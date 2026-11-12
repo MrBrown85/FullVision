@@ -127,11 +127,15 @@ export async function contrast(page) {
    The page's list_student_cards and mark_student_cards_printed can be
    answered from the same stand-in through window.__e2eCardList() and
    window.__e2eCardsPrinted(ids). */
-export const TEACHER_CORS = {
-  'access-control-allow-origin': 'http://localhost:8347',
-  'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info, x-region',
-  'access-control-allow-methods': 'POST, OPTIONS',
-};
+/* The allowed origin follows the page (the request's own origin), so a run on
+   another PORT still passes CORS. */
+export function teacherCors(origin) {
+  return {
+    'access-control-allow-origin': origin || 'http://localhost:' + (process.env.PORT || 8347),
+    'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info, x-region',
+    'access-control-allow-methods': 'POST, OPTIONS',
+  };
+}
 export async function serveTeacherCards(page, fake, opts = {}) {
   const posts = [];
   let n = 0;
@@ -139,7 +143,8 @@ export async function serveTeacherCards(page, fake, opts = {}) {
   await page.exposeFunction('__e2eCardsPrinted', ids => fake.markPrinted(ids));
   await page.route('**/functions/v1/teacher-cards**', async route => {
     const req = route.request();
-    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: TEACHER_CORS });
+    const cors = teacherCors(req.headers()['origin']);
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     n += 1;
     const post = { url: req.url(), headers: req.headers(), body: JSON.parse(req.postData() || 'null') };
     posts.push(post);
@@ -153,7 +158,7 @@ export async function serveTeacherCards(page, fake, opts = {}) {
     if (opts.lose && opts.lose(post, n)) return route.abort();
     return route.fulfill({
       status,
-      headers: { ...TEACHER_CORS, 'content-type': 'application/json', 'cache-control': 'no-store' },
+      headers: { ...cors, 'content-type': 'application/json', 'cache-control': 'no-store' },
       body: JSON.stringify(json),
     });
   });
