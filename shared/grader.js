@@ -529,32 +529,6 @@ window.Grader = (function () {
     return out;
   }
 
-  /* The day a moment fell on in the class's time zone (courseToday's zone,
-     Vancouver unless the class says otherwise), as 'YYYY-MM-DD'. A UTC date
-     would put a return made after 4 pm Pacific on the next day. A bare
-     date is already a day. '' when there is no moment. */
-  function _classDay(cid, when) {
-    var raw = when ? String(when) : '';
-    if (raw.length === 10) return raw;
-    var at = raw ? new Date(raw) : null;
-    if (!at || isNaN(at)) return '';
-    var tz = 'America/Vancouver';
-    var c = typeof COURSES !== 'undefined' && cid ? COURSES[cid] : null;
-    if (c && typeof c.timezone === 'string' && c.timezone) tz = c.timezone;
-    try {
-      var p = {};
-      new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
-        .formatToParts(at)
-        .forEach(function (x) {
-          p[x.type] = x.value;
-        });
-      if (p.year && p.month && p.day) return p.year + '-' + p.month + '-' + p.day;
-    } catch (e) {
-      /* fall through to the UTC date */
-    }
-    return raw.slice(0, 10);
-  }
-
   /* How many grades on the class's pieces were returned in the 7 days to
      `today` (the class's own date when left out): the dashboard's "27
      Returned This Week". A student's grade on a piece counts once. */
@@ -568,7 +542,7 @@ window.Grader = (function () {
       students.forEach(function (st) {
         if (GradeState.stateOf(cid, st.id, a.id) !== GradeState.RETURNED) return;
         var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, st.id, a.id) : null;
-        var on = _classDay(cid, row && row.returned_at);
+        var on = row && row.returned_at ? String(row.returned_at).slice(0, 10) : '';
         if (on && on >= since && on <= day) n++;
       });
     });
