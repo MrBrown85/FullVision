@@ -12,7 +12,7 @@ window.PageStudent = (function () {
   /* ── State variables ────────────────────────────────────── */
   var studentId;
   var activeCourse;
-  var _tab = 'overview'; // the open tab: overview, comps, assess, evidence, breakdown, profile
+  var _tab = 'overview'; // the open tab: overview, comps, grades, work, evidence, profile
   var _ovOpen = ''; // Overview: the assessment open in All Your Work ('' = none)
   var _ovFilter = 'all'; // Overview, All Your Work: all, marked, missing
   var _ovShowAll = false; // Overview: every missing piece, not the first three
