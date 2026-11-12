@@ -1,5 +1,5 @@
 /**
- * Write-path audit, 2026-10-16 (docs/write-path-audit-2026-10.md).
+ * Write-path audit, 2026-10-16.
  *
  * One test per finding. Each test is written the way it should pass once the
  * finding is fixed, and is marked `it.fails` so it passes (the assertion
