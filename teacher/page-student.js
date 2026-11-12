@@ -845,11 +845,19 @@ window.PageStudent = (function () {
 
     // To Get Better: the lowest competency, and the teacher's latest words
     // on work that scored it.
-    var better = null;
+    // Next to Work On: the same pick as the Competencies tab's summary, so
+    // the two never name different competencies, and never one that rests
+    // on too few scores.
+    var cands = [];
     ctx.sections.forEach(function (sec) {
       var v = getSectionProficiency(cid, studentId, sec.id);
-      if (v > 0 && (!better || v < better.v)) better = { sec: sec, v: v };
+      if (!(v > 0)) return;
+      var es = _compEntries(cid, sec);
+      cands.push({ sec: sec, v: v, n: es.length, enough: _cpTrend(cid, es).dir !== 'none' });
     });
+    var picked = _cpPick(cands);
+    var better = picked.lo || picked.hi;
+    if (better) better = { sec: better.sec, v: better.v };
     if (better) {
       var tag = better.sec.tags[0];
       better.name = (tag && tag.label) || better.sec.name;
@@ -1014,11 +1022,8 @@ window.PageStudent = (function () {
 
   function _ovTodoHtml(ov) {
     var n = ov.missing.length;
-    if (!n)
-      return (
-        '<div class="stu-ov-todo"><h3 class="stu-ov-h3">Missing Work</h3>' +
-        '<div class="stu-ov-card stu-ov-none">Nothing missing. Everything assigned is in.</div></div>'
-      );
+    // Nothing missing: the Missing tile above already says so.
+    if (!n) return '';
     var shown = _ovShowAll ? ov.missing : ov.missing.slice(0, 3);
     var html =
       '<div class="stu-ov-todo"><h3 class="stu-ov-h3">' +
@@ -1908,7 +1913,9 @@ window.PageStudent = (function () {
     var html =
       '<div class="stu-gr-course"><div class="stu-gr-course-now"><div class="stu-gr-label">Course Grade</div>' +
       '<div class="stu-gr-course-v">' +
-      _gradePill(summary) +
+      (courseGradeMode(cid) === 'letter'
+        ? _gradePill(summary)
+        : _levelPill(cid, getOverallProficiency(cid, studentId))) +
       '</div></div>';
     if (!cats.length) return html + '</div>';
     var label = [];

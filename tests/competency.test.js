@@ -213,11 +213,12 @@ describe('competency-evidence', () => {
   const sc = (assessmentId, date, score) => ({ assessmentId, date, score, tagId: 't1' });
 
   describe('countLabel', () => {
-    it('names both counts with the right plurals', () => {
+    it('names the counts it has, with the right plurals', () => {
       expect(H.countLabel(3, 2)).toBe('3 scores · 2 observations');
       expect(H.countLabel(1, 1)).toBe('1 score · 1 observation');
-      expect(H.countLabel(2, 0)).toBe('2 scores · 0 observations');
-      expect(H.countLabel(0, 1)).toBe('0 scores · 1 observation');
+      expect(H.countLabel(2, 0)).toBe('2 scores');
+      expect(H.countLabel(0, 3)).toBe('3 observations');
+      expect(H.countLabel(0, 1)).toBe('1 observation');
     });
     it('says "No evidence yet" when there is neither', () => {
       expect(H.countLabel(0, 0)).toBe('No evidence yet');

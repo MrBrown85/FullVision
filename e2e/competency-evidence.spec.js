@@ -30,10 +30,11 @@ test.describe('Competency card evidence drawer', () => {
     const row = card.locator('.dash-tag-row');
     await expect(row).toHaveAttribute('aria-expanded', 'false');
     const countText = (await row.locator('.dash-tag-evidence').textContent()).trim();
-    const m = countText.match(/^(\d+) scores? · (\d+) observations?$/);
+    // "2 scores", or "2 scores · 1 observation" once there are observations.
+    const m = countText.match(/^(\d+) scores?(?: · (\d+) observations?)?$/);
     expect(m, countText).not.toBeNull();
     const scores = Number(m[1]);
-    const linked = Number(m[2]);
+    const linked = Number(m[2] || 0);
     expect(scores).toBeGreaterThan(0);
     const tagId = await row.getAttribute('data-tagid');
     const levelBadge = await row.locator('.stu-level').textContent();
