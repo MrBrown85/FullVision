@@ -260,8 +260,21 @@ const DOORS = {
   'teacher/report-blocks.js': { surface: 'progress', names: BLOCKS },
   'teacher/grade-report.js': {
     surface: 'progress',
-    names: ['rows', 'categorySummary', 'feedbackItems', 'extraCards', 'layoutStudent'],
+    names: [
+      'rows',
+      'categorySummary',
+      'feedbackItems',
+      'extraCards',
+      'layoutStudent',
+      'listPart',
+      '_summaryHtml',
+      '_termHtml',
+      '_feedbackPages',
+    ],
   },
+  // One Report draws its parts with the blocks' and the Quick Report's own
+  // code; these are the functions the Reports page calls it through.
+  'teacher/report-one.js': { surface: 'progress', names: ['partHtml', 'rowsOf', 'layoutStudent'] },
   'teacher/report-feedback.js': { surface: 'progress', names: ['forStudent'] },
   'teacher/page-reports.js': {
     surface: 'progress',

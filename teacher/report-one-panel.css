@@ -1,0 +1,552 @@
+/* One Report's panel (report-one-panel.js): switch cards in the 272px
+   palette, after the One Report section of
+   docs/plans/quick-report-options-mockup.html. */
+
+.one-panel {
+  position: relative;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ── Setup ── */
+.one-setup {
+  position: relative;
+}
+.one-setup-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.one-setup-btn:hover {
+  border-color: var(--border-2);
+}
+.one-setup-k {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.one-setup-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.one-setup-chev {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.one-setup-menu {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg, 0 12px 30px rgba(0, 0, 0, 0.16));
+}
+.one-setup-menu[hidden] {
+  display: none;
+}
+.one-setup-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.one-setup-item span {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.one-setup-item:hover,
+.one-setup-item[aria-checked='true'] {
+  background: var(--active-light);
+}
+
+/* ── Changes Apply To ── */
+.one-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.one-scope-lbl {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.one-panel .one-scope {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.one-panel .one-scope .seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.one-scope-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.one-dot {
+  color: var(--active);
+}
+.one-link {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--link);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.one-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Section headings and folds ── */
+.one-sec-h {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  margin: 16px 0 4px;
+  padding: 2px 0;
+  font: 600 13px var(--font-base);
+  color: var(--text-2);
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.one-sec-h:hover {
+  color: var(--text);
+}
+.one-aside {
+  margin-left: auto;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.one-sec-chev {
+  display: inline-block;
+  width: 10px;
+  color: var(--text-3);
+  transition: transform 150ms ease;
+}
+.one-sec-h[aria-expanded='true'] .one-sec-chev {
+  transform: rotate(90deg);
+}
+.one-fold,
+.one-opts {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.one-fold.open,
+.one-opts.open {
+  grid-template-rows: 1fr;
+}
+/* Shut, its controls are out of reach of Tab; it stays visible while it
+   slides shut. Once open and settled its contents may show past its edge. */
+.one-fold-in,
+.one-opts-in {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s linear 200ms;
+}
+.one-fold.open > .one-fold-in,
+.one-opts.open > .one-opts-in {
+  visibility: visible;
+  transition: none;
+}
+.one-fold.settled > .one-fold-in,
+.one-opts.settled > .one-opts-in {
+  overflow: visible;
+}
+.one-group {
+  margin: 8px 2px 3px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.one-empty {
+  padding: 6px 2px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ── Switch cards ── */
+.one-card {
+  position: relative;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.one-item {
+  position: relative;
+  border-radius: 10px;
+}
+.one-item + .one-item::before {
+  content: '';
+  position: absolute;
+  left: 38px;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: var(--divider-medium);
+}
+.one-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 10px;
+}
+.one-item:hover > .one-row {
+  background: var(--overlay-hover, rgba(0, 0, 0, 0.025));
+}
+.one-grip {
+  width: 8px;
+  margin-left: -6px;
+  margin-right: -4px;
+  font-size: 9px;
+  letter-spacing: -2px;
+  color: var(--border-2);
+  user-select: none;
+}
+.one-item.can-drag:hover .one-grip {
+  color: var(--text-3);
+}
+.one-tint {
+  display: grid;
+  place-items: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.one-row.on .one-tint {
+  color: #fff;
+  background: var(--active);
+}
+.one-row.pinned .one-tint {
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+.one-gi {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.one-item.can-drag .one-tint {
+  cursor: grab;
+  touch-action: none;
+}
+.one-item.can-drag .one-tint:hover {
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.25);
+}
+.one-tint:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.one-item.dragging {
+  z-index: 2;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+.one-item.dragging::before,
+.one-item.dragging + .one-item::before {
+  visibility: hidden;
+}
+.one-panel.is-dragging,
+.one-panel.is-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.one-mine {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--active);
+}
+.one-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.one-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0;
+  font: inherit;
+  line-height: 1.25;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.one-row:not(.on) .one-name {
+  color: var(--text-2);
+}
+.one-label {
+  min-width: 0;
+}
+.one-chev {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--text-3);
+  transition: transform 150ms ease;
+}
+.one-item.is-open .one-chev {
+  transform: rotate(90deg);
+}
+.one-name:focus-visible,
+.one-sec-h:focus-visible,
+.one-setup-btn:focus-visible,
+.one-link:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.one-setup-item:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.one-sub {
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-3);
+}
+.one-sub.warn {
+  color: var(--notice-text, #b45309);
+}
+
+/* The switch: iOS-style, small. */
+.one-sw {
+  display: flex;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 18px;
+  padding: 2px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--border-2);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.one-sw i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease;
+}
+.one-sw[aria-checked='true'] {
+  background: var(--active);
+}
+.one-sw[aria-checked='true'] i {
+  transform: translateX(12px);
+}
+.one-sw:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* ── Options under a part ── */
+.one-opts-in {
+  padding: 0 10px 0 38px;
+}
+.one-opts.open > .one-opts-in {
+  padding-bottom: 8px;
+}
+.one-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 4px 0;
+}
+.one-chip {
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.one-chip[aria-pressed='true'] {
+  color: var(--link);
+  background: var(--active-light);
+  border-color: rgba(0, 122, 255, 0.35);
+}
+.one-chip:focus-visible,
+.one-o-action:focus-visible,
+.one-step-btn:focus-visible,
+.one-o-text:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.one-o-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  margin: 6px 0 4px;
+}
+.one-o-lbl {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.one-panel .one-o-seg {
+  display: flex;
+  width: 100%;
+}
+.one-panel .one-o-seg .seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 3px;
+  font-size: 11px;
+}
+.one-o-text {
+  width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.one-o-lines {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.one-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--seg-track);
+  border-radius: 6px;
+}
+.one-step-btn {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  font: 600 13px/1 var(--font-base);
+  color: var(--text);
+  background: var(--seg-thumb);
+  border: 0;
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.one-step-btn[aria-disabled='true'] {
+  color: var(--text-3);
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+.one-step-n {
+  min-width: 22px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.one-o-action {
+  display: block;
+  width: 100%;
+  margin: 6px 0 2px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--link);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.one-o-action:hover {
+  border-color: rgba(0, 122, 255, 0.4);
+}
+
+/* ── The page: a part pointed to in the panel ── */
+.studio-one .sheet-cell.one-hl,
+.studio-one .fb-sheet .sheet-body.one-hl {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 2px;
+  background-color: rgba(0, 122, 255, 0.05);
+}
+
+/* ── The line over the pages ── */
+.one-fit-over {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .one-fold,
+  .one-opts,
+  .one-sec-chev,
+  .one-chev,
+  .one-tint,
+  .one-sw,
+  .one-sw i {
+    transition: none;
+  }
+  .one-fold-in,
+  .one-opts-in {
+    transition: none;
+  }
+}

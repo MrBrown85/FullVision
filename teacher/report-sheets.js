@@ -1443,7 +1443,9 @@ window.ReportSheets = (function () {
           // taller than a side (it fit the Front but for the Studio's boxes),
           // or moved once and still too long for the room there (above a
           // docked block), starts here and goes on.
-          if (r.moved || r.h > full) {
+          // (One Report, opts.fill: a table always starts where it is and
+          // goes on, so no side ends with room a row would have filled.)
+          if (opts.fill || r.moved || r.h > full) {
             tables.push(r.live[0]);
             r = null;
           } else if (!last) {
@@ -2239,5 +2241,14 @@ window.ReportSheets = (function () {
     renderPreview: renderPreview,
     clearPageStyle: clearPageStyle,
     setPageStyle: _setPageStyle,
+    // One Report (report-one.js) lays its own cells out with these.
+    one: {
+      ROW_W: ROW_W,
+      PAPER: PAPER,
+      cellHtml: _cellHtml,
+      emptyCommentBox: _emptyCommentBox,
+      measureGradeRows: _measureGradeRows,
+      gradesPartHtml: _gradesPartHtml,
+    },
   };
 })();
