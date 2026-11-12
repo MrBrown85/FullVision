@@ -2850,15 +2850,11 @@ textarea.studio-text {
 /* The date column is in em, wide enough for the widest date ("May 30")
    on one line in a wide font such as DejaVu Sans, Linux's default, with
    room to spare: at 40px a date wrapped to two lines there and made its
-   row taller than the rest (Nov 12). The mark column keeps its usual
-   width and grows to --grades-mark, the widest mark the class can print
-   measured in the sheet's fonts (report-blocks.js _gradesMarkPx): at 90px
-   a Both class's "Proficient − · 67%" ran into the next column (Nov 12).
-   The title gives up the room. A Letter class's word column is as it was;
-   a Proficiency or Both class has none (report-grades-noword). */
+   row taller than the rest (Nov 12). A Proficiency or Both class has no
+   word column (report-grades-noword): its title has the room. */
 .report-grades-row {
   display: grid;
-  grid-template-columns: 4.2em minmax(0, 1fr) max(90px, var(--grades-mark, 0px)) 62px;
+  grid-template-columns: 4.2em minmax(0, 1fr) 90px 62px;
   column-gap: 6px;
   align-items: center;
   min-height: 20px;
@@ -2869,13 +2865,13 @@ textarea.studio-text {
   line-height: 1.25;
 }
 .report-grades-noword .report-grades-row {
-  grid-template-columns: 4.2em minmax(0, 1fr) max(90px, var(--grades-mark, 0px));
+  grid-template-columns: 4.2em minmax(0, 1fr) 90px;
 }
 .report-grades-col:only-child .report-grades-row {
-  grid-template-columns: 4.4em minmax(0, 1fr) max(104px, var(--grades-mark, 0px)) 70px;
+  grid-template-columns: 4.4em minmax(0, 1fr) 104px 70px;
 }
 .report-grades-noword .report-grades-col:only-child .report-grades-row {
-  grid-template-columns: 4.4em minmax(0, 1fr) max(104px, var(--grades-mark, 0px));
+  grid-template-columns: 4.4em minmax(0, 1fr) 104px;
 }
 .report-grades-headgrade {
   white-space: nowrap;
@@ -2902,6 +2898,28 @@ textarea.studio-text {
 .report-grades-word {
   color: #48484a;
   white-space: nowrap;
+}
+/* A Proficiency or Both class's mark wider than its column ("Proficient −
+   · 67%"; report-blocks.js renderBlockGradeTable) reaches left past it, on
+   the title's last line: the mark ends at the column's right edge and sits
+   on the last line, and the title ends in a spacer as wide as the mark
+   needs past the column (--grades-mark less the column; the column gap is
+   left clear). The spacer floats right on the title's last line when that
+   line has room and drops to a line of its own when it has not, so the
+   mark never covers the title and a title wraps where it did. At a fixed
+   90px a Both class's marks ran into the next column (Nov 12). */
+.report-grades-wide .report-grades-figs {
+  justify-self: end;
+  align-self: end;
+  width: max-content;
+}
+.report-grades-room {
+  float: right;
+  height: 1.25em;
+  width: max(0px, calc(var(--grades-mark) - 96px));
+}
+.report-grades-col:only-child .report-grades-room {
+  width: max(0px, calc(var(--grades-mark) - 110px));
 }
 .report-grades-legend {
   margin-top: 6px;

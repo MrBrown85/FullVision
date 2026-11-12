@@ -1881,41 +1881,21 @@ window.ReportBlocks = (function () {
     };
   }
 
-  /* The widest marks a class can print, through _rowMarks as a row's are
-     (each row's figs then picks Score and Percent as the form says): a
-     level at each step with its + and −, points out of 100, Complete,
-     Incomplete, Missing and Excused. A % is a whole number, so 100% is the
-     widest. */
-  function _gradesMarkCanon(cid) {
-    const a = { maxPoints: 100 };
-    const out = [
-      { kind: 'points', value: 100, level: 4 },
-      { kind: 'complete', mark: 'complete' },
-      { kind: 'complete', mark: 'incomplete' },
-      { kind: 'status', status: 'NS' },
-      { kind: 'status', status: 'EXC' },
-    ].map(cv => _rowMarks(cid, a, cv));
-    for (let l = 1; l <= 4; l++) {
-      [-1, 0, 1].forEach(mod => {
-        out.push(_rowMarks(cid, a, { kind: 'level', value: l + mod * SCORE_MOD_STEP, percentText: '100%' }));
-      });
-    }
-    return out;
-  }
-
-  /* The width in px the mark column needs for texts: each measured in the
-     sheet's type, in the font the page shows it in and in the one it
-     prints in (reports.css .gr-print-font), the wider kept, with 4% and
-     2px of headroom, as the Quick Report sizes its columns (grade-report.js
-     _fitPx). 0 where nothing can be measured (no layout): the column keeps
+  /* The width in px the mark column needs for texts (this student's
+     marks): each measured in the sheet's type, at the size it prints at
+     (11px: the sheet sets --text-xs itself, reports.css .report-sheet, and
+     the stage is a .report-sheet), in the font the page shows it in and in
+     the one it prints in (reports.css .gr-print-font), the wider kept, with
+     4% and 2px of headroom, as the Quick Report sizes its columns
+     (grade-report.js _fitPx). 0 where nothing can be measured (no layout): the column keeps
      its usual width. A fixed 90px cut off a Both class's "Proficient − ·
      67%" (Nov 12). */
   const MARK_ROOM = 1.04;
   const _markMemo = {};
-  function _gradesMarkPx(texts) {
-    if (typeof document === 'undefined' || !document.body || typeof getComputedStyle !== 'function') return 0;
+  function _gradesMarkNeeds(texts) {
+    if (typeof document === 'undefined' || !document.body || typeof getComputedStyle !== 'function') return {};
     const names = texts.filter((t, i, all) => t && all.indexOf(t) === i);
-    if (!names.length) return 0;
+    if (!names.length) return {};
     // A stage on <body> for this call only, as ReportSheets measures.
     const stage = document.createElement('div');
     stage.className = 'report-sheet report-sheet-measure';
@@ -1954,9 +1934,9 @@ window.ReportBlocks = (function () {
     } finally {
       stage.remove();
     }
-    let w = 0;
-    names.forEach(n => (w = Math.max(w, memo[n] || 0)));
-    return w > 0 ? Math.ceil(w * MARK_ROOM) + 2 : 0;
+    const need = {};
+    names.forEach(n => (need[n] = memo[n] > 0 ? Math.ceil(memo[n] * MARK_ROOM) + 2 : 0));
+    return need;
   }
 
   /* The Assignment Grades groups ({ name, grade?, rows: [row html] }) laid
@@ -2033,11 +2013,13 @@ window.ReportBlocks = (function () {
     const figs = m => [showScore && m.score, showPct && m.percent].filter(Boolean).join(' · ') || m.score;
     const when = d => (d ? parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '—');
     // Every mark printed, for sizing the mark column (_gradesMarkPx).
+    // Each row's mark, for the room a wide one needs (below); the row and
+    // its title carry the mark's number until then.
     const printed = [];
     const rowHtml = (x, marks) => {
       const mark = figs(marks);
-      printed.push(mark);
-      return `<div class="report-grades-row"><span class="report-grades-date">${esc(when(x.d))}</span><span class="report-grades-title">${esc(x.a.title || '')}</span><span class="report-grades-figs">${esc(mark)}</span>${showWord ? `<span class="report-grades-word">${esc(marks.word)}</span>` : ''}</div>`;
+      const slot = '\u0000' + printed.push(mark) + '\u0000';
+      return `<div class="report-grades-row"${slot}><span class="report-grades-date">${esc(when(x.d))}</span><span class="report-grades-title">${esc(x.a.title || '')}${slot}</span><span class="report-grades-figs">${esc(mark)}</span>${showWord ? `<span class="report-grades-word">${esc(marks.word)}</span>` : ''}</div>`;
     };
 
     // The groups: a heading and its rows, in the order they print.
@@ -2139,14 +2121,27 @@ window.ReportBlocks = (function () {
     ]
       .filter(Boolean)
       .join(' ');
-    // The mark column is at least its usual width (reports.css), and wider
-    // when the widest mark this class can print, or this student's own,
-    // needs more in the sheet's fonts.
-    const markPx = _gradesMarkPx(_gradesMarkCanon(cid).map(figs).concat(printed));
-    const markStyle = markPx > 0 ? ` style="--grades-mark:${markPx}px"` : '';
-    return `<div class="report-block-box report-grades${half ? ' report-grades-half' : ''}${showWord ? '' : ' report-grades-noword'}"${markStyle}>
+    // A mark wider than its column, in a Proficiency or Both class ("Proficient
+    // − · 67%"), reaches left past it onto the title's last line: the row
+    // carries the width it needs (--grades-mark, measured in the sheet's
+    // fonts) and the title ends in a spacer that wide less the column
+    // (reports.css), which drops to a line of its own only when the last
+    // line has no room. The columns keep their widths, so a title wraps
+    // where it did. A Letter class is as it was: none of its marks was ever
+    // cut off, and nothing is measured.
+    const needs = byName ? _gradesMarkNeeds(printed) : {};
+    const html = body.replace(
+      /<div class="report-grades-row"\u0000(\d+)\u0000([\s\S]*?)\u0000\1\u0000/g,
+      (m, i, mid) => {
+        const need = needs[printed[i - 1]] || 0;
+        // 90px, the narrowest the column is, holds it: nothing added.
+        if (need <= 90) return '<div class="report-grades-row"' + mid;
+        return `<div class="report-grades-row report-grades-wide" style="--grades-mark:${need}px"${mid}<span class="report-grades-room" aria-hidden="true"></span>`;
+      },
+    );
+    return `<div class="report-block-box report-grades${half ? ' report-grades-half' : ''}${showWord ? '' : ' report-grades-noword'}">
     <div class="report-prof-head"><div class="report-block-title">Assignment Grades</div>${courseHtml}<div class="report-prof-meta">${esc(meta)}</div></div>
-    ${body}
+    ${html}
     <div class="report-grades-legend">${legend}</div>
   </div>`;
   }

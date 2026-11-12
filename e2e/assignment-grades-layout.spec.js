@@ -72,6 +72,7 @@ for (const wide of [false, true]) {
       host.style.cssText = 'position:absolute;left:0;top:0;width:1200px;';
       document.body.appendChild(host);
       const out = {
+        wide: {},
         students: students.map(s => displayNameWithLast(s)),
         cut: [],
         words: {},
@@ -85,6 +86,7 @@ for (const wide of [false, true]) {
           COURSES[cid].gradingSystem = mode;
           out.words[mode] = 0;
           out.marks[mode] = [];
+          out.wide[mode] = 0;
           for (const columns of ['one', 'two'])
             for (const half of [false, true]) {
               const preview = document.createElement('div');
@@ -114,6 +116,20 @@ for (const wide of [false, true]) {
                   r.left < figs.getBoundingClientRect().left - 0.5
                 )
                   out.cut.push([mode, columns, half ? 'half' : 'row', figs.textContent].join(' | '));
+                // A wide mark sits on the title's last line: never over the
+                // title's words (each line of the title, where it shares the
+                // mark's height, ends left of the mark).
+                // The title's words only (its spacer is not a word).
+                const words = row.querySelector('.report-grades-title').firstChild;
+                const title = document.createRange();
+                if (words && words.nodeType === 3) title.selectNodeContents(words);
+                [...(words && words.nodeType === 3 ? title.getClientRects() : [])].forEach(line => {
+                  if (line.width > 0 && line.bottom > r.top + 1 && line.top < r.bottom - 1 && line.right > r.left - 1)
+                    out.cut.push(
+                      [mode, columns, half ? 'half' : 'row', figs.textContent, 'over the title'].join(' | '),
+                    );
+                });
+                if (row.classList.contains('report-grades-wide')) out.wide[mode]++;
                 if (out.marks[mode].indexOf(figs.textContent) < 0) out.marks[mode].push(figs.textContent);
               });
               out.words[mode] += preview.querySelectorAll('.report-grades-word').length;
@@ -136,6 +152,10 @@ for (const wide of [false, true]) {
     expect(found.layouts).toBe(12);
     expect(found.cut).toEqual([]);
     expect(found.past).toBe(0);
+    // Both's wide marks reached past their column onto the title's line; a
+    // Letter class's never do (it is as main drew it).
+    expect(found.wide.both).toBeGreaterThan(0);
+    expect(found.wide.letter).toBe(0);
     // The word column: none in a Proficiency or Both class, Word on; there in a Letter class.
     expect(found.words.proficiency).toBe(0);
     expect(found.words.both).toBe(0);

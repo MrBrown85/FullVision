@@ -1,0 +1,85 @@
+{
+  "note": "Stored by main (9953ecc3) after Page Studio clicks: Custom, then Assignment Grades Proficiency Word ticked (on) and unticked (off). Written by a one-off capture on main; see e2e/assignment-grades-saved-forms.spec.js.",
+  "on": {
+    "progressMode": "build",
+    "form": {
+      "v": 6,
+      "id": "grades",
+      "name": "Grades",
+      "type": "standard",
+      "sides": [
+        {
+          "rows": [
+            {
+              "cells": [
+                {
+                  "block": "header",
+                  "size": "row"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "block": "grade-table",
+                  "size": "row",
+                  "options": {
+                    "columns": "one",
+                    "word": true
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "rows": []
+        }
+      ],
+      "pinned": null,
+      "perStudent": {}
+    },
+    "preset": "standard"
+  },
+  "off": {
+    "progressMode": "build",
+    "form": {
+      "v": 6,
+      "id": "grades",
+      "name": "Grades",
+      "type": "standard",
+      "sides": [
+        {
+          "rows": [
+            {
+              "cells": [
+                {
+                  "block": "header",
+                  "size": "row"
+                }
+              ]
+            },
+            {
+              "cells": [
+                {
+                  "block": "grade-table",
+                  "size": "row",
+                  "options": {
+                    "columns": "one",
+                    "word": false
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "rows": []
+        }
+      ],
+      "pinned": null,
+      "perStudent": {}
+    },
+    "preset": "standard"
+  }
+}
