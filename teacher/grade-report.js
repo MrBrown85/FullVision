@@ -198,7 +198,8 @@ window.GradeReport = (function () {
     });
     var shown = {};
     rows(cid, student, opts).forEach(function (r) {
-      shown[r.id] = true;
+      // One Report: an assessment left off the list is not counted (opts.omit).
+      if (!(opts && opts.omit && opts.omit[r.id])) shown[r.id] = true;
     });
     return (getCategories(cid) || [])
       .map(function (c) {

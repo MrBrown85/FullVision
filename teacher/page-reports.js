@@ -1512,8 +1512,13 @@ window.PageReports = (function () {
     }
     return _oneOn && !!reportConfig;
   }
+  var _oneCache = { rc: null, one: null, model: null };
   function _oneModel() {
-    return ReportOne.modelFor(reportConfig);
+    // Worked out again only when the class's settings or its saved model change.
+    if (_oneCache.rc !== reportConfig || _oneCache.one !== reportConfig.one) {
+      _oneCache = { rc: reportConfig, one: reportConfig.one, model: ReportOne.modelFor(reportConfig) };
+    }
+    return _oneCache.model;
   }
   /* The Setup the class's report matches, by name; Your Setup once the
      teacher has changed its parts. */
@@ -1783,6 +1788,8 @@ window.PageReports = (function () {
   }
 
   function _loadReportConfig(cid) {
+    // Changes Apply To a student ends with the class it was set in.
+    _oneForStudent = false;
     var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
     // Progress Reports opens on the Grade Report, or on Build Your Own for a
     // class that built a report before there was a choice.
@@ -2833,6 +2840,8 @@ window.PageReports = (function () {
      the teacher has left Reports draws nothing (as page-gradebook.js). */
   var _mounted = false;
   function init(params) {
+    // The One Report switch is read again each time Reports opens.
+    _oneOn = null;
     _mounted = true;
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);

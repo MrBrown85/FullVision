@@ -136,7 +136,6 @@ window.ReportOneComment = (function () {
      sentences the teacher wrote), so Generate keeps what was typed here. */
   function _write(cid, sid, termId, text) {
     var RQ = window.ReportQuestionnaire;
-    if (RQ && typeof RQ.saveNarrativeFor === 'function') return RQ.saveNarrativeFor(cid, sid, termId, text);
     var r = _rating(cid, sid, termId) || {};
     var data = { narrative: text };
     var meta = r.draftMeta ? Object.assign({}, r.draftMeta) : { v: 1, sentences: [] };
@@ -574,9 +573,19 @@ window.ReportOneComment = (function () {
 
   /* ── The interface page-reports.js calls ──────────────── */
 
+  var _unloadBound = false;
   function mount(previewEl, apiFn) {
     _apiFn = apiFn;
     _preview = previewEl;
+    if (!_unloadBound && typeof window !== 'undefined' && window.addEventListener) {
+      // Closing or reloading the tab with a comment change not yet saved asks first.
+      _unloadBound = true;
+      window.addEventListener('beforeunload', function (e) {
+        if (!Object.keys(_drafts).length) return;
+        e.preventDefault();
+        e.returnValue = '';
+      });
+    }
     if (!previewEl || previewEl._oneComment) return;
     previewEl._oneComment = true;
     previewEl.addEventListener('click', function (e) {

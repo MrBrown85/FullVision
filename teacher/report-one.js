@@ -621,14 +621,14 @@ window.ReportOne = (function () {
 
   /* The options a block gets: the class's, the registry's fixed ones, its
      lines and its wording. */
-  function _cellOf(m, key) {
+  function _cellOf(m, key, size) {
     var d = _def(key);
     var o = Object.assign({}, m.options[key] || {}, d.fixed || {});
     var noEvidence = o.noEvidence;
     delete o.noEvidence;
     if (key === 'proficiency' && isOn(m, 'course-grade')) o.overall = false;
     if (d.wording && m.wording[key]) o.wording = m.wording[key];
-    var cell = { block: key, size: 'row', options: o };
+    var cell = { block: key, size: size === 'half' ? 'half' : 'row', options: o };
     if (noEvidence) cell.noEvidence = noEvidence;
     if (m.lines[key] != null) cell.lines = m.lines[key];
     return cell;
@@ -637,7 +637,7 @@ window.ReportOne = (function () {
   /* One part's HTML for one student, '' when it prints nothing. Rows the
      teacher left off are taken out, each row that can be is named
      (data-row), and the heading is the class's. */
-  function partHtml(m, key, cid, student, ctx, stage) {
+  function partHtml(m, key, cid, student, ctx, stage, size) {
     var d = _def(key);
     if (!d) return '';
     var sid = student.id;
@@ -659,7 +659,7 @@ window.ReportOne = (function () {
     } else if (key === 'course-grade') {
       html = '<div class="one-part one-grade">' + G().termHtml(cid, student, ctx) + '</div>';
     } else {
-      html = S().one.cellHtml(_cellOf(m, key), cid, student, ctx) || '';
+      html = S().one.cellHtml(_cellOf(m, key, size), cid, student, ctx) || '';
     }
     if (!html) return '';
     var title = m.titles[key] || d.title || '';
@@ -697,8 +697,18 @@ window.ReportOne = (function () {
       var next = g.nextElementSibling;
       if (!next || next.classList.contains('report-ct-group')) g.remove();
     });
+    var kept = Array.prototype.map
+      .call(root.querySelectorAll('[data-row]'), function (row) {
+        return row.getAttribute('data-row');
+      })
+      .sort(function (x, y) {
+        return y.length - x.length;
+      });
     Array.prototype.forEach.call(root.querySelectorAll('.report-prof-fact'), function (line) {
       var text = _text(line);
+      kept.forEach(function (name) {
+        if (name) text = text.split(name).join(' ');
+      });
       if (
         gone.some(function (name) {
           return text.indexOf(name) >= 0;
@@ -821,9 +831,24 @@ window.ReportOne = (function () {
     var tpl = document.createElement('div');
     // html-safe: html is this part's own render (partHtml), parsed in a detached div
     tpl.innerHTML = html;
-    Array.prototype.forEach.call(tpl.querySelectorAll(SPLIT_SEL[split] || 'table > tbody > tr'), function (r, i) {
+    var all = tpl.querySelectorAll(SPLIT_SEL[split] || 'table > tbody > tr');
+    var total = all.length;
+    var holder = total ? all[0].closest('table, .gr-table') : null;
+    Array.prototype.forEach.call(all, function (r, i) {
       if (i < part.start || i >= part.end) r.remove();
     });
+    var title = _titleEl(tpl);
+    for (var node = holder; node && node.parentNode && node.parentNode !== tpl; node = node.parentNode) {
+      if (part.end < total) while (node.nextSibling) node.nextSibling.remove();
+      if (part.start > 0) {
+        var before = node.previousSibling;
+        while (before) {
+          var prev = before.previousSibling;
+          if (!(title && (before === title || (before.contains && before.contains(title))))) before.remove();
+          before = prev;
+        }
+      }
+    }
     if (part.start > 0) {
       var t = _titleEl(tpl);
       if (t) t.textContent = t.textContent.replace(/\s*\(continued\)$/, '') + ' (continued)';
@@ -908,7 +933,17 @@ window.ReportOne = (function () {
       var a = body[i];
       var b = body[i + 1];
       if (b && (_def(a.key) || {}).half && (_def(b.key) || {}).half) {
+        // Drawn again at the width they print at: a block lays itself out
+        // differently side by side.
+        var ha = partHtml(m, a.key, cid, student, ctx, stage, 'half');
+        var hb = partHtml(m, b.key, cid, student, ctx, stage, 'half');
+        if (!ha || !hb) {
+          rows.push([a]);
+          continue;
+        }
         a.size = b.size = 'half';
+        htmlOf[a.key] = a.html = ha;
+        htmlOf[b.key] = b.html = hb;
         rows.push([a, b]);
         i++;
       } else rows.push([a]);

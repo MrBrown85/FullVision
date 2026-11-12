@@ -148,7 +148,7 @@ window.ReportOnePage = (function () {
         cell
           .appendChild(_btn('one-hide', 'Hide', 'oneHide', { part: key }))
           .setAttribute('aria-label', 'Hide ' + label);
-        var h = cell.querySelector('.report-block-title');
+        var h = key === 'progress' ? null : cell.querySelector('.report-block-title');
         if (h) {
           h.setAttribute('data-one-title', key);
           h.setAttribute('tabindex', '0');
@@ -372,14 +372,20 @@ window.ReportOnePage = (function () {
     h.removeAttribute('role');
     h.removeAttribute('aria-label');
     h.classList.remove('one-editing');
-    var text = (h.textContent || '').replace(/\s+/g, ' ').trim();
+    var bare = function (t) {
+      return String(t || '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s*\(continued\)$/, '')
+        .trim();
+    };
+    var text = bare(h.textContent);
     var api = _api && _api();
     var refocus = function (preview) {
       var c = _cellsOf(preview, r.key)[0];
       var again = c && c.querySelector('[data-one-title]');
       _focus(again);
     };
-    if (!api || !save || text === r.old.trim()) {
+    if (!api || !save || text === bare(r.old)) {
       h.textContent = r.old;
       var preview = h.closest('#rb-preview') || document.getElementById('rb-preview');
       if (api && preview) {

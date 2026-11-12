@@ -162,19 +162,6 @@ describe('Save', () => {
     ]);
   });
 
-  it('uses the questionnaire’s own save when it offers one', () => {
-    const api = makeApi(PRI);
-    const own = vi.fn();
-    ReportQuestionnaire.saveNarrativeFor = own;
-    try {
-      T().setDraft(CID, TERM, PRI.id, 'A new comment.');
-      T().save(api, PRI.id);
-      expect(own).toHaveBeenCalledWith(CID, PRI.id, TERM, 'A new comment.');
-    } finally {
-      delete ReportQuestionnaire.saveNarrativeFor;
-    }
-  });
-
   it('never changes a grade: it writes only the comment and its record', () => {
     const api = makeApi(PRI);
     const spy = vi.spyOn(globalThis, 'upsertTermRating');
