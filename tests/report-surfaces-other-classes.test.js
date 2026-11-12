@@ -35,6 +35,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const FILE = resolve(HERE, 'fixtures/report-surfaces-other-classes.json');
 const UPDATE = process.env.UPDATE_REPORT_SURFACES_OTHER === '1';
 
+const DRAWN = ['st1', 'st2', 'st3', 'st4', 'st5', 'st6'];
+
 const fingerprint = s => createHash('sha256').update(s).digest('hex').slice(0, 20) + ' ' + s.length;
 
 /* The same few grading moves in every class, through the one grader. */
@@ -71,7 +73,9 @@ function drawClass(config) {
   clearProfCache();
   freshGenerate();
   const out = {};
-  const drawn = surfaces(cid);
+  // The students the grading moves touch, and two more: a draft rule leaking
+  // into such a class shows on them. All 27 drew the same thing five times slower.
+  const drawn = surfaces(cid, null, { students: DRAWN });
   Object.keys(drawn).forEach(key => (out[key] = fingerprint(drawn[key])));
   return out;
 }
