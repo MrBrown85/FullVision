@@ -1031,10 +1031,12 @@ describe('cm-student-page-my-learning', () => {
    * (S13-F1, docs/plans/student-page-build-plan.md; board "Teacher: Class
    * Settings, Student Page").
    *
-   * - Demo Mode first, as Send Work: the row is drawn in Demo Mode only and
-   *   kept in the class's settings (courseConfig.show_my_learning, what the
-   *   screens read). A signed-in teacher's class does not have it (Batch C is
-   *   not applied) and nothing is asked of the server.
+   * - In Demo Mode the row is kept in the class's settings
+   *   (courseConfig.show_my_learning, what the screens read), through
+   *   setCourseFeedbackOptions. A signed-in class has it where Reflect on
+   *   Feedback is (tests/cm-student-page-show-my-learning.test.js); one the
+   *   server keeps no student-page rows for does not, and nothing is asked
+   *   of the server.
    * - Off until turned on. Off, the My Learning tab in Preview as Student
    *   shows nothing of a grade; on, it shows My Learning.
    * - See What They'd See opens Preview as Student on My Learning for the
@@ -1169,7 +1171,7 @@ describe('cm-student-page-my-learning', () => {
   });
 
   describe('Show My Learning', () => {
-    it('is off at first, in the board’s words, with the line about students’ own devices', () => {
+    it('is off at first, in the board’s words', () => {
       openSettings();
       const r = row();
       expect(r).toBeTruthy();
@@ -1189,9 +1191,8 @@ describe('cm-student-page-my-learning', () => {
       expect(text(r.querySelector('#sp-learning-would'))).toBe(
         "Students would see their level on each skill and their grade in this class’s grading style (Both), only from work you've returned.",
       );
-      expect(text(r.querySelector('#sp-learning-device'))).toBe(
-        "Students' own phones and Chromebooks can't show My Learning yet, even with this on. For now only Preview as Student shows it.",
-      );
+      // Students' own devices show it (S13-W2): no line says they can't.
+      expect(r.querySelector('#sp-learning-device')).toBeNull();
       expect(text(r.querySelector('#sp-learning-see'))).toBe("See What They'd See");
       const sw = r.querySelector('#sp-learning-switch');
       expect(sw.getAttribute('role')).toBe('switch');
@@ -1289,7 +1290,7 @@ describe('cm-student-page-my-learning', () => {
       }
     });
 
-    it('with the student page on, has no Show My Learning row and nothing is sent (Batch C is not applied)', () => {
+    it('with the student page on but a class the server keeps no student-page rows for, has no Show My Learning row and nothing is sent', () => {
       window.isDemoMode = () => false;
       const session = signIn();
       serverSaysStudentPageOn(CID);

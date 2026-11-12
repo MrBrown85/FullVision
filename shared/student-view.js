@@ -1227,10 +1227,15 @@ window.StudentView = (function () {
   /* ── My Learning (S13-T1) ──────────────────────────────────── */
 
   /* Show My Learning, the class's switch (Class Settings › Student Page,
-     S13-F1): on only when the class's settings say so. Missing is off. */
+     S13-F1): on only when the class's settings say so. Missing is off.
+     In the teacher's apps a signed-in class's switch is the server's, read
+     through getCourseFeedbackOptions (shared/data.js), so Preview as
+     Student follows it too. The student's page has no such reader: its
+     settings say it (s/student-data.js). */
   function learningOn(cid) {
     var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
-    return cfg.show_my_learning === true;
+    if (cfg.show_my_learning === true) return true;
+    return typeof getCourseFeedbackOptions === 'function' && getCourseFeedbackOptions(cid).show_my_learning === true;
   }
 
   // A whole level, 1 to 4, for a level's colour and its step on the ladder; 0 with none (calc.js's).

@@ -365,13 +365,11 @@ describe('every caller of saveCourseConfig and update_course', () => {
     // two is sent or changed whatever that copy says, so add it and move on.
     expect(found).toEqual({
       // its definition; the class move's replay; the report-terms save; Demo Mode's switch and the two settings' own writer;
-      // Reflect on Feedback's switch (S10, setCourseFeedbackOptions, Demo Mode only)
+      // Reflect on Feedback's and Show My Learning's switches (S10, S13-W2: setCourseFeedbackOptions, Demo Mode only)
       'shared/data.js': 6,
       'shared/seed-data.js': 1,
       'teacher/dash-class-manager.js': 10,
       'teacher/grading-setup-copy.js': 1,
-      // Show My Learning (S13-F1), Demo Mode only
-      'teacher/cm-student-page.js': 1,
     });
   });
 

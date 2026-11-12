@@ -798,16 +798,13 @@ describe('Class Settings › Student Page: Return Grades', () => {
       expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
       expect(src).not.toMatch(/localStorage|_cache\b|_saveCourseField|setStudentPageSwitch/);
       expect((src.match(/saveReturnSettings\(/g) || []).length).toBe(1);
-      // S13-F1: Show My Learning, drawn in Demo Mode only, is kept in the
-      // class's settings with one saveCourseConfig, which sends nothing in
-      // Demo Mode and never changes the two (_keepReturnSettings). It is
-      // the only one, and it is in Show My Learning's own writer.
-      const calls = src.match(/saveCourseConfig\(/g) || [];
-      expect(calls.length).toBe(1);
+      // S13-W2: Show My Learning no longer keeps itself with saveCourseConfig:
+      // like Reflect on Feedback it writes through setCourseFeedbackOptions,
+      // which is Demo Mode's settings or set_course_feedback_options signed in.
+      expect(src.match(/saveCourseConfig\(/g) || []).toEqual([]);
       const writer = src.slice(src.indexOf('function _turnLearning('), src.indexOf('function _previewStudent('));
-      expect(writer).toMatch(
-        /if \(!cid \|\| !learningSettings\(cid\)\.offered\) return;\n\s*var on[^\n]*\n[^\n]*\n\s*saveCourseConfig\(/,
-      );
+      expect(writer).toMatch(/if \(!cid \|\| !learningSettings\(cid\)\.offered\) return;/);
+      expect(writer).toMatch(/setCourseFeedbackOptions\(cid, \{ show_my_learning: on \}, key\)/);
     });
   });
 });
