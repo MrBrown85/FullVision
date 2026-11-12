@@ -82,8 +82,46 @@
   [headers.values]
     Cache-Control = "no-cache"
 
+# inject-env puts the Supabase address and a fresh nonce policy into pages.
+# It runs on every address except files that are never a page, so Netlify can
+# answer a browser's "has this file changed?" with a quick 304
+# (docs/plans/caching-plan.md, step 2). Every address that returns HTML must
+# still match: the clean routes above have no extension, and nothing here
+# ends in .html. A "*" in these URLPatterns crosses "/", so "/*.js" covers
+# /shared/data.js too. tests/edge-function-paths.test.js checks every page
+# and every shipped file against this list.
 [[edge_functions]]
   path = "/*"
+  excludedPath = [
+    "/*.js",
+    "/*.mjs",
+    "/*.css",
+    "/*.json",
+    "/*.webmanifest",
+    "/*.map",
+    "/*.png",
+    "/*.jpg",
+    "/*.jpeg",
+    "/*.gif",
+    "/*.webp",
+    "/*.avif",
+    "/*.svg",
+    "/*.ico",
+    "/*.woff",
+    "/*.woff2",
+    "/*.ttf",
+    "/*.otf",
+    "/*.pfb",
+    "/*.bcmap",
+    "/*.icc",
+    "/*.wasm",
+    "/*.pdf",
+    "/*.csv",
+    "/*.txt",
+    "/vendor/*",
+    "/assets/*",
+    "/help/img/*",
+  ]
   function = "inject-env"
 
 # Root → login

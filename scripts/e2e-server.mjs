@@ -14,6 +14,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
+import { edgeDeclarations, edgeFunctionRuns } from './edge-function-paths.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const DIST = join(ROOT, 'dist');
@@ -29,6 +30,9 @@ globalThis.Netlify = {
 // The repo isn't an ES-module package, so load the function's source as one.
 const edgeSource = await readFile(join(ROOT, 'netlify/edge-functions/inject-env.js'), 'utf-8');
 const { default: injectEnv } = await import('data:text/javascript,' + encodeURIComponent(edgeSource));
+
+// Run it only where netlify.toml's [[edge_functions]] entry would on Netlify.
+const edgeDecls = edgeDeclarations(await readFile(join(ROOT, 'netlify.toml'), 'utf-8'));
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -84,7 +88,10 @@ createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost:' + PORT);
     const request = new Request(url);
-    const response = await injectEnv(request, { next: () => staticResponse(decodeURIComponent(url.pathname)) });
+    const next = () => staticResponse(decodeURIComponent(url.pathname));
+    const response = edgeFunctionRuns(edgeDecls, 'inject-env', url.pathname)
+      ? await injectEnv(request, { next })
+      : await next();
     const headers = Object.fromEntries(response.headers);
     if (headers['content-security-policy']) {
       headers['content-security-policy'] = withoutReporting(headers['content-security-policy']);
