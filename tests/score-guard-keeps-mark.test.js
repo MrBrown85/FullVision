@@ -315,7 +315,10 @@ function otherTabFills(base) {
    sent, so tab A's marks are never overwritten. An earlier version of this
    PR merged the two copies; two reviews each found a way that merge sent
    clears or marks it should not, so it was taken out. These tests pass on
-   main too. */
+   main too. Here the other tab's saves are written straight into storage,
+   so this tab never read their text and saves as on main; where this tab
+   wrote the saved copy itself (R1) it now catches up first instead
+   (docs/plans/stale-tab-plan.md, tests/stale-tab-catches-up.test.js). */
 describe('(b) a tab behind the saved copy is blocked as on main', () => {
   function expectBlocked(before) {
     expect(guardLogs.length).toBeGreaterThan(0);
@@ -436,7 +439,11 @@ describe('(b) a tab behind the saved copy is blocked as on main', () => {
     expectBlocked(before);
   });
 
-  it('Undo of this tab’s fill after the other tab retyped five of its cells (R1)', async () => {
+  // Replaced in the stale-tab PR (docs/plans/stale-tab-plan.md): this tab
+  // wrote the fill itself, so it knows the saved copy's text and is no longer
+  // stale when it undoes. It catches up first, then puts back only the cells
+  // that still hold what its fill wrote. Main blocked the Undo.
+  it('Undo of this tab’s fill after the other tab retyped five of its cells (R1): those five stay', async () => {
     signIn();
     var mine = {};
     SIDS.forEach(sid => (mine[sid] = [entry(sid, QUIZ, T[0], 2)]));
@@ -448,12 +455,20 @@ describe('(b) a tab behind the saved copy is blocked as on main', () => {
     var theirs = structuredClone(saved());
     SIDS.slice(0, 5).forEach(sid => theirs[sid].forEach(e => e.assessmentId === PTS && (e.score = 10)));
     localStorage.setItem(KEY, JSON.stringify(withFill(theirs, [FILL, OLD])));
-    var before = saved();
     fake.calls.length = 0;
     restoreScoreCells(CID, beforeFill, filled);
     await settle();
-    expectBlocked(before);
+    expect(guardLogs).toEqual([]);
     SIDS.slice(0, 5).forEach(sid => expect(has(saved(), sid, PTS, null, 10)).toBe(true));
+    SIDS.slice(5).forEach(sid => expect((saved()[sid] || []).some(e => e.assessmentId === PTS)).toBe(false));
+    expect(count(saved())).toBe(10 + 5 + 70);
+    var sent = scoreCalls(fake);
+    expect(sent.length).toBeGreaterThan(0);
+    sent.forEach(c => {
+      expect(c.params.p_assessment_id).toBe(PTS);
+      expect(SIDS.slice(5)).toContain(c.params.p_enrollment_id);
+      expect(c.params.p_value).toBe(null);
+    });
   });
 
   it('pair work: a mark the other tab cleared is not copied to the partner (R9)', async () => {

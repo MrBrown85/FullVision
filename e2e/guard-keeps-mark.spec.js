@@ -10,10 +10,11 @@ import { cardMenuItem } from './card-menu.js';
    work's marks. The next mark used to be blocked and lost; now those marks
    are not counted, and the mark saves.
 
-   Two tabs, unchanged from main: tab A uses Set Everyone To on a column (30
-   marks, in the saved copy). Tab B, which saved something a moment ago and
-   so has not reloaded the class, types one mark. The guard refuses it with
-   the red message, so tab A's 30 marks are never overwritten.
+   Two tabs: tab A uses Set Everyone To on a column (30 marks, in the saved
+   copy). Tab B, which saved something a moment ago and so has not reloaded
+   the class, types one mark. Until the stale-tab change the guard refused
+   it with the red message. Now tab B catches up from the saved copy first
+   (docs/plans/stale-tab-plan.md), so the mark is kept and so is the fill.
 
    Signed in (helpers.js mockAuth): each page has its own fake server, read
    from the saved copy at its first call, so a reload reads back what the
@@ -146,7 +147,7 @@ async function expectNoBlock(page, guard) {
   await expect(page.locator('#sync-toast')).toHaveCount(0);
 }
 
-test('two tabs: a mark typed in a tab not yet reloaded after a fill in the other is blocked, and the fill stays', async ({
+test('two tabs: a mark typed in a tab not yet reloaded after a fill in the other is kept, and so is the fill', async ({
   page,
   context,
 }) => {
@@ -181,16 +182,16 @@ test('two tabs: a mark typed in a tab not yet reloaded after a fill in the other
   await expect.poll(async () => (await marks(page, LEVEL)).saved.length).toBe(30);
   await expectNoBlock(page, guardA);
 
-  // Tab B, still without the fill, types a second mark. As on main, the
-  // guard refuses it with the red message, and tab A's fill stays.
+  // Tab B, still without the fill, types a second mark. It catches up from
+  // the saved copy first: the mark is kept and sent once, and the fill stays.
   await b.bringToFront();
   expect((await marks(b, LEVEL)).cache).toEqual([]);
   await typeInCell(b, NEW, SIDS[6], '8');
-  await expect(b.locator('#sync-toast')).toContainText('Score save blocked');
-  expect(guardB.length).toBeGreaterThan(0);
-  expect((await marks(b, LEVEL)).saved).toHaveLength(30);
+  await expect(cell(b, NEW, SIDS[6]).locator('.gb-scores-val')).toHaveText('8');
   await b.waitForTimeout(500);
-  expect((await writesOn([page, b], NEW)).filter(w => w[1] === SIDS[6])).toEqual([]);
+  await expectNoBlock(b, guardB);
+  expect((await marks(b, LEVEL)).saved).toHaveLength(30);
+  expect((await writesOn([page, b], NEW)).filter(w => w[1] === SIDS[6])).toEqual([['upsert_score', SIDS[6], 8]]);
 });
 
 for (const mode of ['Demo Mode', 'signed in'])
