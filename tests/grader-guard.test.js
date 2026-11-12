@@ -55,7 +55,13 @@ const WRITERS = [
 
 // data.js holds the writers; grader.js is the one caller; seed-data.js
 // builds the Demo class by saving whole lists, before any screen is open.
-const EXEMPT = new Set(['shared/data.js', 'shared/data-feedback-live.js', 'shared/grader.js', 'shared/seed-data.js']);
+const EXEMPT = new Set([
+  'shared/data.js',
+  'shared/data-feedback-live.js',
+  'shared/data-markup.js',
+  'shared/grader.js',
+  'shared/seed-data.js',
+]);
 
 function sources() {
   const out = [];
@@ -79,7 +85,8 @@ function count(src) {
 
 describe('grades are written only through shared/grader.js', () => {
   it('every writer in the list is a function in shared/data.js', () => {
-    const data = readFileSync(join(ROOT, 'shared/data.js'), 'utf-8');
+    const data =
+      readFileSync(join(ROOT, 'shared/data.js'), 'utf-8') + readFileSync(join(ROOT, 'shared/data-markup.js'), 'utf-8');
     const missing = WRITERS.filter(name => !new RegExp('^function ' + name + '\\(', 'm').test(data));
     expect(missing).toEqual([]);
   });

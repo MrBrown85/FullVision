@@ -461,7 +461,8 @@ describe('the export stays complete', () => {
       readFileSync(resolve(root, 'shared/data-student-records.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-term-ratings.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-reflect.js'), 'utf-8') +
-      readFileSync(resolve(root, 'shared/data-student-work.js'), 'utf-8');
+      readFileSync(resolve(root, 'shared/data-student-work.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-markup.js'), 'utf-8');
     const readers = [...data.matchAll(/^function (get\w+)\(cid\b/gm)].map(m => m[1]);
     expect(readers.length).toBeGreaterThan(40);
     const used = readers.filter(name => new RegExp('\\b' + name + '\\(').test(SOURCE));
