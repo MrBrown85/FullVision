@@ -31,7 +31,8 @@ const { makeRng } = await import('./differential/prng.mjs');
 const { go, readIndexedDb, readScreens, readStorage, readView, takeCalls, tick } =
   await import('./differential/probe.mjs');
 const { serve } = await import('./differential/serve.mjs');
-const { PHONE, advance, newSession, openTab, tabsOf, waitForApp } = await import('./differential/session.mjs');
+const { DRAIN_CHUNKS, PHONE, advance, newSession, openTab, tabsOf, waitForApp } =
+  await import('./differential/session.mjs');
 
 function parseArgs(argv) {
   const opts = { mode: 'both', seed: 1, steps: 100, offline: false, twoTabs: false, screensEvery: 25, quiet: false };
@@ -60,8 +61,8 @@ const USAGE =
 /* The run's own actions, beside the teacher actions in actions.mjs. */
 const RELOAD = { kind: 'reload', weight: 1 };
 const PHONE_ACTIONS = [
-  { kind: 'phoneGrade', weight: 12 },
-  { kind: 'phoneUndo', weight: 6 },
+  { kind: 'phoneGrade', weight: 60 },
+  { kind: 'phoneUndo', weight: 30 },
 ];
 
 class Difference extends Error {
@@ -250,7 +251,13 @@ async function runMode(browser, urls, mode, opts) {
     }
     async function closeExtra(name) {
       await both(async s => {
-        await s[name].close({ runBeforeUnload: true });
+        // The app's beforeunload handler would keep the page open (a dialog
+        // Playwright dismisses), so the tab is told it is going (pagehide:
+        // the outbox lets go, a pending Undo commits) and then closed.
+        await s[name].evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })));
+        await advance(s);
+        await s[name].close();
+        s.pages = s.pages.filter(p => p !== s[name]);
         s[name] = null;
         await advance(s);
       });
@@ -278,7 +285,7 @@ async function runMode(browser, urls, mode, opts) {
       for (let tries = 0; tries < 50 && !chosen; tries++) {
         const act = rng.weighted(menu);
         if (!alone && act.kind === 'switchClass') continue;
-        tabName = wantTab2 && rng.chance(0.4) ? 'tab2' : 'tab1';
+        tabName = wantTab2 && rng.chance(0.4) && !act.screen ? 'tab2' : 'tab1';
         if (act.kind.startsWith('phone')) {
           tabName = 'phone';
           args = phonePick(act.kind, rng, await readView(sides[0].phone));
@@ -292,6 +299,7 @@ async function runMode(browser, urls, mode, opts) {
       let label = describe(chosen.kind, args) + (tabName !== 'tab1' ? ' (' + tabName + ')' : '');
       counts.actions[chosen.kind] = (counts.actions[chosen.kind] || 0) + 1;
 
+      const t0 = Date.now();
       const doStep = async () => {
         let results;
         if (chosen.kind === 'reload') {
@@ -314,20 +322,34 @@ async function runMode(browser, urls, mode, opts) {
           ]);
         }
         if (process.env.DIFF_TRACE) console.log(mode, step, label, JSON.stringify(results[0]));
+        if (process.env.DIFF_TRACE && String(results[0]).startsWith('threw'))
+          await sides[0][tabName].screenshot({ path: '/tmp/fv-s19/diff-threw-' + step + '.png' });
+        const ta = Date.now();
         await both(s => advance(s));
+        if (process.env.DIFF_TRACE)
+          console.log(
+            '  advance ' +
+              (Date.now() - ta) +
+              ' ms, tabs ' +
+              tabsOf(sides[0]).length +
+              ' ' +
+              tabsOf(sides[0])
+                .map(p => p.url())
+                .join(' '),
+          );
         // The last offline step: back online, and the outbox drains with the
         // clock moved past every backoff.
         if (offline && !inBlock(blocks.offline, off + 1)) {
           await setOffline(false);
           await both(async s => {
             await Promise.all(tabsOf(s).map(p => p.evaluate(() => window.v2Queue && window.v2Queue.flush())));
-            await advance(s);
-            await advance(s);
+            await advance(s, DRAIN_CHUNKS);
           });
           label += ', then back online';
         }
       };
       await withLimit(doStep(), STEP_LIMIT_MS, 'Step ' + step + ' (' + label + ')');
+      if (process.env.DIFF_TRACE) console.log('  ' + (Date.now() - t0) + ' ms');
       const screensNow = opts.screensEvery > 0 && (step % opts.screensEvery === 0 || step === opts.steps);
       await compareNow(step, label, screensNow);
       if (step % 25 === 0 && step < opts.steps)

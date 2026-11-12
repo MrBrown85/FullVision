@@ -16,7 +16,7 @@
  * switch. docs/differential-run.md lists which is which.
  */
 
-import { closeOverlays, tick, until } from './probe.mjs';
+import { closeOverlays, go, tick, until } from './probe.mjs';
 
 const LEVELS = [1, 2, 3, 4];
 const MODS = [0, 0, 1, -1];
@@ -210,6 +210,7 @@ export const ACTIONS = [
   },
   {
     kind: 'graderDialog',
+    screen: true,
     weight: 8,
     pick(rng, view) {
       const c = pickCell(rng, view, levelPieces(view));
@@ -245,7 +246,8 @@ export const ACTIONS = [
         await tick(page, 100);
         if (a.mod) {
           const mod = dlg.locator('[data-action="graderTagMod"][data-mod="' + a.mod + '"]').first();
-          if (await mod.count()) await mod.click();
+          // A − on Emerging or a + on Extending is offered but cannot be pressed.
+          if ((await mod.count()) && (await mod.isEnabled())) await mod.click();
           await tick(page, 100);
         }
       }
@@ -262,6 +264,7 @@ export const ACTIONS = [
   },
   {
     kind: 'gradebookUndo',
+    screen: true,
     weight: 3,
     pick: () => ({}),
     // The real key: Cmd+Z on the gradebook undoes its last score.
@@ -532,29 +535,44 @@ export const ACTIONS = [
   },
   {
     kind: 'deletePiece',
-    weight: 2,
+    weight: 3,
+    screen: true,
     pick(rng, view) {
       if (view.assessments.length < 8) return null;
       const a = rng.pick(view.assessments);
-      return a && { aid: a.id };
+      return a && { aid: a.id, undo: rng.chance(0.4) };
     },
-    // page-gradebook.js _commitDeleteAssess: the shorter list, then the
-    // scores and statuses without the piece, then its observations.
-    run: (page, a) =>
-      inPage(
-        page,
-        `const cid = getActiveCourse(); const aid = args.aid;
-         saveAssessments(cid, getAssessments(cid).filter(x => x.id !== aid));
-         const scores = getScores(cid);
-         Object.keys(scores).forEach(sid => { scores[sid] = scores[sid].filter(e => e.assessmentId !== aid); });
-         Grader.deleteAssessmentScores(cid, aid, scores);
-         const statuses = getAssignmentStatuses(cid); let changed = false;
-         Object.keys(statuses).forEach(k => { if (k.endsWith(':' + aid)) { delete statuses[k]; changed = true; } });
-         if (changed) Grader.deleteAssessmentStatuses(cid, aid, statuses);
-         deleteAssessmentObservations(cid, aid);
-         clearProfCache(); return 'ok';`,
-        a,
-      ),
+    // The real screen: the gradebook's column menu (Return on the column
+    // title), Delete Assessment, Delete in the dialog; then the toast's Undo,
+    // or the toast left to time out (the run's clock), which commits the
+    // delete (page-gradebook.js _deleteAssessWithUndo, _commitDeleteAssess).
+    async run(page, a) {
+      await closeOverlays(page);
+      const cid = await page.evaluate(() => getActiveCourse());
+      if (!(await page.evaluate(() => location.pathname === '/gradebook'))) await go(page, '/gradebook?course=' + cid);
+      const tab = page.locator('[data-action="setView"][data-mode="scores"]');
+      if ((await tab.count()) && (await tab.getAttribute('aria-selected')) !== 'true') {
+        await tab.click();
+        await tick(page);
+      }
+      const label = page.locator('#gb-colheads .gb-grid-colhead[data-aid="' + a.aid + '"] .gb-grid-colhead-label');
+      if (!(await label.count())) return 'no column';
+      await label.focus();
+      await page.keyboard.press('Enter');
+      const item = page.locator('.gb-ctx-menu [data-ctx="deleteAssess"]');
+      if (!(await until(page, () => !!document.querySelector('.gb-ctx-menu [data-ctx="deleteAssess"]'))))
+        return 'no menu';
+      await item.click();
+      if (!(await until(page, () => !!document.getElementById('confirm-ok-btn')))) return 'no dialog';
+      await page.locator('#confirm-ok-btn').click();
+      if (!(await until(page, () => !!document.querySelector('#undo-toast .undo-toast-btn')))) return 'no toast';
+      if (a.undo) {
+        await page.locator('#undo-toast .undo-toast-btn').click();
+        await tick(page, 100);
+        return 'undone';
+      }
+      return 'deleted';
+    },
   },
 
   /* ── Students ──────────────────────────────────────────────────── */
@@ -646,6 +664,7 @@ export const ACTIONS = [
   },
   {
     kind: 'switchClass',
+    screen: true,
     weight: 1,
     pick(rng, view) {
       const other = view.courseIds.filter(c => c !== view.cid);

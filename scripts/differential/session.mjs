@@ -18,10 +18,13 @@ export const PHONE = { width: 390, height: 844 };
 
 /* How far the clock moves after an action, in steps, with the pages left to
    finish their real work (scripts loading, other tabs' messages) before
-   each: what the action set off at once, the short waits (debounces, the
-   outbox's first retry), then the rest of a minute (the outbox's periodic
-   send, the lease's heartbeat). */
-export const STEP_CHUNKS = [0, 2500, 57500];
+   each: what the action set off at once, then the short waits (debounces,
+   the outbox's first retry, the lease's heartbeat): six seconds a step. */
+export const STEP_CHUNKS = [0, 2500, 3500];
+/* Back online: long enough for every outbox retry (its longest backoff is
+   a minute) and its periodic send. Kept out of the ordinary step, where a
+   page's one-second timers would make each minute cost a second. */
+export const DRAIN_CHUNKS = [0, 2500, 30000, 61000, 61000];
 
 export async function newSession(browser, { url, mode, seed }) {
   const context = await browser.newContext({
