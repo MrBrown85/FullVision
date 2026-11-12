@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 
 /* The Term Questionnaire's Observations card and drawer (Questionnaire
    glance plan, step 5), in Demo Mode on Science 8's Report 2, Cece. */
-test.use({ viewport: { width: 1440, height: 900 } });
+// The student list slides in the real app; these specs measure the end state at once.
+test.use({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
 
 const LONG =
   'Third lab write-up this month handed in late. When we talked she said she finishes the experiment and the data table in class, then means to do the conclusion at home and forgets about it until the next lab. Grandma is staying with the family and evenings are loud. Agreed she will write the conclusion in the last ten minutes of the lab period and hand in whatever she has; I will check her binder on Fridays for the next three weeks.';

@@ -702,15 +702,82 @@ function _helpPanelHTML() {
     <div class="help-body" id="help-body"></div>`;
 }
 
+/* ── Panel slide motion ───────────────────────────────────────
+   The student list and the Help panel slide when the teacher presses their
+   button. The panel's width (and, for the student list, its position) moves
+   with the page beside it in one motion (styles.css, "Panel motion"). Nothing
+   slides on a page draw, under reduced motion, or in print. */
+const PANEL_SLIDE_MS = 240;
+function _panelMotionOK() {
+  if (!window.matchMedia) return false;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  return !window.matchMedia('print').matches;
+}
+// Runs done() once el's width settles, or after a fallback so it never sticks.
+function _panelOnSettled(el, done) {
+  if (el._fvCancel) el._fvCancel(); // a turn-round replaces the earlier end
+  let finished = false;
+  const cancel = () => {
+    finished = true;
+    clearTimeout(timer);
+    el.removeEventListener('transitionend', onEnd);
+    el._fvSettle = el._fvCancel = null;
+  };
+  const finish = () => {
+    if (finished) return;
+    cancel();
+    done();
+  };
+  const onEnd = e => {
+    if (e.target === el && e.propertyName === 'width') finish();
+  };
+  const timer = setTimeout(finish, PANEL_SLIDE_MS + 120);
+  el.addEventListener('transitionend', onEnd);
+  el._fvSettle = finish;
+  el._fvCancel = cancel;
+}
+
 /* Draws or removes the panel to match _helpOpen, and refreshes the list
    for the open page. */
-function _helpSync() {
+function _helpSync(animate) {
   var layout = document.getElementById('page-layout');
   if (!layout || typeof layout.appendChild !== 'function') return;
   var panel = document.getElementById('help-panel');
+  animate = !!animate && _panelMotionOK();
   if (!_helpOpen) {
-    if (panel && typeof panel.remove === 'function') panel.remove();
+    if (!panel || typeof panel.remove !== 'function') return;
+    if (!animate) {
+      if (panel._fvSettle) panel._fvSettle();
+      panel.remove();
+      return;
+    }
+    // Slide shut, then leave the page. The width runs from where it is now.
+    panel.style.width = panel.getBoundingClientRect().width + 'px';
+    panel.classList.add('help-sliding', 'help-closing');
+    void panel.offsetWidth;
+    _panelOnSettled(panel, function () {
+      if (!_helpOpen) panel.remove();
+    });
+    panel.style.width = '0px';
     return;
+  }
+  var fresh = !panel;
+  if (panel && panel.classList.contains('help-closing')) {
+    // Opened again mid-slide: turn round from the current width.
+    panel.classList.remove('help-closing');
+    panel.style.width = panel.getBoundingClientRect().width + 'px';
+    void panel.offsetWidth;
+    if (animate) {
+      _panelOnSettled(panel, function () {
+        panel.classList.remove('help-sliding');
+        panel.style.width = '';
+      });
+      panel.style.width = '';
+    } else {
+      if (panel._fvSettle) panel._fvSettle();
+      panel.classList.remove('help-sliding');
+      panel.style.width = '';
+    }
   }
   if (!panel) {
     panel = document.createElement('aside');
@@ -719,7 +786,19 @@ function _helpSync() {
     panel.setAttribute('aria-labelledby', 'help-title');
     // html-safe: _helpPanelHTML is fixed markup.
     panel.innerHTML = _helpPanelHTML();
+    if (animate) {
+      panel.classList.add('help-sliding');
+      panel.style.width = '0px';
+    }
     layout.appendChild(panel);
+    if (animate) {
+      void panel.offsetWidth;
+      _panelOnSettled(panel, function () {
+        panel.classList.remove('help-sliding');
+        panel.style.width = '';
+      });
+      panel.style.width = '';
+    }
     var input = panel.querySelector('#help-search');
     input.value = _helpQuery;
     input.addEventListener('input', function () {
@@ -734,7 +813,7 @@ function _helpSync() {
   if (!_helpSlug || !document.getElementById('help-article')) _helpRenderBody();
 }
 
-function setHelpOpen(open, focusButton) {
+function setHelpOpen(open, focusButton, animate) {
   _helpOpen = !!open;
   // Help and Class Results share the side of the page: one at a time.
   if (_helpOpen && window.ClassResults && ClassResults.isOpen()) ClassResults.close();
@@ -747,7 +826,7 @@ function setHelpOpen(open, focusButton) {
     btn.classList.toggle('is-open', _helpOpen);
     btn.setAttribute('aria-expanded', _helpOpen ? 'true' : 'false');
   });
-  _helpSync();
+  _helpSync(animate);
   if (_helpOpen) {
     var input = document.getElementById('help-search');
     if (input && !_helpSlug) input.focus();
@@ -788,7 +867,7 @@ document.addEventListener('keydown', function (e) {
   var onButton = active && active.matches && active.matches('[data-action="toggleHelp"]');
   if (!inPanel && !onButton && active && active !== document.body) return;
   e.preventDefault();
-  setHelpOpen(false, true);
+  setHelpOpen(false, true, true);
 });
 
 /* ── Report a Problem ────────────────────────────────────────
@@ -1504,6 +1583,8 @@ function segAttr(on, role) {
 function segSelect(btn) {
   var seg = btn && btn.closest('.seg');
   if (!seg) return;
+  var before = _panelMotionOK() ? seg.querySelector('.seg-btn.active') : null;
+  var fromBox = before && before !== btn ? before.getBoundingClientRect() : null;
   seg.querySelectorAll('.seg-btn').forEach(function (b) {
     var on = b === btn;
     var name = _segStateAttr(b.getAttribute('role'), b.tagName);
@@ -1515,6 +1596,114 @@ function segSelect(btn) {
       b.setAttribute(name, on ? 'true' : 'false');
     }
   });
+  if (fromBox) _segGlide(seg, fromBox, btn.getBoundingClientRect());
+}
+
+/* The chosen pill slides from its old place to its new one (150 ms). The
+   selection itself has already changed, so a click or key is never held up. */
+function _segGlide(seg, from, to) {
+  if (!seg.animate || !from.width || !to.width) return;
+  if (seg._fvGlide) seg._fvGlide.remove();
+  const box = seg.getBoundingClientRect();
+  const glide = document.createElement('span');
+  glide.className = 'seg-glide';
+  glide.setAttribute('aria-hidden', 'true');
+  glide.style.cssText =
+    'top:' + (to.top - box.top - seg.clientTop) + 'px;height:' + to.height + 'px;left:0;width:' + to.width + 'px;';
+  seg._fvGlide = glide;
+  seg.classList.add('seg-gliding');
+  seg.appendChild(glide);
+  const fromX = from.left - box.left - seg.clientLeft;
+  const toX = to.left - box.left - seg.clientLeft;
+  const done = () => {
+    glide.remove();
+    if (seg._fvGlide === glide) {
+      seg._fvGlide = null;
+      seg.classList.remove('seg-gliding');
+    }
+  };
+  const anim = glide.animate(
+    [
+      { transform: 'translateX(' + fromX + 'px)', width: from.width + 'px' },
+      { transform: 'translateX(' + toX + 'px)', width: to.width + 'px' },
+    ],
+    { duration: 160, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)', fill: 'forwards' },
+  );
+  anim.onfinish = done;
+  anim.oncancel = done;
+  setTimeout(done, 400);
+}
+
+/* ── Quick exits ────────────────────────────────────────────────
+   Dialogs and menus leave in 130 ms. The real element goes at once, so
+   Escape, Cancel and a menu choice act with no delay; a see-through copy
+   (no ids, no clicks, no focus) fades where it was and is then removed, with
+   a fallback so it cannot stay. Reduced motion and print: no copy. */
+const EXIT_REMOVED = [
+  '.confirm-overlay',
+  '.grader-overlay',
+  '.rb-overlay',
+  '.rubric-modal-overlay',
+  '.pp-overlay',
+  '.edit-modal-overlay',
+  '.obsc-dialog-overlay',
+  '.wv-overlay',
+  '.gb-ctx-menu',
+].join(',');
+const EXIT_MS = 130;
+function _exitGhost(node, parent, kind, prep) {
+  if (!parent || !parent.isConnected) return;
+  const ghost = node.cloneNode(true);
+  ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  ghost.removeAttribute('id');
+  if (prep) prep(ghost);
+  ghost.classList.add('fv-leaving', kind === 'menu' ? 'fv-leave-menu' : 'fv-leave-dialog');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.setAttribute('inert', '');
+  parent.appendChild(ghost);
+  const gone = () => ghost.remove();
+  ghost.addEventListener('animationend', e => {
+    if (e.target === ghost) gone();
+  });
+  setTimeout(gone, EXIT_MS + 230);
+}
+function _exitSeen(records) {
+  if (!_panelMotionOK()) return;
+  records.forEach(rec => {
+    if (rec.type === 'childList') {
+      rec.removedNodes.forEach(n => {
+        if (n.nodeType !== 1 || n.classList.contains('fv-leaving') || !n.matches(EXIT_REMOVED)) return;
+        _exitGhost(n, rec.target, n.matches('.gb-ctx-menu') ? 'menu' : 'dialog');
+      });
+      return;
+    }
+    const t = rec.target;
+    const was = rec.oldValue || '';
+    if (rec.attributeName === 'hidden') {
+      if (t.hasAttribute('hidden') && rec.oldValue === null && t.matches('.sb-sort-menu'))
+        _exitGhost(t, t.parentNode, 'menu', g => g.removeAttribute('hidden'));
+      return;
+    }
+    if (!/(^|\s)open(\s|$)/.test(was) || t.classList.contains('open')) return;
+    if (t.matches('.modal-overlay')) {
+      _exitGhost(t, t.parentNode, 'dialog', g => g.classList.add('open'));
+    } else if (t.matches('.tb-user-menu, .assess-filter-wrap')) {
+      const m = t.querySelector('.tb-user-dropdown, .assess-filter-menu');
+      if (m) _exitGhost(m, t, 'menu', g => (g.style.display = 'block'));
+    }
+  });
+}
+if (typeof MutationObserver === 'function') {
+  const startExits = () =>
+    new MutationObserver(_exitSeen).observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeOldValue: true,
+      attributeFilter: ['class', 'hidden'],
+    });
+  if (document.body) startExits();
+  else document.addEventListener('DOMContentLoaded', startExits);
 }
 
 /* ── Breadcrumb ────────────────────────────────────────────────
@@ -2220,7 +2409,39 @@ function toggleSidebar() {
     return;
   }
   saveViewPref('gb-sidebar-vis', !_sidebarIsVisible());
+  _slideSidebar();
+}
+
+/* The student list slides in or out and the page beside it follows in the
+   same motion. The list stays drawn until the slide ends, then is hidden as
+   before. A second press mid-slide turns round from where it is. */
+function _slideSidebar() {
+  const layout = document.getElementById('page-layout');
+  const mount = document.getElementById('sidebar-mount');
+  const sb = document.getElementById('gb-sidebar');
+  if (!layout || !mount || !sb || !_panelMotionOK()) {
+    if (mount && mount._fvSettle) mount._fvSettle();
+    applySidebarState();
+    return;
+  }
+  const from = mount.getBoundingClientRect().width;
+  mount.style.width = from + 'px';
+  layout.classList.add('sidebar-sliding'); // draws the list even while hidden
+  const open = _sidebarIsVisible();
+  const full = sb.offsetWidth;
+  void mount.offsetWidth;
+  _panelOnSettled(mount, () => {
+    layout.classList.remove('sidebar-sliding');
+    mount.style.width = '';
+    // The toolbar's own class picker takes the list's place: it fades in
+    // now, not while the list is still sliding out.
+    if (!_sidebarIsVisible()) {
+      layout.classList.add('sidebar-settled');
+      setTimeout(() => layout.classList.remove('sidebar-settled'), 300);
+    }
+  });
   applySidebarState();
+  mount.style.width = (open ? full : 0) + 'px';
 }
 
 function _onSidebarOverlayKey(e) {
@@ -2461,10 +2682,10 @@ document.addEventListener('click', function (e) {
       });
     },
     toggleHelp: function () {
-      setHelpOpen(!_helpOpen);
+      setHelpOpen(!_helpOpen, false, true);
     },
     closeHelp: function () {
-      setHelpOpen(false, true);
+      setHelpOpen(false, true, true);
     },
     helpOpenArticle: function () {
       _helpOpenArticle(el.dataset.slug);
@@ -2474,7 +2695,7 @@ document.addEventListener('click', function (e) {
     openHelpArticle: function () {
       _helpSlug = el.dataset.slug;
       if (_helpOpen) _helpRenderBody();
-      else setHelpOpen(true);
+      else setHelpOpen(true, false, true);
       var back = document.querySelector('#help-body .help-back');
       if (back) back.focus();
     },
