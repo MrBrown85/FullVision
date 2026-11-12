@@ -33,9 +33,12 @@ for (const [width, height] of [
     // No heading on a new assessment (Nov 2): the form is plainly that.
     await expect(form.locator('.af-heading')).toHaveCount(0);
     const titles = await form.locator('.af-card .af-card-title').allTextContents();
-    // Competencies above Scoring; no More Options (Colin, Nov 4).
-    expect(titles).toEqual(['Competencies', 'Scoring', 'Students']);
+    // Competencies above Scoring; no More Options (Colin, Nov 4). Students
+    // sits in the top box since Nov 11, so it has no card of its own.
+    expect(titles).toEqual(['Competencies', 'Scoring']);
     await expect(form.locator('.af-card-what #af-title')).toBeVisible();
+    await expect(form.locator('.af-card-what #af-choose-students')).toBeVisible();
+    await expect(form.locator('.af-card-what .af-collab-toggle')).toBeVisible();
     // Category, Evidence Type, Module, Date Assigned and Due Date share one row.
     const row = form.locator('.af-row-what');
     await expect(row.locator('#af-category')).toBeVisible();

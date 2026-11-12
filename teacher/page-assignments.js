@@ -68,18 +68,25 @@ window.PageAssignments = (function () {
   function setCollaboration(mode) {
     AC.setCollaboration(mode);
     _syncCollabState();
+    // Who Sends the Work? shows only for pairs and groups.
+    _refreshFormWorkCard();
   }
   function renderCollabPanel() {
     AC.renderCollabPanel();
+    // The form is in the page now: Student Work can read its due date and title.
+    _refreshFormWorkCard();
   }
   function collabToggleStudent(sid, checked) {
     AC.collabToggleStudent(sid, checked);
+    _refreshWorkPeek();
   }
   function collabCheckAll() {
     AC.collabCheckAll();
+    _refreshWorkPeek();
   }
   function collabCheckNone() {
     AC.collabCheckNone();
+    _refreshWorkPeek();
   }
   function collabRandomPairs() {
     AC.collabRandomPairs();
@@ -2632,6 +2639,7 @@ window.PageAssignments = (function () {
     // Blank Rubric is open on a new assessment (Colin, Nov 2).
     _startOpen = assess ? null : 'blank';
     _blank = null;
+    _categoryTried = false;
     var sections = getSections(cid);
     var isEdit = !!assess;
     var title = assess ? assess.title : '';
@@ -2653,7 +2661,10 @@ window.PageAssignments = (function () {
       !categories.some(function (c) {
         return c.id === categoryId;
       });
-    var scoreMode = assess ? _formModeOf(assess) : 'proficiency';
+    // A new assessment starts on the scoring the last one used (Colin, Nov 11).
+    var lastMode = assess ? null : _lastScoreMode(cid);
+    var scoreMode = assess ? _formModeOf(assess) : lastMode || 'proficiency';
+    if (!assess && scoreMode !== 'proficiency') _startOpen = null;
     var maxPoints = assess ? assess.maxPoints || 100 : 100;
     var weight = getAssessmentWeight(assess);
 
@@ -2755,11 +2766,9 @@ window.PageAssignments = (function () {
       (categories.length === 0
         ? '<div class="af-rubric-info">This class has no grading categories yet. ' +
           '<button type="button" class="af-link-btn" data-action="afAddCategories">Add Categories</button></div>'
-        : '<p class="af-category-hint" id="af-category-hint"' +
-          (needsPick && scoreMode !== 'dibels' ? '' : ' hidden') +
-          '>' +
-          esc(CATEGORY_REQUIRED_HINT) +
-          '</p>') +
+        : // The footer says a category is needed; this line shows only after a
+          // save stopped for one (grey text audit, Colin, Nov 11).
+          '<p class="af-category-hint" id="af-category-hint" hidden>' + esc(CATEGORY_REQUIRED_HINT) + '</p>') +
       '</div>' +
       // Evidence Type beside Category, where it was before More Options
       // (Colin, Nov 4).
@@ -2819,6 +2828,16 @@ window.PageAssignments = (function () {
       '</p>' +
       '</div>' +
       '</div>';
+    // Evidence Type: Photo is not students sending photos (a teacher's
+    // question, Nov 11). Only where Student Work is offered.
+    if (_formWorkOffered(cid))
+      html +=
+        '<p class="af-category-hint af-evidence-hint" id="af-evidence-hint"' +
+        (_evidenceNeedsHint(evidence) ? '' : ' hidden') +
+        '>Evidence Type is for your records. Students send photos under Student Work.</p>';
+    // Who does it, in the top box with what it is (Colin, Nov 11; board
+    // "Assessment Form" 2a to 2d).
+    html += _studentsRowHtml(collaboration);
     html += '</section>';
 
     // Competencies above Scoring, as a short field: the chosen ones as chips
@@ -2968,6 +2987,9 @@ window.PageAssignments = (function () {
       FactorField.fieldHtml(weight) +
       '</div>' +
       '</div>' +
+      (lastMode
+        ? '<p class="af-category-hint af-score-last" id="af-score-last">The same as your last assessment.</p>'
+        : '') +
       '<p class="af-dibels-note" id="af-dibels-note"' +
       (scoreMode === 'dibels' ? '' : ' hidden') +
       '>Words Correct, Errors and Maze are entered at the Beginning, Middle and End of Year, and their levels are worked out on the Grade 8 goals. It counts toward no grade and needs no category.</p>' +
@@ -3063,36 +3085,9 @@ window.PageAssignments = (function () {
       '</div>' +
       '</section>';
 
-    // Students: individual, pair or group, and who it's assigned to.
-    html +=
-      '<section class="af-card af-card-students">' +
-      '<div class="af-card-head">' +
-      '<span class="af-card-title">Students</span>' +
-      '<span class="af-students-summary" id="af-students-summary"></span>' +
-      '<div class="seg af-type-toggle" role="group" aria-label="Collaboration">' +
-      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
-      (collaboration === 'individual' ? ' active' : '') +
-      '"' +
-      segAttr(collaboration === 'individual') +
-      ' data-collab="individual" data-action="setCollaboration">Individual</button>' +
-      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
-      (collaboration === 'pair' ? ' active' : '') +
-      '"' +
-      segAttr(collaboration === 'pair') +
-      ' data-collab="pair" data-action="setCollaboration">Pair</button>' +
-      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
-      (collaboration === 'group' ? ' active' : '') +
-      '"' +
-      segAttr(collaboration === 'group') +
-      ' data-collab="group" data-action="setCollaboration">Group</button>' +
-      '</div>' +
-      '<button type="button" class="btn btn-ghost" id="af-choose-students" data-action="toggleChooseStudents" aria-controls="collab-panel-mount" aria-expanded="false">Choose Students</button>' +
-      '</div>' +
-      '<div id="collab-panel-mount"></div>' +
-      '</section>';
-
     // Student Work (S5-F1): only in a class with Send Work on.
     _formWork = _formWorkOffered(cid) ? _formWorkFor(cid, assess) : null;
+    _formSeedDue = defaultDue;
     if (_formWork) html += _formWorkCardHtml(cid);
 
     // Actions, in a footer that stays at the bottom of the window while the
@@ -3120,6 +3115,48 @@ window.PageAssignments = (function () {
     return html;
   }
 
+  function _evidenceNeedsHint(v) {
+    return v === 'photo' || v === 'video' || v === 'audio';
+  }
+
+  /* The Students row in the top box: a button naming who it's for, which
+     opens Choose Students, and Individual, Pair or Group. Pairs and groups
+     open their builder under it (teacher/assign-collab.js). */
+  // html-safe: fixed labels; the summary is filled by AssignCollab
+  function _studentsRowHtml(collaboration) {
+    var btn = function (mode, label) {
+      return (
+        '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
+        (collaboration === mode ? ' active' : '') +
+        '"' +
+        segAttr(collaboration === mode) +
+        ' data-collab="' +
+        mode +
+        '" data-action="setCollaboration">' +
+        label +
+        '</button>'
+      );
+    };
+    return (
+      '<div class="af-students-row" role="group" aria-labelledby="af-students-label">' +
+      '<span class="af-label" id="af-students-label">Students</span>' +
+      '<div class="af-students-controls">' +
+      '<button type="button" class="af-students-btn" id="af-choose-students" data-action="toggleChooseStudents" aria-controls="collab-panel-mount" aria-expanded="false">' +
+      '<span class="af-students-summary" id="af-students-summary"></span>' +
+      '<svg class="af-students-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>' +
+      '</button>' +
+      '<div class="seg af-type-toggle af-collab-toggle" role="group" aria-label="How students work">' +
+      btn('individual', 'Individual') +
+      btn('pair', 'Pair') +
+      btn('group', 'Group') +
+      '</div>' +
+      '</div>' +
+      '<p class="af-category-hint af-students-names" id="af-students-names" hidden></p>' +
+      '<div id="collab-panel-mount"></div>' +
+      '</div>'
+    );
+  }
+
   /* ── Student Work on the assessment form (S5-F1) ───────────
      Board "Teacher: Student Work Settings on an Assessment", without Keep
      Photos Until (per class only, Q15). The card is drawn only while the
@@ -3135,6 +3172,7 @@ window.PageAssignments = (function () {
      (Colin); Until is the last day work is taken, a week after the due
      date until the teacher picks another. */
   var _formWork = null; // the open form's Student Work choices, or null when the card is not drawn
+  var _formSeedDue = ''; // the due date the form was drawn with, until it is in the page
 
   var WORK_SEND = [
     { value: 'nothing', label: 'Nothing' },
@@ -3172,7 +3210,8 @@ window.PageAssignments = (function () {
           students_send: 'nothing',
           after_due: 'keep',
           accept_until: null,
-          group_work: 'each',
+          // One for the Group: groups are made so one student can send for them (Colin, Nov 11).
+          group_work: 'group',
           students_see_markup: true,
         };
     return {
@@ -3190,23 +3229,17 @@ window.PageAssignments = (function () {
     return _weekAfter(due || courseToday(cid));
   }
 
-  // html-safe: fixed labels and values; the date goes through esc
-  function _formWorkSegHtml(field, label, choices, chosen) {
+  // html-safe: fixed labels and values
+  function _formWorkSegHtml(field, labelId, choices, chosen) {
     return (
-      '<div class="af-work-field">' +
-      '<span class="af-work-label" id="af-work-' +
-      field +
-      '-label">' +
-      label +
-      '</span>' +
-      '<div class="seg af-type-toggle af-work-seg" role="radiogroup" aria-labelledby="af-work-' +
-      field +
-      '-label">' +
+      '<div class="seg af-work-seg" role="radiogroup" aria-labelledby="' +
+      labelId +
+      '">' +
       choices
         .map(function (c) {
           var on = c.value === chosen;
           return (
-            '<button type="button" class="seg-btn af-type-btn' +
+            '<button type="button" class="seg-btn' +
             (on ? ' active' : '') +
             '" role="radio" aria-checked="' +
             on +
@@ -3220,46 +3253,215 @@ window.PageAssignments = (function () {
           );
         })
         .join('') +
+      '</div>'
+    );
+  }
+
+  /* One row of the Student Work list: the question and a line under it on
+     the left, the choices on the right (board "Assessment Form" 2b). */
+  // html-safe: question and hint are fixed text or go through esc
+  function _formWorkRowHtml(field, question, hintText, control, extra) {
+    var id = 'af-work-' + field + '-label';
+    return (
+      '<div class="af-work-row" data-work-row="' +
+      field +
+      '">' +
+      '<div class="af-work-ask"><span class="af-work-q" id="' +
+      id +
+      '">' +
+      esc(question) +
+      '</span>' +
+      (hintText ? '<span class="af-work-hint">' + esc(hintText) + '</span>' : '') +
+      '</div>' +
+      '<div class="af-work-answer">' +
+      control(id) +
+      (extra || '') +
       '</div>' +
       '</div>'
     );
   }
 
-  // html-safe: built from fixed labels by _formWorkSegHtml; the date through esc
+  // html-safe: built from fixed labels, esc'd dates and the form's own values
   function _formWorkCardHtml(cid) {
     var w = _formWork;
-    var until = w.after_due === 'until' && w.accept_until ? w.accept_until : '';
-    var afterChoices = [
-      { value: 'keep', label: 'Keep Accepting' },
-      { value: 'until', label: until ? 'Until ' + formatShortDate(until) : 'Until a Date' },
-      { value: 'stop', label: 'Stop' },
-    ];
+    var dueEl = document.getElementById('af-due');
+    var due = dueEl ? dueEl.value || '' : _formSeedDue;
+    var sending = w.students_send !== 'nothing';
+    var collab = typeof AC !== 'undefined' && AC.collaboration ? AC.collaboration : 'individual';
+    var until = w.accept_until || _formWorkUntilDefault(cid);
+    var rows = [];
+    rows.push(
+      _formWorkRowHtml(
+        'students_send',
+        'Do Students Send You Their Work?',
+        w.students_send === 'photos_files' ? 'PDFs become pages, so Mark Up works on them.' : '',
+        function (id) {
+          return _formWorkSegHtml(
+            'students_send',
+            id,
+            [
+              { value: 'nothing', label: 'No' },
+              { value: 'photos', label: 'Yes, Photos' },
+              { value: 'photos_files', label: 'Yes, Photos or PDFs' },
+            ],
+            w.students_send,
+          );
+        },
+      ),
+    );
+    // With no due date there is nothing to be late for.
+    if (sending && due)
+      rows.push(
+        _formWorkRowHtml(
+          'after_due',
+          'Can Students Send After ' + formatShortDate(due) + '?',
+          '',
+          function (id) {
+            return _formWorkSegHtml(
+              'after_due',
+              id,
+              [
+                { value: 'keep', label: 'Yes, Marked Late' },
+                { value: 'until', label: 'Until ' + formatShortDate(until) },
+                { value: 'stop', label: 'No' },
+              ],
+              w.after_due,
+            );
+          },
+          w.after_due === 'until'
+            ? '<span class="af-work-until"><label class="af-work-until-label" for="af-accept-until">Last Day</label>' +
+                '<input type="date" class="af-input af-work-date" id="af-accept-until" data-action-change="setFormWorkUntil" value="' +
+                esc(until) +
+                '"></span>'
+            : '',
+        ),
+      );
+    if (sending && collab !== 'individual' && (_formWorkDemo() || _formWorkLive()))
+      rows.push(
+        _formWorkRowHtml('group_work', 'Who Sends the Work?', '', function (id) {
+          return _formWorkSegHtml(
+            'group_work',
+            id,
+            [
+              { value: 'group', label: collab === 'pair' ? 'One for the Pair' : 'One for the Group' },
+              { value: 'each', label: 'Each Student' },
+            ],
+            w.group_work,
+          );
+        }),
+      );
+    if (sending && (_formWorkDemo() || _formWorkLive()))
+      rows.push(
+        _formWorkRowHtml(
+          'students_see_markup',
+          'Do Students See What You Write on Their Work?',
+          'The ticks, notes and drawings you add to their photos while you assess.',
+          function (id) {
+            return _formWorkSegHtml(
+              'students_see_markup',
+              id,
+              [
+                { value: 'yes', label: 'Yes, When You Return It' },
+                { value: 'no', label: 'No' },
+              ],
+              w.students_see_markup ? 'yes' : 'no',
+            );
+          },
+        ),
+      );
     return (
       '<section class="af-card af-card-work" aria-labelledby="af-work-title">' +
       '<div class="af-card-head"><span class="af-card-title" id="af-work-title">Student Work</span></div>' +
       '<div class="af-work-body">' +
-      _formWorkSegHtml('students_send', 'Students Send', WORK_SEND, w.students_send) +
-      _formWorkSegHtml('after_due', 'After the Due Date', afterChoices, w.after_due) +
-      (w.after_due === 'until'
-        ? '<div class="af-work-field af-work-until"><label class="af-work-label" for="af-accept-until">Last Day</label>' +
-          '<input type="date" class="cm-input af-work-date" id="af-accept-until" data-action-change="setFormWorkUntil" value="' +
-          esc(until) +
-          '"></div>'
-        : '') +
-      (_formWorkDemo() || _formWorkLive()
-        ? _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work)
-        : '') +
-      (_formWorkDemo() || _formWorkLive()
-        ? _formWorkSegHtml(
-            'students_see_markup',
-            'Students See Your Mark Up',
-            WORK_MARKUP,
-            w.students_see_markup ? 'yes' : 'no',
-          )
-        : '') +
+      '<div class="af-work-list">' +
+      rows.join('') +
+      '</div>' +
+      '<div class="af-work-peek" id="af-work-peek">' +
+      _workPeekHtml(cid) +
+      '</div>' +
       '</div>' +
       '</section>'
     );
+  }
+
+  /* "Cece Sees": the student page's card for this piece as the class's first
+     student will see it, beside the settings (Colin, Nov 11). It reads the
+     form as typed; nothing is saved. */
+  // html-safe: every value goes through esc
+  function _workPeekHtml(cid) {
+    var w = _formWork;
+    if (!w) return '';
+    var val = function (id) {
+      return (document.getElementById(id) || {}).value || '';
+    };
+    var students = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
+    var first = students[0];
+    var who = first ? (first.preferred || first.firstName || displayName(first)).split(' ')[0] : 'Your Student';
+    var title = val('af-title').trim();
+    var modSel = document.getElementById('af-module');
+    var unit = modSel && modSel.value ? modSel.options[modSel.selectedIndex].text : '';
+    var catSel = document.getElementById('af-category');
+    var cat = catSel && catSel.value ? catSel.options[catSel.selectedIndex].text : '';
+    var due = val('af-due');
+    var dueText = '';
+    if (due) {
+      var d = new Date(due + 'T12:00:00');
+      dueText = 'Due ' + d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+    var sending = w.students_send !== 'nothing';
+    var facts = [];
+    var excluded = typeof AC !== 'undefined' && AC.excluded ? AC.excluded.size : 0;
+    if (excluded > 0 && students.length)
+      facts.push('Only the ' + (students.length - excluded) + ' students chosen see it.');
+    if (sending) {
+      var keep = typeof CmStudentPage !== 'undefined' ? CmStudentPage.workSettings(cid).keep_photos_until : '';
+      facts.push(
+        keep === 'end_of_term'
+          ? 'Photos are kept until the end of the term (Class Settings).'
+          : 'Photos are kept until after June report cards (Class Settings).',
+      );
+    }
+    return (
+      '<div class="af-peek-label">' +
+      esc(who) +
+      ' Sees</div>' +
+      '<div class="af-peek-card">' +
+      '<div class="af-peek-head"><span class="af-peek-unit">' +
+      esc(unit) +
+      '</span>' +
+      (dueText ? '<span class="af-peek-due">' + esc(dueText) + '</span>' : '') +
+      '</div>' +
+      '<div class="af-peek-title' +
+      (title ? '' : ' is-empty') +
+      '">' +
+      esc(title || 'Your Title') +
+      '</div>' +
+      (cat ? '<span class="af-peek-cat">' + esc(cat) + '</span>' : '') +
+      (sending
+        ? '<div class="af-peek-send"><span class="af-peek-btn">Use the Camera</span><span class="af-peek-btn is-tint">Choose a File</span>' +
+          '<span class="af-peek-hint">' +
+          esc(
+            w.students_send === 'photos_files'
+              ? 'Photos or PDFs. Working in Word, PowerPoint or Google? Save it as a PDF, then choose it here.'
+              : 'Take a photo of each page.',
+          ) +
+          '</span></div>'
+        : '') +
+      '</div>' +
+      facts
+        .map(function (f) {
+          return '<p class="af-peek-fact">' + esc(f) + '</p>';
+        })
+        .join('')
+    );
+  }
+
+  // Cece Sees follows the form as it's typed.
+  function _refreshWorkPeek() {
+    var peek = document.getElementById('af-work-peek');
+    if (!peek || !_formWork) return;
+    // html-safe: built by _workPeekHtml
+    peek.innerHTML = _workPeekHtml(activeCourse);
   }
 
   // Redraws the card where it is; the rest of the form is left as typed.
@@ -3310,6 +3512,9 @@ window.PageAssignments = (function () {
      what is stored. */
   function _saveFormWork(cid, aid, w) {
     if (!w || !aid || !_formWorkOffered(cid) || typeof saveAssessmentStudentWork !== 'function') return;
+    // Who Sends only applies to pairs and groups.
+    if (typeof AC !== 'undefined' && AC.collaboration === 'individual' && w.group_work !== 'each')
+      w = Object.assign({}, w, { group_work: 'each' });
     saveAssessmentStudentWork(cid, aid, w);
   }
 
@@ -3349,6 +3554,9 @@ window.PageAssignments = (function () {
   }
 
   function setScoreMode(mode) {
+    // "The same as your last assessment" is true only until another is picked.
+    var last = document.getElementById('af-score-last');
+    if (last) last.hidden = true;
     document.querySelectorAll('.af-scoremode-btn').forEach(function (b) {
       b.setAttribute('aria-checked', b.dataset.mode === mode ? 'true' : 'false');
     });
@@ -3383,6 +3591,21 @@ window.PageAssignments = (function () {
     var held = !!a.rubricId && _pendingFormRubric && _pendingFormRubric.id === a.rubricId;
     var gone = !!a.rubricId && !held && !getRubricById(cid || activeCourse, a.rubricId);
     return m === 'proficiency' && (!a.rubricId || gone) ? 'competencies' : m;
+  }
+  /* The scoring of the class's most recently made assessment, when it can be
+     offered on a new one; null with none. */
+  function _lastScoreMode(cid) {
+    var list = (getAssessments(cid) || []).filter(function (a) {
+      return a && !a.deletedAt;
+    });
+    if (!list.length) return null;
+    var last = list.reduce(function (best, a) {
+      return String(a.created || '') >= String(best.created || '') ? a : best;
+    }, list[0]);
+    var m = _formModeOf(last, cid);
+    if (m === 'dibels' && !courseOffersDibels(COURSES[cid])) return null;
+    if (m === 'competencies' && !getSections(cid).length) return null;
+    return m;
   }
   function _formMode() {
     return (document.getElementById('af-scoremode') || {}).value || 'proficiency';
@@ -3506,13 +3729,14 @@ window.PageAssignments = (function () {
   /* Shows the Category field's hint while scored work in a class with
      categories has none chosen; true when it shows. A choice clears the
      red outline a stopped save left. */
+  var _categoryTried = false; // a save stopped for a category since the form opened
   function _refreshCategoryHint() {
     var sel = document.getElementById('af-category');
     var hint = document.getElementById('af-category-hint');
     if (!sel || !hint) return false;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     var show = !sel.value && categoryRequired(activeCourse, { scoreMode: _storedScoreMode(mode) });
-    hint.hidden = !show;
+    hint.hidden = !(show && _categoryTried);
     if (!show) {
       sel.style.border = '';
       sel.removeAttribute('aria-invalid');
@@ -3524,6 +3748,8 @@ window.PageAssignments = (function () {
      stops at the Category field. */
   function _formCategoryChosen() {
     if (!_refreshCategoryHint()) return true;
+    _categoryTried = true;
+    _refreshCategoryHint();
     var sel = document.getElementById('af-category');
     sel.style.border = '2px solid var(--score-1)';
     sel.setAttribute('aria-invalid', 'true');
@@ -3668,6 +3894,14 @@ window.PageAssignments = (function () {
     }
     if (!t.id) return;
     if (t.id === 'af-due' || t.id === 'af-date-assigned') _refreshDueHint();
+    if (t.id === 'af-evidence') {
+      var evHint = document.getElementById('af-evidence-hint');
+      if (evHint) evHint.hidden = !_evidenceNeedsHint(t.value);
+    }
+    // Student Work's late question names the due date; Cece Sees follows the form.
+    if (t.id === 'af-due' && e.type === 'change') _refreshFormWorkCard();
+    else if (t.id === 'af-title' || t.id === 'af-category' || t.id === 'af-module' || t.id === 'af-due')
+      _refreshWorkPeek();
     // A title clears the "Title is required" state as soon as it's typed.
     if (t.id === 'af-title' && t.value.trim()) t.removeAttribute('aria-invalid');
     if (t.id === 'af-maxpoints') {
@@ -3749,7 +3983,7 @@ window.PageAssignments = (function () {
     return (
       '<p class="af-untagged-note" id="af-untagged-note" role="status"' +
       (hasTags ? ' hidden' : '') +
-      '>No competency is ticked, so scores on this assessment won\u2019t count toward any student\u2019s proficiency.</p>'
+      '>None chosen yet, so this counts toward no proficiency.</p>'
     );
   }
   function _refreshUntaggedNote() {
@@ -11288,6 +11522,13 @@ window.PageAssignments = (function () {
       removeComp: function () {
         _removeComp(el.dataset.tag);
       },
+      collabToggleStudent: function () {
+        collabToggleStudent(el.dataset.sid);
+      },
+      collabUndoMove: function () {
+        AC.collabUndoMove();
+        _syncCollabState();
+      },
       collabCheckAll: function () {
         collabCheckAll();
       },
@@ -11787,6 +12028,8 @@ window.PageAssignments = (function () {
     }
   }
   function _handleDragEnd(e) {
+    // A student dropped nowhere, or back where they were, comes back into view.
+    AC.collabDragEnd();
     if (_dragCheck) {
       _dragCheck = null;
       _clearCheckDropMarks();

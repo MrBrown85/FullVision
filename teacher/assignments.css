@@ -668,7 +668,9 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  animation: collabSlideIn 0.2s ease-out;
+}
+.collab-panel.is-opening {
+  animation: collabSlideIn 0.16s ease-out;
 }
 @keyframes collabSlideIn {
   from {
@@ -727,36 +729,166 @@
   background: var(--btn-hover-blue);
 }
 
-/* Individual: student checklist */
-.collab-student-grid {
+/* Choose Students (Colin, Nov 11): a chip per student, like the group
+   cards' members. Chosen: coloured initials, a blue tick. Not chosen: grey
+   initials, an empty circle. A click changes the one chip. */
+.collab-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.collab-choose-count {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.collab-choose-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 4px;
-  max-height: 240px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  max-height: 320px;
   overflow-y: auto;
   padding: 2px;
 }
-.collab-student-item {
+.collab-choose-chip {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-3);
+  font-family: var(--font-base);
+  font-size: 14px;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.1s;
-  font-size: var(--text-base);
+  transition:
+    background-color 0.12s ease-out,
+    border-color 0.12s ease-out,
+    color 0.12s ease-out;
+}
+.collab-choose-chip[aria-pressed='true'] {
+  border-color: rgba(0, 122, 255, 0.35);
+  background: rgba(0, 122, 255, 0.07);
   color: var(--text);
 }
-.collab-student-item:hover {
-  background: var(--overlay-hover);
+.collab-choose-chip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
 }
-.collab-student-item input[type='checkbox'] {
-  accent-color: var(--active);
+.collab-choose-chip .member-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--border);
+  color: #fff;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  font-family: var(--font-mono);
+  transition: background-color 0.12s ease-out;
 }
-.collab-student-item.excluded {
-  opacity: 0.4;
-  text-decoration: line-through;
+.collab-choose-chip[aria-pressed='true'] .member-avatar {
+  background: var(--avatar);
+}
+.collab-choose-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.collab-choose-mark {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 1.6px solid var(--border);
+  border-radius: 50%;
+  transition:
+    background-color 0.12s ease-out,
+    border-color 0.12s ease-out;
+}
+.collab-choose-chip[aria-pressed='true'] .collab-choose-mark {
+  border-color: var(--active);
+  background: var(--active);
+}
+.collab-choose-chip[aria-pressed='true'] .collab-choose-mark::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Moving students between pairs and groups (board "Assessment Form" 3d):
+   the picked-up student fades in place, the group under the pointer turns
+   blue with a slot, and every student who moves glides to their new place. */
+.collab-group-member.is-dragging {
+  opacity: 0.35;
+}
+.collab-group-member.is-gliding {
+  position: relative;
+  z-index: 2;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.collab-group-member.just-moved {
+  animation: collabJustMoved 0.45s ease-out;
+}
+@keyframes collabJustMoved {
+  from {
+    background-color: #dbe9ff;
+    border-color: #8fbcff;
+  }
+}
+.collab-group-card.drag-over::after {
+  content: 'Drop to move here';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  margin: 2px 0;
+  border: 1.5px dashed var(--active);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 122, 255, 0.06);
+  color: var(--link);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.collab-moved {
+  font-size: 13px;
+  color: var(--text);
+}
+.collab-undo {
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collab-panel.is-opening,
+  .collab-group-member.just-moved {
+    animation: none;
+  }
+  .collab-group-member.is-gliding,
+  .collab-choose-chip,
+  .af-students-caret {
+    transition: none;
+  }
 }
 
 /* Pairs / Groups: grouping UI */
@@ -821,9 +953,16 @@
   flex-shrink: 0;
   font-family: var(--font-mono);
 }
+.collab-group-card {
+  transition:
+    background-color 0.1s ease-out,
+    border-color 0.1s ease-out,
+    box-shadow 0.1s ease-out;
+}
 .collab-group-card.drag-over {
   border-color: var(--active);
-  background: rgba(0, 122, 255, 0.04);
+  background: rgba(0, 122, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
 /* Groups count stepper */
@@ -1113,29 +1252,73 @@
 }
 .af-card-title {
   flex: 0 0 136px;
-  font-size: var(--text-base);
+  font-size: 16px;
+  line-height: 22px;
   font-weight: 700;
   color: var(--text);
 }
 .af-card-head .af-mode-cards {
   flex: 1 1 auto;
 }
-.af-card-students .af-card-head .seg {
-  margin-left: auto;
-  width: 300px;
+/* Students, in the top box under the dates (Colin, Nov 11): who it's for,
+   then Individual, Pair or Group; their builder opens underneath. */
+.af-students-row {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider-subtle);
 }
-.af-students-summary {
-  font-size: var(--text-base);
+.af-students-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+  gap: 12px;
+  align-items: center;
+}
+.af-students-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   color: var(--text);
+  font-family: var(--font-base);
+  font-size: 15px;
+  cursor: pointer;
+  text-align: left;
 }
-.af-card-students #af-choose-students {
-  min-height: 40px;
+.af-students-btn:hover {
+  border-color: var(--text-3);
 }
-.af-card-students #af-choose-students[hidden] {
-  display: none;
+.af-students-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
 }
-.af-card-students .collab-panel {
+.af-students-caret {
+  flex: none;
+  transition: transform 0.15s ease-out;
+}
+.af-students-btn[aria-expanded='true'] .af-students-caret {
+  transform: rotate(180deg);
+}
+.af-collab-toggle {
+  height: 40px;
+}
+.af-collab-toggle .seg-btn {
+  line-height: 18px;
+}
+.af-students-names {
+  margin-top: 6px;
+}
+.af-students-row .collab-panel {
   margin-top: 12px;
+}
+@media (max-width: 900px) {
+  .af-students-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .af-row-what {
   display: grid;
@@ -1167,22 +1350,50 @@
 .af-card-scoring .af-rubric-field {
   margin-top: 4px;
 }
-/* Scoring card (redesign PR 2): mode cards sized to their labels, Factor at
-   the row's end, then only what the mode needs. */
+/* Scoring card: the title on its own line, then the ways to score as one
+   toggle row like every other pick-one choice on the form (Colin, Nov 11),
+   Factor at the row's end, then only what the mode needs. */
+.af-card-scoring .af-card-head > .af-card-title {
+  flex: 1 0 100%;
+}
 .af-card-scoring .af-card-head .af-mode-cards {
   display: flex;
   flex-wrap: wrap;
+  flex: 0 1 auto;
   max-width: none;
-  gap: 8px;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: rgba(118, 118, 128, 0.12);
 }
 .af-card-scoring .af-mode-item {
   flex: 0 0 auto;
 }
-/* 140px keeps four cards and Factor on one row on a 1440px screen. */
 .af-card-scoring .af-mode-card {
-  min-width: 140px;
+  min-height: 36px;
   white-space: nowrap;
-  padding: 0 18px;
+  padding: 0 14px;
+  gap: 8px;
+  font-size: 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+}
+.af-card-scoring .af-mode-card:hover {
+  background: transparent;
+  color: var(--text);
+}
+.af-card-scoring .af-mode-card[aria-checked='true'],
+.af-card-scoring .af-mode-card[aria-checked='true']:hover {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.af-card-scoring .af-mode-card[aria-checked='true'] svg {
+  color: var(--text);
 }
 .af-weight-field {
   display: flex;
@@ -1449,9 +1660,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   }
   .af-weight-field {
     margin-left: 0;
-  }
-  .af-card-students .af-card-head .seg {
-    width: 100%;
   }
 }
 .af-comp-view {
@@ -8473,6 +8681,12 @@ button.grader-member-name {
 .af-ge-whole .af-ge-picker {
   top: calc(100% - 2px);
 }
+/* Opened above its button near the form's end: Whole Rubric Scores' top
+   must give way too, or the picker is squeezed to its padding. */
+.af-ge-whole .af-ge-picker.is-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
 .af-ge-pick-list {
   display: grid;
   gap: 1px;
@@ -8745,27 +8959,177 @@ button.grader-member-name {
   margin-top: 4px;
 }
 
-/* Assessment form: the Student Work card (S5-F1; board "Teacher: Student
-   Work Settings on an Assessment"). Drawn only while the class's Send Work
-   is on. A label over each row of choices, as the board draws them. */
+/* Assessment form: the Student Work card (S5-F1), redrawn Nov 11 (board
+   "Assessment Form" 2a to 2d). Drawn only while the class's Send Work is
+   on. One list: each question on the left, its answers on the right; a
+   question shows only where it applies. Beside it, the student's card. */
 .af-work-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+.af-work-list {
+  border: 1px solid var(--divider-subtle);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.af-work-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+}
+.af-work-row + .af-work-row {
+  border-top: 1px solid var(--divider-subtle);
+}
+.af-work-ask {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 640px;
+  gap: 2px;
 }
-.af-work-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.af-work-label {
-  font-size: var(--text-sm);
+.af-work-q {
+  font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
   color: var(--text);
 }
+.af-work-hint {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.af-work-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.af-work-seg .seg-btn {
+  padding: 0 14px;
+  white-space: nowrap;
+}
 .af-work-until {
-  max-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.af-work-until-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.af-card .af-work-date {
+  width: 168px;
+  height: 32px;
+}
+/* Cece Sees: the student page's card, small (s/page-view.css's look). */
+.af-work-peek {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.af-peek-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-3);
+  margin-bottom: 10px;
+}
+.af-peek-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.af-peek-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.af-peek-unit {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.af-peek-due {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fff3dc;
+  color: #8a4b00;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.af-peek-title {
+  margin-top: 8px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.af-peek-title.is-empty {
+  color: var(--text-3);
+  opacity: 0.6;
+}
+.af-peek-cat {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--link);
+  font-size: 12px;
+  font-weight: 700;
+}
+.af-peek-send {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.af-peek-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--active);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+.af-peek-btn.is-tint {
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--link);
+}
+.af-peek-hint {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.af-peek-fact {
+  margin: 10px 2px 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+@media (max-width: 1100px) {
+  .af-work-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .af-work-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .af-work-answer {
+    align-items: flex-start;
+  }
 }
 
 /* ── The student's work beside the scoring (S6-F1 to F3) ──────
