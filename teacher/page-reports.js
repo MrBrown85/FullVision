@@ -1063,8 +1063,10 @@ window.PageReports = (function () {
     html += '<div class="confirm-message">' + subtitle + '</div>';
     html += '<div class="issue-kv">';
     html +=
-      '<span class="issue-k">Form</span><span>' +
-      esc(grade ? 'Quick Report' : form.name) +
+      '<span class="issue-k">' +
+      (_isOne() ? 'Setup' : 'Form') +
+      '</span><span>' +
+      esc(_isOne() ? _oneSetupName() : grade ? 'Quick Report' : form.name) +
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
@@ -1497,6 +1499,15 @@ window.PageReports = (function () {
   }
   function _oneModel() {
     return ReportOne.modelFor(reportConfig);
+  }
+  /* The Setup the class's report matches, by name; Your Setup once the
+     teacher has changed its parts. */
+  function _oneSetupName() {
+    var id = _oneModel().setup;
+    var s = ReportOne.SETUPS.filter(function (x) {
+      return x.id === id;
+    })[0];
+    return s ? s.name : 'Your Setup';
   }
   /* Every change saves the model and can be undone, as _setForm does. */
   function _setOne(model, label) {

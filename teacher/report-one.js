@@ -1066,7 +1066,8 @@ window.ReportOne = (function () {
           '</div></div>';
       } else {
         html +=
-          'Blank</div><div class="report-sheet sheet-blank-side" data-paper="' +
+          _sideLabel(s, sheetCount, 'Blank') +
+          '</div><div class="report-sheet sheet-blank-side" data-paper="' +
           paper +
           '"><div class="sheet-body"><div class="sheet-blank">This side is left blank.</div></div></div>';
       }
