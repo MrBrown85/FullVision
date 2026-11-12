@@ -97,7 +97,7 @@ const _cache = {
   v2Gradebook: {}, // keyed by cid — raw get_gradebook(cid) payload (Phase 3.4+)
 };
 
-// Mapping from cache field → localStorage key suffix (and Supabase data_key)
+// Mapping from cache field → localStorage key suffix
 const _DATA_KEYS = {
   students: 'students',
   categories: 'categories',
@@ -1359,9 +1359,9 @@ async function initAllCourses() {
   // sending must send through the auth guard and re-key the creates it lands.
   _outbox();
 
-  // v2: Realtime / cross-device sync removed with the legacy public-schema
-  // tables. The canonical v2 schema has its own publication strategy to be
-  // designed (tracked in the post-reconciliation backlog).
+  // Realtime refresh: _subscribeCourseSyncCursor listens on the
+  // course_sync_cursor channel and reloads a class when another device
+  // changes it.
 
   // Re-fetch from Supabase when user returns to this tab/app
   _initVisibilityRefresh();
@@ -2133,7 +2133,7 @@ function _applyIdRekeysToStatuses(cid, statuses) {
   return changed;
 }
 
-/* ── Pending creates and re-keys (docs/write-path-audit-2026-10.md §1, 6, 7, 11)
+/* ── Pending creates and re-keys (write-path audit, 2026-10-16, §1, 6, 7, 11)
 
    A row the teacher adds gets a local id until its create_* / upsert_* lands
    and the server names it. Until then every write that mentions the row
@@ -14601,9 +14601,9 @@ window.deleteObservationTemplate = function (tplId) {
 /* ── v2 learning-map + structural helpers (Phase 4.5) ───────────────────
    Namespaced under window.v2 to avoid colliding with the existing
    blob-based local client functions (saveLearningMap, deleteRubric, etc.).
-   New UI code calls v2.<name>() directly; the legacy blob save machinery
-   stays as a localStorage cache until the UI is rewritten to drive these
-   RPCs per-entity. */
+   New UI code calls v2.<name>() directly; the legacy blob saves stay (write-path
+   plan, Phase 5): each save diffs against the server baseline and sends only
+   the rows that changed. */
 window.v2 = window.v2 || {};
 
 function _isSessionExpiredRpcError(err) {
