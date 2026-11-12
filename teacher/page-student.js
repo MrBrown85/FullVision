@@ -1615,12 +1615,33 @@ window.PageStudent = (function () {
   /* One quiet line over the list: how many are assessed, the strongest and
      the one to work on next, each with its level as the app shows levels,
      and where the class's calculation is set. */
+  /* Strongest and Next to Work On, chosen only among competencies with
+     enough evidence for the table's own Since the Start reading (fewer
+     prints "Too few to tell"), so neither rests on one score. On a tie,
+     the one with more scores. A missing pick is left out of the line.
+       items  [{ v: level, n: scores, enough: true|false, ... }] */
+  function _cpPick(items) {
+    var ok = (items || []).filter(function (x) {
+      return x.enough && x.v > 0;
+    });
+    if (!ok.length) return { hi: null, lo: null };
+    var hi = ok.reduce(function (m, x) {
+      return x.v > m.v || (x.v === m.v && x.n > m.n) ? x : m;
+    }, ok[0]);
+    var lo = ok.reduce(function (m, x) {
+      return x.v < m.v || (x.v === m.v && x.n > m.n) ? x : m;
+    }, ok[0]);
+    return { hi: hi, lo: lo === hi ? null : lo };
+  }
+
   function _cpSummaryHtml(ctx) {
     var cid = ctx.cid;
     var scored = [];
     ctx.sections.forEach(function (sec) {
       var v = getSectionProficiency(cid, studentId, sec.id);
-      if (v > 0) scored.push({ sec: sec, v: v });
+      if (!(v > 0)) return;
+      var entries = _compEntries(cid, sec);
+      scored.push({ sec: sec, v: v, n: entries.length, enough: _cpTrend(cid, entries).dir !== 'none' });
     });
     var parts = [
       '<span class="stu-cp-sum-item"><strong>' +
@@ -1631,13 +1652,10 @@ window.PageStudent = (function () {
         (ctx.sections.length === 1 ? 'Competency' : 'Competencies') +
         ' Assessed</span>',
     ];
-    if (scored.length >= 2) {
-      var hi = scored.reduce(function (m, x) {
-        return x.v > m.v ? x : m;
-      }, scored[0]);
-      var lo = scored.reduce(function (m, x) {
-        return x.v < m.v ? x : m;
-      }, scored[0]);
+    var pick = _cpPick(scored);
+    var hi = pick.hi;
+    var lo = pick.lo;
+    if (hi)
       parts.push(
         '<span class="stu-cp-sum-item"><span class="stu-cp-sum-label">Strongest</span> ' +
           esc(hi.sec.name) +
@@ -1645,6 +1663,7 @@ window.PageStudent = (function () {
           _levelPill(cid, hi.v) +
           '</span>',
       );
+    if (lo)
       parts.push(
         '<span class="stu-cp-sum-item"><span class="stu-cp-sum-label">Next to Work On</span> ' +
           esc(lo.sec.name) +
@@ -1652,7 +1671,6 @@ window.PageStudent = (function () {
           _levelPill(cid, lo.v) +
           '</span>',
       );
-    }
     return (
       '<div class="stu-cp-summary">' +
       parts.join('') +
@@ -3622,6 +3640,7 @@ window.PageStudent = (function () {
 
   /* ── Public API ─────────────────────────────────────────── */
   return {
+    _helpers: { cpPick: _cpPick },
     init: init,
     destroy: destroy,
     render: render,

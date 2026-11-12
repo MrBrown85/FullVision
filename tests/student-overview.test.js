@@ -122,6 +122,35 @@ describe('the Overview tab', () => {
     globalThis.document = stubDocument;
   });
 
+  describe('Competencies summary: Strongest and Next to Work On', () => {
+    const pick = items => PageStudent._helpers.cpPick(items);
+    const c = (name, v, n, enough) => ({ name, v, n, enough });
+
+    it('leaves out a competency with too few scores for Since the Start', () => {
+      const r = pick([c('One score', 4, 1, false), c('Strong', 3.2, 5, true), c('Weak', 2.1, 4, true)]);
+      expect(r.hi.name).toBe('Strong');
+      expect(r.lo.name).toBe('Weak');
+    });
+
+    it('leaves an item out when nothing has enough evidence, and shows one when only one does', () => {
+      expect(pick([c('A', 4, 1, false), c('B', 2, 1, false)])).toEqual({ hi: null, lo: null });
+      const one = pick([c('A', 4, 1, false), c('B', 3, 6, true)]);
+      expect(one.hi.name).toBe('B');
+      expect(one.lo).toBeNull();
+    });
+
+    it('breaks a tie by the one with more scores', () => {
+      const r = pick([
+        c('Few', 3, 3, true),
+        c('Many', 3, 8, true),
+        c('Low few', 2, 2, true),
+        c('Low many', 2, 9, true),
+      ]);
+      expect(r.hi.name).toBe('Many');
+      expect(r.lo.name).toBe('Low many');
+    });
+  });
+
   it('is the first tab and opens when no tab was saved', () => {
     const main = open();
     const tabs = Array.from(main.querySelectorAll('.stu-tab'));
