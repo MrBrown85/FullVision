@@ -611,7 +611,15 @@ test.describe('a slip is as it was', () => {
     expect(posts.map(p => p.body)).toEqual([
       { route: 'card', code: 'K7M4QX' },
       { route: 'open', code: 'K7M4QX' },
-      { route: 'verify', token: 'a'.repeat(64), birthday: null, student_number: '0123456', password: null },
+      // The slip's code goes with its verify, so the function checks it against the slip's keyed tag (S3-S1).
+      {
+        route: 'verify',
+        token: 'a'.repeat(64),
+        code: 'K7M4QX',
+        birthday: null,
+        student_number: '0123456',
+        password: null,
+      },
     ]);
     // Six characters is no card's code, so the function answers `card` without asking the database; and it sent
     // the token's verify to the slip's function, not the card's.
