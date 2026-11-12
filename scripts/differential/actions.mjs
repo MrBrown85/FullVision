@@ -438,10 +438,22 @@ export const ACTIONS = [
     modes: ['demo'],
     pick(rng, view) {
       // Mostly a piece with drafts waiting, so a Return returns something.
-      const waiting = view.assessments.filter(a => view.drafts && view.drafts[a.id]);
-      const a = waiting.length && rng.chance(0.8) ? rng.pick(waiting) : rng.pick(view.assessments);
+      // Return to All goes to the piece with the most drafts half the time,
+      // as after a fill, so most of the class is returned at once.
+      const drafts = view.drafts || {};
+      const waiting = view.assessments.filter(a => drafts[a.id]);
+      const most = waiting.slice().sort((x, y) => drafts[y.id] - drafts[x.id])[0];
+      const all = rng.chance(0.6);
+      const r = rng.next();
+      const a = !waiting.length
+        ? rng.pick(view.assessments)
+        : all && r < 0.5
+          ? most
+          : r < 0.9
+            ? rng.pick(waiting)
+            : rng.pick(view.assessments);
       if (!a) return null;
-      return { aid: a.id, all: rng.chance(0.6), sid: rng.pick(view.students).id };
+      return { aid: a.id, all, sid: rng.pick(view.students).id };
     },
     // Return for one student, or Return for all on the piece.
     run: (page, a) =>
@@ -450,7 +462,7 @@ export const ACTIONS = [
         `const cid = getActiveCourse();
          const ids = args.all ? getStudents(cid).map(s => s.id) : [args.sid];
          const out = Grader.returnGrades(cid, args.aid, args.all ? ids : args.sid);
-         return out && typeof out.then === 'function' ? out.then(() => 'ok') : 'ok';`,
+         return Promise.resolve(out).then(o => 'returned ' + ((o && o.returned) || 0));`,
         a,
       ),
   },
