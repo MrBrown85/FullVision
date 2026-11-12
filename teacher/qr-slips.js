@@ -61,19 +61,22 @@ var QrSlips = (function () {
      renderCell(item), and takes the sheet off the page when the print dialog
      closes. The caller checks there is something to print. */
   function printSheet(items, renderCell) {
-    var root = document.getElementById(ROOT_ID);
-    if (!root) {
-      root = document.createElement('div');
-      root.id = ROOT_ID;
-      document.body.appendChild(root);
-    }
-    root.innerHTML = sheetPages(items, renderCell);
-    // Every page the same margin; the cells are cut apart (ui.js setPrintMode).
-    setPrintMode(STYLE_ID, 'qr-slips-active', 'letter portrait', '0.25in');
-    printThen(function () {
-      clearPrintMode(STYLE_ID, 'qr-slips-active');
-      var r = document.getElementById(ROOT_ID);
-      if (r) r.innerHTML = '';
+    // The QR maker (vendor/qrcode.js) loads the first time a sheet is printed (router.js _onDemand).
+    window.Router.withScripts('qrcode', function () {
+      var root = document.getElementById(ROOT_ID);
+      if (!root) {
+        root = document.createElement('div');
+        root.id = ROOT_ID;
+        document.body.appendChild(root);
+      }
+      root.innerHTML = sheetPages(items, renderCell);
+      // Every page the same margin; the cells are cut apart (ui.js setPrintMode).
+      setPrintMode(STYLE_ID, 'qr-slips-active', 'letter portrait', '0.25in');
+      printThen(function () {
+        clearPrintMode(STYLE_ID, 'qr-slips-active');
+        var r = document.getElementById(ROOT_ID);
+        if (r) r.innerHTML = '';
+      });
     });
   }
 

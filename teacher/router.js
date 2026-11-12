@@ -22,13 +22,14 @@ window.Router = (function () {
     '/reports': 'Reports',
   };
 
-  /* Pages whose scripts load the first time the page is opened, not with
-     the app. Reports' scripts (about 740 KB) are used by no other page.
-     They run in the order app.html had them, each once; page-reports.js
-     comes last because it reads ReportPreview and ReportQuestionnaire as
-     it loads. comment-realiser.js stays in app.html: comment-bank.js reads
-     it as it loads. sw.js precaches every file here, so Reports opens
-     offline too (e2e/loading-on-demand.spec.js). */
+  /* Pages whose scripts load the first time the page is opened, and
+     features whose scripts load the first time a button uses them
+     (withScripts), not with the app. Reports' scripts (about 740 KB) are
+     used by no other page. They run in the order app.html had them, each
+     once; page-reports.js comes last because it reads ReportPreview and
+     ReportQuestionnaire as it loads. comment-realiser.js stays in
+     app.html: comment-bank.js reads it as it loads. sw.js precaches every
+     file here, so each opens offline too (e2e/loading-on-demand.spec.js). */
   var _onDemand = {
     '/reports': {
       page: 'PageReports',
@@ -46,9 +47,29 @@ window.Router = (function () {
         '/teacher/page-reports.js',
       ],
     },
+    /* Assignments' page module is a tag, but its rubric forms draw with the
+       rubric library and the Rubric Bank (about 80 KB), which no other page
+       uses: they load before Assignments first draws. `needs` names the
+       globals that say a load has run (for Reports, its page). */
+    '/assignments': {
+      page: 'PageAssignments',
+      needs: ['RubricLibrary', 'RubricBank'],
+      scripts: ['/teacher/rubric-library.js', '/teacher/rubric-bank.js'],
+    },
+    /* Scripts one button or dialog uses, loaded the first time it is
+       pressed (withScripts), not with the app. */
+    gradesPrint: { title: 'Print Grades', needs: ['GradesPrint'], scripts: ['/teacher/grades-print.js'] },
+    gradingSetupCopy: {
+      title: 'Copy Grading Setup',
+      needs: ['GradingSetupCopy'],
+      scripts: ['/teacher/grading-setup-copy.js'],
+    },
+    // The QR maker every print sheet of slips or cards draws with (teacher/qr-slips.js printSheet).
+    qrcode: { title: 'QR Codes', needs: ['qrcode'], scripts: ['/vendor/qrcode.js'] },
   };
   var _ran = {}; // src → true once the script has run
-  var _pageLoads = {}; // path → the load in progress
+  var _pageLoads = {}; // path or feature → the load in progress
+  var _pressed = {}; // feature → the press to run once its scripts have
 
   var _currentPage = null;
   var _currentUrl = null;
@@ -135,9 +156,18 @@ window.Router = (function () {
   }
 
   /* ── Pages loaded on demand ──────────────────────────────── */
+  // Whether an entry's scripts have run: each global it needs is there.
+  function _ready(spec) {
+    return (spec.needs || [spec.page]).every(function (name) {
+      return !!window[name];
+    });
+  }
+
   // The page module for a path, once its scripts have run.
   function _pageFor(path) {
-    if (!_routes[path] && _onDemand[path]) _routes[path] = window[_onDemand[path].page];
+    var spec = _onDemand[path];
+    if (spec && !_ready(spec)) return null;
+    if (!_routes[path] && spec) _routes[path] = window[spec.page];
     return _routes[path];
   }
 
@@ -157,10 +187,10 @@ window.Router = (function () {
     });
   }
 
-  /* Fetches every script the page still needs side by side (preload), then
-     runs them one at a time in order, so one that fails stops the rest. A
-     failed load is forgotten, so Try Again starts from the file that
-     failed. */
+  /* Fetches every script a page or feature still needs side by side
+     (preload), then runs them one at a time in order, so one that fails
+     stops the rest. A failed load is forgotten, so Try Again starts from
+     the file that failed. */
   function _loadPage(path) {
     if (_pageLoads[path]) return _pageLoads[path];
     var spec = _onDemand[path];
@@ -182,7 +212,7 @@ window.Router = (function () {
         });
       }, Promise.resolve())
       .then(function () {
-        if (!_pageFor(path)) throw new Error(spec.page + ' did not load');
+        if (!_ready(spec) || (spec.page && !_pageFor(path))) throw new Error(path + ' did not load');
       });
     _pageLoads[path] = load;
     function settle() {
@@ -230,6 +260,41 @@ window.Router = (function () {
     box.appendChild(retry);
     main.appendChild(box);
     retry.focus();
+  }
+
+  /* A button or dialog whose scripts load the first time it is used (a
+     feature in _onDemand). run() runs at once when they have run already,
+     so a press works as it always did; otherwise once they have. Presses
+     while they load run once, the last one, and only if its page is still
+     the one showing. A file that cannot be fetched: a question that says
+     so, whose Try Again presses again. */
+  function withScripts(key, run) {
+    var spec = _onDemand[key];
+    if (!spec || _ready(spec)) return run();
+    var loading = !!_pageLoads[key];
+    _pressed[key] = { run: run, page: _currentPage };
+    if (loading) return;
+    _loadPage(key).then(
+      function () {
+        var press = _pressed[key];
+        _pressed[key] = null;
+        if (press && press.page === _currentPage) press.run();
+      },
+      function () {
+        var press = _pressed[key];
+        _pressed[key] = null;
+        if (!press || press.page !== _currentPage) return;
+        showConfirm(
+          spec.title + ' Could Not Open',
+          'FullVision could not load this. Check your internet connection, then try again.',
+          'Try Again',
+          'primary',
+          function () {
+            withScripts(key, press.run);
+          },
+        );
+      },
+    );
   }
 
   function _needsCourseLoad(cid) {
@@ -451,6 +516,7 @@ window.Router = (function () {
     getCurrentPage: function () {
       return _currentPage;
     },
+    withScripts: withScripts,
     // Every page's address, for the tests that walk every page.
     routes: function () {
       return Object.keys(_routes);

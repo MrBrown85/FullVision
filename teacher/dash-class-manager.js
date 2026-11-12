@@ -7638,28 +7638,31 @@ window.DashClassManager = (function () {
   // Grading setup copied to or from another class (teacher/grading-setup-copy.js).
   // Unsaved category or term edits would be lost under the copy, so they
   // are saved or undone first.
+  // grading-setup-copy.js loads the first time this is pressed (router.js _onDemand).
   function cmOpenSetupCopy(opts) {
-    if (!cmSelectedCourse || !window.GradingSetupCopy) return;
-    var cid = cmSelectedCourse;
-    if (_cmCatState(cid).dirty || (_cmTermState[cid] && _cmTermState[cid].dirty)) {
-      if (typeof showSyncToast === 'function')
-        showSyncToast('Save or undo your changes to categories and terms first.', 'info');
-      return;
-    }
-    window.GradingSetupCopy.openDialog(
-      cid,
-      Object.assign({}, opts, {
-        onDone: function (cids) {
-          // A class whose categories were left as they were says so above
-          // them when it is next shown here (noteCategoriesNotCopied).
-          (cids || []).forEach(function (c) {
-            delete _cmCategoryState[c];
-            delete _cmTermState[c];
-          });
-          _cmCatRedraw(cid);
-        },
-      }),
-    );
+    window.Router.withScripts('gradingSetupCopy', function () {
+      if (!cmSelectedCourse || !window.GradingSetupCopy) return;
+      var cid = cmSelectedCourse;
+      if (_cmCatState(cid).dirty || (_cmTermState[cid] && _cmTermState[cid].dirty)) {
+        if (typeof showSyncToast === 'function')
+          showSyncToast('Save or undo your changes to categories and terms first.', 'info');
+        return;
+      }
+      window.GradingSetupCopy.openDialog(
+        cid,
+        Object.assign({}, opts, {
+          onDone: function (cids) {
+            // A class whose categories were left as they were says so above
+            // them when it is next shown here (noteCategoriesNotCopied).
+            (cids || []).forEach(function (c) {
+              delete _cmCategoryState[c];
+              delete _cmTermState[c];
+            });
+            _cmCatRedraw(cid);
+          },
+        }),
+      );
+    });
   }
 
   /* A row dragged to a new place. It moves on screen at once. With nothing
