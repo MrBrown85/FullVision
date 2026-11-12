@@ -45,7 +45,6 @@ body.mobile-mode :focus:not(:focus-visible) {
 
 /* ── Course-switch input lock (P7.3) ────────────────────────── */
 body.fv-switching-course #m-app,
-body.fv-switching-course .m-tab-content,
 body.fv-switching-course .m-tab-bar {
   pointer-events: none;
   opacity: 0.55;
@@ -406,8 +405,7 @@ body.fv-switching-course::after {
     opacity 0.15s,
     transform 0.15s;
 }
-.m-nav-bar-scrolled + .m-screen-content .m-title-large,
-.m-title-large.m-title-hidden {
+.m-nav-bar-scrolled + .m-screen-content .m-title-large {
   opacity: 0;
   transform: translateY(-8px);
   height: 0;
@@ -666,39 +664,6 @@ body.fv-switching-course::after {
   font-weight: 500;
 }
 
-/* ── Stats Strip ───────────────────────────────────────────── */
-.m-stats-strip {
-  display: flex;
-  gap: 8px;
-  padding: 0 16px 16px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.m-stats-strip::-webkit-scrollbar {
-  display: none;
-}
-
-.m-stat-card {
-  flex: 0 0 auto;
-  min-width: 90px;
-  background: var(--surface);
-  border-radius: 12px;
-  padding: 10px 12px;
-  text-align: center;
-}
-.m-stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-}
-.m-stat-label {
-  font-size: 12px;
-  color: var(--text-3);
-  margin-top: 2px;
-  font-weight: 500;
-}
-
 /* ── Section Cards ─────────────────────────────────────────── */
 .m-section-card {
   background: var(--surface);
@@ -938,24 +903,6 @@ body.fv-switching-course::after {
   background: rgba(46, 125, 50, 0.1);
   color: var(--score-3);
 }
-.m-assess-scores {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.m-assess-score-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--overlay-hover);
-}
-.m-assess-score-val {
-  font-weight: 700;
-}
 
 /* ── Observation Cards ─────────────────────────────────────── */
 /* The desktop card's vocabulary (teacher/observations.css): a solid type
@@ -1179,15 +1126,6 @@ body.fv-switching-course::after {
 .m-obs-type-pill[data-sentiment='note'] {
   color: var(--obs-note-text);
   background: color-mix(in srgb, var(--obs-note) 22%, transparent);
-}
-.m-obs-student-fixed {
-  padding: 8px 12px;
-  background: var(--overlay-hover);
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 12px;
 }
 .m-obs-sheet-delete {
   display: block;
@@ -1506,20 +1444,6 @@ body.fv-switching-course::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.m-filter-sheet-footer {
-  display: flex;
-  gap: 12px;
-  padding: 12px 0 env(safe-area-inset-bottom, 0px);
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
-  border-top: 0.5px solid var(--divider-medium);
-  margin-top: 12px;
-}
-.m-filter-sheet-footer .m-btn-ghost,
-.m-filter-sheet-footer .m-btn-primary {
-  flex: 1;
-}
 
 /* ── FAB (Floating Action Button) ──────────────────────────── */
 .m-fab {
@@ -1635,19 +1559,6 @@ body.fv-switching-course::after {
   border-color: var(--active);
 }
 
-/* Student picker in sheet */
-.m-student-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 12px;
-  min-height: 44px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  cursor: pointer;
-  align-items: center;
-}
 .m-student-chip {
   display: inline-flex;
   align-items: center;
@@ -1671,13 +1582,11 @@ body.fv-switching-course::after {
 }
 
 /* Sentiment & context selectors */
-.m-sentiment-row,
-.m-context-row {
+.m-sentiment-row {
   display: flex;
   gap: 8px;
 }
-.m-sentiment-btn,
-.m-context-btn {
+.m-sentiment-btn {
   flex: 1;
   display: flex;
   align-items: center;
@@ -1695,30 +1604,10 @@ body.fv-switching-course::after {
   -webkit-tap-highlight-color: transparent;
   transition: all 0.15s;
 }
-.m-sentiment-btn.m-selected,
-.m-context-btn.m-selected {
+.m-sentiment-btn.m-selected {
   border-color: var(--active);
   background: var(--active-light);
   color: var(--link);
-}
-
-/* Dimension tag strip */
-.m-dim-strip {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 2px;
-}
-.m-dim-strip::-webkit-scrollbar {
-  display: none;
-}
-
-.m-dim-section {
-  margin: 10px 0 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-3);
 }
 
 .m-sheet-title {
@@ -1726,30 +1615,6 @@ body.fv-switching-course::after {
   font-weight: 700;
   color: var(--text);
   margin: 0 0 10px;
-}
-
-.m-dim-chip {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  min-height: 44px;
-  border-radius: 22px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-2);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.m-dim-chip.m-selected {
-  border-color: var(--active);
-  background: var(--active-light);
-  color: var(--link);
 }
 
 /* Full-width submit button */
@@ -2003,10 +1868,6 @@ body.fv-switching-course::after {
   font-size: 20px;
   font-weight: 600;
   color: var(--text);
-}
-.m-grade-student-sub {
-  font-size: 14px;
-  color: var(--text-3);
 }
 
 /* Score selector row */
@@ -2578,25 +2439,6 @@ body.fv-switching-course::after {
 }
 
 /* ── Student Picker List (in sheet) ────────────────────────── */
-.m-picker-list {
-  max-height: 300px;
-  overflow-y: auto;
-  margin-top: 8px;
-  background: var(--bg);
-  border-radius: 10px;
-}
-.m-picker-search {
-  width: 100%;
-  height: 36px;
-  border: none;
-  border-bottom: 0.5px solid var(--divider-subtle);
-  background: transparent;
-  padding: 0 12px;
-  font-size: 15px;
-  font-family: inherit;
-  color: var(--text);
-  outline: none;
-}
 .m-picker-item {
   display: flex;
   align-items: center;
@@ -2615,19 +2457,6 @@ body.fv-switching-course::after {
   width: 20px;
   text-align: center;
   flex-shrink: 0;
-}
-
-/* ── Highlight animation for new items ─────────────────────── */
-@keyframes m-highlight {
-  from {
-    background: var(--active-light);
-  }
-  to {
-    background: transparent;
-  }
-}
-.m-highlight {
-  animation: m-highlight 1.5s ease-out;
 }
 
 /* ── Mobile Login Screen ───────────────────────────────────── */
@@ -3017,40 +2846,6 @@ body.fv-switching-course::after {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   VIEW TOGGLE — Cards / List segmented control in nav bar
-   ═══════════════════════════════════════════════════════════════ */
-.m-view-toggle {
-  display: flex;
-  background: rgba(118, 118, 128, 0.12);
-  border-radius: 8px;
-  padding: 2px;
-  gap: 0;
-  margin-right: 8px;
-}
-.m-view-toggle-btn {
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 10px 14px;
-  min-height: 44px;
-  border: none;
-  background: none;
-  border-radius: 6px;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: all 0.2s;
-  -webkit-tap-highlight-color: transparent;
-}
-.m-view-toggle-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    0 0.5px 1px rgba(0, 0, 0, 0.04);
-  font-weight: 600;
-}
-
-/* ═══════════════════════════════════════════════════════════════
    CARD STACK — Swipeable card deck with physical depth
    ═══════════════════════════════════════════════════════════════ */
 .m-card-stack {
@@ -3210,11 +3005,6 @@ body.fv-switching-course::after {
   font-size: 20px;
   font-weight: 700;
   color: var(--text);
-}
-.m-scard-sub {
-  font-size: 13px;
-  color: var(--text-3);
-  margin-top: 2px;
 }
 .m-scard-badges {
   display: flex;
@@ -4549,15 +4339,6 @@ body.fv-switching-course::after {
   border-radius: 10px;
   font-size: 15px;
   font-weight: 700;
-}
-.m-fine-row {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-.m-fine-row .m-score-mods {
-  flex: 2 1 0;
-  margin-top: 0;
 }
 /* A saved comment reads as a note; tapped, it is a box to type in. */
 .m-crit-comment:not(:focus):not(:placeholder-shown) {
