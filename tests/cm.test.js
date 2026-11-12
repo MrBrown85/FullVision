@@ -406,11 +406,14 @@ describe('cm-empty-state', () => {
 
 describe('cm-import-review', () => {
   /**
-   * Import Roster's review. Rows match the roster by student number, then by
-   * name: a matched number with a new name is a name change (kept with their
-   * scores), a new row is added, and a student the file leaves out is offered
-   * for withdrawal, off unless the teacher ticks it. Nothing changes until
-   * Import.
+   * Import Roster (board: Import Roster canvas, Nov 11 2026). Rows match the
+   * roster by student number, then by name: a matched number with a new name
+   * is a name change (kept with their scores), a new row is added, and a
+   * student the file leaves out is offered for withdrawal, off unless the
+   * teacher ticks it. A file whose every column is known goes straight to
+   * Ready to Add; any other is checked column by column. Problems never
+   * block: the student is added with that field blank. Nothing changes until
+   * the teacher adds or saves.
    */
 
   const CID = 'e0000000-0000-4000-8000-0000000c1a55';
@@ -427,27 +430,59 @@ describe('cm-import-review', () => {
       .sort();
   }
 
-  describe('Import Roster review', () => {
-    var main;
-    var originalGetElementById;
+  var main;
+  var originalGetElementById;
 
+  function openStudents(roster) {
+    localStorage.clear();
+    saveCourses({ [CID]: { id: CID, name: 'Science 8' } });
+    saveStudents(CID, roster);
+    main = { innerHTML: '' };
+    originalGetElementById = document.getElementById;
+    document.getElementById = function (id) {
+      return id === 'main' ? main : originalGetElementById(id);
+    };
+    DashClassManager.resetState();
+    DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
+    DashClassManager.openClassManager();
+    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'students' } });
+  }
+
+  function importText(text, fileName) {
+    DashClassManager.cmStartImport(DashClassManager.rosterImportTable(text), fileName || 'roster.csv');
+  }
+
+  function act(action, dataset) {
+    DashClassManager.handleAction(action, { dataset: dataset || {} });
+  }
+
+  // A MyEd class list: every column known, or left out on purpose.
+  const MYED =
+    'Legal Surname,Legal First Name,Usual First Name,Pupil #,Grade,Homeroom,Gender,Date of Birth\n' +
+    'Bains,Arjun,AJ,1203400,08,D-12,M,2012-04-10\n' +
+    'Castillo,Maya,,1203407,08,D-12,F,2012-02-24\n' +
+    'Dhillon,Simran,,1203414,08,D-12,F,2012-07-16\n';
+
+  // A teacher's own spreadsheet: headers FullVision doesn't all know, dates
+  // month first, a number used twice, a row with no name, a date that isn't
+  // real and a column of designation codes.
+  const MESSY =
+    'Student Name,ID,Birthday,Parent Contact,Block,Notes,IEP\n' +
+    '"Bains, Arjun",1203400,5/13/2012,bains.family@gmail.com,B,,\n' +
+    '"Castillo, Maya",1203407,5/22/2012,castillo.family@gmail.com,B,,\n' +
+    '"Eriksen, Tove",1203421,7/26/2012,eriksen.family@gmail.com,B,,P\n' +
+    '"Fontaine, Luc",1203428,Sept 31 2012,fontaine.family@gmail.com,B,,\n' +
+    '"Johal, Navdeep",1203456,1/15/2012,johal.family@gmail.com,B,,\n' +
+    '"Kowalczyk, Zofia",1203456,1/27/2012,kowalczyk.family@gmail.com,B,sits near front,Q\n' +
+    '"",1203498,2/26/2012,patel.family@gmail.com,B,,\n';
+
+  describe('a class with students: What This File Will Change', () => {
     beforeEach(() => {
-      localStorage.clear();
-      saveCourses({ [CID]: { id: CID, name: 'Science 8' } });
-      saveStudents(CID, [
+      openStudents([
         student('s1', 'Fatima', 'Hassan', 'STU-208'),
         student('s2', 'Tyler', 'Rowe', 'STU-215'),
         student('s3', 'Liam', 'Chen', ''),
       ]);
-      main = { innerHTML: '' };
-      originalGetElementById = document.getElementById;
-      document.getElementById = function (id) {
-        return id === 'main' ? main : originalGetElementById(id);
-      };
-      DashClassManager.resetState();
-      DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
-      DashClassManager.openClassManager();
-      DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'students' } });
     });
 
     afterEach(() => {
@@ -465,7 +500,8 @@ describe('cm-import-review', () => {
         { firstName: 'Noor', lastName: 'Al-Rashid', studentNumber: 'STU-202' },
       ]);
       var html = main.innerHTML;
-      expect(html).toContain('Import Roster: Review Changes');
+      expect(html).toContain('What This File Will Change');
+      expect(html).toContain('1 new student and 1 new name.');
       expect(html).toContain('New to This Class');
       expect(html).toContain('Noor Al-Rashid');
       expect(html).toContain('Name Changed');
@@ -473,20 +509,23 @@ describe('cm-import-review', () => {
       expect(html).toContain('In Your Class, Not in This File');
       expect(html).toContain('Tyler Rowe');
       expect(html).toContain('Add 1, rename 1.');
+      expect(html).toContain('Save Changes');
       // Nothing has changed yet.
       expect(names()).toEqual(['Fatima Hassan', 'Liam Chen', 'Tyler Rowe']);
     });
 
-    it('adds and renames on Import, and withdraws no one unless ticked', () => {
+    it('adds and renames on Save Changes, and withdraws no one unless ticked', () => {
       importRows([
         { firstName: 'Fatima', lastName: 'Hassan-Ali', studentNumber: 'STU-208' },
         { firstName: 'Liam', lastName: 'Chen', studentNumber: '' },
         { firstName: 'Noor', lastName: 'Al-Rashid', studentNumber: 'STU-202' },
       ]);
-      DashClassManager.handleAction('cmConfirmImport', { dataset: {} });
+      act('cmConfirmImport');
       expect(names()).toEqual(['Fatima Hassan-Ali', 'Liam Chen', 'Noor Al-Rashid', 'Tyler Rowe']);
       expect(getStudents(CID).find(s => s.studentNumber === 'STU-208').id).toBe('s1');
       expect(getWithdrawnStudents(CID)).toHaveLength(0);
+      expect(main.innerHTML).toContain('Roster Updated');
+      expect(main.innerHTML).toContain('1 added, 1 renamed.');
     });
 
     it('withdraws a missing student the teacher ticks', () => {
@@ -498,20 +537,66 @@ describe('cm-import-review', () => {
         dataset: { actionChange: 'cmImportToggle', kind: 'missing', idx: '0' },
         checked: true,
       });
-      DashClassManager.handleAction('cmConfirmImport', { dataset: {} });
+      act('cmConfirmImport');
       expect(names()).toEqual(['Fatima Hassan', 'Liam Chen']);
       expect(getWithdrawnStudents(CID).map(w => w.student.id)).toEqual(['s2']);
     });
 
     it('Cancel leaves the roster as it was', () => {
       importRows([{ firstName: 'Noor', lastName: 'Al-Rashid', studentNumber: 'STU-202' }]);
-      DashClassManager.handleAction('cmCancelImport', { dataset: {} });
-      expect(main.innerHTML).not.toContain('Review Changes');
+      act('cmCancelImport');
+      expect(main.innerHTML).not.toContain('What This File Will Change');
       expect(names()).toEqual(['Fatima Hassan', 'Liam Chen', 'Tyler Rowe']);
+    });
+
+    it('opens the drop strip, not a page of rules, from Import Roster', () => {
+      act('cmImportRoster');
+      var html = main.innerHTML;
+      expect(html).toContain('Drop a class list here to update this class');
+      expect(html).toContain('matched by student number, so no one is added twice');
+      expect(html).toContain('Download Template');
+      expect(html).not.toContain('Name columns:');
+    });
+
+    it('offers filled-in details for a matched student, old and new side by side, and applies them', () => {
+      var table = DashClassManager.rosterImportTable(
+        'Student Number,First Name,Last Name,Pronouns,Date of Birth,Designations\nSTU-208,Fatima,Hassan,she/her,2013-07-09,G\n',
+      );
+      var read = DashClassManager.rosterRowsFromTable(table);
+      DashClassManager.cmShowImportPreview(read.rows, 'myed.csv', table, read.skipped);
+      var html = main.innerHTML;
+      expect(html).toContain('Details Updated');
+      expect(html).toContain('Date of Birth <span class="cm-import-old">blank →</span> 2013-07-09');
+      expect(html).toContain('Designations + G');
+      act('cmConfirmImport');
+      var st = getStudents(CID).find(s => s.id === 's1');
+      expect(st.pronouns).toBe('she/her');
+      expect(st.dateOfBirth).toBe('2013-07-09');
+      expect(st.designations).toEqual(['G']);
+    });
+
+    it('re-reads the file when a column is matched to a different field', () => {
+      var table = DashClassManager.rosterImportTable('First Name,Last Name,Code\nNoor,Al-Rashid,STU-202\n');
+      var read = DashClassManager.rosterRowsFromTable(table);
+      DashClassManager.cmShowImportPreview(read.rows, 'f.csv', table, read.skipped);
+      DashClassManager.handleChange({ dataset: { actionChange: 'cmImportMap', col: '2' }, value: 'studentNumber' });
+      act('cmConfirmImport');
+      expect(getStudents(CID).find(s => s.firstName === 'Noor').studentNumber).toBe('STU-202');
+    });
+
+    it('keeps what was ticked when the file is read again', () => {
+      importText('First Name,Last Name,Code\nNoor,Al-Rashid,STU-202\nAva,Lee,STU-203\n');
+      DashClassManager.handleChange({
+        dataset: { actionChange: 'cmImportToggle', kind: 'added', idx: '0' },
+        checked: false,
+      });
+      act('cmImportPick', { col: '2', field: 'studentNumber' });
+      act('cmConfirmImport');
+      expect(names()).toEqual(['Ava Lee', 'Fatima Hassan', 'Liam Chen', 'Tyler Rowe']);
     });
   });
 
-  describe('Import Roster file reading', () => {
+  describe('reading the file', () => {
     it('reads columns by header in any order, with quoted commas', () => {
       var table = DashClassManager.rosterImportTable(
         'Student Number,Name,Usual First Name,Birth Date,Parent Email\n' +
@@ -529,10 +614,11 @@ describe('cm-import-review', () => {
           parentEmails: ['n.okafor@example.com'],
         },
       ]);
+      expect(read.rows[0].line).toBe(2);
     });
 
     it('handles CRLF, a BOM, "" inside quotes and tab-separated files', () => {
-      expect(DashClassManager.parseRosterCsv('\uFEFFa,"b ""c"", d"\r\n1,2\r\n')).toEqual([
+      expect(DashClassManager.parseRosterCsv('﻿a,"b ""c"", d"\r\n1,2\r\n')).toEqual([
         ['a', 'b "c", d'],
         ['1', '2'],
       ]);
@@ -542,7 +628,7 @@ describe('cm-import-review', () => {
       ]);
     });
 
-    it('falls back to the old fixed column order when no header is known', () => {
+    it('falls back to the old fixed column order when there is no header', () => {
       var table = DashClassManager.rosterImportTable('Ava,Lee,,she/her,STU-9,2012-01-02,ava@school.ca\n');
       var read = DashClassManager.rosterRowsFromTable(table);
       expect(read.rows[0]).toMatchObject({
@@ -553,65 +639,246 @@ describe('cm-import-review', () => {
         dateOfBirth: '2012-01-02',
         email: 'ava@school.ca',
       });
+      expect(DashClassManager.rosterImportReady(table)).toBe(false);
     });
 
-    it('keeps known designations and ELL, and counts what it could not read', () => {
+    it('keeps known designations and ELL, and lists what it could not read', () => {
       var table = DashClassManager.rosterImportTable(
-        'First Name,Last Name,Designations,ELL,DOB,Email\nAva,Lee,Q; ZZ,yes,03/04/2012,not-an-email\n',
+        'First Name,Last Name,Designations,ELL,DOB,Email\nAva,Lee,Q; ZZ,yes,2012-02-30,not-an-email\n',
       );
       var read = DashClassManager.rosterRowsFromTable(table);
       expect(read.rows[0].designations).toEqual(['Q', 'ELL']);
       expect(read.rows[0].dateOfBirth).toBeUndefined();
       expect(read.skipped).toEqual({ dates: 1, emails: 1, codes: 1 });
+      expect(read.problems.map(p => [p.kind, p.line, p.value])).toEqual([
+        ['code', 2, 'ZZ'],
+        ['date', 2, '2012-02-30'],
+        ['email', 2, 'not-an-email'],
+      ]);
+    });
+
+    it('reads a date column the way its dates show, and asks when every one could go either way', () => {
+      expect(DashClassManager.rosterDateOrder(['5/22/2012', '1/3/2012'])).toBe('mdy');
+      expect(DashClassManager.rosterDateOrder(['22/5/2012', '1/3/2012'])).toBe('dmy');
+      expect(DashClassManager.rosterDateOrder(['5/6/2012', '1/3/2012'])).toBe('ask');
+      expect(DashClassManager.rosterDateOrder(['2012-05-06'])).toBe('');
+      expect(DashClassManager.rosterDate('1/3/2012', 'mdy')).toBe('2012-01-03');
+      expect(DashClassManager.rosterDate('1/3/2012', 'dmy')).toBe('2012-03-01');
+      expect(DashClassManager.rosterDate('5/22/12', 'mdy')).toBe('2012-05-22');
+      expect(DashClassManager.rosterDate('May 15, 2012')).toBe('2012-05-15');
+      expect(DashClassManager.rosterDate('15 May 2012')).toBe('2012-05-15');
+      expect(DashClassManager.rosterDate('Sept 30 2012')).toBe('2012-09-30');
+      expect(DashClassManager.rosterDate('Sept 31 2012')).toBe('');
+      expect(DashClassManager.rosterDate('2012-02-30')).toBe('');
+
+      var table = DashClassManager.rosterImportTable('First Name,DOB\nAva,5/6/2012\nBen,1/3/2012\n');
+      expect(table.dateOrder).toEqual(['', 'ask']);
+      var read = DashClassManager.rosterRowsFromTable(table);
+      expect(read.waiting).toEqual({ 1: 2 });
+      expect(read.problems).toEqual([]);
+      expect(read.rows[0].dateOfBirth).toBeUndefined();
+    });
+
+    it('guesses unknown columns from their values, marks the guesses, and only suggests designations', () => {
+      var table = DashClassManager.rosterImportTable(MESSY);
+      expect(table.map).toEqual(['fullName', 'studentNumber', 'dateOfBirth', 'parentEmail', '', '', '']);
+      expect(table.how).toEqual(['header', 'guess', 'header', 'guess', '', '', '']);
+      expect(table.suggest[6]).toBe('designations');
+      expect(table.dateOrder[2]).toBe('mdy');
+      expect(DashClassManager.rosterImportReady(table)).toBe(false);
+      var read = DashClassManager.rosterRowsFromTable(table);
+      expect(
+        read.rows.some(function (r) {
+          return r.designations;
+        }),
+      ).toBe(false);
+      expect(read.rows[0]).toMatchObject({ firstName: 'Arjun', lastName: 'Bains', dateOfBirth: '2012-05-13' });
+      expect(read.rows[0].parentEmails).toEqual(['bains.family@gmail.com']);
+    });
+
+    it('reports a date that is not real, a number used twice and a row with no name', () => {
+      var read = DashClassManager.rosterRowsFromTable(DashClassManager.rosterImportTable(MESSY));
+      expect(read.rows).toHaveLength(6);
+      expect(read.problems.map(p => [p.kind, p.line])).toEqual([
+        ['date', 5],
+        ['number', 7],
+      ]);
+      expect(read.problems[1].other.line).toBe(6);
+      var zofia = read.rows.find(r => r.firstName === 'Zofia');
+      expect(zofia.studentNumber).toBeUndefined();
+      expect(read.unnamed).toEqual([{ line: 8, cells: ['1203498', '2/26/2012', 'patel.family@gmail.com', 'B'] }]);
+    });
+
+    it('applies what the teacher types on a row', () => {
+      var table = DashClassManager.rosterImportTable(MESSY);
+      var read = DashClassManager.rosterRowsFromTable(table, {
+        5: { dateOfBirth: '2012-09-30' },
+        7: { studentNumber: '1203463' },
+        8: { name: 'Patel, Riya' },
+      });
+      expect(read.problems).toEqual([]);
+      expect(read.unnamed).toEqual([]);
+      expect(read.rows).toHaveLength(7);
+      expect(read.rows.find(r => r.firstName === 'Luc').dateOfBirth).toBe('2012-09-30');
+      expect(read.rows.find(r => r.firstName === 'Zofia').studentNumber).toBe('1203463');
+      expect(read.rows.find(r => r.firstName === 'Riya')).toMatchObject({
+        lastName: 'Patel',
+        studentNumber: '1203498',
+      });
+    });
+
+    it('lets a MyEd class list go straight through, Grade, Homeroom and Gender left out', () => {
+      var table = DashClassManager.rosterImportTable(MYED);
+      expect(table.myEd).toBe(true);
+      expect(DashClassManager.rosterImportReady(table)).toBe(true);
+      expect(table.map).toEqual(['lastName', 'firstName', 'preferred', 'studentNumber', '', '', '', 'dateOfBirth']);
+      var tmpl = readFileSync('roster-template.csv', 'utf8');
+      expect(DashClassManager.rosterImportReady(DashClassManager.rosterImportTable(tmpl))).toBe(true);
     });
   });
 
-  describe('Import Roster review: details and columns', () => {
-    var main;
-    var originalGetElementById;
-
+  describe('an empty class: the first import', () => {
     beforeEach(() => {
-      localStorage.clear();
-      saveCourses({ [CID]: { id: CID, name: 'Science 8' } });
-      saveStudents(CID, [student('s1', 'Fatima', 'Hassan', 'STU-208')]);
-      main = { innerHTML: '' };
-      originalGetElementById = document.getElementById;
-      document.getElementById = function (id) {
-        return id === 'main' ? main : originalGetElementById(id);
-      };
-      DashClassManager.resetState();
-      DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
-      DashClassManager.openClassManager();
-      DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'students' } });
+      openStudents([]);
     });
 
     afterEach(() => {
       document.getElementById = originalGetElementById;
     });
 
-    it('offers filled-in details for a matched student and applies them on Import', () => {
-      var table = DashClassManager.rosterImportTable(
-        'Student Number,First Name,Last Name,Pronouns,Date of Birth,Designations\nSTU-208,Fatima,Hassan,she/her,2013-07-09,G\n',
-      );
-      var read = DashClassManager.rosterRowsFromTable(table);
-      DashClassManager.cmShowImportPreview(read.rows, 'myed.csv', table, read.skipped);
-      expect(main.innerHTML).toContain('Details Updated');
-      expect(main.innerHTML).toContain('Pronouns, Date of Birth, G');
-      expect(main.innerHTML).toContain('Columns in This File');
-      DashClassManager.handleAction('cmConfirmImport', { dataset: {} });
-      var st = getStudents(CID)[0];
-      expect(st.pronouns).toBe('she/her');
-      expect(st.dateOfBirth).toBe('2013-07-09');
-      expect(st.designations).toEqual(['G']);
+    it('shows where the class list goes, with the MyEd steps, and no page of rules', () => {
+      var html = main.innerHTML;
+      expect(html).toContain('Add Your Students');
+      expect(html).toContain('Get the List From MyEducation BC');
+      expect(html).toContain("The file isn't uploaded.");
+      expect(html).toContain('Download Template');
+      expect(html).not.toContain('data-action="cmImportRoster"');
+      expect(html).not.toContain('Name columns:');
     });
 
-    it('re-reads the file when a column is matched to a different field', () => {
-      var table = DashClassManager.rosterImportTable('First Name,Last Name,Code\nNoor,Al-Rashid,STU-202\n');
-      var read = DashClassManager.rosterRowsFromTable(table);
-      DashClassManager.cmShowImportPreview(read.rows, 'f.csv', table, read.skipped);
-      DashClassManager.handleChange({ dataset: { actionChange: 'cmImportMap', col: '2' }, value: 'studentNumber' });
-      DashClassManager.handleAction('cmConfirmImport', { dataset: {} });
-      expect(getStudents(CID).find(s => s.firstName === 'Noor').studentNumber).toBe('STU-202');
+    it('takes a MyEd file straight to Ready to Add, then says what was added', () => {
+      importText(MYED, 'ScienceD_Roster.csv');
+      var html = main.innerHTML;
+      expect(html).toContain('Ready to Add 3 Students');
+      expect(html).toContain(
+        "This is a class list from MyEducation BC. Every column was read, so there's nothing to match.",
+      );
+      expect(html).toContain('Left out: Grade, Homeroom and Gender.');
+      expect(html).not.toContain('cm-import-field-btn');
+      expect(html).toContain('Add 3 Students');
+      act('cmConfirmImport');
+      expect(names()).toEqual(['Arjun Bains', 'Maya Castillo', 'Simran Dhillon']);
+      expect(getStudents(CID).find(s => s.firstName === 'Arjun')).toMatchObject({
+        preferred: 'AJ',
+        studentNumber: '1203400',
+      });
+      html = main.innerHTML;
+      expect(html).toContain('3 Students Added to Science 8');
+      expect(html).toContain('Set Up Grading');
+      expect(html).toContain('Undo This Import');
+      expect(html.match(/cm-rs-new-tag/g)).toHaveLength(3);
+      act('cmCloseImportDone');
+      expect(main.innerHTML).not.toContain('cm-rs-new-tag');
+    });
+
+    it('Change What’s Kept opens the columns of a file that went straight through', () => {
+      importText(MYED);
+      act('cmImportShowColumns');
+      expect(main.innerHTML).toContain('cm-import-field-btn');
+      expect(main.innerHTML).toContain('Check How Your File Was Read');
+    });
+
+    it('checks any other file column by column, with the rows that need a look', () => {
+      importText(MESSY, 'Science 8 Block B.csv');
+      var html = main.innerHTML;
+      expect(html).toContain('Check How Your File Was Read');
+      expect(html).toContain('Best Guess');
+      expect(html).toContain('Read as month/day/year: 5/13/2012 can only be May 13.');
+      expect(html).toContain('Looks like designations (P and Q). Left out unless you choose.');
+      expect(html).toContain('Import as Designations');
+      expect(html).toContain('3 Rows Need a Look');
+      expect(html).toContain('Luc will be added without a birthday.');
+      expect(html).toContain('Student number 1203456 is also Navdeep Johal&#39;s, in row 6.');
+      expect(html).toContain('This row has no name, so it will be left out.');
+      expect(html).toContain('6 students will be added to Science 8.');
+      expect(html).toContain('Row 8 is left out until it has a name.');
+      expect(html).toContain('Add 6 Students');
+    });
+
+    it('adds a student with the blank, and the Done panel names who to fill in', () => {
+      importText(MESSY);
+      DashClassManager.handleChange({
+        dataset: { actionChange: 'cmImportFix', line: '8', field: 'name' },
+        value: 'Patel, Riya',
+      });
+      DashClassManager.handleChange({
+        dataset: { actionChange: 'cmImportFix', line: '5', field: 'dateOfBirth' },
+        value: '2012-09-30',
+      });
+      expect(main.innerHTML).toContain('7 students will be added');
+      act('cmConfirmImport');
+      expect(getStudents(CID)).toHaveLength(7);
+      expect(getStudents(CID).find(s => s.firstName === 'Zofia').studentNumber).toBe('');
+      var html = main.innerHTML;
+      expect(html).toContain('7 Students Added to Science 8');
+      expect(html).toContain('1 has a blank to fill in: Zofia Kowalczyk&#39;s student number.');
+      act('cmImportShowBlanks');
+      var shown = main.innerHTML.match(/<div class="cm-rs-grid cm-rs-row[^>]*>/g).filter(r => !/ hidden>/.test(r));
+      expect(shown).toHaveLength(1);
+      expect(main.innerHTML).toContain('Show All Students');
+    });
+
+    it('imports designations only when the teacher chooses them', () => {
+      importText(MESSY);
+      act('cmImportPick', { col: '6', field: 'designations' });
+      act('cmConfirmImport');
+      expect(getStudents(CID).find(s => s.firstName === 'Tove').designations).toEqual(['P']);
+    });
+
+    it('swaps two columns when a field another column uses is chosen', () => {
+      importText(MESSY);
+      act('cmImportPick', { col: '4', field: 'studentNumber' });
+      var html = main.innerHTML;
+      expect(html).toContain('aria-label="What Block holds: Student Number"');
+      expect(html).toContain('aria-label="What ID holds: Don&#39;t Import"');
+    });
+
+    it('asks which comes first when every date could go either way', () => {
+      importText('First Name,DOB\nAva,5/6/2012\nBen,1/3/2012\n');
+      expect(main.innerHTML).toContain('Which comes first?');
+      act('cmImportDateOrder', { col: '1', order: 'dmy' });
+      act('cmConfirmImport');
+      expect(getStudents(CID).find(s => s.firstName === 'Ava').dateOfBirth).toBe('2012-06-05');
+    });
+
+    it('Undo This Import deletes the students it added, except any with something recorded', () => {
+      importText(MYED);
+      act('cmConfirmImport');
+      var ids = getStudents(CID).map(s => s.id);
+      var arjun = getStudents(CID).find(s => s.firstName === 'Arjun');
+      saveScores(CID, { [arjun.id]: [{ id: 'x1', assessmentId: 'a1', tagId: 'QAP', score: 3 }] });
+      act('cmUndoImport');
+      expect(names()).toEqual(['Arjun Bains']);
+      // Deleted for good: not left in the Withdrawn list.
+      expect(getWithdrawnStudents(CID).filter(w => ids.includes(w.student.id))).toHaveLength(0);
+      var html = main.innerHTML;
+      expect(html).toContain('Import Undone');
+      expect(html).toContain('2 students were removed. Arjun Bains stays: they already have scores or observations.');
+      expect(html).not.toContain('Undo This Import');
+    });
+
+    it('says when a file is an Excel file, or has no names', () => {
+      DashClassManager.handleChange({
+        dataset: { actionChange: 'cmCSV' },
+        files: [{ name: 'Roster.xlsx' }],
+        value: '',
+      });
+      expect(main.innerHTML).toContain('This Is an Excel File');
+      importText('Pupil,Unit 1,Unit 2\n1203400,3,4\n1203407,2,3\n', 'Term 1 Marks.csv');
+      expect(main.innerHTML).toContain('No Names Found');
+      act('cmImportChooseNames');
+      expect(main.innerHTML).toContain('Names</strong> · choose the column that holds them');
+      expect(main.innerHTML).toMatch(/data-action="cmConfirmImport" disabled/);
     });
   });
 });
