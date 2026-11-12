@@ -2,6 +2,27 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Handoff review rulings (2026-11-12)
+
+Context: after the overnight run of the handoff review (S19; 50 PRs merged, see [`plans/handoff-review-plan.md`](plans/handoff-review-plan.md)), Colin ruled on what comes next. The numbers in brackets are the plan's section 6 decisions.
+
+1. **Order of work.** The save guard fix first (S19-B3), then the loading work (S19-C2 to C4), then the split of the big files.
+2. **Staging is held** [4]. No second Supabase project and no branch for now: FullVision has one user and the district is not considering buying it. The same reason holds the District Review Package (S19-F2) and the account moves (S19-F4). Raise them again only if selling to schools comes up.
+3. **The file split is not held** [21]. It matters to the builder now: sessions collide on the big files, agents work worse on them, and redrawing only what changed needs the pages untangled. The pieces that do not touch marks go first, as move-only PRs, each merged by an independent reviewer (Track E). This replaces the plan's rule that Track E waits for the decision to sell to schools.
+4. **"I approve whatever the council would approve."** For the open decisions in the plan's section 6, the council's recommendation stands as Colin's decision without asking him each time. The council is the panel named in "Student page build rulings (2026-11-10)": Beck, Fowler, Humble and Forsgren, Nygard and Kleppmann; OWASP and the privacy commissioner's office; Guskey, O'Connor, Wiliam and the Ministry's reporting policy; Krug and Nielsen. This does not change CLAUDE.md's rules:
+   - SQL is shown to Colin before anything is applied to the production database.
+   - A release happens only when he says.
+   - Grade math changes and anything that deletes data go to him.
+   - Nothing is bought or signed up for without him.
+   - Where the council would be split, or the answer is a fact only he knows, the question still goes to him.
+5. **What the council settles at once.**
+   - Keep `schema.sql` [12]. This closes S19-A10.
+   - Keep the `curriculum_data.js` fallback [13], because a failed load should not leave a teacher with no courses. This closes S19-A8.
+   - Keep the two `fv_backup` tables for now [2].
+   - Drop none of the server functions without its own check against the live database [3].
+   - No Sentry performance tracing while error reports leave Canada [6].
+   - The save guard fix may merge once an independent reviewer has tried and failed to break it [9].
+
 ## Grade calculation (2026-10-16)
 
 Context: `grading-compliance-plan.md`. All implemented; see its status table.
