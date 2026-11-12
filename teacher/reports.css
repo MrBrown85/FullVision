@@ -4827,6 +4827,11 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 8pt;
   font-style: italic;
 }
+/* The font the sheet prints in (styles.css, @media print --font-base),
+   for measuring its columns on screen (grade-report.js _fitPx). */
+.gr-print-font {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
 
 /* ── Feedback cards (Quick Report, Feedback Pages) ──────────────────────
    One bordered card per assessment, built by ReportFeedback.cardHtml

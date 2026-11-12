@@ -324,6 +324,51 @@ describe('the Quick Report’s columns', () => {
     expect(template('letter')).toBe('42px minmax(0,1fr) 60px 64px 40px 36px 52px');
   });
 
+  /* A stage measuring the fixed columns' texts (.gr-fit, in the page's
+     font and the print font) at pxPerChar a character, every other text at
+     7px a character as stubStage does. */
+  const fitStage = pxPerChar => ({
+    innerHTML: '',
+    firstChild: { offsetHeight: 50 },
+    querySelectorAll(sel) {
+      const cls = sel === '.gr-fit' ? 'gr-fit' : 'gr-measure';
+      const per = cls === 'gr-fit' ? pxPerChar : 7;
+      return [...this.innerHTML.matchAll(new RegExp('class="' + cls + '"[^>]*>([^<]*)<', 'g'))].map(m => ({
+        offsetWidth: m[1].replace(/&#39;|&amp;/g, 'x').length * per,
+      }));
+    },
+  });
+  const templates = (mode, pxPerChar = 7) => {
+    seedEvery(mode);
+    const html = G.layoutStudent(CID, ST, {}, { paper: 'letter', stage: fitStage(pxPerChar), grade: {} }).html;
+    unstub();
+    return [...html.matchAll(/--gr-cols:([^;"]*)/g)].map(m => m[1]).filter((t, i, a) => a.indexOf(t) === i);
+  };
+
+  it('widens a fixed column whose widest text needs more room in this machine’s fonts, and only then', () => {
+    // Where the usual width is enough, the column keeps it (the test
+    // above, where nothing is measured, has every usual width). Widths are
+    // kept for the page once measured, so this file measures at one rate.
+    // Wide type, 7px a character: "May 30" is 42px, 46px with 4% and 2px
+    // of headroom; "Developing +" 84px, 90px; "Incomplete" 70px, 75px.
+    // The title takes what the others gain.
+    expect(templates('proficiency', 7)).toEqual(['46px minmax(0,1fr) 60px 90px 32px', 'minmax(0,1fr) 90px 110px']);
+    expect(templates('both', 7)).toEqual(['46px minmax(0,1fr) 60px 90px 53px 32px', 'minmax(0,1fr) 70px 90px 170px']);
+    // Score "Incomplete", Out Of its header, the note "Excused" in bold; % keeps its 36px.
+    expect(templates('letter', 7)).toEqual([
+      '46px minmax(0,1fr) 60px 75px 46px 36px 53px',
+      'minmax(0,1fr) 70px 90px 110px',
+    ]);
+  });
+
+  it('measures the print font the sheet prints in (styles.css, @media print)', () => {
+    const read = f => readFileSync(resolve(HERE, '..', f), 'utf8');
+    const print = read('teacher/styles.css').match(/@media print\s*{\s*:root\s*{[^}]*?--font-base:\s*([^;]+);/);
+    const fit = read('teacher/reports.css').match(/\.gr-print-font\s*{\s*font-family:\s*([^;]+);/);
+    expect(print && fit).toBeTruthy();
+    expect(fit[1]).toBe(print[1]);
+  });
+
   it('is the same data underneath: rows() keeps its fields, a no-mark score blank', () => {
     seedEvery('proficiency');
     const rows = G.rows(CID, ST);

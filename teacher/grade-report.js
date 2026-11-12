@@ -231,26 +231,33 @@ window.GradeReport = (function () {
   var COL_GAP = 6; // reports.css .gr-row column-gap
   function _cols(show, tier) {
     var two = tier.cols === 2;
+    // Each fixed column is at least the width it has always had, and wider
+    // when its widest text needs more in the fonts this machine shows and
+    // prints the sheet in (show.fit, measured in layoutStudent).
+    var fit = (show.fit && show.fit[tier.key === 'regular' ? 'regular' : 'small']) || {};
+    var px = function (key, min) {
+      return Math.max(min, fit[key] || 0) + 'px';
+    };
     var cols = [];
     // Assignment Numbers: a narrow bold column, wide enough for the
     // highest number (show.numPx, set in layoutStudent).
     if (show.numbers) cols.push(['n', '#', (show.numPx || 22) + 'px', 'r']);
-    cols.push(['date', 'Date', '42px', ''], ['title', 'Assignment', 'minmax(0,1fr)', '']);
+    cols.push(['date', 'Date', px('date', 42), ''], ['title', 'Assignment', 'minmax(0,1fr)', '']);
     if (!two) cols.push(['category', 'Category', null, '']);
     if (show.byName) {
       // A Proficiency or Both class: one Result column, wide enough for
       // "Developing +", "Incomplete" and "Missing" in bold, read left to
       // right like the title beside it; Percent in a Both class; the note
       // holds only Late. The width Out Of had goes to the title.
-      cols.push(['result', 'Result', two ? '66px' : '80px', '']);
-      if (show.percent) cols.push(['percent', 'Percent', two ? '40px' : '48px', 'r']);
-      cols.push(['note', '', two ? '28px' : '32px', '']);
+      cols.push(['result', 'Result', px('result', two ? 66 : 80), '']);
+      if (show.percent) cols.push(['percent', 'Percent', px('percent', two ? 40 : 48), 'r']);
+      cols.push(['note', '', px('note', two ? 28 : 32), '']);
     } else {
       // Score holds "Incomplete"; the note "Excused" in bold.
-      cols.push(['score', 'Score', two ? '54px' : '64px', 'r']);
-      cols.push(['outOf', 'Out Of', two ? '34px' : '40px', 'r']);
-      if (show.percent) cols.push(['percent', '%', two ? '32px' : '36px', 'r']);
-      cols.push(['note', '', two ? '46px' : '52px', '']);
+      cols.push(['score', 'Score', px('score', two ? 54 : 64), 'r']);
+      cols.push(['outOf', 'Out Of', px('outOf', two ? 34 : 40), 'r']);
+      if (show.percent) cols.push(['percent', '%', px('percent', two ? 32 : 36), 'r']);
+      cols.push(['note', '', px('note', two ? 46 : 52), '']);
     }
     if (!two) {
       var fixed = cols.reduce(function (sum, c) {
@@ -339,6 +346,129 @@ window.GradeReport = (function () {
     return Array.prototype.map.call(stage.querySelectorAll('.gr-measure'), function (el) {
       return el.offsetWidth;
     });
+  }
+
+  /* What the fixed columns can hold. A column sized for the widest text
+     in one machine's fonts cuts it off in a wider one: on CI's Linux fonts
+     "May 31" and "Developing −" were wider than the Date and Result
+     columns a Mac fitted them in (Nov 12). So each column's widest texts
+     (every date the format can print, every Result, Late, and what this
+     student's rows hold) are measured in the sheet's own type, both in the
+     font the page shows it in and in the one it prints in (reports.css
+     .gr-print-font), with headroom: 4% and 2px. Each column keeps at
+     least its old width, so where the old width was enough it is
+     unchanged; on a Mac only Date grows ("May 28" was 41.7px of 42). More
+     headroom costs the title room: at 8%, a Letter class's sheet in a
+     Verdana-wide font needed a back for its rows. */
+  var FIT_ROOM = 1.04;
+  var _fitTexts = null;
+  function _fitCanon() {
+    if (_fitTexts) return _fitTexts;
+    var dates = [];
+    for (var m = 1; m <= 12; m++) {
+      ['28', '30'].forEach(function (d) {
+        if (m === 2 && d === '30') return;
+        dates.push(_when('2026-' + (m < 10 ? '0' : '') + m + '-' + d));
+      });
+    }
+    var levels = [];
+    if (typeof scoreLevelText === 'function') {
+      for (var l = 1; l <= 4; l++) {
+        [-1, 0, 1].forEach(function (mod) {
+          levels.push(scoreLevelText(l, mod));
+        });
+      }
+    }
+    _fitTexts = { dates: dates, levels: levels };
+    return _fitTexts;
+  }
+
+  /* The width a column needs for texts at one tier's type (bold: in bold,
+     as a header or a flag prints), in px, headroom included. */
+  function _fitPx(stage, key, texts, bold) {
+    var names = texts
+      .map(function (t) {
+        return t == null ? '' : String(t);
+      })
+      .filter(function (t, i, all) {
+        return t && all.indexOf(t) === i;
+      });
+    if (!names.length) return 0;
+    var memo = _memoOk()
+      ? _widthMemo['fit-' + key + (bold ? '-b' : '')] || (_widthMemo['fit-' + key + (bold ? '-b' : '')] = {})
+      : {};
+    var todo = names.filter(function (n) {
+      return !Object.prototype.hasOwnProperty.call(memo, n);
+    });
+    if (todo.length) {
+      var span = function (n) {
+        return '<span class="gr-fit" style="display:inline-block;white-space:nowrap">' + esc(n) + '</span>';
+      };
+      // html-safe: key is a tier key ('regular' or 'small'); every name goes through esc
+      stage.innerHTML =
+        '<div class="gr-table gr-' +
+        key +
+        '"' +
+        (bold ? ' style="font-weight:700"' : '') +
+        '>' +
+        todo
+          .map(function (n) {
+            return '<div>' + span(n) + '</div><div class="gr-print-font">' + span(n) + '</div>';
+          })
+          .join('') +
+        '</div>';
+      var els = stage.querySelectorAll('.gr-fit');
+      todo.forEach(function (n, i) {
+        var a = els[2 * i];
+        var b = els[2 * i + 1];
+        var px = Math.max((a && a.offsetWidth) || 0, (b && b.offsetWidth) || 0);
+        // Nothing measured (no layout): kept out of the memo.
+        if (px > 0) {
+          memo[n] = px;
+          _memoSize++;
+        }
+      });
+    }
+    var w = 0;
+    names.forEach(function (n) {
+      w = Math.max(w, memo[n] || 0);
+    });
+    return w > 0 ? Math.ceil(w * FIT_ROOM) + 2 : 0;
+  }
+
+  /* show.fit: each fixed column's need at the regular and the small type,
+     for this student's rows (_cols takes the larger of it and the
+     column's usual width). */
+  function _fitColumns(stage, show, list) {
+    var canon = _fitCanon();
+    var col = function (k) {
+      return list.map(function (x) {
+        return x[k];
+      });
+    };
+    var fit = {};
+    ['regular', 'small'].forEach(function (key) {
+      var need = function (head, texts, boldTexts) {
+        return Math.max(_fitPx(stage, key, [head].concat(boldTexts || []), true), _fitPx(stage, key, texts, false));
+      };
+      var f = {
+        date: need('Date', canon.dates.concat(col('date'))),
+      };
+      if (show.byName) {
+        f.result = need('Result', canon.levels.concat(['Complete', 'Incomplete', '100 / 100'], list.map(resultText)), [
+          'Missing',
+          'Excused',
+        ]);
+        f.note = need('', [], ['Late']);
+      } else {
+        f.score = need('Score', ['Complete', 'Incomplete', '4'].concat(col('score')));
+        f.outOf = need('Out Of', ['100'].concat(col('outOf')));
+        f.note = need('', [], ['Late', 'Missing', 'Excused']);
+      }
+      if (show.percent) f.percent = need(show.byName ? 'Percent' : '%', ['100%'].concat(col('percent')));
+      fit[key] = f;
+    });
+    return fit;
   }
 
   /* The assignment and category cells' widths at one tier, in px (the
@@ -449,20 +579,43 @@ window.GradeReport = (function () {
      Weight and calls its grade Proficiency, and its last line is Overall
      Proficiency (Colin, 2026-11-12). A Both class keeps Weight, Grade and
      Course Grade, its grade column wider; a Letter class's is as it was. */
-  function _tailHtml(cid, student, opts, ctx) {
+  function _tailHtml(cid, student, opts, ctx, stage) {
     var html = '';
     var term = studentGradeText(cid, student.id, ctx && ctx.termId).text;
     var show = columnsFor(cid);
     var prof = show.byName && !show.percent;
     if (opts.summary) {
       var cats = categorySummary(cid, student, opts);
+      // Each column at least its usual width, and wider when its header or
+      // widest text needs it in this machine's fonts (_fitPx; no stage,
+      // the usual widths).
+      var need = function (min, head, texts) {
+        if (!stage) return min + 'px';
+        return Math.max(min, _fitPx(stage, 'regular', [head], true), _fitPx(stage, 'regular', texts, false)) + 'px';
+      };
+      var counts = cats.map(function (c) {
+        return String(c.count);
+      });
+      var grades = cats.map(function (c) {
+        return c.grade;
+      });
+      var grid;
       if (cats.length && prof) {
+        grid =
+          'minmax(0,1fr) ' +
+          need(90, 'Assessments', counts) +
+          ' ' +
+          need(110, 'Proficiency', _fitCanon().levels.concat(grades));
         html +=
-          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:minmax(0,1fr) 90px 110px"><span class="gr-c">Category</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Proficiency</span></div>' +
+          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
+          grid +
+          '"><span class="gr-c">Category</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Proficiency</span></div>' +
           cats
             .map(function (c) {
               return (
-                '<div class="gr-row" style="--gr-cols:minmax(0,1fr) 90px 110px"><span class="gr-c">' +
+                '<div class="gr-row" style="--gr-cols:' +
+                grid +
+                '"><span class="gr-c">' +
                 esc(c.name) +
                 '</span><span class="gr-c gr-r">' +
                 c.count +
@@ -476,7 +629,21 @@ window.GradeReport = (function () {
       } else if (cats.length) {
         // A Both class's grade reads "Developing · C- 55.4%": wider than a
         // Letter class's "C- 55.4%", which keeps its 110px.
-        var grid = 'minmax(0,1fr) 70px 90px ' + (show.byName ? '170px' : '110px');
+        grid =
+          'minmax(0,1fr) ' +
+          need(
+            70,
+            'Weight',
+            ['100%'].concat(
+              cats.map(function (c) {
+                return c.weight + '%';
+              }),
+            ),
+          ) +
+          ' ' +
+          need(90, 'Assessments', counts) +
+          ' ' +
+          need(show.byName ? 170 : 110, 'Grade', grades);
         html +=
           '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
           grid +
@@ -1064,7 +1231,7 @@ window.GradeReport = (function () {
     var show = columnsFor(cid);
     var list = rows(cid, student, o);
     var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
-    var tail = _tailHtml(cid, student, o, ctx);
+    var tail = '';
     // The Back starts with the line naming the student, as every side after
     // the Front of a built report does, so a sheet printed single-sided can
     // be matched to its student (DECISIONS "Report forms" 13; Colin, Nov 3:
@@ -1081,6 +1248,11 @@ window.GradeReport = (function () {
     var p = null;
     var fb = null;
     try {
+      // The fixed columns and the summary's, wide enough for their texts
+      // in this machine's fonts (_fitPx).
+      show.fit = _fitColumns(stage, show, list);
+      if (show.numbers) show.numPx = Math.max(show.numPx, _fitPx(stage, 'regular', ['#', String(list.length)], true));
+      tail = _tailHtml(cid, student, o, ctx, stage);
       show.catPx = _textPx(
         stage,
         ['Category'].concat(
