@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-/* New Class is easy to find: a button at the top of Class Settings' class
-   list, and the last choice in the sidebar's class picker. Demo Mode. */
+/* New Class is a button at the top of Class Settings' class list. The
+   sidebar's class picker lists only classes: a New Class choice there was
+   easy to pick by accident during the year (Colin, Nov 2026). Demo Mode. */
 
 async function enterDemo(page) {
   await page.goto('/login.html');
@@ -10,15 +11,17 @@ async function enterDemo(page) {
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
 }
 
-test('The class picker offers New Class, which opens the wizard', async ({ page }) => {
+test('The class picker lists only classes, with no New Class choice', async ({ page }) => {
   await enterDemo(page);
-  await page.goto('/assignments');
-  const picker = page.locator('#gb-course-select');
-  await expect(picker.locator('option').last()).toHaveText('New Class…');
-  await picker.selectOption({ label: 'New Class…' });
-  await expect(page).toHaveURL(/\/dashboard\?manage=new$/);
-  await expect(page.locator('.cw-steps')).toBeVisible();
-  expect(await page.evaluate(() => getActiveCourse())).toBe('sci8');
+  // Every page with a class picker: no choice in any picker opens New Class.
+  let pickers = 0;
+  for (const route of ['/dashboard', '/assignments', '/observations', '/gradebook', '/reports']) {
+    await page.goto(route);
+    await page.waitForTimeout(600);
+    pickers += await page.locator('select:has(option[value="sci8"])').count();
+    await expect(page.locator('select option', { hasText: 'New Class' })).toHaveCount(0);
+  }
+  expect(pickers).toBeGreaterThan(0);
 });
 
 test('Class Settings shows New Class as a button at the top of the class list', async ({ page }) => {
