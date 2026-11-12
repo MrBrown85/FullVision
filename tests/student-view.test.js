@@ -490,10 +490,13 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
         getAssessments(CID).find(a => a.id === 'a-essay'),
       ),
     );
+    // A student reads the proficiency with its ± (and a Both class's %), never a figure; a Letter class
+    // reads the % as before (DECISIONS, "Student-facing levels are proficiencies").
+    const letter = courseGradeMode(CID) === 'letter';
     expect(by['a-essay'].result).toEqual({
       kind: 'level',
-      text: essay.text,
-      word: levelWord(CID, essay.value),
+      text: letter ? essay.text : studentMarkText(CID, essay.value, essay.percentText),
+      word: letter ? levelWord(CID, essay.value) : '',
       level: essay.level,
     });
     expect(by['a-essay'].competencies).toEqual([
@@ -635,7 +638,11 @@ describe('a draft is nowhere on the page', () => {
       getAssessments(CID).find(a => a.id === 'a-reflect'),
     );
     expect(allWork.text).not.toBe(returnedOnly.text);
-    expect(by['a-reflect'].result.text).toBe(returnedOnly.text);
+    expect(by['a-reflect'].result.text).toBe(
+      courseGradeMode(CID) === 'letter'
+        ? returnedOnly.text
+        : studentMarkText(CID, returnedOnly.value, returnedOnly.percentText),
+    );
     expect(by['a-draft'].result.text).toBe('');
   });
 

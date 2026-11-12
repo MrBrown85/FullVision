@@ -127,11 +127,12 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
       'KMT & States of Matter Lab',
       'Lab Safety Contract',
     ]);
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
-    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+ · Extending$/);
-    expect(row(page, 'Cell Microscope Lab').result).toBe('2.7');
+    // A student reads the proficiency, once, in the result (DECISIONS, "Student-facing levels are proficiencies").
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
+    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
+    expect(row(page, 'Cell Microscope Lab').result).toBe('Proficient −');
     expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
-    expect(row(page, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Proficient · Late$/);
+    expect(row(page, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Late$/);
     expect(row(page, 'Lab Safety Contract').result).toBe('Complete');
     expect(row(page, 'Immune System Quick Check')).toMatchObject({ result: '' });
     expect(row(page, 'Immune System Quick Check').sub).toMatch(/^Missing · Due /);
@@ -607,7 +608,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
       { route: 'forms', session: token, enrollment_id: CECE },
     ]);
     expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
     expect(dev.store[KEY]).toBeTruthy();
   });
 
@@ -750,7 +751,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     });
     const page = await signIn(dev);
     expect(row(page, 'Lab Safety Contract').sub).toMatch(/^Back \S+ \d+ · Updated$/);
-    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+ · Extending$/);
+    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
     // A session's end written that way is kept and read.
     const kept = JSON.parse(dev.store[KEY]);
     dev.store[KEY] = JSON.stringify(Object.assign(kept, { x: '2099-06-30T07:00:00.123456+00:00' }));
@@ -912,8 +913,8 @@ describe('what the list shows from a page reply', () => {
       // Returned, and nothing of the grade is left in use (or it was cleared).
       piece(4, 'Back With Nothing', { returned_at: at, grade: null }),
     ]);
-    expect(row(page, 'Returned')).toMatchObject({ result: '3.0', dot: 'sp-dot sp-dot-back' });
-    expect(row(page, 'Returned').sub).toMatch(/^Back \S+ \d+ · Proficient$/);
+    expect(row(page, 'Returned')).toMatchObject({ result: 'Proficient', dot: 'sp-dot sp-dot-back' });
+    expect(row(page, 'Returned').sub).toMatch(/^Back \S+ \d+$/);
     expect(row(page, 'Never Graded')).toMatchObject({ result: '', dot: 'sp-dot sp-dot-due' });
     expect(row(page, 'Change Waiting')).toEqual({
       ...row(page, 'Never Graded'),
@@ -938,8 +939,8 @@ describe('what the list shows from a page reply', () => {
     expect(row(page, 'Missing Now').sub).toMatch(/^Missing · Due /);
     expect(row(page, 'Excused Now')).toMatchObject({ result: '', sub: 'Excused · Oct 2' });
     expect(row(page, 'Missing Unreturned')).toMatchObject({ result: '', sub: 'Missing · Oct 3' });
-    expect(row(page, 'Late And Back').result).toBe('3.0');
-    expect(row(page, 'Late And Back').sub).toMatch(/· Proficient · Late$/);
+    expect(row(page, 'Late And Back').result).toBe('Proficient');
+    expect(row(page, 'Late And Back').sub).toMatch(/^Back \S+ \d+ · Late$/);
     // A Missing or Excused piece is not counted as opened: no result was shown.
     await scrollThroughAll(page);
     const seen = page.calls.find(c => c.body.route === 'seen').body;
@@ -979,7 +980,7 @@ describe('what the list shows from a page reply', () => {
     };
     const again = await dev.open('');
     expect(row(again, 'Never Returned').result).toBe('');
-    expect(row(again, 'Returned').result).toBe('2.0');
+    expect(row(again, 'Returned').result).toBe('Developing');
     for (const where of [again.root().innerHTML, JSON.stringify(again.T.state().page)]) {
       expect(where).not.toContain('DRAFT-ONLY');
       expect(where).not.toMatch(/draft|working_copy|returned_copy|report_note/i);
@@ -1025,7 +1026,7 @@ describe('what the list shows from a page reply', () => {
       }),
     ]);
     const updated = title => / · Updated$/.test(row(page, title).sub);
-    expect(row(page, 'Changed Since').sub).toMatch(/^Back \S+ \d+ · Proficient · Updated$/);
+    expect(row(page, 'Changed Since').sub).toMatch(/^Back \S+ \d+ · Updated$/);
     expect(updated('Changed Since')).toBe(true);
     expect(updated('Changed Unseen')).toBe(true);
     expect(updated('Seen Since')).toBe(false);
@@ -1035,14 +1036,15 @@ describe('what the list shows from a page reply', () => {
     expect(updated('Changed From Nothing')).toBe(true);
     // The earlier grade is compared, never kept or shown.
     expect(JSON.stringify(page.T.state().page)).not.toContain('"previous"');
-    expect(row(page, 'Changed Since').result).toBe('3.0');
+    expect(row(page, 'Changed Since').result).toBe('Proficient');
     expect(text(page)).not.toContain('Developing');
   });
 
   it.each([
-    ['proficiency', '3.3', '2.5', '3.0'],
+    // A level as a student reads it, never a figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+    ['proficiency', 'Proficient +', 'Proficient −', 'Proficient'],
     ['letter', '83%', '63%', '75%'],
-    ['both', '3.3 · 83%', '2.5 · 63%', '3.0 · 75%'],
+    ['both', 'Proficient + · 83%', 'Proficient − · 63%', 'Proficient · 75%'],
   ])('a %s class: every result is calc.js’s own text', async (system, plus, rubric, whole) => {
     const { page } = await listOf(
       [
@@ -1070,7 +1072,7 @@ describe('what the list shows from a page reply', () => {
       ],
       system,
     );
-    const format = v => page.run('formatLevel("class", ' + v + ')');
+    const format = v => page.run('studentMarkText("class", ' + v + ')');
     expect(format(10 / 3)).toBe(plus);
     expect(row(page, 'Competency').result).toBe(plus);
     expect(row(page, 'Rubric').result).toBe(rubric);
@@ -1089,7 +1091,7 @@ describe('what the list shows from a page reply', () => {
     base.assessments = [piece(1, 'Whole', { returned_at: at, grade: three })];
     const dev = school({ card: { page: base } });
     const page = await signIn(dev);
-    expect(row(page, 'Whole').result).toBe('3.0 · 80%');
+    expect(row(page, 'Whole').result).toBe('Proficient · 80%');
   });
 });
 

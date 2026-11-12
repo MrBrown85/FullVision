@@ -1881,7 +1881,7 @@ test.describe('Printed progress reports', () => {
 
   // Group 3 #62: reports print black and white, so the screen shows the
   // levels black as they print, and there is no Ink choice.
-  test('levels print as figures and a word, in black, with no dots, and the screen shows them black too', async ({
+  test('levels print as their proficiency, in black, with no dots, and the screen shows them black too', async ({
     page,
   }) => {
     await openStudio(page);
@@ -1889,11 +1889,12 @@ test.describe('Printed progress reports', () => {
     expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     await expect(page.locator('#report-ink')).toHaveCount(0);
     await expect(page.locator('.studio-head')).not.toContainText('Ink');
-    await expect(level).toContainText(/^\d\.\d (Emerging|Developing|Proficient|Extending)$/);
+    // A Proficiency class prints the proficiency, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+    await expect(level).toContainText(/^(Emerging|Developing|Proficient|Extending)$/);
     await expect(page.locator('#rb-preview .report-proficiency').first()).not.toContainText(/[●○]/);
     await expect(page.locator('#rb-preview .report-legend').first()).not.toContainText(/[●○]/);
-    await expect(page.locator('#rb-preview .report-legend')).toContainText('1 · Emerging');
-    await expect(page.locator('#rb-preview .report-legend')).toContainText('BC Proficiency Scale, out of 4');
+    await expect(page.locator('#rb-preview .report-legend')).toContainText('BC Proficiency Scale');
+    await expect(page.locator('#rb-preview .report-legend')).not.toContainText(/out of 4|\d · Emerging/);
     await page.emulateMedia({ media: 'print' });
     expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     await page.emulateMedia({ media: 'screen' });

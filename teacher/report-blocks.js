@@ -286,7 +286,9 @@ window.ReportBlocks = (function () {
     const overall = getOverallProficiency(cid, student.id);
     const overallRound = roundLevel(overall);
     const cc = getCourseConfig(cid);
-    const usePercentage = cc.reportAsPercentage || false;
+    // A Proficiency class reports its proficiency, never a % (DECISIONS,
+    // "Student-facing levels are proficiencies", 2026-11-12).
+    const usePercentage = (cc.reportAsPercentage && courseGradeMode(cid) !== 'proficiency') || false;
     const course = COURSES[cid];
     const isLetter = courseShowsLetterGrades(course);
     const letterData = getCourseLetterData(cid, student.id);
@@ -562,6 +564,12 @@ window.ReportBlocks = (function () {
       const sr = roundLevel(secProf);
       // Only an override that applies to this report (dated by its end).
       const secOverride = sectionOverrideInView(cid, student.id, sec.id);
+      // A competency the teacher set by hand reads the teacher's level on
+      // every row under it, never a calculated one beside it (Colin,
+      // 2026-11-12: "they only see the proficiency, because teachers may
+      // override it"). A Letter class prints as before.
+      const letterClass = courseGradeMode(cid) === 'letter';
+      const handSet = secOverride && !letterClass;
       html += `<div class="report-outcome-section" style="page-break-inside:avoid">
       <div class="report-outcome-section-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>${esc(sec.shortName || sec.name)}</span>`;
@@ -569,19 +577,21 @@ window.ReportBlocks = (function () {
         html += `<span data-prof="${sr}" style="font-size:0.68rem;font-weight:600;color:${PROF_COLORS[sr]}">${esc(levelText(cid, secProf))}</span>`;
       }
       html += `</div>`;
-      if (secOverride) {
+      if (secOverride && letterClass) {
         // The level the scores give now, worked out here rather than taken
         // from the server.
         const calculated = getSectionProficiencyRaw(cid, student.id, sec.id);
         html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${esc([formatLevel(cid, calculated), levelWord(cid, calculated)].filter(Boolean).join(' '))}): ${esc(secOverride.reason)}</div>`;
       }
       sec.tags.forEach(tag => {
-        const prof = getTagProficiency(cid, student.id, tag.id);
+        const prof = handSet ? secProf : getTagProficiency(cid, student.id, tag.id);
         const r = roundLevel(prof);
         const color = PROF_COLORS[r] || PROF_COLORS[0];
         const tint = PROF_TINT[r] || PROF_TINT[0];
         const label = prof > 0 ? esc(levelText(cid, prof)) : 'Not yet assessed';
-        const barPct = levelBarPercent(cid, prof);
+        // By whole proficiency in a Proficiency class: the bar's length
+        // shows no figure behind the word.
+        const barPct = studentLevelBarPercent(cid, prof);
         // Gather per-tag assessment evidence. getTagScores turns points into
         // a level (18/20 is Extending, not level 18) and leaves out excused work.
         const tagScores = getTagScores(cid, student.id, tag.id).filter(s => s.score > 0);
@@ -710,18 +720,16 @@ window.ReportBlocks = (function () {
       }))
       .sort((x, y) => (x.d || '').localeCompare(y.d || '') || samePieceDateOrder(cid, x.a.id, y.a.id));
   }
-  /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
-  /* A mark as the class reads it: "3.3 / 4 Proficient", "83%" for a
-     letter class, "3.3 / 4 · 83% Proficient" for Both. `word` false drops
-     the proficiency word. `own`: the piece's own % (_ownPercent), printed
-     in place of the % its level counts as. */
+  /* "Chemical Reactions Lab, Oct 12 · Proficient +" */
+  /* A mark as a student reads it (calc.js studentMarkText): the level with
+     its + or −, "Proficient +"; "Proficient + · 83%" for Both; "83%" for a
+     letter class. Never a figure out of 4 (DECISIONS, "Student-facing
+     levels are proficiencies", 2026-11-12). `own`: the piece's own %
+     (_ownPercent), printed in place of the % its level counts as. */
   function _mark(cid, v, word, own) {
     if (!(v > 0)) return '\u2014';
-    const mode = courseGradeMode(cid);
     const pct = own || formatLevelAs(cid, v, 'percent');
-    if (mode === 'letter') return pct;
-    const fig = levelFigure(v) + ' / 4' + (mode === 'both' ? ' \u00B7 ' + pct : '');
-    return word === false ? fig : fig + ' ' + _profWord(v);
+    return studentMarkText(cid, v, pct);
   }
   /* Points and Complete/Incomplete work's own %, points earned out of
      possible (calc.js), as Generate prints it (#565): its level is only a
@@ -787,7 +795,7 @@ window.ReportBlocks = (function () {
     const mark = _workMark(cid, sid, once[0], false);
     return { list: once.filter(w => _workMark(cid, sid, w, false) === mark).slice(0, 2), mark };
   }
-  /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
+  /* "Chemical Reactions Lab, Oct 12 · Proficient +" */
   function _workLine(cid, sid, w) {
     const when = _assessmentWhen(w.a);
     return esc(w.a.title || '') + (when ? ', ' + when : '') + ' \u00B7 ' + esc(_workMark(cid, sid, w));
@@ -874,14 +882,14 @@ window.ReportBlocks = (function () {
     const when = a => (_assessmentWhen(a) ? ', ' + _assessmentWhen(a) : '');
     const facts = [];
     if (options.startNow !== false && (startV > 0 || nowV > 0)) {
-      // Figures as the class reads them: a level and its word, or a % for a letter class.
-      const letter = courseGradeMode(cid) === 'letter';
-      const plain = v => formatLevel(cid, v) + (letter ? '' : ' ' + _profWord(v));
+      // As a student reads them: the proficiency (with its % in a Both
+      // class), or a % for a letter class; the change in words.
+      const plain = v => studentLevelText(cid, v);
 
       facts.push([sinceLast ? esc(area.thenLabel) : 'Start of term', esc(plain(startV))]);
       facts.push([
         'Now',
-        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(levelChangeAs(cid, startV, nowV))} ${sinceLast ? 'since ' + esc(area.thenLabel) : 'this term'})</span>`,
+        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(studentLevelChange(cid, startV, nowV))} ${sinceLast ? 'since ' + esc(area.thenLabel) : 'this term'})</span>`,
       ]);
     }
     if (options.best !== false && bests) {
@@ -903,7 +911,7 @@ window.ReportBlocks = (function () {
         work
           .map(
             w =>
-              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(courseGradeMode(cid) === 'letter' ? _workMark(cid, student.id, w) : levelFigure(w.score))}</span></div>`,
+              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(_workMark(cid, student.id, w))}</span></div>`,
           )
           .join('') +
         '</div>';
@@ -1044,7 +1052,7 @@ window.ReportBlocks = (function () {
     if (!prev) return null;
     return _pass('course|' + cid + '|' + sid + '|' + now.ordinal, () =>
       readAsOfTerm(cid, prev.ordinal, () => {
-        const g = studentGradeSummary(cid, sid);
+        const g = studentGradeText(cid, sid);
         return g.text ? { text: g.text, pct: _coursePct(cid, sid), level: getOverallProficiency(cid, sid) } : null;
       }),
     );
@@ -1093,11 +1101,13 @@ window.ReportBlocks = (function () {
     const live = sections.map(sec => rowsBySection[sec.id]).filter(r => r.now > 0 || !hideEmpty);
     if (!live.length) return '';
 
-    // A figure as the class shows it: the score out of 4, or the % for a
-    // letter class, with the proficiency word where it is on.
+    // A letter class: the % with the word where it is on. A Proficiency
+    // class: the proficiency, never a figure out of 4, whatever a saved form
+    // says for Score (DECISIONS, "Student-facing levels are proficiencies",
+    // 2026-11-12); a Both class adds the % with Score on.
     const fig = v => {
       if (!(v > 0)) return '<span class="report-ct-none">—</span>';
-      // The class's figure: 3.2, 80%, or 3.2 · 80% for Both (calc.js).
+      if (mode !== 'letter') return esc(mode === 'both' && showScore ? studentLevelText(cid, v) : levelWord(cid, v));
       const num = formatLevel(cid, v);
       const parts = [];
       if (showScore) parts.push(esc(num));
@@ -1105,14 +1115,18 @@ window.ReportBlocks = (function () {
       if (!parts.length) parts.push(esc(num));
       return parts.join(' ');
     };
-    const change = (a, b) => levelChangeAs(cid, a, b);
+    const change = (a, b) => studentLevelChange(cid, a, b);
     const colCount = 2 + (showChange ? 1 : 0) + (showAssessed ? 1 : 0) + 1;
     const head = (nameLabel, short) =>
       `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
     const tr = (name, then, now, n, cls, count) =>
       `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count} competenc${count === 1 ? 'y' : 'ies'}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
     const headRow = name => `<tr class="report-ct-group"><td colspan="${colCount}">${esc(name)}</td></tr>`;
-    const sortRows = list => (lowestFirst ? list.slice().sort((a, b) => (a.now || 9) - (b.now || 9)) : list);
+    // Lowest First goes by what is printed: the figure in a Letter class,
+    // the proficiency in a Proficiency or Both class, ties in curriculum
+    // order, so the order never shows a figure behind a word.
+    const shownNow = r => (r.now > 0 ? (mode === 'letter' ? r.now : roundLevel(r.now)) : 9);
+    const sortRows = list => (lowestFirst ? list.slice().sort((a, b) => shownNow(a) - shownNow(b)) : list);
     const avg = (list, k) => {
       const v = list.map(r => r[k]).filter(x => x > 0);
       return v.length ? v.reduce((t, x) => t + x, 0) / v.length : 0;
@@ -1140,19 +1154,18 @@ window.ReportBlocks = (function () {
       overallRow = tr('Overall', overallThen, overallNow, assessedOnce(live), 'report-prof-overall');
     } else if (options.overall !== false) {
       const termId = ctx && ctx.termId;
-      const nowG = { text: studentGradeSummary(cid, sid, termId).text, pct: _coursePct(cid, sid), level: overallNow };
+      // A Both class's course grade leads with its proficiency
+      // (studentGradeText: "Proficient · B 82%"), so the word is in it.
+      const nowG = { text: studentGradeText(cid, sid, termId).text, pct: _coursePct(cid, sid), level: overallNow };
       const thenG = last ? _lastReportCourse(cid, sid) : null;
-      const cell = (g, lvl) =>
-        g && g.text
-          ? esc(g.text) + (showWord && mode === 'both' && lvl > 0 ? ' ' + esc(_profWord(lvl)) : '')
-          : '<span class="report-ct-none">—</span>';
+      const cell = g => (g && g.text ? esc(g.text) : '<span class="report-ct-none">—</span>');
       let ch = '\u2014';
-      if (thenG && mode === 'both') ch = levelChange(thenG.level, nowG.level);
+      if (thenG && mode === 'both') ch = studentLevelChange(cid, thenG.level, nowG.level);
       else if (thenG && thenG.pct != null && nowG.pct != null) {
         const d = Math.round((nowG.pct - thenG.pct) * 10) / 10;
         ch = (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
       }
-      overallRow = `<tr class="report-prof-overall"><td class="report-ct-name">Overall</td><td class="report-prof-n">${cell(thenG, thenG && thenG.level)}</td><td class="report-prof-n">${cell(nowG, overallNow)}</td>${showChange ? `<td class="report-prof-n">${esc(ch)}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${assessedOnce(live)}</td>` : ''}</tr>`;
+      overallRow = `<tr class="report-prof-overall"><td class="report-ct-name">Overall</td><td class="report-prof-n">${cell(thenG)}</td><td class="report-prof-n">${cell(nowG)}</td>${showChange ? `<td class="report-prof-n">${esc(ch)}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${assessedOnce(live)}</td>` : ''}</tr>`;
     }
 
     // The rows: blocks that never split across columns. A folder prints as
@@ -1260,7 +1273,17 @@ window.ReportBlocks = (function () {
         .slice()
         .sort((a, b) => b.now - a.now);
       if (ranked.length) {
-        const ties = (list, pick) => list.filter(r => printedLevel(r.now) === printedLevel(pick.now)).slice(0, 3);
+        // Ties are the competencies that print the same: the same figure in
+        // a Letter class, the same proficiency in a Proficiency or Both
+        // class, named in report order (DECISIONS, "Student-facing levels
+        // are proficiencies", 2026-11-12).
+        const same = (x, y) =>
+          mode === 'letter' ? printedLevel(x) === printedLevel(y) : roundLevel(x) === roundLevel(y);
+        const ties = (list, pick) =>
+          list
+            .filter(r => same(r.now, pick.now))
+            .sort((x, y) => (mode === 'letter' ? 0 : printed.indexOf(x) - printed.indexOf(y)))
+            .slice(0, 3);
         const names = list =>
           list
             .map(r => r.name)
@@ -1296,9 +1319,9 @@ window.ReportBlocks = (function () {
         };
         const hi = ties(ranked, ranked[0]);
         const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
-        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(formatLevel(cid, hi[0].now))}.${work(hi, true)}</div>`;
-        if (ranked.length > 1 && printedLevel(lo[0].now) !== printedLevel(hi[0].now)) {
-          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(formatLevel(cid, lo[0].now))}.${work(lo, false)}</div>`;
+        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(studentLevelText(cid, hi[0].now))}.${work(hi, true)}</div>`;
+        if (ranked.length > 1 && !same(lo[0].now, hi[0].now)) {
+          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(studentLevelText(cid, lo[0].now))}.${work(lo, false)}</div>`;
         }
       }
     }
@@ -1321,16 +1344,18 @@ window.ReportBlocks = (function () {
   ];
   /* A Letter class prints its levels as percents, so its legend gives
      the % each level counts as (formatLevel) and no "out of 4" (step 4
-     group 2 #2). */
+     group 2 #2). A Proficiency or Both class prints each level by its name
+     alone: students and families read proficiencies, not numbers
+     (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12). */
   function renderBlockLegend(options, cid) {
     const half = options && options.size === 'half';
     const asPct = cid != null && courseGradeMode(cid) === 'letter';
     const items = LEGEND_LEVELS.map(
       ([n, word, what]) =>
-        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) : n} \u00B7 ${word}</div><div class="report-legend-desc">${what}</div></div>`,
+        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) + ' \u00B7 ' : ''}${word}</div><div class="report-legend-desc">${what}</div></div>`,
     ).join('');
     return `<div class="report-block-box report-legend${half ? ' report-legend-half' : ''}">
-    <div class="report-legend-title">${asPct ? 'BC Proficiency Scale' : 'BC Proficiency Scale, out of 4'}</div>
+    <div class="report-legend-title">BC Proficiency Scale</div>
     <div class="report-legend-items">${items}</div>
   </div>`;
   }
@@ -1479,9 +1504,12 @@ window.ReportBlocks = (function () {
       const sr = roundLevel(secProf);
       const secLabel = secProf > 0 ? esc(levelText(cid, secProf)) : 'No Evidence';
 
-      // Tag-level breakdown
+      // Tag-level breakdown. A competency the teacher set by hand reads the
+      // teacher's level on each row (DECISIONS, "Student-facing levels are
+      // proficiencies", 2026-11-12); a Letter class prints as before.
+      const handSet = courseGradeMode(cid) !== 'letter' && !!sectionOverrideInView(cid, student.id, sec.id);
       const tagData = sec.tags.map(tag => {
-        const prof = getTagProficiency(cid, student.id, tag.id);
+        const prof = handSet ? secProf : getTagProficiency(cid, student.id, tag.id);
         const r = roundLevel(prof);
         return { tag, prof, r };
       });
@@ -1789,9 +1817,12 @@ window.ReportBlocks = (function () {
   function _rowMarks(cid, a, cv, level, sid) {
     if (level != null) {
       if (!(level > 0)) return { score: '—', percent: '', word: '' };
+      const own = _ownPercent(cid, sid, a);
+      if (courseGradeMode(cid) !== 'letter')
+        return _levelMarks(cid, level, own || formatLevelAs(cid, level, 'percent'));
       return {
         score: levelFigure(level) + ' / 4',
-        percent: _ownPercent(cid, sid, a) || formatLevelAs(cid, level, 'percent'),
+        percent: own || formatLevelAs(cid, level, 'percent'),
         word: _profWord(level),
       };
     }
@@ -1809,6 +1840,7 @@ window.ReportBlocks = (function () {
       };
     }
     if (cv.kind === 'level' && cv.value > 0) {
+      if (courseGradeMode(cid) !== 'letter') return _levelMarks(cid, cv.value, cv.percentText);
       return {
         score: levelFigure(cv.value) + ' / 4',
         percent: cv.percentText,
@@ -1816,6 +1848,21 @@ window.ReportBlocks = (function () {
       };
     }
     return { score: '\u2014', percent: '', word: '' };
+  }
+  /* A mark on a level in a Proficiency or Both class, as a student reads
+     it (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12):
+     the Score is the level with its + or − ("Proficient +", calc.js
+     nearestScoreLevelName), never "3.3 / 4", so the Proficiency Word
+     column leaves it alone rather than say it twice; the Percent is the
+     piece's in a Both class and none in a Proficiency class, where a
+     level's % would be its figure in other words. A saved form with Score
+     on, Percent on or Word off prints the proficiency all the same. */
+  function _levelMarks(cid, v, pct) {
+    return {
+      score: nearestScoreLevelName(v),
+      percent: courseGradeMode(cid) === 'both' ? pct : '',
+      word: '',
+    };
   }
 
   /* The Assignment Grades groups ({ name, grade?, rows: [row html] }) laid
@@ -1938,7 +1985,7 @@ window.ReportBlocks = (function () {
             termWork.filter(a => (a.categoryId || a.category_id || null) === c.id),
             categoryCalcMode(c),
           );
-          return [Number(c.weight || 0) + '% of grade', g && g.text].filter(Boolean).join(' · ');
+          return [Number(c.weight || 0) + '% of grade', studentGroupGradeText(cid, g)].filter(Boolean).join(' · ');
         };
         const cats = (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, grade: catGrade(c), rows: [] }));
         const none = { id: null, name: 'No Category', rows: [] };
@@ -1965,13 +2012,23 @@ window.ReportBlocks = (function () {
     // The course grade, the year to date as of the report's end, as the
     // gradebook shows it, with the report's reporting basis (IE, or No
     // Letter Grade for goals).
-    const course = showCourse ? studentGradeSummary(cid, sid, ctx && ctx.termId).text : '';
+    const course = showCourse ? studentGradeText(cid, sid, ctx && ctx.termId).text : '';
     const courseHtml = course
       ? `<div class="report-grades-course">Course Grade <strong>${esc(course)}</strong></div>`
       : '';
+    // A Proficiency or Both class names its levels, with no number for one.
+    const byName = courseGradeMode(cid) !== 'letter';
     const legend = [
-      showScore ? 'Points shown as scored; other work scored out of 4.' : '',
-      showWord ? 'Proficiency: 1 Emerging · 2 Developing · 3 Proficient · 4 Extending.' : '',
+      showScore
+        ? byName
+          ? 'Points shown as scored; other work shown as its proficiency.'
+          : 'Points shown as scored; other work scored out of 4.'
+        : '',
+      showWord
+        ? byName
+          ? 'Proficiency: Emerging · Developing · Proficient · Extending.'
+          : 'Proficiency: 1 Emerging · 2 Developing · 3 Proficient · 4 Extending.'
+        : '',
       organize === 'competency' ? 'Each mark is for that competency.' : '',
     ]
       .filter(Boolean)
@@ -2034,7 +2091,8 @@ window.ReportBlocks = (function () {
         const avg = d.scored > 0 ? d.totalScore / d.scored : 0;
         if (!(avg > 0) && options.noEvidence === 'hide') return;
         const r = roundLevel(avg);
-        const pct = levelBarPercent(cid, avg);
+        // By whole proficiency in a Proficiency class (calc.js).
+        const pct = studentLevelBarPercent(cid, avg);
         const color = avg > 0 ? PROF_COLORS[r] || 'var(--text-3)' : 'var(--border)';
         const profLabel = d.count === 0 ? 'Not yet assessed' : avg > 0 ? esc(levelText(cid, avg)) : 'Not yet assessed';
         const labelColor = avg > 0 ? color : 'var(--text-3)';

@@ -3,7 +3,7 @@ title: Print Report Cards
 section: Reports
 order: 3
 summary: Progress Reports lays out a class's printed reports and prints one for every student at once. A Quick Report is a grade sheet; a Custom report is built from blocks such as Proficiency and Teacher Comment.
-checked: 2026-11-05
+checked: 2026-11-12
 pages:
   - /reports
 demo: /reports
@@ -57,6 +57,9 @@ shots:
 
 1. Open **Reports** and choose **Progress Reports**. Choose the report period in the list beside it.
 2. Choose **Quick Report** for a grade sheet: every assignment with its score, and the category summary. Choose **Custom** to build a report card instead.
+
+   In a Proficiency class, every report shows a level as its proficiency, such as Proficient or Developing +, never as a number out of 4. A Both class adds the percent. Points and Complete/Incomplete work show as scored.
+
 3. In **Custom**, open **Templates** and choose a starter: **Report Card**, **Interim Update** or **Conference Pack**. To change it, open **Blocks** and choose a block to add, such as **Proficiency**, **Teacher Comment** or **Missing Work**.
 
 ![Progress Reports with the Report Card template on Cece Adeyemi's front page](img/print-report-cards.jpg 'The Report Card template. The line above the page counts the sheets each student needs.')

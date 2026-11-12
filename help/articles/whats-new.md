@@ -5,7 +5,7 @@ order: 3
 summary: What's New lists changes to FullVision by release date, newest first.
 keywords:
   - Class Management
-checked: 2026-11-11
+checked: 2026-11-12
 labels:
   - Add Your Students
   - Check How Your File Was Read
@@ -44,6 +44,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 12, 2026: Students Read Proficiencies
+
+In a class graded by Proficiency, everything a student or family reads now names the proficiency instead of a number: the Quick Report, Progress Reports, printed rubrics, phone reports and the student page. A piece of work reads like "Proficient +", and a competency or the overall grade reads like "Proficient". Nothing shows "out of 4", and a level you set by hand is the only level shown. A Both class shows the proficiency with its percent. Letter classes, and work scored in points or Complete/Incomplete, are unchanged. The gradebook and your other teacher screens keep their numbers.
 
 ## Nov 11, 2026: Import Roster
 

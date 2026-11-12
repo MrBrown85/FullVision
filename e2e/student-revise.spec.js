@@ -6,7 +6,7 @@ import { PHONE, CHROMEBOOK, fits, named, shot } from './student-card-fake.js';
    Send Work on, a class graded by both), against the built site with the
    live site's CSP: Needs Revision on the card, Send My Revision with a real
    JPEG, Sent again, Unsend; then Before and After on the revision already
-   returned, with the board's 2.7 · 67% and 3.0 · 75%. Nothing leaves the
+   returned, with the board's Proficient − · 67% and Proficient · 75%. Nothing leaves the
    browser. */
 
 const PHOTO = resolve('assets/sample-work/cell-lab-cece-1.jpg');
@@ -36,7 +36,7 @@ for (const [where, device] of [
   test.describe(where, () => {
     test.use(device);
 
-    test('Needs Revision, Send My Revision, Unsend; Before and After with 2.7 · 67% and 3.0 · 75%', async ({
+    test('Needs Revision, Send My Revision, Unsend; Before and After with Proficient − · 67% and Proficient · 75%', async ({
       page,
     }) => {
       const { posts, errors } = await demo(page);
@@ -75,8 +75,9 @@ for (const [where, device] of [
       await vaccine.getByRole('button', { name: 'Before and After' }).click();
       await expect(page.getByRole('heading', { name: 'Before and After' })).toBeVisible();
       const result = page.locator('.sp-ba-result');
-      await expect(result).toContainText('2.7 · 67%');
-      await expect(result).toContainText('3.0 · 75%');
+      // The proficiency and the %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+      await expect(result).toContainText('Proficient − · 67%');
+      await expect(result).toContainText('Proficient · 75%');
       await expect(page.getByRole('img', { name: 'First Version, page 1' })).toBeVisible();
       await expect(page.getByRole('img', { name: 'Your Revision, page 1' })).toBeVisible();
       await expect(page.getByText('Your Teacher Asked')).toBeVisible();
@@ -86,7 +87,7 @@ for (const [where, device] of [
       await shot(page, tag + '-s11f2-before-and-after');
       await page.locator('.sp-ba').getByRole('button', { name: 'See Your Feedback' }).click();
       await expect(page.locator('.sp-ba')).toHaveCount(0);
-      await expect(page.locator('.sp-fb-big')).toHaveText('Proficient');
+      await expect(page.locator('.sp-fb-big')).toHaveText('Proficient · 75%');
       expect(posts).toEqual([]);
       expect(errors).toEqual([]);
     });

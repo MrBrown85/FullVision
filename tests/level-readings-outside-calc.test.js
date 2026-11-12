@@ -178,9 +178,10 @@ describe.each(VALUES)('a level of %s', v => {
       const chart = ReportBlocks.renderBlockSectionChart(CID, student());
       const strengths = chart.split('Areas for Growth')[0];
       expect(strengths.indexOf('<span>Evidence</span>') >= 0, 'listed as a strength').toBe(s.level >= 3);
-      // Proficiency: the word beside the figure.
+      // Proficiency: the word alone, no figure (DECISIONS, "Student-facing levels are proficiencies").
       const prof = ReportBlocks.renderBlockProficiency(CID, student(), ctx, { word: true });
-      expect(prof).toContain('>' + formatLevel(CID, v) + ' ' + s.word + '<');
+      expect(prof).toContain('<td class="report-prof-n">' + s.word + '</td>');
+      expect(prof).not.toContain(formatLevel(CID, v));
     });
   });
 

@@ -241,8 +241,12 @@ describe.each(['proficiency', 'letter', 'both'])('Your Result in a %s class', sy
       expect(big).toBe(p.result.text);
       expect(q(page, '.sp-fb-beside')).toBeNull();
     } else {
-      expect(big).toBe(p.result.word);
-      expect(beside).toBe(p.result.text);
+      // The proficiency with its ± (and a Both class's %) is the result itself, large, with no figure
+      // (DECISIONS, "Student-facing levels are proficiencies").
+      expect(p.result.word).toBe('');
+      expect(big).toBe(p.result.text);
+      expect(big).toMatch(/^(Emerging|Developing|Proficient|Extending)/);
+      expect(q(page, '.sp-fb-beside')).toBeNull();
     }
     expect(q(page, '.sp-fb-big').className).toContain('sp-lvt-' + p.result.level);
     expect(
