@@ -322,7 +322,13 @@ window.PageAssignments = (function () {
      wrong student (Nov 3 sweep). The same card keeps the focus. */
   function _graderToTop() {
     var sc = _grader && _grader.overlay.querySelector('.grader-scroll');
-    if (sc) sc.scrollTop = 0;
+    if (sc) {
+      sc.scrollTop = 0;
+      // The next student comes in with a short fade (styles.css, Motion).
+      sc.classList.remove('grader-swap');
+      void sc.offsetWidth;
+      sc.classList.add('grader-swap');
+    }
   }
 
   /* The grading control that has focus (a criterion or competency card, a
