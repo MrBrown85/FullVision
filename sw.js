@@ -16,6 +16,7 @@ const PRECACHE_URLS = [
   '/assets/icons/apple-touch-icon.png',
   '/vendor/supabase.min.js',
   '/curriculum_by_course.json',
+  '/curriculum_crosswalk.json',
   // Shared modules
   '/shared/sentry-init.js',
   '/shared/html.js',
