@@ -4396,11 +4396,10 @@ button.stu-bd-row:focus-visible {
   border-radius: 3px;
   background: var(--seg-track);
 }
-.stu-ov-cell.on {
-  background: var(--text-3);
-}
-.stu-ov-rub-row.sel .stu-ov-cell.on {
-  background: var(--text);
+/* The filled cells take the level's colour inline; the chosen criterion
+   reads stronger by its row, not by turning black. */
+.stu-ov-rub-row:not(.sel) .stu-ov-cell.on {
+  opacity: 0.75;
 }
 .stu-ov-next-text {
   margin-top: 4px;
@@ -5765,4 +5764,63 @@ details.gl-rest > summary .gl-title {
   .lp-calib-row {
     padding: 10px 16px;
   }
+}
+
+/* Competencies: one quiet summary line (the count assessed, the strongest,
+   the one to work on next) and a link to where the calculation is set;
+   the start ring explained in the column header. */
+.stu-cp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 24px;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.stu-cp-sum-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.stu-cp-sum-label {
+  color: var(--text-2);
+}
+.stu-cp-how {
+  margin-left: auto;
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.stu-cp-ringkey {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.stu-cp-ringkey i {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+/* Observations: ordinary facts read quietly. The latest gap is a plain
+   line, the gap bands a light tint, and a competency not seen yet a grey
+   dashed chip (the count says how many). */
+.ev-tl-gapline {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-2);
+}
+.ev-tl-gap-label {
+  font-weight: 400;
+  color: var(--text-2);
+}
+.ev-seen-chip.is-none {
+  border: 1px dashed var(--border-2);
+  background: transparent;
+  color: var(--text-2);
 }
