@@ -575,16 +575,8 @@
           about:
             'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
           core: ['CT', 'CRT'],
-          // Handouts and Links: the teacher's link, as the server's page sends it.
-          resources: [
-            {
-              id: 'demo-res-method',
-              kind: 'link',
-              title: 'The Scientific Method',
-              url: 'https://www.britannica.com/science/scientific-method',
-              page_count: null,
-            },
-          ],
+          // Handouts and Links: none on the sample card (its files name no other host).
+          resources: [],
         },
         {
           // A draft, never returned: the student sees the piece and its date only.

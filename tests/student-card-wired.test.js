@@ -1278,7 +1278,11 @@ describe('Demo Mode and a real card cannot drift', () => {
     expect(Object.keys(reply).sort()).toEqual(Object.keys(samplePage(TODAY)).sort());
     // The database's shape since S4-M1: every key the page had, and the five new ones on each piece.
     expect(Object.keys(contract).sort()).toEqual(
-      Object.keys(samplePage(TODAY).assessments[0]).concat(S4M1.assessments).sort(),
+      Object.keys(samplePage(TODAY).assessments[0])
+        .concat(S4M1.assessments)
+        // Handouts and Links (2026111170): the page sends each assessment's resources.
+        .concat(Object.keys(samplePage(TODAY).assessments[0]).includes('resources') ? [] : ['resources'])
+        .sort(),
     );
     expect(Object.keys(contract.grade).sort()).toEqual([
       'checks',
