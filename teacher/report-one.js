@@ -642,8 +642,12 @@ window.ReportOne = (function () {
     if (!d) return '';
     var sid = student.id;
     var html = '';
+    var ids = null; // the Assessments rows' assessment ids, in print order
     if (key === 'assessments') {
       var part = G().listPart(cid, student, _listOpts(m, sid), stage);
+      ids = part.list.map(function (r) {
+        return r.id;
+      });
       html = part.html
         ? '<div class="one-part one-assessments"><div class="report-block-title">Assessments</div>' +
           part.html +
@@ -660,13 +664,19 @@ window.ReportOne = (function () {
     if (!html) return '';
     var title = m.titles[key] || d.title || '';
     var gone = d.rows ? removedOf(m, key, sid) : [];
-    if (!title && !d.rows) return html;
+    if (!title && !d.rows && !ids) return html;
     var tpl = document.createElement('div');
     // html-safe: html is this part's own render above (a ReportBlocks block or GradeReport's table, both escaped), parsed in a detached div
     tpl.innerHTML = html;
     if (title) {
       var t = key === 'course-grade' ? tpl.querySelector('.gr-term span') : _titleEl(tpl);
       if (t) t.textContent = title;
+    }
+    if (ids) {
+      // Each row of the list names its assessment, for the page's controls.
+      Array.prototype.forEach.call(tpl.querySelectorAll(SPLIT_SEL.gr), function (row, i) {
+        if (ids[i] != null) row.setAttribute('data-row', ids[i]);
+      });
     }
     if (d.rows) {
       Array.prototype.forEach.call(tpl.querySelectorAll(d.rows.sel), function (row) {
@@ -897,7 +907,7 @@ window.ReportOne = (function () {
       }),
     ];
     var run = function (caps) {
-      return sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx, caps: caps });
+      return sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx, caps: caps, fill: true });
     };
     var r = run(null);
     var sides = r.sides;
@@ -977,6 +987,10 @@ window.ReportOne = (function () {
         H,
       );
     }
+    // The slip on a front with Feedback Pages after it: its back is left
+    // blank, so the feedback starts on the next sheet and tearing the slip
+    // off takes nothing from it.
+    if (fb && slipAt >= 0 && slipAt % 2 === 0 && slipAt === sides.length - 1) sides.push({ blank: true, rows: [] });
     var bodySides = sides.length;
     var fbBodies = fb ? fb.body(bodySides + 1, bodySides + fb.count) : [];
     var sideCount = bodySides + fbBodies.length;
@@ -1016,7 +1030,7 @@ window.ReportOne = (function () {
       html += '<div class="sheet-zoom" data-side="' + s + '"><div class="sheet-label no-print">';
       if (fbHtml) {
         html += _sideLabel(s, sheetCount, 'Feedback') + '</div>' + G().sideHtml(fbHtml, paper, 'side', s, 'fb-sheet');
-      } else if (side) {
+      } else if (side && !side.blank) {
         var prints =
           side.pinned ||
           side.rows.some(function (row) {

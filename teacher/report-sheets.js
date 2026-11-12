@@ -1448,7 +1448,9 @@ window.ReportSheets = (function () {
           // taller than a side (it fit the Front but for the Studio's boxes),
           // or moved once and still too long for the room there (above a
           // docked block), starts here and goes on.
-          if (r.moved || r.h > full) {
+          // (One Report, opts.fill: a table always starts where it is and
+          // goes on, so no side ends with room a row would have filled.)
+          if (opts.fill || r.moved || r.h > full) {
             tables.push(r.live[0]);
             r = null;
           } else if (!last) {

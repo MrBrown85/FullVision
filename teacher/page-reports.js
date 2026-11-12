@@ -585,6 +585,13 @@ window.PageReports = (function () {
 
     // Progress Reports: Page Studio (report-studio.js)
     output.innerHTML = ReportStudio.layoutHtml({ view: studioView, settingsHtml: _printSettingsHtml() });
+    if (_isOne()) {
+      // The panel and the page listen on these two, made new each time.
+      var studio = document.getElementById('studio');
+      if (studio) studio.classList.add('studio-one');
+      ReportOnePanel.mount(document.getElementById('studio-palette'), _oneApi);
+      if (typeof ReportOnePage !== 'undefined') ReportOnePage.mount(document.getElementById('rb-preview'), _oneApi);
+    }
     renderStudioPanels();
     renderReportPreview();
     _mountStudioKeys();
@@ -683,6 +690,10 @@ window.PageReports = (function () {
   /* + Page after the last side; Empty · Remove on an empty side past the
      second. One Student view of Build Your Own only. */
   function _decoratePages(preview) {
+    if (_isOne()) {
+      if (!viewingIssue && typeof ReportOnePage !== 'undefined') ReportOnePage.decorate(preview, _oneApi());
+      return;
+    }
     if (studioView !== 'one' || viewingIssue || _isGrade()) return;
     var student = preview.querySelector('.sheet-student');
     if (!student) return;
@@ -1083,9 +1094,11 @@ window.PageReports = (function () {
     }
     html += '</fieldset>';
     // The Letterhead's Name option, here too so it can be set at print time.
-    var nameStyle = grade
-      ? _gradeOpts().name
-      : ReportSheets.optionsFor(ReportSheets.cellOf(form, 'header') || { block: 'header' }).name;
+    var nameStyle = _isOne()
+      ? (_oneModel().options.header || {}).name
+      : grade
+        ? _gradeOpts().name
+        : ReportSheets.optionsFor(ReportSheets.cellOf(form, 'header') || { block: 'header' }).name;
     html += '<fieldset class="issue-group"><legend>Name</legend>';
     html +=
       '<label class="issue-option"><input type="radio" name="issue-name" value="preferred"' +
@@ -1171,6 +1184,7 @@ window.PageReports = (function () {
       nameChanged: false,
       gradeBefore: reportConfig.gradeReport ? JSON.parse(JSON.stringify(reportConfig.gradeReport)) : null,
       formBefore: reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null,
+      oneBefore: reportConfig.one ? JSON.parse(JSON.stringify(reportConfig.one)) : null,
     };
     var overlay = document.createElement('div');
     overlay.id = ISSUE_OVERLAY_ID;
@@ -1206,7 +1220,9 @@ window.PageReports = (function () {
     overlay.addEventListener('change', function (e) {
       var t = e.target;
       if (!t || t.name !== 'issue-name') return;
-      if (_isGrade()) _setGradeOption('name', t.value === 'first' ? 'first' : 'preferred');
+      if (_isOne())
+        _setOne(ReportOne.setOption(_oneModel(), 'header', 'name', t.value === 'first' ? 'first' : 'preferred'));
+      else if (_isGrade()) _setGradeOption('name', t.value === 'first' ? 'first' : 'preferred');
       else _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
       if (_issueState) {
         _issueState.nameChanged = true;
@@ -1262,7 +1278,14 @@ window.PageReports = (function () {
     if (overlay && overlay.remove) overlay.remove();
     if (_issueState && _issueState.nameChanged && !keepEveryone) {
       _issueState.nameChanged = false;
-      if (_isGrade()) {
+      if (_isOne()) {
+        if (_issueState.oneBefore) reportConfig.one = _issueState.oneBefore;
+        else delete reportConfig.one;
+        _saveReportConfig();
+        _classFitKey = '';
+        renderStudioPanels();
+        renderReportPreview();
+      } else if (_isGrade()) {
         reportConfig.gradeReport = _issueState.gradeBefore;
         _saveReportConfig();
         _classFitKey = '';
@@ -1373,7 +1396,7 @@ window.PageReports = (function () {
       termId: c.ctx.termId,
       termLabel: c.ctx.termLabel,
       paper: reportPaper,
-      form: ReportSheets.normalizeForm(reportConfig.form),
+      form: _isOne() ? { one: _oneModel() } : ReportSheets.normalizeForm(reportConfig.form),
       students: students,
     }).then(function (res) {
       if (!_mounted) return;
@@ -1441,7 +1464,108 @@ window.PageReports = (function () {
 
   /* ── Grade Report (grade-report.js) ──────────────────────────── */
   function _isGrade() {
-    return !!reportConfig && reportConfig.progressMode === 'grade';
+    return !_isOne() && !!reportConfig && reportConfig.progressMode === 'grade';
+  }
+
+  /* ── One Report (report-one.js) ───────────────────────────────
+     One list of parts in place of the Quick Report and Custom (Colin,
+     2026-11-12; docs/plans/one-report-build-plan.md). Behind a switch
+     until it is the Progress Reports screen for everyone: ?onereport=1 in
+     the address turns it on for this device, ?onereport=0 off. The class's
+     Quick Report choices and built form are read, never rewritten; the
+     model is saved as reportConfig.one the first time the teacher changes
+     something. */
+  var ONE_KEY = 'fv-one-report';
+  var _oneOn = null;
+  var _oneForStudent = false; // Changes Apply To: the student on the canvas, not the class
+  function _isOne() {
+    if (_oneOn === null) {
+      var on = false;
+      try {
+        var q = /[?&]onereport=([01])/.exec(location.search);
+        if (q) {
+          if (q[1] === '1') localStorage.setItem(ONE_KEY, '1');
+          else localStorage.removeItem(ONE_KEY);
+        }
+        on = localStorage.getItem(ONE_KEY) === '1';
+      } catch (e) {
+        on = false;
+      }
+      _oneOn = on && typeof ReportOne !== 'undefined' && typeof ReportOnePanel !== 'undefined';
+    }
+    return _oneOn && !!reportConfig;
+  }
+  function _oneModel() {
+    return ReportOne.modelFor(reportConfig);
+  }
+  /* Every change saves the model and can be undone, as _setForm does. */
+  function _setOne(model, label) {
+    var before = reportConfig.one ? JSON.parse(JSON.stringify(reportConfig.one)) : null;
+    reportConfig.one = ReportOne.normalize(model);
+    _saveReportConfig();
+    _classFitKey = '';
+    renderStudioPanels();
+    renderReportPreview();
+    if (label && typeof showUndoToast === 'function') {
+      var cid = activeCourse;
+      showUndoToast(label, function () {
+        if (activeCourse !== cid) return;
+        if (before) reportConfig.one = before;
+        else delete reportConfig.one;
+        _saveReportConfig();
+        _classFitKey = '';
+        renderStudioPanels();
+        renderReportPreview();
+      });
+    }
+  }
+  /* What the panel (report-one-panel.js) and the page (report-one-page.js)
+     are given to read and change the report with. */
+  function _oneApi() {
+    return {
+      cid: activeCourse,
+      model: _oneModel,
+      set: _setOne,
+      student: _previewStudent,
+      students: function () {
+        return sortStudents(getStudents(activeCourse), 'lastName');
+      },
+      // The student a change is kept for, or null when it is the class's.
+      scope: function () {
+        var st = _oneForStudent && studioView === 'one' ? _previewStudent() : null;
+        return st ? st.id : null;
+      },
+      setScope: function (forStudent) {
+        _oneForStudent = !!forStudent;
+        renderStudioPanels();
+        renderReportPreview();
+      },
+      goStudent: function (sid) {
+        previewSid = sid;
+        previewAuto = false;
+        studioView = 'one';
+        renderReports();
+      },
+      view: function () {
+        return studioView;
+      },
+      ctx: function () {
+        return ReportBlocks.reportContext();
+      },
+      paper: function () {
+        return reportPaper;
+      },
+      // The whole class laid out (sheets per student), once it is measured.
+      fit: function () {
+        return _classFitKey === _classFitKeyNow() ? _classFit : null;
+      },
+      redraw: function () {
+        _classFitKey = '';
+        renderStudioPanels();
+        renderReportPreview();
+      },
+      announce: _announce,
+    };
   }
   function _gradeOpts() {
     return GradeReport.options(reportConfig && reportConfig.gradeReport);
@@ -1449,6 +1573,7 @@ window.PageReports = (function () {
   // The layout the preview, the fit line and printing use: the Grade
   // Report's, or the built form's (undefined).
   function _layout() {
+    if (_isOne()) return ReportOne.layoutWith(_oneModel());
     return _isGrade() ? GradeReport.layoutWith(_gradeOpts()) : undefined;
   }
   function _setProgressMode(mode) {
@@ -1473,11 +1598,11 @@ window.PageReports = (function () {
   /* Save as Template belongs to Build Your Own (so does Sides:
      _printSettingsHtml). */
   function _syncProgressToolbar() {
-    var build = activeTab === 'progress' && !_isGrade();
+    var build = activeTab === 'progress' && !_isGrade() && !_isOne();
     var save = document.getElementById('tb-save-template');
     if (save) save.style.display = build ? '' : 'none';
     var rail = document.getElementById('tb-rail-btn');
-    if (rail) rail.textContent = _isGrade() ? 'Options' : 'Blocks';
+    if (rail) rail.textContent = _isOne() ? 'Parts' : _isGrade() ? 'Options' : 'Blocks';
   }
   /* Paper, and for Build Your Own Sides, over the canvas beside
      One Student and Everyone. */
@@ -1526,7 +1651,7 @@ window.PageReports = (function () {
       ],
       reportPaper,
     );
-    if (!_isGrade()) {
+    if (!_isGrade() && !_isOne()) {
       html += seg(
         'Sides',
         'report-sides',
@@ -1648,7 +1773,7 @@ window.PageReports = (function () {
     var el = document.activeElement;
     if (!palette || !el || !palette.contains(el) || !el.dataset || !el.dataset.action) return null;
     var sel = '[data-action="' + el.dataset.action + '"]';
-    ['key', 'value', 'mode', 'tab', 'block'].forEach(function (k) {
+    ['key', 'value', 'mode', 'tab', 'block', 'part', 'opt'].forEach(function (k) {
       if (el.dataset[k] != null) sel += '[data-' + k + '="' + el.dataset[k] + '"]';
     });
     return sel;
@@ -1657,7 +1782,10 @@ window.PageReports = (function () {
   function renderStudioPanels() {
     var palette = document.getElementById('studio-palette');
     var refocus = _focusedPaletteControl(palette);
-    if (palette && _isGrade()) {
+    if (palette && _isOne()) {
+      ReportOnePanel.render(palette, _oneApi());
+      palette.setAttribute('aria-label', 'Report');
+    } else if (palette && _isGrade()) {
       palette.innerHTML = _modeSwitchHtml() + _gradePanelHtml();
       palette.setAttribute('aria-label', 'Quick Report');
     } else if (palette) {
@@ -1685,6 +1813,12 @@ window.PageReports = (function () {
   function _renderFitLine() {
     var line = document.getElementById('studio-fit');
     if (!line) return;
+    if (_isOne()) {
+      // html-safe: ReportOnePanel.fitHtml escapes the names it prints
+      line.innerHTML = ReportOnePanel.fitHtml(_oneApi());
+      line.classList.toggle('ok', !line.querySelector('.one-fit-over'));
+      return;
+    }
     line.innerHTML = ReportStudio.fitLineHtml(
       _classFitKey === _classFitKeyNow() ? _classFit : null,
       _isGrade() ? null : _formOf(),
@@ -1773,6 +1907,7 @@ window.PageReports = (function () {
       activeCourse,
       ctx.termId,
       reportPaper,
+      _isOne() ? 'one:' + JSON.stringify(_oneModel()) : '',
       _isGrade() ? 'grade:' + JSON.stringify(_gradeOpts()) : JSON.stringify(_formOf()),
       _reportSet(),
     ].join('|');
@@ -2190,7 +2325,7 @@ window.PageReports = (function () {
     }
 
     var cell = e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]');
-    if (cell && studioView === 'one' && !viewingIssue) {
+    if (cell && studioView === 'one' && !viewingIssue && !_isOne()) {
       _selectBlock(cell.dataset.block);
       return;
     }
@@ -2203,6 +2338,11 @@ window.PageReports = (function () {
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
+    // One Report's own controls (data-action="one…") go to its panel and page.
+    if (_isOne() && /^one[A-Z]/.test(action)) {
+      if (ReportOnePanel.handle(action, el, _oneApi(), e)) return;
+      if (typeof ReportOnePage !== 'undefined' && ReportOnePage.handle(action, el, _oneApi(), e)) return;
+    }
     var handlers = {
       switchTab: function () {
         switchTab(el.dataset.tab);
@@ -2280,6 +2420,8 @@ window.PageReports = (function () {
         tqNextStudent();
       },
       printReports: function () {
+        // One Report: a comment edited on the page is saved or discarded first.
+        if (_isOne() && typeof ReportOnePage !== 'undefined' && ReportOnePage.beforePrint(_oneApi()) === false) return;
         // A chosen copy prints as it is; the live reports save a copy, then print.
         var t = _tab();
         if (viewingIssue) _printIssue();
@@ -2542,6 +2684,11 @@ window.PageReports = (function () {
       return;
     }
     var a = el.dataset.action;
+    if (_isOne() && a && /^one[A-Z]/.test(a)) {
+      if (ReportOnePanel.change && ReportOnePanel.change(a, el, _oneApi())) return;
+      if (typeof ReportOnePage !== 'undefined' && ReportOnePage.change && ReportOnePage.change(a, el, _oneApi()))
+        return;
+    }
     if (a === 'gradeOption') {
       _setGradeOption(el.dataset.key, !!el.checked);
     } else if (a === 'studioOption') {
