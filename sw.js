@@ -81,6 +81,10 @@ const PRECACHE_URLS = [
   '/teacher/report-sheets.js',
   '/teacher/report-issues.js',
   '/shared/comment-bank.js',
+  // Demo Mode's sample class (DEFAULT_COURSES) is read from this file on
+  // every start, never from the saved classes, so an offline start needs
+  // it. The address is exactly the one shared/data.js _loadSeedScript asks.
+  '/shared/seed-data.js?v=46',
   '/teacher/comment-realiser.js',
   '/teacher/comment-lint.js',
   '/shared/bank-comment.js',
