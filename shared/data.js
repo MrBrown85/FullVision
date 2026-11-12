@@ -10746,22 +10746,40 @@ function _scoresOfLiveRows(cid, prev) {
 }
 
 /* This tab's memory is behind the saved copy: another tab saved since this
-   one last loaded the class. The saved copy, with the cells this save
-   changes against the baseline (what this tab last loaded or saved) put
-   on it, and a cell memory holds that the saved copy lacks kept. A student
-   this save leaves with no marks is taken out, so the guard counts them.
-   Null with no baseline (Demo Mode): which cells changed is not known. */
-function _scoresMergedOntoSaved(cid, saved, next) {
+   one last loaded the class. The saved copy, with only the cells whose
+   value this save changes against the baseline (what this tab last loaded
+   or saved, the test persistScoreDiffToCanonical sends by) put on it. Every
+   other cell is as the saved copy has it, or as memory has it when the
+   saved copy lacks it. A student this save leaves with
+   no marks is taken out, so the guard counts them. Null, so the save is
+   blocked, with no baseline (Demo Mode: which cells changed is not known),
+   or when this save itself loses too much against the baseline: a drop the
+   guard's rule sees, or more than two cells cleared beyond an Undo's own. */
+function _scoresMergedOntoSaved(cid, saved, next, fillUndone) {
   if (!_hasServerState('scores', cid)) return null;
-  var was = _scoreEntriesByKey(_migrateRubricScoreKeys(cid, _serverState.scores[cid]));
+  var base = _migrateRubricScoreKeys(cid, _serverState.scores[cid]);
+  if (_scoreGuardDrop(base, next, fillUndone)) return null;
+  var was = _scoreEntriesByKey(base);
   var now = _scoreEntriesByKey(next);
+  var entered = function (x) {
+    return isScoreEntered(_assessmentById(cid, x.entry.assessmentId), x.entry);
+  };
   var out = _cloneValue(saved);
   var have = _scoreEntriesByKey(out);
-  Object.keys(Object.assign({}, was, now)).forEach(function (key) {
+  var cleared = 0;
+  var changed = Object.keys(Object.assign({}, was, now)).filter(function (key) {
     var a = was[key];
     var b = now[key];
-    if (have[key] && a && b && JSON.stringify(a.entry) === JSON.stringify(b.entry)) return;
-    var sid = (b || a).sid;
+    // Unchanged here: the saved copy's value stands, and a cell it lacks is
+    // kept as memory has it (another tab's stale save can leave it out).
+    if (a && b && !_scoreEntryRemoteChanged(a.entry, b.entry)) return !have[key];
+    if (a && (!b || (entered(a) && !entered(b)))) cleared++;
+    return true;
+  });
+  if (cleared > (fillUndone || 0) + 2) return null;
+  changed.forEach(function (key) {
+    var b = now[key];
+    var sid = (b || was[key]).sid;
     var list = out[sid] || (out[sid] = []);
     var at = have[key] ? list.indexOf(have[key].entry) : -1;
     if (b) list.splice(at < 0 ? list.length : at, at < 0 ? 0 : 1, _cloneValue(b.entry));
@@ -10787,14 +10805,15 @@ function saveScores(cid, obj, fillUndone) {
   // wiping all grades. When the saved copy and memory disagree, the drop
   // may not be a loss: the saved copy can still hold deleted work's marks,
   // or another tab's marks this tab has not loaded. Then the save goes
-  // ahead against the saved copy without the gone marks, or as the saved
-  // copy with this save's cells put on it; it is still refused if that
-  // would drop too much. Only the cells this save changed are sent.
+  // ahead against the saved copy without the gone marks, or, when this
+  // save's own change against its baseline is small, as the saved copy with
+  // this save's cells put on it; it is still refused if that would drop too
+  // much. Only the cells this save changed are sent.
   var sent = obj;
   var drop = _scoreGuardDrop(prev, obj, fillUndone);
   if (drop) {
     var live = _scoresOfLiveRows(cid, prev) || prev;
-    var merged = _scoreGuardDrop(live, obj, fillUndone) ? _scoresMergedOntoSaved(cid, live, obj) : obj;
+    var merged = _scoreGuardDrop(live, obj, fillUndone) ? _scoresMergedOntoSaved(cid, live, obj, fillUndone) : obj;
     if (merged && !_scoreGuardDrop(live, merged, fillUndone)) {
       prev = live;
       obj = merged;
