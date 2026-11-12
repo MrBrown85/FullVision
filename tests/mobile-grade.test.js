@@ -271,13 +271,12 @@ describe('MGrade.renderSwiper', () => {
 
 /* ── Points mode ────────────────────────────────────────────── */
 describe('Points mode variant', () => {
-  // Skip: COURSES global interacts with gb-data.js initialization in test env
-  // Points mode verified working via preview server.
-  // NOTE: course.gradingSystem no longer has a 'points' value (T-UI-02 retired
-  // it 2026-04-21; valid values are proficiency/letter/both). Per-assessment
-  // scoring still supports points via assessment.score_mode='points', which
-  // is what this test actually exercises. Fixture updated to 'both'.
-  it.skip('shows +/- stepper for points-based courses', () => {
+  // Per-assessment points scoring is live: assessment.scoreMode === 'points'
+  // switches the phone grader to the points stepper. This is the only draw
+  // test of that stepper. course.gradingSystem has no 'points' value (retired
+  // 2026-04-21), so the course fixture uses 'both'.
+  it('shows +/- stepper for points-based courses', () => {
+    const originalGetPointsScore = globalThis.getPointsScore;
     globalThis.getPointsScore = () => 85;
     mockDataLayer({
       getStudents: () => [
@@ -291,7 +290,7 @@ describe('Points mode variant', () => {
           date: '2025-03-20',
           tagIds: ['t1'],
           maxPoints: 100,
-          score_mode: 'points',
+          scoreMode: 'points',
         },
       ],
       getAssignmentStatuses: () => ({}),
@@ -301,10 +300,14 @@ describe('Points mode variant', () => {
     globalThis.COURSES = {
       test: { id: 'test', name: 'Test', calcMethod: 'mostRecent', gradingSystem: 'both' },
     };
-    const html = MGrade.renderSwiper(CID, 'a1');
+    let html;
+    try {
+      html = MGrade.renderSwiper(CID, 'a1');
+    } finally {
+      globalThis.getPointsScore = originalGetPointsScore;
+    }
     expect(html).toContain('/ 100');
     expect(html).toContain('85');
-    delete globalThis.getPointsScore;
   });
 });
 
