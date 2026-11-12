@@ -297,7 +297,7 @@ describe('grade-format-guard', () => {
     'teacher/dash-insights.js round r.min': 'a rule’s fewest pieces',
     'teacher/factor-field.js round Number(v) * 10': 'an assessment’s Factor',
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
-    'teacher/page-assignments.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',
+    'teacher/assign-competency-picker.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',
     'teacher/page-assignments.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
     'teacher/page-dashboard.js round r.bottom - c.top + 2': 'a tip’s position',
     'teacher/page-student.js round p.R - lg.R': 'points between two course % as shown',
