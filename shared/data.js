@@ -2325,6 +2325,7 @@ var _ID_PARAM_KINDS = {
   p_check_id: 'check',
   p_module_id: 'module',
   p_category_id: 'category',
+  p_resource_id: 'resource',
 };
 var _P_ID_KINDS = {
   update_assessment: 'assessment',
@@ -2807,6 +2808,9 @@ function _rekey(cid, kind, localId, serverId, extra) {
     _rekeyField('observationTemplates', cid, function (rows) {
       return _rekeyRowId(rows, localId, serverId);
     });
+  } else if (kind === 'resource') {
+    // A handout or link (Handouts and Links).
+    _rekeyResource(cid, localId, serverId);
   }
   _rekeyGradeReturns(cid, localId, serverId);
   if (typeof clearProfCache === 'function') clearProfCache();
@@ -2981,9 +2985,11 @@ function _onOutboxEvent(evt) {
     if (meta.endpoint === 'import_json_restore') _onRestoreLanded(meta.payload, meta.data);
     if (_WORK_ENDPOINTS[meta.endpoint]) _onWorkWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
     if (_FB_ENDPOINTS[meta.endpoint]) _onFeedbackWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
+    if (_RES_ENDPOINTS[meta.endpoint]) _onResourceWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
   } else if (evt.kind === 'flush:dead-letter') {
     if (_WORK_ENDPOINTS[meta.endpoint]) _onWorkWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
     if (_FB_ENDPOINTS[meta.endpoint]) _onFeedbackWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
+    if (_RES_ENDPOINTS[meta.endpoint]) _onResourceWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
     var undo = _baselineUndo[meta.id];
     _revertBaselineRow(undo, meta.endpoint, meta.payload);
     delete _baselineUndo[meta.id];
@@ -6997,6 +7003,7 @@ function _clearCourseLocalState(id) {
     'student-profile-summaries',
     'withdrawn',
     'bundle-meta',
+    'assessment-resources',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];
@@ -18211,6 +18218,8 @@ function _workServerTake(cid, sub) {
    still missing or the upload is being started again, and a lasting one
    for what storage holds that it should not. */
 async function _workCommit(batch) {
+  // A handout's pages (Handouts and Links) are handed in their own way.
+  if (batch && batch.kind === 'handout') return _handoutCommit(batch);
   var rec = _workUploadByBatch(batch.key);
   var files = (batch.files || [])
     .slice()
@@ -21581,3 +21590,880 @@ window.submitSupportReport = function (report) {
     p_app_version: report.appVersion ? String(report.appVersion).slice(0, 100) : null,
   });
 };
+
+/* ══════════════════════════════════════════════════════════════════
+   Handouts and Links (the assessment form's Handouts and Links; the
+   student page's For This Assignment)
+   ══════════════════════════════════════════════════════════════════
+   A teacher adds to an assessment a handout (a PDF, turned into JPEG pages
+   on this device by shared/photo-shrink.js and shared/photo-readers.js, 20
+   pages at most) and links (any http:// or https:// address, with an
+   optional name students see). Students see them on the assignment's card.
+   The contract: start_handout_upload, finish_handout_upload,
+   add_assessment_link, remove_assessment_resource and list_course_resources
+   (public, each write idempotent through p_idempotency_key);
+   student_submit.page's assessments[].resources and student_submit.
+   handout_links through the student-submit edge function.
+
+   Kept on this device as gb-assessment-resources-<cid>:
+     { rows: [ { id, assessment_id, kind: 'pdf' | 'link', title, url,
+                 page_count, status: 'uploading' | 'ready', position,
+                 created_at, pages: [ path ] | null } ],
+       gone: [ id ] }  removed here, the removal not yet landed
+   A page still on this device has the path "photo-queue:<id>" (the photo
+   queue, IndexedDB), which openAssessmentHandoutPage turns into an
+   address. In Demo Mode everything stays there: the queue never sends.
+
+   A signed-in class whose student page is on (_serverKeepsRows) goes to
+   the server, the way Add Work does: the pages wait in the photo queue
+   under a local resource id, start_handout_upload goes through the outbox
+   (the id is re-keyed when it lands, _rekey 'resource'), each page uploads
+   to the path the server named, and the queue's commit hands them in with
+   finish_handout_upload under the batch's key. Offline, both wait. Any
+   other signed-in class is offered none of this.
+
+   A link or a handout added to a new assessment waits behind its
+   create_assessment in the outbox (p_assessment_id is held on a local id
+   like any write). Sync problems show on the sync dot only: a refused
+   write through the outbox's dead letters, a page that will not send
+   through the photo queue's failed count. */
+var RESOURCE_MAX_PAGES = 20;
+var RESOURCE_TITLE_MAX = 200;
+var RESOURCE_URL_MAX = 2000;
+var _RES_KEY_PREFIX = 'gb-assessment-resources-';
+var _HANDOUT_UPLOADS_KEY = 'gb-handout-uploads';
+var _RES_REFRESH_MS = 30000;
+var _resMemo = {}; // cid → { raw, value }
+var _resReadAt = {}; // cid → when list_course_resources last answered
+var _resReading = {}; // cid → the read under way
+var _resMissing = false; // the server has no list_course_resources yet: nothing is offered
+var _RES_ENDPOINTS = {
+  add_assessment_link: true,
+  start_handout_upload: true,
+  remove_assessment_resource: true,
+};
+
+function _resStored(cid) {
+  var raw = null;
+  try {
+    raw = localStorage.getItem(_RES_KEY_PREFIX + cid);
+  } catch (e) {
+    raw = null;
+  }
+  var memo = _resMemo[cid];
+  if (memo && memo.raw === raw) return memo.value;
+  var value = null;
+  try {
+    value = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    value = null;
+  }
+  if (!_plainObject(value)) value = {};
+  value = {
+    rows: Array.isArray(value.rows) ? value.rows.filter(_plainObject) : [],
+    gone: Array.isArray(value.gone)
+      ? value.gone.filter(function (id) {
+          return typeof id === 'string';
+        })
+      : [],
+  };
+  _resMemo[cid] = { raw: raw, value: value };
+  return value;
+}
+
+function _resWrite(cid, value) {
+  var raw = JSON.stringify(value);
+  _safeLSSet(_RES_KEY_PREFIX + cid, raw);
+  _resMemo[cid] = { raw: raw, value: value };
+}
+
+// A copy of the class's store to change.
+function _resDraft(cid) {
+  var s = _resStored(cid);
+  return {
+    rows: s.rows.map(function (r) {
+      return Object.assign({}, r, { pages: Array.isArray(r.pages) ? r.pages.slice() : null });
+    }),
+    gone: s.gone.slice(),
+  };
+}
+
+/* An address as a link keeps it: http:// or https:// only (one typed with
+   no scheme gets https://), at most 2,000 characters, with a host that has
+   a dot in it or is localhost. → { ok: true, url, host } or { ok: false,
+   reason: 'empty' | 'not_web' | 'too_long' }. */
+function assessmentLinkCheck(address) {
+  var s = String(address == null ? '' : address).trim();
+  if (!s) return { ok: false, reason: 'empty' };
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s) || /^[a-z0-9.-]+:\d+(\/|$)/i.test(s)) s = 'https://' + s.replace(/^\/+/, '');
+  if (s.length > RESOURCE_URL_MAX) return { ok: false, reason: 'too_long' };
+  var u = null;
+  try {
+    u = new URL(s);
+  } catch (e) {
+    u = null;
+  }
+  if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:') || u.username || u.password) {
+    return { ok: false, reason: 'not_web' };
+  }
+  var host = u.hostname.toLowerCase();
+  if (!host || (host.indexOf('.') < 0 && host !== 'localhost') || /\.$/.test(host)) {
+    return { ok: false, reason: 'not_web' };
+  }
+  var url = u.href;
+  if (url.length > RESOURCE_URL_MAX) return { ok: false, reason: 'too_long' };
+  return { ok: true, url: url, host: resourceHost(url) };
+}
+
+/* The site a link goes to, as a student reads it: its host without www.
+   (britannica.com). '' for anything that is not an http(s) address. */
+function resourceHost(url) {
+  try {
+    var u = new URL(String(url || ''));
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return u.hostname.toLowerCase().replace(/^www\./, '');
+  } catch (e) {
+    return '';
+  }
+}
+
+/* The name a link with none is given: its address without https:// and
+   www. (britannica.com/science/density), at most 200 characters. */
+function _resLinkTitle(url) {
+  var s = String(url || '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '');
+  return s.length > RESOURCE_TITLE_MAX ? s.slice(0, RESOURCE_TITLE_MAX - 1) + '…' : s;
+}
+
+function _resTitle(title, fallback) {
+  var t = String(title == null ? '' : title)
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) t = fallback || '';
+  return t.length > RESOURCE_TITLE_MAX ? t.slice(0, RESOURCE_TITLE_MAX) : t;
+}
+
+function _resLocalId() {
+  return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function _resLive(cid) {
+  return !!cid && !_isDemoSession() && _serverKeepsRows(cid);
+}
+
+/* Can class `cid` have handouts and links? Demo Mode, or a signed-in class
+   the server keeps student-page rows for, once the server has the calls.
+   The form shows the field only where the student page is on as well. */
+function assessmentResourcesOffered(cid) {
+  if (!cid) return false;
+  if (_isDemoSession()) return true;
+  return _resLive(cid) && !_resMissing;
+}
+
+function _resRowOut(r) {
+  var kind = r.kind === 'pdf' ? 'pdf' : 'link';
+  var pages = Array.isArray(r.pages) ? r.pages : null;
+  return {
+    id: String(r.id),
+    assessmentId: String(r.assessment_id),
+    kind: kind,
+    title: String(r.title || ''),
+    url: kind === 'link' ? String(r.url || '') : null,
+    host: kind === 'link' ? resourceHost(r.url) : '',
+    pageCount: kind === 'pdf' ? Math.max(0, Number(r.page_count) || (pages ? pages.length : 0)) : 0,
+    status: r.status === 'uploading' ? 'uploading' : 'ready',
+    position: Number(r.position) || 0,
+  };
+}
+
+function _resSorted(rows) {
+  return rows.slice().sort(function (x, y) {
+    return (
+      (Number(x.position) || 0) - (Number(y.position) || 0) ||
+      String(x.created_at || '').localeCompare(String(y.created_at || ''))
+    );
+  });
+}
+
+/* The handouts and links of assessment `aid`, in the order they were
+   added: [ { id, assessmentId, kind, title, url, host, pageCount, status,
+   position } ]. opts.ready: only those students can open (a handout still
+   uploading is left out). */
+function getAssessmentResources(cid, aid, opts) {
+  if (!cid || !aid) return [];
+  var ready = !!(opts && opts.ready);
+  return _resSorted(
+    _resStored(cid).rows.filter(function (r) {
+      return r && String(r.assessment_id) === String(aid) && (!ready || r.status !== 'uploading');
+    }),
+  ).map(_resRowOut);
+}
+
+function _resNextPosition(rows, aid) {
+  var top = 0;
+  rows.forEach(function (r) {
+    if (r && String(r.assessment_id) === String(aid)) top = Math.max(top, Number(r.position) || 0);
+  });
+  return top + 1;
+}
+
+function _resFind(cid, rid) {
+  return (
+    _resStored(cid).rows.filter(function (r) {
+      return r && r.id === rid;
+    })[0] || null
+  );
+}
+
+// Screens that show handouts and links draw again.
+function _resChanged(cid) {
+  if (typeof document === 'undefined') return;
+  if (typeof document.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    document.dispatchEvent(new CustomEvent('fv:resources-changed', { detail: { cid: cid } }));
+  }
+}
+
+// A row the server sent, as it is kept here, or null.
+function _resFromServer(row) {
+  if (!_plainObject(row) || !_isUuid(row.id) || !_isUuid(row.assessment_id)) return null;
+  var kind = row.kind === 'pdf' ? 'pdf' : row.kind === 'link' ? 'link' : null;
+  if (!kind) return null;
+  var out = {
+    id: String(row.id).toLowerCase(),
+    assessment_id: String(row.assessment_id).toLowerCase(),
+    kind: kind,
+    title: String(row.title || ''),
+    url: kind === 'link' ? String(row.url || '') : null,
+    page_count: kind === 'pdf' ? Number(row.page_count) || 0 : null,
+    status: row.status === 'uploading' ? 'uploading' : 'ready',
+    position: Number(row.position) || 0,
+    created_at: row.created_at || null,
+    pages: null,
+  };
+  if (kind === 'pdf' && Array.isArray(row.paths)) {
+    out.pages = row.paths.filter(function (p) {
+      return typeof p === 'string';
+    });
+  }
+  return out;
+}
+
+/* ── Adding and removing ── */
+
+/* Add a link to assessment `aid`. `title` is the name students see; with
+   none they see the address. → Promise of { ok: true, resource } or { ok:
+   false, reason } (the reasons of assessmentLinkCheck, or 'not_available'). */
+function addAssessmentLink(cid, aid, address, title) {
+  var check = assessmentLinkCheck(address);
+  if (!check.ok) return Promise.resolve(check);
+  if (!assessmentResourcesOffered(cid) || !aid) return Promise.resolve({ ok: false, reason: 'not_available' });
+  var draft = _resDraft(cid);
+  var row = {
+    id: _resLocalId(),
+    assessment_id: aid,
+    kind: 'link',
+    title: _resTitle(title, _resLinkTitle(check.url)),
+    url: check.url,
+    page_count: null,
+    status: 'ready',
+    position: _resNextPosition(draft.rows, aid),
+    created_at: new Date().toISOString(),
+    pages: null,
+  };
+  draft.rows.push(row);
+  _resWrite(cid, draft);
+  if (_resLive(cid)) {
+    var key = _newEntryId();
+    _registerPendingCreate(cid, 'resource', row.id, 'add_assessment_link', { entryId: key });
+    _rpcOrNoop(
+      'add_assessment_link',
+      { p_assessment_id: aid, p_url: row.url, p_title: row.title, p_idempotency_key: key },
+      { entryId: key },
+    );
+  }
+  _resChanged(cid);
+  return Promise.resolve({ ok: true, resource: _resRowOut(row) });
+}
+
+/* Add a handout to assessment `aid`: `pages` are PhotoShrink.prepare's, in
+   order, 1 to 20. `title` is the name students see (the file's name).
+   → Promise of { ok: true, resource } or { ok: false, reason:
+   'too_many_pages' | 'no_pages' | 'storage_full' | 'store_failed' |
+   'no_photo_store' | 'not_available' }. */
+function addAssessmentHandout(cid, aid, title, pages) {
+  if (!Array.isArray(pages) || !pages.length) return Promise.resolve({ ok: false, reason: 'no_pages' });
+  if (pages.length > RESOURCE_MAX_PAGES) return Promise.resolve({ ok: false, reason: 'too_many_pages' });
+  if (!assessmentResourcesOffered(cid) || !aid) return Promise.resolve({ ok: false, reason: 'not_available' });
+  var live = _resLive(cid);
+  var q = live ? _wireWorkQueue() : window.PhotoQueue;
+  if (!q || typeof q.addHandout !== 'function') return Promise.resolve({ ok: false, reason: 'no_photo_store' });
+  var rid = _resLocalId();
+  var name = _resTitle(title, 'Handout');
+  return Promise.resolve(q.addHandout({ course: cid, assessment: aid, resource: rid }, pages))
+    .then(function (res) {
+      if (!res || !res.ok)
+        return { ok: false, reason: res && res.reason === 'storage_full' ? 'storage_full' : 'store_failed' };
+      var draft = _resDraft(cid);
+      var row = {
+        id: rid,
+        assessment_id: aid,
+        kind: 'pdf',
+        title: name,
+        url: null,
+        page_count: pages.length,
+        status: live ? 'uploading' : 'ready',
+        position: _resNextPosition(draft.rows, aid),
+        created_at: new Date().toISOString(),
+        pages: res.ids.map(function (id) {
+          return 'photo-queue:' + id;
+        }),
+      };
+      draft.rows.push(row);
+      _resWrite(cid, draft);
+      if (live) _handoutStart(cid, aid, rid, name, res);
+      _resChanged(cid);
+      return { ok: true, resource: _resRowOut(row) };
+    })
+    .then(null, function () {
+      return { ok: false, reason: 'store_failed' };
+    });
+}
+
+function _resQueueIds(row) {
+  return ((row && row.pages) || [])
+    .map(function (p) {
+      var m = typeof p === 'string' ? _STUDENT_WORK_QUEUE_PATH.exec(p) : null;
+      return m && !m[2] ? m[1] : null;
+    })
+    .filter(Boolean);
+}
+
+/* Take a handout or link off its assessment. Its pages still on this
+   device go too. → Promise of { ok }. */
+function removeAssessmentResource(cid, rid) {
+  var row = _resFind(cid, rid);
+  if (!row) return Promise.resolve({ ok: false, reason: 'not_found' });
+  var draft = _resDraft(cid);
+  draft.rows = draft.rows.filter(function (r) {
+    return r.id !== rid;
+  });
+  var live = _resLive(cid);
+  if (live && draft.gone.indexOf(rid) < 0) draft.gone.push(rid);
+  _resWrite(cid, draft);
+  // An upload on its way is given up: its start, if it lands, finds nothing to send.
+  var uploads = _handoutUploads();
+  Object.keys(uploads).forEach(function (k) {
+    if (uploads[k] && uploads[k].rid === rid) delete uploads[k];
+  });
+  _handoutUploadsSave(uploads);
+  if (live) _rpcOrNoop('remove_assessment_resource', { p_resource_id: rid, p_idempotency_key: _newEntryId() });
+  _resChanged(cid);
+  return _teacherWorkForget(_resQueueIds(row)).then(function () {
+    return { ok: true };
+  });
+}
+
+/* ── Reading the server's ── */
+
+/* Read class `cid`'s handouts and links again (list_course_resources), at
+   most once in 30 seconds unless `force`. A signed-in class only; Demo
+   Mode's are all here. Rows this device added that have not landed, and
+   rows removed here whose removal has not, are kept as this device has
+   them. Resolves when done; never rejects. */
+function refreshAssessmentResources(cid, force) {
+  if (!_resLive(cid) || _resMissing) return Promise.resolve();
+  if (_resReading[cid]) return _resReading[cid];
+  if (!force && _resReadAt[cid] && Date.now() - _resReadAt[cid] < _RES_REFRESH_MS) return Promise.resolve();
+  var run = Promise.resolve()
+    .then(function () {
+      return _callRpcWithAuthGuard(
+        'list_course_resources',
+        { p_course_id: cid },
+        { suppressSessionExpiredModal: true },
+      );
+    })
+    .then(function (res) {
+      if (!res || res.error) {
+        if (res && res.error && _isMissingRpcError(res.error)) {
+          _resMissing = true;
+          _resChanged(cid);
+        }
+        return;
+      }
+      _resReadAt[cid] = Date.now();
+      var data = res.data;
+      var list = _plainObject(data) && Array.isArray(data.resources) ? data.resources : _rpcRows(data);
+      _resTakeServer(cid, list.map(_resFromServer).filter(Boolean));
+    })
+    .then(null, function (e) {
+      console.warn('list_course_resources failed:', e);
+    })
+    .then(function () {
+      delete _resReading[cid];
+    });
+  _resReading[cid] = run;
+  return run;
+}
+
+function _resTakeServer(cid, serverRows) {
+  var before = _resStored(cid);
+  var gone = before.gone.filter(function (id) {
+    // Still waiting to land: kept out of what the server says.
+    return _isPendingLocalId(id) || _resRemovalQueued(id);
+  });
+  var uploads = _handoutUploads();
+  var mine = {}; // rows with an upload on this device keep their pages here
+  Object.keys(uploads).forEach(function (k) {
+    if (uploads[k] && uploads[k].cid === cid) mine[uploads[k].rid] = true;
+  });
+  var byId = {};
+  before.rows.forEach(function (r) {
+    byId[r.id] = r;
+  });
+  var onServer = {};
+  var rows = serverRows
+    .filter(function (r) {
+      onServer[r.id] = true;
+      return gone.indexOf(r.id) < 0;
+    })
+    .map(function (r) {
+      var had = byId[r.id];
+      if (had && mine[r.id]) return Object.assign({}, r, { pages: had.pages, status: had.status });
+      if (had && !r.pages && had.pages && had.status === 'ready') return Object.assign({}, r, { pages: had.pages });
+      return r;
+    });
+  before.rows.forEach(function (r) {
+    // Not on the server yet: added here, waiting in the outbox.
+    if (!onServer[r.id] && (!_isUuid(r.id) || mine[r.id])) rows.push(r);
+  });
+  var next = { rows: rows, gone: gone };
+  if (JSON.stringify(next) === JSON.stringify(before)) return;
+  _resWrite(cid, next);
+  _resChanged(cid);
+}
+
+function _resRemovalQueued(rid) {
+  var q = window.v2Queue;
+  if (!q || typeof q.queued !== 'function') return false;
+  try {
+    return q.queued('remove_assessment_resource').some(function (e) {
+      return e && e.payload && e.payload.p_resource_id === rid;
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ── A handout's upload (signed in) ── */
+
+function _handoutUploads() {
+  var all = _safeParseLS(_HANDOUT_UPLOADS_KEY, null);
+  return _plainObject(all) ? all : {};
+}
+function _handoutUploadsSave(all) {
+  if (!Object.keys(all).length) {
+    try {
+      localStorage.removeItem(_HANDOUT_UPLOADS_KEY);
+    } catch (e) {
+      /* nothing kept */
+    }
+    return;
+  }
+  _safeLSSet(_HANDOUT_UPLOADS_KEY, JSON.stringify(all));
+}
+
+// start_handout_upload through the outbox, keyed so a retry is the same start.
+function _handoutStart(cid, aid, rid, title, queued) {
+  var key = _newEntryId();
+  var all = _handoutUploads();
+  all[key] = {
+    key: key,
+    cid: cid,
+    aid: aid,
+    rid: rid,
+    local: rid,
+    title: title,
+    n: queued.ids.length,
+    ids: queued.ids,
+    batch: queued.batch,
+  };
+  _handoutUploadsSave(all);
+  _registerPendingCreate(cid, 'resource', rid, 'start_handout_upload', { entryId: key });
+  _rpcOrNoop(
+    'start_handout_upload',
+    { p_assessment_id: aid, p_title: title, p_page_count: queued.ids.length, p_idempotency_key: key },
+    { entryId: key },
+  ).then(function (res) {
+    if (res && !res.error && res.data != null) _handoutStarted(key, res.data);
+  });
+}
+
+/* start_handout_upload answered (from the call, or from the outbox's own
+   event after a reload): { id, paths }. Each waiting page takes the
+   server's resource id and the path named for it, in page order, and
+   goes up. A path that is not this class's and this handout's, or a count
+   that does not match, gives the upload up. Runs once per start. */
+function _handoutStarted(key, data) {
+  var rec = _handoutUploads()[key];
+  if (!rec || rec.placed) return Promise.resolve(null);
+  var res = _rpcObject(data) || {};
+  var id = _isUuid(res.id) ? String(res.id).toLowerCase() : null;
+  var paths = Array.isArray(res.paths) ? res.paths.map(String) : [];
+  var q = _wireWorkQueue();
+  if (!id || !q || typeof q.placeHandout !== 'function' || paths.length !== rec.ids.length) {
+    return _handoutGiveUp(rec, true);
+  }
+  // In page order: by the number in each path's name.
+  var numbered = paths.slice().sort(function (x, y) {
+    return Number((/\/(\d+)\.jpg$/.exec(x) || [])[1]) - Number((/\/(\d+)\.jpg$/.exec(y) || [])[1]);
+  });
+  return Promise.resolve(q.ready && q.ready())
+    .then(function () {
+      // By the local id the pages were queued under: the class's own re-key may already have run.
+      var local = rec.local || rec.rid;
+      return local !== id ? q.rekey(local, id) : { ok: true };
+    })
+    .then(function (out) {
+      if (!out || !out.ok) return { ok: false };
+      var map = {};
+      rec.ids.forEach(function (qid, i) {
+        map[qid] = numbered[i];
+      });
+      return q.placeHandout(map);
+    })
+    .then(function (placed) {
+      if (!placed || !placed.ok) return _handoutGiveUp(rec, true);
+      var now = _handoutUploads();
+      if (now[key]) {
+        now[key].placed = true;
+        now[key].rid = id;
+        _handoutUploadsSave(now);
+      }
+      q.send();
+      return null;
+    })
+    .then(null, function (e) {
+      console.warn('A handout upload could not start:', e);
+      return null;
+    });
+}
+
+/* The upload is given up: its pages leave the device and the handout is
+   taken off the assessment here. `refused`: the server said no after the
+   form had closed, so the sync dot says photos were dropped. */
+function _handoutGiveUp(rec, refused) {
+  var all = _handoutUploads();
+  delete all[rec.key];
+  _handoutUploadsSave(all);
+  var draft = _resDraft(rec.cid);
+  draft.rows = draft.rows.filter(function (r) {
+    return r.id !== rec.rid;
+  });
+  _resWrite(rec.cid, draft);
+  if (refused && typeof _workNoteDropped === 'function') _workNoteDropped();
+  _resChanged(rec.cid);
+  return _teacherWorkForget(rec.ids || []).then(function () {
+    return null;
+  });
+}
+
+function _handoutUploadByBatch(batch) {
+  var all = _handoutUploads();
+  var keys = Object.keys(all);
+  for (var i = 0; i < keys.length; i++) if (all[keys[i]] && all[keys[i]].batch === batch) return all[keys[i]];
+  return null;
+}
+
+/* The photo queue's commit for a handout: every page is in storage;
+   finish_handout_upload marks it ready under the batch's key. Answers {
+   error } as the queue reads it: none once it is ready (or the handout is
+   gone, so its pages are let go), a passing one while the server still
+   misses a page (each is sent again), a lasting one for anything else. */
+async function _handoutCommit(batch) {
+  var rid = batch && batch.ids && batch.ids.resource;
+  if (!_isUuid(rid)) return { error: { message: 'no resource id', status: 422 } };
+  var rec = _handoutUploadByBatch(batch.key);
+  var res = await _callRpcWithAuthGuard(
+    'finish_handout_upload',
+    { p_resource_id: rid, p_idempotency_key: batch.key },
+    { suppressSessionExpiredModal: true },
+  );
+  if (!res || res.error) return { error: (res && res.error) || { message: 'no answer', status: 503 } };
+  var row = _rpcObject(res.data) || {};
+  var cid = (rec && rec.cid) || batch.ids.course;
+  if (row.status === 'ready') {
+    var draft = _resDraft(cid);
+    draft.rows.forEach(function (r) {
+      if (r.id !== rid) return;
+      r.status = 'ready';
+      r.pages = (batch.files || [])
+        .slice()
+        .sort(function (x, y) {
+          return (x.order || 0) - (y.order || 0);
+        })
+        .map(function (f) {
+          return f.path;
+        });
+    });
+    _resWrite(cid, draft);
+    if (rec) {
+      var all = _handoutUploads();
+      delete all[rec.key];
+      _handoutUploadsSave(all);
+    }
+    _resChanged(cid);
+    _resReadAfterWrite({ p_course_id: cid });
+    return { error: null };
+  }
+  if (row.status === 'uploading') {
+    // Still missing a page (row.missing names them by number): those go again.
+    var q = window.PhotoQueue;
+    var missing = Array.isArray(row.missing) ? row.missing.map(Number) : null;
+    var pages = q && typeof q.pages === 'function' ? q.pages() : [];
+    await Promise.all(
+      pages
+        .filter(function (p) {
+          return p.batch === batch.key && (!missing || missing.indexOf((p.order || 0) + 1) >= 0 || !missing.length);
+        })
+        .map(function (p) {
+          return Promise.resolve(q.retry(p.id, { again: true })).then(null, function () {});
+        }),
+    );
+    return { error: { message: 'missing_pages', status: 503 } };
+  }
+  /* Gone: removed, its assessment deleted, or its two hours to upload ran
+     out. Nothing to hand in; its pages are let go, and when the teacher did
+     not remove it the sync dot says the pages were dropped. */
+  if (row.status === 'gone' || row.error === 'not_found' || row.result === 'not_found') {
+    if (rec) await _handoutGiveUp(rec, true);
+    return { error: null };
+  }
+  return { error: { message: String(row.error || row.result || 'refused'), status: 409 } };
+}
+
+/* The outbox's word on a handouts-and-links write (_onOutboxEvent). */
+function _onResourceWriteEvent(kind, endpoint, payload, data) {
+  // Adding or removing one does not move the class's sync version: the class is read again after each write lands.
+  if (kind === 'flush:success') _resReadAfterWrite(payload);
+  try {
+    var key = payload && payload.p_idempotency_key;
+    if (endpoint === 'start_handout_upload' && key) {
+      if (kind === 'flush:success') _handoutStarted(key, data);
+      else {
+        var rec = _handoutUploads()[key];
+        if (rec) _handoutGiveUp(rec, true);
+      }
+      return;
+    }
+    if (endpoint === 'add_assessment_link' && kind === 'flush:success') {
+      var row = _resFromServer(_rpcObject(data));
+      var cid = row ? _classOfAssessment(row.assessment_id) : null;
+      if (!row || !cid) return;
+      var draft = _resDraft(cid);
+      var changed = false;
+      draft.rows = draft.rows.map(function (r) {
+        if (r.id !== row.id) return r;
+        changed = true;
+        return Object.assign({}, r, { title: row.title, url: row.url, position: row.position, status: 'ready' });
+      });
+      if (changed) _resWrite(cid, draft);
+      return;
+    }
+    if (endpoint === 'add_assessment_link' && kind === 'flush:dead-letter' && key) {
+      // Refused: the link this device added (still under its local id) goes.
+      _pendingCreatesByEntry(key).forEach(function (p) {
+        if (p.kind !== 'resource') return;
+        var d = _resDraft(p.cid);
+        d.rows = d.rows.filter(function (r) {
+          return r.id !== p.localId;
+        });
+        _resWrite(p.cid, d);
+        _resChanged(p.cid);
+      });
+    }
+    if (endpoint === 'remove_assessment_resource' && payload && payload.p_resource_id) {
+      var rid = payload.p_resource_id;
+      Object.keys(_resMemo).forEach(function (c) {
+        if (_resStored(c).gone.indexOf(rid) < 0) return;
+        var d = _resDraft(c);
+        d.gone = d.gone.filter(function (x) {
+          return x !== rid;
+        });
+        _resWrite(c, d);
+      });
+    }
+    if (kind === 'flush:dead-letter') {
+      // A refused add or removal: the class is read again, so the screens show what the server has.
+      Object.keys(_resReadAt).forEach(function (c) {
+        refreshAssessmentResources(c, true);
+      });
+    }
+  } catch (e) {
+    console.warn('Handouts and links: following up a write failed:', e);
+  }
+}
+
+/* After one of this device's writes landed: the class it was in is read
+   again (list_course_resources), a tick later so the write's own follow-up
+   is in first. A removal names no class: each class read before is. */
+function _resReadAfterWrite(payload) {
+  var cid =
+    (payload && payload.p_course_id) ||
+    (payload && payload.p_assessment_id ? _classOfAssessment(payload.p_assessment_id) : null);
+  var cids = cid ? [cid] : Object.keys(_resReadAt);
+  setTimeout(function () {
+    cids.forEach(function (c) {
+      refreshAssessmentResources(c, true);
+    });
+  }, 0);
+}
+
+/* A resource's local id became the server's (_rekey 'resource'): the row,
+   the removal list, the upload on its way and its waiting pages take it. */
+function _rekeyResource(cid, localId, serverId) {
+  var s = _resStored(cid);
+  var hit =
+    s.gone.indexOf(localId) >= 0 ||
+    s.rows.some(function (r) {
+      return r.id === localId;
+    });
+  if (hit) {
+    var d = _resDraft(cid);
+    d.rows.forEach(function (r) {
+      if (r.id === localId) r.id = serverId;
+    });
+    d.gone = d.gone.map(function (x) {
+      return x === localId ? serverId : x;
+    });
+    _resWrite(cid, d);
+  }
+  var all = _handoutUploads();
+  var moved = false;
+  Object.keys(all).forEach(function (k) {
+    if (all[k] && all[k].rid === localId) {
+      all[k].rid = serverId;
+      moved = true;
+    }
+  });
+  if (moved) _handoutUploadsSave(all);
+  var q = window.PhotoQueue;
+  if (q && typeof q.rekey === 'function') Promise.resolve(q.rekey(localId, serverId)).then(null, function () {});
+}
+
+// A new assessment's id became the server's: its handouts and links follow it.
+function _resAssessmentRekeyed(e) {
+  var d = e && e.detail;
+  if (!d || d.kind !== 'assessment' || !d.cid || !_isUuid(d.to)) return;
+  var hit = _resStored(d.cid).rows.some(function (r) {
+    return r.assessment_id === d.from;
+  });
+  if (hit) {
+    var draft = _resDraft(d.cid);
+    draft.rows.forEach(function (r) {
+      if (r.assessment_id === d.from) r.assessment_id = d.to;
+    });
+    _resWrite(d.cid, draft);
+  }
+  var all = _handoutUploads();
+  var moved = false;
+  Object.keys(all).forEach(function (k) {
+    if (all[k] && all[k].aid === d.from) {
+      all[k].aid = d.to;
+      moved = true;
+    }
+  });
+  if (moved) _handoutUploadsSave(all);
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('fv:id-rekeyed', _resAssessmentRekeyed);
+}
+
+/* A signed-in page opening: handout pages left waiting by an earlier visit go. */
+function _resumeHandoutUploads() {
+  if (_isDemoSession() || !_writesEnabled() || !Object.keys(_handoutUploads()).length) return;
+  var q = _wireWorkQueue();
+  if (q && typeof q.send === 'function') q.send();
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('load', function () {
+    setTimeout(_resumeHandoutUploads, 0);
+  });
+}
+
+/* ── Showing a handout's page ── */
+
+var _HANDOUT_STORAGE_PATH =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handouts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/([1-9]|1[0-9]|20)\.jpg$/;
+
+/* Page `i` (from 0) of handout `rid` in class `cid`: { url, release } or
+   null. A page still on this device comes from the photo queue; one on
+   the server through a link signed for 300 seconds, fetched, and shown
+   from a blob: address. Only a path in this class's own handouts folder,
+   under this handout. */
+function openAssessmentHandoutPage(cid, rid, i) {
+  var row = _resFind(cid, rid);
+  var n = Number(i);
+  if (!row || row.kind !== 'pdf' || !(n >= 0) || Math.floor(n) !== n) return Promise.resolve(null);
+  var name = row.pages && row.pages[n];
+  // The contract's layout, <course>/handouts/<resource>/<n>.jpg, when the server sent no paths.
+  if (!name && _isUuid(rid) && n < (Number(row.page_count) || 0)) {
+    name = String(cid).toLowerCase() + '/handouts/' + String(rid).toLowerCase() + '/' + (n + 1) + '.jpg';
+  }
+  if (!name) return Promise.resolve(null);
+  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return Promise.resolve(null);
+  var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
+  if (m) {
+    var q = window.PhotoQueue;
+    if (m[2] || !q || typeof q.blobs !== 'function') return Promise.resolve(null);
+    return Promise.resolve()
+      .then(function () {
+        return q.blobs(m[1]);
+      })
+      .then(
+        function (found) {
+          return found && found.photo ? _resPicture(found.photo) : null;
+        },
+        function () {
+          return null;
+        },
+      );
+  }
+  var prefix = String(cid).toLowerCase() + '/handouts/' + String(rid).toLowerCase() + '/';
+  if (_isDemoSession() || !_HANDOUT_STORAGE_PATH.test(name) || name.indexOf(prefix) !== 0) return Promise.resolve(null);
+  var sb = getSupabase();
+  if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
+  return Promise.resolve()
+    .then(function () {
+      return sb.storage.from('student-photos').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
+    })
+    .then(function (res) {
+      var link = res && !res.error && res.data && res.data.signedUrl;
+      if (!link) return null;
+      return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
+        return r && r.ok ? r.blob() : null;
+      });
+    })
+    .then(function (blob) {
+      return blob ? _resPicture(blob) : null;
+    })
+    .then(null, function () {
+      return null;
+    });
+}
+
+// A picture shown from a blob: address, with the way to let it go.
+function _resPicture(blob) {
+  // Always a picture: what is handed back is shown in an <img> and nothing else.
+  var url = URL.createObjectURL(new Blob([blob], { type: 'image/jpeg' }));
+  var released = false;
+  return {
+    url: url,
+    release: function () {
+      if (released) return;
+      released = true;
+      URL.revokeObjectURL(url);
+    },
+  };
+}

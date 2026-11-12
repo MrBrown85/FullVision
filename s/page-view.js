@@ -705,6 +705,178 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* ── For This Assignment (Handouts and Links; the board "What the
+     Student Sees (Phone)") ──────────────────────────────────────
+     Under the Description: the teacher's handout, which opens its pages
+     here one at a time as See Your Work does, and each link, which opens
+     in a new tab. A link is only ever an http(s) address (the view checks
+     it, shared/student-view.js resourcesOf). */
+  var RES_DOC =
+    '<svg class="sp-res-icon sp-res-icon-doc" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14h6M9 17h4"/></svg>';
+  var RES_LINK =
+    '<svg class="sp-res-icon sp-res-icon-link" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+  var RES_VIDEO =
+    '<svg class="sp-res-icon sp-res-icon-video" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="m10 9 5 3-5 3z" fill="currentColor"/></svg>';
+  var RES_GO =
+    '<svg class="sp-res-go" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"/></svg>';
+  var VIDEO_HOSTS = /^(youtube\.com|m\.youtube\.com|youtu\.be|vimeo\.com)$/;
+
+  function pagesWord(n) {
+    return n === 1 ? '1 page' : n + ' pages';
+  }
+
+  function resourceRowHtml(p, r) {
+    var words = function (line) {
+      return (
+        '<span class="sp-res-words"><span class="sp-res-name">' +
+        esc(r.title) +
+        '</span> <span class="sp-res-line">' +
+        esc(line) +
+        '</span></span>'
+      );
+    };
+    if (r.kind === 'handout') {
+      return (
+        '<button type="button" class="sp-res-row" data-act="handout" data-piece="' +
+        esc(p.id) +
+        '" data-resource="' +
+        esc(r.id) +
+        '">' +
+        RES_DOC +
+        words('Handout' + SEP + pagesWord(r.pages)) +
+        RES_GO +
+        '</button>'
+      );
+    }
+    return (
+      '<a class="sp-res-row" href="' +
+      esc(r.url) +
+      '" target="_blank" rel="noopener noreferrer">' +
+      (VIDEO_HOSTS.test(r.host) ? RES_VIDEO : RES_LINK) +
+      words(r.host) +
+      '<span class="sp-hidden-title"> (opens in a new tab)</span>' +
+      RES_GO +
+      '</a>'
+    );
+  }
+
+  function resourcesHtml(p) {
+    var list = Array.isArray(p.resources) ? p.resources : [];
+    if (!list.length) return '';
+    var id = domId(p.id) + '-res';
+    return (
+      '<section class="sp-res" aria-labelledby="' +
+      id +
+      '"><h3 class="sp-res-head" id="' +
+      id +
+      '">For This Assignment</h3>' +
+      list
+        .map(function (r) {
+          return resourceRowHtml(p, r);
+        })
+        .join('') +
+      '</section>'
+    );
+  }
+
+  // The handout the page is open on: { piece, resource }, or null when it cannot be shown.
+  function handoutOpen(view, ui) {
+    if (!view || !ui.handout || !ui.handoutPiece) return null;
+    var p = pieceIn(view.work, ui.handoutPiece);
+    if (!p || p.id !== ui.handoutPiece) return null;
+    var r = (p.resources || []).filter(function (x) {
+      return x && x.kind === 'handout' && x.id === ui.handout;
+    })[0];
+    return r ? { piece: p, resource: r } : null;
+  }
+
+  // The handout's pages fetched, when they are in: [ { url } ], or null.
+  function handoutPages(ui, r) {
+    var got = ui.handoutPages && r && ui.handoutPages.id === r.id ? ui.handoutPages : null;
+    if (!got || got.state !== 'ready') return null;
+    return (Array.isArray(got.pages) ? got.pages : []).filter(function (pg) {
+      return pg && typeof pg.url === 'string' && PAGE_URL.test(pg.url);
+    });
+  }
+
+  /* A handout open in the page: the way back to the card, its name, which
+     page this is, the page, and a way between the pages, as See Your Work
+     shows the student's own. */
+  function handoutPaneHtml(ui, open) {
+    var r = open.resource;
+    var got = ui.handoutPages && ui.handoutPages.id === r.id ? ui.handoutPages : null;
+    var pages = handoutPages(ui, r) || [];
+    var n = pages.length;
+    var i = Math.max(0, Math.min(n - 1, Number(ui.handoutPage) || 0));
+    var body;
+    if (got && got.state === 'failed') {
+      body =
+        '<p class="sp-lead sp-msg" role="alert">The handout didn’t load. Check your internet and try again.</p>' +
+        '<button type="button" class="sp-btn sp-btn-tint sp-work-retry" data-act="handout-retry" data-resource="' +
+        esc(r.id) +
+        '">Try Again</button>';
+    } else if (!got || got.state !== 'ready') {
+      body = '<p class="sp-lead sp-msg-calm" role="status">Getting the handout…</p>';
+    } else if (!n) {
+      body = '<p class="sp-lead sp-msg-calm">This handout can’t be shown here.</p>';
+    } else {
+      var dots = '';
+      for (var k = 0; k < n; k++) dots += '<span class="sp-work-dot' + (k === i ? ' sp-work-dot-on' : '') + '"></span>';
+      body =
+        '<figure class="sp-work-page sp-handout-page"><img class="sp-work-img" src="' +
+        esc(pages[i].url) +
+        '" alt="' +
+        esc(r.title + ', page ' + (i + 1)) +
+        '"></figure>' +
+        (n > 1
+          ? '<div class="sp-work-bar"><button type="button" class="sp-head-icon" data-act="handout-page" data-page="' +
+            (i - 1) +
+            '" aria-label="Previous Page"' +
+            (i === 0 ? ' disabled' : '') +
+            '>' +
+            BACK_ARROW +
+            '</button><span class="sp-work-dots" role="img" aria-label="' +
+            esc('Page ' + (i + 1) + ' of ' + n) +
+            '">' +
+            dots +
+            '</span><button type="button" class="sp-head-icon sp-work-next" data-act="handout-page" data-page="' +
+            (i + 1) +
+            '" aria-label="Next Page"' +
+            (i === n - 1 ? ' disabled' : '') +
+            '>' +
+            BACK_ARROW +
+            '</button></div>'
+          : '');
+    }
+    return (
+      '<section class="sp-feedback sp-work sp-handout" aria-labelledby="sp-handout-title">' +
+      '<div class="sp-work-head"><button type="button" class="sp-head-icon" data-act="handout-close" aria-label="Back">' +
+      BACK_ARROW +
+      '</button><div class="sp-work-words"><h1 class="sp-work-title" id="sp-handout-title" tabindex="-1">' +
+      esc(r.title) +
+      '</h1><p class="sp-fb-sub">' +
+      esc(n ? 'Page ' + (i + 1) + ' of ' + n : 'Handout' + SEP + pagesWord(r.pages)) +
+      '</p></div></div>' +
+      body +
+      '</section>'
+    );
+  }
+
+  // A handout open in place of the cards, with the list on the left on a Chromebook.
+  function handoutBody(ui, view, open) {
+    var seg = segmentOf(open.piece) || ui.segment || 'todo';
+    var pieces = inSegment(view, seg);
+    return (
+      '<div class="sp-fb-segments">' +
+      segmentsHtml(Object.assign({}, ui, { segment: seg }), view) +
+      '</div>' +
+      '<div class="sp-split sp-split-feedback">' +
+      sideHtml(pieces, open.piece) +
+      handoutPaneHtml(ui, open) +
+      '</div>'
+    );
+  }
+
   function cardHtml(p, picked) {
     var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
     var todo = p.kind === 'due' || p.kind === 'missing';
@@ -731,6 +903,7 @@ window.StudentPageView = (function () {
         ? '<p class="sp-piece-category"><span class="sp-category-pill">' + esc(p.category.name) + '</span></p>'
         : '') +
       (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
+      (todo ? resourcesHtml(p) : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
       (p.kind === 'back' ? cardCommentHtml(p) : '') +
@@ -2427,6 +2600,8 @@ window.StudentPageView = (function () {
       );
     }
     if (ui.all) return allBody(ui, view);
+    var ho = handoutOpen(view, ui);
+    if (ho) return handoutBody(ui, view, ho);
     var fb = feedbackPiece(view, ui);
     return fb ? feedbackBody(ui, view, fb) : assignmentsBody(ui, view);
   }
@@ -2494,7 +2669,7 @@ window.StudentPageView = (function () {
     var block = String(course.block || '').trim();
     var onAssignments = (TAB_BODIES[ui.tab] ? ui.tab : 'assignments') === 'assignments';
     var all = !!ui.all && onAssignments;
-    var fb = onAssignments && !all && !ui.waiting && feedbackPiece(view, ui);
+    var fb = onAssignments && !all && !ui.waiting && (handoutOpen(view, ui) || feedbackPiece(view, ui));
     return (
       '<div class="sp-view' +
       (fb ? ' sp-on-feedback' : '') +
@@ -2580,6 +2755,52 @@ window.StudentPageView = (function () {
       next.work = '';
       next.workPage = 0;
       next.marksOff = false;
+    }
+    // A handout open in the page goes with any press but its own (Handouts and Links).
+    if (!/^handout/.test(act)) {
+      next.handout = '';
+      next.handoutPiece = '';
+      next.handoutPage = 0;
+    }
+    if (act === 'handout') {
+      var hp = view && pieceIn(view.work, attr('data-piece'));
+      var hid = attr('data-resource');
+      if (!hp || hp.id !== attr('data-piece')) return null;
+      var hr = (hp.resources || []).filter(function (x) {
+        return x && x.kind === 'handout' && x.id === hid;
+      })[0];
+      if (!hr) return null;
+      next.tab = 'assignments';
+      next.all = false;
+      next.feedback = '';
+      next.whole = false;
+      next.segment = segmentOf(hp) || next.segment;
+      next.pick = hp.id;
+      next.handout = hr.id;
+      next.handoutPiece = hp.id;
+      next.handoutPage = 0;
+      // Pages fetched for another handout are not this one's.
+      if (next.handoutPages && next.handoutPages.id !== hr.id) next.handoutPages = null;
+      return { ui: next, focus: '#sp-handout-title', handout: { piece: hp.id, resource: hr.id } };
+    }
+    if (act === 'handout-close') {
+      var was2 = { piece: next.handoutPiece, resource: next.handout };
+      next.handout = '';
+      next.handoutPiece = '';
+      next.handoutPage = 0;
+      return {
+        ui: next,
+        focus: was2.resource ? '[data-act="handout"][data-resource="' + cssId(was2.resource) + '"]' : '.sp-segment-on',
+      };
+    }
+    if (act === 'handout-page') {
+      var openH = handoutOpen(view, next);
+      if (!openH) return null;
+      var hcount = (handoutPages(next, openH.resource) || []).length;
+      var hto = Number(attr('data-page'));
+      if (!hcount || !(hto >= 0 && hto < hcount) || Math.floor(hto) !== hto) return null;
+      next.handoutPage = hto;
+      return { ui: next, focus: '#sp-handout-title' };
     }
     if (act === 'work') {
       var wid = attr('data-piece');

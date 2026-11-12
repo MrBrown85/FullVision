@@ -575,6 +575,16 @@
           about:
             'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
           core: ['CT', 'CRT'],
+          // Handouts and Links: the teacher's link, as the server's page sends it.
+          resources: [
+            {
+              id: 'demo-res-method',
+              kind: 'link',
+              title: 'The Scientific Method',
+              url: 'https://www.britannica.com/science/scientific-method',
+              page_count: null,
+            },
+          ],
         },
         {
           // A draft, never returned: the student sees the piece and its date only.
@@ -944,6 +954,7 @@
           category_name: w.category || null,
           category_percent: demoPercent(cls, w, system || 'proficiency'),
           core_competencies: demoCore(w.core),
+          resources: w.resources || [],
           // Missing, Excused and Late are never drafts: they show at once.
           status: w.status || null,
           returned_at: back ? back.returned_at : null,
@@ -1726,6 +1737,11 @@
     'marksOff',
     'workPages',
     'compare',
+    // A handout open in the page (Handouts and Links; s/handouts.js fetches its pages).
+    'handout',
+    'handoutPiece',
+    'handoutPage',
+    'handoutPages',
   ];
   function uiOf() {
     var ui = {};
@@ -2252,6 +2268,8 @@
     'revise-unsend': 1,
     'group-work': 1,
     'group-links': 1,
+    // A handout's pages (Handouts and Links; s/handouts.js).
+    'handout-links': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
@@ -2458,7 +2476,7 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare)$/.test(
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page)$/.test(
         act,
       )
     ) {

@@ -2720,6 +2720,10 @@ window.PageAssignments = (function () {
         ? '<p class="af-category-hint" id="af-desc-hint">Students see this on their page.</p>'
         : '') +
       '</div>';
+    // Handouts and Links, right under the Description: what students open
+    // from the card (board 3a). Only where students read the page.
+    _formRes = _formResOffered(cid) ? _formResFor(cid, assess) : null;
+    if (_formRes) html += _formResHtml();
 
     // Which classes this assessment goes to (Teams' "Assign to"), right
     // under the title so it is seen before the details are filled in.
@@ -3518,6 +3522,407 @@ window.PageAssignments = (function () {
     saveAssessmentStudentWork(cid, aid, w);
   }
 
+  /* ── Handouts and Links on the assessment form ─────────────
+     Board "3a. A Handout and Two Links, Adding a Link": under the
+     Description, the handout (a PDF, at most 20 pages, turned into pages
+     on this computer as Add Work's are) and links students open from the
+     assignment's card. Drawn only in a class whose student page is on
+     (the Description hint's test) and that can keep them
+     (assessmentResourcesOffered, shared/data.js). What is added or
+     removed here is saved with the assessment: for a new one, after it
+     exists, as Student Work's choices are (_saveFormRes). Kept by the
+     assessment's id, so a copy starts with none. */
+  var _formRes = null; // { cid, aid, items, linkOpen, busy, msg, next } while the field is drawn
+  var RES_MAX_PAGES = 20;
+  var RES_ICON_DOC =
+    '<svg class="af-res-icon af-res-icon-doc" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M9 14h6M9 17h4"></path></svg>';
+  var RES_ICON_LINK =
+    '<svg class="af-res-icon af-res-icon-link" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>';
+  var RES_ICON_VIDEO =
+    '<svg class="af-res-icon af-res-icon-video" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="4"></rect><path d="m10 9 5 3-5 3z" fill="currentColor"></path></svg>';
+  var RES_ICON_REMOVE =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>';
+  var RES_VIDEO_HOSTS = /^(youtube\.com|m\.youtube\.com|youtu\.be|vimeo\.com)$/;
+
+  function _formResOffered(cid) {
+    return _studentPageOn(cid) && typeof assessmentResourcesOffered === 'function' && assessmentResourcesOffered(cid);
+  }
+
+  function _formResFor(cid, assess) {
+    var saved = assess && typeof getAssessmentResources === 'function' ? getAssessmentResources(cid, assess.id) : [];
+    if (assess && typeof refreshAssessmentResources === 'function') refreshAssessmentResources(cid);
+    return {
+      cid: cid,
+      aid: assess ? assess.id : null,
+      items: saved.map(function (r, i) {
+        return Object.assign({ key: 's' + i, saved: true, removed: false }, r);
+      }),
+      linkOpen: false,
+      busy: false,
+      msg: '',
+      next: 0,
+      fresh: '', // the item (or 'link', the link row) just added, which comes in once
+    };
+  }
+
+  // What the field holds, for the form's unsaved-changes check.
+  function _formResSnapshot() {
+    if (!_formRes) return '';
+    return JSON.stringify(
+      _formRes.items
+        .filter(function (it) {
+          return !it.saved || it.removed;
+        })
+        .map(function (it) {
+          return [it.key, !!it.removed];
+        }),
+    );
+  }
+
+  function _pagesWord(n) {
+    return n === 1 ? '1 page' : n + ' pages';
+  }
+
+  function _formResItemHtml(it) {
+    var pdf = it.kind === 'pdf';
+    var meta = pdf
+      ? ' · PDF · ' + _pagesWord(it.pageCount) + (it.status === 'uploading' ? ' · Uploading' : '')
+      : ' · ' + (it.host || '');
+    return (
+      '<li class="af-res-item' +
+      (_formRes && _formRes.fresh === it.key ? ' af-res-in' : '') +
+      '" data-key="' +
+      esc(it.key) +
+      '">' +
+      (pdf ? RES_ICON_DOC : RES_VIDEO_HOSTS.test(it.host || '') ? RES_ICON_VIDEO : RES_ICON_LINK) +
+      '<span class="af-res-name"' +
+      (it.kind === 'link' ? ' title="' + esc(it.url || '') + '"' : '') +
+      '>' +
+      esc(it.title) +
+      ' <span class="af-res-meta">' +
+      esc(meta) +
+      '</span></span>' +
+      '<button type="button" class="af-res-remove" data-action="afResRemove" data-key="' +
+      esc(it.key) +
+      '" aria-label="' +
+      esc('Remove ' + it.title) +
+      '">' +
+      RES_ICON_REMOVE +
+      '</button></li>'
+    );
+  }
+
+  function _formResHtml() {
+    var res = _formRes;
+    var shown = res.items.filter(function (it) {
+      return !it.removed;
+    });
+    return (
+      '<div class="af-field af-res" id="af-res" role="group" aria-labelledby="af-res-label">' +
+      '<span class="af-label" id="af-res-label">Handouts and Links</span>' +
+      (shown.length ? '<ul class="af-res-list">' + shown.map(_formResItemHtml).join('') + '</ul>' : '') +
+      (res.linkOpen
+        ? '<div class="af-res-linkrow' +
+          (res.fresh === 'link' ? ' af-res-in' : '') +
+          '">' +
+          '<input class="af-input af-res-url" id="af-res-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Web Address" placeholder="Paste a web address">' +
+          '<input class="af-input af-res-title" id="af-res-title" type="text" autocomplete="off" maxlength="200" aria-label="Name Students See (optional)" placeholder="Name Students See (optional)">' +
+          '<button type="button" class="btn btn-primary af-res-linkadd" data-action="afResLinkAdd">Add Link</button>' +
+          '<button type="button" class="btn btn-ghost af-res-linkcancel" data-action="afResLinkCancel">Cancel</button>' +
+          '</div>'
+        : '') +
+      '<div class="af-res-adds">' +
+      '<button type="button" class="af-res-add" data-action="afResAddPdf"' +
+      (res.busy ? ' disabled aria-disabled="true"' : '') +
+      '>+ Add a PDF</button>' +
+      '<button type="button" class="af-res-add" data-action="afResAddLink"' +
+      (res.linkOpen ? ' aria-expanded="true"' : ' aria-expanded="false"') +
+      '>+ Add a Link</button>' +
+      '<span class="af-res-hint">A PDF can have up to 20 pages.</span>' +
+      '<input type="file" class="af-res-file" accept="application/pdf,.pdf" hidden tabindex="-1" aria-hidden="true" data-action-change="afResPdf">' +
+      '</div>' +
+      '<p class="af-res-msg" id="af-res-msg" role="status"' +
+      (res.msg ? '' : ' hidden') +
+      '>' +
+      esc(res.msg || '') +
+      '</p>' +
+      '</div>'
+    );
+  }
+
+  // Draw the field again in place; `focus` is where the keyboard goes after.
+  function _refreshFormRes(focus) {
+    var el = document.getElementById('af-res');
+    if (!el || !_formRes) return;
+    var keep = {};
+    ['af-res-url', 'af-res-title'].forEach(function (id) {
+      var input = document.getElementById(id);
+      if (input) keep[id] = input.value;
+    });
+    // html-safe: built by _formResHtml, which escapes every name, address and line
+    el.outerHTML = _formResHtml();
+    _formRes.fresh = '';
+    Object.keys(keep).forEach(function (id) {
+      var input = document.getElementById(id);
+      if (input) input.value = keep[id];
+    });
+    var to = focus ? document.querySelector(focus) : null;
+    if (to && typeof to.focus === 'function') to.focus({ preventScroll: true });
+  }
+
+  function _formResSay(text) {
+    if (!_formRes) return;
+    _formRes.msg = text || '';
+    var p = document.getElementById('af-res-msg');
+    if (!p) return;
+    p.textContent = _formRes.msg;
+    p.hidden = !_formRes.msg;
+  }
+
+  function _formResOpenLink() {
+    if (!_formRes) return;
+    _formRes.msg = '';
+    if (!_formRes.linkOpen) {
+      _formRes.linkOpen = true;
+      _formRes.fresh = 'link';
+      _refreshFormRes('#af-res-url');
+    } else {
+      var url = document.getElementById('af-res-url');
+      if (url) url.focus();
+    }
+  }
+
+  function _formResCloseLink() {
+    if (!_formRes) return;
+    _formRes.linkOpen = false;
+    _formRes.msg = '';
+    _refreshFormRes('[data-action="afResAddLink"]');
+  }
+
+  var RES_LINK_WORDS = {
+    empty: 'Paste a web address first.',
+    not_web: 'That isn’t a web address. Copy it from the browser’s address bar.',
+    too_long: 'That address is too long to add.',
+  };
+
+  function _formResAddLink() {
+    var res = _formRes;
+    if (!res || !res.linkOpen) return;
+    var urlEl = document.getElementById('af-res-url');
+    var titleEl = document.getElementById('af-res-title');
+    var check = typeof assessmentLinkCheck === 'function' ? assessmentLinkCheck(urlEl ? urlEl.value : '') : null;
+    if (!check || !check.ok) {
+      _formResSay(RES_LINK_WORDS[(check && check.reason) || 'not_web'] || RES_LINK_WORDS.not_web);
+      if (urlEl) {
+        urlEl.setAttribute('aria-invalid', 'true');
+        urlEl.focus();
+      }
+      return;
+    }
+    var name = String((titleEl && titleEl.value) || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+    res.next += 1;
+    res.items.push({
+      key: 'n' + res.next,
+      saved: false,
+      removed: false,
+      kind: 'link',
+      url: check.url,
+      host: check.host,
+      // With no name, students see the address (the data layer gives it the same).
+      title:
+        name ||
+        check.url
+          .replace(/^https?:\/\//i, '')
+          .replace(/^www\./i, '')
+          .replace(/\/$/, ''),
+      named: name,
+    });
+    res.fresh = 'n' + res.next;
+    res.linkOpen = false;
+    res.msg = '';
+    _refreshFormRes('[data-action="afResAddLink"]');
+  }
+
+  function _formResRemove(key) {
+    var res = _formRes;
+    if (!res) return;
+    var at = -1;
+    res.items.forEach(function (it, i) {
+      if (it.key === key) at = i;
+    });
+    if (at < 0) return;
+    var it = res.items[at];
+    if (it.saved) it.removed = true;
+    else res.items.splice(at, 1);
+    res.msg = '';
+    // The keyboard goes to the next item's Remove, else the one before, else + Add a PDF.
+    var shown = function (x) {
+      return x && !x.removed;
+    };
+    var after = res.items.slice(at + (it.saved ? 1 : 0)).filter(shown)[0] || res.items.slice(0, at).filter(shown).pop();
+    _refreshFormRes(after ? '.af-res-remove[data-key="' + CSS.escape(after.key) + '"]' : '[data-action="afResAddPdf"]');
+  }
+
+  function _formResRefusal(out) {
+    var R = (window.PhotoShrink && PhotoShrink.REASONS) || {};
+    if (out && out.reason === R.TOO_MANY_PAGES)
+      return 'That PDF has more than 20 pages. A PDF can have up to 20 pages.';
+    if (out && out.reason === R.PDF_TOO_LARGE) return 'That PDF is too large to add. Save a smaller copy, then add it.';
+    if (out && out.locked) return 'That PDF has a password. Save a copy without one, then add it.';
+    if (out && out.reason === R.NO_DECODER) return "The PDF reader couldn't load. Check the connection and try again.";
+    if (out && out.reason === R.OFFICE) return 'Save it as a PDF first.';
+    return "That PDF couldn't be read. Try another copy of it.";
+  }
+
+  // A PDF's name as students see it: the file's name without .pdf.
+  function _formResPdfTitle(name) {
+    var t = String(name || '')
+      .replace(/\.pdf$/i, '')
+      .replace(/[_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return (t || 'Handout').slice(0, 200);
+  }
+
+  function _formResPdf(input) {
+    var res = _formRes;
+    var file = input && input.files && input.files[0];
+    if (input) input.value = '';
+    if (!res || res.busy || !file || !window.PhotoShrink) return;
+    var named = typeof PhotoShrink.classify === 'function' ? PhotoShrink.classify(file) : null;
+    if (named && named.ok && named.kind !== 'pdf') {
+      _formResSay('Choose a PDF. A photo can be added to a student’s work instead.');
+      return;
+    }
+    res.busy = true;
+    res.msg = 'Reading the PDF…';
+    _refreshFormRes();
+    PhotoShrink.prepare(file, {
+      openPdf: window.PhotoReaders && PhotoReaders.openPdf,
+      maxPages: RES_MAX_PAGES,
+    })
+      .then(null, function () {
+        return { ok: false };
+      })
+      .then(function (out) {
+        if (_formRes !== res) return;
+        res.busy = false;
+        if (!out || !out.ok) res.msg = _formResRefusal(out);
+        else if (out.kind !== 'pdf') res.msg = 'Choose a PDF. A photo can be added to a student’s work instead.';
+        else if (out.pages.length > RES_MAX_PAGES)
+          res.msg = _formResRefusal({ reason: PhotoShrink.REASONS.TOO_MANY_PAGES });
+        else {
+          res.next += 1;
+          res.items.push({
+            key: 'n' + res.next,
+            saved: false,
+            removed: false,
+            kind: 'pdf',
+            title: _formResPdfTitle(file.name),
+            pageCount: out.pages.length,
+            pages: out.pages,
+          });
+          res.fresh = 'n' + res.next;
+          res.msg = '';
+        }
+        _refreshFormRes('[data-action="afResAddPdf"]');
+      });
+  }
+
+  /* After a save: what was added and removed in the field, for `aid`. `res`
+     is the field as read before the save: saving draws the page again. In
+     the order the teacher added them, one after another. */
+  function _saveFormRes(cid, aid, res) {
+    if (!res || !aid || res.cid !== cid) return Promise.resolve();
+    var steps = [];
+    res.items.forEach(function (it) {
+      if (it.saved && it.removed) {
+        steps.push(function () {
+          return removeAssessmentResource(cid, it.id);
+        });
+      } else if (!it.saved && it.kind === 'link') {
+        steps.push(function () {
+          return addAssessmentLink(cid, aid, it.url, it.named || '');
+        });
+      } else if (!it.saved && it.kind === 'pdf') {
+        steps.push(function () {
+          return addAssessmentHandout(cid, aid, it.title, it.pages);
+        });
+      }
+    });
+    return steps
+      .reduce(function (p, step) {
+        return p.then(step).then(function (out) {
+          if (out && out.ok === false) console.warn('Handouts and Links: not kept:', out.reason);
+        });
+      }, Promise.resolve())
+      .then(null, function (e) {
+        console.warn('Handouts and Links: saving failed:', e);
+      });
+  }
+
+  /* Before a save: a PDF still being read holds it until it is in the
+     list, and an address typed in the open link row is added (or, when it
+     is not a web address, holds the save with the reason), so neither is
+     lost. */
+  function _formResBusy() {
+    if (!_formRes) return false;
+    if (_formRes.busy) {
+      _formResSay('The PDF is still being read. Save once it is in the list.');
+      return true;
+    }
+    var url = document.getElementById('af-res-url');
+    if (_formRes.linkOpen && url && url.value.trim()) {
+      _formResAddLink();
+      return !!_formRes.linkOpen;
+    }
+    return false;
+  }
+
+  // Keys in the link row: Enter adds the link, Escape closes the row (not the form).
+  function _formResKeydown(e) {
+    var t = e.target;
+    if (!t || !t.closest || !t.closest('.af-res-linkrow') || e.isComposing) return;
+    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      _formResAddLink();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      _formResCloseLink();
+    }
+  }
+
+  /* The class's handouts and links changed (read from the server, an
+     upload done): the field shows them, unless the teacher has changed
+     it, which is kept as it is. A server without the calls hides it. */
+  function _formResChanged(e) {
+    var res = _formRes;
+    var d = e && e.detail;
+    if (!res || !d || d.cid !== res.cid) return;
+    var el = document.getElementById('af-res');
+    if (!el) return;
+    if (!_formResOffered(res.cid)) {
+      _formRes = null;
+      el.remove();
+      return;
+    }
+    var touched =
+      res.busy ||
+      res.linkOpen ||
+      res.items.some(function (it) {
+        return !it.saved || it.removed;
+      });
+    if (touched || !res.aid) return;
+    var fresh = _formResFor(res.cid, { id: res.aid });
+    res.items = fresh.items;
+    var before = _formStart && _formStart.res;
+    _refreshFormRes();
+    if (_formStart && before !== undefined) _formStart.res = _formResSnapshot();
+  }
+
   /* ── Assessment Form Helpers ────────────────────────────── */
   /* A new Date Assigned moves Due Date with it only while Due is still the
      week-later date it was given (or empty); a due date the teacher set
@@ -3843,6 +4248,8 @@ window.PageAssignments = (function () {
       cc: on('.af-cc-chip.active', function (el) {
         return el.dataset.cc;
       }),
+      // Handouts and Links added or removed (_formResSnapshot).
+      res: _formResSnapshot(),
       collab: JSON.stringify([
         newCollaboration || 'individual',
         Array.from(collabExcluded || []).sort(),
@@ -6357,6 +6764,7 @@ window.PageAssignments = (function () {
 
   function saveNewAssess(addAnother) {
     addAnother = addAnother === true;
+    if (_formResBusy()) return;
     var titleEl = document.getElementById('af-title');
     var title = (titleEl ? titleEl.value : '').trim();
     if (!title) {
@@ -6446,10 +6854,12 @@ window.PageAssignments = (function () {
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
     var formWork = _formWork;
+    var formRes = _formRes;
     var srcCid = activeCourse;
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
     _saveFormWork(activeCourse, id, formWork);
+    _saveFormRes(activeCourse, id, formRes);
     var keep = addAnother ? _formKeepForNext() : null;
     openAssessIds.clear();
     openAssessIds.add(id);
@@ -6777,6 +7187,7 @@ window.PageAssignments = (function () {
   }
 
   function saveEditAssess(aid) {
+    if (_formResBusy()) return;
     var titleEl = document.getElementById('af-title');
     var title = (titleEl ? titleEl.value : '').trim();
     if (!title) {
@@ -6884,8 +7295,9 @@ window.PageAssignments = (function () {
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length && !next.copyGroup) next.copyGroup = AssessmentCopy.newCopyGroup();
     if (!edited && !copyTargets.length) {
-      // Only the Student Work card changed, or nothing: it is kept apart.
+      // Only the Student Work card or Handouts and Links changed, or nothing: they are kept apart.
       _saveFormWork(activeCourse, aid, _formWork);
+      _saveFormRes(activeCourse, aid, _formRes);
       hideNewForm();
       render();
       return;
@@ -6898,9 +7310,11 @@ window.PageAssignments = (function () {
     Object.assign(cur, next);
     var after = structuredClone(cur);
     var formWork = _formWork;
+    var formRes = _formRes;
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
     _saveFormWork(activeCourse, aid, formWork);
+    _saveFormRes(activeCourse, aid, formRes);
     var move = _scoreMoveAfterSave;
     _scoreMoveAfterSave = null;
     if (move && move.aid === aid && after.rubricId === move.rubricId) Grader.moveToRubric(activeCourse, aid, move);
@@ -11126,6 +11540,23 @@ window.PageAssignments = (function () {
         cancelAssessForm();
       },
       // A class with no categories: Class Settings' Grading tab.
+      // Handouts and Links (board 3a).
+      afResAddPdf: function () {
+        var f = document.querySelector('#af-res .af-res-file');
+        if (f && _formRes && !_formRes.busy) f.click();
+      },
+      afResAddLink: function () {
+        _formResOpenLink();
+      },
+      afResLinkAdd: function () {
+        _formResAddLink();
+      },
+      afResLinkCancel: function () {
+        _formResCloseLink();
+      },
+      afResRemove: function () {
+        _formResRemove(el.dataset.key);
+      },
       afAddCategories: function () {
         var cid = activeCourse;
         cancelAssessForm(function () {
@@ -11637,6 +12068,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'onRubricSelect') {
       onRubricSelect(el.value);
+      return;
+    }
+    if (el.dataset.actionChange === 'afResPdf') {
+      _formResPdf(el);
       return;
     }
     if (el.dataset.actionChange === 'setFormWorkUntil') {
@@ -16260,7 +16695,10 @@ window.PageAssignments = (function () {
     _addDocListener('input', _formInput);
     _addDocListener('change', _formInput);
     _addDocListener('keydown', _compKeydown);
+    // Before _formEscape: Escape in the link row closes the row, not the form.
+    _addDocListener('keydown', _formResKeydown);
     _addDocListener('keydown', _formEscape);
+    _addDocListener('fv:resources-changed', _formResChanged);
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
     _addDocListener('focusin', _codeHover);

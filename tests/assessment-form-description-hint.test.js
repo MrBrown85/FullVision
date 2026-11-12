@@ -141,8 +141,11 @@ describe('with the Student Page off the assessment form is what it was', () => {
 describe('with the Student Page on the form says students see the Description', () => {
   const before = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) : {};
   const HINT_HTML = '<p class="af-category-hint" id="af-desc-hint">' + HINT + '</p>';
-  // The form with the hint taken out is the form with the page off.
-  const withoutHint = html => html.replace(HINT_HTML, '').replace(' aria-describedby="af-desc-hint"', '');
+  // The form with the hint taken out is the form with the page off. Handouts and Links
+  // (assessment-handouts.test.js) is the other field a class whose students read the page has.
+  const RES_FIELD = /<div class="af-field af-res" id="af-res"[\s\S]*?<p class="af-res-msg"[^>]*>[^<]*<\/p><\/div>/;
+  const withoutHint = html =>
+    html.replace(RES_FIELD, '').replace(HINT_HTML, '').replace(' aria-describedby="af-desc-hint"', '');
 
   async function check(config) {
     const now = await walk(config);

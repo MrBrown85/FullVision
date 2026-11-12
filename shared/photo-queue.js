@@ -63,6 +63,14 @@
  *   answers storage_full and stats().storageFull stays true until space is
  *   freed.
  *
+ * Handouts: a teacher's handout PDF (Handouts and Links on the assessment
+ *   form) waits here too, one record per page, kind 'handout', added by
+ *   addHandout(). Its ids are { course, assessment, resource, file } and it
+ *   has no thumbnail. It goes to the path the server named for it
+ *   (<course>/handouts/<resource>/<n>.jpg), which placeHandout() writes into
+ *   the record once start_handout_upload answers: until then it is blocked.
+ *   Its batch commits as { kind: 'handout', key, ids, files }.
+ *
  * Everything here is a window.PhotoQueue.* public surface; no other globals.
  */
 window.PhotoQueue = (function () {
@@ -77,6 +85,10 @@ window.PhotoQueue = (function () {
   var BACKOFF_MS = [1000, 5000, 30000, 60000];
   var SLOW_AFTER = 5; // attempts before a page counts as slow
   var ID_KEYS = ['course', 'assessment', 'enrollment', 'submission', 'file'];
+  var HANDOUT_KEYS = ['course', 'assessment', 'resource']; // a page's own file id stays its local one
+  // Where a handout's page goes: the class's handouts folder, the resource, the page's number.
+  var HANDOUT_PATH =
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/handouts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([1-9]|1[0-9]|20)\.jpg$/;
   // The same test shared/data.js uses (_isUuid) to tell a server id from a local one.
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var BUSY = {}; // another tab holds the lease
@@ -169,10 +181,39 @@ window.PhotoQueue = (function () {
     return _folder(ids) + '/' + ids.file.toLowerCase() + '-thumb.jpg';
   }
 
+  function _isHandout(meta) {
+    return !!meta && meta.kind === 'handout';
+  }
+
+  function _keysOf(meta) {
+    return _isHandout(meta) ? HANDOUT_KEYS : ID_KEYS;
+  }
+
   function _blocked(meta) {
-    return !ID_KEYS.every(function (k) {
+    if (_isHandout(meta) && !meta.path) return true;
+    return !_keysOf(meta).every(function (k) {
       return isServerId(meta.ids && meta.ids[k]);
     });
+  }
+
+  // Where this record's page goes. A handout's is the path the server named; it throws until there is one.
+  function _pathOf(meta) {
+    if (!_isHandout(meta)) return pathFor(meta.ids);
+    if (!meta.path) throw new Error('A handout page cannot upload before the server names its path');
+    return meta.path;
+  }
+
+  /* Does `path` belong to a handout page of this class and resource? Both
+     ids must be server ids, and the path the bucket's handout layout. */
+  function handoutPathOk(path, course, resource) {
+    var m = typeof path === 'string' ? HANDOUT_PATH.exec(path) : null;
+    return (
+      !!m &&
+      isServerId(course) &&
+      isServerId(resource) &&
+      m[1] === String(course).toLowerCase() &&
+      m[2] === String(resource).toLowerCase()
+    );
   }
 
   /* ── The IndexedDB store ──────────────────────────────────────────────── */
@@ -281,7 +322,7 @@ window.PhotoQueue = (function () {
         // Read the bytes first: a transaction closes while anything else is awaited.
         return Promise.all(
           items.map(function (item) {
-            return Promise.all([_buffer(item.photo), _buffer(item.thumb)]);
+            return Promise.all([_buffer(item.photo), item.thumb ? _buffer(item.thumb) : null]);
           }),
         ).then(function (bytes) {
           return tx(['meta', 'blobs'], 'readwrite', function (t) {
@@ -305,7 +346,11 @@ window.PhotoQueue = (function () {
         return tx(['blobs'], 'readonly', function (t, done) {
           var req = t.objectStore('blobs').get(id);
           req.onsuccess = function () {
-            done(req.result ? { photo: jpeg(req.result.photo), thumb: jpeg(req.result.thumb) } : null);
+            done(
+              req.result
+                ? { photo: jpeg(req.result.photo), thumb: req.result.thumb ? jpeg(req.result.thumb) : null }
+                : null,
+            );
           };
         });
       },
@@ -457,6 +502,8 @@ window.PhotoQueue = (function () {
         return {
           id: m.id,
           batch: m.batch,
+          kind: m.kind || 'work',
+          path: m.path || null,
           ids: Object.assign({}, m.ids),
           order: m.order,
           name: m.name,
@@ -606,6 +653,107 @@ window.PhotoQueue = (function () {
     return { ok: true, batch: batch, ids: ids };
   }
 
+  /* Queue the pages of one handout (the teacher's PDF, Handouts and Links).
+     ref: { course, assessment, resource } (ids local or server). pages are
+     PhotoShrink's, in order; their thumbnails are not kept. All of them are
+     kept, or none. Answers as add() does. */
+  async function addHandout(ref, pageList) {
+    ref = ref || {};
+    var bad = ['course', 'assessment', 'resource'].some(function (k) {
+      return typeof ref[k] !== 'string' || !ref[k];
+    });
+    if (bad || !Array.isArray(pageList) || !pageList.length) return { ok: false, reason: 'invalid' };
+    var unsized = pageList.some(function (p) {
+      return !p || !p.blob || !(p.blob.size > 0);
+    });
+    if (unsized) return { ok: false, reason: 'invalid' };
+
+    await ready();
+    var now = Date.now();
+    var batch = _uuid4();
+    var owner = _ownerNow();
+    var items = pageList.map(function (page, i) {
+      var id = newLocalId();
+      return {
+        meta: {
+          id: id,
+          batch: batch,
+          kind: 'handout',
+          path: null,
+          owner: owner,
+          ids: { course: ref.course, assessment: ref.assessment, resource: ref.resource, file: id },
+          order: i,
+          hash: page.hash || null,
+          bytes: page.blob.size,
+          thumb_bytes: 0,
+          width: page.width || null,
+          height: page.height || null,
+          name: page.name || null,
+          queued_at: now,
+          state: 'waiting',
+          sent: { photo: false, thumb: true },
+          attempts: 0,
+          last_error: null,
+          last_code: null,
+          next_at: 0,
+        },
+        photo: page.blob,
+        thumb: null,
+      };
+    });
+    try {
+      await _getStore().putAll(items);
+    } catch (err) {
+      if (_isQuota(err)) {
+        _storageFull = true;
+        _notifyLocal('storage-full', { error: _message(err) });
+        return { ok: false, reason: 'storage_full', error: _message(err) };
+      }
+      _storeError = _message(err);
+      _notifyLocal('store-failed', { error: _storeError });
+      return { ok: false, reason: 'store_failed', error: _storeError };
+    }
+    _storageFull = false;
+    await _reload();
+    var ids = items.map(function (item) {
+      return item.meta.id;
+    });
+    _changed('add', { batch: batch, ids: ids });
+    return { ok: true, batch: batch, ids: ids };
+  }
+
+  /* start_handout_upload answered: each waiting handout page takes the path
+     the server named for it. map: { pageId: path }. Every path must be the
+     page's own class and resource (server ids by now: rekey first) in the
+     handouts folder, or nothing is written. */
+  async function placeHandout(map) {
+    map = map || {};
+    var ids = Object.keys(map);
+    if (!ids.length) return { ok: false, reason: 'invalid' };
+    await ready();
+    await _reload();
+    var rows = ids.map(function (id) {
+      return (
+        (_metas || []).filter(function (m) {
+          return m.id === id;
+        })[0] || null
+      );
+    });
+    for (var i = 0; i < rows.length; i++) {
+      var m = rows[i];
+      if (!m) return { ok: false, reason: 'not_found', id: ids[i] };
+      if (!_isHandout(m) || !handoutPathOk(map[ids[i]], m.ids && m.ids.course, m.ids && m.ids.resource)) {
+        return { ok: false, reason: 'bad_path', id: ids[i] };
+      }
+    }
+    for (var j = 0; j < rows.length; j++) {
+      await _save(rows[j], { path: String(map[ids[j]]).toLowerCase() });
+    }
+    await _reload();
+    _changed('place', { changed: rows.length });
+    return { ok: true, changed: rows.length };
+  }
+
   /* A record came back from the server: put its id into every waiting page
      that names the local one. rekey(localId, serverId) or rekey({ local:
      server, … }). A page's own file id is rekeyed the same way, by the local
@@ -625,7 +773,7 @@ window.PhotoQueue = (function () {
     for (var j = 0; j < metas.length; j++) {
       var ids = {};
       var touched = false;
-      ID_KEYS.forEach(function (k) {
+      _keysOf(metas[j]).forEach(function (k) {
         var id = metas[j].ids && metas[j].ids[k];
         if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(map, id)) {
           ids[k] = map[id];
@@ -799,9 +947,10 @@ window.PhotoQueue = (function () {
     try {
       var blobs = await _getStore().blobs(meta.id);
       if (epoch !== _epoch || !blobs) return null;
-      var paths = { photo: pathFor(meta.ids), thumb: thumbPathFor(meta.ids) };
-      meta.sent = meta.sent || { photo: false, thumb: false };
-      var parts = ['photo', 'thumb'];
+      var handout = _isHandout(meta);
+      var paths = { photo: _pathOf(meta), thumb: handout ? null : thumbPathFor(meta.ids) };
+      meta.sent = meta.sent || { photo: false, thumb: handout };
+      var parts = handout ? ['photo'] : ['photo', 'thumb'];
       for (var i = 0; i < parts.length; i++) {
         var part = parts[i];
         if (meta.sent[part]) continue;
@@ -860,28 +1009,45 @@ window.PhotoQueue = (function () {
       var first = rows[0];
       var res;
       try {
-        res = await _commit({
-          key: keys[i],
-          ids: {
-            course: first.ids.course,
-            assessment: first.ids.assessment,
-            enrollment: first.ids.enrollment,
-            submission: first.ids.submission,
-          },
-          files: rows.map(function (m) {
-            return {
-              id: m.ids.file,
-              order: m.order,
-              path: pathFor(m.ids),
-              thumbPath: thumbPathFor(m.ids),
-              hash: m.hash,
-              bytes: m.bytes,
-              thumbBytes: m.thumb_bytes,
-              width: m.width,
-              height: m.height,
-            };
-          }),
-        });
+        res = _isHandout(first)
+          ? await _commit({
+              kind: 'handout',
+              key: keys[i],
+              ids: { course: first.ids.course, assessment: first.ids.assessment, resource: first.ids.resource },
+              files: rows.map(function (m) {
+                return {
+                  id: m.ids.file,
+                  order: m.order,
+                  path: _pathOf(m),
+                  hash: m.hash,
+                  bytes: m.bytes,
+                  width: m.width,
+                  height: m.height,
+                };
+              }),
+            })
+          : await _commit({
+              key: keys[i],
+              ids: {
+                course: first.ids.course,
+                assessment: first.ids.assessment,
+                enrollment: first.ids.enrollment,
+                submission: first.ids.submission,
+              },
+              files: rows.map(function (m) {
+                return {
+                  id: m.ids.file,
+                  order: m.order,
+                  path: pathFor(m.ids),
+                  thumbPath: thumbPathFor(m.ids),
+                  hash: m.hash,
+                  bytes: m.bytes,
+                  thumbBytes: m.thumb_bytes,
+                  width: m.width,
+                  height: m.height,
+                };
+              }),
+            });
       } catch (err) {
         res = { error: { message: _message(err) || 'commit failed' } };
       }
@@ -1010,7 +1176,7 @@ window.PhotoQueue = (function () {
     var meta = await _find(id);
     if (!meta) return { ok: false, reason: 'not_found' };
     var patch = { state: 'waiting', attempts: 0, next_at: 0, last_error: null, last_code: null };
-    if (opts && opts.again) patch.sent = { photo: false, thumb: false };
+    if (opts && opts.again) patch.sent = { photo: false, thumb: _isHandout(meta) };
     await _save(meta, patch);
     await _reload();
     _changed('retry:reset', { id: id });
@@ -1102,6 +1268,9 @@ window.PhotoQueue = (function () {
     configure: configure,
     ready: ready,
     add: add,
+    addHandout: addHandout,
+    placeHandout: placeHandout,
+    handoutPathOk: handoutPathOk,
     rekey: rekey,
     send: send,
     stats: stats,

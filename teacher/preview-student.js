@@ -348,12 +348,73 @@ window.PreviewStudent = (function () {
       if (_open.ui.work) _loadWork(_open.ui.work);
       return;
     }
+    if (act === 'handout-retry') {
+      if (_open.ui.handout) _loadHandout(_open.ui.handout);
+      return;
+    }
     var out = StudentPageView.press(_open.ui, built.view, act, el);
     if (!out) return;
     _open.ui = out.ui;
     var have = out.ui.workPages;
     if (out.work && !(have && have.id === out.work && have.state === 'ready')) return _loadWork(out.work);
+    var got = out.ui.handoutPages;
+    if (out.handout && !(got && got.id === out.handout.resource && got.state === 'ready')) {
+      return _loadHandout(out.handout.resource);
+    }
     _drawScreen(out.focus);
+  }
+
+  /* ── A handout (Handouts and Links) ────────────────────────── */
+
+  /* The pages of handout `rid` as the student sees them, in order, from
+     the class's store (openAssessmentHandoutPage: this device's photo
+     queue in Demo Mode, a signed link otherwise). The answer draws only
+     while the preview is still open on this student with the handout open. */
+  function _loadHandout(rid) {
+    var mine = _open;
+    if (!mine) return;
+    var cid = mine.cid;
+    _letGo(mine);
+    mine.ui = Object.assign({}, mine.ui, { handoutPages: { id: rid, state: 'loading', pages: [] } });
+    _drawScreen('#sp-handout-title');
+    var row = (
+      typeof getAssessmentResources === 'function'
+        ? getAssessmentResources(cid, mine.ui.handoutPiece, { ready: true })
+        : []
+    ).filter(function (r) {
+      return r.id === rid;
+    })[0];
+    var count = row ? row.pageCount : 0;
+    var opening = [];
+    for (var i = 0; i < count; i++) {
+      opening.push(
+        typeof openAssessmentHandoutPage === 'function'
+          ? Promise.resolve(openAssessmentHandoutPage(cid, rid, i)).then(null, function () {
+              return null;
+            })
+          : Promise.resolve(null),
+      );
+    }
+    Promise.all(opening).then(function (opened) {
+      var still = _open === mine && mine.ui.handout === rid;
+      if (!still) {
+        opened.forEach(function (o) {
+          if (o && typeof o.release === 'function') o.release();
+        });
+        return;
+      }
+      var pages = [];
+      mine.releases = [];
+      opened.forEach(function (o) {
+        if (!o || !o.url) return;
+        if (typeof o.release === 'function') mine.releases.push(o.release);
+        pages.push({ url: o.url });
+      });
+      mine.ui = Object.assign({}, mine.ui, {
+        handoutPages: { id: rid, state: !pages.length ? 'failed' : 'ready', pages: pages },
+      });
+      _drawScreen('#sp-handout-title');
+    });
   }
 
   /* ── See Your Work (S9-F3) ─────────────────────────────────── */

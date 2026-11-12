@@ -28,10 +28,14 @@
 // The bucket is fixed here and is never taken from a caller. Nothing lists
 // the bucket (the contract: listing it is slow and nothing needs it).
 //
-// Every path is checked against the bucket's one layout before it is used:
+// Every path is checked against the bucket's layout before it is used:
 //   <course>/<assessment>/<enrollment>/<submission>/<file>.jpg
 //   <course>/<assessment>/<enrollment>/<submission>/<file>-thumb.jpg
-// each part a lower-case id. Only the database names paths; this is a
+// each part a lower-case id. A teacher's handout page (Handouts and Links,
+// migrations/2026111170_handouts_links.sql) is
+//   <course>/handouts/<resource>/<n>.jpg      n from 1 to 20
+// and is taken only by signDownloads and remove: a student never uploads
+// one, and nothing here reads or overwrites one. Only the database names paths; this is a
 // second look, so a path with anything else in it (a dot-dot, a slash too
 // many, a query) never reaches the Storage service, from any caller.
 //
@@ -58,6 +62,16 @@ export type PathParts = {
   file: string;
   thumb: boolean;
 };
+
+/** A teacher's handout page: <course>/handouts/<resource>/<n>.jpg, n from 1 to 20. */
+export const HANDOUT_PATH = new RegExp(`^(${ID})/handouts/(${ID})/([1-9]|1[0-9]|20)\\.jpg$`);
+
+/** A handout page's parts, or null when it is not one. */
+export function handoutPathParts(path: unknown): { course: string; resource: string; page: number } | null {
+  if (typeof path !== 'string') return null;
+  const m = HANDOUT_PATH.exec(path);
+  return m ? { course: m[1], resource: m[2], page: Number(m[3]) } : null;
+}
 
 /** A path's parts, or null when it is not one of the bucket's two shapes. */
 export function pathParts(path: unknown): PathParts | null {
@@ -87,6 +101,12 @@ class StorageError extends Error {
 
 function checked(path: string): string {
   if (!PATH.test(path)) throw new StorageError('path', 0);
+  return path;
+}
+
+// A path signDownloads and remove take: a student's page or thumbnail, or a teacher's handout page.
+function checkedOrHandout(path: string): string {
+  if (!PATH.test(path) && !HANDOUT_PATH.test(path)) throw new StorageError('path', 0);
   return path;
 }
 
@@ -162,7 +182,7 @@ export function storageRest(
 
     async signDownloads(paths, seconds) {
       if (!paths.length) return {};
-      paths.forEach(checked);
+      paths.forEach(checkedOrHandout);
       const said = await deadline('sign-download', ms, async signal => {
         const res = await fetcher(`${api}/object/sign/${BUCKET}`, {
           method: 'POST',
@@ -248,7 +268,7 @@ export function storageRest(
 
     async remove(paths) {
       if (!paths.length) return;
-      paths.forEach(checked);
+      paths.forEach(checkedOrHandout);
       await deadline('remove', ms, async signal => {
         const res = await fetcher(`${api}/object/${BUCKET}`, {
           method: 'DELETE',
