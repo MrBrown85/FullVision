@@ -141,6 +141,9 @@ test('Add Work for a student with nothing in, then Delete Work', async ({ page }
    holds every kind of piece: label over control, nothing past its right
    edge, and a chosen rubric tile keeps its level's whole name. */
 test('every kind of piece fits the scoring column, with and without Focus on Work', async ({ page }) => {
+  // Five pieces, each opened and measured twice: 23 to 29 s on CI, too
+  // near the 30 s default.
+  test.setTimeout(60_000);
   await openDemo(page);
   // Rubric, single-point, points, Complete/Incomplete, competency levels.
   const pieces = ['sci8a3', 'sci8a18', 'sci8q1', 'sci8q4', 'sci8a2'];
