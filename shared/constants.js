@@ -1,3 +1,4 @@
+// @ts-check
 /* gb-constants.js — Shared constants for FullVision */
 
 /**
