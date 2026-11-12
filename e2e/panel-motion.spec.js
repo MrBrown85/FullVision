@@ -78,11 +78,24 @@ test.describe('with motion', () => {
   test('the Help panel slides in and out and ends fully open or gone', async ({ page }) => {
     await openDemo(page);
     const mainFull = await mainWidth(page);
+    // Every frame of the slide, from the press: some frame is part-way open.
+    // (A fixed wait missed the middle on a busy machine.)
+    const frames = page.evaluate(
+      () =>
+        new Promise(resolve => {
+          const out = [];
+          const start = performance.now();
+          const tick = () => {
+            const p = document.getElementById('help-panel');
+            out.push(p ? p.getBoundingClientRect().width : 0);
+            if (performance.now() - start < 600) requestAnimationFrame(tick);
+            else resolve(out);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
     await page.click('[data-action="toggleHelp"]');
-    await page.waitForTimeout(60);
-    const mid = await helpWidth(page);
-    expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(400);
+    expect((await frames).some(w => w > 0 && w < 400)).toBe(true);
     await expect.poll(() => helpWidth(page)).toBe(400);
     await expect(page.locator('#help-panel')).not.toHaveClass(/help-sliding/);
     expect(await mainWidth(page)).toBeCloseTo(mainFull - 400, 0);
