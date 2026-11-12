@@ -2,20 +2,18 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, TEST_LEARNING_MAP } from './helpers.js';
 import { cardMenuItem } from './card-menu.js';
 
-/* The save guard keeps the mark it used to drop (S19-B3). saveScores
-   (shared/data.js) refuses a save that drops most of a class's marks
-   against the browser's saved copy. In two rare cases the saved copy and
-   memory disagree, and the guard dropped the mark the teacher had just
-   entered:
-
-   Two tabs: tab A uses Set Everyone To on a column (30 marks, in the saved
-   copy). Tab B, which saved something a moment ago and so has not reloaded
-   the class, types one mark. The guard rightly refuses to overwrite A's 30
-   marks; B's mark is now kept with them, and is the only mark B sends.
+/* The save guard and a failed write during Delete Assessment (S19-B3).
+   saveScores (shared/data.js) refuses a save that drops most of a class's
+   marks against the browser's saved copy.
 
    Storage full during Delete Assessment: the saved copy keeps the deleted
-   work's marks. The next mark used to be blocked; now those marks are not
-   counted, and the mark saves.
+   work's marks. The next mark used to be blocked and lost; now those marks
+   are not counted, and the mark saves.
+
+   Two tabs, unchanged from main: tab A uses Set Everyone To on a column (30
+   marks, in the saved copy). Tab B, which saved something a moment ago and
+   so has not reloaded the class, types one mark. The guard refuses it with
+   the red message, so tab A's 30 marks are never overwritten.
 
    Signed in (helpers.js mockAuth): each page has its own fake server, read
    from the saved copy at its first call, so a reload reads back what the
@@ -148,7 +146,7 @@ async function expectNoBlock(page, guard) {
   await expect(page.locator('#sync-toast')).toHaveCount(0);
 }
 
-test('two tabs: a mark typed in a tab not yet reloaded after a fill in the other is kept, with the fill', async ({
+test('two tabs: a mark typed in a tab not yet reloaded after a fill in the other is blocked, and the fill stays', async ({
   page,
   context,
 }) => {
@@ -183,29 +181,16 @@ test('two tabs: a mark typed in a tab not yet reloaded after a fill in the other
   await expect.poll(async () => (await marks(page, LEVEL)).saved.length).toBe(30);
   await expectNoBlock(page, guardA);
 
-  // Tab B, still without the fill, types a second mark.
+  // Tab B, still without the fill, types a second mark. As on main, the
+  // guard refuses it with the red message, and tab A's fill stays.
   await b.bringToFront();
   expect((await marks(b, LEVEL)).cache).toEqual([]);
   await typeInCell(b, NEW, SIDS[6], '8');
-  await expectNoBlock(b, guardB);
-  expect((await marks(b, NEW)).saved.sort()).toEqual([7, 8]);
+  await expect(b.locator('#sync-toast')).toContainText('Score save blocked');
+  expect(guardB.length).toBeGreaterThan(0);
   expect((await marks(b, LEVEL)).saved).toHaveLength(30);
-  expect((await marks(b, LEVEL)).cache).toHaveLength(30);
-  // Only the two marks B typed go up; the fill is not sent again.
-  await expect
-    .poll(() => writesOn([page, b], NEW))
-    .toEqual([
-      ['upsert_score', SIDS[5], 7],
-      ['upsert_score', SIDS[6], 8],
-    ]);
-
-  await b.reload();
-  await waitForClass(b, 3);
-  await b.locator('[data-action="setView"][data-mode="scores"]').click();
-  await expect(cell(b, NEW, SIDS[6]).locator('.gb-scores-val')).toHaveText('8');
-  await expect(cell(b, NEW, SIDS[5]).locator('.gb-scores-val')).toHaveText('7');
-  expect((await marks(b, NEW)).saved.sort()).toEqual([7, 8]);
-  await expectNoBlock(b, guardB);
+  await b.waitForTimeout(500);
+  expect((await writesOn([page, b], NEW)).filter(w => w[1] === SIDS[6])).toEqual([]);
 });
 
 for (const mode of ['Demo Mode', 'signed in'])
