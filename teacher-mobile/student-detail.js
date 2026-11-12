@@ -879,6 +879,5 @@ window.MStudentDetail = (function () {
     selectTab: selectTab,
     scrollActiveTab: scrollActiveTab,
     refreshEvidence: refreshEvidence,
-    refreshPanels: refreshPanels,
   };
 })();
