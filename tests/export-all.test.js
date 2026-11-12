@@ -456,6 +456,7 @@ describe('the export stays complete', () => {
   it('uses every per-class reader in shared/data.js, or says why not', () => {
     const data =
       readFileSync(resolve(root, 'shared/data.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-observations.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-student-cards.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-student-records.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-term-ratings.js'), 'utf-8');
