@@ -477,7 +477,23 @@ D8 and D9 wait for the last wave, so they pin the assessment form work that anot
 
 ### Track E. Organized code
 
-The Nov 12 ruling started Track E with the pieces that do not touch marks (`docs/DECISIONS.md`, "Handoff review rulings (2026-11-12)"). Pieces that touch marks follow after the safe pieces, as move-only PRs with an independent review. The score writers themselves (the plan's rows for statuses, score writes and group grading, Draft and Returned, and the load path) wait for a day's use on real classes after a release, which needs Colin. Recommended order, from the map.
+The Nov 12 ruling started Track E (`docs/DECISIONS.md`, "Handoff review rulings (2026-11-12)"). A later ruling the same day lets pieces that touch marks move too, as move-only PRs under a method that leaves Colin and Karen with no change they can see (`docs/DECISIONS.md`, "Marks may be moved; Colin and Karen must see no change (2026-11-12)").
+
+**Moved (19 pieces, each a move-only PR merged by an independent reviewer, all released).**
+
+- Into `shared/`: `data-curriculum-index.js`, `data-utilities.js`, `data-demo.js`, `data-student-cards.js`, `data-student-records.js` (flags, goals, reflections, notes and modules), `data-term-ratings.js` (term ratings and report preferences) and `data-observations.js`. `shared/data.js` went from 22,218 lines to 19,123.
+- Page pieces: `teacher/cm-roster-file.js`, `teacher/cm-block-picker.js`, `teacher/gradebook-csv.js`, `teacher/gradebook-chrome.js`, `teacher/student-groups.js`, `teacher/student-edit-dialog.js`, `teacher/assign-competency-picker.js` and `teacher/assign-descriptor-bar.js`.
+
+**Stopped with no change (6).** The seam map marked several of these as not touching marks; it was wrong each time, and the agents caught it before changing anything.
+
+- The DIBELS benchmark (`teacher/page-assignments.js`): it reads or writes marks.
+- Copy From Another Class: not a separable dialog.
+- The Reports Issue dialog: "Return Them, Then Print" returns draft grades, and it shares page state.
+- The v2 server-call wrappers: they include the reader that loads every score and the wrappers that save section overrides and term ratings.
+- Reflect on Feedback: it reads returned grades and revision requests.
+- Student work and feedback: its feedback half returns grades and syncs returned work and revisions.
+
+**The ruling.** Colin, 2026-11-12: marks may be moved, and Colin and Karen must see no change. The remaining pieces proceed as move-only PRs under the method in that entry: a byte-for-byte proof, the same long sequence of real teacher actions on main and on the branch, an independent reviewer with a different sequence, the full browser suite on GitHub before merge, and small releases. Anything that cannot be shown identical stops and goes to Colin. Changing how a mark is saved, queued, synced, returned or deleted still needs him. This replaces the old rule that the score writers wait for a day's use on real classes after a release. Recommended order, from the map.
 
 **Tidyings in `shared/data.js` that cut false coupling** (each its own PR):
 
@@ -488,7 +504,7 @@ The Nov 12 ruling started Track E with the pieces that do not touch marks (`docs
 5. Retire the per-table load (about 900 lines), the path every vitest test runs because `tests/setup.js:182` turns the class bundle off. Needs Colin (loading).
 6. Drop the 11 self-guards on `data.js`'s own functions and the second `window.v2` init.
 
-**Then the seams, one per PR, leaves first:** curriculum index; utilities; the `v2` RPC wrappers; Demo Mode; student cards; flags, goals, reflections, overrides, notes, modules, profile summaries; term ratings and reports; observations; the student-page cluster (reflections, Mark Up, student work); revisions; learning map, categories, rubrics, assessments, settings; roster; courses and terms; then the mark writers together (statuses, score writes, group grading); Draft and Returned; the load path. The kernel (sync status, RPC plumbing, outbox and re-keying, cross-tab, boot) stays as `data.js`. Every seam from "revisions" on touches marks and needs Colin.
+**Then the seams, one per PR, leaves first:** curriculum index; utilities; the `v2` RPC wrappers; Demo Mode; student cards; flags, goals, reflections, overrides, notes, modules, profile summaries; term ratings and reports; observations; the student-page cluster (reflections, Mark Up, student work); revisions; learning map, categories, rubrics, assessments, settings; roster; courses and terms; then the mark writers together (statuses, score writes, group grading); Draft and Returned; the load path. The kernel (sync status, RPC plumbing, outbox and re-keying, cross-tab, boot) stays as `data.js`. Every seam from "revisions" on touches marks and moves only under the method above.
 
 **Page seams, smallest first:**
 
@@ -502,7 +518,7 @@ The Nov 12 ruling started Track E with the pieces that do not touch marks (`docs
 - **Needs Colin:** desktop and phone show a criterion's level differently when keys are mixed (desktop the first non-zero level, phone the lowest). One of them is wrong. Also the grading order differs (last name on desktop, alphabetical on phone).
 - Map `teacher/report-questionnaire.js` (8,994 lines); no one has.
 
-**Status.** Later, except the items marked "Needs Colin", which wait for him.
+**Status.** In progress: 19 pieces moved; the rest proceed as move-only PRs under the Nov 12 method. Items marked "Needs Colin" still wait for him.
 
 ### Track F. Run it like a service
 
@@ -627,7 +643,7 @@ The seven open decisions on card cp1, the server change the Nov 2 plan marked "y
 | 18  | Retire the April-era saved-copy readers.                                                                                                                                                                    | S19-B8                                                         |
 | 19  | When to make lint and `tsc` able to fail the build.                                                                                                                                                         | S19-D15                                                        |
 | 20  | What `*.nsvcs.net` in the content policy is for; the Sentry build credentials; Netlify's Node version; the edge function deploy command.                                                                    | S19-F1 and F2 final versions                                   |
-| 21  | Phase 4 (ES modules and splits) with the decision to sell to schools. **Ruled Nov 12: the split goes ahead, safe pieces first.**                                                                            | Track E                                                        |
+| 21  | Phase 4 (ES modules and splits) with the decision to sell to schools. **Ruled Nov 12: the split goes ahead, safe pieces first.** **Ruled Nov 12: marks may be moved; no change for Colin or Karen.**        | Track E                                                        |
 | 22  | Accept or drop each of the five `CLAUDE.md` edits in the S19-A14b draft, and say what has been released.                                                                                                    | S19-A14b                                                       |
 | 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it.                                                                                                             | Faster first draw (Nov 2 Phase 2 #2)                           |
 
