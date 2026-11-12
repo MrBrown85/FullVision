@@ -914,7 +914,6 @@ window.DashObservations = (function () {
 
   return {
     renderCard: renderCard,
-    buildModel: buildModel,
     popoverHtml: popoverHtml,
     lastModel: lastModel,
     obsGridColumns: obsGridColumns,
@@ -933,9 +932,7 @@ window.DashObservations = (function () {
     rowName: rowName,
     flagList: flagList,
     rowMatches: rowMatches,
-    obDay: obDay,
     obType: obType,
-    newestFirst: newestFirst,
     FIXED: FIXED,
     MIN_CELL: MIN_CELL,
   };
