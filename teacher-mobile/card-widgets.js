@@ -742,6 +742,5 @@ window.MCardWidgets = (function () {
     renderFallbackHero: renderFallbackHero,
     assembleCard: assembleCard,
     commentSheetHtml: commentSheetHtml,
-    staleNameNote: staleNameNote,
   };
 })();

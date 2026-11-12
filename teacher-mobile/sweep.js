@@ -665,16 +665,9 @@ window.MSweep = (function () {
     isOpen: isOpen,
     close: close,
     pick: pick,
-    setOrder: setOrder,
-    setType: setType,
-    chooseStarter: chooseStarter,
-    writeInstead: writeInstead,
     saveAndNext: saveAndNext,
     undo: undo,
     skip: skip,
-    _state: function () {
-      return _s;
-    },
     _helpers: {
       localDay: localDay,
       doneSet: doneSet,
