@@ -1734,6 +1734,7 @@ function _keepOrDefaultField(cid, field, fallback) {
   var key = _DATA_KEYS[field];
   _cache[field][cid] = key ? _safeParseLS('gb-' + key + '-' + cid, fallback) : fallback;
   if (field === 'courseConfigs') _noteSettingsRead(cid);
+  _noteLoadedTexts(cid);
 }
 
 /* The class's settings as this page read them from this device's storage:
@@ -1768,6 +1769,7 @@ function _persistLoadedField(cid, field, value) {
       same = false;
     }
     if (!same) _safeLSSet(lsKey, json);
+    else if (value && typeof value === 'object') _baseOf.set(value, json);
   }
   if (_SERVER_STATE_FIELDS[field]) _rememberServerState(field, cid, value);
 }
@@ -4620,6 +4622,7 @@ function _loadSavedCopy(cid) {
   var meta = _classMeta(cid) || {};
   _loadCourseFromLS(cid);
   _cache.categories[cid] = _safeParseLS('gb-categories-' + cid, []);
+  _noteLoadedTexts(cid);
   if (meta.dirty || meta.settings !== _SAVED_SETTINGS) return;
   Object.keys(_SERVER_STATE_FIELDS).forEach(function (field) {
     if (_cache[field][cid] !== undefined) _rememberServerState(field, cid, _cache[field][cid]);
@@ -5206,6 +5209,7 @@ function _loadCourseFromLS(cid) {
   _noteRubricsSet(cid);
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
   _cache.rubricPrints[cid] = _safeParseLS('gb-rubric-prints-' + cid, {});
+  _noteLoadedTexts(cid);
   delete _cache.gradeReturns[cid]; // read again when asked for (getGradeReturns)
   delete _serverStudentPage[cid]; // and the server's word on its student page (_serverSaysStudentPage)
 
@@ -5244,6 +5248,7 @@ function _safeLSSet(key, value) {
   try {
     localStorage.setItem(key, value);
     _storageSaved(key);
+    _noteSavedText(key, value);
     return true;
   } catch (e) {
     var keyClass = /^gb-/.test(key) && key.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
@@ -5251,6 +5256,7 @@ function _safeLSSet(key, value) {
       try {
         localStorage.setItem(key, value);
         _storageSaved(key);
+        _noteSavedText(key, value);
         return true;
       } catch (retryError) {
         e = retryError;
@@ -5269,6 +5275,269 @@ function _safeLSSet(key, value) {
 
 function _storageSaved(key) {
   if (_storageFullKeys.delete(key)) _saveProblemChanged();
+}
+
+/* ── A tab that is behind catches up before it saves ────────────────────
+   docs/plans/stale-tab-plan.md. Every tab of the browser shares the saved
+   copy (gb-* keys); each keeps its own copy in memory, and re-reads the
+   class from the server only once it has been quiet (_REFRESH_QUIET_MS)
+   and the outbox is empty. A tab that saved from its old copy meanwhile
+   overwrote another tab's newer marks and lists in the saved copy, or had
+   its own mark blocked by the guard in saveScores.
+
+   _baseOf holds, for each object a tab keeps in memory, the text of the
+   saved copy it was read from or last written as. When storage holds other
+   text, another tab has saved since. _catchUp then takes the saved copy as
+   it is now and puts back on it only what this tab changed: the difference
+   between that text and this tab's object, both this tab's own, so another
+   tab's data is never in it. Cells and rows this tab did not change take
+   the saved copy's value. The server baseline moves the same way, so a save
+   sends only this tab's change. With no text known, or a field whose last
+   write failed here (storage full: memory is newer than storage), nothing
+   changes. The guard in saveScores is untouched and still runs after. */
+var _CATCH_UP_FIELDS = ['assessments', 'students', 'withdrawn', 'categories', 'statuses', 'courseConfigs', 'scores'];
+var _baseOf = new WeakMap();
+
+function _catchUpKey(field, cid) {
+  return 'gb-' + _DATA_KEYS[field] + '-' + cid;
+}
+
+/* A gb-* write succeeded: the object in memory was written as `text`. */
+function _noteSavedText(key, text) {
+  for (var i = 0; i < _CATCH_UP_FIELDS.length; i++) {
+    var prefix = 'gb-' + _DATA_KEYS[_CATCH_UP_FIELDS[i]] + '-';
+    if (key.indexOf(prefix) !== 0) continue;
+    var held = _cache[_CATCH_UP_FIELDS[i]][key.slice(prefix.length)];
+    if (held && typeof held === 'object') _baseOf.set(held, text);
+    return;
+  }
+}
+
+/* The class was just read from the saved copy into memory. A field with
+   nothing saved was read as its default. */
+function _noteLoadedTexts(cid) {
+  _CATCH_UP_FIELDS.forEach(function (field) {
+    var held = _cache[field][cid];
+    if (!held || typeof held !== 'object' || _baseOf.has(held)) return;
+    try {
+      var raw = localStorage.getItem(_catchUpKey(field, cid));
+      _baseOf.set(held, raw != null ? raw : JSON.stringify(held));
+    } catch (e) {
+      /* unknown text: this field saves as before */
+    }
+  });
+}
+
+/* JSON with keys sorted, to compare two values. */
+function _stableJson(v) {
+  if (v === undefined) return 'undefined';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(_stableJson).join(',') + ']';
+  return (
+    '{' +
+    Object.keys(v)
+      .sort()
+      .filter(function (k) {
+        return v[k] !== undefined;
+      })
+      .map(function (k) {
+        return JSON.stringify(k) + ':' + _stableJson(v[k]);
+      })
+      .join(',') +
+    '}'
+  );
+}
+
+/* Onto `now` (the saved copy's row, owned by the caller), the fields this
+   tab changed from `was` to `mine`. Keys in one group go together: a level
+   and its + or − are one change. */
+function _putBackChangedFields(was, mine, now, groups) {
+  var done = {};
+  Object.keys(Object.assign({}, was, mine)).forEach(function (k) {
+    if (done[k]) return;
+    var unit = (groups || []).find(function (g) {
+      return g.indexOf(k) >= 0;
+    }) || [k];
+    unit.forEach(function (u) {
+      done[u] = true;
+    });
+    var changed = unit.some(function (u) {
+      return _stableJson(was[u]) !== _stableJson(mine[u]);
+    });
+    if (!changed) return;
+    unit.forEach(function (u) {
+      if (mine[u] === undefined) delete now[u];
+      else now[u] = _cloneValue(mine[u]);
+    });
+  });
+  return now;
+}
+
+function _remapIds(cid, rows, field) {
+  var map = _idRekeys[cid];
+  if (!map || !Array.isArray(rows)) return;
+  rows.forEach(function (row) {
+    var holder = field === 'withdrawn' ? row && row.student : row;
+    if (holder && map[holder.id]) holder.id = map[holder.id];
+  });
+}
+
+/* A list of rows with ids: rows this tab added, removed or changed since
+   `was`, put back on `now`. A row another tab removed stays removed. */
+function _rebaseRows(was, mine, now, keyOf) {
+  function index(rows) {
+    var out = {};
+    rows.forEach(function (row) {
+      var k = keyOf(row);
+      if (k != null) out[k] = row;
+    });
+    return out;
+  }
+  if (!Array.isArray(was) || !Array.isArray(mine) || !Array.isArray(now)) return null;
+  var w = index(was),
+    m = index(mine),
+    n = index(now);
+  var out = [];
+  now.forEach(function (row) {
+    var k = keyOf(row);
+    if (k == null) return out.push(row);
+    if (w[k] && !m[k]) return; // this tab removed it
+    if (m[k] && _stableJson(w[k]) !== _stableJson(m[k])) {
+      out.push(w[k] ? _putBackChangedFields(w[k], m[k], row) : _cloneValue(m[k]));
+    } else out.push(row);
+  });
+  mine.forEach(function (row) {
+    var k = keyOf(row);
+    if (k != null && !w[k] && !n[k]) out.push(_cloneValue(row)); // this tab added it
+  });
+  return out;
+}
+
+/* An object of keys (statuses, settings): each key this tab changed. */
+function _rebaseKeys(was, mine, now) {
+  if (!_plainObject(was) || !_plainObject(mine) || !_plainObject(now)) return null;
+  return _putBackChangedFields(was, mine, Object.assign({}, now));
+}
+
+/* Scores, cell by cell (student, work, key). A cell typed onto work or a
+   student another tab removed is not kept: the row is gone. Null when this
+   tab's own change would trip the guard's rule: the guard then decides
+   against the saved copy, as before. */
+function _rebaseScores(cid, was, mine, now, gone, fillUndone) {
+  if (!_plainObject(was) || !_plainObject(mine) || !_plainObject(now)) return null;
+  _applyIdRekeysToScores(cid, was);
+  _applyIdRekeysToScores(cid, now);
+  was = _migrateRubricScoreKeys(cid, was);
+  now = _migrateRubricScoreKeys(cid, now);
+  if (_scoreGuardDrop(was, mine, fillUndone)) return null;
+  var w = _scoreEntriesByKey(was),
+    m = _scoreEntriesByKey(mine),
+    n = _scoreEntriesByKey(now);
+  var out = {};
+  Object.keys(now).forEach(function (sid) {
+    out[sid] = Array.isArray(now[sid]) ? now[sid].slice() : now[sid];
+  });
+  Object.keys(Object.assign({}, w, m)).forEach(function (k) {
+    var before = w[k],
+      after = m[k];
+    if (_stableJson(before && before.entry) === _stableJson(after && after.entry)) return;
+    var sid = (after || before).sid;
+    var aid = (after || before).entry.assessmentId;
+    if (after && ((gone.work && gone.work[aid]) || (gone.students && gone.students[sid]))) return;
+    var list = Array.isArray(out[sid]) ? out[sid] : (out[sid] = []);
+    var at = n[k] ? list.indexOf(n[k].entry) : -1;
+    if (!after) {
+      if (at >= 0) list.splice(at, 1);
+      return;
+    }
+    var entry =
+      n[k] && before
+        ? _putBackChangedFields(before.entry, after.entry, n[k].entry, [['score', 'mod']])
+        : _cloneValue(after.entry);
+    if (at >= 0) list[at] = entry;
+    else list.push(entry);
+  });
+  return out;
+}
+
+function _rebaseField(cid, field, was, mine, now, gone, fillUndone) {
+  if (field === 'scores') return _rebaseScores(cid, was, mine, now, gone, fillUndone);
+  if (field === 'statuses') {
+    _applyIdRekeysToStatuses(cid, was);
+    _applyIdRekeysToStatuses(cid, now);
+  }
+  if (field === 'statuses' || field === 'courseConfigs') return _rebaseKeys(was, mine, now);
+  _remapIds(cid, was, field);
+  _remapIds(cid, now, field);
+  return _rebaseRows(was, mine, now, function (row) {
+    var holder = field === 'withdrawn' ? row && row.student : row;
+    return holder && holder.id ? holder.id : null;
+  });
+}
+
+/* Before a save of `field` (with `mine`, the value to save) or, with no
+   field, before a writer reads memory: every field of the class another tab
+   saved since this tab read it is taken from the saved copy, with this
+   tab's own changes put back. Answers the value to save. `gone`, if given,
+   gets the ids of work and students another tab removed. */
+function _catchUp(cid, field, mine, fillUndone, gone) {
+  if (!cid) return mine;
+  gone = gone || {};
+  var caughtUp = false;
+  _CATCH_UP_FIELDS.forEach(function (f) {
+    var held = _cache[f] && _cache[f][cid];
+    var saving = f === field && mine != null;
+    var cur = saving ? mine : held;
+    if (!cur || typeof cur !== 'object') return;
+    var base = _baseOf.get(cur);
+    if (base === undefined && saving && held && typeof held === 'object') base = _baseOf.get(held);
+    var key = _catchUpKey(f, cid);
+    if (base === undefined || _storageFullKeys.has(key)) return;
+    var raw = null;
+    try {
+      raw = localStorage.getItem(key);
+    } catch (e) {
+      return;
+    }
+    if (raw == null || raw === base) return;
+    var was, now;
+    try {
+      was = JSON.parse(base);
+      now = JSON.parse(raw);
+    } catch (e) {
+      return;
+    }
+    if (f === 'assessments' || f === 'students') {
+      var ids = {};
+      (Array.isArray(was) ? was : []).forEach(function (row) {
+        if (row && row.id) ids[row.id] = true;
+      });
+      (Array.isArray(now) ? now : []).forEach(function (row) {
+        if (row && row.id) delete ids[row.id];
+      });
+      gone[f === 'assessments' ? 'work' : 'students'] = ids;
+    }
+    var next = _rebaseField(cid, f, was, cur, now, gone, fillUndone);
+    if (!next) return;
+    if (_hasServerState(f, cid)) {
+      var server = _rebaseField(cid, f, JSON.parse(base), _cloneValue(_serverState[f][cid]), JSON.parse(raw), {}, 0);
+      if (server) _serverState[f][cid] = server;
+    }
+    var read = f === 'courseConfigs' ? _settingsRead[cid] : null;
+    if (read && read.of === held) {
+      var copy = _rebaseField(cid, f, JSON.parse(base), _cloneValue(read.copy), JSON.parse(raw), {}, 0);
+      _settingsRead[cid] = { of: next, copy: copy || read.copy };
+    }
+    _baseOf.set(next, raw);
+    _cache[f][cid] = next;
+    if (saving) mine = next;
+    caughtUp = true;
+  });
+  if (caughtUp) {
+    if (typeof clearProfCache === 'function') clearProfCache();
+    delete _returnedSets[cid];
+  }
+  return mine;
 }
 
 function _loadCoursesFromLS() {
@@ -7952,6 +8221,7 @@ function getAssignmentStatuses(cid) {
 }
 function saveAssignmentStatuses(cid, obj) {
   _applyIdRekeysToStatuses(cid, obj);
+  obj = _catchUp(cid, 'statuses', obj);
   var prev = _loadPersistedCourseFieldSnapshot('statuses', cid, (_cache.statuses && _cache.statuses[cid]) || {});
   var next = obj || {};
   _saveCourseField('statuses', cid, next);
@@ -8521,6 +8791,7 @@ function moveRubricScores(cid, aid, maps) {
   var crit = (maps && maps.criteria) || {};
   var chk = (maps && maps.checks) || {};
   if (!aid || !Object.keys(crit).length) return Promise.resolve({ data: 0, error: null });
+  _catchUp(cid);
   var scores = getScores(cid) || {};
   var next = {};
   Object.keys(scores).forEach(function (sid) {
@@ -9105,6 +9376,7 @@ function _settingText(v) {
    class before a change made elsewhere put the old values back. A save that
    changes nothing sends nothing. */
 function saveCourseConfig(cid, obj) {
+  obj = _catchUp(cid, 'courseConfigs', obj);
   // Draft and Returned: the student page's switch and Return Grades are not
   // this function's to change or send for a signed-in teacher
   // (saveReturnSettings is their one writer). They stay as the class holds
@@ -9421,6 +9693,7 @@ function getStudents(cid) {
   }
 }
 function saveStudents(cid, arr) {
+  arr = _catchUp(cid, 'students', arr);
   var prev = _loadPersistedCourseFieldSnapshot('students', cid, _cache.students[cid] || []).map(migrateStudent);
   _saveCourseField('students', cid, arr);
   // Demo mode and offline both stay local-only. A class that has no server
@@ -9728,6 +10001,7 @@ function getCategories(cid) {
    too). If the save has to wait and is then not sent, the class says so
    when next opened (noteCategoriesNotCopied). */
 function saveCategories(cid, arr, options) {
+  arr = _catchUp(cid, 'categories', arr);
   var prev = _loadPersistedCourseFieldSnapshot('categories', cid, (_cache.categories && _cache.categories[cid]) || []);
   var next = arr || [];
   _saveCourseField('categories', cid, next);
@@ -10086,6 +10360,7 @@ function getCategoryById(cid, categoryId) {
   );
 }
 function saveAssessments(cid, arr) {
+  arr = _catchUp(cid, 'assessments', arr);
   var prev = _loadPersistedCourseFieldSnapshot(
     'assessments',
     cid,
@@ -10740,6 +11015,7 @@ function _scoresOfLiveRows(cid, prev) {
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
   _applyIdRekeysToScores(cid, obj);
+  obj = _catchUp(cid, 'scores', obj, fillUndone);
   // The baseline is read in the same key space as the scores, or a copy
   // saved with rubric scores under competencies would make every criterion
   // look new and every competency key look removed (a clear on the server).
@@ -10814,6 +11090,7 @@ function saveScores(cid, obj, fillUndone) {
    and dates, and the cell still holds what the fill wrote. A proficiency 0
    and no entry are the same unscored cell (the server deletes a 0). */
 function restoreScoreCells(cid, before, after) {
+  _catchUp(cid);
   var now = getScores(cid);
   var next = structuredClone(now);
   var was = _scoreEntriesByKey(before);
@@ -13348,6 +13625,10 @@ function setGradedSeparately(cid, aid, sid, on) {
 /* A grade write for one student: `write` runs, then (outermost write only)
    the student's grade is copied to the rest of their group. */
 function _groupWrite(cid, sid, aid, write, args) {
+  // Another tab removed this work or student since this tab read the class.
+  var gone = {};
+  _catchUp(cid, null, undefined, 0, gone);
+  if ((gone.work && gone.work[aid]) || (gone.students && gone.students[sid])) return false;
   var outer = _groupWriteDepth === 0;
   var prior = outer && isLinkedGroupMember(cid, aid, sid) ? _groupGradeKey(getScores(cid), sid, aid) : null;
   _groupWriteDepth++;
@@ -15453,6 +15734,7 @@ function getWithdrawnStudents(cid) {
 }
 
 function _saveWithdrawn(cid, list) {
+  list = _catchUp(cid, 'withdrawn', list);
   _saveCourseField('withdrawn', cid, list);
 }
 
@@ -15541,6 +15823,7 @@ function _studentWriteId(cid, sid) {
 /* Withdraw: the remove action in Class Settings. Returns the entry (for
    Undo), or null when the student isn't on the roster. */
 function withdrawStudent(cid, sid) {
+  _catchUp(cid);
   var students = getStudents(cid);
   var index = students.findIndex(function (s) {
     return s && s.id === sid;
@@ -15570,6 +15853,7 @@ function withdrawStudent(cid, sid) {
 /* Re-enrol a withdrawn student: back on the roster where they were, with
    everything they had. Returns false when they aren't in the list. */
 function reenrolStudent(cid, sid) {
+  _catchUp(cid);
   var list = getWithdrawnStudents(cid);
   var entry = list.find(function (w) {
     return w && w.student && w.student.id === sid;
