@@ -4396,11 +4396,10 @@ button.stu-bd-row:focus-visible {
   border-radius: 3px;
   background: var(--seg-track);
 }
-.stu-ov-cell.on {
-  background: var(--text-3);
-}
-.stu-ov-rub-row.sel .stu-ov-cell.on {
-  background: var(--text);
+/* The filled cells take the level's colour inline; the chosen criterion
+   reads stronger by its row, not by turning black. */
+.stu-ov-rub-row:not(.sel) .stu-ov-cell.on {
+  opacity: 0.75;
 }
 .stu-ov-next-text {
   margin-top: 4px;

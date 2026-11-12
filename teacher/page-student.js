@@ -1118,7 +1118,10 @@ window.PageStudent = (function () {
     rows.forEach(function (r) {
       var on = r === sel;
       var cells = '';
-      for (var n = 1; n <= 4; n++) cells += '<span class="stu-ov-cell' + (n <= r.near.level ? ' on' : '') + '"></span>';
+      // Filled in the level's colour, as every 1–4 scale (design rule 5).
+      var fill = PROF_COLORS[r.near.level] || PROF_COLORS[0];
+      for (var n = 1; n <= 4; n++)
+        cells += '<span class="stu-ov-cell' + (n <= r.near.level ? ' on" style="background:' + fill : '') + '"></span>';
       html +=
         '<button type="button" class="stu-ov-rub-row' +
         (on ? ' sel' : '') +
