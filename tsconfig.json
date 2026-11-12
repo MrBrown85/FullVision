@@ -14,6 +14,7 @@
     "shared/html.js",
     "shared/constants.js",
     "shared/calc.js",
+    "shared/data-utilities.js",
     "shared/data.js",
     "shared/data-curriculum-index.js"
   ]

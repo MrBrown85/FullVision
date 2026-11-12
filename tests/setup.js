@@ -232,6 +232,7 @@ Object.assign(
   ),
 );
 load('shared/reporting-term-presets.js');
+load('shared/data-utilities.js');
 load('shared/data.js');
 load('shared/data-curriculum-index.js');
 load('shared/calc.js');

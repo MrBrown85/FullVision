@@ -27,6 +27,7 @@ const PRECACHE_URLS = [
   '/launch.html',
   '/shared/constants.js',
   '/shared/reporting-term-presets.js',
+  '/shared/data-utilities.js',
   '/shared/data.js',
   '/shared/data-curriculum-index.js',
   '/shared/offline-queue.js',
