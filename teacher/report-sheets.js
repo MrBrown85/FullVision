@@ -248,7 +248,11 @@ window.ReportSheets = (function () {
         { key: 'categoryGrade', label: 'Category Grades', def: true },
         { key: 'score', label: 'Score', def: true },
         { key: 'percent', label: 'Percent', def: 'auto' },
-        { key: 'word', label: 'Proficiency Word', def: 'auto' },
+        // A Proficiency or Both class prints no word beside a mark (a level
+        // is its proficiency; points carry none), so Word is not offered
+        // there and a saved form's Word is not read (ReportBlocks.
+        // renderBlockGradeTable).
+        { key: 'word', label: 'Proficiency Word', def: 'auto', hideIn: ['proficiency', 'both'] },
         {
           key: 'organize',
           label: 'Organize By',

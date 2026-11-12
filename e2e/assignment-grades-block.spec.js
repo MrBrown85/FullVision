@@ -91,7 +91,9 @@ for (const wide of [false, true]) {
         .first();
     const pts = row(at.points.title);
     await expect(pts.locator('.report-grades-figs')).toHaveText(at.points.mark);
-    await expect(pts.locator('.report-grades-word')).toHaveText('');
+    // No Proficiency Word column in a Proficiency class, though the form
+    // has Word on (Assignment Grades layout, 2026-11-12).
+    await expect(pts.locator('.report-grades-word')).toHaveCount(0);
     const blank = row(at.none);
     await expect(blank.locator('.report-grades-figs')).toHaveText('');
     await expect(blank).not.toContainText('—');
