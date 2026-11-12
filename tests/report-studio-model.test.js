@@ -1138,7 +1138,7 @@ describe('stage 3 blocks', () => {
     expect(t).toContain('Assignment Grades Course Grade Proficient This term · 3 assessments');
     expect(t).toContain('Labs 40% of grade · Proficient Oct 5 Plate Tectonics Presentation Proficient +');
     expect(t).toContain(
-      'Quizzes 60% of grade · Proficient Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12/15 Proficient',
+      'Quizzes 60% of grade · Proficient Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12 / 15 Points shown as scored',
     );
     expect(t).not.toMatch(/\d\.\d|\/ 4|out of 4/);
     const bare = text(
@@ -1185,7 +1185,7 @@ describe('stage 3 blocks', () => {
       ),
     );
     expect(pct).toContain(
-      'September Sep 10 Chemical Formulas Quiz 12/15 · 80% October Oct 5 Plate Tectonics Presentation Proficient + Oct 12 Energy Forms Quiz Missing',
+      'September Sep 10 Chemical Formulas Quiz 12 / 15 · 80% October Oct 5 Plate Tectonics Presentation Proficient + Oct 12 Energy Forms Quiz Missing',
     );
     // Word off still prints a level's proficiency, and a Proficiency class prints no % for a level.
     expect(pct).not.toContain('83%');
@@ -1217,7 +1217,7 @@ describe('stage 3 blocks', () => {
     // A letter class starts with score and percent, no word.
     COURSES[CID].gradingSystem = 'letter';
     expect(ReportBlocks.showDefaults(CID)).toEqual({ percent: true, word: false });
-    expect(text(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({})))).toContain('12/15 · 80%');
+    expect(text(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({})))).toContain('12 / 15 · 80%');
     COURSES[CID].gradingSystem = 'proficiency';
     stub('getAssessments', () => []);
     expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}))).toBe('');

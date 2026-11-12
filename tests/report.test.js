@@ -2503,7 +2503,7 @@ describe('report-points-own-percent', () => {
 
       const byComp = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
       const byDate = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'date' }));
-      expect(byDate).toContain('17/20 · 85%');
+      expect(byDate).toContain('17 / 20 · 85%');
       expect(byComp).toContain('85%');
       expect(byComp).not.toContain('75%');
 
@@ -2556,7 +2556,7 @@ describe('report-points-own-percent', () => {
       seed('both', pieces, scores);
       withLowCompetency(CID, SID);
       expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
-        'Best work: Quiz Q (Oct 1), 17/20 · 85%.',
+        'Best work: Quiz Q (Oct 1), 17 / 20 · 85%.',
       );
       // A Proficiency class ranks by level: the 3+ is the best work.
       seed('proficiency', pieces, scores);
@@ -2571,7 +2571,7 @@ describe('report-points-own-percent', () => {
       withLowCompetency(CID, SID);
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       // Step 4 group 2 #3: the whole piece's mark, the higher of the two.
-      expect(prof).toContain('Best work: Quiz B (Oct 5), 17/20.');
+      expect(prof).toContain('Best work: Quiz B (Oct 5), 17 / 20.');
     });
   });
 });
