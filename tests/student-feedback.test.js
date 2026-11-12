@@ -234,7 +234,6 @@ describe.each(['proficiency', 'letter', 'both'])('Your Result in a %s class', sy
     const { page } = await real(boardsPage(system));
     const p = await openFeedback(page, 'Cell Microscope Lab');
     const big = words(q(page, '.sp-fb-big'));
-    const beside = words(q(page, '.sp-fb-beside'));
     if (system === 'letter') {
       // A Letter class has no proficiency words: the result itself, large.
       expect(p.result.word).toBe('');
