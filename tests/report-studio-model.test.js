@@ -971,11 +971,20 @@ describe('stage 3 blocks', () => {
     expect(t).toContain('Question and Predict Proficient Proficient Same 2');
     expect(t).toContain('Plan Investigations Extending Proficient ↓ Down 1');
     expect(t).toContain('Evaluate Methods — — — 0');
-    // 3.2 and 3.4 both read Proficient: one Highest line names both, in report order, and no Lowest line.
-    expect(t).toContain(
-      'Highest now: Question and Predict and Plan Investigations Proficient. Best work: Quiz (Oct 5), Extending −.',
-    );
+    // 3.2 and 3.4 both read Proficient: with every competency at one word there is no highest or lowest,
+    // so neither line prints (Colin, 2026-11-12: "go with your recommendations on all four").
+    expect(t).not.toContain('Highest now');
     expect(t).not.toContain('Lowest now');
+    // At different words, both print: the highest, then the lowest, each with its work.
+    stub('getSectionProficiency', (cid, sid, id) => ({ q: 2.2, p: 3.4, e: 0 })[id]);
+    const apart = text(
+      ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, S.optionsFor({ block: 'proficiency' })),
+    );
+    expect(apart).toContain('Highest now: Plan Investigations Proficient. Best work: Quiz (Oct 5), Extending −.');
+    expect(apart).toContain(
+      'Lowest now: Question and Predict Developing. Lowest work: Lab Report (Sep 10), Proficient.',
+    );
+    stub('getSectionProficiency', (cid, sid, id) => ({ q: 3.2, p: 3.4, e: 0 })[id]);
     expect(t).not.toMatch(/\d\.\d|\/ 4/);
     expect(html).not.toMatch(/[●○]/);
     // Options: no word, no facts, hide empty rows, lowest first, no overall.
@@ -1007,6 +1016,8 @@ describe('stage 3 blocks', () => {
       ungrouped: [secs[2]],
     }));
     stub('getGroupProficiency', () => 3.3);
+    // Evaluate Methods at Developing, so the folder and it read differently and the lines print.
+    stub('getSectionProficiency', (cid, sid, id) => ({ q: 3.2, p: 3.4, e: 2.2 })[id]);
     const asGraded = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
     expect(asGraded).toContain('Inquiry · 2 competencies Extending Proficient ↓ Down 2');
     expect(asGraded).not.toContain('Inquiry Question and Predict');

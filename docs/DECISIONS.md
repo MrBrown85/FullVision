@@ -16,6 +16,13 @@ Context: Colin printed a Quick Report for a student and saw a level as a number.
 - **Points and Complete/Incomplete work stay as they are** (Colin, 2026-11-12: "points and complete/incomplete should remain as is"): "7/10", "70%", "Complete". A points score is never printed beside a level out of 4.
 - What was saved before is not rewritten: an issued report's fixed copy reprints as it was, and a phone report sent before today shows its letter and % without the figure (the view drops it). Every Progress Report issued before shows as changed since its last issue, because its text changed.
 - `studentLevelText`, `studentMarkText`, `studentGradeText`, `studentGroupGradeText`, `studentLevelChange`, `studentLevelBarPercent` and `studentLevelStep` in `shared/calc.js` only format; no grade is computed differently. `tests/student-facing-proficiency.test.js` holds the student-facing files to them.
+- **Rulings, 2026-11-12 (later).** Colin, on the four questions left open: "go with your recommendations on all four".
+  1. A competency set by hand prints no override reason on anything a student or family reads (the reason is the teacher's note).
+  2. Highest Now and Lowest Now print together or not at all: in a Proficiency or Both class, only when the highest and lowest competencies read different words. With every competency at one word, or only one competency with a level, neither prints, and nor does its Best or Lowest Work. A Letter class is unchanged: Highest Now always, Lowest Now when the lowest prints a different figure.
+  3. Reports issued before 2026-11-12 reprint as they went home, figures and all: an issued copy is a fixed record.
+  4. Every report issued before 2026-11-12 showing "changed since last issue" is accepted.
+- **For Colin's eyes** (flagged in review): a points piece's competency band in Next Steps, Ways to Support at Home and Progress in One Area now reads as the proficiency (it read "2.8 / 4 Proficient"); the points score itself ("7/10", "70%") is unchanged everywhere else. The Proficiency block's Change column reads "Up", "Down" or "Same" (with an arrow) in a Proficiency or Both class, not "+0.3".
+- **Known gap, not fixed here:** a scored piece marked Late shows "Late" on the student page but no Late note on the Quick Report.
 
 ## Handoff review rulings (2026-11-12)
 
