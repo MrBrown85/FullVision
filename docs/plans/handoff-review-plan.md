@@ -470,7 +470,7 @@ D8 and D9 wait for the last wave, so they pin the assessment form work that anot
 
 ### Track E. Organized code
 
-All of Track E waits for the decision to sell to schools (Phase 4), except where a feature PR needs a tidying first. Recommended order, from the map.
+The Nov 12 ruling started Track E with the pieces that do not touch marks (`docs/DECISIONS.md`, "Handoff review rulings (2026-11-12)"). Pieces that do touch marks still wait for the decision to sell to schools, except where a feature PR needs a tidying first. Recommended order, from the map.
 
 **Tidyings in `shared/data.js` that cut false coupling** (each its own PR):
 
@@ -594,33 +594,35 @@ Leave these alone until someone re-maps them.
 
 ## 6. Decisions for Colin
 
+On 2026-11-12 Colin ruled on several of these; see "Handoff review rulings (2026-11-12)" in `docs/DECISIONS.md`. The rows it settles are marked.
+
 The seven open decisions on card cp1, the server change the Nov 2 plan marked "your OK", and what the map raised. Each says what it blocks.
 
-| #   | Decision                                                                                                                                                                 | It blocks                                                      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| 1   | Delete or keep `fullvision-user-inputs.xlsx` and `fullvision-documentation-inventory.xlsx`, and the two `_dev` scripts that build them (with the Apple design rulebook). | The two `_dev` scripts and the rulebook (see the `.xlsx` rule) |
-| 2   | Keep or drop `fv_backup.orphan_student_20261012` and `points_zero_20261016` past this term.                                                                              | Any backup-table migration                                     |
-| 3   | Drop any of the unused server functions. Every candidate was refuted as a mechanical change; each needs its own check against the live database.                         | Nov 2 item 11                                                  |
-| 4   | Staging: a Supabase branch or a small second project.                                                                                                                    | S19-D16, S19-F8, a rehearsed restore                           |
-| 5   | Keep the repo public or make it private.                                                                                                                                 | S19-F3; S19-F2; the held sections of S19-F1                    |
-| 6   | Turn on Sentry performance tracing.                                                                                                                                      | S19-C11 (depends on 7)                                         |
-| 7   | Keep Sentry in the EU and disclose it, or keep error reports in Canada.                                                                                                  | S19-F5, the privacy impact answers in S19-F2                   |
-| 8   | Merge `bootstrap_teacher` and `list_teacher_courses` into one boot call.                                                                                                 | S19-C8                                                         |
-| 9   | Approve the fix for the mass-loss guard that refuses real saves after Delete Assessment.                                                                                 | S19-B3, then B4 and B5                                         |
-| 10  | Send an undone cell once instead of twice.                                                                                                                               | S19-B4, B5                                                     |
-| 11  | Finish the review of `87ed0faa` (S0-F1e).                                                                                                                                | S19-B6                                                         |
-| 12  | Keep `schema.sql` (the map says keep).                                                                                                                                   | Closes S19-A10; the README's `schema.sql` line                 |
-| 13  | Drop the `curriculum_data.js` fallback, accepting that a failed JSON load then shows no courses.                                                                         | S19-A8                                                         |
-| 14  | Move the security headers, then check them with `curl` after the next release.                                                                                           | S19-A9, S19-C5                                                 |
-| 15  | Test-only and "needs Colin" dead code: keep as test seams, or delete with their tests.                                                                                   | S19-A40                                                        |
-| 16  | Does the phone get an Undo button for `undoLastScore`, or does it go with its tests?                                                                                     | Part of S19-A40                                                |
-| 17  | Which criterion level is right when keys are mixed: the desktop's or the phone's? And should the grading order match?                                                    | Sharing that code in Track E                                   |
-| 18  | Retire the April-era saved-copy readers.                                                                                                                                 | S19-B8                                                         |
-| 19  | When to make lint and `tsc` able to fail the build.                                                                                                                      | S19-D15                                                        |
-| 20  | What `*.nsvcs.net` in the content policy is for; the Sentry build credentials; Netlify's Node version; the edge function deploy command.                                 | S19-F1 and F2 final versions                                   |
-| 21  | Phase 4 (ES modules and splits) with the decision to sell to schools.                                                                                                    | Track E                                                        |
-| 22  | Accept or drop each of the five `CLAUDE.md` edits in the S19-A14b draft, and say what has been released.                                                                 | S19-A14b                                                       |
-| 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it.                                                                          | Faster first draw (Nov 2 Phase 2 #2)                           |
+| #   | Decision                                                                                                                                                                                       | It blocks                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 1   | Delete or keep `fullvision-user-inputs.xlsx` and `fullvision-documentation-inventory.xlsx`, and the two `_dev` scripts that build them (with the Apple design rulebook).                       | The two `_dev` scripts and the rulebook (see the `.xlsx` rule) |
+| 2   | Keep or drop `fv_backup.orphan_student_20261012` and `points_zero_20261016` past this term. **Ruled Nov 12: keep.**                                                                            | Any backup-table migration                                     |
+| 3   | Drop any of the unused server functions. Every candidate was refuted as a mechanical change; each needs its own check against the live database. **Ruled Nov 12: none without its own check.** | Nov 2 item 11                                                  |
+| 4   | Staging: a Supabase branch or a small second project. **Ruled Nov 12: held.**                                                                                                                  | S19-D16, S19-F8, a rehearsed restore                           |
+| 5   | Keep the repo public or make it private.                                                                                                                                                       | S19-F3; S19-F2; the held sections of S19-F1                    |
+| 6   | Turn on Sentry performance tracing. **Ruled Nov 12: no.**                                                                                                                                      | S19-C11 (depends on 7)                                         |
+| 7   | Keep Sentry in the EU and disclose it, or keep error reports in Canada.                                                                                                                        | S19-F5, the privacy impact answers in S19-F2                   |
+| 8   | Merge `bootstrap_teacher` and `list_teacher_courses` into one boot call.                                                                                                                       | S19-C8                                                         |
+| 9   | Approve the fix for the mass-loss guard that refuses real saves after Delete Assessment. **Ruled Nov 12: approved once an independent review cannot break it.**                                | S19-B3, then B4 and B5                                         |
+| 10  | Send an undone cell once instead of twice.                                                                                                                                                     | S19-B4, B5                                                     |
+| 11  | Finish the review of `87ed0faa` (S0-F1e).                                                                                                                                                      | S19-B6                                                         |
+| 12  | Keep `schema.sql` (the map says keep). **Ruled Nov 12: keep.**                                                                                                                                 | Closes S19-A10; the README's `schema.sql` line                 |
+| 13  | Drop the `curriculum_data.js` fallback, accepting that a failed JSON load then shows no courses. **Ruled Nov 12: keep.**                                                                       | S19-A8                                                         |
+| 14  | Move the security headers, then check them with `curl` after the next release.                                                                                                                 | S19-A9, S19-C5                                                 |
+| 15  | Test-only and "needs Colin" dead code: keep as test seams, or delete with their tests.                                                                                                         | S19-A40                                                        |
+| 16  | Does the phone get an Undo button for `undoLastScore`, or does it go with its tests?                                                                                                           | Part of S19-A40                                                |
+| 17  | Which criterion level is right when keys are mixed: the desktop's or the phone's? And should the grading order match?                                                                          | Sharing that code in Track E                                   |
+| 18  | Retire the April-era saved-copy readers.                                                                                                                                                       | S19-B8                                                         |
+| 19  | When to make lint and `tsc` able to fail the build.                                                                                                                                            | S19-D15                                                        |
+| 20  | What `*.nsvcs.net` in the content policy is for; the Sentry build credentials; Netlify's Node version; the edge function deploy command.                                                       | S19-F1 and F2 final versions                                   |
+| 21  | Phase 4 (ES modules and splits) with the decision to sell to schools. **Ruled Nov 12: the split goes ahead, safe pieces first.**                                                               | Track E                                                        |
+| 22  | Accept or drop each of the five `CLAUDE.md` edits in the S19-A14b draft, and say what has been released.                                                                                       | S19-A14b                                                       |
+| 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it.                                                                                                | Faster first draw (Nov 2 Phase 2 #2)                           |
 
 ---
 
