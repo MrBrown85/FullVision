@@ -16,7 +16,7 @@ const LAZY = {
     'shared/bank-comment.js', // teacher/competency-wording.js:80
     'shared/bank-sets.js', // teacher/comment-bank.js:1224
     'shared/comment-bank.js', // teacher/comment-bank.js:8244
-    'curriculum_data.js', // shared/data.js:7228
+    'curriculum_data.js', // shared/data-curriculum-index.js:23
     'shared/seed-data.js', // shared/data.js:21400
     // Reports' own scripts, loaded the first time Reports opens (teacher/router.js _onDemand).
     'teacher/report-sheets.js',

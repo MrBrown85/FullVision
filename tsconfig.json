@@ -9,5 +9,12 @@
     "skipLibCheck": true,
     "types": []
   },
-  "files": ["types/globals.d.ts", "shared/html.js", "shared/constants.js", "shared/calc.js", "shared/data.js"]
+  "files": [
+    "types/globals.d.ts",
+    "shared/html.js",
+    "shared/constants.js",
+    "shared/calc.js",
+    "shared/data.js",
+    "shared/data-curriculum-index.js"
+  ]
 }
