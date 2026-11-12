@@ -45,6 +45,7 @@ const FILES = [
   'shared/reporting-term-presets.js',
   'shared/data-utilities.js',
   'shared/data.js',
+  'shared/data-demo.js',
   'shared/data-curriculum-index.js',
   'shared/calc.js',
   'shared/rubric-draft.js',

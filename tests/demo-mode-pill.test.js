@@ -57,7 +57,7 @@ describe('Demo Mode pill', () => {
 
   it('leaves Demo Mode before the sign-in page, signing out a live session', () => {
     expect(typeof window.leaveDemoMode).toBe('function');
-    var data = readFileSync(resolve(root, 'shared/data.js'), 'utf8');
+    var data = readFileSync(resolve(root, 'shared/data-demo.js'), 'utf8');
     expect(data).toContain('await signOut({ force: !!opts.force, redirect: href })');
     expect(window.leaveDemoUnsentText(1)).toBe(
       '1 change has not reached the server. Leaving Demo Mode signs out and deletes it.',
