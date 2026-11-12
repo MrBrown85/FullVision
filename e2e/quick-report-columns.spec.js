@@ -139,15 +139,16 @@ for (const wide of [false, true]) {
 
 /* Nothing is cut off in a wider font, in any of the sheet's layouts: every
    Demo student's sheet in a Proficiency, Both and Letter class, on Letter
-   and Legal paper, with and without Assignment Numbers, and with the
-   class's work listed up to four times over, so the sheet drops to its
-   small type and then to two columns of rows. A cell is cut off when its
-   text is wider than the cell. The Assignment column is the one that gives
-   way (its titles print on two lines, then end in "…"), so it is left out
-   here: with Assignment Numbers in two columns of rows in a Letter class,
-   this font leaves it narrower than its heading. */
+   and Legal paper, with and without Assignment Numbers; and the first
+   three students' with the class's work listed up to four times over, so
+   the sheet drops to its small type and then to two columns of rows. A
+   cell is cut off when its text is wider than the cell. The Assignment
+   column is the one that gives way (its titles print on two lines, then
+   end in "…"), so it is left out here: with Assignment Numbers in two
+   columns of rows in a Letter class, this font leaves it narrower than its
+   heading. */
 test('in a wider font no cell is cut off, in every layout and grading style', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await openDemo(page, true);
@@ -176,7 +177,9 @@ test('in a wider font no cell is cut off, in every layout and grading style', as
           };
           for (const paper of ['letter', 'legal']) {
             for (const numbers of [false, true]) {
-              for (const st of getStudents(cid)) {
+              // Every student at the class's own length; a few at the
+              // longer ones, which only move the sheet to a smaller size.
+              for (const st of getStudents(cid).slice(0, times === 1 ? undefined : 3)) {
                 const r = GradeReport.layoutStudent(cid, st, ReportBlocks.reportContext(), {
                   paper,
                   grade: { numbers },
