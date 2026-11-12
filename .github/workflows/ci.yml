@@ -75,6 +75,21 @@ jobs:
       - name: Check innerHTML sites
         run: npm run audit:html
 
+      # Type checks on the files that start with // @ts-check (the list is in
+      # tsconfig.json). JSDoc only: no TypeScript files, no build step.
+      # Reports only (continue-on-error) until Colin turns it on as a gate.
+      - name: Check types
+        continue-on-error: true
+        run: npm run typecheck
+
+      # ESLint's no-undef and no-unused-vars, both warnings (eslint.config.mjs).
+      # It reports and never fails the job.
+      - name: Lint (warnings only)
+        continue-on-error: true
+        run: |
+          npx eslint . | tee eslint.txt
+          { echo '## Lint'; echo; tail -n 2 eslint.txt; } >> "$GITHUB_STEP_SUMMARY"
+
       # Fails when the client calls an RPC the live database doesn't have, or
       # a file in migrations/ was never applied. Skipped until the read-only
       # role's connection string is saved as a secret (see

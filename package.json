@@ -21,14 +21,19 @@
     "format": "prettier --write '**/*.{js,css,html,json,md}'",
     "format:check": "prettier --check '**/*.{js,css,html,json,md}'",
     "format:staged": "bash scripts/format-staged.sh",
-    "audit:html": "node scripts/audit-innerhtml.mjs --check"
+    "audit:html": "node scripts/audit-innerhtml.mjs --check",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
     "linkedom": "^0.18.12",
     "prettier": "^3.2.0",
+    "typescript": "7.0.2",
     "vitest": "^5.0.5"
   }
 }

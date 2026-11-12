@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2022",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "strict": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "files": ["types/globals.d.ts", "shared/html.js", "shared/constants.js", "shared/calc.js", "shared/data.js"]
+}
