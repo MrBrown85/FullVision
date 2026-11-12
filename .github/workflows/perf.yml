@@ -1,0 +1,64 @@
+name: Speed
+
+# Records load time and click response on a class of 30 students by 60
+# assessments (e2e-perf/speed.spec.js). It never fails a merge: the numbers
+# go to the run's summary and an artifact. Runs after each merge to main and
+# by hand (Actions > Speed > Run workflow).
+on:
+  push:
+    branches: [main]
+    paths: ['teacher/**', 'teacher-mobile/**', 'shared/**', 's/**', 'e2e-perf/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  speed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright's browser
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: |
+          if ! timeout 120 npx playwright install --with-deps chromium; then
+            npx playwright install chromium
+          fi
+
+      # PERF_CPU=4: a quarter-speed CPU, near a school Chromebook.
+      - name: Record speed
+        env:
+          PERF_CPU: 4
+        run: npx playwright test --config=playwright.perf.config.js
+
+      - name: Keep the numbers
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: speed-${{ github.sha }}
+          path: test-results/perf/
+          retention-days: 90
