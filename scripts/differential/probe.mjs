@@ -1,4 +1,4 @@
-/* global KeyboardEvent, document, getActiveCourse, getAssessments, getCategories, getCourseConfig, getRubrics, getSections, getStudents, getWithdrawnStudents, indexedDB, isDemoMode, loadCourses, window -- page.evaluate code runs in the app page. */
+/* global GradeState, KeyboardEvent, document, getActiveCourse, getAssessments, getCategories, getCourseConfig, getRubrics, getSections, getStudents, getWithdrawnStudents, indexedDB, isDemoMode, loadCourses, window -- page.evaluate code runs in the app page. */
 /**
  * What a differential run reads from a page: the device's saved copy, the
  * calls the fake server was sent, the state the next action is picked from,
@@ -157,6 +157,18 @@ export function readView(page) {
       categories: (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, weight: c.weight })),
       sections: (getSections(cid) || []).map(s => s.id),
       studentPage: !!(getCourseConfig(cid) || {}).student_page_enabled,
+      // How many grades wait as drafts on each piece (GradeState.stateOf).
+      drafts:
+        typeof GradeState === 'undefined'
+          ? {}
+          : Object.fromEntries(
+              getAssessments(cid)
+                .map(a => [
+                  a.id,
+                  getStudents(cid).filter(s => GradeState.stateOf(cid, s.id, a.id) === GradeState.DRAFT).length,
+                ])
+                .filter(([, n]) => n > 0),
+            ),
       demo: typeof isDemoMode === 'function' && isDemoMode(),
     };
   });
@@ -266,21 +278,32 @@ export async function readScreens(page, cid, who) {
     await go(page, '/student?id=' + who.student + '&course=' + cid);
     out.student = await layoutText(page);
   }
+  // Each preview student's Assignments, and My Learning as See What They'd
+  // See opens it (cm-student-page.js): the skills' levels, hand-set ones
+  // included, as the student would see them.
+  const views = [
+    ['', null],
+    [' learning', { tab: 'learning', learning: true }],
+  ];
   for (const [i, sid] of (who.preview || []).entries()) {
-    const opened = await page.evaluate(
-      ([cid, sid]) => window.PreviewStudent && window.PreviewStudent.open(cid, sid),
-      [cid, sid],
-    );
-    if (opened === false) {
-      out['preview' + (i + 1)] = '(Preview as Student did not open)';
-      continue;
+    for (const [suffix, opts] of views) {
+      const name = 'preview' + (i + 1) + suffix;
+      const opened = await page.evaluate(
+        ([cid, sid, opts]) =>
+          window.PreviewStudent && window.PreviewStudent.open(cid, sid, null, null, opts || undefined),
+        [cid, sid, opts],
+      );
+      if (opened === false) {
+        out[name] = '(Preview as Student did not open)';
+        continue;
+      }
+      await tick(page);
+      out[name] = await page.evaluate(() => {
+        const el = document.getElementById('preview-student');
+        return el ? el.innerText : '(no preview)';
+      });
+      await page.evaluate(() => window.PreviewStudent.close());
     }
-    await tick(page);
-    out['preview' + (i + 1)] = await page.evaluate(() => {
-      const el = document.getElementById('preview-student');
-      return el ? el.innerText : '(no preview)';
-    });
-    await page.evaluate(() => window.PreviewStudent.close());
   }
   await go(page, '/reports?course=' + cid);
   out.quickReport = await page.evaluate(() => {

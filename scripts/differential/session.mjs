@@ -141,7 +141,10 @@ export async function openTab(s, path, viewport) {
   page.on('pageerror', e => s.errors.push(String(e && e.message)));
   s.pages.push(page);
   if (s.mode === 'demo' && s.pages.length === 1) {
-    await page.goto('/login.html?demo=1');
+    // As the front page's Try Demo Mode link starts it (login-auth.js
+    // markStudentDemo): the student page on, Return Grades When I Return
+    // Them, Send Work and My Learning, so Draft and Returned are in play.
+    await page.goto('/login.html?demo=1&student=1');
     for (let i = 0; i < 100 && !/\/(dashboard|gradebook|assignments)/.test(page.url()); i++) {
       await runClock(s.context, 100);
       await page.waitForTimeout(10);

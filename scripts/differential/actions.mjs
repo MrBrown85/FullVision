@@ -437,9 +437,11 @@ export const ACTIONS = [
     weight: 4,
     modes: ['demo'],
     pick(rng, view) {
-      const a = rng.pick(view.assessments);
+      // Mostly a piece with drafts waiting, so a Return returns something.
+      const waiting = view.assessments.filter(a => view.drafts && view.drafts[a.id]);
+      const a = waiting.length && rng.chance(0.8) ? rng.pick(waiting) : rng.pick(view.assessments);
       if (!a) return null;
-      return { aid: a.id, all: rng.chance(0.4), sid: rng.pick(view.students).id };
+      return { aid: a.id, all: rng.chance(0.6), sid: rng.pick(view.students).id };
     },
     // Return for one student, or Return for all on the piece.
     run: (page, a) =>

@@ -46,7 +46,7 @@ It also compares what each action answered and any page errors.
 ### The classes
 
 - Signed in: the speed recorder's class (`e2e-perf/speed.spec.js`, 30 students by 60 pieces, every cell scored), with server-shaped ids, a rubric, two categories, and points, Complete/Incomplete, rubric, pair, group and two-competency pieces among the 60 (`scripts/differential/fixtures.mjs`). The last ten pieces start blank. A second, small class is there to switch to.
-- Demo Mode: the Demo class, from `login.html?demo=1`.
+- Demo Mode: the Demo class, from `login.html?demo=1&student=1`, as the front page's Try Demo Mode link starts it: the student page on, Return Grades When I Return Them, Send Work and My Learning, so drafts, Return and revisions are in play.
 
 ### Making A and B the same
 
