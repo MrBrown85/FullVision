@@ -1802,8 +1802,9 @@ window.ReportBlocks = (function () {
 
   /* ── Assignment Grades ──────────────────────────────────────────
      One row per assessment: the date, the full title, and the marks the
-     teacher picks under Show: the Score (12/15, or 3.3 / 4 for work scored
-     on proficiency), the Percent and the Proficiency Word. Percent and the
+     teacher picks under Show: the Score (12 / 15; work scored on
+     proficiency as its proficiency, or 3.3 / 4 in a Letter class; blank
+     with no mark yet), the Percent and the Proficiency Word. Percent and the
      word start from the class grading setting (showDefaults). Organized by
      Category, by Date (a heading per month) or by Competency (a heading per
      competency over its latest few pieces of work, each row the mark on
@@ -1822,10 +1823,15 @@ window.ReportBlocks = (function () {
      there is none). cv: calc.js assessmentCellValue. level: the mark on
      one competency instead of the whole assessment, for student sid;
      points work keeps its own % (_ownPercent). A whole piece prints the %
-     its category counts it as (cv.percentText). */
+     its category counts it as (cv.percentText). As the Quick Report
+     prints them (DECISIONS, "Student-facing levels are proficiencies",
+     Assignment Grades, 2026-11-12): work with no mark yet is blank, no
+     dash; points read "7 / 10"; and in a Proficiency or Both class points
+     carry no proficiency word, which was only the band the points fall
+     in. A Letter class keeps the word beside points when Word is on. */
   function _rowMarks(cid, a, cv, level, sid) {
     if (level != null) {
-      if (!(level > 0)) return { score: '—', percent: '', word: '' };
+      if (!(level > 0)) return { score: '', percent: '', word: '' };
       const own = _ownPercent(cid, sid, a);
       if (courseGradeMode(cid) !== 'letter')
         return _levelMarks(cid, level, own || formatLevelAs(cid, level, 'percent'));
@@ -1843,9 +1849,9 @@ window.ReportBlocks = (function () {
     if (cv.kind === 'points') {
       const max = Number(a.maxPoints) || 100;
       return {
-        score: formatPoints(cv.value) + '/' + formatPoints(max),
+        score: formatPoints(cv.value) + ' / ' + formatPoints(max),
         percent: formatPointsPercent(cv.value, max),
-        word: _profWord(cv.level),
+        word: courseGradeMode(cid) === 'letter' ? _profWord(cv.level) : '',
       };
     }
     if (cv.kind === 'level' && cv.value > 0) {
@@ -1856,7 +1862,7 @@ window.ReportBlocks = (function () {
         word: _profWord(cv.value),
       };
     }
-    return { score: '\u2014', percent: '', word: '' };
+    return { score: '', percent: '', word: '' };
   }
   /* A mark on a level in a Proficiency or Both class, as a student reads
      it (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12):
