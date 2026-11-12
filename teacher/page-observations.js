@@ -46,7 +46,6 @@ window.PageObservations = (function () {
   var _focusCtxOpen = false;
   var _focusFocusables = null;
   var _focusLastActiveEl = null;
-  var _motion = null;
 
   var SEARCH_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
@@ -811,17 +810,6 @@ window.PageObservations = (function () {
      FOCUS CARD — click-to-expand inline editor
      ══════════════════════════════════════════════════════════ */
 
-  async function _ensureMotion() {
-    if (_motion) return _motion;
-    try {
-      _motion = await import('https://esm.sh/motion@10.18.0');
-    } catch (err) {
-      console.warn('Motion One unavailable; falling back to CSS transitions', err);
-      _motion = { animate: null };
-    }
-    return _motion;
-  }
-
   function _focusFindOb(sid, obId) {
     var byStudent = getQuickObs(activeCourse) || {};
     var arr = byStudent[sid] || [];
@@ -997,55 +985,37 @@ window.PageObservations = (function () {
     ta.style.height = Math.min(280, Math.max(104, ta.scrollHeight)) + 'px';
   }
 
-  async function _animateFocusOpen() {
+  /* One fade in and out, by CSS (observations.css, "FOCUS CARD"). It used
+     to be drawn by Motion One, imported from esm.sh on the first open: the
+     card showed at once, then faded in again from nothing when the library
+     arrived, a double flash on the first edit of a visit. */
+  function _animateFocusOpen() {
     if (!_focusBackdropEl || !_focusEl) return;
-    // Add `.open` so the underlying resting state is fully visible — Motion One
-    // and the CSS fallback both end up here; Motion One simply paints a spring
-    // transition on top before settling to the underlying style.
+    // Take the closed look first, so .open fades from it.
+    void _focusBackdropEl.offsetWidth;
     _focusBackdropEl.classList.add('open');
     _focusEl.classList.add('open');
-    var m = await _ensureMotion();
-    if (!_focusBackdropEl || !_focusEl || !m.animate) return;
-    // Suppress the CSS transition so Motion One owns the timing.
-    _focusBackdropEl.style.transition = 'none';
-    _focusEl.style.transition = 'none';
-    m.animate(_focusBackdropEl, { opacity: [0, 1] }, { duration: 0.2 });
-    m.animate(
-      _focusEl,
-      { opacity: [0, 1], transform: ['scale(0.96)', 'scale(1)'] },
-      { type: 'spring', stiffness: 300, damping: 30 },
-    );
   }
 
-  async function _animateFocusClose(done) {
+  function _animateFocusClose(done) {
     var bd = _focusBackdropEl;
     var card = _focusEl;
     if (!bd || !card) {
       done();
       return;
     }
-    var m = await _ensureMotion();
-    if (!bd || !card) {
-      done();
-      return;
-    }
-    // Remove `.open` so the underlying resting state is hidden; the animation
-    // (Motion One or CSS) interpolates from current → that resting state.
     bd.classList.remove('open');
     card.classList.remove('open');
-    if (!m.animate) {
-      setTimeout(done, 200);
-      return;
-    }
-    bd.style.transition = 'none';
-    card.style.transition = 'none';
-    m.animate(bd, { opacity: [1, 0] }, { duration: 0.15 });
-    var anim = m.animate(card, { opacity: [1, 0], transform: ['scale(1)', 'scale(0.96)'] }, { duration: 0.15 });
-    if (anim && anim.finished && typeof anim.finished.then === 'function') {
-      anim.finished.then(done, done);
-    } else {
-      setTimeout(done, 160);
-    }
+    var finished = false;
+    var finish = function () {
+      if (finished) return;
+      finished = true;
+      done();
+    };
+    card.addEventListener('transitionend', function (e) {
+      if (e.target === card && e.propertyName === 'opacity') finish();
+    });
+    setTimeout(finish, 200);
   }
 
   /* The same edit window over another page (the student page's
