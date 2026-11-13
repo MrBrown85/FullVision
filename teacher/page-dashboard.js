@@ -409,7 +409,7 @@ window.PageDashboard = (function () {
     var flags = getFlags(cid);
     var list = _shownStudents(cid, flags);
     _toolbar(list.students);
-    var before = _slideCards ? _cardsBefore() : null;
+    var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: dash-overview, dash-insights and dash-student-cards escape every name, title and label.
     host.innerHTML = _studentsHtml(
@@ -421,7 +421,7 @@ window.PageDashboard = (function () {
       getAssessments(cid),
       getScores(cid),
     );
-    if (before) _slideCardsFrom(before);
+    if (before) StudentCards.slideFrom(before);
     if (_litKey && !naComp) _setLit(_litKey);
     else _litKey = null;
     var sortSelect = host.querySelector('.dash-sort-select');
