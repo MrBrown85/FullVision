@@ -48,6 +48,7 @@ const FILES = [
   'shared/data-learning-map.js',
   'shared/data-categories.js',
   'shared/data-rubrics.js',
+  'shared/data-assessments.js',
   'shared/data-observations.js',
   'shared/data-term-ratings.js',
   'shared/data-student-records.js',

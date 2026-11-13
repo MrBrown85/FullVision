@@ -237,6 +237,7 @@ load('shared/data.js');
 load('shared/data-learning-map.js');
 load('shared/data-categories.js');
 load('shared/data-rubrics.js');
+load('shared/data-assessments.js');
 load('shared/data-observations.js');
 load('shared/data-term-ratings.js');
 load('shared/data-student-records.js');
