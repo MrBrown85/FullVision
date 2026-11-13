@@ -932,13 +932,18 @@ var CmStudentPage = (function () {
   /* ── The panel ─────────────────────────────────────────────── */
 
   // The panel's HTML for a class: nothing for a class without the tab.
-  function render(cid) {
-    // A preview that is open draws again with the class (rows that loaded,
-    // a change); on another class, or one whose page is off, it closes.
+  // A preview that is open draws again with the class (rows that loaded,
+  // a change); on another class, or one whose page is off, it closes. Class
+  // Settings asks this on every draw, on this tab or another.
+  function followPreview(cid) {
     if (typeof PreviewStudent !== 'undefined' && PreviewStudent.isOpen()) {
       if (isShown(cid) && _settings(cid).student_page === true) PreviewStudent.refresh(cid);
       else PreviewStudent.close();
     }
+  }
+
+  function render(cid) {
+    followPreview(cid);
     if (!isShown(cid)) return '';
     var on = _settings(cid).student_page;
     return (
@@ -1051,6 +1056,7 @@ var CmStudentPage = (function () {
   }
 
   return {
+    followPreview: followPreview,
     isShown: isShown,
     render: render,
     workSettings: workSettings,

@@ -35,10 +35,6 @@ window.DashClassManager = (function () {
     _onRender = opts.onRender;
     _onCourseChange = opts.onCourseChange;
   }
-  function _setActiveCourse(cid) {
-    _activeCourse = cid;
-  }
-
   var CM_COLORS = [
     '#dc2626',
     '#ea580c',
@@ -3684,19 +3680,50 @@ window.DashClassManager = (function () {
     return html;
   }
 
+  /* The header, the tabs and the open tab's panel, the only panel built.
+     What a closed tab did besides drawing still happens: questionnaires and
+     categories are asked for, and an open student preview follows the class. */
   function renderCmDetail(cid) {
-    var course = COURSES[cid];
-    var cc = getCourseConfig(cid);
-    var lm = getLearningMap(cid);
     var studentCount = getStudents(cid).length;
     var assessCount = getAssessments(cid).length;
     var tagCount = getAllTags(cid).length;
-    var panels = {};
+    _cmLoadGuardians(cid);
+    var qn = typeof CmQuestionnaires !== 'undefined';
+    var sp = _cmTabShown('student-page', cid);
+    var build = {
+      details: _cmDetailsPanel,
+      students: _cmStudentsPanel,
+      questionnaires: qn && CmQuestionnaires.render,
+      'student-page': sp && CmStudentPage.render,
+      grading: _cmRenderGradingTab,
+      terms: _cmTermsPanel,
+      competencies: _cmCompetenciesPanel,
+    };
+    var tab = build[cmTab] ? cmTab : 'details';
+    if (qn && tab !== 'questionnaires') CmQuestionnaires.prepare(cid);
+    if (sp && tab !== 'student-page') CmStudentPage.followPreview(cid);
+    if (tab !== 'grading') _cmCatPrepare(cid, _cmCatState(cid));
+    var panel = build[tab](cid);
+    return (
+      '<div class="cm-detail-inner cm-tabbed' +
+      (tab === 'students' ? ' cm-tabbed-wide' : '') +
+      '">' +
+      _cmRenderHeader(cid, studentCount, assessCount, tagCount) +
+      _cmRenderTabs(tab, studentCount, tagCount) +
+      '<div class="cm-tab-panel cm-tab-panel-' +
+      tab +
+      '" role="tabpanel" id="cm-tabpanel" aria-labelledby="cm-tab-' +
+      tab +
+      '">' +
+      panel +
+      '</div>' +
+      '</div>'
+    );
+  }
 
-    var html = '';
-
-    // Details tab: Class Details
-    html +=
+  function _cmDetailsPanel(cid) {
+    var course = COURSES[cid];
+    return (
       '<div class="cm-section">' +
       '<div class="cm-section-title">Class Details</div>' +
       '<div class="cm-details-row">' +
@@ -3732,16 +3759,15 @@ window.DashClassManager = (function () {
       '</textarea>' +
       '<div class="cm-hint">Optional. Printed reports with a Score Distribution block show it.</div>' +
       '</div>' +
-      '</div>';
-    panels.details = html;
-    html = '';
+      '</div>'
+    );
+  }
 
-    // Students tab: a toolbar, the roster edited in place, then Withdrawn
+  // Students tab: a toolbar (for an empty class, where the class list goes:
+  // cmImportEmptyHtml), the roster edited in place, then Withdrawn.
+  function _cmStudentsPanel(cid) {
     var students = getStudents(cid);
-    _cmLoadGuardians(cid);
-    // An empty class shows where the class list goes (cmImportEmptyHtml)
-    // in place of the toolbar.
-    html +=
+    var html =
       _cmImportDoneHtml(cid) +
       (students.length
         ? '<div class="cm-roster-bar">' +
@@ -3846,25 +3872,18 @@ window.DashClassManager = (function () {
       '</div>' +
       rosterHtml +
       renderWithdrawnList(cid);
-    panels.students = html;
-    html = '';
+    return html;
+  }
 
-    // Questionnaires tab (teacher/cm-questionnaires.js)
-    if (typeof CmQuestionnaires !== 'undefined') panels.questionnaires = CmQuestionnaires.render(cid);
+  function _cmTermsPanel() {
+    return '<div class="cm-section">' + _cmRenderReportingTermsField(cmSelectedCourse) + '</div>';
+  }
 
-    // Student Page tab (teacher/cm-student-page.js), built only where shown
-    if (_cmTabShown('student-page', cid)) panels['student-page'] = CmStudentPage.render(cid);
-
-    // Grading tab
-    panels.grading = _cmRenderGradingTab(cid);
-
-    // Reporting Terms tab
-    panels.terms = '<div class="cm-section">' + _cmRenderReportingTermsField(cmSelectedCourse) + '</div>';
-    html = '';
-
-    // Competencies tab: a toolbar and the competencies, beside the BC
-    // Curriculum link and the subjects.
-    html += '<div class="cm-section cm-comp-side-card">' + '<h2 class="cm-grade-title">Subjects</h2>';
+  // Competencies tab: a toolbar and the list, beside the curriculum and subjects.
+  function _cmCompetenciesPanel(cid) {
+    var course = COURSES[cid];
+    var lm = getLearningMap(cid);
+    var html = '<div class="cm-section cm-comp-side-card">' + '<h2 class="cm-grade-title">Subjects</h2>';
     (lm.subjects || []).forEach(function (sub) {
       html +=
         '<div class="cm-subject-row">' +
@@ -4094,31 +4113,14 @@ window.DashClassManager = (function () {
     }
     html += '</div>';
     // Select mode is the list alone.
-    panels.competencies = cmCompSelect
+    return cmCompSelect
       ? '<div class="cm-comp-layout cm-comp-selecting"><div class="cm-comp-main">' + compHtml + '</div></div>'
       : '<div class="cm-comp-layout"><div class="cm-comp-main">' +
-        compHtml +
-        '</div><div class="cm-comp-side">' +
-        html +
-        subjectsHtml +
-        '</div></div>';
-
-    var tab = panels[cmTab] != null ? cmTab : 'details';
-    return (
-      '<div class="cm-detail-inner cm-tabbed' +
-      (tab === 'students' ? ' cm-tabbed-wide' : '') +
-      '">' +
-      _cmRenderHeader(cid, studentCount, assessCount, tagCount) +
-      _cmRenderTabs(tab, studentCount, tagCount) +
-      '<div class="cm-tab-panel cm-tab-panel-' +
-      tab +
-      '" role="tabpanel" id="cm-tabpanel" aria-labelledby="cm-tab-' +
-      tab +
-      '">' +
-      panels[tab] +
-      '</div>' +
-      '</div>'
-    );
+          compHtml +
+          '</div><div class="cm-comp-side">' +
+          html +
+          subjectsHtml +
+          '</div></div>';
   }
 
   /* \u2500\u2500 Class header and tabs \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -6413,7 +6415,6 @@ window.DashClassManager = (function () {
     if (field === 'name' || field === 'block') _cmRefreshSidebar();
   }
 
-  // T-UI-02 helpers ──────────────────────────────────────────────────
   // Default grading_system by grade level: 8–9 → proficiency, 10–12 → letter.
   // Every new class defaults to Mean (_cmDefaultCalcMethod).
   // Falls back to proficiency when the grade isn't a number we recognize.
@@ -6941,25 +6942,28 @@ window.DashClassManager = (function () {
     if (saveEl) saveEl.disabled = !_cmCatCanSave(cid);
   }
 
-  function _cmRenderCategoriesField(cid) {
-    if (!cid) return '';
-    var st = _cmCatState(cid);
-    // Cached categories are read now, so opening Class Settings draws it
-    // once; a server's answer redraws it when it comes.
+  /* On every draw, any tab: cached categories are read now and the server's
+     asked for (its answer redraws). Discarded with a save's answer outstanding
+     and no connection then: the server's list is read now. */
+  function _cmCatPrepare(cid, st) {
+    if (!cid) return;
     if (!st.loaded && !st.loading && _cmCatsLocalOnly()) _cmCatFillLocal(cid, st);
     if (!st.loaded && !st.loading)
       setTimeout(function () {
         _cmLoadCategories(cid);
       }, 0);
-    // Discarded with a save's answer outstanding and no connection then:
-    // the server's list is read now.
     if (st.loaded && st.followServer && !st.dirty) {
       st.followServer = false;
       setTimeout(function () {
         _cmCatFollowServer(cid);
       }, 0);
     }
+  }
 
+  function _cmRenderCategoriesField(cid) {
+    if (!cid) return '';
+    var st = _cmCatState(cid);
+    _cmCatPrepare(cid, st);
     var rows = st.rows || [];
     var html =
       '<div class="cm-field cm-cat-field">' +
@@ -10560,12 +10564,8 @@ window.DashClassManager = (function () {
     _cmStdSave(entry);
   }
 
-  // Updates the user-facing tag.code (e.g. "RD1", "ENG10A") for a standard.
-  // Pre-V2 this used to rename the section/tag local IDs, fanning out updates
-  // to assessment.tagIds and score.tagId references; post-V2 those IDs are
-  // server-owned UUIDs that the database authoritatively holds, and the
-  // user-visible code is its own column. This implementation just updates
-  // tag.code locally; saveLearningMap sends the changed tag.
+  // A competency's code (e.g. "RD1", "ENG10A") is its own column, apart from
+  // its id; saveLearningMap sends the changed tag.
   function _cmCleanCode(val) {
     return val
       .trim()
