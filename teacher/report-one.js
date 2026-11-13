@@ -446,7 +446,9 @@ window.ReportOne = (function () {
       })
       .concat(d.options || []);
     var out = defs.map(function (o) {
-      var def = o.def === 'auto' ? _auto(key, o.key, cid) : o.def;
+      // 'auto' on a switch means the class's grading style decides; on a
+      // choice it is one of the choices (Rows: As Graded).
+      var def = o.def === 'auto' && !o.choices ? _auto(key, o.key, cid) : o.def;
       var value = saved[o.key] != null ? saved[o.key] : def;
       var name = (o.labelIn && o.labelIn[mode]) || o.label;
       if (o.choices)
@@ -1000,6 +1002,24 @@ window.ReportOne = (function () {
     var fb = null;
     if (m.feedback.rubrics || m.feedback.comments || m.feedback.observations) {
       var lo = _listOpts(m, sid);
+      // A card carries its row's number when the Assessments list prints
+      // numbered, so a reader can find the card from the list.
+      var numbered = [];
+      if (
+        lo.numbers &&
+        cells.some(function (c) {
+          return c.key === 'assessments';
+        })
+      ) {
+        numbered = G()
+          .rows(cid, student, lo)
+          .filter(function (r) {
+            return !lo.omit[r.id];
+          });
+        numbered.forEach(function (r, i) {
+          r.n = i + 1;
+        });
+      }
       removedOf(m, 'fb', sid).forEach(function (id) {
         lo.omit[id] = true;
       });
@@ -1012,12 +1032,12 @@ window.ReportOne = (function () {
           comments: m.feedback.comments,
           observations: m.feedback.observations,
           termComment: false,
-          numbers: false,
+          numbers: numbered.length > 0,
           order: lo.order,
           name: lo.name,
           omit: lo.omit,
         },
-        [],
+        numbered,
         stage,
         H,
       );

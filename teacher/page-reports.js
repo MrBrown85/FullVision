@@ -722,7 +722,8 @@ window.PageReports = (function () {
     // The canvas pads 24px a side; two pages sit 22px apart.
     var two = (canvasWidth - 48 - 22) / (2 * sheetW);
     if (two >= 0.75) return { zoom: Math.round(Math.min(1, two) * 1000) / 1000, stacked: false };
-    var one = Math.min(1, Math.max(0.5, (canvasWidth - 48) / sheetW));
+    // Down to a phone's width (390 leaves 342 for the page), so the page is never cut off.
+    var one = Math.min(1, Math.max(0.3, (canvasWidth - 48) / sheetW));
     return { zoom: Math.round(one * 1000) / 1000, stacked: true };
   }
 

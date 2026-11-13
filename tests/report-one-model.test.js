@@ -171,6 +171,14 @@ describe('options for the panel', () => {
     expect(opts.find(o => o.key === 'titles')).toMatchObject({ kind: 'toggle', value: true });
   });
 
+  it('Proficiency’s Rows starts on As Graded, one of its choices, until the teacher picks another', () => {
+    const rows = R.optionsFor(CARD(), 'proficiency', 'c1').find(o => o.key === 'rows');
+    expect(rows.value).toBe('auto');
+    expect(rows.choices.map(c => c.v)).toContain(rows.value);
+    const picked = R.optionsFor(R.setOption(CARD(), 'proficiency', 'rows', 'each'), 'proficiency', 'c1');
+    expect(picked.find(o => o.key === 'rows').value).toBe('each');
+  });
+
   it('the comment has its lines; the Assessments part its own choices', () => {
     const m = R.setOption(CARD(), 'teacher-narrative', 'lines', 6);
     expect(R.optionsFor(m, 'teacher-narrative', 'c1').find(o => o.kind === 'lines')).toMatchObject({ value: 6 });
