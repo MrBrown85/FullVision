@@ -1,7 +1,12 @@
 /**
  * Speed recorder: load time and click response on a class of 30 students by
- * 60 assessments, every cell scored. It records numbers; it never fails on
- * them. A test fails only when a page does not draw at all.
+ * 60 assessments, every cell scored, and (the "Work in" rows) on Demo Mode's
+ * class with its student page on and about 620 pieces of student work in, as
+ * History 12 was on Nov 13, 2026, when filed scans made every page that
+ * shows work slow and no test had a class like it. It records numbers; it
+ * never fails on them. A test fails only when a page does not draw at all.
+ * What does fail on a class like that is tests/speed-guard.test.js, which
+ * counts work instead of timing it.
  *
  * Run: npx playwright test --config=playwright.perf.config.js
  * Numbers: printed as a table, attached to the report, and written to
@@ -130,7 +135,7 @@ test.afterAll(() => {
   if (process.env.GITHUB_STEP_SUMMARY && rows.length) {
     const keys = [...new Set(rows.flatMap(Object.keys))];
     const md =
-      '## Speed (30 students x 60 assessments)\n\n| ' +
+      '## Speed (30 students x 60 assessments; "Work in": Demo Mode with 620 pieces of work)\n\n| ' +
       keys.join(' | ') +
       ' |\n|' +
       keys.map(() => ' --- ').join('|') +
@@ -195,6 +200,139 @@ test('Class Management', async ({ page }, testInfo) => {
     openLongestEventMs: open.longestEventMs,
     tabMs: tab.clickToDrawnMs,
     tabLongestEventMs: tab.longestEventMs,
+  });
+});
+
+/* Demo Mode's class in History 12's state: the student page and Send Work
+   on, every piece taking photos, and about 620 pieces of work in with two
+   pages each, spread over every piece. Demo Mode, because the signed-in fake holds no student work. */
+async function seedWorkClass(page) {
+  await watchInputs(page);
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 20000 });
+  await page.waitForFunction(() => {
+    const cid = typeof getActiveCourse === 'function' && getActiveCourse();
+    return !!cid && getAssessments(cid).some(a => a.id === 'sci8a1');
+  });
+  const at = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    setStudentPageSwitch(cid, true, 'on_return');
+    const work = getCourseSubmissions(cid);
+    const pieces = getAssessments(cid);
+    const students = getStudents(cid);
+    work.course.send_work = true;
+    work.assessments = pieces.map(a => ({ id: a.id, students_send: 'photos', after_due: 'stop' }));
+    const subs = [];
+    // Three students in five on every piece: about 620 pieces of work.
+    pieces.forEach((a, p) =>
+      students.forEach((s, i) => {
+        if ((i * 3 + p) % 5 >= 3) return;
+        const k = subs.length;
+        const file = p => ({
+          id: 'pf' + k + '-' + p,
+          page: p,
+          path: 'lab-p' + p + '.jpg',
+          thumb_path: 'lab-p' + p + '-thumb.jpg',
+          sha256: 'h' + k + p,
+          width: 1546,
+          height: 2000,
+          rotation: 0,
+          added_by: 'teacher',
+        });
+        subs.push({
+          id: 'ps' + k,
+          assessment_id: a.id,
+          enrollment_id: s.id,
+          version: 1,
+          state: 'sent',
+          sent_by: 'teacher',
+          on_paper: false,
+          is_late: false,
+          note: null,
+          sent_at: '2026-11-13T19:00:00Z',
+          created_at: '2026-11-13T19:00:00Z',
+          files: [file(1), file(2)],
+        });
+      }),
+    );
+    work.submissions = subs;
+    saveDemoStudentWork(cid, work);
+    return { students: students.length, pieces: pieces.length, work: subs.length };
+  });
+  const rate = Number(process.env.PERF_CPU) || 1;
+  if (rate > 1) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate });
+  }
+  return at;
+}
+const elements = page => page.evaluate(() => document.getElementsByTagName('*').length);
+
+test('Work in: Assignments', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const at = await seedWorkClass(page);
+  await page.goto('/assignments');
+  await page.locator('#ac-sci8a1 .assess-title').waitFor();
+  const load = await loadNumbers(page);
+  const count = await elements(page);
+  const open = await clickNumbers(
+    page,
+    () => page.locator('#ac-sci8a1 .assess-title').click(),
+    () => page.locator('#ac-sci8a1 .rsg-criterion-row').first().waitFor(),
+  );
+  await expect(page.locator('#ac-sci8a1 .rsg-see-work').first()).toBeVisible();
+  const level = await clickNumbers(
+    page,
+    () => page.locator('#ac-sci8a1 .rsg-level[data-action="selectRubricScore"]').nth(5).click(),
+    () => Promise.resolve(),
+  );
+  record(testInfo, 'Work in: Assignments', {
+    ...load,
+    elements: count,
+    pieces: at.pieces,
+    work: at.work,
+    openMs: open.clickToDrawnMs,
+    openLongestEventMs: open.longestEventMs,
+    clickToDrawnMs: level.clickToDrawnMs,
+    longestEventMs: level.longestEventMs,
+  });
+});
+
+test('Work in: Gradebook and grader', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const at = await seedWorkClass(page);
+  await page.goto('/gradebook');
+  const cell = page.locator('.gb-scores-cell[data-aid="sci8a1"]').first();
+  await cell.waitFor();
+  const load = await loadNumbers(page);
+  const count = await elements(page);
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  const open = await clickNumbers(
+    page,
+    () => cell.click(),
+    () => dialog.waitFor(),
+  );
+  await expect(dialog).toHaveClass(/has-work/);
+  const next = await clickNumbers(
+    page,
+    () => page.keyboard.press('ArrowRight'),
+    () => Promise.resolve(),
+  );
+  const close = await clickNumbers(
+    page,
+    () => page.keyboard.press('Escape'),
+    () => dialog.waitFor({ state: 'detached' }),
+  );
+  record(testInfo, 'Work in: Gradebook and grader', {
+    ...load,
+    elements: count,
+    pieces: at.pieces,
+    work: at.work,
+    openMs: open.clickToDrawnMs,
+    openLongestEventMs: open.longestEventMs,
+    nextStudentMs: next.clickToDrawnMs,
+    closeMs: close.clickToDrawnMs,
+    closeLongestEventMs: close.longestEventMs,
   });
 });
 

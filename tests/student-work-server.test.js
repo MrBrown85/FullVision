@@ -400,6 +400,39 @@ describe('reading a signed-in class’s work', () => {
     expect(getStudentSubmission(CID, NOOR, CAUSES)).toBeNull();
   });
 
+  it('the links asked for in one turn are signed in one request, where the client can', async () => {
+    await openClass();
+    const batches = [];
+    const from = fake.storage.from;
+    fake.storage.from = bucket => ({
+      ...from(bucket),
+      createSignedUrls: async (paths, seconds) => {
+        batches.push({ bucket, paths: [...paths], seconds });
+        return {
+          data: paths.map(path => ({ path, signedUrl: 'https://x.supabase.co/sign/' + path, error: null })),
+          error: null,
+        };
+      },
+    });
+    try {
+      const files = getStudentSubmission(CID, NOOR, CAUSES).files;
+      const pages = await Promise.all([
+        openStudentWorkPage(CID, files[0], 'thumb'),
+        openStudentWorkPage(CID, files[1], 'thumb'),
+        openStudentWorkPage(CID, files[0], 'page'),
+        openStudentWorkPage(CID, files[0], 'page'),
+      ]);
+      expect(pages.every(p => p && p.url === 'blob:page')).toBe(true);
+      // One request for the three different paths; none one at a time.
+      expect(batches).toEqual([
+        { bucket: 'student-photos', paths: [files[0].thumb_path, files[1].thumb_path, files[0].path], seconds: 300 },
+      ]);
+      expect(signed).toEqual([]);
+    } finally {
+      fake.storage.from = from;
+    }
+  });
+
   it('shows a page through a 300-second signed link, as a blob: address, and only from this class', async () => {
     await openClass();
     const f = getStudentSubmission(CID, NOOR, CAUSES).files[0];
