@@ -4,7 +4,7 @@ Settled product decisions. Add a dated entry when one is made; don't reopen one 
 
 ## A refused score is not resent; refusals are counted first (2026-11-13)
 
-When the browser's outbox cannot take a score (it holds 500 waiting changes, or the browser's storage is full), the score is refused and can be lost at the next class load. The design for resending it (step 5 of [`plans/one-mark-save-design.md`](plans/one-mark-save-design.md), draft PR 1329) was reviewed twice. It can put an older score over a newer one when the same cell is scored on another device. An independent review of a redesign found it still worse than today in three rare cases.
+When the browser's outbox cannot take a score (it holds 500 waiting changes, or the browser's storage is full), the score is refused and can be lost at the next class load. The design for resending it (step 5 of `plans/one-mark-save-design.md`, draft PR 1329) was reviewed twice. It can put an older score over a newer one when the same cell is scored on another device. An independent review of a redesign found it still worse than today in three rare cases.
 
 - **Colin ruled on 2026-11-13:** do not build the resend.
 - **Count refusals first.** Each refused write sends one warning to Sentry, once per page load for each function and reason, for example `Write refused: upsert_score (queue_full)`. It carries nothing from the write: no ids, names, scores or comments.
