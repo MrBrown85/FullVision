@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth } from './helpers.js';
-import { catchPrints, fakeTeacherCards, heldAnywhere, serveTeacherCards, sheets } from './student-card-fake.js';
+import { catchPrints, fakeTeacherCards, heldAnywhere, holds, serveTeacherCards, sheets } from './student-card-fake.js';
 
 // S0-W1: Draft and Returned and student cards for a signed-in teacher, in
 // the browser, against a stand-in server.
@@ -410,8 +410,8 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   const kept = await heldAnywhere(page);
   for (const code of sheet.codes.concat(sheet.passwords)) {
     expect(shownText).not.toContain(code);
-    expect(kept).not.toContain(code);
-    expect(kept).not.toContain(code.replace('-', ''));
+    expect(holds(kept, code)).toBe(false);
+    expect(holds(kept, code.replace('-', ''))).toBe(false);
   }
 
   // Print Again prints the same; after a reload it is gone, and the server's list shows the cards printed.
@@ -627,11 +627,21 @@ test('New Codes for This Class: a part-failed run names who still has their old 
   for (const sheet of all) {
     for (const code of sheet.codes.concat(sheet.passwords)) {
       expect(shownText).not.toContain(code);
-      expect(kept).not.toContain(code);
-      expect(kept).not.toContain(code.replace('-', ''));
+      expect(holds(kept, code)).toBe(false);
+      expect(holds(kept, code.replace('-', ''))).toBe(false);
     }
   }
   expect(errors).toEqual([]);
+});
+
+test('the held-code check counts a code only where no digit or hex letter sits beside it', () => {
+  // `0891` inside the Science colour is not a held password; a stored value is.
+  expect(holds('fv-colors={"sci":"#0891b2"}', '0891')).toBe(false);
+  expect(holds('fv-x="0891"', '0891')).toBe(true);
+  expect(holds('fv-x=0891\nfv-y=1', '0891')).toBe(true);
+  expect(holds('fv-x={"pw":"0891"}', '0891')).toBe(true);
+  expect(holds('fv-x=10891', '0891')).toBe(false);
+  expect(holds('fv-x=AB12-CD34', 'AB12-CD34')).toBe(true);
 });
 
 /* Print New Card when the reply is lost and its recovery is lost too: the

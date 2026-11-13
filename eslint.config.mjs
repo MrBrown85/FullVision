@@ -1,9 +1,12 @@
 // Proposed eslint.config.mjs for FullVision (no bundler, script-tag globals).
-// Two rules only, both warnings: no-undef and no-unused-vars.
+// Two rules only, no-undef and no-unused-vars, both warnings, except in the
+// files listed in scripts/lint-ratchet.mjs, where an undefined name is an error.
 // Page globals come from the <script src> tags of the four pages, computed at
 // load time by scripts/lint-globals.mjs (so nothing generated is committed).
 import globals from 'globals';
 import { pageGlobals } from './scripts/lint-globals.mjs';
+import { NO_UNDEF_FILES, strictGlobals, guardedWhere } from './scripts/lint-ratchet.mjs';
+import { guardedGlobals } from './scripts/lint-guarded-globals.mjs';
 
 const { byFile, pages } = pageGlobals(import.meta.dirname);
 
@@ -15,12 +18,27 @@ const RULES = {
 };
 
 // One block per page-file, its globals the union of the pages that load it.
-const perFile = Object.entries(byFile).map(([file, pageNames]) => ({
-  files: [file],
-  languageOptions: {
-    globals: Object.assign({}, ...pageNames.map(p => pages[p].globals)),
-  },
-}));
+// The files in scripts/lint-ratchet.mjs instead get only the globals a
+// <script> tag defines on every page loading them, and fv/guarded-globals in
+// place of no-undef, as an error (S19-D15).
+const perFile = Object.entries(byFile).map(([file, pageNames]) =>
+  NO_UNDEF_FILES.includes(file)
+    ? {
+        files: [file],
+        plugins: { fv: { rules: { 'guarded-globals': guardedGlobals } } },
+        languageOptions: { globals: strictGlobals(file, byFile, pages) },
+        rules: {
+          'no-undef': 'off',
+          'fv/guarded-globals': ['error', { where: guardedWhere(file, byFile, pages) }],
+        },
+      }
+    : {
+        files: [file],
+        languageOptions: {
+          globals: Object.assign({}, ...pageNames.map(p => pages[p].globals)),
+        },
+      },
+);
 
 export default [
   {

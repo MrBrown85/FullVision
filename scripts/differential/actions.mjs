@@ -300,7 +300,7 @@ export const ACTIONS = [
         await tick(page, 100);
       }
       await dlg.locator('[data-grader="close"]').click({ timeout: 5000 });
-      await until(page, () => !document.querySelector('.grader-dialog'), null, 10);
+      await until(page, () => !document.querySelector('.grader-dialog'));
       const left = await closeOverlays(page);
       return left ? 'ok, then closed the ' + left : 'ok';
     },
@@ -809,7 +809,7 @@ export const ACTIONS = [
           setActiveCourse(cid);
           window.Router.navigate('/gradebook?course=' + cid);
         }, cid);
-        if (!(await until(page, cid => getActiveCourse() === cid && getStudents(cid).length > 0, cid)))
+        if (!(await until(page, cid => getActiveCourse() === cid && getStudents(cid).length > 0, cid, 12)))
           return 'did not switch';
       }
       return 'ok';

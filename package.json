@@ -23,6 +23,7 @@
     "format:staged": "bash scripts/format-staged.sh",
     "audit:html": "node scripts/audit-innerhtml.mjs --check",
     "lint": "eslint .",
+    "lint:ratchet": "node scripts/lint-ratchet.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {

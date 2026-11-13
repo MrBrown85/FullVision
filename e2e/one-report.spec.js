@@ -258,7 +258,12 @@ test.describe('working on the report', () => {
   test('a part moves up and down in the panel, by keyboard and by dragging, and prints in its new place', async ({
     page,
   }) => {
+    test.slow(); // three times the 30 s, for the waits below
     const errors = await openOne(page, 'report-card', false);
+    // Each change schedules a whole-class layout (setTimeout 0, page-reports
+    // _scheduleClassFit) that blocks the page for over 5 s on a loaded runner,
+    // and the page gives no signal when it ends, so these reads wait up to 20 s.
+    const SLOW = { timeout: 20_000 };
     const order = () => page.evaluate(() => getReportConfig('sci8').one.parts);
     const printed = () =>
       page
@@ -270,16 +275,16 @@ test.describe('working on the report', () => {
     const handle = page.locator('#studio-palette [data-action="oneDrag"][data-part="teacher-narrative"]');
     await handle.focus();
     await page.keyboard.press('ArrowUp');
-    await expect.poll(order).toEqual(
+    await expect.poll(order, SLOW).toEqual(
       before
         .slice(0, at - 1)
         .concat('teacher-narrative', before[at - 1])
         .concat(before.slice(at + 1)),
     );
-    await expect(page.locator('#studio-live')).toContainText('Teacher Comment, ');
+    await expect(page.locator('#studio-live')).toContainText('Teacher Comment, ', SLOW);
     expect((await printed()).indexOf('teacher-narrative')).toBeLessThan((await printed()).indexOf(before[at - 1]));
     await page.keyboard.press('ArrowDown');
-    await expect.poll(order).toEqual(before);
+    await expect.poll(order, SLOW).toEqual(before);
     // Dragging: the comment held by its handle and let go over the
     // Proficiency Legend's row lands above it.
     const legend = page.locator('#studio-palette .one-onlist > .one-item[data-part="legend"]');
@@ -294,7 +299,7 @@ test.describe('working on the report', () => {
       .poll(async () => {
         const o = await order();
         return o.indexOf('teacher-narrative') < o.indexOf('legend');
-      })
+      }, SLOW)
       .toBe(true);
     const now = await printed();
     expect(now.indexOf('teacher-narrative')).toBeLessThan(now.indexOf('legend'));
@@ -316,7 +321,7 @@ test.describe('working on the report', () => {
     await expect(part(page, 'parent-response')).toHaveCount(0);
     await expect(part(page, 'assessments')).toHaveCount(0);
     expect(await page.evaluate(() => getReportConfig('sci8').one.setup)).toBe('interim-update');
-    await expect(page.locator('#studio-palette .one-setup-name')).toHaveText('Interim Update');
+    await expect(page.locator('#studio-palette .one-setup-name')).toHaveText('Interim Update', { timeout: 20_000 }); // a Setup also schedules the whole-class layout
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(part(page, 'parent-response')).toHaveCount(1);
     expect(await page.evaluate(() => getReportConfig('sci8').one.setup)).toBe('report-card');

@@ -346,13 +346,17 @@ describe('rubric work', () => {
   it('a rubric put on work already scored by competency: the competency levels are the same before and after a reload', () => {
     // Scored Ask 3 and Plan 4 by competency; then given R1, whose criteria
     // feed Ask and Plan. The data layer moves each such level onto the
-    // criterion that feeds its competency, but only when it next reads the
-    // scores afresh (a reload). Until then they sit under the competencies.
+    // criterion that feeds its competency the next time it reads the
+    // scores, as a reload does (it used to wait for the reload).
     seed([essay(), lab()], essayAndLab, { rubrics: [R1()] });
     numbers(); // the data layer has looked at these scores once, with no rubric on the piece
     piece('essay').rubricId = 'R1';
     const before = numbers();
-    expect(getScores(CID).sam.map(e => e.tagId)).toEqual([ASK, PLAN, PLAN]);
+    expect(
+      getScores(CID)
+        .sam.map(e => e.tagId)
+        .sort(),
+    ).toEqual([PLAN, 'r1-ask', 'r1-plan'].sort());
 
     // A reload: the scores are read afresh and the levels moved.
     _cache.scores[CID] = structuredClone(_cache.scores[CID]);
@@ -376,21 +380,20 @@ describe('rubric work', () => {
     expect(returnedNumbers()).toEqual(after);
   });
 
-  it('FLAGGED, unchanged: that piece’s own level and % appear only after the reload', () => {
-    // Before the data layer moves the levels, the rubric has no criterion
-    // scored, so the piece has no level and is not in the course %. After,
-    // it has one. calc.js cannot make these agree without redoing the data
-    // layer's move; the data layer should make the move when a piece is
-    // given a rubric. Main does the same.
+  it('that piece’s own level and % appear at once, as after a reload', () => {
+    // Flagged here before: the data layer only moved the levels on a
+    // reload, so until then the rubric had no criterion scored and the
+    // piece had no level and was not in the course %. It now moves them
+    // when the piece is given a rubric.
     seed([essay(), lab()], essayAndLab, { rubrics: [R1()] });
     numbers();
     piece('essay').rubricId = 'R1';
     const before = numbers();
     _cache.scores[CID] = structuredClone(_cache.scores[CID]);
     const after = numbers();
-    expect(before.sam.pieces[0]).toBeNull();
+    expect(before.sam.pieces[0]).toBe(3.5);
     expect(after.sam.pieces[0]).toBe(3.5);
-    expect(before.sam.percent).not.toBe(after.sam.percent);
+    expect(before.sam.percent).toBe(after.sam.percent);
   });
 
   it('the rubric taken off again: its criteria’s levels count nowhere; the competency levels do', () => {

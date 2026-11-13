@@ -1,3 +1,4 @@
+/* global Grader, getScores, window -- named inside functions that are only read as text, never run. */
 /**
  * The pure parts of the differential run (scripts/differential-run.mjs):
  * its seeded sequence and its comparisons. The run itself drives a browser
@@ -6,7 +7,15 @@
 import { describe, expect, it } from 'vitest';
 import { parseArgs } from '../scripts/differential/args.mjs';
 import { makeRng } from '../scripts/differential/prng.mjs';
-import { compareCalls, compareScreens, compareStorage, diffValues } from '../scripts/differential/compare.mjs';
+import { readFileSync } from 'node:fs';
+import {
+  compareCalls,
+  compareScreens,
+  compareStorage,
+  compareViews,
+  diffValues,
+} from '../scripts/differential/compare.mjs';
+import { fingerprint, firstUnlike, watch } from '../scripts/differential/given.mjs';
 
 describe('makeRng', () => {
   it('gives the same sequence for the same seed', () => {
@@ -122,5 +131,100 @@ describe('parseArgs', () => {
   it('refuses a mode it does not know and an option it does not know', () => {
     expect(() => parseArgs(['--mode', 'signedin'])).toThrow(/--mode is signed-in, demo or both/);
     expect(() => parseArgs(['--sed', '1'])).toThrow(/Unknown option --sed/);
+  });
+});
+
+describe('lists of entries with ids', () => {
+  const entry = (id, tagId, score = 2) => ({ id, assessmentId: 'a2', tagId, score, date: '2026-05-12' });
+
+  it('names an entry whose key changed, not every entry after it', () => {
+    const a = { st1: [entry('e1', 'CM1'), entry('e2', 'c1', 3), entry('e3', 'c2', 1)] };
+    const b = { st1: [entry('e9', 'PA5'), entry('e2', 'c1', 3), entry('e3', 'c2', 1)] };
+    const lines = compareStorage({ k: JSON.stringify(a) }, { k: JSON.stringify(b) });
+    expect(lines).toEqual([
+      'localStorage k:',
+      '  st1[e1 in A, e9 in B].id  A: "e1"  B: "e9"',
+      '  st1[e1 in A, e9 in B].tagId  A: "CM1"  B: "PA5"',
+    ]);
+  });
+
+  it('names an entry only one side has', () => {
+    const a = [entry('e1', 'CM1'), entry('e2', 'c1', 3)];
+    const lines = compareStorage({ k: JSON.stringify(a) }, { k: JSON.stringify(a.slice(1)) });
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('[e1]  A: {"id":"e1"');
+    expect(lines[1]).toContain('B: nothing');
+  });
+
+  it('names a field that differs by the entry’s id', () => {
+    const lines = compareStorage(
+      { k: JSON.stringify([entry('e1', 'CM1', 3), entry('e2', 'c1')]) },
+      { k: JSON.stringify([entry('e1', 'CM1', 2), entry('e2', 'c1')]) },
+    );
+    expect(lines[1]).toBe('  [e1].score  A: 3  B: 2');
+  });
+
+  it('says so when the same entries are in another order', () => {
+    const a = [entry('e1', 'CM1'), entry('e2', 'c1', 3)];
+    const lines = compareStorage({ k: JSON.stringify(a) }, { k: JSON.stringify([a[1], a[0]]) });
+    expect(lines.join('\n')).toContain('the order of its entries, from place 1');
+  });
+
+  it('compares a list without ids place by place, as before', () => {
+    expect(diffValues([1, 2, 3], [1, 5, 3])).toEqual([{ path: '[1]', a: 2, b: 5 }]);
+  });
+});
+
+describe('compareViews', () => {
+  it('finds nothing in two views that are the same, and names what differs', () => {
+    const view = { cid: 'c', drafts: { a1: ['s1'] } };
+    expect(compareViews(view, structuredClone(view))).toEqual([]);
+    expect(compareViews(view, { cid: 'c', drafts: {} }).join('\n')).toContain('drafts.a1');
+  });
+});
+
+describe('the run asks both builds the same things', () => {
+  it('notes what a page is asked, the run’s own waiting aside', () => {
+    const settle = () => window.__diffPending;
+    const read = () => getScores('c');
+    expect(fingerprint(settle)).toBeNull();
+    expect(fingerprint(read)).toContain("getScores('c')");
+    expect(fingerprint(read, { a: 1 })).not.toBe(fingerprint(read, { a: 2 }));
+    expect(fingerprint(read, { a: 1 })).toBe(fingerprint(read, { a: 1 }));
+  });
+
+  it('catches a read made of one build and not the other', async () => {
+    const page = given => watch({ evaluate: async () => 'ok' }, given, () => 'tab 1');
+    const a = [];
+    const b = [];
+    const readView = () => getScores('c');
+    const act = () => Grader.setLevel('c');
+    // The fault the tool had: the class was read in A alone before each step.
+    await page(a).evaluate(readView);
+    await page(a).evaluate(act, { level: 3 });
+    await page(b).evaluate(act, { level: 3 });
+    const unlike = firstUnlike(a, b);
+    expect(unlike.at).toBe(1);
+    expect(unlike.a).toContain('getScores');
+    expect(unlike.b).toContain('Grader.setLevel');
+    // Read in both, the two are the same.
+    b.unshift(a[0]);
+    expect(firstUnlike(a, b)).toBeNull();
+  });
+
+  it('catches the same call with another argument, and one call more', () => {
+    const act = () => Grader.setLevel('c');
+    const one = [fingerprint(act, { level: 3 })];
+    expect(firstUnlike(one, [fingerprint(act, { level: 4 })]).at).toBe(1);
+    expect(firstUnlike(one, [...one, 'tab 1: more'])).toMatchObject({ at: 2, a: '(nothing more)' });
+  });
+
+  it('has no read of one build alone in the run', () => {
+    const src = readFileSync(new URL('../scripts/differential-run.mjs', import.meta.url), 'utf-8');
+    // A page of sides[0] or sides[1] is never handed to a reader or asked
+    // anything on its own: every read goes through both().
+    expect(src).not.toMatch(/\b(read\w+|take\w+|go|tick|phoneRun)\(\s*sides\[[01]\]/);
+    expect(src).not.toMatch(/sides\[[01]\](\.\w+|\[\w+\])\.(evaluate|locator|screenshot|reload|goto|keyboard)\b/);
+    expect(src).toMatch(/both\(s => readView\(s\[name\]\)\)/);
   });
 });

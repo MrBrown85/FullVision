@@ -3349,18 +3349,26 @@ function _scoreEntryFromCanonical(
   return entry;
 }
 
+/* A piece of work as this page holds it (getAssessments), the copy every
+   screen draws from, so a grade is saved for the piece as the teacher sees
+   it: its competencies, scoring, rubric and groups as they are now. The
+   row the class load sent (_cache.v2Gradebook) is read only for a piece
+   this page does not hold. Reading the load's row first sent a competency
+   added since the load, and every competency of work switched from points,
+   as the piece's overall score, and filled no group-mates: that row has
+   collab_mode and collab_config, not collaboration and groups. */
 function _assessmentById(cid, aid) {
+  var mine = (getAssessments(cid) || []).find(function (assessment) {
+    return assessment && assessment.id === aid;
+  });
+  if (mine) return mine;
   var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
-  var fromGradebook =
-    gb &&
-    (gb.assessments || []).find(function (assessment) {
-      return assessment && assessment.id === aid;
-    });
-  if (fromGradebook) return fromGradebook;
   return (
-    (getAssessments(cid) || []).find(function (assessment) {
-      return assessment && assessment.id === aid;
-    }) || null
+    (gb &&
+      (gb.assessments || []).find(function (assessment) {
+        return assessment && assessment.id === aid;
+      })) ||
+    null
   );
 }
 
@@ -4861,7 +4869,8 @@ function courseLoadFailed(cid) {
 
 function _loadCourseFromLS(cid) {
   _cache.students[cid] = _safeParseLS('gb-students-' + cid, []).map(migrateStudent);
-  _cache.assessments[cid] = _safeParseLS('gb-assessments-' + cid, []);
+  // A copy saved before every save made its snake_case fields agree.
+  _cache.assessments[cid] = _assessmentFieldsAgree(_safeParseLS('gb-assessments-' + cid, []));
   _cache.scores[cid] = _safeParseLS('gb-scores-' + cid, {});
   _cache.overrides[cid] = _safeParseLS('gb-overrides-' + cid, {});
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
@@ -6106,7 +6115,10 @@ function sortStudents(arr, mode, cid) {
    their own"). Scores from an older save are moved once: each criterion
    takes the entry under its first competency, and rubric work's
    competency-keyed entries are dropped. It runs again when the class's
-   rubrics change, so a rubric loaded later still moves its scores. */
+   rubrics change, so a rubric loaded later still moves its scores, and
+   when a piece of work gains, changes or loses its rubric, so marks given
+   by competency move as soon as the work is given a rubric, as a reload
+   moves them. */
 var _rubricKeyedScores = new WeakMap();
 // Counts up each time a class's rubrics are set (cache, save, load, re-key),
 // so a scores object moved under one set of rubrics is looked at again under
@@ -6114,6 +6126,18 @@ var _rubricKeyedScores = new WeakMap();
 var _rubricsRev = {};
 function _noteRubricsSet(cid) {
   _rubricsRev[cid] = (_rubricsRev[cid] || 0) + 1;
+}
+/* What a scores object was moved under: the class's rubrics, and which work
+   is scored on which rubric (as _rubricLegacyKeyIndex picks it). Read from
+   the list itself, so a rubric given to work in any way (the assessment
+   form, a linked copy's edit, another tab, a load) is seen. */
+function _rubricKeySig(cid) {
+  var sig = String(_rubricsRev[cid] || 0);
+  (getAssessments(cid) || []).forEach(function (a) {
+    var rubricId = a && (a.rubricId || a.rubric_id);
+    if (rubricId && !isPointsScored(a)) sig += '|' + a.id + '=' + rubricId;
+  });
+  return sig;
 }
 /* Rubric work whose criteria feed competencies: { assessmentId: criteria }
    and, per assessment, the competency ids an old entry would sit under. */
@@ -6153,7 +6177,7 @@ function _hasLegacyRubricKeys(scores, legacyTags) {
 }
 function _migrateRubricScoreKeys(cid, scores) {
   if (!scores || typeof scores !== 'object') return scores;
-  var sig = _rubricsRev[cid] || 0;
+  var sig = _rubricKeySig(cid);
   if (_rubricKeyedScores.get(scores) === sig) return scores;
   var index = _rubricLegacyKeyIndex(cid);
   var byAssessment = index.byAssessment;
@@ -7773,12 +7797,23 @@ function isGroupWithheld(cid, sid, aid) {
   var status = getAssignmentStatus(cid, sid, aid);
   return status === 'NS' || status === 'EXC';
 }
-/* The other members of `sid`'s group still graded with it. */
+/* Whether `sid` is on the class's roster. A withdrawn student is not
+   (withdrawStudent takes them off getStudents and puts their marks aside),
+   and no group write may touch them: their marks stay as they were until
+   they are re-enrolled. */
+function _onRoster(cid, sid) {
+  return (getStudents(cid) || []).some(function (s) {
+    return s && s.id === sid;
+  });
+}
+/* The other members of `sid`'s group still graded with it, on the roster.
+   Every group write (the fill, Back to Group Grade, the Missing or Excused
+   clear and copy-back, the grade set aside) lists its members here. */
 function _linkedGroupPeers(cid, a, sid) {
   var group = getCollabGroupOf(a, sid);
   if (!group) return [];
   return group.members.filter(function (m) {
-    return m !== sid && !isGradedSeparately(a, m);
+    return m !== sid && !isGradedSeparately(a, m) && _onRoster(cid, m);
   });
 }
 
@@ -7896,7 +7931,7 @@ function _groupGradeEmpty(scores, a, sid) {
    separately, Missing or Excused. */
 function _syncGroupFrom(cid, aid, sid, prior, onlyTo) {
   var a = _assessmentById(cid, aid);
-  if (!a || !isLinkedGroupMember(cid, aid, sid) || isGroupWithheld(cid, sid, aid)) return;
+  if (!a || !isLinkedGroupMember(cid, aid, sid) || isGroupWithheld(cid, sid, aid) || !_onRoster(cid, sid)) return;
   var targets = _linkedGroupPeers(cid, a, sid).filter(function (m) {
     return (!onlyTo || m === onlyTo) && !isGroupWithheld(cid, m, aid);
   });
@@ -8170,7 +8205,7 @@ function _groupGradesIn(cid, scores) {
     if (!a || isDibelsScored(a) || (a.collaboration !== 'pair' && a.collaboration !== 'group')) return;
     ((a.collaboration === 'pair' ? a.pairs : a.groups) || []).forEach(function (members) {
       (members || []).forEach(function (sid) {
-        if (!isGradedSeparately(a, sid))
+        if (!isGradedSeparately(a, sid) && _onRoster(cid, sid))
           linked.push({ aid: a.id, sid: sid, group: members, key: _groupGradeKey(scores || {}, sid, a.id) });
       });
     });
