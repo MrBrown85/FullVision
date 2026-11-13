@@ -78,6 +78,16 @@ test('the student page on and Send Work off: work that is in still shows', async
   // See the Work on a student's row opens the grader on their pages.
   const see = page.locator('#ac-' + LAB + ' .rsg-see-work[data-sid="st2"]');
   await expect(see).toHaveText('See the Work');
+  // Pointing at it shows the pages in a card; moving away takes the card off.
+  await see.hover();
+  const glance = page.locator('.ww-glance .ww-glance-img');
+  await expect(glance).toHaveCount(2);
+  await expect.poll(() => glance.first().evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+  const box = await page.locator('.ww-glance').boundingBox();
+  const view = page.viewportSize();
+  expect(box.x >= 0 && box.y >= 0 && box.x + box.width <= view.width && box.y + box.height <= view.height).toBe(true);
+  await page.mouse.move(5, 5);
+  await expect(page.locator('.ww-glance')).toHaveCount(0);
   await see.click();
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog).toHaveClass(/has-work/);

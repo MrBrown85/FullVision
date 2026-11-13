@@ -470,9 +470,32 @@ describe("work on the teacher's other screens", () => {
     seed({ sendWork: false });
     const html = WorkWall.seeWorkHtml(CID, PIECE, IDS[0]);
     expect(html).toContain('data-action="gradeSubmissions"');
-    expect(html).toContain('data-aid="' + PIECE + '" data-sid="' + IDS[0] + '"');
+    expect(html).toContain('data-cid="' + CID + '" data-aid="' + PIECE + '" data-sid="' + IDS[0] + '"');
     expect(html).toContain('>See the Work<');
     expect(WorkWall.seeWorkHtml(CID, PIECE, last)).toBe('');
+  });
+
+  it('See the Work with focus: a glance at the first two pages, gone when focus leaves', async () => {
+    seed({ sendWork: false });
+    const main = doc.getElementById('main');
+    const fire = (el, type) => el.dispatchEvent(new doc.defaultView.Event(type, { bubbles: true }));
+    // IDS[3] sent two pages, IDS[0] one.
+    main.innerHTML = WorkWall.seeWorkHtml(CID, PIECE, IDS[3]) + WorkWall.seeWorkHtml(CID, PIECE, IDS[0]);
+    const [two, one] = $$('.rsg-see-work');
+    fire(two, 'focusin');
+    expect($$('.ww-glance .ww-glance-img')).toHaveLength(2);
+    expect($('.ww-glance').getAttribute('aria-hidden')).toBe('true');
+    expect($('.ww-glance-more')).toBeNull();
+    await settle();
+    expect(asked).toEqual(['page:' + file(IDS[3], 1).path, 'page:' + file(IDS[3], 2).path]);
+    expect($$('.ww-glance-img').every(img => !!img.getAttribute('src'))).toBe(true);
+    fire(two, 'focusout');
+    expect($('.ww-glance')).toBeNull();
+    fire(one, 'focusin');
+    expect($$('.ww-glance .ww-glance-img')).toHaveLength(1);
+    // A click on the button opens the grader; the glance goes.
+    fire(one, 'click');
+    expect($('.ww-glance')).toBeNull();
   });
 
   it('an open row of All Your Work: the pages whole, each opening full size', async () => {

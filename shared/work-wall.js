@@ -970,7 +970,9 @@ window.WorkWall = (function () {
   /* ── Work on the teacher's other screens ──────────────────────
      seeWorkHtml: See the Work on a student's row in the Assignments page's
      whole-class grid, when work is in for them; it opens the grader on
-     their pages (the page's gradeSubmissions action).
+     their pages (the page's gradeSubmissions action). Pointing at it, or
+     tabbing to it, shows the first pages in a card beside the button, for
+     a look without opening anything (the glance, below).
 
      pieceHtml and mountPiece: the student's pages for one piece, whole,
      beside the rubric in an open row of All Your Work on the teacher's
@@ -982,8 +984,11 @@ window.WorkWall = (function () {
     if (!a || !GraderWork.workShown(cid, a)) return '';
     var subs = typeof getGroupSubmissions === 'function' ? getGroupSubmissions(cid, sid, aid) : [];
     if (!subs.length && !getStudentSubmission(cid, sid, aid)) return '';
+    _glanceWire();
     return (
-      '<button type="button" class="assess-add-work-btn rsg-see-work" data-stop-prop="true" data-action="gradeSubmissions" data-aid="' +
+      '<button type="button" class="assess-add-work-btn rsg-see-work" data-stop-prop="true" data-action="gradeSubmissions" data-cid="' +
+      esc(cid) +
+      '" data-aid="' +
       esc(aid) +
       '" data-sid="' +
       esc(sid) +
@@ -1022,6 +1027,143 @@ window.WorkWall = (function () {
         .join('') +
       '</div>'
     );
+  }
+
+  /* The glance: the student's first pages (two at most) in a card by the
+     See the Work button while the pointer rests on it or it has focus. It
+     takes no clicks and no focus, and goes when the pointer or focus
+     leaves, on a click, a scroll or Escape, and when the row is drawn
+     again. The pictures are kept for half a minute after the last glance,
+     so moving down a class list does not fetch a page twice. */
+  var GLANCE_WAIT = 200; // ms the pointer rests before the card shows
+  var GLANCE_KEEP = 30000; // ms the pictures are kept after the last card
+  var GLANCE_WIDE = 340; // px, a page's width in the card
+  var _glance = null; // { btn, el }
+  var _glancePics = null;
+  var _glanceTimer = null;
+  var _glanceLetGo = null;
+  var _glanceDoc = null;
+  function _glanceBtn(e) {
+    return e.target && e.target.closest ? e.target.closest('.rsg-see-work') : null;
+  }
+  function _glanceWire() {
+    if (typeof document === 'undefined' || _glanceDoc === document || !document.addEventListener) return;
+    _glanceDoc = document;
+    // In the capture phase: the grid stops a row's events before they reach the document.
+    document.addEventListener(
+      'mouseover',
+      function (e) {
+        var btn = _glanceBtn(e);
+        if (!btn) return _glance && _glanceHide();
+        if (_glance && _glance.btn === btn) return;
+        clearTimeout(_glanceTimer);
+        _glanceTimer = setTimeout(function () {
+          // Still there and still under the pointer: the page may have scrolled meanwhile.
+          if (btn.isConnected && btn.matches(':hover')) _glanceShow(btn);
+        }, GLANCE_WAIT);
+      },
+      true,
+    );
+    document.addEventListener(
+      'mouseout',
+      function (e) {
+        if (_glanceBtn(e)) _glanceHide();
+      },
+      true,
+    );
+    document.addEventListener(
+      'focusin',
+      function (e) {
+        var btn = _glanceBtn(e);
+        if (btn) _glanceShow(btn);
+      },
+      true,
+    );
+    document.addEventListener('focusout', _glanceHide, true);
+    document.addEventListener('click', _glanceHide, true);
+    // A scroll takes the card off; a card still waiting to show is checked when its time comes.
+    document.addEventListener('scroll', _glanceOff, true);
+    document.addEventListener(
+      'keydown',
+      function (e) {
+        if (e.key === 'Escape') _glanceHide();
+      },
+      true,
+    );
+  }
+  function _glanceHide() {
+    clearTimeout(_glanceTimer);
+    _glanceOff();
+  }
+  function _glanceOff() {
+    if (!_glance) return;
+    _glance.el.remove();
+    _glance = null;
+    clearTimeout(_glanceLetGo);
+    _glanceLetGo = setTimeout(function () {
+      if (_glance || !_glancePics) return;
+      _glancePics.releaseAll();
+      _glancePics = null;
+    }, GLANCE_KEEP);
+  }
+  function _glanceShow(btn) {
+    _glanceHide();
+    var cid = btn.getAttribute('data-cid');
+    var aid = btn.getAttribute('data-aid');
+    var sid = btn.getAttribute('data-sid');
+    var sub = getStudentSubmission(cid, sid, aid);
+    if (!sub && typeof getGroupSubmissions === 'function') sub = getGroupSubmissions(cid, sid, aid)[0] || null;
+    var pages = _pages(sub);
+    if (!pages.length) return;
+    var shown = pages.slice(0, 2);
+    // A page keeps its shape, and the card fits the window.
+    var win = typeof window !== 'undefined' ? window : {};
+    var roomW = (win.innerWidth || 1280) - 24;
+    var roomH = (win.innerHeight || 800) - 24;
+    var shape = function (f) {
+      return f.width > 0 && f.height > 0 ? f.height / f.width : 11 / 8.5;
+    };
+    var tall = Math.max.apply(null, shown.map(shape));
+    var wide = Math.floor(
+      Math.min(GLANCE_WIDE, (roomW - 16 - 8 * (shown.length - 1)) / shown.length, (roomH - 48) / tall),
+    );
+    var more = pages.length - shown.length;
+    var el = document.createElement('div');
+    el.className = 'ww-glance';
+    el.setAttribute('aria-hidden', 'true');
+    // html-safe: numbers we worked out and fixed words; no name or title is written
+    el.innerHTML =
+      '<div class="ww-glance-pages">' +
+      shown
+        .map(function (f, i) {
+          return (
+            '<img class="ww-glance-img" data-work-pic data-work-which="page" data-page="' +
+            i +
+            '" alt="" width="' +
+            wide +
+            '" height="' +
+            Math.round(wide * shape(f)) +
+            '">'
+          );
+        })
+        .join('') +
+      '</div>' +
+      (more > 0 ? '<div class="ww-glance-more">' + (more === 1 ? '1 more page' : more + ' more pages') + '</div>' : '');
+    document.body.appendChild(el);
+    // Under the button, or over it when there is more room there; kept inside the window.
+    var at = btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 0, top: 0, bottom: 0 };
+    var box = el.getBoundingClientRect ? el.getBoundingClientRect() : { width: 0, height: 0 };
+    var below = roomH + 24 - at.bottom - 8;
+    var top = below >= box.height + 12 || below >= at.top ? at.bottom + 8 : at.top - 8 - box.height;
+    el.style.left = Math.max(12, Math.min(at.left, roomW + 12 - box.width)) + 'px';
+    el.style.top = Math.max(12, Math.min(top, roomH + 12 - box.height)) + 'px';
+    _glance = { btn: btn, el: el };
+    clearTimeout(_glanceLetGo);
+    if (!_glancePics) _glancePics = WorkThumbs.holder();
+    _glancePics.sweep();
+    _glancePics.fill(el, cid, function (img) {
+      return _glance && _glance.el === el ? shown[Number(img.getAttribute('data-page')) || 0] || null : null;
+    });
   }
 
   var _row = null; // { cid, sid, root, pics }: the open rows' pictures on the student page
