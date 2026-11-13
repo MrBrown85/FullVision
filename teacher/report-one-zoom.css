@@ -125,6 +125,14 @@
 .studio-nav[hidden] {
   display: none;
 }
+/* At 900 px and narrower the Reports toolbar shows its own Previous and
+   Next (.report-stepper, teacher/reports.css), which step the same way
+   (ReportOneHead.go): one pair only. */
+@media (max-width: 900px) {
+  .studio-nav {
+    display: none !important;
+  }
+}
 .studio-nav .tq-toolbar-arrow {
   width: 26px;
   height: 26px;

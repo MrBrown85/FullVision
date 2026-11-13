@@ -226,6 +226,7 @@ window.ReportOneHead = (function () {
     reset: reset,
     setHidden: setHidden,
     target: target,
+    go: go,
     isHidden: function () {
       return _hidden;
     },

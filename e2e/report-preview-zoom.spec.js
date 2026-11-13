@@ -295,3 +295,26 @@ test('Hide Panels gives the pages the width; Show Panels brings both panels back
   await expect.poll(async () => (await layout(page)).zoom, { timeout: 5000 }).toBe(before.zoom);
   await expect(page.getByRole('button', { name: 'Hide Panels' })).toBeVisible();
 });
+
+test('one pair of Previous and Next at any width, and both step the same way', async ({ page }) => {
+  await open(page);
+  const visible = name =>
+    page
+      .getByRole('button', { name, exact: true })
+      .evaluateAll(list => list.filter(b => b.getClientRects().length).length);
+  const selected = () => page.locator('#gb-roster-list .student-row.selected').getAttribute('data-sid');
+  const order = await page.locator('#gb-roster-list .student-row').evaluateAll(list => list.map(r => r.dataset.sid));
+  for (const width of [1916, 900]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await expect.poll(() => visible('Previous Student')).toBe(1);
+    expect(await visible('Next Student')).toBe(1);
+    const from = await selected();
+    await page.getByRole('button', { name: 'Next Student', exact: true }).filter({ visible: true }).click();
+    await expect.poll(selected).toBe(order[order.indexOf(from) + 1]);
+  }
+  // Panels hidden at full width: still one pair.
+  await page.setViewportSize({ width: 1916, height: 1100 });
+  await page.getByRole('button', { name: 'Hide Panels' }).click();
+  await expect.poll(() => visible('Previous Student')).toBe(1);
+  expect(await visible('Next Student')).toBe(1);
+});
