@@ -1286,7 +1286,8 @@ window.StudentView = (function () {
       });
     });
     pieces.sort(function (x, y) {
-      return x.date === y.date ? 0 : x.date < y.date ? 1 : -1;
+      if (x.date !== y.date) return x.date < y.date ? 1 : -1;
+      return samePieceDateOrder(cid, y.id, x.id);
     });
     var has = value > 0;
     var bankTag = (sec.tags || []).find(function (t) {

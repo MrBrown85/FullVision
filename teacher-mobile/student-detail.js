@@ -34,7 +34,7 @@ window.MStudentDetail = (function () {
       });
     });
     allEvidenceScores.sort(function (a, b) {
-      return (a.date || '').localeCompare(b.date || '');
+      return (a.date || '').localeCompare(b.date || '') || samePieceDateOrder(cid, a.assessmentId, b.assessmentId);
     });
     var recentScores = allEvidenceScores.slice(-5);
 
@@ -827,7 +827,7 @@ window.MStudentDetail = (function () {
             getAssessments(cid)
               .slice()
               .sort(function (a, b) {
-                return (b.date || '').localeCompare(a.date || '');
+                return (b.date || '').localeCompare(a.date || '') || samePieceDateOrder(cid, b.id, a.id);
               })[0].title,
           ) +
           '</button>'

@@ -297,7 +297,7 @@ window.DashStudentCards = (function () {
         var trend = 'flat';
         if (allSc.length >= 4) {
           allSc.sort(function (a, b) {
-            return (a.date || '').localeCompare(b.date || '');
+            return (a.date || '').localeCompare(b.date || '') || samePieceDateOrder(cid, a.assessmentId, b.assessmentId);
           });
           var mid = Math.floor(allSc.length / 2);
           var earlyAvg =
