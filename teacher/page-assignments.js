@@ -2463,6 +2463,7 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var course = COURSES[cid];
     if (!course) return;
+    _pageBehind = false;
     // A signed-in class's student work, read again now and then (S6-W1).
     if (typeof refreshStudentWork === 'function') refreshStudentWork(cid);
     _loadDibelsOnce(cid);
@@ -7196,8 +7197,8 @@ window.PageAssignments = (function () {
   /* Opening or closing cards draws or empties those cards' bodies and sets
      Expand and Collapse; the rest of the page stays as drawn (a whole
      redraw took 260 ms of script). False when the page must be drawn
-     again instead: a card not on the page, or one in a folder the teacher
-     closed, which opens or closes with the cards in it. */
+     again instead: a card not on the page, or a folder the teacher closed
+     that must now open or close. */
   function _redrawCards(aids) {
     var cid = activeCourse;
     var main = document.getElementById('main');
@@ -7215,9 +7216,18 @@ window.PageAssignments = (function () {
       var card = document.getElementById('ac-' + aids[i]);
       var a = card && main.contains(card) && byId[aids[i]];
       if (!a) return false;
-      var folder = card.closest('.mod-folder');
-      if (folder && !filtersActive && collapsedModules[folder.dataset.moduleId]) return false;
       cards.push({ card: card, a: a });
+    }
+    // A folder the teacher closed is drawn open only while a card in it is
+    // held open (renderAssessmentList): every folder is checked, since Expand
+    // lets go of cards that stay open.
+    var folders = filtersActive ? [] : main.querySelectorAll('.mod-folder');
+    for (var f = 0; f < folders.length; f++) {
+      if (!collapsedModules[folders[f].dataset.moduleId]) continue;
+      var holds = Array.prototype.some.call(folders[f].querySelectorAll('.assess-card'), function (el) {
+        return openAssessIds.has(el.id.slice(3));
+      });
+      if (holds !== folders[f].classList.contains('open')) return false;
     }
     _hideChipTip();
     _hideAfTip();
@@ -11396,7 +11406,18 @@ window.PageAssignments = (function () {
         _openGraderOnWork(el.dataset.aid, el.dataset.sid || null);
       },
       openWorkWall: function () {
-        if (window.WorkWall && activeCourse) WorkWall.open(activeCourse, el.dataset.aid);
+        var aid = el.dataset.aid;
+        if (!window.WorkWall || !activeCourse) return;
+        // Grade in This Order grades in the dialog over the wall, and the
+        // page under both is not drawn: it is drawn, whole, as the wall closes.
+        WorkWall.open(activeCourse, aid, {
+          onClose: function () {
+            if (!_pageBehind) return;
+            render();
+            var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
+            if (more) more.focus({ preventScroll: true });
+          },
+        });
       },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
@@ -12441,6 +12462,8 @@ window.PageAssignments = (function () {
      listeners run alongside the gradebook's (which stand aside, see
      PageAssignments.graderOpen). */
   var _grader = null;
+  // True from a dialog over this page closing until the page is next drawn.
+  var _pageBehind = false;
 
   function openGrader(cid, aid, sid, opts) {
     if (_grader) closeGrader();
@@ -12449,6 +12472,17 @@ window.PageAssignments = (function () {
     if (typeof refreshStudentWork === 'function') refreshStudentWork(cid, { force: true });
     activeCourse = cid;
     _loadDibelsOnce(cid);
+    // Over this page (Grade Submissions, the Work Wall): the page's cards and
+    // student, put back when the dialog closes.
+    var page = opts.overPage
+      ? {
+          open: openAssessIds,
+          focus: focusStudentId,
+          expanded: _allExpanded,
+          collapsed: _collapsedIds,
+          rubricViews: rubricViewStates,
+        }
+      : null;
     openAssessIds = new Set([aid]);
     focusStudentId = sid;
     _allExpanded = false;
@@ -12481,6 +12515,7 @@ window.PageAssignments = (function () {
       rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
       pageListeners: opts.overPage ? pageListeners : null,
+      page: page,
       // Show: To Grade, To Return, Returned, Not In or All (S1-F2, S6-F3).
       show: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
       // The student's work beside the scoring (S6-F1): its page, the fit,
@@ -13765,18 +13800,8 @@ window.PageAssignments = (function () {
     var waiting = GraderWork.workCounts(cid, aid, ids).ids.tograde;
     var to = sid || waiting[0];
     if (!to) return;
-    var page = { open: Array.from(openAssessIds), focus: focusStudentId, expanded: _allExpanded };
-    openGrader(cid, aid, to, {
-      show: !sid && waiting.length ? 'tograde' : 'all',
-      overPage: true,
-      onClose: function () {
-        // The page as it was before the dialog opened.
-        openAssessIds = new Set(page.open);
-        focusStudentId = page.focus;
-        _allExpanded = page.expanded;
-        render();
-      },
-    });
+    // closeGrader puts the page back as it was before the dialog opened.
+    openGrader(cid, aid, to, { show: !sid && waiting.length ? 'tograde' : 'all', overPage: true, onClose: render });
   }
 
   /* ── Draft and Returned (S0-F2) ───────────────────────────
@@ -16280,6 +16305,15 @@ window.PageAssignments = (function () {
     // The student it ended on, so the gradebook selects their cell.
     var lastSid = focusStudentId;
     focusStudentId = null;
+    // The page under the dialog is as it was, and has not seen what was graded.
+    if (g.page) {
+      openAssessIds = g.page.open;
+      focusStudentId = g.page.focus;
+      _allExpanded = g.page.expanded;
+      _collapsedIds = g.page.collapsed;
+      rubricViewStates = g.page.rubricViews;
+      _pageBehind = true;
+    }
     g.overlay.remove();
     if (g.onClose) g.onClose(lastSid);
   }
@@ -16494,6 +16528,7 @@ window.PageAssignments = (function () {
 
   function destroy() {
     _hideChipTip();
+    _pageBehind = false;
     closeColorPop();
     if (window.ClassResults) ClassResults.setPage(null);
     // Remove all tracked listeners
