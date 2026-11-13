@@ -10,7 +10,12 @@ import { resolve } from 'node:path';
      UPDATE_LETTER_MAIN=1 TZ=UTC npx playwright test e2e/assignment-grades-letter.spec.js
    The widths do not depend on the font (each column is set in px or em
    at the sheet's fixed size), so the file holds on any machine; the test
-   also runs with a wider font forced on the sheet. Students by name. */
+   also runs with a wider font forced on the sheet. Students by name.
+
+   Demo Mode dates its sample work from today, so the page's clock is held
+   at the day the file was written (Nov 12, 2026, Vancouver). Run on any
+   other day, every date shifts and a row can cross into another month. */
+const WRITTEN = new Date('2026-11-12T12:00:00-08:00');
 
 // Run from the repository's root, as Playwright runs it.
 const FILE = resolve('e2e/fixtures/assignment-grades-letter-main.json');
@@ -28,6 +33,7 @@ for (const wide of [false, true]) {
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', e => errors.push(String(e)));
+    await page.clock.setFixedTime(WRITTEN);
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/\/dashboard/, { timeout: 15000 });
     await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
