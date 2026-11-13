@@ -37,7 +37,7 @@ if (spawnSync('which', ['sips']).status !== 0) {
 const pause = (page, ms) => page.waitForTimeout(ms);
 
 // The class's Student Page, Send Work, Reflect on Feedback and Show My
-// Learning on, and grades returned by hand: the pilot's setup.
+// Learning on, and grades returned by hand: the setup the splash shows.
 async function studentPageOn(page, base) {
   await page.goto(base + '/dashboard?manage=student-page&build=student-page');
   await page.waitForSelector('#sp-build-switch', { state: 'attached', timeout: 15000 });
