@@ -863,6 +863,7 @@ window.PageReports = (function () {
     ReportOneHead.sync(studioView, _oneApi);
     ReportOneZoom.apply(preview, studioView);
     _syncPrintButton();
+    _renderFitLine(); // the copy's paper, said where Print This Copy is pressed
   }
 
   /* Print This Copy prints the whole copy, every student in it, whatever
@@ -935,10 +936,8 @@ window.PageReports = (function () {
       noAttendance: [],
     };
     var ids = Object.keys(s.perStudent || {});
-    var sheets = 0;
     var hashes = {};
     ids.forEach(function (sid) {
-      sheets += s.perStudent[sid].sheets;
       hashes[sid] = ReportIssues.hash(s.perStudent[sid].html);
     });
     var ctx = ReportBlocks.reportContext();
@@ -947,7 +946,7 @@ window.PageReports = (function () {
     var changed = last
       ? ReportIssues.changedSince({ hashes: ReportIssues.printedHashes(activeCourse, ctx.termId) }, hashes)
       : ids;
-    return { ids: ids, sheets: sheets, hashes: hashes, last: last, changed: changed, ctx: ctx, summary: s };
+    return { ids: ids, paper: reportPaper, hashes: hashes, last: last, changed: changed, ctx: ctx, summary: s };
   }
 
   // html-safe: term, course, form name, issue label and student names esc()'d; counts are numbers; the rest is fixed markup
@@ -962,50 +961,19 @@ window.PageReports = (function () {
       .filter(Boolean)
       .map(esc)
       .join(' \u00B7 ');
-    // Students grouped by sheets: "24 on 1 sheet, 3 on 2, 1 on 3".
-    var bySheets = {};
-    c.ids.forEach(function (sid) {
-      var k = c.summary.perStudent[sid].sheets;
-      bySheets[k] = (bySheets[k] || 0) + 1;
+    // While the box re-counts for a new paper (_issuePaper), the counts say so.
+    var wait = _issueState && _issueState.counting;
+    var sheets = c.ids.map(function (sid) {
+      return c.summary.perStudent[sid].sheets;
     });
-    var counts = Object.keys(bySheets)
-      .map(Number)
-      .sort(function (a, b) {
-        return a - b;
-      });
-    var studentsLine =
-      n +
-      (n === 1 ? ' student' : ' students') +
-      ' \u00B7 ' +
-      (counts.length > 1
-        ? counts
-            .map(function (k) {
-              return bySheets[k] + ' on ' + k + (k === 1 ? ' sheet' : '');
-            })
-            .join(', ')
-        : counts[0] > 1
-          ? counts[0] + ' sheets' + (n === 1 ? '' : ' each')
-          : n === 1
-            ? '1 sheet'
-            : '1 sheet each');
     var html = '<div class="confirm-card issue-card">';
     html += '<div class="confirm-title" id="issue-title">Print ' + n + (n === 1 ? ' Report' : ' Reports') + '</div>';
     html += '<div class="confirm-message">' + subtitle + '</div>';
     html += '<div class="issue-kv">';
-    html +=
-      '<span class="issue-k">Setup</span><span>' +
-      esc(_oneSetupName()) +
-      ' \u00B7 ' +
-      (reportPaper === 'legal' ? 'Legal' : 'Letter') +
-      ' \u00B7 ' +
-      'Black' +
-      '</span>';
-    html += '<span class="issue-k">Sheets</span><span>' + studentsLine + '</span>';
-    html +=
-      '<span class="issue-k">Copier</span><span>' +
-      (reportPaper === 'legal' ? 'Legal' : 'Letter') +
-      ', 2-sided, flip on long edge</span>';
-    html += '</div>';
+    html += '<span class="issue-k">Setup</span><span>' + esc(_oneSetupName()) + ' \u00B7 Black</span>';
+    html += '<span class="issue-k">Sheets</span><span id="issue-sheets" aria-live="polite">';
+    html += (wait ? ReportPrintPaper.COUNTING : ReportPrintPaper.sheetsLine(sheets)) + '</span>';
+    html += ReportPrintPaper.rowsHtml(wait || reportPaper) + '</div>';
     html += '<fieldset class="issue-group"><legend>Which Students</legend>';
     html +=
       '<label class="issue-option"><input type="radio" name="issue-who" value="all" checked><span>All ' +
@@ -1014,12 +982,11 @@ window.PageReports = (function () {
     if (c.last) {
       html +=
         '<label class="issue-option"><input type="radio" name="issue-who" value="changed"' +
-        (c.changed.length ? '' : ' disabled') +
+        (c.changed.length && !wait ? '' : ' disabled') +
         '><span>Changed since the last print <span class="issue-help">(' +
         esc(ReportIssues.label(c.last).replace(/^Printed /, '')) +
         ' \u00B7 ' +
-        c.changed.length +
-        (c.changed.length === 1 ? ' student' : ' students') +
+        (wait ? ReportPrintPaper.COUNTING : c.changed.length + (c.changed.length === 1 ? ' student' : ' students')) +
         ')</span></span></label>';
     }
     html += '</fieldset>';
@@ -1111,6 +1078,7 @@ window.PageReports = (function () {
       if (!a) return;
       e.preventDefault();
       if (a.dataset.issue === 'cancel') closeIssueDialog();
+      else if (a.dataset.issue === 'paper') _issuePaper(overlay, a.dataset.paper);
       else if (a.dataset.issue === 'go') _issueFromDialog(overlay);
       else if (a.dataset.issue === 'write' || a.dataset.issue === 'attendance') {
         var key = a.dataset.issue === 'write' ? 'noComment' : 'noAttendance';
@@ -1145,6 +1113,35 @@ window.PageReports = (function () {
     document.body.appendChild(overlay);
     var first = overlay.querySelector('input');
     if (first && first.focus) first.focus();
+  }
+
+  /* Paper in the box: the toolbar's setPaper. Counting Sheets… with Print off until the pages
+     are laid out for the new paper (a few hundred ms for a class), then the new counts. */
+  function _issuePaper(overlay, paper) {
+    var state = _issueState;
+    if (!state || state.counting || paper === reportPaper) return;
+    var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value;
+    var repaint = function () {
+      // The card's contents only: a new card would replay its pop-in.
+      var fresh = document.createElement('div');
+      fresh.innerHTML = _printDialogHtml(state.counts);
+      overlay.firstElementChild.replaceChildren.apply(overlay.firstElementChild, fresh.firstElementChild.childNodes);
+      (overlay.querySelector('input[name="issue-who"][value="' + who + '"]:not([disabled])') || {}).checked = true;
+      overlay.querySelector('[data-issue="go"]').disabled = !!state.counting;
+      overlay.querySelector('#issue-paper [data-paper="' + paper + '"]').focus();
+    };
+    state.counting = paper;
+    repaint();
+    requestAnimationFrame(function () {
+      setTimeout(function () {
+        if (!_mounted) return;
+        setPaper(paper);
+        if (_issueState !== state) return;
+        state.counts = _issueCounts();
+        state.counting = false;
+        repaint();
+      }, 0);
+    });
   }
 
   /* Keeps Tab inside a modal dialog: past its last control it goes to the
@@ -1232,7 +1229,8 @@ window.PageReports = (function () {
      back to the dialog and does nothing. */
   function _issueFromDialog(overlay) {
     var c = _issueState && _issueState.counts;
-    if (!c) return;
+    // Never counts or pages laid out for the other paper (_issuePaper).
+    if (!c || _issueState.counting || c.paper !== reportPaper) return;
     var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value || 'all';
     var found = _draftsInPrint(who === 'changed' ? c.changed : c.ids);
     if (!found) return _issueAndPrint(c, who);
@@ -1494,8 +1492,10 @@ window.PageReports = (function () {
   function _renderFitLine() {
     var line = document.getElementById('studio-fit');
     if (!line) return;
+    // A saved copy's line is what its paper needs.
+    if (viewingIssue) line.textContent = ReportPrintPaper.sentence(viewingIssue.paper);
     // html-safe: ReportOnePanel.fitHtml escapes the names it prints
-    line.innerHTML = ReportOnePanel.fitHtml(_oneApi());
+    else line.innerHTML = ReportOnePanel.fitHtml(_oneApi());
     line.classList.toggle('ok', !line.querySelector('.one-fit-over'));
   }
 
