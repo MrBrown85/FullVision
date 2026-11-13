@@ -392,55 +392,51 @@
     });
   }
 
+  /* Each file's pages go on screen as soon as that file is ready (in place
+     of the Retake, or after the others), while Getting Your Photos Ready
+     shows and Send waits for the rest. */
   function shrink(send, files, at, prepare) {
-    var room = function () {
-      return send.room - send.pages.length + (at >= 0 ? 1 : 0);
-    };
-    var out = [];
+    var room = send.room - send.pages.length + (at >= 0 ? 1 : 0);
+    var retake = at >= 0 && at < send.pages.length;
+    var made = [];
     var why = '';
     var chain = Promise.resolve();
     files.forEach(function (file) {
       chain = chain.then(function () {
-        if (why) return null;
+        if (why || !current(send)) return null;
         // A PDF is asked for no more pages than fit in the send, and never more than 20.
-        var fit = Math.max(1, Math.min(PDF_PAGES, room() - out.length));
-        return Promise.resolve(prepare(file, { maxPages: fit, openPdf: openPdf() })).then(function (res) {
+        var fit = Math.max(1, Math.min(PDF_PAGES, room - made.length));
+        return StudentPage.whileCurrent(prepare(file, { maxPages: fit, openPdf: openPdf() })).then(function (res) {
           if (!res || !res.ok) {
             why = refusal(res || {});
             return;
           }
-          if (out.length + res.pages.length > room()) {
+          if (made.length + res.pages.length > room) {
             why = 'You can send ' + send.room + ' pages at most.';
             return;
           }
-          res.pages.forEach(function (pg) {
-            out.push({ pg: pg, from: res.kind });
+          // Not drawn if the student left, or another send started, while the file was shrunk.
+          if (!current(send)) return;
+          var pages = res.pages.map(function (pg) {
+            return pageOf(send, pg, res.kind);
           });
+          send.pages.splice.apply(
+            send.pages,
+            [retake ? at + made.length : send.pages.length, retake && !made.length ? 1 : 0].concat(pages),
+          );
+          made = made.concat(pages);
+          StudentPage.paintKeepingCaret();
         });
       });
     });
     return StudentPage.whileCurrent(
-      chain.then(
-        function () {
-          return true;
-        },
-        function () {
-          why = why || 'That file couldn’t be used. Try another photo.';
-          return true;
-        },
-      ),
+      chain.then(null, function () {
+        why = why || 'That file couldn’t be used. Try another photo.';
+      }),
     ).then(function () {
-      // The student left, or another send started, while the files were shrunk.
       if (!current(send)) return;
       send.busy = false;
       send.message = why;
-      var made = out.map(function (o) {
-        return pageOf(send, o.pg, o.from);
-      });
-      if (made.length) {
-        if (at >= 0 && at < send.pages.length) send.pages.splice.apply(send.pages, [at, 1].concat(made));
-        else Array.prototype.push.apply(send.pages, made);
-      }
       // A blurry photo is shown before anything else (the Blurry Photo board).
       var blurry = made.filter(function (m) {
         return m.blurry;
