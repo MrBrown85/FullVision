@@ -98,24 +98,6 @@ window.ReportSheets = (function () {
     pinned: 'parent-response',
     perStudent: {},
   };
-  var FORM_INTERIM = {
-    v: 6,
-    id: 'interim-update',
-    name: 'Interim Update',
-    type: 'standard',
-    sides: [
-      {
-        rows: [
-          _row(_c('header')),
-          _row(_c('proficiency')),
-          _row(_c('teacher-narrative', 'row', { lines: 10 })),
-          _row(_c('legend')),
-        ],
-      },
-    ],
-    pinned: null,
-    perStudent: {},
-  };
   /* The Report Card starter, made whole. */
   function form() {
     return normalizeForm(FORM_REPORT_CARD);
@@ -732,28 +714,14 @@ window.ReportSheets = (function () {
     return out;
   }
 
-  /* The class's form from its report config. A class still on the old
-     Brief preset opens on the Interim Update; anything else without a
-     saved form opens on the name and Assignment Grades. */
+  /* The class's saved form, or, without one, the name and Assignment
+     Grades (page-reports.js _readSaved). */
   function formFor(reportConfig) {
     if (reportConfig && reportConfig.form) return normalizeForm(reportConfig.form);
-    if (reportConfig && reportConfig.preset === 'brief') return normalizeForm(FORM_INTERIM);
     return normalizeForm(FORM_DEFAULT);
   }
 
   /* ── Reading the form ─────────────────────────────────────────── */
-  /* Ids on the form, in order. */
-  function onForm(f) {
-    var ids = [];
-    f.sides.forEach(function (sd) {
-      sd.rows.forEach(function (row) {
-        row.cells.forEach(function (c) {
-          ids.push(c.block);
-        });
-      });
-    });
-    return ids;
-  }
   function hiddenFor(f, sid) {
     var e = f.perStudent && f.perStudent[sid];
     return e && e.hide ? e.hide.slice() : [];
@@ -1308,7 +1276,6 @@ window.ReportSheets = (function () {
     normalizeForm: normalizeForm,
     optionsFor: optionsFor,
     formFor: formFor,
-    onForm: onForm,
     hiddenFor: hiddenFor,
     pack: pack,
     sideHeight: sideHeight,

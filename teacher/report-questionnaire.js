@@ -1831,14 +1831,34 @@ window.ReportQuestionnaire = (function () {
     _redrawHabits(st, CommentBank.ATTENDANCE_STEPS);
   }
 
-  /* ── The class's report form ───────────────────────────── */
+  /* ── The class's report ─────────────────────────────────── */
 
-  function _form(cid) {
-    return ReportSheets.formFor((typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
+  /* What Progress Reports prints for the class: One Report's model, read
+     from what the class saved (ReportOne.modelFor). */
+  function _model(cid) {
+    return ReportOne.modelFor((typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
   }
-  function _blockLabel(id) {
-    var b = ReportSheets.BLOCKS[id];
-    return b ? b.label : id;
+  /* A part's name as it prints: the teacher's heading when they renamed it. */
+  function _partLabel(model, key, cid) {
+    return (model.titles && model.titles[key]) || ReportOne.label(key, cid);
+  }
+  /* The parts on the class's report, in the order they print, then the
+     Feedback Pages that are on; and the parts the class could add. */
+  function _parts(cid) {
+    var model = _model(cid);
+    var on = ReportOne.order(model).filter(function (k) {
+      return ReportOne.available(k, cid);
+    });
+    var fb = ReportOne.FEEDBACK.map(function (f) {
+      return f.key;
+    });
+    var off = ReportOne.offParts(model, cid).filter(function (k) {
+      return k !== 'header';
+    });
+    fb.forEach(function (k) {
+      (ReportOne.isOn(model, k) ? on : off).push(k);
+    });
+    return { model: model, on: on, off: off };
   }
 
   /* ── Where This Information Comes From ───────────────────── */
@@ -1862,7 +1882,7 @@ window.ReportQuestionnaire = (function () {
     ],
   ];
 
-  /* Where each block on the class's form gets its content. */
+  /* Where each part of the class's report gets its content. */
   function _blockSource(cid, id) {
     var phones = '';
     if (typeof Questionnaires !== 'undefined' && Questionnaires.list) {
@@ -1883,6 +1903,9 @@ window.ReportQuestionnaire = (function () {
       legend: ['Nothing to fill in. Same for everyone.', 'FullVision'],
       'competency-table': ['Nothing to fill in. Comes from scores.', 'FullVision'],
       'grade-table': ['Nothing to fill in. Comes from scores.', 'FullVision'],
+      assessments: ['Nothing to fill in. Each assessment and its score, from your gradebook.', 'FullVision'],
+      'category-summary': ['Nothing to fill in. Comes from scores and your category weights.', 'FullVision'],
+      'course-grade': [SCREEN_SOURCES[0][1], 'FullVision'],
       'missing-work': ['Nothing to fill in. Comes from assignments.', 'FullVision'],
       'teacher-narrative': [SCREEN_SOURCES[7][1], 'You'],
       'term-attendance': [SCREEN_SOURCES[6][1], 'You'],
@@ -1901,6 +1924,9 @@ window.ReportQuestionnaire = (function () {
       'student-reflection-habits': ['Nothing to fill in. The student writes on the printed page.', 'Student'],
       'parent-response': ['Nothing to fill in. The family writes it.', 'Family'],
       'text-block': ['Nothing to fill in. Your text on the form, in Progress Reports.', 'You'],
+      'fb-rubrics': ['Nothing to fill in. Your rubrics on each assessment, on pages after the report.', 'You'],
+      'fb-comments': ['Nothing to fill in. Your comments on each assessment, on pages after the report.', 'You'],
+      'fb-observations': ['Nothing to fill in. Your observations this term, on pages after the report.', 'You'],
     };
     return map[id] || ['Nothing to fill in. Comes from FullVision.', 'FullVision'];
   }
@@ -1925,28 +1951,25 @@ window.ReportQuestionnaire = (function () {
   }
 
   var INFO_ID = 'tq-info-overlay';
-  // html-safe: course, report and block labels esc()'d; sources and who chips are fixed text
+  // html-safe: course, report and part labels esc()'d; sources and who chips are fixed text
   function _infoHtml(cid) {
-    var form = _form(cid);
-    var on = ReportSheets.onForm(form);
+    var parts = _parts(cid);
+    var name = function (k) {
+      return _partLabel(parts.model, k, cid);
+    };
     var course = (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || '';
     var report = _reportLabel(getTermId());
     var habitsFrom = _habitsInfo(cid, _current());
     var screen = SCREEN_SOURCES.map(function (r, i) {
       return _sourceRow(r[0], i === 1 ? habitsFrom : r[1], r[2]);
     }).join('');
-    var blocks = on
+    var blocks = parts.on
       .map(function (id) {
         var s = _blockSource(cid, id);
-        return _sourceRow(_blockLabel(id), id === 'learner-dimensions' ? habitsFrom : s[0], s[1]);
+        return _sourceRow(name(id), id === 'learner-dimensions' ? habitsFrom : s[0], s[1]);
       })
       .join('');
-    var off = Object.keys(ReportSheets.BLOCKS)
-      .filter(function (id) {
-        var b = ReportSheets.BLOCKS[id];
-        return !b.retired && on.indexOf(id) < 0 && id !== 'header';
-      })
-      .map(_blockLabel);
+    var off = parts.off.map(name);
     return `<div class="qn-info" role="document">
       <div class="qn-info-top"><span class="qn-info-title" id="tq-info-title">Where This Information Comes From</span><button type="button" class="qn-btn" data-action="tqCloseInfo">Done</button></div>
       <span class="qn-info-label">On This Screen</span>

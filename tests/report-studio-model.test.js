@@ -9,7 +9,7 @@ import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const S = ReportSheets;
-const ids = f => S.onForm(f);
+const blocksOf = f => f.sides.flatMap(sd => sd.rows.flatMap(r => r.cells.map(c => c.block)));
 const cellOf = (f, id) => {
   for (const sd of f.sides) for (const row of sd.rows) for (const c of row.cells) if (c.block === id) return c;
   return null;
@@ -163,11 +163,10 @@ describe('normalizeForm', () => {
     expect(S.canHalf('legend')).toBe(true);
   });
 
-  it('formFor opens an old Brief class on the Interim Update and anything else on the name and Assignment Grades', () => {
-    expect(S.formFor({ preset: 'brief' }).id).toBe('interim-update');
-    expect(S.formFor({ preset: 'brief' }).sides).toHaveLength(1);
+  it('formFor opens a class with no saved form on the name and Assignment Grades', () => {
+    expect(S.formFor({ preset: 'brief' }).id).toBe('grades');
     expect(S.formFor({ preset: 'standard' }).id).toBe('grades');
-    expect(S.onForm(S.formFor(null))).toEqual(['header', 'grade-table']);
+    expect(blocksOf(S.formFor(null))).toEqual(['header', 'grade-table']);
     // Assignment Grades starts in one column, by date, year to date, on a
     // new report.
     expect(S.optionsFor(cellOf(S.formFor(null), 'grade-table'))).toMatchObject({
@@ -995,7 +994,7 @@ describe('stage 3 blocks', () => {
 
   it('a saved layout keeps a retired block', () => {
     const kept = S.normalizeForm({ v: 6, sides: [{ rows: [] }, { rows: [{ cells: [{ block: 'section-chart' }] }] }] });
-    expect(S.onForm(kept)).toContain('section-chart');
+    expect(blocksOf(kept)).toContain('section-chart');
   });
 
   it('Assignment Grades is Year to Date by default; Percent and Proficiency Word start from the class setting', () => {
