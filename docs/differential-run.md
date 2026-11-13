@@ -39,7 +39,7 @@ Exit codes:
 - 1: a difference.
 - 2: the run could not be done. A step over its 30-second limit is one (it names the step and action). So is a server the run started that stops while the run is going: the run ends at once and says that something outside it stopped the server. Run it again, alone if the machine is busy.
 
-Speed on an M5 Pro: 600 steps in both modes with `--offline --two-tabs` take about eight minutes with two other runs going. Three seeds can run at once.
+Speed on an M5 Pro: 600 steps in both modes with `--offline --two-tabs` take eight to ten minutes with two other runs going, less alone. Three seeds can run at once.
 
 ## What it does
 
