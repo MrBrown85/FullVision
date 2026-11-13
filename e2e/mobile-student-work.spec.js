@@ -118,7 +118,11 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   await expect(card.locator('.m-work-sent')).toContainText('Submitted');
   await expect(card.locator('.m-work-sent')).toContainText('2 photos');
   await expect(card.locator('.m-work-note')).toHaveText('Page 2 has my answers.');
-  await expect(card.locator('.m-work-page img').first()).toHaveAttribute('src', /sample-work\/cell-lab-noor-1\.jpg$/);
+  // The strip shows the thumbnail; the whole page shows only full screen.
+  await expect(card.locator('.m-work-page img').first()).toHaveAttribute(
+    'src',
+    /sample-work\/cell-lab-noor-1-thumb\.jpg$/,
+  );
   await expect(card.locator('.m-work-dot')).toHaveCount(2);
   await page.waitForTimeout(400);
   await shot(page, 'S7-F2-speed-grader-photos');
@@ -135,6 +139,29 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   // Full screen: every page.
   await card.locator('.m-work-full').click();
   await expect(page.locator('#m-sheet-container .m-work-sheet-page')).toHaveCount(2);
+  await expect(page.locator('#m-sheet-container .m-work-sheet-page').first()).toHaveAttribute(
+    'src',
+    /sample-work\/cell-lab-noor-1\.jpg$/,
+  );
+});
+
+test('the grader fills the card on screen and its neighbours, the rest when reached', async ({ page }) => {
+  await openPhone(page);
+  await openGradeTab(page);
+  await page.locator('.m-seg-btn[data-val="all"]').click();
+  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  const cards = page.locator('.m-swiper-card');
+  const withWork = await cards.evaluateAll(els =>
+    els.map((c, i) => (c.querySelector('.m-work-page img') ? i : -1)).filter(i => i >= 0),
+  );
+  const far = withWork.find(i => i > 2);
+  expect(far).toBeGreaterThan(2);
+  const strip = i => cards.nth(i).locator('.m-work-page img').first();
+  await expect(strip(withWork[0])).toHaveAttribute('src', /-thumb\.jpg$/);
+  await expect(strip(far)).not.toHaveAttribute('src', /./);
+  await page.locator('#m-thumb-strip .m-thumb').nth(far).click();
+  await expect(strip(far)).toHaveAttribute('src', /-thumb\.jpg$/);
 });
 
 test('the filter applies as you tap', async ({ page }) => {
