@@ -28,6 +28,10 @@ for (const wide of [false, true]) {
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', e => errors.push(String(e)));
+    // Demo Mode moves its dates so the class ends yesterday, and the fixture
+    // was drawn on Nov 12, 2026: the clock is set to that day, or every row's
+    // date is a day later from Nov 13 on (main's run at 00:10 UTC, Nov 13).
+    await page.clock.setFixedTime(new Date('2026-11-12T12:00:00'));
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/\/dashboard/, { timeout: 15000 });
     await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
