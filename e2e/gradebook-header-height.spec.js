@@ -24,4 +24,39 @@ test.describe('Scores header height', () => {
     await expect(page.locator('.gb-grid-colhead').first()).toBeVisible();
     expect(await height()).toBe(dragged);
   });
+
+  // The height is worked out from the titles' text before the draw is
+  // written: it must be what measuring each drawn title gives.
+  test('a redraw sizes the header as measuring the titles on the page does', async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await seedAssessments(page, [
+      { ...TEST_ASSESSMENT, title: 'Quiz 1' },
+      { ...TEST_ASSESSMENT, id: 'a-long', title: 'Ecosystems and Energy Flow Lab' },
+    ]);
+    await gotoApp(page, '/gradebook');
+    const height = () => page.evaluate(() => document.querySelector('.gb-grid-colhead').getBoundingClientRect().height);
+    const measured = () =>
+      page.evaluate(() => {
+        const ctx = document.createElement('canvas').getContext('2d');
+        let widest = 0;
+        document
+          .querySelectorAll('#gb-colheads .gb-scores-assess-name, #gb-colheads .gb-scores-assess-meta')
+          .forEach(el => {
+            const cs = getComputedStyle(el);
+            ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+            widest = Math.max(widest, ctx.measureText(el.textContent).width);
+          });
+        return Math.max(100, Math.min(170, Math.ceil((widest + 48) / Math.SQRT2)));
+      });
+    const want = await measured();
+    expect(want).toBeGreaterThan(100);
+    expect(await height()).toBe(want);
+    // Competencies and back: the Scores header drawn again.
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+    await expect(page.locator('.gb-grid-colhead').first()).toBeVisible();
+    expect(await height()).toBe(want);
+  });
 });
