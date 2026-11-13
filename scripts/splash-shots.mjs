@@ -253,20 +253,31 @@ const SHOTS = [
     },
   },
   {
-    file: 'custom-report.jpg',
+    file: 'progress-report.jpg',
+    // Narrow enough that the page is drawn beside the panel at reading size.
+    width: 1100,
+    height: 1000,
     async run(page, base) {
       await page.goto(base + '/reports');
       await pause(page, 1200);
-      await page.locator('role=tab[name="Progress Reports"]').first().click();
+      await page.getByRole('tab', { name: 'Progress Reports' }).click();
+      await page.waitForSelector('#studio.studio-one', { timeout: 10000 });
       await pause(page, 800);
-      await page.locator('main >> text="Custom"').first().click();
-      await pause(page, 500);
-      await page.locator('.studio-palette >> text="Templates"').first().click();
-      await pause(page, 500);
-      await page.locator('.studio-palette >> text="Report Card"').first().click();
-      await pause(page, 7000);
-      // The sheet itself, without the Undo toast below it.
-      return { clip: [555, 150, 590, 672] };
+      await page.locator('.one-setup-btn').click();
+      await pause(page, 300);
+      await page.locator('.one-setup-item[data-value="report-card"]').click();
+      await pause(page, 1500);
+      // One student on the page, picked by name so the shot does not move.
+      await page.getByRole('button', { name: 'Select students' }).click();
+      const list = page.locator('#picker-dropdown');
+      await list.getByRole('button', { name: 'Deselect All' }).click();
+      await list.locator('.student-picker-item', { hasText: 'Cece Adeyemi' }).click();
+      await page.getByRole('button', { name: 'Select students' }).click();
+      await page.locator('#rb-preview .sheet-student').first().waitFor({ timeout: 10000 });
+      await page.mouse.move(0, 0);
+      await pause(page, 2500);
+      // The parts panel and the student's first page, side by side.
+      return { clip: [182, 105, 908, 890] };
     },
   },
 
