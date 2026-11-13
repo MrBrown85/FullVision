@@ -195,6 +195,11 @@ describe('score-save-parity', () => {
       'teacher/page-gradebook.js',
       'teacher-mobile/tab-grade.js',
       'shared/data.js',
+      'shared/data-student-work.js',
+      'shared/data-feedback-live.js',
+      'shared/data-markup.js',
+      'shared/data-reflect.js',
+      'shared/data-revisions.js',
     ];
     it.each(files)('%s passes scoreTypeFor to upsertScore', file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
