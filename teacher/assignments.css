@@ -9218,6 +9218,11 @@ button.grader-member-name {
   background: var(--active);
   color: #fff;
 }
+/* See the Work on a row of the whole-class grid (WorkWall.seeWorkHtml). */
+.rsg-see-work {
+  border-color: var(--link);
+  color: var(--link);
+}
 /* The open card's Set Everyone To ▾ and ⋯ menus (AssignmentsPage). */
 .assess-menu-wrap {
   position: relative;

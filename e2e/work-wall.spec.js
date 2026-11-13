@@ -66,6 +66,42 @@ test('with Send Work off there is no wall and no Work tab', async ({ page }) => 
   await expect(page.locator('#stu-tab-work')).toHaveCount(0);
 });
 
+test('the student page on and Send Work off: work that is in still shows', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const at = await openDemo(page, { on: false });
+  await page.evaluate(cid => setStudentPageSwitch(cid, true, 'on_return'), at.cid);
+  // Nobody is To Grade or Not In: the piece takes nothing while Send Work is off.
+  expect(await page.evaluate(({ cid, LAB }) => GraderWork.workCounts(cid, LAB).notin, { cid: at.cid, LAB })).toBe(0);
+  await page.goto('/assignments?open=' + LAB);
+  await page.waitForSelector('#dock-mount nav');
+  // See the Work on a student's row opens the grader on their pages.
+  const see = page.locator('#ac-' + LAB + ' .rsg-see-work[data-sid="st2"]');
+  await expect(see).toHaveText('See the Work');
+  await see.click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog).toHaveClass(/has-work/);
+  await expect(dialog.locator('.grader-work-img')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  // The wall opens for the piece.
+  expect(await page.evaluate(({ cid, LAB }) => WorkWall.open(cid, LAB), { cid: at.cid, LAB })).toBe(true);
+  await expect(page.locator('#work-wall-overlay .ww-title')).toHaveText('Work Wall');
+  await page.evaluate(() => WorkWall.close());
+  // The student page: the Work tab, and the pages whole beside the rubric in an open row.
+  await page.goto('/student?id=st2&course=' + at.cid + '&tab=overview');
+  await expect(page.locator('#stu-tab-work')).toHaveCount(1);
+  await page.locator('.stu-ov-row-btn', { hasText: 'Cell Microscope Lab' }).first().click();
+  const pages = page.locator('.stu-ov-work .ovw-img');
+  await expect(pages).toHaveCount(2);
+  await expect.poll(() => pages.first().evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+  await page.locator('.stu-ov-work .ovw-page').nth(1).click();
+  await expect(page.locator('#work-viewer-overlay .wv-at')).toHaveText('2 of 2');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#work-viewer-overlay')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('the wall: thumbnails only, sorting, the level filters, a page, the grader', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));

@@ -179,12 +179,14 @@ describe('the Work Wall opens where work is on or in', () => {
     WorkWall.close();
   });
 
-  it('the build switch off, work in: the wall shows it', () => {
+  it('Demo Mode with the build switch off: no wall, work in or not', () => {
     seed();
     setStudentPageSwitch(CID, false);
-    expect(WorkWall.open(CID, PIECE)).toBe(true);
-    expect($('#work-wall-overlay')).not.toBeNull();
-    WorkWall.close();
+    expect(WorkWall.open(CID, PIECE)).toBe(false);
+    expect($('#work-wall-overlay') === null).toBe(true);
+    expect(WorkWall.seeWorkHtml(CID, PIECE, IDS[0])).toBe('');
+    expect(WorkWall.pieceHtml(CID, IDS[0], PIECE)).toBe('');
+    expect(WorkWall.tabOn(CID)).toBe(false);
   });
 });
 

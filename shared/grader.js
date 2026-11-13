@@ -440,6 +440,9 @@ window.Grader = (function () {
      stored work it was worked out from, and nothing is copied. */
   var _withWork = { cid: null, stored: null, ids: {} };
   function _piecesWithWork(cid) {
+    // Demo Mode keeps the student page build behind its switch, as before:
+    // its sample class holds sample work, and a visitor is not shown it.
+    if (typeof isDemoMode === 'function' && isDemoMode() && !getReturnSettings(cid).student_page) return {};
     var stored = typeof peekStudentWork === 'function' ? peekStudentWork(cid) : null;
     if (!stored) return {};
     if (_withWork.cid !== cid || _withWork.stored !== stored) {
