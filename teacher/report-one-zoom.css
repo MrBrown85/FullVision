@@ -65,6 +65,19 @@
   .rb-preview.studio-pages:not(.studio-all) .sheet-zoom > .report-sheet {
     transform: none !important;
   }
+  /* No transition into print. The app's reduced-motion rule (styles.css)
+     gives every property a 0.01 ms transition, and a running transition
+     outranks even !important: on the switch to print a sheet kept its
+     screen scale (and the pages their screen sizes) until the next frame.
+     With none, the print rules above and in reports.css win at once. The
+     page round the preview too: its padding for the top bar went the same
+     way, so a sheet could start 52 px down the first printed page. */
+  html,
+  html *,
+  html *::before,
+  html *::after {
+    transition: none !important;
+  }
 }
 
 /* ── The Zoom control, left of Paper ─────────────────────────── */
@@ -173,4 +186,54 @@
    left edge, not the picked highlight. */
 #gb-roster-list .student-row.fv-shown-now {
   box-shadow: inset 3px 0 0 var(--active);
+}
+
+/* ── Everyone view at a percent (ReportOneZoom, class fit-zoom) ──────
+   Whole Class sets nothing: the Fit Map's rules in teacher/reports.css
+   draw it as they always have. At a percent each student's block holds
+   their name and badge over their sides, two to a row, a sheet's front
+   and back side by side (8 px apart, 22 px between sheets, as in One
+   Student); the blocks flow and wrap as the Fit Map's do. Screen only:
+   Print Reports prints from this view, so nothing here may reach print. */
+@media screen {
+  .rb-preview.report-fitmap.fit-zoom .sheet-student {
+    display: grid;
+    grid-template-columns: repeat(2, calc(8.5in * var(--fit-zoom) + 7px));
+    column-gap: 8px;
+    row-gap: 8px;
+    align-content: start;
+    width: auto;
+    max-width: none;
+    padding: 8px;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student-head {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom {
+    display: block;
+    width: calc(8.5in * var(--fit-zoom));
+    height: calc(11in * var(--fit-zoom));
+    margin: 0;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom:has(.report-sheet[data-paper='legal']) {
+    height: calc(14in * var(--fit-zoom));
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student > .sheet-zoom:nth-child(odd of .sheet-zoom) {
+    justify-self: end;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student > .sheet-zoom:nth-child(even of .sheet-zoom) {
+    justify-self: start;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom > .report-sheet {
+    transform: scale(var(--fit-zoom));
+  }
+  /* The Fit Map's marks keep their size on screen: the shadow round each
+     side and the outline on a second sheet onward. */
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom .report-sheet {
+    box-shadow: 0 0 0 calc(1px / var(--fit-zoom)) rgba(0, 0, 0, 0.12);
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student:not([data-sheets='1']) .sheet-zoom:nth-child(n + 4) .report-sheet {
+    outline-width: calc(2px / var(--fit-zoom));
+  }
 }

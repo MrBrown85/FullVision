@@ -263,7 +263,8 @@ test('Previous and Next Student follow the rail, its search included', async ({ 
   await expect(page.getByRole('button', { name: 'Previous Student' })).toBeVisible();
   await page.locator('.studio-view [data-view="all"]').click();
   await expect(page.getByRole('button', { name: 'Previous Student' })).toBeHidden();
-  await expect(page.locator('#studio-zoom')).toBeHidden();
+  // Everyone view has its own zoom (e2e/report-everyone-zoom.spec.js).
+  await expect(page.locator('#studio-zoom-btn')).toHaveText('Whole Class');
 });
 
 test('Hide Panels gives the pages the width; Show Panels brings both panels back as they were', async ({ page }) => {
