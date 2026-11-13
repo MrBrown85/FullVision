@@ -120,3 +120,39 @@ One line per PR: what merged, what was learned, what it changed. A note per phas
 | When         | What                                   | Learned                                                                                                            | Changed                                                                                      |
 | ------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | Nov 13, plan | The checks in section 1, before any PR | Three planned tools were not needed, and two items (#40, #42) were several times larger than the first draft said. | Two enablers dropped; #40 and #38 parked; #42 narrowed; #43 folded into #45; four at a time. |
+
+### Phase 1 and most of Phase 2, Nov 13 (one night)
+
+Merged, in order: PRs 1322, 1323, 1324, 1326, 1325, 1328, 1327, 1330, 1333, 1335, 1332, 1331, 1334, 1337, 1338, 1336. Applied to the live database, on Colin's word: `same_teacher_links`. Nothing was released.
+
+| Item                     | What happened                                                                                                                                 | Learned                                                                                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #41, #36, package name   | PR 1324. The type check can fail a merge; big files may only shrink.                                                                          | 26 files are over 1,500 lines, not 14.                                                                                                                  |
+| #8                       | The check of `87ed0faa` passed.                                                                                                               | Five screens sorted same-date work by date alone: the same cause as #22.                                                                                |
+| #22                      | PR 1326. Same-date work shows in made order on six screens; report ties come newest first, as the comment bank already did.                   | My brief gave no direction for the tie, and the first build chose the wrong one. Briefs now say the direction of every sort and name the rule to match. |
+| #16                      | PR 1325. The database's structure rebuilds from the repo and equals live three ways.                                                          | The repo had never been able to rebuild it. The baseline is read from the live catalogs by the read-only CI role.                                       |
+| #42                      | PR 1328. Missing-value checks on the grade math, comments only.                                                                               | An identical syntax tree, before and after, is a proof a reviewer can re-run in seconds. It is now asked of every move-only or comment-only PR.         |
+| #23                      | PR 1327. The comparison tool lists the mark writers a run reached, and a move names the ones it must reach.                                   | The tool guarded only the actions it performed. One cause, fixed once.                                                                                  |
+| #51                      | PR 1330. The service worker refuses a file of the wrong type.                                                                                 |                                                                                                                                                         |
+| S19 #5, B6               | PR 1333. One dead function went.                                                                                                              | S19 #5 had already been done by PR 1241. Check a plan's list against `main` before briefing from it.                                                    |
+| #48                      | PRs 1335, 1337, 1338. Tests that one teacher cannot reach another's rows, on every PR. They found a real gap, closed by `same_teacher_links`. | The most valuable item of the night. A security finding is built and rehearsed locally and pushed only after it is applied.                             |
+| #44, part of #45 and #46 | PRs 1331, 1334, 1332, at Colin's request. Typed globals, database types, typed server calls, a ratchet for `// @ts-check`.                    | No wrapper disagrees with its server function.                                                                                                          |
+| #1, step 4               | PR 1336. A tab that is behind no longer clears or reverts another tab's marks.                                                                | The plan was wrong about this item: a level tap already saved one mark, and the phone's 395 ms was the recorder. The real fault was a second tab.       |
+
+What the log changes in section 3:
+
+- **#1 is now three small steps (4, 5, 1) that stop marks being lost.** The design is in draft PR 1329. Its largest step (10b) and the two that sit on it (11, 12) are parked: after the three steps plus 6, 9 and 10a no real class's mark is lost, and the lasting fix is one stored record per cell.
+- **S19-C10 is closed.** The phone's tap draws in about 15 ms.
+- **Moving the mark writers (S19 #7) is no longer on the path to stopping loss.** It stays in Phase 4 as tidying.
+- **A fix cannot be proved by the comparison tool past the first place it acts.** The tool stops at the first difference. Steps that change calls are proved by unit tests and two-page browser specs.
+- **One heavy job at a time.** Three browser suites at once made unit tests time out and one run useless.
+- **A migration PR takes two pushes.** The first fails the snapshot step and uploads the live snapshot; the second commits it with the refreshed baseline. Until it merges, every other PR fails that step.
+
+## 6. For Colin
+
+1. **Release.** `main` holds the fix for the two-tab loss (PR 1336) and everything above. Release when you choose; step 4 is best released alone.
+2. **Until it is released: one tab per class.** The fault needs two tabs of one browser on one class, offline or with changes waiting, and one of them opened or reloaded in that time.
+3. **Report lines.** A Best or Lowest line can name different pieces than before when three or more tie at a mark (PR 1326). No grade changed. The comment bank still prefers a piece on the strongest competency, so the comment and the line can differ when a tie spans competencies.
+4. **A loose grant.** The signed-out and signed-in roles may create objects in schema `public`. Nothing uses it. The fix is a one-line migration, not yet written.
+5. **Found, not started:** a same-date piece made earlier is never listed as "before" on Class Results; a piece made offline takes the time it reached the server; a restored class loses made-order; CI's snapshot does not cover schema `fv_private`; two browser specs fail on this Mac and pass on GitHub (`edit-student-dialog.spec.js:21`, `work-wall.spec.js:69`); the comparison tool's fake server answers every `list_` read with no rows.
+6. **Not rehearsed:** the student page's own writes on a database with `same_teacher_links`. Every existing student-page row on live fits the rule.

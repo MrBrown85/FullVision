@@ -2,6 +2,21 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Grade math may be touched; Colin's and Karen's scores must not break (2026-11-13)
+
+Context: during the alignment build ([`plans/alignment-plan.md`](plans/alignment-plan.md)) Colin wrote:
+
+> i approve things that touch grade math, but don't break colin or karen's scores
+
+- **Rule:** a change that touches `shared/calc.js` or other grade math no longer waits for Colin's review, on one condition: no grade, level or percent that Colin or Karen sees in a real class changes.
+- **Each such PR shows it.** The golden-grade tests pass untouched. Where the change could reach a number, the PR gives a proof: an identical syntax tree for a comment-only change, or a before-and-after comparison on data shaped like their classes.
+- **If a number would move, the PR stops and goes to Colin.**
+- **Still Colin's:** every release, SQL on the live database, and anything that deletes data. This narrows rule 2 of `CLAUDE.md` for this build; it does not replace it.
+
+## The same-teacher rule was applied (2026-11-13)
+
+The security rule tests found that the database checked which class a row belongs to and not the other records the row names. Colin was told what it was, that the live data held no such link (69 read-only checks, 0 rows), and that the fix was rehearsed with a tested undo. His answer: "Approved". `migrations/2026111301_same_teacher_links.sql` was applied the same night; PR 1337 records it and PR 1338 tests it on every PR. He approved it without reading the SQL, which is in that file.
+
 ## Wave 0 rulings (2026-11-13)
 
 Context: the alignment plan ([`plans/alignment-plan.md`](plans/alignment-plan.md)) began with a list of decisions waiting for Colin ("Wave 0"). Asked for them, he answered:
