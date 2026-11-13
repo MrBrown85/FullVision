@@ -1,3 +1,4 @@
+// @ts-check
 /* The learning map: getLearningMap and saveLearningMap, the flat-map migration, removed sections, the save to the server (_persistLearningMapToCanonical),
    and competency groups, sections and tags. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -94,7 +95,7 @@ function getLearningMap(cid) {
   // Not yet loaded into cache — read from localStorage as fallback
   var map;
   try {
-    const custom = JSON.parse(localStorage.getItem('gb-learningmap-' + cid));
+    const custom = JSON.parse(/** @type {string} */ (localStorage.getItem('gb-learningmap-' + cid)));
     if (custom && custom._customized) map = custom;
   } catch (e) {
     console.warn('LearningMap parse error:', e);
@@ -492,7 +493,12 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
     var sent = hasBaseline ? _learningMapSignatures(baseline) : null;
     var current = hasBaseline ? _learningMapSignatures(map) : null;
     function unchanged(kind, id) {
-      return !!(sent && _isUuid(id) && sent[kind][id] !== undefined && sent[kind][id] === current[kind][id]);
+      return !!(
+        sent &&
+        _isUuid(id) &&
+        sent[kind][id] !== undefined &&
+        sent[kind][id] === /** @type {NonNullable<typeof current>} */ (current)[kind][id]
+      );
     }
     if (!_learningMapIdRemap[cid]) _learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} };
     var known = _learningMapIdRemap[cid];
@@ -647,7 +653,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
           if (window.v2.removeSection) opsToDelete.push(window.v2.removeSection(gone));
           return;
         }
-        if (pair[3]) opsToDelete.push(pair[3](gone));
+        if (pair[3]) opsToDelete.push(/** @type {(id: string) => unknown} */ (pair[3])(gone));
       });
     });
     opsToDelete.forEach(function (op) {

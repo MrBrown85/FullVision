@@ -1,10 +1,11 @@
+// @ts-check
 /* Assessments: getAssessments and saveAssessments, the save to the server (create, update, delete, collab), window.duplicateAssessment,
    window.saveAssessmentTags, window.saveCollab and _cleanOrphanedScores. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
 function getAssessments(cid) {
   if (_cache.assessments[cid] !== undefined) return _cache.assessments[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-assessments-' + cid)) || [];
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-assessments-' + cid))) || [];
   } catch (e) {
     console.warn('Assessments parse fallback:', e);
     return [];
@@ -99,6 +100,7 @@ function _persistAssessmentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
   if (!sb) return;
   var tail = _assessmentDispatchQueue[cid] || Promise.resolve();
+  /** @type {Promise<unknown> | null} */
   var landed = null;
   var dispatched = tail.then(function () {
     var before = _serverStateOr('assessments', cid, prev);
@@ -292,6 +294,7 @@ function _changedPatch(patch, basePatch) {
    Without `base`, everything. */
 function _canonicalUpdateAssessment(sb, cid, assessmentId, a, base) {
   var tagIds = (a.tagIds || []).filter(_isUuid);
+  /** @type {Record<string, unknown>} */
   var patch = _assessmentPatchOf(a);
   var sendTags = true;
   var sendCollab = true;

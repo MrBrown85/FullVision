@@ -1,3 +1,4 @@
+// @ts-check
 /* Class settings: saveConfig, getCourseConfig and saveCourseConfig, the changed-only settings patch and the old-settings write guard.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). getConfig stayed in shared/data.js. */
 
@@ -72,7 +73,7 @@ function saveConfig(obj) {
 function getCourseConfig(cid) {
   if (_cache.courseConfigs[cid] !== undefined) return _cache.courseConfigs[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-courseconfig-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-courseconfig-' + cid))) || {};
   } catch (e) {
     console.warn('CourseConfig parse fallback:', e);
     return {};
@@ -265,7 +266,12 @@ function _sendableCoursePatch(params, options) {
     delete clean[FV_SETTINGS_CHANGED_ONLY];
     return { params: Object.assign({}, params, { p_patch: clean }) };
   }
-  return _isOldSettingsPatch(patch) ? _oldSettingsWrite(params, options || {}) : { params: params };
+  return _isOldSettingsPatch(patch)
+    ? /** @type {(params: unknown, options: unknown) => ReturnType<typeof _oldSettingsWrite>} */ (_oldSettingsWrite)(
+        params,
+        options || {},
+      )
+    : { params: params };
 }
 function _isOldSettingsPatch(patch) {
   return (
