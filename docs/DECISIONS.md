@@ -1020,3 +1020,11 @@ Context: the Progress Reports screen offered two things, the Quick Report (seven
 - **Saved reports are read, never rewritten.** A class's Quick Report choices or built form open as a model with the same parts in the same order; the saved form is kept as it is, and a printed copy reprints as it went home.
 - **Letter and Legal** stay, beside the pages.
 - Not built yet, each its own change: Excuse It Instead on a missing piece (it changes a grade: Colin's review), IEP Goals for one student, Use in My Other Classes. The old editor's code stays, unreachable, until One Report has been the screen for a reporting period.
+
+## One Report is the Progress Reports screen (2026-11-13)
+
+Colin: "make one report the screen for everyone and remove the old editor. clean up the code." (Colin, 2026-11-13.)
+
+1. **One Report is the Progress Reports screen for every teacher.** No switch turns it on. The Quick Report / Custom choice and Page Studio's editor are gone (`teacher/report-studio.js`). This replaces "Page Studio is the Progress Reports screen" (Report forms 8) and the last bullet of One Report (2026-11-12), "The old editor's code stays, unreachable, until One Report has been the screen for a reporting period".
+2. **The template library is removed.** Save as Template and Your Templates are gone because no teacher had saved a template (the live database, 2026-11-13: 0 rows in `report_template`). The table and its functions are left as they are.
+3. **Saved report settings are read, never rewritten.** A class's Quick Report choices or built form open as the same parts in the same order, and a printed copy reprints as it went home. The readers for saved forms and printed copies stay.
