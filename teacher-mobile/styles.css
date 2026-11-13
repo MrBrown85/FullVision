@@ -1353,7 +1353,10 @@ body.fv-switching-course::after {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .m-filter-pill.m-filter-active {
   background: var(--active);
@@ -1602,7 +1605,10 @@ body.fv-switching-course::after {
   color: var(--text-2);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .m-sentiment-btn.m-selected {
   border-color: var(--active);
@@ -1702,7 +1708,10 @@ body.fv-switching-course::after {
   color: var(--text-2);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
 }
 .m-seg-btn.m-seg-active {
   background: var(--surface);
@@ -1995,7 +2004,12 @@ body.fv-switching-course::after {
   cursor: pointer;
   position: relative;
   -webkit-tap-highlight-color: transparent;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2255,7 +2269,11 @@ body.fv-switching-course::after {
   color: var(--text-3);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
 }
 .m-status-row .m-status-pill {
   position: relative;

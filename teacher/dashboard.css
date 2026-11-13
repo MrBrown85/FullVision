@@ -2169,7 +2169,10 @@ a.dash-ins-name:hover {
   background: var(--surface);
   color: var(--text-2);
   cursor: pointer;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
   white-space: nowrap;
 }
 .dash-filter-chip:hover {
@@ -3609,7 +3612,10 @@ a.dash-ins-name:hover {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .cw-grade-btn:hover {
   border-color: var(--active);
@@ -3637,7 +3643,10 @@ a.dash-ins-name:hover {
   background: var(--surface);
   color: var(--text-2);
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3695,7 +3704,10 @@ a.dash-ins-name:hover {
   flex-shrink: 0;
   font-size: var(--text-xs);
   color: transparent;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 .cw-course-item.selected .cw-course-check {
   background: var(--active);
@@ -3738,7 +3750,10 @@ a.dash-ins-name:hover {
   font-weight: 500;
   cursor: pointer;
   width: 100%;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 .cw-custom-btn:hover {
   border-color: var(--text-3);
@@ -4516,7 +4531,10 @@ a.dash-ins-name:hover {
   background: transparent;
   color: var(--link);
   cursor: pointer;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 .cm-relink-btn:hover {
   background: var(--active);
@@ -4581,7 +4599,9 @@ a.dash-ins-name:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.1s;
+  transition:
+    background-color 0.1s,
+    color 0.1s;
 }
 .cm-delete-mini:hover {
   background: rgba(255, 59, 48, 0.1);
@@ -4758,7 +4778,11 @@ a.dash-ins-name:hover {
   border-radius: var(--radius-sm);
   padding: 6px 14px;
   cursor: pointer;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s,
+    opacity 0.12s;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -4892,7 +4916,9 @@ a.dash-ins-name:hover {
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: all 0.1s;
+  transition:
+    border-color 0.1s,
+    transform 0.1s;
 }
 .cm-color-dot:hover {
   border-color: var(--text);

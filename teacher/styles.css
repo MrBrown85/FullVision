@@ -414,7 +414,9 @@ body.offline-active #app-dock {
   font-family: var(--font-base);
   font-size: var(--text-sm);
   color: var(--text-2);
-  transition: all 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
   white-space: nowrap;
   max-width: 180px;
 }
@@ -1241,7 +1243,13 @@ body.offline-active #app-dock {
   color: #fff;
   border: none;
   cursor: pointer;
-  transition: all var(--duration-micro) var(--ease-out);
+  transition:
+    background-color var(--duration-micro) var(--ease-out),
+    border-color var(--duration-micro) var(--ease-out),
+    color var(--duration-micro) var(--ease-out),
+    box-shadow var(--duration-micro) var(--ease-out),
+    filter var(--duration-micro) var(--ease-out),
+    transform var(--duration-micro) var(--ease-out);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -1279,7 +1287,10 @@ body.offline-active #app-dock {
   color: var(--text-2);
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: all var(--duration-micro) var(--ease-out);
+  transition:
+    background-color var(--duration-micro) var(--ease-out),
+    border-color var(--duration-micro) var(--ease-out),
+    color var(--duration-micro) var(--ease-out);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1842,7 +1853,13 @@ body.offline-active #app-dock {
   color: #fff;
   border: none;
   cursor: pointer;
-  transition: all var(--duration-micro);
+  transition:
+    background-color var(--duration-micro),
+    border-color var(--duration-micro),
+    color var(--duration-micro),
+    box-shadow var(--duration-micro),
+    filter var(--duration-micro),
+    transform var(--duration-micro);
   box-shadow: 0 1px 4px rgba(0, 122, 255, 0.12);
   text-decoration: none;
   flex-shrink: 0;
@@ -2286,7 +2303,14 @@ body.offline-active #app-dock {
   min-height: 32px;
   line-height: 1;
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
   border: none;
   display: inline-flex;
   align-items: center;
@@ -2590,7 +2614,9 @@ body.offline-active #app-dock {
   padding: 4px 12px;
   border-radius: var(--radius-xs);
   cursor: pointer;
-  transition: all 0.1s;
+  transition:
+    background-color 0.1s,
+    border-color 0.1s;
 }
 .undo-toast-btn:hover {
   background: rgba(255, 255, 255, 0.15);
@@ -2645,7 +2671,9 @@ body.offline-active #app-dock {
   padding: 4px 12px;
   border-radius: var(--radius-xs);
   cursor: pointer;
-  transition: all 0.1s;
+  transition:
+    background-color 0.1s,
+    border-color 0.1s;
 }
 .sync-toast-btn:hover {
   background: rgba(255, 255, 255, 0.15);
