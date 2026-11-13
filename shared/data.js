@@ -4293,29 +4293,6 @@ function _savedCopyUsable(cid) {
   return _hasLocalCopy(cid);
 }
 
-// A saved copy that still keeps rubric scores under competencies.
-function _savedCopyHasLegacyRubricKeys(cid) {
-  var scores = _safeParseLS('gb-scores-' + cid, {});
-  var assessments = _safeParseLS('gb-assessments-' + cid, []);
-  var rubricById = {};
-  _safeParseLS('gb-rubrics-' + cid, []).forEach(function (r) {
-    if (r && r.id) rubricById[r.id] = r;
-  });
-  var legacyTags = {};
-  (assessments || []).forEach(function (a) {
-    var rubric = a && !isPointsScored(a) && rubricById[a.rubricId || a.rubric_id];
-    if (!rubric) return;
-    var tags = {};
-    (rubric.criteria || []).forEach(function (c) {
-      ((c && c.tagIds) || []).forEach(function (t) {
-        tags[t] = true;
-      });
-    });
-    legacyTags[a.id] = tags;
-  });
-  return _hasLegacyRubricKeys(scores || {}, legacyTags);
-}
-
 /* The copy becomes the server baseline only when it holds no local edits:
    with edits it isn't what the server has, and diffing against it would
    hide them. Without a baseline (or a version) the check downloads the
