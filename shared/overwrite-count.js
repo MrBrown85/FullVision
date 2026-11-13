@@ -14,22 +14,25 @@
  * outbox waits for it. Neither shared/data.js nor shared/offline-queue.js
  * calls this file.
  *
- * Which writes: the score writes still waiting (v2Queue.queued, read-only
- * copies) that were queued at least a minute before the drain started, for
- * which this tab holds the baseline row the write was made against
- * (shared/data.js _baselineUndo, read and never changed):
+ * Which writes: every score write still waiting (v2Queue.queued, copies,
+ * read and never written) that was queued at least a minute before the
+ * drain started. One is measured when this tab holds the baseline row it
+ * was made against (shared/data.js _baselineUndo, read and never changed),
+ * for every write waiting on the same field:
  *   upsert_tag_score      a competency's level, +/−, and comment
  *   upsert_rubric_score   a criterion's level, +/−, Work On and Went Beyond
  *   upsert_score          the score of points, Complete/Incomplete or
  *                         unlinked proficiency work (value, +/−)
  *   save_score_comment    the Overall Comment
  *   set_score_status      Missing, Excused or Late
- * Left out, because what this device last knew can't be told: clear_score
- * (a whole cell, which the baseline keeps in another shape), set_rubric_check
- * (no baseline row), a write queued before this page loaded (the baseline is
- * in memory only) or by another tab, upsert_score on work scored by
- * competency or rubric (the cache keeps no copy of score.value there), and a
- * write whose target has a rejected write in the failed list.
+ * Not measured, because what this device last knew can't be told, and
+ * counted as such: clear_score (a whole cell, which the baseline keeps in
+ * another shape), set_rubric_check and save_score_report_note, a write
+ * queued before this page loaded (the baseline is in memory only, so a
+ * browser closed or reloaded while offline leaves every waiting score here)
+ * or by another tab, upsert_score on work scored by competency or rubric (the
+ * cache keeps no copy of score.value there), a field with a rejected write in
+ * the failed list, and cells past the read's cap. No read is made for them.
  *
  * Counted: a cell whose server value differs from what this device last knew
  * and from every value this device has waiting for it. A proficiency 0 is no
@@ -39,8 +42,12 @@
  * out low, never high.
  *
  * Sent: one Sentry warning, "Overwrite count: <n> of <m> waiting cells changed
- * on the server (waited <bucket>)", at most once per bucket per page load,
- * also when n is 0. Nothing else: no ids, names, class, scores or comments.
+ * on the server, <k> not measured (waited <bucket>)", the bucket from the
+ * oldest waiting score write, measured or not. k counts the cells with no
+ * measured write, so "could not look" is told apart from "never happens".
+ * At most once per bucket per page load; also when n is 0, and when only k
+ * has anything (with no read). Nothing else: no ids, names, class, scores
+ * or comments.
  * Demo Mode has no server and never reports. Nothing shows on screen.
  */
 (function () {
@@ -52,11 +59,14 @@
   var ROW_LIMIT = 1000; // a read this long may have been cut short: no report
   var KEEP = {}; // a note sent as null keeps the server's
 
+  // The score writes that can be measured, and every score write (the rest
+  // are counted as not measured).
   var ENDPOINTS = ['upsert_tag_score', 'upsert_rubric_score', 'upsert_score', 'save_score_comment', 'set_score_status'];
+  var SCORE_ENDPOINTS = ENDPOINTS.concat(['clear_score', 'set_rubric_check', 'save_score_report_note']);
 
   /** @type {Record<string, true>} buckets reported or being read this page load */
   var _buckets = {};
-  /** @type {Record<string, true>} outbox entry ids already measured */
+  /** @type {Record<string, true>} outbox entry ids already in a report */
   var _measured = {};
   /** @type {(() => void) | null} */
   var _unsubscribe = null;
@@ -352,42 +362,81 @@
       });
     }
 
-    /** @type {Record<string, Target>} */
-    var byKey = {};
+    // Every waiting score write that waited long enough, grouped by what it
+    // sets. queued() hands back copies; even so, an entry here is only ever
+    // read, never assigned to.
+    /** @type {Record<string, { cell: string, endpoint: string, entries: Record<string, unknown>[] }>} */
+    var groups = {};
     /** @type {string[]} */
     var order = [];
     var oldest = 0;
     var queued = /** @type {(endpoint: string) => unknown} */ (queue.queued);
-    ENDPOINTS.forEach(function (endpoint) {
+    SCORE_ENDPOINTS.forEach(function (endpoint) {
       var list = queued(endpoint);
       (Array.isArray(list) ? list : []).forEach(function (/** @type {unknown} */ item) {
         var e = _obj(item);
-        if (!e || typeof e.id !== 'string' || _measured[e.id]) return;
+        if (!e || typeof e.id !== 'string') return;
         var waited = startedAt - Date.parse(_text(e.created_at));
         if (!(waited >= MIN_WAIT_MS)) return;
-        var p = _obj(e.payload);
-        var t = p ? _target(endpoint, p, undos[e.id]) : null;
-        if (!t || failed[t.key]) return;
-        var had = byKey[t.key];
-        // Oldest first: the first write to a target holds what this device
-        // knew before it; every later one adds a value it is sending.
-        if (had) {
-          had.send = had.send.concat([t.send]);
-          (had.ids || []).push(e.id);
-        } else {
-          t.send = [t.send];
-          t.ids = [e.id];
-          byKey[t.key] = t;
-          order.push(t.key);
-        }
         if (waited > oldest) oldest = waited;
+        var p = _obj(e.payload) || {};
+        var cell =
+          typeof p.p_enrollment_id === 'string' && typeof p.p_assessment_id === 'string'
+            ? p.p_enrollment_id + ':' + p.p_assessment_id
+            : 'entry:' + e.id;
+        var key = (ENDPOINTS.indexOf(endpoint) >= 0 && _keyOf(endpoint, p)) || 'other:' + endpoint + ':' + e.id;
+        if (!groups[key]) {
+          groups[key] = { cell: cell, endpoint: endpoint, entries: [] };
+          order.push(key);
+        }
+        groups[key].entries.push(e);
       });
     });
     if (!order.length) return;
     var bucket = _bucket(oldest);
     if (_buckets[bucket]) return;
 
-    // The first cells, as long as the read stays small.
+    // A target is measured only when every write waiting for it was made on
+    // this page against a baseline this tab holds. Oldest first: the first
+    // holds what this device knew before it; every later one adds a value it
+    // is sending. One measured in an earlier report is left out of this one.
+    /** @type {Target[]} */
+    var measurable = [];
+    /** @type {Record<string, true>} */
+    var unmeasured = {};
+    /** @type {string[]} */
+    var reported = [];
+    order.forEach(function (key) {
+      var g = groups[key];
+      var ids = g.entries.map(function (e) {
+        return /** @type {string} */ (e.id);
+      });
+      if (
+        ids.some(function (id) {
+          return _measured[id];
+        })
+      )
+        return;
+      reported = reported.concat(ids);
+      /** @type {Target | null} */
+      var base = null;
+      var ok = ENDPOINTS.indexOf(g.endpoint) >= 0 && !failed[key];
+      for (var i = 0; ok && i < g.entries.length; i++) {
+        var p = _obj(g.entries[i].payload);
+        var t = p ? _target(g.endpoint, p, undos[/** @type {string} */ (g.entries[i].id)]) : null;
+        if (!t) ok = false;
+        else if (!base) {
+          base = t;
+          base.send = [t.send];
+        } else base.send = base.send.concat([t.send]);
+      }
+      if (ok && base) measurable.push(base);
+      else unmeasured[g.cell] = true;
+    });
+    if (!reported.length) return;
+
+    // The first cells, as long as the read stays small; the rest are not
+    // measured.
     /** @type {Record<string, true>} */
     var cells = {};
     /** @type {Record<string, true>} */
@@ -396,27 +445,53 @@
     var aids = {};
     /** @type {Target[]} */
     var targets = [];
-    order.forEach(function (key) {
-      var t = byKey[key];
+    measurable.forEach(function (t) {
       var parts = t.cell.split(':');
       if (!cells[t.cell]) {
         var more = (sids[parts[0]] ? 0 : 1) + (aids[parts[1]] ? 0 : 1);
-        if (Object.keys(cells).length >= MAX_CELLS) return;
-        if (Object.keys(sids).length + Object.keys(aids).length + more > MAX_IDS) return;
+        if (
+          Object.keys(cells).length >= MAX_CELLS ||
+          Object.keys(sids).length + Object.keys(aids).length + more > MAX_IDS
+        ) {
+          unmeasured[t.cell] = true;
+          return;
+        }
         cells[t.cell] = true;
         sids[parts[0]] = true;
         aids[parts[1]] = true;
       }
       targets.push(t);
     });
-    if (!targets.length) return;
+    // A cell with any measured write counts among the measured.
+    var k = Object.keys(unmeasured).filter(function (cell) {
+      return !cells[cell];
+    }).length;
 
     _buckets[bucket] = true;
-    targets.forEach(function (t) {
-      (t.ids || []).forEach(function (id) {
+    /** @param {number} n @param {number} m */
+    var report = function (n, m) {
+      reported.forEach(function (id) {
         _measured[id] = true;
       });
-    });
+      capture.call(
+        hub,
+        'Overwrite count: ' +
+          n +
+          ' of ' +
+          m +
+          ' waiting cells changed on the server, ' +
+          k +
+          ' not measured (waited ' +
+          bucket +
+          ')',
+        'warning',
+      );
+    };
+    // Nothing to compare: no read.
+    if (!targets.length) {
+      report(0, 0);
+      return;
+    }
     /** @type {Record<string, true>} */
     var tables = {};
     targets.forEach(function (t) {
@@ -453,17 +528,11 @@
           });
           if (!mine) changed[t.cell] = true;
         });
-        var n = Object.keys(changed).length;
-        var m = Object.keys(cells).length;
-        capture.call(
-          hub,
-          'Overwrite count: ' + n + ' of ' + m + ' waiting cells changed on the server (waited ' + bucket + ')',
-          'warning',
-        );
+        report(Object.keys(changed).length, Object.keys(cells).length);
       })
       .catch(function () {
         // A failed or unreadable read reports nothing; a later drain may try
-        // this bucket again with writes not yet measured.
+        // this bucket again.
         delete _buckets[bucket];
       });
   }

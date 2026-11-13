@@ -202,7 +202,7 @@ describe('counting', () => {
     expect(reads[0].table).toBe('tag_score');
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
     expect(sentry.captureMessage.mock.calls[0]).toEqual([
-      'Overwrite count: 1 of 3 waiting cells changed on the server (waited 1-10 min)',
+      'Overwrite count: 1 of 3 waiting cells changed on the server, 0 not measured (waited 1-10 min)',
       'warning',
     ]);
   });
@@ -224,7 +224,7 @@ describe('counting', () => {
     age(5 * 60 * 1000);
     await reconnect();
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 0 of 3 waiting cells changed on the server (waited 1-10 min)',
+      'Overwrite count: 0 of 3 waiting cells changed on the server, 0 not measured (waited 1-10 min)',
     );
   });
 
@@ -234,7 +234,7 @@ describe('counting', () => {
     age(5 * 60 * 1000);
     await reconnect();
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 0 of 3 waiting cells changed on the server (waited 1-10 min)',
+      'Overwrite count: 0 of 3 waiting cells changed on the server, 0 not measured (waited 1-10 min)',
     );
   });
 
@@ -244,7 +244,7 @@ describe('counting', () => {
     age(5 * 60 * 1000);
     await reconnect();
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 1 of 3 waiting cells changed on the server (waited 1-10 min)',
+      'Overwrite count: 1 of 3 waiting cells changed on the server, 0 not measured (waited 1-10 min)',
     );
   });
 
@@ -253,7 +253,7 @@ describe('counting', () => {
     age(3 * 60 * 60 * 1000);
     await reconnect();
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 1 of 3 waiting cells changed on the server (waited 1-24 h)',
+      'Overwrite count: 1 of 3 waiting cells changed on the server, 0 not measured (waited 1-24 h)',
     );
   });
 
@@ -275,7 +275,7 @@ describe('counting', () => {
     age(2 * 24 * 60 * 60 * 1000);
     await reconnect();
     expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
-    expect(sentry.captureMessage.mock.calls[1][0]).toMatch(/\(waited over 24 h\)$/);
+    expect(sentry.captureMessage.mock.calls[1][0]).toMatch(/, 0 not measured \(waited over 24 h\)$/);
   });
 });
 
@@ -304,7 +304,7 @@ describe('points work and the Overall Comment', () => {
     await reconnect();
     expect(reads.map(r => r.table)).toEqual(['score']);
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 1 of 1 waiting cells changed on the server (waited 10-60 min)',
+      'Overwrite count: 1 of 1 waiting cells changed on the server, 0 not measured (waited 10-60 min)',
     );
   });
 
@@ -312,7 +312,7 @@ describe('points work and the Overall Comment', () => {
     setUp({ value: 17, modifier: 0, status: null, comment: null });
     await reconnect();
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 0 of 1 waiting cells changed on the server (waited 10-60 min)',
+      'Overwrite count: 0 of 1 waiting cells changed on the server, 0 not measured (waited 10-60 min)',
     );
   });
 
@@ -322,8 +322,121 @@ describe('points work and the Overall Comment', () => {
     age(15 * 60 * 1000);
     await reconnect();
     expect(sentry.captureMessage.mock.calls[0][0]).toBe(
-      'Overwrite count: 1 of 1 waiting cells changed on the server (waited 10-60 min)',
+      'Overwrite count: 1 of 1 waiting cells changed on the server, 0 not measured (waited 10-60 min)',
     );
+  });
+});
+
+describe('waiting cells that cannot be measured', () => {
+  const offline = () => Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+
+  // A write queued with a baseline row this tab holds, so it is left out
+  // for its kind alone.
+  function queueWithBaseline(endpoint, payload) {
+    const r = window.v2Queue.enqueue(endpoint, payload, { noFlush: true });
+    _baselineUndo[r.id] = { field: 'scores', cid: CID, prev: [tagEntry(2)] };
+  }
+
+  it('reports every waiting score after a reload as not measured, with no read', async () => {
+    scoreThreeOffline();
+    // A page load: this tab's baselines are gone; the outbox kept the writes.
+    Object.keys(_baselineUndo).forEach(id => delete _baselineUndo[id]);
+    age(2 * 60 * 60 * 1000);
+    await reconnect();
+    expect(reads).toHaveLength(0);
+    expect(sentry.captureMessage.mock.calls).toEqual([
+      ['Overwrite count: 0 of 0 waiting cells changed on the server, 3 not measured (waited 1-24 h)', 'warning'],
+    ]);
+  });
+
+  [
+    ['clear_score', { p_enrollment_id: ENR2, p_assessment_id: AID }],
+    ['set_rubric_check', { p_enrollment_id: ENR2, p_assessment_id: AID, p_check_id: TAG1, p_on: true }],
+    ['save_score_report_note', { p_enrollment_id: ENR2, p_assessment_id: AID, p_note: 'Steps.' }],
+    // upsert_score on work scored by competency: the cache keeps no score.value.
+    ['upsert_score', { p_enrollment_id: ENR2, p_assessment_id: AID, p_value: 3, p_modifier: 0 }],
+  ].forEach(([endpoint, payload]) => {
+    it('counts a waiting ' + endpoint + ' as not measured', async () => {
+      offline();
+      upsertScore(CID, ENR1, AID, TAG1, 3, '2026-11-13', 'summative', '');
+      queueWithBaseline(endpoint, payload);
+      age(5 * 60 * 1000);
+      await reconnect();
+      expect(sentry.captureMessage.mock.calls[0][0]).toBe(
+        'Overwrite count: 0 of 1 waiting cells changed on the server, 1 not measured (waited 1-10 min)',
+      );
+    });
+  });
+
+  it('counts a waiting score from another tab as not measured', async () => {
+    offline();
+    upsertScore(CID, ENR1, AID, TAG1, 3, '2026-11-13', 'summative', '');
+    // Queued with no baseline row in this tab.
+    window.v2Queue.enqueue(
+      'upsert_tag_score',
+      { p_enrollment_id: ENR3, p_assessment_id: AID, p_tag_id: TAG1, p_value: 4, p_modifier: 0, p_comment: null },
+      { noFlush: true },
+    );
+    age(5 * 60 * 1000);
+    await reconnect();
+    expect(sentry.captureMessage.mock.calls[0][0]).toBe(
+      'Overwrite count: 0 of 1 waiting cells changed on the server, 1 not measured (waited 1-10 min)',
+    );
+  });
+
+  it('counts a cell with a rejected write in the failed list as not measured', async () => {
+    scoreThreeOffline();
+    localStorage.setItem(
+      'fv-sync-dead-letter-v1',
+      JSON.stringify([
+        {
+          id: 'dead-1',
+          owner: 'teacher-uuid',
+          endpoint: 'upsert_tag_score',
+          payload: { p_enrollment_id: ENR3, p_assessment_id: AID, p_tag_id: TAG1, p_value: 1 },
+        },
+      ]),
+    );
+    age(5 * 60 * 1000);
+    await reconnect();
+    expect(sentry.captureMessage.mock.calls[0][0]).toBe(
+      'Overwrite count: 0 of 2 waiting cells changed on the server, 1 not measured (waited 1-10 min)',
+    );
+  });
+
+  it('takes the bucket from the oldest waiting score, measured or not', async () => {
+    offline();
+    upsertScore(CID, ENR1, AID, TAG1, 3, '2026-11-13', 'summative', '');
+    window.v2Queue.enqueue('clear_score', { p_enrollment_id: ENR2, p_assessment_id: AID }, { noFlush: true });
+    const q = JSON.parse(localStorage.getItem(QUEUE_KEY));
+    q.entries.forEach(e => {
+      const ms = e.endpoint === 'clear_score' ? 30 * 60 * 1000 : 2 * 60 * 1000;
+      e.created_at = new Date(Date.now() - ms).toISOString();
+    });
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    await reconnect();
+    expect(sentry.captureMessage.mock.calls[0][0]).toBe(
+      'Overwrite count: 0 of 1 waiting cells changed on the server, 1 not measured (waited 10-60 min)',
+    );
+  });
+
+  it('changes no outbox entry and no baseline row', async () => {
+    scoreThreeOffline();
+    window.v2Queue.enqueue('clear_score', { p_enrollment_id: ENR2, p_assessment_id: AID }, { noFlush: true });
+    age(5 * 60 * 1000);
+    const undoBefore = JSON.stringify(_baselineUndo);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+    fake.hold();
+    const flushing = window.v2Queue.flush();
+    // The outbox has marked what it started; the counter has not run yet.
+    const sent = localStorage.getItem(QUEUE_KEY);
+    await new Promise(r => setTimeout(r, 5));
+    await settle();
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(QUEUE_KEY)).toBe(sent);
+    expect(JSON.stringify(_baselineUndo)).toBe(undoBefore);
+    await fake.release();
+    await flushing;
   });
 });
 
