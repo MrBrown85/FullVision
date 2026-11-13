@@ -37,7 +37,6 @@ window.Router = (function () {
         '/teacher/report-sheets.js',
         '/teacher/report-issues.js',
         '/teacher/report-questionnaire.js',
-        '/teacher/report-studio.js',
         '/teacher/grade-report.js',
         '/teacher/report-preview.js',
         '/shared/phone-report-view.js',

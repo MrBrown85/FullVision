@@ -442,14 +442,17 @@
   font-size: 11px;
   color: var(--text-3);
 }
+/* A choice whose labels do not fit on one line wraps onto a second: a
+   button is never narrower than its label. */
 .one-panel .one-o-seg {
   display: flex;
+  flex-wrap: wrap;
   width: 100%;
+  box-sizing: border-box;
 }
 .one-panel .one-o-seg .seg-btn {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 2px 3px;
+  flex: 1 0 auto;
+  padding: 2px 6px;
   font-size: 11px;
 }
 .one-o-text {

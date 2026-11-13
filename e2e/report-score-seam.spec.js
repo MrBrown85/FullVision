@@ -2,8 +2,8 @@
  * Reports read grades through one entry, teacher/report-scores.js (student
  * page build plan, S2-T1), checked on the page itself.
  *
- * The Reports page redraws from timers (a resize, the class fit, the
- * palette's peek) and from promises (a sent phone report, a printed copy).
+ * The Reports page redraws from timers (a resize, the class fit) and
+ * from promises (a sent phone report, a printed copy).
  * A grade read there outside ReportScores.withReportScores would count
  * drafts once reports are on returned grades (S2-F1), and nothing in a unit
  * test runs those timers. Two watches are set on the page. Every function
@@ -143,14 +143,22 @@ test('every grade the Reports page draws, from a click, a timer or a promise, is
   await page.waitForTimeout(900);
   expect((await seen(page)).inside).toBeGreaterThan(0);
 
-  // Progress Reports: the Quick Report, with its class-fit timer.
+  // Progress Reports: One Report on the class's Quick Report choices, with
+  // its class-fit timer.
   await forget(page);
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
-  await expect(page.locator('#studio')).toBeVisible();
+  await expect(page.locator('#studio.studio-one')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
-  await forget(page);
-  await page.getByRole('switch', { name: 'Feedback Pages' }).click();
-  await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  // The Feedback Pages, switched on in the panel.
+  for (const key of ['fb-rubrics', 'fb-comments', 'fb-observations']) {
+    await forget(page);
+    await page.locator(`#studio-palette [data-action="oneSwitch"][data-part="${key}"]`).click();
+    await expect(page.locator(`#studio-palette [data-action="oneSwitch"][data-part="${key}"]`)).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  }
   // A resize redraws the canvas from a timer.
   await forget(page);
   await page.setViewportSize({ width: 1180, height: 820 });
@@ -159,20 +167,29 @@ test('every grade the Reports page draws, from a click, a timer or a promise, is
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.waitForTimeout(400);
 
-  // A built report: the template pictures, the block heights, the palette's peek timer.
+  // A Setup: the Report Card, then Choose Assessments (each row's result)
+  // and a part switched off for one student.
   await forget(page);
-  await page.getByRole('radio', { name: 'Custom' }).click();
+  await page.locator('#studio-palette [data-action="oneSetupMenu"]').click();
   await forget(page);
-  await page.locator('[data-action="studioTab"][data-tab="templates"]').click();
-  await forget(page);
-  await page.locator('[data-action="studioTemplate"][data-starter="report-card"]').click();
-  await page.locator('[data-action="studioTab"][data-tab="blocks"]').click();
-  await expect(page.locator('.sheet-cell[data-block="parent-response"]')).toHaveCount(1);
+  await page.locator('#studio-palette [data-action="oneSetup"][data-value="report-card"]').click();
+  await expect(page.locator('.sheet-cell[data-part="parent-response"]')).toHaveCount(1);
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   await forget(page);
-  await page.locator('#studio-palette .studio-blk[data-block]').first().hover();
-  await expect(page.locator('#studio-peek')).toBeVisible();
-  await page.mouse.move(700, 400);
+  await page.locator('#studio-palette [data-action="oneOpen"][data-part="assessments"]').click();
+  await page.locator('#studio-palette [data-action="oneChoose"]').click();
+  const choose = page.getByRole('dialog', { name: 'Choose Assessments' });
+  await expect(choose).toBeVisible();
+  await forget(page);
+  await choose.getByRole('switch').first().click();
+  await page.keyboard.press('Escape');
+  await expect(choose).toHaveCount(0);
+  await forget(page);
+  await page.locator('#studio-palette [data-action="oneScope"]').nth(1).click();
+  await forget(page);
+  await page.locator('#studio-palette [data-action="oneSwitch"][data-part="legend"]').click();
+  await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  await page.locator('#studio-palette [data-action="oneScope"]').first().click();
 
   // Everyone, then Print Reports: the copy is saved and printed from a promise.
   await forget(page);

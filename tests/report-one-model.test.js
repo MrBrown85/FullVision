@@ -76,9 +76,9 @@ describe('reading what a class has today', () => {
   });
 
   it('a built form’s options, and the blocks left off one student, come with it', () => {
-    let form = S.normalizeForm(undefined);
-    form = S.setOption(form, 'proficiency', 'change', false);
-    form = S.hideFor(form, 'st-1', 'legend', true);
+    const form = S.normalizeForm(undefined);
+    form.sides[0].rows[1].cells[0].options = { change: false };
+    form.perStudent = { 'st-1': { hide: ['legend'] } };
     const before = JSON.stringify(form);
     const m = R.fromForm(form);
     expect(m.options.proficiency).toEqual({ change: false });
@@ -171,6 +171,14 @@ describe('options for the panel', () => {
     expect(opts.find(o => o.key === 'titles')).toMatchObject({ kind: 'toggle', value: true });
   });
 
+  it('Proficiency’s Rows starts on As Graded, one of its choices, until the teacher picks another', () => {
+    const rows = R.optionsFor(CARD(), 'proficiency', 'c1').find(o => o.key === 'rows');
+    expect(rows.value).toBe('auto');
+    expect(rows.choices.map(c => c.v)).toContain(rows.value);
+    const picked = R.optionsFor(R.setOption(CARD(), 'proficiency', 'rows', 'each'), 'proficiency', 'c1');
+    expect(picked.find(o => o.key === 'rows').value).toBe('each');
+  });
+
   it('the comment has its lines; the Assessments part its own choices', () => {
     const m = R.setOption(CARD(), 'teacher-narrative', 'lines', 6);
     expect(R.optionsFor(m, 'teacher-narrative', 'c1').find(o => o.kind === 'lines')).toMatchObject({ value: 6 });
@@ -244,20 +252,12 @@ describe('ReportSheets.pack for One Report', () => {
   const c = (id, px, more) => ({ id, size: 'row', px, ...more });
   const table = (id, n, rowPx) => c(id, 40 + n * rowPx, { rows: Array.from({ length: n }, () => rowPx), chrome: 40 });
 
-  it('fill: a table that would fit a side of its own still starts in the room left and goes on', () => {
+  it('a table that would fit a side of its own still starts in the room left and goes on', () => {
     const rows = [[c('header', 600)], [table('list', 30, 20)]];
-    // Without fill it moves whole to the next side, leaving the front's foot empty.
-    const whole = P(rows);
-    expect(whole.sides[0].rows).toHaveLength(1);
-    const filled = P(rows, { fill: true });
+    const filled = P(rows);
     expect(filled.sides[0].rows[1].cells[0].part.start).toBe(0);
     expect(filled.sides[0].rows[1].cells[0].part.end).toBeGreaterThan(5);
     expect(filled.sides[1].rows[0].cells[0].part.end).toBe(30);
     filled.sides.forEach(sd => sd.rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H)));
-  });
-
-  it('changes no layout that does not ask for it', () => {
-    const rows = [[c('header', 300)], [table('list', 60, 20)], [c('b', 300)]];
-    expect(P(rows, { fill: false })).toEqual(P(rows));
   });
 });

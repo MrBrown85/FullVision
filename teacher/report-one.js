@@ -446,7 +446,9 @@ window.ReportOne = (function () {
       })
       .concat(d.options || []);
     var out = defs.map(function (o) {
-      var def = o.def === 'auto' ? _auto(key, o.key, cid) : o.def;
+      // 'auto' on a switch means the class's grading style decides; on a
+      // choice it is one of the choices (Rows: As Graded).
+      var def = o.def === 'auto' && !o.choices ? _auto(key, o.key, cid) : o.def;
       var value = saved[o.key] != null ? saved[o.key] : def;
       var name = (o.labelIn && o.labelIn[mode]) || o.label;
       if (o.choices)
@@ -902,9 +904,9 @@ window.ReportOne = (function () {
   }
 
   /* Lays one student's report out. opts: { paper, stage }. Returns what
-     ReportSheets.layoutStudent returns (the preview, the fit line, Everyone,
-     Print Reports and the printed copies read it), plus cards and
-     feedbackSides, and parts: the keys that printed something. */
+     ReportSheets.renderPreview and classSummary read (the preview, the fit
+     line, Everyone, Print Reports and the printed copies read it), plus
+     cards and feedbackSides, and parts: the keys that printed something. */
   function layoutStudent(m, cid, student, ctx, opts) {
     opts = opts || {};
     var sheetsApi = S();
@@ -963,7 +965,7 @@ window.ReportOne = (function () {
         });
       }),
     ];
-    var r = sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx, fill: true });
+    var r = sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx });
     var sides = r.sides;
     // The response slip docks at the foot of the last side of the report,
     // or on a side of its own when there is no room left there.
@@ -1000,6 +1002,24 @@ window.ReportOne = (function () {
     var fb = null;
     if (m.feedback.rubrics || m.feedback.comments || m.feedback.observations) {
       var lo = _listOpts(m, sid);
+      // A card carries its row's number when the Assessments list prints
+      // numbered, so a reader can find the card from the list.
+      var numbered = [];
+      if (
+        lo.numbers &&
+        cells.some(function (c) {
+          return c.key === 'assessments';
+        })
+      ) {
+        numbered = G()
+          .rows(cid, student, lo)
+          .filter(function (r) {
+            return !lo.omit[r.id];
+          });
+        numbered.forEach(function (r, i) {
+          r.n = i + 1;
+        });
+      }
       removedOf(m, 'fb', sid).forEach(function (id) {
         lo.omit[id] = true;
       });
@@ -1012,12 +1032,12 @@ window.ReportOne = (function () {
           comments: m.feedback.comments,
           observations: m.feedback.observations,
           termComment: false,
-          numbers: false,
+          numbers: numbered.length > 0,
           order: lo.order,
           name: lo.name,
           omit: lo.omit,
         },
-        [],
+        numbered,
         stage,
         H,
       );
@@ -1062,11 +1082,7 @@ window.ReportOne = (function () {
       if (fbHtml) {
         html += _sideLabel(s, sheetCount, 'Feedback') + '</div>' + G().sideHtml(fbHtml, paper, 'side', s, 'fb-sheet');
       } else if (side) {
-        var prints =
-          side.pinned ||
-          side.rows.some(function (row) {
-            return !row.empty;
-          });
+        var prints = side.pinned || side.rows.length > 0;
         html +=
           _sideLabel(s, sheetCount, side.kind === 'after' ? 'After the Report' : '') +
           '</div><div class="report-sheet one-sheet' +

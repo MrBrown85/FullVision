@@ -9,7 +9,6 @@ import { readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'acorn';
-import { parseHTML } from 'linkedom';
 import { runInThisContext } from 'vm';
 
 describe('report-academic-summary-letter', () => {
@@ -731,80 +730,11 @@ describe('report-continued-name', () => {
       expect(ReportBlocks.renderContinuedLine('c-cont', NORA, { name: 'first' })).toContain('Eleanor Kim');
     });
   });
-
-  describe('ReportSheets.layoutStudent: every side after the Front names its student', () => {
-    const LINE = 'Nora Kim · Science 8 · Block A (continued)';
-    let origDoc;
-    afterEach(() => {
-      globalThis.document = origDoc;
-      delete COURSES['c-cont'];
-    });
-    /* Lays Nora out on `sides` with each block `px` tall, and returns each
-     printed side's kind and its first line (or null). */
-    const layout = (sides, px) => {
-      COURSES['c-cont'] = { id: 'c-cont', name: 'Science 8', block: 'A' };
-      const dom = parseHTML('<!doctype html><html><body></body></html>');
-      origDoc = globalThis.document;
-      globalThis.document = dom.document;
-      // linkedom has no layout: each block is `px` tall, the line 16px.
-      Object.defineProperty(dom.HTMLElement.prototype, 'offsetHeight', {
-        configurable: true,
-        get() {
-          return this.classList.contains('sheet-name-line') ? HEAD : px[this.dataset.block] || 0;
-        },
-      });
-      const form = ReportSheets.normalizeForm({ v: 6, sides, pinned: null });
-      const stage = document.createElement('div');
-      document.body.appendChild(stage);
-      const probe = { linePx: 22, boxChromePx: 40 };
-      const r = ReportSheets.layoutStudent('c-cont', NORA, {}, { form, paper: 'letter', stage, probe });
-      stage.remove();
-      const host = document.createElement('div');
-      host.innerHTML = r.html;
-      return [...host.querySelectorAll('.report-sheet')].map(s => {
-        const first = s.querySelector('.sheet-body').firstElementChild;
-        return [
-          s.dataset.kind || 'blank',
-          first && first.classList.contains('sheet-name-line') ? first.textContent : null,
-          s.querySelectorAll('.sheet-name-line').length,
-        ];
-      });
-    };
-    const text = { block: 'text-block', size: 'row', options: { title: 'Notes', text: 'Field trip on Friday.' } };
-    const row = cell => ({ cells: [cell] });
-
-    it('prints the line on the Back, a Continued side and an After the Report side, not on the Front', () => {
-      const sides = layout(
-        [
-          { rows: [row({ block: 'header', size: 'row' }), row(text)] },
-          { rows: [row({ block: 'teacher-narrative', size: 'row' }), row({ block: 'parent-response', size: 'row' })] },
-        ],
-        { header: 600, 'text-block': 600, 'teacher-narrative': 300, 'parent-response': H - 10 },
-      );
-      expect(sides).toEqual([
-        ['side', null, 0],
-        ['continued', LINE, 1],
-        ['side', LINE, 1],
-        ['after', LINE, 1],
-      ]);
-    });
-
-    it('an empty Back prints no line', () => {
-      const sides = layout([{ rows: [row({ block: 'header', size: 'row' }), row(text)] }, { rows: [] }], {
-        header: 100,
-        'text-block': 100,
-      });
-      expect(sides).toEqual([
-        ['side', null, 0],
-        ['side', null, 0],
-      ]);
-    });
-  });
 });
 
 describe('report-feedback-cards', () => {
   /**
-   * The Quick Report's Feedback Pages cards (teacher/report-feedback-cards.js):
+   * The Feedback Pages' cards (teacher/report-feedback-cards.js):
    * the HTML for each kind of item from ReportFeedback.forStudent, plus the
    * observations and Term Comment cards.
    */
@@ -1331,7 +1261,7 @@ describe('report-feedback-cards', () => {
 
 describe('report-feedback', () => {
   /**
-   * The data behind the Quick Report's Feedback Pages (teacher/report-feedback.js):
+   * The data behind the Feedback Pages (teacher/report-feedback.js):
    * which assessments get a card, what each card carries, the student's
    * observations and the term comment.
    */
@@ -2938,25 +2868,6 @@ describe('report-sheets', () => {
       expect(r.over).toBe(false);
     });
 
-    it('a cell that prints nothing takes no room; a pair with one empty cell prints the other alone; an empty row keeps its place at no height', () => {
-      const r = P([
-        [
-          [c('header', 81)],
-          [h('att', 0, { empty: true }), h('miss', 60)],
-          [c('gone', 0, { empty: true })],
-          [c('legend', 100)],
-        ],
-      ]);
-      expect(rowsOf(r.sides[0])).toEqual([
-        [0, 81, 'header/row@81'],
-        [93, 60, 'miss/half@60'],
-        [165, 0, 'gone/row@0'],
-        [165, 100, 'legend/row@100'],
-      ]);
-      expect(r.sides[0].rows[2].empty).toBe(true);
-      expect(r.sides[0].rows[3].empty).toBeUndefined();
-    });
-
     it('a table taller than a side goes on side by side; anything else taller prints after the report, alone and over', () => {
       const rows = Array.from({ length: 60 }, () => 30); // 1800px of rows
       const r = P([
@@ -3062,11 +2973,11 @@ describe('report-sheets', () => {
       expect(r.sides[0].rows[1].y + r.sides[0].rows[1].h).toBe(993);
     });
 
-    it('a side’s worth, too long for the room after the name: whole on the Back, not on a side of its own', () => {
+    it('a side’s worth, too long for the room after the name: starts under the name and ends on the Back', () => {
       const r = newReport(30);
       expect(where(r)).toEqual([
-        ['side', 0, ['header']],
-        ['side', 1, ['grades']],
+        ['side', 0, ['header', 'grades 0-28']],
+        ['side', 1, ['grades 28-30']],
       ]);
       expect(r.sides[1].rows[0].y).toBe(TOP);
       expect(r.sides[1].rows[0].carried).toBe(true);
@@ -3141,24 +3052,24 @@ describe('report-sheets', () => {
       sound(r, 38);
     });
 
-    it('a table moved to the Back that does not fit above its docked block starts there and goes on', () => {
+    it('a table that fits a side starts in the room left and goes on above the Back’s docked block', () => {
       const r = PH([[[c('header', 81)], [c('comment', 700)], [grades(20)]], [[c('response', 400)]]], {
         pinned: 'response',
       });
       expect(where(r)).toEqual([
-        ['side', 0, ['header', 'comment']],
-        ['side', 1, ['grades 0-16']],
-        ['continued', 1, ['grades 16-20']],
+        ['side', 0, ['header', 'comment', 'grades 0-4']],
+        ['side', 1, ['grades 4-20']],
       ]);
       sound(r, 20);
     });
 
-    it('a table that fits a side still goes whole onto a continued side past the last side', () => {
+    it('past the last side, a table that fits a side starts in the room left and goes on onto a continued side', () => {
       const r = PH([[[c('header', 81)], [c('comment', 700)], [grades(20)]]]);
       expect(where(r)).toEqual([
-        ['side', 0, ['header', 'comment']],
-        ['continued', 0, ['grades']],
+        ['side', 0, ['header', 'comment', 'grades 0-4']],
+        ['continued', 0, ['grades 4-20']],
       ]);
+      sound(r, 20);
     });
 
     it('a row taller than a whole side prints alone, over, and the rest goes on', () => {
@@ -3178,26 +3089,6 @@ describe('report-sheets', () => {
       expect(ReportSheets.sideHeight('legal')).toBe(14 * 96 - 60);
       expect(ReportSheets.cellWidth('row')).toBe(720);
       expect(ReportSheets.cellWidth('half')).toBe(354);
-      expect(ReportSheets.sideLabel({ kind: 'side', from: 0 })).toBe('Front');
-      expect(ReportSheets.sideLabel({ kind: 'side', from: 1 })).toBe('Back');
-      expect(ReportSheets.sideLabel({ kind: 'side', from: 2 })).toBe('Page 3');
-      expect(ReportSheets.sideLabel({ kind: 'continued', from: 0 })).toBe('Continued');
-      expect(ReportSheets.sideLabel({ kind: 'after' })).toBe('After the Report');
-      expect(ReportSheets.sideLabel(null)).toBe('Blank');
-    });
-  });
-
-  describe('ReportSheets.fitText', () => {
-    it('says how a comment sits in its lines, and names the second sheet when the report runs to one', () => {
-      expect(ReportSheets.fitText(null)).toBe('');
-      expect(ReportSheets.fitText({ room: 10, noComment: true })).toBe('No comment yet. The box holds 10 lines.');
-      expect(ReportSheets.fitText({ room: 10, commentLines: 4, sheets: 1 })).toBe('Fits. 4 lines; room for 6 more.');
-      expect(ReportSheets.fitText({ room: 10, commentLines: 13, sheets: 1 })).toBe(
-        '13 lines, 3 past the box; what is under it moves down. Nothing is cut.',
-      );
-      expect(ReportSheets.fitText({ room: 10, commentLines: 18, sheets: 2 })).toBe(
-        '18 lines, 8 past the box; this report runs to 2 sheets. Nothing is cut.',
-      );
     });
   });
 
@@ -3221,21 +3112,6 @@ describe('report-sheets', () => {
         'short@80',
       ]);
     });
-
-    it('pairsWell: the shorter is at least half the taller; unmeasured blocks pair', () => {
-      expect(ReportSheets.pairsWell('legend', 'support-home', { legend: 116, 'support-home': 118 })).toBe(true);
-      expect(ReportSheets.pairsWell('missing-work', 'legend', { 'missing-work': 44, legend: 116 })).toBe(false);
-      expect(ReportSheets.pairsWell('legend', 'support-home', {})).toBe(true);
-      expect(ReportSheets.pairsWell('legend', 'parent-response', {})).toBe(false);
-    });
-
-    it('Side by Side does not pair blocks of very different heights', () => {
-      const f = ReportSheets.setSize(ReportSheets.form(), 'legend', 'half');
-      const uneven = ReportSheets.setSize(f, 'proficiency', 'half', { legend: 116, proficiency: 360 });
-      expect(uneven.sides[0].rows[1].cells.map(c => c.block)).toEqual(['proficiency']);
-      const even = ReportSheets.setSize(f, 'proficiency', 'half', { legend: 200, proficiency: 360 });
-      expect(even.sides[0].rows[1].cells.map(c => c.block)).toEqual(['proficiency', 'legend']);
-    });
   });
 
   describe('calc.js levelChangeAs', () => {
@@ -3252,13 +3128,12 @@ describe('report-sheets', () => {
   });
 });
 
-describe('report-studio-words', () => {
+describe('report-block-words', () => {
   /**
-   * Page Studio's words (step 4 group 3 #63): "to the Page 3", folder counts
-   * with no word for what they count, a Start of Term of "—" in the
-   * Proficiency table where Progress in One Area printed the first piece's
-   * level, a "Focus area (biggest change)" that changed 0.0, and "black" in
-   * lower case in the print dialog.
+   * The report blocks' words (step 4 group 3 #63, first found on the old
+   * Page Studio): a Start of Term of "—" in the Proficiency table where
+   * Progress in One Area printed the first piece's level, and a "Focus area
+   * (biggest change)" that changed 0.0.
    */
 
   const CID = 'studio-words';
@@ -3302,14 +3177,8 @@ describe('report-studio-words', () => {
     clearProfCache();
   }
 
-  describe('Page Studio words', () => {
+  describe('the blocks’ words', () => {
     afterEach(() => delete COURSES[CID]);
-
-    it('names a side as a sentence does', () => {
-      expect(ReportStudio.sideWhere(0)).toBe('the Front');
-      expect(ReportStudio.sideWhere(1)).toBe('the Back');
-      expect(ReportStudio.sideWhere(2)).toBe('Page 3');
-    });
 
     it('the Proficiency table starts a competency where Progress in One Area does', () => {
       seed();
@@ -3326,327 +3195,6 @@ describe('report-studio-words', () => {
       const prog = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
       expect(prog).toContain('Focus area (lowest now)');
       expect(prog).not.toContain('biggest change');
-    });
-  });
-});
-
-describe('report-studio', () => {
-  /**
-   * Page Studio's pure parts (teacher/report-studio.js): the two panes, the
-   * palette with its ticks and greyed blocks, where a block lands, the fit
-   * line, the selected block's card, the Options popover, the live-region
-   * text and the canvas zoom.
-   */
-
-  const per = list =>
-    Object.fromEntries(
-      list.map((p, i) => [`s${i}`, { name: `S ${i}`, sheets: 1, over: false, used: 100, free: [500, 500], ...p }]),
-    );
-  const fit = list => ({ perStudent: per(list), sideHeight: 996 });
-
-  describe('ReportStudio', () => {
-    it('lays out two panes: the palette and the canvas with the fit line and the view switch', () => {
-      const html = ReportStudio.layoutHtml({ view: 'one' });
-      expect(html).toContain('id="studio-palette"');
-      expect(html).toContain('id="studio-fit"');
-      expect(html).toContain('One Student');
-      expect(html).toContain('Everyone');
-      expect(html).not.toContain('studio-inspector');
-    });
-
-    it('the Quick Report fit line names each cause on its own flag, a student with both counted in each', () => {
-      const text = {
-        over: 'Too many assessments to fit on one sheet for ',
-        feedbackOver: 'A feedback card is taller than a page for ',
-      };
-      const both = { over: true, gradeOver: true, feedbackOver: true };
-      const cut = { over: true, gradeOver: true };
-      const tall = { over: true, feedbackOver: true };
-      expect(ReportStudio.fitLineHtml(fit([both, cut]), null, text)).toContain(
-        'Too many assessments to fit on one sheet for 2 students; A feedback card is taller than a page for 1 student<',
-      );
-      const mixed = ReportStudio.fitLineHtml(fit([both]), null, text);
-      expect(mixed).toContain(
-        'Too many assessments to fit on one sheet for 1 student; A feedback card is taller than a page for 1 student',
-      );
-      const apart = ReportStudio.fitLineHtml(fit([cut, tall]), null, text);
-      expect(apart).toContain('for 1 student; A feedback card is taller than a page for 1 student');
-    });
-
-    it('the fit line counts sheets: one for all, or how many need more (a link to Everyone)', () => {
-      const f = ReportSheets.form();
-      expect(ReportStudio.fitLineHtml(fit([{}, {}, {}]), f)).toBe('1 sheet for all 3 students');
-      expect(ReportStudio.fitLineHtml(fit([{}]), f)).toBe('1 sheet for 1 student');
-      const more = ReportStudio.fitLineHtml(fit([{ sheets: 2 }, {}, { sheets: 2 }]), f);
-      expect(more).toContain('2 sheets for 2 students');
-      expect(more).toContain('data-action="studioView" data-view="all"');
-      expect(ReportStudio.fitLineHtml(fit([{ sheets: 3 }]), f)).toContain('3 sheets for 1 student<');
-      // Students who need different counts: the range, not the most any one
-      // needs (it read "8 sheets for 30 students"; step 4 group 2 #9).
-      expect(ReportStudio.fitLineHtml(fit([{ sheets: 2 }, { sheets: 8 }, {}, { sheets: 5 }]), f)).toContain(
-        '2 to 8 sheets for 3 students<',
-      );
-      const over = ReportStudio.fitLineHtml(fit([{ sheets: 2, over: true }, {}]), f);
-      expect(over).toContain('A block is taller than a page for 1 student');
-      expect(ReportStudio.fitLineHtml(fit([{}, {}]), ReportSheets.setSides(f, 1))).toBe(
-        'Front only · 1 page for all 2 students',
-      );
-      expect(ReportStudio.fitLineHtml(fit([{ sides: 2 }, { sides: 1 }]), ReportSheets.setSides(f, 1))).toContain(
-        'Continues on the back for 1 student<',
-      );
-      expect(ReportStudio.fitLineHtml(null, f)).toBe('');
-    });
-
-    it('names the student whose report is longest', () => {
-      expect(ReportStudio.longestStudent({ perStudent: per([{ used: 900 }, { used: 1800 }, { used: 700 }]) })).toBe(
-        's1',
-      );
-      expect(ReportStudio.longestStudent(null)).toBeNull();
-    });
-
-    it('a block lands on the first side with room for every student, after the report when taller than a side, nowhere when nothing fits', () => {
-      const f = ReportSheets.form();
-      const sizes = {
-        observations: { row: 400, half: 600 },
-        legend: { row: 100, half: 200 },
-        big: { row: 1200, half: null },
-      };
-      expect(ReportStudio.landing(f, 'legend', sizes, fit([{ free: [300, 50] }, { free: [120, 400] }]))).toEqual({
-        side: 0,
-      });
-      expect(ReportStudio.landing(f, 'observations', sizes, fit([{ free: [300, 500] }, { free: [900, 420] }]))).toEqual(
-        {
-          side: 1,
-        },
-      );
-      expect(ReportStudio.landing(f, 'observations', sizes, fit([{ free: [300, 400] }]))).toEqual({
-        reason: 'No room on either side',
-        fix: 'Add a page or remove a block',
-      });
-      expect(ReportStudio.landing(ReportSheets.setSides(f, 1), 'observations', sizes, fit([{ free: [300] }]))).toEqual({
-        reason: 'No room on the Front',
-        fix: 'Choose Front and Back',
-      });
-      expect(ReportStudio.landing(f, 'big', sizes, fit([{}]))).toEqual({ after: true });
-      // An empty side has room for anything up to a side.
-      expect(ReportStudio.landing(f, 'observations', sizes, fit([{ free: [0, 996] }]))).toEqual({ side: 1 });
-      expect(ReportStudio.landing(f, 'legend', null, fit([{}]))).toBeNull();
-      expect(ReportStudio.landing(f, 'legend', sizes, null)).toBeNull();
-    });
-
-    it('scales two pages side by side when there is room beside the gutter, else one above the other', () => {
-      expect(ReportStudio.fitZoom(1600)).toEqual({ zoom: 0.62, stacked: false });
-      const narrow = ReportStudio.fitZoom(1100);
-      expect(narrow.stacked).toBe(false);
-      expect(narrow.zoom).toBeLessThan(0.62);
-      expect(ReportStudio.fitZoom(900).stacked).toBe(true);
-    });
-
-    it('renders the palette with every block grouped, the placed ones ticked and the ones with no room greyed', () => {
-      const f = ReportSheets.form();
-      const sizes = { 'student-reflection-habits': { row: 600, half: null } };
-      const html = ReportStudio.paletteHtml(f, 'blocks', [], sizes, fit([{ free: [100, 100] }]));
-      expect(html).toContain('Grades');
-      expect(html).toMatch(/class="studio-blk placed"[^>]*data-block="proficiency"[^>]*aria-pressed="true"/);
-      expect(html).toContain('Click to find it');
-      expect(html).toMatch(
-        /class="studio-blk nofit"[^>]*data-block="student-reflection-habits"[^>]*aria-disabled="true"/,
-      );
-      expect(html).toContain('No room on either side. Add a page or remove a block.');
-      expect(html).not.toContain('Letterhead');
-      expect(html).not.toMatch(/studio-sz|>S<|>XL</);
-      // Retired blocks stay out unless placed.
-      expect(html).not.toContain('data-block="section-chart"');
-      // Before the class is measured nothing is greyed.
-      expect(ReportStudio.paletteHtml(f, 'blocks', [], null, null)).not.toContain('nofit');
-      const tpl = ReportStudio.paletteHtml(f, 'templates', [{ id: 't1', name: 'Mine' }]);
-      expect(tpl).toContain('Starters');
-      expect(tpl).toContain('Report Card');
-      expect(tpl).toContain('Mine');
-      expect(tpl).toContain('aria-label="Delete Mine"');
-    });
-
-    it('the selected block’s inspector says where it is and offers Lines, Size, Move, its options, Leave Off and Remove', () => {
-      const f = ReportSheets.form();
-      const who = { id: 'st1', name: 'Ethan Dubois' };
-      const comment = ReportStudio.blockToolbarHtml(f, 'teacher-narrative', who);
-      expect(comment).toContain('On the Front');
-      expect(comment).toContain('Teacher Comment');
-      expect(comment).toContain('<b>10</b>');
-      expect(comment).toContain('data-action="studioLines"');
-      expect(comment).toContain('Room for the longest comment in the class');
-      expect(comment).toContain('data-action="studioSize"');
-      expect(comment).toContain('aria-label="Move Up"');
-      expect(comment).toContain('aria-label="Move Down"');
-      expect(comment).toContain('aria-label="Move to Back"');
-      expect(comment).toContain('>To Back<');
-      expect(comment).toContain('Leave Off Ethan');
-      expect(comment).toContain('>Remove<');
-      expect(comment).not.toContain('studioOption');
-      // The legend: no lines; the table's options are in the inspector.
-      expect(ReportStudio.blockToolbarHtml(f, 'legend', who)).not.toContain('studioLines');
-      expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toContain('data-action="studioOption"');
-      // The letterhead: its options and a line, nothing to move.
-      const head = ReportStudio.blockToolbarHtml(f, 'header', who);
-      expect(head).toContain('Always first on the Front');
-      expect(head).not.toContain('Move');
-      expect(head).not.toContain('Remove');
-      expect(head).not.toContain('studioSize');
-      // The pinned Response: Comment Lines, no Move, no Size.
-      const resp = ReportStudio.blockToolbarHtml(f, 'parent-response', who);
-      expect(resp).toContain('On the Back');
-      expect(resp).toContain('Always last on the Back');
-      expect(resp).toContain('Comment Lines');
-      expect(resp).not.toContain('Move');
-      expect(resp).not.toContain('studioSize');
-      // Move Up is off for the first row under the letterhead; Move Down for the last.
-      expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toMatch(/data-dir="-1"[^>]* disabled>/);
-      expect(ReportStudio.blockToolbarHtml(f, 'grade-table', who)).toMatch(/data-dir="1"[^>]* disabled>/);
-      expect(ReportStudio.blockToolbarHtml(f, 'nope', who)).toBe('');
-      // Everyone view: no Leave Off.
-      expect(ReportStudio.blockToolbarHtml(f, 'legend', null)).not.toContain('Leave Off');
-    });
-
-    it('the inspector holds the block’s Show checkboxes, choices, no-evidence rule or text fields', () => {
-      const f = ReportSheets.form();
-      const table = ReportStudio.blockToolbarHtml(f, 'proficiency', null);
-      expect(table).toContain('role="region"');
-      expect(table).toContain('aria-label="Proficiency Settings"');
-      // A Proficiency class prints the proficiency whatever Score says, so Score out of 4 is not offered
-      // (DECISIONS, "Student-facing levels are proficiencies"); a Letter class still has it.
-      expect(table).not.toContain('data-key="score"');
-      expect(table).not.toContain('Score out of 4');
-      const cid = getActiveCourse();
-      const was = COURSES[cid].gradingSystem;
-      COURSES[cid].gradingSystem = 'letter';
-      expect(ReportStudio.blockToolbarHtml(f, 'proficiency', null)).toContain('data-key="score"');
-      COURSES[cid].gradingSystem = 'both';
-      expect(ReportStudio.blockToolbarHtml(f, 'proficiency', null)).toMatch(/data-key="score"[^>]*>\s*Percent</);
-      COURSES[cid].gradingSystem = was;
-      // No Compare With: the first report compares with the start of the
-      // term, every later one with the last report (2026-11-03).
-      expect(table).not.toContain('aria-label="Compare With"');
-      expect(table).toContain('Hide Row');
-      expect(table).not.toMatch(/Width|Height|row \d/);
-      const withSteps = ReportSheets.insert(f, 'next-steps', { side: 0 });
-      expect(ReportStudio.blockToolbarHtml(withSteps, 'next-steps', null)).toContain('aria-label="Competencies"');
-      const text = ReportStudio.blockToolbarHtml(ReportSheets.insert(f, 'text-block', { side: 1 }), 'text-block', null);
-      expect(text).toContain('id="studio-text-title"');
-      expect(text).toContain('id="studio-text-body"');
-      expect(ReportStudio.hasOptions('text-block')).toBe(true);
-      expect(ReportStudio.hasOptions('legend')).toBe(false);
-      expect(ReportStudio.hasOptions('teacher-narrative')).toBe(false);
-    });
-
-    it('says where a block is for the live region', () => {
-      const f = ReportSheets.form();
-      expect(ReportStudio.placeText(f, 'teacher-narrative')).toBe('Teacher Comment, Front, row 4 of 5');
-      expect(ReportStudio.placeText(f, 'term-attendance')).toBe('Attendance, Front, row 5 of 5, beside Missing Work');
-      expect(ReportStudio.placeText(f, 'parent-response')).toBe('Parent / Guardian Response, Back, row 3 of 3');
-      expect(ReportStudio.placeText(f, 'nope')).toBe('');
-    });
-  });
-
-  describe('ReportStudio drag targets', () => {
-    const row = (top, bottom, cells, more) => ({ top, bottom, cells, ...more });
-    const c = (id, size, right) => ({ id, size, right: right ?? 720 });
-    const rows = [
-      row(0, 81, [c('header', 'row')]),
-      row(93, 339, [c('proficiency', 'row')]),
-      row(351, 468, [c('legend', 'half', 354)]),
-      row(480, 606, [c('teacher-narrative', 'row')]),
-      row(700, 996, [c('parent-response', 'row')], { pinned: true }),
-    ];
-    const T = (x, y, opts) => ReportStudio.targetFor(rows, x, y, { lo: 1, ...opts });
-
-    it('a drop lands in the gap under every row whose midpoint is above the pointer, never above the letterhead or after the pinned row', () => {
-      expect(T(100, 10)).toEqual({ kind: 'row', index: 1 });
-      expect(T(100, 100)).toEqual({ kind: 'row', index: 1 });
-      expect(T(100, 300)).toEqual({ kind: 'row', index: 2 });
-      expect(T(100, 400)).toEqual({ kind: 'row', index: 2 });
-      expect(T(100, 460)).toEqual({ kind: 'row', index: 3 });
-      expect(T(100, 600)).toEqual({ kind: 'row', index: 4 });
-      expect(T(100, 900)).toEqual({ kind: 'row', index: 4 });
-    });
-
-    it('over the empty half beside a lone Side by Side block the drop lands beside it, when the pair is allowed', () => {
-      const ok = { canBeside: () => true };
-      expect(T(500, 400, ok)).toEqual({ kind: 'beside', target: 'legend' });
-      expect(T(200, 400, ok)).toEqual({ kind: 'row', index: 2 });
-      expect(T(500, 400, { canBeside: () => false })).toEqual({ kind: 'row', index: 2 });
-      expect(T(500, 400)).toEqual({ kind: 'row', index: 2 });
-    });
-
-    it('the held block’s own row is neither a target nor counted', () => {
-      const held = rows.map(r => (r.cells[0].id === 'proficiency' ? { ...r, held: true } : r));
-      expect(ReportStudio.targetFor(held, 100, 300, { lo: 1 })).toEqual({ kind: 'row', index: 1 });
-      expect(ReportStudio.targetFor(held, 100, 460, { lo: 1 })).toEqual({ kind: 'row', index: 2 });
-    });
-
-    it('fitsOn says whether a side has room for the block for every student', () => {
-      const f = ReportSheets.form();
-      const sizes = { observations: { row: 400, half: 600 } };
-      const fit = list => ({ perStudent: per(list), sideHeight: 996 });
-      expect(ReportStudio.fitsOn(f, 'observations', 0, sizes, fit([{ free: [500, 0] }, { free: [420, 0] }]))).toBe(
-        true,
-      );
-      expect(ReportStudio.fitsOn(f, 'observations', 0, sizes, fit([{ free: [500, 0] }, { free: [300, 0] }]))).toBe(
-        false,
-      );
-      expect(ReportStudio.fitsOn(f, 'observations', 1, sizes, fit([{ free: [0, 996] }]))).toBe(true);
-      // A block already on the side moves within it.
-      expect(ReportStudio.fitsOn(f, 'legend', 0, { legend: { row: 2000 } }, fit([{ free: [0, 0] }]))).toBe(true);
-      expect(ReportStudio.fitsOn(f, 'observations', 0, null, fit([{}]))).toBeNull();
-    });
-
-    it('peekHtml wraps the block at Row width with its caption', () => {
-      const html = ReportStudio.peekHtml('Teacher Comment', 'Ethan Dubois', '<div>x</div>');
-      expect(html).toContain('studio-peek-box');
-      expect(html).toContain('width:720px');
-      expect(html).toContain('Teacher Comment for Ethan Dubois, at print size');
-    });
-  });
-
-  describe('ReportStudio Everyone order and the Templates tab', () => {
-    it('Everyone leads with the students on more than one sheet, most first, then roster order', () => {
-      const students = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
-      const summary = { perStudent: { a: { sheets: 1 }, b: { sheets: 2 }, c: { sheets: 3 }, d: { sheets: 1 } } };
-      expect(ReportStudio.orderBySheets(students, summary).map(s => s.id)).toEqual(['c', 'b', 'a', 'd']);
-      expect(ReportStudio.orderBySheets(students, null).map(s => s.id)).toEqual(['a', 'b', 'c', 'd']);
-      expect(ReportStudio.orderBySheets(students, { perStudent: {} }).map(s => s.id)).toEqual(['a', 'b', 'c', 'd']);
-    });
-
-    it('the Templates tab draws each template with the real report and its sheet count, and marks the current one', () => {
-      const f = ReportSheets.form();
-      const thumbs = {
-        'report-card': {
-          html: '<span class="studio-tpl-side">x</span><span class="studio-tpl-side">y</span>',
-          sheets: 1,
-        },
-        'interim-update': { html: '<span class="studio-tpl-side">x</span>', sheets: 1 },
-        t1: { html: '<span class="studio-tpl-side">x</span>', sheets: 2 },
-      };
-      const html = ReportStudio.paletteHtml(f, 'templates', [{ id: 't1', name: 'Mine' }], null, null, thumbs);
-      expect(html).toMatch(/class="studio-blk studio-tpl current"[^>]*data-starter="report-card"/);
-      expect(html).toMatch(/data-starter="interim-update"[^>]*>(?!.*current)/);
-      expect((html.match(/studio-tpl-side/g) || []).length).toBe(4);
-      expect(html).toContain('Report Card</span><span class="studio-tpl-count">1 sheet</span>');
-      expect(html).toContain('Mine</span><span class="studio-tpl-count">2 sheets</span>');
-      // Without thumbs the cards still list the templates.
-      const bare = ReportStudio.paletteHtml(f, 'templates', []);
-      expect(bare).toContain('Conference Pack');
-      expect(bare).not.toContain('studio-tpl-thumbs');
-    });
-  });
-
-  describe('review fixes: the Templates tab', () => {
-    it('marks a starter current only while the layout is as it came', () => {
-      const f = ReportSheets.form();
-      expect(ReportStudio.sameLayout(f, ReportSheets.starter('report-card'))).toBe(true);
-      const edited = ReportSheets.removeCell(f, 'legend');
-      expect(ReportStudio.sameLayout(edited, ReportSheets.starter('report-card'))).toBe(false);
-      expect(ReportStudio.paletteHtml(edited, 'templates', [])).not.toContain('studio-tpl current');
-      expect(ReportStudio.paletteHtml(f, 'templates', [])).toMatch(/studio-tpl current[^>]*data-starter="report-card"/);
     });
   });
 });

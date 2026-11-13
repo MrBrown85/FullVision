@@ -4,8 +4,8 @@ import { cardMenuItem } from './card-menu.js';
 /* Students and families read proficiencies, not scores out of 4 (DECISIONS,
    "Student-facing levels are proficiencies", 2026-11-12). Demo Mode's
    Science 8 is a Proficiency class. Each surface a student or family reads
-   is opened as the teacher opens it: the Quick Report's preview, a Progress
-   Report on the Report Card template, a printed rubric, and the student's
+   is opened as the teacher opens it: Progress Reports on the class's Quick
+   Report choices, then on the Report Card Setup, a printed rubric, and the student's
    own page in Preview as Student. None shows "/ 4", "out of 4" or a level as
    a decimal; each names a proficiency. The student page and the reports say
    the same for the same student, a level the teacher set by hand included. */
@@ -13,7 +13,8 @@ import { cardMenuItem } from './card-menu.js';
 const FIGURE = /\/ ?4\b|out of 4|(?<![\d.:])[0-4]\.\d(?![\d%])/;
 const WORD = /Emerging|Developing|Proficient|Extending/;
 
-/* A report with the Proficiency block, each competency on its own row. */
+/* A report built in Page Studio with the Proficiency block, each
+   competency on its own row; One Report reads it as its parts. */
 const ONE_BLOCK = {
   progressMode: 'build',
   form: {
@@ -85,7 +86,8 @@ test('every surface a student or family reads names a proficiency and shows no s
   test.setTimeout(90_000);
   const { at, errors } = await demo(page);
 
-  // The Quick Report: the grade sheet, its summary and Course Grade, then its Feedback Pages.
+  // The class's Quick Report choices: the Assessments list, its summary and
+  // Overall Proficiency, then its Feedback Pages.
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
   const sheet = page.locator('.report-sheet').first();
@@ -95,15 +97,15 @@ test('every surface a student or family reads names a proficiency and shows no s
   expect(quick).toMatch(WORD);
   expect(noFigure(quick)).toBeNull();
   await expect(sheet.locator('.gr-term-grade')).toHaveText(WORD);
-  await page.getByRole('switch', { name: 'Feedback Pages' }).click();
-  await expect(page.locator('.report-sheet').nth(1)).toBeVisible();
+  for (const key of ['fb-rubrics', 'fb-comments', 'fb-observations'])
+    await page.locator(`#studio-palette [data-action="oneSwitch"][data-part="${key}"]`).click();
+  await expect(page.locator('.report-sheet.fb-sheet').first()).toBeVisible();
   const pages = (await page.locator('.report-sheet').allInnerTexts()).join('\n');
   expect(noFigure(pages)).toBeNull();
 
-  // A Progress Report: the Report Card template, front and back.
-  await page.getByRole('radio', { name: 'Custom' }).click();
-  await page.locator('[data-action="studioTab"][data-tab="templates"]').click();
-  await page.locator('[data-action="studioTemplate"][data-starter="report-card"]').click();
+  // A Progress Report: the Report Card Setup, front and back.
+  await page.locator('#studio-palette [data-action="oneSetupMenu"]').click();
+  await page.locator('#studio-palette [data-action="oneSetup"][data-value="report-card"]').click();
   await expect(page.locator('.sheet-cell[data-block="proficiency"]').first()).toBeVisible();
   const card = (await page.locator('.report-sheet').allInnerTexts()).join('\n');
   expect(card).toContain('BC Proficiency Scale');
@@ -163,7 +165,8 @@ test('the student page and the reports say the same for the same student', async
   test.setTimeout(60_000);
   const { at, errors } = await demo(page);
 
-  // The reports: the Quick Report's Course Grade, and a competency's Now on a Progress Report.
+  // The reports: Overall Proficiency on the class's Quick Report choices, and a competency's Now on a
+  // report built with the Proficiency block.
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
   await expect(page.locator('.report-sheet').first()).toBeVisible();

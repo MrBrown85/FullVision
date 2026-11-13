@@ -99,7 +99,7 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     expect(t).toContain('Course Grade Developing · C- 50%');
   });
 
-  it('the Quick Report lists the year to date and prints its Course Grade', () => {
+  it('the Assessments list lists the year to date and the Course Grade line prints', () => {
     setActiveTerm(CID, 2);
     expect(GradeReport.rows(CID, STUDENT).map(r => r.title)).toEqual(['October Lab', 'December Lab']);
     const cats = GradeReport.categorySummary(CID, STUDENT);
@@ -182,7 +182,7 @@ describe("Missing Work lists anything still Missing up to the report's end (deci
     expect(t).toContain('September Quiz, Undated Poster');
   });
 
-  it('This Term at a Glance, the questionnaire, Generate and the Quick Report count the same work', () => {
+  it('This Term at a Glance, the questionnaire, Generate and the Assessments list count the same work', () => {
     setActiveTerm(CID, 2);
     const glance = text(ReportBlocks.renderBlockTermGlance(CID, STUDENT));
     expect(glance).toMatch(/2 Missing/);

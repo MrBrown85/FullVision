@@ -159,12 +159,6 @@
   font: 13px var(--font-base);
   text-align: center;
 }
-/* Over the pages, which sit centred left of the canvas's 256 px gutter
-   (reports.css, .sheet-student). */
-.studio-one .rb-preview.studio-pages:not(.studio-all) .one-banner,
-.studio-one .rb-preview.studio-pages:not(.studio-all) .one-add {
-  margin-left: max(0px, calc((100% - 256px - 8.5in * var(--sheet-zoom, 1)) / 2));
-}
 .studio-one .one-banner-back {
   font: inherit;
   font-weight: 600;
