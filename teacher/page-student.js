@@ -1065,6 +1065,7 @@ window.PageStudent = (function () {
     }
     var drawerId = 'ced-' + sec.id;
     var open = _openTags.has(tag.id);
+    var ev = CompetencyEvidence.evidenceFor(cid, studentId, tag.id); // once; a closed drawer is built when it opens
     var sub = tag.ican || (tag.label && tag.label !== sec.name ? tag.label : '');
     return (
       '<div class="stu-comp' +
@@ -1097,13 +1098,13 @@ window.PageStudent = (function () {
       esc(tr.text) +
       '</span>' +
       '<span class="stu-cp-ev dash-tag-evidence">' +
-      esc(CompetencyEvidence.rowCount(cid, studentId, tag.id)) +
+      esc(CompetencyEvidence.rowCount(cid, studentId, tag.id, ev)) +
       '</span>' +
       '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
       '</button>' +
       _compNowHtml(cid, tag, sp) +
       _compWhereHtml(ctx, entries) +
-      CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId) +
+      CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId, { later: !open, ev: ev, map: ctx.assessMap }) +
       _cpFactsHtml(ctx, sec, sp, entries, tr, override) +
       '<div class="stu-comp-override">' +
       '<button type="button" class="override-btn' +
@@ -2693,13 +2694,13 @@ window.PageStudent = (function () {
     );
   }
 
-  /* The students in the sidebar's order, and this one's neighbours. */
-  function _neighbours() {
+  /* The students in the sidebar's order (sorted once a draw), and this one's neighbours as ‹ and ›. */
+  function _stepButtonsHtml() {
     var list = sortStudents(getStudents(activeCourse), 'lastName');
     var i = list.findIndex(function (s) {
       return s.id === studentId;
     });
-    return { prev: i > 0 ? list[i - 1] : null, next: i >= 0 && i < list.length - 1 ? list[i + 1] : null };
+    return _stepButtonHtml('prev', i > 0 ? list[i - 1] : null) + _stepButtonHtml('next', i >= 0 ? list[i + 1] : null);
   }
 
   function _stepButtonHtml(dir, st) {
@@ -2768,8 +2769,7 @@ window.PageStudent = (function () {
       '<div class="student-toolbar">' +
       renderBreadcrumb('Dashboard', '/dashboard', displayName(student)) +
       '<span class="stu-step">' +
-      _stepButtonHtml('prev', _neighbours().prev) +
-      _stepButtonHtml('next', _neighbours().next) +
+      _stepButtonsHtml() +
       '</span>' +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
       '</div>';
