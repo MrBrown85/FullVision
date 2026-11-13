@@ -22,10 +22,10 @@ These were checked before designing. The design is for the faults that exist.
 
 1. **The phone's tap does not take 395 ms.** PR 1282 found the speed recorder was timing the screen sliding in. A tap draws in about 15 ms (`e2e-perf/speed.spec.js:233-237`; PR 1282's table). The phone already redraws only the row tapped (`teacher-mobile/tab-grade.js:2943-2952`). S19-C10 has nothing left to fix.
 2. **One tap on a level already saves one mark.** It compares one cell and sends one call (`shared/data.js:5109-5158`). The whole class is compared only for points, Complete and Incomplete, clears, Undo and group copies (`saveScores`, `shared/data.js:6290`). What every tap does do for the whole class is rewrite the saved copy (section 1).
-3. **An undone cell is sent twice, not more,** and only when the tab is online and is the tab that sends. Offline, or in a second tab, the outbox folds the two into one (`shared/offline-queue.js:921-942`). No control on the phone reaches its Undo (`tests/pin-phone-grade-writes.test.js:25-27`).
+3. **An undone cell is sent twice, not more,** and only when the tab is online and is the tab that sends. Offline, or in a second tab, the outbox folds the two into one (`shared/offline-queue.js:921-942`, `767-769`; seen in the code, not run). No control on the phone reaches its Undo (`tests/pin-phone-grade-writes.test.js:25-27`).
 4. **The score send is on no export list.** `persistScoreDiffToCanonical` is not on `window.GB` (`shared/data.js:8799`). It is callable because every top-level function in a plain script is. One test allowlist names it (`tests/grader-guard.test.js:44`).
 5. **`_saveCourseField` names five other areas, not four** (`shared/data.js:4991-5000`).
-6. **A tab that is behind harms the server's marks in one case only** (no baseline, section 2 fault 4). In the common case it harms only this computer's saved copy.
+6. **A tab that is behind clears another tab's marks on the server in one case only** (no baseline; section 2, faults 4 and 7). In the common case it harms only this computer's saved copy.
 7. `docs/schema.generated.sql` holds each server function's first line only. The bodies were read from `migrations/`. Two old ones (`set_score_status`, `save_score_comment`) have no migration; they were read from `docs/backend-design/write-paths.sql:1592-1630`, which is design history and may not match the live database.
 8. `docs/DECISIONS.md` has no "Wave 0 rulings (2026-11-13)" on this branch.
 9. PR 1320 removed none of the listed faults.
@@ -100,7 +100,7 @@ These go through `saveScores` (`shared/data.js:6290-6356`). One tap then:
 | ------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
 | Phone: tap to mark drawn                    | 15 ms (14 ms at quarter speed)   | PR 1282, measured in the page                                           |
 | The save itself, one mark, 5,400-mark class | 1.6 ms (4.0 ms at quarter speed) | PR 1263, Review B. Reported there; not measured again here.             |
-| Assignments card: click to saved            | 199 ms (432 ms at quarter speed) | PR 1263, Review B. Includes the test tool's own click time.             |
+| Assignments card: click to saved            | 199 ms (432 ms at quarter speed) | PR 1263, Review B. It does not say how the click was timed.             |
 | Gradebook: a typed score to the page drawn  | **Not measured by anyone**       | The recorder times a right-click, not a score (`speed.spec.js:144-158`) |
 | Any of these with the student page on       | **Not measured by anyone**       |                                                                         |
 
@@ -129,7 +129,7 @@ How each happens:
 1. **Undo twice.** `saveScores` sends what changed. Then three callers send the same change again: `Grader.undoCell` (`shared/grader.js:156-160`), `Grader.undoOnPhone` (`279-283`) and `restoreScoreCells` (`shared/data.js:6402-6403`). Online, the first call has already left, so the second cannot replace it and goes too (`offline-queue.js:932`). Reproduced by pins that pass on main and assert it: `tests/pin-gradebook-writes.test.js:921-927`, `tests/pin-phone-grade-writes.test.js:994-996`, `tests/pin-assignments-fills.test.js:140-142`. The two grader callers also send when `saveScores` refused the save.
 2. **Callable from anywhere.** A plain function at `shared/data.js:5658`.
 3. **Old copy over the saved copy.** Each tab holds the class in its own memory. Every writer writes its whole memory to the one shared key (`5143`, `5378`, `5449`, `5519`, `5580`, `4999`). A tab re-reads the class only from the server, only after two quiet seconds with nothing waiting to send (`828-843`). Offline that never comes. Reproduced: the saved copy held 40 marks, 10 of them from the other tab; one level typed in the tab that was behind left 31. The server was sent only the one mark.
-4. **No baseline.** A whole-list save works out what to send by comparing the class with the baseline. With no baseline it falls back to the saved copy as it is now (`6346`, `1824-1826`), which the other tab may have written. The other tab's marks then look like marks this tab removed, and a clear is sent for each (`5690-5700`). A tab has no baseline when it opened from a saved copy that holds unsent edits (`4323-4332`) and the server has not answered yet: offline, or a slow or failed load (`4793-4800`). Reproduced: one points mark sent 10 clears for the other tab's marks.
+4. **No baseline.** A whole-list save works out what to send by comparing the class with the baseline. With no baseline it falls back to the saved copy as it is now (`6346`, `1824-1826`), which the other tab may have written. The other tab's marks then look like marks this tab removed, and a clear is sent for each (`5690-5700`). A tab has no baseline when it opened from a saved copy flagged as edited on this computer (`4323-4332`, `4334-4338`), which is any copy graded on since its last load from the server (`4219-4233`), and the server has not answered yet: offline, or a slow or failed load (`4793-4800`). Reproduced: one points mark sent 10 clears for the other tab's marks.
 5. **Blocked.** The guard compares the tab's old memory with the fuller saved copy and takes the difference for a mass loss (`6302-6339`). Reproduced by `tests/score-guard-keeps-mark.test.js:335-343`, which passes on main, and pinned in the browser by `e2e/guard-keeps-mark.spec.js:149`.
 6. **Draft and Returned.** The "before" is read from the saved copy (`7221`) and the "after" from this tab's memory, and every cell is compared (`7249-7262`). The other tab's marks read as cleared here. The server's own rows are read back afterwards (`7123`).
 7. **Statuses.** The same fallback: `shared/data.js:5900-5914`.
@@ -164,6 +164,7 @@ Today a tab writes everything it holds, and works out what to send by comparing 
 
 - **One mark:** nothing is compared beyond the cell itself. One call.
 - **Many cells at once** (Undo, Undo of a fill, Clear Score, Delete Assessment, group copies): the whole-list save stays, with its guard. Its "before" becomes what this tab last read or wrote, never the saved copy as another tab left it. With one tab these are the same text, so nothing changes. Class settings already learned this (`shared/data.js:1740-1745`).
+- **Missing, Excused and Late** keep their whole-list save, with the same own "before".
 
 ### A tab that is behind
 
@@ -295,16 +296,17 @@ For every step: tests first. A behaviour step needs Colin (it changes how a mark
 
 - New tests: after each kind of score entry, the page equals a full redraw (the check in section 3); group work; a rubric criterion that feeds two competencies; the To Return filter falls back to the full redraw; focus and scroll are kept.
 - A constant turns it off (`FV_CELL_REDRAW`, like `FV_CACHE_FIRST`), removed two releases later.
-- Differential run: 0 differences, with the full-redraw check switched on in both builds.
+- Differential run: 0 differences. The branch build runs with the full-redraw check on, and the check must never fire.
 
 **Step 4. This tab's own "before".** `shared/data.js`: `_safeLSSet` (`4927`), `_loadCourseFromLS` (`4870`) and `_persistLoadedField` (`1753`) record the text read or written for the scores and status keys; `saveScores` (`6346`, `6308`) and `saveAssignmentStatuses` (`5910`) use it when there is no baseline.
 
 - Pins before: `tests/score-guard-keeps-mark.test.js`, `tests/write-path-regressions.test.js`, `tests/data-scores-v2-dispatch.test.js`, `tests/id-rekey-and-points-clear.test.js`, `tests/status-rejected-then-undone.test.js`, `e2e/guard-keeps-mark.spec.js`.
 - New tests: fault 4 and fault 7, failing on main (two tabs, one storage, no baseline: no clear is sent for the other tab's marks or statuses); one tab sends exactly what main sends; a class copied to a new id still sends every mark.
 - A site that forgets to record makes the tab think it is behind. The cost is its own cells sent again, never another tab's cleared.
+- Cost: the tab keeps the last text of each open class's scores and statuses in memory, about 1 MB for a 5,400-mark class (PR 1263, Review B).
 - Differential run: one tab, 0 differences. With `--two-tabs`, the only difference allowed is a clear build A sends for a cell that tab never wrote.
 
-**Step 5. A refused mark.** `shared/data.js`: `_onWriteRefused` (`2009`), `_onOutboxEvent` (`2912`). New test: fault 10, failing on main. Differential run: 0 differences (the run never fills the outbox).
+**Step 5. A refused mark.** `shared/data.js`: `_onWriteRefused` (`2009`), `_onOutboxEvent` (`2912`). Pins before: `tests/offline-queue.test.js`, `tests/write-path-audit.test.js`, `tests/score-rejected-clear-retype.test.js`. New test: fault 10, failing on main. Differential run: 0 differences (the run never fills the outbox).
 
 **Step 6. Points as one cell.** `_setPointsScoreOne` and `_setCompletionMarkOne` (`shared/data.js:7700-7747`) save and send as `_upsertScoreOne` does. They keep four things `saveScores` did for them: moving marks onto server ids first (`6291`), one call for a points cell however many competencies it has (`5662-5672`), dismissing a failed write the teacher has typed over (`6349`), and a block when this tab's memory has lost most of what it last wrote (counted when the text is recorded, so nothing is parsed).
 
@@ -313,9 +315,9 @@ For every step: tests first. A behaviour step needs Colin (it changes how a mark
 - Until step 10, that mark is saved the way a level is today: the other tab's marks leave this computer's copy until the next class load. The server keeps them.
 - Differential run: one tab, 0 differences in the saved copy, the calls and the screens.
 
-**Step 7. Private send.** The rename in section 3. `tests/grader-guard.test.js:44`, `tests/data-scores-v2-dispatch.test.js:240-253`, `tests/grade-return-data.test.js:279-313`. Differential run: 0 differences.
+**Step 7. Private send.** The rename in section 3. Pins before: step 1's. `tests/grader-guard.test.js:44`, `tests/data-scores-v2-dispatch.test.js:240-253`, `tests/grade-return-data.test.js:279-313`. Differential run: 0 differences.
 
-**Step 8. One writer, and hooks.** In the mark writers' file. Every place that writes the scores copy calls one function: the five one-cell writers (`shared/data.js:5143`, `5378`, `5449`, `5519`, `5580`), `saveScores` (`6341`), the clean-up after Delete Assessment (`shared/data-assessments.js:446`), Edit a Copy's move (`shared/data-rubrics.js:505`), the re-key (`shared/data.js:2405`) and the class load (`1753`). `_saveCourseField` and that function run one list of hooks in place of the named calls. Each writer keeps its own order of effects where the order can be seen (a refused level does not tell other tabs, `shared/data.js:5153-5156`). A new test fails if any other code writes `gb-scores-`. Proof: the method for mark-touching moves (DECISIONS, "Marks may be moved"): 0 differences on three seeds, both modes, offline and two tabs.
+**Step 8. One writer, and hooks.** In the mark writers' file. Every place that writes the scores copy calls one function: the five one-cell writers (`shared/data.js:5143`, `5378`, `5449`, `5519`, `5580`), `saveScores` (`6341`), the clean-up after Delete Assessment (`shared/data-assessments.js:446`), Edit a Copy's move (`shared/data-rubrics.js:505`), the re-key (`shared/data.js:2405`) and the class load (`1753`). `_saveCourseField` and that function run one list of hooks in place of the named calls. Each writer keeps its own order of effects where the order can be seen (a refused level does not tell other tabs, `shared/data.js:5153-5156`). A new test fails if any other code writes `gb-scores-`. Pins before: every pin named in steps 1, 4 and 6, and `e2e/pin-phone-grade-tab.spec.js`. Proof: the method for mark-touching moves (DECISIONS, "Marks may be moved"): 0 differences on three seeds, both modes, offline and two tabs.
 
 **Step 9. Draft and Returned on one cell.** The one-cell writers pass the cell's old entry instead of reading the saved copy (`shared/data.js:7217-7262`). Pins: `tests/grade-return-data.test.js`, `tests/fixtures/grade-state-cases.json`, `e2e/marks-read-current-piece.spec.js`. New test: fault 6. Differential run: one tab, 0 differences, the `gb-grade-returns-` text included.
 
@@ -327,9 +329,9 @@ For every step: tests first. A behaviour step needs Colin (it changes how a mark
 
 **Step 11. The guard.** `saveScores` (`shared/data.js:6302-6339`). The twelve cases in `tests/score-guard-keeps-mark.test.js:319-476` are decided one by one, test first: an empty list, one student's marks, or a save that drops most of this tab's own marks stays blocked; a save whose own change is small goes through.
 
-**Step 12. Statuses, ticks, rows.** The same function for `gb-statuses-`, `gb-rubric-checks-` and `gb-grade-returns-`. They are already keyed by cell.
+**Step 12. Statuses, ticks, rows.** The same function for `gb-statuses-`, `gb-rubric-checks-` and `gb-grade-returns-`. They are already keyed by cell. Pins before: `tests/status-rejected-then-undone.test.js`, `tests/pin-class-results-mark-missing.test.js`, `tests/gradebook-clear-score-undo-ticks.test.js`, `tests/grade-return-data.test.js`. New tests: step 10's, for a status, a tick and a row.
 
-**Step 13. Grader dialog.** Only if step 0 says so.
+**Step 13. Grader dialog.** `teacher/page-assignments.js:15917-15950`, `16029`. Only if step 0 says so. Pins before: `tests/pin-grader-dialog-writes.test.js`, `e2e/group-grader.spec.js`. The same full-redraw check as step 3.
 
 ## 7. Risks and how each is caught
 
@@ -354,26 +356,26 @@ The lines on published views are my reading of each author's published work. Non
 
 1. **Should the server refuse a write from a device that is behind?**
    **Recommended: no.** Keep the last call wins for a cell, and make no server change.
-   - Kleppmann (_Designing Data-Intensive Applications_, chapter 5): last write wins is safe when the later write is meant to replace the earlier one, and loses data when two writers each needed theirs kept. One teacher's two devices are the first case.
-   - Nygard (_Release It!_): do not add a way to fail without a place for the failure to go. A refusal here becomes a dropped write.
-   - Ask again if two teachers ever share a class.
+   - Kleppmann (_Designing Data-Intensive Applications_, chapter 5): last write wins quietly throws away one of two writes made at the same time, and is a poor choice where losing a write is not acceptable; his answer there is a version check. A write that follows another is not that case: it replaces it. One teacher moving between two devices mostly makes the second kind. His view points toward a version check for the first kind, which here is a device that was offline for a while.
+   - Nygard (_Release It!_): every link to another system fails in time, so decide what the failure looks like before adding one. A refusal here becomes a dropped write, with no screen to put it right.
+   - So: not now. Ask again if two teachers ever share a class, or once a refused write has somewhere to go.
 2. **When a tab is behind, merge quietly or refuse and say so?**
    **Recommended: merge by cell and say nothing.** The mark is saved, so there is no problem to report (rule 5).
-   - Kleppmann: merge at the smallest unit that has one owner at a time; a cell is that unit.
-   - Nygard: on any error, fall back to the path that already works.
+   - Kleppmann (the same chapter, and his work on merging edits made apart): keep both changes when they touch different things, and merge at the finest unit that makes sense. Here that is a cell.
+   - Nygard: a failure in new code should be contained, not passed on. Any error in the merge falls back to the write that works today.
 3. **Should a tab take the other tab's marks into its memory at once, so its screen is never behind?**
    **Recommended: not in this item.** The saved copy and the server are safe without it, and the screen catches up as today. It would be a second way for two tabs to disagree.
-   - Kleppmann: passing each change between copies needs every message delivered once and in order; merging on one shared copy does not.
+   - Kleppmann (the research on merging he writes about): passing each change between copies needs every message delivered, once; merging onto one shared copy does not.
 4. **A switch for the small redraw, and the full-redraw check in tests?**
    **Recommended: yes to both.** The switch is a constant, removed two releases later. The check never runs for teachers.
-   - Fowler ("ParallelChange", "Feature Toggles"): keep the old path beside the new one until the new one is proven, then remove it.
+   - Fowler's site ("ParallelChange", "Feature Toggles"): keep the old path beside the new one until the new one is proven, then remove it and the switch.
    - Beck (_Tidy First?_): the move-only step (2) and the behaviour step (3) are separate PRs.
 5. **How slow must the gradebook be for step 3 to be worth it?**
    **Recommended:** build step 3 only if step 0 shows a typed score takes more than 100 ms to draw at quarter speed. Build step 13 only on the same test.
-   - Beck and Fowler: measure before changing; the smallest change that removes the pain.
+   - Fowler (_Refactoring_, on performance): measure before tuning. Beck: the smallest change that removes the pain.
 6. **Should every one-cell write, levels too, check that this tab's memory has not collapsed?**
    **Recommended: yes, in step 10,** where the answer to a collapse is to write own cells only, not to block. Today a level tap after such a fault rewrites the saved copy with almost nothing.
-   - Nygard: contain a fault where it is found.
+   - Nygard: contain a fault where it is found, so it cannot spread to what is saved.
 7. **Should the red "Score save blocked" message move to the sync dot?**
    **Recommended: leave it.** The plan lists the remaining toasts as a feature PR of their own. After step 11 it shows only for a real mass loss. Colin's call.
 8. **Should a refused mark outlast a reload?**
