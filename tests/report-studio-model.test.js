@@ -1008,3 +1008,30 @@ describe('stage 3 blocks', () => {
     });
   });
 });
+
+describe('measuring the class for One Report', () => {
+  it('measures in the standard type and gives the layout only the paper and the stage, whatever a saved form says', () => {
+    const seen = [];
+    const old = document.createElement;
+    document.createElement = () => ({ setAttribute() {}, style: {}, remove() {} });
+    const layout = (cid, st, ctx, o) => {
+      seen.push({ cls: o.stage.className, keys: Object.keys(o).sort() });
+      return { html: '', sheets: 1, sides: 1 };
+    };
+    try {
+      S.classSummary(
+        'x',
+        [{ id: 's1', firstName: 'Ada', lastName: 'Lee' }],
+        {},
+        {
+          paper: 'letter',
+          form: { v: 6, type: 'compact', sides: [] },
+          layout,
+        },
+      );
+    } finally {
+      document.createElement = old;
+    }
+    expect(seen).toEqual([{ cls: 'report-sheet report-sheet-measure', keys: ['paper', 'stage'] }]);
+  });
+});

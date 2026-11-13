@@ -683,7 +683,6 @@ window.PageReports = (function () {
     Preview.renderReportPreview({
       cid: activeCourse,
       students: _previewStudents(),
-      reportConfig: { form: _saved().form },
       paper: reportPaper,
       layout: ReportOne.layoutWith(_oneModel()),
       onSheets: _rememberSummary,
@@ -1336,8 +1335,7 @@ window.PageReports = (function () {
   /* What a class saved before One Report, read as the Progress Reports
      screen read it: on the Quick Report unless it chose Build Your Own, or
      built a form before there was a choice; its form, or the starting
-     one. ReportOne.modelFor and the measuring stage read this; nothing
-     saves it. */
+     one. ReportOne.modelFor reads this; nothing saves it. */
   function _readSaved(rc) {
     var r = Object.assign({}, rc);
     if (r.progressMode !== 'grade' && r.progressMode !== 'build') r.progressMode = r.form ? 'build' : 'grade';
@@ -1529,7 +1527,6 @@ window.PageReports = (function () {
   function _classSummary(students) {
     return ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
       paper: reportPaper,
-      form: _saved().form,
       layout: ReportOne.layoutWith(_oneModel()),
     });
   }

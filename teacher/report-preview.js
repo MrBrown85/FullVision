@@ -1,10 +1,10 @@
-/* report-preview.js — lays the class's form into #rb-preview (report-sheets.js). */
+/* report-preview.js — lays the class's report into #rb-preview (ReportSheets.renderPreview). */
 window.ReportPreview = (function () {
   'use strict';
 
-  /* Lays the students into #rb-preview on the class's form. opts.students
-     is the list to show; without it, selectedStudentIds filters the class
-     (null means everyone). opts.layout: the Grade Report's layout. */
+  /* Lays the students into #rb-preview. opts.students is the list to
+     show; without it, selectedStudentIds filters the class (null means
+     everyone). opts.layout: One Report's layout (ReportOne.layoutWith). */
   function renderReportPreview(opts) {
     var preview = document.getElementById('rb-preview');
     if (!preview) return;
@@ -39,7 +39,6 @@ window.ReportPreview = (function () {
         ctx: ReportBlocks.reportContext(),
         preview: preview,
         paper: opts.paper || 'letter',
-        form: ReportSheets.formFor(opts.reportConfig),
         layout: opts.layout,
       });
       if (typeof opts.onSheets === 'function') opts.onSheets(summary);

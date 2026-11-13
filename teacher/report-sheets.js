@@ -1082,9 +1082,11 @@ window.ReportSheets = (function () {
   }
 
   /* ── Measuring ──────────────────────────────────────────────── */
-  function _stage(host, contentW, type) {
+  /* The off-screen sheet a part is measured in, in the standard type One
+     Report prints in. */
+  function _stage(host, contentW) {
     var st = document.createElement('div');
-    st.className = 'report-sheet report-sheet-measure' + (type === 'compact' ? ' compact' : '');
+    st.className = 'report-sheet report-sheet-measure';
     st.setAttribute('aria-hidden', 'true');
     st.style.cssText =
       'position:absolute;left:-10000px;top:0;width:' +
@@ -1252,14 +1254,13 @@ window.ReportSheets = (function () {
   function renderPreview(opts) {
     var preview = opts.preview;
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
-    var formUsed = normalizeForm(opts.form);
     var lay = opts.layout;
-    var stage = _stage(preview, ROW_W, formUsed.type);
+    var stage = _stage(preview, ROW_W);
     var summary = _summary(opts.students);
     summary.sideHeight = sideHeight(paper);
     var html = opts.students
       .map(function (st) {
-        var r = lay(opts.cid, st, opts.ctx, { form: formUsed, paper: paper, stage: stage });
+        var r = lay(opts.cid, st, opts.ctx, { paper: paper, stage: stage });
         _count(summary, st, r).html = r.html;
         return r.html;
       })
@@ -1273,20 +1274,19 @@ window.ReportSheets = (function () {
     return summary;
   }
 
-  /* The class laid out on the current form, without rendering: the same
+  /* The class laid out, without rendering: the same
      summary renderPreview returns, minus the HTML. For the fit line while
      one student is on screen. opts.layout as renderPreview. */
   function classSummary(cid, students, ctx, opts) {
     opts = opts || {};
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
-    var formUsed = normalizeForm(opts.form);
     var lay = opts.layout;
-    var stage = _stage(document.body, ROW_W, formUsed.type);
+    var stage = _stage(document.body, ROW_W);
     var summary = _summary(students);
     try {
       summary.sideHeight = sideHeight(paper);
       students.forEach(function (st) {
-        var r = lay(cid, st, ctx, { form: formUsed, paper: paper, stage: stage });
+        var r = lay(cid, st, ctx, { paper: paper, stage: stage });
         _count(summary, st, r).hash = ReportIssuesHash(r.html);
       });
     } finally {
