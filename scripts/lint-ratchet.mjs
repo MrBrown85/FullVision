@@ -43,6 +43,7 @@ export const NO_UNDEF_FILES = [
   'shared/data-term-ratings.js',
   'shared/data-utilities.js',
   'shared/data-withdrawn.js',
+  'shared/overwrite-count.js',
 ];
 
 const PAGE_NAMES = {

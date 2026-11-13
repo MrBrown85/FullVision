@@ -31,7 +31,8 @@
     "shared/data-rubrics.js",
     "shared/data-student-cards.js",
     "shared/data-demo.js",
-    "shared/data-feedback-live.js"
+    "shared/data-feedback-live.js",
+    "shared/overwrite-count.js"
   ],
   "notYetChecked": [
     "s/app.js",
