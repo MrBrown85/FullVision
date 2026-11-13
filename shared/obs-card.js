@@ -101,7 +101,16 @@ window.ObsCard = (function () {
      dates every card. */
   var _fmts = {};
   function _format(key, opts) {
-    return _fmts[key] || (_fmts[key] = new Intl.DateTimeFormat('en-CA', opts));
+    // An unreadable date reads "Invalid Date", as toLocaleDateString gave, not a thrown error.
+    if (!_fmts[key]) {
+      var f = new Intl.DateTimeFormat('en-CA', opts);
+      _fmts[key] = {
+        format: function (d) {
+          return isNaN(d) ? 'Invalid Date' : f.format(d);
+        },
+      };
+    }
+    return _fmts[key];
   }
 
   /* "12:00 p.m." The feed's day header carries the date. */

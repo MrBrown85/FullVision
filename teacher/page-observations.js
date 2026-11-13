@@ -311,7 +311,16 @@ window.PageObservations = (function () {
   // Formatters are slow to make: one each, made once.
   var _fmts = {};
   function _format(key, opts) {
-    return _fmts[key] || (_fmts[key] = new Intl.DateTimeFormat('en-CA', opts));
+    // An unreadable date reads "Invalid Date", as toLocaleDateString gave, not a thrown error.
+    if (!_fmts[key]) {
+      var f = new Intl.DateTimeFormat('en-CA', opts);
+      _fmts[key] = {
+        format: function (d) {
+          return isNaN(d) ? 'Invalid Date' : f.format(d);
+        },
+      };
+    }
+    return _fmts[key];
   }
   function _shortDate(ymd) {
     return _format('md', { month: 'short', day: 'numeric' }).format(new Date(ymd + 'T12:00:00'));

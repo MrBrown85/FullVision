@@ -105,4 +105,12 @@ describe('date formatters are made once', () => {
     expect(got[51]).toBe(want(old));
     expect(got[51]).toContain('2019');
   });
+
+  it('an observation with no readable date reads as before, and the card is still drawn', () => {
+    // toLocaleDateString gave "Invalid Date"; a formatter's format() throws.
+    const bad = { id: 'bad' };
+    expect(() => ObsCard.cardWhen(bad)).not.toThrow();
+    expect(ObsCard.cardWhen(bad)).toBe(new Date('x').toLocaleDateString('en-CA', { weekday: 'short' }));
+    expect(ObsCard.cardWhen({ id: 'bad2', created: 'not a date' })).toBe('Invalid Date · Invalid Date');
+  });
 });

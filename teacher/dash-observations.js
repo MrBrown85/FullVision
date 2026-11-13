@@ -379,7 +379,16 @@ window.DashObservations = (function () {
      card labels every week of every student. */
   var _fmts = {};
   function _utcFormat(key, opts) {
-    return _fmts[key] || (_fmts[key] = new Intl.DateTimeFormat('en-CA', Object.assign({ timeZone: 'UTC' }, opts)));
+    // An unreadable date reads "Invalid Date", as toLocaleDateString gave, not a thrown error.
+    if (!_fmts[key]) {
+      var f = new Intl.DateTimeFormat('en-CA', Object.assign({ timeZone: 'UTC' }, opts));
+      _fmts[key] = {
+        format: function (d) {
+          return isNaN(d) ? 'Invalid Date' : f.format(d);
+        },
+      };
+    }
+    return _fmts[key];
   }
 
   function _weekLabel(week) {
