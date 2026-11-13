@@ -573,7 +573,7 @@
 }
 
 /* The rubric card: how a piece was scored, beside a card on the Work tab
-   or the Work Wall while it is pointed at (shared/work-wall.js). Over the
+   or the Work Wall while it is pointed at (teacher/work-rubric-card.js). Over the
    wall, so above its overlay. It takes no clicks. */
 .wr-card {
   position: fixed;

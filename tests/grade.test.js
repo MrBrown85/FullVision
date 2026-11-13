@@ -187,7 +187,7 @@ describe('grade-format-guard', () => {
     'teacher-mobile/student-detail.js': 7,
     'teacher-mobile/tab-grade.js': 4, // the checklist's level names; the level buttons' words are scoreLevelText's (MComponents.levelButtonsHTML)
     'teacher/comment-bank.js': 1,
-    'shared/work-wall.js': 1, // the rubric card's level column heads (a rubric column)
+    'teacher/work-rubric-card.js': 1, // the rubric card's level column heads (a rubric column)
     'teacher/comment-personal.js': 1,
     // The level word as a line's label ("Developing: …").
     'shared/competency-wording.js': 1,
