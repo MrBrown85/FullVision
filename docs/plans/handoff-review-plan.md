@@ -127,7 +127,7 @@ Each slice says what it changes, the tests that prove it, when it is done, and i
 **Files.** `docs/plans/handoff-review-plan.md` (new), `docs/plans/student-page-build-plan.md` (the S19 stub only).
 **Tests.** `tests/docs-sync.test.js`; Prettier on both files.
 **Done when.** The plan is on `main` and the S19 stub points at it.
-**Status.** Queued for the night of Nov 11 (wave 0).
+**Status.** Done and released (PR 1185).
 
 #### S19-A2. Delete the old curriculum pipeline in `_dev/`
 
@@ -135,7 +135,7 @@ Each slice says what it changes, the tests that prove it, when it is done, and i
 **Files.** The four paths above.
 **Tests.** `npm run audit:html`; `tests/curriculum-labels.test.js`.
 **Done when.** 228 files are gone (the 225 JSON files and the three named files; `git ls-files _dev` drops from 231 to 3) and `git grep` finds the names only in `_dev/make-docs-xlsx.py`.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1190).
 
 #### S19-A3. Delete nine unreferenced screenshots
 
@@ -143,7 +143,7 @@ Each slice says what it changes, the tests that prove it, when it is done, and i
 **Files.** The two folders.
 **Tests.** `tests/docs-sync.test.js`.
 **Done when.** Both folders are gone and nothing links to them.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1187).
 
 #### S19-A4. Remove dead lines from `scripts/build.sh`
 
@@ -151,14 +151,14 @@ The `robots.txt` copy (no such file), the "future portals" `student/` and `paren
 **Files.** `scripts/build.sh`.
 **Tests.** The built `dist/` is byte-for-byte the same before and after (with a fixed `COMMIT_REF`); `tests/device-routing.test.js`, `tests/app-routes.test.js`; `e2e/app-loading.spec.js`.
 **Done when.** The two file listings match and the script still exits 0.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1192).
 
 #### S19-A5. Ignore `scratchpad/` and `supabase/.temp/`
 
 **Files.** `.gitignore`.
 **Tests.** `git check-ignore -v scratchpad supabase/.temp`; `git ls-files scratchpad supabase/.temp` is empty.
 **Done when.** Both folders are ignored and no tracked file changed state.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1189).
 
 #### S19-A6. Rename the package from `teacher-dashboard` to `fullvision`
 
@@ -166,7 +166,7 @@ Three lines in `package.json` and `package-lock.json`. Nothing reads the name.
 **Files.** `package.json`, `package-lock.json`.
 **Tests.** `npm ci`; `tests/app-routes.test.js`; `git grep teacher-dashboard` finds nothing.
 **Done when.** The three lines say `fullvision`, `npm ci` passes, and nothing else in the lockfile changed.
-**Status.** Queued for the night of Nov 11 (wave 3, after S19-D2 changes the same files).
+**Status.** Not done. `package.json` still says `teacher-dashboard`. It needs a rerun.
 
 #### S19-A7. Precache `curriculum_crosswalk.json`
 
@@ -174,13 +174,13 @@ Re-link fetches it, but the service worker does not keep it, so Re-link fails of
 **Files.** `sw.js`.
 **Tests.** `grep -c "'/curriculum_crosswalk.json'" sw.js` prints 1 (the real check: `tests/sw-precache.test.js` passes with or without the line, and the Re-link spec does not run offline); `tests/sw-precache.test.js`; `e2e/cm-keyboard-focus.spec.js` (Re-link review).
 **Done when.** The line is in the precache list and the tests pass.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1207).
 
 #### S19-A8. Drop `curriculum_data.js` and its fallback
 
 The app loads `curriculum_by_course.json`. `curriculum_data.js` (1.96 MB) is fetched only when that load fails.
 **Needs Colin.** The skeptics refuted it as written: dropping it changes what a teacher sees when the JSON fetch fails (the course picker gets nothing instead of the copy). The full edit list is in the map (`repo-leftovers-8`), plus `docs/STUDENT-VOICE-PLAN.md:207`.
-**Status.** Waits for Colin.
+**Status.** Closed. Colin's Nov 12 rulings keep the fallback (`docs/DECISIONS.md`, "Handoff review rulings (2026-11-12)").
 
 #### S19-A9. Move the security headers from `_headers` into `netlify.toml`
 
@@ -191,7 +191,7 @@ Only `_headers` sends X-Frame-Options, nosniff, HSTS and Referrer-Policy. Both f
 #### S19-A10. Retire `schema.sql`
 
 **Needs Colin.** The map says keep it: it is maintained, and `migrations/local-test/student_page_fields.py` rewrites it. Colin confirms, and the Nov 2 item 10 is dropped.
-**Status.** Waits for Colin.
+**Status.** Closed. Colin's Nov 12 rulings keep `schema.sql` (`docs/DECISIONS.md`, "Handoff review rulings (2026-11-12)").
 
 #### S19-A11. Fix the skipped points test and drop duplicate tests
 
@@ -203,7 +203,7 @@ The map marked the points test (`tests-audit-1`) `needs Colin`. It is queued bec
 **Files.** The three test files.
 **Tests.** The three files pass; the skipped count drops by one.
 **Done when.** The points stepper test runs and passes.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1191).
 
 #### S19-A12. Fix old file names in test comments
 
@@ -213,7 +213,7 @@ The skeptics refuted a blind rename of these names (`docs-audit-26` and `-28`): 
 **Files.** The 13 test files, `tests/setup.js` and `tests/setup-mobile.js` included.
 **Tests.** The changed test files pass. A token check shows each file's code is unchanged once comments are ignored.
 **Done when.** `git grep -E 'gb-(data|calc|ui|router)\.js|m-(components|students|observe|grade)\.js' tests/` finds nothing.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1210).
 
 #### S19-A13. Fix docs that contradict the code, in place
 
@@ -225,7 +225,7 @@ The skeptics refuted a blind rename of these names (`docs-audit-26` and `-28`): 
 **Files.** `docs/plans/student-page-build-plan.md`, `docs/STUDENT-VOICE-PLAN.md`, `docs/ROADMAP.md`, `README.md`.
 **Tests.** `tests/docs-sync.test.js`; Prettier.
 **Done when.** Each listed line says what the code does today.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1193).
 
 #### S19-A14. Update `CLAUDE.md`
 
@@ -233,7 +233,7 @@ Line 64 names a deleted test file (the guard is `describe('grade-format-guard')`
 **Files.** `CLAUDE.md`.
 **Tests.** `tests/docs-sync.test.js`; Prettier.
 **Done when.** Line 64 names `tests/grade.test.js` and nothing else in the file changed.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1206).
 
 #### S19-A14b. The rest of the `CLAUDE.md` update, for Colin
 
@@ -241,7 +241,7 @@ Line 64 names a deleted test file (the guard is `describe('grade-format-guard')`
 **Files.** `CLAUDE.md`.
 **Tests.** `tests/docs-sync.test.js`; Prettier.
 **Done when.** Colin accepts or drops each of the five edits.
-**Status.** Queued for the night of Nov 11 as a draft PR (wave 4). Colin reads it.
+**Status.** Done and released (PR 1214). It merged after review.
 
 #### S19-A15. `docs/ARCHITECTURE.md`: the student page, and every module named
 
@@ -249,7 +249,7 @@ Line 30 says the card screens run in Demo Mode only; the card routes exist. Line
 **Files.** `docs/ARCHITECTURE.md`.
 **Tests.** `tests/docs-sync.test.js`; a short script that lists unnamed `s/` and `shared/` files prints nothing.
 **Done when.** Every `s/` and `shared/` file is named and the statements match the code.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1213).
 
 The test that every `s/` and `shared/` file must be named waits for the morning. Added tonight, it would fail any PR the build session opens that adds such a file without naming it. Add it once that session knows the rule. **Status.** Later.
 
@@ -259,7 +259,7 @@ Ten `.drawio` files, their README and the four `lucidchart-*` files. The README 
 **Files.** `docs/diagrams/`, the four `docs/lucidchart-*` files, `docs/history/`, `README.md`, `docs/backend-design/HANDOFF.md`.
 **Tests.** `tests/docs-sync.test.js`; Prettier; `git grep -E 'docs/diagrams|lucidchart'`.
 **Done when.** The files are under `docs/history/diagrams/` and every link in its README resolves.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1209).
 
 #### S19-A17. Fix two stale code comments
 
@@ -267,7 +267,7 @@ Ten `.drawio` files, their README and the four `lucidchart-*` files. The README 
 **Files.** `teacher/page-student.js`, `shared/seed-data.js`.
 **Tests.** A token check shows the code is unchanged once comments are ignored; `tests/student-overview.test.js`, `tests/edit.test.js`, `tests/golden-grades.test.js`; `e2e/student-tabs.spec.js`.
 **Done when.** Only the two comments changed.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1211).
 
 #### S19-A18 to S19-A28. Delete dead functions and unused export keys
 
@@ -290,7 +290,7 @@ Every name below passed both skeptics, is marked low or medium risk, and is name
 If `tests/grade.test.js` fails (its list of rounding calls that are not grades), the PR stops and reports; it never edits that test.
 **Tests.** Each PR runs the module's own tests and the guard tests that read source by name: `tests/grade.test.js` (the grade-format guard and its rounding list), `tests/grader-guard.test.js`, `tests/level-readings-outside-calc.test.js`, `tests/report-score-seam.test.js`, `tests/no-inline-handlers.test.js`, `tests/help-labels.test.js`, plus `npm run audit:html`.
 **Done when.** `git grep -w` finds no read of a removed name, tests pass untouched, and no script list changes (no file is added or removed).
-**Status.** Queued for the night of Nov 11 (waves 4 and 6).
+**Status.** Done and released. PRs: A18 1221, A19 1217, A20 1223, A21 1224, A22 1218, A23 1215, A24 1222, A25 1219, A26 1220, A27 1216, A28 1235.
 
 #### S19-A29 to S19-A39. Delete dead CSS, one stylesheet per PR
 
@@ -311,7 +311,7 @@ Each PR deletes only the selectors named in the map's confirmed entries (never a
 | A39   | `teacher/assignments.css`     | css-teacher 3-10, 99, and the `assignments.css` parts of 1, 2                                  | desktop                                        | 6 (last; the form's CSS is being changed tonight) |
 
 Not tonight: the seven custom properties read but never defined. Every fix offered for them either changes a colour in dark mode or is a no-op (S19 section 5).
-**Status.** Queued for the night of Nov 11 (waves 5 and 6).
+**Status.** Done and released. PRs: A29 1233, A30 1231, A31 1234, A32 1230, A33 1232, A34 1226, A35 1227, A36 1228, A37 1225, A38 1229, A39 1236.
 
 #### S19-A40. Test-only code, and the "needs Colin" dead code
 
@@ -339,7 +339,7 @@ The skeptics refuted every move as written except the diagrams (S19-A16). Severa
 #### S19-B1. The re-checked Phase 6 list
 
 Rewrite Phase 6 in `docs/write-path-plan.md` with the findings above and the order below. Fix the header ("Phase 5 in review").
-**Status.** Queued for the night of Nov 11 as a draft PR (wave 1). Colin reads it.
+**Status.** Done and released (PR 1194).
 
 #### S19-B2. Comment-only fixes in `shared/data.js`
 
@@ -347,7 +347,7 @@ Lines 100, 1362-1364, 2136 and 14594-14598, and `tests/write-path-audit.test.js:
 **Files.** `shared/data.js`, `tests/write-path-audit.test.js`.
 **Tests.** A token check shows the code is unchanged once comments are ignored; `tests/write-path-audit.test.js`, `tests/data.test.js`, `tests/persistence.test.js`.
 **Done when.** Only those comments changed.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1208).
 
 #### S19-B3. Keep a mark the guard blocks
 
@@ -359,7 +359,7 @@ Lines 100, 1362-1364, 2136 and 14594-14598, and `tests/write-path-audit.test.js:
 2. Two tabs on the same class. Tab A uses Set Everyone To on a column. Tab B, which saved something in the last two seconds and so has not yet reloaded the class, enters a mark. The guard blocks it, because it would otherwise overwrite tab A's fill. That mark is gone after tab B reloads.
    **The fix.** A blocked mark is kept and saved once the saved copy is fresh. It is never dropped. Tests come first, a test that fails today for each case and one that proves an accidental empty save is still refused. An independent reviewer then tries to break it.
    **Needs Colin.** It changes how marks are saved; his Nov 12 ruling lets it merge once the reviewer cannot break it (section 6, decision 9).
-   **Status.** In progress (Nov 12). Being built as its own PR.
+   **Status.** Done and released (PR 1250). Its pin is PR 1246 and the corrected report is PR 1247.
 
 #### S19-B4. Send an undone cell once
 
@@ -395,23 +395,23 @@ Six readers of old saved-copy shapes still run. Demo classes and copies with no 
 
 A Playwright spec on a 30-student, 60-assessment class: load time, Largest Contentful Paint, and click response for the Gradebook, Assignments, Class Management and the phone Grade tab, at full speed and at a quarter-speed CPU. It records numbers to the CI summary and an artifact. It has no `expect` on any number. It runs on pushes to `main`, never on PRs, with a concurrency group that cancels an older run, so a burst of merges runs it once.
 **Files.** `e2e-perf/speed.spec.js`, `playwright.perf.config.js`, `.github/workflows/perf.yml` (all new).
-**Status.** Queued for the night of Nov 11 (wave 2).
+**Status.** Done and released (PR 1196).
 
 #### S19-C2 to C11. The speed work itself
 
 All of it changes what loads or when, so none of it is tonight's. In order of value:
 
-- **C2.** Remove the eager `shared/bank-comment.js` tag (261 KB); `competency-wording.js` already loads it on demand. Later.
-- **C3.** Load the reports-only scripts (11 files, 642 KB) and the print, QR and rubric-bank code only on the pages that use them. Later.
-- **C4.** `defer` on the scripts, keeping the order rules in the map's loading report (section 6). Later.
+- **C2.** Remove the eager `shared/bank-comment.js` tag (261 KB); `competency-wording.js` already loads it on demand. Dropped (Nov 12). The tag is still in `teacher/app.html`.
+- **C3.** Load the reports-only scripts (11 files, 642 KB) and the print, QR and rubric-bank code only on the pages that use them. Done and released (PRs 1245 and 1286).
+- **C4.** `defer` on the scripts, keeping the order rules in the map's loading report (section 6). Closed (Nov 12): no gain.
 - **C5.** Versioned file names and a long cache. Later; it needs S19-A9 first.
-- **C6.** A service worker that precaches each page's own files and stops re-downloading 12.66 MB on every deploy. Later.
+- **C6.** A service worker that precaches each page's own files and stops re-downloading 12.66 MB on every deploy. Done and released (PR 1290).
 - **Plan for C5, C6 and C7:** `docs/plans/caching-plan.md` (Nov 12). The site never answers "not changed", so a repeat visit re-downloads 1.65 MB; it recommends C7 first, then keeping unchanged files across releases, and leaves versioned file names.
-- **C7.** Run the `inject-env` edge function on HTML only, not on every file. Needs Colin (only a deploy proves it). Waits for Colin.
+- **C7.** Run the `inject-env` edge function on HTML only, not on every file. Done and released (PR 1289). The read-only check script is PR 1288.
 - **C8.** One boot call instead of `bootstrap_teacher` then `list_teacher_courses`. Needs Colin (server change). Waits for Colin.
 - **C9.** One mark saves one mark; redraw only what changed. Needs Colin (save and redraw paths). Waits for Colin.
-- **C10.** Find out why the phone score tap takes 395 ms. Later.
-- **C11.** Sentry performance tracing. Needs Colin. Waits for Colin.
+- **C10.** Find out why the phone score tap takes 395 ms. Measured in PR 1282 (released). The 395 ms is not fixed. It moves into C9.
+- **C11.** Sentry performance tracing. Ruled no (Nov 12): error reports leave Canada.
 
 ### Track D. Safety nets
 
@@ -419,7 +419,7 @@ All of it changes what loads or when, so none of it is tonight's. In order of va
 
 `PORT=8348 npx playwright test` runs a second worktree's tests on its own server. Today the second run silently tests the first worktree's build.
 **Files.** `playwright.config.js`, `playwright.real.config.js`, `e2e/student-card-fake.js`.
-**Status.** Queued for the night of Nov 11 (wave 0).
+**Status.** Done and released (PR 1186).
 
 #### S19-D2. ESLint and type checks, reporting only
 
@@ -427,7 +427,7 @@ ESLint with `no-undef` and `no-unused-vars` as warnings, with the globals of eac
 **Files.** `package.json`, `package-lock.json`, `.github/workflows/ci.yml`, `eslint.config.mjs`, `scripts/lint-globals.mjs`, `tsconfig.json`, `types/globals.d.ts` (the last four new), `shared/html.js`, `shared/constants.js`.
 **Tests.** `npm run typecheck` (0 errors); `npx eslint .` (0 errors, about 186 warnings); `npm run audit:html`; `tests/data-utils.test.js`, `tests/grade.test.js`, `tests/csp-directives.test.js`; `e2e/app-loading.spec.js`.
 **Done when.** Both new CI steps run with `continue-on-error` and report.
-**Status.** Queued for the night of Nov 11 (wave 2).
+**Status.** Done and released (PR 1197).
 
 #### S19-D3. `// @ts-check` on `calc.js`
 
@@ -435,7 +435,7 @@ Comments only: two `/*` become `/**`, two `@returns`, one `@param`, one `@ts-exp
 **Files.** `shared/calc.js`.
 **Tests.** The token check; `npm run typecheck` (0 errors); every calc and golden-grade test, untouched.
 **Done when.** All three pass.
-**Status.** Queued for the night of Nov 11 (wave 3).
+**Status.** Done and released (PR 1212).
 
 #### S19-D4. A test that freezes the security headers
 
@@ -443,12 +443,12 @@ Comments only: two `/*` become `/**`, two `@returns`, one `@param`, one `@ts-exp
 **Files.** `tests/headers.test.js` (new).
 **Tests.** The new test passes on today's files and fails if any of the four values changes.
 **Done when.** Both are shown.
-**Status.** Queued for the night of Nov 11 (wave 1).
+**Status.** Done and released (PR 1188).
 
 #### S19-D5. A screenshot harness for CSS deletions
 
 `playwright.visual.config.js` and `e2e-visual/` (new): it captures every page and state that loads a given sheet, at desktop and phone size, with a fixed clock. Run once on `main` to record, once on the branch to compare; no pixel may differ. It also checks that a list of deleted selectors matches nothing. The pictures are kept outside the repo.
-**Status.** Queued for the night of Nov 11 (wave 2).
+**Status.** Done and released (PR 1205).
 
 #### S19-D6 to S19-D13. Pins before any page is split
 
@@ -466,14 +466,14 @@ Each is a new browser spec in Demo Mode. They record what the page does today; t
 | D13   | `e2e/pin-phone-grade-tab.spec.js`            | levels, statuses, Complete and Incomplete, Undo after Set To, comments after a reload, a phone grade reaching the desktop gradebook      | 2    |
 
 D8 and D9 wait for the last wave, so they pin the assessment form work that another session is landing tonight.
-**Status.** Queued for the night of Nov 11.
+**Status.** Done and released. PRs: D6 1198, D7 1203, D8 1237, D9 1238, D10 1201, D11 1204, D12 1202, D13 1200.
 
 #### S19-D14 to D17
 
 - **D14.** Make `tests/grader-guard.test.js` read sub-folders before any code moves into a feature folder; today it would stop seeing moved code without failing. Later.
 - **D15.** Turn lint warnings into errors file by file, and make `tsc` blocking. Needs Colin (when). Later.
 - **D16.** A database the repo can rebuild (a baseline migration) and tests for who can see what (pgTAP). Later; it needs a place to run (D17).
-- **D17.** Staging: a Supabase branch or a small second project. Needs Colin. Waits for Colin.
+- **D17.** Staging: a Supabase branch or a small second project. Needs Colin. Held (Nov 12).
 
 ### Track E. Organized code
 
@@ -493,7 +493,7 @@ The Nov 12 ruling started Track E (`docs/DECISIONS.md`, "Handoff review rulings 
 - Reflect on Feedback: it reads returned grades and revision requests.
 - Student work and feedback: its feedback half returns grades and syncs returned work and revisions.
 
-**The ruling.** Colin, 2026-11-12: marks may be moved, and Colin and Karen must see no change. The remaining pieces proceed as move-only PRs under the method in that entry: a byte-for-byte proof, the same long sequence of real teacher actions on main and on the branch, an independent reviewer with a different sequence, the full browser suite on GitHub before merge, and small releases. Anything that cannot be shown identical stops and goes to Colin. Changing how a mark is saved, queued, synced, returned or deleted still needs him. This replaces the old rule that the score writers wait for a day's use on real classes after a release. Recommended order, from the map.
+**The ruling.** Colin, 2026-11-12: marks may be moved, and Colin and Karen must see no change. The remaining pieces proceed as move-only PRs under the method in that entry: a byte-for-byte proof, the same long sequence of real teacher actions on main and on the branch, an independent reviewer with a different sequence, the full browser suite on GitHub before merge, and small releases. Anything that cannot be shown identical stops and goes to Colin. The long sequence is `scripts/differential-run.mjs` (`docs/differential-run.md`): main against the branch, three seeds, both modes, offline and two tabs. Changing how a mark is saved, queued, synced, returned or deleted still needs him. This replaces the old rule that the score writers wait for a day's use on real classes after a release. Recommended order, from the map.
 
 **Tidyings in `shared/data.js` that cut false coupling** (each its own PR):
 
@@ -518,7 +518,9 @@ The Nov 12 ruling started Track E (`docs/DECISIONS.md`, "Handoff review rulings 
 - **Needs Colin:** desktop and phone show a criterion's level differently when keys are mixed (desktop the first non-zero level, phone the lowest). One of them is wrong. Also the grading order differs (last name on desktop, alphabetical on phone).
 - Map `teacher/report-questionnaire.js` (8,994 lines); no one has.
 
-**Status.** In progress: 19 pieces moved; the rest proceed as move-only PRs under the Nov 12 method. Items marked "Needs Colin" still wait for him.
+**Status.** In progress. Nineteen pieces that do not touch marks moved first. Then four mark-touching moves merged: PRs 1298, 1299, 1308 and 1309. `shared/data.js` is 9,680 lines on `origin/main`. The comparison tool (the differential run) merged as PR 1304. A follow-up PR for it is owed. Left to move: the mark writers, Draft and Returned, and the load path. Items marked "Needs Colin" still wait for him.
+
+Record of how the four mark-touching moves were checked. For PRs 1298, 1299 and 1308, the full browser suite ran on `main` straight after the merge (green each time), not on GitHub before it, as the method says. For PR 1309 it ran on GitHub before the merge.
 
 ### Track F. Run it like a service
 
@@ -527,7 +529,7 @@ The Nov 12 ruling started Track E (`docs/DECISIONS.md`, "Handoff review rulings 
 `docs/operations.md`: run locally, deploy, roll back, what CI does, the edge functions. Facts from the map's `ops-facts` report; gaps only Colin can fill are marked "Colin fills in". Keys and secrets, backups and restore, paid accounts and who pays, who to call, and the domain registrar are written to a local file for Colin (`~/reports/S19 held drafts/`), not to the PR, until decision 5.
 **Files.** `docs/operations.md`.
 **Done when.** The four public sections are sourced and the held sections are in the local file only.
-**Status.** Queued for the night of Nov 11 as a draft PR (wave 1).
+**Status.** Not done. An operations guide was drafted, but nothing is merged. It needs a rerun.
 
 #### S19-F2. The District Review Package
 
@@ -651,6 +653,8 @@ The seven open decisions on card cp1, the server change the Nov 2 plan marked "y
 
 ## 7. Order of work
 
+The night's queue of Nov 11 to 12 finished. The status lines in section 3 say what happened to each item. The "Tonight" tables below stay as they were written.
+
 **Tonight (the night of Nov 11 to 12).** Seven waves. A wave starts when the one before it is finished (every item merged, opened as a draft, abandoned or skipped) and the wave gate below is green. Inside a wave, PRs run side by side in their own worktrees and merge on their own when `test-and-format` passes.
 
 | Wave | What                                          | PRs                                                  |
@@ -697,3 +701,63 @@ If an item's agent reports that the work needs more judgment than its model has,
 **In the morning.** Colin reads the morning report, the drafts (B1, F1, A14b) and the decisions in section 6. Decision 9 first: the guard can drop a real mark in two rare cases.
 
 **Next.** The save-path fixes he approves (B3, B4, B5), then the speed work (C2 to C6), then Track E an area at a time, only as features need it, until the decision to sell.
+
+---
+
+## 8. What is left (reviewed Nov 12, evening)
+
+Reviewed against the council on 2026-11-12. Items marked "yours" wait for Colin; the others stand under "I approve whatever the council would approve" (DECISIONS, Handoff review rulings, 4).
+
+### Do now
+
+1. The rubric-attach fix: attaching a rubric to a graded piece must move its marks at once (found Nov 12; no real class was affected). Tests first, independent review, then a release of its own.
+2. The comparison tool's follow-up: the gaps its review found, then a second review. The mark writers wait for it.
+3. This plan's status lines and this list.
+4. Undefined names fail the build (`no-undef`) in the files split out of `shared/data.js`, then file by file (S19-D15, decision 19).
+5. Delete the dead converter layer in `shared/data.js` (about 250 lines) after its two-skeptic check, before more code moves.
+6. A database the repo can rebuild (S19-D16, board card db1): a baseline dumped from the live schema with no student data, proved by rebuilding it on a local PostgreSQL 17. It no longer needs staging.
+
+### Next, in this order
+
+7. Move the mark writers (statuses, score writes, group grading) out of `shared/data.js`, move only.
+8. One mark saves one mark, and only what changed is redrawn (S19-C9). Design first; yours to approve. It carries the phone's 395 ms tap (C10), "send an undone cell once" (B4, yours), making the score send private (B5), and the fix for a tab that is behind saving over newer marks (closed PR 1263).
+9. Move Draft and Returned, with a browser test for Return for Revision with the grade hidden.
+10. Retire the per-table load (about 900 lines; yours, it changes loading), then move the load path. Delete before moving.
+11. The re-key listener moves into the student-work file (approved Nov 12).
+12. The small tidyings: generic helpers into utilities, the self-guards, the second `window.v2` init.
+13. The operations guide's four public sections (S19-F1), with Colin's answers for its gaps (F7).
+14. A Content-Type check in the service worker's copy step.
+15. The sign-in re-check runs alongside the class load, and nothing is drawn or sent until both finish (decision 23).
+16. Delete the test-only dead code with its tests (S19-A40, decision 15); keep `undoLastScore` for a phone Undo button (decision 16).
+17. `docs/README.md` as an index; the file moves in S19-A41 are dropped.
+18. Bring the write-path docs up to date after item 8 (S19-B7).
+19. Rename the package (S19-A6).
+
+### Only when a feature touches it
+
+20. The page-file pieces (the phone Grade tab's two halves, Class Settings' terms, import and wizard, the Assignments grader dialog and form, the Gradebook table renderers, the Reports Issue dialog, the shared Return for Revision helpers), and a map of `teacher/report-questionnaire.js`. The grader guard must read sub-folders first (S19-D14).
+21. On-save hooks for `_saveCourseField` (yours), with item 8.
+
+### Before the January pilot
+
+22. A rehearsed restore and monitoring (board cards i42 and i44). Staging is held; the council would not start twenty teachers without a restore that has been tried.
+23. Two-step sign-in on the GitHub, Netlify, Supabase and Sentry accounts (yours to switch on). Organizations wait for a second person.
+24. Closed signup (S19-F6).
+25. Sentry stays in the EU and is disclosed on the privacy page; error reports carry no student data (decision 7).
+26. The privacy assessment the district will ask for (S19-F2), written privately first.
+
+### Dropped or held
+
+27. Moving the security headers (S19-A9) and versioned file names (S19-C5): no gain now.
+28. One boot call (S19-C8): measure it with the speed recorder first.
+29. Retiring the April-era saved-copy readers (S19-B8): old copies may still be on devices.
+30. Serving from the cache with a guard (caching plan): after item 8.
+31. Staging, and the live-account tests on a schedule (S19-D17, F8): held.
+
+### Yours, with no council answer
+
+32. Public or private repo (decision 5). Private costs GitHub Actions minutes; public keeps sensitive docs out of the repo.
+33. The two `.xlsx` files and their scripts (decision 1).
+34. Which criterion level is right when keys are mixed (decision 17). It is grade math; the council's lean is that every screen shows the level `calc.js` counts.
+35. Your review of `87ed0faa` (decision 11), which S19-B6 waits on.
+36. Each release.

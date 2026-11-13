@@ -461,6 +461,11 @@ describe('the export stays complete', () => {
       readFileSync(resolve(root, 'shared/data-rubrics.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-assessments.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-config-settings.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-roster.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-withdrawn.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-overrides.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-profile-summaries.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-courses-terms.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-observations.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-student-cards.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-student-records.js'), 'utf-8') +
