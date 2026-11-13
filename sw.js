@@ -144,6 +144,7 @@ const PRECACHE_URLS = [
   '/shared/backup-restore.js',
   '/teacher/cm-roster-file.js',
   '/teacher/cm-block-picker.js',
+  '/teacher/cm-std-help.js',
   '/teacher/dash-class-manager.js',
   '/teacher/dash-overview.js',
   '/teacher/dash-observations.js',
