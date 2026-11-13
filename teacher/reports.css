@@ -1486,10 +1486,10 @@
   align-items: center;
   gap: 8px;
 }
-/* ── Setup list (DECISIONS "Report forms" 8): a few named choices ── */
-
 /* ══════════════════════════════════════════════════════════════
-   PAGE STUDIO — palette · pages (report-studio.js)
+   PROGRESS REPORTS — One Report's panel · pages (page-reports.js;
+   the panel's and the page's own rules are report-one-panel.css and
+   report-one-page.css)
    ══════════════════════════════════════════════════════════════ */
 #report-output:has(.studio) {
   overflow: hidden;
@@ -1506,61 +1506,7 @@
   padding: 14px 14px 20px;
   overflow-y: auto;
 }
-.studio-tabs {
-  display: flex;
-  width: 100%;
-  margin-bottom: 4px;
-}
-.studio-tabs .seg-btn {
-  flex: 1;
-  text-align: center;
-}
-/* Grade Report or Build Your Own, above the palette. The two halves
-   share the column's width and never run past it. */
-.studio-mode {
-  display: flex;
-  width: 100%;
-  box-sizing: border-box;
-  margin-bottom: 12px;
-}
-.studio-mode .seg-btn,
-.gr-panel .seg .seg-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  padding-left: 6px;
-  padding-right: 6px;
-  font-size: 13px;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gr-panel h4:first-child {
-  margin-top: 4px;
-}
-.studio-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 2px;
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-}
-.gr-panel .seg {
-  display: flex;
-  width: 100%;
-}
-/* The Feedback Pages heading with its switch at the right; the choices
-   under it indent. Off greys them and keeps their ticks. */
-.gr-switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 14px 0 2px;
-}
-.studio-palette .gr-switch-row h4 {
-  margin: 0;
-}
+
 .gr-switch {
   display: flex;
   align-items: center;
@@ -1592,64 +1538,7 @@
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-.gr-sub {
-  display: flex;
-  flex-direction: column;
-  padding-left: 4px;
-}
-.studio-check.is-off {
-  color: var(--text-3);
-  opacity: 0.55;
-  cursor: default;
-}
-.studio-check.is-off input {
-  cursor: default;
-}
-.studio-palette h4 {
-  font-family: var(--font-base);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-3);
-  margin: 14px 0 6px;
-}
-.studio-blk {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 9px;
-  margin-bottom: 5px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-.studio-blk:hover {
-  border-color: var(--active);
-}
-.studio-blk.placed {
-  opacity: 0.45;
-}
-.studio-blk.placed:hover {
-  opacity: 0.75;
-}
-.studio-blk-name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.studio-empty {
-  font-size: 12px;
-  color: var(--text-3);
-  padding: 4px 2px 8px;
-}
+
 .studio-canvas {
   position: relative;
   display: flex;
@@ -1680,16 +1569,7 @@
 .studio-fit.ok {
   color: #15803d;
 }
-.studio-fit-link {
-  font: inherit;
-  font-weight: 600;
-  color: #b45309;
-  background: none;
-  border: none;
-  padding: 0;
-  text-decoration: underline;
-  cursor: pointer;
-}
+
 .studio-view {
   flex: 0 0 auto;
 }
@@ -1705,15 +1585,12 @@
    transform, not zoom: a transform leaves layout alone, so a page measures
    on screen exactly as the engine measured it (zoom re-wraps text in
    WebKit). The wrapper takes the scaled size so the pages sit together. */
-/* The pages are centred in the room left of the gutter, where the selected
-   block's inspector sits (report-studio.js GUTTER_W). */
 .rb-preview.studio-pages:not(.studio-all) .sheet-student {
   display: flex;
   flex-wrap: wrap;
   gap: 22px;
   justify-content: center;
   align-items: flex-start;
-  padding-right: 256px;
 }
 .rb-preview.studio-pages:not(.studio-all) .sheet-zoom {
   zoom: 1;
@@ -1788,24 +1665,6 @@
   max-width: 100%;
   height: auto;
 }
-/* Selection on the page. */
-.studio-pages .sheet-cell {
-  cursor: pointer;
-}
-.studio-pages .sheet-cell.studio-sel {
-  outline: 2px solid var(--active);
-  outline-offset: 1px;
-}
-.studio-field {
-  margin-bottom: 14px;
-}
-.studio-field > label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-2);
-  font-weight: 600;
-  margin-bottom: 5px;
-}
 .report-text-body {
   font-size: var(--text-base);
   line-height: 1.5;
@@ -1874,15 +1733,13 @@
   }
 }
 
-/* ── Page Studio: the selected block ───────────────────────────────
+/* ── A part in focus on the page ───────────────────────────────────
    The pages are scaled with a transform, so an outline on a page is sized
-   against --sheet-zoom to read at screen size; the block's card and the
-   popover sit in the canvas itself, unscaled. */
+   against --sheet-zoom to read at screen size. */
 .studio-pages .sheet-cell:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 1px;
 }
-.studio-pages .sheet-cell.studio-sel,
 .studio-pages .sheet-cell:focus-visible {
   outline-width: calc(2px / var(--sheet-zoom, 1));
 }
@@ -1917,331 +1774,14 @@
   font-size: 8pt;
   color: #8e8e93;
 }
-/* The palette: a block on the report is ticked; one with no room is
-   greyed with the reason. */
-.studio-tick {
-  width: 14px;
-  flex: 0 0 14px;
-  color: #2e7d32;
-  font-weight: 700;
-  font-size: 12px;
-}
-.studio-blk.nofit {
-  color: var(--text-3);
-  cursor: default;
-  flex-wrap: wrap;
-}
-.studio-blk.nofit:hover {
-  border-color: var(--border);
-}
-.studio-why {
-  flex: 0 0 100%;
-  padding-left: 22px;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-3);
-}
-/* ── Hands on the page: the held block, the gap it would take, the slot
-   beside a lone Side by Side block, and the palette's previews. */
-.studio-blk:not(.placed):not(.nofit),
-.studio-pages:not(.studio-all) .sheet-body .sheet-cell:not([data-block='header']) {
-  touch-action: none;
-}
-.studio-blk:not(.placed):not(.nofit) {
-  cursor: grab;
-}
-.studio-dragging,
-.studio-dragging .studio-blk {
-  cursor: grabbing;
-}
-.studio-dragging .studio-pages .sheet-cell {
-  pointer-events: none;
-}
-.studio-ghost {
-  position: fixed;
-  z-index: 60;
-  pointer-events: none;
-  opacity: 0.85;
-  filter: drop-shadow(0 8px 20px rgba(10, 108, 255, 0.3));
-}
-.studio-ghost-sheet {
-  height: auto !important;
-  min-height: 0;
-  padding: 0 !important;
-  box-shadow: none !important;
-  transform-origin: top left;
-  overflow: visible !important;
-}
-.studio-pages .sheet-cell.studio-held {
-  opacity: 0.3;
-}
-.studio-pages .sheet-row {
-  transition: transform 160ms ease-out;
-}
-.studio-drop-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0;
-  border-top: calc(3px / var(--sheet-zoom, 1)) solid var(--active);
-  border-radius: 2px;
-  z-index: 2;
-  pointer-events: none;
-}
-.studio-drop-slot {
-  position: absolute;
-  top: 0;
-  box-sizing: border-box;
-  border: calc(2px / var(--sheet-zoom, 1)) dashed var(--active);
-  border-radius: 6px;
-  background: rgba(10, 108, 255, 0.08);
-  z-index: 2;
-  pointer-events: none;
-}
+
+/* A row holds the page's own controls (report-one-page.js). */
 .studio-pages .sheet-row {
   position: relative;
 }
-.studio-peek {
-  position: fixed;
-  z-index: 70;
-  width: 356px;
-  padding: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  pointer-events: none;
-}
-.studio-peek-box {
-  position: relative;
-  overflow: hidden;
-  width: 338px;
-}
-.studio-peek-sheet {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 720px;
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  box-shadow: none;
-  transform: scale(0.47);
-  transform-origin: top left;
-}
-.studio-peek-sheet .sheet-cell {
-  display: block;
-}
-.studio-peek-cap {
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--text-3);
-}
-@media (prefers-reduced-motion: reduce) {
-  .studio-pages .sheet-row {
-    transition: none;
-  }
-}
-/* The selected block's inspector, pinned at the top right of the canvas
-   over the gutter the pages leave (report-studio.js GUTTER_W). Sections
-   under the name: Place, Show, the choices; Leave Off and Remove at the
-   foot. It scrolls inside itself when it is taller than the canvas. */
-.studio-bar {
-  position: absolute;
-  right: 14px;
-  z-index: 7;
-  width: 240px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  background: var(--surface);
-  border-radius: 12px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    0 6px 20px rgba(0, 0, 0, 0.08);
-  font-size: 12.5px;
-  color: var(--text);
-}
-.studio-insp-head {
-  padding: 12px 14px 10px;
-}
-.studio-insp-sec {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px 12px;
-  border-top: 1px solid var(--divider-medium);
-}
-.studio-insp-title {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.studio-bar .studio-field {
-  margin: 0;
-}
-.studio-bar .studio-field > label {
-  font-weight: 500;
-  font-size: 12.5px;
-  color: var(--text);
-}
-/* A choice fills the inspector's width, its options sharing it. Options too
-   long to share one line (Rows: As Graded, Each Folder, Each Competency)
-   wrap onto a second line inside the same track instead of overlapping. */
-.studio-bar .studio-field .seg {
-  display: flex;
-  flex-wrap: wrap;
-}
-.studio-bar .studio-field .seg-btn {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding-left: 4px;
-  padding-right: 4px;
-  white-space: nowrap;
-}
-.studio-bar-move {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.studio-bar-moves {
-  display: flex;
-  gap: 4px;
-}
-.studio-bar-moves .studio-bar-btn {
-  padding: 4px 9px;
-}
-.studio-bar-where {
-  font-size: 11px;
-  color: var(--text-3);
-}
-.studio-bar-name {
-  font-size: 14px;
-  font-weight: 700;
-}
-.studio-bar-hint {
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--text-3);
-}
-.studio-bar-lines {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 5px 8px;
-}
-.studio-bar-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.studio-bar-step b {
-  min-width: 16px;
-  text-align: center;
-}
-.studio-bar-stepbtn {
-  font: inherit;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.studio-bar-stepbtn:disabled {
-  color: var(--text-3);
-  cursor: default;
-}
-.studio-bar-size {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.studio-bar-acts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 10px 14px 12px;
-  border-top: 1px solid var(--divider-medium);
-}
-.studio-bar-btn {
-  font: inherit;
-  font-size: 12px;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 6px 4px;
-  cursor: pointer;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
-.studio-bar-btn:hover {
-  border-color: var(--active);
-}
-.studio-bar-btn:disabled {
-  color: var(--text-3);
-  border-color: var(--divider-subtle, var(--border));
-  cursor: default;
-}
-.studio-bar-btn.active {
-  background: var(--active-tint, #e8f0ff);
-  color: var(--active);
-  border-color: var(--active);
-}
-.studio-bar-x {
-  color: var(--danger);
-}
-/* + Page after the last page; Empty · Remove on an empty page. */
-.studio-page-add {
-  flex: 0 0 100%;
-  width: calc(8.5in * var(--sheet-zoom, 0.6));
-  margin: 0 auto;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-2);
-  background: none;
-  border: 2px dashed #c3c9d2;
-  border-radius: 10px;
-  padding: 14px;
-  cursor: pointer;
-}
-.studio-page-add:hover {
-  color: var(--active);
-  border-color: var(--active);
-}
-.studio-page-empty {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(calc(1 / var(--sheet-zoom, 1)));
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-2);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 12px;
-  cursor: pointer;
-  z-index: 3;
-}
-.studio-page-empty:hover {
-  color: var(--danger);
-  border-color: var(--danger);
-}
+
 @media print {
-  .studio-live,
-  .studio-bar,
-  .studio-page-add,
-  .studio-page-empty {
+  .studio-live {
     display: none !important;
   }
   .sheet-cell.sheet-off {
@@ -2249,7 +1789,7 @@
   }
 }
 
-/* ── Page Studio stage 3: block options ─────────────────────── */
+/* ── Block options ─────────────────────────────────────────── */
 .report-ct-note {
   font-size: 7.5pt;
   font-weight: 400;
@@ -2257,66 +1797,7 @@
   line-height: 1.35;
   margin-top: 1px;
 }
-.studio-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.studio-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text);
-  padding: 3px 0;
-  cursor: pointer;
-}
-.studio-check input {
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  accent-color: var(--active);
-}
-.studio-text {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  margin-bottom: 6px;
-}
-textarea.studio-text {
-  min-height: 84px;
-  resize: vertical;
-}
 
-/* ── Page Studio stage 4: templates ─────────────────────────── */
-/* A template drawn with the class's real report: each side at 7.5%, or
-   smaller when its sides would not fit the card (--tpl-scale, set by
-   ReportStudio.fitThumbs). */
-.studio-tpl {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 8px;
-}
-.studio-tpl.current {
-  border-color: var(--active);
-  box-shadow: 0 0 0 2px var(--active-tint, #e8f0ff);
-}
-.studio-tpl-thumbs {
-  display: flex;
-  gap: 5px;
-  overflow: hidden;
-  padding: 7px;
-  background: var(--bg);
-  border-radius: 7px;
-}
 .studio-tpl-side {
   position: relative;
   width: calc(8.5in * var(--tpl-scale, 0.075));
@@ -2335,73 +1816,7 @@ textarea.studio-text {
 .studio-tpl-side .sheet-row-empty {
   display: none;
 }
-.studio-tpl-name {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-.studio-tpl-count {
-  color: var(--text-3);
-  white-space: nowrap;
-}
-.studio-tpl-row {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  margin-bottom: 5px;
-}
-.studio-tpl-row .studio-blk {
-  margin-bottom: 0;
-  flex: 1;
-  min-width: 0;
-}
-.studio-tpl-del {
-  flex: 0 0 30px;
-  font: inherit;
-  font-size: 15px;
-  color: var(--text-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-}
-.studio-tpl-del:hover {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-.studio-save-card {
-  width: min(380px, calc(100vw - 32px));
-}
-.studio-save-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  margin: 12px 0 5px;
-}
-.studio-save-btn {
-  display: none;
-  width: 100%;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--active);
-  background: var(--surface);
-  border: 1px dashed var(--active);
-  border-radius: 8px;
-  padding: 7px 9px;
-  margin-bottom: 6px;
-  cursor: pointer;
-}
-@media (max-width: 1240px) {
-  .report-toolbar #tb-save-template {
-    display: none !important;
-  }
-  .studio-save-btn {
-    display: block;
-  }
-}
+
 /* Laptop widths: the Progress Reports toolbar keeps one row with room to
    spare for the wider system fonts on Windows and Linux. */
 @media (max-width: 1240px) {
@@ -2422,7 +1837,7 @@ textarea.studio-text {
   }
 }
 
-/* ── Page Studio: blocks adapt to their box ────────────────────
+/* ── Blocks adapt to their box ─────────────────────────────────
    Each block's cell is a size container (container-type above); what a
    narrow box cannot hold goes by width, never by student. */
 @container (width < 520px) {
@@ -2930,7 +2345,7 @@ textarea.studio-text {
   margin-bottom: 0 !important;
 }
 
-/* ── Page Studio stage 3: the new blocks and their shapes ──────── */
+/* ── The newer blocks and their shapes ───────────────────────── */
 .report-glance {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
