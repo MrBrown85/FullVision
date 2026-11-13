@@ -332,6 +332,7 @@
     if (res.reason === R.TOO_MANY_PAGES && res.kind === 'pdf' && res.limit === PDF_PAGES) {
       return 'A PDF can have ' + PDF_PAGES + ' pages at most.';
     }
+    if (res.kind === 'heic' && res.reason === R.NO_DECODER) return 'Take the photo here, or save it as a JPEG first.';
     if (res.reason === R.TOO_MANY_PAGES) return 'You can send ' + MAX_PAGES + ' pages at most.';
     if (res.reason === R.PDF_TOO_LARGE) return 'That PDF is too big to send. It can be 20 MB at most.';
     return 'That file couldn’t be used. Try another photo.';

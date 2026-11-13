@@ -354,6 +354,7 @@ window.MAddWork = (function () {
     if (res.kind === 'pdf' && res.reason === R.NO_DECODER)
       return "PDFs can't be opened right now. Try again when you're online, or take a photo of each page.";
     if (res.reason === R.TOO_MANY_PAGES || res.reason === R.PDF_TOO_LARGE) return 'That PDF is too long to add here.';
+    if (res.kind === 'heic' && res.reason === R.NO_DECODER) return 'Take the photo here, or save it as a JPEG first.';
     return "That file couldn't be used. Try another photo.";
   }
 

@@ -4420,7 +4420,7 @@ function setPageLock(kind, on) {
   if (main) main.inert = locked;
 }
 
-/* Saved copies not opened for 14 days are removed at sign-in. */
+/* Saved copies not opened for 14 days are removed at sign-in; an unsaved category draft stays. */
 function _purgeStaleSavedCopies() {
   var stale = {};
   try {
@@ -4436,7 +4436,7 @@ function _purgeStaleSavedCopies() {
   }
   _removeLocalKeys(function (key) {
     var m = key.match(/^gb-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
-    return !!m && !!stale[m[1]];
+    return !!m && !!stale[m[1]] && key.indexOf('gb-category-draft-') !== 0;
   });
 }
 
