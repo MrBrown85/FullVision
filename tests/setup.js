@@ -256,6 +256,8 @@ load('shared/data-profile-summaries.js');
 load('shared/data-courses-terms.js');
 load('shared/data-demo.js');
 load('shared/data-curriculum-index.js');
+// Counts waiting scores that meet newer ones; attaches only to a loaded outbox.
+load('shared/overwrite-count.js');
 load('shared/calc.js');
 load('shared/grade-state.js');
 load('shared/grader.js');

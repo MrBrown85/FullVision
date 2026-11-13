@@ -52,6 +52,7 @@ const PRECACHE_URLS = [
   '/shared/data-demo.js',
   '/shared/data-curriculum-index.js',
   '/shared/offline-queue.js',
+  '/shared/overwrite-count.js',
   '/shared/photo-shrink.js',
   '/shared/photo-queue.js',
   '/shared/photo-readers.js',

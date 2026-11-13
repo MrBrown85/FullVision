@@ -415,6 +415,46 @@ window.Grader = (function () {
     return getAssessmentStudentWork(cid, a.id).students_send !== 'nothing';
   }
 
+  /* Whether the teacher's screens show the piece's work: it takes work, or
+     work is in for it (a student's from before Students Send was turned
+     off, or the teacher's own Add Work, which needs neither switch nor the
+     student page). To Grade and Not In still follow workOn alone: a piece
+     that takes nothing has nobody "not in". */
+  function workShown(cid, a) {
+    if (!a || isDibelsScored(a)) return false;
+    return workOn(cid, a) || _piecesWithWork(cid)[a.id] === true;
+  }
+
+  /* ...and whether any piece of the class does. */
+  function workShownInClass(cid) {
+    if (!cid) return false;
+    if (workOnInClass(cid)) return true;
+    var withWork = _piecesWithWork(cid);
+    return (getAssessments(cid) || []).some(function (a) {
+      return a && !isDibelsScored(a) && withWork[a.id] === true;
+    });
+  }
+
+  /* { assessment id: true } for the pieces with work handed in. The screens
+     ask for every card and row they draw, so the answer is kept beside the
+     stored work it was worked out from, and nothing is copied. */
+  var _withWork = { cid: null, stored: null, ids: {} };
+  function _piecesWithWork(cid) {
+    // Demo Mode keeps the student page build behind its switch, as before:
+    // its sample class holds sample work, and a visitor is not shown it.
+    if (typeof isDemoMode === 'function' && isDemoMode() && !getReturnSettings(cid).student_page) return {};
+    var stored = typeof peekStudentWork === 'function' ? peekStudentWork(cid) : null;
+    if (!stored) return {};
+    if (_withWork.cid !== cid || _withWork.stored !== stored) {
+      var ids = {};
+      (stored.submissions || []).forEach(function (s) {
+        if (s && s.state === 'sent' && s.assessment_id) ids[s.assessment_id] = true;
+      });
+      _withWork = { cid: cid, stored: stored, ids: ids };
+    }
+    return _withWork.ids;
+  }
+
   /* 'toreturn', 'returned', 'tograde', 'notin' or null, for one student. */
   function workStateOf(cid, aid, sid) {
     // A revision first (S11): one sent in is work to grade again; one being
@@ -725,6 +765,8 @@ window.Grader = (function () {
     draftsReturned: draftsReturned,
     workOnInClass: workOnInClass,
     workOn: workOn,
+    workShown: workShown,
+    workShownInClass: workShownInClass,
     workStateOf: workStateOf,
     workCounts: workCounts,
     classWorkCounts: classWorkCounts,

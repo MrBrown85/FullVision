@@ -361,13 +361,39 @@ describe('reading a signed-in class’s work', () => {
     }
   });
 
-  it('a class whose student page is off is sent nothing new, and its writers answer as before', async () => {
+  it('Students Send is Nothing: work that is in still shows, though nobody is To Grade or Not In', async () => {
+    srv.assessments = [];
+    await openClass();
+    expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
+    const piece = getAssessments(CID).find(a => a.id === CAUSES);
+    expect(GraderWork.workOn(CID, piece)).toBe(false);
+    expect(GraderWork.workShown(CID, piece)).toBe(true);
+    expect(GraderWork.workStateOf(CID, CAUSES, MATEO)).toBeNull();
+  });
+
+  it('a class whose student page is off, with Send Work on: its work is read and shown, and the settings stay closed', async () => {
     course.student_page_enabled = false;
     await openClass();
+    expect(callsTo('list_course_submissions')).toEqual([]);
+    await refreshStudentWork(CID);
+    expect(callsTo('list_course_submissions')).toHaveLength(1);
+    expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
+    expect(studentWorkLive(CID)).toBe(false);
+    expect(GraderWork.workOnInClass(CID)).toBe(false);
+    expect(GraderWork.workShownInClass(CID)).toBe(true);
+    expect(setCourseSendWork(CID, { send_work: false })).toEqual({ ok: false });
+    expect(saveAssessmentStudentWork(CID, CAUSES, { students_send: 'nothing' })).toEqual({ ok: false });
+    await window.v2Queue.flush();
+    const settings = /set_course_send_work|set_assessment_student_work|markup|reflection|revision/;
+    expect(fake.calls.map(c => c.name).filter(n => settings.test(n))).toEqual([]);
+  });
+
+  it('a class whose student page and Send Work are both off is sent nothing new', async () => {
+    course.student_page_enabled = false;
+    course.send_work = false;
+    await openClass();
     await refreshStudentWork(CID, { force: true });
-    expect(setCourseSendWork(CID, { send_work: true })).toEqual({ ok: false });
-    expect(await addStudentWorkPages(CID, MATEO, CAUSES, shrunk(1))).toEqual({ result: 'not_available' });
-    expect(await deleteStudentWork(CID, NOOR, CAUSES)).toEqual({ result: 'not_available' });
+    expect(readStudentWorkForDelete(CID)).toBeNull();
     await window.v2Queue.flush();
     const work = /submission|work|paper/;
     expect(fake.calls.map(c => c.name).filter(n => work.test(n))).toEqual([]);

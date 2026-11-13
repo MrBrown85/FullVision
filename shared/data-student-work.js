@@ -185,6 +185,10 @@ function getCourseSubmissions(cid) {
 function getStudentSubmission(cid, sid, aid) {
   return _newestSubmissionsOf(cid, [sid], aid)[0] || null;
 }
+// The class's stored work, not copied: only for looking (GraderWork.workShown).
+function peekStudentWork(cid) {
+  return _studentWorkStored(cid);
+}
 
 function studentWorkGradingStarted(cid, sid, aid) {
   var row = getGradeReturn(cid, sid, aid);
@@ -796,13 +800,18 @@ var _workViewClearing = false;
 var _workQueueWired = false;
 var _workSweepTimer = null;
 
+/* A signed-in class's work is the server's, student page on or off: the
+   server takes a teacher's Add Work whatever the switches say. */
 function _workOnServer(cid) {
-  return !!cid && !_isDemoSession() && _serverKeepsRows(cid);
+  return !!cid && !_isDemoSession() && _useSupabase && _writesEnabled() && _isUuid(cid);
 }
-/* True when class `cid`'s student work is the server's (a signed-in class
-   with the build switch on). The screens ask it beside Demo Mode. */
+/* True when class `cid`'s student-page rows are the server's (a signed-in
+   class with the build switch on). The screens ask it beside Demo Mode. */
 function studentWorkLive(cid) {
-  return _workOnServer(cid);
+  return _workRowsOnServer(cid);
+}
+function _workRowsOnServer(cid) {
+  return !!cid && !_isDemoSession() && _serverKeepsRows(cid);
 }
 
 function _workChanged(cid) {
@@ -1028,14 +1037,15 @@ function _noteCourseSendWork(cid, courseRow) {
   _workChanged(cid);
 }
 
-/* Whether the class's work is worth reading. Every screen that shows it
-   asks for Send Work on (GraderWork.workOnInClass), so with it off there
-   is nothing to draw and nothing is read (S6-W1 review, should-fix 4).
-   Read anyway when Send Work is not known yet (the read tells), while a
-   change to it is on its way (the view already says on), or when the
-   last answer held work (a class just turned off stays current). */
+/* Whether the class's work is worth reading. With Send Work off there is
+   nothing to draw and nothing is read (S6-W1 review, should-fix 4).
+   Read anyway when Send Work is not known yet (the read tells; only with
+   the student page on, so a class with it off and Send Work off is sent
+   nothing new), while a change to it is on its way (the view already says
+   on), or when the last answer held work (a class just turned off stays
+   current). */
 function _workReadWanted(cid) {
-  if (!_workCourseRow[cid]) return true;
+  if (!_workCourseRow[cid]) return _workRowsOnServer(cid);
   if (_workServerView(cid).course.send_work === true) return true;
   var srv = _workServer[cid];
   return !!(srv && Array.isArray(srv.submissions) && srv.submissions.length);
@@ -1121,7 +1131,7 @@ async function _fetchStudentWork(cid) {
    for the server, or { known: false } when the read failed: the warning
    then says photos go rather than miss them. Never rejects. */
 function readStudentWorkForDelete(cid) {
-  if (!_workOnServer(cid)) return null;
+  if (!_workOnServer(cid) || (!_workRowsOnServer(cid) && !_workReadWanted(cid))) return null;
   var st = _workRead[cid];
   if (st && st.at && !st.running) return null;
   return refreshStudentWork(cid, { force: true, anyway: true }).then(
@@ -1172,7 +1182,7 @@ function setCourseSendWork(cid, patch) {
     work.course = Object.assign({}, work.course, clean);
     return { ok: saveDemoStudentWork(cid, work) };
   }
-  if (!_workOnServer(cid)) return { ok: false };
+  if (!_workRowsOnServer(cid)) return { ok: false };
   var mine = { patch: Object.assign({}, (_workCourseHere[cid] || {}).patch, clean) };
   _workCourseHere[cid] = mine;
   _workChanged(cid);
@@ -1214,7 +1224,7 @@ function saveAssessmentStudentWork(cid, aid, w) {
       .concat([Object.assign({ id: aid }, row)]);
     return { ok: saveDemoStudentWork(cid, work) };
   }
-  if (!_workOnServer(cid)) return { ok: false };
+  if (!_workRowsOnServer(cid)) return { ok: false };
   var patch = {};
   Object.keys(row).forEach(function (k) {
     if (row[k] !== now[k]) patch[k] = row[k];

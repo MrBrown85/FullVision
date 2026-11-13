@@ -2907,6 +2907,49 @@ button.ced-obs-row {
   flex-direction: column;
   gap: 16px;
 }
+/* The student's pages beside the rubric in an open row (WorkWall.pieceHtml). */
+.stu-ov-work {
+  flex: 1.6 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* With pages in the row: rubric and facts on the left, the pages on the right. */
+@media (min-width: 1100px) {
+  .stu-ov-open-cols:has(> .stu-ov-work) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .stu-ov-open-cols:has(> .stu-ov-work) > .stu-ov-work {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .stu-ov-open-cols:has(> .stu-ov-work) > .stu-ov-facts {
+    grid-column: 1;
+    align-self: start;
+  }
+}
+.ovw-page {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.ovw-page:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.ovw-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 120px;
+}
 .stu-ov-facts {
   flex: 1 1 260px;
   margin: 0;

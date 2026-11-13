@@ -100,12 +100,49 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Send Work off: the dialog is as it was', () => {
-  it('no work pane, no work line', () => {
-    const overlay = openGrader(() => seed({ sendWork: false }), CID, PIECE, ANA);
+describe('Send Work off: the pane follows the work', () => {
+  const nothingIn = () => {
+    seed({ sendWork: false });
+    saveDemoStudentWork(CID, {
+      course: { send_work: false },
+      assessments: [{ id: PIECE, students_send: 'photos' }],
+      submissions: [],
+    });
+  };
+
+  it('nothing in for the piece: no work pane, no work line', () => {
+    const overlay = openGrader(nothingIn, CID, PIECE, ANA);
     expect($(overlay, '.grader-dialog').classList.contains('has-work')).toBe(false);
     expect($(overlay, '.grader-work')).toBeNull();
     expect($(overlay, '.grader-work-line')).toBeNull();
+  });
+
+  it('work in: the pages show beside the scoring, and nobody is To Grade or Not In', () => {
+    const overlay = openGrader(() => seed({ sendWork: false }), CID, PIECE, ANA);
+    expect($(overlay, '.grader-dialog').classList.contains('has-work')).toBe(true);
+    expect($(overlay, '.grader-work')).not.toBeNull();
+    const piece = getAssessments(CID).find(a => a.id === PIECE);
+    expect(GraderWork.workOn(CID, piece)).toBe(false);
+    expect(GraderWork.workShown(CID, piece)).toBe(true);
+    const counts = GraderWork.workCounts(CID, PIECE);
+    expect(counts.tograde).toBe(0);
+    expect(counts.notin).toBe(0);
+  });
+
+  it('Students Send is Nothing, with Send Work on: work a teacher added still shows', () => {
+    const overlay = openGrader(
+      () => {
+        seed();
+        const work = getCourseSubmissions(CID);
+        work.assessments = [{ id: PIECE, students_send: 'nothing' }];
+        saveDemoStudentWork(CID, work);
+      },
+      CID,
+      PIECE,
+      ANA,
+    );
+    expect($(overlay, '.grader-dialog').classList.contains('has-work')).toBe(true);
+    expect(GraderWork.workCounts(CID, PIECE).notin).toBe(0);
   });
 });
 

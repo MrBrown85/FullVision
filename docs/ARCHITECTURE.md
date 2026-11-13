@@ -111,12 +111,13 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 31. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
 32. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
 33. `shared/offline-queue.js`
-34. `shared/auto-update.js`
-35. `shared/calc.js`
-36. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-37. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-38. `shared/rubric-draft.js`
-39. `shared/rubric-checks.js`
+34. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
+35. `shared/auto-update.js`
+36. `shared/calc.js`
+37. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+38. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+39. `shared/rubric-draft.js`
+40. `shared/rubric-checks.js`
 
 The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 
