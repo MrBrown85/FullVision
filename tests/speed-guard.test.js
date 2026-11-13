@@ -305,7 +305,10 @@ afterAll(() => {
 
 const card = aid => document.getElementById('ac-' + aid);
 
-describe('a class the size of History 12, with 635 pieces of work in', () => {
+// These draws are heavy (that is what the file measures), and a shared CI
+// machine takes several times longer than a laptop: the counts are held, the
+// clock is not.
+describe('a class the size of History 12, with 635 pieces of work in', { timeout: 120000 }, () => {
   it('the Assignments page', () => {
     step('Assignments: open', () => openAssignments(quietSeed, CID, {}));
     step('Assignments: open one card', () => click(card(AIDS[0]).querySelector('.assess-title')));
