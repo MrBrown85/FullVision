@@ -789,14 +789,15 @@ window.ReportBlocks = (function () {
   function _namedWork(cid, sid, items, best) {
     if (!items.length) return null;
     const byMark = _byMark(cid, sid, best);
-    // Pieces at the same mark: oldest first, same-date pieces in the order
-    // calc.js counts them (not where they are stored).
-    const sorted = items.slice().sort(
-      (x, y) =>
-        byMark(x, y) ||
-        _assessmentDate(x.a).localeCompare(_assessmentDate(y.a)) ||
-        samePieceDateOrder(cid, x.a.id, y.a.id),
-    );
+    // At one mark: oldest first, same-date pieces as calc.js counts them.
+    const sorted = items
+      .slice()
+      .sort(
+        (x, y) =>
+          byMark(x, y) ||
+          _assessmentDate(x.a).localeCompare(_assessmentDate(y.a)) ||
+          samePieceDateOrder(cid, x.a.id, y.a.id),
+      );
     // A piece that scored two of the tied competencies is named once, at
     // its best (or lowest) mark among them.
     const once = sorted.filter((w, i) => sorted.findIndex(x => x.a === w.a) === i);
@@ -2384,8 +2385,8 @@ window.ReportBlocks = (function () {
       if (work.length) {
         const hi = _byMark(cid, student.id, true);
         const lo = _byMark(cid, student.id, false);
-        const best = work.slice().sort((a, b) => hi(a, b) || (b.d || '').localeCompare(a.d || '') || samePieceDateOrder(cid, b.a.id, a.a.id))[0];
-        const low = work.slice().sort((a, b) => lo(a, b) || (b.d || '').localeCompare(a.d || '') || samePieceDateOrder(cid, b.a.id, a.a.id))[0];
+        const best = work.slice().sort((a, b) => hi(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
+        const low = work.slice().sort((a, b) => lo(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
         if (options.see !== false && best) lines.push(['Ask to see', _workLine(cid, student.id, best)]);
         if (options.about !== false && low && (work.length > 1 || options.see === false)) {
           lines.push([
