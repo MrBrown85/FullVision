@@ -65,6 +65,19 @@
   .rb-preview.studio-pages:not(.studio-all) .sheet-zoom > .report-sheet {
     transform: none !important;
   }
+  /* No transition into print. The app's reduced-motion rule (styles.css)
+     gives every property a 0.01 ms transition, and a running transition
+     outranks even !important: on the switch to print a sheet kept its
+     screen scale (and the pages their screen sizes) until the next frame.
+     With none, the print rules above and in reports.css win at once. The
+     page round the preview too: its padding for the top bar went the same
+     way, so a sheet could start 52 px down the first printed page. */
+  html,
+  html *,
+  html *::before,
+  html *::after {
+    transition: none !important;
+  }
 }
 
 /* ── The Zoom control, left of Paper ─────────────────────────── */

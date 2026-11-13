@@ -200,3 +200,62 @@ test('what prints is the same at 50% as at Whole Class: the sheets, and the prin
   expect(copies[0]).not.toContain('fit-zoom');
   expect(copies[0]).not.toContain('--fit-zoom');
 });
+
+// The first three sheets as they are this instant: no frame is waited for.
+const sheetsNow = () =>
+  [...document.querySelectorAll('#rb-preview .report-sheet')].slice(0, 3).map(el => {
+    const r = el.getBoundingClientRect();
+    return { transform: getComputedStyle(el).transform, box: [r.left, r.top, r.width, r.height] };
+  });
+
+/* The hard way, as Cmd+P straight after a zoom: 75% picked and the print
+   media switched on at once, with no frame between. The app's reduced-motion
+   rule gives every property a 0.01 ms transition, and a running transition
+   outranks !important, so a sheet used to keep its screen scale until the
+   next frame. Print now turns transitions off: the very first read is the
+   print state. */
+test('print wins at once, with no frame between a zoom and the print media', async ({ page }) => {
+  await openEveryone(page);
+  await page.emulateMedia({ media: 'print' });
+  await settle(page);
+  const whole = await page.evaluate(sheetsNow);
+  await page.emulateMedia({ media: 'screen' });
+  await settle(page);
+  expect(whole[0].transform).toBe('none');
+
+  await page.locator('#studio-zoom-btn').click();
+  await page.getByRole('menuitemradio', { name: '75%', exact: true }).click();
+  await page.emulateMedia({ media: 'print' });
+  const first = await page.evaluate(sheetsNow);
+  expect(first.map(x => x.transform)).toEqual(['none', 'none', 'none']);
+  await settle(page);
+  expect(await page.evaluate(sheetsNow)).toEqual(whole);
+});
+
+/* The real path: Print Reports at 75%, with window.print replaced by a
+   recorder of the first three sheets at the instant it is called, under
+   print media switched on just before the print starts (as the browser
+   does). The same as at Whole Class. */
+test('Print Reports at 75% prints what it prints at Whole Class', async ({ page }) => {
+  await openEveryone(page);
+  await page.evaluate(src => {
+    const read = new Function('return (' + src + ')')();
+    window.__atPrint = [];
+    window.print = () => window.__atPrint.push(read());
+  }, sheetsNow.toString());
+  const printReports = async () => {
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    await expect(page.locator('#issue-overlay [data-issue="go"]')).toBeVisible();
+    await page.emulateMedia({ media: 'print' });
+    await page.evaluate(() => document.querySelector('#issue-overlay [data-issue="go"]').click());
+    await expect.poll(() => page.evaluate(() => window.__atPrint.length), { timeout: 30000 }).toBeGreaterThan(0);
+    const got = await page.evaluate(() => window.__atPrint.splice(0));
+    await page.emulateMedia({ media: 'screen' });
+    await settle(page);
+    return got[0];
+  };
+  const whole = await printReports();
+  expect(whole[0].transform).toBe('none');
+  await pick(page, '75%');
+  expect(await printReports()).toEqual(whole);
+});
