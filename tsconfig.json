@@ -31,6 +31,11 @@
     "shared/data-markup.js",
     "shared/data-reflect.js",
     "shared/data-revisions.js",
+    "shared/data-roster.js",
+    "shared/data-withdrawn.js",
+    "shared/data-overrides.js",
+    "shared/data-profile-summaries.js",
+    "shared/data-courses-terms.js",
     "shared/data-demo.js",
     "shared/data-curriculum-index.js"
   ]
