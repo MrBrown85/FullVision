@@ -138,7 +138,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   WorkWall.close(true);
-  WorkWall.unmountTab();
+  WorkWall.unmountTab(true);
   if (window.PageStudent && PageStudent.destroy) PageStudent.destroy();
   globalThis.openStudentWorkPage = realOpen;
   window.PageAssignments = realPA;
@@ -156,19 +156,35 @@ const nameOf = sid => {
 };
 const pill = f => $('.ww-pill[data-filter="' + f + '"]');
 
-describe('the Work Wall opens only where work is on', () => {
-  it('Send Work off: no wall', () => {
+describe('the Work Wall opens where work is on or in', () => {
+  const emptied = () =>
+    saveDemoStudentWork(CID, {
+      course: { send_work: false },
+      assessments: [{ id: PIECE, students_send: 'photos' }],
+      submissions: [],
+    });
+
+  it('Send Work off, nothing in: no wall', () => {
     seed({ sendWork: false });
+    emptied();
     expect(WorkWall.open(CID, PIECE)).toBe(false);
     expect($('#work-wall-overlay')).toBeNull();
     expect(asked).toEqual([]);
   });
 
-  it('the build switch off: no wall', () => {
+  it('Send Work off, work in: the wall shows it', () => {
+    seed({ sendWork: false });
+    expect(WorkWall.open(CID, PIECE)).toBe(true);
+    expect($('#work-wall-overlay')).not.toBeNull();
+    WorkWall.close();
+  });
+
+  it('the build switch off, work in: the wall shows it', () => {
     seed();
     setStudentPageSwitch(CID, false);
-    expect(WorkWall.open(CID, PIECE)).toBe(false);
-    expect($('#work-wall-overlay')).toBeNull();
+    expect(WorkWall.open(CID, PIECE)).toBe(true);
+    expect($('#work-wall-overlay')).not.toBeNull();
+    WorkWall.close();
   });
 });
 
@@ -445,6 +461,43 @@ describe('the door into the grader', () => {
   });
 });
 
+describe("work on the teacher's other screens", () => {
+  const last = IDS[IDS.length - 1]; // nothing in
+
+  it('See the Work on a row of the whole-class grid: only where work is in for the student', () => {
+    seed({ sendWork: false });
+    const html = WorkWall.seeWorkHtml(CID, PIECE, IDS[0]);
+    expect(html).toContain('data-action="gradeSubmissions"');
+    expect(html).toContain('data-aid="' + PIECE + '" data-sid="' + IDS[0] + '"');
+    expect(html).toContain('>See the Work<');
+    expect(WorkWall.seeWorkHtml(CID, PIECE, last)).toBe('');
+  });
+
+  it('an open row of All Your Work: the pages whole, each opening full size', async () => {
+    seed({ sendWork: false });
+    expect(WorkWall.pieceHtml(CID, last, PIECE)).toBe('');
+    const main = doc.getElementById('main');
+    main.innerHTML = WorkWall.pieceHtml(CID, IDS[3], PIECE);
+    expect($$('.stu-ov-work .ovw-page').map(b => b.getAttribute('aria-label'))).toEqual([
+      'Page 1 of 2, full size',
+      'Page 2 of 2, full size',
+    ]);
+    WorkWall.mountPiece(main, CID, IDS[3]);
+    await settle();
+    expect(asked).toEqual(['page:' + file(IDS[3], 1).path, 'page:' + file(IDS[3], 2).path]);
+    expect($$('.ovw-img').every(img => !!img.getAttribute('src'))).toBe(true);
+    // Drawn again: nothing new is asked for.
+    WorkWall.mountPiece(main, CID, IDS[3]);
+    await settle();
+    expect(asked).toHaveLength(2);
+    click($$('.ovw-page')[1]);
+    expect(text($('.wv-title'))).toBe(nameOf(IDS[3]));
+    expect(text($('.wv-at'))).toBe('2 of 2');
+    WorkWall.unmountTab(true);
+    expect($('#work-viewer-overlay')).toBeNull();
+  });
+});
+
 describe("the Work tab on the teacher's student page", () => {
   function openStudent(sid) {
     runInThisContext(readFileSync('teacher/page-student.js', 'utf-8'), { filename: 'teacher/page-student.js' });
@@ -452,11 +505,19 @@ describe("the Work tab on the teacher's student page", () => {
     return doc.getElementById('main');
   }
 
-  it('Send Work off: no Work tab', () => {
+  it('Send Work off, nothing in for the class: no Work tab', () => {
     seed({ sendWork: false });
+    saveDemoStudentWork(CID, { course: { send_work: false }, assessments: [], submissions: [] });
     const main = openStudent(IDS[0]);
     expect(main.querySelector('#stu-tab-work')).toBeNull();
     expect(main.querySelector('.sw-tab')).toBeNull();
+  });
+
+  it('Send Work off, work in: the Work tab shows it', () => {
+    seed({ sendWork: false });
+    const main = openStudent(IDS[0]);
+    expect(main.querySelector('#stu-tab-work')).not.toBeNull();
+    expect(main.querySelector('.sw-tab')).not.toBeNull();
   });
 
   it('the tile and the cards, newest first, thumbnails only', async () => {

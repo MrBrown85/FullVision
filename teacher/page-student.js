@@ -827,6 +827,7 @@ window.PageStudent = (function () {
       '<div class="stu-ov-open"><div class="stu-ov-open-cols"><div class="stu-ov-open-main">' +
       (left || '<div class="stu-ov-sub">No comment or rubric on this one yet.</div>') +
       '</div>' +
+      (window.WorkWall ? WorkWall.pieceHtml(cid, studentId, a.id) : '') +
       factsHtml +
       // What only the teacher acts on, marked as theirs.
       '</div><div class="stu-ov-teacher"><span class="stu-ov-only">' +
@@ -2744,6 +2745,7 @@ window.PageStudent = (function () {
   function render() {
     var cid = activeCourse;
     var course = COURSES[cid];
+    if (typeof refreshStudentWork === 'function') refreshStudentWork(cid); // read now and then, as Assignments does
     var students = getStudents(cid);
     var student = students.find(function (s) {
       return s.id === studentId;
@@ -2847,6 +2849,7 @@ window.PageStudent = (function () {
     });
     if (_tab === 'work') WorkWall.mountTab(document.getElementById('stu-panel'), cid, studentId, { onChange: render });
     else if (window.WorkWall) WorkWall.unmountTab();
+    if (window.WorkWall) WorkWall.mountPiece(document.getElementById('main'), cid, studentId);
     CompetencyEvidence.mount(activeCourse, studentId, main, {
       onAdd: function () {
         Evidence.refresh();
@@ -3172,7 +3175,7 @@ window.PageStudent = (function () {
     closeEditStudent();
     Evidence.destroy();
     CompetencyEvidence.destroy();
-    if (window.WorkWall) WorkWall.unmountTab();
+    if (window.WorkWall) WorkWall.unmountTab(true);
     delete window._pageSwitchCourse;
   }
 

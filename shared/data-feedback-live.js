@@ -65,7 +65,7 @@ var _FB_ENDPOINTS = {
 /* True when class `cid`'s marks and reflections are the server's (a
    signed-in class with the build switch on). */
 function _fbOn(cid) {
-  return _workOnServer(cid);
+  return _workRowsOnServer(cid);
 }
 // Demo Mode, or a class the server keeps rows for: where the readers answer.
 function _fbReads(cid) {

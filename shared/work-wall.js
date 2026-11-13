@@ -188,7 +188,7 @@ window.WorkWall = (function () {
     _view = {
       items: items,
       at: Math.max(0, Math.min(at || 0, items.length - 1)),
-      page: 0,
+      page: (opts && opts.page) || 0,
       step: (opts && opts.step) || 'Student',
       onGrade: (opts && opts.onGrade) || null,
       opener: document.activeElement,
@@ -577,7 +577,7 @@ window.WorkWall = (function () {
     var w = _wall;
     if (!w) return;
     var a = _piece(w.cid, w.aid);
-    if (!a || !GraderWork.workOn(w.cid, a)) return close();
+    if (!a || !GraderWork.workShown(w.cid, a)) return close();
     var m = _wallModel(w);
     var drawn = _wallHtml(w, m, !!(w.onGrade || (window.PageAssignments && PageAssignments.openGrader)));
     var focus = document.activeElement;
@@ -709,7 +709,7 @@ window.WorkWall = (function () {
 
   function open(cid, aid, opts) {
     var a = _piece(cid, aid);
-    if (!a || !GraderWork.workOn(cid, a)) return false;
+    if (!a || !GraderWork.workShown(cid, a)) return false;
     close(true);
     opts = opts || {};
     var counts = GraderWork.workCounts(cid, aid);
@@ -764,14 +764,14 @@ window.WorkWall = (function () {
   var _tabComp = { key: '', comp: '' }; // the chip picked, kept while the same student is shown
 
   function tabOn(cid) {
-    return !!cid && GraderWork.workOnInClass(cid);
+    return !!cid && GraderWork.workShownInClass(cid);
   }
 
   /* The pieces this student has work in for, newest first. */
   function _tabPieces(cid, sid) {
     return (getAssessments(cid) || [])
       .filter(function (a) {
-        return a && GraderWork.workOn(cid, a) && !!getStudentSubmission(cid, sid, a.id);
+        return a && GraderWork.workShown(cid, a) && !!getStudentSubmission(cid, sid, a.id);
       })
       .map(function (a) {
         var sub = getStudentSubmission(cid, sid, a.id);
@@ -967,7 +967,101 @@ window.WorkWall = (function () {
     _keys(true);
   }
 
-  function unmountTab() {
+  /* ── Work on the teacher's other screens ──────────────────────
+     seeWorkHtml: See the Work on a student's row in the Assignments page's
+     whole-class grid, when work is in for them; it opens the grader on
+     their pages (the page's gradeSubmissions action).
+
+     pieceHtml and mountPiece: the student's pages for one piece, whole,
+     beside the rubric in an open row of All Your Work on the teacher's
+     student page, to sit with a student and talk it through. A page opens
+     full size. unmountTab(true) lets these pictures go too. */
+  // html-safe: ids are ours; fixed words
+  function seeWorkHtml(cid, aid, sid) {
+    var a = _piece(cid, aid);
+    if (!a || !GraderWork.workShown(cid, a)) return '';
+    var subs = typeof getGroupSubmissions === 'function' ? getGroupSubmissions(cid, sid, aid) : [];
+    if (!subs.length && !getStudentSubmission(cid, sid, aid)) return '';
+    return (
+      '<button type="button" class="assess-add-work-btn rsg-see-work" data-stop-prop="true" data-action="gradeSubmissions" data-aid="' +
+      esc(aid) +
+      '" data-sid="' +
+      esc(sid) +
+      '">See the Work</button>'
+    );
+  }
+
+  // html-safe: the title goes through esc; ids are ours; fixed words
+  function pieceHtml(cid, sid, aid) {
+    var a = _piece(cid, aid);
+    if (!a || !GraderWork.workShown(cid, a)) return '';
+    var sub = getStudentSubmission(cid, sid, aid);
+    if (!sub) return '';
+    var pages = _pages(sub);
+    var head = '<div class="stu-ov-work" data-aid="' + esc(aid) + '"><div class="stu-ov-label">Your Work</div>';
+    if (!pages.length) return head + '<div class="stu-ov-read">Handed in on paper.</div></div>';
+    return (
+      head +
+      pages
+        .map(function (f, i) {
+          var what = 'Page ' + (i + 1) + ' of ' + pages.length;
+          return (
+            '<button type="button" class="ovw-page" data-ovw="' +
+            i +
+            '" aria-label="' +
+            esc(what + ', full size') +
+            '"><img class="ovw-img" data-work-pic data-work-which="page" data-aid="' +
+            esc(aid) +
+            '" data-page="' +
+            i +
+            '" alt="' +
+            esc(what + ' of ' + (a.title || 'this work')) +
+            '" loading="lazy"></button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  var _row = null; // { cid, sid, root, pics }: the open rows' pictures on the student page
+  function _rowClick(e) {
+    var r = _row;
+    var btn = e.target.closest && e.target.closest('[data-ovw]');
+    var box = btn && btn.closest('.stu-ov-work');
+    if (!r || !box) return;
+    _openViewer([{ cid: r.cid, sid: r.sid, aid: box.getAttribute('data-aid') }], 0, {
+      step: 'Piece',
+      page: Number(btn.getAttribute('data-ovw')) || 0,
+    });
+  }
+  function mountPiece(root, cid, sid) {
+    if (_row && (_row.root !== root || _row.cid !== cid || _row.sid !== sid)) unmountPiece();
+    if (!root) return;
+    if (!_row) {
+      _row = { cid: cid, sid: sid, root: root, pics: WorkThumbs.holder() };
+      root.addEventListener('click', _rowClick);
+    }
+    var r = _row;
+    _keys(true); // Escape closes a page opened full size
+    r.pics.sweep();
+    r.pics.fill(root, cid, function (img) {
+      if (_row !== r || !img.closest('.stu-ov-work')) return null;
+      var sub = getStudentSubmission(cid, sid, img.getAttribute('data-aid'));
+      return _pages(sub)[Number(img.getAttribute('data-page')) || 0] || null;
+    });
+  }
+  function unmountPiece() {
+    if (!_row) return;
+    _row.root.removeEventListener('click', _rowClick);
+    _row.pics.releaseAll();
+    _row = null;
+    _closeViewer(true);
+    if (!_wall && !_tab) _keys(false);
+  }
+
+  function unmountTab(all) {
+    if (all) unmountPiece();
     var t = _tab;
     if (!t) return;
     _tab = null;
@@ -988,5 +1082,8 @@ window.WorkWall = (function () {
     tabHtml: tabHtml,
     mountTab: mountTab,
     unmountTab: unmountTab,
+    seeWorkHtml: seeWorkHtml,
+    pieceHtml: pieceHtml,
+    mountPiece: mountPiece,
   };
 })();

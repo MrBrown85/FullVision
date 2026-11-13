@@ -236,7 +236,7 @@ describe('the Assignments page', () => {
     expect(document.querySelectorAll('.assess-card').length).toBe(3);
   });
 
-  it('Work Wall on a piece that takes work opens the wall for it; none with Send Work off', () => {
+  it('Work Wall on a piece that takes work or has work in opens the wall for it; none with nothing in', () => {
     const opened = vi.spyOn(WorkWall, 'open').mockImplementation(() => {});
     openAssignments(() => seed(), CID, {});
     const btn = document.querySelector('.assess-work-wall-btn[data-aid="' + LAB + '"]');
@@ -245,7 +245,20 @@ describe('the Assignments page', () => {
     expect(opened).toHaveBeenCalledWith(CID, LAB);
     opened.mockRestore();
     closePages();
+    // Send Work off: the pieces with work in keep the wall.
     openAssignments(() => seed({ sendWork: false }), CID, {});
-    expect(document.querySelector('.assess-work-wall-btn')).toBeNull();
+    expect(document.querySelector('.assess-work-wall-btn[data-aid="' + LAB + '"]') === null).toBe(false);
+    closePages();
+    openAssignments(
+      () => {
+        seed({ sendWork: false });
+        const work = getCourseSubmissions(CID);
+        work.submissions = [];
+        saveDemoStudentWork(CID, work);
+      },
+      CID,
+      {},
+    );
+    expect(document.querySelector('.assess-work-wall-btn') === null).toBe(true);
   });
 });
