@@ -77,3 +77,96 @@ describe('Everyone and the longest report', () => {
     expect(longestStudent(null)).toBeNull();
   });
 });
+
+describe('Escape and the Parts panel on a narrow screen', () => {
+  const progress = PageReports._helpers.tabs.find(t => t.id === 'progress');
+  const classes = on => {
+    const set = new Set(on);
+    return {
+      contains: c => set.has(c),
+      remove: c => set.delete(c),
+      add: c => set.add(c),
+      has: c => set.has(c),
+    };
+  };
+  // A page with the panel open; `open` lists the selectors something on it matches.
+  const page = (open = []) => {
+    const layout = { classList: classes(['rail-open']) };
+    const rail = {
+      classList: classes(['active']),
+      attrs: { 'aria-pressed': 'true' },
+      setAttribute(k, v) {
+        this.attrs[k] = v;
+      },
+      focus() {
+        rail.focused = true;
+      },
+    };
+    const old = globalThis.document;
+    globalThis.document = Object.assign({}, old, {
+      getElementById: id => (id === 'studio' ? layout : id === 'tb-rail-btn' ? rail : null),
+      querySelector: sel => (open.some(o => sel.indexOf(o) >= 0) ? {} : null),
+    });
+    return { layout, rail, restore: () => (globalThis.document = old) };
+  };
+  const press = (key, target) => {
+    const e = { key, target: target || null, prevented: false, preventDefault: () => (e.prevented = true) };
+    progress.key(e);
+    return e;
+  };
+
+  it('closes the panel, puts the Parts button back and gives it the focus', () => {
+    const p = page();
+    try {
+      const e = press('Escape');
+      expect(p.layout.classList.has('rail-open')).toBe(false);
+      expect(p.rail.classList.has('active')).toBe(false);
+      expect(p.rail.attrs['aria-pressed']).toBe('false');
+      expect(p.rail.focused).toBe(true);
+      expect(e.prevented).toBe(true);
+    } finally {
+      p.restore();
+    }
+  });
+
+  it('another key leaves it open', () => {
+    const p = page();
+    try {
+      press('Enter');
+      expect(p.layout.classList.has('rail-open')).toBe(true);
+    } finally {
+      p.restore();
+    }
+  });
+
+  it.each([
+    ['a dialog', '.confirm-overlay'],
+    ['a part’s dialog', '.one-dlg-overlay'],
+    ['the comment editor', '.one-com-edit'],
+    ['the comment’s save question', '.one-com-ask'],
+    ['an inline rename', '[data-one-title][contenteditable]'],
+    ['a drag', '.is-dragging'],
+  ])('leaves it open while %s is open', (what, sel) => {
+    const p = page([sel]);
+    try {
+      const e = press('Escape');
+      expect(p.layout.classList.has('rail-open')).toBe(true);
+      expect(p.rail.focused).toBeUndefined();
+      expect(e.prevented).toBe(false);
+    } finally {
+      p.restore();
+    }
+  });
+
+  it('leaves it open for an Escape a dialog used to close itself', () => {
+    const p = page();
+    try {
+      press('Escape', { nodeType: 1, isConnected: false });
+      expect(p.layout.classList.has('rail-open')).toBe(true);
+      press('Escape', { nodeType: 1, isConnected: true, closest: s => (s === '[role="dialog"]' ? {} : null) });
+      expect(p.layout.classList.has('rail-open')).toBe(true);
+    } finally {
+      p.restore();
+    }
+  });
+});

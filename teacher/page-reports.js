@@ -104,6 +104,9 @@ window.PageReports = (function () {
       print: function () {
         openIssueDialog();
       },
+      key: function (e) {
+        if (e.key === 'Escape' && _closeRailOnEscape(e)) e.preventDefault();
+      },
       resize: function () {
         clearTimeout(_resizeTimer);
         _resizeTimer = setTimeout(function () {
@@ -1895,6 +1898,30 @@ window.PageReports = (function () {
     else if (e.target && e.target.id === 'tq-browse-search') RQ.tqSentences('search', e.target);
     else if (e.target && e.target.id === 'tq-own-input') RQ.tqSentences('ownInput', e.target);
     else if (e.target && e.target.id === 'tq-obs-search') RQ.tqObsSearch(e.target.value);
+  }
+
+  /* Escape on Progress Reports closes the Parts panel opened over the pages
+     on a narrow screen, focus going back to the Parts button. A dialog, the
+     comment editor and its save question, an inline rename and a drag keep
+     Escape for themselves. Returns true when it closed the panel. */
+  function _closeRailOnEscape(e) {
+    var layout = document.getElementById('studio');
+    if (!layout || !layout.classList.contains('rail-open')) return false;
+    if (document.querySelector('.confirm-overlay, .one-dlg-overlay, .one-com-edit, .one-com-ask, .is-dragging'))
+      return false;
+    if (document.querySelector('[data-one-title][contenteditable]')) return false;
+    // An Escape a dialog used to close itself (it is gone from the page) or
+    // pressed inside one is the dialog's.
+    var t = e && e.target;
+    if (t && t.nodeType === 1 && (!t.isConnected || (t.closest && t.closest('[role="dialog"]')))) return false;
+    layout.classList.remove('rail-open');
+    var rail = document.getElementById('tb-rail-btn');
+    if (rail) {
+      rail.classList.remove('active');
+      rail.setAttribute('aria-pressed', 'false');
+      rail.focus();
+    }
+    return true;
   }
 
   /* A key press goes to the open tab, when it listens for keys. */
