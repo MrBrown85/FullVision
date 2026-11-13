@@ -1,3 +1,4 @@
+// @ts-check
 /* Classes and reporting terms: createCourse, updateCourse, deleteCourseData, the grading scale, reporting terms and term spans, switching class,
    load timings and blocks. Moved from shared/data.js on 2026-11-12 (S19 split, move only). loadCourses, saveCourses, COURSES, getActiveCourse and isCourseArchived stayed. */
 

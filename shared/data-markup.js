@@ -1,3 +1,4 @@
+// @ts-check
 /* Mark Up: the teacher's marks on a page of student work, as Demo Mode keeps them, the readers both kinds of class share, and Return with the marks (returnWork).
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -43,6 +44,7 @@ var _studentFeedback = {}; // cid → { raw, value }: the stored feedback (Demo 
 
 function _studentFeedbackStored(cid) {
   if (!cid || !_isDemoSession()) return null;
+  /** @type {string | null} */
   var raw = null;
   try {
     raw = localStorage.getItem('gb-student-feedback-' + cid);
@@ -285,7 +287,10 @@ function _teacherMarksOnWork(cid, sid, aid, submissionId) {
 function returnWork(cid, aid, studentIds) {
   var ids = Array.isArray(studentIds) ? studentIds : studentIds ? [studentIds] : [];
   if (!_isDemoSession() && _fbOn(cid)) return _returnWorkLive(cid, aid, ids);
-  var out = Object.assign({}, returnGrades(cid, aid, ids), { marks_given: 0, marks_enrollment_ids: [] });
+  var out = Object.assign({}, returnGrades(cid, aid, ids), {
+    marks_given: 0,
+    marks_enrollment_ids: /** @type {string[]} */ ([]),
+  });
   // Signed in there are no marks to give (getAssessmentMarkup reads none).
   var listed = {};
   ids.forEach(function (sid) {

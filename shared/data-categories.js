@@ -1,3 +1,4 @@
+// @ts-check
 /* Categories: an assessment's category and its badge, getCategories and saveCategories, the save to the server (_persistCategoriesToCanonical),
    the category write guard and Class Settings' category draft. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -124,7 +125,7 @@ function _persistCategoriesToCanonical(cid, prev, arr, copy) {
 function getCategories(cid) {
   if (_cache.categories[cid] !== undefined) return _cache.categories[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-categories-' + cid)) || [];
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-categories-' + cid))) || [];
   } catch (e) {
     console.warn('Categories parse fallback:', e);
     return [];

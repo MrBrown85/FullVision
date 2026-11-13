@@ -1,3 +1,4 @@
+// @ts-check
 /* The small helpers every part of the app uses: student names, dates, colours, ids and RPC results.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -109,6 +110,7 @@ function formatShortDate(ts, today) {
   if (isNaN(d.getTime())) return '';
   const now = today ? parseLocalDate(today) : new Date();
   const schoolYear = x => (x.getMonth() >= 7 ? x.getFullYear() : x.getFullYear() - 1);
+  /** @type {Intl.DateTimeFormatOptions} */
   const opts = { month: 'short', day: 'numeric' };
   if (schoolYear(d) !== schoolYear(now)) opts.year = 'numeric';
   return d.toLocaleDateString('en-CA', opts);
@@ -185,7 +187,7 @@ function _localDayOf(value) {
   if (!value) return '';
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   var d = new Date(value);
-  if (isNaN(d)) return '';
+  if (isNaN(/** @type {number} */ (/** @type {unknown} */ (d)))) return '';
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 

@@ -1,3 +1,4 @@
+// @ts-check
 /* Withdrawn students: withdrawStudent, reenrolStudent, the Withdrawn list (getWithdrawnStudents), permanent delete (deleteWithdrawnStudent),
    putting a withdrawn student's records aside and back, and forgetStudentServerState. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
