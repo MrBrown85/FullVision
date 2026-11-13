@@ -13,6 +13,7 @@
     "dev:local": "node scripts/dev-local.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:db": "node tests/db/run.mjs",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:real": "npx playwright test --config=playwright.real.config.js",

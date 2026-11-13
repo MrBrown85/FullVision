@@ -112,6 +112,39 @@ The two allow the same rows. The check accepts a difference only on those
 two constraints, and only when the lines are equal once every bracket is
 taken out.
 
+## The security rule tests
+
+`npm run test:db` (`tests/db/run.mjs`) rebuilds the structure into a fresh
+database, with `--check`, and then tests who can see what on it. Point
+`DATABASE_URL` at any database on a local PostgreSQL 17 server; the run
+makes its own database beside it and drops it at the end (`KEEP_DB=1` keeps
+it). CI runs it on every pull request, in the Database Rules job, against a
+`postgres:17` container. No secrets, no data.
+
+It seeds two teachers, A and B, through the app's own write functions where
+it can (`tests/db/seed.sql`). Then, with every table and function read from
+the catalogs at that moment:
+
+- **Tables.** Each table must have an owner in `tests/db/table-owners.mjs`,
+  so a new table fails the run until someone decides whose rows it holds.
+  Acting as A, no read returns a row of B's, no update or delete reaches
+  one, and a copy of B's row is refused. A visitor who is not signed in
+  reads and writes nothing.
+- **Functions.** A visitor may run none. Each function A may run is called
+  with B's ids and again with A's own (`tests/db/function-args.mjs` builds
+  the arguments). B's rows must not change, A's rows must not take in B's
+  words, and nothing of B's may come back. The run prints how each call was
+  refused, and lists the few it could not prove.
+- **The student page.** Only `service_role`, the edge functions' key, may
+  run anything in `student_submit`. A teacher and a visitor are refused.
+
+What this proves: the row security policies, grants and functions, as last
+refreshed into `migrations/baseline/`, keep the two teachers apart. What it
+does not cover: the files in Storage, the edge functions' own code, Supabase's
+settings (sign-in, the API server, keys), or any change made to
+`gradebook-prod` since the baseline was refreshed. On this Mac, run it with
+the `PSQL` stand-in above.
+
 ## What is not covered
 
 - **Data.** No rows, ever. No student data leaves `gradebook-prod`.
