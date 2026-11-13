@@ -650,22 +650,15 @@ window.PageAssignments = (function () {
      on a focused card goes through _handleClick / _graderKeydown. */
   function _criterionState(cid, sid, aid, crit) {
     var entries = getScores(cid)[sid] || [];
-    var level = 0;
-    var mod = 0;
-    var mixed = false;
-    rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      var e = entries.find(function (x) {
+    // A criterion is saved under one key (rubricCriterionScoreKeys), so it is never mixed.
+    var tid = rubricCriterionScoreKeys(crit)[0];
+    var e =
+      tid &&
+      entries.find(function (x) {
         return x.assessmentId === aid && x.tagId === tid;
       });
-      var v = e ? Number(e.score) || 0 : 0;
-      if (!v) return;
-      if (level && (v !== level || (e.mod || 0) !== mod)) mixed = true;
-      if (!level) {
-        level = v;
-        mod = e.mod || 0;
-      }
-    });
-    return { level: level, mod: mixed ? 0 : mod, mixed: mixed };
+    var level = e ? Number(e.score) || 0 : 0;
+    return { level: level, mod: level ? e.mod || 0 : 0, mixed: false };
   }
   // A criterion's comment box is open while the teacher writes in it.
   var _graderNotesOpen = new Set();
