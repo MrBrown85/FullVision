@@ -350,5 +350,6 @@ beforeEach(() => {
   _serverState = {};
   _localWrites = {};
   _refreshState = {};
+  _refusalsReported = {}; // the refusals already reported to Sentry this page load
   _keptText = {}; // the fourth piece of per-session memory: each tab's own copy of scores and statuses
 });

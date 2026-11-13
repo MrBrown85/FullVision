@@ -196,18 +196,18 @@ Nothing waits on you to do. The release is done and the two-tab fix is live.
 
 **Yours to decide**
 
-1. **Mark saving, step 5.** The design is in draft PR 1329. Step 5 would put an older score over a newer one when a laptop is offline with 500 changes waiting, a score is refused, and the same cell is scored on a phone. A redesign closes that but has had no review and still has two rare sequences worse than today. The designer recommends leaving the fault and first counting how often a score is refused. Colin chose on Nov 13 to send the redesign to an independent review first. That review is running. Whether to build step 5 is decided after its verdict.
-2. **Step 1, Undo sends each call once.** It is ready to build and changes nothing a teacher sees. Build it now?
-3. **The phone's Undo.** After a score tap on the phone there is no way back. No design exists for where the control sits or when it shows.
-4. **Opened.** Where a teacher sees that a returned piece was opened, and the line the privacy page needs. Today the student page counts a piece as opened when its row has been on screen for 600 ms.
-5. **Should the graders follow the roster's sort?** Today both always use last name. Grade Lowest First and Most Missing Work reshuffle as marks go in.
-6. **Class Results, "before".** A same-date piece made earlier is never listed as before. The fix is one line in `calc.js` and changes what that card lists.
-7. **The questionnaire file's split:** whether to do the rewrite that most of the remaining pieces need.
-8. **Card follow-ups that need a deploy or a migration:** drop the IP key's fallback (first confirm the secret is set); a database login for the edge functions that can run only the student functions; hashing the session token in the edge function; a count of unknown card codes.
-9. **Settings on two computers:** which of the three per-device choices should follow the teacher (report paper size, the bulk-status choice, the phone-reports choice); a category save checked by the database; the wording for the two "waiting" cases.
+1. **Step 1, Undo sends each call once.** It is ready to build and changes nothing a teacher sees. Build it now?
+2. **The phone's Undo.** After a score tap on the phone there is no way back. No design exists for where the control sits or when it shows.
+3. **Opened.** Where a teacher sees that a returned piece was opened, and the line the privacy page needs. Today the student page counts a piece as opened when its row has been on screen for 600 ms.
+4. **Should the graders follow the roster's sort?** Today both always use last name. Grade Lowest First and Most Missing Work reshuffle as marks go in.
+5. **Class Results, "before".** A same-date piece made earlier is never listed as before. The fix is one line in `calc.js` and changes what that card lists.
+6. **The questionnaire file's split:** whether to do the rewrite that most of the remaining pieces need.
+7. **Card follow-ups that need a deploy or a migration:** drop the IP key's fallback (first confirm the secret is set); a database login for the edge functions that can run only the student functions; hashing the session token in the edge function; a count of unknown card codes.
+8. **Settings on two computers:** which of the three per-device choices should follow the teacher (report paper size, the bulk-status choice, the phone-reports choice); a category save checked by the database; the wording for the two "waiting" cases.
 
 **To know**
 
+9. **A refused score is not resent; refusals are counted first.** Resending it (step 5 of mark saving, draft PR 1329) can put an older score over a newer one, and an independent review of the redesign found it still worse than today in three rare cases. Colin ruled on Nov 13: do not build it, count refusals in Sentry by reason with no contents, and design the lasting fix, a version number per score checked by the server.
 10. **The loose grant is closed.** `revoke create on schema public from anon, authenticated;` was applied to the live database on Nov 13, on your yes. Checked on live before and after: neither role can create in `public` now, and both still reach every table and function. A test keeps it so on every PR. The undo is one `grant` line, recorded in DECISIONS.
 11. **Step 4 of mark saving, now live, is worse than the old code in one rare sequence.** A tab with no baseline holds a score the outbox refused (the outbox is full at 500 waiting changes, or storage is full). Another tab's stale write drops that score from the saved copy. Before step 4, the first tab's next whole-list save sent the score again by accident; now it does not.
 12. **Three ignored arguments, found and left:** `_oldSettingsWrite(params, options)` in `shared/data-config-settings.js`; `getObservationTemplates(cid)`, four times, in `shared/data-observations.js`; and an unguarded `CURRICULUM_INDEX[courseTag]` in `shared/data-curriculum-index.js`.

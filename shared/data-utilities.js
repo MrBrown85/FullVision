@@ -232,3 +232,27 @@ var _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function _isUuid(v) {
   return typeof v === 'string' && _UUID_RE.test(v);
 }
+
+/* A write the outbox refused (full, or the browser's storage is full): the
+   warning in the console, and one report to Sentry for each distinct text
+   per page load. The text is the function's name and the reason, and
+   nothing from the write itself. Never throws into the save. */
+/** @type {Record<string, true>} */
+var _refusalsReported = {};
+/**
+ * @param {string} name the server function that was refused
+ * @param {unknown} reason the reason the outbox gave
+ * @returns {void}
+ */
+function _warnWriteRefused(name, reason) {
+  console.warn(name + ' not queued (' + reason + '): the outbox has no room');
+  try {
+    var text = 'Write refused: ' + name + ' (' + String(reason) + ')';
+    if (_refusalsReported[text]) return;
+    _refusalsReported[text] = true;
+    var sentry = /** @type {any} */ (window).Sentry;
+    if (sentry && typeof sentry.captureMessage === 'function') sentry.captureMessage(text, 'warning');
+  } catch (e) {
+    /* reporting must never reach the save */
+  }
+}
