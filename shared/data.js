@@ -3349,38 +3349,27 @@ function _scoreEntryFromCanonical(
   return entry;
 }
 
-/* A piece of work as the class load sent it (_v2GradebookToCache), or this
-   page's own copy when it was made since. Work given a rubric, another
-   rubric or none since the load is read with this page's rubric,
-   competencies and scoring, so its scores go up as the screen shows them:
-   as the load's row, its criteria were sent as the piece's overall score
-   (a 0 for each one a whole-class save took away), and a competency on
-   work that lost its rubric was not sent at all. */
+/* A piece of work as this page holds it (getAssessments), the copy every
+   screen draws from, so a grade is saved for the piece as the teacher sees
+   it: its competencies, scoring, rubric and groups as they are now. The
+   row the class load sent (_cache.v2Gradebook) is read only for a piece
+   this page does not hold. Reading the load's row first sent a competency
+   added since the load, and every competency of work switched from points,
+   as the piece's overall score, and filled no group-mates: that row has
+   collab_mode and collab_config, not collaboration and groups. */
 function _assessmentById(cid, aid) {
-  var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
-  var fromGradebook =
-    gb &&
-    (gb.assessments || []).find(function (assessment) {
-      return assessment && assessment.id === aid;
-    });
-  var mine =
-    (getAssessments(cid) || []).find(function (assessment) {
-      return assessment && assessment.id === aid;
-    }) || null;
-  if (!fromGradebook) return mine;
-  if (!mine || (mine.rubricId || '') === (fromGradebook.rubric_id || fromGradebook.rubricId || '')) {
-    return fromGradebook;
-  }
-  var tagIds = (mine.tagIds || mine.tag_ids || []).slice();
-  return Object.assign({}, fromGradebook, {
-    rubric_id: mine.rubricId || null,
-    rubricId: mine.rubricId || '',
-    has_rubric: !!mine.rubricId,
-    tag_ids: tagIds,
-    tagIds: tagIds,
-    score_mode: mine.scoreMode || mine.score_mode || 'proficiency',
-    scoreMode: mine.scoreMode || mine.score_mode || 'proficiency',
+  var mine = (getAssessments(cid) || []).find(function (assessment) {
+    return assessment && assessment.id === aid;
   });
+  if (mine) return mine;
+  var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
+  return (
+    (gb &&
+      (gb.assessments || []).find(function (assessment) {
+        return assessment && assessment.id === aid;
+      })) ||
+    null
+  );
 }
 
 function _rubricForAssessment(cid, assessment) {
@@ -4880,7 +4869,8 @@ function courseLoadFailed(cid) {
 
 function _loadCourseFromLS(cid) {
   _cache.students[cid] = _safeParseLS('gb-students-' + cid, []).map(migrateStudent);
-  _cache.assessments[cid] = _safeParseLS('gb-assessments-' + cid, []);
+  // A copy saved before every save made its snake_case fields agree.
+  _cache.assessments[cid] = _assessmentFieldsAgree(_safeParseLS('gb-assessments-' + cid, []));
   _cache.scores[cid] = _safeParseLS('gb-scores-' + cid, {});
   _cache.overrides[cid] = _safeParseLS('gb-overrides-' + cid, {});
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
