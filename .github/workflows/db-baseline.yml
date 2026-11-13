@@ -1,0 +1,47 @@
+name: Database baseline
+
+# Prints the live database's baseline as loadable SQL (scripts/db-baseline.sql)
+# and uploads it as the "db-baseline" artifact. It reads the system catalogs
+# only, as the read-only fv_schema_reader role, never a row of an app table.
+# Commit the artifact with node scripts/db-rebuild.mjs --import
+# (docs/database-rebuild.md).
+on:
+  # Run by hand (Actions > Database baseline > Run workflow) after a
+  # migration is applied.
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/db-baseline.sql'
+      - '.github/workflows/db-baseline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Print the baseline from the live catalogs
+        id: baseline
+        env:
+          DATABASE_URL: ${{ secrets.FV_SCHEMA_READER_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::Database baseline skipped: the FV_SCHEMA_READER_URL secret is not set."
+            exit 0
+          fi
+          psql "$DATABASE_URL" -X -q -A -t -v ON_ERROR_STOP=1 -f scripts/db-baseline.sql -o db-baseline.out
+          echo "made=yes" >> "$GITHUB_OUTPUT"
+          { echo '## Database baseline'; echo; grep -c '' db-baseline.out | sed 's/^/Lines: /'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the baseline
+        if: steps.baseline.outputs.made == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-baseline
+          path: db-baseline.out
+          retention-days: 7

@@ -34,8 +34,7 @@ begin
 end
 $roles$;
 grant anon, authenticated, service_role to authenticator;
-
-grant usage on schema public to anon, authenticated, service_role;
+-- Grants on the app's own schemas and objects are in 60-grants.sql.
 
 -- Extensions
 -- Supabase keeps extensions in their own schema. gen_random_uuid() is
