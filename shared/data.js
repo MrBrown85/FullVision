@@ -4754,29 +4754,8 @@ function _evictOldestSavedCopy(keepCid) {
   return true;
 }
 
-/* get_class_bundle doesn't compute grades, including the "calculated" level
-   shown beside a teacher override. Work it out here, as setting an override
-   does (calc.js). */
-function _fillOverrideCalculated(cid) {
-  var overrides = _cache.overrides[cid];
-  if (!overrides || typeof getSectionProficiencyRaw !== 'function' || !COURSES[cid]) return;
-  if (typeof clearProfCache === 'function') clearProfCache();
-  var changed = false;
-  Object.keys(overrides).forEach(function (sid) {
-    Object.keys(overrides[sid] || {}).forEach(function (sectionId) {
-      var o = overrides[sid][sectionId];
-      if (!o || o.calculated != null) return;
-      try {
-        // As calc.js saves it (setSectionOverride): the printed figure.
-        o.calculated = printedLevel(getSectionProficiencyRaw(cid, sid, sectionId));
-        changed = true;
-      } catch (e) {
-        console.warn('Could not work out the calculated level for an override:', e);
-      }
-    });
-  });
-  if (changed) _persistLoadedField(cid, 'overrides', overrides);
-}
+/* The teacher's hand-set levels (getOverrides, saveOverrides, _fillOverrideCalculated) are in shared/data-overrides.js,
+   which loads just after this file. */
 
 /* Term ratings from the server, merged into this device's copy. The server's
    fields win; the nine "dims" the old questionnaire rated were never stored
@@ -9581,18 +9560,6 @@ function _cleanOrphanedScores(cid, validArr) {
   _dropGradeReturnsNotIn(cid, validIds);
   if (_hasServerState('scores', cid)) dropScores(_serverState.scores[cid]);
   if (_hasServerState('statuses', cid)) dropStatuses(_serverState.statuses[cid]);
-}
-function getOverrides(cid) {
-  if (_cache.overrides[cid] !== undefined) return _cache.overrides[cid];
-  try {
-    return JSON.parse(localStorage.getItem('gb-overrides-' + cid)) || {};
-  } catch (e) {
-    console.warn('Overrides parse fallback:', e);
-    return {};
-  }
-}
-function saveOverrides(cid, obj) {
-  _saveCourseField('overrides', cid, obj);
 }
 /* Notes (getNotes, saveNotes) are in shared/data-student-records.js, which loads just after this file. */
 
