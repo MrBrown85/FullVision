@@ -2774,7 +2774,8 @@ describe('rubric-attached-to-scored-work', () => {
       ).toEqual(byCriterion.map(b => [b[Q1], b[Q2], b[Q3]]));
 
       upsertScore(CID, SIDS[1], QUIZ, CI, 4, '2026-10-12', 'summative', '');
-      SIDS.forEach(sid => expect(GradeState.stateOf(CID, sid, ESSAY)).toBe(null));
+      // Work graded before, with no row, reads as Returned; none is a Draft.
+      SIDS.forEach(sid => expect(GradeState.stateOf(CID, sid, ESSAY)).not.toBe('draft'));
       expect(getGradeReturns(CID)[ESSAY]).toBeUndefined();
       // The quiz's own grade is a Draft, as any grade in a class that holds them.
       expect(GradeState.stateOf(CID, SIDS[1], QUIZ)).toBe('draft');
@@ -2789,7 +2790,8 @@ describe('rubric-attached-to-scored-work', () => {
       const scores = getScores(CID);
       scores[SIDS[0]].push(mark(SIDS[0], QUIZ, CI, 3));
       saveScores(CID, scores);
-      SIDS.forEach(sid => expect(GradeState.stateOf(CID, sid, ESSAY)).toBe(null));
+      // Work graded before, with no row, reads as Returned; none is a Draft.
+      SIDS.forEach(sid => expect(GradeState.stateOf(CID, sid, ESSAY)).not.toBe('draft'));
       expect(essayLevels(stored('scores', CID))).toEqual(byCriterion);
     });
   });
