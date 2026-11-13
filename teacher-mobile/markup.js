@@ -846,7 +846,6 @@ window.MMarkUp = (function () {
     redo: redo,
     setTool: setTool,
     setColor: setColor,
-    saveNote: saveNote,
     hitTest: hitTest,
     // For tests: the marks on screen now, not saved yet.
     marks: function () {

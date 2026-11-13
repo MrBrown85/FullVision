@@ -14,6 +14,39 @@ interface Window {
     saveCategories(courseId: string, rows: unknown, options?: unknown): Promise<RpcResult<'save_categories'>>;
     getStudentProfile(enrollmentId: string): Promise<RpcResult<'get_student_profile'>>;
     listCourseStudentProfiles(courseId: string): Promise<RpcResult<'list_course_student_profiles'>>;
+    // The learning map, modules, notes, goals, ratings and preferences calls
+    // (shared/data-rpc-wrappers.js; saveTermRating is in shared/data.js).
+    upsertSubject(params: V2UpsertSubjectParams, options?: unknown): Promise<RpcResult<'upsert_subject'>>;
+    upsertCompetencyGroup(
+      params: V2UpsertCompetencyGroupParams,
+      options?: unknown,
+    ): Promise<RpcResult<'upsert_competency_group'>>;
+    upsertSection(params: V2UpsertSectionParams, options?: unknown): Promise<RpcResult<'upsert_section'>>;
+    upsertTag(params: V2UpsertTagParams, options?: unknown): Promise<RpcResult<'upsert_tag'>>;
+    upsertModule(params: V2UpsertModuleParams, options?: unknown): Promise<RpcResult<'upsert_module'>>;
+    deleteSubject(id: string): Promise<RpcResult<'delete_subject'>>;
+    deleteCompetencyGroup(id: string): Promise<RpcResult<'delete_competency_group'>>;
+    deleteSection(id: string): Promise<RpcResult<'delete_section'>>;
+    deleteTag(id: string): Promise<RpcResult<'delete_tag'>>;
+    deleteModule(id: string): Promise<RpcResult<'delete_module'>>;
+    removeSection(id: string): Promise<RpcResult<'remove_section'>>;
+    restoreSection(id: string): Promise<RpcResult<'restore_section'>>;
+    addNote(enrollmentId: string, body: string): Promise<RpcResult<'upsert_note'>>;
+    deleteNote(noteId: string): Promise<RpcResult<'delete_note'>>;
+    listCourseGoalDates(courseId: string): Promise<RpcResult<'list_course_goal_dates'>>;
+    listCourseTermAttendance(courseId: string): Promise<RpcResult<'list_course_term_attendance'>>;
+    saveTermAttendance(enrollmentId: string, term: number, absences: number | null, lates: number | null): unknown;
+    listCourseCoreSelfAssessments(courseId: string): Promise<RpcResult<'list_course_core_self_assessments'>>;
+    saveCoreSelfAssessment(
+      enrollmentId: string,
+      coreId: string,
+      termKey: string,
+      level: unknown,
+      text: string | null,
+      goal: string | null,
+    ): unknown;
+    saveTermRating(enrollmentId: string, term: number, payload: unknown): unknown;
+    saveTeacherPreferences(patch: import('./database').Json): unknown;
     [name: string]: unknown;
   };
   // Set by shared/calc.js for tests and the console. Nothing checked reads it.
@@ -95,7 +128,11 @@ declare var ObsCard: {
 // member the checked data files call is typed.
 // __fvPerf: shared/data-courses-terms.js keeps the last 50 load timings here.
 interface Window {
-  v2Queue: { dropBlockedOn(localId: string, opts?: unknown): number };
+  v2Queue: {
+    dropBlockedOn(localId: string, opts?: unknown): number;
+    remove(id: string): boolean;
+    markReloaded(classId: string): number;
+  };
   __fvPerf: unknown[];
 }
 // The grade state (shared/grade-state.js, not checked yet). Only the members
@@ -104,6 +141,9 @@ declare var GradeState: {
   RETURNED: string;
   holds(klass: unknown): boolean;
   stateOf(cid: string, sid: string, aid: string): string | null;
+  copyOf(grade: unknown): unknown;
+  sameCopy(a: unknown, b: unknown): boolean;
+  partInUse(copy: unknown, scoring: unknown): unknown;
 };
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
@@ -118,7 +158,58 @@ declare function reportingTermPreset(
   date?: string,
 ): { ordinal: number; label: string; starts_on: string; ends_on: string }[] | null;
 declare function reportingTermReportNames(terms: unknown): string[] | null;
-// teacher/ui.js (not checked yet): a segmented button's state attributes, and
-// the short message toast.
+// teacher/ui.js (not checked yet): a segmented button's state attributes.
 declare function segAttr(on: boolean, role?: string): string;
+// Second batch of data files: what window.X = ... sets and what other
+// files define. Only the members the checked data files use are typed.
+// The Sentry browser SDK (shared/sentry-init.js loads it).
+interface Window {
+  Sentry?: { captureMessage?(message: string, level?: string): unknown };
+  // The curriculum index (curriculum_data.js).
+  _CURRICULUM_DATA?: Record<string, unknown>;
+  // Set by the data files themselves (shared/data-assessments.js, data-roster.js).
+  // Each resolves with undefined when it did nothing (no client or a bad id).
+  duplicateAssessment(srcAssessmentId: string): Promise<RpcResult<'duplicate_assessment'> | undefined>;
+  saveAssessmentTags(assessmentId: string, tagIds: string[]): Promise<RpcResult<'save_assessment_tags'> | undefined>;
+  saveCollab(assessmentId: string, mode: unknown, config: unknown): Promise<RpcResult<'save_collab'> | undefined>;
+  reorderRoster(enrollmentIds: string[]): Promise<RpcResult<'reorder_roster'> | undefined>;
+  bulkApplyPronouns(
+    studentIds: string[],
+    pronouns: string | null,
+  ): Promise<RpcResult<'bulk_apply_pronouns'> | undefined>;
+  importRosterCsv(cid: string, rows: unknown[]): Promise<RpcResult<'import_roster_csv'> | undefined>;
+  setEnrollmentFlag(enrollmentId: string, flagged: unknown): Promise<RpcResult<'update_enrollment'> | undefined>;
+}
+// The sync toast (teacher/ui.js, not checked yet).
 declare function showSyncToast(message: string, type?: string): void;
+// What each window.v2.upsert* call reads from its params (shared/data-rpc-wrappers.js).
+type V2UpsertSubjectParams = {
+  id: string | null;
+  courseId: string;
+  name?: string;
+  color?: string | null;
+  displayOrder?: number | string | null;
+};
+type V2UpsertModuleParams = V2UpsertSubjectParams;
+type V2UpsertCompetencyGroupParams = V2UpsertSubjectParams & { countsAsOne?: boolean | null };
+type V2UpsertSectionParams = {
+  id: string | null;
+  subjectId: string;
+  name?: string;
+  color?: string | null;
+  competencyGroupId?: string | null;
+  displayOrder?: number | string | null;
+};
+type V2UpsertTagParams = {
+  id: string | null;
+  sectionId: string;
+  label?: string;
+  code?: string | null;
+  iCanText?: string | null;
+  displayOrder?: number | string | null;
+  iCanStatements?: string[] | null;
+  sourceText?: string | null;
+  bankId?: string | null;
+};
+// shared/data.js holds this while getRevisionFirstCell reads a first version.
+declare var _firstVersionScope: { cid: string; sid: string; aid: string; entries: unknown } | null;

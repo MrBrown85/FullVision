@@ -1,10 +1,11 @@
+// @ts-check
 /* The class list: getStudents and saveStudents, the save to the server (_persistStudentsToCanonical: enrol, update, withdraw),
    and the roster helpers (window.reorderRoster, bulkApplyPronouns, importRosterCsv, setEnrollmentFlag). Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
   try {
-    return (JSON.parse(localStorage.getItem('gb-students-' + cid)) || []).map(migrateStudent);
+    return (JSON.parse(/** @type {string} */ (localStorage.getItem('gb-students-' + cid))) || []).map(migrateStudent);
   } catch (e) {
     console.warn('Students parse fallback:', e);
     return [];
@@ -43,6 +44,7 @@ function _persistStudentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
   if (!sb) return;
   var tail = _studentDispatchQueue[cid] || Promise.resolve();
+  /** @type {Promise<unknown> | null} */
   var landed = null;
   var dispatched = tail.then(function () {
     var before = _serverStateOr('students', cid, prev);
@@ -184,6 +186,7 @@ function _cancelPendingCreateOrResolve(cid, kind, localId) {
    baseline row) only the keys that differ from it are sent, plus
    roster_position when `moved`. Without `base`, all of them. */
 function _canonicalUpdateEnrollment(sb, enrollmentId, s, idx, base, moved) {
+  /** @type {Record<string, unknown>} */
   var patch = _enrollmentPatchOf(s, idx);
   if (base) {
     // Both sides take idx, so roster_position never differs here.
@@ -211,6 +214,7 @@ function _enrollmentPatchOf(s, idx) {
    left out. With `base` (the server baseline row) only the keys that differ
    from it are sent; without it, all of them. */
 function _canonicalUpdateStudent(sb, studentId, s, base) {
+  /** @type {Record<string, unknown>} */
   var patch = _studentPatchOf(s);
   if (base) {
     patch = _changedPatch(patch, _studentPatchOf(base));

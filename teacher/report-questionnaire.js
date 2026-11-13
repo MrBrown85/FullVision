@@ -8337,7 +8337,6 @@ window.ReportQuestionnaire = (function () {
     isTyped: isTyped,
     typedRow: typedRow,
     keepTyped: keepTyped,
-    earlierRow: earlierRow,
     teacherText: teacherText,
     gradeClaimWrong: gradeClaimWrong,
     insertRow: insertRow,
