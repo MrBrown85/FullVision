@@ -104,24 +104,6 @@ declare var GradeState: {
   holds(klass: unknown): boolean;
   stateOf(cid: string, sid: string, aid: string): string | null;
 };
-// teacher/cm-std-help.js draws a panel with plain DOM calls and shadows
-// `document` with this narrower view of it, so each lookup of its own markup
-// answers with the same element type (the panel is built a moment earlier
-// from fixed markup). Same object at run time; types only.
-interface CmHelpEl extends Omit<HTMLElement, 'querySelector' | 'querySelectorAll'> {
-  querySelector(selector: string): CmHelpEl;
-  querySelectorAll(selector: string): CmHelpList;
-}
-interface CmHelpList extends ArrayLike<CmHelpEl> {
-  forEach(callback: (el: CmHelpEl, index: number) => void): void;
-}
-interface CmHelpDocument {
-  activeElement: CmHelpEl | null;
-  body: { appendChild(el: CmHelpEl): CmHelpEl };
-  createElement(tag: string): CmHelpEl;
-  addEventListener(type: string, listener: (e: KeyboardEvent) => void): void;
-  removeEventListener(type: string, listener: (e: KeyboardEvent) => void): void;
-}
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
 declare function reportingTermsSchoolMatch(terms: unknown): {

@@ -8,18 +8,17 @@
 window.CmStdHelp = (function () {
   'use strict';
 
-  /** @typedef {{ selectedCourse: () => (string | null), stdCode: (tag: any) => string, currentId: (kind: string, id: string) => string }} CmStdHelpHost */
+  /** @typedef {{ code?: string, id?: string, shortName?: string } | null | undefined} CmStdTag */
+  /** @typedef {{ selectedCourse: () => (string | null), stdCode: (tag: CmStdTag) => string, currentId: (kind: string, id: string) => string }} CmStdHelpHost */
   /** @type {CmStdHelpHost | null} */
   var _host = null;
   /** @type {string | null} */
   var cmSelectedCourse = null;
-  // The same document, seen through the narrower type in types/globals.d.ts.
-  var document = /** @type {CmHelpDocument} */ (/** @type {unknown} */ (window.document));
   /** @param {CmStdHelpHost} opts */
   function configure(opts) {
     _host = opts;
   }
-  /** @param {any} tag */
+  /** @param {CmStdTag} tag */
   function _cmStdCode(tag) {
     return _host ? _host.stdCode(tag) : '';
   }
@@ -193,7 +192,7 @@ window.CmStdHelp = (function () {
         picture: _cmHelpNextSteps(cid, sec, tag),
       },
     ];
-    var triggerEl = document.activeElement;
+    var triggerEl = /** @type {HTMLElement | null} */ (document.activeElement);
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay cm-help-overlay';
     overlay.setAttribute('role', 'dialog');
@@ -232,8 +231,8 @@ window.CmStdHelp = (function () {
       '</div>' +
       '</div>';
     document.body.appendChild(overlay);
-    var panel = overlay.querySelector('.cm-help-panel');
-    var tabs = overlay.querySelectorAll('.cm-help-tab');
+    var panel = /** @type {HTMLElement} */ (overlay.querySelector('.cm-help-panel'));
+    var tabs = /** @type {NodeListOf<HTMLElement>} */ (overlay.querySelectorAll('.cm-help-tab'));
     function show(i) {
       tabs.forEach(function (t, j) {
         t.setAttribute('aria-selected', j === i ? 'true' : 'false');
@@ -275,7 +274,7 @@ window.CmStdHelp = (function () {
         return;
       }
       if (e.key === 'Tab') {
-        var focusable = [overlay.querySelector('.cm-help-close')].concat(
+        var focusable = [/** @type {HTMLElement} */ (overlay.querySelector('.cm-help-close'))].concat(
           Array.prototype.filter.call(tabs, function (t) {
             return t.tabIndex === 0;
           }),
@@ -296,7 +295,7 @@ window.CmStdHelp = (function () {
         show(Number(t.dataset.idx));
       });
     });
-    overlay.querySelector('.cm-help-close').addEventListener('click', close);
+    /** @type {HTMLElement} */ (overlay.querySelector('.cm-help-close')).addEventListener('click', close);
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) close();
     });
