@@ -346,4 +346,5 @@ beforeEach(() => {
   _serverState = {};
   _localWrites = {};
   _refreshState = {};
+  _keptText = {}; // the fourth piece of per-session memory: each tab's own copy of scores and statuses
 });

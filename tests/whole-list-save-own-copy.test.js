@@ -392,3 +392,127 @@ describe('re-keys, loads and other classes', () => {
     expect(calls.filter(c => c.params.p_assessment_id === QUIZ)).toHaveLength(10);
   });
 });
+
+/* Lines the review's mutation check found unpinned. Each passes on main as
+   well; each fails with its one line of the change taken out. */
+describe('the kept copy is read in the same key space as the save', () => {
+  const LOCAL = 'local-quiz-1';
+  const SERVER = id('a', 7);
+  // Quiz under its local id, scored for three students.
+  function localQuiz() {
+    return Object.assign({}, work[QUIZ], { id: LOCAL });
+  }
+  function localQuizScores() {
+    var scores = oldLabScores();
+    SIDS.slice(0, 3).forEach(sid => scores[sid].push(entry(sid, LOCAL, T[0], 2)));
+    return scores;
+  }
+  // This tab's own save re-keyed the Quiz; then an older copy (another
+  // tab's, written before it heard) went back into storage, and this tab
+  // read the class again from it. Its kept text holds the local id again.
+  function rekeyedHereThenReadBack(statuses) {
+    openFromSavedCopy(CID, [work[OLD], work[PTS], localQuiz()], localQuizScores(), statuses);
+    _rekey(CID, 'assessment', LOCAL, SERVER);
+    expect(_idRekeys[CID][LOCAL]).toBe(SERVER);
+    otherTabWrites(scoresKey(CID), localQuizScores());
+    if (statuses) otherTabWrites(statusesKey(CID), statuses);
+    _loadCourseFromLS(CID);
+  }
+
+  it('scores: a local id this tab re-keyed is read as the server id in the kept copy', async () => {
+    signIn();
+    rekeyedHereThenReadBack();
+    setPointsScore(CID, SIDS[5], PTS, 7);
+    await settle();
+    expect(scoreCalls(fake).map(brief)).toEqual([['upsert_score', SIDS[5], PTS]]);
+  });
+
+  it('statuses: a local id this tab re-keyed is read as the server id in the kept copy', async () => {
+    signIn();
+    rekeyedHereThenReadBack({ [SIDS[0] + ':' + LOCAL]: 'LATE', [SIDS[1] + ':' + LOCAL]: 'NS' });
+    expect(setAssignmentStatus(CID, SIDS[5], OLD, 'LATE')).toBe(true);
+    await settle();
+    expect(statusCalls(fake).map(c => [c.params.p_enrollment_id, c.params.p_assessment_id, c.params.p_status])).toEqual(
+      [[SIDS[5], OLD, 'LATE']],
+    );
+  });
+
+  // The fallback reads the kept copy under criteria in any case; the group
+  // check needs it read so too, or the pair member looks changed.
+  it('rubric pair work: a kept copy with marks under competencies is read under criteria', async () => {
+    signIn();
+    const RUB = id('b', 1);
+    const CRIT = [id('c', 1), id('c', 2)];
+    const rubricWork = {
+      id: id('a', 8),
+      title: 'Rubric Lab',
+      date: '2026-11-01',
+      type: 'summative',
+      tagIds: [T[0], T[1]],
+      rubricId: RUB,
+      collaboration: 'pair',
+      pairs: [[SIDS[0], SIDS[1]]],
+    };
+    localStorage.setItem(
+      'gb-rubrics-' + CID,
+      JSON.stringify([
+        {
+          id: RUB,
+          name: 'Lab Rubric',
+          criteria: [
+            { id: CRIT[0], name: 'Plan', tagIds: [T[0]], levels: {} },
+            { id: CRIT[1], name: 'Write', tagIds: [T[1]], levels: {} },
+          ],
+        },
+      ]),
+    );
+    // Marked before the work had a rubric: under its competencies, and only
+    // SIDS[0] holds the pair's grade.
+    var scores = oldLabScores();
+    scores[SIDS[0]].push(entry(SIDS[0], rubricWork.id, T[0], 3), entry(SIDS[0], rubricWork.id, T[1], 2));
+    openFromSavedCopy(CID, [work[OLD], work[PTS], rubricWork], scores);
+    expect(_keptText[scoresKey(CID)]).toContain('"tagId":"' + T[0] + '"');
+
+    var mine = getScores(CID);
+    mine[SIDS[5]].push(entry(SIDS[5], PTS, T[0], 6));
+    saveScores(CID, mine);
+    await settle();
+    expect((getScores(CID)[SIDS[1]] || []).some(e => e.assessmentId === rubricWork.id)).toBe(false);
+    expect(scoreCalls(fake).map(brief)).toEqual([['upsert_score', SIDS[5], PTS]]);
+  });
+
+  it('a class whose baseline is forgotten forgets its kept copy too', async () => {
+    signIn();
+    openFromSavedCopy(CID, [work[OLD], work[PTS], work[QUIZ]], oldLabScores());
+    otherTabMarksQuiz(CID, oldLabScores());
+    _forgetServerState(CID);
+
+    setPointsScore(CID, SIDS[3], PTS, 7);
+    await settle();
+
+    // Nothing kept: main's fallback, a clear for each Quiz mark.
+    expect(scoreCalls(fake).filter(c => c.params.p_assessment_id === QUIZ)).toHaveLength(10);
+  });
+
+  it('a server load that finds the saved copy unchanged keeps its text', async () => {
+    signIn();
+    // Memory and the saved copy seeded directly: nothing kept yet.
+    savedCopy(CID, [work[OLD], work[PTS], work[PAIR]], pairScores());
+    _cache.students[CID] = SIDS.map(student);
+    _cache.assessments[CID] = [work[OLD], work[PTS], work[PAIR]];
+    expect(_keptText[scoresKey(CID)]).toBeUndefined();
+    _persistLoadedField(CID, 'scores', pairScores());
+    expect(_keptText[scoresKey(CID)]).toBe(localStorage.getItem(scoresKey(CID)));
+    var theirs = pairScores();
+    theirs[SIDS[0]] = theirs[SIDS[0]].filter(e => e.assessmentId !== PAIR);
+    otherTabWrites(scoresKey(CID), theirs);
+
+    var mine = getScores(CID);
+    mine[SIDS[5]].push(entry(SIDS[5], PTS, T[0], 6));
+    saveScores(CID, mine);
+    await settle();
+
+    expect(partnerHasCopy(getScores(CID))).toBe(false);
+    expect(scoreCalls(fake).map(brief)).toEqual([['upsert_score', SIDS[5], PTS]]);
+  });
+});
