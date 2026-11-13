@@ -148,11 +148,46 @@ What the log changes in section 3:
 - **One heavy job at a time.** Three browser suites at once made unit tests time out and one run useless.
 - **A migration PR takes two pushes.** The first fails the snapshot step and uploads the live snapshot; the second commits it with the refreshed baseline. Until it merges, every other PR fails that step.
 
+### Later the same night
+
+Merged: PRs 1339, 1340, 1341, 1342, 1343, 1344. Nothing was applied to the live database after `same_teacher_links`, and nothing was released.
+
+| Item                         | What happened                                                                                                                         | Learned                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #7                           | Nothing to build. Since PR 502 a criterion has one key, so the two screens cannot disagree, and both already list by last name.       | The third stale item of the week. An Opus builder is a dear way to find that out.                                                                                                      |
+| The queue                    | One read-only scout checked ten queued items against `main`. Six sub-items were already done, six were ready, the rest need Colin.    | From here a scout checks an item's premise before any builder starts.                                                                                                                  |
+| ROADMAP 1.7, Wave 0 ruling 6 | PR 1341. A HEIC photo gets a useful message; a category draft survives the 14-day clean-up; two branches that could not run are gone. | Wording that reaches more than one screen is checked on each: the phone's sentence did not fit the computer.                                                                           |
+| The comparison tool          | PR 1343. Its fake server answers the category-list read, so a run's outbox no longer sticks.                                          |                                                                                                                                                                                        |
+| #32                          | PR 1340 maps `teacher/report-questionnaire.js`. PRs 1342 and 1344 moved its two cheapest pieces: 9,017 lines to 8,429.                | A piece with no shared state costs about five minutes and 120k tokens, type check included. The next piece reads marks; most of the rest wait on a rewrite of eleven shared variables. |
+
+What this changes in section 3:
+
+- **#7 is closed.** Wave 0 ruling 2 ruled on a case that no longer exists.
+- **#32 pauses after two pieces.** Going on means the rewrite in section 6c of [questionnaire-file-map.md](questionnaire-file-map.md), which is a decision, not more of the same.
+- **Already true, so off the list:** the phone's term filter uses real terms (#63, first half); Keep Photos Until follows the photos; Mark Up counts as started grading; the revision screens are merged.
+- **A scout before a builder** is now the rule for anything taken from a plan's list.
+
 ## 6. For Colin
 
-1. **Release.** `main` holds the fix for the two-tab loss (PR 1336) and everything above. Release when you choose; step 4 is best released alone.
-2. **Until it is released: one tab per class.** The fault needs two tabs of one browser on one class, offline or with changes waiting, and one of them opened or reloaded in that time.
-3. **Report lines.** A Best or Lowest line can name different pieces than before when three or more tie at a mark (PR 1326). No grade changed. The comment bank still prefers a piece on the strongest competency, so the comment and the line can differ when a tie spans competencies.
-4. **A loose grant.** The signed-out and signed-in roles may create objects in schema `public`. Nothing uses it. The fix is a one-line migration, not yet written.
-5. **Found, not started:** a same-date piece made earlier is never listed as "before" on Class Results; a piece made offline takes the time it reached the server; a restored class loses made-order; CI's snapshot does not cover schema `fv_private`; two browser specs fail on this Mac and pass on GitHub (`edit-student-dialog.spec.js:21`, `work-wall.spec.js:69`); the comparison tool's fake server answers every `list_` read with no rows.
-6. **Not rehearsed:** the student page's own writes on a database with `same_teacher_links`. Every existing student-page row on live fits the rule.
+**Yours to do**
+
+1. **Release.** `main` holds the fix for the two-tab loss (PR 1336) and everything else above. It is best released alone.
+2. **Until then: one tab per class.** The fault needs two tabs of one browser on one class, offline or with changes waiting, and one of them opened or reloaded in that time.
+
+**Yours to decide**
+
+3. **A loose grant.** The signed-out and signed-in roles may create objects in schema `public`. Nothing uses it and nothing relies on it. The fix is one statement: `revoke create on schema public from anon, authenticated;`.
+4. **The phone's Undo.** After a score tap on the phone there is no way back. No design exists for where the control sits or when it shows.
+5. **Opened.** Where a teacher sees that a returned piece was opened, and the line the privacy page needs. Today the student page counts a piece as opened when its row has been on screen for 600 ms.
+6. **Should the graders follow the roster's sort?** Today both always use last name. Grade Lowest First and Most Missing Work reshuffle as marks go in.
+7. **Class Results, "before".** A same-date piece made earlier is never listed as before. The fix is one line in `calc.js` and changes what that card lists.
+8. **The questionnaire file's split:** whether to do the rewrite that most of the remaining pieces need.
+9. **Card follow-ups that need a deploy or a migration:** drop the IP key's fallback (first confirm the secret is set); a database login for the edge functions that can run only the student functions; hashing the session token in the edge function; a count of unknown card codes.
+10. **Settings on two computers:** which of the three per-device choices should follow the teacher (report paper size, the bulk-status choice, the phone-reports choice); a category save checked by the database; the wording for the two "waiting" cases.
+
+**To know**
+
+11. **Report lines.** A Best or Lowest line can name different pieces than before when three or more tie at a mark (PR 1326). No grade changed. The comment bank still prefers a piece on the strongest competency, so the comment and the line can differ when a tie spans competencies.
+12. **Not rehearsed:** the student page's own writes on a database with `same_teacher_links`. Every existing student-page row on live fits the rule. If a save is ever wrongly refused, `migrations/local-test/same-teacher-links-stop.sql` takes the rule off.
+13. **Found, not started:** a piece made offline takes the time it reached the server; a restored class loses made-order; CI's snapshot does not cover schema `fv_private`; two browser specs fail on this Mac and pass on GitHub (`edit-student-dialog.spec.js:21`, `work-wall.spec.js:69`); the Focus Area pick has no server column, and how a teacher sets it today is not settled.
+14. **Mark saving, next:** steps 5 and 1 of draft PR 1329 hold with changes from the second review. The designer folds them in, and they are built one at a time after step 4 has been released and used.
