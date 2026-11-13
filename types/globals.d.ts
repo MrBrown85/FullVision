@@ -46,3 +46,18 @@ declare var _callRpcWithAuthGuard: <N extends RpcName>(
 ) => Promise<RpcResult<N>>;
 // Set by shared/supabase.js (window.getSupabase): the client, or null.
 declare function getSupabase(): unknown;
+// The Comment Bank's engine (teacher/comment-bank.js, not checked yet). Only
+// the members a checked file uses are typed.
+declare var CommentBank: {
+  STANDING: Record<string, string>;
+  SKILLS: Record<string, { key: string; name: string }[]>;
+  HABITS: { key: string; name: string }[];
+  aOrAn(word: string): string;
+  gradeOf(facts: unknown): { kind: string; letter?: string; standing?: string; next?: string; word?: string } | null;
+  angle(facts: unknown, picks: unknown): { id: string };
+  stepOf(sentence: unknown): string | null;
+};
+// Browse Sentences' cases (teacher/report-qn-browse-cases.js).
+interface Window {
+  ReportQnBrowseCases: unknown;
+}

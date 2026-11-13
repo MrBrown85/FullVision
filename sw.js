@@ -123,6 +123,7 @@ const PRECACHE_URLS = [
   '/vendor/exceljs.min.js',
   '/teacher/comment-bank.js',
   '/teacher/comment-personal.js',
+  '/teacher/report-qn-browse-cases.js',
   '/teacher/report-questionnaire.js',
   '/teacher/grade-report.js',
   '/teacher/report-preview.js',
