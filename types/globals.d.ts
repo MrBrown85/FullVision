@@ -57,7 +57,28 @@ declare var CommentBank: {
   angle(facts: unknown, picks: unknown): { id: string };
   stepOf(sentence: unknown): string | null;
 };
-// Browse Sentences' cases (teacher/report-qn-browse-cases.js).
+// Browse Sentences' cases (teacher/report-qn-browse-cases.js) and the
+// Observations card, the student's Voice and the class's report parts
+// (teacher/report-qn-voice-observations.js).
 interface Window {
   ReportQnBrowseCases: unknown;
+  ReportQnVoiceObservations: unknown;
 }
+// One Report's model (teacher/report-one.js, not checked yet). Only the
+// members the Voice and Observations piece uses are typed.
+declare var ReportOne: {
+  FEEDBACK: { key: string; opt: string; label: string }[];
+  modelFor(reportConfig: unknown): { titles?: Record<string, string> };
+  available(key: string, cid: string): boolean;
+  isOn(model: unknown, key: string, sid?: string): boolean;
+  order(model: unknown, sid?: string): string[];
+  offParts(model: unknown, cid: string, sid?: string): string[];
+  label(key: string, cid: string): string;
+};
+// The observation card (teacher/obs-card.js, not checked yet). Only the
+// members the Voice and Observations piece uses are typed.
+declare var ObsCard: {
+  obDay(ob: unknown): string;
+  context(cid: string, opts?: unknown): unknown;
+  html(ob: unknown, ctx: unknown, opts?: unknown): string;
+};

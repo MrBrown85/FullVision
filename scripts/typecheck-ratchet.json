@@ -4,7 +4,8 @@
     "shared/constants.js",
     "shared/data-rpc-wrappers.js",
     "shared/html.js",
-    "teacher/report-qn-browse-cases.js"
+    "teacher/report-qn-browse-cases.js",
+    "teacher/report-qn-voice-observations.js"
   ],
   "notYetChecked": [
     "s/app.js",

@@ -39,6 +39,7 @@
     "shared/data-courses-terms.js",
     "shared/data-demo.js",
     "shared/data-curriculum-index.js",
-    "teacher/report-qn-browse-cases.js"
+    "teacher/report-qn-browse-cases.js",
+    "teacher/report-qn-voice-observations.js"
   ]
 }

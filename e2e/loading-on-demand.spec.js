@@ -26,6 +26,7 @@ const REPORTS = [
   '/teacher/report-sheets.js',
   '/teacher/report-issues.js',
   '/teacher/report-qn-browse-cases.js',
+  '/teacher/report-qn-voice-observations.js',
   '/teacher/report-questionnaire.js',
   '/teacher/grade-report.js',
   '/teacher/report-preview.js',
