@@ -443,7 +443,8 @@ test.describe('A Page Studio form, read as parts', () => {
     const dialog = page.locator('#issue-overlay');
     await expect(dialog).toContainText('Print 27 Reports');
     await expect(dialog).toContainText('27 students · 1 sheet each');
-    await expect(dialog).toContainText('Letter, 2-sided, flip on long edge');
+    await expect(dialog.locator('#issue-paper-say')).toHaveText('Letter paper (8.5 × 11 in).');
+    await expect(dialog).toContainText('2-sided, flip on long edge');
     // Demo Mode has no attendance entered: said once, never blocking.
     await expect(dialog.locator('.issue-warn')).toContainText(
       'No attendance is entered for this report. Their reports print without it.',

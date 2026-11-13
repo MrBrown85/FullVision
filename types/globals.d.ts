@@ -108,6 +108,7 @@ interface Window {
   CmTerms: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
+  ReportPrintPaper: unknown;
 }
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.

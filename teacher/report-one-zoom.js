@@ -1,9 +1,10 @@
 // @ts-check
-/* report-one-zoom.js — Progress Reports, One Student view: how large the
-   sides of a student's report are drawn on screen, and the Zoom control
-   that chooses it (Automatic, Fit Width, Whole Page, All Pages or a
-   percent). Moved out of teacher/page-reports.js with _applyStudioZoom and
-   _oneZoom, on 2026-11-13.
+/* report-one-zoom.js — Progress Reports: how large the sides of the
+   reports are drawn on screen, and the Zoom control that chooses it. One
+   Student view: Automatic, Fit Width, Whole Page, All Pages or a percent
+   (moved out of teacher/page-reports.js with _applyStudioZoom and _oneZoom,
+   on 2026-11-13). Everyone view: Whole Class (the Fit Map as it always was,
+   at 13%) or a percent, 13% to 75%.
 
    The zoom is screen only. It sets --sheet-zoom (the scale), --sheet-cols
    (sides per row) and --pair-pad on the preview; teacher/report-one-zoom.css
@@ -12,16 +13,20 @@
    inside @media screen. A sheet's front and back always share a row: when
    two or more sides fit across, the sides per row are even.
 
+   In Everyone view Whole Class sets nothing: the Fit Map's own rules in
+   teacher/reports.css draw it. A percent sets the class fit-zoom and
+   --fit-zoom on the preview, read only by @media screen rules in
+   teacher/report-one-zoom.css; Print Reports and reprints print from this
+   view, and print as they always did. Nothing is set inside a student's
+   sheets, so a printed copy's saved HTML never carries the zoom.
+
    The choice (never the pixels) is remembered on this device in
-   localStorage, one key per view ('gb-report-zoom-one'). The control takes
-   its view and its list of choices from the caller, so another view can
-   have its own; only the maths below (zoomFor, columns) is the One Student
-   layout's. Everyone view keeps its own scale for now. */
+   localStorage, one key per view ('gb-report-zoom-one', 'gb-report-zoom-all'). */
 window.ReportOneZoom = (function () {
   'use strict';
 
-  /** @typedef {'auto' | 'width' | 'page' | 'all' | number} Choice
-      A fit choice by name, or a percent (30 to 150). */
+  /** @typedef {'auto' | 'width' | 'page' | 'all' | 'class' | number} Choice
+      A fit choice by name, or a percent. */
   /** @typedef {{ width: number, height: number, paper: string, sides: number }} Box
       The pane's inner size in px (less its padding), the paper and how
       many sides the student's report has. */
@@ -40,16 +45,41 @@ window.ReportOneZoom = (function () {
   var SAFETY = 1; // a pixel spare, for the browser's rounding of each width
   var MIN = 0.3;
   var MAX = 1.5;
-  var STEPS = [30, 50, 60, 75, 90, 100, 125, 150];
+  var FIT_MAP = 0.13; // the Fit Map's scale (teacher/reports.css .report-fitmap)
   var FITS = ['auto', 'width', 'page', 'all'];
   /** @type {Record<string, string>} */
-  var NAMES = { auto: 'Automatic', width: 'Fit Width', page: 'Whole Page', all: 'All Pages' };
+  var NAMES = { auto: 'Automatic', width: 'Fit Width', page: 'Whole Page', all: 'All Pages', class: 'Whole Class' };
+  /** @typedef {{ min: number, max: number, steps: number[], fits: string[], percents: number[], def: Choice }} ViewCfg */
+  /** @type {Record<string, ViewCfg>} */
+  var VIEWS = {
+    one: {
+      min: MIN,
+      max: MAX,
+      steps: [30, 50, 60, 75, 90, 100, 125, 150],
+      fits: FITS,
+      percents: [50, 75, 100, 125, 150],
+      def: 'auto',
+    },
+    all: {
+      min: FIT_MAP,
+      max: 0.75,
+      steps: [13, 20, 30, 40, 50, 60, 75],
+      fits: ['class'],
+      percents: [20, 30, 40, 50, 75],
+      def: 'class',
+    },
+  };
+  /** @param {string} [view] @returns {ViewCfg} */
+  function cfg(view) {
+    return VIEWS[view === 'all' ? 'all' : 'one'];
+  }
 
   /* ── The maths (pure; tests/report-one-zoom.test.js) ───────── */
 
-  /** @param {number} z */
-  function clamp(z) {
-    return Math.min(MAX, Math.max(MIN, z));
+  /** @param {number} z @param {string} [view] */
+  function clamp(z, view) {
+    var c = cfg(view);
+    return Math.min(c.max, Math.max(c.min, z));
   }
   /* Down to a thousandth, never up: rounding up made two sides a fraction
      of a pixel wider than the pane, and the second wrapped below. */
@@ -105,9 +135,10 @@ window.ReportOneZoom = (function () {
     return best;
   }
 
-  /* The scale for a choice in a pane. */
-  /** @param {Choice} choice @param {Box} box @returns {number} */
-  function zoomFor(choice, box) {
+  /* The scale for a choice in a pane (in a view, One Student by default). */
+  /** @param {Choice} choice @param {Box} box @param {string} [view] @returns {number} */
+  function zoomFor(choice, box, view) {
+    if (view === 'all') return typeof choice === 'number' ? clamp(choice / 100, 'all') : FIT_MAP;
     if (typeof choice === 'number') return clamp(choice / 100);
     if (choice === 'width') return floor3(clamp(zoomAcross(1, box.width, box.paper)));
     if (choice === 'page') {
@@ -122,8 +153,9 @@ window.ReportOneZoom = (function () {
   }
 
   /* The next percent up (dir 1) or down (dir -1) from scale z. */
-  /** @param {number} z @param {number} dir @returns {number} */
-  function step(z, dir) {
+  /** @param {number} z @param {number} dir @param {string} [view] @returns {number} */
+  function step(z, dir, view) {
+    var STEPS = cfg(view).steps;
     var p = z * 100;
     var i;
     if (dir > 0) {
@@ -133,32 +165,34 @@ window.ReportOneZoom = (function () {
     for (i = STEPS.length - 1; i >= 0; i--) if (STEPS[i] < p - 0.5) return STEPS[i];
     return STEPS[0];
   }
-  /** @param {number} z */
-  function atMin(z) {
-    return z <= MIN + 0.0005;
+  /** @param {number} z @param {string} [view] */
+  function atMin(z, view) {
+    return z <= cfg(view).min + 0.0005;
   }
-  /** @param {number} z */
-  function atMax(z) {
-    return z >= MAX - 0.0005;
+  /** @param {number} z @param {string} [view] */
+  function atMax(z, view) {
+    return z >= cfg(view).max - 0.0005;
   }
 
-  /** @param {unknown} s @returns {Choice} */
-  function parseChoice(s) {
-    if (typeof s !== 'string') return 'auto';
-    if (FITS.indexOf(s) >= 0) return /** @type {Choice} */ (s);
+  /** @param {unknown} s @param {string} [view] @returns {Choice} */
+  function parseChoice(s, view) {
+    var c = cfg(view);
+    if (typeof s !== 'string') return c.def;
+    if (c.fits.indexOf(s) >= 0) return /** @type {Choice} */ (s);
     if (/^\d{2,3}$/.test(s)) {
       var n = Number(s);
-      if (n >= MIN * 100 && n <= MAX * 100) return n;
+      // The limits as whole percents (0.13 * 100 is 13.000000000000002).
+      if (n >= c.min * 100 - 0.5 && n <= c.max * 100 + 0.5) return n;
     }
-    return 'auto';
+    return c.def;
   }
   /** @param {{ getItem(k: string): string | null } | null} [store] @param {string} [view] @returns {Choice} */
   function readChoice(store, view) {
     try {
       var s = store === undefined ? window.localStorage : store;
-      return parseChoice(s ? s.getItem(KEY + (view || 'one')) : null);
+      return parseChoice(s ? s.getItem(KEY + (view || 'one')) : null, view);
     } catch (e) {
-      return 'auto';
+      return cfg(view).def;
     }
   }
   /** @param {Choice} choice @param {{ setItem(k: string, v: string): void, removeItem(k: string): void } | null} [store] @param {string} [view] */
@@ -167,7 +201,7 @@ window.ReportOneZoom = (function () {
       var s = store === undefined ? window.localStorage : store;
       if (!s) return;
       var key = KEY + (view || 'one');
-      if (choice === 'auto') s.removeItem(key);
+      if (choice === cfg(view).def) s.removeItem(key);
       else s.setItem(key, typeof choice === 'number' ? String(Math.round(choice)) : choice);
     } catch (e) {
       /* storage unavailable: the choice lasts this visit */
@@ -220,17 +254,18 @@ window.ReportOneZoom = (function () {
     );
   }
 
-  /* The Zoom control. opts.view names the view it zooms ('one' by
-     default); opts.fits and opts.percents are its menu (by default the One
-     Student view's: Automatic, Fit Width, Whole Page, All Pages, then 50%
-     to 150%). Literal markup only: a fit is drawn only by its name in
-     NAMES, a percent only as a number. */
+  /* The Zoom control. opts (or just the view's name) names the view it
+     zooms ('one' by default); opts.fits and opts.percents are its menu (by
+     default the view's own: Automatic, Fit Width, Whole Page, All Pages,
+     50% to 150% for One Student; Whole Class, 20% to 75% for Everyone).
+     Literal markup only: a fit is drawn only by its name in NAMES, a
+     percent only as a number. */
   // html-safe: fixed markup; the names come from NAMES, the percents are numbers
-  /** @param {{ view?: string, fits?: string[], percents?: number[] }} [opts] */
+  /** @param {string | { view?: string, fits?: string[], percents?: number[] }} [opts] */
   function controlHtml(opts) {
-    var o = opts || {};
+    var o = typeof opts === 'string' ? { view: opts } : opts || {};
     var view = o.view === 'all' ? 'all' : 'one';
-    var items = (o.fits || FITS)
+    var items = (o.fits || cfg(view).fits)
       .filter(function (k) {
         return Object.prototype.hasOwnProperty.call(NAMES, k);
       })
@@ -239,7 +274,7 @@ window.ReportOneZoom = (function () {
       })
       .join('');
     items += '<div class="studio-zoom-sep" role="separator"></div>';
-    items += (o.percents || [50, 75, 100, 125, 150])
+    items += (o.percents || cfg(view).percents)
       .map(function (p) {
         var n = Math.round(Number(p)) || 100;
         return _item(String(n), n + '%');
@@ -253,7 +288,11 @@ window.ReportOneZoom = (function () {
       '<span class="seg seg-sm studio-zoom-seg">' +
       '<button type="button" class="seg-btn studio-zoom-step" data-zoom-step="-1" aria-label="Zoom Out" title="Zoom Out">−</button>' +
       '<span class="dash-view-wrap">' +
-      '<button type="button" class="seg-btn studio-zoom-btn" id="studio-zoom-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="studio-zoom-menu" aria-label="Zoom: Automatic"><span class="studio-zoom-now">Automatic</span>' +
+      '<button type="button" class="seg-btn studio-zoom-btn" id="studio-zoom-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="studio-zoom-menu" aria-label="Zoom: ' +
+      label(cfg(view).def) +
+      '"><span class="studio-zoom-now">' +
+      label(cfg(view).def) +
+      '</span>' +
       CARET +
       '</button>' +
       '<div class="dash-view-menu studio-zoom-menu" id="studio-zoom-menu" role="menu" aria-label="Zoom" hidden>' +
@@ -301,6 +340,25 @@ window.ReportOneZoom = (function () {
     _sync();
   }
 
+  /* Everyone view: Whole Class takes off everything set here, so the Fit
+     Map's own rules draw it; a percent sets the class and the scale. No
+     glide here: a class's 200 or more sides re-laid out together stutter
+     (measured in Demo Mode; see the PR). */
+  /** @param {HTMLElement} preview @param {number} z */
+  function _setAll(preview, z) {
+    var whole = choice() === 'class';
+    preview.classList.toggle('fit-zoom', !whole);
+    if (whole) preview.style.removeProperty('--fit-zoom');
+    else preview.style.setProperty('--fit-zoom', String(z));
+    _st(_view).z = z;
+    _sync();
+  }
+  /** @param {HTMLElement} preview @param {number} z @param {boolean} glide */
+  function _draw(preview, z, glide) {
+    if (_view === 'all') _setAll(preview, z);
+    else _set(preview, z, glide);
+  }
+
   function _sync() {
     var ctl = document.getElementById('studio-zoom');
     if (!ctl) return;
@@ -320,14 +378,13 @@ window.ReportOneZoom = (function () {
     var steps = ctl.querySelectorAll('[data-zoom-step]');
     steps.forEach(function (b) {
       var down = b.getAttribute('data-zoom-step') === '-1';
-      /** @type {HTMLButtonElement} */ (b).disabled = down ? atMin(_st(_view).z) : atMax(_st(_view).z);
+      /** @type {HTMLButtonElement} */ (b).disabled = down ? atMin(_st(_view).z, _view) : atMax(_st(_view).z, _view);
     });
   }
 
   /** @returns {HTMLElement | null} */
   function _preview() {
-    var p = document.getElementById('rb-preview');
-    return p && !p.classList.contains('studio-all') ? p : null;
+    return document.getElementById('rb-preview');
   }
 
   /** @param {Choice} c @param {boolean} glide */
@@ -335,7 +392,7 @@ window.ReportOneZoom = (function () {
     _setChoice(c);
     saveChoice(c, undefined, _view);
     var p = _preview();
-    if (p) _set(p, zoomFor(c, _box(p)), glide);
+    if (p) _draw(p, zoomFor(c, _box(p), _view), glide);
     else _sync();
   }
 
@@ -387,10 +444,10 @@ window.ReportOneZoom = (function () {
     var ctl = el && el.closest('.studio-zoom');
     if (!el || !ctl) return;
     if (el.hasAttribute('data-zoom-step')) {
-      _choose(step(_st(_view).z, Number(el.getAttribute('data-zoom-step'))), true);
+      _choose(step(_st(_view).z, Number(el.getAttribute('data-zoom-step')), _view), true);
     } else if (el.hasAttribute('data-zoom')) {
       _close(true);
-      _choose(parseChoice(el.getAttribute('data-zoom')), true);
+      _choose(parseChoice(el.getAttribute('data-zoom'), _view), true);
     } else if (_openMenu) _close(true);
     else _open(ctl);
   }
@@ -450,7 +507,7 @@ window.ReportOneZoom = (function () {
     var fx = r && r.width ? (x - r.left) / r.width : 0;
     var fy = r && r.height ? (y - r.top) / r.height : 0;
     _setChoice(z * 100);
-    _set(preview, Math.round(z * 1000) / 1000, false);
+    _draw(preview, Math.round(z * 1000) / 1000, false);
     if (anchor && r) {
       var r2 = anchor.getBoundingClientRect();
       preview.scrollLeft += r2.left + fx * r2.width - x;
@@ -472,12 +529,12 @@ window.ReportOneZoom = (function () {
     preview.addEventListener(
       'wheel',
       function (e) {
-        if (!(e.ctrlKey || e.metaKey) || preview.classList.contains('studio-all')) return;
+        if (!(e.ctrlKey || e.metaKey)) return;
         // The browser's own page zoom stays as it is.
         e.preventDefault();
         var dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
         dy = Math.max(-40, Math.min(40, dy));
-        _zoomAbout(preview, clamp(_st(_view).z * Math.exp(-dy * 0.005)), e.clientX, e.clientY);
+        _zoomAbout(preview, clamp(_st(_view).z * Math.exp(-dy * 0.005), _view), e.clientX, e.clientY);
       },
       { passive: false },
     );
@@ -485,11 +542,10 @@ window.ReportOneZoom = (function () {
     var base = 1;
     /** @param {Event} e @param {boolean} start */
     var gesture = function (e, start) {
-      if (preview.classList.contains('studio-all')) return;
       e.preventDefault();
       var g = /** @type {Event & { scale?: number, clientX?: number, clientY?: number }} */ (e);
       if (start) base = _st(_view).z;
-      else _zoomAbout(preview, clamp(base * (g.scale || 1)), g.clientX || 0, g.clientY || 0);
+      else _zoomAbout(preview, clamp(base * (g.scale || 1), _view), g.clientX || 0, g.clientY || 0);
     };
     preview.addEventListener('gesturestart', function (e) {
       gesture(e, true);
@@ -508,24 +564,20 @@ window.ReportOneZoom = (function () {
   }
 
   /* After each render of the pages (and a resize, a new student or a
-     paper change, which render them): the scale for the choice, at once,
-     never gliding. In Everyone view the control hides and the preview
-     keeps the Fit Map's own scale. */
+     paper change, which render them): the scale for the view's choice, at
+     once, never gliding. */
   /** @param {HTMLElement} preview @param {string} view */
   function apply(preview, view) {
+    _view = view === 'all' ? 'all' : 'one';
     var ctl = document.getElementById('studio-zoom');
     if (ctl) {
-      // A control drawn for another view hides; only One Student has its maths yet.
-      ctl.hidden = view === 'all' || (ctl.getAttribute('data-view') || 'one') !== view;
+      // A control drawn for the other view hides.
+      ctl.hidden = (ctl.getAttribute('data-view') || 'one') !== _view;
       _bindControl(ctl);
     }
-    if (view === 'all') {
-      preview.classList.remove('zoom-wide');
-      return;
-    }
-    _view = view;
+    if (_view === 'all') preview.classList.remove('zoom-wide');
     _bindPreview(preview);
-    _set(preview, zoomFor(choice(), _box(preview)), false);
+    _draw(preview, zoomFor(choice(), _box(preview), _view), false);
   }
 
   /* The pane changed width without a render (a panel hidden or shown):
@@ -533,7 +585,7 @@ window.ReportOneZoom = (function () {
   /** @param {boolean} glide */
   function refit(glide) {
     var p = _preview();
-    if (p) _set(p, zoomFor(choice(), _box(p)), glide);
+    if (p) _draw(p, zoomFor(choice(), _box(p), _view), glide);
   }
 
   return {
@@ -552,6 +604,7 @@ window.ReportOneZoom = (function () {
     saveChoice: saveChoice,
     label: label,
     PAPER: PAPER,
-    GEOM: { GAP: GAP, PAIR_PAD: PAIR_PAD, ROW_GAP: ROW_GAP, LABEL: LABEL, MIN: MIN, MAX: MAX },
+    GEOM: { GAP: GAP, PAIR_PAD: PAIR_PAD, ROW_GAP: ROW_GAP, LABEL: LABEL, MIN: MIN, MAX: MAX, FIT_MAP: FIT_MAP },
+    VIEWS: VIEWS,
   };
 })();

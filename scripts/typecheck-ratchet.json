@@ -10,6 +10,7 @@
     "teacher/cm-terms.js",
     "teacher/report-one-zoom.js",
     "teacher/report-one-head.js",
+    "teacher/report-print-paper.js",
     "shared/data-withdrawn.js",
     "shared/data-overrides.js",
     "shared/data-utilities.js",
