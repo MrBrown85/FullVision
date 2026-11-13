@@ -173,6 +173,9 @@ grant execute on routine fv_private.report_note_hold(p_enrollment_id uuid, p_ass
 revoke all on routine fv_private.restore_grade_returns(p_payload jsonb) from public;
 grant execute on routine fv_private.restore_grade_returns(p_payload jsonb) to authenticated;
 grant execute on routine fv_private.restore_grade_returns(p_payload jsonb) to service_role;
+revoke all on routine fv_private.same_teacher() from public;
+revoke all on routine fv_private.same_teacher_problem(p_row jsonb, p_args text[]) from public;
+revoke all on routine fv_private.teacher_of(p_kind text, p_id uuid) from public;
 revoke all on routine fv_private.work_path_course(p_name text) from public;
 grant execute on routine fv_private.work_path_course(p_name text) to authenticated;
 grant execute on routine fv_private.work_path_course(p_name text) to service_role;
