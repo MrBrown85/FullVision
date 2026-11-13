@@ -57,6 +57,11 @@ const WRITERS = [
 // builds the Demo class by saving whole lists, before any screen is open.
 const EXEMPT = new Set([
   'shared/data.js',
+  'shared/data-learning-map.js',
+  'shared/data-categories.js',
+  'shared/data-rubrics.js',
+  'shared/data-assessments.js',
+  'shared/data-config-settings.js',
   'shared/data-student-work.js',
   'shared/data-feedback-live.js',
   'shared/data-markup.js',
@@ -90,6 +95,11 @@ describe('grades are written only through shared/grader.js', () => {
   it('every writer in the list is a function in shared/data.js', () => {
     const data = [
       'shared/data.js',
+      'shared/data-learning-map.js',
+      'shared/data-categories.js',
+      'shared/data-rubrics.js',
+      'shared/data-assessments.js',
+      'shared/data-config-settings.js',
       'shared/data-student-work.js',
       'shared/data-feedback-live.js',
       'shared/data-markup.js',
