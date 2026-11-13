@@ -5,6 +5,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { U, signIn, seedClass, clearClass, stored, settle } from './helpers/pin-save-paths.js';
 
 describe('rubric-bank-stats', () => {
   /**
@@ -2639,6 +2640,225 @@ describe('rubric-print', () => {
       });
       expect(out.html).toContain('Names the variables');
       expect(out.html).not.toContain('is-on');
+    });
+  });
+});
+
+describe('rubric-attached-to-scored-work', () => {
+  /**
+   * Work graded by competency, then given a rubric (the assessment form's
+   * Save Changes, a linked copy's edit, another tab). The marks under the
+   * competencies move to the rubric's criteria when the scores are read
+   * (_migrateRubricScoreKeys), as a reload moves them. They used to stay
+   * where they were until a reload, once the scores had been read under the
+   * same rubrics: the criteria read blank, the next grade anywhere in a
+   * class that holds grades made every student's grade on the work a
+   * Draft, and signed in, a whole-class save sent upsert_score 0 for every
+   * student on the work, because the server writers read the piece as the
+   * class load sent it (_assessmentById), without its rubric.
+   */
+  const CID = U(901);
+  const SIDS = [U(911), U(912), U(913)];
+  const ESSAY = U(931); // graded by competency, then given the rubric
+  const QUIZ = U(932); // other work, graded after
+  const RUBRIC = U(971);
+  const Q1 = U(972);
+  const Q2 = U(973);
+  const Q3 = U(974);
+  const CI = U(981);
+  const CP = U(982);
+
+  const rubric = {
+    id: RUBRIC,
+    name: 'Reading Questions',
+    criteria: [
+      { id: Q1, name: 'Question 1', tagIds: [CI], levels: {} },
+      { id: Q2, name: 'Question 2', tagIds: [CI], levels: {} },
+      { id: Q3, name: 'Question 3', tagIds: [CP], levels: {} },
+    ],
+  };
+  const essay = { id: ESSAY, title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: [CI, CP] };
+  const quiz = { id: QUIZ, title: 'Quiz', date: '2026-10-12', type: 'summative', tagIds: [CI] };
+  const mark = (sid, aid, tid, score) => ({
+    id: sid + ':' + aid + ':' + tid,
+    assessmentId: aid,
+    tagId: tid,
+    score,
+    date: '2026-10-10',
+    type: 'summative',
+    note: '',
+    created: '2026-10-10T17:00:00.000Z',
+  });
+  // CI and CP levels per student, before the rubric.
+  const LEVELS = [
+    [3, 2],
+    [4, 3],
+    [2, 1],
+  ];
+  const byCriterion = LEVELS.map(([ci, cp]) => ({ [Q1]: ci, [Q2]: ci, [Q3]: cp }));
+
+  function seed(withRubric) {
+    const scores = {};
+    SIDS.forEach((sid, i) => {
+      scores[sid] = withRubric
+        ? [mark(sid, ESSAY, Q1, LEVELS[i][0]), mark(sid, ESSAY, Q2, LEVELS[i][0]), mark(sid, ESSAY, Q3, LEVELS[i][1])]
+        : [mark(sid, ESSAY, CI, LEVELS[i][0]), mark(sid, ESSAY, CP, LEVELS[i][1])];
+    });
+    seedClass(CID, {
+      students: SIDS.map((id, i) => ({ id, firstName: ['Ava', 'Ben', 'Cy'][i], lastName: 'Test' })),
+      assessments: [Object.assign({}, essay, withRubric ? { rubricId: RUBRIC } : {}), structuredClone(quiz)],
+      rubrics: [structuredClone(rubric)],
+      scores,
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_return' },
+    });
+    _noteRubricsSet(CID);
+  }
+  /* The class's pieces as the class load keeps them (_v2GradebookToCache):
+     the server's rows, read by the server writers through _assessmentById. */
+  function loadedRows() {
+    _cache.v2Gradebook[CID] = {
+      assessments: getAssessments(CID).map(a => ({
+        id: a.id,
+        title: a.title,
+        score_mode: 'proficiency',
+        rubric_id: a.rubricId || null,
+        has_rubric: !!a.rubricId,
+        tag_ids: a.tagIds.slice(),
+        collab_mode: null,
+      })),
+    };
+  }
+  // Attach the rubric as the assessment form's Save Changes does: the stored
+  // row changed in place, then the list saved.
+  function attach() {
+    const list = getAssessments(CID);
+    list.find(a => a.id === ESSAY).rubricId = RUBRIC;
+    saveAssessments(CID, list);
+  }
+  const essayLevels = blob =>
+    SIDS.map(sid => {
+      const out = {};
+      (blob[sid] || []).forEach(e => {
+        if (e.assessmentId === ESSAY) out[e.tagId] = e.score;
+      });
+      return out;
+    });
+  const scoreCalls = calls => calls.filter(([name]) => /score|clear/.test(name));
+  const onEssay = calls => scoreCalls(calls).filter(([, p]) => p.p_assessment_id === ESSAY);
+
+  afterEach(() => {
+    if (_cache.v2Gradebook) delete _cache.v2Gradebook[CID];
+    clearClass(CID);
+  });
+
+  describe('on this device only', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      seed(false);
+    });
+
+    it('moves the marks to the criteria at once, and the next grade makes no Draft on the work', () => {
+      // A screen read the scores before the rubric was attached.
+      expect(essayLevels(getScores(CID))).toEqual(LEVELS.map(([ci, cp]) => ({ [CI]: ci, [CP]: cp })));
+      attach();
+      expect(essayLevels(getScores(CID))).toEqual(byCriterion);
+      // Each criterion reads its level through the key the screens use.
+      expect(
+        SIDS.map(sid =>
+          rubric.criteria.map(c => {
+            const keys = rubricCriterionScoreKeys(c);
+            const e = getScores(CID)[sid].find(x => x.assessmentId === ESSAY && keys.includes(x.tagId));
+            return e ? e.score : null;
+          }),
+        ),
+      ).toEqual(byCriterion.map(b => [b[Q1], b[Q2], b[Q3]]));
+
+      upsertScore(CID, SIDS[1], QUIZ, CI, 4, '2026-10-12', 'summative', '');
+      // Work graded before, with no row, reads as Returned; none is a Draft.
+      SIDS.forEach(sid => expect(GradeState.stateOf(CID, sid, ESSAY)).not.toBe('draft'));
+      expect(getGradeReturns(CID)[ESSAY]).toBeUndefined();
+      // The quiz's own grade is a Draft, as any grade in a class that holds them.
+      expect(GradeState.stateOf(CID, SIDS[1], QUIZ)).toBe('draft');
+      // No level changed, on the screen or in the saved copy.
+      expect(essayLevels(getScores(CID))).toEqual(byCriterion);
+      expect(essayLevels(stored('scores', CID))).toEqual(byCriterion);
+    });
+
+    it('a whole-class save after the attach makes no Draft on the work either', () => {
+      getScores(CID);
+      attach();
+      const scores = getScores(CID);
+      scores[SIDS[0]].push(mark(SIDS[0], QUIZ, CI, 3));
+      saveScores(CID, scores);
+      // Work graded before, with no row, reads as Returned; none is a Draft.
+      SIDS.forEach(sid => expect(GradeState.stateOf(CID, sid, ESSAY)).not.toBe('draft'));
+      expect(essayLevels(stored('scores', CID))).toEqual(byCriterion);
+    });
+  });
+
+  describe('signed in', () => {
+    let session;
+    beforeEach(() => {
+      localStorage.clear();
+      session = signIn();
+    });
+    afterEach(() => session.signOut());
+
+    it('a whole-class save after the attach sends nothing for the work', async () => {
+      seed(false);
+      loadedRows();
+      getScores(CID);
+      attach();
+      await settle();
+      session.since();
+      const scores = getScores(CID);
+      scores[SIDS[0]].push(mark(SIDS[0], QUIZ, CI, 3));
+      saveScores(CID, scores);
+      await settle();
+      const sent = session.since();
+      expect(onEssay(sent)).toEqual([]);
+      expect(scoreCalls(sent)).toEqual([
+        ['upsert_tag_score', expect.objectContaining({ p_assessment_id: QUIZ, p_tag_id: CI, p_value: 3 })],
+      ]);
+      expect(essayLevels(getScores(CID))).toEqual(byCriterion);
+    });
+
+    it('a criterion graded after the attach goes up as its rubric score', async () => {
+      seed(false);
+      loadedRows();
+      getScores(CID);
+      attach();
+      await settle();
+      session.since();
+      upsertScore(CID, SIDS[0], ESSAY, Q3, 4, '2026-10-10', 'summative', '');
+      await settle();
+      expect(onEssay(session.since())).toEqual([
+        ['upsert_rubric_score', expect.objectContaining({ p_enrollment_id: SIDS[0], p_criterion_id: Q3, p_value: 4 })],
+      ]);
+    });
+
+    it('a competency graded after the rubric is taken off goes up as its competency score', async () => {
+      seed(true);
+      loadedRows();
+      getScores(CID);
+      const list = getAssessments(CID);
+      list.find(a => a.id === ESSAY).rubricId = undefined;
+      saveAssessments(CID, list);
+      await settle();
+      session.since();
+      upsertScore(CID, SIDS[0], ESSAY, CP, 4, '2026-10-10', 'summative', '');
+      await settle();
+      expect(onEssay(session.since())).toEqual([
+        ['upsert_tag_score', expect.objectContaining({ p_enrollment_id: SIDS[0], p_tag_id: CP, p_value: 4 })],
+      ]);
+    });
+
+    it('work whose rubric did not change is read as the class load sent it', () => {
+      seed(false);
+      loadedRows();
+      const row = _cache.v2Gradebook[CID].assessments.find(a => a.id === QUIZ);
+      expect(_assessmentById(CID, QUIZ)).toBe(row);
+      expect(_assessmentById(CID, ESSAY)).toBe(_cache.v2Gradebook[CID].assessments.find(a => a.id === ESSAY));
     });
   });
 });

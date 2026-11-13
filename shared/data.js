@@ -3349,6 +3349,13 @@ function _scoreEntryFromCanonical(
   return entry;
 }
 
+/* A piece of work as the class load sent it (_v2GradebookToCache), or this
+   page's own copy when it was made since. Work given a rubric, another
+   rubric or none since the load is read with this page's rubric,
+   competencies and scoring, so its scores go up as the screen shows them:
+   as the load's row, its criteria were sent as the piece's overall score
+   (a 0 for each one a whole-class save took away), and a competency on
+   work that lost its rubric was not sent at all. */
 function _assessmentById(cid, aid) {
   var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
   var fromGradebook =
@@ -3356,12 +3363,24 @@ function _assessmentById(cid, aid) {
     (gb.assessments || []).find(function (assessment) {
       return assessment && assessment.id === aid;
     });
-  if (fromGradebook) return fromGradebook;
-  return (
+  var mine =
     (getAssessments(cid) || []).find(function (assessment) {
       return assessment && assessment.id === aid;
-    }) || null
-  );
+    }) || null;
+  if (!fromGradebook) return mine;
+  if (!mine || (mine.rubricId || '') === (fromGradebook.rubric_id || fromGradebook.rubricId || '')) {
+    return fromGradebook;
+  }
+  var tagIds = (mine.tagIds || mine.tag_ids || []).slice();
+  return Object.assign({}, fromGradebook, {
+    rubric_id: mine.rubricId || null,
+    rubricId: mine.rubricId || '',
+    has_rubric: !!mine.rubricId,
+    tag_ids: tagIds,
+    tagIds: tagIds,
+    score_mode: mine.scoreMode || mine.score_mode || 'proficiency',
+    scoreMode: mine.scoreMode || mine.score_mode || 'proficiency',
+  });
 }
 
 function _rubricForAssessment(cid, assessment) {
@@ -6106,7 +6125,10 @@ function sortStudents(arr, mode, cid) {
    their own"). Scores from an older save are moved once: each criterion
    takes the entry under its first competency, and rubric work's
    competency-keyed entries are dropped. It runs again when the class's
-   rubrics change, so a rubric loaded later still moves its scores. */
+   rubrics change, so a rubric loaded later still moves its scores, and
+   when a piece of work gains, changes or loses its rubric, so marks given
+   by competency move as soon as the work is given a rubric, as a reload
+   moves them. */
 var _rubricKeyedScores = new WeakMap();
 // Counts up each time a class's rubrics are set (cache, save, load, re-key),
 // so a scores object moved under one set of rubrics is looked at again under
@@ -6114,6 +6136,18 @@ var _rubricKeyedScores = new WeakMap();
 var _rubricsRev = {};
 function _noteRubricsSet(cid) {
   _rubricsRev[cid] = (_rubricsRev[cid] || 0) + 1;
+}
+/* What a scores object was moved under: the class's rubrics, and which work
+   is scored on which rubric (as _rubricLegacyKeyIndex picks it). Read from
+   the list itself, so a rubric given to work in any way (the assessment
+   form, a linked copy's edit, another tab, a load) is seen. */
+function _rubricKeySig(cid) {
+  var sig = String(_rubricsRev[cid] || 0);
+  (getAssessments(cid) || []).forEach(function (a) {
+    var rubricId = a && (a.rubricId || a.rubric_id);
+    if (rubricId && !isPointsScored(a)) sig += '|' + a.id + '=' + rubricId;
+  });
+  return sig;
 }
 /* Rubric work whose criteria feed competencies: { assessmentId: criteria }
    and, per assessment, the competency ids an old entry would sit under. */
@@ -6153,7 +6187,7 @@ function _hasLegacyRubricKeys(scores, legacyTags) {
 }
 function _migrateRubricScoreKeys(cid, scores) {
   if (!scores || typeof scores !== 'object') return scores;
-  var sig = _rubricsRev[cid] || 0;
+  var sig = _rubricKeySig(cid);
   if (_rubricKeyedScores.get(scores) === sig) return scores;
   var index = _rubricLegacyKeyIndex(cid);
   var byAssessment = index.byAssessment;
