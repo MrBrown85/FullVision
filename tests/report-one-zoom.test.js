@@ -264,3 +264,60 @@ describe('the choice on this device', () => {
     expect(Z.label(81)).toBe('81%');
   });
 });
+
+describe('the Everyone view', () => {
+  const B = { width: 1337, height: 900, paper: 'legal', sides: 6 };
+
+  it('Whole Class is the Fit Map’s own scale, 13%', () => {
+    expect(Z.zoomFor('class', B, 'all')).toBe(0.13);
+    expect(Z.GEOM.FIT_MAP).toBe(0.13);
+    expect(Z.label('class')).toBe('Whole Class');
+  });
+
+  it('a percent is that scale, from 13% to 75%', () => {
+    expect(Z.zoomFor(50, B, 'all')).toBe(0.5);
+    expect(Z.zoomFor(5, B, 'all')).toBe(0.13);
+    expect(Z.zoomFor(150, B, 'all')).toBe(0.75);
+  });
+
+  it('steps 13, 20, 30, 40, 50, 60 and 75, from Whole Class’s scale, and stops at both ends', () => {
+    expect(Z.step(0.13, 1, 'all')).toBe(20);
+    expect(Z.step(0.2, 1, 'all')).toBe(30);
+    expect(Z.step(0.5, 1, 'all')).toBe(60);
+    expect(Z.step(0.6, 1, 'all')).toBe(75);
+    expect(Z.step(0.75, 1, 'all')).toBe(75);
+    expect(Z.step(0.3, -1, 'all')).toBe(20);
+    expect(Z.step(0.2, -1, 'all')).toBe(13);
+    expect(Z.step(0.13, -1, 'all')).toBe(13);
+    expect(Z.atMin(0.13, 'all')).toBe(true);
+    expect(Z.atMin(0.2, 'all')).toBe(false);
+    expect(Z.atMax(0.75, 'all')).toBe(true);
+    expect(Z.atMax(0.6, 'all')).toBe(false);
+  });
+
+  it('keeps its own stored choice, apart from One Student’s', () => {
+    const m = new Map();
+    const s = {
+      getItem: k => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, v),
+      removeItem: k => m.delete(k),
+    };
+    Z.saveChoice(50, s, 'all');
+    Z.saveChoice(125, s, 'one');
+    expect(m.get('gb-report-zoom-all')).toBe('50');
+    expect(m.get('gb-report-zoom-one')).toBe('125');
+    expect(Z.readChoice(s, 'all')).toBe(50);
+    expect(Z.readChoice(s, 'one')).toBe(125);
+    Z.saveChoice('class', s, 'all');
+    expect(m.has('gb-report-zoom-all')).toBe(false);
+    expect(Z.readChoice(s, 'all')).toBe('class');
+  });
+
+  it('ignores a choice that belongs to the other view, or garbage', () => {
+    for (const junk of ['auto', 'width', '125', '10', 'zoom', '']) {
+      expect(Z.parseChoice(junk, 'all'), junk).toBe('class');
+    }
+    expect(Z.parseChoice('class', 'one')).toBe('auto');
+    expect(Z.parseChoice('13', 'all')).toBe(13);
+  });
+});

@@ -586,7 +586,7 @@ window.PageReports = (function () {
       ReportOneHead.navHtml() +
       '<span class="studio-fit" id="studio-fit"></span>' +
       '<div class="studio-tools">' +
-      ReportOneZoom.controlHtml() +
+      ReportOneZoom.controlHtml(studioView) +
       _printSettingsHtml() +
       '<span class="seg seg-sm studio-view" role="radiogroup" aria-label="View">' +
       '<button type="button" class="seg-btn' +
