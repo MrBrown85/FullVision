@@ -42,6 +42,8 @@
     "teacher/report-qn-browse-cases.js",
     "teacher/report-qn-voice-observations.js",
     "teacher/cm-std-help.js",
-    "teacher/cm-terms.js"
+    "teacher/cm-terms.js",
+    "teacher/report-one-zoom.js",
+    "teacher/report-one-head.js"
   ]
 }
