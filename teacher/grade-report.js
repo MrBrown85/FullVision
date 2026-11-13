@@ -322,7 +322,7 @@ window.GradeReport = (function () {
 
   /* Each text's width in a table of one tier's type, in px, in order. */
   function _textWidths(stage, names, key) {
-    // html-safe: key is a tier key ('regular' or 'small'); every name goes through esc
+    // html-safe: key is the tier key ('regular'); every name goes through esc
     stage.innerHTML =
       '<div class="gr-table gr-' +
       key +
@@ -398,7 +398,7 @@ window.GradeReport = (function () {
       var span = function (n) {
         return '<span class="gr-fit" style="display:inline-block;white-space:nowrap">' + esc(n) + '</span>';
       };
-      // html-safe: key is a tier key ('regular' or 'small'); every name goes through esc
+      // html-safe: key is the tier key ('regular'); every name goes through esc
       stage.innerHTML =
         '<div class="gr-table gr-' +
         key +

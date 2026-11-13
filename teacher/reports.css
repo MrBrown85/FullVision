@@ -1507,38 +1507,6 @@
   overflow-y: auto;
 }
 
-.gr-switch {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  width: 36px;
-  height: 22px;
-  padding: 2px;
-  border: 0;
-  border-radius: 11px;
-  background: var(--border-2);
-  cursor: pointer;
-  transition: background var(--duration-micro) ease;
-}
-.gr-switch-knob {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform var(--duration-micro) ease;
-}
-.gr-switch[aria-checked='true'] {
-  background: var(--active);
-}
-.gr-switch[aria-checked='true'] .gr-switch-knob {
-  transform: translateX(14px);
-}
-.gr-switch:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-}
-
 .studio-canvas {
   position: relative;
   display: flex;
@@ -1762,18 +1730,6 @@
 .studio-pages:not(.studio-all) .sheet-row-empty .sheet-cell {
   min-height: 30px;
 }
-.studio-pages:not(.studio-all) .sheet-cell.sheet-empty {
-  outline: calc(1px / var(--sheet-zoom, 1)) dashed #b4bcc7;
-  outline-offset: -1px;
-  border-radius: 6px;
-}
-.studio-pages:not(.studio-all) .sheet-cell.sheet-empty::after {
-  content: attr(data-label);
-  padding: 7px 10px;
-  font-family: var(--font-base);
-  font-size: 8pt;
-  color: #8e8e93;
-}
 
 /* A row holds the page's own controls (report-one-page.js). */
 .studio-pages .sheet-row {
@@ -1784,9 +1740,6 @@
   .studio-live {
     display: none !important;
   }
-  .sheet-cell.sheet-off {
-    outline: none !important;
-  }
 }
 
 /* ── Block options ─────────────────────────────────────────── */
@@ -1796,25 +1749,6 @@
   color: #444;
   line-height: 1.35;
   margin-top: 1px;
-}
-
-.studio-tpl-side {
-  position: relative;
-  width: calc(8.5in * var(--tpl-scale, 0.075));
-  height: calc(11in * var(--tpl-scale, 0.075));
-  flex: none;
-  overflow: hidden;
-  border-radius: 2px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-.studio-tpl-side > .report-sheet {
-  transform: scale(var(--tpl-scale, 0.075));
-  transform-origin: top left;
-  box-shadow: none;
-  pointer-events: none;
-}
-.studio-tpl-side .sheet-row-empty {
-  display: none;
 }
 
 /* Laptop widths: the Progress Reports toolbar keeps one row with room to
@@ -4192,10 +4126,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 9pt;
   line-height: 1.2;
 }
-.gr-table.gr-small,
-.gr-table.gr-two {
-  font-size: 7.5pt;
-}
 .gr-row {
   display: grid;
   grid-template-columns: var(--gr-cols);
@@ -4237,17 +4167,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .gr-flag {
   font-weight: 700;
 }
-.gr-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 16px;
-  align-items: start;
-}
-.gr-tail {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .gr-summary {
   font-size: 9pt;
 }
@@ -4262,13 +4181,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   border-bottom: 1.5px solid #000;
   font-size: 11pt;
   font-weight: 700;
-}
-.gr-facts {
-  font-size: 9pt;
-}
-.gr-cut {
-  font-size: 8pt;
-  font-style: italic;
 }
 /* The font the sheet prints in (styles.css, @media print --font-base),
    for measuring its columns on screen (grade-report.js _fitPx). */
