@@ -55,7 +55,16 @@ const WRITERS = [
 
 // data.js holds the writers; grader.js is the one caller; seed-data.js
 // builds the Demo class by saving whole lists, before any screen is open.
-const EXEMPT = new Set(['shared/data.js', 'shared/grader.js', 'shared/seed-data.js']);
+const EXEMPT = new Set([
+  'shared/data.js',
+  'shared/data-roster.js',
+  'shared/data-withdrawn.js',
+  'shared/data-overrides.js',
+  'shared/data-profile-summaries.js',
+  'shared/data-courses-terms.js',
+  'shared/grader.js',
+  'shared/seed-data.js',
+]);
 
 function sources() {
   const out = [];
