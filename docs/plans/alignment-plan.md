@@ -208,7 +208,7 @@ Nothing waits on you to do. The release is done and the two-tab fix is live.
 
 **To know**
 
-10. **The loose grant.** You said yes on Nov 13 to `revoke create on schema public from anon, authenticated;`. It is rehearsed on a local PostgreSQL 17: before, both roles could create a table in `public`; after, 12 of 12 tries to create a table or a function are refused and every security rule test passes. A test that keeps it so is written. It waits on the Supabase connector, which refused connections. Its PR follows once it is applied.
+10. **The loose grant is closed.** You said yes on Nov 13 to `revoke create on schema public from anon, authenticated;`. It was applied to the live database on Nov 13 (PR 1359). Before, both roles could create in `public`. After, neither can, and everything else is reached as before. A test keeps it so. The undo is `grant create on schema public to anon, authenticated;`.
 11. **Step 4 of mark saving, now live, is worse than the old code in one rare sequence.** A tab with no baseline holds a score the outbox refused (the outbox is full at 500 waiting changes, or storage is full). Another tab's stale write drops that score from the saved copy. Before step 4, the first tab's next whole-list save sent the score again by accident; now it does not.
 12. **Three ignored arguments, found and left:** `_oldSettingsWrite(params, options)` in `shared/data-config-settings.js`; `getObservationTemplates(cid)`, four times, in `shared/data-observations.js`; and an unguarded `CURRICULUM_INDEX[courseTag]` in `shared/data-curriculum-index.js`.
 13. **`shared/data-student-work.js` is not type-checked.** It sits at its size limit, and one comment line would grow it. It can be checked once a piece moves out.

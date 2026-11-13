@@ -2,6 +2,14 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## The signed-out and signed-in roles can no longer create objects in schema `public` (2026-11-13)
+
+The security rule tests' read of the catalogs showed that the two roles the browser uses, `anon` (signed out) and `authenticated` (signed in), held CREATE on schema `public`, a grant from the project's first setup. Nothing in the app uses it. Colin was shown the one statement, `revoke create on schema public from anon, authenticated;`, and said yes on 2026-11-13. `migrations/2026111302_public_schema_no_create.sql` was applied the same day; PR 1359 records it, and a new part of the security rule tests fails if either role can create a table or a function in `public`, `student_submit` or `fv_private`.
+
+- **Checked on the live database before:** both roles could create in `public`; neither owned a table or a function there; no grant reached them another way.
+- **Checked after:** neither role can create; `anon`, `authenticated` and `service_role` still hold USAGE, so every table, view and function is reached as before; `service_role` can still create.
+- **Undo:** `grant create on schema public to anon, authenticated;`
+
 ## Test-only code is deleted; code that tests use to reach real features stays (2026-11-13)
 
 This records decision 15 of the handoff review plan, which the plan's list approved but this file never carried. Code that only tests call is deleted, with its tests: 6 functions and 18 export keys that nothing called, 5 functions only tests called, and `tagScoresByAssessment` in `shared/calc.js`, the averaging Colin ruled against on Nov 3 (PRs 1350, 1351, 1354). "Only tests call it" is not enough on its own: each candidate is sorted first, because some code exists so a test can reach a real feature. That code stays: `GradeState.afterSeen`, `GradeState.studentCopy`, `isRubricCheckOn`, `PhotoQueue.isLocalId`, `GradesPrint.statusText`, `ReportQuestionnaire.skillTags`, `ReportQuestionnaire.iePending` and the `StudentCards` test hooks. `undoLastScore`, `getSyncStatus` and `setStudentPageSwitch` stay by ruling, and `DashClassManager.reorderCategory` is a live feature.
