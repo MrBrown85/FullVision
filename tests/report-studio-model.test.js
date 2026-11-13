@@ -1,5 +1,5 @@
 /**
- * The built form a class saved with Page Studio (teacher/report-sheets.js):
+ * The built form a class saved with the old Page Studio (teacher/report-sheets.js):
  * sides of rows, each row one block at Row width or one or two at Side by
  * Side width, migration from every earlier shape, and the block registry.
  * One Report reads a saved form through these (ReportOne.fromForm).

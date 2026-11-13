@@ -397,8 +397,8 @@ window.ReportBlocks = (function () {
   // questionnaire saves plain text, a paragraph per line.
   const HTML_COMMENT = /<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i;
 
-  /* A term comment as it goes home: the report card, the Quick Report's
-     Term Comment card and phone reports all print it through this. A
+  /* A term comment as it goes home: the Teacher Comment on Progress
+     Reports and phone reports all print it through this. A
      comment saved before Nov 2 may say [date] in its Deadline sentence: it
      never prints. The sentence is left out until a deadline is picked, then
      says the date; a saved date that has passed or falls after the school
@@ -1941,7 +1941,7 @@ window.ReportBlocks = (function () {
      there is none). cv: calc.js assessmentCellValue. level: the mark on
      one competency instead of the whole assessment, for student sid;
      points work keeps its own % (_ownPercent). A whole piece prints the %
-     its category counts it as (cv.percentText). As the Quick Report
+     its category counts it as (cv.percentText). As the Assessments list
      prints them (DECISIONS, "Student-facing levels are proficiencies",
      Assignment Grades, 2026-11-12): work with no mark yet is blank, no
      dash; points read "7 / 10"; and in a Proficiency or Both class points
@@ -2003,7 +2003,7 @@ window.ReportBlocks = (function () {
      (11px: the sheet sets --text-xs itself, reports.css .report-sheet, and
      the stage is a .report-sheet), in the font the page shows it in and in
      the one it prints in (reports.css .gr-print-font), the wider kept, with
-     4% and 2px of headroom, as the Quick Report sizes its columns
+     4% and 2px of headroom, as the Assessments list sizes its columns
      (grade-report.js _fitPx). 0 where nothing can be measured (no layout): the column keeps
      its usual width. A fixed 90px cut off a Both class's "Proficient − ·
      67%" (Nov 12). */

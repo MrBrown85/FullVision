@@ -1,4 +1,5 @@
-/* report-feedback-cards.js — the Quick Report's Feedback Pages cards.
+/* report-feedback-cards.js — the cards on the Feedback Pages One Report
+   prints after a report (grade-report.js feedbackPages).
 
    One card's HTML for an item from ReportFeedback.forStudent (the item
    shape is documented at the top of report-feedback.js), plus the two

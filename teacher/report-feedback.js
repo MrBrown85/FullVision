@@ -1,7 +1,7 @@
-/* report-feedback.js — the data behind the Quick Report's Feedback Pages.
+/* report-feedback.js — the data behind the Feedback Pages.
 
-   After the grade sheet, the Quick Report can print every assessment that
-   has a rubric or written feedback as a card, in date order (the Full
+   After the report, One Report can print every assessment that has a
+   rubric or written feedback as a card, in date order (the Full
    Record canvas, layout B). This file only gathers what each card shows;
    the cards and pages are drawn elsewhere. Pure: data in, plain objects
    out, nothing touches the DOM.

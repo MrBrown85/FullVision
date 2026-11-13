@@ -244,20 +244,12 @@ describe('ReportSheets.pack for One Report', () => {
   const c = (id, px, more) => ({ id, size: 'row', px, ...more });
   const table = (id, n, rowPx) => c(id, 40 + n * rowPx, { rows: Array.from({ length: n }, () => rowPx), chrome: 40 });
 
-  it('fill: a table that would fit a side of its own still starts in the room left and goes on', () => {
+  it('a table that would fit a side of its own still starts in the room left and goes on', () => {
     const rows = [[c('header', 600)], [table('list', 30, 20)]];
-    // Without fill it moves whole to the next side, leaving the front's foot empty.
-    const whole = P(rows);
-    expect(whole.sides[0].rows).toHaveLength(1);
-    const filled = P(rows, { fill: true });
+    const filled = P(rows);
     expect(filled.sides[0].rows[1].cells[0].part.start).toBe(0);
     expect(filled.sides[0].rows[1].cells[0].part.end).toBeGreaterThan(5);
     expect(filled.sides[1].rows[0].cells[0].part.end).toBe(30);
     filled.sides.forEach(sd => sd.rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H)));
-  });
-
-  it('changes no layout that does not ask for it', () => {
-    const rows = [[c('header', 300)], [table('list', 60, 20)], [c('b', 300)]];
-    expect(P(rows, { fill: false })).toEqual(P(rows));
   });
 });

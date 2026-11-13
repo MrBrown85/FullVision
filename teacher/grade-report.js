@@ -1,32 +1,28 @@
-/* grade-report.js — the Grade Report: a ready-made progress report that
-   reads like the student printout from the old gradebook programs. The
-   letterhead, one row per assessment in the year to date as of the
-   report's end, then a summary by category, the course grade (Overall
-   Proficiency in a Proficiency class) and the missing work. Grades only:
-   no comment, attendance or other feedback.
+/* grade-report.js — the grade parts One Report (report-one.js) prints:
+   the Assessments list (listPart), one row per assessment in the year to
+   date as of the report's end; the summary by category (summaryHtml);
+   the course grade line, Overall Proficiency in a Proficiency class
+   (termHtml); and the Feedback Pages after the report (feedbackPages,
+   drawn on sides by sideHtml). It also reads a class's saved Quick Report
+   choices (options), which ReportOne.fromGrade opens as a model.
 
    A row's columns follow the class's grading style (DECISIONS, "The
    Quick Report's columns", 2026-11-12): in a Proficiency class Date,
-   Assignment, Category and Result, the Result what the piece was marked
+   Assignment, Category and Result, the Result what the piece was assessed
    in ("Developing +", "8 / 10", Complete, Missing, Excused); a Both class
    adds Percent; a Letter class prints Score, Out Of, % and the note, as it
-   always has. Work with no mark yet leaves its Result (or Score) blank.
+   always has. Work not yet assessed leaves its Result (or Score) blank.
 
-   Feedback Pages (the `feedback` option): after the grade sheet, a card for
-   every assessment with a rubric or written feedback
-   (ReportFeedback.forStudent and .cardHtml), down two columns, on as many
-   sides as they need. Each card is measured at the column's width and the
-   columns are filled by those heights (packColumns); a card never splits,
-   except a rubric taller than a whole column, which splits between its
-   criterion rows (splitRows).
-
-   The Quick Report is no longer drawn whole: One Report (report-one.js)
-   draws its parts with listPart, summaryHtml, termHtml, feedbackPages and
-   sideHtml, and reads a class's saved Quick Report choices with options. */
+   Feedback Pages: a card for every assessment with a rubric or written
+   feedback (ReportFeedback.forStudent and .cardHtml), down two columns,
+   on as many sides as they need. Each card is measured at the column's
+   width and the columns are filled by those heights (packColumns); a
+   card never splits, except a rubric taller than a whole column, which
+   splits between its criterion rows (splitRows). */
 window.GradeReport = (function () {
   'use strict';
 
-  /* The Quick Report is drawn in the set of scores Progress Reports use
+  /* These parts are drawn in the set of scores Progress Reports use
      (teacher/report-scores.js): each function named here runs inside
      ReportScores.withReportScores every time it is called, so its rows,
      its summary and its Feedback Pages read no grade outside it. */
@@ -66,8 +62,9 @@ window.GradeReport = (function () {
     termComment: false,
   };
   var FLAGS = ['summary', 'ungraded', 'numbers', 'feedback', 'rubrics', 'comments', 'observations', 'termComment'];
-  /* The table's size: row height and type in px. */
-  var TIERS = [{ key: 'regular', rowPx: 19 }];
+  /* The table's size: its type and its row height in px (measured again
+     for each student's list). */
+  var TIER = { key: 'regular', rowPx: 19 };
 
   /* The class's choices, with the defaults filled in. */
   function options(saved) {
@@ -683,7 +680,7 @@ window.GradeReport = (function () {
     });
     show.catPx = _textPx(stage, ['Category'].concat(cats));
     show.titlePx = _textPx(stage, ['Assessment'].concat(titles));
-    var tier = Object.assign({}, TIERS[0]);
+    var tier = Object.assign({}, TIER);
     var one = _measure(stage, _tableHtml(list.slice(0, 1).concat(list.slice(0, 1)), show, tier));
     var head = _measure(stage, _tableHtml([], show, tier));
     if (list.length) tier.rowPx = Math.max(tier.rowPx, (one - head) / 2);

@@ -201,13 +201,13 @@ window.PageReports = (function () {
      Letter or Legal for the printed reports, remembered per class on this
      device. The sheets set the page size themselves when they render
      (ReportSheets.setPageStyle). DECISIONS.md, "Report forms" 4. */
-  var PAPER_SIZES = { letter: 'letter portrait', legal: 'legal portrait' };
+  var PAPERS = ['letter', 'legal'];
   var reportPaper = 'letter';
 
   function _loadPaper(cid) {
     try {
       var v = localStorage.getItem('gb-report-paper-' + cid);
-      return PAPER_SIZES[v] ? v : 'letter';
+      return PAPERS.indexOf(v) >= 0 ? v : 'letter';
     } catch (e) {
       return 'letter';
     }
@@ -222,7 +222,7 @@ window.PageReports = (function () {
   }
 
   function setPaper(paper) {
-    if (!PAPER_SIZES[paper]) return;
+    if (PAPERS.indexOf(paper) < 0) return;
     reportPaper = paper;
     try {
       if (paper === 'letter') localStorage.removeItem('gb-report-paper-' + activeCourse);

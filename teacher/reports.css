@@ -1297,11 +1297,6 @@
   font-size: 8.75pt;
 }
 
-/* The rail widens while editing so a block's name and its controls share a
-   row; when they cannot, the controls wrap under the name. */
-
-/* Grip, pairs, starters and the library in Edit Layout. */
-
 /* Review on a tablet or a phone: the rail hides behind a Layout button and
    opens over the pages; one student at a time with the stepper; sheets
    scale to the width (ReportSheets sets --sheet-zoom from the preview). */
@@ -4214,7 +4209,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
-/* ── Feedback cards (Quick Report, Feedback Pages) ──────────────────────
+/* ── Feedback cards (Feedback Pages) ───────────────────────────────────
    One bordered card per assessment, built by ReportFeedback.cardHtml
    (teacher/report-feedback-cards.js). Black and white only: it is
    photocopied. Every rule is under .fb-card so nothing leaks into the
@@ -4507,7 +4502,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 
 /* ── Feedback Pages (grade-report.js) ──────────────────────────────────
-   After the Quick Report's grade sheet: a head (the student's name, the
+   After the report: a head (the student's name, the
    class, block and term, the page number) and two equal columns of cards,
    16px apart, 12px between cards. The cards are measured at the column's
    width (352px) and placed by those heights, so a column never overflows. */
@@ -5981,9 +5976,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   .rb-preview.studio-pages {
     padding: 12px 12px 32px;
   }
-  .rb-preview.studio-pages:not(.studio-all) .sheet-student {
-    padding-right: 0;
-  }
 }
 
 /* With 44 px controls on a phone, the toolbar's right-hand group (Ready
@@ -6005,15 +5997,11 @@ body.qn-roster #gb-sidebar .student-row-note {
 .report-sheet .sheet-cell[data-part='legend'] .report-legend-desc {
   white-space: normal;
 }
-/* The Assessments table, the Categories summary and the grade line are the
-   Quick Report's own, each a part here. */
+/* The Assessments table, the Categories summary and the grade line
+   (grade-report.js), each a part here. */
 .one-part {
   width: 100%;
 }
 .one-assessments > .report-block-title {
   margin-bottom: 4px;
-}
-/* No inspector beside One Report's pages, so no gutter is kept for one. */
-.studio-one .rb-preview.studio-pages:not(.studio-all) .sheet-student {
-  padding-right: 0;
 }

@@ -734,7 +734,7 @@ describe('report-continued-name', () => {
 
 describe('report-feedback-cards', () => {
   /**
-   * The Quick Report's Feedback Pages cards (teacher/report-feedback-cards.js):
+   * The Feedback Pages' cards (teacher/report-feedback-cards.js):
    * the HTML for each kind of item from ReportFeedback.forStudent, plus the
    * observations and Term Comment cards.
    */
@@ -1261,7 +1261,7 @@ describe('report-feedback-cards', () => {
 
 describe('report-feedback', () => {
   /**
-   * The data behind the Quick Report's Feedback Pages (teacher/report-feedback.js):
+   * The data behind the Feedback Pages (teacher/report-feedback.js):
    * which assessments get a card, what each card carries, the student's
    * observations and the term comment.
    */
@@ -2868,25 +2868,6 @@ describe('report-sheets', () => {
       expect(r.over).toBe(false);
     });
 
-    it('a cell that prints nothing takes no room; a pair with one empty cell prints the other alone; an empty row keeps its place at no height', () => {
-      const r = P([
-        [
-          [c('header', 81)],
-          [h('att', 0, { empty: true }), h('miss', 60)],
-          [c('gone', 0, { empty: true })],
-          [c('legend', 100)],
-        ],
-      ]);
-      expect(rowsOf(r.sides[0])).toEqual([
-        [0, 81, 'header/row@81'],
-        [93, 60, 'miss/half@60'],
-        [165, 0, 'gone/row@0'],
-        [165, 100, 'legend/row@100'],
-      ]);
-      expect(r.sides[0].rows[2].empty).toBe(true);
-      expect(r.sides[0].rows[3].empty).toBeUndefined();
-    });
-
     it('a table taller than a side goes on side by side; anything else taller prints after the report, alone and over', () => {
       const rows = Array.from({ length: 60 }, () => 30); // 1800px of rows
       const r = P([
@@ -2992,11 +2973,11 @@ describe('report-sheets', () => {
       expect(r.sides[0].rows[1].y + r.sides[0].rows[1].h).toBe(993);
     });
 
-    it('a side’s worth, too long for the room after the name: whole on the Back, not on a side of its own', () => {
+    it('a side’s worth, too long for the room after the name: starts under the name and ends on the Back', () => {
       const r = newReport(30);
       expect(where(r)).toEqual([
-        ['side', 0, ['header']],
-        ['side', 1, ['grades']],
+        ['side', 0, ['header', 'grades 0-28']],
+        ['side', 1, ['grades 28-30']],
       ]);
       expect(r.sides[1].rows[0].y).toBe(TOP);
       expect(r.sides[1].rows[0].carried).toBe(true);
@@ -3071,24 +3052,24 @@ describe('report-sheets', () => {
       sound(r, 38);
     });
 
-    it('a table moved to the Back that does not fit above its docked block starts there and goes on', () => {
+    it('a table that fits a side starts in the room left and goes on above the Back’s docked block', () => {
       const r = PH([[[c('header', 81)], [c('comment', 700)], [grades(20)]], [[c('response', 400)]]], {
         pinned: 'response',
       });
       expect(where(r)).toEqual([
-        ['side', 0, ['header', 'comment']],
-        ['side', 1, ['grades 0-16']],
-        ['continued', 1, ['grades 16-20']],
+        ['side', 0, ['header', 'comment', 'grades 0-4']],
+        ['side', 1, ['grades 4-20']],
       ]);
       sound(r, 20);
     });
 
-    it('a table that fits a side still goes whole onto a continued side past the last side', () => {
+    it('past the last side, a table that fits a side starts in the room left and goes on onto a continued side', () => {
       const r = PH([[[c('header', 81)], [c('comment', 700)], [grades(20)]]]);
       expect(where(r)).toEqual([
-        ['side', 0, ['header', 'comment']],
-        ['continued', 0, ['grades']],
+        ['side', 0, ['header', 'comment', 'grades 0-4']],
+        ['continued', 0, ['grades 4-20']],
       ]);
+      sound(r, 20);
     });
 
     it('a row taller than a whole side prints alone, over, and the rest goes on', () => {
@@ -3147,13 +3128,12 @@ describe('report-sheets', () => {
   });
 });
 
-describe('report-studio-words', () => {
+describe('report-block-words', () => {
   /**
-   * Page Studio's words (step 4 group 3 #63): "to the Page 3", folder counts
-   * with no word for what they count, a Start of Term of "—" in the
-   * Proficiency table where Progress in One Area printed the first piece's
-   * level, a "Focus area (biggest change)" that changed 0.0, and "black" in
-   * lower case in the print dialog.
+   * The report blocks' words (step 4 group 3 #63, first found on the old
+   * Page Studio): a Start of Term of "—" in the Proficiency table where
+   * Progress in One Area printed the first piece's level, and a "Focus area
+   * (biggest change)" that changed 0.0.
    */
 
   const CID = 'studio-words';

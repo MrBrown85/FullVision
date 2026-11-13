@@ -238,11 +238,12 @@ jobs:
           fi
 
       # Playwright's --shard cuts the test list into contiguous blocks, which
-      # put all of report-studio.spec.js (half the run's time) in one shard:
-      # 4 minutes against 10 with two shards. Each shard takes every fourth
-      # test location (file:line) instead, so slow files split evenly. Tests
-      # made on one line (a loop) stay together. The count check fails the
-      # shard if its locations select more or fewer tests than the list holds.
+      # put a whole slow file in one shard (the old Page Studio spec, half
+      # the run's time: 4 minutes against 10 with two shards). Each shard
+      # takes every fourth test location (file:line) instead, so slow files
+      # split evenly. Tests made on one line (a loop) stay together. The
+      # count check fails the shard if its locations select more or fewer
+      # tests than the list holds.
       - name: Pick this shard's tests
         run: |
           set -euo pipefail

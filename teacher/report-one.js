@@ -963,7 +963,7 @@ window.ReportOne = (function () {
         });
       }),
     ];
-    var r = sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx, fill: true });
+    var r = sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx });
     var sides = r.sides;
     // The response slip docks at the foot of the last side of the report,
     // or on a side of its own when there is no room left there.
@@ -1062,11 +1062,7 @@ window.ReportOne = (function () {
       if (fbHtml) {
         html += _sideLabel(s, sheetCount, 'Feedback') + '</div>' + G().sideHtml(fbHtml, paper, 'side', s, 'fb-sheet');
       } else if (side) {
-        var prints =
-          side.pinned ||
-          side.rows.some(function (row) {
-            return !row.empty;
-          });
+        var prints = side.pinned || side.rows.length > 0;
         html +=
           _sideLabel(s, sheetCount, side.kind === 'after' ? 'After the Report' : '') +
           '</div><div class="report-sheet one-sheet' +

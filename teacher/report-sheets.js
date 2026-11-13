@@ -39,9 +39,6 @@ window.ReportSheets = (function () {
      Parent / Guardian Response and the student reflection are placed,
      never reworded (DECISIONS "Report forms" 5). */
   var GAP = 12;
-  // The Studio's box for a block that prints nothing (reports.css,
-  // .sheet-row-empty .sheet-cell min-height).
-  var EMPTY_PX = 30;
   var ROW_W = 720;
   var HALF_W = (ROW_W - GAP) / 2;
   /* One ruled line, from reports.css (.report-ruled repeats every 22px). */
@@ -158,7 +155,7 @@ window.ReportSheets = (function () {
         // 4 (DECISIONS, "Student-facing levels are proficiencies",
         // 2026-11-12): a Proficiency class prints the word whatever these
         // say, so neither is offered there; a Both class's Score is its %.
-        // hideIn and labelIn were read by Page Studio's inspector.
+        // One Report's panel reads hideIn and labelIn (ReportOne.optionsFor).
         { key: 'score', label: 'Score out of 4', def: true, hideIn: ['proficiency'], labelIn: { both: 'Percent' } },
         { key: 'word', label: 'Proficiency Word', def: 'auto', hideIn: ['proficiency', 'both'] },
         { key: 'change', label: 'Change', def: true },
@@ -738,9 +735,9 @@ window.ReportSheets = (function () {
 
   /* ── The rows engine (pure) ─────────────────────────────────────
      sides: the form's sides, each a list of rows, each a list of cells
-     { id, size, px, empty?, rows?, chrome? }: px is the height the
-     student's content takes at the cell's width (0 when the block prints
-     nothing), rows and chrome a table's row heights and the rest of it in
+     { id, size, px, rows?, chrome? }: px is the height the student's
+     content takes at the cell's width (One Report sends only the parts
+     that print something), rows and chrome a table's row heights and the rest of it in
      px. opts: { H (a side's height), gap, pinned (id), head (the px of
      the line naming the student at the top of every side after the
      Front) }. Every side but the Front keeps room for that line, so the
@@ -750,22 +747,18 @@ window.ReportSheets = (function () {
      the bottom of its side, and the gap above it is the side's limit. A
      row that passes the limit, and every row after it on that side, moves
      to a continued side inserted after it (for this student only).
-     Tables (Assignment Grades) go on side by side instead, so no side is
-     left blank: one that fits a side but not the room left here goes
-     whole onto the next side of the form (the Back), ahead of that side's
-     own rows, and the rows after it go with it; one taller than a whole
-     side (below the line, unless it fits where it is on the Front)
-     starts where it is, with as many of its rows as the room left there
-     holds, and goes on onto the next side of the form, then past the
-     last side onto continued sides. A row is never cut, and each part
+     Tables (a part with rows) go on side by side instead, so no side is
+     left with room a row would have filled: one that does not fit the
+     room left here starts where it is, with as many of its rows as that
+     room holds, and goes on onto the next side of the form, then past
+     the last side onto continued sides. A row is never cut, and each part
      repeats the table's title. Anything else taller than a side is held
      back and printed after the report, alone and over. Returns { sides:
      [{ rows: [{ y, h, cells: [{ id, size, h, part? }], carried? }],
      pinned?, passed?, kind: 'side' | 'continued' | 'after', from, head }],
      after: [id], continued: [id], over }; head is true on every side but
      the Front. A row is carried when it belongs to an earlier side of the
-     form, or is a table's second or later part (the Studio counts each
-     block once); a side is passed when the rest of it went on to the
+     form, or is a table's second or later part; a side is passed when the rest of it went on to the
      next side of the form. */
   function pack(sides, opts) {
     var H = opts.H;
@@ -777,18 +770,15 @@ window.ReportSheets = (function () {
     var top = opts.head ? opts.head + gap : 0;
     var full = H - top;
     var rowOf = function (cells, from) {
-      var live = cells.filter(function (c) {
-        return !c.empty;
-      });
       var h = Math.max.apply(
         null,
         [0].concat(
-          live.map(function (c) {
+          cells.map(function (c) {
             return c.px;
           }),
         ),
       );
-      return { h: h, cells: cells, live: live, from: from };
+      return { h: h, cells: cells, from: from };
     };
     var isTable = function (c) {
       return !!c.rows && c.rows.length > 1;
@@ -813,7 +803,7 @@ window.ReportSheets = (function () {
       var limit = H;
       var side = { rows: [], kind: 'side', from: s, head: s > 0 };
       out.push(side);
-      if (pin && pin.live.length) {
+      if (pin) {
         var cap = s > 0 ? full : H;
         var ph = Math.min(pin.h, cap);
         if (pin.h > cap) over = true;
@@ -830,13 +820,7 @@ window.ReportSheets = (function () {
         cur = { rows: [], kind: 'continued', from: s, head: true };
         out.push(cur);
         y = y0 = top;
-        shown = 0;
       };
-      // A block that prints nothing takes no room on paper, but the Studio
-      // shows it as a box with its name (reports.css, .sheet-row-empty). A
-      // table filling a side keeps room for those boxes, so its last rows
-      // are not pushed past the foot of the side on screen.
-      var shown = 0;
       var place = function (cells, h, from) {
         var row = { y: y, h: h, cells: cells };
         var carried =
@@ -860,7 +844,7 @@ window.ReportSheets = (function () {
       var flow = function (c, start, from) {
         while (start < c.rows.length) {
           var lim = cur === side ? limit : H;
-          var room = lim - y - shown - c.chrome - 1;
+          var room = lim - y - c.chrome - 1;
           var take = 0;
           var used = 0;
           while (start + take < c.rows.length && used + c.rows[start + take] <= room) {
@@ -868,7 +852,7 @@ window.ReportSheets = (function () {
             take++;
           }
           if (!take) {
-            if (y + shown > y0 || lim < H) {
+            if (y > y0 || lim < H) {
               // No room for a row here: the next side.
               if (!last) return start;
               turn();
@@ -900,22 +884,6 @@ window.ReportSheets = (function () {
           }
           continue;
         }
-        if (!r.live.length) {
-          // Nothing to print: the row keeps its place at no height, so the
-          // canvas can still show and select the block.
-          var none = {
-            y: y,
-            h: 0,
-            empty: true,
-            cells: r.cells.map(function (c) {
-              return { id: c.id, size: c.size, h: 0 };
-            }),
-          };
-          if (r.from !== s) none.carried = true;
-          cur.rows.push(none);
-          shown += EMPTY_PX + gap;
-          continue;
-        }
         // Fits a side: under the line, or where it is on the Front.
         var fits = function (h) {
           return h <= full || (cur === side && s === 0 && y + h <= limit);
@@ -927,7 +895,7 @@ window.ReportSheets = (function () {
           // by side; anything else prints after the report. A short partner
           // stays where it is, alone in the row, above the table.
           var short = [];
-          r.live.forEach(function (c) {
+          r.cells.forEach(function (c) {
             if (fits(c.px)) short.push(c);
             else if (isTable(c)) tables.push(c);
             else after.push(c);
@@ -935,31 +903,20 @@ window.ReportSheets = (function () {
           r = short.length ? rowOf(short, from) : null;
         }
         var lim = cur === side ? limit : H;
-        var lone = !!r && r.live.length === 1 && isTable(r.live[0]);
-        if (lone && y + shown + r.h > lim && (y + shown > y0 || cur === side)) {
-          // A table that fits a side but not the room left here goes whole
-          // onto the next side of the form (the Back), and the rows after
-          // it with it; past the last side, whole onto a continued side. One
-          // taller than a side (it fit the Front but for the Studio's boxes),
-          // or moved once and still too long for the room there (above a
-          // docked block), starts here and goes on.
-          // (One Report, opts.fill: a table always starts where it is and
-          // goes on, so no side ends with room a row would have filled.)
-          if (opts.fill || r.moved || r.h > full) {
-            tables.push(r.live[0]);
-            r = null;
-          } else if (!last) {
-            r.moved = true;
-            carry = [r].concat(queue.slice(i + 1));
-            break;
-          } else turn();
+        var lone = !!r && r.cells.length === 1 && isTable(r.cells[0]);
+        if (lone && y + r.h > lim && (y > y0 || cur === side)) {
+          // A table that does not fit the room left here starts where it is
+          // and goes on, so no side ends with room a row would have filled
+          // (One Report, DECISIONS "One Report" 2026-11-12, Parts flow).
+          tables.push(r.cells[0]);
+          r = null;
         }
         if (r) {
           // (A side with only a docked block above the limit continues
           // too: nothing fits above the block.)
           if (y + r.h > lim && (y > y0 || cur === side)) turn();
           place(
-            r.live.map(function (c) {
+            r.cells.map(function (c) {
               return { id: c.id, size: c.size, h: r.h };
             }),
             r.h,
@@ -1268,8 +1225,6 @@ window.ReportSheets = (function () {
 
   return {
     GAP: GAP,
-    ROW_W: ROW_W,
-    HALF_W: HALF_W,
     form: form,
     BLOCKS: BLOCKS,
     canHalf: canHalf,

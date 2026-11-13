@@ -2,7 +2,7 @@
  * Reports in a class that does not hold grades are what main prints
  * (student page build plan, S2-F1 and S2-F2).
  *
- * S2 puts Progress Reports, the Quick Report and its Feedback Pages, the
+ * S2 puts Progress Reports, the Assessments list and its Feedback Pages, the
  * rubric handout, the Term Questionnaire with Generate, and Sent to Phones
  * on returned grades, but only in a class that holds grades: its student
  * page on (the build switch) and Return Grades set to When I Return Them.

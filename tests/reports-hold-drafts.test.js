@@ -160,7 +160,7 @@ describe('reports in a class that holds grades', { timeout: 120000 }, () => {
       Object.keys(drawn).filter(k => names.indexOf(surfaceOf(k)) >= 0 && drawn[k].indexOf(needle) >= 0);
 
     const held = draw();
-    // Progress Reports, the Quick Report, its Feedback Pages and the rubric handout: nothing of a draft.
+    // Progress Reports, the Assessments list, the Feedback Pages and the rubric handout: nothing of a draft.
     expect(holding(held, ['progress', 'quick'], 'ZZDRAFT')).toEqual([]);
     expect(handoutTicks(cid, lab, cece)).not.toContain(added);
     expect(getRubricCheckIds(cid, cece, lab)).toContain(added);

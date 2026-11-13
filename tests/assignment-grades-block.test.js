@@ -1,12 +1,13 @@
 /**
- * The Progress Report's Assignment Grades block matches the Quick Report
+ * The Progress Report's Assignment Grades block matches the Assessments
+ * list (once the Quick Report)
  * (DECISIONS, "Student-facing levels are proficiencies", the Assignment
  * Grades block, 2026-11-12). Colin: "go with your recommendations on all
  * four".
  *
- * 1. A piece with no mark yet leaves its mark cell blank, as the Quick
- *    Report does: no dash.
- * 2. Points read "7 / 10", with spaces, as the Quick Report writes them.
+ * 1. A piece with no mark yet leaves its mark cell blank, as the
+ *    Assessments list does: no dash.
+ * 2. Points read "7 / 10", with spaces, as the Assessments list writes them.
  * 3. In a Proficiency or Both class a points piece prints no proficiency
  *    word beside its points (the word was only the band its points fall
  *    in). The points, and a Both class's %, are as scored.

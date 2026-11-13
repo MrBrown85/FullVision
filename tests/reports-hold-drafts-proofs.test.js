@@ -1,6 +1,6 @@
 /**
  * The review proofs for S2-F1 and S2-F2, kept (student page build plan):
- * Progress Reports, the Quick Report with its Feedback Pages, the rubric
+ * Progress Reports, the Assessments list with its Feedback Pages, the rubric
  * handout, the Term Questionnaire, Generate and the phone copies, in a class
  * that holds grades. Demo Mode's Science 8, graded through the one grader.
  *
@@ -9,7 +9,7 @@
  * and one before/after drawing of every surface, carry these proofs:
  *
  * 1 (S2-F1 1, S2-F2 U1) Every grade turned into a draft: Progress Reports,
- *   the Quick Report with its Feedback Pages, the handout, the questionnaire,
+ *   the Assessments list with its Feedback Pages, the handout, the questionnaire,
  *   Generate and every phone copy are what they were, and none holds a draft's
  *   words; Print Grades moves.
  * 2 (S2-F1 2, S2-F2 U2) Nothing kept from all-work readings (the grader's
@@ -237,7 +237,7 @@ describe('a holding class full of drafts', { timeout: 240000 }, () => {
     expect(
       Object.keys(afterNotes).filter(k => /ZZNOTED-[^"\\]*-(overall|crit|tag|beyond)/.test(afterNotes[k])),
     ).toEqual([]);
-    // Progress Reports and the Quick Report do not print notes.
+    // Progress Reports and the Assessments list do not print notes.
     expect(holding(afterNotes, 'ZZNOTED', ['progress', 'quick'])).toEqual([]);
     expect(moved(before, afterNotes).filter(k => surfaceOf(k) === 'progress' || surfaceOf(k) === 'quick')).toEqual([]);
   });
