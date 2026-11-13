@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /* One Report (teacher/report-one.js; DECISIONS, "One Report", 2026-11-12):
-   Progress Reports as one list of parts, behind ?onereport=1. Demo Mode's
-   Science 8. The student is picked by name: in One Student view the canvas
+   Progress Reports as one list of parts, the screen for every class. Demo
+   Mode's Science 8. The student is picked by name: in One Student view the canvas
    otherwise moves to whichever report the class fit finds longest, and
    that depends on the machine's fonts. */
 
@@ -30,7 +30,6 @@ async function openOne(page, setup, wide) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
   if (wide) await page.addStyleTag({ content: WIDE_FONT });
-  await page.evaluate(() => localStorage.setItem('fv-one-report', '1'));
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
@@ -162,16 +161,19 @@ test('leaving an assessment off the list changes the page and no grade', async (
   await expect(page.locator('#rb-preview .gr-term-grade')).toHaveText(before.grade);
 });
 
-test('with the switch off, Progress Reports is the screen it was', async ({ page }) => {
+test('a class opens straight on One Report, with no mode switch on the screen', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getStudents('sci8').length > 0);
-  await page.evaluate(() => localStorage.removeItem('fv-one-report'));
-  await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
-  await expect(page.locator('#studio')).toBeVisible();
-  await expect(page.locator('#studio.studio-one')).toHaveCount(0);
-  await expect(page.getByRole('radio', { name: 'Quick Report' })).toHaveAttribute('aria-checked', 'true');
+  await page.evaluate(r => window.Router.navigate(r), '/reports?course=sci8&tab=progress');
+  await expect(page.locator('#studio.studio-one')).toBeVisible();
+  await expect(page.locator('#studio-palette [data-action="oneSwitch"]').first()).toBeVisible();
+  for (const name of ['Quick Report', 'Custom']) await expect(page.getByRole('radio', { name })).toHaveCount(0);
+  await expect(page.locator('#tb-save-template')).toHaveCount(0);
+  await expect(page.locator('#report-sides')).toHaveCount(0);
+  expect(errors).toEqual([]);
 });
 
 /* The screen itself: the panel, the page's controls, the comment. */
