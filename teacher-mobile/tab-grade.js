@@ -3514,7 +3514,6 @@ window.MGrade = (function () {
     document.addEventListener('click', _holdClick, true);
 
     return {
-      showLevelSheet: showLevelSheet,
       renderSwiper: renderSwiper,
       setScore: setScore,
       setScoreMod: setScoreMod,
