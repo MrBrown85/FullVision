@@ -211,9 +211,6 @@ test('Progress Reports fits a phone', async ({ page }) => {
       const s = document.querySelector('#rb-preview .sheet-zoom .report-sheet').getBoundingClientRect();
       return s.left >= p.left - 0.5 && s.right <= p.right + 0.5;
     });
-  // TODO(one-report): app bug, reported: on a phone One Report draws the
-  // page wider than the canvas (408 px at 390 wide), so its right edge is
-  // cut off and this fails.
   await expect.poll(sheetIn).toBe(true);
   await expect(page.locator('.studio-tools [data-action="setPaper"]').first()).toBeVisible();
   await expect(page.locator('.studio-tools [data-action="studioView"]').first()).toBeVisible();

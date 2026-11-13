@@ -279,35 +279,66 @@ const sideKinds = student =>
 test.describe('A Page Studio form, read as parts', () => {
   test.setTimeout(120_000);
 
-  test('the parts print in the form’s order; the Response docks at the foot of the Back', async ({ page }) => {
+  /* A saved form opens as a Setup and flows as one list: its sides are
+     not kept (DECISIONS, "One Report", Parts flow). */
+  test('the parts print once each in the form’s order, flowing over the sides; the Response docks at the foot', async ({
+    page,
+  }) => {
     await openStudio(page);
-    // Attendance prints nothing in Demo Mode (none is entered), so Missing
-    // Work prints alone, across the page.
-    // TODO(one-report): Page Studio printed the form's sides as built: the
-    // Front ended at Missing Work and the Back held the Self-Assessment,
-    // Assignment Grades and the Response. One Report reads the sides as one
-    // list and flows it, so the Self-Assessment and the start of Assignment
-    // Grades move up onto the Front. Left failing until Colin rules which
-    // prints.
-    expect
-      .soft(await rowsOf(page, 0))
-      .toEqual(['header', 'proficiency', 'legend', 'teacher-narrative', 'missing-work']);
-    expect.soft(await rowsOf(page, 1)).toEqual(['self-assessment', 'grade-table', 'parent-response']);
-    const back = page.locator('#rb-preview .sheet-zoom[data-side="1"] .report-sheet');
-    await expect(back.locator('.sheet-pinned .report-parent-response')).toHaveCount(1);
-    const docked = await back.locator('.sheet-pinned').evaluate(el => {
+    const student = page.locator('#rb-preview .sheet-student').first();
+    // Each side's parts, in print order.
+    const sides = await student
+      .locator('.sheet-zoom')
+      .evaluateAll(zooms => zooms.map(z => [...z.querySelectorAll('.sheet-cell[data-part]')].map(c => c.dataset.part)));
+    // A part cut between sides runs on from one side to the next: taken
+    // once, the list is the form's order. Attendance prints nothing in
+    // Demo Mode (none is entered), so it is not on the page.
+    const flat = sides.flat().filter((k, i, a) => k !== a[i - 1]);
+    expect(flat).toEqual([
+      'header',
+      'proficiency',
+      'legend',
+      'teacher-narrative',
+      'missing-work',
+      'self-assessment',
+      'grade-table',
+      'parent-response',
+    ]);
+    // The list flows over the sides: the Front holds the form's Front and
+    // goes on into what the form put on the Back.
+    expect(sides.length).toBeGreaterThan(1);
+    expect(sides[0].slice(0, 5)).toEqual(['header', 'proficiency', 'legend', 'teacher-narrative', 'missing-work']);
+    expect(sides[0].length).toBeGreaterThan(5);
+    expect(sides[1].length).toBeGreaterThan(0);
+    expect(await overflowing(page)).toEqual([]);
+    // The Response docks at the foot of the report's last side.
+    const pinned = student.locator('.sheet-pinned');
+    await expect(pinned.locator('.report-parent-response')).toHaveCount(1);
+    const docked = await pinned.evaluate(el => {
       const body = el.closest('.sheet-body').getBoundingClientRect();
       return Math.round(body.bottom - el.getBoundingClientRect().bottom);
     });
     expect(Math.abs(docked)).toBeLessThanOrEqual(1);
-    await expect(back.locator('.sheet-pinned')).toContainText('I have reviewed this report with my child');
-    await expect(back.locator('.sheet-pinned')).toContainText(
+    await expect(pinned).toContainText('I have reviewed this report with my child');
+    await expect(pinned).toContainText(
       'Please review this report with your child and return this section to the school.',
     );
     // No running footer; no Page 1 of 2.
     await expect(page.locator('.sheet-footer')).toHaveCount(0);
-    // The saved form is read, never rewritten.
-    expect(await page.evaluate(() => 'one' in getReportConfig(getActiveCourse()))).toBe(false);
+    // The saved form is read, never rewritten: opening writes nothing, and a
+    // change writes only the model.
+    const saved = () => page.evaluate(() => getReportConfig(getActiveCourse()));
+    let now = await saved();
+    expect('one' in now).toBe(false);
+    expect(now.form).toEqual(STARTING_LAYOUT.form);
+    expect(now.progressMode).toBe('build');
+    await partSwitch(page, 'legend').click();
+    await expect(cellOf(page, 'legend')).toHaveCount(0);
+    now = await saved();
+    expect(now.one.parts).not.toContain('legend');
+    expect(now.form).toEqual(STARTING_LAYOUT.form);
+    expect(now.progressMode).toBe('build');
+    expect(now.preset).toBe('standard');
   });
 
   test('every student is one sheet and nothing overflows; a student in Everyone opens that student', async ({
@@ -535,8 +566,6 @@ test.describe('A Page Studio form, read as parts', () => {
     expect(right).toBeLessThanOrEqual(1100);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(400);
-    // TODO(one-report): app bug, reported: at 390 wide the page is drawn
-    // 408 px wide (816 px at zoom 0.5) and its right edge is cut off.
     const box = await page.locator('.report-sheet').first().boundingBox();
     expect(box.width).toBeLessThanOrEqual(390);
     await expect(page.locator('#studio-palette')).toBeHidden();
@@ -560,13 +589,16 @@ test.describe('A Page Studio form, read as parts', () => {
   });
 
   /* Rows (As Graded, Each Folder, Each Competency) is a long choice; its
-     buttons once squeezed onto one line and overlapped.
-     TODO(one-report): app bug, reported: in One Report's panel the three
-     Rows buttons are narrower than their labels at every width here
-     (Each Competency 83 px for 100 px of text) and run to the panel's
-     edge. */
+     buttons once squeezed onto one line and overlapped, then (in One
+     Report's panel) were narrower than their labels. They wrap onto two
+     lines instead. */
   test("Proficiency's choices in the panel do not overlap at 1440, 1280 and 1024 wide", async ({ page }) => {
     await openStudio(page);
+    // A fresh Report Card: one Rows choice is shown as chosen, As Graded.
+    await applySetup(page, 'report-card');
+    const rows = (await openOptions(page, 'proficiency')).getByRole('radiogroup', { name: 'Rows' });
+    await expect(rows.locator('[role="radio"][aria-checked="true"]')).toHaveCount(1);
+    await expect(rows.getByRole('radio', { name: 'As Graded' })).toHaveAttribute('aria-checked', 'true');
     for (const [width, height] of [
       [1440, 900],
       [1280, 800],
@@ -658,10 +690,9 @@ test.describe('The Quick Report’s choices, read as parts', () => {
     await openGrade(page);
     const sheet = page.locator('#rb-preview .report-sheet').first();
     await expect(sheet.locator('.report-student-name')).toHaveText(/\w+ \w+/);
-    // TODO(one-report): the Quick Report headed the title column
-    // "Assignment"; One Report's Assessments part heads it "Assessment".
-    // Left failing until Colin rules which prints.
-    await expect.soft(sheet.locator('.gr-head').first()).toContainText('Assignment');
+    // One Report heads the title column Assessment (it was Assignment).
+    await expect(sheet.locator('.gr-head').first()).toContainText('Assessment');
+    await expect(sheet.locator('.gr-head').first()).not.toContainText('Assignment');
     // Demo's Science 8 is a Proficiency class: one Result column, no Score
     // or Out Of, and the last line is Overall Proficiency (Colin, 2026-11-12).
     await expect(sheet.locator('.gr-head').first()).toContainText('Result');
@@ -681,16 +712,30 @@ test.describe('The Quick Report’s choices, read as parts', () => {
       .locator('#rb-preview .gr-row:not(.gr-head) .gr-c')
       .evaluateAll(cells => cells.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent));
     expect(cut).toEqual([]);
-    // The panel's buttons stay inside it.
-    const spill = await page.locator('#studio-palette').evaluate(pal => {
-      const edge = pal.getBoundingClientRect().right - parseFloat(getComputedStyle(pal).paddingRight);
-      return [...pal.querySelectorAll('button, label')]
-        .filter(
-          b => b.offsetParent && (b.getBoundingClientRect().right > edge + 0.5 || b.scrollWidth > b.clientWidth + 1),
-        )
-        .map(b => b.textContent.trim());
-    });
-    expect(spill).toEqual([]);
+    // The panel's buttons stay inside it and show their whole labels, once
+    // the options have opened. An open part's chevron is turned a quarter
+    // turn, which counts as overflow without cutting a word: it is measured
+    // unturned.
+    const spill = () =>
+      page.locator('#studio-palette').evaluate(pal => {
+        const edge = pal.getBoundingClientRect().right - parseFloat(getComputedStyle(pal).paddingRight);
+        const chevs = [...pal.querySelectorAll('.one-chev')];
+        chevs.forEach(c => {
+          c.style.transition = 'none';
+          c.style.transform = 'none';
+        });
+        const out = [...pal.querySelectorAll('button, label')]
+          .filter(
+            b => b.offsetParent && (b.getBoundingClientRect().right > edge + 0.5 || b.scrollWidth > b.clientWidth + 1),
+          )
+          .map(b => b.textContent.trim());
+        chevs.forEach(c => {
+          c.style.transform = '';
+          c.style.transition = '';
+        });
+        return out;
+      });
+    await expect.poll(spill).toEqual([]);
     await showEveryone(page);
     expect(await page.locator('.sheet-student[data-sheets="1"]').count()).toBe(STUDENTS);
     expect(await overflowing(page)).toEqual([]);
@@ -801,7 +846,9 @@ test.describe('The Quick Report’s choices, read as parts', () => {
     expect(await overflowing(page)).toEqual([]);
   });
 
-  test('a class saved with Term Comment on its Feedback Pages prints a Term Comment card', async ({ page }) => {
+  test('a class saved with Term Comment on its Feedback Pages prints the Teacher Comment part and no Term Comment card', async ({
+    page,
+  }) => {
     await openGrade(page);
     await page.evaluate(() => {
       const cid = getActiveCourse();
@@ -821,13 +868,16 @@ test.describe('The Quick Report’s choices, read as parts', () => {
     await expect(
       page.locator(`.sheet-student[data-sid="${withTerm.sid}"] .sheet-cell[data-part="teacher-narrative"]`).first(),
     ).toContainText(withTerm.term.split('\n')[0].slice(0, 40));
-    // TODO(one-report): the Quick Report printed the comment as a "Term
-    // Comment" card, last on the Feedback Pages; One Report prints it as the
-    // Teacher Comment part on the report and has no Term Comment card.
-    // Left failing until Colin rules which prints.
-    await expect
-      .soft(page.locator(`.sheet-student[data-sid="${withTerm.sid}"] .fb-card.fb-term`).first())
-      .toContainText(withTerm.term.split('\n')[0].slice(0, 40));
+    expect(
+      await page.evaluate(
+        () => getReportConfig(getActiveCourse()) && ReportOne.modelFor(getReportConfig(getActiveCourse())).parts,
+      ),
+    ).toContain('teacher-narrative');
+    // The Feedback Pages print, with no Term Comment card for anyone.
+    await expect(page.locator('.fb-sheet').first()).toBeVisible();
+    await expect(page.locator('.fb-card.fb-term')).toHaveCount(0);
+    const titles = await page.locator('.fb-card .fb-title').allTextContents();
+    expect(titles.filter(t => t.startsWith('Term Comment'))).toEqual([]);
   });
 
   test('a long Observations card splits between entries, its title repeated with (continued)', async ({ page }) => {
@@ -943,13 +993,9 @@ test.describe('The Quick Report’s choices, read as parts', () => {
         list.map(c => [c.querySelector('.fb-num')?.textContent || '', c.querySelector('.fb-title').textContent]),
       );
     expect(cards.length).toBeGreaterThan(3);
-    // TODO(one-report): the Quick Report, with Assignment Numbers on,
-    // numbered each card with its row's number; One Report numbers the
-    // Assessments rows but prints the cards with no number. Left failing
-    // until Colin rules which prints.
     for (const [n, title] of cards) {
-      expect.soft(n).not.toBe('');
-      expect.soft(rows[n]).toBe(title.replace(/ \(continued\)$/, ''));
+      expect(n).not.toBe('');
+      expect(rows[n]).toBe(title.replace(/ \(continued\)$/, ''));
     }
     // In the list's order.
     const order = cards.map(([n]) => Number(n));

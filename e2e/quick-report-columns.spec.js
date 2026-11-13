@@ -81,17 +81,15 @@ async function printedRows(page) {
 }
 
 for (const wide of [false, true]) {
-  test(`a Proficiency class prints Date, Assignment, Category and Result, the summary and Overall Proficiency${
+  test(`a Proficiency class prints Date, Assessment, Category and Result, the summary and Overall Proficiency${
     wide ? ', in a wider font' : ''
   }`, async ({ page }) => {
     test.setTimeout(60_000);
     const { sheet, marked, errors } = await openQuickReportFor(page, wide);
 
     const head = await sheet.locator('.gr-table .gr-head').first().locator('.gr-c').allTextContents();
-    // TODO(one-report): One Report's Assessments part heads this column
-    // "Assessment" (GradeReport.listPart's titleHead); the Quick Report
-    // printed "Assignment". Left failing until Colin rules which prints.
-    expect.soft(head).toEqual(['Date', 'Assignment', 'Category', 'Result', '']);
+    // One Report heads the title column Assessment (it was Assignment).
+    expect(head).toEqual(['Date', 'Assessment', 'Category', 'Result', '']);
     await expect(page.locator('#rb-preview .gr-table .gr-head')).not.toContainText(['Score']);
 
     const rows = await printedRows(page);
@@ -125,11 +123,16 @@ for (const wide of [false, true]) {
     expect(sum).toEqual(['Category', 'Assessments', 'Proficiency']);
     await expect(page.locator('.gr-term > span').first()).toHaveText('Overall Proficiency');
     await expect(page.locator('.gr-term-grade')).toHaveText(LEVEL);
-    // TODO(one-report): the Quick Report printed "Missing Assignments: 1"
-    // under the grade; One Report prints its Missing Work part instead
-    // ("Missing Work", the piece's title, "As of <date>"). Left failing
-    // until Colin rules which prints.
-    await expect.soft(page.locator('#rb-preview .gr-facts')).toHaveText('Missing Assignments: 1');
+    // His one Missing piece: no "Missing Assignments" line under the grade;
+    // the Missing Work part names it, as of today.
+    await expect(page.locator('#rb-preview .gr-facts')).toHaveCount(0);
+    const missing = rows.filter(r => r.missing);
+    expect(missing).toHaveLength(1);
+    const strip = page.locator('#rb-preview .sheet-cell[data-part="missing-work"] .report-missing-work');
+    await expect(strip).toHaveCount(1);
+    await expect(strip.locator('.report-strip-title')).toHaveText('Missing Work');
+    await expect(strip.locator('.report-strip-title + span')).toHaveText(missing[0].title);
+    await expect(strip.locator('.report-strip-meta')).toHaveText(/^As of [A-Z][a-z]{2}\.? \d{1,2}, \d{4}$/);
 
     // It still fits: one sheet, nothing cut off in a cell, nothing past the page.
     await expect(page.locator('.sheet-student .sheet-badge')).toHaveText('1 sheet');
@@ -145,15 +148,20 @@ for (const wide of [false, true]) {
   });
 }
 
-/* Nothing is cut off in a wider font, in any of the list's layouts: every
-   Demo student's Assessments in a Proficiency, Both and Letter class, on
-   Letter and Legal paper, with and without Numbers; and the first three
-   students' with the class's work listed up to four times over, so the
-   list carries on over more sides. A cell is cut off when its text is
-   wider than the cell. The Assessment column is the one that gives way
-   (its titles print on two lines, then end in "…"), so it is left out
-   here. */
-test('in a wider font no cell is cut off, in every layout and grading style', async ({ page }) => {
+/* A long list stays at the regular size in one column and carries on at
+   the top of the next side, its column headings repeated; nothing shrinks
+   and nothing is cut off (One Report; the Quick Report shrank its type and
+   went to two columns instead). Every Demo student's Assessments in a
+   Proficiency, Both and Letter class, on Letter and Legal paper, with and
+   without Numbers; and the first three students' with the class's work
+   listed up to four times over (the copies as new assessments, with no
+   marks). Every assessment prints once, in the list's order. A cell is cut
+   off when its text is wider than the cell. The Assessment column is the
+   one that gives way (its titles print on two lines, then end in "…"), so
+   it is left out of that check. */
+test('a long list carries on at the regular size, every row once, in a wider font with no cell cut off', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -173,6 +181,10 @@ test('in a wider font no cell is cut off, in every layout and grading style', as
     document.body.appendChild(host);
     const cut = [];
     const tiers = {};
+    const heads = [];
+    const split = [];
+    const order = [];
+    let carried = 0;
     let pages = 0;
     let sides = 0;
     try {
@@ -181,9 +193,11 @@ test('in a wider font no cell is cut off, in every layout and grading style', as
         for (const times of [1, 1.5, 1.75, 2, 2.25, 2.5, 3, 4]) {
           window.getAssessments = c => {
             const list = own(c);
-            return c === cid
-              ? [].concat(...Array(Math.ceil(times)).fill(list)).slice(0, Math.round(list.length * times))
-              : list;
+            if (c !== cid) return list;
+            const copies = [];
+            for (let k = 0; k < Math.ceil(times); k++)
+              list.forEach(a => copies.push(k ? Object.assign({}, a, { id: a.id + '-copy' + k }) : a));
+            return copies.slice(0, Math.round(list.length * times));
           };
           for (const paper of ['letter', 'legal']) {
             for (const numbers of [false, true]) {
@@ -192,17 +206,36 @@ test('in a wider font no cell is cut off, in every layout and grading style', as
               const preview = document.createElement('div');
               preview.className = 'report-fitmap';
               host.appendChild(preview);
+              const students = getStudents(cid).slice(0, times === 1 ? undefined : 3);
+              const m = model(numbers);
               ReportSheets.renderPreview({
                 preview,
                 paper,
                 cid,
-                students: getStudents(cid).slice(0, times === 1 ? undefined : 3),
+                students,
                 ctx: ReportBlocks.reportContext(),
-                layout: ReportOne.layoutWith(model(numbers)),
+                layout: ReportOne.layoutWith(m),
               });
+              const where = [mode, times, paper, numbers ? 'numbers' : 'no numbers'].join(' | ');
+              // Regular type, one column: no smaller size, no split table.
               preview.querySelectorAll('.gr-table').forEach(t => {
                 const tier = [...t.classList].find(c => c !== 'gr-table').slice(3);
-                tiers[mode + ' ' + tier] = true;
+                tiers[tier] = true;
+                // Each piece of the list has its column headings.
+                if (t.querySelectorAll(':scope > .gr-head').length !== 1) heads.push(where);
+              });
+              if (preview.querySelector('.gr-split')) split.push(where);
+              students.forEach(st => {
+                const el = preview.querySelector('.sheet-student[data-sid="' + st.id + '"]');
+                const printed = [...el.querySelectorAll('.sheet-cell[data-part="assessments"] .gr-row[data-row]')].map(
+                  r => r.dataset.row,
+                );
+                const listed = ReportOne.rowsOf(m, 'assessments', cid, st, ReportBlocks.reportContext()).map(
+                  r => r.key,
+                );
+                if (printed.join('|') !== listed.join('|')) order.push(where + ' | ' + displayNameWithLast(st));
+                const pieces = el.querySelectorAll('.sheet-cell[data-part="assessments"]').length;
+                if (pieces > 1) carried++;
               });
               preview.querySelectorAll('.gr-row .gr-c:not(.gr-title)').forEach(c => {
                 if (c.scrollWidth > c.clientWidth + 1) cut.push([mode, paper, c.className, c.textContent].join(' | '));
@@ -222,17 +255,26 @@ test('in a wider font no cell is cut off, in every layout and grading style', as
       host.remove();
       ReportSheets.clearPageStyle && ReportSheets.clearPageStyle();
     }
-    return { cut: [...new Set(cut)], tiers: Object.keys(tiers).sort(), over: pages, sides };
+    return {
+      cut: [...new Set(cut)],
+      tiers: Object.keys(tiers).sort(),
+      heads: [...new Set(heads)],
+      split: [...new Set(split)],
+      order,
+      carried,
+      over: pages,
+      sides,
+    };
   });
   expect(found.sides).toBeGreaterThan(0);
   expect(found.cut).toEqual([]);
-  // TODO(one-report): the Quick Report dropped to small type and then to
-  // two columns of rows to keep a long list on one sheet; One Report's
-  // Assessments part prints at the regular size in one column and carries
-  // on over the next side (DECISIONS, "One Report", Parts flow). Left
-  // failing until Colin rules which prints.
-  for (const mode of ['proficiency', 'both', 'letter'])
-    for (const tier of ['regular', 'small', 'two']) expect.soft(found.tiers).toContain(mode + ' ' + tier);
+  // The regular size on every side, in one column, headings on each piece.
+  expect(found.tiers).toEqual(['regular']);
+  expect(found.split).toEqual([]);
+  expect(found.heads).toEqual([]);
+  // Every assessment once, in the list's order; the long lists carried on.
+  expect(found.order).toEqual([]);
+  expect(found.carried).toBeGreaterThan(0);
   expect(found.over).toBe(0);
   expect(errors).toEqual([]);
 });
