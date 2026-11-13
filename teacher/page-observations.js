@@ -35,6 +35,10 @@ window.PageObservations = (function () {
   var _students = [];
   var _studentsById = {};
 
+  // The feed shows the newest 50 that pass the filters; Show More adds 50; a search or filter starts over.
+  var FEED_STEP = 50;
+  var _feedLimit = FEED_STEP;
+
   /* ── Focus card state ───────────────────────────────────── */
   var _focusObId = null;
   var _focusSid = null;
@@ -122,6 +126,7 @@ window.PageObservations = (function () {
     filterAssessment = null;
     filterQuoted = null;
     searchQuery = '';
+    _feedLimit = FEED_STEP;
   }
 
   /* ── Course switch ──────────────────────────────────────── */
@@ -160,7 +165,9 @@ window.PageObservations = (function () {
             // Click picks the student; shift-click adds them to the group.
             _capture.pickStudent(sid, e.shiftKey);
             filterStudents = _capture.getStudents();
-            render();
+            syncPopoverChecks('filter-student-dropdown', filterStudents, 'data-sid');
+            refreshFilterStrip();
+            refilter();
             document.querySelectorAll('.student-row').forEach(function (r) {
               var rid = new URLSearchParams((r.getAttribute('data-href') || '').split('?')[1] || '').get('id');
               r.classList.toggle('selected', filterStudents.indexOf(rid) >= 0);
@@ -181,8 +188,9 @@ window.PageObservations = (function () {
     h += '<div class="obs-capture-host" id="obs-capture-host"></div>';
 
     // Toolbar
-    var allObs = visibleObs(getAllQuickObs(activeCourse));
-    var filtered = applyFilters(allObs);
+    feedChanged();
+    var data = feedData();
+    var filtered = applyFilters(data.obs);
 
     // Search, filter chips and count, one row
     h +=
@@ -196,12 +204,12 @@ window.PageObservations = (function () {
       renderFilterRow() +
       '</div>' +
       '<span class="obs-toolbar-count" id="obs-count">' +
-      countText(filtered.length, allObs.length) +
+      countText(filtered.length, data.obs.length) +
       '</span>' +
       '</div>';
 
     // Feed
-    h += '<div class="obs-feed" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
+    h += '<div class="obs-feed" id="obs-feed">' + renderFeedHtml(filtered, data) + '</div>';
 
     // html-safe: the search text is escaped; renderFilterRow's chips and popovers escape every name and label; counts are numbers.
     document.getElementById('main').innerHTML = h;
@@ -436,13 +444,30 @@ window.PageObservations = (function () {
     return total + ' observation' + (total === 1 ? '' : 's');
   }
 
+  // After the observations changed (added, edited, deleted, Undo).
   function refreshFeedAndCount() {
-    var allObs = visibleObs(getAllQuickObs(activeCourse));
-    var filtered = applyFilters(allObs);
+    feedChanged();
+    showFeed();
+  }
+  // After a search or a filter: the same observations, the newest first again.
+  function refilter() {
+    _feedLimit = FEED_STEP;
+    showFeed();
+  }
+  function showFeed() {
+    var data = feedData();
+    var filtered = applyFilters(data.obs);
     var feedEl = document.getElementById('obs-feed');
-    if (feedEl) feedEl.innerHTML = renderFeedHtml(filtered);
+    if (feedEl) feedEl.innerHTML = renderFeedHtml(filtered, data);
     var countEl = document.getElementById('obs-count');
-    if (countEl) countEl.textContent = countText(filtered.length, allObs.length);
+    if (countEl) countEl.textContent = countText(filtered.length, data.obs.length);
+  }
+  function showMore() {
+    var at = _feedLimit;
+    _feedLimit += FEED_STEP;
+    showFeed();
+    var next = document.querySelectorAll('#obs-feed .obs-card')[at];
+    if (next && typeof next.focus === 'function') next.focus();
   }
 
   /* Updates chip labels, option checks and the Clear button in place, so an
@@ -507,7 +532,7 @@ window.PageObservations = (function () {
       }
       if (next === 'custom') {
         refreshFilterStrip();
-        refreshFeedAndCount();
+        refilter();
         var from = document.getElementById('filter-date-from');
         if (from) from.focus();
         return;
@@ -515,7 +540,7 @@ window.PageObservations = (function () {
     }
     closeAllPopovers();
     refreshFilterStrip();
-    refreshFeedAndCount();
+    refilter();
   }
 
   function setCustomDate(which, value) {
@@ -523,7 +548,7 @@ window.PageObservations = (function () {
     else filterDateTo = value || '';
     filterDate = filterDateFrom || filterDateTo ? 'custom' : filterDate;
     refreshFilterStrip();
-    refreshFeedAndCount();
+    refilter();
   }
 
   /* ── Apply filters ──────────────────────────────────────── */
@@ -531,10 +556,6 @@ window.PageObservations = (function () {
     return allObs.filter(function (o) {
       return !_pendingDeletes[o.id];
     });
-  }
-
-  function assessmentTitle(ob) {
-    return Card.assessmentTitle(activeCourse, ob);
   }
 
   function dateBounds() {
@@ -582,36 +603,61 @@ window.PageObservations = (function () {
     }
     if (searchQuery) {
       var q = searchQuery.toLowerCase();
+      var hay = (_feed && _feed.hay) || {};
       f = f.filter(function (o) {
-        var sn = _studentsById[o.studentId] ? displayName(_studentsById[o.studentId]) : '';
-        if ((o.text || '').toLowerCase().includes(q) || sn.toLowerCase().includes(q)) return true;
-        var tagHit = (o.dims || []).some(function (t) {
-          return String(resolveTag(t).label || '')
-            .toLowerCase()
-            .includes(q);
-        });
-        if (tagHit) return true;
-        var ctx = o.context && OBS_CONTEXTS[o.context];
-        if (ctx && ctx.label.toLowerCase().includes(q)) return true;
-        return assessmentTitle(o).toLowerCase().includes(q);
+        var k = o.studentId + '|' + o.id;
+        return (hay[k] != null ? hay[k] : (hay[k] = searchText(o))).indexOf(q) >= 0;
       });
     }
     return f;
   }
 
-  /* ── Feed HTML ──────────────────────────────────────────── */
-  function feedContext() {
-    return Card.context(activeCourse, { hidden: _pendingDeletes });
+  /* What a search looks in, lower case, a field to a line (a search holds no
+     line break): note, name, tags, context, linked assessment. */
+  function searchText(o) {
+    var sn = _studentsById[o.studentId] ? displayName(_studentsById[o.studentId]) : '';
+    var ctx = o.context && OBS_CONTEXTS[o.context];
+    return [o.text || '', sn]
+      .concat(
+        (o.dims || []).map(function (t) {
+          return String(resolveTag(t).label || '');
+        }),
+        ctx ? ctx.label : '',
+        Card.assessmentTitle(activeCourse, o),
+      )
+      .join('\n')
+      .toLowerCase();
   }
 
-  function renderObsCardHtml(ob, ctx) {
-    return Card.html(ob, ctx || feedContext());
+  /* ── Feed HTML ──────────────────────────────────────────── */
+  /* The observations (less those waiting on Undo), the cards' context and
+     the search text, made once per change (feedChanged, or a new list or
+     length from a sync), so a search or a filter only filters. */
+  var _feed = null;
+  function feedChanged() {
+    _feed = null;
+  }
+  function feedData() {
+    var byStudent = getQuickObs(activeCourse) || {};
+    var n = 0;
+    for (var sid in byStudent) n += (byStudent[sid] || []).length;
+    if (_feed && _feed.cid === activeCourse && _feed.of === byStudent && _feed.n === n) return _feed;
+    var every = getAllQuickObs(activeCourse);
+    _feed = {
+      cid: activeCourse,
+      of: byStudent,
+      n: n,
+      obs: visibleObs(every),
+      ctx: Card.context(activeCourse, { hidden: _pendingDeletes, all: every }),
+      hay: {},
+    };
+    return _feed;
   }
 
   // html-safe: day labels go through ObsCard.dayHeaderHtml's esc; ObsCard.html escapes names, text, tags and titles.
-  function renderFeedHtml(filtered) {
+  function renderFeedHtml(filtered, data) {
     if (filtered.length === 0) {
-      var n = visibleObs(getAllQuickObs(activeCourse)).length;
+      var n = data.obs.length;
       return (
         '<div class="obs-empty"><div class="obs-empty-title">' +
         (n === 0 ? 'No observations yet' : 'No matching observations') +
@@ -620,22 +666,21 @@ window.PageObservations = (function () {
         '</div></div>'
       );
     }
+    // A day's heading counts all of its observations, shown or not yet.
     var groups = {};
-    filtered.forEach(function (ob) {
+    var shown = {};
+    filtered.forEach(function (ob, i) {
       var d = ob.date || ob.created.slice(0, 10);
       (groups[d] = groups[d] || []).push(ob);
+      if (i < _feedLimit) (shown[d] = shown[d] || []).push(ob);
     });
     var today = getTodayStr();
-    var yd = (function () {
-      var d = new Date();
-      d.setDate(d.getDate() - 1);
-      return (
-        d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-      );
-    })();
-    var ctx = feedContext();
+    var y = new Date();
+    y.setDate(y.getDate() - 1);
+    var yd = _ymd(y);
+    var ctx = data.ctx;
     var out = '';
-    Object.keys(groups)
+    Object.keys(shown)
       .sort(function (a, b) {
         return b.localeCompare(a);
       })
@@ -651,11 +696,18 @@ window.PageObservations = (function () {
                   day: 'numeric',
                 });
         out += '<div class="obs-feed-date-group">' + Card.dayHeaderHtml(lbl, groups[ds].length);
-        groups[ds].forEach(function (ob) {
-          out += renderObsCardHtml(ob, ctx);
+        shown[ds].forEach(function (ob) {
+          out += Card.html(ob, ctx);
         });
         out += '</div>';
       });
+    if (filtered.length > _feedLimit)
+      out +=
+        '<div class="obs-feed-more"><span>Showing the newest ' +
+        _feedLimit +
+        ' of ' +
+        filtered.length +
+        '.</span> <button type="button" class="btn btn-ghost" data-action="obsShowMore">Show More</button></div>';
     return out;
   }
 
@@ -706,7 +758,7 @@ window.PageObservations = (function () {
     else filterStudents.push(sid);
     syncPopoverChecks('filter-student-dropdown', filterStudents, 'data-sid');
     refreshFilterStrip();
-    refreshFeedAndCount();
+    refilter();
   }
 
   /* ── Filter strip: tags ─────────────────────────────────── */
@@ -716,7 +768,7 @@ window.PageObservations = (function () {
     else filterTags.push(key);
     syncPopoverChecks('filter-tag-dropdown', filterTags, 'data-tag');
     refreshFilterStrip();
-    refreshFeedAndCount();
+    refilter();
   }
 
   /* ── Shared popover helpers ─────────────────────────────── */
@@ -756,7 +808,7 @@ window.PageObservations = (function () {
     closeAllPopovers();
     var strip = document.getElementById('obs-filter-strip');
     if (strip) strip.innerHTML = renderFilterRow();
-    refreshFeedAndCount();
+    refilter();
   }
 
   function wireSearch() {
@@ -767,7 +819,7 @@ window.PageObservations = (function () {
         var val = e.target.value;
         _searchDebounce = setTimeout(function () {
           searchQuery = val;
-          refreshFeedAndCount();
+          refilter();
         }, 120);
       });
   }
@@ -1255,6 +1307,9 @@ window.PageObservations = (function () {
       },
       clearAllFilters: function () {
         clearAllFilters();
+      },
+      obsShowMore: function () {
+        showMore();
       },
       deleteOb: function () {
         deleteOb(el.dataset.sid, el.dataset.obid);

@@ -244,7 +244,8 @@ window.ObsCard = (function () {
   }
 
   /* opts.hidden: obId → truthy for observations the list is hiding (a
-     delete waiting on its Undo toast); they do not count as "with …". */
+     delete waiting on its Undo toast); they do not count as "with …".
+     opts.all: getAllQuickObs(cid), when the caller has it already. */
   function context(cid, opts) {
     opts = opts || {};
     var hidden = opts.hidden || {};
@@ -257,7 +258,7 @@ window.ObsCard = (function () {
       quoted: quotedIndex(getTermRatings(cid)),
       hasTerms: getReportingTerms(cid).length > 0,
       sameCapture: sameCaptureIndex(
-        getAllQuickObs(cid).filter(function (o) {
+        (opts.all || getAllQuickObs(cid)).filter(function (o) {
           return !hidden[o.id];
         }),
       ),
