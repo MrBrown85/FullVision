@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { catchPrints, heldAnywhere, sheets } from './student-card-fake.js';
+import { catchPrints, heldAnywhere, holds, sheets } from './student-card-fake.js';
 import { notAdded } from '../tests/helpers/kept-secret.js';
 
 // S0-W1 and S3-W1: the Student Cards list in Class Settings › Student Page,
@@ -154,8 +154,8 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
   const kept = await heldAnywhere(page);
   for (const code of sheet.codes) {
     expect(shownText).not.toContain(code);
-    expect(kept).not.toContain(code);
-    expect(kept).not.toContain(code.replace('-', ''));
+    expect(holds(kept, code)).toBe(false);
+    expect(holds(kept, code.replace('-', ''))).toBe(false);
   }
   // A password is four digits, which the device already holds by the hundred: found no more often than before.
   for (const password of sheet.passwords) {
@@ -237,8 +237,8 @@ async function noCodeKept(page, printed, keptBefore) {
   for (const sheet of printed) {
     for (const code of sheet.codes) {
       expect(shownText).not.toContain(code);
-      expect(kept).not.toContain(code);
-      expect(kept).not.toContain(code.replace('-', ''));
+      expect(holds(kept, code)).toBe(false);
+      expect(holds(kept, code.replace('-', ''))).toBe(false);
     }
     for (const password of sheet.passwords) {
       expect(shownText).not.toContain(password);

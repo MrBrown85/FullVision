@@ -202,6 +202,15 @@ export function heldAnywhere(page, skip = []) {
   }, skip);
 }
 
+/* True when `kept` (heldAnywhere's text) holds `code` as a value of its own:
+   no other digit or hex letter sits beside it. Passwords are random 4-digit
+   numbers, so a plain contains check matched `0891` inside the Science
+   colour `#0891b2` by chance. */
+export function holds(kept, code) {
+  const safe = String(code).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(?<![0-9a-fA-F])' + safe + '(?![0-9a-fA-F])').test(kept);
+}
+
 /* Print with the dialog held shut: what is on the sheet each time it would
    be open, in window.__sheets. */
 export function catchPrints(page) {
