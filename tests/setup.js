@@ -235,6 +235,7 @@ load('shared/reporting-term-presets.js');
 load('shared/data-utilities.js');
 load('shared/data.js');
 load('shared/data-roster.js');
+load('shared/data-withdrawn.js');
 load('shared/data-observations.js');
 load('shared/data-term-ratings.js');
 load('shared/data-student-records.js');

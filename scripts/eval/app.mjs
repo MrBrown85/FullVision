@@ -46,6 +46,7 @@ const FILES = [
   'shared/data-utilities.js',
   'shared/data.js',
   'shared/data-roster.js',
+  'shared/data-withdrawn.js',
   'shared/data-observations.js',
   'shared/data-term-ratings.js',
   'shared/data-student-records.js',
