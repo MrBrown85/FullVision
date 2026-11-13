@@ -249,9 +249,75 @@ const PRECACHE_FINGERPRINTS = null;
 // cache that has it is complete.
 const FINGERPRINTS_KEY = '/__sw-precache-fingerprints.json';
 
-function downloadAll(cache, urls) {
-  // addAll fails, and stores nothing, if any download fails or is not a 200.
-  return cache.addAll(urls.map(url => new Request(url, { cache: 'reload' })));
+// Whether a response's Content-Type fits the address it answered. The host
+// can answer a script's address with an HTML error, sign-in or quota page and
+// status 200; keeping that would break the app until the next release. Only
+// the media type is compared (no "; charset="), in any case. A missing type is
+// refused for scripts, stylesheets and pages, and accepted for the rest. An
+// address of a kind not listed here is accepted.
+function typeFitsAddress(address, contentType) {
+  const url = new URL(address, self.location.origin);
+  const ext = (url.pathname.match(/\.([a-z0-9]+)$/i) || [])[1];
+  const type = (contentType || '').split(';')[0].trim().toLowerCase();
+  if (ext === undefined) {
+    // A page route (the app shell's addresses, "/" or a folder) is a page.
+    return isAppRoute(url) || url.pathname.endsWith('/') ? type === 'text/html' : true;
+  }
+  switch (ext.toLowerCase()) {
+    case 'js':
+    case 'mjs':
+      return /^(text|application)\/(x-)?(java|ecma)script$/.test(type);
+    case 'css':
+      return type === 'text/css';
+    case 'html':
+      return type === 'text/html';
+    case 'json':
+      return !type || /^application\/(.+\+)?json$/.test(type);
+    case 'svg':
+      return !type || type === 'image/svg+xml';
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'webp':
+    case 'gif':
+    case 'avif':
+    case 'ico':
+      return !type || type.startsWith('image/');
+    case 'woff':
+    case 'woff2':
+    case 'ttf':
+    case 'otf':
+      return (
+        !type ||
+        /^(font\/|application\/(x-)?font|application\/vnd\.ms-fontobject$|application\/octet-stream$)/.test(type)
+      );
+    default:
+      return true;
+  }
+}
+
+// A response fit to keep for this address: OK, and a type that fits it. Logs
+// one warning naming the address and the type received when it does not.
+function isFitToKeep(response, address) {
+  if (!response || !response.ok) return false;
+  const type = response.headers.get('Content-Type');
+  if (typeFitsAddress(address, type)) return true;
+  console.warn('Service worker: not keeping ' + address + '. It answered with ' + (type || 'no type') + '.');
+  return false;
+}
+
+async function downloadAll(cache, urls) {
+  // Like addAll, nothing is stored if any download fails or is not a 200. It
+  // also fails on a type that does not fit, so this version never takes over
+  // with a page where a script should be and the previous one keeps working.
+  const responses = await Promise.all(
+    urls.map(async url => {
+      const response = await fetch(new Request(url, { cache: 'reload' }));
+      if (!isFitToKeep(response, url)) throw new Error('Service worker: ' + url + ' is not the file it should be.');
+      return response;
+    }),
+  );
+  await Promise.all(responses.map((response, i) => cache.put(urls[i], response)));
 }
 
 async function sha256(buffer) {
@@ -301,7 +367,7 @@ async function keepUnchanged(cache, sources, url) {
     if (source.files[url] !== want) continue;
     try {
       const stored = await source.cache.match(url);
-      if (!isWholeCopy(stored, url)) continue;
+      if (!isWholeCopy(stored, url) || !isFitToKeep(stored, url)) continue;
       // The copy put in the cache is the same stream as the bytes hashed.
       const copy = stored.clone();
       if ((await sha256(await stored.arrayBuffer())) !== want) continue;
@@ -358,6 +424,9 @@ self.addEventListener('activate', event => {
 // error offline, or until the next deploy.
 function cacheIfGood(request, response) {
   if (!response || !response.ok || response.type !== 'basic') return;
+  // The page still gets what the host sent; the cache does not keep a type
+  // that does not fit the address.
+  if (!isFitToKeep(response, response.url || (typeof request === 'string' ? request : request.url))) return;
   const clone = response.clone();
   caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
 }
