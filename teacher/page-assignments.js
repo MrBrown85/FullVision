@@ -7955,22 +7955,6 @@ window.PageAssignments = (function () {
     });
   }
 
-  function selectScore(el, value) {
-    var group = el.parentElement;
-    var cid = activeCourse;
-    var sid = group.dataset.student;
-    var aid = group.dataset.assess;
-    var tagId = group.dataset.tag;
-    var wasActive = el.classList.contains('active');
-    var next = wasActive ? 0 : value;
-    Grader.setLevel(cid, sid, aid, tagId, next);
-    group.querySelectorAll('.score-opt').forEach(function (o) {
-      o.classList.remove('active');
-    });
-    if (!wasActive) el.classList.add('active');
-    refreshSidebarGrades(sid);
-  }
-
   /* ── Bulk scoring ───────────────────────────────────────── */
   function closeMenus() {
     document.querySelectorAll('.col-fill-menu').forEach(function (m) {

@@ -91,7 +91,6 @@ window.RubricChecks = (function () {
   }
 
   return {
-    LEVELS: LEVELS,
     checksAt: checksAt,
     hasChecks: hasChecks,
     suggestedLevel: suggestedLevel,

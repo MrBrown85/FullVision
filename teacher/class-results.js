@@ -1886,6 +1886,5 @@ window.ClassResults = (function () {
     setPage: setPage,
     cardHtml: cardHtml,
     assessmentObservations: assessmentObservations,
-    otherClassesResults: otherClassesResults,
   };
 })();
