@@ -371,20 +371,14 @@ export async function quiet(page, maxMs = 20000) {
   }
 }
 
-/* Look for `fn` (run in the page) to answer true, moving the clock 50 ms
-   between looks, `ticks` times at most. The clock always ends `ticks` moves
-   on, found or not and however long the page took in real time, so build A
-   and build B never drift apart here. Answers whether it was found. */
-export async function until(page, fn, arg, ticks = 12) {
+/* Whether `fn` (run in the page) answers true once the clock has moved
+   `ticks` times by 50 ms, the page left to finish its real work before each
+   move. The clock always moves the same and `fn` is always run once,
+   whatever the page does and however long it took in real time, so build A
+   and build B are given the same clock and the same calls. */
+export async function until(page, fn, arg, ticks = 4) {
   for (let i = 0; i < ticks; i++) {
     await settle(page);
-    if (await page.evaluate(fn, arg).catch(() => false)) {
-      if (process.env.DIFF_TRACE) console.log('  found at look ' + (i + 1) + ' of ' + ticks);
-      // The rest of the clock in one move.
-      await runClock(page.context(), (ticks - i) * 50);
-      await settle(page);
-      return true;
-    }
     await runClock(page.context(), 50);
   }
   await settle(page);
