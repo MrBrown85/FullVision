@@ -37,6 +37,7 @@ const POINTS = U(835); // points out of 10, becomes proficiency
 const POINTS_RUBRIC = U(836); // points out of 10, given the rubric
 const PLAIN = U(837); // never edited, not group work
 const PLAIN_POINTS = U(838); // never edited, points
+const DUO = U(839); // groups: Dee and Eve, on two competencies
 
 const row = (id, title, extra) =>
   Object.assign(
@@ -92,7 +93,9 @@ function load() {
       row(GROUP, 'Group Lab', {
         collab_mode: 'groups',
         collab_config: { groups: [[S[0], S[1], S[2]], [S[3]]], groupCount: 2 },
+        tag_ids: [T1, T2],
       }),
+      row(DUO, 'Duo Lab', { collab_mode: 'groups', collab_config: { groups: [[S[3], S[4]]] }, tag_ids: [T1, T2] }),
       row(NULL_CONFIG, 'Groups, None Saved', { collab_mode: 'groups', collab_config: null }),
       row(EMPTY_GROUPS, 'Groups, Empty', { collab_mode: 'groups', collab_config: { groups: [] } }),
       row(ADD, 'Add a Competency'),
@@ -117,6 +120,11 @@ function edit(aid, change) {
   saveAssessments(CID, list);
 }
 const level = (sid, aid, tid, value) => upsertScore(CID, sid, aid, tid, value, '2026-10-01', 'summative', '', 0);
+// A withdrawn student's levels, as their withdrawn entry holds them.
+const heldWhileWithdrawn = sid => {
+  const w = getWithdrawnStudents(CID).find(x => x.student.id === sid);
+  return [((w && w.records && w.records.scores) || []).map(e => e.tagId + '=' + e.score).join(' ')];
+};
 const scoreCalls = calls => calls.filter(([name]) => /score|collab/.test(name));
 const onPiece = (calls, aid) => scoreCalls(calls).filter(([, p]) => p.p_assessment_id === aid || p.p_id === aid);
 const levelsOn = (blob, aid) =>
@@ -196,6 +204,97 @@ describe('signed in, the score writers read the piece as this page holds it', ()
       expect(getStudents(CID).map(s => s.id)).toEqual(S);
       expect(piece(GROUP).groups).toEqual([[S[0], S[1], S[2]], [S[3]]]);
       expect(S.map(sid => isLinkedGroupMember(CID, GROUP, sid))).toEqual([true, true, true, true, false]);
+    });
+  });
+
+  describe('a withdrawn member is left alone', () => {
+    // GROUP is Ann, Ben, Cal: Cal is withdrawn. DUO is Dee and Eve: Eve is.
+    async function withdrawOne(aid, members, gone) {
+      level(members[0], aid, T1, 3);
+      level(members[0], aid, T2, 2);
+      await settle();
+      withdrawStudent(CID, gone);
+      await settle();
+      session.since();
+    }
+    const touches = (calls, sid) => calls.filter(([, p]) => p && p.p_enrollment_id === sid);
+    const held = [T1 + '=3 ' + T2 + '=2'];
+
+    it('grading the other member of a pair sends nothing for the withdrawn one', async () => {
+      await withdrawOne(DUO, [S[3], S[4]], S[4]);
+      level(S[3], DUO, T1, 4);
+      await settle();
+      const calls = session.since();
+      expect(touches(calls, S[4])).toEqual([]);
+      expect(onPiece(calls, DUO)).toEqual([
+        ['upsert_tag_score', expect.objectContaining({ p_enrollment_id: S[3], p_tag_id: T1, p_value: 4 })],
+      ]);
+      expect(getScores(CID)[S[4]]).toBeUndefined();
+      expect(stored('scores', CID)[S[4]]).toBeUndefined();
+      expect(heldWhileWithdrawn(S[4])).toEqual(held);
+      reenrolStudent(CID, S[4]);
+      await settle();
+      expect(levelsOn(getScores(CID), DUO)[4]).toBe(held[0]);
+      expect(levelsOn(getScores(CID), DUO)[3]).toBe(T1 + '=4 ' + T2 + '=2');
+    });
+
+    it('the members left still fill each other', async () => {
+      await withdrawOne(GROUP, [S[0], S[1], S[2]], S[2]);
+      level(S[0], GROUP, T1, 4);
+      await settle();
+      const calls = session.since();
+      expect(touches(calls, S[2])).toEqual([]);
+      expect(levelsOn(getScores(CID), GROUP).slice(0, 2)).toEqual([T1 + '=4 ' + T2 + '=2', T1 + '=4 ' + T2 + '=2']);
+      expect(heldWhileWithdrawn(S[2])).toEqual(held);
+    });
+
+    it('Back to Group Grade takes nothing from, and sends nothing for, the withdrawn member', async () => {
+      await withdrawOne(GROUP, [S[0], S[1], S[2]], S[2]);
+      Grader.gradeSeparately(CID, GROUP, S[1]);
+      level(S[1], GROUP, T1, 1);
+      level(S[0], GROUP, T1, 4);
+      await settle();
+      session.since();
+      Grader.backToGroupGrade(CID, GROUP, S[1]);
+      await settle();
+      expect(touches(session.since(), S[2])).toEqual([]);
+      expect(levelsOn(getScores(CID), GROUP).slice(0, 2)).toEqual([T1 + '=4 ' + T2 + '=2', T1 + '=4 ' + T2 + '=2']);
+      expect(heldWhileWithdrawn(S[2])).toEqual(held);
+
+      // In a pair, Back to Group Grade with the partner withdrawn keeps the
+      // member's own grade: there is nobody on the roster to copy from.
+      await withdrawOne(DUO, [S[3], S[4]], S[4]);
+      Grader.gradeSeparately(CID, DUO, S[3]);
+      level(S[3], DUO, T1, 1);
+      await settle();
+      session.since();
+      Grader.backToGroupGrade(CID, DUO, S[3]);
+      await settle();
+      expect(touches(session.since(), S[4])).toEqual([]);
+      expect(levelsOn(getScores(CID), DUO)[3]).toBe(T1 + '=1 ' + T2 + '=2');
+      expect(heldWhileWithdrawn(S[4])).toEqual(held);
+    });
+
+    it('Missing, then cleared, on the member left sends nothing for the withdrawn one', async () => {
+      await withdrawOne(DUO, [S[3], S[4]], S[4]);
+      expect(setAssignmentStatus(CID, S[3], DUO, 'NS')).toBeTruthy();
+      await settle();
+      expect(levelsOn(getScores(CID), DUO)[3]).toBe('');
+      setAssignmentStatus(CID, S[3], DUO, '');
+      await settle();
+      expect(touches(session.since(), S[4])).toEqual([]);
+      expect(levelsOn(getScores(CID), DUO)[3]).toBe(held[0]);
+      expect(getScores(CID)[S[4]]).toBeUndefined();
+      expect(heldWhileWithdrawn(S[4])).toEqual(held);
+
+      await withdrawOne(GROUP, [S[0], S[1], S[2]], S[2]);
+      setAssignmentStatus(CID, S[0], GROUP, 'NS');
+      await settle();
+      setAssignmentStatus(CID, S[0], GROUP, '');
+      await settle();
+      expect(touches(session.since(), S[2])).toEqual([]);
+      expect(levelsOn(getScores(CID), GROUP).slice(0, 2)).toEqual([held[0], held[0]]);
+      expect(heldWhileWithdrawn(S[2])).toEqual(held);
     });
   });
 
@@ -293,5 +392,24 @@ describe('Demo Mode (this device only), for contrast', () => {
     expect(levelsOn(getScores(CID), GROUP)).toEqual([T1 + '=3', T1 + '=3', T1 + '=3', T1 + '=4', '']);
     expect(levelsOn(getScores(CID), NULL_CONFIG)).toEqual([T1 + '=2', '', '', '', '']);
     expect(levelsOn(getScores(CID), EMPTY_GROUPS)).toEqual([T1 + '=2', '', '', '', '']);
+  });
+
+  it('a withdrawn member is left alone, and comes back with their own grade', () => {
+    level(S[3], DUO, T1, 3);
+    level(S[3], DUO, T2, 2);
+    withdrawStudent(CID, S[4]);
+    level(S[3], DUO, T1, 4);
+    expect(getScores(CID)[S[4]]).toBeUndefined();
+    Grader.gradeSeparately(CID, DUO, S[3]);
+    level(S[3], DUO, T1, 1);
+    Grader.backToGroupGrade(CID, DUO, S[3]);
+    setAssignmentStatus(CID, S[3], DUO, 'NS');
+    setAssignmentStatus(CID, S[3], DUO, '');
+    expect(getScores(CID)[S[4]]).toBeUndefined();
+    expect(heldWhileWithdrawn(S[4])).toEqual([T1 + '=3 ' + T2 + '=2']);
+    expect(levelsOn(getScores(CID), DUO)[3]).toBe(T1 + '=1 ' + T2 + '=2');
+    reenrolStudent(CID, S[4]);
+    expect(levelsOn(getScores(CID), DUO)[4]).toBe(T1 + '=3 ' + T2 + '=2');
+    expect(levelsOn(getScores(CID), DUO)[3]).toBe(T1 + '=1 ' + T2 + '=2');
   });
 });

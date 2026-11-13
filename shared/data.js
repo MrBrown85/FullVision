@@ -7797,12 +7797,23 @@ function isGroupWithheld(cid, sid, aid) {
   var status = getAssignmentStatus(cid, sid, aid);
   return status === 'NS' || status === 'EXC';
 }
-/* The other members of `sid`'s group still graded with it. */
+/* Whether `sid` is on the class's roster. A withdrawn student is not
+   (withdrawStudent takes them off getStudents and puts their marks aside),
+   and no group write may touch them: their marks stay as they were until
+   they are re-enrolled. */
+function _onRoster(cid, sid) {
+  return (getStudents(cid) || []).some(function (s) {
+    return s && s.id === sid;
+  });
+}
+/* The other members of `sid`'s group still graded with it, on the roster.
+   Every group write (the fill, Back to Group Grade, the Missing or Excused
+   clear and copy-back, the grade set aside) lists its members here. */
 function _linkedGroupPeers(cid, a, sid) {
   var group = getCollabGroupOf(a, sid);
   if (!group) return [];
   return group.members.filter(function (m) {
-    return m !== sid && !isGradedSeparately(a, m);
+    return m !== sid && !isGradedSeparately(a, m) && _onRoster(cid, m);
   });
 }
 
@@ -7920,7 +7931,7 @@ function _groupGradeEmpty(scores, a, sid) {
    separately, Missing or Excused. */
 function _syncGroupFrom(cid, aid, sid, prior, onlyTo) {
   var a = _assessmentById(cid, aid);
-  if (!a || !isLinkedGroupMember(cid, aid, sid) || isGroupWithheld(cid, sid, aid)) return;
+  if (!a || !isLinkedGroupMember(cid, aid, sid) || isGroupWithheld(cid, sid, aid) || !_onRoster(cid, sid)) return;
   var targets = _linkedGroupPeers(cid, a, sid).filter(function (m) {
     return (!onlyTo || m === onlyTo) && !isGroupWithheld(cid, m, aid);
   });
@@ -8194,7 +8205,7 @@ function _groupGradesIn(cid, scores) {
     if (!a || isDibelsScored(a) || (a.collaboration !== 'pair' && a.collaboration !== 'group')) return;
     ((a.collaboration === 'pair' ? a.pairs : a.groups) || []).forEach(function (members) {
       (members || []).forEach(function (sid) {
-        if (!isGradedSeparately(a, sid))
+        if (!isGradedSeparately(a, sid) && _onRoster(cid, sid))
           linked.push({ aid: a.id, sid: sid, group: members, key: _groupGradeKey(scores || {}, sid, a.id) });
       });
     });
