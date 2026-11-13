@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { mockAuth } from '../../e2e/helpers.js';
 import { seedSignedIn, signedInClasses } from './fixtures.mjs';
 import { watch } from './given.mjs';
+import { WRITER_NAMES, installLedger } from './writers.mjs';
 import { quiet, runClock, settle } from './probe.mjs';
 
 const INIT_SRC = readFileSync(new URL('./page-init.js', import.meta.url), 'utf-8');
@@ -72,6 +73,13 @@ export async function newSession(browser, { url, mode, seed }) {
   await context.addInitScript({
     content: INIT_SRC + '\ndifferentialPageInit(' + JSON.stringify({ seed }) + ');',
   });
+  // The writer ledger (writers.mjs): each page tells the run which mark
+  // writers it called; the count is kept here, never in the page.
+  s.ledger = {};
+  await context.exposeFunction('__diffWriterCalled', name => {
+    s.ledger[name] = (s.ledger[name] || 0) + 1;
+  });
+  await context.addInitScript(installLedger, WRITER_NAMES);
   if (mode === 'signed-in') {
     // mockAuth registers its init script and routes on what it is given; a
     // context does both for every page, the second tab's too.

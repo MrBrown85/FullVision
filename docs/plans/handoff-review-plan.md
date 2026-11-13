@@ -738,9 +738,9 @@ Reviewed against the council on 2026-11-12. Items marked "yours" wait for Colin;
 20. The page-file pieces (the phone Grade tab's two halves, Class Settings' terms, import and wizard, the Assignments grader dialog and form, the Gradebook table renderers, the Reports Issue dialog, the shared Return for Revision helpers), and a map of `teacher/report-questionnaire.js`. The grader guard must read sub-folders first (S19-D14).
 21. On-save hooks for `_saveCourseField` (yours), with item 8.
 
-### Before the January pilot
+### Trust and recovery
 
-22. A rehearsed restore and monitoring (board cards i42 and i44). Staging is held; the council would not start twenty teachers without a restore that has been tried.
+22. A rehearsed restore and monitoring (board cards i42 and i44). Staging is held.
 23. Two-step sign-in on the GitHub, Netlify, Supabase and Sentry accounts (yours to switch on). Organizations wait for a second person.
 24. Closed signup (S19-F6).
 25. Sentry stays in the EU and is disclosed on the privacy page; error reports carry no student data (decision 7).

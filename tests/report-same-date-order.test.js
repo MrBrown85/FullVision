@@ -85,7 +85,7 @@ describe('same-date work on a report', () => {
   const MADE_ORDER = {
     nextSteps:
       'Next Steps Continuity and Change Keep building on this competency. Latest: Current Events: Week 2, Oct 20 · 100%',
-    best: 'Current Events: Week 3, Oct 20 · Current Events: Week 2, Oct 20 · 100%',
+    best: 'Current Events: Week 2, Oct 20 · Current Events: Week 3, Oct 20 · 100%',
     latest: 'Current Events: Week 2, Oct 20 · 100%',
     list:
       'Oct 16 What Does the Poster Show, and What Does It Hide? 75% ' +
@@ -97,7 +97,7 @@ describe('same-date work on a report', () => {
   const ID_ORDER = {
     nextSteps:
       'Next Steps Continuity and Change Keep building on this competency. Latest: Current Events: Week 3, Oct 20 · 100%',
-    best: 'Current Events: Week 2, Oct 20 · Current Events: Week 3, Oct 20 · 100%',
+    best: 'Current Events: Week 3, Oct 20 · Current Events: Week 2, Oct 20 · 100%',
     latest: 'Current Events: Week 3, Oct 20 · 100%',
     list:
       'Oct 16 What Does the Poster Show, and What Does It Hide? 75% ' +

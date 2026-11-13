@@ -84,9 +84,8 @@ jobs:
 
       # Type checks on the files that start with // @ts-check (the list is in
       # tsconfig.json). JSDoc only: no TypeScript files, no build step.
-      # Reports only (continue-on-error) until Colin turns it on as a gate.
+      # A type error fails the job.
       - name: Check types
-        continue-on-error: true
         run: npm run typecheck
 
       # ESLint's no-undef and no-unused-vars, warnings everywhere except the

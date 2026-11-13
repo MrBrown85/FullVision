@@ -117,3 +117,67 @@ describe('Highest Now and Lowest Now', () => {
     expect(now.apart).toContain('Lowest now');
   });
 });
+
+/* Two pieces at the same mark on one date are named in the order they were
+   made (calc.js samePieceDateOrder), not by where they are stored
+   (ROADMAP 1.9: a cleared returned grade moves its entry to the end). */
+describe('Best work and Lowest work: tied pieces come out in the order they were made', () => {
+  afterEach(() => delete COURSES[CID]);
+
+  // Four competencies: t1 and t2 tie at the top, t3 and t4 tie at the bottom. The piece made first
+  // sits on the later competency of each pair, so reading by competency puts it second.
+  function seedTies(storedOrder) {
+    seed('proficiency', 3, 1);
+    const sec = (n, tag) => ({ id: 'sec-' + n, name: 'Skill ' + n, tags: [{ id: tag, label: 'Skill ' + n }] });
+    _cache.learningMaps[CID].sections = [sec(1, 't1'), sec(2, 't2'), sec(3, 't3'), sec(4, 't4')];
+    const day = '2026-10-06';
+    const made = n => '2026-10-01T09:0' + n + ':00.000Z';
+    const piece = (id, title, tag, n) => ({ id, title, date: day, tagIds: [tag], created: made(n) });
+    const all = {
+      hiFirst: piece('h1', 'High Made First', 't2', 1),
+      hiLater: piece('h2', 'High Made Later', 't1', 2),
+      loFirst: piece('l1', 'Low Made First', 't4', 3),
+      loLater: piece('l2', 'Low Made Later', 't3', 4),
+    };
+    const entry = (a, score) => ({ assessmentId: a.id, tagId: a.tagIds[0], score, date: day });
+    const score = k => (k.startsWith('hi') ? 3 : 1);
+    _cache.assessments[CID] = storedOrder.map(k => all[k]);
+    _cache.scores[CID] = { [SID]: storedOrder.map(k => entry(all[k], score(k))) };
+    clearProfCache();
+  }
+
+  it.each([
+    ['made order', ['hiFirst', 'hiLater', 'loFirst', 'loLater']],
+    ['the other way round', ['loLater', 'loFirst', 'hiLater', 'hiFirst']],
+  ])('stored in %s', (_name, stored) => {
+    seedTies(stored);
+    const f = facts(draw()).replace(/<[^>]+>/g, '');
+    expect(f).toContain('Best work: High Made Later (Oct 6) and High Made First (Oct 6)');
+    expect(f).toContain('Lowest work: Low Made Later (Oct 6) and Low Made First (Oct 6)');
+  });
+
+  // The Comment Bank names a tied piece newest first (bestOrderOf); so does this line.
+  it('three pieces tied at the top mark on different dates: the two newest are named', () => {
+    seed('proficiency', 3, 1);
+    const piece = (id, title, date) => ({ id, title, date, tagIds: ['t1'] });
+    _cache.assessments[CID] = [
+      piece('o', 'Oldest Piece', '2026-10-02'),
+      piece('n', 'Newest Piece', '2026-10-09'),
+      piece('m', 'Middle Piece', '2026-10-06'),
+      { id: 'low', title: 'Low Piece', date: '2026-10-03', tagIds: ['t2'] },
+    ];
+    const entry = (id, tag, score, date) => ({ assessmentId: id, tagId: tag, score, date });
+    _cache.scores[CID] = {
+      [SID]: [
+        entry('o', 't1', 3, '2026-10-02'),
+        entry('n', 't1', 3, '2026-10-09'),
+        entry('m', 't1', 3, '2026-10-06'),
+        entry('low', 't2', 1, '2026-10-03'),
+      ],
+    };
+    clearProfCache();
+    const f = facts(draw()).replace(/<[^>]+>/g, '');
+    expect(f).toContain('Best work: Newest Piece (Oct 9) and Middle Piece (Oct 6)');
+    expect(f).not.toContain('Oldest Piece');
+  });
+});

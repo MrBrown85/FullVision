@@ -1,8 +1,9 @@
 -- The database's shape as text, for docs/schema.generated.sql
 -- (scripts/schema-snapshot.mjs). Reads the system catalogs only, so the
 -- read-only fv_schema_reader role can run it and every role gets the same
--- answer. Function bodies are left out; signatures, SECURITY DEFINER,
--- tables, columns, constraints, indexes, triggers and RLS policies are in.
+-- answer. Function bodies are left out; signatures (functions and
+-- procedures), SECURITY DEFINER, tables, columns, constraints, indexes,
+-- triggers, RLS policies and the app's event triggers are in.
 with t as (
   select n.nspname, c.relname, c.oid, c.relrowsecurity
   from pg_class c
@@ -47,13 +48,28 @@ lines as (
   from t join pg_policy pol on pol.polrelid = t.oid
   union all
   select 2, n.nspname || '.' || p.proname, 0, pg_get_function_identity_arguments(p.oid),
-         'function ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') returns '
-           || pg_get_function_result(p.oid)
+         -- A procedure has no result: pg_get_function_result gives NULL,
+         -- which used to drop the whole line.
+         case when p.prokind = 'p' then 'procedure ' else 'function ' end
+           || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+           || coalesce(' returns ' || pg_get_function_result(p.oid), '')
            || case when p.prosecdef then ' security definer' else '' end
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname in ('public', 'student_submit')
     and p.prokind in ('f', 'p')
     and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
+  union all
+  -- Event triggers that run an app function (ensure_rls). Supabase's own,
+  -- which run functions in its extensions schema, are left out.
+  select 3, e.evtname, 0, '',
+         'event trigger ' || e.evtname || ' on ' || e.evtevent
+           || coalesce(' when tag in (' || array_to_string(e.evttags, ', ') || ')', '')
+           || ' runs ' || n.nspname || '.' || p.proname || '()'
+           || case e.evtenabled when 'D' then ' (disabled)' else '' end
+  from pg_event_trigger e
+  join pg_proc p on p.oid = e.evtfoid
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('public', 'student_submit')
 )
 select string_agg(line, E'\n' order by sec, k, sub, k2) from lines;

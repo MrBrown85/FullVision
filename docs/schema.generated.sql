@@ -1759,6 +1759,7 @@ function public.get_report_issue(p_issue_id uuid) returns jsonb
 function public.get_student_profile(p_enrollment_id uuid) returns jsonb
 function public.get_term_rating(p_enrollment_id uuid, p_term integer) returns jsonb
 function public.get_withdrawn_student_records(p_enrollment_id uuid) returns jsonb
+procedure public.grade_return_repair_nightly()
 function public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) returns jsonb
@@ -1790,6 +1791,7 @@ function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_l
 function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
+procedure public.photo_lifecycle_nightly()
 function public.photo_removal_call() returns bigint
 function public.photo_removal_due() returns boolean security definer
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
@@ -1925,3 +1927,4 @@ function student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_ass
 function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) returns jsonb security definer
 function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) returns jsonb security definer
 function student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
+event trigger ensure_rls on ddl_command_end when tag in (CREATE TABLE, CREATE TABLE AS, SELECT INTO) runs public.rls_auto_enable()

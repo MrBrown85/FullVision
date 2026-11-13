@@ -10,12 +10,14 @@
  *   node scripts/differential-run.mjs --a <dir or URL> --b <dir or URL>
  *        --seed <n> --steps <n> [--mode signed-in|demo|both]
  *        [--offline] [--two-tabs] [--screens-every <n>]
+ *        [--must-reach <writer,writer,...>]
  *
  * A build is a repo checkout with dist/ built (npm run build:e2e), a built
  * site folder, or a URL serving one. See docs/differential-run.md.
  *
  * Exit code: 0 when nothing differed, 1 at the first difference, 2 when the
- * run could not be done.
+ * run could not be done, 3 when nothing differed but a --must-reach writer
+ * was not called on both sides.
  */
 import { chromium } from '@playwright/test';
 
@@ -36,6 +38,7 @@ const { makeRng } = await import('./differential/prng.mjs');
 const { go, readIndexedDb, readScreens, readStorage, readView, takeLeftCalls, takeOwnCalls, tick } =
   await import('./differential/probe.mjs');
 const { serve } = await import('./differential/serve.mjs');
+const { ledgerLines, unreached } = await import('./differential/writers.mjs');
 const { DRAIN_CHUNKS, PHONE, advance, bootTogether, newSession, reloadTab, startTab, tabsOf } =
   await import('./differential/session.mjs');
 
@@ -453,7 +456,7 @@ async function runMode(browser, urls, mode, opts) {
         'requests to other servers: A ' + JSON.stringify(xa) + ' | B ' + JSON.stringify(xb),
       ]);
     }
-    return { counts };
+    return { counts, ledgers: sides.map(s => ({ ...s.ledger })) };
   } finally {
     await Promise.all(sides.map(s => s.context.close().catch(() => {})));
   }
@@ -573,11 +576,17 @@ async function main() {
     servers.push(b);
     browser = await chromium.launch();
     const flags = (opts.offline ? ' --offline' : '') + (opts.twoTabs ? ' --two-tabs' : '');
+    // The writer ledger over the whole run, one per side.
+    const whole = [{}, {}];
     for (const mode of modes) {
       const t0 = Date.now();
       try {
-        const { counts } = await runMode(browser, { a: a.url, b: b.url }, mode, opts);
+        const { counts, ledgers } = await runMode(browser, { a: a.url, b: b.url }, mode, opts);
         if (counts.calls) console.log(mode + ': calls compared, by name: ' + byName(counts.callNames));
+        for (const line of ledgerLines(mode, ledgers)) console.log(line);
+        ledgers.forEach((l, i) => {
+          for (const [n, c] of Object.entries(l)) whole[i][n] = (whole[i][n] || 0) + c;
+        });
         console.log(
           summaryLine(mode, counts) +
             (opts.quiet ? '' : ' (seed ' + opts.seed + flags + ', ' + Math.round((Date.now() - t0) / 1000) + ' s)'),
@@ -596,6 +605,18 @@ async function main() {
       }
     }
     if (!opts.quiet) console.log('Total ' + Math.round((Date.now() - started) / 1000) + ' s');
+    if (opts.mustReach) {
+      const missed = unreached(opts.mustReach, whole);
+      if (missed.length) {
+        console.log(
+          'NOT REACHED: --must-reach names writers this run did not call on both sides: ' +
+            missed.join(', ') +
+            '. The run does not guard them: a longer run, another seed, or reading and a test.',
+        );
+        return 3;
+      }
+      console.log('Every --must-reach writer was called on both sides: ' + opts.mustReach.join(', '));
+    }
     return 0;
   } catch (e) {
     console.error('The run could not be done: ' + (e && e.stack ? e.stack : e));

@@ -168,7 +168,7 @@ describe('report-best-work-once', () => {
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       expect(prof).toContain('Highest now: Evidence and Perspective');
       // The mark as a student reads it, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
-      expect(prof).toContain('Best work: Primary Source Analysis (Oct 2) and Map Study (Oct 6), Extending.');
+      expect(prof).toContain('Best work: Map Study (Oct 6) and Primary Source Analysis (Oct 2), Extending.');
     });
 
     it('names it once when it is the only piece', () => {
@@ -2680,7 +2680,7 @@ describe('report-proficiency-one-figure', () => {
     it('a piece named as best work is not named as lowest work too', () => {
       seed('proficiency');
       const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
-      expect(t).toContain('Best work: Local History Inquiry');
+      expect(t).toMatch(/Best work: (Unit Quiz \(Oct 21\) and )?Local History Inquiry/);
       expect(t).not.toMatch(/Lowest work: Local History Inquiry/);
     });
   });
@@ -2707,7 +2707,7 @@ describe('report-proficiency-one-figure', () => {
       const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { word: false }, {}));
       // The Inquiry is 4 on Evidence and 2 on Inquiry: 3.0 as a whole.
       expect(back).toContain('Local History Inquiry Proficient');
-      expect(t).toMatch(/Best work: Local History Inquiry \(Oct 20\)( and Unit Quiz \(Oct 21\))?, Proficient\./);
+      expect(t).toMatch(/Best work: (Unit Quiz \(Oct 21\) and )?Local History Inquiry \(Oct 20\), Proficient\./);
       expect(t).not.toContain('Safety Contract');
       expect(t).not.toMatch(/Best work: [^.]*Extending/);
     });

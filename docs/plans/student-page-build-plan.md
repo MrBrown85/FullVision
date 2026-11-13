@@ -133,7 +133,7 @@ Card codes are unreadable to the database (`docs/DECISIONS.md`, "Card codes the 
 - **Making cards** goes through a second edge function, `teacher-cards` (1.8), never through an RPC. The function draws each code and password, makes their tags, and calls one service-only database function, `student_submit.issue_cards`, which checks the teacher owns the class through the same helpers every RPC uses and stores the tags. The new codes go back to the teacher's browser once, in the reply to that one press, and are kept nowhere. One operation covers every button: for each student the browser names the card it believes is live (or none), and the database stops that card and stores the new one in one step, or answers `changed` if another tab got there first.
 - **Teacher RPCs that need no key:** list cards (no code, no password; with the card number, whether it has a password, and Needs a New Card for a card made under another key), mark printed, unlock, Unlock All, and set the Cards Work Until date (default the class's last reporting date). They go through the outbox as any write does.
 - **Sessions** (`student_submit` schema, no API access): a session belongs to a device, not to a card. A second table lists the enrollments that session has opened, one per card added. That is what makes Switching Classes work now and lets a passkey or another sign-in attach to the same session later with no rework (Nov 8, decision 13).
-- **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs. They move to the same key in their own change before the January pilot (`S3-S1`).
+- **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs. They move to the same key in their own change (`S3-S1`).
 
 No teacher's screen ever shows a code. A code is on screen only in the browser's print dialog while it is open. A lost card is replaced, never shown again: Print New Card stops the old card and makes a new one, and New Codes for This Class does that for every student. A replaced card tells the student "This card has been replaced. Ask your teacher for your new card." Changing the key stops every card; Colin keeps a copy of the key in his password manager only so a lost key can be put back without a reprint.
 
@@ -355,7 +355,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S3-F2` Unlock, Unlock All, Print New Card, New Codes for This Class, with their confirms. Done (PR 1014).
 - `S3-F3` The rest of the student sign-in screens, phone and Chromebook: the locks, Done, and Switching Classes with Add Another Card. Done (PR 1021).
 - `S3-P1` The privacy page (`privacy.html`): a card's code and password are kept only as keyed fingerprints, nobody can look one up after printing, and what is recorded for a card. Colin's words; the privacy officer if he chooses. Done (PR 1037), approved as drafted (DECISIONS, "Student page build rulings (2026-11-10, late night)" 20). Not released: the two current teachers are emailed before the release that carries it.
-- `S3-S1` Slips move to the same key: a slip's code and `student.slip_password` stop being readable by the database. Its own change, with its own migration and review, right after cards are live and before the January pilot (DECISIONS, "Card codes the database cannot read" 2). Until it ships the privacy page must not say a slip code cannot be read back from the database.
+- `S3-S1` Slips move to the same key: a slip's code and `student.slip_password` stop being readable by the database. Its own change, with its own migration and review, right after cards are live (DECISIONS, "Card codes the database cannot read" 2). Until it ships the privacy page must not say a slip code cannot be read back from the database.
 
 `S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` can all be built while `S3-M1` is in review.
 
@@ -720,7 +720,7 @@ Colin, Nov 9 (Q25): not now. MyEdBC Input and the Export Sheet (S16) still ship.
 
 The rest of cleanup card cp1, after the build: what is still in `data.js` and the big page files, the write-path plan's Phase 6, dead code, and the docs. Not a phase of this build.
 
-The plan for S19, its slices and the decisions it needs are in [handoff-review-plan.md](handoff-review-plan.md).
+The plan for S19, its slices and the decisions it needs are in [handoff-review-plan.md](handoff-review-plan.md). The work that follows it, from Nov 13, is in [alignment-plan.md](alignment-plan.md).
 
 ### Where the cleanup card's items land
 
@@ -773,7 +773,7 @@ The session that hands out the work keeps one list of who holds each of these fi
 - `S0-T2` before `S1-T1`, `S1-T2` and `S1-T3`. Those three are in different files and run side by side.
 - `S0-T1` before `S0-F1`. `S0-F1` before S2, S4 and S16-F3.
 - Batch A applied before any `W` PR in S0 to S4. Batch B before S5 to S7 wiring. Batch C before S9 to S13 wiring. Batch D before a real class turns on Send Work.
-- `S3-W1` merges before `S3-M1` is applied, and `S3-M1` before the S3 release (S3, the day). `S3-S1` before the January pilot.
+- `S3-W1` merges before `S3-M1` is applied, and `S3-M1` before the S3 release (S3, the day). `S3-S1` right after cards are live.
 - S3 before real students use S4. S4 before S5's student screens. S5 before S6 and S7. S6 before S9, S11, S12 and S14.
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
