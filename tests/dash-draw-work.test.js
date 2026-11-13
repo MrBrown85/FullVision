@@ -184,14 +184,14 @@ describe('the Dashboard draw', () => {
     expect(chip.textContent.startsWith(codes[chip.getAttribute('data-key')])).toBe(true);
   });
 
-  it('measures the Observations card after the click, not in it', () => {
+  it('measures the Observations card after the draw, not in it', () => {
     let drawn = 0;
     DashObservations.renderCard = function () {
       drawn++;
       return stub.renderCard.apply(this, arguments);
     };
     measures = 0;
-    sortBy('last-desc');
+    page.render(); // a whole-page draw (a sort may draw the students alone)
     expect(measures).toBe(0);
     expect(drawn).toBe(1);
     flush();
@@ -201,7 +201,7 @@ describe('the Dashboard draw', () => {
   });
 
   it('draws the Observations card again when the width moved', () => {
-    sortBy('last-desc');
+    page.render();
     let drawn = 0;
     DashObservations.renderCard = function () {
       drawn++;
