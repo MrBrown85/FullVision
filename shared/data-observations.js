@@ -16,9 +16,16 @@ function saveQuickObs(cid, obj) {
   _saveCourseField('observations', cid, obj);
 }
 
+/* The student's list itself, newest first. It is sorted in place, so it is
+   sorted once: a list already in order is handed back as it is. */
 function getStudentQuickObs(cid, sid) {
-  const all = getQuickObs(cid);
-  return (all[sid] || []).sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+  const list = getQuickObs(cid)[sid] || [];
+  for (let i = 1; i < list.length; i++) {
+    if ((list[i].created || '').localeCompare(list[i - 1].created || '') > 0) {
+      return list.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+    }
+  }
+  return list;
 }
 
 function getAllQuickObs(cid) {

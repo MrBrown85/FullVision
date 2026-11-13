@@ -242,16 +242,11 @@ window.PageDashboard = (function () {
     // Sort
     switch (sortMode) {
       case 'last-asc':
-        students = sortStudents(students, 'lastName');
-        break;
       case 'last-desc':
-        students = sortStudents(students, 'lastName').reverse();
-        break;
       case 'first-asc':
-        students = sortStudents(students, 'firstName');
-        break;
       case 'first-desc':
-        students = sortStudents(students, 'firstName').reverse();
+        students = sortStudents(students, sortMode.indexOf('last') === 0 ? 'lastName' : 'firstName');
+        if (sortMode.slice(-5) === '-desc') students = students.reverse();
         break;
       case 'overall-desc':
       case 'overall-asc':
@@ -457,7 +452,7 @@ window.PageDashboard = (function () {
     if (before) _slideCardsFrom(before);
     if (_compFade) _fadeCompRows();
     _compFade = false;
-    _afterObsRender(null, 0);
+    _afterObsRender(null);
     _placeMixPop();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
@@ -512,21 +507,27 @@ window.PageDashboard = (function () {
     // html-safe: DashObservations.renderCard escapes names, labels and notes; types and flags are fixed keys.
     card.innerHTML = DashObservations.renderCard(activeCourse, getStudents(activeCourse), st);
     obsHighlight = st.highlight;
-    _afterObsRender(focusKey, (depth || 0) + 1);
+    _afterObsRender(focusKey, depth == null ? null : depth + 1);
   }
 
   /* After the card is drawn: measure it, redraw if the number of student
      columns or the sideways scroll should change, then set the roving tab
      stop. A redraw can add or remove the pane's scrollbar and so change the
-     width again: a second corrective pass is allowed, never more. */
+     width again: a second corrective pass is allowed, never more. Drawn to
+     the stored width in a window as wide, it is measured in the next frame
+     as the page is laid out to paint (a measure in the click lays it out). */
   var OBS_MAX_PASSES = 2;
+  var _obsWinWidth = 0;
   function _afterObsRender(focusKey, depth) {
     var card = _obsCard();
     if (!card) return;
     var m = DashObservations.lastModel();
-    var w = _measureObsWidth(card);
+    var later = depth == null && _obsWidth > 0 && window.innerWidth === _obsWinWidth;
+    if (later) requestAnimationFrame(_refitObs);
+    var w = later ? 0 : _measureObsWidth(card);
     if (m && w > 0) {
       _obsWidth = w;
+      _obsWinWidth = window.innerWidth;
       var layout =
         m.tab === 'competency' && m.sections.length > 7
           ? { cols: 1, compact: false }
@@ -544,7 +545,7 @@ window.PageDashboard = (function () {
         (depth || 0) < OBS_MAX_PASSES &&
         (cols !== m.cols || scrollX !== m.scrollX || !!layout.compact !== !!m.compact)
       ) {
-        renderObsCard(focusKey, depth);
+        renderObsCard(focusKey, depth || 0);
         return;
       }
     }
@@ -872,13 +873,12 @@ window.PageDashboard = (function () {
   function _onResize() {
     _placeMixPop();
     clearTimeout(_resizeTimer);
-    _resizeTimer = setTimeout(function () {
-      var card = _obsCard();
-      if (!card) return;
-      var active = document.activeElement;
-      var key = active && card.contains(active) ? active.getAttribute('data-focus-key') : null;
-      _afterObsRender(key, 0);
-    }, 150);
+    _resizeTimer = setTimeout(_refitObs, 150);
+  }
+  function _refitObs() {
+    var card = _obsCard();
+    var active = document.activeElement;
+    if (card) _afterObsRender(active && card.contains(active) ? active.getAttribute('data-focus-key') : null, 0);
   }
 
   /* "+" on a row: the capture strip in a dialog, the student fixed. */

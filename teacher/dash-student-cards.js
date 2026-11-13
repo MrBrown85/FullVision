@@ -161,8 +161,9 @@ window.DashStudentCards = (function () {
   /* The strip: one segment per column of DashInsights.columns, tinted by the
      student's level on it. Up to CHIP_MAX columns each is a chip with its
      code; more are thin bars. `focusKey` outlines one column and dims the
-     rest. data-student-tab: the student page tab a click here opens. */
-  function stripHtml(cid, sid, cols, focusKey, secById) {
+     rest. data-student-tab: the student page tab a click here opens.
+     `codes`: DashInsights.columnCodes for the class, worked out once a draw. */
+  function stripHtml(cid, sid, cols, focusKey, secById, codes) {
     var chips = cols.length <= CHIP_MAX;
     var html =
       '<div class="dash-card-strip' +
@@ -186,7 +187,7 @@ window.DashStudentCards = (function () {
           '" aria-label="' +
           esc(label) +
           '">' +
-          esc(DashInsights.columnCode(cid, col)) +
+          esc(codes[col.key] != null ? codes[col.key] : DashInsights.columnCode(cid, col)) +
           _tipHtml(lines) +
           '</button>';
       } else {
@@ -245,6 +246,7 @@ window.DashStudentCards = (function () {
   function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags, opts) {
     opts = opts || {};
     var cols = DashInsights.columns(cid);
+    var codes = DashInsights.columnCodes(cid, cols);
     var secById = {};
     getSections(cid).forEach(function (sec) {
       secById[sec.id] = sec;
@@ -396,7 +398,7 @@ window.DashStudentCards = (function () {
           trendHtml(trend) +
           '</div>';
 
-        html += stripHtml(cid, st.id, cols, focusKey, secById);
+        html += stripHtml(cid, st.id, cols, focusKey, secById, codes);
 
         // The footer: the flag at the bottom left (plan F.6), the
         // observation line, then Missing and the right-hand note.
