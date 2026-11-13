@@ -382,7 +382,14 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
       expect(src, file).not.toMatch(/['"`](return_grades|list_course_grade_returns|course_draft_count)['"`]\s*,/);
       expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
     });
-    ['shared/data.js'].forEach(file => {
+    [
+      'shared/data.js',
+      'shared/data-student-work.js',
+      'shared/data-feedback-live.js',
+      'shared/data-markup.js',
+      'shared/data-reflect.js',
+      'shared/data-revisions.js',
+    ].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       // Each through the guarded calls, never as a bare { rpc: … } op.
       expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);

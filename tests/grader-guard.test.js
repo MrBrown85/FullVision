@@ -62,6 +62,11 @@ const EXEMPT = new Set([
   'shared/data-rubrics.js',
   'shared/data-assessments.js',
   'shared/data-config-settings.js',
+  'shared/data-student-work.js',
+  'shared/data-feedback-live.js',
+  'shared/data-markup.js',
+  'shared/data-reflect.js',
+  'shared/data-revisions.js',
   'shared/grader.js',
   'shared/seed-data.js',
 ]);
@@ -95,8 +100,13 @@ describe('grades are written only through shared/grader.js', () => {
       'shared/data-rubrics.js',
       'shared/data-assessments.js',
       'shared/data-config-settings.js',
+      'shared/data-student-work.js',
+      'shared/data-feedback-live.js',
+      'shared/data-markup.js',
+      'shared/data-reflect.js',
+      'shared/data-revisions.js',
     ]
-      .map(rel => readFileSync(join(ROOT, rel), 'utf-8'))
+      .map(f => readFileSync(join(ROOT, f), 'utf-8'))
       .join('\n');
     const missing = WRITERS.filter(name => !new RegExp('^function ' + name + '\\(', 'm').test(data));
     expect(missing).toEqual([]);
