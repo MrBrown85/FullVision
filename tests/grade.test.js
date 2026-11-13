@@ -308,6 +308,7 @@ describe('grade-format-guard', () => {
     'teacher/report-blocks.js round (profPlus / total) * 100': 'a share of scores',
     'teacher/report-blocks.js round (counts[level] / total) * 100': 'a share of scores',
     'teacher/report-questionnaire.js round ((x - r.left - inset) / span) * (HS_STOPS - 1)': 'a slider stop',
+    'teacher/report-one-zoom.js round _st(_view).z * 100': 'the preview’s zoom as a percent',
     'teacher/report-questionnaire.js round (nx.min - Number(g.pct)) * 10':
       'the gap to the next letter from the shown course %',
     'teacher-mobile/card-widgets.js round levelBarPercent(cid, value)': 'a bar’s width',
