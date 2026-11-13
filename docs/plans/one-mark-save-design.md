@@ -1,6 +1,12 @@
 # One mark saves one mark: design (S19-C9)
 
-Status: a design, revised after two independent reviews. Step 4 is built, merged (PR 1336) and released (2026-11-13). Step 1 is ready to build. Step 5 is parked. Nothing in Part B is approved. This document changes no app code.
+Status, 2026-11-13. This document is kept as the record of why step 4 is built the way it is. Merging it approves nothing else in it.
+
+- **Step 4:** built, merged (PR 1336) and released on 2026-11-13.
+- **Step 5:** not to be built. Colin ruled on 2026-11-13 after two reviews of it and one of its redesign (`DECISIONS.md`, "A refused score is not resent; refusals are counted first"). Refused writes are counted instead (PR 1360).
+- **Step 1:** ready to build, not started. It changes nothing a teacher sees.
+- **Part B:** not approved. Steps 10b, 11 and 12 are parked.
+- **What came next:** a design for a time on every score was written and reviewed (draft PR 1361, closed without merging). The review advised measuring first, and Colin agreed: the app counts how often a waiting score meets a newer one on the server before anything more is designed.
 
 It has two parts.
 
