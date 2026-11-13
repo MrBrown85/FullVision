@@ -364,9 +364,10 @@ describe('every caller of saveCourseConfig and update_course', () => {
     // copy of a class's settings: the tests below hold that neither of the
     // two is sent or changed whatever that copy says, so add it and move on.
     expect(found).toEqual({
-      // its definition; the class move's replay; the report-terms save; Demo Mode's switch and the two settings' own writer;
+      // its definition; the class move's replay; the report-terms save; Demo Mode's switch and the two settings' own writer
+      'shared/data.js': 5,
       // Reflect on Feedback's and Show My Learning's switches (S10, S13-W2: setCourseFeedbackOptions, Demo Mode only)
-      'shared/data.js': 6,
+      'shared/data-reflect.js': 1,
       'shared/seed-data.js': 1,
       'teacher/dash-class-manager.js': 10,
       'teacher/grading-setup-copy.js': 1,
@@ -1863,7 +1864,16 @@ describe('the page is redrawn only when the server’s rows would look different
 });
 
 describe('what the client names', () => {
-  const src = readFileSync(resolve(root, 'shared/data.js'), 'utf-8');
+  const src = [
+    'shared/data.js',
+    'shared/data-student-work.js',
+    'shared/data-feedback-live.js',
+    'shared/data-markup.js',
+    'shared/data-reflect.js',
+    'shared/data-revisions.js',
+  ]
+    .map(f => readFileSync(resolve(root, f), 'utf-8'))
+    .join('\n');
 
   it('the server’s return and its list of rows, each at one call site the drift check can read', () => {
     expect(src.match(/_writeRpc\('return_grades'/g).length).toBe(1);
