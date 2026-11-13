@@ -37,7 +37,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 - Entry point: `teacher/app.html`
 - Router: `teacher/router.js`
 - Main page modules:
-  - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`, and draws the block picker and the first screen for a teacher with no classes through `cm-block-picker.js`
+  - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`, and draws the block picker and the first screen for a teacher with no classes through `cm-block-picker.js`, and draws its Where These Appear help panel through `cm-std-help.js`
   - `page-assignments.js`; its assessment form's competency picker (Choose Competencies, the Codes and List views, the focus box and type to narrow) is `assign-competency-picker.js`; the descriptor bar (a rubric level's or a competency level's wording while it is hovered, focused or held, on the class grid and in the grader) is `assign-descriptor-bar.js`
   - `page-student.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`; the Grades tab's Group By (which assessments fall in each category, unit, type or rubric) is `student-groups.js`; the Edit Student dialog (also opened from the Term Questionnaire) is `student-edit-dialog.js`
   - `page-gradebook.js`; its Export CSV is `gradebook-csv.js`, and the grid's hover, scroll sync, sticky Overall column, header height and slanted headers are `gradebook-chrome.js`
