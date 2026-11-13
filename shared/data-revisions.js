@@ -105,11 +105,8 @@ function _revisionScoring(cid, a) {
 // The handed-in submission a request's revision is, or null (none sent, unsent or deleted).
 function _revisionSubmission(cid, r) {
   if (!r || !r.revision_submission_id) return null;
-  return (
-    _studentWorkSubmissions(cid).find(function (s) {
-      return s.id === r.revision_submission_id;
-    }) || null
-  );
+  var found = _workSentIn(cid, 'sub', r.revision_submission_id)[0];
+  return found ? _studentWorkReadable(found) : null;
 }
 
 /* A request's state: open, sent, grading, returned or cancelled. A closed
@@ -301,11 +298,7 @@ function _studentRevisionOf(cid, sid, a) {
   if (state === 'cancelled') return null;
   var status = getAssignmentStatus(cid, sid, a.id);
   var hidden = _revisionHidden(cid, r);
-  var firstSub = r.first_submission_id
-    ? _studentWorkSubmissions(cid).find(function (s) {
-        return s.id === r.first_submission_id;
-      })
-    : null;
+  var firstSub = r.first_submission_id ? _workSentIn(cid, 'sub', r.first_submission_id)[0] : null; // read only
   var inNow = state !== 'open';
   return {
     // A draft is not the student's to see: grading reads as sent.
@@ -341,10 +334,8 @@ function getStudentRevision(cid, sid, aid) {
    by side, and Before and After's two photos. Each as getStudentSubmission
    gives one. getStudentSubmission is still the newest. */
 function getSubmissionVersions(cid, sid, aid) {
-  return _studentWorkSubmissions(cid)
-    .filter(function (s) {
-      return s.enrollment_id === sid && s.assessment_id === aid;
-    })
+  return _workSentIn(cid, 'pair', aid, sid)
+    .map(_studentWorkReadable)
     .sort(function (x, y) {
       return (x.version || 1) - (y.version || 1);
     });
