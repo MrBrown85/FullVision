@@ -34,11 +34,77 @@ function isObject(v) {
   return v !== null && typeof v === 'object';
 }
 
-/* Every place two JSON values differ, as { path, a, b }, at most `limit`. */
+/* A list's entries by their id, when every entry is an object with its own
+   id (score entries, students, pieces); else null. */
+function byId(list) {
+  const map = new Map();
+  for (const x of list) {
+    if (!isObject(x) || Array.isArray(x)) return null;
+    if (typeof x.id !== 'string' && typeof x.id !== 'number') return null;
+    if (map.has(x.id)) return null;
+    map.set(x.id, x);
+  }
+  return map;
+}
+
+/* How many of two entries' fields differ, their ids aside. */
+function fieldsApart(x, y) {
+  let n = 0;
+  for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+    if (k !== 'id' && JSON.stringify(x[k]) !== JSON.stringify(y[k])) n++;
+  }
+  return n;
+}
+
+/* Two lists of entries with ids, compared entry by entry and not place by
+   place: one entry more or fewer, or one whose key changed, is named, where
+   a place-by-place comparison would report every entry after it. An entry
+   only A has and one only B has that are alike but for a field or two are
+   shown as one entry whose key changed. */
+function diffById(a, b, ia, ib, path, out, limit) {
+  const start = out.length;
+  const at = id => path + '[' + id + ']';
+  let onlyA = a.filter(x => !ib.has(x.id));
+  const onlyB = b.filter(x => !ia.has(x.id));
+  for (const y of onlyB.slice()) {
+    let best = null;
+    for (const x of onlyA) {
+      const apart = fieldsApart(x, y);
+      if (apart <= 2 && Object.keys(x).length >= 4 && (!best || apart < best.apart)) best = { x, apart };
+    }
+    if (!best) continue;
+    onlyA = onlyA.filter(x => x !== best.x);
+    onlyB.splice(onlyB.indexOf(y), 1);
+    diffValues(best.x, y, path + '[' + best.x.id + ' in A, ' + y.id + ' in B]', out, limit);
+  }
+  for (const x of onlyA) if (out.length < limit) out.push({ path: at(x.id), a: x, b: undefined });
+  for (const y of onlyB) if (out.length < limit) out.push({ path: at(y.id), a: undefined, b: y });
+  for (const x of a) {
+    if (out.length >= limit) break;
+    if (ib.has(x.id)) diffValues(x, ib.get(x.id), at(x.id), out, limit);
+  }
+  if (out.length === start) {
+    // The same entries: only their order can differ.
+    const i = a.findIndex((x, n) => !b[n] || b[n].id !== x.id);
+    if (i >= 0)
+      out.push({
+        path: path + ' (the order of its entries, from place ' + (i + 1) + ')',
+        a: a[i].id,
+        b: b[i] && b[i].id,
+      });
+  }
+  return out;
+}
+
+/* Every place two JSON values differ, as { path, a, b }, at most `limit`.
+   Lists of entries with ids are compared by id (diffById). */
 export function diffValues(a, b, path = '', out = [], limit = MAX_SHOWN) {
   if (out.length >= limit) return out;
   if (a === b) return out;
   if (Array.isArray(a) && Array.isArray(b)) {
+    const ia = byId(a);
+    const ib = byId(b);
+    if (ia && ib) return diffById(a, b, ia, ib, path, out, limit);
     const n = Math.max(a.length, b.length);
     for (let i = 0; i < n && out.length < limit; i++) diffValues(a[i], b[i], path + '[' + i + ']', out, limit);
     return out;
@@ -138,5 +204,14 @@ export function compareScreens(xa, xb) {
     lines.push('  A: ' + (i < la.length ? la[i].slice(0, 200) : '(ends)'));
     lines.push('  B: ' + (i < lb.length ? lb[i].slice(0, 200) : '(ends)'));
   }
+  return lines;
+}
+
+/* What the next action is picked from (probe.mjs readView), read from both
+   builds. Lines, empty when the two are the same. */
+export function compareViews(va, vb) {
+  if (JSON.stringify(va) === JSON.stringify(vb)) return [];
+  const lines = ['the class as the app gives it differs:'];
+  for (const d of diffValues(va, vb)) lines.push('  ' + d.path + '  A: ' + short(d.a) + '  B: ' + short(d.b));
   return lines;
 }

@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { mockAuth } from '../../e2e/helpers.js';
 import { seedSignedIn, signedInClasses } from './fixtures.mjs';
+import { watch } from './given.mjs';
 import { quiet, runClock, settle } from './probe.mjs';
 
 const INIT_SRC = readFileSync(new URL('./page-init.js', import.meta.url), 'utf-8');
@@ -53,7 +54,8 @@ export async function newSession(browser, { url, mode, seed }) {
   context.setDefaultTimeout(5000);
   context.setDefaultNavigationTimeout(45000);
   const origin = new URL(url).origin;
-  const s = { context, url, mode, pages: [], errors: [], external: [], seenCalls: new Set(), heldCalls: [] };
+  // `given`: everything the run asks of this build's pages (given.mjs).
+  const s = { context, url, mode, pages: [], errors: [], external: [], seenCalls: new Set(), heldCalls: [], given: [] };
   // Every request that goes to another server than the build's own. Demo
   // Mode must make none; signed in, the fake server answers in the page.
   context.on('request', req => {
@@ -185,7 +187,7 @@ export async function startTab(s, path, viewport) {
   // A page opened later starts its clock from the log of every move so
   // far, which can land a few milliseconds off; this puts it at the time.
   if (s.pages.length) await s.context.clock.setSystemTime(s.context.__diffNow);
-  const page = await s.context.newPage();
+  const page = watch(await s.context.newPage(), s.given, () => 'tab ' + (s.pages.indexOf(page) + 1));
   if (viewport) await page.setViewportSize(viewport);
   page.on('pageerror', e => s.errors.push(String(e && e.message)));
   s.pages.push(page);

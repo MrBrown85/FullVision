@@ -30,7 +30,8 @@ const { tmpdir } = await import('node:os');
 const { join } = await import('node:path');
 const { ACTIONS } = await import('./differential/actions.mjs');
 const { USAGE, parseArgs } = await import('./differential/args.mjs');
-const { compareCalls, compareScreens, compareStorage } = await import('./differential/compare.mjs');
+const { compareCalls, compareScreens, compareStorage, compareViews } = await import('./differential/compare.mjs');
+const { firstUnlike } = await import('./differential/given.mjs');
 const { makeRng } = await import('./differential/prng.mjs');
 const { go, readIndexedDb, readScreens, readStorage, readView, takeLeftCalls, takeOwnCalls, tick } =
   await import('./differential/probe.mjs');
@@ -201,7 +202,35 @@ async function runMode(browser, urls, mode, opts) {
       calls.forEach(c => fresh(s, s.heldCalls, name, c));
     }
 
+    /* The run's check on itself (given.mjs): both builds were asked the
+       same things in the same order since the last look. */
+    function sameGiven() {
+      const unlike = firstUnlike(sides[0].given, sides[1].given);
+      sides.forEach(s => s.given.splice(0));
+      if (!unlike) return;
+      throw new Error(
+        'The run asked build A and build B different things, which is its own fault and says nothing about the builds. ' +
+          'What it asked, number ' +
+          unlike.at +
+          ' since the last comparison: A ' +
+          unlike.a +
+          ' | B ' +
+          unlike.b,
+      );
+    }
+
+    /* What the next action is picked from, read from both builds: a read
+       can change what the app holds, so neither build is read alone. The
+       two must be the same; A's is the one used. */
+    async function viewOf(name) {
+      const [va, vb] = await both(s => readView(s[name]));
+      const lines = compareViews(va, vb);
+      if (lines.length) throw new Difference(counts.steps, 'what the next action is picked from (' + name + ')', lines);
+      return va;
+    }
+
     async function compareNow(step, action, withScreens) {
+      sameGiven();
       const lines = [];
       const [sa, sb] = await both(s => readStorage(s.tab1));
       lines.push(...compareStorage(sa, sb));
@@ -222,7 +251,7 @@ async function runMode(browser, urls, mode, opts) {
       if (JSON.stringify(ea) !== JSON.stringify(eb))
         lines.push('page errors: A ' + JSON.stringify(ea) + ' | B ' + JSON.stringify(eb));
       if (!lines.length && withScreens) {
-        const view = await readView(sides[0].tab1);
+        const view = await viewOf('tab1');
         const who = screenWho(view, mode);
         const [xa, xb] = await withLimit(
           both(async s => {
@@ -247,7 +276,7 @@ async function runMode(browser, urls, mode, opts) {
 
     await compareNow(0, 'set-up', true);
     // The students whose screens are read, for actions that want them.
-    const startView = await readView(sides[0].tab1);
+    const startView = await viewOf('tab1');
     const firstWho = screenWho(startView, mode);
     const focus = [firstWho.student, ...firstWho.preview].filter(Boolean);
 
@@ -336,10 +365,10 @@ async function runMode(browser, urls, mode, opts) {
         tabName = wantTab2 && rng.chance(0.4) && !act.screen ? 'tab2' : 'tab1';
         if (act.kind.startsWith('phone')) {
           tabName = 'phone';
-          args = phonePick(act.kind, rng, await readView(sides[0].phone));
+          args = phonePick(act.kind, rng, await viewOf('phone'));
         } else if (act.pick) {
           if (act === RETURN_REFUSED) tabName = 'tab1';
-          args = act.pick(rng, await readView(sides[0][tabName]), { mode, focus, recent, forced: !!fixed });
+          args = act.pick(rng, await viewOf(tabName), { mode, focus, recent, forced: !!fixed });
           if (!args) continue;
         } else args = {};
         chosen = act;
@@ -377,7 +406,7 @@ async function runMode(browser, urls, mode, opts) {
         }
         if (process.env.DIFF_TRACE) console.log(mode, step, label, JSON.stringify(results[0]));
         if (process.env.DIFF_TRACE && String(results[0]).startsWith('threw'))
-          await sides[0][tabName].screenshot({ path: join(tmpdir(), 'fv-diff-threw-' + step + '.png') });
+          await both(s => s[tabName].screenshot({ path: join(tmpdir(), 'fv-diff-threw-' + step + s.label + '.png') }));
         if (args && args.sid && args.aid) {
           recent.unshift({ kind: chosen.kind, sid: args.sid, aid: args.aid, did: results[0], crit: args.crit });
           recent.length = Math.min(recent.length, 24);
@@ -413,6 +442,7 @@ async function runMode(browser, urls, mode, opts) {
       if (step % 25 === 0 && step < opts.steps)
         console.log(mode + ': step ' + step + ' of ' + opts.steps + ', 0 differences so far');
     }
+    sameGiven();
     // Requests to any other server than the build's own, over the whole
     // mode. A moment first, for the last of them to be heard of.
     await new Promise(r => setTimeout(r, 300));
