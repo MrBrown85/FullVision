@@ -88,6 +88,9 @@ jobs:
       - name: Check types
         run: npm run typecheck
 
+      - name: Check that checked files stay checked
+        run: npm run typecheck:ratchet
+
       # ESLint's no-undef and no-unused-vars, warnings everywhere except the
       # covered files above (eslint.config.mjs). It reports and never fails the job.
       - name: Lint (warnings only)
