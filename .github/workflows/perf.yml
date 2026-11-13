@@ -1,9 +1,11 @@
 name: Speed
 
 # Records load time and click response on a class of 30 students by 60
-# assessments (e2e-perf/speed.spec.js). It never fails a merge: the numbers
-# go to the run's summary and an artifact. Runs after each merge to main and
-# by hand (Actions > Speed > Run workflow).
+# assessments, and on a class with about 620 pieces of student work in
+# (e2e-perf/speed.spec.js). It never fails a merge: the numbers go to the
+# run's summary and an artifact. Runs after each merge to main and by hand
+# (Actions > Speed > Run workflow). The check that does fail on such a class
+# is tests/speed-guard.test.js, in every PR's unit tests.
 on:
   push:
     branches: [main]
