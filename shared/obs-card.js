@@ -112,6 +112,10 @@ window.ObsCard = (function () {
     }
     return _fmts[key];
   }
+  // The same, for other lists (the Observations page's day headings and filter dates).
+  function dateFormat(opts) {
+    return _format(JSON.stringify(opts), opts);
+  }
 
   /* "12:00 p.m." The feed's day header carries the date. */
   function cardTime(ob) {
@@ -408,6 +412,7 @@ window.ObsCard = (function () {
     parts: parts,
     cardTime: cardTime,
     cardWhen: cardWhen,
+    dateFormat: dateFormat,
     assessmentTitle: assessmentTitle,
     isLinked: isLinked,
     obDay: obDay,
