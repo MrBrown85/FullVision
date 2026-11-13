@@ -196,7 +196,7 @@ Nothing waits on you to do. The release is done and the two-tab fix is live.
 
 **Yours to decide**
 
-1. **Mark saving, step 5.** The design is in draft PR 1329. Step 5 would put an older score over a newer one when a laptop is offline with 500 changes waiting, a score is refused, and the same cell is scored on a phone. A redesign closes that but has had no review and still has two rare sequences worse than today. Bring step 5 back for review, or leave the fault as it is? The designer recommends leaving it and first counting how often a score is refused.
+1. **Mark saving, step 5.** The design is in draft PR 1329. Step 5 would put an older score over a newer one when a laptop is offline with 500 changes waiting, a score is refused, and the same cell is scored on a phone. A redesign closes that but has had no review and still has two rare sequences worse than today. The designer recommends leaving the fault and first counting how often a score is refused. Colin chose on Nov 13 to send the redesign to an independent review first. That review is running. Whether to build step 5 is decided after its verdict.
 2. **Step 1, Undo sends each call once.** It is ready to build and changes nothing a teacher sees. Build it now?
 3. **The phone's Undo.** After a score tap on the phone there is no way back. No design exists for where the control sits or when it shows.
 4. **Opened.** Where a teacher sees that a returned piece was opened, and the line the privacy page needs. Today the student page counts a piece as opened when its row has been on screen for 600 ms.
