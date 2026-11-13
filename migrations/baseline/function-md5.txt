@@ -6,6 +6,9 @@ fv_private.handout_read_allowed(p_name text) c49416c21dea4d9ebdae95e1ca881b8c 56
 fv_private.handout_upload_allowed(p_name text) b7a01941ecc710558b161f247c6cb413 678
 fv_private.report_note_hold(p_enrollment_id uuid, p_assessment_id uuid) f3ded8cae1f22c24b15fa2f7ba55427f 679
 fv_private.restore_grade_returns(p_payload jsonb) 66501afe2d758a938cfc8f1d4fc13a92 7761
+fv_private.same_teacher() 81cd77e2e122e6b12562a3ff412871f0 765
+fv_private.same_teacher_problem(p_row jsonb, p_args text[]) c79c97b49b7d5d31b1e9e72c9f4145a1 2187
+fv_private.teacher_of(p_kind text, p_id uuid) c2ed64921a7413c387fafdee8038fae2 4791
 fv_private.work_path_course(p_name text) 7fb0272243ceef1cb6b42658d27664e3 346
 fv_private.work_read_allowed(p_name text) 3ea2b37a835c7a86a881ed743b95d1c9 565
 fv_private.work_upload_allowed(p_name text) b53e85108b1e870a16e717055c63f2dc 632

@@ -207,6 +207,177 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION fv_private.same_teacher()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _new jsonb := to_jsonb(new);
+    _old jsonb;
+    _col text;
+begin
+    if tg_op = 'UPDATE' then
+        _old := to_jsonb(old);
+        if not exists (select 1 from unnest(tg_argv) a
+                        where (_new -> split_part(a, ':', 1)) is distinct from (_old -> split_part(a, ':', 1))) then
+            return new;
+        end if;
+    end if;
+    _col := fv_private.same_teacher_problem(_new, tg_argv);
+    if _col is not null then
+        raise exception '%.% names a record of another teacher', tg_table_name, _col using errcode = '42501';
+    end if;
+    return new;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.same_teacher_problem(p_row jsonb, p_args text[])
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _arg     text;
+    _col     text;
+    _kind    text;
+    _id      uuid;
+    _who     uuid;
+    _teacher uuid;
+begin
+    foreach _arg in array p_args loop
+        _col := split_part(_arg, ':', 1);
+        _kind := split_part(_arg, ':', 2);
+        continue when _kind in ('assessment_copy_group', 'rubric_copy_group');
+        for _id in
+            select v::uuid
+              from jsonb_array_elements_text(case jsonb_typeof(p_row -> _col)
+                                                 when 'array' then p_row -> _col
+                                                 when 'string' then jsonb_build_array(p_row -> _col)
+                                                 else '[]'::jsonb end) v
+        loop
+            _who := fv_private.teacher_of(replace(_kind, '[]', ''), _id);
+            continue when _who is null;
+            if _teacher is null then
+                _teacher := _who;
+            elsif _who <> _teacher then
+                return _col;
+            end if;
+        end loop;
+    end loop;
+    if _teacher is null then
+        return null;
+    end if;
+    -- A copy group links one teacher's assessments (or rubrics) in several
+    -- classes. Another teacher's group is not this row's to join.
+    foreach _arg in array p_args loop
+        _col := split_part(_arg, ':', 1);
+        _kind := split_part(_arg, ':', 2);
+        continue when (p_row ->> _col) is null;
+        if _kind = 'assessment_copy_group'
+           and exists (select 1 from assessment a join course c on c.id = a.course_id
+                        where a.copy_group = (p_row ->> _col)::uuid and c.teacher_id <> _teacher) then
+            return _col;
+        end if;
+        if _kind = 'rubric_copy_group'
+           and exists (select 1 from rubric r join course c on c.id = r.course_id
+                        where r.copy_group = (p_row ->> _col)::uuid and c.teacher_id <> _teacher) then
+            return _col;
+        end if;
+    end loop;
+    return null;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.teacher_of(p_kind text, p_id uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _t uuid;
+begin
+    case p_kind
+    when 'teacher' then
+        return p_id;
+    when 'course' then
+        select c.teacher_id into _t from course c where c.id = p_id;
+    when 'student' then
+        select s.teacher_id into _t from student s where s.id = p_id;
+    when 'enrollment' then
+        select c.teacher_id into _t from enrollment x join course c on c.id = x.course_id where x.id = p_id;
+    when 'assessment' then
+        select c.teacher_id into _t from assessment x join course c on c.id = x.course_id where x.id = p_id;
+    when 'rubric' then
+        select c.teacher_id into _t from rubric x join course c on c.id = x.course_id where x.id = p_id;
+    when 'category' then
+        select c.teacher_id into _t from category x join course c on c.id = x.course_id where x.id = p_id;
+    when 'module' then
+        select c.teacher_id into _t from module x join course c on c.id = x.course_id where x.id = p_id;
+    when 'subject' then
+        select c.teacher_id into _t from subject x join course c on c.id = x.course_id where x.id = p_id;
+    when 'competency_group' then
+        select c.teacher_id into _t from competency_group x join course c on c.id = x.course_id where x.id = p_id;
+    when 'section' then
+        select c.teacher_id into _t from section x join course c on c.id = x.course_id where x.id = p_id;
+    when 'custom_tag' then
+        select c.teacher_id into _t from custom_tag x join course c on c.id = x.course_id where x.id = p_id;
+    when 'observation' then
+        select c.teacher_id into _t from observation x join course c on c.id = x.course_id where x.id = p_id;
+    when 'questionnaire' then
+        select c.teacher_id into _t from questionnaire x join course c on c.id = x.course_id where x.id = p_id;
+    when 'phone_report' then
+        select c.teacher_id into _t from phone_report x join course c on c.id = x.course_id where x.id = p_id;
+    when 'report_issue' then
+        select c.teacher_id into _t from report_issue x join course c on c.id = x.course_id where x.id = p_id;
+    when 'submission' then
+        select c.teacher_id into _t from submission x join course c on c.id = x.course_id where x.id = p_id;
+    when 'revision_request' then
+        select c.teacher_id into _t from revision_request x join course c on c.id = x.course_id where x.id = p_id;
+    when 'criterion' then
+        select c.teacher_id into _t
+          from criterion x join rubric r on r.id = x.rubric_id join course c on c.id = r.course_id where x.id = p_id;
+    when 'criterion_check' then
+        select c.teacher_id into _t
+          from criterion_check k join criterion x on x.id = k.criterion_id join rubric r on r.id = x.rubric_id
+          join course c on c.id = r.course_id where k.id = p_id;
+    when 'tag' then
+        select c.teacher_id into _t
+          from tag x join section s on s.id = x.section_id join course c on c.id = s.course_id where x.id = p_id;
+    when 'observation_template' then
+        select coalesce(x.teacher_id, c.teacher_id) into _t
+          from observation_template x left join course c on c.id = x.course_id where x.id = p_id;
+    when 'question' then
+        select c.teacher_id into _t
+          from question x join questionnaire n on n.id = x.questionnaire_id join course c on c.id = n.course_id where x.id = p_id;
+    when 'response' then
+        select c.teacher_id into _t
+          from response x join questionnaire n on n.id = x.questionnaire_id join course c on c.id = n.course_id where x.id = p_id;
+    when 'submission_file' then
+        select c.teacher_id into _t
+          from submission_file x join submission s on s.id = x.submission_id join course c on c.id = s.course_id where x.id = p_id;
+    when 'term_rating' then
+        select c.teacher_id into _t
+          from term_rating x join enrollment e on e.id = x.enrollment_id join course c on c.id = e.course_id where x.id = p_id;
+    when 'score' then
+        select c.teacher_id into _t
+          from score x join enrollment e on e.id = x.enrollment_id join course c on c.id = e.course_id where x.id = p_id;
+    when 'student_card' then
+        select c.teacher_id into _t
+          from student_card x join enrollment e on e.id = x.enrollment_id join course c on c.id = e.course_id where x.id = p_id;
+    when 'access_code' then
+        select c.teacher_id into _t
+          from student_access_code x join enrollment e on e.id = x.enrollment_id join course c on c.id = e.course_id where x.id = p_id;
+    else
+        raise exception 'fv_private.teacher_of: no kind %', p_kind using errcode = '22023';
+    end case;
+    return _t;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION fv_private.work_path_course(p_name text)
  RETURNS uuid
  LANGUAGE sql
