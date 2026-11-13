@@ -278,15 +278,7 @@ const DOORS = {
   'teacher/report-feedback.js': { surface: 'progress', names: ['forStudent'] },
   'teacher/page-reports.js': {
     surface: 'progress',
-    names: [
-      'renderReportPreview',
-      'renderStudioPanels',
-      '_templateThumbs',
-      '_measureBlockSizes',
-      '_classSummary',
-      '_blockHtml',
-      '_draftsInPrint',
-    ],
+    names: ['renderReportPreview', 'renderStudioPanels', '_classSummary', '_draftsInPrint'],
   },
   'teacher/comment-bank.js': { surface: 'questionnaire', names: ['facts', 'compsOf', 'markedCounts'] },
   'teacher/report-questionnaire.js': {
@@ -320,7 +312,6 @@ describe('report files read scores only through ReportScores', () => {
     [
       'teacher/page-reports.js',
       'teacher/report-blocks.js',
-      'teacher/report-studio.js',
       'teacher/report-questionnaire.js',
       'teacher/comment-bank.js',
       'teacher/phone-reports.js',
@@ -480,16 +471,10 @@ describe('report files read scores only through ReportScores', () => {
       'the set in those keys',
       "return ReportScores.reportScoreSet('questionnaire');",
     ],
-    ['teacher/page-reports.js', '_thumbCache', 'JSON.stringify(list),\n      _reportSet(),\n    ].join'],
-    [
-      'teacher/page-reports.js',
-      '_blockSizes',
-      'if (_blockSizes === null || _blockSizesSet !== _reportSet()) {\n        _blockSizes = _measureBlockSizes();\n        _blockSizesSet = _reportSet();',
-    ],
     [
       'teacher/page-reports.js',
       '_classFit',
-      "_isGrade() ? 'grade:' + JSON.stringify(_gradeOpts()) : JSON.stringify(_formOf()),\n      _reportSet(),\n    ].join",
+      "return [activeCourse, ctx.termId, reportPaper, 'one:' + JSON.stringify(_oneModel()), _reportSet()].join('|');",
     ],
     ['teacher/page-reports.js', '_lastSummary (kept)', '_lastSummary = summary;\n    _lastSummarySet = _reportSet();'],
     [

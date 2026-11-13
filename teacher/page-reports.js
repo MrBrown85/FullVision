@@ -8,22 +8,18 @@ window.PageReports = (function () {
      never decides it and never reads a score. Each function below that
      draws or measures a Progress Report runs inside
      ReportScores.withReportScores every time it is called: from a click,
-     the resize timer, the class-fit timer, the palette's peek timer or a
-     promise alike, because the function itself is wrapped, not the code
-     that schedules it. The blocks, the Quick Report, the questionnaire and
-     the phone copies wrap themselves the same way in their own files.
-     What this page keeps to draw faster (the template pictures, the block
-     heights, the class fit, the last render's summary) is keyed by the
+     the resize timer, the class-fit timer or a promise alike, because the
+     function itself is wrapped, not the code that schedules it. The
+     blocks, One Report, the questionnaire and the phone copies wrap
+     themselves the same way in their own files. What this page keeps to
+     draw faster (the class fit, the last render's summary) is keyed by the
      set, _reportSet(). */
   var _inReportScores = function (fn) {
     return ReportScores.scoped('progress', fn);
   };
   renderReportPreview = _inReportScores(renderReportPreview);
   renderStudioPanels = _inReportScores(renderStudioPanels);
-  _templateThumbs = _inReportScores(_templateThumbs);
-  _measureBlockSizes = _inReportScores(_measureBlockSizes);
   _classSummary = _inReportScores(_classSummary);
-  _blockHtml = _inReportScores(_blockHtml);
   _draftsInPrint = _inReportScores(_draftsInPrint);
   function _reportSet() {
     return ReportScores.reportScoreSet('progress');
@@ -194,22 +190,14 @@ window.PageReports = (function () {
     return _tabFor(TABS, activeTab);
   }
 
-  /* ══════════════════════════════════════════════════════════════
-   REPORT BUILDER — Config, presets, persistence
-   ══════════════════════════════════════════════════════════════ */
+  /* The class's saved report settings (getReportConfig), as this page
+     holds them: One Report's model is reportConfig.one. */
   var reportConfig = null;
-
-  /* ── Block renderers + helpers now in report-blocks.js ────── */
-  var getPronouns = ReportBlocks.getPronouns;
-  var getTermId = ReportBlocks.getTermId;
-  var renderReportBlock = ReportBlocks.renderReportBlock;
 
   /* ── Paper ───────────────────────────────────────────────────────
      Letter or Legal for the printed reports, remembered per class on this
-     device. reports.css fixes @page to Letter; a Legal choice appends a
-     style element that overrides it, the way rubric-print.js does for its
-     layouts. DECISIONS.md, "Report forms" 4. */
-  var PAPER_STYLE_ID = 'report-paper-style';
+     device. The sheets set the page size themselves when they render
+     (ReportSheets.setPageStyle). DECISIONS.md, "Report forms" 4. */
   var PAPER_SIZES = { letter: 'letter portrait', legal: 'legal portrait' };
   var reportPaper = 'letter';
 
@@ -223,20 +211,6 @@ window.PageReports = (function () {
   }
 
   function _applyPaper() {
-    var style = document.getElementById(PAPER_STYLE_ID);
-    // The Report Card form's sheets carry their own margins and set the
-    // page size themselves when they render (ReportSheets.renderPreview).
-    var sheets = true;
-    if (reportPaper === 'letter' || sheets) {
-      if (style) style.remove();
-    } else {
-      if (!style) {
-        style = document.createElement('style');
-        style.id = PAPER_STYLE_ID;
-        document.head.appendChild(style);
-      }
-      style.textContent = '@media print { @page { size: ' + PAPER_SIZES[reportPaper] + '; margin: 0.5in; } }';
-    }
     document.querySelectorAll('#report-paper .seg-btn').forEach(function (b) {
       var on = b.dataset.paper === reportPaper;
       b.classList.toggle('active', on);
@@ -255,15 +229,6 @@ window.PageReports = (function () {
     }
     _applyPaper();
     if (activeTab === 'progress') renderReportPreview();
-  }
-
-  function _syncSidesButtons() {
-    var n = _formOf().sides.length > 1 ? '2' : '1';
-    document.querySelectorAll('#report-sides .seg-btn').forEach(function (b) {
-      var on = b.dataset.sides === n;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
   }
 
   /* ── Tab switching ───────────────────────────────────────────── */
@@ -296,12 +261,8 @@ window.PageReports = (function () {
 
   function _showProgressTab(on) {
     document.getElementById('student-picker').style.display = on ? '' : 'none';
-    const tbSave = document.getElementById('tb-save-template');
-    if (tbSave) tbSave.style.display = on ? '' : 'none';
     const copySel = document.getElementById('report-copy');
     if (copySel && !on) copySel.style.display = 'none';
-    if (on) _syncSidesButtons();
-    _syncProgressToolbar();
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = on ? '' : 'none';
     if (!on) phonesView = false;
@@ -583,18 +544,13 @@ window.PageReports = (function () {
       return;
     }
 
-    // Progress Reports: Page Studio (report-studio.js)
-    output.innerHTML = ReportStudio.layoutHtml({ view: studioView, settingsHtml: _printSettingsHtml() });
-    if (_isOne()) {
-      // The panel and the page listen on these two, made new each time.
-      var studio = document.getElementById('studio');
-      if (studio) studio.classList.add('studio-one');
-      ReportOnePanel.mount(document.getElementById('studio-palette'), _oneApi);
-      if (typeof ReportOnePage !== 'undefined') ReportOnePage.mount(document.getElementById('rb-preview'), _oneApi);
-    }
+    // Progress Reports: One Report's panel beside the pages.
+    output.innerHTML = _layoutHtml();
+    // The panel and the page listen on these two, made new each time.
+    ReportOnePanel.mount(document.getElementById('studio-palette'), _oneApi);
+    ReportOnePage.mount(document.getElementById('rb-preview'), _oneApi);
     renderStudioPanels();
     renderReportPreview();
-    _mountStudioKeys();
 
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
@@ -609,12 +565,81 @@ window.PageReports = (function () {
   }
 
   /* ══════════════════════════════════════════════════════════════
-   REPORT BUILDER — Interaction functions
+   PROGRESS REPORTS — One Report's panel and pages
    ══════════════════════════════════════════════════════════════ */
+  /* The two panes: One Report's panel (report-one-panel.js) on the left;
+     on the right the fit line, Paper, One Student / Everyone and the
+     pages, which the layout fills. The two report-one CSS files are scoped
+     under .studio-one. */
+  // html-safe: fixed markup; _printSettingsHtml is literal buttons
+  function _layoutHtml() {
+    var all = studioView === 'all';
+    return (
+      '<div class="studio studio-one" id="studio">' +
+      '<aside class="studio-palette no-print" id="studio-palette" aria-label="Report"></aside>' +
+      '<div class="studio-canvas">' +
+      '<div class="studio-head no-print">' +
+      '<span class="studio-fit" id="studio-fit"></span>' +
+      '<div class="studio-tools">' +
+      _printSettingsHtml() +
+      '<span class="seg seg-sm studio-view" role="radiogroup" aria-label="View">' +
+      '<button type="button" class="seg-btn' +
+      (all ? '' : ' active') +
+      '" data-action="studioView" data-view="one" role="radio" aria-checked="' +
+      !all +
+      '">One Student</button>' +
+      '<button type="button" class="seg-btn' +
+      (all ? ' active' : '') +
+      '" data-action="studioView" data-view="all" role="radio" aria-checked="' +
+      all +
+      '">Everyone</button>' +
+      '</span></div></div>' +
+      '<div class="rb-preview studio-pages' +
+      (all ? ' studio-all' : '') +
+      '" id="rb-preview"></div>' +
+      '<div class="studio-live" id="studio-live" aria-live="polite"></div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  /* Everyone leads with the students who need more than one sheet, most
+     first, then the rest in roster order. summary: the class fit (or
+     null, which keeps the order given). */
+  function _orderBySheets(students, summary) {
+    if (!summary || !summary.perStudent) return students.slice();
+    var sheetsOf = function (st) {
+      var p = summary.perStudent[st.id];
+      return p && p.sheets ? p.sheets : 1;
+    };
+    return students
+      .map(function (st, i) {
+        return { st: st, i: i, n: sheetsOf(st) };
+      })
+      .sort(function (a, b) {
+        return b.n - a.n || a.i - b.i;
+      })
+      .map(function (x) {
+        return x.st;
+      });
+  }
+
+  /* The student whose report is longest (most measured px), for the
+     default preview; null until the summary is in. */
+  function _longestStudent(summary) {
+    if (!summary || !summary.perStudent) return null;
+    var best = null;
+    Object.keys(summary.perStudent).forEach(function (sid) {
+      var p = summary.perStudent[sid];
+      if (!best || p.used > best.used) best = { id: sid, used: p.used };
+    });
+    return best ? best.id : null;
+  }
+
   /* The students the canvas shows: everyone selected in Everyone view, one
      of them in One Student view: the one the teacher picked, else the one
      whose report is longest when the class fit first comes in (the teacher
-     designs against the fullest report), else the first. The canvas moves
+     works against the fullest report), else the first. The canvas moves
      to the longest once; a later edit never moves it under the teacher. */
   function _previewStudents() {
     var all = sortStudents(getStudents(activeCourse), 'lastName');
@@ -625,10 +650,9 @@ window.PageReports = (function () {
             return selectedStudentIds.includes(st.id);
           });
     // Everyone leads with the students on more than one sheet.
-    if (studioView === 'all')
-      return ReportStudio.orderBySheets(chosen, _classFitKey === _classFitKeyNow() ? _classFit : null);
+    if (studioView === 'all') return _orderBySheets(chosen, _classFitKey === _classFitKeyNow() ? _classFit : null);
     if (previewAuto) {
-      var longest = ReportStudio.longestStudent(_classFitKey === _classFitKeyNow() ? _classFit : null);
+      var longest = _longestStudent(_classFitKey === _classFitKeyNow() ? _classFit : null);
       if (
         longest &&
         chosen.some(function (st) {
@@ -659,9 +683,9 @@ window.PageReports = (function () {
     Preview.renderReportPreview({
       cid: activeCourse,
       students: _previewStudents(),
-      reportConfig: reportConfig,
+      reportConfig: { form: _saved().form },
       paper: reportPaper,
-      layout: _layout(),
+      layout: ReportOne.layoutWith(_oneModel()),
       onSheets: _rememberSummary,
     });
     _syncPrintButton();
@@ -670,29 +694,27 @@ window.PageReports = (function () {
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
       _applyStudioZoom(preview);
-      _decoratePages(preview);
-      _applySelection(preview);
+      // The page's own controls (Hide, a row left off, a heading renamed,
+      // the comment): never on a printed copy.
+      if (!viewingIssue) ReportOnePage.decorate(preview, _oneApi());
     }
   }
 
-  /* One student's pages scale to the canvas: two side by side when there
-     is room, else one above the other. Everyone keeps the Fit Map's scale. */
+  /* One student's pages are worked on directly (a row left off, a heading
+     renamed, the comment edited), so they are drawn at reading size: one
+     above the other at up to full size, or two side by side where the
+     canvas is wide enough for both at three quarters or more. Everyone
+     keeps the Fit Map's scale. */
   function _applyStudioZoom(preview) {
     if (studioView === 'all') {
       preview.classList.remove('studio-stacked');
       return;
     }
-    var z = _isOne()
-      ? _oneZoom(preview.clientWidth || 800)
-      : ReportStudio.fitZoom(preview.clientWidth || 800, reportPaper);
+    var z = _oneZoom(preview.clientWidth || 800);
     preview.style.setProperty('--sheet-zoom', String(z.zoom));
     preview.classList.toggle('studio-stacked', !!z.stacked);
   }
 
-  /* One Report's pages are worked on directly (a row left off, a heading
-     renamed, the comment edited), so they are drawn at reading size: one
-     above the other at up to full size, or two side by side where the
-     canvas is wide enough for both at three quarters or more. */
   function _oneZoom(canvasWidth) {
     var sheetW = 8.5 * 96;
     // The canvas pads 24px a side; two pages sit 22px apart.
@@ -702,100 +724,10 @@ window.PageReports = (function () {
     return { zoom: Math.round(one * 1000) / 1000, stacked: true };
   }
 
-  /* + Page after the last side; Empty · Remove on an empty side past the
-     second. One Student view of Build Your Own only. */
-  function _decoratePages(preview) {
-    if (_isOne()) {
-      if (!viewingIssue && typeof ReportOnePage !== 'undefined') ReportOnePage.decorate(preview, _oneApi());
-      return;
-    }
-    if (studioView !== 'one' || viewingIssue || _isGrade()) return;
-    var student = preview.querySelector('.sheet-student');
-    if (!student) return;
-    var f = _formOf();
-    f.sides.forEach(function (sd, i) {
-      if (i < 2 || sd.rows.length) return;
-      var sheet = preview.querySelector('.sheet-zoom[data-side="' + i + '"] .report-sheet');
-      if (!sheet) return;
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'studio-page-empty no-print';
-      b.dataset.action = 'studioRemoveSide';
-      b.dataset.side = String(i);
-      b.textContent = 'Empty · Remove';
-      sheet.appendChild(b);
-    });
-    var add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'studio-page-add no-print';
-    add.dataset.action = 'studioAddSide';
-    add.textContent = '+ Page';
-    student.appendChild(add);
-  }
-
-  /* The selected block: a blue outline on the page and its inspector
-     pinned at the top right of the canvas, over the gutter the pages leave
-     (ReportStudio.GUTTER_W), so it stays put as the pages scroll. A control
-     that had focus in the inspector has it again after a redraw. */
-  function _applySelection(preview) {
-    var canvas = preview.parentElement;
-    var oldBar = canvas && canvas.querySelector('.studio-bar');
-    var had = oldBar && oldBar.contains(document.activeElement) ? document.activeElement : null;
-    var focusKey = had
-      ? ['action', 'key', 'value', 'dir', 'size', 'side', 'rule']
-          .map(function (k) {
-            return had.dataset[k] ? '[data-' + k + '="' + had.dataset[k] + '"]' : '';
-          })
-          .join('')
-      : '';
-    preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
-      el.classList.remove('studio-sel');
-    });
-    if (oldBar) oldBar.remove();
-    preview.querySelectorAll('.sheet-body .sheet-cell[data-block]').forEach(function (el) {
-      // Every block, the letterhead too, can be reached and selected from
-      // the keyboard; a screen reader hears the block's name.
-      el.setAttribute('tabindex', '0');
-      el.setAttribute('role', 'group');
-      el.setAttribute('aria-label', _label(el.dataset.block));
-    });
-    if (_focusBlock) {
-      var target = preview.querySelector('.sheet-body .sheet-cell[data-block="' + _focusBlock + '"]');
-      _focusBlock = null;
-      if (target) target.focus({ preventScroll: true });
-    }
-    if (!studioSelected || studioView !== 'one' || viewingIssue || !canvas) return;
-    var cells = preview.querySelectorAll('.sheet-body .sheet-cell[data-block="' + studioSelected + '"]');
-    if (!cells.length) return;
-    cells.forEach(function (el) {
-      el.classList.add('studio-sel');
-    });
-    var st = _previewStudent();
-    var who = st ? { id: st.id, name: fullName(st) } : null;
-    var bar = document.createElement('div');
-    bar.innerHTML = ReportStudio.blockToolbarHtml(
-      _formOf(),
-      studioSelected,
-      who,
-      ReportBlocks.showDefaults(activeCourse),
-    );
-    var barEl = bar.firstElementChild;
-    if (!barEl) return;
-    var top = preview.offsetTop + 12;
-    barEl.style.top = top + 'px';
-    barEl.style.maxHeight = 'calc(100% - ' + (top + 12) + 'px)';
-    canvas.appendChild(barEl);
-    if (focusKey) {
-      var again = barEl.querySelector(focusKey);
-      if (again) again.focus({ preventScroll: true });
-    }
-  }
-  var _focusBlock = null;
-
   /* ── The rail: sheets per student ──────────────────────────────
-     On the Report Card, each sidebar row shows how many sheets the
+     On Progress Reports, each sidebar row shows how many sheets the
      student needs ("1 sheet", "2 sheets") or "No comment", with the reason
-     as its title. The grade badges come back on any other tab or preset. */
+     as its title. The grade badges come back on any other tab. */
   var _sidebarAnnotated = false;
   function _annotateSidebar(summary) {
     if (!summary || !summary.perStudent) return;
@@ -862,7 +794,7 @@ window.PageReports = (function () {
     var preview = document.getElementById('rb-preview');
     if (!preview || !summary || !summary.perStudent) return;
     var nodes = Array.prototype.slice.call(preview.querySelectorAll(':scope > .sheet-student'));
-    var wanted = ReportStudio.orderBySheets(
+    var wanted = _orderBySheets(
       nodes.map(function (el) {
         return { id: el.dataset.sid };
       }),
@@ -1071,17 +1003,13 @@ window.PageReports = (function () {
           : n === 1
             ? '1 sheet'
             : '1 sheet each');
-    var form = ReportSheets.formFor(reportConfig);
-    var grade = _isGrade();
     var html = '<div class="confirm-card issue-card">';
     html += '<div class="confirm-title" id="issue-title">Print ' + n + (n === 1 ? ' Report' : ' Reports') + '</div>';
     html += '<div class="confirm-message">' + subtitle + '</div>';
     html += '<div class="issue-kv">';
     html +=
-      '<span class="issue-k">' +
-      (_isOne() ? 'Setup' : 'Form') +
-      '</span><span>' +
-      esc(_isOne() ? _oneSetupName() : grade ? 'Quick Report' : form.name) +
+      '<span class="issue-k">Setup</span><span>' +
+      esc(_oneSetupName()) +
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
@@ -1111,11 +1039,7 @@ window.PageReports = (function () {
     }
     html += '</fieldset>';
     // The Letterhead's Name option, here too so it can be set at print time.
-    var nameStyle = _isOne()
-      ? (_oneModel().options.header || {}).name
-      : grade
-        ? _gradeOpts().name
-        : ReportSheets.optionsFor(ReportSheets.cellOf(form, 'header') || { block: 'header' }).name;
+    var nameStyle = (_oneModel().options.header || {}).name;
     html += '<fieldset class="issue-group"><legend>Name</legend>';
     html +=
       '<label class="issue-option"><input type="radio" name="issue-name" value="preferred"' +
@@ -1146,22 +1070,7 @@ window.PageReports = (function () {
           ' Their reports print without it. <button type="button" data-issue="attendance">Enter it now</button>',
       );
     }
-    if (grade) {
-      // The Quick Report names each cause on its own: a student can have both.
-      var named = function (key) {
-        return Object.keys(c.summary.perStudent || {})
-          .filter(function (sid) {
-            return c.summary.perStudent[sid][key];
-          })
-          .map(function (sid) {
-            return c.summary.perStudent[sid].name;
-          });
-      };
-      var cut = named('gradeOver');
-      var tall = named('feedbackOver');
-      if (cut.length) warn.push(esc(cut.join(', ')) + ': too many assessments to fit on one sheet.');
-      if (tall.length) warn.push(esc(tall.join(', ')) + ': a feedback card is taller than a page.');
-    } else if (c.summary.over && c.summary.over.length) {
+    if (c.summary.over && c.summary.over.length) {
       warn.push(esc(c.summary.over.join(', ')) + ': a block is taller than a page.');
     }
     if (warn.length) {
@@ -1199,8 +1108,6 @@ window.PageReports = (function () {
       counts: c,
       trigger: document.activeElement,
       nameChanged: false,
-      gradeBefore: reportConfig.gradeReport ? JSON.parse(JSON.stringify(reportConfig.gradeReport)) : null,
-      formBefore: reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null,
       oneBefore: reportConfig.one ? JSON.parse(JSON.stringify(reportConfig.one)) : null,
     };
     var overlay = document.createElement('div');
@@ -1237,10 +1144,7 @@ window.PageReports = (function () {
     overlay.addEventListener('change', function (e) {
       var t = e.target;
       if (!t || t.name !== 'issue-name') return;
-      if (_isOne())
-        _setOne(ReportOne.setOption(_oneModel(), 'header', 'name', t.value === 'first' ? 'first' : 'preferred'));
-      else if (_isGrade()) _setGradeOption('name', t.value === 'first' ? 'first' : 'preferred');
-      else _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
+      _setOne(ReportOne.setOption(_oneModel(), 'header', 'name', t.value === 'first' ? 'first' : 'preferred'));
       if (_issueState) {
         _issueState.nameChanged = true;
         _issueState.counts = _issueCounts();
@@ -1295,22 +1199,12 @@ window.PageReports = (function () {
     if (overlay && overlay.remove) overlay.remove();
     if (_issueState && _issueState.nameChanged && !keepEveryone) {
       _issueState.nameChanged = false;
-      if (_isOne()) {
-        if (_issueState.oneBefore) reportConfig.one = _issueState.oneBefore;
-        else delete reportConfig.one;
-        _saveReportConfig();
-        _classFitKey = '';
-        renderStudioPanels();
-        renderReportPreview();
-      } else if (_isGrade()) {
-        reportConfig.gradeReport = _issueState.gradeBefore;
-        _saveReportConfig();
-        _classFitKey = '';
-        renderStudioPanels();
-        renderReportPreview();
-      } else {
-        _setForm(_issueState.formBefore || ReportSheets.formFor(null));
-      }
+      if (_issueState.oneBefore) reportConfig.one = _issueState.oneBefore;
+      else delete reportConfig.one;
+      _saveReportConfig();
+      _classFitKey = '';
+      renderStudioPanels();
+      renderReportPreview();
     }
     if (_restoreOneAfterPrint && !keepEveryone) {
       _restoreOneAfterPrint = false;
@@ -1413,7 +1307,7 @@ window.PageReports = (function () {
       termId: c.ctx.termId,
       termLabel: c.ctx.termLabel,
       paper: reportPaper,
-      form: _isOne() ? { one: _oneModel() } : ReportSheets.normalizeForm(reportConfig.form),
+      form: { one: _oneModel() },
       students: students,
     }).then(function (res) {
       if (!_mounted) return;
@@ -1426,97 +1320,41 @@ window.PageReports = (function () {
     });
   }
 
-  /* ── Page Studio state (report-studio.js) ─────────────────────── */
+  /* ── The canvas ──────────────────────────────────────────────── */
   var studioView = 'one'; // 'one' | 'all'
   var previewSid = null; // the student on the canvas in One Student view
   var previewAuto = true; // previewSid was chosen for the teacher (the longest report), not by them
-  var studioSelected = null; // the selected block id
-  var studioTab = 'blocks'; // the palette's tab
-  var _blockSizes = null; // every block's Row and Side by Side height for the class, measured once per class/paper/type
-  var _blockSizesSet = ''; // and per set of scores: the set those heights were measured in
-
-  /* Every edit saves the form and can be undone: `label` names the change
-     on the Undo toast ("Moved Teacher Comment up"); without one there is
-     no toast (an Undo itself, or a change the caller announces). */
-  function _setForm(form, label) {
-    var before = reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null;
-    reportConfig.form = ReportSheets.normalizeForm(form);
-    // Heights follow each placed block's options and lines; a move or a
-    // size change keeps them.
-    if (before && _optionsOf(before) !== _optionsOf(reportConfig.form)) _blockSizes = null;
-    _saveReportConfig();
-    if (studioSelected && !ReportSheets.locate(reportConfig.form, studioSelected)) studioSelected = null;
-    _classFitKey = '';
-    renderStudioPanels();
-    renderReportPreview();
-    _syncSidesButtons();
-    if (label && typeof showUndoToast === 'function') {
-      var wasSelected = studioSelected;
-      var cid = activeCourse;
-      showUndoToast(label, function () {
-        // Undo belongs to the class it was made in.
-        if (activeCourse !== cid) return;
-        studioSelected = wasSelected;
-        _setForm(before || ReportSheets.formFor(null));
-      });
-    }
-  }
-
-  /* Every placed block's options, no-evidence rule and lines, by id. */
-  function _optionsOf(f) {
-    var out = {};
-    (f.sides || []).forEach(function (sd) {
-      sd.rows.forEach(function (row) {
-        row.cells.forEach(function (c) {
-          out[c.block] = [c.options || null, c.noEvidence || null, c.lines || null];
-        });
-      });
-    });
-    return JSON.stringify(out);
-  }
-
-  function _formOf() {
-    return ReportSheets.formFor(reportConfig);
-  }
-
-  /* ── Grade Report (grade-report.js) ──────────────────────────── */
-  function _isGrade() {
-    return !_isOne() && !!reportConfig && reportConfig.progressMode === 'grade';
-  }
 
   /* ── One Report (report-one.js) ───────────────────────────────
-     One list of parts in place of the Quick Report and Custom (Colin,
-     2026-11-12; docs/plans/one-report-build-plan.md). Behind a switch
-     until it is the Progress Reports screen for everyone: ?onereport=1 in
-     the address turns it on for this device, ?onereport=0 off. The class's
-     Quick Report choices and built form are read, never rewritten; the
-     model is saved as reportConfig.one the first time the teacher changes
-     something. */
-  var ONE_KEY = 'fv-one-report';
-  var _oneOn = null;
+     One list of parts (Colin, 2026-11-12; docs/plans/one-report-build-plan.md).
+     A class's report is reportConfig.one, saved the first time the teacher
+     changes something. Until then it is read from what the class saved
+     before One Report (its Quick Report choices or its built form), each
+     time; those are read, never rewritten. */
   var _oneForStudent = false; // Changes Apply To: the student on the canvas, not the class
-  function _isOne() {
-    if (_oneOn === null) {
-      var on = false;
-      try {
-        var q = /[?&]onereport=([01])/.exec(location.search);
-        if (q) {
-          if (q[1] === '1') localStorage.setItem(ONE_KEY, '1');
-          else localStorage.removeItem(ONE_KEY);
-        }
-        on = localStorage.getItem(ONE_KEY) === '1';
-      } catch (e) {
-        on = false;
-      }
-      _oneOn = on && typeof ReportOne !== 'undefined' && typeof ReportOnePanel !== 'undefined';
-    }
-    return _oneOn && !!reportConfig;
+
+  /* What a class saved before One Report, read as the Progress Reports
+     screen read it: on the Quick Report unless it chose Build Your Own, or
+     built a form before there was a choice; its form, or the starting
+     one. ReportOne.modelFor and the measuring stage read this; nothing
+     saves it. */
+  function _readSaved(rc) {
+    var r = Object.assign({}, rc);
+    if (r.progressMode !== 'grade' && r.progressMode !== 'build') r.progressMode = r.form ? 'build' : 'grade';
+    r.form = ReportSheets.formFor({ form: rc && rc.form });
+    return r;
+  }
+  var _savedCache = { rc: null, read: null };
+  function _saved() {
+    if (_savedCache.rc !== reportConfig) _savedCache = { rc: reportConfig, read: _readSaved(reportConfig) };
+    return _savedCache.read;
   }
   var _oneCache = { rc: null, one: null, model: null };
   function _oneModel() {
     // Worked out again only when the class's settings or its saved model change.
     if (_oneCache.rc !== reportConfig || _oneCache.one !== reportConfig.one) {
-      _oneCache = { rc: reportConfig, one: reportConfig.one, model: ReportOne.modelFor(reportConfig) };
+      var input = Object.assign({}, _saved(), { one: reportConfig.one });
+      _oneCache = { rc: reportConfig, one: reportConfig.one, model: ReportOne.modelFor(input) };
     }
     return _oneCache.model;
   }
@@ -1529,7 +1367,8 @@ window.PageReports = (function () {
     })[0];
     return s ? s.name : 'Your Setup';
   }
-  /* Every change saves the model and can be undone, as _setForm does. */
+  /* Every change saves the model. `label` names the change on the Undo
+     toast; without one there is no toast. */
   function _setOne(model, label) {
     var before = reportConfig.one ? JSON.parse(JSON.stringify(reportConfig.one)) : null;
     reportConfig.one = ReportOne.normalize(model);
@@ -1598,181 +1437,33 @@ window.PageReports = (function () {
       announce: _announce,
     };
   }
-  function _gradeOpts() {
-    return GradeReport.options(reportConfig && reportConfig.gradeReport);
-  }
-  // The layout the preview, the fit line and printing use: the Grade
-  // Report's, or the built form's (undefined).
-  function _layout() {
-    if (_isOne()) return ReportOne.layoutWith(_oneModel());
-    return _isGrade() ? GradeReport.layoutWith(_gradeOpts()) : undefined;
-  }
-  function _setProgressMode(mode) {
-    if (mode !== 'grade' && mode !== 'build') return;
-    if (reportConfig.progressMode === mode) return;
-    reportConfig.progressMode = mode;
-    _saveReportConfig();
-    studioSelected = null;
-    _classFitKey = '';
-    previewAuto = true;
-    renderReports();
-    _syncProgressToolbar();
-  }
-  function _setGradeOption(key, value) {
-    reportConfig.gradeReport = Object.assign({}, _gradeOpts());
-    reportConfig.gradeReport[key] = value;
-    _saveReportConfig();
-    _classFitKey = '';
-    renderStudioPanels();
-    renderReportPreview();
-  }
-  /* Save as Template belongs to Build Your Own (so does Sides:
-     _printSettingsHtml). */
-  function _syncProgressToolbar() {
-    var build = activeTab === 'progress' && !_isGrade() && !_isOne();
-    var save = document.getElementById('tb-save-template');
-    if (save) save.style.display = build ? '' : 'none';
-    var rail = document.getElementById('tb-rail-btn');
-    if (rail) rail.textContent = _isOne() ? 'Parts' : _isGrade() ? 'Options' : 'Blocks';
-  }
-  /* Paper, and for Build Your Own Sides, over the canvas beside
-     One Student and Everyone. */
+
+  /* Paper, over the canvas beside One Student and Everyone. */
   // html-safe: literal labels, ids and option values only
   function _printSettingsHtml() {
-    var seg = function (label, id, action, key, options, current) {
-      return (
-        '<span class="tb-label">' +
-        label +
-        '</span><div class="seg seg-sm" id="' +
-        id +
-        '" role="radiogroup" aria-label="' +
-        label +
-        '">' +
-        options
-          .map(function (o) {
-            var on = o[0] === current;
-            return (
-              '<button type="button" class="seg-btn' +
-              (on ? ' active' : '') +
-              '" data-action="' +
-              action +
-              '" data-' +
-              key +
-              '="' +
-              o[0] +
-              '" role="radio" aria-checked="' +
-              on +
-              '">' +
-              o[1] +
-              '</button>'
-            );
-          })
-          .join('') +
-        '</div>'
-      );
-    };
-    var html = seg(
-      'Paper',
-      'report-paper',
-      'setPaper',
-      'paper',
-      [
-        ['letter', 'Letter'],
-        ['legal', 'Legal'],
-      ],
-      reportPaper,
-    );
-    if (!_isGrade() && !_isOne()) {
-      html += seg(
-        'Sides',
-        'report-sides',
-        'setSides',
-        'sides',
-        [
-          ['1', 'Front Only'],
-          ['2', 'Front and Back'],
-        ],
-        _formOf().sides.length > 1 ? '2' : '1',
-      );
-    }
-    return html + '<span class="tb-divider" aria-hidden="true">\u2502</span>';
-  }
-  // html-safe: literal labels and modes only
-  function _modeSwitchHtml() {
-    var grade = _isGrade();
-    var btn = function (mode, label, on) {
-      return (
-        '<button type="button" class="seg-btn' +
-        (on ? ' active' : '') +
-        '" data-action="progressMode" data-mode="' +
-        mode +
-        '" role="radio" aria-checked="' +
-        on +
-        '">' +
-        label +
-        '</button>'
-      );
-    };
+    var options = [
+      ['letter', 'Letter'],
+      ['legal', 'Legal'],
+    ];
     return (
-      '<div class="seg studio-mode" role="radiogroup" aria-label="Report">' +
-      btn('grade', 'Quick Report', grade) +
-      btn('build', 'Custom', !grade) +
-      '</div>'
-    );
-  }
-  // html-safe: literal labels, keys and values only
-  function _gradePanelHtml() {
-    var o = _gradeOpts();
-    var check = function (key, label, off) {
-      return (
-        '<label class="studio-check' +
-        (off ? ' is-off' : '') +
-        '"><input type="checkbox" data-action="gradeOption" data-key="' +
-        key +
-        '"' +
-        (o[key] ? ' checked' : '') +
-        (off ? ' disabled' : '') +
-        '><span>' +
-        label +
-        '</span></label>'
-      );
-    };
-    var order = function (v, label) {
-      return (
-        '<button type="button" class="seg-btn' +
-        (o.order === v ? ' active' : '') +
-        '" data-action="gradeOrder" data-value="' +
-        v +
-        '" role="radio" aria-checked="' +
-        (o.order === v) +
-        '">' +
-        label +
-        '</button>'
-      );
-    };
-    return (
-      '<div class="gr-panel">' +
-      '<h4>Grade Sheet</h4>' +
-      check('summary', 'Category Summary') +
-      check('ungraded', 'Ungraded Assignments') +
-      check('numbers', 'Assignment Numbers') +
-      // The Feedback Pages switch. Off greys the choices under it and keeps
-      // their ticks: their saved values are not touched.
-      '<div class="gr-switch-row"><h4>Feedback Pages</h4>' +
-      '<button type="button" class="gr-switch" role="switch" data-action="gradeFeedback" aria-label="Feedback Pages" aria-checked="' +
-      !!o.feedback +
-      '"><span class="gr-switch-knob"></span></button></div>' +
-      '<div class="gr-sub">' +
-      check('rubrics', 'Rubrics', !o.feedback) +
-      check('comments', 'Assignment Comments', !o.feedback) +
-      check('observations', 'Observations', !o.feedback) +
-      check('termComment', 'Term Comment', !o.feedback) +
-      '</div>' +
-      '<h4>Order</h4>' +
-      '<div class="seg seg-sm" role="radiogroup" aria-label="Order">' +
-      order('oldest', 'Oldest First') +
-      order('newest', 'Newest First') +
-      '</div></div>'
+      '<span class="tb-label">Paper</span><div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper">' +
+      options
+        .map(function (o) {
+          var on = o[0] === reportPaper;
+          return (
+            '<button type="button" class="seg-btn' +
+            (on ? ' active' : '') +
+            '" data-action="setPaper" data-paper="' +
+            o[0] +
+            '" role="radio" aria-checked="' +
+            on +
+            '">' +
+            o[1] +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div><span class="tb-divider" aria-hidden="true">│</span>'
     );
   }
 
@@ -1787,20 +1478,15 @@ window.PageReports = (function () {
     saveReportConfig(activeCourse, reportConfig);
   }
 
+  /* The class's report settings as saved, every key kept as it is. */
   function _loadReportConfig(cid) {
     // Changes Apply To a student ends with the class it was set in.
     _oneForStudent = false;
-    var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
-    // Progress Reports opens on the Grade Report, or on Build Your Own for a
-    // class that built a report before there was a choice.
-    if (rc.progressMode !== 'grade' && rc.progressMode !== 'build') rc.progressMode = rc.form ? 'build' : 'grade';
-    rc.form = ReportSheets.formFor(rc);
-    rc.preset = 'standard';
-    return rc;
+    return Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
   }
 
-  /* A control in the palette that has focus, as a selector that finds the
-     same control after the palette is redrawn (the class fit redraws it a
+  /* A control in the panel that has focus, as a selector that finds the
+     same control after the panel is redrawn (the class fit redraws it a
      moment after an option changes). */
   function _focusedPaletteControl(palette) {
     var el = document.activeElement;
@@ -1815,29 +1501,7 @@ window.PageReports = (function () {
   function renderStudioPanels() {
     var palette = document.getElementById('studio-palette');
     var refocus = _focusedPaletteControl(palette);
-    if (palette && _isOne()) {
-      ReportOnePanel.render(palette, _oneApi());
-      palette.setAttribute('aria-label', 'Report');
-    } else if (palette && _isGrade()) {
-      palette.innerHTML = _modeSwitchHtml() + _gradePanelHtml();
-      palette.setAttribute('aria-label', 'Quick Report');
-    } else if (palette) {
-      palette.setAttribute('aria-label', 'Blocks');
-      if (_blockSizes === null || _blockSizesSet !== _reportSet()) {
-        _blockSizes = _measureBlockSizes();
-        _blockSizesSet = _reportSet();
-      }
-      palette.innerHTML = ReportStudio.paletteHtml(
-        _formOf(),
-        studioTab,
-        ReportSheets.templates(),
-        _blockSizes,
-        _classFitKey === _classFitKeyNow() ? _classFit : null,
-        studioTab === 'templates' ? _templateThumbs() : null,
-      );
-      palette.insertAdjacentHTML('afterbegin', _modeSwitchHtml());
-      ReportStudio.fitThumbs(palette);
-    }
+    if (palette) ReportOnePanel.render(palette, _oneApi());
     var again = refocus && palette && palette.querySelector(refocus);
     if (again && again.focus) again.focus();
     _renderFitLine();
@@ -1846,112 +1510,27 @@ window.PageReports = (function () {
   function _renderFitLine() {
     var line = document.getElementById('studio-fit');
     if (!line) return;
-    if (_isOne()) {
-      // html-safe: ReportOnePanel.fitHtml escapes the names it prints
-      line.innerHTML = ReportOnePanel.fitHtml(_oneApi());
-      line.classList.toggle('ok', !line.querySelector('.one-fit-over'));
-      return;
-    }
-    line.innerHTML = ReportStudio.fitLineHtml(
-      _classFitKey === _classFitKeyNow() ? _classFit : null,
-      _isGrade() ? null : _formOf(),
-      _isGrade()
-        ? {
-            over: 'Too many assessments to fit on one sheet for ',
-            feedbackOver: 'A feedback card is taller than a page for ',
-          }
-        : null,
-    );
-    line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
+    // html-safe: ReportOnePanel.fitHtml escapes the names it prints
+    line.innerHTML = ReportOnePanel.fitHtml(_oneApi());
+    line.classList.toggle('ok', !line.querySelector('.one-fit-over'));
   }
 
-  /* Each starter and saved template drawn with the previewed student's
-     real report, for the Templates tab: { id: { html, sheets } }. Measured
-     once per class, student, paper, library and set of scores. */
-  var _thumbCache = { key: '', thumbs: null };
-  function _templateThumbs() {
-    var st = _previewStudent();
-    if (!st) return null;
-    var list = ReportSheets.templates();
-    var key = [
-      activeCourse,
-      st.id,
-      reportPaper,
-      ReportBlocks.reportContext().termId,
-      JSON.stringify(list),
-      _reportSet(),
-    ].join('|');
-    if (_thumbCache.key === key) return _thumbCache.thumbs;
-    var out = {};
-    var ctx = ReportBlocks.reportContext();
-    var draw = function (id, form) {
-      try {
-        out[id] = ReportSheets.thumbs(activeCourse, st, ctx, { form: form, paper: reportPaper });
-      } catch (e) {
-        out[id] = null;
-      }
-    };
-    ReportSheets.starters().forEach(function (s) {
-      draw(s.id, ReportSheets.starter(s.id));
-    });
-    list.forEach(function (t) {
-      draw(t.id, t.form);
-    });
-    _thumbCache = { key: key, thumbs: out };
-    return out;
-  }
-
-  /* Every block at both widths for every student: the tallest wins, so
-     the palette knows where a block has room for the whole class. */
-  function _measureBlockSizes() {
-    try {
-      var students = sortStudents(getStudents(activeCourse), 'lastName');
-      if (!students.length) return {};
-      return ReportSheets.blockSizes(activeCourse, students, ReportBlocks.reportContext(), {
-        paper: reportPaper,
-        type: _formOf().type,
-        form: _formOf(),
-      });
-    } catch (e) {
-      return {};
-    }
-  }
-
-  /* Where a block from the palette lands: the Front when it has room for
-     every student, else the Back (the toast says so), else after the
-     report when it is taller than a side. Null when nothing fits. */
-  function _landing(id) {
-    var f = _formOf();
-    var land = ReportStudio.landing(f, id, _blockSizes, _classFitKey === _classFitKeyNow() ? _classFit : null);
-    if (!land) return { side: f.sides.length - 1 };
-    if (land.reason) return null;
-    if (land.after) return { side: f.sides.length - 1, after: true };
-    return land;
-  }
-
-  /* The whole class laid out on the form, for the fit line, once per
-     class, report, paper, form and set of scores, after the canvas has
-     rendered. In Everyone view the canvas render is that summary. */
+  /* The whole class laid out, for the fit line, once per class, report,
+     paper, model and set of scores, after the canvas has rendered. In
+     Everyone view the canvas render is that summary. */
   var _classFit = null;
   var _classFitKey = '';
   function _classFitKeyNow() {
     var ctx = ReportBlocks.reportContext();
-    return [
-      activeCourse,
-      ctx.termId,
-      reportPaper,
-      _isOne() ? 'one:' + JSON.stringify(_oneModel()) : '',
-      _isGrade() ? 'grade:' + JSON.stringify(_gradeOpts()) : JSON.stringify(_formOf()),
-      _reportSet(),
-    ].join('|');
+    return [activeCourse, ctx.termId, reportPaper, 'one:' + JSON.stringify(_oneModel()), _reportSet()].join('|');
   }
   /* Every student laid out, off the canvas: the grades are read here, when
      the timer below runs, inside the report's set of scores. */
   function _classSummary(students) {
     return ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
       paper: reportPaper,
-      form: _formOf(),
-      layout: _layout(),
+      form: _saved().form,
+      layout: ReportOne.layoutWith(_oneModel()),
     });
   }
   function _scheduleClassFit() {
@@ -1973,14 +1552,14 @@ window.PageReports = (function () {
       } catch (e) {
         _classFit = null;
       }
-      // The palette greys the blocks with no room once the fit is in, and
+      // The panel and the fit line are redrawn once the fit is in, and
       // every student's badge in the rail is redrawn from it: a render of
       // one student only redraws that student's (step 4 group 2 #9).
       renderStudioPanels();
       if (_classFit) _annotateSidebar(_classFit);
       // The summary names the longest report; the canvas moves to it.
       if (previewAuto && studioView === 'one') {
-        var longest = ReportStudio.longestStudent(_classFit);
+        var longest = _longestStudent(_classFit);
         if (longest) {
           previewAuto = false;
           if (longest !== previewSid) {
@@ -1992,70 +1571,6 @@ window.PageReports = (function () {
     }, 0);
   }
 
-  /* Your Templates are the teacher's, on the server (report_template);
-     this device keeps a copy that shows at once. */
-  function _syncTemplates() {
-    if (typeof ReportSheets.syncTemplates !== 'function') return;
-    ReportSheets.syncTemplates().then(function (changed) {
-      if (changed && _mounted && studioTab === 'templates' && activeTab === 'progress') renderStudioPanels();
-    });
-  }
-
-  var SAVE_TEMPLATE_ID = 'save-template-overlay';
-  function _closeSaveTemplate() {
-    var o = document.getElementById(SAVE_TEMPLATE_ID);
-    if (o) o.remove();
-    var b = document.getElementById('tb-save-template');
-    if (b) b.focus();
-  }
-  function _openSaveTemplate() {
-    _closeSaveTemplate();
-    var form = _formOf();
-    var starter = ReportSheets.starters().some(function (st) {
-      return st.id === form.id && st.name === form.name;
-    });
-    var overlay = document.createElement('div');
-    overlay.id = SAVE_TEMPLATE_ID;
-    overlay.className = 'confirm-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'save-template-title');
-    overlay.innerHTML =
-      '<form class="confirm-card studio-save-card" id="save-template-form">' +
-      '<div class="confirm-title" id="save-template-title">Save as Template</div>' +
-      '<label class="studio-save-label" for="save-template-name">Name</label>' +
-      '<input type="text" class="studio-text" id="save-template-name" maxlength="60" required value="' +
-      esc(starter ? '' : form.name || '') +
-      '">' +
-      '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-save="cancel">Cancel</button>' +
-      '<button type="submit" class="confirm-ok primary">Save</button></div></form>';
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay || (e.target.closest && e.target.closest('[data-save="cancel"]'))) _closeSaveTemplate();
-    });
-    overlay.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') _closeSaveTemplate();
-    });
-    overlay.querySelector('form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var name = overlay.querySelector('#save-template-name').value.trim();
-      if (!name) return;
-      var entry = ReportSheets.saveTemplate(name, Object.assign({}, _formOf(), { name: name, id: 'custom' }));
-      _closeSaveTemplate();
-      if (!entry) return;
-      studioTab = 'templates';
-      renderStudioPanels();
-    });
-    document.body.appendChild(overlay);
-    var input = overlay.querySelector('#save-template-name');
-    if (input) input.focus();
-  }
-
-  function _selectBlock(id) {
-    studioSelected = id || null;
-    var preview = document.getElementById('rb-preview');
-    if (preview) _applySelection(preview);
-  }
-
   function _announce(text) {
     var live = document.getElementById('studio-live');
     if (live) live.textContent = text;
@@ -2063,213 +1578,6 @@ window.PageReports = (function () {
 
   function _previewStudent() {
     return _previewStudents()[0] || null;
-  }
-
-  /* The pointer and keyboard work on the page (report-studio.js). Every
-     edit goes through _setForm, which saves and offers Undo. A drop on a
-     side with no room for every student lands on the next side that has
-     it, and the toast says so. */
-  var _studioKeys = null;
-  var _studioDrag = null;
-  function _mountStudioKeys() {
-    if (_studioKeys) _studioKeys.destroy();
-    if (_studioDrag) _studioDrag.destroy();
-    _studioKeys = _studioDrag = null;
-    // One Report's pages have their own controls; the old editor's keys
-    // and dragging would change the built form under them.
-    if (_isOne()) return;
-    var root = document.getElementById('studio');
-    if (!root) return;
-    var fit = function () {
-      return _classFitKey === _classFitKeyNow() ? _classFit : null;
-    };
-    _studioDrag = ReportStudio.initDrag(root, {
-      form: _formOf,
-      sizes: function () {
-        return _blockSizes;
-      },
-      canHalf: ReportSheets.canHalf,
-      insert: function (id, to) {
-        var f = _formOf();
-        var was = ReportSheets.locate(f, id);
-        var label = (was ? 'Moved ' : 'Added ') + _label(id);
-        // A side with no room for every student passes the block on to the
-        // next side that has it (the sides after it first).
-        if (ReportStudio.fitsOn(f, id, to.side, _blockSizes, fit()) === false) {
-          var order = [];
-          for (var s = to.side + 1; s < f.sides.length; s++) order.push(s);
-          for (var t = 0; t < to.side; t++) order.push(t);
-          var next = order.find(function (s) {
-            return ReportStudio.fitsOn(f, id, s, _blockSizes, fit());
-          });
-          if (next != null) {
-            var full =
-              to.side === 0 && next > 1
-                ? 'The Front and Back are full'
-                : to.side === 0
-                  ? 'The Front is full'
-                  : to.side === 1
-                    ? 'The Back is full'
-                    : 'That page is full';
-            label += ' to ' + ReportStudio.sideWhere(next) + '. ' + full;
-            to = { side: next };
-          }
-        }
-        _setForm(ReportSheets.insert(f, id, to), label);
-      },
-      beside: function (id, target) {
-        var f = _formOf();
-        _setForm(ReportSheets.beside(f, id, target), 'Put ' + _label(id) + ' beside ' + _label(target));
-      },
-      select: _selectBlock,
-      announce: _announce,
-      html: function (id, size) {
-        return _blockHtml(id, size);
-      },
-    });
-    var keepFocus = function (id) {
-      if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.sheet-cell')) {
-        _focusBlock = id;
-      }
-    };
-    _studioKeys = ReportStudio.initKeys(root, {
-      form: _formOf,
-      move: function (id, dir) {
-        keepFocus(id);
-        _moveBlock(id, dir);
-      },
-      remove: _removeBlock,
-      select: function (id) {
-        _focusBlock = id;
-        _selectBlock(id);
-      },
-      announce: _announce,
-      escape: _studioEscape,
-    });
-  }
-
-  /* Escape on Progress Reports closes the Blocks panel on a narrow screen,
-     else the selected block's card, focus going back to the block (step 4
-     group 3 #64). A dialog over the page keeps Escape for itself. */
-  function _studioEscape(e) {
-    if (activeTab !== 'progress' || document.querySelector('.confirm-overlay, .studio-dragging')) return false;
-    // An Escape a dialog used to close itself (it is gone from the page) or
-    // pressed inside one is the dialog's.
-    var t = e && e.target;
-    if (t && t.nodeType === 1 && (!t.isConnected || (t.closest && t.closest('[role="dialog"]')))) return false;
-    var layout = document.getElementById('studio');
-    var rail = document.getElementById('tb-rail-btn');
-    if (layout && layout.classList.contains('rail-open')) {
-      layout.classList.remove('rail-open');
-      if (rail) {
-        rail.classList.remove('active');
-        rail.setAttribute('aria-pressed', 'false');
-        rail.focus();
-      }
-      return true;
-    }
-    if (studioSelected) {
-      var id = studioSelected;
-      _focusBlock = id;
-      _selectBlock(null);
-      return true;
-    }
-    return false;
-  }
-
-  function _label(id) {
-    return ReportSheets.BLOCKS[id] ? ReportSheets.BLOCKS[id].label : id;
-  }
-  /* A block rendered for the previewed student, for the ghost and the
-     palette's previews. */
-  function _blockHtml(id, size) {
-    var st = _previewStudent();
-    if (!st) return '';
-    var cell = ReportSheets.cellOf(_formOf(), id) || { block: id, size: size || 'row' };
-    try {
-      return ReportBlocks.renderReportBlock(
-        id,
-        activeCourse,
-        st,
-        ReportBlocks.reportContext(),
-        ReportSheets.optionsFor(cell),
-      );
-    } catch (e) {
-      return '';
-    }
-  }
-
-  /* Holding the pointer on a block in the palette shows it at its real
-     size for the previewed student, beside the palette. */
-  var PEEK_SCALE = 0.47; // reports.css .studio-peek-sheet
-  var _peekTimer = null;
-  var _peekFor = null; // the palette button the pointer rests on
-  function _hidePeek() {
-    clearTimeout(_peekTimer);
-    _peekTimer = null;
-    _peekFor = null;
-    var p = document.getElementById('studio-peek');
-    if (p) p.remove();
-  }
-  function _handlePeekOver(e) {
-    var btn = e.target.closest ? e.target.closest('#studio-palette .studio-blk[data-block]') : null;
-    if (!btn || (_studioDrag && _studioDrag.dragging())) return;
-    _hidePeek();
-    _peekFor = btn;
-    _peekTimer = setTimeout(function () {
-      if (_peekFor !== btn) return;
-      var id = btn.dataset.block;
-      var html = _blockHtml(id, 'row');
-      if (!html) return;
-      var st = _previewStudent();
-      var wrap = document.createElement('div');
-      wrap.innerHTML = ReportStudio.peekHtml(_label(id), st ? fullName(st) : '', html);
-      var peek = wrap.firstElementChild;
-      peek.id = 'studio-peek';
-      document.body.appendChild(peek);
-      // The sheet is scaled with a transform, which leaves layout alone:
-      // the box takes the scaled height by hand.
-      var inner = peek.querySelector('.sheet-cell');
-      peek.querySelector('.studio-peek-box').style.height = Math.ceil(inner.offsetHeight * PEEK_SCALE) + 'px';
-      var br = btn.getBoundingClientRect();
-      var top = Math.max(8, Math.min(br.top, window.innerHeight - peek.offsetHeight - 8));
-      peek.style.left = br.right + 10 + 'px';
-      peek.style.top = top + 'px';
-    }, 350);
-  }
-  function _handlePeekOut(e) {
-    var btn = e.target.closest ? e.target.closest('#studio-palette .studio-blk[data-block]') : null;
-    if (!btn) return;
-    var to = e.relatedTarget;
-    if (to && btn.contains(to)) return;
-    _hidePeek();
-  }
-  function _moveBlock(id, dir) {
-    var f = _formOf();
-    var next = ReportSheets.moveRow(f, id, dir);
-    if (JSON.stringify(next) === JSON.stringify(f)) return;
-    _setForm(next, 'Moved ' + _label(id) + (dir < 0 ? ' up' : ' down'));
-  }
-  /* Selects a placed block on the previewed student's page and brings it
-     into view, from the palette. Everyone view switches to One Student,
-     where a block can be selected. */
-  function _findBlock(id) {
-    if (studioView !== 'one') {
-      studioView = 'one';
-      studioSelected = id;
-      renderReports();
-    } else _selectBlock(id);
-    var cell = document.querySelector('#rb-preview .sheet-body .sheet-cell[data-block="' + id + '"]');
-    if (cell) {
-      cell.scrollIntoView({ block: 'nearest' });
-      cell.focus({ preventScroll: true });
-    }
-    _announce(ReportStudio.placeText(_formOf(), id) + '.');
-  }
-  function _removeBlock(id) {
-    if (studioSelected === id) studioSelected = null;
-    _setForm(ReportSheets.removeCell(_formOf(), id), 'Removed ' + _label(id));
-    _announce(_label(id) + ' removed from the report.');
   }
 
   /* ── Course switching ────────────────────────────────────────── */
@@ -2288,11 +1596,9 @@ window.PageReports = (function () {
     reportPaper = _loadPaper(cid);
     _applyPaper();
     reportConfig = _loadReportConfig(cid);
-    _blockSizes = null;
     _classFitKey = '';
     previewSid = null;
     previewAuto = true;
-    studioSelected = null;
     _configureQuestionnaire();
     populateStudentSelect();
     populateReportPeriods(false);
@@ -2361,12 +1667,6 @@ window.PageReports = (function () {
       if (dd) dd.classList.remove('open');
     }
 
-    var cell = e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]');
-    if (cell && studioView === 'one' && !viewingIssue && !_isOne()) {
-      _selectBlock(cell.dataset.block);
-      return;
-    }
-
     // A click outside the IE deadline calendar closes it.
     if (RQ.deadlineOpen() && !e.target.closest('#tq-cal, #tq-deadline-btn')) RQ.tqCloseDeadline();
     // And outside the Support Line menu or the character limit.
@@ -2376,9 +1676,9 @@ window.PageReports = (function () {
     if (!el) return;
     var action = el.dataset.action;
     // One Report's own controls (data-action="one…") go to its panel and page.
-    if (_isOne() && /^one[A-Z]/.test(action)) {
+    if (/^one[A-Z]/.test(action)) {
       if (ReportOnePanel.handle(action, el, _oneApi(), e)) return;
-      if (typeof ReportOnePage !== 'undefined' && ReportOnePage.handle(action, el, _oneApi(), e)) return;
+      if (ReportOnePage.handle(action, el, _oneApi(), e)) return;
     }
     var handlers = {
       switchTab: function () {
@@ -2457,8 +1757,8 @@ window.PageReports = (function () {
         tqNextStudent();
       },
       printReports: function () {
-        // One Report: a comment edited on the page is saved or discarded first.
-        if (_isOne() && typeof ReportOnePage !== 'undefined' && ReportOnePage.beforePrint(_oneApi()) === false) return;
+        // A comment edited on the page is saved or discarded first.
+        if (ReportOnePage.beforePrint(_oneApi()) === false) return;
         // A chosen copy prints as it is; the live reports save a copy, then print.
         var t = _tab();
         if (viewingIssue) _printIssue();
@@ -2467,150 +1767,15 @@ window.PageReports = (function () {
       },
       setPaper: function () {
         setPaper(el.dataset.paper);
-        _blockSizes = null;
-        renderStudioPanels();
-      },
-      setSides: function () {
-        var n = el.dataset.sides === '1' ? 1 : 2;
-        var f = _formOf();
-        if ((f.sides.length === 1) === (n === 1)) return;
-        _setForm(ReportSheets.setSides(f, n), n === 1 ? 'Front only' : 'Front and Back');
-        _syncSidesButtons();
       },
       studioView: function () {
         studioView = el.dataset.view === 'all' ? 'all' : 'one';
         renderReports();
       },
-      studioTab: function () {
-        studioTab = el.dataset.tab === 'templates' ? 'templates' : 'blocks';
-        renderStudioPanels();
-        if (studioTab === 'templates') _syncTemplates();
-      },
-      studioBlock: function () {
-        // A block already on the form is found on the page: selected, with
-        // its card, and scrolled to (DECISIONS "Report forms" 13; it was
-        // removed, step 4 group 2 #8). Remove is on its card. One that isn't
-        // lands in a row of its own: on the Front when it has room for
-        // every student, else on the Back, with a toast that says so. A
-        // block taller than a side prints after the report.
-        var id = el.dataset.block;
-        var f = _formOf();
-        if (ReportSheets.locate(f, id)) return _findBlock(id);
-        if (el.getAttribute('aria-disabled') === 'true') return;
-        var land = _landing(id);
-        if (!land) return;
-        studioSelected = id;
-        var label = 'Added ' + _label(id);
-        if (land.after) label += '. It prints after the report';
-        else if (land.side > 0 && f.sides.length > 1)
-          label +=
-            ' to ' +
-            ReportStudio.sideWhere(land.side) +
-            (land.side > 1 ? '. The Front and Back are full' : '. The Front is full');
-        _setForm(ReportSheets.insert(f, id, { side: land.side }), label);
-        _announce(ReportStudio.placeText(_formOf(), id) + '.');
-      },
-      studioChoice: function () {
-        var v = el.dataset.value;
-        _setForm(
-          ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, /^\d+$/.test(v) ? Number(v) : v),
-          'Changed ' + _label(el.dataset.block) + ' options',
-        );
-      },
-      studioNoEvidence: function () {
-        _setForm(
-          ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule),
-          'Changed ' + _label(el.dataset.block) + ' options',
-        );
-      },
-      studioLines: function () {
-        var id = el.dataset.block;
-        var cur = ReportSheets.optionsFor(ReportSheets.cellOf(_formOf(), id) || { block: id }).lines;
-        var n = cur + (Number(el.dataset.dir) || 1);
-        _setForm(ReportSheets.setLines(_formOf(), id, n), _label(id) + ': ' + n + ' lines');
-      },
-      studioSize: function () {
-        var id = el.dataset.block;
-        var size = el.dataset.size === 'half' ? 'half' : 'row';
-        var f = _formOf();
-        if ((ReportSheets.cellOf(f, id) || {}).size === size) return;
-        _setForm(
-          ReportSheets.setSize(f, id, size, ReportStudio.halfHeights(_blockSizes)),
-          _label(id) + ': ' + (size === 'half' ? 'Side by Side' : 'Row'),
-        );
-      },
-      studioMove: function () {
-        _moveBlock(el.dataset.block, Number(el.dataset.dir) || 1);
-      },
-      studioMoveSide: function () {
-        var id = el.dataset.block;
-        var to = Number(el.dataset.side) || 0;
-        _setForm(
-          ReportSheets.moveToSide(_formOf(), id, to),
-          'Moved ' + _label(id) + ' to ' + ReportStudio.sideWhere(to),
-        );
-        _announce(ReportStudio.placeText(_formOf(), id) + '.');
-      },
-      studioLeaveOff: function () {
-        var on = el.getAttribute('aria-pressed') !== 'true';
-        var st = _previewStudent();
-        var first = st ? fullName(st).split(/\s+/)[0] : 'this student';
-        _setForm(
-          ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, on),
-          (on ? 'Left off ' : 'Put back ') + _label(el.dataset.block) + ' for ' + first,
-        );
-      },
-      studioRemove: function () {
-        _removeBlock(el.dataset.block);
-      },
-      studioAddSide: function () {
-        _setForm(ReportSheets.addSide(_formOf()), 'Added a page');
-        _syncSidesButtons();
-      },
-      studioRemoveSide: function () {
-        _setForm(ReportSheets.removeSide(_formOf(), Number(el.dataset.side)), 'Removed the empty page');
-        _syncSidesButtons();
-      },
-      studioTemplate: function () {
-        var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
-        if (!f) return;
-        var name = ((el.querySelector && el.querySelector('.studio-blk-name')) || el).textContent.trim();
-        studioSelected = null;
-        _setForm(f, 'Applied ' + name);
-        _syncSidesButtons();
-      },
-      studioTemplateDelete: function () {
-        var t = ReportSheets.templates().find(function (x) {
-          return x.id === el.dataset.id || x.localId === el.dataset.id;
-        });
-        if (!t) return;
-        ReportSheets.removeTemplate(t.id);
-        renderStudioPanels();
-        if (typeof showUndoToast === 'function') {
-          showUndoToast('Deleted ' + t.name, function () {
-            ReportSheets.saveTemplate(t.name, t.form);
-            renderStudioPanels();
-          });
-        }
-      },
-      openSaveTemplate: function () {
-        _openSaveTemplate();
-      },
       togglePhones: function () {
         phonesView = !phonesView;
         _syncPhonesButton();
         renderReports();
-      },
-      progressMode: function () {
-        _setProgressMode(el.dataset.mode);
-      },
-      gradeFeedback: function () {
-        _setGradeOption('feedback', !_gradeOpts().feedback);
-        var sw = document.querySelector('#studio-palette .gr-switch');
-        if (sw) sw.focus();
-      },
-      gradeOrder: function () {
-        _setGradeOption('order', el.dataset.value === 'newest' ? 'newest' : 'oldest');
       },
       toggleRail: function () {
         // Narrow screens hide the palette; this opens it over the pages.
@@ -2619,7 +1784,6 @@ window.PageReports = (function () {
         var open = layout.classList.toggle('rail-open');
         el.classList.toggle('active', open);
         el.setAttribute('aria-pressed', open ? 'true' : 'false');
-        if (open) ReportStudio.fitThumbs(document.getElementById('studio-palette'));
       },
       stepStudent: function () {
         // One student at a time, in roster order; All becomes the first or last.
@@ -2721,20 +1885,10 @@ window.PageReports = (function () {
       return;
     }
     var a = el.dataset.action;
-    if (_isOne() && a && /^one[A-Z]/.test(a)) {
+    // One Report's own controls (data-action="one…").
+    if (a && /^one[A-Z]/.test(a)) {
       if (ReportOnePanel.change && ReportOnePanel.change(a, el, _oneApi())) return;
-      if (typeof ReportOnePage !== 'undefined' && ReportOnePage.change && ReportOnePage.change(a, el, _oneApi()))
-        return;
-    }
-    if (a === 'gradeOption') {
-      _setGradeOption(el.dataset.key, !!el.checked);
-    } else if (a === 'studioOption') {
-      _setForm(
-        ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked),
-        'Changed ' + _label(el.dataset.block) + ' options',
-      );
-    } else if (a === 'studioText') {
-      _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.value));
+      if (ReportOnePage.change) ReportOnePage.change(a, el, _oneApi());
     }
   }
 
@@ -2756,8 +1910,6 @@ window.PageReports = (function () {
     // The box knows the report it was drawn for, so this saves there.
     RQ.tqSaveCurrentIfNeeded();
     viewingIssue = null;
-    // A different report term means different work and heights.
-    _blockSizes = null;
     renderReports();
   }
 
@@ -2769,7 +1921,6 @@ window.PageReports = (function () {
      once and are refreshed from it when the page opens or the class
      changes. Demo Mode and offline keep the device copies. */
   function _syncFromServer(cid) {
-    _syncTemplates();
     // Student Voice answers (Self-Assessment and Goal) arrive after the
     // class; the reports redraw once when they do.
     if (typeof StudentVoice !== 'undefined' && !StudentVoice.loaded(cid)) {
@@ -2840,8 +1991,6 @@ window.PageReports = (function () {
      the teacher has left Reports draws nothing (as page-gradebook.js). */
   var _mounted = false;
   function init(params) {
-    // The One Report switch is read again each time Reports opens.
-    _oneOn = null;
     _mounted = true;
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
@@ -2849,11 +1998,9 @@ window.PageReports = (function () {
     selectedStudentIds = null;
 
     reportConfig = _loadReportConfig(activeCourse);
-    _blockSizes = null;
     _classFitKey = '';
     _classFit = null;
     previewSid = null;
-    studioSelected = null;
     _configureQuestionnaire();
     RQ.tqStudentIndex = 0;
     RQ.tqNarrativeDirty = false;
@@ -2905,9 +2052,6 @@ window.PageReports = (function () {
     window._pageSwitchCourse = switchCourse;
 
     _addDocListener('click', _handleClick);
-    _addDocListener('pointerover', _handlePeekOver);
-    _addDocListener('pointerout', _handlePeekOut);
-    _addDocListener('pointerdown', _hidePeek);
     _addDocListener('change', _handleStudioChange);
     window.addEventListener('resize', _handleResize);
     _addDocListener('keydown', _handleTabKey);
@@ -2924,18 +2068,6 @@ window.PageReports = (function () {
   }
 
   function _teardownProgressTab() {
-    _closeSaveTemplate();
-    _hidePeek();
-    if (_studioKeys) {
-      _studioKeys.destroy();
-      _studioKeys = null;
-    }
-    if (_studioDrag) {
-      _studioDrag.destroy();
-      _studioDrag = null;
-    }
-    var paperStyle = document.getElementById(PAPER_STYLE_ID);
-    if (paperStyle) paperStyle.remove();
     if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
     _restoreSidebarBadges();
     closeIssueDialog();
@@ -2975,7 +2107,7 @@ window.PageReports = (function () {
   var TOOLBAR_HTML =
     '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        ' +
     _tabBarHtml(TABS) +
-    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Parts</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {
@@ -2998,6 +2130,9 @@ window.PageReports = (function () {
       tabFor: _tabFor,
       tabIdFor: _tabIdFor,
       tabBarHtml: _tabBarHtml,
+      readSaved: _readSaved,
+      orderBySheets: _orderBySheets,
+      longestStudent: _longestStudent,
     },
   };
 })();

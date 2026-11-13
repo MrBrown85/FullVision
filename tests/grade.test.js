@@ -327,7 +327,6 @@ describe('grade-format-guard', () => {
     'teacher/gradebook-csv.js': 3, // the CSV's stored levels to two decimals
     'teacher/page-gradebook.js': 1, // a title through oneDecimal
     'teacher/page-student.js': 12, // chart coordinates
-    'teacher/report-studio.js': 1, // a zoom
     'teacher/rubric-bank.js': 2, // gradient stops
     'teacher/student-evidence.js': 1, // positions
     'teacher-mobile/card-widgets.js': 4, // chart coordinates

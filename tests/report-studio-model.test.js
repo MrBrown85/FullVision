@@ -1223,65 +1223,18 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}))).toBe('');
   });
 
-  it('retired blocks leave the palette but a saved layout keeps them', () => {
-    const html = ReportStudio.paletteHtml(S.form(), 'blocks', []);
-    [
-      'section-outcomes',
-      'score-distribution',
-      'section-chart',
-      'academic-summary',
-      'competency-table',
-      'growth',
-    ].forEach(id => expect(html).not.toContain(`data-block="${id}"`));
-    ['support-home', 'progress', 'missing-work', 'proficiency', 'self-assessment'].forEach(id =>
-      expect(html).toContain(`data-block="${id}"`),
-    );
+  it('a saved layout keeps a retired block', () => {
     const kept = S.insert(S.form(), 'section-chart', { side: 1 });
     expect(S.onForm(kept)).toContain('section-chart');
-    expect(ReportStudio.paletteHtml(kept, 'blocks', [])).toMatch(
-      /class="studio-blk placed"[^>]*data-block="section-chart"/,
-    );
   });
 
-  it('Assignment Grades offers Last 10, This Term and Year to Date; Year to Date is the default', () => {
+  it('Assignment Grades is Year to Date by default; Percent and Proficiency Word start from the class setting', () => {
     const f = S.insert(S.form(), 'grade-table', { side: 1 });
     expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('all');
-    const pop = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
-    expect(pop).toContain('aria-label="Range"');
-    expect(pop).toContain('aria-label="Organize By"');
-    // A Proficiency class (this one) is not offered Proficiency Word: it
-    // prints no word beside a mark. A Both class neither; a Letter class is.
-    stub('getActiveCourse', () => CID);
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).toContain(
-      'Percent starts from the class grading setting.',
-    );
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).not.toContain('data-key="word"');
-    COURSES[CID].gradingSystem = 'both';
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).not.toContain('data-key="word"');
-    COURSES[CID].gradingSystem = 'letter';
-    const letter = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
-    expect(letter).toMatch(/data-key="word"> Proficiency Word/);
-    expect(letter).toContain('Percent and Proficiency Word start from the class grading setting.');
-    COURSES[CID].gradingSystem = 'proficiency';
-    // Per Competency shows only when organized by competency.
-    expect(pop).not.toContain('aria-label="Per Competency"');
-    const byComp = S.setOption(f, 'grade-table', 'organize', 'competency');
-    expect(ReportStudio.blockToolbarHtml(byComp, 'grade-table', null)).toContain('aria-label="Per Competency"');
-    // Percent and Proficiency Word start from the class setting: unticked
-    // until the class says, ticked when it does.
-    expect(pop).toMatch(/data-key="percent"> Percent/);
-    const auto = ReportStudio.blockToolbarHtml(f, 'grade-table', null, { percent: true, word: true });
-    expect(auto).toMatch(/data-key="percent" checked> Percent/);
     expect(S.optionsFor(S.cellOf(f, 'grade-table'), { percent: true, word: false })).toMatchObject({
       percent: true,
       word: false,
       score: true,
     });
-    expect(pop).toMatch(/data-value="last10"[^>]*>Last 10</);
-    expect(pop).toMatch(/data-value="term"[^>]*>This Term</);
-    expect(pop).toMatch(/data-value="all" role="radio" aria-checked="true">Year to Date</);
-    const sup = ReportStudio.blockToolbarHtml(S.insert(S.form(), 'support-home', { side: 1 }), 'support-home', null);
-    expect(sup).toContain('Your Own Line');
-    expect(sup).toContain('data-action="studioText" data-block="support-home" data-key="note"');
   });
 });
