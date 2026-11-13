@@ -320,8 +320,18 @@ async function runMode(browser, urls, mode, opts) {
       let chosen = null;
       let args = null;
       let tabName = 'tab1';
+      // Offline, the block's second and third steps are fixed: a piece is
+      // made and graded, then a student is added and given a mark, so each
+      // create waits in the outbox with writes behind it and is re-keyed
+      // when the device is back online.
+      const fixed =
+        wantOffline && off === blocks.offline[0] + 1
+          ? 'createPiece'
+          : wantOffline && off === blocks.offline[0] + 2
+            ? 'addStudent'
+            : null;
       for (let tries = 0; tries < 50 && !chosen; tries++) {
-        const act = rng.weighted(menu);
+        const act = fixed ? teacherActions.find(a => a.kind === fixed) : rng.weighted(menu);
         if (!alone && act.kind === 'switchClass') continue;
         tabName = wantTab2 && rng.chance(0.4) && !act.screen ? 'tab2' : 'tab1';
         if (act.kind.startsWith('phone')) {
@@ -329,7 +339,7 @@ async function runMode(browser, urls, mode, opts) {
           args = phonePick(act.kind, rng, await readView(sides[0].phone));
         } else if (act.pick) {
           if (act === RETURN_REFUSED) tabName = 'tab1';
-          args = act.pick(rng, await readView(sides[0][tabName]), { mode, focus, recent });
+          args = act.pick(rng, await readView(sides[0][tabName]), { mode, focus, recent, forced: !!fixed });
           if (!args) continue;
         } else args = {};
         chosen = act;

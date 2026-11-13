@@ -568,11 +568,17 @@ export const ACTIONS = [
   {
     kind: 'createPiece',
     weight: 2,
-    pick(rng, view) {
+    pick(rng, view, ctx) {
+      const two = [rng.pick(view.students), rng.pick(view.students), rng.pick(view.students)].filter(Boolean);
       return {
         kind: rng.pick(['level', 'points', 'complete', 'rubric']),
         n: rng.int(1000),
         cat: rng.pick(view.categories.map(c => c.id).concat([''])),
+        // Six in ten are graded at once, before the server has answered
+        // with the piece's id: two students' marks and a third's Late, all
+        // under the id made here, re-keyed when the create lands.
+        graded: !!(ctx && ctx.forced) || rng.chance(0.6),
+        sids: two.map(st => st.id),
       };
     },
     // As the assessment form saves a new piece: the list with it at the end.
@@ -588,7 +594,17 @@ export const ACTIONS = [
            scoreMode: args.kind === 'points' ? 'points' : args.kind === 'complete' ? 'complete' : '', maxPoints: args.kind === 'points' ? 25 : 0,
            weight: 1, dueDate: '', collaboration: 'individual', moduleId: '', pairs: [], groups: [], excludedStudents: [], created: new Date().toISOString() };
          if (args.cat) piece.categoryId = args.cat;
-         list.push(piece); saveAssessments(cid, list); return piece.id;`,
+         list.push(piece); saveAssessments(cid, list);
+         if (args.graded) {
+           const keys = __keysFor(cid, piece.id);
+           args.sids.slice(0, 2).forEach((sid, i) => {
+             if (piece.scoreMode === 'points') Grader.setPoints(cid, sid, piece.id, 10 + i);
+             else if (piece.scoreMode === 'complete') Grader.setMark(cid, sid, piece.id, i ? 'incomplete' : 'complete');
+             else keys.forEach(k => Grader.setLevel(cid, sid, piece.id, k, 2 + i, 0));
+           });
+           if (args.sids[2]) Grader.setStatus(cid, args.sids[2], piece.id, 'LATE');
+         }
+         return piece.id;`,
         a,
       ),
   },
@@ -689,15 +705,21 @@ export const ACTIONS = [
   {
     kind: 'addStudent',
     weight: 1,
-    pick: rng => ({ n: rng.int(1000) }),
+    pick(rng, view, ctx) {
+      const a = rng.pick(levelPieces(view));
+      // Six in ten are given a mark at once, under the id made here.
+      return { n: rng.int(1000), aid: (!!(ctx && ctx.forced) || rng.chance(0.6)) && a ? a.id : '' };
+    },
     // teacher/dash-class-manager.js's Add Student: the roster with one more.
     run: (page, a) =>
       inPage(
         page,
-        `const cid = getActiveCourse(); const list = getStudents(cid).slice();
-         list.push({ id: uid(), firstName: 'New' + args.n, lastName: 'Student', preferred: '', pronouns: '', studentNumber: String(9000 + args.n),
+        `const cid = getActiveCourse(); const list = getStudents(cid).slice(); const id = uid();
+         list.push({ id, firstName: 'New' + args.n, lastName: 'Student', preferred: '', pronouns: '', studentNumber: String(9000 + args.n),
            dateOfBirth: '', email: '', designations: [], attendance: [], sortName: 'Student New' + args.n, enrolledDate: new Date().toISOString().slice(0, 10) });
-         saveStudents(cid, list); return 'ok';`,
+         saveStudents(cid, list);
+         if (args.aid) __keysFor(cid, args.aid).forEach(k => Grader.setLevel(cid, id, args.aid, k, 3, 0));
+         return 'ok';`,
         a,
       ),
   },
