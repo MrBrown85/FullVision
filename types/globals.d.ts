@@ -138,6 +138,8 @@ interface Window {
     markReloaded(classId: string): number;
   };
   __fvPerf: unknown[];
+  // shared/overwrite-count.js: lets a test (standing for a reload) detach it.
+  OverwriteCount?: { detach(): void };
 }
 // The grade state (shared/grade-state.js, not checked yet). Only the members
 // the checked data files use are typed.

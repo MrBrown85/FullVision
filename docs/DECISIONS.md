@@ -2,6 +2,16 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Older scores landing over newer ones: measured before anything is built (2026-11-13)
+
+The server keeps no version for a score: the last write to arrive wins. A laptop offline with scores waiting, while the same cells are scored on the phone, sends its older scores over the newer ones when it reconnects. The design for a time on every score (draft PR 1361) was reviewed independently. It holds only with nine changes. Six sequences would be worse than today, and seven of its claims about the code were wrong. Nobody had measured whether the problem happens to a real teacher.
+
+- **Colin ruled on 2026-11-13:** measure first.
+- **What is counted.** When the outbox starts sending, scores that waited at least a minute are compared with one read of the server's current values for those cells. A cell counts when the server holds something other than what this device last knew and other than what it is about to send. A proficiency 0 is no score. Counted: a competency's or criterion's level, +/− and notes, the score of points, Complete/Incomplete and unlinked work, the Overall Comment, and Missing, Excused and Late. Not counted, because what the device last knew can't be told: Clear Score, Advanced Rubric checks, and scores queued before the page was last loaded.
+- **What is sent.** One Sentry warning, `Overwrite count: <n> of <m> waiting cells changed on the server (waited <bucket>)`, where the bucket is `1-10 min`, `10-60 min`, `1-24 h` or `over 24 h` for the oldest waiting score. It is sent when n is 0 too, at most once per bucket per page load. It carries nothing from the scores: no ids, names, class, scores or comments. Nothing shows on screen, and Demo Mode never reports.
+- **It can read low, never high.** The read does not hold up the sending. A waiting score that lands before the read returns shows the server holding this device's own value, so that cell does not count.
+- **What happens next.** If the count stays near zero, the design is not needed. If not, it comes back with the nine changes.
+
 ## A refused score is not resent; refusals are counted first (2026-11-13)
 
 When the browser's outbox cannot take a score (it holds 500 waiting changes, or the browser's storage is full), the score is refused and can be lost at the next class load. The design for resending it (step 5 of `plans/one-mark-save-design.md`, draft PR 1329) was reviewed twice. It can put an older score over a newer one when the same cell is scored on another device. An independent review of a redesign found it still worse than today in three rare cases.
