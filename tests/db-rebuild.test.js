@@ -5,13 +5,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  HEADER,
   isLocalUrl,
   lineDifferences,
-  missingTypes,
   parseColumn,
   parseSnapshot,
-  shellFromSnapshot,
+  splitBaseline,
   statementAt,
+  tablesFromSnapshot,
+  withoutHeader,
+  withoutKnown,
 } from '../scripts/db-rebuild.mjs';
 
 const SAMPLE = `-- header
@@ -31,6 +34,8 @@ table public.note (rls on)
   WHERE (c.id = note.course_id))))
 function public._touch() returns trigger
 function public.result_of(p_id uuid) returns public.score_result security definer
+procedure public.nightly()
+event trigger ensure_rls on ddl_command_end runs public.rls_auto_enable()
 `;
 
 describe('isLocalUrl', () => {
@@ -77,6 +82,7 @@ describe('parseSnapshot', () => {
     expect(functions).toEqual([
       { schema: 'public', name: '_touch', args: '', returns: 'trigger', definer: false },
       { schema: 'public', name: 'result_of', args: 'p_id uuid', returns: 'public.score_result', definer: true },
+      { schema: 'public', name: 'nightly', args: '', returns: null, definer: false },
     ]);
   });
 
@@ -87,42 +93,59 @@ describe('parseSnapshot', () => {
   });
 });
 
-describe('missingTypes', () => {
-  it('names types a signature uses that no table makes', () => {
-    expect(missingTypes(parseSnapshot(SAMPLE))).toEqual(['public.score_result']);
+describe('tablesFromSnapshot', () => {
+  const { tables, keys } = tablesFromSnapshot(SAMPLE);
+
+  it('makes each table with bare columns', () => {
+    expect(tables).toContain('create table public.note (\n  id uuid not null,\n  body text,');
+    expect(tables).not.toContain('default');
+  });
+
+  it('adds defaults, then keys, then foreign keys, indexes, triggers and row security', () => {
+    const at = s => keys.indexOf(s);
+    expect(at('set default gen_random_uuid()')).toBeLessThan(at('add constraint note_pkey'));
+    expect(at('add constraint note_pkey')).toBeLessThan(at('add constraint note_course_id_fkey'));
+    expect(keys).toContain('CREATE INDEX note_course_idx');
+    expect(keys).toContain('CREATE TRIGGER note_touch AFTER UPDATE');
+    expect(keys).toContain('alter table public.note enable row level security;');
+  });
+
+  it('leaves out an index a constraint already made, and the policies', () => {
+    expect(keys).not.toContain('CREATE UNIQUE INDEX note_pkey');
+    expect(keys).not.toContain('policy');
   });
 });
 
-describe('shellFromSnapshot', () => {
-  const shell = shellFromSnapshot(SAMPLE);
-  const at = s => shell.indexOf(s);
-
-  it('makes the table bare, then functions, then defaults and keys', () => {
-    expect(shell).toContain('create table public.note (\n  id uuid not null,\n  body text,');
-    expect(at('create type public.score_result as ();')).toBeLessThan(at('create table public.note'));
-    expect(at('create table public.note')).toBeLessThan(at('create function public._touch()'));
-    expect(at('create function public._touch()')).toBeLessThan(at('set default gen_random_uuid()'));
-    expect(at('add constraint note_pkey')).toBeLessThan(at('add constraint note_course_id_fkey'));
+describe('splitBaseline', () => {
+  it('splits the output at its file lines', () => {
+    const out = 'set\n-- @file a.sql\ncreate x;\n\n-- @file b.txt\n\n-- @file c.sql\none\ntwo\n';
+    expect(splitBaseline(out)).toEqual({ 'a.sql': 'create x;\n', 'b.txt': '\n', 'c.sql': 'one\ntwo\n' });
   });
 
-  it('gives every function a body that only raises', () => {
-    expect(shell).toContain(
-      'create function public.result_of(p_id uuid) returns public.score_result security definer language plpgsql',
-    );
-    expect(shell).toContain("raise exception 'shell: public._touch has no body'");
+  it('strips the header a committed part starts with', () => {
+    expect(withoutHeader(HEADER + 'create x;\n')).toBe('create x;\n');
+    expect(withoutHeader('create x;\n')).toBe('create x;\n');
+  });
+});
+
+describe('withoutKnown', () => {
+  const live = "  constraint tag_score_modifier_check CHECK ((((m >= '-1'::integer) AND (m <= 1)) AND (NOT (v = 1))))";
+  const rebuilt = "  constraint tag_score_modifier_check CHECK (((m >= '-1'::integer) AND (m <= 1) AND (NOT (v = 1))))";
+
+  it('accepts the flattened AND in a named check', () => {
+    expect(withoutKnown({ onlyA: [live], onlyB: [rebuilt] })).toEqual({
+      onlyA: [],
+      onlyB: [],
+      accepted: ['tag_score_modifier_check'],
+    });
   });
 
-  it('leaves out an index a constraint already made', () => {
-    expect(shell).toContain('CREATE INDEX note_course_idx');
-    expect(shell).not.toContain('CREATE UNIQUE INDEX note_pkey');
-  });
-
-  it('keeps the trigger, row security and the policy as listed', () => {
-    expect(shell).toContain('CREATE TRIGGER note_touch AFTER UPDATE');
-    expect(shell).toContain('alter table public.note enable row level security;');
-    expect(shell).toContain(
-      'create policy note_owner on public.note for all to public using ((EXISTS ( SELECT 1\n   FROM public.course c\n  WHERE (c.id = note.course_id))));',
-    );
+  it('keeps any other difference, even in a named check', () => {
+    const other = rebuilt.replace('v = 1', 'v = 2');
+    expect(withoutKnown({ onlyA: [live], onlyB: [other] }).onlyA).toEqual([live]);
+    const a = live.replace('tag_score', 'note');
+    const b = rebuilt.replace('tag_score', 'note');
+    expect(withoutKnown({ onlyA: [a], onlyB: [b] }).onlyA).toEqual([a]);
   });
 });
 

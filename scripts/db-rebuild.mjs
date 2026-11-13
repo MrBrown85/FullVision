@@ -1,32 +1,41 @@
 #!/usr/bin/env node
 /*
- * Rebuilds FullVision's database structure on an EMPTY local PostgreSQL 17.
- * See docs/database-rebuild.md.
+ * Rebuilds FullVision's database structure on an EMPTY local PostgreSQL 17,
+ * from the repo alone. See docs/database-rebuild.md.
  *
- *   DATABASE_URL=postgresql://postgres@127.0.0.1:54417/fv_rebuild node scripts/db-rebuild.mjs [--from-snapshot] [--check]
+ *   DATABASE_URL=postgresql://postgres@127.0.0.1:54417/fv_rebuild node scripts/db-rebuild.mjs [--check]
+ *   node scripts/db-rebuild.mjs --import db-baseline.out
  *
- * Loads every file in migrations/baseline/ in name order, each in one
- * transaction, and stops at the first error with the statement that
- * failed. 00-supabase-stubs.sql comes first: the roles and schemas Supabase
- * gives every project.
+ * The rebuild loads, in this order, each part in one transaction, and stops
+ * at the first error with the statement that failed:
  *
- *   --from-snapshot  after the stubs, load a SHELL made from
- *                    docs/schema.generated.sql instead of the other files:
- *                    every table, column, constraint, index, trigger and
- *                    policy it lists, and every function it lists with a
- *                    body that only raises an error. The snapshot has no
- *                    function bodies, so the shell cannot run the app. It
- *                    proves the stubs and the snapshot load together.
- *   --check          then run scripts/schema-snapshot.sql against the
- *                    rebuilt database and compare its answer with
- *                    docs/schema.generated.sql, line by line.
+ *   migrations/baseline/00-supabase-stubs.sql  what Supabase gives every project
+ *   migrations/baseline/05-schemas.sql         the app's schemas
+ *   migrations/baseline/10-types.sql           types
+ *   migrations/baseline/20-sequences.sql       sequences
+ *   tables, from docs/schema.generated.sql     bare columns
+ *   migrations/baseline/30-functions.sql       every function and procedure, whole
+ *   keys, from docs/schema.generated.sql       defaults, constraints, indexes, triggers, row security on
+ *   migrations/baseline/40-views.sql           views
+ *   migrations/baseline/50-table-extras.sql    policies, identity columns, the publication, outside pieces
+ *   migrations/baseline/60-grants.sql          grants to the client roles
+ *
+ * Every file but the stubs is printed from the live catalogs by
+ * scripts/db-baseline.sql. --import splits that output into those files.
+ *
+ * --check then proves the rebuild three ways:
+ *   1. scripts/schema-snapshot.sql on the rebuilt database gives
+ *      docs/schema.generated.sql, apart from KNOWN_DIFFERENCES;
+ *   2. scripts/db-baseline.sql on the rebuilt database gives the same md5 for
+ *      every function and procedure as migrations/baseline/function-md5.txt;
+ *   3. it gives the same 60-grants.sql, and the same other parts too.
  *
  * Runs psql, as scripts/schema-snapshot.mjs does (set PSQL to use another
  * one). Refuses any host but this computer, and any database that already
  * has tables in public.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +45,34 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = join(root, 'migrations', 'baseline');
 const SNAPSHOT = join(root, 'docs', 'schema.generated.sql');
 const SNAPSHOT_SQL = join(root, 'scripts', 'schema-snapshot.sql');
-const STUBS = '00-supabase-stubs.sql';
+const BASELINE_SQL = join(root, 'scripts', 'db-baseline.sql');
+
+/* The parts scripts/db-baseline.sql prints, and which --check compares.
+   checks.txt is information only: it names this computer's own extensions
+   and schemas too, so it is not compared. */
+export const PARTS = [
+  '05-schemas.sql',
+  '10-types.sql',
+  '20-sequences.sql',
+  '30-functions.sql',
+  'function-md5.txt',
+  '40-views.sql',
+  '50-table-extras.sql',
+  '60-grants.sql',
+  'checks.txt',
+];
+const COMPARED = PARTS.filter(p => p !== 'checks.txt');
+
+/* Lines of docs/schema.generated.sql a rebuild cannot give back exactly.
+   Live stores these two checks with a nested AND (they were written with
+   BETWEEN). Printed and loaded again, PostgreSQL flattens it. The two allow
+   the same rows. A difference is accepted only for these constraints, and
+   only when the two lines are equal once every bracket is taken out. */
+export const KNOWN_DIFFERENCES = ['rubric_score_modifier_check', 'tag_score_modifier_check'];
+
+export const HEADER =
+  "-- Printed by scripts/db-baseline.sql from gradebook-prod's system catalogs.\n" +
+  "-- Don't edit by hand: refresh it with the Database baseline workflow (docs/database-rebuild.md).\n";
 
 /* Only a database on this computer. */
 export function isLocalUrl(url) {
@@ -76,10 +112,14 @@ export function parseSnapshot(text) {
       tables.push(cur);
       continue;
     }
-    const f = line.match(/^function (\w+)\.(\w+)\((.*)\) returns (.*?)( security definer)?$/);
+    const f = line.match(/^(function|procedure) (\w+)\.(\w+)\((.*?)\)( returns (.*?))?( security definer)?$/);
     if (f) {
       cur = null;
-      functions.push({ schema: f[1], name: f[2], args: f[3], returns: f[4], definer: !!f[5] });
+      functions.push({ schema: f[2], name: f[3], args: f[4], returns: f[6] ?? null, definer: !!f[7] });
+      continue;
+    }
+    if (line.startsWith('event trigger ')) {
+      cur = null;
       continue;
     }
     if (!cur) throw new Error('A snapshot line outside a table: ' + line);
@@ -115,72 +155,69 @@ export function parseColumn(body) {
   return { name, type: rest, notNull, dflt };
 }
 
-/* The types a function's signature names that the snapshot does not make:
-   schema-qualified names that are not tables. */
-export function missingTypes({ tables, functions }) {
-  const made = new Set(tables.map(t => t.schema + '.' + t.name));
-  const named = new Set();
-  for (const f of functions) {
-    for (const m of (f.args + ' ' + f.returns).matchAll(/\b(public|student_submit)\.(\w+)/g)) {
-      if (!made.has(m[0])) named.add(m[0]);
-    }
-  }
-  return [...named].sort();
-}
-
-/* The shell: SQL that makes every object the snapshot lists. */
-export function shellFromSnapshot(text) {
+/* The tables docs/schema.generated.sql lists, as two parts: `tables`, the
+   bare columns, loaded before the functions so they can name row types;
+   and `keys`, loaded after them: defaults, constraints (foreign keys last),
+   indexes no constraint made, triggers, and row security on. Policies come
+   from 50-table-extras.sql, which knows permissive from restrictive. */
+export function tablesFromSnapshot(text) {
   const snap = parseSnapshot(text);
-  const out = [];
-  const w = s => out.push(s);
   const q = t => `${t.schema}.${t.name}`;
-  w('-- A shell made by scripts/db-rebuild.mjs --from-snapshot from docs/schema.generated.sql.');
-  w('-- Every function body only raises an error: the snapshot has no bodies.\n');
-  const schemas = [...new Set([...snap.tables, ...snap.functions].map(o => o.schema))].filter(s => s !== 'public');
-  for (const s of schemas) w(`create schema ${s};`);
-  for (const ty of missingTypes(snap)) {
-    w(`-- ${ty} is named by a function but not listed in the snapshot: made empty.`);
-    w(`create type ${ty} as ();`);
-  }
-  // Tables first with bare columns, so functions can name their row types.
+  const tables = [];
+  const keys = [];
   for (const t of snap.tables) {
     const cols = t.cols.map(c => `  ${c.name} ${c.type}${c.notNull ? ' not null' : ''}`);
-    w(`create table ${q(t)} (\n${cols.join(',\n')}\n);`);
-  }
-  for (const f of snap.functions) {
-    w(
-      `create function ${f.schema}.${f.name}(${f.args}) returns ${f.returns}` +
-        `${f.definer ? ' security definer' : ''} language plpgsql as $shell$ ` +
-        `begin raise exception 'shell: ${f.schema}.${f.name} has no body'; end $shell$;`,
-    );
+    tables.push(`create table ${q(t)} (\n${cols.join(',\n')}\n);`);
   }
   for (const t of snap.tables)
-    for (const c of t.cols) if (c.dflt !== null) w(`alter table ${q(t)} alter column ${c.name} set default ${c.dflt};`);
+    for (const c of t.cols)
+      if (c.dflt !== null) keys.push(`alter table ${q(t)} alter column ${c.name} set default ${c.dflt};`);
   for (const wantFk of [false, true]) {
     for (const t of snap.tables) {
       for (const con of t.cons) {
         const [, name, def] = con.match(/^constraint (\S+) (.*)$/s);
         if (def.startsWith('TRIGGER')) continue; // made by its CREATE CONSTRAINT TRIGGER line
-        if (def.startsWith('FOREIGN KEY') === wantFk) w(`alter table ${q(t)} add constraint ${name} ${def};`);
+        if (def.startsWith('FOREIGN KEY') === wantFk) keys.push(`alter table ${q(t)} add constraint ${name} ${def};`);
       }
     }
   }
   for (const t of snap.tables) {
     const made = new Set(t.cons.map(c => c.split(' ')[1]));
-    for (const idx of t.idx) if (!made.has(idx.match(/INDEX (\S+) /)[1])) w(idx + ';');
+    for (const idx of t.idx) if (!made.has(idx.match(/INDEX (\S+) /)[1])) keys.push(idx + ';');
   }
-  for (const t of snap.tables) for (const trg of t.trg) w(trg + ';');
-  for (const t of snap.tables) {
-    if (t.rls) w(`alter table ${q(t)} enable row level security;`);
-    for (const pol of t.pol) {
-      const [, name, rest] = pol.match(/^policy (\S+) (.*)$/s);
-      w(`create policy ${name} on ${q(t)} ${rest};`);
-    }
-  }
-  return out.join('\n') + '\n';
+  for (const t of snap.tables) for (const trg of t.trg) keys.push(trg + ';');
+  for (const t of snap.tables) if (t.rls) keys.push(`alter table ${q(t)} enable row level security;`);
+  const head = '-- Made by scripts/db-rebuild.mjs from docs/schema.generated.sql.\n';
+  return { tables: head + tables.join('\n') + '\n', keys: head + keys.join('\n') + '\n' };
 }
 
-/* Lines only in a, lines only in b (as sorted multisets). */
+/* scripts/db-baseline.sql's output as {name: text}, split at its
+   "-- @file NAME" lines. Each text ends with one newline. */
+export function splitBaseline(out) {
+  const parts = {};
+  let name = null;
+  let buf = [];
+  const flush = () => {
+    if (name) parts[name] = buf.join('\n').replace(/\s+$/, '') + '\n';
+  };
+  for (const line of out.split('\n')) {
+    const m = line.match(/^-- @file (\S+)$/);
+    if (m) {
+      flush();
+      name = m[1];
+      buf = [];
+    } else if (name) buf.push(line);
+  }
+  flush();
+  return parts;
+}
+
+/* A committed part without its header. */
+export function withoutHeader(text) {
+  return text.startsWith(HEADER) ? text.slice(HEADER.length) : text;
+}
+
+/* Lines only in a, lines only in b (as multisets). */
 export function lineDifferences(a, b) {
   const count = new Map();
   for (const l of a.split('\n')) count.set(l, (count.get(l) || 0) + 1);
@@ -194,10 +231,28 @@ export function lineDifferences(a, b) {
   return { onlyA, onlyB };
 }
 
+/* Takes the KNOWN_DIFFERENCES pairs out of lineDifferences' answer. */
+export function withoutKnown({ onlyA, onlyB }) {
+  const flat = l => l.replace(/[()]/g, '');
+  const nameOf = l => (l.match(/^ {2}constraint (\S+) /) || [])[1];
+  const a = [...onlyA];
+  const b = [...onlyB];
+  const accepted = [];
+  for (let i = a.length - 1; i >= 0; i--) {
+    if (!KNOWN_DIFFERENCES.includes(nameOf(a[i]))) continue;
+    const j = b.findIndex(l => nameOf(l) === nameOf(a[i]) && flat(l) === flat(a[i]));
+    if (j < 0) continue;
+    accepted.push(nameOf(a[i]));
+    a.splice(i, 1);
+    b.splice(j, 1);
+  }
+  return { onlyA: a, onlyB: b, accepted: accepted.sort() };
+}
+
 function psql(url, args) {
   return execFileSync(process.env.PSQL || 'psql', [url, '-X', '-q', '-v', 'ON_ERROR_STOP=1', ...args], {
     encoding: 'utf-8',
-    maxBuffer: 64 * 1024 * 1024,
+    maxBuffer: 256 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
@@ -215,7 +270,59 @@ function load(url, file, label) {
   }
 }
 
+function importBaseline(file) {
+  const parts = splitBaseline(readFileSync(file, 'utf-8'));
+  const missing = PARTS.filter(p => !(p in parts));
+  if (missing.length) {
+    console.error(`${file} has no part ${missing.join(', ')}. Is it scripts/db-baseline.sql's output?`);
+    process.exit(1);
+  }
+  for (const p of PARTS) writeFileSync(join(BASELINE, p), HEADER + parts[p]);
+  console.log(`Wrote ${PARTS.length} files to migrations/baseline/.`);
+}
+
+function check(url) {
+  let failed = false;
+  // 1. The snapshot. The live reader's names come out schema-qualified
+  // (public.course), so its search path holds no app schema. A path of
+  // pg_catalog alone gives the same.
+  const raw = execFileSync(
+    process.env.PSQL || 'psql',
+    [url, '-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-c', 'set search_path = pg_catalog', '-f', SNAPSHOT_SQL],
+    { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  const snap = withoutKnown(lineDifferences(readFileSync(SNAPSHOT, 'utf-8'), snapshotText(raw)));
+  if (snap.onlyA.length || snap.onlyB.length) {
+    failed = true;
+    console.error('1. The rebuilt snapshot differs from docs/schema.generated.sql:');
+    for (const l of snap.onlyA) console.error('  only in the snapshot: ' + l);
+    for (const l of snap.onlyB) console.error('  only in the rebuild:  ' + l);
+  } else {
+    console.log(
+      `1. The rebuilt snapshot matches docs/schema.generated.sql, apart from the known ${snap.accepted.join(' and ')}.`,
+    );
+  }
+  // 2 and 3. scripts/db-baseline.sql on the rebuilt database.
+  const parts = splitBaseline(psql(url, ['-A', '-t', '-f', BASELINE_SQL]));
+  for (const p of COMPARED) {
+    const committed = withoutHeader(readFileSync(join(BASELINE, p), 'utf-8'));
+    if (parts[p] === committed) {
+      const n = committed.trim() ? committed.trim().split('\n').length : 0;
+      console.log(`${p === 'function-md5.txt' ? '2' : p === '60-grants.sql' ? '3' : '-'}. ${p} matches (${n} lines).`);
+      continue;
+    }
+    failed = true;
+    const { onlyA, onlyB } = lineDifferences(committed, parts[p] || '');
+    console.error(`${p} differs:`);
+    for (const l of onlyA) console.error('  only in the baseline: ' + l);
+    for (const l of onlyB) console.error('  only in the rebuild:  ' + l);
+  }
+  if (failed) process.exit(1);
+}
+
 function main() {
+  const i = process.argv.indexOf('--import');
+  if (i >= 0) return importBaseline(process.argv[i + 1]);
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error('DATABASE_URL is not set. It names an empty database on this computer.');
@@ -230,43 +337,25 @@ function main() {
     console.error(`The database already has ${tables} tables in public. Start from an empty one.`);
     process.exit(2);
   }
-  const fromSnapshot = process.argv.includes('--from-snapshot');
-  const files = readdirSync(BASELINE)
-    .filter(f => f.endsWith('.sql'))
-    .sort();
-  if (!files.includes(STUBS)) throw new Error(`migrations/baseline/${STUBS} is missing.`);
-  load(url, join(BASELINE, STUBS), `migrations/baseline/${STUBS}`);
-  if (fromSnapshot) {
-    const shell = join(mkdtempSync(join(tmpdir(), 'fv-shell-')), 'shell.sql');
-    writeFileSync(shell, shellFromSnapshot(readFileSync(SNAPSHOT, 'utf-8')));
-    load(url, shell, `the shell from docs/schema.generated.sql (${shell})`);
-  } else {
-    const rest = files.filter(f => f !== STUBS);
-    if (!rest.length) {
-      console.error('migrations/baseline/ has only the stubs: no schema dump yet. See docs/database-rebuild.md.');
-      process.exit(1);
-    }
-    for (const f of rest) load(url, join(BASELINE, f), `migrations/baseline/${f}`);
-  }
-  if (!process.argv.includes('--check')) return;
-  // The live reader's names come out schema-qualified (public.course), so
-  // its search path holds no app schema. An empty path gives the same.
-  const raw = execFileSync(
-    process.env.PSQL || 'psql',
-    [url, '-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-c', 'set search_path = pg_catalog', '-f', SNAPSHOT_SQL],
-    { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 },
-  );
-  const rebuilt = snapshotText(raw);
-  const committed = readFileSync(SNAPSHOT, 'utf-8');
-  if (rebuilt === committed) {
-    console.log('The rebuilt database gives docs/schema.generated.sql byte for byte.');
-    return;
-  }
-  const { onlyA, onlyB } = lineDifferences(committed, rebuilt);
-  console.error(`The rebuilt database differs from docs/schema.generated.sql.`);
-  for (const l of onlyA) console.error('  only in the snapshot: ' + l);
-  for (const l of onlyB) console.error('  only in the rebuild:  ' + l);
-  process.exit(1);
+  const made = tablesFromSnapshot(readFileSync(SNAPSHOT, 'utf-8'));
+  const dir = mkdtempSync(join(tmpdir(), 'fv-rebuild-'));
+  writeFileSync(join(dir, 'tables.sql'), made.tables);
+  writeFileSync(join(dir, 'keys.sql'), made.keys);
+  const b = f => [join(BASELINE, f), `migrations/baseline/${f}`];
+  const steps = [
+    b('00-supabase-stubs.sql'),
+    b('05-schemas.sql'),
+    b('10-types.sql'),
+    b('20-sequences.sql'),
+    [join(dir, 'tables.sql'), 'the tables from docs/schema.generated.sql'],
+    b('30-functions.sql'),
+    [join(dir, 'keys.sql'), 'the keys, indexes and triggers from docs/schema.generated.sql'],
+    b('40-views.sql'),
+    b('50-table-extras.sql'),
+    b('60-grants.sql'),
+  ];
+  for (const [file, label] of steps) load(url, file, label);
+  if (process.argv.includes('--check')) check(url);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
