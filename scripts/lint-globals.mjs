@@ -76,18 +76,65 @@ function scriptsOf(htmlRel) {
   return out;
 }
 
+const asts = new Map();
+function parse(rel) {
+  if (asts.has(rel)) return asts.get(rel);
+  const file = path.join(root, rel);
+  let ast = null;
+  if (fs.existsSync(file)) {
+    try {
+      ast = acorn.parse(fs.readFileSync(file, 'utf8'), {
+        ecmaVersion: 'latest',
+        sourceType: 'script',
+        allowHashBang: true,
+      });
+    } catch (e) {
+      console.error('parse failed', rel, e.message);
+    }
+  }
+  asts.set(rel, ast);
+  return ast;
+}
+
+// The scripts a page adds while it runs, read from the code rather than LAZY:
+// every string in a loaded script that names a .js file in the repo (such as
+// '/shared/seed-data.js?v=46' or the paths in teacher/router.js's _onDemand)
+// and is not one of the page's <script> tags, and the same for those files.
+// Used by scripts/lint-ratchet.mjs; LAZY stays for the report-only lint.
+function runtimeScriptsOf(htmlRel, tagged) {
+  const dir = path.posix.dirname(htmlRel);
+  const seen = new Set(tagged);
+  const found = [];
+  const queue = [...tagged];
+  while (queue.length) {
+    const ast = parse(queue.shift());
+    if (!ast) continue;
+    const strings = [];
+    walk.simple(ast, {
+      Literal(n) {
+        if (typeof n.value === 'string') strings.push(n.value);
+      },
+      TemplateLiteral(n) {
+        if (!n.expressions.length) strings.push(n.quasis[0].value.cooked);
+      },
+    });
+    for (const str of strings) {
+      const m = /^([\w./-]+\.js)(\?.*)?$/.exec(str);
+      if (!m) continue;
+      const rel = m[1].startsWith('/') ? m[1].slice(1) : path.posix.normalize(path.posix.join(dir, m[1]));
+      if (seen.has(rel) || !fs.existsSync(path.join(root, rel))) continue;
+      seen.add(rel);
+      found.push(rel);
+      queue.push(rel);
+    }
+  }
+  return found;
+}
+
 function definedBy(rel) {
   if (VENDOR_GLOBALS[rel]) return VENDOR_GLOBALS[rel];
-  const file = path.join(root, rel);
-  if (!fs.existsSync(file)) return [];
-  const src = fs.readFileSync(file, 'utf8');
-  let ast;
-  try {
-    ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script', allowHashBang: true });
-  } catch (e) {
-    console.error('parse failed', rel, e.message);
-    return [];
-  }
+  const ast = parse(rel);
+  if (!ast) return [];
   const names = new Set();
   for (const node of ast.body) {
     if (node.type === 'VariableDeclaration') {
@@ -128,7 +175,22 @@ export function pageGlobals(rootDir) {
       }
       (result.fileToPages[rel] ||= []).includes(page) || result.fileToPages[rel].push(page);
     }
-    result.pages[page] = { html, scripts: tagged, lazy, count: Object.keys(globals).length, globals, definedIn };
+    const runtime = runtimeScriptsOf(html, tagged);
+    const tagGlobals = {};
+    for (const rel of tagged) for (const g of definedBy(rel)) tagGlobals[g] = 'writable';
+    const runtimeDefinedIn = {};
+    for (const rel of runtime) for (const g of definedBy(rel)) (runtimeDefinedIn[g] ||= []).push(rel);
+    result.pages[page] = {
+      html,
+      scripts: tagged,
+      lazy,
+      runtime,
+      count: Object.keys(globals).length,
+      globals,
+      tagGlobals,
+      runtimeDefinedIn,
+      definedIn,
+    };
   }
   return { pages: result.pages, byFile: result.fileToPages };
 }

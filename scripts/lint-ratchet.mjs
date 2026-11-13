@@ -1,11 +1,13 @@
 // scripts/lint-ratchet.mjs: the files where an undefined name fails the build
 // (plan item S19-D15). Every other file and rule stays a warning.
 //
-// A covered file is checked against the globals that BOTH pages loading it
-// define (teacher/app.html and teacher-mobile/index.html), not the union, so a
-// name defined only in a desktop script is an error: on the phone it would be
-// a ReferenceError. Names a file uses only behind a `typeof X` guard are listed
-// with the file; they were checked by reading the code.
+// A covered file may use, unguarded, only the names that a <script> tag
+// defines on EVERY page loading it (teacher/app.html and
+// teacher-mobile/index.html). A name from a desktop-only script, or from a
+// script a page loads on demand (shared/seed-data.js, curriculum_data.js, the
+// banks, Reports' scripts), is allowed only behind a `typeof` guard; the rule
+// is in scripts/lint-guarded-globals.mjs. The on-demand scripts are read from
+// the code by scripts/lint-globals.mjs (runtimeScriptsOf).
 //
 //   node scripts/lint-ratchet.mjs                       lint the covered files
 //   node scripts/lint-ratchet.mjs --stdin-filename F    lint stdin as file F
@@ -15,45 +17,83 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// To add a file: `npx eslint <file>` shows no no-undef warning, then add it
-// here with the desktop-only names it uses behind a typeof guard (often none).
-export const NO_UNDEF_FILES = {
-  'shared/data.js': ['refreshSyncStatusUI', 'showSyncToast', 'Router'],
-  'shared/data-assessments.js': [],
-  'shared/data-categories.js': [],
-  'shared/data-config-settings.js': [],
-  'shared/data-courses-terms.js': ['reportingTermsSchoolMatch'],
-  'shared/data-curriculum-index.js': [],
-  'shared/data-demo.js': [],
-  'shared/data-feedback-live.js': [],
-  'shared/data-learning-map.js': ['showSyncToast'],
-  'shared/data-markup.js': [],
-  'shared/data-observations.js': [],
-  'shared/data-overrides.js': [],
-  'shared/data-profile-summaries.js': [],
-  'shared/data-reflect.js': [],
-  'shared/data-revisions.js': [],
-  'shared/data-roster.js': [],
-  'shared/data-rpc-wrappers.js': [],
-  'shared/data-rubrics.js': ['showSyncToast'],
-  'shared/data-student-cards.js': [],
-  'shared/data-student-records.js': [],
-  'shared/data-student-work.js': [],
-  'shared/data-term-ratings.js': [],
-  'shared/data-utilities.js': [],
-  'shared/data-withdrawn.js': [],
+// To add a file: `npm run lint:ratchet` after adding it here must pass.
+export const NO_UNDEF_FILES = [
+  'shared/data.js',
+  'shared/data-assessments.js',
+  'shared/data-categories.js',
+  'shared/data-config-settings.js',
+  'shared/data-courses-terms.js',
+  'shared/data-curriculum-index.js',
+  'shared/data-demo.js',
+  'shared/data-feedback-live.js',
+  'shared/data-learning-map.js',
+  'shared/data-markup.js',
+  'shared/data-observations.js',
+  'shared/data-overrides.js',
+  'shared/data-profile-summaries.js',
+  'shared/data-reflect.js',
+  'shared/data-revisions.js',
+  'shared/data-roster.js',
+  'shared/data-rpc-wrappers.js',
+  'shared/data-rubrics.js',
+  'shared/data-student-cards.js',
+  'shared/data-student-records.js',
+  'shared/data-student-work.js',
+  'shared/data-term-ratings.js',
+  'shared/data-utilities.js',
+  'shared/data-withdrawn.js',
+];
+
+const PAGE_NAMES = {
+  desktop: 'the desktop',
+  phone: 'the phone',
+  student: 'the student page',
+  login: 'the sign-in page',
 };
 
-// The globals a covered file may use: those every page loading it defines,
-// plus its guarded names. Used by eslint.config.mjs.
+// The globals a covered file may use unguarded: those a <script> tag defines
+// on every page that loads it. Used by eslint.config.mjs.
 export function strictGlobals(file, byFile, pages) {
   const pageNames = byFile[file] || [];
   if (!pageNames.length) return null;
-  const sets = pageNames.map(p => pages[p].globals);
+  const sets = pageNames.map(p => pages[p].tagGlobals);
   const out = {};
   for (const name of Object.keys(sets[0])) if (sets.every(s => name in s)) out[name] = 'writable';
-  for (const name of NO_UNDEF_FILES[file] || []) out[name] = 'readonly';
   return out;
+}
+
+// The names some page loading the file defines but not every page's tags:
+// each with a sentence on where it comes from, for the rule's message.
+export function guardedWhere(file, byFile, pages) {
+  const pageNames = byFile[file] || [];
+  const strict = strictGlobals(file, byFile, pages) || {};
+  const names = new Set();
+  for (const p of pageNames) {
+    for (const n of Object.keys(pages[p].globals)) names.add(n);
+    for (const n of Object.keys(pages[p].runtimeDefinedIn)) names.add(n);
+  }
+  const where = {};
+  for (const name of names) {
+    if (name in strict) continue;
+    const parts = [];
+    for (const p of pageNames) {
+      const P = pages[p];
+      if (name in P.tagGlobals) {
+        const from = (P.definedIn[name] || []).filter(f => P.scripts.includes(f));
+        parts.push(`${PAGE_NAMES[p]} loads it from ${from[0]}`);
+        continue;
+      }
+      const lazy = P.runtimeDefinedIn[name] || (P.definedIn[name] || []).filter(f => P.lazy.includes(f));
+      parts.push(
+        lazy.length
+          ? `on ${PAGE_NAMES[p]} it comes from ${lazy[0]}, which loads only on demand`
+          : `${PAGE_NAMES[p]} does not load it`,
+      );
+    }
+    where[name] = parts.join('; ') + '.';
+  }
+  return where;
 }
 
 async function main(argv) {
@@ -63,7 +103,7 @@ async function main(argv) {
   const eslint = new ESLint({ cwd: root });
 
   const { byFile } = pageGlobals(root);
-  const unloaded = Object.keys(NO_UNDEF_FILES).filter(f => !(byFile[f] || []).length);
+  const unloaded = NO_UNDEF_FILES.filter(f => !(byFile[f] || []).length);
   if (unloaded.length) {
     console.error('No page loads these covered files (remove them from scripts/lint-ratchet.mjs):');
     for (const f of unloaded) console.error('  ' + f);
@@ -74,13 +114,13 @@ async function main(argv) {
   const i = argv.indexOf('--stdin-filename');
   if (i >= 0) {
     const file = argv[i + 1];
-    if (!NO_UNDEF_FILES[file]) {
+    if (!NO_UNDEF_FILES.includes(file)) {
       console.error(`${file} is not a covered file.`);
       return 1;
     }
     results = await eslint.lintText(fs.readFileSync(0, 'utf8'), { filePath: path.join(root, file) });
   } else {
-    results = await eslint.lintFiles(Object.keys(NO_UNDEF_FILES).map(f => path.join(root, f)));
+    results = await eslint.lintFiles(NO_UNDEF_FILES.map(f => path.join(root, f)));
   }
 
   const errors = ESLint.getErrorResults(results);
