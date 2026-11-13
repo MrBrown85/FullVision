@@ -441,8 +441,92 @@ window.DashStudentCards = (function () {
     return html;
   }
 
+  function _cardEls() {
+    return Array.prototype.slice.call(document.querySelectorAll('#main .dash-grid > .dash-card[data-sid]'));
+  }
+
+  /* ── Sliding to new places (plan B.5) ───────────────────── */
+  /* Before a re-render that may move the student cards: where each card is,
+     which competency the chips were focused on, and which cards had the
+     amber border. The page asks only when motion is not reduced. */
+  function cardsBefore() {
+    var cards = _cardEls();
+    if (!cards.length || typeof cards[0].getBoundingClientRect !== 'function') return null;
+    var seg = document.querySelector('#main .dash-card-strip.has-focus .dash-card-seg.is-focus');
+    var out = { rects: {}, below: {}, focus: seg ? seg.getAttribute('data-key') : null };
+    cards.forEach(function (el) {
+      var sid = el.getAttribute('data-sid');
+      out.rects[sid] = el.getBoundingClientRect();
+      if (el.classList.contains('is-focus-below')) out.below[sid] = true;
+    });
+    return out;
+  }
+
+  /* FLIP: each card that was on screen starts where it was, in the look it
+     had (chips, border), then slides to its new place as the chips and the
+     border change (dashboard.css .is-sliding). New cards just appear. */
+  function slideFrom(before) {
+    var placed = [];
+    // Every new place is read before any card is moved: a read after a
+    // write lays the page out again, once for each card.
+    var cards = _cardEls().filter(function (el) {
+      return !!before.rects[el.getAttribute('data-sid')];
+    });
+    var rects = cards.map(function (el) {
+      return el.getBoundingClientRect();
+    });
+    cards.forEach(function (el, n) {
+      var sid = el.getAttribute('data-sid');
+      var a = before.rects[sid];
+      var b = rects[n];
+      var strip = el.querySelector('.dash-card-strip');
+      var segs = strip ? Array.prototype.slice.call(strip.querySelectorAll('.dash-card-seg')) : [];
+      var now = {
+        el: el,
+        below: el.classList.contains('is-focus-below'),
+        strip: strip,
+        stripFocus: strip ? strip.classList.contains('has-focus') : false,
+        segs: segs.map(function (g) {
+          return g.classList.contains('is-focus');
+        }),
+        dx: a.left - b.left,
+        dy: a.top - b.top,
+      };
+      el.classList.add('is-placing');
+      el.classList.toggle('is-focus-below', !!before.below[sid]);
+      if (strip) strip.classList.toggle('has-focus', !!before.focus);
+      segs.forEach(function (g) {
+        g.classList.toggle('is-focus', !!before.focus && g.getAttribute('data-key') === before.focus);
+      });
+      if (now.dx || now.dy) el.style.transform = 'translate(' + now.dx + 'px, ' + now.dy + 'px)';
+      now.segEls = segs;
+      placed.push(now);
+    });
+    if (!placed.length) return;
+    // One layout read, so the old places and looks take before the change.
+    void document.body.offsetHeight;
+    placed.forEach(function (p) {
+      var el = p.el;
+      el.classList.remove('is-placing');
+      el.classList.add('is-sliding');
+      el.classList.toggle('is-focus-below', p.below);
+      if (p.strip) p.strip.classList.toggle('has-focus', p.stripFocus);
+      p.segEls.forEach(function (g, i) {
+        g.classList.toggle('is-focus', p.segs[i]);
+      });
+      el.style.transform = '';
+    });
+    setTimeout(function () {
+      placed.forEach(function (p) {
+        p.el.classList.remove('is-sliding');
+      });
+    }, 300);
+  }
+
   return {
     renderStudentCards: renderStudentCards,
+    cardsBefore: cardsBefore,
+    slideFrom: slideFrom,
     obsSummary: obsSummary,
     obsWhenText: obsWhenText,
   };

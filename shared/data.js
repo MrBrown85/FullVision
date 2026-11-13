@@ -2432,6 +2432,7 @@ function _rekeyField(field, cid, transform) {
   if (value !== undefined && transform(value)) {
     _cache[field][cid] = value;
     if (field === 'rubrics') _noteRubricsSet(cid);
+    if (field === 'assessments') _assessmentsRekeyed++; // an id changed in place: _assessmentInClass
     // A re-key from another tab: it wrote the shared copy already.
     if (dataKey && !_applyingRemoteRekey) wrote = _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
     if (!_applyingRemoteRekey) {
@@ -3393,9 +3394,7 @@ function _scoreEntryFromCanonical(
    as the piece's overall score, and filled no group-mates: that row has
    collab_mode and collab_config, not collaboration and groups. */
 function _assessmentById(cid, aid) {
-  var mine = (getAssessments(cid) || []).find(function (assessment) {
-    return assessment && assessment.id === aid;
-  });
+  var mine = _assessmentInClass(cid, aid); // shared/data-assessments.js: by an index kept with the list
   if (mine) return mine;
   var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
   return (
@@ -6153,12 +6152,7 @@ function _noteRubricsSet(cid) {
    the list itself, so a rubric given to work in any way (the assessment
    form, a linked copy's edit, another tab, a load) is seen. */
 function _rubricKeySig(cid) {
-  var sig = String(_rubricsRev[cid] || 0);
-  (getAssessments(cid) || []).forEach(function (a) {
-    var rubricId = a && (a.rubricId || a.rubric_id);
-    if (rubricId && !isPointsScored(a)) sig += '|' + a.id + '=' + rubricId;
-  });
-  return sig;
+  return _rubricWorkSig(cid, _rubricsRev[cid] || 0); // shared/data-assessments.js: built only when they change
 }
 /* Rubric work whose criteria feed competencies: { assessmentId: criteria }
    and, per assessment, the competency ids an old entry would sit under. */
