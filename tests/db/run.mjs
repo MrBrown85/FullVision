@@ -25,6 +25,9 @@
  *      to show what the function does when it is allowed.
  *   3. The student page's functions (student_submit) run only for
  *      service_role, the edge functions' key.
+ *   4. Links. Every column a same_teacher trigger guards is pointed at a
+ *      record of teacher B from one of A's rows; each try must be refused
+ *      (tests/db/same-teacher.sql).
  *
  * Runs psql (set PSQL to use another one), as scripts/db-rebuild.mjs does.
  */
@@ -91,6 +94,27 @@ function attempt(cases) {
     out.push(...json(`select rls_test.attempt(${lit(JSON.stringify(batch))}::jsonb, '${A}', '${B}')::text`));
   }
   return out;
+}
+
+/* ---------- the same-teacher rule ---------- */
+
+/* Every column a same_teacher trigger guards refuses a record of another
+   teacher (tests/db/same-teacher.sql). */
+function testSameTeacherLinks() {
+  psql(url, readFileSync(join(here, 'same-teacher.sql'), 'utf-8'));
+  const tries = json(`select rls_test.same_teacher_links('${A}', '${B}')::text`);
+  const count = outcome => tries.filter(r => r.outcome === outcome).length;
+  for (const r of tries) {
+    if (r.outcome === 'ALLOWED')
+      fail('links', `${r.tbl}.${r.col} took a record of another teacher. The same-teacher rule must refuse it.`);
+    if (r.outcome === 'no seed row')
+      fail('links', `${r.tbl}.${r.col} was not tried: ${r.detail}. Add a row to tests/db/seed.sql.`);
+  }
+  if (!tries.length) fail('links', 'no same_teacher trigger was found, so nothing was tried');
+  say(`Links: ${tries.length} columns that name a second record, each pointed at a record of teacher B.`);
+  say(`  Refused by the same-teacher rule: ${count('refused by the rule')}.`);
+  say(`  Refused by another check that fires first: ${count('refused by another check')}.`);
+  return tries;
 }
 
 /* ---------- the run ---------- */
@@ -568,8 +592,12 @@ function main() {
     const t = testTables(tables, rows);
     const f = testFunctions(fns, seeded, uuids);
     const s = testStudentDoor(fns, seeded);
+    const l = testSameTeacherLinks();
     if (process.env.RLS_REPORT)
-      writeFileSync(process.env.RLS_REPORT, JSON.stringify({ tables: t, functions: f, student: s, failures }, null, 2));
+      writeFileSync(
+        process.env.RLS_REPORT,
+        JSON.stringify({ tables: t, functions: f, student: s, links: l, failures }, null, 2),
+      );
     ok = failures.length === 0;
   } finally {
     drop();
