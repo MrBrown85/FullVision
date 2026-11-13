@@ -18,7 +18,7 @@
  *    caps only go down.
  * 2. The output. Demo Mode's Science 8 is drawn as a Proficiency, a Both and
  *    a Letter class, every student-facing surface (every Progress Reports
- *    block, the Quick Report with its Feedback Pages and rubric sheets, the
+ *    block, the Assessments list with its Feedback Pages and rubric sheets, the
  *    phone copy, the student page): no figure for a level in a Proficiency
  *    or Both class, the proficiency words there, and a Letter class's output
  *    and every points or Complete/Incomplete score exactly what main gave
@@ -26,7 +26,7 @@
  *    written by this file in a checkout of the commit before it:
  *    UPDATE_STUDENT_FACING=1 npx vitest run tests/student-facing-proficiency.test.js).
  * 3. Overrides. A student whose competency the teacher set by hand reads the
- *    teacher's level on the Quick Report, a Progress Report, the student
+ *    teacher's level on the Assessments list, a Progress Report, the student
  *    page and the phone copy, and nothing there shows the calculated figure.
  */
 import './setup.js';
@@ -90,7 +90,7 @@ const ALLOWED = {
     'a Letter class only (_levelHtml, the override note, the Proficiency block, the legend), or the % of a Both class (_levelHtml)',
   ],
   'teacher/report-blocks.js formatLevelAs(': [4, "always 'percent': a piece's % in a Letter or Both class"],
-  'teacher/grade-report.js levelFigure(': [1, 'the Quick Report in a Letter class'],
+  'teacher/grade-report.js levelFigure(': [1, 'the Assessments list in a Letter class'],
   'shared/student-view.js formatLevel(': [2, 'My Learning in a Letter class: the %'],
   'shared/student-view.js studentGradeSummary(': [1, 'the level and whether there is any grade, not its text'],
 };
@@ -192,7 +192,7 @@ function draw(cid) {
 }
 
 /* Every points and Complete/Incomplete score a student or family reads in
-   a Proficiency class: the Quick Report's rows and score cards, the
+   a Proficiency class: the Assessments list's rows and score cards, the
    Assignment Grades rows, the student page's results, the printed score
    sheet. Each as it is shown. */
 function pointsWork(cid, drawn) {
@@ -287,7 +287,7 @@ describe('every student-facing surface of the Demo class', { timeout: 120000 }, 
       expect(d[key], part).toMatch(WORD);
     });
     expect(d['student page › st1']).toMatch(WORD);
-    // The Quick Report's grade sheet: a level's Score is its proficiency, Out Of empty.
+    // The Assessments list: a level's Score is its proficiency, Out Of empty.
     const q = JSON.parse(d['year › quick › st1']);
     const levels = q.rows.filter(r => WORD.test(r.score));
     expect(levels.length).toBeGreaterThan(5);
@@ -378,8 +378,8 @@ describe('a competency the teacher set by hand', () => {
     const ctx = { termId: 'term-1', termLabel: 'Report 1' };
     expect(getSectionProficiencyRaw(CID, ME, 'ev')).toBe(2);
     expect(getSectionProficiency(CID, ME, 'ev')).toBe(4);
-    // The Quick Report's Course Grade, a Progress Report, the phone copy and the student page.
-    // The Quick Report's Course Grade and the Assignment Grades block print this (calc.js studentGradeText).
+    // The Course Grade line, a Progress Report, the phone copy and the student page.
+    // The Course Grade line and the Assignment Grades block print this (calc.js studentGradeText).
     const course = studentGradeText(CID, ME, 'term-1').text;
     expect(course).toMatch(/^Extending/);
     const prog = ['proficiency', 'section-outcomes', 'section-chart', 'progress', 'grade-table', 'competency-table']

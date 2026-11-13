@@ -45,10 +45,13 @@ saved form is rewritten. A class with no `one` yet gets one read from what it ha
    first.
 5. Its own PRs after that: Excuse It Instead (it changes a grade: Colin's review), IEP Goals, Use
    in My Other Classes.
-6. One Report becomes the Progress Reports screen for everyone; the old editor stays in the code,
-   unreachable, for one reporting period.
-7. Delete last: `report-studio.js`, the grid editing in `page-reports.js`, the mode switch. Never
-   the saved-form readers or reprinting.
+6. Done 2026-11-13. One Report is the Progress Reports screen for everyone (Colin: "make one
+   report the screen for everyone and remove the old editor. clean up the code."). The old editor
+   did not wait a reporting period.
+7. Done 2026-11-13. Removed: `report-studio.js`, the grid editing in `page-reports.js`, the Quick
+   Report / Custom switch and the template library (Save as Template, Your Templates; no teacher
+   had saved one). Kept: the readers that open a saved Quick Report or built form as parts, the
+   form model in `report-sheets.js`, and printed copies, which reprint as they went home.
 
 Steps 2 to 4 are one PR (nothing reaches a teacher until the switch is on). A release is Colin's
 word, as always.

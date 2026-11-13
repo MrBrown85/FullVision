@@ -2,7 +2,7 @@
  * What every report surface gives for the Demo class, pinned
  * (student page build plan, S2-T1: reports read grades through one entry).
  *
- * Progress Reports, the Quick Report and its Feedback Pages, the Term
+ * Progress Reports, the Assessments list and its Feedback Pages, the Term
  * Questionnaire with Generate, Sent to Phones, Print Grades and Export are
  * each drawn for Demo Mode's Science 8 (tests/helpers/report-surfaces.js)
  * and compared with tests/fixtures/report-surfaces.json, a fingerprint of

@@ -2232,22 +2232,22 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(count(/\bv2\.saveCategories\(/g)).toEqual({
       // _persistCategoriesToCanonical, for saveCategories below; and
       // saveCategoriesNow for a class no server holds (Demo Mode)
-      'shared/data.js': 2,
+      'shared/data-categories.js': 2,
     });
     expect(count(/\bv2\.reorderCategories\(/g)).toEqual({
-      'shared/data.js': 1, // reorderCategoriesNow for a class no server holds
+      'shared/data-categories.js': 1, // reorderCategoriesNow for a class no server holds
     });
     // Class Settings saves and reorders through the two that check and send in one moment.
     expect(count(/(?<![.\w])saveCategoriesNow\(/g)).toEqual({
-      'shared/data.js': 1,
+      'shared/data-categories.js': 1,
       'teacher/dash-class-manager.js': 1,
     });
     expect(count(/(?<![.\w])reorderCategoriesNow\(/g)).toEqual({
-      'shared/data.js': 1,
+      'shared/data-categories.js': 1,
       'teacher/dash-class-manager.js': 1,
     });
     // Asked of the server directly, never left in the outbox.
-    const data = read('shared/data.js');
+    const data = read('shared/data-categories.js');
     const now = data.slice(
       data.indexOf('async function _categoryWriteNow('),
       data.indexOf('function _noAnswerFromServer('),
@@ -2257,7 +2257,8 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(count(/\bv2\.(upsertCategory|deleteCategory)\(/g)).toEqual({});
     // The data layer's whole-list save.
     expect(count(/(?<![.\w])saveCategories\(/g)).toEqual({
-      'shared/data.js': 2, // its definition; a class just made on this device going up
+      'shared/data-categories.js': 1, // its definition
+      'shared/data.js': 1, // a class just made on this device going up
       'shared/seed-data.js': 1, // Demo Mode's sample class
       'teacher/dash-class-manager.js': 1, // Duplicate Class: a new class
       'teacher/grading-setup-copy.js': 1, // Copy Grading Setup: an existing class

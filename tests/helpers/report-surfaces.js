@@ -4,9 +4,10 @@
  * what a family, a student or the teacher's printer is given, read through
  * the same functions the app calls.
  *
- * - Progress Reports: every block the Page Studio has, with its default
+ * - Progress Reports: every block a report can print, with its default
  *   options, at both widths; the Focus Area picks; the letterhead.
- * - The Quick Report: its rows, the summary by category, and its Feedback
+ * - The Assessments list (GradeReport; the 'quick' parts, once the Quick
+ *   Report): its rows, the summary by category, and the Feedback
  *   Pages (the cards, their rubric sheets, the extra cards).
  * - The Term Questionnaire: the facts, the header grade, the lists, the
  *   whole screen, the checks on a comment, and what Generate drafts.

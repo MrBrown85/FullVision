@@ -2,7 +2,7 @@
    (docs/plans/student-page-build-plan.md 1.3 and S2; S2-T1).
 
    A report is anything a family, a student or the office is handed:
-   Progress Reports, the Quick Report and its Feedback Pages, the Term
+   Progress Reports and its Feedback Pages, the Term
    Questionnaire's facts and Generate, Sent to Phones, Print Grades and
    Export. Each is a surface below, and SURFACES is the one place that says
    which set of scores it uses:
@@ -38,7 +38,7 @@ window.ReportScores = (function () {
      uses"; DECISIONS, "Student page build answers" 6). To put a surface on
      returned grades, change its row to 'returned'. */
   var SURFACES = {
-    // Progress Reports on Page Studio, and the Quick Report with its Feedback Pages (S2-F1).
+    // Progress Reports (One Report) with its Feedback Pages (S2-F1).
     progress: 'returned',
     /* The rubric handout (teacher/rubric-print.js), from each door that
        prints it: the grader, Class Results and the gradebook's column menu.

@@ -1535,7 +1535,7 @@ describe('rubric-piece-percent', () => {
   describe('a rubric piece alone in its category', () => {
     afterEach(() => delete COURSES[CID]);
 
-    it('shows the category’s % in its cell, its Quick Report row and Assignment Grades', () => {
+    it('shows the category’s % in its cell, its Assessments row and Assignment Grades', () => {
       seed('letter');
       const projects = getCategories(CID).find(c => c.id === 'cat-proj');
       expect(assessmentGroupGrade(CID, SID, [inquiry], categoryCalcMode(projects)).text).toBe('A 87%');

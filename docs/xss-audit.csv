@@ -1,253 +1,351 @@
 file,line,col,sink,classification,note,via,snippet
-login-auth.js,68,4,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""confirm-card""> <div class=""confirm-title"" id=""restore-account-title"">Restore Account</div> <div class=""confirm-message"">Your account is scheduled …"
-s/questionnaire.js,763,4,innerHTML,ESC_WRAPPED,helper:progressHtml,,tmp.innerHTML = progressHtml(S)
-s/student.js,469,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = render(S)
-shared/supabase.js,165,4,innerHTML,LITERAL,,,"toast.innerHTML = '<span>Session expired</span><button class=""sync-toast-btn"" data-action=""go-login"">Sign In</button>'"
+s/page-view.js,2724,4,innerHTML,REVIEWED,marked at the sink,,"root.innerHTML = html(view, ui)"
+s/questionnaire.js,797,4,innerHTML,ESC_WRAPPED,helper:progressHtml,,tmp.innerHTML = progressHtml(S)
+s/student.js,652,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = render(S)
+shared/loading-screen.js,119,6,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = inner(kind)
+shared/sign-in.js,80,4,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""confirm-card""> <div class=""confirm-title"" id=""restore-account-title"">Restore Account</div> <div class=""confirm-message"">Your account is scheduled …"
+shared/supabase.js,194,4,innerHTML,LITERAL,,,"toast.innerHTML = '<span>Session expired</span><button class=""sync-toast-btn"" data-action=""go-login"">Sign In</button>'"
+teacher-mobile/add-work.js,197,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = head + body
 teacher-mobile/card-stack.js,54,6,innerHTML,REVIEWED,marked at the sink,,"el.innerHTML = _renderCard(_cards[idx], idx)"
 teacher-mobile/card-stack.js,59,6,innerHTML,LITERAL,,,containerEl.innerHTML = ''
 teacher-mobile/card-stack.js,77,6,innerHTML,REVIEWED,marked at the sink,,"behindEl.innerHTML = _renderCard(_cards[behindIdx], behindIdx)"
-teacher-mobile/card-stack.js,211,10,innerHTML,REVIEWED,marked at the sink,,"_els[1].innerHTML = _renderCard(_cards[nextIdx], nextIdx)"
-teacher-mobile/card-stack.js,272,6,innerHTML,LITERAL,,,containerEl.innerHTML = ''
-teacher-mobile/card-widget-editor.js,114,19,innerHTML,LITERAL,helper:buildEditorHTML,,content.innerHTML = buildEditorHTML()
-teacher-mobile/card-widget-editor.js,133,19,innerHTML,LITERAL,helper:buildEditorHTML,,content.innerHTML = buildEditorHTML()
-teacher-mobile/card-widget-editor.js,195,23,innerHTML,LITERAL,helper:buildEditorHTML,,content.innerHTML = buildEditorHTML()
-teacher-mobile/components.js,80,4,innerHTML,REVIEWED,marked at the sink,,"container.innerHTML = '<div class=""m-sheet' + halfClass + '"">' + '<div class=""m-sheet-handle"" role=""button"" tabindex=""0"" aria-label=""Dismiss sheet""></div>' + '<div class=""m-sheet-…"
-teacher-mobile/components.js,191,6,innerHTML,LITERAL,,,container.innerHTML = ''
-teacher-mobile/components.js,207,4,innerHTML,ESC_WRAPPED,concat,,"el.innerHTML = '<div class=""m-toast-item""><span>' + _esc(message) + '</span>' + undoBtn + '</div>'"
-teacher-mobile/shell.js,203,6,innerHTML,LITERAL,,,"_pullIndicator.innerHTML = '<span class=""m-pull-spinner""></span>'"
-teacher-mobile/shell.js,507,4,innerHTML,REVIEWED,marked at the sink,,tmp.innerHTML = html
-teacher-mobile/shell.js,529,4,innerHTML,LITERAL,,,stack.innerHTML = ''
-teacher-mobile/shell.js,542,4,innerHTML,REVIEWED,marked at the sink,,stack.innerHTML = html
-teacher-mobile/shell.js,575,4,innerHTML,REVIEWED,marked at the sink,,tmp.innerHTML = html
-teacher-mobile/shell.js,663,6,innerHTML,REVIEWED,helper:renderDetail,,"tmp.innerHTML = MStudents.renderDetail(_cid, sid)"
+teacher-mobile/card-stack.js,216,10,innerHTML,REVIEWED,marked at the sink,,"_els[1].innerHTML = _renderCard(_cards[nextIdx], nextIdx)"
+teacher-mobile/card-stack.js,326,6,innerHTML,LITERAL,,,containerEl.innerHTML = ''
+teacher-mobile/card-widget-editor.js,115,19,innerHTML,LITERAL,helper:buildEditorHTML,,content.innerHTML = buildEditorHTML()
+teacher-mobile/card-widget-editor.js,134,19,innerHTML,LITERAL,helper:buildEditorHTML,,content.innerHTML = buildEditorHTML()
+teacher-mobile/card-widget-editor.js,196,23,innerHTML,LITERAL,helper:buildEditorHTML,,content.innerHTML = buildEditorHTML()
+teacher-mobile/components.js,99,4,innerHTML,REVIEWED,marked at the sink,,"container.innerHTML = '<div class=""m-sheet' + halfClass + '"">' + '<div class=""m-sheet-handle"" role=""button"" tabindex=""0"" aria-label=""Dismiss sheet""></div>' + '<div class=""m-sheet-…"
+teacher-mobile/components.js,210,6,innerHTML,LITERAL,,,container.innerHTML = ''
+teacher-mobile/components.js,276,4,innerHTML,ESC_WRAPPED,concat,,"el.innerHTML = '<div class=""m-toast-item""><span>' + _esc(message) + '</span>' + undoBtn + '</div>'"
+teacher-mobile/markup.js,617,4,innerHTML,REVIEWED,marked at the sink,,"root.innerHTML = '<div class=""m-markup-top"">' + '<button type=""button"" class=""m-markup-done"" data-mk=""done"">Done</button>' + '<div class=""m-markup-head""><div class=""m-markup-title…"
+teacher-mobile/markup.js,705,4,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = _marksHtml()
+teacher-mobile/markup.js,797,4,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = html
+teacher-mobile/shell.js,211,6,innerHTML,LITERAL,,,"_pullIndicator.innerHTML = '<span class=""m-pull-spinner""></span>'"
+teacher-mobile/shell.js,634,4,innerHTML,REVIEWED,marked at the sink,,tmp.innerHTML = html
+teacher-mobile/shell.js,667,15,insertAdjacentHTML,REVIEWED,marked at the sink,,"title.insertAdjacentHTML('beforebegin', DEMO_PILL_HTML)"
+teacher-mobile/shell.js,725,4,innerHTML,LITERAL,,,stack.innerHTML = ''
+teacher-mobile/shell.js,738,4,innerHTML,REVIEWED,marked at the sink,,stack.innerHTML = html
+teacher-mobile/shell.js,772,4,innerHTML,REVIEWED,marked at the sink,,tmp.innerHTML = html
+teacher-mobile/shell.js,872,6,innerHTML,REVIEWED,helper:renderDetail,,"tmp.innerHTML = MStudents.renderDetail(_cid, sid)"
+teacher-mobile/shell.js,1207,10,innerHTML,REVIEWED,marked at the sink,,"leaveSheet.innerHTML = _demoUnsentConfirmHtml(res.unsent, demoHref)"
+teacher-mobile/shell.js,1221,23,innerHTML,REVIEWED,marked at the sink,,demoSheet.innerHTML = _demoResetConfirmHtml()
+teacher-mobile/shell.js,1227,25,innerHTML,REVIEWED,marked at the sink,,cancelSheet.innerHTML = _demoSheetInnerHtml()
+teacher-mobile/student-detail.js,191,10,outerHTML,REVIEWED,marked at the sink,,"box.outerHTML = _secNowHtml(at, sid, s, getSectionProficiency(at, sid, s.id))"
+teacher-mobile/student-detail.js,862,4,innerHTML,REVIEWED,marked at the sink,,"tmp.innerHTML = MStudents.renderDetail(cid, desc.sid)"
+teacher-mobile/student-detail.js,867,26,innerHTML,REVIEWED,marked at the sink,,panel.innerHTML = fresh.innerHTML
 teacher-mobile/sweep.js,457,15,innerHTML,REVIEWED,helper:_orderHtml,,order.innerHTML = _orderHtml()
 teacher-mobile/sweep.js,459,14,innerHTML,REVIEWED,helper:_gridHtml,,grid.innerHTML = _gridHtml(done)
 teacher-mobile/sweep.js,461,15,innerHTML,REVIEWED,helper:_panelHtml,,panel.innerHTML = _panelHtml(done)
-teacher-mobile/tab-grade.js,1017,4,outerHTML,REVIEWED,helper:_renderStudentCard,,"card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid))"
-teacher-mobile/tab-grade.js,1094,4,innerHTML,REVIEWED,fn-return,,"swiper.innerHTML = sortStudents(getStudents(cid).slice(), 'alpha') .map(function (st) { return _renderStudentCard(cid, st, assessment, scores, statuses); }) .join('')"
-teacher-mobile/tab-grade.js,1161,4,innerHTML,REVIEWED,helper:_modBtnsHtml,,"box.innerHTML = _modBtnsHtml(level, e ? normalizeScoreMod(level, e.mod) : 0)"
-teacher-mobile/tab-grade.js,1281,10,innerHTML,REVIEWED,helper:_modBtnsHtml,,"box.innerHTML = _modBtnsHtml(0, 0)"
-teacher-mobile/tab-grade.js,1494,15,innerHTML,REVIEWED,helper:_completionBtnsHtml,,group.innerHTML = _completionBtnsHtml(next)
-teacher-mobile/tab-grade.js,1516,12,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"el.innerHTML = pointsPctHtml(value, max, 0)"
-teacher-mobile/tab-observe.js,242,6,innerHTML,REVIEWED,helper:_renderObsCards,,"container.innerHTML = _renderObsCards(cid, allObs, filter)"
-teacher-mobile/tab-observe.js,350,14,outerHTML,REVIEWED,marked at the sink,,el.outerHTML = map[id]()
-teacher-mobile/tab-observe.js,533,4,innerHTML,REVIEWED,marked at the sink,,"pick.innerHTML = '<div class=""m-edit-top"">' + '<button type=""button"" class=""m-edit-cancel"" data-action=""m-obs-picker-back"">\u2039 Back</button>' + '<div class=""m-edit-title"">' + P…"
-teacher-mobile/tab-observe.js,603,4,innerHTML,LITERAL,,,pick.innerHTML = ''
-teacher-mobile/tab-observe.js,611,14,innerHTML,REVIEWED,helper:_tagChipsHtml,,tags.innerHTML = _tagChipsHtml()
-teacher-mobile/tab-observe.js,722,6,innerHTML,LITERAL,,,"picker.innerHTML = '<span class=""m-student-picker-placeholder"">Select student...</span>'"
-teacher-mobile/tab-observe.js,725,6,innerHTML,REVIEWED,marked at the sink,,"picker.innerHTML = _selectedStudents .map(function (sid) { var st = students.find(function (s) { return s.id === sid; }); return ( '<span class=""m-student-chip"">' + MC.esc(st ? di…"
-teacher-mobile/tab-observe.js,758,13,outerHTML,REVIEWED,helper:_contextRowHtml,,row.outerHTML = _contextRowHtml()
-teacher-mobile/tab-observe.js,875,4,innerHTML,REVIEWED,marked at the sink,,"pickEl.innerHTML = '<div class=""m-edit-top""><span class=""m-edit-top-sp""></span><div class=""m-edit-title"">Concern Added</div>' + '<button type=""button"" class=""m-edit-save"" data-act…"
-teacher-mobile/tab-observe.js,1113,6,innerHTML,REVIEWED,helper:_renderObsCards,,"container.innerHTML = _renderObsCards(cid, allObs, _activeFilter)"
-teacher/assessment-copy.js,479,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card copy-dialog-card"">' + '<div class=""confirm-title"" id=""copy-dialog-title"">' + esc(opts.title) + '</div>' + '<div class=""copy-dialog-bo…"
-teacher/assessment-copy.js,991,6,innerHTML,LITERAL,,,mount.innerHTML = ''
-teacher/assessment-copy.js,1003,4,innerHTML,ESC_WRAPPED,fn-return,,"mount.innerHTML = ticked .map(function (chip) { var id = chip.dataset.cid; var keep = existing[id] || {}; return ( '<div class=""af-copy-date-row"" data-cid=""' + esc(id) + '""><span …"
-teacher/assessment-copy.js,1170,8,innerHTML,ESC_WRAPPED,fn-return,,"list.innerHTML = rows .map(function (x) { var already = x.copyGroup && have[x.copyGroup]; var cat = _categoryOf(srcCid, x); return ( '<label class=""copy-review-check' + (already ?…"
-teacher/assign-collab.js,82,6,innerHTML,TRUSTED_EXPR,concat,,mount.innerHTML = html
-teacher/assign-collab.js,144,6,innerHTML,LITERAL,,,mount.innerHTML = html
-teacher/assign-collab.js,228,6,innerHTML,LITERAL,,,mount.innerHTML = html
-teacher/comment-personal.js,1568,4,innerHTML,REVIEWED,helper:_sheetHtml,,o.innerHTML = _sheetHtml()
-teacher/competency-evidence.js,283,16,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = listHtml(_cid, _sid, ev, assessMap)"
-teacher/dash-class-manager.js,535,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""cm-help-card"">' + '<div class=""cm-help-head"">' + '<h2 class=""cm-help-title"" id=""cm-help-title"">Where These Appear</h2>' + '<button type=""button"" c…"
-teacher/dash-class-manager.js,576,6,innerHTML,REVIEWED,marked at the sink,,"panel.innerHTML = '<div class=""cm-help-picture"" aria-hidden=""true"">' + parts[i].picture + '</div>' + '<div class=""cm-help-caption""><span class=""cm-help-caption-name"">' + esc(parts…"
-teacher/dash-class-manager.js,1014,4,innerHTML,ESC_WRAPPED,concat,,"keep.innerHTML = '<span class=""cm-keep-copy-text""><strong>Keep a copy first</strong><span>A CSV of ' + esc(name) + '’s scores and observations in ' + esc((COURSES[cid] && COURSES[…"
-teacher/dash-class-manager.js,1760,4,innerHTML,ESC_WRAPPED,fn-return,,"picker.innerHTML = Object.keys(BC_DESIGNATIONS) .filter(function (code) { return have.indexOf(code) < 0; }) .map(function (code) { return ( '<button type=""button"" role=""menuitem"" …"
-teacher/dash-class-manager.js,2566,32,outerHTML,REVIEWED,helper:renderCmSidebar,,el.outerHTML = renderCmSidebar(Object.keys(COURSES))
-teacher/dash-class-manager.js,2714,6,innerHTML,REVIEWED,concat,,"toolbarMount.innerHTML = '<div class=""page-toolbar dash-toolbar cm-toolbar"">' + renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') + '<span class…"
-teacher/dash-class-manager.js,2741,6,innerHTML,LITERAL,concat,,document.getElementById('main').innerHTML = html
-teacher/dash-class-manager.js,2746,19,innerHTML,REVIEWED,helper:renderCmSidebar,,sideMount.innerHTML = renderCmSidebar(courseIds)
-teacher/dash-class-manager.js,2770,4,innerHTML,LITERAL,,,document.getElementById('main').innerHTML = html
-teacher/dash-class-manager.js,4615,16,innerHTML,ESC_WRAPPED,helper:_cmCalcMethodDescription,,desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val)
-teacher/dash-class-manager.js,4620,17,innerHTML,ESC_WRAPPED,helper:_cmGradingSystemDescription,,gdesc.innerHTML = _cmGradingSystemDescription(btn.dataset.val)
-teacher/dash-class-manager.js,4859,6,innerHTML,LITERAL,helper:_cmCatSumHtml,,sumEl.innerHTML = _cmCatSumHtml(cid)
-teacher/dash-class-manager.js,5487,14,innerHTML,REVIEWED,helper:_cmTermFooterHtml,,foot.innerHTML = _cmTermFooterHtml(cid)
-teacher/dash-class-manager.js,6182,4,innerHTML,REVIEWED,concat,,"overlay.innerHTML = '<div class=""confirm-card cm-dup-card"">' + '<div class=""confirm-title"" id=""cm-dup-title"">Duplicate ' + esc(courseDisplayName(src)) + '</div>' + '<div class=""co…"
-teacher/dash-class-manager.js,6325,6,innerHTML,LITERAL,,,p.innerHTML = ''
-teacher/dash-class-manager.js,6329,6,innerHTML,LITERAL,,,palette.innerHTML = ''
-teacher/dash-class-manager.js,6346,4,innerHTML,REVIEWED,marked at the sink,,palette.innerHTML = html
-teacher/grade-report.js,212,4,innerHTML,ESC_WRAPPED,concat,,"stage.innerHTML = '<div class=""gr-table gr-regular"">' + names .map(function (n) { return ( '<div><span class=""gr-measure"" style=""display:inline-block;white-space:nowrap"">' + esc(n…"
-teacher/grade-report.js,359,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""sheet-item"">' + html + '</div>'"
-teacher/grade-report.js,576,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""fb-col"" style=""width:' + FB_COL_W + 'px"">' + htmls.join('') + '</div>'"
-teacher/grade-report.js,664,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""fb-col"" style=""width:' + FB_COL_W + 'px"">' + _withTextSize(ReportFeedback.cardHtml(item, { number: number }), size) + _withTextSize(ReportFeedback.c…"
-teacher/grade-report.js,706,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""fb-col"" style=""width:' + FB_COL_W + 'px"">' + _extraHtml(x) + cont + '</div>'"
-teacher/grade-report.js,768,4,innerHTML,ESC_WRAPPED,helper:_pageHeadHtml,,"stage.innerHTML = _pageHeadHtml(name, meta, 'Page 88 of 88')"
-teacher/grades-print.js,1090,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = renderPages(model)
-teacher/grades-print.js,1114,14,innerHTML,LITERAL,,,root.innerHTML = ''
-teacher/grades-print.js,1540,17,innerHTML,REVIEWED,helper:_previewHtml,,preview.innerHTML = _previewHtml(model)
-teacher/grades-print.js,1552,4,innerHTML,REVIEWED,helper:_settingsHtml,,"pane.innerHTML = _settingsHtml(_state.cid, _state.opts)"
-teacher/grades-print.js,1591,4,innerHTML,ESC_WRAPPED,fn-return,,"menu.innerHTML = items .map(function (it) { var on = it === cur; return ( '<button type=""button"" role=""menuitemradio"" class=""gpd-menu-item"" tabindex=""-1"" aria-checked=""' + on + '""…"
-teacher/grades-print.js,1659,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = _dialogHtml(cid, _state.opts)"
-teacher/grades-print.js,1702,18,innerHTML,ESC_WRAPPED,helper:_pickList,,"pick.innerHTML = _pickList(cid, o)"
-teacher/grading-setup-copy.js,557,8,innerHTML,REVIEWED,helper:_groupsHtml,,"box.innerHTML = _groupsHtml(srcCid, only)"
-teacher/grading-setup-copy.js,574,8,innerHTML,REVIEWED,concat,,"classes.innerHTML = '<div class=""copy-review-note"">Copy ' + esc(_className(cid)) + '’s setup into:</div><div class=""copy-from-list"">' + _classRows(targets, 'checkbox', 'gsc-dst') …"
-teacher/grading-setup-copy.js,582,8,innerHTML,ESC_WRAPPED,concat,,"classes.innerHTML = '<label class=""copy-review-field"">Import into ' + esc(_className(cid)) + ' from <select class=""af-input"" id=""gsc-from"">' + all .map(function (c) { return '<opt…"
+teacher-mobile/tab-grade.js,299,6,innerHTML,REVIEWED,marked at the sink,,"panel.innerHTML = _toReturnHtml(cid, rows)"
+teacher-mobile/tab-grade.js,303,6,innerHTML,REVIEWED,marked at the sink,,seg.innerHTML = _toReturnSegHtml(n)
+teacher-mobile/tab-grade.js,1290,6,innerHTML,REVIEWED,marked at the sink,,"tmp.innerHTML = renderSwiper(cid, aid, { keep: true })"
+teacher-mobile/tab-grade.js,1292,6,innerHTML,REVIEWED,marked at the sink,,swiper.innerHTML = tmp.querySelector('#m-swiper').innerHTML
+teacher-mobile/tab-grade.js,1294,6,innerHTML,REVIEWED,marked at the sink,,strip.innerHTML = tmp.querySelector('#m-thumb-strip').innerHTML
+teacher-mobile/tab-grade.js,1838,8,innerHTML,REVIEWED,marked at the sink,,state.innerHTML = parts.state
+teacher-mobile/tab-grade.js,1843,8,innerHTML,REVIEWED,marked at the sink,,act.innerHTML = parts.act
+teacher-mobile/tab-grade.js,1926,6,innerHTML,REVIEWED,marked at the sink,,"tmp.innerHTML = renderSwiper(cid, aid, { student: sid, aids: _student.aids, kinds: _student.kinds })"
+teacher-mobile/tab-grade.js,2621,6,outerHTML,REVIEWED,helper:_renderStudentCard,,"card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid), unit)"
+teacher-mobile/tab-grade.js,2823,6,innerHTML,REVIEWED,fn-return,,"swiper.innerHTML = _swiperUnits(cid, assessment) .map(function (u) { return _renderStudentCard(cid, u.st, assessment, scores, statuses, u); }) .join('')"
+teacher-mobile/tab-grade.js,2895,6,innerHTML,REVIEWED,marked at the sink,,"box.innerHTML = MC.fineTuneButtonsHTML(level, mod)"
+teacher-mobile/tab-grade.js,2982,12,innerHTML,REVIEWED,marked at the sink,,"box.innerHTML = MC.fineTuneButtonsHTML(0, 0)"
+teacher-mobile/tab-grade.js,3381,17,innerHTML,REVIEWED,helper:_completionBtnsHtml,,group.innerHTML = _completionBtnsHtml(next)
+teacher-mobile/tab-grade.js,3405,14,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"el.innerHTML = pointsPctHtml(value, max, 0)"
+teacher-mobile/tab-grade.js,3480,25,outerHTML,REVIEWED,marked at the sink,,"box.outerHTML = _levelSheetHtml(cid, tag, level)"
+teacher-mobile/tab-observe.js,243,6,innerHTML,REVIEWED,helper:_renderObsCards,,"container.innerHTML = _renderObsCards(cid, allObs, filter)"
+teacher-mobile/tab-observe.js,361,14,outerHTML,REVIEWED,marked at the sink,,el.outerHTML = map[id]()
+teacher-mobile/tab-observe.js,545,4,innerHTML,REVIEWED,marked at the sink,,"pick.innerHTML = '<div class=""m-edit-top"">' + '<button type=""button"" class=""m-edit-cancel"" data-action=""m-obs-picker-back"">\u2039 Back</button>' + '<div class=""m-edit-title"">' + P…"
+teacher-mobile/tab-observe.js,621,4,innerHTML,LITERAL,,,pick.innerHTML = ''
+teacher-mobile/tab-observe.js,629,14,innerHTML,REVIEWED,helper:_tagChipsHtml,,tags.innerHTML = _tagChipsHtml()
+teacher-mobile/tab-observe.js,740,6,innerHTML,LITERAL,,,"picker.innerHTML = '<span class=""m-student-picker-placeholder"">Select student...</span>'"
+teacher-mobile/tab-observe.js,743,6,innerHTML,REVIEWED,marked at the sink,,"picker.innerHTML = _selectedStudents .map(function (sid) { var st = students.find(function (s) { return s.id === sid; }); return ( '<span class=""m-student-chip"">' + MC.esc(st ? di…"
+teacher-mobile/tab-observe.js,777,13,outerHTML,REVIEWED,helper:_contextRowHtml,,row.outerHTML = _contextRowHtml()
+teacher-mobile/tab-observe.js,894,4,innerHTML,REVIEWED,marked at the sink,,"pickEl.innerHTML = '<div class=""m-edit-top""><span class=""m-edit-top-sp""></span><div class=""m-edit-title"">Concern Added</div>' + '<button type=""button"" class=""m-edit-save"" data-act…"
+teacher-mobile/tab-observe.js,1143,6,innerHTML,REVIEWED,helper:_renderObsCards,,"container.innerHTML = _renderObsCards(cid, allObs, _activeFilter)"
+teacher/assessment-copy.js,495,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card copy-dialog-card"">' + '<div class=""confirm-title"" id=""copy-dialog-title"">' + esc(opts.title) + '</div>' + '<div class=""copy-dialog-bo…"
+teacher/assessment-copy.js,1032,6,innerHTML,LITERAL,,,mount.innerHTML = ''
+teacher/assessment-copy.js,1044,4,innerHTML,ESC_WRAPPED,fn-return,,"mount.innerHTML = ticked .map(function (chip) { var id = chip.dataset.cid; var keep = existing[id] || {}; return ( '<div class=""af-copy-date-row"" data-cid=""' + esc(id) + '""><span …"
+teacher/assessment-copy.js,1211,8,innerHTML,ESC_WRAPPED,fn-return,,"list.innerHTML = rows .map(function (x) { var already = x.copyGroup && have[x.copyGroup]; var refused = !already && !offersScoreMode(cid, x); var cat = _categoryOf(srcCid, x); ret…"
+teacher/assign-collab.js,163,6,innerHTML,LITERAL,,,mount.innerHTML = ''
+teacher/assign-collab.js,190,6,innerHTML,REVIEWED,marked at the sink,,mount.innerHTML = html
+teacher/assign-collab.js,219,6,innerHTML,REVIEWED,marked at the sink,,mount.innerHTML = html
+teacher/assign-collab.js,276,6,innerHTML,REVIEWED,marked at the sink,,mount.innerHTML = html
+teacher/assign-competency-picker.js,259,6,innerHTML,ESC_WRAPPED,fn-return,,"head.innerHTML = chosen .map(function (t) { var tag = getTagById(cid, t); var code = (tag && tag.code) || t; return ( '<span class=""af-comp-chip"" tabindex=""0"" data-af-tip=""comp"" d…"
+teacher/assign-competency-picker.js,328,4,innerHTML,ESC_WRAPPED,concat,,"box.innerHTML = '<div class=""af-codes-focus-head""><span class=""af-codes-focus-code"">' + esc(tag.code || tag.id) + '</span><span class=""af-codes-focus-name"">' + esc(tag.label || ta…"
+teacher/assign-descriptor-bar.js,23,6,innerHTML,LITERAL,,,"bar.innerHTML = '<div class=""rsg-descriptor-left""><span class=""rsg-descriptor-label""></span><span class=""rsg-descriptor-tags""></span></div><span class=""rsg-descriptor-text""></span…"
+teacher/assign-descriptor-bar.js,33,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-label').innerHTML = ''
+teacher/assign-descriptor-bar.js,34,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-tags').innerHTML = ''
+teacher/assign-descriptor-bar.js,35,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-text').innerHTML = ''
+teacher/assign-descriptor-bar.js,94,4,innerHTML,REVIEWED,marked at the sink,,bar.innerHTML = lines
+teacher/assign-descriptor-bar.js,107,4,innerHTML,REVIEWED,marked at the sink,,"bar.querySelector('.rsg-descriptor-label').innerHTML = esc( _rubricTagName(tag, getSectionForTag(activeCourse, tag.id)), )"
+teacher/assign-descriptor-bar.js,110,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-tags').innerHTML = ''
+teacher/assign-descriptor-bar.js,114,4,innerHTML,REVIEWED,marked at the sink,,text.innerHTML = lines
+teacher/assign-descriptor-bar.js,146,4,innerHTML,REVIEWED,marked at the sink,,"bar.querySelector('.rsg-descriptor-label').innerHTML = esc(crit.name) + ' <span style=""color:' + (levelColors[level] || 'var(--text-3)') + '"">\u2014 ' + esc(levelNames[level] || l…"
+teacher/assign-descriptor-bar.js,172,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-tags').innerHTML = tagsHtml
+teacher/class-results.js,536,6,innerHTML,REVIEWED,marked at the sink,,"box.innerHTML = _otherClassesHtml(cid, a, avg, rows)"
+teacher/class-results.js,1509,4,innerHTML,REVIEWED,marked at the sink,,"panel.innerHTML = _bodyHtml(_state.cid, a)"
+teacher/class-results.js,1696,4,innerHTML,REVIEWED,marked at the sink,,"el.innerHTML = items .map(function (it) { return ( '<button type=""button"" role=""menuitemradio"" aria-checked=""' + !!it.on + '"" data-v=""' + esc(it.value) + '"">' + esc(it.label) + '<…"
+teacher/comment-personal.js,1712,4,innerHTML,REVIEWED,helper:_sheetHtml,,o.innerHTML = _sheetHtml()
+teacher/competency-evidence.js,286,16,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = listHtml(_cid, _sid, ev, assessMap)"
+teacher/dash-class-manager.js,598,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""cm-help-card"">' + '<div class=""cm-help-head"">' + '<h2 class=""cm-help-title"" id=""cm-help-title"">Where These Appear</h2>' + '<button type=""button"" c…"
+teacher/dash-class-manager.js,639,6,innerHTML,REVIEWED,marked at the sink,,"panel.innerHTML = '<div class=""cm-help-picture"" aria-hidden=""true"">' + parts[i].picture + '</div>' + '<div class=""cm-help-caption""><span class=""cm-help-caption-name"">' + esc(parts…"
+teacher/dash-class-manager.js,1170,4,innerHTML,ESC_WRAPPED,concat,,"keep.innerHTML = '<span class=""cm-keep-copy-text""><strong>Keep a copy first</strong><span>A CSV of ' + esc(name) + '’s scores and observations in ' + esc((COURSES[cid] && COURSES[…"
+teacher/dash-class-manager.js,1974,4,innerHTML,ESC_WRAPPED,fn-return,,"picker.innerHTML = Object.keys(BC_DESIGNATIONS) .filter(function (code) { return have.indexOf(code) < 0; }) .map(function (code) { return ( '<button type=""button"" role=""menuitem"" …"
+teacher/dash-class-manager.js,3651,32,outerHTML,REVIEWED,helper:renderCmSidebar,,el.outerHTML = renderCmSidebar(Object.keys(COURSES))
+teacher/dash-class-manager.js,3768,6,innerHTML,REVIEWED,concat,,"toolbarMount.innerHTML = '<div class=""page-toolbar dash-toolbar cm-toolbar"">' + renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') + '<span class=""…"
+teacher/dash-class-manager.js,3790,6,innerHTML,LITERAL,helper:_cmEmptyStateHtml,,document.getElementById('main').innerHTML = html
+teacher/dash-class-manager.js,3795,19,innerHTML,REVIEWED,helper:renderCmSidebar,,sideMount.innerHTML = renderCmSidebar(courseIds)
+teacher/dash-class-manager.js,3819,4,innerHTML,LITERAL,,,document.getElementById('main').innerHTML = html
+teacher/dash-class-manager.js,6624,16,innerHTML,ESC_WRAPPED,helper:_cmCalcMethodDescription,,desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val)
+teacher/dash-class-manager.js,6629,17,innerHTML,ESC_WRAPPED,helper:_cmGradingSystemDescription,,gdesc.innerHTML = _cmGradingSystemDescription(btn.dataset.val)
+teacher/dash-class-manager.js,7197,6,innerHTML,LITERAL,helper:_cmCatSumHtml,,sumEl.innerHTML = _cmCatSumHtml(cid)
+teacher/dash-class-manager.js,7954,14,innerHTML,REVIEWED,helper:_cmTermFooterHtml,,foot.innerHTML = _cmTermFooterHtml(cid)
+teacher/dash-class-manager.js,8858,4,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""confirm-card cm-restore-card"">' + '<div class=""confirm-title"" id=""cm-restore-title"">Restore Class from Backup</div>' + '<div class=""confirm-messag…"
+teacher/dash-class-manager.js,8917,6,innerHTML,ESC_WRAPPED,concat,,"summary.innerHTML = '<div>' + esc(line) + '</div>' + (backup.courseInfo ? '' : '<div class=""cm-restore-note"">This backup is from before November 2026 and has no class settings. Se…"
+teacher/dash-class-manager.js,8980,4,innerHTML,REVIEWED,concat,,"overlay.innerHTML = '<div class=""confirm-card cm-dup-card"">' + '<div class=""confirm-title"" id=""cm-dup-title"">Duplicate ' + esc(courseDisplayName(src)) + '</div>' + '<div class=""co…"
+teacher/dash-class-manager.js,9126,6,innerHTML,LITERAL,,,p.innerHTML = ''
+teacher/dash-class-manager.js,9130,6,innerHTML,LITERAL,,,palette.innerHTML = ''
+teacher/dash-class-manager.js,9147,4,innerHTML,REVIEWED,marked at the sink,,palette.innerHTML = html
+teacher/drafts-before-print.js,149,4,innerHTML,REVIEWED,helper:_html,,"overlay.innerHTML = _html(found, words)"
+teacher/factor-field.js,156,4,innerHTML,REVIEWED,helper:barHtml,,"mount.innerHTML = barHtml(info, selfTitle)"
+teacher/grade-report.js,323,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""gr-table gr-' + key + '"">' + names .map(function (n) { return ( '<div><span class=""gr-measure"" style=""display:inline-block;white-space:nowrap"">' + e…"
+teacher/grade-report.js,399,6,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""gr-table gr-' + key + '""' + (bold ? ' style=""font-weight:700""' : '') + '>' + todo .map(function (n) { return '<div>' + span(n) + '</div><div class=""…"
+teacher/grade-report.js,706,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""sheet-item"">' + html + '</div>'"
+teacher/grade-report.js,921,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""fb-col"" style=""width:' + FB_COL_W + 'px"">' + htmls.join('') + '</div>'"
+teacher/grade-report.js,1009,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""fb-col"" style=""width:' + FB_COL_W + 'px"">' + _withTextSize(ReportFeedback.cardHtml(item, { number: number }), size) + _withTextSize(ReportFeedback.c…"
+teacher/grade-report.js,1051,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""fb-col"" style=""width:' + FB_COL_W + 'px"">' + _extraHtml(x) + cont + '</div>'"
+teacher/grade-report.js,1113,4,innerHTML,ESC_WRAPPED,helper:_pageHeadHtml,,"stage.innerHTML = _pageHeadHtml(name, meta, 'Page 88 of 88')"
+teacher/grades-print.js,1086,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = renderPages(model)
+teacher/grades-print.js,1104,14,innerHTML,LITERAL,,,root.innerHTML = ''
+teacher/grades-print.js,1519,17,innerHTML,REVIEWED,helper:_previewHtml,,preview.innerHTML = _previewHtml(model)
+teacher/grades-print.js,1531,4,innerHTML,REVIEWED,helper:_settingsHtml,,"pane.innerHTML = _settingsHtml(_state.cid, _state.opts)"
+teacher/grades-print.js,1570,4,innerHTML,ESC_WRAPPED,fn-return,,"menu.innerHTML = items .map(function (it) { var on = it === cur; return ( '<button type=""button"" role=""menuitemradio"" class=""gpd-menu-item"" tabindex=""-1"" aria-checked=""' + on + '""…"
+teacher/grades-print.js,1638,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = _dialogHtml(cid, _state.opts)"
+teacher/grades-print.js,1681,18,innerHTML,ESC_WRAPPED,helper:_pickList,,"pick.innerHTML = _pickList(cid, o)"
+teacher/grading-setup-copy.js,640,8,innerHTML,REVIEWED,helper:_groupsHtml,,"box.innerHTML = _groupsHtml(srcCid, only)"
+teacher/grading-setup-copy.js,657,8,innerHTML,REVIEWED,concat,,"classes.innerHTML = '<div class=""copy-review-note"">Copy ' + esc(_className(cid)) + '’s setup into:</div><div class=""copy-from-list"">' + _classRows(targets, 'checkbox', 'gsc-dst') …"
+teacher/grading-setup-copy.js,665,8,innerHTML,ESC_WRAPPED,concat,,"classes.innerHTML = '<label class=""copy-review-field"">Import into ' + esc(_className(cid)) + ' from <select class=""af-input"" id=""gsc-from"">' + all .map(function (c) { return '<opt…"
+teacher/markup.js,132,4,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = _shellHtml()
+teacher/markup.js,359,4,innerHTML,REVIEWED,marked at the sink,,"host.innerHTML = D.svgHtml(marks, D.aspect(s.overlay.querySelector('.markup-img')), { pending: s.pending }) + _calloutsHtml(marks, turn)"
+teacher/markup.js,447,4,innerHTML,LITERAL,,,box.innerHTML = html
 teacher/obs-capture.js,431,4,innerHTML,REVIEWED,marked at the sink,,"root.innerHTML = '<div class=""obsc-row obsc-who"" data-part=""who""></div>' + '<div class=""obsc-slot"" data-slot=""who""></div>' + '<div class=""obsc-input-wrap"">' + '<textarea class=""ob…"
-teacher/obs-capture.js,945,6,innerHTML,LITERAL,helper:renderWho,,"root.querySelector('[data-part=""who""]').innerHTML = renderWho()"
-teacher/obs-capture.js,946,6,innerHTML,REVIEWED,helper:renderLinks,,"root.querySelector('[data-part=""links""]').innerHTML = renderLinks()"
-teacher/obs-capture.js,947,6,innerHTML,ESC_WRAPPED,helper:renderFlag,,"root.querySelector('[data-part=""flag""]').innerHTML = renderFlag()"
-teacher/obs-capture.js,954,8,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = html
-teacher/obs-capture.js,1072,6,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card obsc-save-card"">' + '<div class=""confirm-title"" id=""' + p + 'save-starter-title"">Save as Starter</div>' + '<label class=""obsc-save-la…"
-teacher/obs-capture.js,1617,8,innerHTML,LITERAL,,,el.innerHTML = ''
-teacher/obs-capture.js,1719,4,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""obsc-dialog"" role=""dialog"" aria-modal=""true"" aria-labelledby=""obsc-dialog-title"">' + '<div class=""obsc-dialog-head""><div><div class=""obsc-dialog-t…"
-teacher/page-assignments.js,176,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
-teacher/page-assignments.js,234,6,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
-teacher/page-assignments.js,1126,4,innerHTML,REVIEWED,ternary,,"scope.querySelector('[data-out=""orfLevel""]').innerHTML = f.orfLevel || none ? _dibelsChip(f.orfLevel) : ''"
-teacher/page-assignments.js,1127,4,innerHTML,REVIEWED,ternary,,"scope.querySelector('[data-out=""mazeLevel""]').innerHTML = f.mazeLevel || none ? _dibelsChip(f.mazeLevel) : ''"
-teacher/page-assignments.js,1135,8,innerHTML,REVIEWED,helper:_dibelsCountsHtml,,"fresh.innerHTML = _dibelsCountsHtml(cid, a, sortStudents(getStudents(cid), 'lastName'), period)"
-teacher/page-assignments.js,1146,18,innerHTML,REVIEWED,helper:_dibelsLevelPillsHtml,,"levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid)"
-teacher/page-assignments.js,1865,4,innerHTML,ESC_WRAPPED,concat,,"tip.innerHTML = '<div class=""gb-code-tip""><strong>' + esc(chip.dataset.chipTipName) + '</strong><div class=""gb-code-tip-group"">' + esc(chip.dataset.chipTip) + '</div></div>'"
-teacher/page-assignments.js,1951,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml
-teacher/page-assignments.js,1954,4,innerHTML,REVIEWED,helper:renderAssessmentList,,"document.getElementById('main').innerHTML = renderAssessmentList( cid, assessments, allAssessments, students, scores, modules, )"
-teacher/page-assignments.js,2566,6,innerHTML,REVIEWED,helper:renderAssessForm,,"form.innerHTML = renderAssessForm(activeCourse, null)"
-teacher/page-assignments.js,2727,6,innerHTML,REVIEWED,helper:renderAssessForm,,"form.innerHTML = renderAssessForm(cid, assess)"
-teacher/page-assignments.js,3081,6,innerHTML,REVIEWED,marked at the sink,,tally.innerHTML = '<span><b>' + n.c + '</b> Complete</span><span><b>' + n.i + '</b> Incomplete</span><span><b>' + n.u + '</b> Unmarked</span>'
-teacher/page-assignments.js,3122,8,innerHTML,TRUSTED_EXPR,concat,,"stats.innerHTML = '<span class=""ldg-name"">Class</span><span>Median <b>' + formatPoints(mid) + ' / ' + max + '</b></span><span>Lowest <b>' + formatPoints(sorted[0]) + ' / ' + max +…"
-teacher/page-assignments.js,3136,22,innerHTML,LITERAL,,,stats.innerHTML = ''
-teacher/page-assignments.js,3137,4,innerHTML,TRUSTED_EXPR,concat,,tally.innerHTML = html
-teacher/page-assignments.js,3205,14,innerHTML,REVIEWED,helper:completionButtonsHtml,,"cell.innerHTML = completionButtonsHtml(aid, sid, next)"
-teacher/page-assignments.js,3363,17,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"pctSpan.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 0)"
-teacher/page-assignments.js,3380,17,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"pctSpan.innerHTML = pointsPctHtml(raw, max, 0)"
-teacher/page-assignments.js,3622,6,innerHTML,REVIEWED,helper:_levelInnerHtml,,"el.innerHTML = _levelInnerHtml(l, on ? modLevel : 0, st.mod)"
-teacher/page-assignments.js,4356,4,outerHTML,REVIEWED,helper:_rubricCriterionRowHtml,,"row.outerHTML = _rubricCriterionRowHtml(cid, aid, sid, crit, getScores(cid)[sid] || [], true)"
-teacher/page-assignments.js,4561,6,innerHTML,LITERAL,,,"bar.innerHTML = '<div class=""rsg-descriptor-left""><span class=""rsg-descriptor-label""></span><span class=""rsg-descriptor-tags""></span></div><span class=""rsg-descriptor-text""></span…"
-teacher/page-assignments.js,4569,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-label').innerHTML = ''
-teacher/page-assignments.js,4570,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-tags').innerHTML = ''
-teacher/page-assignments.js,4571,4,innerHTML,LITERAL,,,"bar.querySelector('.rsg-descriptor-text').innerHTML = '<span class=""rsg-descriptor-idle"">Hover a rubric level to see its descriptor</span>'"
-teacher/page-assignments.js,4593,4,innerHTML,REVIEWED,marked at the sink,,"bar.querySelector('.rsg-descriptor-label').innerHTML = esc(crit.name) + ' <span style=""color:' + (levelColors[level] || 'var(--text-3)') + '"">\u2014 ' + esc(levelNames[level] || l…"
-teacher/page-assignments.js,4619,4,innerHTML,LITERAL,,,bar.querySelector('.rsg-descriptor-tags').innerHTML = tagsHtml
-teacher/page-assignments.js,4798,4,insertAdjacentHTML,LITERAL,concat,,"document.body.insertAdjacentHTML('beforeend', html)"
-teacher/page-assignments.js,5257,4,innerHTML,LITERAL,helper:renderCriterionBlock,,mount.innerHTML = h
-teacher/page-assignments.js,5595,8,innerHTML,ESC_WRAPPED,concat,,"dd.innerHTML = '<option value="""">None</option>' + freshRubrics .map(function (r) { return ( '<option value=""' + esc(r.id) + '"">' + esc(r.name) + ' (' + r.criteria.length + ' crite…"
-teacher/page-assignments.js,5631,6,innerHTML,ESC_WRAPPED,concat,,"dd.innerHTML = '<option value="""">None</option>' + getRubrics(activeCourse) .map(function (r) { return ( '<option value=""' + esc(r.id) + '"">' + esc(r.name) + ' (' + r.criteria.leng…"
-teacher/page-assignments.js,5776,6,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""comment-popover"" role=""dialog"" aria-labelledby=""comment-popover-title""><div class=""comment-popover-header""><div><div class=""comment-popover-title""…"
-teacher/page-assignments.js,5801,4,innerHTML,REVIEWED,helper:_commentEntriesHtml,,"overlay.querySelector('.comment-popover-body').innerHTML = _commentEntriesHtml(cid, sid, aid)"
-teacher/page-assignments.js,5868,6,innerHTML,LITERAL,,,overlay.innerHTML = ''
-teacher/page-assignments.js,5878,8,innerHTML,REVIEWED,marked at the sink,,"btn.innerHTML = count > 0 ? 'Comment <span class=""comment-count"">' + count + '</span>' : 'Comment'"
-teacher/page-assignments.js,5969,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""comment-popover crit-comment-popover"" role=""dialog"" aria-modal=""true"" aria-labelledby=""crit-comment-title""><div class=""comment-popover-header""><di…"
-teacher/page-assignments.js,6084,6,innerHTML,LITERAL,,,overlay.innerHTML = ''
-teacher/page-assignments.js,7357,4,innerHTML,LITERAL,,,"overlay.innerHTML = '<div class=""grader-dialog"" role=""dialog"" aria-modal=""true"" aria-labelledby=""grader-title"" tabindex=""-1""></div>'"
-teacher/page-assignments.js,7480,6,innerHTML,REVIEWED,marked at the sink,,"dialog.innerHTML = '<div class=""grader-toolbar"">' + '<div class=""grader-toolbar-start""></div>' + '<div class=""grader-title-wrap""><h2 class=""grader-title"" id=""grader-title""></h2>' …"
-teacher/page-assignments.js,7520,4,innerHTML,REVIEWED,helper:_graderPrintButton,,"dialog.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a)"
-teacher/page-assignments.js,7522,4,innerHTML,REVIEWED,marked at the sink,,"dialog.querySelector('.grader-body').innerHTML = '<div class=""assess-card open active"" id=""ac-' + a.id + '""><div class=""assess-body"">' + _graderHtml(cid, a, _scoreTagObjs(cid, a),…"
-teacher/page-assignments.js,7659,6,innerHTML,REVIEWED,marked at the sink,,dialog.querySelector('.grader-status').innerHTML = statusHtml
-teacher/page-assignments.js,7680,6,innerHTML,REVIEWED,helper:_dibelsLevelPillsHtml,,"levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid)"
-teacher/page-assignments.js,7964,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
-teacher/page-dashboard.js,179,4,innerHTML,REVIEWED,helper:renderSidebar,,"mount.innerHTML = renderSidebar(activeCourse, null)"
-teacher/page-dashboard.js,489,4,innerHTML,REVIEWED,marked at the sink,,"document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({ activeCourse: activeCourse, students: students, })"
-teacher/page-dashboard.js,555,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = html
-teacher/page-dashboard.js,604,4,innerHTML,REVIEWED,marked at the sink,,"card.innerHTML = DashObservations.renderCard(activeCourse, getStudents(activeCourse), st)"
-teacher/page-dashboard.js,815,4,innerHTML,ESC_WRAPPED,ternary,,pop.innerHTML = html
-teacher/page-dashboard.js,1139,4,innerHTML,LITERAL,,,document.getElementById('sidebar-mount').innerHTML = ''
-teacher/page-gradebook.js,451,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = html
-teacher/page-gradebook.js,2137,4,innerHTML,TRUSTED_EXPR,ternary,,"pctLabel.innerHTML = hasCurrent ? pointsPctHtml(current, max, 1) : ''"
-teacher/page-gradebook.js,2144,6,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"pctLabel.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 1)"
-teacher/page-gradebook.js,2212,4,innerHTML,REVIEWED,marked at the sink,,"pop.innerHTML = '<div class=""gb-add-popover-title"">New Assignment</div>' + '<div class=""gb-add-field""><label>Title</label><input type=""text"" id=""gb-new-title"" placeholder=""e.g. Ch…"
-teacher/page-gradebook.js,2556,4,innerHTML,REVIEWED,marked at the sink,,"menu.innerHTML = '<div class=""gb-ctx-item"" data-ctx=""editCell"">Edit Score</div>' + '<div class=""gb-ctx-item"" data-ctx=""clearCell"">Clear Score</div>' + '<div class=""gb-ctx-divider""…"
-teacher/page-gradebook.js,2650,4,innerHTML,LITERAL,concat,,"menu.innerHTML = '<div class=""gb-ctx-item"" data-ctx=""scoreMode"">Grade This Assessment</div>' + '<div class=""gb-ctx-item"" data-ctx=""editAssess"">Edit Assessment Details</div>' + '<d…"
-teacher/page-gradebook.js,3309,4,innerHTML,ESC_WRAPPED,concat,,"gbTip.innerHTML = '<div class=""gb-code-tip"">' + (code ? '<strong>' + esc(code) + '</strong> ' : '') + esc(head.dataset.tipText) + (group ? '<div class=""gb-code-tip-group"">' + esc(…"
-teacher/page-gradebook.js,3333,4,innerHTML,REVIEWED,marked at the sink,,gbTip.innerHTML = tipHtml
-teacher/page-observations.js,132,4,innerHTML,REVIEWED,helper:renderSidebar,,document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid)
-teacher/page-observations.js,206,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = h
-teacher/page-observations.js,442,16,innerHTML,REVIEWED,helper:renderFeedHtml,,feedEl.innerHTML = renderFeedHtml(filtered)
-teacher/page-observations.js,456,6,innerHTML,ESC_WRAPPED,helper:chipInnerHtml,,btn.innerHTML = chipInnerHtml(name)
-teacher/page-observations.js,472,6,insertAdjacentHTML,LITERAL,,,"strip.insertAdjacentHTML( 'beforeend', '<button type=""button"" class=""obs-filter-clear"" data-action=""clearAllFilters"">Clear all</button>', )"
-teacher/page-observations.js,757,15,innerHTML,LITERAL,helper:renderFilterRow,,strip.innerHTML = renderFilterRow()
-teacher/page-observations.js,919,4,innerHTML,REVIEWED,helper:_focusRowHtml,,row.innerHTML = _focusRowHtml()
-teacher/page-observations.js,1056,4,innerHTML,REVIEWED,helper:_renderFocusCardHtml,,_focusBackdropEl.innerHTML = _renderFocusCardHtml(ob)
-teacher/page-observations.js,1354,4,innerHTML,REVIEWED,helper:renderSidebar,,document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse)
-teacher/page-reports.js,178,4,innerHTML,LITERAL,,,dd.innerHTML = html
-teacher/page-reports.js,320,4,innerHTML,ESC_WRAPPED,fn-return,,"sel.innerHTML = opts .map(function (o) { return '<option value=""Report ' + o.n + '"">' + esc(o.label) + '</option>'; }) .join('')"
-teacher/page-reports.js,351,6,innerHTML,REVIEWED,helper:renderTermQuestionnaire,,output.innerHTML = renderTermQuestionnaire(cid)
-teacher/page-reports.js,363,6,innerHTML,REVIEWED,marked at the sink,,"output.innerHTML = PhoneReports.panelHtml(cid, ReportBlocks.reportContext())"
-teacher/page-reports.js,368,4,innerHTML,REVIEWED,helper:layoutHtml,,"output.innerHTML = ReportStudio.layoutHtml({ view: studioView, settingsHtml: _printSettingsHtml() })"
-teacher/page-reports.js,528,4,innerHTML,TRUSTED_EXPR,helper:blockToolbarHtml,,"bar.innerHTML = ReportStudio.blockToolbarHtml( _formOf(), studioSelected, who, ReportBlocks.showDefaults(activeCourse), )"
-teacher/page-reports.js,561,8,innerHTML,REVIEWED,marked at the sink,,cell.innerHTML = cell.dataset.gradesHtml
-teacher/page-reports.js,565,6,innerHTML,ESC_WRAPPED,concat,,"cell.innerHTML = '<span class=""student-row-sheets ' + cls + '""' + (info.reason ? ' title=""' + esc(info.reason) + '""' : '') + '>' + esc(info.badge) + '</span>'"
-teacher/page-reports.js,581,8,innerHTML,REVIEWED,marked at the sink,,cell.innerHTML = cell.dataset.gradesHtml
-teacher/page-reports.js,643,6,innerHTML,LITERAL,,,sel.innerHTML = ''
-teacher/page-reports.js,647,4,innerHTML,ESC_WRAPPED,concat,,"sel.innerHTML = '<option value="""">Live</option>' + issues .map(function (e) { return '<option value=""' + esc(e.id) + '"">' + esc(ReportIssues.label(e)) + '</option>'; }) .join('')"
-teacher/page-reports.js,680,6,innerHTML,REVIEWED,marked at the sink,,preview.innerHTML = shown .map(function (st) { return st.html; }) .join('')
-teacher/page-reports.js,909,4,innerHTML,REVIEWED,helper:_printDialogHtml,,overlay.innerHTML = _printDialogHtml(c)
-teacher/page-reports.js,1287,6,innerHTML,REVIEWED,concat,,palette.innerHTML = _modeSwitchHtml() + _gradePanelHtml()
-teacher/page-reports.js,1292,6,innerHTML,REVIEWED,helper:paletteHtml,,"palette.innerHTML = ReportStudio.paletteHtml( _formOf(), studioTab, ReportSheets.templates(), _blockSizes, _classFitKey === _classFitKeyNow() ? _classFit : null, studioTab === 'te…"
-teacher/page-reports.js,1300,6,insertAdjacentHTML,REVIEWED,helper:_modeSwitchHtml,,"palette.insertAdjacentHTML('afterbegin', _modeSwitchHtml())"
-teacher/page-reports.js,1311,4,innerHTML,REVIEWED,helper:fitLineHtml,,"line.innerHTML = ReportStudio.fitLineHtml( _classFitKey === _classFitKeyNow() ? _classFit : null, _isGrade() ? null : _formOf(), _isGrade() ? { over: 'Too many assessments to fit …"
-teacher/page-reports.js,1459,4,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<form class=""confirm-card studio-save-card"" id=""save-template-form"">' + '<div class=""confirm-title"" id=""save-template-title"">Save as Template</div>' + '<label…"
-teacher/page-reports.js,1621,6,innerHTML,REVIEWED,helper:peekHtml,,"wrap.innerHTML = ReportStudio.peekHtml(_label(id), st ? fullName(st) : '', html)"
-teacher/page-reports.js,1676,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid, null)"
-teacher/page-reports.js,1716,12,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null)"
-teacher/page-reports.js,2193,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null)"
-teacher/page-reports.js,2198,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = TOOLBAR_HTML
+teacher/obs-capture.js,973,6,innerHTML,LITERAL,helper:renderWho,,"root.querySelector('[data-part=""who""]').innerHTML = renderWho()"
+teacher/obs-capture.js,974,6,innerHTML,REVIEWED,helper:renderLinks,,"root.querySelector('[data-part=""links""]').innerHTML = renderLinks()"
+teacher/obs-capture.js,975,6,innerHTML,ESC_WRAPPED,helper:renderFlag,,"root.querySelector('[data-part=""flag""]').innerHTML = renderFlag()"
+teacher/obs-capture.js,982,8,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = html
+teacher/obs-capture.js,1100,6,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card obsc-save-card"">' + '<div class=""confirm-title"" id=""' + p + 'save-starter-title"">Save as Starter</div>' + '<label class=""obsc-save-la…"
+teacher/obs-capture.js,1655,8,innerHTML,LITERAL,,,el.innerHTML = ''
+teacher/obs-capture.js,1757,4,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""obsc-dialog"" role=""dialog"" aria-modal=""true"" aria-labelledby=""obsc-dialog-title"">' + '<div class=""obsc-dialog-head""><div><div class=""obsc-dialog-t…"
+teacher/page-assignments.js,207,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
+teacher/page-assignments.js,268,6,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
+teacher/page-assignments.js,1221,4,innerHTML,REVIEWED,ternary,,"scope.querySelector('[data-out=""orfLevel""]').innerHTML = f.orfLevel || none ? _dibelsChip(f.orfLevel) : ''"
+teacher/page-assignments.js,1222,4,innerHTML,REVIEWED,ternary,,"scope.querySelector('[data-out=""mazeLevel""]').innerHTML = f.mazeLevel || none ? _dibelsChip(f.mazeLevel) : ''"
+teacher/page-assignments.js,1230,8,innerHTML,REVIEWED,helper:_dibelsCountsHtml,,"fresh.innerHTML = _dibelsCountsHtml(cid, a, sortStudents(getStudents(cid), 'lastName'), period)"
+teacher/page-assignments.js,1241,18,innerHTML,REVIEWED,helper:_dibelsLevelPillsHtml,,"levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid)"
+teacher/page-assignments.js,1986,4,innerHTML,ESC_WRAPPED,concat,,"tip.innerHTML = '<div class=""gb-code-tip""><strong>' + esc(chip.dataset.chipTipName) + '</strong>' + (chip.dataset.chipTip || chip.dataset.nameTipText ? '<div class=""gb-code-tip-gr…"
+teacher/page-assignments.js,2323,4,innerHTML,REVIEWED,marked at the sink,,tip.innerHTML = content.html
+teacher/page-assignments.js,2515,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml
+teacher/page-assignments.js,2522,6,innerHTML,REVIEWED,helper:renderAssessmentList,,"document.getElementById('main').innerHTML = renderAssessmentList( cid, assessments, allAssessments, students, scores, modules, )"
+teacher/page-assignments.js,3468,4,innerHTML,REVIEWED,marked at the sink,,peek.innerHTML = _workPeekHtml(activeCourse)
+teacher/page-assignments.js,3477,4,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = _formWorkCardHtml(activeCourse)
+teacher/page-assignments.js,3663,4,outerHTML,REVIEWED,marked at the sink,,el.outerHTML = _formResHtml()
+teacher/page-assignments.js,4418,6,innerHTML,REVIEWED,marked at the sink,,"view.innerHTML = _startCardHtml(cid, _startOpen, true)"
+teacher/page-assignments.js,4428,6,innerHTML,ESC_WRAPPED,concat,,"view.innerHTML = '<div class=""af-rubric-card"">' + '<div class=""af-rubric-card-head""><span class=""af-rubric-card-name"" tabindex=""0"" data-af-tip=""rubric"">' + esc(rubric.name) + '</s…"
+teacher/page-assignments.js,4453,6,innerHTML,LITERAL,,,view.innerHTML = ''
+teacher/page-assignments.js,4484,4,innerHTML,REVIEWED,marked at the sink,,"view.innerHTML = '<div class=""af-rubric-starts"" role=""tablist"" aria-label=""Start a Rubric"">' + starts .map(function (st) { var open = _startOpen === st.name; return ( '<button typ…"
+teacher/page-assignments.js,5516,16,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = _blankPickListHtml(activeCourse, _blank.picker.i)"
+teacher/page-assignments.js,5737,4,innerHTML,ESC_WRAPPED,concat,,"dd.innerHTML = '<option value="""">None</option>' + getRubrics(activeCourse) .map(function (r) { return '<option value=""' + esc(r.id) + '"">' + esc(r.name) + ' (' + r.criteria.length…"
+teacher/page-assignments.js,5994,6,innerHTML,LITERAL,,,slot.innerHTML = ''
+teacher/page-assignments.js,6007,4,innerHTML,ESC_WRAPPED,concat,,"slot.innerHTML = '<div class=""af-rubric-card af-tag-rubric-card"">' + '<div class=""af-rubric-card-head""><span class=""af-rubric-card-name"">Competency Rubric</span>' + '<span class=""…"
+teacher/page-assignments.js,6072,4,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = html
+teacher/page-assignments.js,6183,6,innerHTML,REVIEWED,helper:renderAssessForm,,"form.innerHTML = renderAssessForm(activeCourse, null)"
+teacher/page-assignments.js,6332,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card af-dialog-card""><div class=""confirm-title"" id=""af-dialog-title"">' + esc(title) + '</div><div class=""confirm-message"">' + esc(message)…"
+teacher/page-assignments.js,6571,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card af-past-card"">' + '<div class=""confirm-title"" id=""af-past-title"">Start From a Past Assessment</div>' + '<input class=""af-input af-pas…"
+teacher/page-assignments.js,6595,6,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = shown .slice(0, 200) .map(function (r, i) { var head = ''; if (r.cid !== lastClass) { lastClass = r.cid; head = '<div class=""af-past-group"">' + esc(r.cid === cid …"
+teacher/page-assignments.js,6843,6,innerHTML,REVIEWED,helper:renderAssessForm,,"form.innerHTML = renderAssessForm(cid, assess)"
+teacher/page-assignments.js,7326,6,innerHTML,REVIEWED,marked at the sink,,tally.innerHTML = '<span><b>' + n.c + '</b> Complete</span><span><b>' + n.i + '</b> Incomplete</span><span><b>' + n.u + '</b> Unmarked</span>' + (grid.dataset.aid ? _classResultsL…
+teacher/page-assignments.js,7372,8,innerHTML,REVIEWED,marked at the sink,,"stats.innerHTML = (grid.dataset.aid ? _classResultsLinkHtml(activeCourse, grid.dataset.aid) : '<span class=""ldg-name"">Class</span>') + '<span>Median <b>' + formatPoints(mid) + ' /…"
+teacher/page-assignments.js,7389,22,innerHTML,LITERAL,,,stats.innerHTML = ''
+teacher/page-assignments.js,7390,4,innerHTML,TRUSTED_EXPR,concat,,tally.innerHTML = html
+teacher/page-assignments.js,7462,14,innerHTML,REVIEWED,helper:completionButtonsHtml,,"cell.innerHTML = completionButtonsHtml(aid, sid, next)"
+teacher/page-assignments.js,7616,17,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"pctSpan.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 0)"
+teacher/page-assignments.js,7637,17,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"pctSpan.innerHTML = pointsPctHtml(raw, max, 0)"
+teacher/page-assignments.js,7903,6,innerHTML,REVIEWED,helper:_levelInnerHtml,,"el.innerHTML = _levelInnerHtml(l, on ? modLevel : 0, st.mod)"
+teacher/page-assignments.js,8903,4,outerHTML,REVIEWED,helper:_rubricCriterionRowHtml,,"row.outerHTML = _rubricCriterionRowHtml(cid, aid, sid, crit, getScores(cid)[sid] || [], true)"
+teacher/page-assignments.js,9331,4,insertAdjacentHTML,LITERAL,concat,,"document.body.insertAdjacentHTML('beforeend', html)"
+teacher/page-assignments.js,9798,4,innerHTML,LITERAL,helper:renderCriterionBlock,,mount.innerHTML = h
+teacher/page-assignments.js,10155,8,innerHTML,ESC_WRAPPED,concat,,"dd.innerHTML = '<option value="""">None</option>' + freshRubrics .map(function (r) { return ( '<option value=""' + esc(r.id) + '"">' + esc(r.name) + ' (' + r.criteria.length + ' crite…"
+teacher/page-assignments.js,10325,6,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""comment-popover"" role=""dialog"" aria-labelledby=""comment-popover-title""><div class=""comment-popover-header""><div><div class=""comment-popover-title""…"
+teacher/page-assignments.js,10350,4,innerHTML,REVIEWED,helper:_commentEntriesHtml,,"overlay.querySelector('.comment-popover-body').innerHTML = _commentEntriesHtml(cid, sid, aid)"
+teacher/page-assignments.js,10417,6,innerHTML,LITERAL,,,overlay.innerHTML = ''
+teacher/page-assignments.js,10427,8,innerHTML,REVIEWED,marked at the sink,,"btn.innerHTML = count > 0 ? 'Comment <span class=""comment-count"">' + count + '</span>' : 'Comment'"
+teacher/page-assignments.js,10519,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""comment-popover crit-comment-popover"" role=""dialog"" aria-modal=""true"" aria-labelledby=""crit-comment-title""><div class=""comment-popover-header""><di…"
+teacher/page-assignments.js,10680,6,innerHTML,LITERAL,,,overlay.innerHTML = ''
+teacher/page-assignments.js,12331,4,innerHTML,LITERAL,,,"overlay.innerHTML = '<div class=""grader-dialog"" role=""dialog"" aria-modal=""true"" aria-labelledby=""grader-title"" tabindex=""-1""></div>'"
+teacher/page-assignments.js,12571,6,innerHTML,REVIEWED,marked at the sink,,dialog.innerHTML = work ? _graderWorkShellHtml() : _graderShellHtml()
+teacher/page-assignments.js,12708,4,innerHTML,REVIEWED,marked at the sink,,"bar.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a)"
+teacher/page-assignments.js,12734,4,innerHTML,REVIEWED,marked at the sink,,"body.innerHTML = '<div class=""assess-card open active"" id=""ac-' + a.id + '""><div class=""assess-body"">' + _graderHtml(cid, a, _scoreTagObjs(cid, a), [st], getScores(cid), true) + '…"
+teacher/page-assignments.js,12754,55,innerHTML,REVIEWED,marked at the sink,,statusBox.innerHTML = statusHtml
+teacher/page-assignments.js,12763,6,innerHTML,REVIEWED,marked at the sink,,markBox.innerHTML = markHtml
+teacher/page-assignments.js,13223,6,innerHTML,REVIEWED,marked at the sink,,card.innerHTML = html
+teacher/page-assignments.js,13238,6,innerHTML,REVIEWED,marked at the sink,,line.innerHTML = lineHtml
+teacher/page-assignments.js,13253,4,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = html
+teacher/page-assignments.js,13326,6,innerHTML,REVIEWED,helper:_dibelsLevelPillsHtml,,"levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid)"
+teacher/page-assignments.js,13744,4,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = html
+teacher/page-assignments.js,13973,6,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = html
+teacher/page-assignments.js,14002,14,innerHTML,REVIEWED,marked at the sink,,slot.innerHTML = _toReturnPillHtml()
+teacher/page-assignments.js,14238,6,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = html
+teacher/page-assignments.js,14593,4,innerHTML,REVIEWED,marked at the sink,,line.innerHTML = html
+teacher/page-assignments.js,14776,6,innerHTML,REVIEWED,marked at the sink,,pane.innerHTML = html
+teacher/page-assignments.js,14837,4,insertAdjacentHTML,REVIEWED,marked at the sink,,"img.insertAdjacentHTML('afterend', html)"
+teacher/page-assignments.js,14881,6,innerHTML,REVIEWED,marked at the sink,,"b.innerHTML = '<span class=""lvl-full"">' + esc(name) + '</span><span class=""lvl-short"" aria-hidden=""true"">' + short + '</span>'"
+teacher/page-assignments.js,15300,4,innerHTML,REVIEWED,marked at the sink,,"back.innerHTML = _revisionSheetHtml(cid, a, st)"
+teacher/page-assignments.js,15521,4,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = html
+teacher/page-assignments.js,15718,4,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = html
+teacher/page-assignments.js,16189,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
+teacher/page-dashboard.js,209,4,innerHTML,REVIEWED,helper:renderSidebar,,"mount.innerHTML = renderSidebar(activeCourse, null)"
+teacher/page-dashboard.js,377,4,innerHTML,REVIEWED,marked at the sink,,"document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({ activeCourse: activeCourse, students: students, })"
+teacher/page-dashboard.js,456,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = html
+teacher/page-dashboard.js,513,4,innerHTML,REVIEWED,marked at the sink,,"card.innerHTML = DashObservations.renderCard(activeCourse, getStudents(activeCourse), st)"
+teacher/page-dashboard.js,724,4,innerHTML,ESC_WRAPPED,ternary,,pop.innerHTML = html
+teacher/page-dashboard.js,1446,4,innerHTML,LITERAL,,,document.getElementById('sidebar-mount').innerHTML = ''
+teacher/page-gradebook.js,563,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = html
+teacher/page-gradebook.js,2718,4,innerHTML,TRUSTED_EXPR,ternary,,"pctLabel.innerHTML = hasCurrent ? pointsPctHtml(current, max, 1) : ''"
+teacher/page-gradebook.js,2725,6,innerHTML,TRUSTED_EXPR,helper:pointsPctHtml,,"pctLabel.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 1)"
+teacher/page-gradebook.js,2791,4,innerHTML,REVIEWED,marked at the sink,,"pop.innerHTML = '<div class=""gb-add-popover-title"">New Assignment</div>' + '<div class=""gb-add-field""><label>Title</label><input type=""text"" id=""gb-new-title"" placeholder=""e.g. Ch…"
+teacher/page-gradebook.js,3055,4,innerHTML,REVIEWED,marked at the sink,,"menu.innerHTML = '<div class=""gb-ctx-item"" data-ctx=""editCell"">Edit Score</div>' + '<div class=""gb-ctx-item' + (hasScore ? '' : ' is-disabled"" aria-disabled=""true"" title=""There is…"
+teacher/page-gradebook.js,3257,4,innerHTML,REVIEWED,marked at the sink,,"menu.innerHTML = (waiting.length ? '<div class=""gb-ctx-note"">' + esc(GradeState.draftsSentence(activeCourse, waiting)) + '</div>' + '<div class=""gb-ctx-item gb-ctx-return"" data-ct…"
+teacher/page-gradebook.js,4005,4,innerHTML,REVIEWED,marked at the sink,,gbTip.innerHTML = tipHtml
+teacher/page-gradebook.js,4057,4,innerHTML,REVIEWED,marked at the sink,,"gbTip.innerHTML = '<div class=""gb-code-tip"">' + (code ? '<strong>' + esc(code) + '</strong> ' : '') + esc(head.dataset.tipText) + (group ? '<div class=""gb-code-tip-group"">' + esc(…"
+teacher/page-gradebook.js,4086,4,innerHTML,REVIEWED,marked at the sink,,gbTip.innerHTML = tipHtml
+teacher/page-observations.js,133,4,innerHTML,REVIEWED,helper:renderSidebar,,document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid)
+teacher/page-observations.js,207,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = h
+teacher/page-observations.js,443,16,innerHTML,REVIEWED,helper:renderFeedHtml,,feedEl.innerHTML = renderFeedHtml(filtered)
+teacher/page-observations.js,457,6,innerHTML,ESC_WRAPPED,helper:chipInnerHtml,,btn.innerHTML = chipInnerHtml(name)
+teacher/page-observations.js,473,6,insertAdjacentHTML,LITERAL,,,"strip.insertAdjacentHTML( 'beforeend', '<button type=""button"" class=""obs-filter-clear"" data-action=""clearAllFilters"">Clear all</button>', )"
+teacher/page-observations.js,758,15,innerHTML,LITERAL,helper:renderFilterRow,,strip.innerHTML = renderFilterRow()
+teacher/page-observations.js,922,4,innerHTML,REVIEWED,helper:_focusRowHtml,,row.innerHTML = _focusRowHtml()
+teacher/page-observations.js,1060,4,innerHTML,REVIEWED,helper:_renderFocusCardHtml,,_focusBackdropEl.innerHTML = _renderFocusCardHtml(ob)
+teacher/page-observations.js,1360,4,innerHTML,REVIEWED,helper:renderSidebar,,document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse)
+teacher/page-reports.js,304,4,innerHTML,LITERAL,,,dd.innerHTML = html
+teacher/page-reports.js,420,6,innerHTML,REVIEWED,helper:renderSidebar,,"mount.innerHTML = renderSidebar(cid, null)"
+teacher/page-reports.js,449,4,innerHTML,ESC_WRAPPED,fn-return,,"sel.innerHTML = opts .map(function (o) { return '<option value=""Report ' + o.n + '"">' + esc(o.label) + '</option>'; }) .join('')"
+teacher/page-reports.js,504,18,innerHTML,REVIEWED,marked at the sink,,output.innerHTML = ReportScores.WAITING_HTML
+teacher/page-reports.js,515,6,innerHTML,LITERAL,,,"output.innerHTML = '<div class=""empty-state""><div class=""empty-state-text"">Loading the sentence bank…</div></div>'"
+teacher/page-reports.js,522,10,innerHTML,LITERAL,,,"output.innerHTML = '<div class=""empty-state""><div class=""empty-state-text"">The sentence bank didn’t load. Check your connection, then open Reports again.</div></div>'"
+teacher/page-reports.js,527,4,innerHTML,REVIEWED,helper:renderTermQuestionnaire,,output.innerHTML = renderTermQuestionnaire(cid)
+teacher/page-reports.js,546,6,innerHTML,REVIEWED,marked at the sink,,"output.innerHTML = PhoneReports.panelHtml(cid, ReportBlocks.reportContext())"
+teacher/page-reports.js,551,4,innerHTML,REVIEWED,helper:_layoutHtml,,output.innerHTML = _layoutHtml()
+teacher/page-reports.js,743,8,innerHTML,REVIEWED,marked at the sink,,cell.innerHTML = cell.dataset.gradesHtml
+teacher/page-reports.js,747,6,innerHTML,ESC_WRAPPED,concat,,"cell.innerHTML = '<span class=""student-row-sheets ' + cls + '""' + (info.reason ? ' title=""' + esc(info.reason) + '""' : '') + '>' + esc(info.badge) + '</span>'"
+teacher/page-reports.js,763,8,innerHTML,REVIEWED,marked at the sink,,cell.innerHTML = cell.dataset.gradesHtml
+teacher/page-reports.js,827,6,innerHTML,LITERAL,,,sel.innerHTML = ''
+teacher/page-reports.js,831,4,innerHTML,ESC_WRAPPED,concat,,"sel.innerHTML = '<option value="""">Live</option>' + issues .map(function (e) { return '<option value=""' + esc(e.id) + '"">' + esc(ReportIssues.label(e)) + '</option>'; }) .join('')"
+teacher/page-reports.js,872,4,innerHTML,REVIEWED,marked at the sink,,preview.innerHTML = shown .map(function (st) { return st.html; }) .join('')
+teacher/page-reports.js,1121,4,innerHTML,REVIEWED,helper:_printDialogHtml,,overlay.innerHTML = _printDialogHtml(c)
+teacher/page-reports.js,1515,4,innerHTML,REVIEWED,marked at the sink,,line.innerHTML = ReportOnePanel.fitHtml(_oneApi())
+teacher/page-reports.js,1607,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid, null)"
+teacher/page-reports.js,1647,12,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null)"
+teacher/page-reports.js,2035,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null)"
+teacher/page-reports.js,2040,4,innerHTML,REVIEWED,marked at the sink,,document.getElementById('main').innerHTML = TOOLBAR_HTML
 teacher/page-starters.js,178,6,innerHTML,REVIEWED,concat,,"toolbar.innerHTML = '<div class=""dash-toolbar"">' + renderBreadcrumb('Observations', '/observations', 'My Sentence Starters', 'msBack') + '</div>'"
 teacher/page-starters.js,227,4,innerHTML,LITERAL,,,main.innerHTML = h
 teacher/page-starters.js,408,17,innerHTML,LITERAL,,,toolbar.innerHTML = ''
-teacher/page-student.js,252,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""edit-modal es-modal"">' + '<div class=""es-head""><h2 class=""edit-modal-title"" id=""edit-modal-heading"">Edit Student</h2>' + '<div class=""es-sub"">' + …"
-teacher/page-student.js,421,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, studentId, 'PageStudent.switchStudent', )"
-teacher/page-student.js,2711,6,innerHTML,LITERAL,concat,,"document.getElementById('main').innerHTML = '<div style=""text-align:center;padding:60px 20px"">' + '<div style=""font-size:2rem;margin-bottom:12px;opacity:0.5"">?</div>' + '<div styl…"
-teacher/page-student.js,2799,4,innerHTML,LITERAL,,,main.innerHTML = html
-teacher/page-student.js,3039,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, studentId, 'PageStudent.switchStudent', )"
-teacher/phone-reports.js,614,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""pp-phone""><div class=""pp-phone-bar""><span>As ' + esc(row.data.first || 'the student') + ' sees it</span><button type=""button"" class=""cm-action-btn…"
-teacher/qr-slips.js,151,4,innerHTML,REVIEWED,helper:buildPages,,"root.innerHTML = buildPages(slips, q, _className(cid))"
-teacher/qr-slips.js,171,13,innerHTML,LITERAL,,,r.innerHTML = ''
-teacher/report-preview.js,30,6,innerHTML,LITERAL,,,"preview.innerHTML = '<div class=""empty-state""><div class=""empty-state-title"">No report data yet</div><div class=""empty-state-text"">Score some assignments to generate progress repo…"
-teacher/report-preview.js,33,6,innerHTML,LITERAL,,,"preview.innerHTML = '<div class=""empty-state""><div class=""empty-state-title"">No students selected</div></div>'"
-teacher/report-questionnaire.js,458,4,innerHTML,ESC_WRAPPED,helper:_marksHtml,,"layer.innerHTML = _marksHtml(_rows[_rowKey(st)] || [], el.value)"
-teacher/report-questionnaire.js,1284,20,innerHTML,REVIEWED,marked at the sink,,"warnNote.innerHTML = `<span class=""qn-att-warn"">${ATTENDANCE_BAD}</span>`"
-teacher/report-questionnaire.js,1290,14,innerHTML,REVIEWED,helper:_attendanceNoteHtml,,note.innerHTML = _attendanceNoteHtml(att)
-teacher/report-questionnaire.js,1449,4,innerHTML,REVIEWED,helper:_infoHtml,,overlay.innerHTML = _infoHtml(_activeCourse)
-teacher/report-questionnaire.js,1569,4,innerHTML,ESC_WRAPPED,helper:_warnHtml,,"wrap.innerHTML = _warnHtml(_activeCourse, st, el.value)"
-teacher/report-questionnaire.js,1621,4,innerHTML,REVIEWED,helper:_bothHtml,,"overlay.innerHTML = _bothHtml(_activeCourse, st, text, w)"
-teacher/report-questionnaire.js,4595,4,outerHTML,REVIEWED,helper:_sentencesHtml,,"card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st))"
-teacher/report-questionnaire.js,5385,4,innerHTML,REVIEWED,helper:_browseHtml,,"overlay.innerHTML = _browseHtml(_activeCourse, st, _facts(st))"
-teacher/report-questionnaire.js,5432,4,innerHTML,REVIEWED,helper:_browseHtml,,"o.innerHTML = _browseHtml(_activeCourse, st, _facts(st))"
-teacher/report-questionnaire.js,5442,4,innerHTML,REVIEWED,helper:_browseRowsHtml,,"list.innerHTML = _browseRowsHtml(_activeCourse, st, f, _bankContext(_activeCourse, st, f))"
-teacher/report-questionnaire.js,5934,4,innerHTML,ESC_WRAPPED,helper:_ownOutHtml,,out.innerHTML = _ownOutHtml(c)
-teacher/report-questionnaire.js,5941,4,outerHTML,ESC_WRAPPED,helper:_ownBoxHtml,,box.outerHTML = _ownBoxHtml(st)
-teacher/report-sheets.js,1410,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = htmls .map(function (h) { return '<div class=""sheet-item"">' + h + '</div>'; }) .join('')"
-teacher/report-sheets.js,1437,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = cells .map(function (c) { return ( '<div class=""sheet-cell"" data-block=""' + c.cell.block + '"" style=""width:' + cellWidth(c.size) + 'px"">' + c.html + '</div>' ); …"
-teacher/report-sheets.js,1475,4,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = html
-teacher/report-sheets.js,1792,4,innerHTML,REVIEWED,marked at the sink,,preview.innerHTML = html
-teacher/report-sheets.js,1912,6,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = r.html
-teacher/report-studio.js,813,6,innerHTML,REVIEWED,marked at the sink,,"ghost.innerHTML = '<div class=""report-sheet studio-ghost-sheet"" style=""width:' + wPx + 'px;transform:scale(' + k + ')""><div class=""sheet-cell"" style=""width:' + wPx + 'px"">' + (own…"
-teacher/router.js,98,4,innerHTML,REVIEWED,helper:renderDock,,mount.innerHTML = renderDock(activePage)
-teacher/router.js,154,4,innerHTML,LITERAL,,,document.getElementById('main').innerHTML = ''
-teacher/router.js,155,4,innerHTML,LITERAL,,,document.getElementById('page-toolbar-mount').innerHTML = ''
-teacher/router.js,156,4,innerHTML,LITERAL,,,document.getElementById('sidebar-mount').innerHTML = ''
-teacher/rubric-bank.js,405,4,innerHTML,LITERAL,concat,,overlay.innerHTML = html
-teacher/rubric-bank.js,765,4,innerHTML,TRUSTED_EXPR,helper:_newHtml,,el.innerHTML = _newHtml()
-teacher/rubric-bank.js,976,12,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = listHtml()
-teacher/rubric-bank.js,981,12,innerHTML,ESC_WRAPPED,helper:paneHtml,,el.innerHTML = paneHtml()
-teacher/rubric-bank.js,992,15,innerHTML,LITERAL,helper:_scopeHtml,,scope.innerHTML = _scopeHtml()
-teacher/rubric-bank.js,1252,4,innerHTML,REVIEWED,helper:_overlayHtml,,overlay.innerHTML = _overlayHtml()
-teacher/rubric-library.js,643,10,innerHTML,REVIEWED,marked at the sink,,list.innerHTML = parts.join('')
-teacher/rubric-library.js,700,8,innerHTML,ESC_WRAPPED,fn-return,,"list.innerHTML = rows .map(function (r) { var plan = planCopy(srcCid, r, dstCid); return ( '<label class=""copy-review-check rubric-copy-row""><input type=""radio"" name=""rubric-pick""…"
-teacher/rubric-print.js,770,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = out.html
-teacher/rubric-print.js,837,16,innerHTML,LITERAL,,,root.innerHTML = ''
-teacher/rubric-print.js,1169,4,innerHTML,LITERAL,,,box.innerHTML = ''
-teacher/rubric-print.js,1264,4,innerHTML,REVIEWED,marked at the sink,,next.innerHTML = _dialogHtml()
-teacher/rubric-print.js,1265,33,innerHTML,REVIEWED,marked at the sink,,card.innerHTML = next.firstChild.innerHTML
-teacher/rubric-print.js,1266,9,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = next.innerHTML
-teacher/rubric-print.js,1333,4,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = _dialogHtml()
-teacher/rubric-print.js,1414,74,innerHTML,LITERAL,,,root.innerHTML = ''
-teacher/rubric-print.js,1449,16,innerHTML,LITERAL,,,root.innerHTML = ''
-teacher/student-evidence.js,476,14,innerHTML,REVIEWED,helper:tabsHtml,,tabs.innerHTML = tabsHtml(tabCounts(all))
-teacher/student-evidence.js,481,6,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = listHtml(tabFilter(all, _tab))"
-teacher/student-evidence.js,489,4,innerHTML,LITERAL,helper:timelineHtml,,el.innerHTML = timelineHtml()
-teacher/student-overrides.js,74,4,innerHTML,REVIEWED,marked at the sink,,panel.innerHTML = html
-teacher/ui.js,10,2,innerHTML,REVIEWED,marked at the sink,,holder.innerHTML = raw
-teacher/ui.js,246,2,innerHTML,LITERAL,,,"toast.innerHTML = '<span>Session expired. Copy your draft before it is lost.</span><button class=""sync-toast-btn"" data-action=""copy-session-draft"">Copy Draft</button>'"
-teacher/ui.js,269,2,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""modal-box session-expired-modal""> <div class=""confirm-title"" id=""session-expired-title"">Session Expired</div> <div class=""confirm-message"">Enter y…"
-teacher/ui.js,788,2,innerHTML,REVIEWED,helper:_rosterShowMenuHtml,,"document.getElementById('sb-show-menu').innerHTML = _rosterShowMenuHtml(cid, mode)"
-teacher/ui.js,802,2,innerHTML,REVIEWED,helper:_sidebarRowsHtml,,"list.innerHTML = _sidebarRowsHtml(cid, _sortedRoster(cid, mode), sel ? sel.dataset.sid : null, _sidebarClickFnName)"
-teacher/ui.js,804,2,innerHTML,REVIEWED,helper:_rosterSortMenuHtml,,document.getElementById('sb-sort-menu').innerHTML = _rosterSortMenuHtml(mode)
-teacher/ui.js,887,10,innerHTML,REVIEWED,helper:_sidebarBadgesHtml,,"el.innerHTML = _sidebarBadgesHtml(cid, sid)"
-teacher/ui.js,915,6,innerHTML,REVIEWED,helper:_sidebarBadgesHtml,,"el.innerHTML = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'))"
-teacher/ui.js,947,4,innerHTML,REVIEWED,marked at the sink,,extra.innerHTML = a.top()
-teacher/ui.js,966,19,innerHTML,REVIEWED,marked at the sink,,cell.innerHTML = n.mark || ''
-teacher/ui.js,1128,2,innerHTML,REVIEWED,helper:renderSidebar,,"mount.innerHTML = renderSidebar(cid, selId, clickFn)"
-teacher/ui.js,1172,2,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""undo-toast-btn"" data-action=""executeUndo"">Undo</button>`"
-teacher/ui.js,1210,4,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""sync-toast-btn"" data-action=""retry-supabase-recovery"">Retry Now</button>`"
-teacher/ui.js,1213,4,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""sync-toast-btn"" data-action=""retry-course-load"">Retry</button>`"
-teacher/ui.js,1215,4,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""sync-toast-btn"" data-action=""retry-sync"">Retry Now</button>`"
-teacher/ui.js,1217,4,innerHTML,ESC_WRAPPED,template,,toast.innerHTML = `<span>${esc(message)}</span>`
-teacher/ui.js,1268,2,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""confirm-card""> <div class=""confirm-title"" id=""confirm-title"">${esc(title)}</div> <div class=""confirm-message"">${esc(message)}</div> <div class=""co…"
+teacher/page-student.js,1187,16,insertAdjacentHTML,REVIEWED,marked at the sink,,"row.insertAdjacentHTML('afterend', html)"
+teacher/page-student.js,2752,6,innerHTML,LITERAL,concat,,"document.getElementById('main').innerHTML = '<div style=""text-align:center;padding:60px 20px"">' + '<div style=""font-size:2rem;margin-bottom:12px;opacity:0.5"">?</div>' + '<div styl…"
+teacher/page-student.js,2838,4,innerHTML,LITERAL,,,main.innerHTML = html
+teacher/page-student.js,3139,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, studentId, 'PageStudent.switchStudent', )"
+teacher/phone-reports.js,592,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""pp-phone""><div class=""pp-phone-bar""><span>As ' + esc(row.data.first || 'the student') + ' sees it</span><button type=""button"" class=""cm-action-btn…"
+teacher/preview-student.js,237,4,innerHTML,REVIEWED,helper:_previewHtml,,el.innerHTML = _previewHtml()
+teacher/preview-student.js,494,4,innerHTML,REVIEWED,marked at the sink,,"screen.innerHTML = drawPage(built.view, _open.ui)"
+teacher/qr-slips.js,72,6,innerHTML,REVIEWED,helper:sheetPages,,"root.innerHTML = sheetPages(items, renderCell)"
+teacher/qr-slips.js,78,15,innerHTML,LITERAL,,,r.innerHTML = ''
+teacher/report-blocks.js,2023,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = '<div class=""report-grades""><div class=""report-grades-row"" style=""display:block""></div><div class=""report-grades-row gr-print-font"" style=""display:block""></div><…"
+teacher/report-blocks.js,2039,8,innerHTML,REVIEWED,marked at the sink,,rows[0].innerHTML = spans
+teacher/report-blocks.js,2041,8,innerHTML,REVIEWED,marked at the sink,,rows[1].innerHTML = spans
+teacher/report-one-comment.js,250,4,innerHTML,REVIEWED,marked at the sink,,"layer.innerHTML = diffHtml(base, draft)"
+teacher/report-one-comment.js,257,6,innerHTML,REVIEWED,marked at the sink,,"note.innerHTML = 'Unsaved changes · <button type=""button"" data-action=""oneComSave"" data-sid=""' + esc(String(st.id)) + '"">Save</button> · <button type=""button"" data-action=""oneComD…"
+teacher/report-one-comment.js,285,4,innerHTML,REVIEWED,marked at the sink,,"wrap.innerHTML = '<div class=""one-ce-bar""><b>Teacher Comment · ' + esc(_full(st)) + '</b><span class=""one-ce-count"" aria-live=""polite""></span></div>' + '<textarea class=""one-ce-te…"
+teacher/report-one-comment.js,442,4,innerHTML,REVIEWED,marked at the sink,,"el.innerHTML = '<div><b id=""one-com-ask-t"">Save your changes to ' + esc(first) + '’s comment?</b><span id=""one-com-ask-d"">' + esc(body) + '</span></div><div class=""one-cp-btns"">' …"
+teacher/report-one-page.js,678,6,innerHTML,REVIEWED,marked at the sink,,"d.card.innerHTML = '<div class=""one-dlg-head""><div><h2 id=""one-dlg-title"">Choose Assessments</h2><p id=""one-dlg-sub"">' + esc(sub) + '</p></div><button type=""button"" class=""one-dlg…"
+teacher/report-one-page.js,700,4,innerHTML,REVIEWED,marked at the sink,,list.innerHTML = vis.length ? vis .map(function (r) { var on = !r.removed; var locked = scope ? r.classOff : r.ownOff && !r.classOff; var why = locked ? (scope ? 'Left off for the…
+teacher/report-one-page.js,946,4,innerHTML,REVIEWED,marked at the sink,,d.card.innerHTML = html
+teacher/report-one-panel.js,509,4,innerHTML,REVIEWED,marked at the sink,,palette.innerHTML = panelHtml(api)
+teacher/report-one.js,670,4,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = html
+teacher/report-one.js,777,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = partHtml(bare, key, cid, student, ctx, null)"
+teacher/report-one.js,795,4,innerHTML,REVIEWED,marked at the sink,,"stage.innerHTML = cells .map(function (c) { return _cellTag(c.key, c.size, c.html, 0); }) .join('')"
+teacher/report-one.js,833,4,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = html
+teacher/report-one.js,957,4,innerHTML,REVIEWED,marked at the sink,,stage.innerHTML = headLine
+teacher/report-preview.js,31,6,innerHTML,LITERAL,,,"preview.innerHTML = '<div class=""empty-state""><div class=""empty-state-title"">No report data yet</div><div class=""empty-state-text"">Score some assignments to generate progress repo…"
+teacher/report-preview.js,34,6,innerHTML,LITERAL,,,"preview.innerHTML = '<div class=""empty-state""><div class=""empty-state-title"">No students selected</div></div>'"
+teacher/report-questionnaire.js,538,4,innerHTML,REVIEWED,helper:_marksHtml,,"layer.innerHTML = _marksHtml(_rows[_rowKey(st)] || [], el.value)"
+teacher/report-questionnaire.js,1816,20,innerHTML,REVIEWED,marked at the sink,,"warnNote.innerHTML = `<span class=""qn-att-warn"">${ATTENDANCE_BAD}</span>`"
+teacher/report-questionnaire.js,1822,14,innerHTML,REVIEWED,helper:_attendanceNoteHtml,,note.innerHTML = _attendanceNoteHtml(att)
+teacher/report-questionnaire.js,1998,4,innerHTML,REVIEWED,helper:_infoHtml,,overlay.innerHTML = _infoHtml(_activeCourse)
+teacher/report-questionnaire.js,2118,4,innerHTML,ESC_WRAPPED,helper:_warnHtml,,"wrap.innerHTML = _warnHtml(_activeCourse, st, el.value)"
+teacher/report-questionnaire.js,2170,4,innerHTML,REVIEWED,helper:_bothHtml,,"overlay.innerHTML = _bothHtml(_activeCourse, st, text, w)"
+teacher/report-questionnaire.js,5826,4,outerHTML,REVIEWED,helper:_sentencesHtml,,"card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st))"
+teacher/report-questionnaire.js,6662,4,innerHTML,REVIEWED,helper:_browseHtml,,"overlay.innerHTML = _browseHtml(_activeCourse, st, _facts(st))"
+teacher/report-questionnaire.js,6709,4,innerHTML,REVIEWED,helper:_browseHtml,,"o.innerHTML = _browseHtml(_activeCourse, st, _facts(st))"
+teacher/report-questionnaire.js,6719,4,innerHTML,REVIEWED,helper:_browseRowsHtml,,"list.innerHTML = _browseRowsHtml(_activeCourse, st, f, _bankContext(_activeCourse, st, f))"
+teacher/report-questionnaire.js,7251,4,innerHTML,ESC_WRAPPED,helper:_ownOutHtml,,out.innerHTML = _ownOutHtml(c)
+teacher/report-questionnaire.js,7258,4,outerHTML,ESC_WRAPPED,helper:_ownBoxHtml,,box.outerHTML = _ownBoxHtml(st)
+teacher/report-questionnaire.js,8541,4,outerHTML,REVIEWED,helper:_drawerHtml,,"el.outerHTML = _drawerHtml(_activeCourse, st, _facts(st))"
+teacher/report-sheets.js,1072,4,innerHTML,REVIEWED,marked at the sink,,tpl.innerHTML = html
+teacher/report-sheets.js,1104,4,innerHTML,REVIEWED,marked at the sink,,"fresh.innerHTML = ReportBlocks.gradeColumnsHtml(groups, one)"
+teacher/report-sheets.js,1195,4,innerHTML,REVIEWED,marked at the sink,,preview.innerHTML = html
+teacher/router.js,150,4,innerHTML,REVIEWED,helper:renderDock,,mount.innerHTML = renderDock(activePage)
+teacher/router.js,235,4,innerHTML,REVIEWED,marked at the sink,,"main.innerHTML = FVLoading.html('teacher', 'Opening ' + title, true)"
+teacher/router.js,243,4,innerHTML,LITERAL,,,main.innerHTML = ''
+teacher/router.js,355,4,innerHTML,LITERAL,,,document.getElementById('main').innerHTML = ''
+teacher/router.js,356,4,innerHTML,LITERAL,,,document.getElementById('page-toolbar-mount').innerHTML = ''
+teacher/router.js,357,4,innerHTML,LITERAL,,,document.getElementById('sidebar-mount').innerHTML = ''
+teacher/rubric-bank.js,424,4,innerHTML,LITERAL,concat,,overlay.innerHTML = html
+teacher/rubric-bank.js,885,4,innerHTML,TRUSTED_EXPR,helper:_newHtml,,el.innerHTML = _newHtml()
+teacher/rubric-bank.js,1127,12,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = listHtml()
+teacher/rubric-bank.js,1132,12,innerHTML,ESC_WRAPPED,helper:paneHtml,,el.innerHTML = paneHtml()
+teacher/rubric-bank.js,1143,15,innerHTML,LITERAL,helper:_scopeHtml,,scope.innerHTML = _scopeHtml()
+teacher/rubric-bank.js,1421,4,innerHTML,REVIEWED,helper:_overlayHtml,,overlay.innerHTML = _overlayHtml()
+teacher/rubric-library.js,644,10,innerHTML,REVIEWED,marked at the sink,,list.innerHTML = parts.join('')
+teacher/rubric-print.js,745,33,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = html
+teacher/rubric-print.js,1088,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = out.html
+teacher/rubric-print.js,1125,16,innerHTML,LITERAL,,,root.innerHTML = ''
+teacher/rubric-print.js,1530,4,innerHTML,LITERAL,,,box.innerHTML = ''
+teacher/rubric-print.js,1577,6,innerHTML,REVIEWED,marked at the sink,,"printedBox.innerHTML = summary ? '<span class=""rp-printed-title"">Already Printed</span><span>' + esc(summary.first) + '</span>' + (summary.second ? '<span>' + esc(summary.second) …"
+teacher/rubric-print.js,1637,4,innerHTML,REVIEWED,marked at the sink,,next.innerHTML = _dialogHtml()
+teacher/rubric-print.js,1638,33,innerHTML,REVIEWED,marked at the sink,,card.innerHTML = next.firstChild.innerHTML
+teacher/rubric-print.js,1639,9,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = next.innerHTML
+teacher/rubric-print.js,1739,4,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = _dialogHtml()
+teacher/rubric-print.js,1915,74,innerHTML,LITERAL,,,root.innerHTML = ''
+teacher/student-edit-dialog.js,107,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""edit-modal es-modal"">' + '<div class=""es-head""><h2 class=""edit-modal-title"" id=""edit-modal-heading"">Edit Student</h2>' + '<div class=""es-sub"">' + …"
+teacher/student-edit-dialog.js,356,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, studentId, 'PageStudent.switchStudent', )"
+teacher/student-evidence.js,626,6,innerHTML,REVIEWED,marked at the sink,,"seen.innerHTML = seenHtml(coverage(all, ObsCapture.competencyItems(_cid)))"
+teacher/student-evidence.js,631,14,innerHTML,REVIEWED,marked at the sink,,slot.innerHTML = compSlotHtml()
+teacher/student-evidence.js,635,15,innerHTML,REVIEWED,marked at the sink,,types.innerHTML = typesHtml(typeCounts(base))
+teacher/student-evidence.js,638,14,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = listHtml(typeFilter(base, _type))"
+teacher/student-evidence.js,645,4,innerHTML,ESC_WRAPPED,helper:timelineHtml,,el.innerHTML = timelineHtml()
+teacher/student-overrides.js,93,4,innerHTML,REVIEWED,marked at the sink,,panel.innerHTML = html
+teacher/ui.js,172,2,innerHTML,REVIEWED,marked at the sink,,holder.innerHTML = raw
+teacher/ui.js,501,4,innerHTML,REVIEWED,marked at the sink,,"body.innerHTML = '<p class=""help-note"">' + HELP_LOAD_ERROR + '</p>'"
+teacher/ui.js,506,4,innerHTML,LITERAL,,,body.innerHTML = ''
+teacher/ui.js,514,2,innerHTML,REVIEWED,marked at the sink,,body.innerHTML = _helpHomeHTML()
+teacher/ui.js,536,2,innerHTML,ESC_WRAPPED,concat,,"body.innerHTML = '<button type=""button"" class=""help-back"" data-action=""helpBack""><span aria-hidden=""true"">‹</span> Back</button>' + '<div class=""help-article-wrap"" id=""help-articl…"
+teacher/ui.js,773,4,innerHTML,REVIEWED,marked at the sink,,panel.innerHTML = _helpPanelHTML()
+teacher/ui.js,934,2,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""cm-help-card report-card"">' + '<div class=""cm-help-head"">' + '<h2 class=""cm-help-title"" id=""report-problem-title"">Report a Problem</h2>' + '<butto…"
+teacher/ui.js,1001,4,innerHTML,REVIEWED,marked at the sink,,"body.innerHTML = '<p class=""report-done"" role=""status"">' + message + '</p><div class=""report-actions""><span class=""report-spacer""></span>' + '<button type=""button"" class=""btn btn-…"
+teacher/ui.js,1153,2,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""cm-help-card kbd-card"">' + '<div class=""cm-help-head"">' + '<h2 class=""cm-help-title"" id=""kbd-sheet-title"">Keyboard Shortcuts</h2>' + '<button type…"
+teacher/ui.js,1388,2,innerHTML,LITERAL,,,"toast.innerHTML = '<span>Session expired. Copy your draft before it is lost.</span><button class=""sync-toast-btn"" data-action=""copy-session-draft"">Copy Draft</button>'"
+teacher/ui.js,1411,2,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""modal-box session-expired-modal""> <div class=""confirm-title"" id=""session-expired-title"">Session Expired</div> <div class=""confirm-message"">Enter y…"
+teacher/ui.js,1941,2,innerHTML,REVIEWED,helper:_rosterShowMenuHtml,,"document.getElementById('sb-show-menu').innerHTML = _rosterShowMenuHtml(cid, mode)"
+teacher/ui.js,1953,2,innerHTML,REVIEWED,helper:_sidebarRowsHtml,,"list.innerHTML = _sidebarRowsHtml(cid, _sortedRoster(cid, mode), sel ? sel.dataset.sid : null, _sidebarClickFnName)"
+teacher/ui.js,1955,2,innerHTML,REVIEWED,helper:_rosterSortMenuHtml,,document.getElementById('sb-sort-menu').innerHTML = _rosterSortMenuHtml(mode)
+teacher/ui.js,2050,10,innerHTML,REVIEWED,helper:_sidebarBadgesHtml,,"el.innerHTML = _sidebarBadgesHtml(cid, sid)"
+teacher/ui.js,2080,6,innerHTML,REVIEWED,helper:_sidebarBadgesHtml,,"el.innerHTML = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'))"
+teacher/ui.js,2112,4,innerHTML,REVIEWED,marked at the sink,,extra.innerHTML = a.top()
+teacher/ui.js,2131,19,innerHTML,REVIEWED,marked at the sink,,cell.innerHTML = n.mark || ''
+teacher/ui.js,2299,2,innerHTML,REVIEWED,helper:renderSidebar,,"mount.innerHTML = renderSidebar(cid, selId, clickFn)"
+teacher/ui.js,2424,2,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""undo-toast-btn"" data-action=""executeUndo"">Undo</button>`"
+teacher/ui.js,2460,4,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""sync-toast-btn"" data-action=""retry-sync"">Retry Now</button>`"
+teacher/ui.js,2462,4,innerHTML,ESC_WRAPPED,template,,toast.innerHTML = `<span>${esc(message)}</span>`
+teacher/ui.js,2521,2,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""confirm-card""> <div class=""confirm-title"" id=""confirm-title"">${esc(title)}</div> <div class=""confirm-message"">${esc(message)}</div> <div class=""co…"
+teacher/work-wall.js,279,4,innerHTML,REVIEWED,marked at the sink,,_view.overlay.innerHTML = html
+teacher/work-wall.js,594,4,innerHTML,REVIEWED,marked at the sink,,w.overlay.innerHTML = drawn.html

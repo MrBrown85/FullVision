@@ -1,14 +1,19 @@
 /**
- * The layout model behind Page Studio (teacher/report-sheets.js): sides
- * of rows, each row one block at Row width or one or two at Side by Side
- * width, migration from every earlier shape, and the pure helpers the
- * Studio calls. docs/DECISIONS.md "Report forms" 13.
+ * The built form a class saved with the old Page Studio (teacher/report-sheets.js):
+ * sides of rows, each row one block at Row width or one or two at Side by
+ * Side width, migration from every earlier shape, and the block registry.
+ * One Report reads a saved form through these (ReportOne.fromForm).
+ * docs/DECISIONS.md "Report forms" 13.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const S = ReportSheets;
-const ids = f => S.onForm(f);
+const blocksOf = f => f.sides.flatMap(sd => sd.rows.flatMap(r => r.cells.map(c => c.block)));
+const cellOf = (f, id) => {
+  for (const sd of f.sides) for (const row of sd.rows) for (const c of row.cells) if (c.block === id) return c;
+  return null;
+};
 const rowsOf = (f, side) =>
   f.sides[side].rows.map(r => r.cells.map(c => c.block + (c.size === 'half' ? '/half' : '')).join('+'));
 
@@ -26,8 +31,8 @@ describe('normalizeForm', () => {
       'term-attendance/half+missing-work/half',
     ]);
     expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table', 'parent-response']);
-    expect(S.cellOf(f, 'teacher-narrative')).toEqual({ block: 'teacher-narrative', size: 'row', lines: 10 });
-    expect(S.cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
+    expect(cellOf(f, 'teacher-narrative')).toEqual({ block: 'teacher-narrative', size: 'row', lines: 10 });
+    expect(cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
     expect(f.pinned).toBe('parent-response');
     expect(f.type).toBe('standard');
     expect(f).not.toHaveProperty('pagesPerStudent');
@@ -67,13 +72,13 @@ describe('normalizeForm', () => {
       'growth/half',
     ]);
     // 13 rows × 20px less the box's 40px, in 22px lines: 10.
-    expect(S.cellOf(f, 'teacher-narrative')).toEqual({
+    expect(cellOf(f, 'teacher-narrative')).toEqual({
       block: 'teacher-narrative',
       size: 'row',
       lines: 10,
       options: { x: 1 },
     });
-    expect(S.cellOf(f, 'parent-response').lines).toBe(7);
+    expect(cellOf(f, 'parent-response').lines).toBe(7);
     expect(f.pinned).toBe('parent-response');
     expect(f.perStudent).toEqual({ st1: { hide: ['legend'] } });
   });
@@ -99,7 +104,7 @@ describe('normalizeForm', () => {
       pinned: 'parent-response',
     });
     expect(rowsOf(f, 0)).toEqual(['header', 'teacher-narrative', 'proficiency/half+legend/half']);
-    expect(S.cellOf(f, 'teacher-narrative').lines).toBe(6);
+    expect(cellOf(f, 'teacher-narrative').lines).toBe(6);
     expect(rowsOf(f, 1)).toEqual(['parent-response']);
   });
 
@@ -149,268 +154,31 @@ describe('normalizeForm', () => {
       'observations/half',
       'parent-response',
     ]);
-    expect(S.cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
-    expect(S.cellOf(f, 'header')).toEqual({ block: 'header', size: 'row', options: { school: false } });
+    expect(cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
+    expect(cellOf(f, 'header')).toEqual({ block: 'header', size: 'row', options: { school: false } });
     expect(f.sides[1].rows).toEqual([]);
-    expect(S.cellOf(f, 'teacher-narrative').lines).toBe(16);
+    expect(cellOf(f, 'teacher-narrative').lines).toBe(16);
     expect(S.canHalf('student-reflection-learning')).toBe(false);
     expect(S.canHalf('parent-response')).toBe(false);
     expect(S.canHalf('legend')).toBe(true);
   });
 
-  it('formFor opens an old Brief class on the Interim Update and anything else on the name and Assignment Grades', () => {
-    expect(S.formFor({ preset: 'brief' }).id).toBe('interim-update');
-    expect(S.formFor({ preset: 'brief' }).sides).toHaveLength(1);
+  it('formFor opens a class with no saved form on the name and Assignment Grades', () => {
+    expect(S.formFor({ preset: 'brief' }).id).toBe('grades');
     expect(S.formFor({ preset: 'standard' }).id).toBe('grades');
-    expect(S.onForm(S.formFor(null))).toEqual(['header', 'grade-table']);
+    expect(blocksOf(S.formFor(null))).toEqual(['header', 'grade-table']);
     // Assignment Grades starts in one column, by date, year to date, on a
-    // new report or added from the palette.
-    expect(S.optionsFor(S.cellOf(S.formFor(null), 'grade-table'))).toMatchObject({
+    // new report.
+    expect(S.optionsFor(cellOf(S.formFor(null), 'grade-table'))).toMatchObject({
       columns: 'one',
       organize: 'date',
       range: 'all',
     });
-    const added = S.insert(S.form(), 'next-steps', { side: 0 });
-    expect(
-      S.optionsFor(S.cellOf(S.insert(S.removeCell(added, 'grade-table'), 'grade-table', { side: 1 }), 'grade-table')),
-    ).toMatchObject({ columns: 'one', organize: 'date', range: 'all' });
     expect(S.formFor({ form: { v: 6, id: 'x', sides: [] } }).id).toBe('x');
   });
 });
 
-describe('editing', () => {
-  it('insert puts a new block in its own row at the end of a side, before the pinned row; at a row index on request', () => {
-    let f = S.insert(S.form(), 'observations', { side: 1 });
-    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table', 'observations', 'parent-response']);
-    f = S.insert(f, 'next-steps', { side: 0, row: 2 });
-    expect(rowsOf(f, 0)).toEqual([
-      'header',
-      'proficiency',
-      'next-steps',
-      'legend',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-    ]);
-    // Row 0 on the Front is the letterhead's: a block asked there goes under it.
-    f = S.insert(f, 'growth', { side: 0, row: 0 });
-    expect(rowsOf(f, 0)[1]).toBe('growth');
-    // A moved block keeps its options and leaves its pair.
-    f = S.insert(S.setOption(f, 'missing-work', 'x', 1), 'missing-work', { side: 1, row: 0 });
-    expect(rowsOf(f, 0)).toContain('term-attendance/half');
-    expect(rowsOf(f, 1)[0]).toBe('missing-work/half');
-    expect(S.cellOf(f, 'missing-work').options).toEqual({ x: 1 });
-    expect(S.insert(f, 'header', { side: 1 })).toBe(f);
-    expect(S.insert(f, 'nope', { side: 1 })).toBe(f);
-  });
-
-  it('beside pairs two blocks that may go Side by Side when the target is alone; otherwise nothing changes', () => {
-    const f0 = S.form();
-    const f = S.beside(f0, 'legend', 'proficiency');
-    expect(rowsOf(f, 0)).toEqual([
-      'header',
-      'proficiency/half+legend/half',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-    ]);
-    expect(S.partnerOf(f, 'legend')).toBe('proficiency');
-    expect(S.partnerOf(f, 'teacher-narrative')).toBeNull();
-    // A full pair takes no third; the reflections never pair; the response never pairs.
-    expect(S.beside(f, 'teacher-narrative', 'legend')).toEqual(f);
-    expect(S.beside(f0, 'student-reflection-habits', 'legend')).toBe(f0);
-    expect(S.beside(f0, 'legend', 'parent-response')).toBe(f0);
-    // A new block from the palette pairs too.
-    const g = S.beside(f0, 'support-home', 'legend');
-    expect(rowsOf(g, 0)[2]).toBe('legend/half+support-home/half');
-  });
-
-  it('moveRow moves a row up or down on its side; the letterhead and the pinned row stay put', () => {
-    let f = S.moveRow(S.form(), 'teacher-narrative', -1);
-    expect(rowsOf(f, 0)).toEqual([
-      'header',
-      'proficiency',
-      'teacher-narrative',
-      'legend',
-      'term-attendance/half+missing-work/half',
-    ]);
-    f = S.moveRow(f, 'missing-work', -1);
-    expect(rowsOf(f, 0)[3]).toBe('term-attendance/half+missing-work/half');
-    expect(S.moveRow(f, 'proficiency', -1)).toBe(f); // under the letterhead already
-    expect(S.moveRow(f, 'grade-table', 1)).toBe(f); // above the pinned row already
-    expect(S.moveRow(f, 'parent-response', -1)).toBe(f);
-    expect(S.moveRow(f, 'header', 1)).toBe(f);
-  });
-
-  it('moveToSide appends a row to another side before its pinned row', () => {
-    const f = S.moveToSide(S.form(), 'legend', 1);
-    expect(rowsOf(f, 0)).toEqual([
-      'header',
-      'proficiency',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-    ]);
-    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table', 'legend', 'parent-response']);
-    expect(S.moveToSide(f, 'legend', 1)).toBe(f);
-    expect(S.moveToSide(f, 'legend', 5)).toBe(f);
-    expect(S.moveToSide(f, 'parent-response', 0)).toBe(f);
-  });
-
-  it('setSize: Side by Side pairs with a lone Side by Side neighbour; Row splits a pair, the partner staying at half width', () => {
-    let f = S.setSize(S.form(), 'legend', 'half');
-    expect(rowsOf(f, 0)[2]).toBe('legend/half');
-    f = S.setSize(f, 'proficiency', 'half');
-    expect(rowsOf(f, 0)).toEqual([
-      'header',
-      'proficiency/half+legend/half',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-    ]);
-    f = S.setSize(f, 'proficiency', 'row');
-    expect(rowsOf(f, 0)).toEqual([
-      'header',
-      'proficiency',
-      'legend/half',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-    ]);
-    expect(S.setSize(f, 'student-reflection-habits', 'half')).toEqual(f);
-    expect(rowsOf(S.setSize(S.form(), 'parent-response', 'half'), 1)).toEqual([
-      'self-assessment',
-      'grade-table',
-      'parent-response',
-    ]);
-  });
-
-  it('setLines clamps to the block’s range and only applies to writing boxes', () => {
-    const f = S.form();
-    expect(S.cellOf(S.setLines(f, 'teacher-narrative', 14), 'teacher-narrative').lines).toBe(14);
-    expect(S.cellOf(S.setLines(f, 'teacher-narrative', 1), 'teacher-narrative').lines).toBe(3);
-    expect(S.cellOf(S.setLines(f, 'teacher-narrative', 40), 'teacher-narrative').lines).toBe(16);
-    expect(S.cellOf(S.setLines(f, 'parent-response', 5), 'parent-response').lines).toBe(5);
-    expect(S.setLines(f, 'legend', 5)).toEqual(f);
-    expect(S.optionsFor(S.cellOf(f, 'teacher-narrative')).lines).toBe(10);
-    expect(S.optionsFor({ block: 'teacher-narrative' }).lines).toBe(10);
-  });
-
-  it('removeCell drops the block (and the pin if it was pinned); its partner stays alone at half width', () => {
-    let f = S.removeCell(S.form(), 'term-attendance');
-    expect(rowsOf(f, 0)[4]).toBe('missing-work/half');
-    expect(S.available(f)).toContain('term-attendance');
-    f = S.removeCell(f, 'parent-response');
-    expect(f.pinned).toBeNull();
-    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table']);
-    expect(S.removeCell(f, 'header')).toBe(f);
-    expect(S.removeCell(f, 'nope')).toBe(f);
-  });
-
-  it('addSide, removeSide (only an empty side past the second) and setSides (Front Only folds the Back onto the Front)', () => {
-    let f = S.addSide(S.form());
-    expect(f.sides).toHaveLength(3);
-    expect(S.removeSide(f, 1)).toBe(f);
-    expect(S.removeSide(f, 2).sides).toHaveLength(2);
-    f = S.insert(f, 'observations', { side: 2 });
-    expect(S.removeSide(f, 2)).toBe(f);
-    const one = S.setSides(S.form(), 1);
-    expect(one.sides).toHaveLength(1);
-    expect(rowsOf(one, 0)).toEqual([
-      'header',
-      'proficiency',
-      'legend',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-      'self-assessment',
-      'grade-table',
-      'parent-response',
-    ]);
-    expect(one.pinned).toBe('parent-response');
-    // Front and Back puts the folded blocks back where they were (step 4
-    // group 2 #4), the Response docked last on the Back again.
-    const two = S.setSides(one, 2);
-    expect(two.sides).toHaveLength(2);
-    expect(two).toEqual(S.form());
-    expect(two.folded).toBeUndefined();
-    expect(S.setSides(S.form(), 2).sides).toHaveLength(2);
-  });
-
-  it('Front Only, an edit, then Front and Back: folded blocks go back, a block added meanwhile stays on the Front', () => {
-    let f = S.insert(S.addSide(S.form()), 'observations', { side: 2 });
-    f = S.setSides(f, 1);
-    expect(f.sides).toHaveLength(1);
-    expect(f.folded).toEqual({ 'self-assessment': 1, 'grade-table': 1, 'parent-response': 1, observations: 2 });
-    // The folded note survives a save and a reload.
-    f = S.normalizeForm(JSON.parse(JSON.stringify(f)));
-    f = S.removeCell(f, 'self-assessment');
-    f = S.insert(f, 'next-steps', { side: 0 });
-    const back = S.setSides(f, 2);
-    expect(back.sides).toHaveLength(3);
-    expect(rowsOf(back, 0)).toEqual([
-      'header',
-      'proficiency',
-      'legend',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-      'next-steps',
-    ]);
-    expect(rowsOf(back, 1)).toEqual(['grade-table', 'parent-response']);
-    expect(rowsOf(back, 2)).toEqual(['observations']);
-  });
-
-  it('a one-sided form saved before Front Only noted the sides opens Front and Back on an empty Back', () => {
-    const one = S.setSides(S.form(), 1);
-    delete one.folded;
-    const two = S.setSides(one, 2);
-    expect(two.sides[1].rows).toEqual([]);
-  });
-
-  it('setOption, setNoEvidence, setPinned, setType', () => {
-    let f = S.setOption(S.form(), 'proficiency', 'evidence', false);
-    expect(S.cellOf(f, 'proficiency').options).toEqual({ evidence: false });
-    f = S.setNoEvidence(f, 'proficiency', 'hide');
-    expect(S.cellOf(f, 'proficiency').noEvidence).toBe('hide');
-    f = S.setPinned(f, null);
-    expect(f.pinned).toBeNull();
-    expect(S.setPinned(f, 'parent-response').pinned).toBe('parent-response');
-    expect(S.setPinned(f, 'legend').pinned).toBeNull();
-    expect(S.setType(f, 'compact').type).toBe('compact');
-    expect(S.setType(f, 'x').type).toBe('standard');
-  });
-
-  it('hideFor hides a block for one student and leaves the class layout alone', () => {
-    let f = S.hideFor(S.form(), 'st1', 'legend', true);
-    expect(S.hiddenFor(f, 'st1')).toEqual(['legend']);
-    expect(S.hiddenFor(f, 'st2')).toEqual([]);
-    expect(rowsOf(f, 0)).toEqual(rowsOf(S.form(), 0));
-    f = S.hideFor(f, 'st1', 'legend', false);
-    expect(f.perStudent).toEqual({});
-  });
-
-  it('the letterhead keeps its options through normalizeForm and any later edit', () => {
-    let f = S.setOption(S.form(), 'header', 'studentNumber', false);
-    expect(S.cellOf(f, 'header').options).toEqual({ studentNumber: false });
-    f = S.insert(f, 'legend', { side: 1 });
-    expect(S.cellOf(f, 'header').options).toEqual({ studentNumber: false });
-    expect(S.normalizeForm(f).sides[0].rows[0].cells[0].options).toEqual({ studentNumber: false });
-  });
-});
-
-describe('starters', () => {
-  it('are whole v6 forms: the letterhead first, the Response last on the Back, every block once', () => {
-    S.starters().forEach(st => {
-      const f = S.starter(st.id);
-      expect(f.v).toBe(6);
-      expect(f.sides[0].rows[0].cells[0].block).toBe('header');
-      const all = ids(f);
-      expect(new Set(all).size).toBe(all.length);
-      if (f.pinned) {
-        const last = f.sides[f.sides.length - 1].rows.slice(-1)[0];
-        expect(last.cells.map(c => c.block)).toEqual([f.pinned]);
-      }
-    });
-    expect(S.starter('interim-update').sides).toHaveLength(1);
-    expect(S.starter('conference-pack').sides).toHaveLength(2);
-    expect(S.optionsFor(S.cellOf(S.starter('conference-pack'), 'grade-table')).range).toBe('all');
-    expect(S.starter('nope')).toBeNull();
-  });
-
+describe('the block registry', () => {
   it('optionsFor fills the registry defaults and adds the no-evidence rule and the lines', () => {
     expect(S.optionsFor({ block: 'competency-table' })).toEqual({
       evidence: true,
@@ -432,7 +200,8 @@ describe('starters', () => {
     Object.keys(S.BLOCKS).forEach(id => {
       const def = S.BLOCKS[id];
       expect(def.label).toMatch(/^[A-Z]/);
-      if (id !== 'header') expect(S.PALETTE_GROUPS).toContain(def.group);
+      if (id !== 'header')
+        expect(['Grades', 'Comments and Evidence', 'Student Voice', 'Learner Profile', 'Family']).toContain(def.group);
       expect(def).not.toHaveProperty('rows');
       (def.options || []).forEach(o => {
         expect(o.key).toMatch(/^[a-z][A-Za-z]*$/);
@@ -1223,65 +992,45 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}))).toBe('');
   });
 
-  it('retired blocks leave the palette but a saved layout keeps them', () => {
-    const html = ReportStudio.paletteHtml(S.form(), 'blocks', []);
-    [
-      'section-outcomes',
-      'score-distribution',
-      'section-chart',
-      'academic-summary',
-      'competency-table',
-      'growth',
-    ].forEach(id => expect(html).not.toContain(`data-block="${id}"`));
-    ['support-home', 'progress', 'missing-work', 'proficiency', 'self-assessment'].forEach(id =>
-      expect(html).toContain(`data-block="${id}"`),
-    );
-    const kept = S.insert(S.form(), 'section-chart', { side: 1 });
-    expect(S.onForm(kept)).toContain('section-chart');
-    expect(ReportStudio.paletteHtml(kept, 'blocks', [])).toMatch(
-      /class="studio-blk placed"[^>]*data-block="section-chart"/,
-    );
+  it('a saved layout keeps a retired block', () => {
+    const kept = S.normalizeForm({ v: 6, sides: [{ rows: [] }, { rows: [{ cells: [{ block: 'section-chart' }] }] }] });
+    expect(blocksOf(kept)).toContain('section-chart');
   });
 
-  it('Assignment Grades offers Last 10, This Term and Year to Date; Year to Date is the default', () => {
-    const f = S.insert(S.form(), 'grade-table', { side: 1 });
-    expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('all');
-    const pop = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
-    expect(pop).toContain('aria-label="Range"');
-    expect(pop).toContain('aria-label="Organize By"');
-    // A Proficiency class (this one) is not offered Proficiency Word: it
-    // prints no word beside a mark. A Both class neither; a Letter class is.
-    stub('getActiveCourse', () => CID);
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).toContain(
-      'Percent starts from the class grading setting.',
-    );
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).not.toContain('data-key="word"');
-    COURSES[CID].gradingSystem = 'both';
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).not.toContain('data-key="word"');
-    COURSES[CID].gradingSystem = 'letter';
-    const letter = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
-    expect(letter).toMatch(/data-key="word"> Proficiency Word/);
-    expect(letter).toContain('Percent and Proficiency Word start from the class grading setting.');
-    COURSES[CID].gradingSystem = 'proficiency';
-    // Per Competency shows only when organized by competency.
-    expect(pop).not.toContain('aria-label="Per Competency"');
-    const byComp = S.setOption(f, 'grade-table', 'organize', 'competency');
-    expect(ReportStudio.blockToolbarHtml(byComp, 'grade-table', null)).toContain('aria-label="Per Competency"');
-    // Percent and Proficiency Word start from the class setting: unticked
-    // until the class says, ticked when it does.
-    expect(pop).toMatch(/data-key="percent"> Percent/);
-    const auto = ReportStudio.blockToolbarHtml(f, 'grade-table', null, { percent: true, word: true });
-    expect(auto).toMatch(/data-key="percent" checked> Percent/);
-    expect(S.optionsFor(S.cellOf(f, 'grade-table'), { percent: true, word: false })).toMatchObject({
+  it('Assignment Grades is Year to Date by default; Percent and Proficiency Word start from the class setting', () => {
+    const f = S.form();
+    expect(S.optionsFor(cellOf(f, 'grade-table')).range).toBe('all');
+    expect(S.optionsFor(cellOf(f, 'grade-table'), { percent: true, word: false })).toMatchObject({
       percent: true,
       word: false,
       score: true,
     });
-    expect(pop).toMatch(/data-value="last10"[^>]*>Last 10</);
-    expect(pop).toMatch(/data-value="term"[^>]*>This Term</);
-    expect(pop).toMatch(/data-value="all" role="radio" aria-checked="true">Year to Date</);
-    const sup = ReportStudio.blockToolbarHtml(S.insert(S.form(), 'support-home', { side: 1 }), 'support-home', null);
-    expect(sup).toContain('Your Own Line');
-    expect(sup).toContain('data-action="studioText" data-block="support-home" data-key="note"');
+  });
+});
+
+describe('measuring the class for One Report', () => {
+  it('measures in the standard type and gives the layout only the paper and the stage, whatever a saved form says', () => {
+    const seen = [];
+    const old = document.createElement;
+    document.createElement = () => ({ setAttribute() {}, style: {}, remove() {} });
+    const layout = (cid, st, ctx, o) => {
+      seen.push({ cls: o.stage.className, keys: Object.keys(o).sort() });
+      return { html: '', sheets: 1, sides: 1 };
+    };
+    try {
+      S.classSummary(
+        'x',
+        [{ id: 's1', firstName: 'Ada', lastName: 'Lee' }],
+        {},
+        {
+          paper: 'letter',
+          form: { v: 6, type: 'compact', sides: [] },
+          layout,
+        },
+      );
+    } finally {
+      document.createElement = old;
+    }
+    expect(seen).toEqual([{ cls: 'report-sheet report-sheet-measure', keys: ['paper', 'stage'] }]);
   });
 });

@@ -889,7 +889,16 @@ describe('signed in: nothing yet', () => {
   });
 
   it('data.js names the teacher’s revision functions at call sites the drift check can read, and none of the student’s (S7-W1)', () => {
-    const src = readFileSync('shared/data.js', 'utf-8');
+    const src = [
+      'shared/data.js',
+      'shared/data-student-work.js',
+      'shared/data-feedback-live.js',
+      'shared/data-markup.js',
+      'shared/data-reflect.js',
+      'shared/data-revisions.js',
+    ]
+      .map(f => readFileSync(f, 'utf-8'))
+      .join('\n');
     expect(src.match(/_writeRpc\(\s*'return_for_revision'/g).length).toBe(1);
     expect(src.match(/_writeRpc\(\s*'set_revision_request'/g).length).toBe(1);
     expect(src.match(/_writeRpc\(\s*'cancel_revision'/g).length).toBe(1);

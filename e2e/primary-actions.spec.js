@@ -28,6 +28,10 @@ async function solidPrimaries(page) {
         if (el.closest('dialog, [role="dialog"], [aria-modal="true"]')) return false;
         // A chosen radio (a Work Habits rating) is a choice, not an action.
         if (el.getAttribute('role') === 'radio') return false;
+        // A switch that is on (a part of the report) is a setting, not an action.
+        if (el.getAttribute('role') === 'switch') return false;
+        // A report part's icon tile is its drag handle, not an action.
+        if (el.classList.contains('one-tint')) return false;
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0) return false;
         const cs = getComputedStyle(el);

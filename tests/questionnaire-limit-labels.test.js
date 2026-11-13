@@ -357,6 +357,73 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
     });
   });
 
+  describe('the ⓘ sheet lists what Progress Reports prints (One Report’s model)', () => {
+    const report = html => html.split('qn-info-label')[2].split('qn-info-never')[0];
+    const partsOf = html => [...report(html).matchAll(/class="qn-info-part">([^<]*)</g)].map(m => m[1]);
+    const offOf = html => (report(html).match(/qn-info-off-title">[^<]*<\/span><span>([^<]*)</) || [])[1] || '';
+    let kept;
+    beforeAll(() => {
+      kept = getReportConfig(cid);
+    });
+    afterAll(() => {
+      saveReportConfig(cid, kept || {});
+    });
+
+    it('lists the parts that are on, in print order, with a renamed heading, then the Feedback Pages', () => {
+      saveReportConfig(cid, {
+        one: {
+          parts: ['header', 'teacher-narrative', 'parent-response', 'proficiency'],
+          titles: { 'teacher-narrative': 'From Your Teacher' },
+          feedback: { rubrics: true },
+        },
+      });
+      open(byName('Tyler'));
+      const html = sheet().innerHTML;
+      RQ.tqCloseInfo();
+      expect(partsOf(html)).toEqual([
+        'Letterhead',
+        'From Your Teacher',
+        'Proficiency',
+        'Parent / Guardian Response',
+        'Rubrics',
+      ]);
+      expect(html).toContain('Your rubrics on each assessment, on pages after the report.');
+      const off = offOf(html).split(' · ');
+      expect(off).toContain('Assessments');
+      expect(off).toContain('Assessment Comments');
+      expect(off).not.toContain('Rubrics');
+      expect(off).not.toContain('Letterhead');
+      // A Letter class has no Proficiency Legend to add.
+      expect(off).not.toContain('Proficiency Legend');
+      expect(html).toContain('Add them in Progress Reports.');
+    });
+
+    it('a class with nothing saved lists the Grades setup', () => {
+      saveReportConfig(cid, {});
+      open(byName('Tyler'));
+      const html = sheet().innerHTML;
+      RQ.tqCloseInfo();
+      expect(partsOf(html)).toEqual(['Letterhead', 'Assessments', 'Categories', 'Course Grade', 'Missing Work']);
+      expect(html).toContain('Each assessment and its score, from your gradebook.');
+      expect(html).toContain('Comes from scores and your category weights.');
+    });
+
+    it('a class’s old built form lists that form’s blocks', () => {
+      saveReportConfig(cid, {
+        progressMode: 'build',
+        form: {
+          v: 6,
+          id: 'x',
+          sides: [{ rows: [{ cells: [{ block: 'header' }] }, { cells: [{ block: 'teacher-narrative' }] }] }],
+        },
+      });
+      open(byName('Tyler'));
+      const html = sheet().innerHTML;
+      RQ.tqCloseInfo();
+      expect(partsOf(html)).toEqual(['Letterhead', 'Teacher Comment']);
+    });
+  });
+
   describe('9. the ⓘ sheet keeps the focus', () => {
     it('Tab and Shift-Tab cycle inside it; Escape closes it and the ⓘ button gets the focus', () => {
       const st = byName('Tyler');

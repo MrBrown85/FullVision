@@ -1,12 +1,13 @@
 /**
- * The Progress Report's Assignment Grades block matches the Quick Report
+ * The Progress Report's Assignment Grades block matches the Assessments
+ * list (once the Quick Report)
  * (DECISIONS, "Student-facing levels are proficiencies", the Assignment
  * Grades block, 2026-11-12). Colin: "go with your recommendations on all
  * four".
  *
- * 1. A piece with no mark yet leaves its mark cell blank, as the Quick
- *    Report does: no dash.
- * 2. Points read "7 / 10", with spaces, as the Quick Report writes them.
+ * 1. A piece with no mark yet leaves its mark cell blank, as the
+ *    Assessments list does: no dash.
+ * 2. Points read "7 / 10", with spaces, as the Assessments list writes them.
  * 3. In a Proficiency or Both class a points piece prints no proficiency
  *    word beside its points (the word was only the band its points fall
  *    in). The points, and a Both class's %, are as scored.
@@ -324,10 +325,14 @@ describe('Assignment Grades: the word column only in a Letter class', () => {
 
   it('a saved form keeps its Word option: it loads, draws without the column, and is not rewritten', () => {
     const S = ReportSheets;
-    const saved = S.setOption(S.insert(S.form(), 'grade-table', { side: 1 }), 'grade-table', 'word', true);
+    const saved = S.normalizeForm({
+      v: 6,
+      sides: [{ rows: [] }, { rows: [{ cells: [{ block: 'grade-table', options: { word: true } }] }] }],
+    });
+    const cellOf = (f, id) => f.sides[1].rows.map(r => r.cells[0]).find(c => c.block === id);
     const json = JSON.stringify(saved);
     const loaded = S.normalizeForm(JSON.parse(json));
-    expect(S.cellOf(loaded, 'grade-table').options.word).toBe(true);
+    expect(cellOf(loaded, 'grade-table').options.word).toBe(true);
     MODES.forEach(mode => {
       seed(mode);
       const html = ReportBlocks.renderReportBlock(
@@ -335,7 +340,7 @@ describe('Assignment Grades: the word column only in a Letter class', () => {
         CID,
         STUDENT,
         {},
-        S.optionsFor(S.cellOf(loaded, 'grade-table')),
+        S.optionsFor(cellOf(loaded, 'grade-table')),
       );
       if (mode === 'letter') expect(html).toMatch(WORD_ROWS);
       else expect(html).not.toMatch(WORD_ROWS);
