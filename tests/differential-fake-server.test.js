@@ -28,8 +28,8 @@ function storage() {
 
 /* A page with mockAuth's client as it answers: the bundle with a course row,
    reads and writes with nothing, a write with a 504 while writes fail. */
-function page(load = 'load3') {
-  const window = { localStorage: storage(), __diffTab: load, __e2eFailWrites: false, under: [] };
+function page(load = 'load3', shared = storage()) {
+  const window = { localStorage: shared, __diffTab: load, __e2eFailWrites: false, under: [] };
   window._supabase = {
     rpc(name, params) {
       window.under.push(name);
@@ -196,5 +196,95 @@ describe('Draft and Returned rows', () => {
     const back = (await w._supabase.rpc('cancel_revision', { p_request_id: made.request.id })).data;
     expect(back.result).toBe('cancelled');
     expect((await w._supabase.rpc('cancel_revision', { p_request_id: made.request.id })).data.result).toBe('not_open');
+  });
+});
+
+describe('categories', () => {
+  const CID2 = 'c1a55e00-0000-4000-8000-0000000d1ff2';
+  const T = 'ca700000-0000-4000-8000-000000000001';
+  const L = 'ca700000-0000-4000-8000-000000000002';
+  const START = [
+    { id: T, name: 'Tests', weight: 60, display_order: 0, calc_mode: 'points' },
+    { id: L, name: 'Labs', weight: 40, display_order: 1, calc_mode: 'percent' },
+  ];
+
+  /* A page whose bundle carries categories, as mockAuth's does. */
+  function withCategories(load = 'load3', shared) {
+    const w = page(load, shared);
+    const under = w._supabase.rpc;
+    w._supabase.rpc = function (name, params) {
+      if (name === 'get_class_bundle') {
+        const cats = params.p_course_id === CID ? START : [];
+        return Promise.resolve({ data: { gradebook: { course: {}, categories: cats } }, error: null });
+      }
+      return under.call(this, name, params);
+    };
+    // The fake wraps whatever rpc is on the client when it starts, so start it again.
+    // eslint-disable-next-line no-new-func
+    new Function('window', SRC + '\ndifferentialFakeServer();')(w);
+    return w;
+  }
+  const list = async (w, cid) => (await w._supabase.rpc('list_categories', { p_course_id: cid })).data;
+  const shape = rows => rows.map(r => [r.id, r.name, r.weight, r.display_order, r.calc_mode]);
+
+  it('answers with the starting categories, in the real function’s columns', async () => {
+    const w = withCategories();
+    await w._supabase.rpc('get_class_bundle', { p_course_id: CID });
+    const rows = await list(w, CID);
+    expect(shape(rows)).toEqual([
+      [T, 'Tests', 60, 0, 'points'],
+      [L, 'Labs', 40, 1, 'percent'],
+    ]);
+    expect(Object.keys(rows[0]).sort()).toEqual(
+      ['calc_mode', 'course_id', 'created_at', 'display_order', 'id', 'name', 'updated_at', 'weight'].sort(),
+    );
+    expect(rows[0].course_id).toBe(CID);
+  });
+
+  it('answers with the saved list after a save, and leaves another class alone', async () => {
+    const w = withCategories();
+    await w._supabase.rpc('get_class_bundle', { p_course_id: CID });
+    await w._supabase.rpc('get_class_bundle', { p_course_id: CID2 });
+    const ids = (
+      await w._supabase.rpc('save_categories', {
+        p_idempotency_key: 'c1',
+        p_course_id: CID,
+        p_categories: [
+          { id: L, name: ' Labs ', weight: 30, calc_mode: 'points' },
+          { name: 'Projects', weight: 70 },
+        ],
+      })
+    ).data;
+    // Tests is gone, Labs keeps its id and moves up, Projects is new.
+    expect(shape(await list(w, CID))).toEqual([
+      [L, 'Labs', 30, 0, 'points'],
+      [ids[1], 'Projects', 70, 1, 'points'],
+    ]);
+    expect(await list(w, CID2)).toEqual([]);
+  });
+
+  it('does not change the list when a save fails', async () => {
+    const w = withCategories();
+    await w._supabase.rpc('get_class_bundle', { p_course_id: CID });
+    w.__e2eFailWrites = true;
+    await w._supabase.rpc('save_categories', {
+      p_idempotency_key: 'c2',
+      p_course_id: CID,
+      p_categories: [{ name: 'Only', weight: 100 }],
+    });
+    expect(shape(await list(w, CID))).toEqual(shape(START));
+  });
+
+  it('is seen by a second page, and a new bundle does not reset it', async () => {
+    const a = withCategories('load1');
+    await a._supabase.rpc('get_class_bundle', { p_course_id: CID });
+    await a._supabase.rpc('save_categories', {
+      p_idempotency_key: 'c3',
+      p_course_id: CID,
+      p_categories: [{ id: T, name: 'Tests', weight: 100 }],
+    });
+    const b = withCategories('load2', a.localStorage);
+    await b._supabase.rpc('get_class_bundle', { p_course_id: CID });
+    expect(shape(await list(b, CID))).toEqual([[T, 'Tests', 100, 0, 'points']]);
   });
 });
