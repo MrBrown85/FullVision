@@ -71,6 +71,7 @@ interface Window {
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
+  CmTerms: unknown;
 }
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
@@ -107,5 +108,17 @@ declare var GradeState: {
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
 declare function reportingTermsSchoolMatch(terms: unknown): {
-  school: { terms: { starts_on: string; ends_on: string; report?: string }[] };
+  school: { id: string; terms: { label?: string; starts_on: string; ends_on: string; report?: string }[] };
 } | null;
+// The same file's other members, as teacher/cm-terms.js uses them.
+declare var REPORTING_TERM_PRESETS: { schoolYear: string; defaultSchool: string };
+declare function reportingTermSchools(): { id: string; name: string; assumed: unknown; notes: string }[];
+declare function reportingTermPreset(
+  schoolId: string | null,
+  date?: string,
+): { ordinal: number; label: string; starts_on: string; ends_on: string }[] | null;
+declare function reportingTermReportNames(terms: unknown): string[] | null;
+// teacher/ui.js (not checked yet): a segmented button's state attributes, and
+// the short message toast.
+declare function segAttr(on: boolean, role?: string): string;
+declare function showSyncToast(message: string, type?: string): void;
