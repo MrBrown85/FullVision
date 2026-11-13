@@ -1950,6 +1950,7 @@ var _WORK_ENDPOINTS = {
    waiting by an earlier visit go (an upload whose start has no answer
    waits for the outbox). */
 function _resumeWorkUploads() {
+  if (_signInWait) return void _signInWait.then(_resumeWorkUploads); // not before start-up's re-check has answered
   if (_isDemoSession() || !_writesEnabled() || !Object.keys(_workUploads()).length) return;
   var q = _wireWorkQueue();
   var all = _workUploads();
