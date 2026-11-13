@@ -92,21 +92,6 @@ describe('MComponents.navBar', () => {
   });
 });
 
-/* ── largeTitleHTML ──────────────────────────────────────────── */
-describe('MComponents.largeTitleHTML', () => {
-  it('renders large title div', () => {
-    const html = MComponents.largeTitleHTML('Students');
-    expect(html).toContain('m-title-large');
-    expect(html).toContain('Students');
-  });
-
-  it('escapes HTML in title', () => {
-    const html = MComponents.largeTitleHTML('<script>alert("xss")</script>');
-    expect(html).not.toContain('<script>');
-    expect(html).toContain('&lt;script&gt;');
-  });
-});
-
 /* ── profBg (dark-mode-aware colors) ────────────────────────── */
 describe('MComponents.profBg', () => {
   it('returns a color for each proficiency level 0-4', () => {

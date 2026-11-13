@@ -665,7 +665,6 @@ window.GradeState = (function () {
   return {
     DRAFT: DRAFT,
     RETURNED: RETURNED,
-    NONE: NONE,
     copyOf: copyOf,
     sameCopy: sameCopy,
     holds: holds,

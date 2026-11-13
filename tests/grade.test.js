@@ -189,8 +189,9 @@ describe('grade-format-guard', () => {
     'teacher/comment-bank.js': 1,
     'teacher/comment-personal.js': 1,
     // The level word as a line's label ("Developing: …").
-    'teacher/competency-wording.js': 1,
-    'teacher/dash-class-manager.js': 2,
+    'shared/competency-wording.js': 1,
+    'teacher/cm-std-help.js': 1, // the sample level's scale name (moved from dash-class-manager.js)
+    'teacher/dash-class-manager.js': 1,
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
     'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
@@ -198,7 +199,7 @@ describe('grade-format-guard', () => {
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
     'teacher/report-feedback-cards.js': 2,
-    'teacher/report-questionnaire.js': 1,
+    'teacher/report-qn-browse-cases.js': 1,
     'teacher/rubric-bank.js': 2,
     'teacher/student-overrides.js': 2,
     'teacher/ui.js': 2,
@@ -307,6 +308,7 @@ describe('grade-format-guard', () => {
     'teacher/report-blocks.js round (profPlus / total) * 100': 'a share of scores',
     'teacher/report-blocks.js round (counts[level] / total) * 100': 'a share of scores',
     'teacher/report-questionnaire.js round ((x - r.left - inset) / span) * (HS_STOPS - 1)': 'a slider stop',
+    'teacher/report-one-zoom.js round _st(_view).z * 100': 'the preview’s zoom as a percent',
     'teacher/report-questionnaire.js round (nx.min - Number(g.pct)) * 10':
       'the gap to the next letter from the shown course %',
     'teacher-mobile/card-widgets.js round levelBarPercent(cid, value)': 'a bar’s width',

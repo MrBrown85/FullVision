@@ -1,3 +1,4 @@
+// @ts-check
 /* Student records kept beside the marks: flags, goals and goal dates, Core Competency self-assessments,
    reflections and notes; and the class's modules. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -6,9 +7,9 @@ function getModules(cid) {
   if (_cache.modules[cid] !== undefined) return _cache.modules[cid];
   // Pre-init fallback
   try {
-    let data = JSON.parse(localStorage.getItem('gb-modules-' + cid));
+    let data = JSON.parse(/** @type {string} */ (localStorage.getItem('gb-modules-' + cid)));
     if (!data) {
-      data = JSON.parse(localStorage.getItem('gb-units-' + cid));
+      data = JSON.parse(/** @type {string} */ (localStorage.getItem('gb-units-' + cid)));
       if (data) {
         _safeLSSet('gb-modules-' + cid, JSON.stringify(data));
         localStorage.removeItem('gb-units-' + cid);
@@ -115,7 +116,7 @@ function getModuleById(cid, moduleId) {
 function getNotes(cid) {
   if (_cache.notes[cid] !== undefined) return _cache.notes[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-notes-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-notes-' + cid))) || {};
   } catch (e) {
     console.warn('Notes parse fallback:', e);
     return {};
@@ -200,7 +201,7 @@ function _persistNotesToCanonical(cid, prev, obj) {
 function getFlags(cid) {
   if (_cache.flags[cid] !== undefined) return _cache.flags[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-flags-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-flags-' + cid))) || {};
   } catch (e) {
     console.warn('Flags parse fallback:', e);
     return {};
@@ -238,7 +239,7 @@ function toggleFlag(cid, sid) {
 function getGoals(cid) {
   if (_cache.goals[cid] !== undefined) return _cache.goals[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-goals-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-goals-' + cid))) || {};
   } catch (e) {
     console.warn('Goals parse fallback:', e);
     return {};
@@ -321,7 +322,7 @@ async function _loadCoreSelf(cid) {
 function getReflections(cid) {
   if (_cache.reflections[cid] !== undefined) return _cache.reflections[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-reflections-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-reflections-' + cid))) || {};
   } catch (e) {
     console.warn('Reflections parse fallback:', e);
     return {};

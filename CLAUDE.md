@@ -58,13 +58,13 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 9. **Plain language in the UI:** Title Case for labels, headings, buttons and tabs; plain sentences for hints and messages. No jargon without a legend, no all-caps prompts.
 10. **Don't touch** `fullvision-user-inputs.xlsx`, `fullvision-documentation-inventory.xlsx`, or the gradebook site's CSS from classroom-content work.
 
-## Current state (2026-11-12)
+## Current state (2026-11-13)
 
 - Grading compliance with Schoology/Teams (`docs/grading-compliance-plan.md`): Phase 1 and Phase 2 are implemented and live.
 - Course soft-delete with 30-day purge is live. Removing a student withdraws them (`migrations/20261019_withdraw_students.sql`); permanent delete is a second step from the Withdrawn list in Class Settings.
 - Reports: the Term Questionnaire with its Comment Bank and Generate, and Progress Reports on One Report (one list of parts, for every teacher, since Nov 13). Students answer questionnaires and read phone reports on the student page (`s/`).
 - Grades display only through `calc.js` and its helpers in `constants.js` (`formatLevel`, `scoreLevelText`, `BC_LETTER_BANDS`, `PROF_LABELS`); the grade-format-guard in `tests/grade.test.js` enforces it. Text goes into HTML only through `esc` in `shared/html.js`; `npm run audit:html` fails on a new unproven innerHTML site.
 - The curriculum bank was rebuilt from the Ministry's files (Nov 2). New classes import from it through the New Class wizard; older classes change only when a teacher runs Re-link. Folders Count as One and Each Course Counts Equally are Grading tab switches.
-- The student page build (`docs/plans/student-page-build-plan.md`) is built on `main` behind a per-class build switch. Not built: S15 (waits for Colin), S16 (paused), S17 (not in this build) and S18-F2 (waits for Colin). Release status, checked 2026-11-12: the last release merged into `production` was PR #1239 ("Release: Nov 12, 2026 (Handouts and Links, overnight cleanup)"), at 13:13 UTC. It carried everything on `main` up to then, including the student page files in `s/` and the handoff review's overnight work. Anything merged to `main` after it is not released.
-- The S19 cleanup follows `docs/plans/handoff-review-plan.md`. Its overnight run is merged to `main` and, as of #1239, released.
+- The student page build (`docs/plans/student-page-build-plan.md`) is built on `main` behind a per-class build switch. Not built: S15 (waits for Colin), S16 (paused), S17 (not in this build) and S18-F2 (waits for Colin). The last release merged into `production` was PR #1347 ("Release: Nov 13, 2026 (the two-tab fix, same-date order, service worker check)") at 13:29 UTC on 2026-11-13. Anything merged to `main` after it is not released.
+- The S19 cleanup follows `docs/plans/handoff-review-plan.md`. Its overnight run and the Nov 13 alignment work (`docs/plans/alignment-plan.md`) are merged, and released up to PR #1347.
 - `codex.md` and `docs/backend-design/HANDOFF.md` are history; the open-work list is `docs/ROADMAP.md`.

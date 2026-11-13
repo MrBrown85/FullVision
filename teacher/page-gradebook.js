@@ -2169,31 +2169,6 @@ window.PageGradebook = (function () {
     return html;
   }
 
-  /* ── Always-visible Overall column ──────────────────────── */
-  // The overall grade as the class is set to grade: the level out of 4 in a
-  // Proficiency or Both class (Both adds a Grade column), the letter and %
-  // in a Letter class.
-  function renderOverallCell(cid, sid) {
-    var val = getOverallProficiency(cid, sid);
-    var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid, viewedReportTerm(cid)) : null;
-    var r = grade ? grade.level : roundLevel(val);
-    var color = PROF_COLORS[r] || PROF_COLORS[0];
-    var label = levelWord(cid, val);
-    var num = grade ? grade.text || '—' : levelFigure(val);
-    var tint = PROF_TINT[r] || '';
-    var bg = tint ? 'background:linear-gradient(' + tint + ',' + tint + '),var(--bg)' : '';
-    return (
-      '<td class="gb-overall-col"' +
-      (bg ? ' style="' + bg + '"' : '') +
-      '><span class="gb-overall-num" style="color:' +
-      color +
-      '">' +
-      num +
-      '</span>' +
-      (label ? '<div class="gb-overall-label" style="color:' + color + '">' + label + '</div>' : '') +
-      '</td>'
-    );
-  }
   /* The tooltip on a student's name, in two groups so the two kinds of
      number never sit side by side: the course grade as the class shows it
      (with how many assignments are NS, which count as 0 toward a %) and
@@ -2442,11 +2417,6 @@ window.PageGradebook = (function () {
     if (mark === 'complete') return '<span class="gb-cmp gb-cmp-complete">\u2713</span>';
     if (mark === 'incomplete') return '<span class="gb-cmp gb-cmp-incomplete">\u2717</span>';
     return '<span class="gb-pts-empty">\u2014</span>';
-  }
-
-  // Click order: unmarked → Complete → Incomplete → unmarked.
-  function nextCompletionMark(mark) {
-    return mark === 'complete' ? 'incomplete' : mark === 'incomplete' ? null : 'complete';
   }
 
   function setCellCompletion(td, mark) {

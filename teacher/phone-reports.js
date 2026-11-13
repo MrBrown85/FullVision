@@ -666,7 +666,6 @@ var PhoneReports = (function () {
 
   return {
     snapshot: snapshot,
-    termNumber: termNumber,
     forTerm: forTerm,
     send: send,
     close: close,

@@ -12,8 +12,8 @@ let root;
 const LAZY = {
   desktop: [
     'shared/bank-core-competencies.js', // teacher/page-assignments.js:2298
-    'shared/bank-proficiency.js', // teacher/rubric-print.js:225, teacher/competency-wording.js:77
-    'shared/bank-comment.js', // teacher/competency-wording.js:80
+    'shared/bank-proficiency.js', // teacher/rubric-print.js:225, shared/competency-wording.js:77
+    'shared/bank-comment.js', // shared/competency-wording.js:80
     'shared/bank-sets.js', // teacher/comment-bank.js:1224
     'shared/comment-bank.js', // teacher/comment-bank.js:8244
     'curriculum_data.js', // shared/data-curriculum-index.js:23
@@ -21,6 +21,8 @@ const LAZY = {
     // Reports' own scripts, loaded the first time Reports opens (teacher/router.js _onDemand).
     'teacher/report-sheets.js',
     'teacher/report-issues.js',
+    'teacher/report-qn-browse-cases.js',
+    'teacher/report-qn-voice-observations.js',
     'teacher/report-questionnaire.js',
     'teacher/grade-report.js',
     'teacher/report-preview.js',
@@ -32,6 +34,9 @@ const LAZY = {
     'teacher/report-one-panel.js',
     'teacher/report-one-page.js',
     'teacher/report-one-comment.js',
+    'teacher/report-one-zoom.js',
+    'teacher/report-one-head.js',
+    'teacher/report-print-paper.js',
     'teacher/page-reports.js',
     // Assignments' rubric scripts, loaded before Assignments first draws (teacher/router.js _onDemand).
     'teacher/rubric-library.js',

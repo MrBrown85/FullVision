@@ -1768,6 +1768,7 @@ function _persistLoadedField(cid, field, value) {
       same = false;
     }
     if (!same) _safeLSSet(lsKey, json);
+    else _keepText(lsKey, json);
   }
   if (_SERVER_STATE_FIELDS[field]) _rememberServerState(field, cid, value);
 }
@@ -1831,6 +1832,35 @@ function _forgetServerState(cid) {
   Object.keys(_serverState).forEach(function (field) {
     delete _serverState[field][cid];
   });
+  delete _keptText['gb-scores-' + cid];
+  delete _keptText['gb-statuses-' + cid];
+}
+
+/* This tab's own copy of a class's scores and of its statuses: the text of
+   this tab's memory of each when it last read it from storage or wrote it
+   there (docs/plans/one-mark-save-design.md, step 4). With no baseline, a
+   whole-list save works out what this tab changed against it, not against
+   the saved copy as another tab may have left it; the group check starts
+   from it too. The save guard still reads the saved copy. Forgotten with
+   the baseline. In memory only. */
+var _keptText = {}; // 'gb-scores-<cid>' or 'gb-statuses-<cid>' → text
+
+function _keepText(key, text) {
+  if (key.indexOf('gb-scores-') !== 0 && key.indexOf('gb-statuses-') !== 0) return;
+  if (typeof text === 'string') _keptText[key] = text;
+  else delete _keptText[key];
+}
+
+// The kept text read back, or `fallback` when nothing was kept or it can't
+// be read: then a save starts from the saved copy, as before.
+function _keptValue(text, fallback) {
+  if (typeof text !== 'string') return fallback;
+  try {
+    var value = JSON.parse(text);
+    return value && typeof value === 'object' ? value : fallback;
+  } catch (e) {
+    return fallback;
+  }
 }
 
 /* ── Rejected writes and the baseline (write-path audit §3, §5) ───────────
@@ -2008,7 +2038,7 @@ var _writeRefusals = 0;
 
 function _onWriteRefused(name, params, undo, reason, entryId) {
   _writeRefusals++;
-  console.warn(name + ' not queued (' + reason + '): the outbox has no room');
+  _warnWriteRefused(name, reason);
   // A refused create is forgotten, and its row leaves the baseline, so the
   // next save of the field creates it again.
   var creates = _pendingCreatesByEntry(entryId);
@@ -2397,18 +2427,23 @@ function _readFieldForRekey(field, cid) {
    are already in the outbox and are re-keyed there. */
 function _rekeyField(field, cid, transform) {
   var value = _readFieldForRekey(field, cid);
+  var dataKey = _DATA_KEYS[field];
+  var wrote = false;
   if (value !== undefined && transform(value)) {
     _cache[field][cid] = value;
     if (field === 'rubrics') _noteRubricsSet(cid);
-    var dataKey = _DATA_KEYS[field];
     // A re-key from another tab: it wrote the shared copy already.
-    if (dataKey && !_applyingRemoteRekey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
+    if (dataKey && !_applyingRemoteRekey) wrote = _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
     if (!_applyingRemoteRekey) {
       _markLocalWrite(field, cid);
       _broadcastChange(cid, field);
     }
   }
   if (_hasServerState(field, cid)) transform(_serverState[field][cid]);
+  // This tab's own copy gets the change the baseline gets, unless the
+  // write above just kept the new text.
+  var kept = dataKey && !wrote && _keptValue(_keptText['gb-' + dataKey + '-' + cid], null);
+  if (kept && transform(kept)) _keepText('gb-' + dataKey + '-' + cid, JSON.stringify(kept));
   if (field === 'statuses' || _withdrawnRecordFields()[field]) _rekeyWithdrawnRecords(field, cid, transform);
 }
 
@@ -4293,29 +4328,6 @@ function _savedCopyUsable(cid) {
   return _hasLocalCopy(cid);
 }
 
-// A saved copy that still keeps rubric scores under competencies.
-function _savedCopyHasLegacyRubricKeys(cid) {
-  var scores = _safeParseLS('gb-scores-' + cid, {});
-  var assessments = _safeParseLS('gb-assessments-' + cid, []);
-  var rubricById = {};
-  _safeParseLS('gb-rubrics-' + cid, []).forEach(function (r) {
-    if (r && r.id) rubricById[r.id] = r;
-  });
-  var legacyTags = {};
-  (assessments || []).forEach(function (a) {
-    var rubric = a && !isPointsScored(a) && rubricById[a.rubricId || a.rubric_id];
-    if (!rubric) return;
-    var tags = {};
-    (rubric.criteria || []).forEach(function (c) {
-      ((c && c.tagIds) || []).forEach(function (t) {
-        tags[t] = true;
-      });
-    });
-    legacyTags[a.id] = tags;
-  });
-  return _hasLegacyRubricKeys(scores || {}, legacyTags);
-}
-
 /* The copy becomes the server baseline only when it holds no local edits:
    with edits it isn't what the server has, and diffing against it would
    hide them. Without a baseline (or a version) the check downloads the
@@ -4408,7 +4420,7 @@ function setPageLock(kind, on) {
   if (main) main.inert = locked;
 }
 
-/* Saved copies not opened for 14 days are removed at sign-in. */
+/* Saved copies not opened for 14 days are removed at sign-in; an unsaved category draft stays. */
 function _purgeStaleSavedCopies() {
   var stale = {};
   try {
@@ -4424,7 +4436,7 @@ function _purgeStaleSavedCopies() {
   }
   _removeLocalKeys(function (key) {
     var m = key.match(/^gb-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
-    return !!m && !!stale[m[1]];
+    return !!m && !!stale[m[1]] && key.indexOf('gb-category-draft-') !== 0;
   });
 }
 
@@ -4871,13 +4883,13 @@ function _loadCourseFromLS(cid) {
   _cache.students[cid] = _safeParseLS('gb-students-' + cid, []).map(migrateStudent);
   // A copy saved before every save made its snake_case fields agree.
   _cache.assessments[cid] = _assessmentFieldsAgree(_safeParseLS('gb-assessments-' + cid, []));
-  _cache.scores[cid] = _safeParseLS('gb-scores-' + cid, {});
+  _cache.scores[cid] = _safeParseLS('gb-scores-' + cid, {}, true);
   _cache.overrides[cid] = _safeParseLS('gb-overrides-' + cid, {});
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
   _cache.flags[cid] = _safeParseLS('gb-flags-' + cid, {});
   _cache.goals[cid] = _safeParseLS('gb-goals-' + cid, {});
   _cache.reflections[cid] = _safeParseLS('gb-reflections-' + cid, {});
-  _cache.statuses[cid] = _safeParseLS('gb-statuses-' + cid, {});
+  _cache.statuses[cid] = _safeParseLS('gb-statuses-' + cid, {}, true);
   _cache.observations[cid] = _safeParseLS('gb-quick-obs-' + cid, {});
   _cache.termRatings[cid] = _safeParseLS('gb-term-ratings-' + cid, {});
   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
@@ -4913,12 +4925,15 @@ function _loadCourseFromLS(cid) {
   _cache.modules[cid] = modData || [];
 }
 
-function _safeParseLS(key, fallback) {
+// keep: the text read is this tab's own copy (_keepText).
+function _safeParseLS(key, fallback, keep) {
   try {
     const raw = localStorage.getItem(key);
+    if (keep) _keepText(key, raw);
     if (raw === null) return fallback;
     return JSON.parse(raw);
   } catch (e) {
+    if (keep) _keepText(key, null);
     console.warn('LS read fallback:', e);
     return fallback;
   }
@@ -4928,6 +4943,7 @@ function _safeLSSet(key, value) {
   try {
     localStorage.setItem(key, value);
     _storageSaved(key);
+    _keepText(key, value);
     return true;
   } catch (e) {
     var keyClass = /^gb-/.test(key) && key.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
@@ -4935,6 +4951,7 @@ function _safeLSSet(key, value) {
       try {
         localStorage.setItem(key, value);
         _storageSaved(key);
+        _keepText(key, value);
         return true;
       } catch (retryError) {
         e = retryError;
@@ -5898,16 +5915,20 @@ function getAssignmentStatuses(cid) {
   }
 }
 function saveAssignmentStatuses(cid, obj) {
+  var kept = _keptText['gb-statuses-' + cid];
   _applyIdRekeysToStatuses(cid, obj);
   var prev = _loadPersistedCourseFieldSnapshot('statuses', cid, (_cache.statuses && _cache.statuses[cid]) || {});
+  // This tab's own copy, not the saved copy another tab may have written.
+  var before = _keptValue(kept, prev);
+  if (before !== prev) _applyIdRekeysToStatuses(cid, before);
   var next = obj || {};
   _saveCourseField('statuses', cid, next);
   // Missing or Excused on a linked group member clears their copy of the
   // group grade; taking it off copies it back (Group grading).
-  if (!_groupWriteDepth) _syncGroupStatuses(cid, prev, next);
+  if (!_groupWriteDepth) _syncGroupStatuses(cid, before, next);
   if (!_writesEnabled() || !_isUuid(cid)) return true;
   var refusals = _writeRefusals;
-  var baseline = _serverStateOr('statuses', cid, prev);
+  var baseline = _serverStateOr('statuses', cid, before);
   _persistStatusDiffToCanonical(baseline, next);
   _dismissOverriddenStatusWrites(cid, baseline, next);
   _rememberServerState('statuses', cid, next);
@@ -6288,6 +6309,7 @@ function _scoresOfLiveRows(cid, prev) {
 // fillUndone: how many entries restoreScoreCells took out because the fill
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
+  var kept = _keptText['gb-scores-' + cid];
   _applyIdRekeysToScores(cid, obj);
   // The baseline is read in the same key space as the scores, or a copy
   // saved with rubric scores under competencies would make every criterion
@@ -6304,8 +6326,15 @@ function saveScores(cid, obj, fillUndone) {
   else gone = null;
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = obj ? Object.keys(obj).length : 0;
+  // What this tab had before this save: its own copy, in the same key space,
+  // not the saved copy another tab may have written. The guard uses `prev`.
+  var before = _keptValue(kept, prev);
+  if (before !== prev) {
+    _applyIdRekeysToScores(cid, before);
+    before = _migrateRubricScoreKeys(cid, before);
+  }
   // Group work: which linked members' grades this save changes (Group grading).
-  var groupBefore = _groupWriteDepth ? null : _groupGradesIn(cid, prev);
+  var groupBefore = _groupWriteDepth ? null : _groupGradesIn(cid, before);
   // Block catastrophic saves: if student-count drops >50%, refuse to save.
   // This prevents empty/partial objects from wiping all grades.
   if (prevCount > 2 && newCount < prevCount * 0.5) {
@@ -6343,7 +6372,7 @@ function saveScores(cid, obj, fillUndone) {
   var refused = false;
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
-    var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev));
+    var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, before));
     if (gone) baseline = _scoresOfLiveRows(cid, baseline) || baseline;
     persistScoreDiffToCanonical(cid, baseline, obj || {});
     _dismissOverriddenScoreWrites(cid, baseline, obj || {});

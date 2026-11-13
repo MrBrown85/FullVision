@@ -704,47 +704,47 @@ If an item's agent reports that the work needs more judgment than its model has,
 
 ---
 
-## 8. What is left (reviewed Nov 12, evening)
+## 8. What is left (reviewed Nov 12, evening; reviewed again on 2026-11-13)
 
 Reviewed against the council on 2026-11-12. Items marked "yours" wait for Colin; the others stand under "I approve whatever the council would approve" (DECISIONS, Handoff review rulings, 4).
 
 ### Do now
 
-1. The rubric-attach fix: attaching a rubric to a graded piece must move its marks at once (found Nov 12; no real class was affected). Tests first, independent review, then a release of its own.
-2. The comparison tool's follow-up: the gaps its review found, then a second review. The mark writers wait for it.
-3. This plan's status lines and this list.
-4. Undefined names fail the build (`no-undef`) in the files split out of `shared/data.js`, then file by file (S19-D15, decision 19).
-5. Delete the dead converter layer in `shared/data.js` (about 250 lines) after its two-skeptic check, before more code moves.
-6. A database the repo can rebuild (S19-D16, board card db1): a baseline dumped from the live schema with no student data, proved by rebuilding it on a local PostgreSQL 17. It no longer needs staging.
+1. The rubric-attach fix: attaching a rubric to a graded piece must move its marks at once (found Nov 12; no real class was affected). Tests first, independent review, then a release of its own. **Done and released** (PR 1316).
+2. The comparison tool's follow-up: the gaps its review found, then a second review. The mark writers wait for it. **Done and released** (PRs 1319, 1327, 1343).
+3. This plan's status lines and this list. **Done.**
+4. Undefined names fail the build (`no-undef`) in the files split out of `shared/data.js`, then file by file (S19-D15, decision 19). **Partly done:** the `data-*` files are checked; not yet file by file elsewhere.
+5. Delete the dead converter layer in `shared/data.js` (about 250 lines) after its two-skeptic check, before more code moves. **Closed:** already gone in PR 1241.
+6. A database the repo can rebuild (S19-D16, board card db1): a baseline dumped from the live schema with no student data, proved by rebuilding it on a local PostgreSQL 17. It no longer needs staging. **Done and released** (PR 1325).
 
 ### Next, in this order
 
-7. Move the mark writers (statuses, score writes, group grading) out of `shared/data.js`, move only.
-8. One mark saves one mark, and only what changed is redrawn (S19-C9). Design first; yours to approve. It carries the phone's 395 ms tap (C10), "send an undone cell once" (B4, yours), making the score send private (B5), and the fix for a tab that is behind saving over newer marks (closed PR 1263).
-9. Move Draft and Returned, with a browser test for Return for Revision with the grade hidden.
-10. Retire the per-table load (about 900 lines; yours, it changes loading), then move the load path. Delete before moving.
-11. The re-key listener moves into the student-work file (approved Nov 12).
-12. The small tidyings: generic helpers into utilities, the self-guards, the second `window.v2` init.
-13. The operations guide's four public sections (S19-F1), with Colin's answers for its gaps (F7).
-14. A Content-Type check in the service worker's copy step.
-15. The sign-in re-check runs alongside the class load, and nothing is drawn or sent until both finish (decision 23).
-16. Delete the test-only dead code with its tests (S19-A40, decision 15); keep `undoLastScore` for a phone Undo button (decision 16).
-17. `docs/README.md` as an index; the file moves in S19-A41 are dropped.
-18. Bring the write-path docs up to date after item 8 (S19-B7).
-19. Rename the package (S19-A6).
+7. Move the mark writers (statuses, score writes, group grading) out of `shared/data.js`, move only. **Not started.**
+8. One mark saves one mark, and only what changed is redrawn (S19-C9). Design first; yours to approve. It carries the phone's 395 ms tap (C10), "send an undone cell once" (B4, yours), making the score send private (B5), and the fix for a tab that is behind saving over newer marks (closed PR 1263). **Partly done:** step 4 is released (PR 1336); step 5 is parked; step 1 is ready; the phone's 395 ms was the recorder, closed.
+9. Move Draft and Returned, with a browser test for Return for Revision with the grade hidden. **Not started.**
+10. Retire the per-table load (about 900 lines; yours, it changes loading), then move the load path. Delete before moving. **Not started.**
+11. The re-key listener moves into the student-work file (approved Nov 12). **Not started.**
+12. The small tidyings: generic helpers into utilities, the self-guards, the second `window.v2` init. **Not started.**
+13. The operations guide's four public sections (S19-F1), with Colin's answers for its gaps (F7). **Off Colin's list (2026-11-13).**
+14. A Content-Type check in the service worker's copy step. **Done and released** (PR 1330).
+15. The sign-in re-check runs alongside the class load, and nothing is drawn or sent until both finish (decision 23). **Not started.**
+16. Delete the test-only dead code with its tests (S19-A40, decision 15); keep `undoLastScore` for a phone Undo button (decision 16). **Done except `cmShowImportPreview`** (PRs 1350, 1351, 1354); `undoLastScore` kept.
+17. `docs/README.md` as an index; the file moves in S19-A41 are dropped. **Not started.**
+18. Bring the write-path docs up to date after item 8 (S19-B7). **Waits for item 8.**
+19. Rename the package (S19-A6). **Done and released** (PR 1324).
 
 ### Only when a feature touches it
 
-20. The page-file pieces (the phone Grade tab's two halves, Class Settings' terms, import and wizard, the Assignments grader dialog and form, the Gradebook table renderers, the Reports Issue dialog, the shared Return for Revision helpers), and a map of `teacher/report-questionnaire.js`. The grader guard must read sub-folders first (S19-D14).
-21. On-save hooks for `_saveCourseField` (yours), with item 8.
+20. The page-file pieces (the phone Grade tab's two halves, Class Settings' terms, import and wizard, the Assignments grader dialog and form, the Gradebook table renderers, the Reports Issue dialog, the shared Return for Revision helpers), and a map of `teacher/report-questionnaire.js`. The grader guard must read sub-folders first (S19-D14). **Partly done:** the questionnaire file is mapped and two pieces are out (PRs 1340, 1342, 1344); two pieces are out of the class manager (PRs 1353, 1355).
+21. On-save hooks for `_saveCourseField` (yours), with item 8. **Waits for item 8.**
 
 ### Trust and recovery
 
-22. A rehearsed restore and monitoring (board cards i42 and i44). Staging is held.
-23. Two-step sign-in on the GitHub, Netlify, Supabase and Sentry accounts (yours to switch on). Organizations wait for a second person.
-24. Closed signup (S19-F6).
-25. Sentry stays in the EU and is disclosed on the privacy page; error reports carry no student data (decision 7).
-26. The privacy assessment the district will ask for (S19-F2), written privately first.
+22. A rehearsed restore and monitoring (board cards i42 and i44). Staging is held. **Off Colin's list (2026-11-13).**
+23. Two-step sign-in on the GitHub, Netlify, Supabase and Sentry accounts (yours to switch on). Organizations wait for a second person. **Off Colin's list (2026-11-13).**
+24. Closed signup (S19-F6). **Off Colin's list (2026-11-13).**
+25. Sentry stays in the EU and is disclosed on the privacy page; error reports carry no student data (decision 7). **Off Colin's list (2026-11-13).**
+26. The privacy assessment the district will ask for (S19-F2), written privately first. **Off Colin's list (2026-11-13).**
 
 ### Dropped or held
 
@@ -756,8 +756,8 @@ Reviewed against the council on 2026-11-12. Items marked "yours" wait for Colin;
 
 ### Yours, with no council answer
 
-32. Public or private repo (decision 5). Private costs GitHub Actions minutes; public keeps sensitive docs out of the repo.
-33. The two `.xlsx` files and their scripts (decision 1).
-34. Which criterion level is right when keys are mixed (decision 17). It is grade math; the council's lean is that every screen shows the level `calc.js` counts.
-35. Your review of `87ed0faa` (decision 11), which S19-B6 waits on.
-36. Each release.
+32. Public or private repo (decision 5). Private costs GitHub Actions minutes; public keeps sensitive docs out of the repo. **Off Colin's list (2026-11-13).**
+33. The two `.xlsx` files and their scripts (decision 1). **Ruled:** the files stay (DECISIONS, Wave 0 rulings).
+34. Which criterion level is right when keys are mixed (decision 17). It is grade math; the council's lean is that every screen shows the level `calc.js` counts. **Closed:** it cannot happen since PR 502.
+35. Your review of `87ed0faa` (decision 11), which S19-B6 waits on. **Done**, and S19-B6 with it (PR 1333).
+36. Each release. **The latest release is PR 1347.**

@@ -2,6 +2,43 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## A refused score is not resent; refusals are counted first (2026-11-13)
+
+When the browser's outbox cannot take a score (it holds 500 waiting changes, or the browser's storage is full), the score is refused and can be lost at the next class load. The design for resending it (step 5 of `plans/one-mark-save-design.md`, draft PR 1329) was reviewed twice. It can put an older score over a newer one when the same cell is scored on another device. An independent review of a redesign found it still worse than today in three rare cases.
+
+- **Colin ruled on 2026-11-13:** do not build the resend.
+- **Count refusals first.** Each refused write sends one warning to Sentry, once per page load for each function and reason, for example `Write refused: upsert_score (queue_full)`. It carries nothing from the write: no ids, names, scores or comments.
+- **Design the lasting fix.** A version number on each score, checked by the server, so an older score can never replace a newer one.
+
+## The signed-out and signed-in roles can no longer create objects in schema public (2026-11-13)
+
+The security rule tests' read of the catalogs showed that the two roles the browser uses (`anon` when signed out, `authenticated` when signed in) held CREATE on schema `public`, a grant from the project's first setup. Nothing in FullVision uses it: the browser reaches the database only through the API, and no function creates an object there. Colin was shown the one statement and said yes on 2026-11-13.
+
+- **Applied to `gradebook-prod` on 2026-11-13:** `revoke create on schema public from anon, authenticated;` (`migrations/2026111302_public_schema_no_create.sql`).
+- **Checked on live.** Before: both roles could create; neither owned any table or function in `public`. After: neither can create, both keep USAGE, and `service_role` is unchanged.
+- **Rehearsed first** on a local PostgreSQL 17 rebuilt from the repo: 12 of 12 tries to create a table or a function were refused, and every security rule test passed.
+- **Kept fixed** by a fifth part of the security rule tests (`tests/db/run.mjs`), which runs on every PR.
+- **Undo:** `grant create on schema public to anon, authenticated;`
+
+## Test-only code is deleted; code that tests use to reach real features stays (2026-11-13)
+
+This records decision 15 of the handoff review plan, which the plan's list approved but this file never carried. Code that only tests call is deleted, with its tests: 6 functions and 18 export keys that nothing called, 5 functions only tests called, and `tagScoresByAssessment` in `shared/calc.js`, the averaging Colin ruled against on Nov 3 (PRs 1350, 1351, 1354). "Only tests call it" is not enough on its own: each candidate is sorted first, because some code exists so a test can reach a real feature. That code stays: `GradeState.afterSeen`, `GradeState.studentCopy`, `isRubricCheckOn`, `PhotoQueue.isLocalId`, `GradesPrint.statusText`, `ReportQuestionnaire.skillTags`, `ReportQuestionnaire.iePending` and the `StudentCards` test hooks. `undoLastScore`, `getSyncStatus` and `setStudentPageSwitch` stay by ruling, and `DashClassManager.reorderCategory` is a live feature.
+
+## Grade math may be touched; Colin's and Karen's scores must not break (2026-11-13)
+
+Context: during the alignment build ([`plans/alignment-plan.md`](plans/alignment-plan.md)) Colin wrote:
+
+> i approve things that touch grade math, but don't break colin or karen's scores
+
+- **Rule:** a change that touches `shared/calc.js` or other grade math no longer waits for Colin's review, on one condition: no grade, level or percent that Colin or Karen sees in a real class changes.
+- **Each such PR shows it.** The golden-grade tests pass untouched. Where the change could reach a number, the PR gives a proof: an identical syntax tree for a comment-only change, or a before-and-after comparison on data shaped like their classes.
+- **If a number would move, the PR stops and goes to Colin.**
+- **Still Colin's:** every release, SQL on the live database, and anything that deletes data. This narrows rule 2 of `CLAUDE.md` for this build; it does not replace it.
+
+## The same-teacher rule was applied (2026-11-13)
+
+The security rule tests found that the database checked which class a row belongs to and not the other records the row names. Colin was told what it was, that the live data held no such link (69 read-only checks, 0 rows), and that the fix was rehearsed with a tested undo. His answer: "Approved". `migrations/2026111301_same_teacher_links.sql` was applied the same night; PR 1337 records it and PR 1338 tests it on every PR. He approved it without reading the SQL, which is in that file.
+
 ## Wave 0 rulings (2026-11-13)
 
 Context: the alignment plan ([`plans/alignment-plan.md`](plans/alignment-plan.md)) began with a list of decisions waiting for Colin ("Wave 0"). Asked for them, he answered:

@@ -650,22 +650,15 @@ window.PageAssignments = (function () {
      on a focused card goes through _handleClick / _graderKeydown. */
   function _criterionState(cid, sid, aid, crit) {
     var entries = getScores(cid)[sid] || [];
-    var level = 0;
-    var mod = 0;
-    var mixed = false;
-    rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      var e = entries.find(function (x) {
+    // A criterion is saved under one key (rubricCriterionScoreKeys), so it is never mixed.
+    var tid = rubricCriterionScoreKeys(crit)[0];
+    var e =
+      tid &&
+      entries.find(function (x) {
         return x.assessmentId === aid && x.tagId === tid;
       });
-      var v = e ? Number(e.score) || 0 : 0;
-      if (!v) return;
-      if (level && (v !== level || (e.mod || 0) !== mod)) mixed = true;
-      if (!level) {
-        level = v;
-        mod = e.mod || 0;
-      }
-    });
-    return { level: level, mod: mixed ? 0 : mod, mixed: mixed };
+    var level = e ? Number(e.score) || 0 : 0;
+    return { level: level, mod: level ? e.mod || 0 : 0, mixed: false };
   }
   // A criterion's comment box is open while the teacher writes in it.
   var _graderNotesOpen = new Set();
@@ -7962,22 +7955,6 @@ window.PageAssignments = (function () {
     });
   }
 
-  function selectScore(el, value) {
-    var group = el.parentElement;
-    var cid = activeCourse;
-    var sid = group.dataset.student;
-    var aid = group.dataset.assess;
-    var tagId = group.dataset.tag;
-    var wasActive = el.classList.contains('active');
-    var next = wasActive ? 0 : value;
-    Grader.setLevel(cid, sid, aid, tagId, next);
-    group.querySelectorAll('.score-opt').forEach(function (o) {
-      o.classList.remove('active');
-    });
-    if (!wasActive) el.classList.add('active');
-    refreshSidebarGrades(sid);
-  }
-
   /* ── Bulk scoring ───────────────────────────────────────── */
   function closeMenus() {
     document.querySelectorAll('.col-fill-menu').forEach(function (m) {
@@ -13481,7 +13458,7 @@ window.PageAssignments = (function () {
         _CLASS_RESULTS_ICON,
         'Class Results',
       ) + _cardPrintItem(cid, a);
-    // Work Wall (S14, teacher/work-wall.js): every student's work side by
+    // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
     if (!focusStudentId && window.WorkWall && GraderWork.workOn(cid, a))
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
@@ -15004,6 +14981,8 @@ window.PageAssignments = (function () {
       return "The PDF reader couldn't load. Check the connection and try again.";
     if (res && (res.reason === R.TOO_MANY_PAGES || res.reason === R.PDF_TOO_LARGE))
       return 'That PDF is too long to add here.';
+    if (res && res.kind === 'heic' && res.reason === R.NO_DECODER)
+      return 'Save that photo as a JPEG first, then add it.';
     return "That file couldn't be used. Try another photo.";
   }
   function _addWorkAnswer(res) {

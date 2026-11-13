@@ -36,6 +36,8 @@ window.Router = (function () {
       scripts: [
         '/teacher/report-sheets.js',
         '/teacher/report-issues.js',
+        '/teacher/report-qn-browse-cases.js',
+        '/teacher/report-qn-voice-observations.js',
         '/teacher/report-questionnaire.js',
         '/teacher/grade-report.js',
         '/teacher/report-preview.js',
@@ -47,6 +49,9 @@ window.Router = (function () {
         '/teacher/report-one-panel.js',
         '/teacher/report-one-page.js',
         '/teacher/report-one-comment.js',
+        '/teacher/report-one-zoom.js',
+        '/teacher/report-one-head.js',
+        '/teacher/report-print-paper.js',
         '/teacher/page-reports.js',
       ],
     },

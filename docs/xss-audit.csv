@@ -127,14 +127,14 @@ teacher/grading-setup-copy.js,665,8,innerHTML,ESC_WRAPPED,concat,,"classes.inner
 teacher/markup.js,132,4,innerHTML,REVIEWED,marked at the sink,,overlay.innerHTML = _shellHtml()
 teacher/markup.js,359,4,innerHTML,REVIEWED,marked at the sink,,"host.innerHTML = D.svgHtml(marks, D.aspect(s.overlay.querySelector('.markup-img')), { pending: s.pending }) + _calloutsHtml(marks, turn)"
 teacher/markup.js,447,4,innerHTML,LITERAL,,,box.innerHTML = html
-teacher/obs-capture.js,431,4,innerHTML,REVIEWED,marked at the sink,,"root.innerHTML = '<div class=""obsc-row obsc-who"" data-part=""who""></div>' + '<div class=""obsc-slot"" data-slot=""who""></div>' + '<div class=""obsc-input-wrap"">' + '<textarea class=""ob…"
-teacher/obs-capture.js,973,6,innerHTML,LITERAL,helper:renderWho,,"root.querySelector('[data-part=""who""]').innerHTML = renderWho()"
-teacher/obs-capture.js,974,6,innerHTML,REVIEWED,helper:renderLinks,,"root.querySelector('[data-part=""links""]').innerHTML = renderLinks()"
-teacher/obs-capture.js,975,6,innerHTML,ESC_WRAPPED,helper:renderFlag,,"root.querySelector('[data-part=""flag""]').innerHTML = renderFlag()"
-teacher/obs-capture.js,982,8,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = html
-teacher/obs-capture.js,1100,6,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card obsc-save-card"">' + '<div class=""confirm-title"" id=""' + p + 'save-starter-title"">Save as Starter</div>' + '<label class=""obsc-save-la…"
-teacher/obs-capture.js,1655,8,innerHTML,LITERAL,,,el.innerHTML = ''
-teacher/obs-capture.js,1757,4,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""obsc-dialog"" role=""dialog"" aria-modal=""true"" aria-labelledby=""obsc-dialog-title"">' + '<div class=""obsc-dialog-head""><div><div class=""obsc-dialog-t…"
+shared/obs-capture.js,431,4,innerHTML,REVIEWED,marked at the sink,,"root.innerHTML = '<div class=""obsc-row obsc-who"" data-part=""who""></div>' + '<div class=""obsc-slot"" data-slot=""who""></div>' + '<div class=""obsc-input-wrap"">' + '<textarea class=""ob…"
+shared/obs-capture.js,973,6,innerHTML,LITERAL,helper:renderWho,,"root.querySelector('[data-part=""who""]').innerHTML = renderWho()"
+shared/obs-capture.js,974,6,innerHTML,REVIEWED,helper:renderLinks,,"root.querySelector('[data-part=""links""]').innerHTML = renderLinks()"
+shared/obs-capture.js,975,6,innerHTML,ESC_WRAPPED,helper:renderFlag,,"root.querySelector('[data-part=""flag""]').innerHTML = renderFlag()"
+shared/obs-capture.js,982,8,innerHTML,REVIEWED,marked at the sink,,el.innerHTML = html
+shared/obs-capture.js,1100,6,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""confirm-card obsc-save-card"">' + '<div class=""confirm-title"" id=""' + p + 'save-starter-title"">Save as Starter</div>' + '<label class=""obsc-save-la…"
+shared/obs-capture.js,1655,8,innerHTML,LITERAL,,,el.innerHTML = ''
+shared/obs-capture.js,1757,4,innerHTML,ESC_WRAPPED,concat,,"overlay.innerHTML = '<div class=""obsc-dialog"" role=""dialog"" aria-modal=""true"" aria-labelledby=""obsc-dialog-title"">' + '<div class=""obsc-dialog-head""><div><div class=""obsc-dialog-t…"
 teacher/page-assignments.js,207,4,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
 teacher/page-assignments.js,268,6,innerHTML,REVIEWED,helper:renderSidebar,,"document.getElementById('sidebar-mount').innerHTML = renderSidebar( activeCourse, focusStudentId, 'toggleFocusStudent', )"
 teacher/page-assignments.js,1221,4,innerHTML,REVIEWED,ternary,,"scope.querySelector('[data-out=""orfLevel""]').innerHTML = f.orfLevel || none ? _dibelsChip(f.orfLevel) : ''"
@@ -347,5 +347,5 @@ teacher/ui.js,2424,2,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>$
 teacher/ui.js,2460,4,innerHTML,ESC_WRAPPED,template,,"toast.innerHTML = `<span>${esc(message)}</span><button class=""sync-toast-btn"" data-action=""retry-sync"">Retry Now</button>`"
 teacher/ui.js,2462,4,innerHTML,ESC_WRAPPED,template,,toast.innerHTML = `<span>${esc(message)}</span>`
 teacher/ui.js,2521,2,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""confirm-card""> <div class=""confirm-title"" id=""confirm-title"">${esc(title)}</div> <div class=""confirm-message"">${esc(message)}</div> <div class=""co…"
-teacher/work-wall.js,279,4,innerHTML,REVIEWED,marked at the sink,,_view.overlay.innerHTML = html
-teacher/work-wall.js,594,4,innerHTML,REVIEWED,marked at the sink,,w.overlay.innerHTML = drawn.html
+shared/work-wall.js,279,4,innerHTML,REVIEWED,marked at the sink,,_view.overlay.innerHTML = html
+shared/work-wall.js,594,4,innerHTML,REVIEWED,marked at the sink,,w.overlay.innerHTML = drawn.html

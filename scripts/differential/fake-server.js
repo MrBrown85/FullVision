@@ -27,6 +27,9 @@
  *   answer as live; one can be told to refuse (window.__diffRefuseReturns),
  *   which is how the run reaches the outbox's refusal handling. Send Work,
  *   Return for Revision and Take Back are kept the same way.
+ * - CATEGORIES. list_categories answers with the class's categories as the
+ *   server holds them: the bundle's list the first time the class is
+ *   served, then whatever the last save_categories that landed left.
  *
  * What it keeps is in localStorage under `__diff-srv-`, one key a record, so
  * a reload and a second tab see the same server. The run's comparison leaves
@@ -112,6 +115,57 @@ function differentialFakeServer() {
     });
   }
 
+  // ── The class's categories, as list_categories returns them ──
+  // Taken from the class bundle the first time a class is served, then
+  // changed only by a save_categories that lands (the real function replaces
+  // the class's list: rows not named are deleted, named rows keep their
+  // created_at, order is the list's order).
+  function categoriesOf(cid) {
+    return read(SRV + 'cats-' + cid, null);
+  }
+  function takeBundleCategories(cid, rows) {
+    if (categoriesOf(cid) !== null || !Array.isArray(rows)) return;
+    var at = new Date().toISOString();
+    write(
+      SRV + 'cats-' + cid,
+      rows.map(function (r, i) {
+        return {
+          id: r.id,
+          course_id: cid,
+          name: r.name || '',
+          weight: r.weight || 0,
+          display_order: r.display_order != null ? r.display_order : i,
+          calc_mode: r.calc_mode === 'percent' ? 'percent' : 'points',
+          created_at: at,
+          updated_at: at,
+        };
+      }),
+    );
+  }
+  function keepCategories(cid, wanted, ids, now) {
+    var had = {};
+    (categoriesOf(cid) || []).forEach(function (r) {
+      had[r.id] = r;
+    });
+    write(
+      SRV + 'cats-' + cid,
+      wanted.map(function (c, i) {
+        var old = had[ids[i]];
+        var mode = c && c.calc_mode;
+        return {
+          id: ids[i],
+          course_id: cid,
+          name: String((c && c.name) || '').trim(),
+          weight: Number(c && c.weight) || 0,
+          display_order: i,
+          calc_mode: mode === 'points' || mode === 'percent' ? mode : old ? old.calc_mode : 'points',
+          created_at: old ? old.created_at : now,
+          updated_at: now,
+        };
+      }),
+    );
+  }
+
   /* What a write answers with once it has landed, or undefined to leave
      mockAuth's answer (nothing). */
   function landed(name, params) {
@@ -127,9 +181,11 @@ function differentialFakeServer() {
       };
     }
     if (name === 'save_categories') {
-      return (params.p_categories || []).map(function (c, i) {
+      var ids = (params.p_categories || []).map(function (c, i) {
         return c && UUID.test(c.id || '') ? c.id : serverId('category', key, i);
       });
+      keepCategories(params.p_course_id, params.p_categories || [], ids, now);
+      return ids;
     }
     if (name === 'update_course') {
       var patch = params.p_patch || {};
@@ -147,8 +203,8 @@ function differentialFakeServer() {
       return { send_work: c.send_work === true, keep_photos_until: 'end_of_year' };
     }
     if (name === 'return_grades' || name === 'return_work') {
-      var ids = params.p_enrollment_ids || [];
-      return { returned: ids.length, enrollment_ids: ids, returned_at: now };
+      var enrolled = params.p_enrollment_ids || [];
+      return { returned: enrolled.length, enrollment_ids: enrolled, returned_at: now };
     }
     if (name === 'return_for_revision') {
       var open = revisions().find(function (r) {
@@ -218,6 +274,13 @@ function differentialFakeServer() {
       };
     }
     if (name === 'list_assessment_markup') return [];
+    if (name === 'list_categories') {
+      return (categoriesOf(params.p_course_id) || []).slice().sort(function (a, b) {
+        return (
+          a.display_order - b.display_order || (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)
+        );
+      });
+    }
     return undefined;
   }
 
@@ -229,6 +292,7 @@ function differentialFakeServer() {
       // course row, as live.
       return real.call(client, name, params).then(function (res) {
         var course = courseOf(p.p_course_id);
+        if (res && res.data && res.data.gradebook) takeBundleCategories(p.p_course_id, res.data.gradebook.categories);
         if (course && res && res.data && res.data.gradebook && res.data.gradebook.course) {
           Object.assign(res.data.gradebook.course, {
             student_page_enabled: course.student_page_enabled === true,

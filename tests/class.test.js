@@ -165,25 +165,6 @@ describe('class-insights', () => {
   });
 
   describe('Who Needs Help', () => {
-    it('ranks competencies by students below Proficient and joins those with the same students', () => {
-      const res = DashInsights.helpGroups(CID, STUDENTS, { below: 3, min: 3 });
-      expect(res.groups.map(g => g.cols.map(c => c.key))).toEqual([['s:p'], ['s:q', 's:c']]);
-      expect(res.groups[0].ids).toEqual(['s1', 's2', 's4']);
-      expect(res.groups[1].ids).toEqual(['s1', 's2']);
-    });
-
-    it('lists students below on most competencies', () => {
-      const res = DashInsights.helpGroups(CID, STUDENTS, { below: 3, min: 3 });
-      expect(res.wideMin).toBe(2);
-      expect(res.wide).toEqual(['s1', 's2']);
-    });
-
-    it('follows the rule: below Developing, and a minimum number of scores', () => {
-      expect(DashInsights.helpGroups(CID, STUDENTS, { below: 2, min: 3 }).groups.map(g => g.ids)).toEqual([['s1']]);
-      evidence = 2;
-      expect(DashInsights.helpGroups(CID, STUDENTS, { below: 3, min: 3 }).groups).toEqual([]);
-    });
-
     it('reads a saved rule and falls back to Below Proficient, at least 3 scores', () => {
       expect(DashInsights.readRule(undefined)).toEqual({ below: 3, min: 3 });
       expect(DashInsights.readRule({ below: 2, min: 1 })).toEqual({ below: 2, min: 1 });

@@ -665,7 +665,6 @@ window.MSweep = (function () {
     isOpen: isOpen,
     close: close,
     pick: pick,
-    saveAndNext: saveAndNext,
     undo: undo,
     skip: skip,
     _helpers: {

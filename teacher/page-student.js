@@ -218,7 +218,7 @@ window.PageStudent = (function () {
     return id;
   }
 
-  // The tabs this class shows: Work is drawn by teacher/work-wall.js.
+  // The tabs this class shows: Work is drawn by shared/work-wall.js.
   function _shownTabs() {
     var work = !!window.WorkWall && WorkWall.tabOn(activeCourse);
     return TABS.filter(function (t) {

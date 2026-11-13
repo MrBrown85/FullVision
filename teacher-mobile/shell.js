@@ -1511,7 +1511,7 @@
         MGrade.openRowMenu(_cid, target.getAttribute('data-aid'), target);
         return;
       }
-      // The row menu's Work Wall (S14): teacher/work-wall.js over the Grade
+      // The row menu's Work Wall (S14): shared/work-wall.js over the Grade
       // tab. Grade in This Order closes it and opens the phone's grader on
       // the students the wall showed, in its order, at the one picked.
       if (action === 'm-work-wall') {

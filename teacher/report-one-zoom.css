@@ -1,0 +1,239 @@
+/* Progress Reports, One Student view: the Zoom control, Previous and Next
+   Student, Hide Panels, and the sides laid out in pairs
+   (teacher/report-one-zoom.js, teacher/report-one-head.js).
+
+   Screen only. ReportOneZoom sets --sheet-zoom (the scale), --sheet-cols
+   (sides per row: 1, or an even number so a sheet's front and back share a
+   row) and --pair-pad on the preview. The page itself is still scaled with
+   a transform (teacher/reports.css), so it measures as the layout engine
+   measured it. Everyone view (.studio-all) keeps its own scale. */
+
+@media screen {
+  /* The scrollbar's room is kept whether or not it shows, so a scrollbar
+     that comes with a taller row can never push the second side below. */
+  .rb-preview.studio-pages:not(.studio-all) {
+    scrollbar-gutter: stable;
+  }
+  /* A grid of --sheet-cols columns. Each column is a side's width plus
+     --pair-pad (7 px); a front sits at the right of its column and its back
+     at the left of the next, so a sheet's two sides are 8 px apart and two
+     sheets 22 px apart. */
+  .rb-preview.studio-pages:not(.studio-all) .sheet-student {
+    display: grid;
+    grid-template-columns: repeat(var(--sheet-cols, 1), calc(8.5in * var(--sheet-zoom) + var(--pair-pad, 0px)));
+    column-gap: 8px;
+    row-gap: 22px;
+    justify-content: safe center;
+    align-items: start;
+  }
+  .rb-preview.studio-pages:not(.studio-all) .sheet-student > .sheet-zoom:nth-child(odd of .sheet-zoom) {
+    justify-self: end;
+  }
+  .rb-preview.studio-pages:not(.studio-all) .sheet-student > .sheet-zoom:nth-child(even of .sheet-zoom) {
+    justify-self: start;
+  }
+  /* Zoomed in past the pane's width: the row starts at its left edge and
+     the pane scrolls sideways, so nothing is cut off on the left. */
+  .rb-preview.studio-pages.zoom-wide:not(.studio-all) .sheet-student {
+    justify-content: start;
+  }
+}
+
+/* A zoom change glides; a window resize or a new render does not (the
+   class is set only for a zoom change or a panel hidden or shown). */
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rb-preview.studio-pages.zoom-glide:not(.studio-all) .sheet-student {
+    transition: grid-template-columns 180ms var(--ease-out);
+  }
+  .rb-preview.studio-pages.zoom-glide:not(.studio-all) .sheet-zoom {
+    transition:
+      width 180ms var(--ease-out),
+      height 180ms var(--ease-out);
+  }
+  .rb-preview.studio-pages.zoom-glide:not(.studio-all) .sheet-zoom > .report-sheet {
+    transition: transform 180ms var(--ease-out);
+  }
+}
+
+/* Printing never shows the screen's zoom: a page prints at its own size
+   whatever the preview's scale. (Print Reports and reprints print from
+   Everyone view, which these rules do not touch.) */
+@media print {
+  .rb-preview.studio-pages:not(.studio-all) .sheet-zoom {
+    height: auto !important;
+  }
+  .rb-preview.studio-pages:not(.studio-all) .sheet-zoom > .report-sheet {
+    transform: none !important;
+  }
+  /* No transition into print. The app's reduced-motion rule (styles.css)
+     gives every property a 0.01 ms transition, and a running transition
+     outranks even !important: on the switch to print a sheet kept its
+     screen scale (and the pages their screen sizes) until the next frame.
+     With none, the print rules above and in reports.css win at once. The
+     page round the preview too: its padding for the top bar went the same
+     way, so a sheet could start 52 px down the first printed page. */
+  html,
+  html *,
+  html *::before,
+  html *::after {
+    transition: none !important;
+  }
+}
+
+/* ── The Zoom control, left of Paper ─────────────────────────── */
+.studio-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.studio-zoom[hidden] {
+  display: none;
+}
+.studio-zoom .seg-btn.studio-zoom-step {
+  min-width: 26px;
+  padding-left: 6px;
+  padding-right: 6px;
+  font-weight: 600;
+}
+.studio-zoom .seg-btn.studio-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 96px;
+  color: var(--text);
+}
+.studio-zoom-btn svg {
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+.studio-zoom-btn[aria-expanded='true'] {
+  background: var(--seg-thumb);
+}
+.studio-zoom-menu.dash-view-menu {
+  width: 168px;
+  top: calc(100% + 6px);
+}
+.studio-zoom-menu .dash-view-item {
+  padding: 5px 8px;
+}
+.studio-zoom-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--divider-medium);
+}
+
+/* ── Previous and Next Student, beside the fit line ──────────── */
+.studio-head .studio-fit {
+  margin-right: auto;
+}
+.studio-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-right: -6px;
+}
+.studio-nav[hidden] {
+  display: none;
+}
+/* At 900 px and narrower the Reports toolbar shows its own Previous and
+   Next (.report-stepper, teacher/reports.css), which step the same way
+   (ReportOneHead.go): one pair only. */
+@media (max-width: 900px) {
+  .studio-nav {
+    display: none !important;
+  }
+}
+.studio-nav .tq-toolbar-arrow {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+.studio-nav .tq-toolbar-arrow:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 0;
+}
+
+/* ── Hide Panels ─────────────────────────────────────────────── */
+.studio-tools .studio-panels-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+.studio.panels-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+.studio.panels-hidden .studio-palette {
+  display: none !important;
+}
+/* The roster, tucked by Hide Panels for this visit (ReportOneHead): the
+   teacher's saved sidebar setting is left as it is. Not in the narrow
+   layout, where the roster is an overlay. */
+@media (min-width: 1025px) {
+  .page-layout.fv-roster-tucked #sidebar-mount {
+    width: 0;
+    overflow: hidden;
+  }
+  .page-layout.fv-roster-tucked #sidebar-mount #gb-sidebar {
+    display: none;
+  }
+}
+
+/* The student whose report is shown, marked in the roster rail while All
+   Students or several are picked (ReportOneHead): a thin bar at the row's
+   left edge, not the picked highlight. */
+#gb-roster-list .student-row.fv-shown-now {
+  box-shadow: inset 3px 0 0 var(--active);
+}
+
+/* ── Everyone view at a percent (ReportOneZoom, class fit-zoom) ──────
+   Whole Class sets nothing: the Fit Map's rules in teacher/reports.css
+   draw it as they always have. At a percent each student's block holds
+   their name and badge over their sides, two to a row, a sheet's front
+   and back side by side (8 px apart, 22 px between sheets, as in One
+   Student); the blocks flow and wrap as the Fit Map's do. Screen only:
+   Print Reports prints from this view, so nothing here may reach print. */
+@media screen {
+  .rb-preview.report-fitmap.fit-zoom .sheet-student {
+    display: grid;
+    grid-template-columns: repeat(2, calc(8.5in * var(--fit-zoom) + 7px));
+    column-gap: 8px;
+    row-gap: 8px;
+    align-content: start;
+    width: auto;
+    max-width: none;
+    padding: 8px;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student-head {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom {
+    display: block;
+    width: calc(8.5in * var(--fit-zoom));
+    height: calc(11in * var(--fit-zoom));
+    margin: 0;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom:has(.report-sheet[data-paper='legal']) {
+    height: calc(14in * var(--fit-zoom));
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student > .sheet-zoom:nth-child(odd of .sheet-zoom) {
+    justify-self: end;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student > .sheet-zoom:nth-child(even of .sheet-zoom) {
+    justify-self: start;
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom > .report-sheet {
+    transform: scale(var(--fit-zoom));
+  }
+  /* The Fit Map's marks keep their size on screen: the shadow round each
+     side and the outline on a second sheet onward. */
+  .rb-preview.report-fitmap.fit-zoom .sheet-zoom .report-sheet {
+    box-shadow: 0 0 0 calc(1px / var(--fit-zoom)) rgba(0, 0, 0, 0.12);
+  }
+  .rb-preview.report-fitmap.fit-zoom .sheet-student:not([data-sheets='1']) .sheet-zoom:nth-child(n + 4) .report-sheet {
+    outline-width: calc(2px / var(--fit-zoom));
+  }
+}
