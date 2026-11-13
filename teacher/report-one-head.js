@@ -3,12 +3,15 @@
    Student and Next Student beside the fit line, and Hide Panels at the
    right end of the tools (2026-11-13).
 
-   Previous and Next step through the roster rail as it is shown now (its
-   sort and its search) and open the student by clicking that student's
-   row, so they do exactly what a click on the rail does: the same guard
-   for a comment being edited on the page, the same highlight, the same
-   redraw. At either end they stay where they are, as the Term
-   Questionnaire's Previous does at its first student.
+   Previous and Next change whose report is shown, never who is picked
+   (the All Students picker, which is what Print Reports and Sent to Phones
+   act on). With All Students or several picked they move only the preview
+   (One Report's goStudent), through the picked students the roster rail
+   shows now, in its order (its sort and its search); the rail marks the
+   student shown with aria-current. With exactly one picked, the pick is the
+   student shown, so it follows: they click the next row of the rail, as a
+   teacher would. Either way a comment being edited is asked about first
+   (ReportOneComment.beforeLeave). At either end they stay where they are.
 
    Hide Panels tucks away the parts panel (#studio-palette) and the roster
    for this visit only, writing no preference; Show Panels brings both back
@@ -49,6 +52,11 @@ window.ReportOneHead = (function () {
 
   /* ── Previous and Next ───────────────────────────────────── */
 
+  /** @typedef {{ cid: string, view(): string, student(): ({ id: string } | null), goStudent(sid: string): void }} OneApi */
+  /** @type {(() => OneApi) | null} */
+  var _apiFn = null;
+  var SHOWN = 'fv-shown-now';
+
   /** @returns {HTMLElement[]} */
   function _rows() {
     var list = document.getElementById('gb-roster-list');
@@ -58,31 +66,45 @@ window.ReportOneHead = (function () {
   function _shown(r) {
     return r.style.display !== 'none' && !r.classList.contains('roster-hidden');
   }
+  /* The picked students, as the rail highlights them (page-reports.js
+     marks each picked row .selected; none when All Students is picked). */
+  function _picked() {
+    return _rows().filter(function (r) {
+      return r.classList.contains('selected');
+    });
+  }
 
-  /* The row dir steps from the student shown: the next shown row after
-     it in the rail's order (or before it), or null at the end. A student
-     the search has hidden still has a place in the order. */
+  /* The row dir steps to from the student shown: the next row after it in
+     the rail's order (or before it) that the rail shows and, with several
+     picked, that is picked; null at the end. A student the search hides
+     still has a place in the order. */
   /** @param {number} dir @returns {HTMLElement | null} */
   function target(dir) {
     var rows = _rows();
+    var picked = _picked();
+    var several = picked.length > 1;
+    /** @param {HTMLElement} r */
+    var ok = function (r) {
+      return _shown(r) && (!several || r.classList.contains('selected'));
+    };
     var i = -1;
     for (var k = 0; k < rows.length; k++) if (rows[k].getAttribute('data-sid') === _sid) i = k;
     if (i < 0) {
-      var shown = rows.filter(_shown);
-      return (dir > 0 ? shown[0] : shown[shown.length - 1]) || null;
+      var all = rows.filter(ok);
+      return (dir > 0 ? all[0] : all[all.length - 1]) || null;
     }
-    for (var j = i + dir; j >= 0 && j < rows.length; j += dir) if (_shown(rows[j])) return rows[j];
+    for (var j = i + dir; j >= 0 && j < rows.length; j += dir) if (ok(rows[j])) return rows[j];
     return null;
   }
 
   /** @param {number} dir */
   function go(dir) {
     var row = target(dir);
-    if (!row) return;
-    var sid = row.getAttribute('data-sid');
+    var api = _apiFn ? _apiFn() : null;
+    if (!row || !api) return;
+    var sid = String(row.getAttribute('data-sid'));
     var focused = /** @type {HTMLElement | null} */ (document.activeElement);
     var had = focused && focused.closest && focused.closest('.studio-nav') ? focused.getAttribute('data-nav') : null;
-    row.click();
     var landed = function () {
       var now = document.querySelector('#gb-roster-list .student-row[data-sid="' + sid + '"]');
       if (now && now.getClientRects().length) now.scrollIntoView({ block: 'nearest' });
@@ -95,8 +117,38 @@ window.ReportOneHead = (function () {
         if (btn) btn.focus();
       }
     };
-    landed();
-    setTimeout(landed, 0);
+    var move = function () {
+      if (_picked().length === 1) {
+        // One picked: the pick follows the preview, as a click on the rail.
+        var r = /** @type {HTMLElement | null} */ (
+          document.querySelector('#gb-roster-list .student-row[data-sid="' + sid + '"]')
+        );
+        if (r) r.click();
+      } else {
+        var now = _apiFn ? _apiFn() : null;
+        if (now) now.goStudent(sid);
+      }
+      landed();
+      setTimeout(landed, 0);
+    };
+    var C = /** @type {Window & { ReportOneComment?: { beforeLeave(api: OneApi, then: () => void): void } }} */ (window)
+      .ReportOneComment;
+    if (C && C.beforeLeave) C.beforeLeave(api, move);
+    else move();
+  }
+
+  /* The rail's quiet mark on the student shown, with All Students or
+     several picked (aria-current, never a selection); none in Everyone
+     view, with one picked (the pick is the mark) or off Progress Reports. */
+  /** @param {string | null} sid */
+  function _mark(sid) {
+    _rows().forEach(function (r) {
+      var on = sid !== null && r.getAttribute('data-sid') === sid;
+      r.classList.toggle(SHOWN, on);
+      if (on) r.setAttribute('aria-current', 'true');
+      else if (r.classList.contains(SHOWN) || r.getAttribute('aria-current') === 'true')
+        r.removeAttribute('aria-current');
+    });
   }
 
   /* ── Hide Panels ─────────────────────────────────────────── */
@@ -190,10 +242,22 @@ window.ReportOneHead = (function () {
 
   /* After each render of the preview: the student shown, the arrows hidden
      in Everyone view, the panels as the teacher left them, the controls
-     bound (they are drawn new with the head). */
-  /** @param {string} view @param {string | null} sid */
-  function sync(view, sid) {
-    _sid = sid;
+     bound (they are drawn new with the head). apiFn: One Report's api
+     (page-reports.js _oneApi). */
+  /** @param {string} view @param {() => OneApi} apiFn */
+  function sync(view, apiFn) {
+    _apiFn = apiFn;
+    var api = apiFn();
+    var st = view === 'all' ? null : api.student();
+    // The page marks the rail's picked rows after drawing the preview: read them once it has.
+    var after = function () {
+      var picked = _picked();
+      // In Everyone view the narrow toolbar's arrows step from the one picked, else from the start.
+      _sid = st ? String(st.id) : picked.length === 1 ? picked[0].getAttribute('data-sid') : null;
+      _mark(view !== 'all' && picked.length !== 1 ? _sid : null);
+    };
+    after();
+    setTimeout(after, 0);
     var nav = document.getElementById('studio-nav');
     if (nav) {
       var navEl = nav;
@@ -235,6 +299,7 @@ window.ReportOneHead = (function () {
     _hidden = false;
     _hidRoster = false;
     _tuck(false);
+    _mark(null);
   }
 
   return {

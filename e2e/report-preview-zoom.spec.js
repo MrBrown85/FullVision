@@ -384,3 +384,135 @@ test('Hide Panels writes no preference; a reload brings the panels back; the sid
   await expect(page.getByRole('button', { name: 'Hide Panels' })).toBeVisible();
   expect(await stored()).toEqual(before);
 });
+
+/* Stepping moves the preview, never the pick, unless exactly one is picked. */
+test.describe('Previous and Next change whose report is shown, not who is picked', () => {
+  const fitName = page => page.locator('#studio-fit').textContent();
+  const railOrder = page =>
+    page.locator('#gb-roster-list .student-row').evaluateAll(list =>
+      list
+        .filter(r => r.style.display !== 'none')
+        .map(r => ({
+          sid: r.dataset.sid,
+          first: r.querySelector('.student-row-name').textContent.trim().split(' ')[0],
+        })),
+    );
+  const shownSid = page =>
+    page.evaluate(() => document.querySelector('#gb-roster-list .student-row.fv-shown-now')?.dataset.sid || null);
+  async function pickAll(page) {
+    await page.getByRole('button', { name: 'Select students' }).click();
+    await page.locator('#picker-dropdown').getByRole('button', { name: 'Select All', exact: true }).click();
+    await page.getByRole('button', { name: 'Select students' }).click();
+    await expect(page.locator('#picker-label')).toHaveText(/^All Students/);
+  }
+  const next = page => page.getByRole('button', { name: 'Next Student', exact: true }).filter({ visible: true });
+
+  test('All Students picked: Next moves the preview; the pick, the class total and what prints stay', async ({
+    page,
+  }) => {
+    await open(page);
+    await pickAll(page);
+    const label = await page.locator('#picker-label').textContent();
+    const fit = await fitName(page);
+    const total = fit.split('·')[1].trim();
+    const rows = await railOrder(page);
+    const from = await shownSid(page);
+    expect(from).not.toBeNull();
+    const at = rows.findIndex(r => r.sid === from);
+    await next(page).click();
+    const to = rows[at + 1];
+    await expect(page.locator('#studio-fit')).toContainText('for ' + to.first);
+    await expect(page.locator('#rb-preview .sheet-student')).toHaveAttribute('data-sid', to.sid);
+    await expect(page.locator('#picker-label')).toHaveText(label);
+    expect(await page.locator('#gb-roster-list .student-row.selected').count()).toBe(0);
+    expect(await shownSid(page)).toBe(to.sid);
+    await expect(page.locator(`#gb-roster-list .student-row[data-sid="${to.sid}"]`)).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    await expect(page.locator(`#gb-roster-list .student-row[data-sid="${to.sid}"]`)).not.toHaveAttribute(
+      'aria-selected',
+      /./,
+    );
+    await expect(page.locator('#studio-fit')).toContainText(total);
+
+    // A re-render (the paper changed and changed back) keeps the student stepped to.
+    await page.getByRole('radio', { name: 'Letter' }).click();
+    await page.getByRole('radio', { name: 'Legal' }).click();
+    await expect(page.locator('#rb-preview .sheet-student')).toHaveAttribute('data-sid', to.sid);
+    await expect(page.locator('#studio-fit')).toContainText('for ' + to.first);
+
+    // What Print Reports prints (Everyone view) is still the whole class, and the mark goes.
+    await page.locator('.studio-view [data-view="all"]').click();
+    await expect(page.locator('#rb-preview > .sheet-student')).toHaveCount(rows.length);
+    expect(await shownSid(page)).toBeNull();
+  });
+
+  test('three picked: Next walks those three in the rail’s order and stops at the last; one picked moves the pick', async ({
+    page,
+  }) => {
+    await open(page);
+    const rows = await railOrder(page);
+    const three = [rows[2], rows[5], rows[9]];
+    await page.getByRole('button', { name: 'Select students' }).click();
+    const list = page.locator('#picker-dropdown');
+    await list.getByRole('button', { name: 'Deselect All' }).click();
+    for (const r of three) await list.locator(`.student-picker-item[data-sid="${r.sid}"]`).click();
+    await page.getByRole('button', { name: 'Select students' }).click();
+    await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(3);
+    // Start from the first of the three.
+    while ((await page.locator('#rb-preview .sheet-student').getAttribute('data-sid')) !== three[0].sid) {
+      await page.getByRole('button', { name: 'Previous Student', exact: true }).filter({ visible: true }).click();
+    }
+    for (const r of three.slice(1)) {
+      await next(page).click();
+      await expect(page.locator('#rb-preview .sheet-student')).toHaveAttribute('data-sid', r.sid);
+      await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(3);
+    }
+    await next(page).click();
+    await expect(page.locator('#rb-preview .sheet-student')).toHaveAttribute('data-sid', three[2].sid);
+
+    // One picked: the pick follows.
+    await page.locator(`#gb-roster-list .student-row[data-sid="${rows[0].sid}"]`).click();
+    await next(page).click();
+    await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveAttribute('data-sid', rows[1].sid);
+    await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(1);
+    expect(await shownSid(page)).toBeNull();
+  });
+
+  test('with a search typed, stepping stays in the results; a comment being edited is asked about first', async ({
+    page,
+  }) => {
+    await open(page);
+    await pickAll(page);
+    await page.locator('#gb-roster-search').fill('an');
+    const found = await railOrder(page);
+    expect(found.length).toBeGreaterThan(2);
+    // From the first result onwards.
+    await next(page).click();
+    const seen = [await page.locator('#rb-preview .sheet-student').getAttribute('data-sid')];
+    for (let i = 0; i < found.length; i++) {
+      await next(page).click();
+      seen.push(await page.locator('#rb-preview .sheet-student').getAttribute('data-sid'));
+    }
+    for (const sid of seen) expect(found.map(r => r.sid)).toContain(sid);
+    await page.locator('#gb-roster-search').fill('');
+
+    // A comment being edited: Next asks before the preview moves.
+    const before = await page.locator('#rb-preview .sheet-student').getAttribute('data-sid');
+    await page.locator('#rb-preview [aria-label^="Edit "][aria-label$="comment"]').first().click();
+    const box = page.locator('.one-ce-text');
+    await box.press('End');
+    await box.pressSequentially(' A new line.');
+    await next(page).click();
+    const ask = page.getByRole('alertdialog');
+    await expect(ask).toContainText('Save your changes');
+    await expect(page.locator('#rb-preview .sheet-student')).toHaveAttribute('data-sid', before);
+    await ask.getByRole('button', { name: 'Keep Editing' }).click();
+    await expect(page.locator('#rb-preview .sheet-student')).toHaveAttribute('data-sid', before);
+    await page.locator('.one-ce-text').press('Escape');
+    await next(page).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('#rb-preview .sheet-student')).not.toHaveAttribute('data-sid', before);
+  });
+});

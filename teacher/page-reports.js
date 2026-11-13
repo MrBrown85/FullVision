@@ -679,14 +679,6 @@ window.PageReports = (function () {
     return one ? [one] : [];
   }
 
-  /* Where Previous and Next step from: the student shown in One Student
-     view; in Everyone view the one student picked, else none (Next opens
-     the first). */
-  function _stepFrom() {
-    if (studioView !== 'all') return previewSid;
-    return selectedStudentIds && selectedStudentIds.length === 1 ? selectedStudentIds[0] : null;
-  }
-
   function renderReportPreview() {
     if (viewingIssue) {
       _showIssue(viewingIssue.id);
@@ -708,7 +700,7 @@ window.PageReports = (function () {
     if (preview) {
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
-      ReportOneHead.sync(studioView, _stepFrom());
+      ReportOneHead.sync(studioView, _oneApi);
       ReportOneZoom.apply(preview, studioView);
       // The page's own controls (Hide, a row left off, a heading renamed,
       // the comment): never on a printed copy.
@@ -868,7 +860,7 @@ window.PageReports = (function () {
     preview.classList.toggle('report-fitmap', studioView === 'all');
     preview.classList.toggle('studio-all', studioView === 'all');
     ReportSheets.setPageStyle(rec.paper || 'letter');
-    ReportOneHead.sync(studioView, _stepFrom());
+    ReportOneHead.sync(studioView, _oneApi);
     ReportOneZoom.apply(preview, studioView);
     _syncPrintButton();
   }

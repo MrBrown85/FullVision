@@ -167,3 +167,10 @@
     display: none;
   }
 }
+
+/* The student whose report is shown, marked in the roster rail while All
+   Students or several are picked (ReportOneHead): a thin bar at the row's
+   left edge, not the picked highlight. */
+#gb-roster-list .student-row.fv-shown-now {
+  box-shadow: inset 3px 0 0 var(--active);
+}
