@@ -75,6 +75,13 @@ jobs:
       - name: Check innerHTML sites
         run: npm run audit:html
 
+      # Fails on an undefined name in the files listed in
+      # scripts/lint-ratchet.mjs (S19-D15): the data layer split out of
+      # shared/data.js, checked against the globals both the desktop and the
+      # phone page define. Every other file and rule reports only (below).
+      - name: Check for undefined names in the covered files
+        run: npm run lint:ratchet
+
       # Type checks on the files that start with // @ts-check (the list is in
       # tsconfig.json). JSDoc only: no TypeScript files, no build step.
       # Reports only (continue-on-error) until Colin turns it on as a gate.
@@ -82,8 +89,8 @@ jobs:
         continue-on-error: true
         run: npm run typecheck
 
-      # ESLint's no-undef and no-unused-vars, both warnings (eslint.config.mjs).
-      # It reports and never fails the job.
+      # ESLint's no-undef and no-unused-vars, warnings everywhere except the
+      # covered files above (eslint.config.mjs). It reports and never fails the job.
       - name: Lint (warnings only)
         continue-on-error: true
         run: |
