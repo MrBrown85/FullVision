@@ -298,39 +298,6 @@ window.DashInsights = (function () {
     });
   }
 
-  /* Competencies with students under the rule, those with the same students
-     together, most students first. Each: { cols, ids, values }. Also the
-     students under it on most competencies (`wide`, at least `wideMin`). */
-  function helpGroups(cid, allStudents, rule) {
-    var ids = _ids(allStudents);
-    var lists = belowLists(cid, allStudents, rule);
-    var perStudent = {};
-    var groups = [];
-    lists.forEach(function (l) {
-      l.ids.forEach(function (sid) {
-        perStudent[sid] = (perStudent[sid] || 0) + 1;
-      });
-      if (!l.ids.length) return;
-      var key = l.ids.slice().sort().join(',');
-      var g = groups.find(function (x) {
-        return x.key === key;
-      });
-      if (g) g.cols.push(l.col);
-      else groups.push({ key: key, cols: [l.col], ids: l.ids, values: l.values });
-    });
-    groups.sort(function (a, b) {
-      return b.ids.length - a.ids.length || a.cols.length - b.cols.length;
-    });
-    var wideMin = Math.max(2, Math.ceil((lists.length * 2) / 3));
-    var wide =
-      lists.length >= 3
-        ? ids.filter(function (sid) {
-            return (perStudent[sid] || 0) >= wideMin;
-          })
-        : [];
-    return { groups: groups, wide: wide, wideMin: wideMin };
-  }
-
   /* ── Missing and Late ───────────────────────────────────── */
   var MISSING_KINDS = {
     ns: { label: 'Missing', cls: 'is-ns' },
@@ -783,7 +750,6 @@ window.DashInsights = (function () {
     readRule: readRule,
     ruleLevelName: ruleLevelName,
     belowLists: belowLists,
-    helpGroups: helpGroups,
     missingItems: missingItems,
     missingGlanceHtml: missingGlanceHtml,
     attentionModel: attentionModel,

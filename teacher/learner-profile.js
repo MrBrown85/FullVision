@@ -81,8 +81,6 @@ var LearnerProfile = (function () {
     );
   }
 
-  var AGAIN = ' <span class="qw-again">↻ Jan · Jun</span>';
-
   function src(who, first) {
     return who === 'you'
       ? '<span class="src src-you">Set by you</span>'
@@ -225,108 +223,6 @@ var LearnerProfile = (function () {
         '</span></div></div>';
     }
     return html;
-  }
-
-  /* ── About Me ─────────────────────────────────────────────── */
-
-  function aboutHtml(o) {
-    var a = o.model.about;
-    var head =
-      '<div class="qw-head"><h2 id="lp-about-h">About Me</h2>' +
-      (a ? '<span>' + esc(day(a.at)) + '</span>' : '') +
-      '</div>';
-    if (!a) {
-      return (
-        '<section class="qw-sec" id="lp-about" aria-labelledby="lp-about-h">' +
-        head +
-        '<div class="lp-none">' +
-        (o.aboutOn
-          ? esc(o.first) + ' hasn’t answered About Me yet.'
-          : 'About Me isn’t turned on for this class. Turn it on in ' +
-            (o.cid
-              ? '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
-                esc(encodeURIComponent(o.cid)) +
-                '&amp;manage=questionnaires">Class Settings › Questionnaires</a>'
-              : 'Class Settings › Questionnaires') +
-            '.') +
-        '</div></section>'
-      );
-    }
-    var html = '<section class="qw-sec" id="lp-about" aria-labelledby="lp-about-h">' + head;
-    if (a.goodAt || a.hard) {
-      html += '<div class="qw-group"><h3>As a Learner</h3><div class="qw-pair">';
-      if (a.goodAt) html += qa(a.goodAt.q.prompt, a.goodAt.v, AGAIN);
-      if (a.hard) html += qa(a.hard.q.prompt, a.hard.v, AGAIN);
-      html += '</div></div>';
-    }
-    if (a.outside)
-      html += '<div class="qw-group"><h3>Outside School</h3>' + qa(a.outside.q.prompt, a.outside.v) + '</div>';
-    // Anything else they were asked, in order, so no answer goes unshown.
-    var rest = (a.rest || []).filter(function (it) {
-      return !it.q.teacher_only;
-    });
-    if (rest.length) {
-      html += '<div class="qw-group"><h3>More About ' + esc(o.first) + '</h3>';
-      rest.forEach(function (it) {
-        html += qa(it.q.prompt, it.v);
-      });
-      html += '</div>';
-    }
-    return html + '</section>';
-  }
-
-  /* ── The student's own goals ──────────────────────────────── */
-
-  function courseGoalHtml(o) {
-    var a = o.model.about;
-    var c = o.model.checkin;
-    // The goal's next step, from the latest Goal Check-In.
-    var next = c && c.next && text(c.next.v);
-    if (!(a && a.goal) && !(c && c.status) && !next) return '';
-    var status = c && c.status && c.status.v ? text(c.status.v) : '';
-    var html =
-      '<div class="qw-group"><h3>' +
-      esc(o.courseName + ' Goal') +
-      '</h3><div class="gl-card"><div class="gl-top"><span class="gl-meta">' +
-      src('them', o.first) +
-      (a ? ' Set ' + esc(day(a.at)) : '') +
-      (a && a.goal ? AGAIN : '') +
-      '</span>' +
-      (status
-        ? '<span class="st"><span class="st-dot" style="background:' +
-          (STATUS_COLORS[status] || 'var(--text-3)') +
-          '"></span>' +
-          esc(status) +
-          '</span>'
-        : '') +
-      '</div>';
-    if (a && a.goal) html += qa(a.goal.q.prompt.replace(/\bthis class\b/g, o.courseName), a.goal.v);
-    if (next) {
-      html +=
-        '<figure class="qw gl-check"><figcaption class="qw-q">Next step <span class="gl-meta">' +
-        esc('Check-in · ' + day(c.at)) +
-        '</span></figcaption>' +
-        bubble(next) +
-        '</figure>';
-    }
-    return html + '</div></div>';
-  }
-
-  function coreGoalHtml(o) {
-    var c = o.model.checkin;
-    if (!c || !(c.core || c.coreGoal || c.coreStep)) return '';
-    var pick = c.core && c.core.v ? text(c.core.v) : '';
-    var html =
-      '<div class="qw-group"><h3>Core Competency Goal</h3><div class="gl-card"><div class="gl-top"><div class="gl-title">' +
-      esc(pick ? coreName(pick) : 'No competency chosen') +
-      '</div><span class="gl-meta">' +
-      src('them', o.first) +
-      ' ' +
-      esc(day(c.at)) +
-      '</span></div>';
-    if (c.coreGoal) html += qa(c.coreGoal.q.prompt, c.coreGoal.v);
-    if (c.coreStep) html += qa(c.coreStep.q.prompt, c.coreStep.v, '', { cls: 'gl-check' });
-    return html + '</div></div>';
   }
 
   /* ── The Learner Profile as the redesign's board draws it ───────
@@ -771,9 +667,6 @@ var LearnerProfile = (function () {
     feedbackHtml: feedbackHtml,
     setFeedbackFilter: setFeedbackFilter,
     idCardHtml: idCardHtml,
-    aboutHtml: aboutHtml,
-    courseGoalHtml: courseGoalHtml,
-    coreGoalHtml: coreGoalHtml,
     reflectionsHtml: reflectionsHtml,
     goalCount: goalCount,
     wordsItems: wordsItems,
