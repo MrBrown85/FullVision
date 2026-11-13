@@ -55,7 +55,7 @@ A difference in a list of entries that have ids (a student's score entries, the 
 
 ### The classes
 
-- Signed in: the speed recorder's class (`e2e-perf/speed.spec.js`, 30 students by 60 pieces, every cell scored), with a rubric, two categories, and points, Complete/Incomplete, rubric, pair, group and two-competency pieces among the 60 (`scripts/differential/fixtures.mjs`). Every id is one the server could have made: the class, its students, pieces, rubric, criteria, categories, competencies and their sections. So every write is sent as it is live, a competency score (`upsert_tag_score`) and a hand-set level (`upsert_section_override`) included. The class's student page is on, it returns grades When I Return Them, and Send Work is on. The last ten pieces start blank. A second, small class is there to switch to.
+- Signed in: the speed recorder's class (`e2e-perf/speed.spec.js`, 30 students by 60 pieces, every cell scored), with a rubric, two categories, and points, Complete/Incomplete, rubric, pair, group and two-competency pieces among the 60, one pair piece scored by points and one group piece scored Complete/Incomplete (`scripts/differential/fixtures.mjs`). Every id is one the server could have made: the class, its students, pieces, rubric, criteria, categories, competencies and their sections. So every write is sent as it is live, a competency score (`upsert_tag_score`) and a hand-set level (`upsert_section_override`) included. The class's student page is on, it returns grades When I Return Them, and Send Work is on. The last ten pieces start blank. A second, small class is there to switch to.
 - Demo Mode: the Demo class, from `login.html?demo=1&student=1`, as the front page's Try Demo Mode link starts it: the student page on, Return Grades When I Return Them, Send Work and My Learning, so drafts, Return and revisions are in play.
 
 ### The fake server
@@ -83,6 +83,8 @@ Through the real screen:
 - The grader dialog from a gradebook cell: a level, + or −, Late, Done.
 - Cmd+Z on the gradebook (Undo of the last score).
 - Delete Assessment from the gradebook's column menu, the dialog, then the toast's Undo or the toast timing out.
+- Mark Blank Cells Missing or Excused from the column menu, then sometimes its Undo, from the toast or from the menu's Undo Marking Blank Cells.
+- Keys on a selected cell of the Competencies view: a level 1 to 4, + or − (which sends the cell's comment again with the level), 0 or Backspace to clear, C or I on Complete/Incomplete work.
 - Switching class and back.
 - A reload.
 
@@ -93,7 +95,7 @@ Through the screen's functions:
 - Missing, Excused, Late and clearing them.
 - An overall comment, a competency's comment and a criterion's comment, and clearing each; a criterion comment on a criterion with no score.
 - Set Everyone To on a piece and its Undo; a column fill and Undo; a row fill or Clear and Undo; the gradebook's Clear Score and its Undo.
-- Pair and group marks, Grade Separately and Back to Group Grade.
+- Pair and group marks (levels, points and Complete/Incomplete), Grade Separately and Back to Group Grade.
 - A hand-set competency level and clearing it; a term rating.
 - Return for one student and Return to All (`return_work` with Send Work on, `return_grades` with it off); a new mark on a returned grade (a draft over a returned grade); a Return the server refuses, which the outbox puts back to a draft (signed in); Return for Revision, a revised mark, and Take Back; Send Work on and off.
 - Creating a piece, graded at once six times in ten (before the server has answered with its id); editing a piece's title, points, category, date, rubric, weight, due date, description and Core Competencies; deleting a piece.
@@ -110,8 +112,10 @@ Through the screen's functions:
 - A Return the outbox has no room for. A refused Return runs; a full outbox does not.
 - Photos and Mark Up: no student sends work, so `return_work` carries no marks and Return for Revision has no first version. The Note for the Report, DIBELS scores, Advanced Rubric checkboxes and Copy to Another Class.
 - Creating a rubric, a class or a learning-map entry: their creates are not answered with server ids, so their re-keying does not run. Pieces, students and categories are.
-- Typing a points score into the gradebook grid, Set Everyone To from its menu, and the phone Grade tab's buttons: driven through the same functions the screens call, not by clicks.
+- Typing a points score into the gradebook grid (the keys above cover levels, + and −, clearing and Complete/Incomplete), Set Everyone To from its menu, and the phone Grade tab's buttons: driven through the same functions the screens call, not by clicks. The gradebook's Scores view keys (Edit Score) are not pressed.
 - Undo of a fill after the toast has gone (the toast is the only Undo for a fill).
+- Marks in a class whose student page is off, or that returns grades As Soon As I Save. Both classes that are marked hold grades When I Return Them from start to end, so a change that matters only when a class does not hold grades (a class with its build switch off, for one) is not seen.
+- A piece's scoring changed (proficiency to points and back), its competencies changed, or its pairs or groups changed, after it has marks. A single-point rubric's Went Beyond note.
 - More than one teacher device. After a refused Return the class is read again whole, and the fake answers with the class as the page held it when it last loaded (the run reloads the page first, so that is the class as it is).
 - The student's own phone page (`s/`): Preview as Student draws the same page with the same code (`s/page-view.js`).
 

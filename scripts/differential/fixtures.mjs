@@ -61,6 +61,10 @@ export const STUDENTS = Array.from({ length: 30 }, (_, i) => ({
 /* What kind each piece is. Most are scored by competency, as in the speed
    recorder; the rest give the other actions something to act on. */
 export function pieceKind(i) {
+  // Group work scored by points and by Complete/Incomplete: the group
+  // writes reach them through setPointsScore and setCompletionMark.
+  if (i === 47) return 'pairPoints';
+  if (i === 57) return 'groupComplete';
   if (i % 10 === 1) return 'points';
   if (i % 10 === 3) return 'rubric';
   if (i % 10 === 5) return 'complete';
@@ -128,13 +132,13 @@ export const ASSESSMENTS = Array.from({ length: 60 }, (_, i) => {
     created: day + 'T12:00:00.000Z',
   };
   if (i % 4 === 0) a.categoryId = CAT[i % 8 === 0 ? 0 : 1];
-  if (kind === 'points') Object.assign(a, { scoreMode: 'points', maxPoints: 20, tagIds: [] });
-  if (kind === 'complete') Object.assign(a, { scoreMode: 'complete', tagIds: [] });
+  if (kind === 'points' || kind === 'pairPoints') Object.assign(a, { scoreMode: 'points', maxPoints: 20, tagIds: [] });
+  if (kind === 'complete' || kind === 'groupComplete') Object.assign(a, { scoreMode: 'complete', tagIds: [] });
   if (kind === 'rubric') Object.assign(a, { rubricId: RUBRIC_ID, tagIds: [TAGS[0], TAGS[1]] });
   if (kind === 'twoTags') a.tagIds = [TAGS[0], TAGS[2]];
-  if (kind === 'pair')
+  if (kind === 'pair' || kind === 'pairPoints')
     Object.assign(a, { collaboration: 'pair', pairs: pairsOf(STUDENTS.map(s => s.id).slice(0, 12), 2) });
-  if (kind === 'group')
+  if (kind === 'group' || kind === 'groupComplete')
     Object.assign(a, { collaboration: 'group', groups: pairsOf(STUDENTS.map(s => s.id).slice(0, 12), 4) });
   return a;
 });
@@ -155,7 +159,8 @@ export const SCORES = Object.fromEntries(
       };
       const id = n => 'seed-' + si + '-' + ai + '-' + n;
       const kind = pieceKind(ai);
-      if (kind === 'points') entries.push({ ...base, id: id(0), tagId: null, score: 8 + ((si + ai) % 13) });
+      if (kind === 'points' || kind === 'pairPoints')
+        entries.push({ ...base, id: id(0), tagId: null, score: 8 + ((si + ai) % 13) });
       else if (kind === 'complete') entries.push({ ...base, id: id(0), tagId: null, score: (si + ai) % 5 ? 1 : 0 });
       else if (kind === 'rubric')
         RUBRIC.criteria.forEach((c, ci) =>
