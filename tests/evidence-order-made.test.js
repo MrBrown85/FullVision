@@ -7,8 +7,10 @@
  *
  * - A piece loaded from the server carries the server's created_at when the
  *   class bundle sends it (the loader keeps it; one line in shared/data.js).
- *   Today's bundle does not send it; a migration adds it. Until then a
- *   loaded piece has no time known and same-date pieces fall to id order.
+ *   The bundle has sent it since 2026-11-10 (migration
+ *   2026111001_assessment_created_at_in_bundle.sql). A bundle without it
+ *   (an older copy, or a piece the server has no time for) leaves a loaded
+ *   piece with no time known, and same-date pieces fall to id order.
  * - A piece made on this device carries this device's clock
  *   (assessment.created) until the class is next loaded. At that load the
  *   server's copy takes its place, with the server's time and id.
@@ -144,7 +146,7 @@ describe('what the loader keeps of when a piece was made', () => {
     getAssessments(cid).forEach((a, i) => expect(a.created_at, a.title).toBe(MADE[i]));
   });
 
-  it('nothing, when the bundle does not send it (today’s bundle)', () => {
+  it('nothing, when the bundle does not send it (a bundle without it)', () => {
     const cid = load(sameDateClass());
     expect(_pieceOrderFacts(cid)).toEqual(
       MADE.map((t, i) => ({ id: id(300 + i), made: null, here: false, stored: i })),
@@ -208,7 +210,7 @@ describe('loading the same class again gives the same grades', () => {
     expect(mostRecent(again, 'Priya')).toBe(3);
   });
 
-  it('without it (today’s bundle): same-date work counts in id order, on every load', () => {
+  it('without it (a bundle without it): same-date work counts in id order, on every load', () => {
     const bundle = sameDateClass();
     const cid = load(bundle);
     const first = everything(cid);
@@ -485,7 +487,7 @@ describe('a piece made on this device, before and after the next load', () => {
     });
   });
 
-  describe('until then (today’s bundle sends no created_at)', () => {
+  describe('when the bundle sends no created_at', () => {
     it('a new piece counts after the loaded same-date pieces, and two new pieces in the order made, until the next load', () => {
       const cid = load(sameDateClass());
       makeOnDevice(
