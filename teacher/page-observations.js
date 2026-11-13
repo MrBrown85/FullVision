@@ -308,8 +308,13 @@ window.PageObservations = (function () {
     for (var i = 0; i < options.length; i++) if (options[i].value === value) return options[i].label;
     return value;
   }
+  // Formatters are slow to make: one each, made once.
+  var _fmts = {};
+  function _format(key, opts) {
+    return _fmts[key] || (_fmts[key] = new Intl.DateTimeFormat('en-CA', opts));
+  }
   function _shortDate(ymd) {
-    return new Date(ymd + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+    return _format('md', { month: 'short', day: 'numeric' }).format(new Date(ymd + 'T12:00:00'));
   }
 
   var FILTER_CHIPS = {
@@ -645,11 +650,7 @@ window.PageObservations = (function () {
             ? 'Today'
             : ds === yd
               ? 'Yesterday'
-              : new Date(ds + 'T12:00:00').toLocaleDateString('en-CA', {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric',
-                });
+              : _format('day', { weekday: 'long', month: 'short', day: 'numeric' }).format(new Date(ds + 'T12:00:00'));
         out += '<div class="obs-feed-date-group">' + Card.dayHeaderHtml(lbl, groups[ds].length);
         groups[ds].forEach(function (ob) {
           out += renderObsCardHtml(ob, ctx);
