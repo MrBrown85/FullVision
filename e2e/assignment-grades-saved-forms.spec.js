@@ -6,12 +6,14 @@ import { resolve } from 'node:path';
    one with it off, open on this build in each grading style (Assignment
    Grades layout, 2026-11-12). e2e/fixtures/report-config-main.json holds
    what main stored after the teacher's clicks in Page Studio (main
-   9953ecc3: Custom, then the Word box ticked, then unticked).
+   9953ecc3: Custom, then the Word box ticked, then unticked). Page Studio
+   is gone; One Report reads the saved form as its parts (DECISIONS, "One
+   Report is the Progress Reports screen", 3).
 
    In a Proficiency or Both class the report draws with no word column and
-   Page Studio does not offer Word; in a Letter class Word is offered with
-   the saved choice and the column follows it. Opening the report,
-   selecting the block and printing it leave the stored report exactly as
+   the panel does not offer Word; in a Letter class Word is offered with
+   the saved choice and the column follows it. Opening the report, opening
+   the part's options and printing it leave the stored report exactly as
    main stored it. */
 
 const SAVED = JSON.parse(readFileSync(resolve('e2e/fixtures/report-config-main.json'), 'utf8'));
@@ -42,19 +44,20 @@ for (const word of ['on', 'off']) {
       const cell = page.locator('#rb-preview .sheet-cell[data-block="grade-table"]').first();
       await expect(cell).toBeVisible();
       await expect(cell.locator('.report-grades-row').first()).toBeVisible();
-      await cell.click();
-      const bar = page.locator('.studio-bar');
+      // The part's options, in the panel.
+      await page.locator('#studio-palette [data-action="oneOpen"][data-part="grade-table"]').click();
+      const bar = page.locator('#one-opts-grade-table');
       await expect(bar).toBeVisible();
-      const box = bar.locator('input[data-key="word"]');
+      const box = bar.locator('[data-opt="word"]');
       const words = page.locator('#rb-preview .report-grades-word');
       if (mode === 'letter') {
         // The option and the column come back with the saved choice.
         await expect(box).toHaveCount(1);
         if (word === 'on') {
-          await expect(box).toBeChecked();
+          await expect(box).toHaveAttribute('aria-pressed', 'true');
           await expect(words.first()).toBeAttached();
         } else {
-          await expect(box).not.toBeChecked();
+          await expect(box).toHaveAttribute('aria-pressed', 'false');
           await expect(words).toHaveCount(0);
         }
       } else {

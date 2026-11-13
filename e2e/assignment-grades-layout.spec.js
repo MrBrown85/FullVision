@@ -5,12 +5,14 @@ import { test, expect } from '@playwright/test';
 
    1. A Proficiency or Both class prints no Proficiency Word column (a
       level's mark is its proficiency and points carry no word, so the
-      column was empty) and Page Studio does not offer the option there. A
+      column was empty) and the panel does not offer the option there. A
       Letter class keeps both.
    2. No mark is cut off or runs into the next column, in any grading
-      style, at full and half width, in one column and in two: the mark
-      column grows to the widest mark the class can print, measured in the
-      sheet's fonts. At 90px a Both class's "Proficient − · 67%" ran over.
+      style, in one column and in two: the mark column grows to the widest
+      mark the class can print, measured in the sheet's fonts. At 90px a
+      Both class's "Proficient − · 67%" ran over. One Report prints the
+      part across the page (DECISIONS, "One Report"), so the half width
+      Page Studio offered is not laid out here.
 
    Each layout check also runs in a wider font forced on the sheet. CI's
    Linux fonts are wider than a Mac's. */
@@ -46,26 +48,12 @@ for (const wide of [false, true]) {
       const cid = 'sci8';
       const S = ReportSheets;
       const students = getStudents(cid);
-      // Two blocks side by side make each a half; one alone is a row.
-      const form = (columns, half) =>
-        S.normalizeForm({
-          v: 6,
-          id: 'custom',
-          name: 'Custom',
-          type: 'standard',
-          sides: [
-            {
-              rows: [
-                { cells: [{ block: 'header', size: 'row' }] },
-                {
-                  cells: [{ block: 'grade-table', size: 'row', options: { word: true, columns } }].concat(
-                    half ? [{ block: 'proficiency', size: 'half' }] : [],
-                  ),
-                },
-              ],
-            },
-          ],
-          perStudent: {},
+      // The part on its own under the letterhead, as One Report lays it out.
+      const model = columns =>
+        ReportOne.normalize({
+          parts: ['header', 'grade-table'],
+          options: { 'grade-table': { word: true, columns } },
+          feedback: {},
         });
       const host = document.createElement('div');
       host.className = 'rb-preview';
@@ -87,57 +75,54 @@ for (const wide of [false, true]) {
           out.words[mode] = 0;
           out.marks[mode] = [];
           out.wide[mode] = 0;
-          for (const columns of ['one', 'two'])
-            for (const half of [false, true]) {
-              const preview = document.createElement('div');
-              host.appendChild(preview);
-              S.renderPreview({
-                preview,
-                paper: 'letter',
-                form: form(columns, half),
-                cid,
-                students,
-                ctx: ReportBlocks.reportContext(),
+          for (const columns of ['one', 'two']) {
+            const preview = document.createElement('div');
+            host.appendChild(preview);
+            S.renderPreview({
+              preview,
+              paper: 'letter',
+              cid,
+              students,
+              ctx: ReportBlocks.reportContext(),
+              layout: ReportOne.layoutWith(model(columns)),
+            });
+            out.layouts++;
+            preview.querySelectorAll('.report-grades-row').forEach(row => {
+              const figs = row.querySelector('.report-grades-figs');
+              if (!figs.textContent) return;
+              const next = figs.nextElementSibling;
+              // Cut off: wider than its cell. Into its neighbour: past the
+              // next cell's left edge, or past the row's right edge.
+              const text = document.createRange();
+              text.selectNodeContents(figs);
+              const r = text.getBoundingClientRect();
+              const right = next ? next.getBoundingClientRect().left : row.getBoundingClientRect().right;
+              if (
+                figs.scrollWidth > figs.clientWidth + 1 ||
+                r.right > right + 0.5 ||
+                r.left < figs.getBoundingClientRect().left - 0.5
+              )
+                out.cut.push([mode, columns, 'row', figs.textContent].join(' | '));
+              // A wide mark sits on the title's last line: never over the
+              // title's words (each line of the title, where it shares the
+              // mark's height, ends left of the mark).
+              // The title's words only (its spacer is not a word).
+              const words = row.querySelector('.report-grades-title').firstChild;
+              const title = document.createRange();
+              if (words && words.nodeType === 3) title.selectNodeContents(words);
+              [...(words && words.nodeType === 3 ? title.getClientRects() : [])].forEach(line => {
+                if (line.width > 0 && line.bottom > r.top + 1 && line.top < r.bottom - 1 && line.right > r.left - 1)
+                  out.cut.push([mode, columns, 'row', figs.textContent, 'over the title'].join(' | '));
               });
-              out.layouts++;
-              preview.querySelectorAll('.report-grades-row').forEach(row => {
-                const figs = row.querySelector('.report-grades-figs');
-                if (!figs.textContent) return;
-                const next = figs.nextElementSibling;
-                // Cut off: wider than its cell. Into its neighbour: past the
-                // next cell's left edge, or past the row's right edge.
-                const text = document.createRange();
-                text.selectNodeContents(figs);
-                const r = text.getBoundingClientRect();
-                const right = next ? next.getBoundingClientRect().left : row.getBoundingClientRect().right;
-                if (
-                  figs.scrollWidth > figs.clientWidth + 1 ||
-                  r.right > right + 0.5 ||
-                  r.left < figs.getBoundingClientRect().left - 0.5
-                )
-                  out.cut.push([mode, columns, half ? 'half' : 'row', figs.textContent].join(' | '));
-                // A wide mark sits on the title's last line: never over the
-                // title's words (each line of the title, where it shares the
-                // mark's height, ends left of the mark).
-                // The title's words only (its spacer is not a word).
-                const words = row.querySelector('.report-grades-title').firstChild;
-                const title = document.createRange();
-                if (words && words.nodeType === 3) title.selectNodeContents(words);
-                [...(words && words.nodeType === 3 ? title.getClientRects() : [])].forEach(line => {
-                  if (line.width > 0 && line.bottom > r.top + 1 && line.top < r.bottom - 1 && line.right > r.left - 1)
-                    out.cut.push(
-                      [mode, columns, half ? 'half' : 'row', figs.textContent, 'over the title'].join(' | '),
-                    );
-                });
-                if (row.classList.contains('report-grades-wide')) out.wide[mode]++;
-                if (out.marks[mode].indexOf(figs.textContent) < 0) out.marks[mode].push(figs.textContent);
-              });
-              out.words[mode] += preview.querySelectorAll('.report-grades-word').length;
-              preview.querySelectorAll('.report-sheet .sheet-body').forEach(b => {
-                if (b.scrollHeight > b.clientHeight + 1) out.past++;
-              });
-              preview.remove();
-            }
+              if (row.classList.contains('report-grades-wide')) out.wide[mode]++;
+              if (out.marks[mode].indexOf(figs.textContent) < 0) out.marks[mode].push(figs.textContent);
+            });
+            out.words[mode] += preview.querySelectorAll('.report-grades-word').length;
+            preview.querySelectorAll('.report-sheet .sheet-body').forEach(b => {
+              if (b.scrollHeight > b.clientHeight + 1) out.past++;
+            });
+            preview.remove();
+          }
         }
       } finally {
         COURSES[cid].gradingSystem = was;
@@ -149,7 +134,7 @@ for (const wide of [false, true]) {
     });
     expect(found.students).toContain(NAME);
     expect(found.students.length).toBeGreaterThan(20);
-    expect(found.layouts).toBe(12);
+    expect(found.layouts).toBe(6);
     expect(found.cut).toEqual([]);
     expect(found.past).toBe(0);
     // Both's wide marks reached past their column onto the title's line; a
@@ -170,9 +155,10 @@ for (const wide of [false, true]) {
   });
 }
 
-/* Page Studio offers Proficiency Word for Assignment Grades in a Letter
-   class only. */
-test('Page Studio offers Proficiency Word for Assignment Grades only in a Letter class', async ({ page }) => {
+/* The panel offers Proficiency Word for Assignment Grades in a Letter
+   class only. The class's report is a form built in Page Studio, read as
+   One Report's parts and never rewritten. */
+test('the panel offers Proficiency Word for Assignment Grades only in a Letter class', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -209,18 +195,18 @@ test('Page Studio offers Proficiency Word for Assignment Grades only in a Letter
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
     const cell = page.locator('#rb-preview .sheet-cell[data-block="grade-table"]').first();
     await expect(cell).toBeVisible();
-    await cell.click();
-    const bar = page.locator('.studio-bar');
+    const open = page.locator('#studio-palette [data-action="oneOpen"][data-part="grade-table"]');
+    if ((await open.getAttribute('aria-expanded')) !== 'true') await open.click();
+    const bar = page.locator('#one-opts-grade-table');
     await expect(bar).toBeVisible();
-    await expect(bar.getByText('Percent', { exact: true })).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'Percent', exact: true })).toBeVisible();
     if (mode === 'letter') {
-      await expect(bar.locator('input[data-key="word"]')).toHaveCount(1);
-      await expect(bar.locator('label.studio-check', { hasText: 'Proficiency Word' })).toBeVisible();
+      await expect(bar.locator('[data-opt="word"]')).toHaveCount(1);
+      await expect(bar.getByRole('button', { name: 'Proficiency Word' })).toBeVisible();
       await expect(page.locator('#rb-preview .report-grades-word').first()).toBeAttached();
     } else {
-      await expect(bar.locator('input[data-key="word"]')).toHaveCount(0);
+      await expect(bar.locator('[data-opt="word"]')).toHaveCount(0);
       await expect(bar).not.toContainText('Proficiency Word');
-      await expect(bar).toContainText('Percent starts from the class grading setting.');
       await expect(page.locator('#rb-preview .report-grades-word')).toHaveCount(0);
     }
     // The saved form still has Word on: it was not rewritten.

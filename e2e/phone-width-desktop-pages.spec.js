@@ -200,8 +200,8 @@ test('Term Questionnaire fits a phone', async ({ page }) => {
 });
 
 // Group 2 #46: Progress Reports fits a phone: the sheet starts inside the
-// canvas, and Paper, Sides and One Student / Everyone are
-// all on screen.
+// canvas, Paper and One Student / Everyone are on screen, and the Parts
+// button opens the panel.
 test('Progress Reports fits a phone', async ({ page }) => {
   await openDesktop(page, '/reports?tab=progress');
   await expect(page.locator('#rb-preview .sheet-zoom .report-sheet').first()).toBeVisible();
@@ -211,11 +211,12 @@ test('Progress Reports fits a phone', async ({ page }) => {
       const s = document.querySelector('#rb-preview .sheet-zoom .report-sheet').getBoundingClientRect();
       return s.left >= p.left - 0.5 && s.right <= p.right + 0.5;
     });
+  // TODO(one-report): app bug, reported: on a phone One Report draws the
+  // page wider than the canvas (408 px at 390 wide), so its right edge is
+  // cut off and this fails.
   await expect.poll(sheetIn).toBe(true);
-  // On a narrow screen the Report switch is in the Options panel.
-  await page.locator('#tb-rail-btn').click();
-  await page.locator('[data-action="progressMode"][data-mode="build"]').click();
-  await expect(page.locator('.studio-tools [data-action="setSides"]').first()).toBeVisible();
+  await expect(page.locator('.studio-tools [data-action="setPaper"]').first()).toBeVisible();
+  await expect(page.locator('.studio-tools [data-action="studioView"]').first()).toBeVisible();
   const off = await page.evaluate(() =>
     [...document.querySelectorAll('.studio-tools button')]
       .filter(b => {
@@ -226,6 +227,9 @@ test('Progress Reports fits a phone', async ({ page }) => {
   );
   expect(off).toEqual([]);
   await expect.poll(sheetIn).toBe(true);
+  // On a narrow screen the panel of parts opens from the Parts button.
+  await page.locator('#tb-rail-btn').click();
+  await expect(page.locator('#studio-palette [data-action="oneSwitch"]').first()).toBeVisible();
 });
 
 // The one-week photo reminder (S8-F1) on the Dashboard fits a phone, with Send

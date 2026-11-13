@@ -10,7 +10,11 @@ import { resolve } from 'node:path';
      UPDATE_LETTER_MAIN=1 TZ=UTC npx playwright test e2e/assignment-grades-letter.spec.js
    The widths do not depend on the font (each column is set in px or em
    at the sheet's fixed size), so the file holds on any machine; the test
-   also runs with a wider font forced on the sheet. Students by name. */
+   also runs with a wider font forced on the sheet. Students by name.
+
+   Drawn as One Report lays the part out (the letterhead, then Assignment
+   Grades across the page). One Report never prints the part at half
+   width, so the fixture's half-width entries are not compared. */
 
 // Run from the repository's root, as Playwright runs it.
 const FILE = resolve('e2e/fixtures/assignment-grades-letter-main.json');
@@ -53,29 +57,22 @@ for (const wide of [false, true]) {
       try {
         for (const word of [true, false, 'auto'])
           for (const columns of ['one', 'two'])
-            for (const half of [false, true]) {
-              const form = S.normalizeForm({
-                v: 6,
-                id: 'custom',
-                name: 'Custom',
-                type: 'standard',
-                perStudent: {},
-                sides: [
-                  {
-                    rows: [
-                      { cells: [{ block: 'header', size: 'row' }] },
-                      {
-                        cells: [{ block: 'grade-table', size: 'row', options: { word, columns } }].concat(
-                          half ? [{ block: 'proficiency', size: 'half' }] : [],
-                        ),
-                      },
-                    ],
-                  },
-                ],
+            for (const half of [false]) {
+              const model = ReportOne.normalize({
+                parts: ['header', 'grade-table'],
+                options: { 'grade-table': { word, columns } },
+                feedback: {},
               });
               const preview = document.createElement('div');
               host.appendChild(preview);
-              S.renderPreview({ preview, paper: 'letter', form, cid, students, ctx: ReportBlocks.reportContext() });
+              S.renderPreview({
+                preview,
+                paper: 'letter',
+                cid,
+                students,
+                ctx: ReportBlocks.reportContext(),
+                layout: ReportOne.layoutWith(model),
+              });
               students.forEach(st => {
                 const el = preview.querySelector('.sheet-student[data-sid="' + st.id + '"]');
                 const blocks = [...el.querySelectorAll('.sheet-body .report-grades')];
@@ -98,9 +95,11 @@ for (const wide of [false, true]) {
       return out;
     }, NAMES);
     if (UPDATE && !wide) writeFileSync(FILE, JSON.stringify(now, null, 2) + '\n');
-    const main = JSON.parse(readFileSync(FILE, 'utf8'));
+    const all = JSON.parse(readFileSync(FILE, 'utf8'));
+    // The entries at full width: One Report has no half-width part.
+    const main = Object.fromEntries(Object.entries(all).filter(([key]) => key.split(' | ')[2] === 'row'));
     expect(Object.keys(now).sort()).toEqual(Object.keys(main).sort());
-    expect(Object.keys(now).length).toBe(3 * 2 * 2 * NAMES.length);
+    expect(Object.keys(now).length).toBe(3 * 2 * NAMES.length);
     for (const key of Object.keys(main)) {
       expect(now[key].html, key).toBe(main[key].html);
       expect(now[key].widths, key).toEqual(main[key].widths);

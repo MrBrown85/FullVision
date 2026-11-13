@@ -1,7 +1,7 @@
 /**
  * Scripts a page loads only when it is opened (teacher/router.js _onDemand).
  *
- * Reports: its eleven scripts (report-sheets.js to page-reports.js) are not
+ * Reports: its fourteen scripts (report-sheets.js to page-reports.js) are not
  * in teacher/app.html. The router fetches them the first time Reports is
  * opened, shows the loading screen meanwhile, runs them once in order, and
  * then draws the page. Every way in is covered: a click, a direct visit to
@@ -26,13 +26,16 @@ const REPORTS = [
   '/teacher/report-sheets.js',
   '/teacher/report-issues.js',
   '/teacher/report-questionnaire.js',
-  '/teacher/report-studio.js',
   '/teacher/grade-report.js',
   '/teacher/report-preview.js',
   '/shared/phone-report-view.js',
   '/teacher/phone-reports.js',
   '/teacher/report-feedback.js',
   '/teacher/report-feedback-cards.js',
+  '/teacher/report-one.js',
+  '/teacher/report-one-panel.js',
+  '/teacher/report-one-page.js',
+  '/teacher/report-one-comment.js',
   '/teacher/page-reports.js',
 ];
 
@@ -131,13 +134,13 @@ test.describe('Reports loads its scripts when opened', () => {
   test('a file that cannot be fetched: a message, then Try Again opens Reports', async ({ page }) => {
     await demo(page);
     let blocked = true;
-    await page.route('**/teacher/report-studio.js', route => (blocked ? route.abort() : route.continue()));
+    await page.route('**/teacher/report-one.js', route => (blocked ? route.abort() : route.continue()));
     await page.evaluate(r => window.Router.navigate(r), '/reports');
     const alert = page.getByRole('alert');
     await expect(alert).toContainText('Reports Could Not Open');
     await expect(alert).toContainText('Check your internet connection');
     // Nothing after the failed file ran.
-    expect(await page.evaluate(() => [typeof window.ReportStudio, typeof window.PageReports])).toEqual([
+    expect(await page.evaluate(() => [typeof window.ReportOne, typeof window.PageReports])).toEqual([
       'undefined',
       'undefined',
     ]);
