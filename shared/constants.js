@@ -34,6 +34,12 @@
  * @property {LearningTag[]} tags - Single tag in flat format
  */
 
+/**
+ * @typedef {Object} Rubric
+ * @property {string} id
+ * @property {any[]} [criteria] - Each criterion has an id, its levels and its linked competencies
+ */
+
 /* ── Student Display Helpers ───────────────────────────────── */
 const PRONOUNS_OPTIONS = ['he/him', 'she/her', 'they/them', 'prefer not to say'];
 
@@ -386,6 +392,7 @@ function scoreTagIds(assessment, cid) {
     }
   }
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
+  /** @type {Rubric | null | undefined} */
   var rubric = null;
   if (cid && rubricId && !isPointsScored(assessment) && typeof getRubricById === 'function') {
     rubric = getRubricById(cid, rubricId);
