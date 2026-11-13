@@ -79,9 +79,7 @@ body.fv-switching-course::after {
   justify-content: space-around;
   height: calc(49px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--surface-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--surface);
   border-top: 0.5px solid var(--divider-medium);
   flex-shrink: 0;
   z-index: var(--z-fab);
@@ -289,9 +287,7 @@ body.fv-switching-course::after {
   position: sticky;
   top: 0;
   z-index: var(--z-navbar);
-  background: var(--surface-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--surface);
   padding-top: env(safe-area-inset-top, 0px);
   border-bottom: 0.5px solid transparent;
   transition: border-color 0.2s;
@@ -1733,9 +1729,7 @@ body.fv-switching-course::after {
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  background: var(--surface-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--surface);
   border-bottom: 0.5px solid var(--divider-subtle);
 }
 .m-thumb-strip::-webkit-scrollbar {
@@ -1752,9 +1746,7 @@ body.fv-switching-course::after {
   padding: 8px 16px;
   overflow-x: auto;
   scrollbar-width: none;
-  background: var(--surface-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--surface);
   border-bottom: 0.5px solid var(--divider-subtle);
 }
 .m-work-tabs::-webkit-scrollbar {

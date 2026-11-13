@@ -3362,7 +3362,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   inset: 0;
   z-index: 5000;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4760,7 +4759,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   inset: 0;
   z-index: 9999;
   background: var(--divider-strong);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4953,9 +4951,7 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   margin: 0 auto;
   z-index: 10000;
   max-width: 1400px;
-  background: var(--surface-glass);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background: var(--surface);
   border: 1px solid var(--overlay-pressed);
   border-radius: var(--radius);
   padding: 6px 16px;
@@ -6260,9 +6256,7 @@ button.grader-member-name {
   flex-direction: column;
   gap: 2px;
   padding: 8px 16px;
-  background: var(--surface-glass);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background: var(--surface);
   border: 1px solid var(--overlay-pressed);
   border-radius: var(--radius);
   box-shadow:
