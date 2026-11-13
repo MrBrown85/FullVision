@@ -4,6 +4,7 @@
  * and is not part of the test suite (docs/differential-run.md).
  */
 import { describe, expect, it } from 'vitest';
+import { parseArgs } from '../scripts/differential/args.mjs';
 import { makeRng } from '../scripts/differential/prng.mjs';
 import { compareCalls, compareScreens, compareStorage, diffValues } from '../scripts/differential/compare.mjs';
 
@@ -95,5 +96,31 @@ describe('diffValues', () => {
         5,
       ),
     ).toHaveLength(5);
+  });
+});
+
+describe('parseArgs', () => {
+  it('reads the options', () => {
+    const o = parseArgs(['--a', 'x', '--b', 'y', '--seed', '7', '--steps', '600', '--offline', '--two-tabs']);
+    expect(o).toMatchObject({ a: 'x', b: 'y', seed: 7, steps: 600, offline: true, twoTabs: true, mode: 'both' });
+  });
+
+  it('refuses a seed that is not a whole number', () => {
+    for (const bad of ['7 a', '', 'seven', '1e3', '-1', '1.5', ' 7', '0x10']) {
+      expect(() => parseArgs(['--seed', bad]), bad).toThrow(/--seed takes a whole number/);
+    }
+    expect(() => parseArgs(['--seed'])).toThrow(/--seed needs a value/);
+  });
+
+  it('refuses steps and screens-every that are not whole numbers', () => {
+    expect(() => parseArgs(['--steps', '10x'])).toThrow(/--steps takes a whole number of 1 or more/);
+    expect(() => parseArgs(['--steps', '0'])).toThrow(/--steps takes a whole number of 1 or more/);
+    expect(() => parseArgs(['--screens-every', 'often'])).toThrow(/--screens-every takes a whole number/);
+    expect(parseArgs(['--screens-every', '0']).screensEvery).toBe(0);
+  });
+
+  it('refuses a mode it does not know and an option it does not know', () => {
+    expect(() => parseArgs(['--mode', 'signedin'])).toThrow(/--mode is signed-in, demo or both/);
+    expect(() => parseArgs(['--sed', '1'])).toThrow(/Unknown option --sed/);
   });
 });

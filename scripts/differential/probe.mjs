@@ -1,4 +1,4 @@
-/* global GradeState, KeyboardEvent, document, getActiveCourse, getAssessments, getCategories, getCourseConfig, getRubrics, getSections, getStudents, getWithdrawnStudents, indexedDB, isDemoMode, loadCourses, window -- page.evaluate code runs in the app page. */
+/* global GradeState, KeyboardEvent, document, getActiveCourse, getAssessments, getCategories, getCourseConfig, getCourseSendWork, getRubrics, getScores, getSections, getStudents, getWithdrawnStudents, indexedDB, isDemoMode, loadCourses, window -- page.evaluate code runs in the app page. */
 /**
  * What a differential run reads from a page: the device's saved copy, the
  * calls the fake server was sent, the state the next action is picked from,
@@ -60,20 +60,52 @@ export function readIndexedDb(page) {
   });
 }
 
-/* The calls the fake server took since the last read, and forget them. */
-export function takeCalls(page) {
+/* The calls this page has sent since the last read, in order, taken off
+   the fake server's log (fake-server.js: one localStorage key a call).
+   { load, calls: [{ id, name, params }] }; `load` names this page load. */
+export function takeOwnCalls(page) {
   return page.evaluate(() => {
-    const log = window.__e2eRpcLog || [];
-    return log.splice(0, log.length).map(c => ({ name: c.name, params: c.params }));
+    const load = window.__diffTab;
+    const prefix = '__diff-call-' + load + '-';
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    keys.sort();
+    const calls = keys.map(k => ({ id: k, ...JSON.parse(localStorage.getItem(k)) }));
+    keys.forEach(k => localStorage.removeItem(k));
+    return { load, calls };
   });
+}
+
+/* The calls left in the log by pages that are no longer open: a page that
+   reloaded or closed and sent something as it went. `openLoads` names the
+   page loads still open, whose calls are theirs to give. */
+export function takeLeftCalls(page, openLoads) {
+  return page.evaluate(openLoads => {
+    const found = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      const m = k && /^__diff-call-(load(\d+))-(\d+)$/.exec(k);
+      if (m && !openLoads.includes(m[1])) found.push({ k, load: Number(m[2]), n: Number(m[3]) });
+    }
+    found.sort((x, y) => x.load - y.load || x.n - y.n);
+    const calls = found.map(f => ({ id: f.k, ...JSON.parse(localStorage.getItem(f.k)) }));
+    found.forEach(f => localStorage.removeItem(f.k));
+    return calls;
+  }, openLoads);
 }
 
 /* Wait until the page has finished its real work (scripts loading, IndexedDB,
    other tabs' messages): the saved copy, the calls, the outbox and the
    page's elements stay the same over `polls` looks `everyMs` apart, in real
-   time. The app's own timers wait for the run's clock (session.mjs
-   advance), so they do not count here. Answers false if it never settled. */
-export function settle(page, polls = 2, everyMs = 8, maxMs = 3000) {
+   time, the page has loaded, nothing it started is still on its way
+   (page-init.js counts its loads, fetches and IndexedDB work) and it is not
+   leaving for another page. The app's own timers wait for the run's clock
+   (session.mjs advance), so they do not count here. Answers false if it
+   never settled, or the page went while it waited. */
+export function settle(page, polls = 3, everyMs = 8, maxMs = 3000) {
   return page
     .evaluate(
       ({ polls, everyMs, maxMs }) =>
@@ -105,7 +137,8 @@ export function settle(page, polls = 2, everyMs = 8, maxMs = 3000) {
             }
             spent += everyMs;
             if (spent > maxMs) return resolve(false);
-            if (same < polls || window.__diffPending) return wait(tick, everyMs);
+            if (same < polls || window.__diffPending || window.__diffLeaving || document.readyState !== 'complete')
+              return wait(tick, everyMs);
             // A Web Lock asked for and free to be granted (the outbox's
             // owner, when a tab opens or goes) is still to come.
             if (!navigator.locks || !navigator.locks.query) return resolve(true);
@@ -157,7 +190,7 @@ export function readView(page) {
       categories: (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, weight: c.weight })),
       sections: (getSections(cid) || []).map(s => s.id),
       studentPage: !!(getCourseConfig(cid) || {}).student_page_enabled,
-      // How many grades wait as drafts on each piece (GradeState.stateOf).
+      // The students whose grade waits as a draft, by piece (GradeState.stateOf).
       drafts:
         typeof GradeState === 'undefined'
           ? {}
@@ -165,10 +198,24 @@ export function readView(page) {
               getAssessments(cid)
                 .map(a => [
                   a.id,
-                  getStudents(cid).filter(s => GradeState.stateOf(cid, s.id, a.id) === GradeState.DRAFT).length,
+                  getStudents(cid)
+                    .filter(s => GradeState.stateOf(cid, s.id, a.id) === GradeState.DRAFT)
+                    .map(s => s.id),
                 ])
-                .filter(([, n]) => n > 0),
+                .filter(([, ids]) => ids.length > 0),
             ),
+      // The students with no score on each rubric piece.
+      unscored: Object.fromEntries(
+        getAssessments(cid)
+          .filter(a => a.rubricId)
+          .map(a => [
+            a.id,
+            getStudents(cid)
+              .filter(s => !(getScores(cid)[s.id] || []).some(e => e.assessmentId === a.id && Number(e.score) > 0))
+              .map(s => s.id),
+          ]),
+      ),
+      sendWork: typeof getCourseSendWork === 'function' && getCourseSendWork(cid).send_work === true,
       demo: typeof isDemoMode === 'function' && isDemoMode(),
     };
   });
@@ -313,12 +360,33 @@ export async function readScreens(page, cid, who) {
   return out;
 }
 
-/* Wait for `fn` (run in the page) to answer true, moving the clock a little
-   between looks. Answers whether it did. */
-export async function until(page, fn, arg, tries = 60) {
-  for (let i = 0; i < tries; i++) {
-    if (await page.evaluate(fn, arg).catch(() => false)) return true;
-    await tick(page, 50);
+/* Wait until a page that may be loading, or going to another page, has
+   loaded and settled. Answers false if it has not after `maxMs`. */
+export async function quiet(page, maxMs = 20000) {
+  const end = Date.now() + maxMs;
+  for (;;) {
+    await page.waitForLoadState('load', { timeout: 30000 }).catch(() => {});
+    if (await settle(page)) return true;
+    if (page.isClosed() || Date.now() > end) return false;
   }
-  return false;
+}
+
+/* Look for `fn` (run in the page) to answer true, moving the clock 50 ms
+   between looks, `ticks` times at most. The clock always ends `ticks` moves
+   on, found or not and however long the page took in real time, so build A
+   and build B never drift apart here. Answers whether it was found. */
+export async function until(page, fn, arg, ticks = 12) {
+  for (let i = 0; i < ticks; i++) {
+    await settle(page);
+    if (await page.evaluate(fn, arg).catch(() => false)) {
+      if (process.env.DIFF_TRACE) console.log('  found at look ' + (i + 1) + ' of ' + ticks);
+      // The rest of the clock in one move.
+      await runClock(page.context(), (ticks - i) * 50);
+      await settle(page);
+      return true;
+    }
+    await runClock(page.context(), 50);
+  }
+  await settle(page);
+  return page.evaluate(fn, arg).catch(() => false);
 }

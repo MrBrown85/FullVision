@@ -26,41 +26,34 @@ process.removeAllListeners('warning');
 process.on('warning', w => {
   if (w.code !== 'MODULE_TYPELESS_PACKAGE_JSON') console.warn(w);
 });
+const { tmpdir } = await import('node:os');
+const { join } = await import('node:path');
 const { ACTIONS } = await import('./differential/actions.mjs');
+const { USAGE, parseArgs } = await import('./differential/args.mjs');
 const { compareCalls, compareScreens, compareStorage } = await import('./differential/compare.mjs');
 const { makeRng } = await import('./differential/prng.mjs');
-const { go, readIndexedDb, readScreens, readStorage, readView, takeCalls, tick } =
+const { go, readIndexedDb, readScreens, readStorage, readView, takeLeftCalls, takeOwnCalls, tick } =
   await import('./differential/probe.mjs');
 const { serve } = await import('./differential/serve.mjs');
-const { DRAIN_CHUNKS, PHONE, advance, newSession, openTab, tabsOf, waitForApp } =
+const { DRAIN_CHUNKS, PHONE, advance, bootTogether, newSession, reloadTab, startTab, tabsOf } =
   await import('./differential/session.mjs');
-
-function parseArgs(argv) {
-  const opts = { mode: 'both', seed: 1, steps: 100, offline: false, twoTabs: false, screensEvery: 25, quiet: false };
-  for (let i = 0; i < argv.length; i++) {
-    const k = argv[i];
-    const v = () => argv[++i];
-    if (k === '--a') opts.a = v();
-    else if (k === '--b') opts.b = v();
-    else if (k === '--seed') opts.seed = Number(v());
-    else if (k === '--steps') opts.steps = Number(v());
-    else if (k === '--mode') opts.mode = v();
-    else if (k === '--offline') opts.offline = true;
-    else if (k === '--two-tabs') opts.twoTabs = true;
-    else if (k === '--screens-every') opts.screensEvery = Number(v());
-    else if (k === '--quiet') opts.quiet = true;
-    else if (k === '--help' || k === '-h') opts.help = true;
-    else throw new Error('Unknown option ' + k);
-  }
-  return opts;
-}
-
-const USAGE =
-  'node scripts/differential-run.mjs --a <dir or URL> --b <dir or URL> --seed <n> --steps <n>\n' +
-  '  [--mode signed-in|demo|both] [--offline] [--two-tabs] [--screens-every <n>]';
 
 /* The run's own actions, beside the teacher actions in actions.mjs. */
 const RELOAD = { kind: 'reload', weight: 1 };
+/* Signed in, a Return the server refuses: the tab is reloaded first (so
+   the device has only the server's word for its rows, as after any load),
+   then one waiting draft is returned and the fake server says no. The
+   outbox puts the row back to a draft and has the class read again. */
+const RETURN_REFUSED = {
+  kind: 'returnRefused',
+  weight: 1,
+  modes: ['signed-in'],
+  pick(rng, view) {
+    const waiting = view.assessments.filter(a => (view.drafts[a.id] || []).length);
+    const a = rng.pick(waiting);
+    return a ? { aid: a.id, sid: rng.pick(view.drafts[a.id]) } : null;
+  },
+};
 const PHONE_ACTIONS = [
   { kind: 'phoneGrade', weight: 60 },
   { kind: 'phoneUndo', weight: 30 },
@@ -136,7 +129,7 @@ function withLimit(promise, ms, what) {
 
 async function runMode(browser, urls, mode, opts) {
   const rng = makeRng(opts.seed * 2654435761 + (mode === 'demo' ? 17 : 0));
-  const counts = { steps: 0, actions: {}, keys: 0, calls: 0, screens: 0, records: 0 };
+  const counts = { steps: 0, actions: {}, callNames: {}, keys: 0, calls: 0, screens: 0, records: 0 };
   const blocks = blocksFor(opts);
   const sides = [];
   for (const [label, url] of [
@@ -151,8 +144,9 @@ async function runMode(browser, urls, mode, opts) {
   let offline = false;
   try {
     await both(async s => {
-      s.tab1 = await openTab(s, '/gradebook');
+      s.tab1 = await startTab(s, '/gradebook');
     });
+    await bootTogether(sides, s => s.tab1);
 
     /* Set-up, the same in A and B: the gradebook on its Scores view and
        Reports on the Quick Report, so reading the screens later changes
@@ -180,12 +174,32 @@ async function runMode(browser, urls, mode, opts) {
         ['phone', s.phone],
       ].filter(([, p]) => p && !p.isClosed());
 
-    const takeAll = s =>
-      (async () => {
-        const out = [];
-        for (const [name, p] of named(s)) for (const c of await takeCalls(p)) out.push({ tab: name, ...c });
-        return out;
-      })();
+    /* The calls a session has sent since the last look, in a fixed order:
+       those read off a tab before it closed or reloaded, those a page left
+       as it went, then each open tab's. Each call is counted once. */
+    const fresh = (s, out, tab, c) => {
+      if (s.seenCalls.has(c.id)) return;
+      s.seenCalls.add(c.id);
+      out.push({ tab, name: c.name, params: c.params });
+    };
+    async function takeAll(s) {
+      const open = named(s);
+      const own = await Promise.all(open.map(([, p]) => takeOwnCalls(p)));
+      const left = await takeLeftCalls(
+        s.tab1,
+        own.map(o => o.load),
+      );
+      const out = s.heldCalls.splice(0);
+      left.forEach(c => fresh(s, out, 'a page that has gone', c));
+      open.forEach(([name], i) => own[i].calls.forEach(c => fresh(s, out, name, c)));
+      return out;
+    }
+    /* Before a tab closes or reloads: its calls so far, kept for the next
+       comparison. */
+    async function holdCalls(s, name) {
+      const { calls } = await takeOwnCalls(s[name]);
+      calls.forEach(c => fresh(s, s.heldCalls, name, c));
+    }
 
     async function compareNow(step, action, withScreens) {
       const lines = [];
@@ -203,6 +217,7 @@ async function runMode(browser, urls, mode, opts) {
       const [ca, cb] = await both(takeAll);
       lines.push(...compareCalls(ca, cb));
       counts.calls += ca.length;
+      for (const c of ca) counts.callNames[c.name] = (counts.callNames[c.name] || 0) + 1;
       const [ea, eb] = sides.map(s => s.errors.splice(0));
       if (JSON.stringify(ea) !== JSON.stringify(eb))
         lines.push('page errors: A ' + JSON.stringify(ea) + ' | B ' + JSON.stringify(eb));
@@ -248,7 +263,10 @@ async function runMode(browser, urls, mode, opts) {
        sent is compared at once. */
     async function openExtra(name, path, viewport) {
       await both(async s => {
-        s[name] = await openTab(s, path, viewport);
+        s[name] = await startTab(s, path, viewport);
+      });
+      await bootTogether(sides, s => s[name], name === 'phone');
+      await both(async s => {
         if (offline) await s[name].evaluate(() => (window.__e2eFailWrites = true));
         await advance(s);
       });
@@ -261,6 +279,8 @@ async function runMode(browser, urls, mode, opts) {
         // the outbox lets go, a pending Undo commits) and then closed.
         await s[name].evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })));
         await advance(s);
+        // What it sent up to now is read from the tab itself, before it goes.
+        await holdCalls(s, name);
         await s[name].close();
         s.pages = s.pages.filter(p => p !== s[name]);
         s[name] = null;
@@ -269,7 +289,20 @@ async function runMode(browser, urls, mode, opts) {
       await compareNow(counts.steps, 'closing ' + name, false);
     }
 
-    const teacherActions = ACTIONS.filter(a => !a.modes || a.modes.includes(mode));
+    async function reloadBoth() {
+      await both(async s => {
+        await holdCalls(s, 'tab1');
+        await reloadTab(s, s.tab1);
+      });
+      await bootTogether(sides, s => s.tab1);
+    }
+
+    // The cells the last steps touched, newest first: actions go back to
+    // them (a comment is cleared, a returned grade is changed).
+    const recent = [];
+    const inMode = a => !a.modes || a.modes.includes(mode);
+    const teacherActions = ACTIONS.filter(inMode);
+    const aloneActions = [RELOAD, RETURN_REFUSED].filter(inMode);
     for (let step = 1; step <= opts.steps; step++) {
       counts.steps = step;
       const off = (step - 1) % blocks.cycle;
@@ -283,7 +316,7 @@ async function runMode(browser, urls, mode, opts) {
       if (wantOffline && !offline) await setOffline(true);
 
       const alone = !wantTab2 && !wantPhone && !wantOffline;
-      const menu = [...teacherActions, ...(alone ? [RELOAD] : []), ...(wantPhone ? PHONE_ACTIONS : [])];
+      const menu = [...teacherActions, ...(alone ? aloneActions : []), ...(wantPhone ? PHONE_ACTIONS : [])];
       let chosen = null;
       let args = null;
       let tabName = 'tab1';
@@ -295,7 +328,8 @@ async function runMode(browser, urls, mode, opts) {
           tabName = 'phone';
           args = phonePick(act.kind, rng, await readView(sides[0].phone));
         } else if (act.pick) {
-          args = act.pick(rng, await readView(sides[0][tabName]), { mode, focus });
+          if (act === RETURN_REFUSED) tabName = 'tab1';
+          args = act.pick(rng, await readView(sides[0][tabName]), { mode, focus, recent });
           if (!args) continue;
         } else args = {};
         chosen = act;
@@ -308,12 +342,17 @@ async function runMode(browser, urls, mode, opts) {
       const doStep = async () => {
         let results;
         if (chosen.kind === 'reload') {
-          await both(async s => {
-            await s.context.clock.setSystemTime(s.context.__diffNow);
-            await s.tab1.reload();
-            await waitForApp(s, s.tab1);
-          });
+          await reloadBoth();
           results = ['ok', 'ok'];
+        } else if (chosen.kind === 'returnRefused') {
+          await reloadBoth();
+          results = await both(s =>
+            s.tab1.evaluate(args => {
+              window.__diffRefuseReturns = 1;
+              const out = Grader.returnGrades(getActiveCourse(), args.aid, args.sid);
+              return 'returned ' + ((out && out.returned) || 0) + ', to be refused';
+            }, args),
+          );
         } else if (chosen.kind === 'phoneGrade' || chosen.kind === 'phoneUndo') {
           results = await both(s => phoneRun(s.phone, chosen.kind, args).catch(e => 'threw: ' + e.message));
         } else {
@@ -328,7 +367,11 @@ async function runMode(browser, urls, mode, opts) {
         }
         if (process.env.DIFF_TRACE) console.log(mode, step, label, JSON.stringify(results[0]));
         if (process.env.DIFF_TRACE && String(results[0]).startsWith('threw'))
-          await sides[0][tabName].screenshot({ path: '/tmp/fv-s19/diff-threw-' + step + '.png' });
+          await sides[0][tabName].screenshot({ path: join(tmpdir(), 'fv-diff-threw-' + step + '.png') });
+        if (args && args.sid && args.aid) {
+          recent.unshift({ kind: chosen.kind, sid: args.sid, aid: args.aid, did: results[0], crit: args.crit });
+          recent.length = Math.min(recent.length, 24);
+        }
         const ta = Date.now();
         await both(s => advance(s));
         if (process.env.DIFF_TRACE)
@@ -359,6 +402,16 @@ async function runMode(browser, urls, mode, opts) {
       await compareNow(step, label, screensNow);
       if (step % 25 === 0 && step < opts.steps)
         console.log(mode + ': step ' + step + ' of ' + opts.steps + ', 0 differences so far');
+    }
+    // Requests to any other server than the build's own, over the whole
+    // mode. A moment first, for the last of them to be heard of.
+    await new Promise(r => setTimeout(r, 300));
+    const [xa, xb] = sides.map(s => [...new Set(s.external)].sort());
+    counts.external = xa.length;
+    if (JSON.stringify(xa) !== JSON.stringify(xb)) {
+      throw new Difference(opts.steps, 'the whole run', [
+        'requests to other servers: A ' + JSON.stringify(xa) + ' | B ' + JSON.stringify(xb),
+      ]);
     }
     return { counts };
   } finally {
@@ -409,6 +462,13 @@ async function phoneRun(page, kind, args) {
   );
 }
 
+function byName(counted) {
+  return Object.entries(counted)
+    .sort((x, y) => (x[0] < y[0] ? -1 : 1))
+    .map(([k, n]) => k + ' ' + n)
+    .join(', ');
+}
+
 function summaryLine(mode, counts) {
   const kinds = Object.entries(counts.actions)
     .sort((x, y) => (x[0] < y[0] ? -1 : 1))
@@ -428,6 +488,8 @@ function summaryLine(mode, counts) {
     counts.calls +
     ', screens compared ' +
     counts.screens +
+    ', other servers asked ' +
+    counts.external +
     '; 0 differences'
   );
 }
@@ -445,17 +507,29 @@ async function main() {
     return opts.help ? 0 : 2;
   }
   const modes = opts.mode === 'both' ? ['signed-in', 'demo'] : [opts.mode];
-  if (!modes.every(m => m === 'signed-in' || m === 'demo')) {
-    console.error('--mode is signed-in, demo or both');
-    return 2;
-  }
   const servers = [];
   let browser = null;
   const started = Date.now();
+  /* A server this run started has stopped, and the run did not stop it:
+     something outside did. The run ends at once, saying so; going on would
+     only report the pages that could no longer load. */
+  const serverStopped = info => {
+    console.error(
+      'The run could not be done: the server it started for build ' +
+        info.label +
+        ' (process ' +
+        info.pid +
+        ') stopped ' +
+        (info.signal ? 'on ' + info.signal : 'with code ' + info.code) +
+        ' while the run was going. The run did not stop it, so something outside the run did. ' +
+        'Neither build is at fault: run it again.',
+    );
+    process.exit(2);
+  };
   try {
-    const a = await serve(opts.a, 'A');
+    const a = await serve(opts.a, 'A', serverStopped);
     servers.push(a);
-    const b = await serve(opts.b, 'B');
+    const b = await serve(opts.b, 'B', serverStopped);
     servers.push(b);
     browser = await chromium.launch();
     const flags = (opts.offline ? ' --offline' : '') + (opts.twoTabs ? ' --two-tabs' : '');
@@ -463,6 +537,7 @@ async function main() {
       const t0 = Date.now();
       try {
         const { counts } = await runMode(browser, { a: a.url, b: b.url }, mode, opts);
+        if (counts.calls) console.log(mode + ': calls compared, by name: ' + byName(counts.callNames));
         console.log(
           summaryLine(mode, counts) +
             (opts.quiet ? '' : ' (seed ' + opts.seed + flags + ', ' + Math.round((Date.now() - t0) / 1000) + ' s)'),

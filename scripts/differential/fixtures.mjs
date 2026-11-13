@@ -2,8 +2,9 @@
 /**
  * The signed-in class a differential run grades: the speed recorder's class
  * (e2e-perf/speed.spec.js: 30 students by 60 pieces, every cell scored),
- * with server-shaped ids so the writes reach the fake server (as
- * e2e/pin-delete-assessment-then-grade.spec.js does), and with some of its
+ * with ids as the server makes them for the class, its students, pieces,
+ * rubric, categories, competencies and their sections, so every write is
+ * sent as it is live, and with some of its
  * pieces made points, Complete / Incomplete, rubric, pair and group work so
  * every action has something to act on. A second, small class is there to
  * switch to and back.
@@ -23,7 +24,23 @@ export const RUBRIC_ID = 'b0b00000-0000-4000-8000-000000000001';
 const CRIT = ['b0c00000-0000-4000-8000-000000000001', 'b0c00000-0000-4000-8000-000000000002'];
 const CAT = ['ca700000-0000-4000-8000-000000000001', 'ca700000-0000-4000-8000-000000000002'];
 
-const TAGS = ['QAP', 'PI', 'IP'];
+// The learning map of e2e/helpers.js with ids as the server makes them, so a
+// competency score and a hand-set level are sent as they are live
+// (shared/data.js sends a tag score only for a tag id the server could know).
+const SUBJECT = '5c180000-0000-4000-8000-000000000001';
+const SECTIONS = [1, 2, 3].map(n => '5ec00000-0000-4000-8000-' + hex(n));
+const TAGS = [1, 2, 3].map(n => '7a600000-0000-4000-8000-' + hex(n));
+const CODES = ['QAP', 'PI', 'IP'];
+export const LEARNING_MAP = {
+  _flatVersion: 2,
+  subjects: [{ ...TEST_LEARNING_MAP.subjects[0], id: SUBJECT, name: 'Science 9' }],
+  sections: TEST_LEARNING_MAP.sections.slice(0, 3).map((sec, i) => ({
+    ...sec,
+    id: SECTIONS[i],
+    subject: SUBJECT,
+    tags: sec.tags.slice(0, 1).map(t => ({ ...t, id: TAGS[i], code: CODES[i], subject: SUBJECT })),
+  })),
+};
 
 export const STUDENTS = Array.from({ length: 30 }, (_, i) => ({
   id: sid(i),
@@ -61,14 +78,14 @@ export const RUBRIC = {
     {
       id: CRIT[0],
       name: 'Safety',
-      tagIds: ['QAP'],
+      tagIds: [TAGS[0]],
       weight: 1,
       levels: { 4: 'Leads safe practice', 3: 'Follows every step', 2: 'Needs reminders', 1: 'Many reminders' },
     },
     {
       id: CRIT[1],
       name: 'Data',
-      tagIds: ['PI'],
+      tagIds: [TAGS[1]],
       weight: 1,
       levels: { 4: 'Repeatable', 3: 'Complete', 2: 'Partial', 1: 'Little' },
     },
@@ -113,8 +130,8 @@ export const ASSESSMENTS = Array.from({ length: 60 }, (_, i) => {
   if (i % 4 === 0) a.categoryId = CAT[i % 8 === 0 ? 0 : 1];
   if (kind === 'points') Object.assign(a, { scoreMode: 'points', maxPoints: 20, tagIds: [] });
   if (kind === 'complete') Object.assign(a, { scoreMode: 'complete', tagIds: [] });
-  if (kind === 'rubric') Object.assign(a, { rubricId: RUBRIC_ID, tagIds: ['QAP', 'PI'] });
-  if (kind === 'twoTags') a.tagIds = ['QAP', 'IP'];
+  if (kind === 'rubric') Object.assign(a, { rubricId: RUBRIC_ID, tagIds: [TAGS[0], TAGS[1]] });
+  if (kind === 'twoTags') a.tagIds = [TAGS[0], TAGS[2]];
   if (kind === 'pair')
     Object.assign(a, { collaboration: 'pair', pairs: pairsOf(STUDENTS.map(s => s.id).slice(0, 12), 2) });
   if (kind === 'group')
@@ -188,13 +205,16 @@ export function signedInClasses() {
           calcMethod: 'mostRecent',
           decayWeight: 0.65,
         },
-        learningMap: TEST_LEARNING_MAP,
+        learningMap: LEARNING_MAP,
         students: STUDENTS,
         assessments: ASSESSMENTS,
         scores: SCORES,
         statuses: STATUSES,
         rubrics: [RUBRIC],
         categories: CATEGORIES,
+        // What the fake server holds for the class (fake-server.js): its
+        // student page on, grades returned When I Return Them, Send Work on.
+        server: { student_page_enabled: true, return_grades: 'on_return', send_work: true },
       },
       {
         cid: CID2,
@@ -205,7 +225,7 @@ export function signedInClasses() {
           calcMethod: 'mostRecent',
           decayWeight: 0.65,
         },
-        learningMap: TEST_LEARNING_MAP,
+        learningMap: LEARNING_MAP,
         students: SMALL_STUDENTS,
         assessments: SMALL_ASSESSMENTS,
         scores: {},
@@ -236,5 +256,6 @@ export function seedSignedIn(data) {
     set('statuses', c.statuses);
     set('rubrics', c.rubrics);
     set('categories', c.categories);
+    if (c.server) localStorage.setItem('__diff-srv-course-' + c.cid, JSON.stringify(c.server));
   });
 }

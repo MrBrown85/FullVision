@@ -32,7 +32,23 @@ const completePieces = view => view.assessments.filter(a => a.scoreMode === 'com
 const rubricPieces = view => view.assessments.filter(a => a.rubricId && a.criteria.length);
 const groupPieces = view => view.assessments.filter(a => a.collaboration === 'pair' || a.collaboration === 'group');
 
-function pickCell(rng, view, pieces) {
+/* One of the cells the last steps touched (ctx.recent, newest first) that
+   is still in the class and that `ok` allows, `chance` of the time; else
+   null. Going back is how a change is followed by a clear, a comment by its
+   removal, a returned grade by a new draft. */
+function again(rng, view, ctx, chance, ok) {
+  const live = ((ctx && ctx.recent) || []).filter(c => {
+    const a = view.assessments.find(x => x.id === c.aid);
+    return !!a && view.students.some(st => st.id === c.sid) && (!ok || ok(c, a));
+  });
+  if (!rng.chance(chance) || !live.length) return null;
+  return rng.pick(live.slice(0, 8));
+}
+
+/* A cell of one of `pieces`: a recent one `chance` of the time, else any. */
+function pickCell(rng, view, pieces, ctx, chance = 0) {
+  const back = chance ? again(rng, view, ctx, chance, (c, a) => pieces.includes(a)) : null;
+  if (back) return { sid: back.sid, aid: back.aid };
   const a = rng.pick(pieces);
   const s = rng.pick(view.students);
   if (!a || !s) return null;
@@ -67,8 +83,8 @@ export const ACTIONS = [
   {
     kind: 'level',
     weight: 14,
-    pick(rng, view) {
-      const c = pickCell(rng, view, levelPieces(view));
+    pick(rng, view, ctx) {
+      const c = pickCell(rng, view, levelPieces(view), ctx, 0.3);
       if (!c) return null;
       return { ...c, keyIndex: rng.int(4), level: rng.pick([0, ...LEVELS]), mod: rng.pick(MODS) };
     },
@@ -84,8 +100,8 @@ export const ACTIONS = [
   {
     kind: 'plusMinus',
     weight: 6,
-    pick(rng, view) {
-      const c = pickCell(rng, view, levelPieces(view));
+    pick(rng, view, ctx) {
+      const c = pickCell(rng, view, levelPieces(view), ctx, 0.3);
       return c && { ...c, mod: rng.pick([1, -1, 0]) };
     },
     run: (page, a) =>
@@ -101,9 +117,9 @@ export const ACTIONS = [
   {
     kind: 'tagByTag',
     weight: 5,
-    pick(rng, view) {
+    pick(rng, view, ctx) {
       const pieces = levelPieces(view).filter(a => a.tagIds.length > 1);
-      const c = pickCell(rng, view, pieces.length ? pieces : levelPieces(view));
+      const c = pickCell(rng, view, pieces.length ? pieces : levelPieces(view), ctx, 0.2);
       return (
         c && {
           ...c,
@@ -124,8 +140,8 @@ export const ACTIONS = [
   {
     kind: 'rubric',
     weight: 7,
-    pick(rng, view) {
-      const c = pickCell(rng, view, rubricPieces(view));
+    pick(rng, view, ctx) {
+      const c = pickCell(rng, view, rubricPieces(view), ctx, 0.3);
       return (
         c && {
           ...c,
@@ -147,9 +163,9 @@ export const ACTIONS = [
   {
     kind: 'points',
     weight: 8,
-    pick(rng, view) {
+    pick(rng, view, ctx) {
       const pieces = pointsPieces(view);
-      const c = pickCell(rng, view, pieces);
+      const c = pickCell(rng, view, pieces, ctx, 0.35);
       if (!c) return null;
       const a = pieces.find(p => p.id === c.aid);
       const max = a.maxPoints || 10;
@@ -162,8 +178,8 @@ export const ACTIONS = [
   {
     kind: 'complete',
     weight: 5,
-    pick(rng, view) {
-      const c = pickCell(rng, view, completePieces(view));
+    pick(rng, view, ctx) {
+      const c = pickCell(rng, view, completePieces(view), ctx, 0.35);
       return c && { ...c, mark: rng.pick(['complete', 'incomplete', null]) };
     },
     run: (page, a) => inPage(page, `Grader.setMark(getActiveCourse(), args.sid, args.aid, args.mark); return 'ok';`, a),
@@ -171,8 +187,12 @@ export const ACTIONS = [
   {
     kind: 'status',
     weight: 8,
-    pick(rng, view) {
-      const c = pickCell(rng, view, view.assessments);
+    pick(rng, view, ctx) {
+      // Four in ten go back to a cell whose status was just set: mostly to
+      // clear it, sometimes to change it.
+      const back = again(rng, view, ctx, 0.4, c => c.kind === 'status');
+      if (back) return { sid: back.sid, aid: back.aid, status: rng.pick([null, null, null, 'LATE', 'NS', 'EXC']) };
+      const c = pickCell(rng, view, view.assessments, ctx, 0.2);
       return c && { ...c, status: rng.pick(['NS', 'EXC', 'LATE', null, null]) };
     },
     // As the grader's status buttons: Missing and Excused only where canSetAssignmentStatus allows.
@@ -187,11 +207,32 @@ export const ACTIONS = [
   },
   {
     kind: 'comment',
-    weight: 4,
-    pick(rng, view) {
-      const c = pickCell(rng, view, view.assessments);
+    weight: 7,
+    pick(rng, view, ctx) {
       const texts = ['Good work on the lab.', '', 'Check your units.', 'See me about this one.'];
-      return c && { ...c, where: rng.pick(['overall', 'tag', 'criterion']), text: rng.pick(texts) };
+      // Nearly half go back to a cell just commented on, the same comment
+      // (overall, competency or criterion): mostly to clear it.
+      const back = again(rng, view, ctx, 0.45, c => c.kind === 'comment');
+      if (back) {
+        return {
+          sid: back.sid,
+          aid: back.aid,
+          where: back.did,
+          crit: back.crit || 0,
+          text: rng.chance(0.6) ? '' : rng.pick(texts),
+        };
+      }
+      const where = rng.pick(['overall', 'overall', 'tag', 'criterion', 'criterion']);
+      let pieces = where === 'criterion' ? rubricPieces(view) : where === 'tag' ? levelPieces(view) : view.assessments;
+      if (!pieces.length) pieces = view.assessments;
+      const a = rng.pick(pieces);
+      const any = rng.pick(view.students);
+      if (!a || !any) return null;
+      // A criterion comment goes half the time to a student with no score
+      // on the piece: a comment on an unscored criterion.
+      const blank = where === 'criterion' ? (view.unscored && view.unscored[a.id]) || [] : [];
+      const sid = blank.length && rng.chance(0.5) ? rng.pick(blank) : any.id;
+      return { sid, aid: a.id, where, crit: rng.int(4), text: rng.pick(texts) };
     },
     run: (page, a) =>
       inPage(
@@ -200,10 +241,11 @@ export const ACTIONS = [
          const piece = getAssessments(cid).find(x => x.id === args.aid);
          if (args.where === 'criterion' && piece && piece.rubricId) {
            const r = getRubricById(cid, piece.rubricId);
-           if (r && r.criteria[0]) { Grader.setCriterionComment(cid, args.sid, args.aid, r.criteria[0].id, args.text); return 'criterion'; }
+           const c = r && r.criteria[args.crit % r.criteria.length];
+           if (c) { Grader.setCriterionComment(cid, args.sid, args.aid, c.id, args.text); return 'criterion'; }
          }
          if (args.where === 'tag' && keys.length && piece && !piece.rubricId && piece.scoreMode !== 'points' && piece.scoreMode !== 'complete') {
-           Grader.setCompetencyComment(cid, args.sid, args.aid, keys[0], args.text); return 'tag';
+           Grader.setCompetencyComment(cid, args.sid, args.aid, keys[args.crit % keys.length], args.text); return 'tag';
          }
          Grader.setOverallComment(cid, args.sid, args.aid, args.text); return 'overall';`,
         a,
@@ -213,8 +255,8 @@ export const ACTIONS = [
     kind: 'graderDialog',
     screen: true,
     weight: 8,
-    pick(rng, view) {
-      const c = pickCell(rng, view, levelPieces(view));
+    pick(rng, view, ctx) {
+      const c = pickCell(rng, view, levelPieces(view), ctx, 0.2);
       return (
         c && { ...c, level: rng.pick(LEVELS), mod: rng.pick([0, 0, 1, -1]), status: rng.chance(0.2) ? 'LATE' : null }
       );
@@ -353,8 +395,9 @@ export const ACTIONS = [
   {
     kind: 'clearScore',
     weight: 4,
-    pick(rng, view) {
-      const c = pickCell(rng, view, view.assessments);
+    pick(rng, view, ctx) {
+      // Half go back to a cell just scored, commented on or returned.
+      const c = pickCell(rng, view, view.assessments, ctx, 0.5);
       return c && { ...c, undo: rng.chance(0.4) };
     },
     // The gradebook's Clear Score (page-gradebook.js): the keys come off
@@ -377,8 +420,8 @@ export const ACTIONS = [
   {
     kind: 'groupMark',
     weight: 4,
-    pick(rng, view) {
-      const c = pickCell(rng, view, groupPieces(view));
+    pick(rng, view, ctx) {
+      const c = pickCell(rng, view, groupPieces(view), ctx, 0.2);
       return c && { ...c, level: rng.pick([0, ...LEVELS]), separate: rng.chance(0.15), back: rng.chance(0.1) };
     },
     run: (page, a) =>
@@ -434,16 +477,17 @@ export const ACTIONS = [
   },
   {
     kind: 'returnGrades',
-    weight: 4,
-    modes: ['demo'],
+    weight: 5,
     pick(rng, view) {
       // Mostly a piece with drafts waiting, so a Return returns something.
       // Return to All goes to the piece with the most drafts half the time,
-      // as after a fill, so most of the class is returned at once.
+      // as after a fill, so most of the class is returned at once. One
+      // student's Return goes to a student whose grade is waiting.
       const drafts = view.drafts || {};
-      const waiting = view.assessments.filter(a => drafts[a.id]);
-      const most = waiting.slice().sort((x, y) => drafts[y.id] - drafts[x.id])[0];
-      const all = rng.chance(0.6);
+      const count = a => (drafts[a.id] || []).length;
+      const waiting = view.assessments.filter(count);
+      const most = waiting.slice().sort((x, y) => count(y) - count(x))[0];
+      const all = rng.chance(0.5);
       const r = rng.next();
       const a = !waiting.length
         ? rng.pick(view.assessments)
@@ -452,41 +496,70 @@ export const ACTIONS = [
           : r < 0.9
             ? rng.pick(waiting)
             : rng.pick(view.assessments);
-      if (!a) return null;
-      return { aid: a.id, all, sid: rng.pick(view.students).id };
+      const any = rng.pick(view.students);
+      if (!a || !any) return null;
+      const sid = count(a) && rng.chance(0.8) ? rng.pick(drafts[a.id]) : any.id;
+      return { aid: a.id, all, sid };
     },
-    // Return for one student, or Return for all on the piece.
+    // Return for one student, or Return to All on the piece (the grader's
+    // Return and the gradebook's Return to All both end in
+    // Grader.returnGrades). Signed in this is return_work with Send Work
+    // on, return_grades with it off.
     run: (page, a) =>
       inPage(
         page,
         `const cid = getActiveCourse();
          const ids = args.all ? getStudents(cid).map(s => s.id) : [args.sid];
          const out = Grader.returnGrades(cid, args.aid, args.all ? ids : args.sid);
-         return Promise.resolve(out).then(o => 'returned ' + ((o && o.returned) || 0));`,
+         return 'returned ' + ((out && out.returned) || 0);`,
         a,
       ),
   },
   {
     kind: 'revision',
-    weight: 2,
-    modes: ['demo'],
-    pick(rng, view) {
-      const c = pickCell(rng, view, levelPieces(view));
-      return c && { ...c, level: rng.pick(LEVELS) };
+    weight: 3,
+    pick(rng, view, ctx) {
+      // Half go back to a cell just returned for revision: Take Back, or
+      // the same piece asked for again.
+      const back = again(rng, view, ctx, 0.5, c => c.kind === 'revision');
+      const by = () => rng.pick([null, '2026-11-20']);
+      if (back) return { sid: back.sid, aid: back.aid, level: rng.pick(LEVELS), by: by(), takeBack: rng.chance(0.6) };
+      const c = pickCell(rng, view, levelPieces(view), ctx, 0.3);
+      return c && { ...c, level: rng.pick(LEVELS), by: by(), takeBack: false };
     },
-    // Return for Revision, then a revised mark on the same piece.
+    // Return for Revision, then a revised mark on the same piece once the
+    // request is answered; or Take Back of the request that is open. Signed
+    // in these are return_work, return_for_revision and cancel_revision.
     run: (page, a) =>
       inPage(
         page,
         `const cid = getActiveCourse();
-         const p = Grader.returnForRevision
-           ? Grader.returnForRevision(cid, args.sid, args.aid, { what_to_fix: 'Show your working.', revise_by: '', criterion_ids: [] }, 'diff-' + args.sid + args.aid)
-           : null;
-         return Promise.resolve(p).then(() => {
-           const keys = __keysFor(cid, args.aid);
-           keys.forEach(k => Grader.setLevel(cid, args.sid, args.aid, k, args.level));
-           return 'ok';
-         });`,
+         if (args.takeBack) {
+           const open = typeof getRevisionRequest === 'function' ? getRevisionRequest(cid, args.sid, args.aid) : null;
+           if (!open || !open.id) return 'nothing to take back';
+           Grader.cancelRevision(cid, args.sid, args.aid, open.id, crypto.randomUUID());
+           return 'taken back';
+         }
+         const before = window.__diffRevision || 'none';
+         const p = Grader.returnForRevision(cid, args.sid, args.aid, { what_to_fix: 'Show your working.', revise_by: args.by, criterion_ids: [] }, crypto.randomUUID());
+         Promise.resolve(p).then(r => {
+           window.__diffRevision = (r && r.result) || 'no answer';
+           __keysFor(cid, args.aid).forEach(k => Grader.setLevel(cid, args.sid, args.aid, k, args.level));
+         });
+         return 'asked (the one before: ' + before + ')';`,
+        a,
+      ),
+  },
+  {
+    kind: 'sendWork',
+    weight: 1,
+    pick: rng => ({ on: rng.chance(0.75) }),
+    // Class Settings' Send Work switch (cm-student-page.js). Off, a Return
+    // is return_grades and Return for Revision is not offered.
+    run: (page, a) =>
+      inPage(
+        page,
+        `const out = setCourseSendWork(getActiveCourse(), { send_work: args.on }); return out && out.ok ? 'ok' : 'not changed';`,
         a,
       ),
   },
@@ -521,13 +594,24 @@ export const ACTIONS = [
   },
   {
     kind: 'editPiece',
-    weight: 3,
+    weight: 5,
     pick(rng, view) {
       const a = rng.pick(view.assessments);
       return (
         a && {
           aid: a.id,
-          field: rng.pick(['title', 'points', 'category', 'date', 'rubric']),
+          field: rng.pick([
+            'title',
+            'points',
+            'category',
+            'date',
+            'rubric',
+            'weight',
+            'weight',
+            'dueDate',
+            'description',
+            'coreCompetencies',
+          ]),
           n: rng.int(100),
           cat: rng.pick(view.categories.map(c => c.id).concat([''])),
         }
@@ -543,6 +627,14 @@ export const ACTIONS = [
          else if (args.field === 'points') { if (p.scoreMode !== 'points') return 'not points'; p.maxPoints = 10 + (args.n % 30); }
          else if (args.field === 'category') { if (args.cat) p.categoryId = args.cat; else delete p.categoryId; }
          else if (args.field === 'date') p.date = '2026-10-' + String(1 + (args.n % 28)).padStart(2, '0');
+         else if (args.field === 'weight') { const w = [0.5, 2, 3, 1].filter(x => x !== Number(p.weight)); p.weight = w[args.n % w.length]; }
+         else if (args.field === 'dueDate') p.dueDate = p.dueDate && args.n % 3 === 0 ? '' : '2026-11-' + String(1 + (args.n % 28)).padStart(2, '0');
+         else if (args.field === 'description') p.description = p.description && args.n % 3 === 0 ? '' : 'Bring your lab notes (' + args.n + ').';
+         else if (args.field === 'coreCompetencies') {
+           const all = CORE_COMPETENCIES.map(c => c.id);
+           const two = [all[args.n % all.length], all[(args.n + 2) % all.length]];
+           p.coreCompetencyIds = (p.coreCompetencyIds || []).length && args.n % 3 === 0 ? [] : all.filter(id => two.includes(id));
+         }
          else if (args.field === 'rubric') {
            const r = (getRubrics(cid) || [])[0]; if (!r || p.scoreMode === 'points' || p.scoreMode === 'complete') return 'no rubric';
            if (p.rubricId) { p.rubricId = ''; } else { p.rubricId = r.id; p.tagIds = r.criteria.flatMap(c => c.tagIds || []); }

@@ -12,6 +12,10 @@
  *   seeded generator. Each page load takes the next seed from a counter kept
  *   in localStorage, so a reload or a second tab never repeats the ids the
  *   first page made, and A and B count their loads the same way.
+ * - window.__diffPending counts the page's real work still on its way
+ *   (scripts and stylesheets it adds, fetches, IndexedDB), and
+ *   window.__diffLeaving says it is going to another page: the run moves the
+ *   clock only when a page has none of either (probe.mjs settle).
  * - window.__diffFirstLoad is true on the first page load of the run only.
  *   The run's seeding script checks it, so a reload keeps what the device
  *   saved instead of writing the class again.
@@ -54,6 +58,43 @@ function differentialPageInit(opts) {
       });
     });
   }).observe(document, { childList: true, subtree: true });
+  // IndexedDB work, the same way: a database being opened and a transaction
+  // not yet finished.
+  function pend(target, events) {
+    var over = false;
+    window.__diffPending++;
+    events.forEach(function (name) {
+      target.addEventListener(name, function () {
+        if (over) return;
+        over = true;
+        window.__diffPending--;
+      });
+    });
+  }
+  if (window.IDBFactory && window.IDBDatabase) {
+    ['open', 'deleteDatabase'].forEach(function (name) {
+      var realOpen = window.IDBFactory.prototype[name];
+      window.IDBFactory.prototype[name] = function () {
+        var req = realOpen.apply(this, arguments);
+        pend(req, ['success', 'error']);
+        return req;
+      };
+    });
+    var realTx = window.IDBDatabase.prototype.transaction;
+    window.IDBDatabase.prototype.transaction = function () {
+      var tx = realTx.apply(this, arguments);
+      pend(tx, ['complete', 'abort']);
+      return tx;
+    };
+  }
+  // The page is leaving for another (Demo Mode's login page going to the
+  // app): the run waits for the new page, not for this one to go quiet.
+  window.__diffLeaving = false;
+  if (window.navigation && window.navigation.addEventListener) {
+    window.navigation.addEventListener('navigate', function (e) {
+      if (e && e.destination && e.destination.sameDocument === false && !e.downloadRequest) window.__diffLeaving = true;
+    });
+  }
   var realFetch = window.fetch;
   if (realFetch) {
     window.fetch = function () {
