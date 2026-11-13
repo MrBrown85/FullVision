@@ -6354,7 +6354,8 @@ window.ReportQuestionnaire = (function () {
         if (!_browse) return;
         _browse.q = String(el.value || '');
         _browse.openQ = {};
-        _syncBrowseList();
+        clearTimeout(_browse.timer);
+        _browse.timer = setTimeout(_syncBrowseList, 120); // the list follows once typing pauses
         return;
       case 'group': {
         if (!_browse) return;
