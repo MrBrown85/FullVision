@@ -47,6 +47,12 @@ const clone = v => JSON.parse(JSON.stringify(v));
 const id = n => 'e0000000-0000-4000-8000-' + String(n).padStart(12, '0');
 const STUDENTS = [100, 101, 102, 103, 104].map(id); // the fixture's five, in roster order
 
+/* The real waits above (two seconds, then one-second retries) can stack in a
+   test that opens the app twice, so the five-second default is too tight on a
+   busy machine. The wait itself ends the moment the laptop is quiet. */
+const QUIET_CAP_MS = 20000;
+vi.setConfig({ testTimeout: 30000 });
+
 let server;
 let original;
 let tabs = [];
@@ -105,9 +111,15 @@ function loadOutbox() {
   setOnline(true);
 }
 
-/* Until the laptop has nothing left to send or load. */
+/* Until the laptop has nothing left to send or load. The outbox sends its
+   first flush a real two seconds after it loads (shared/offline-queue.js,
+   _becomeOwner), and a send that fails waits a real second before its retry,
+   so this waits for the state, not for a count of turns: a count that is
+   just over two seconds on a quick machine is under it on a busy one. The
+   twenty seconds only ends a run that is really stuck. */
 async function quiet() {
-  for (let i = 0; i < 80; i++) {
+  const giveUp = Date.now() + QUIET_CAP_MS;
+  while (Date.now() < giveUp) {
     await settle();
     const refresh = _refreshState[CID];
     if (!(refresh && refresh.running) && !_hasUnsentWrites()) return;
