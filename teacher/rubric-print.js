@@ -1944,7 +1944,6 @@
     GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,
     feedbackItems: feedbackItems,
-    scoreSheetData: scoreSheetData,
     blankSheetData: blankSheetData,
     usesOf: usesOf,
     MAX_COPIES: MAX_COPIES,

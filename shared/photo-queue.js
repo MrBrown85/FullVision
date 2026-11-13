@@ -1288,8 +1288,6 @@ window.PhotoQueue = (function () {
     newLocalId: newLocalId,
     indexedDbStore: indexedDbStore,
     applyPatch: applyPatch,
-    DB_NAME: DB_NAME,
-    LOCK_NAME: LOCK_NAME,
     BACKOFF_MS: BACKOFF_MS,
     SLOW_AFTER: SLOW_AFTER,
   };

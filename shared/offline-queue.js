@@ -1641,7 +1641,6 @@
     clear: clear,
     claim: claim,
     release: release,
-    currentOwner: currentOwner,
     subscribe: subscribe,
     MAX_ENTRIES: MAX_ENTRIES,
     SLOW_AFTER: SLOW_AFTER,

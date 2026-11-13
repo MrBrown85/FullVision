@@ -1736,13 +1736,6 @@
     }
   }
 
-  function destroy() {
-    close();
-    deactivatePrintMode();
-    var root = document.getElementById(ROOT_ID);
-    if (root && root.remove) root.remove();
-  }
-
   window.GradesPrint = {
     PAPER: PAPER,
     SIZES: SIZES,
@@ -1779,6 +1772,5 @@
     print: print,
     open: open,
     close: close,
-    destroy: destroy,
   };
 })();

@@ -3578,7 +3578,6 @@ window.MGrade = (function () {
   })();
 
   return {
-    showLevelSheet: Speed.showLevelSheet,
     renderPicker: List.renderPicker,
     filterAssessments: List.filterAssessments,
     openFilterSheet: List.openFilterSheet,
