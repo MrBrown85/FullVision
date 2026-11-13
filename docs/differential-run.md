@@ -26,17 +26,19 @@ Options:
 - `--offline`: ten steps offline in every 200, then back online with the outbox drained. The second and third offline steps are fixed: a piece is made and graded, then a student is added and given a mark.
 - `--two-tabs`: a second desktop tab open for a block of steps in every 200, taking about four in ten of the actions while it is open.
 - `--screens-every <n>`: how often the screens are compared (default 25; always after the last step).
+- `--must-reach <writer,writer,...>`: mark writers (names from `scripts/differential/writers.mjs`) the run must call on both sides. If any was not called, the run ends with exit code 3, even with no difference. A name that is not on the list is refused with exit code 2.
 
 `--seed`, `--steps` and `--screens-every` take whole numbers written in digits. Anything else (`"7 a"`, `1e3`, nothing) is refused with exit code 2, so a typo cannot run a different sequence from the one it names.
 
 It serves each built folder through `scripts/e2e-server.mjs` (the edge function and its CSP, as the browser specs get it) on a free port and stops each server by its process id when done. However the run ends, its servers are stopped and its temporary folder removed; a folder left by a run that was killed outright is removed by the next run.
 
-What it prints: a progress line every 25 steps; at the end, per mode, the calls compared by name and one line with the steps run, the actions by kind, the keys, calls and screens compared and "0 differences". At the first difference it stops and prints the step, the action and what differed.
+What it prints: a progress line every 25 steps; at the end, per mode, the calls compared by name, the writer ledger (below) and one line with the steps run, the actions by kind, the keys, calls and screens compared and "0 differences". At the first difference it stops and prints the step, the action and what differed.
 
 Exit codes:
 
 - 0: no difference.
 - 1: a difference.
+- 3: no difference, but a `--must-reach` writer was not called on both sides. The run is no proof for that writer.
 - 2: the run could not be done. A step over its 30-second limit is one (it names the step and action). So is a server the run started that stops while the run is going: the run ends at once and says that something outside it stopped the server. Run it again, alone if the machine is busy. So is the run finding that it asked the two builds different things: that is a fault in the run, to be fixed in the run.
 
 Speed on an M5 Pro: 600 steps in both modes with `--offline --two-tabs` take eight to ten minutes with two other runs going, less alone. Three seeds can run at once.
@@ -55,7 +57,7 @@ A difference in a list of entries that have ids (a student's score entries, the 
 
 ### The classes
 
-- Signed in: the speed recorder's class (`e2e-perf/speed.spec.js`, 30 students by 60 pieces, every cell scored), with a rubric, two categories, and points, Complete/Incomplete, rubric, pair, group and two-competency pieces among the 60, one pair piece scored by points and one group piece scored Complete/Incomplete (`scripts/differential/fixtures.mjs`). Every id is one the server could have made: the class, its students, pieces, rubric, criteria, categories, competencies and their sections. So every write is sent as it is live, a competency score (`upsert_tag_score`) and a hand-set level (`upsert_section_override`) included. The class's student page is on, it returns grades When I Return Them, and Send Work is on. The last ten pieces start blank. A second, small class is there to switch to.
+- Signed in: the speed recorder's class (`e2e-perf/speed.spec.js`, 30 students by 60 pieces, every cell scored), with a rubric, two categories, and points, Complete/Incomplete, rubric, pair, group and two-competency pieces among the 60, one pair piece scored by points and one group piece scored Complete/Incomplete, and an Overall Comment on two students in three of the competency work (`scripts/differential/fixtures.mjs`). Every id is one the server could have made: the class, its students, pieces, rubric, criteria, categories, competencies and their sections. So every write is sent as it is live, a competency score (`upsert_tag_score`) and a hand-set level (`upsert_section_override`) included. The class's student page is on, it returns grades When I Return Them, and Send Work is on. The last ten pieces start blank. A second, small class is there to switch to.
 - Demo Mode: the Demo class, from `login.html?demo=1&student=1`, as the front page's Try Demo Mode link starts it: the student page on, Return Grades When I Return Them, Send Work and My Learning, so drafts, Return and revisions are in play.
 
 ### The fake server
@@ -105,6 +107,24 @@ Through the screen's functions:
 
 **Going back.** A random cell of 1,800 is almost never touched twice, so a clear after a change would almost never happen. The run keeps the cells the last steps touched, and the marks, statuses, comments, Clear Score and Return for Revision go back to one of them between two and five times in ten: a comment is cleared on the cell that has it, a status is set then cleared, a score is changed then cleared, a returned grade is changed.
 
+### The writer ledger
+
+A run only guards what it does. A fault in a writer the run never calls passes every comparison, however long the run. So the run counts the writers it calls.
+
+`scripts/differential/writers.mjs` lists every function exported by `shared/data.js`, the `shared/data-*.js` files and `shared/grader.js` that saves, clears, returns, takes back or restores a score, status, comment, note, rubric tick, DIBELS score or group mark, each with its area and a reason. It also lists the exported names that look like a writer's but are not one. `tests/differential-writers.test.js` fails when an exported function whose name looks like a writer's (a verb such as set, save, clear or undo with a word such as Score, Status, Comment or Group, and every export of `window.Grader`) is on neither list, and when a listed name is gone. So a new writer cannot be added without the run counting it.
+
+In every page the run opens, each listed writer is wrapped once the page's scripts have run: the wrapper tells the run its name through a Playwright binding, then calls the writer with the same `this`, arguments and answer. Nothing is stored in the page. App files are not changed. A writer called while the page's scripts are still loading, or through a reference a script took before then, is not counted.
+
+At the end of each mode the run prints the writers called, with their counts (A and B apart where they differ), and the writers not called.
+
+**A writer on the "not called" list is not guarded by the run.** The reviewer of a move that touches it must check it by reading or by a test, and say which. A move names the writers it moves with `--must-reach`, so a run that never reached one cannot pass as proof for it.
+
+For the coming moves of mark writers out of `shared/data.js`, the run (seeds 1, 2 and 3, 600 steps, both modes, `--offline --two-tabs`) takes these lists, each the writers of that move that the run reaches:
+
+- Assignment statuses: `--must-reach Grader.setStatus,Grader.markBlankCells,Grader.undoMarkBlankCells,setAssignmentStatus,applyAssignmentStatus,saveAssignmentStatuses`. Not reached, so checked by reading or a test: `Grader.deleteAssessmentStatuses`, `Grader.undoMissing`, `setCellStatus`.
+- Score writes: `--must-reach upsertScore,setPointsScore,setCompletionMark,saveScores,persistScoreDiffToCanonical,restoreScoreCells,clearScoreEntries,clearScore,upsertCellScore,saveScoreComment,saveTagComment,saveRubricCriterionComment,Grader.setLevel,Grader.setPlusMinus,Grader.setPoints,Grader.setMark,Grader.typeLevel,Grader.typePlusMinus,Grader.clearScore,Grader.clearScoreOnServer,Grader.undoCell,Grader.undo,Grader.deleteAssessmentScores,Grader.setLevelOnPhone,Grader.setPlusMinusOnPhone,Grader.undoOnPhone,Grader.setOverallComment,Grader.setCompetencyComment,Grader.setCriterionComment`. Not reached: `saveRubricCriterionBeyond`, `saveScoreReportNote`, `setRubricCheck`, `saveRubricChecks`, `saveDibelsScore`, `moveRubricScores`, `clearRowScores`, `clearColumnScores`, `fillRubric`, `Grader.carryOverall`, `Grader.moveToRubric`, `Grader.setReportNote`, `Grader.setTick`, `Grader.setWentBeyond`, `Grader.setDibels`.
+- Group grading: `--must-reach setGradedSeparately,Grader.gradeSeparately,Grader.backToGroupGrade`. Back to Group Grade is reached in Demo Mode only, so this list needs both modes. The group fill itself runs inside `upsertScore`, `setPointsScore` and `setCompletionMark` (`_groupWrite`, `_syncGroupFrom`, `_syncGroupStatuses` are private and not counted); it is guarded by the comparisons, not by the ledger.
+
 ### Not covered
 
 - A student opening a returned piece (`seen_at`), and so a grade marked Updated because the student had seen it: the fake server never says a student opened anything.
@@ -137,5 +157,7 @@ Two pull requests hold the tables: #1304, which added it, and #1319, which has t
 - `scripts/differential/compare.mjs`: the comparisons and their readable output.
 - `scripts/differential/given.mjs`: the run's check that it asked both builds the same things.
 - `scripts/differential/prng.mjs`: the seeded sequence.
+- `scripts/differential/writers.mjs`: the mark writers, the ledger's wrapper and its readout.
 - `tests/differential-run-helpers.test.js`: tests for the comparisons, the sequence, the command line and the run's check on itself.
 - `tests/differential-fake-server.test.js`: tests for the fake server.
+- `tests/differential-writers.test.js`: the writers list against the code, and the ledger's readout.

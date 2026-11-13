@@ -166,7 +166,15 @@ export const SCORES = Object.fromEntries(
         RUBRIC.criteria.forEach((c, ci) =>
           entries.push({ ...base, id: id(ci), tagId: c.id, score: 1 + ((si + ci + ai) % 4) }),
         );
-      else a.tagIds.forEach((t, ti) => entries.push({ ...base, id: id(ti), tagId: t, score: 1 + ((level + ti) % 4) }));
+      else {
+        // Two students in three have an Overall Comment on their competency
+        // work, as a class in use does: + or − typed on such a cell sends
+        // the comment again with the level (Grader.typePlusMinus).
+        const note = si % 3 ? 'Comment on Task ' + (ai + 1) + '.' : '';
+        a.tagIds.forEach((t, ti) =>
+          entries.push({ ...base, id: id(ti), tagId: t, score: 1 + ((level + ti) % 4), note }),
+        );
+      }
     });
     return [s.id, entries];
   }),

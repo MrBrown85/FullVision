@@ -344,7 +344,7 @@ export const ACTIONS = [
   {
     kind: 'gradebookKey',
     screen: true,
-    weight: 4,
+    weight: 6,
     pick(rng, view, ctx) {
       // Half the time, + or − on a cell given an Overall Comment in the
       // last steps: the key sends the comment again with the level.
@@ -352,7 +352,13 @@ export const ACTIONS = [
       if (commented) return { sid: commented.sid, aid: commented.aid, key: rng.pick(['+', '-']), cell: 0 };
       const c = pickCell(rng, view, levelPieces(view).concat(completePieces(view)), ctx, 0.3);
       return (
-        c && { ...c, key: rng.pick(['1', '2', '3', '4', '+', '-', '+', '0', 'Backspace', 'c', 'i']), cell: rng.int(4) }
+        c && {
+          ...c,
+          // + or − half the time: on most competency cells it sends the
+          // cell's comment again (fixtures.mjs).
+          key: rng.chance(0.5) ? rng.pick(['+', '-']) : rng.pick(['1', '2', '3', '4', '0', 'Backspace', 'c', 'i']),
+          cell: rng.int(4),
+        }
       );
     },
     // The real keys on the gradebook's Competencies view: the cell is
