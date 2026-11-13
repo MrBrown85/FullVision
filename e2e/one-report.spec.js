@@ -188,6 +188,9 @@ test.describe('working on the report', () => {
     await sw.click();
     await expect(part(page, 'legend')).toHaveCount(0);
     expect(await page.evaluate(() => getReportConfig('sci8').one.parts.includes('legend'))).toBe(false);
+    // Only the model is saved: the old screen's settings are never written.
+    const saved = await page.evaluate(() => Object.keys(getReportConfig('sci8')));
+    ['progressMode', 'gradeReport', 'form', 'preset'].forEach(key => expect(saved).not.toContain(key));
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(part(page, 'legend')).toHaveCount(1);
     expect(errors).toEqual([]);
