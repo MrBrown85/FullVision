@@ -40,13 +40,13 @@ Compared with MyEducation BC's gradebook, Teams Assignments, Schoology, Google C
 
 1. **The BC curriculum, word for word, built in.** 226 courses, 5,029 competencies, with I Can statements, picked in the New Class wizard.
 2. **Comments written from the evidence, with no AI.** The questionnaire puts the student's year, observations and own words beside a Comment Bank in BC's four parts; Generate assembles your own sentences.
-3. **Students without accounts.** A printed card opens a student's page: questionnaires, self-assessment, goals, and (from January) sending work and reading feedback. No student email, no password.
-4. **Paper work, graded on screen.** A student photographs the page; the teacher ticks the rubric beside it, marks it up, and returns it. The Advanced Rubric suggests the level; the teacher decides. (January pilot.)
-5. **Feedback the student answers.** Reflect on Feedback: Did it make sense? A question for the teacher, a plan for next time, and "Did you do it?" on the next piece. Questions land on the teacher's dashboard. (January pilot.)
+3. **Students without accounts.** A printed card opens a student's page: questionnaires, self-assessment, goals, sending work and reading feedback. No student email, no password.
+4. **Paper work, graded on screen.** A student photographs the page; the teacher ticks the rubric beside it, marks it up, and returns it. The Advanced Rubric suggests the level; the teacher decides.
+5. **Feedback the student answers.** Reflect on Feedback: Did it make sense? A question for the teacher, a plan for next time, and "Did you do it?" on the next piece. Questions land on the teacher's dashboard.
 6. **A gradebook that reads like the reporting policy.** Proficiency with + and −, Letter, or Both; grades build all year; Missing counts no level.
 7. **Report cards that fill themselves.** Page Studio blocks fill from the gradebook for every student: Report Card, Interim Update, Conference Pack, Quick Report.
 8. **The class on a phone, offline.** Grade and observe from a phone; marks send when the Wi-Fi is back.
 
 ## What the page leaves out
 
-Prices, roadmap promises beyond the January pilot, competitor names, calculation methods, and anything still behind the build switch that the pilot does not cover.
+Prices, roadmap promises, competitor names, calculation methods, and anything still behind the build switch that this page does not list.

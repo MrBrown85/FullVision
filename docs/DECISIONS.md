@@ -2,6 +2,45 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Grade math may be touched; Colin's and Karen's scores must not break (2026-11-13)
+
+Context: during the alignment build ([`plans/alignment-plan.md`](plans/alignment-plan.md)) Colin wrote:
+
+> i approve things that touch grade math, but don't break colin or karen's scores
+
+- **Rule:** a change that touches `shared/calc.js` or other grade math no longer waits for Colin's review, on one condition: no grade, level or percent that Colin or Karen sees in a real class changes.
+- **Each such PR shows it.** The golden-grade tests pass untouched. Where the change could reach a number, the PR gives a proof: an identical syntax tree for a comment-only change, or a before-and-after comparison on data shaped like their classes.
+- **If a number would move, the PR stops and goes to Colin.**
+- **Still Colin's:** every release, SQL on the live database, and anything that deletes data. This narrows rule 2 of `CLAUDE.md` for this build; it does not replace it.
+
+## The same-teacher rule was applied (2026-11-13)
+
+The security rule tests found that the database checked which class a row belongs to and not the other records the row names. Colin was told what it was, that the live data held no such link (69 read-only checks, 0 rows), and that the fix was rehearsed with a tested undo. His answer: "Approved". `migrations/2026111301_same_teacher_links.sql` was applied the same night; PR 1337 records it and PR 1338 tests it on every PR. He approved it without reading the SQL, which is in that file.
+
+## Wave 0 rulings (2026-11-13)
+
+Context: the alignment plan ([`plans/alignment-plan.md`](plans/alignment-plan.md)) began with a list of decisions waiting for Colin ("Wave 0"). Asked for them, he answered:
+
+> you make the best practice decisions for Wave 0
+
+So these are the orchestrator's rulings, made on what the council's members have published and on the rules already recorded here. Colin can reverse any of them. Three things do not change: nothing is released without his word, SQL is shown to him before it is applied to the live database, and anything that would delete a student's or a teacher's data goes to him.
+
+1. **One mark saves one mark** (S19-C9, with B4, B5, C10 and the on-save hooks). The design is written first and reviewed by an independent reviewer who tries to break it. If the review holds, the design is approved under this entry. It is built in small steps under "Marks may be moved; Colin and Karen must see no change", and released on its own, on Colin's word.
+2. **A criterion's level with mixed keys** (handoff review decision 17). Every screen shows the level `calc.js` counts, as rule 3 of `CLAUDE.md` already asks. Desktop and phone list students in one order when grading: the order the teacher chose for the roster.
+3. **The review of `87ed0faa`** (decision 11). The order was Colin's on Nov 10 ("The one made later"); what was owed was a check that the commit does that. An independent review makes the check. If it passes, S19-B6 goes ahead.
+4. **The phone gets an Undo button** (decision 16). `undoLastScore` stays. One tap grades a student on the phone, so a wrong tap must be one tap to take back.
+5. **The two `.xlsx` files stay where they are** (decision 1), with the scripts that build them. `CLAUDE.md` rule 10 stands.
+6. **The student page.**
+   - **Opened** (S4). A teacher sees whether a returned piece was opened, as Opened and the date, nothing finer. It counts when the student opens Your Feedback, not when the piece shows in a list. The privacy page says so before the first class uses it.
+   - **iPhone photos** (S5). No HEIC decoder is added: its licence and patent terms are not ones to take on for a free tool. The phone's own change to JPEG is used; a file the browser cannot read gets "Take the photo here, or save it as a JPEG first."
+   - **Keep Photos Until** (S8) follows the photos, not the switch. The reminder and the removal happen whether Send Work is on or off.
+   - **Mark Up counts as started grading** (S9). A student cannot unsend a page the teacher has marked up. The server's rule changes in its own migration.
+   - **"Only Mr. Brown sees this." is kept** (S10, S18-F2). A student's reflection is never quoted in anything a family reads, and an observation made from one stays out of reports. In Their Words (S18-F2) is not built. It can come back only with a choice on each reflection, in the student's hands, such as "My teacher can share this".
+   - **A regrade that is still a draft** (S11) shows in the teacher's own views, marked Draft, as every draft does. Students and reports keep the returned grade until the regrade is returned. The held S11 screens may merge after their independent review.
+   - **My Learning's math** (S13). Nothing is owed: PR 1081 merged on Nov 11.
+   - **Passkeys and MyEdBC Input** (S15, S16) stay as they are: not built, and paused.
+7. **Left for later:** who owns a class, and retiring the per-table load. Neither is needed until the work reaches them.
+
 ## Marks may be moved; Colin and Karen must see no change (2026-11-12)
 
 Context: the split of `shared/data.js` and the big page files (Track E) moved 19 pieces that do not touch marks, each as a move-only PR merged by an independent reviewer, all released. Six pieces were stopped with no change, because they read or write marks or could not move cleanly: the DIBELS benchmark, Copy From Another Class, the Reports Issue dialog, the v2 server-call wrappers, Reflect on Feedback, and Student work and feedback. The rest of the split is code that reads, writes, returns and syncs marks. Colin was asked. His answer, two lines sent together:
@@ -319,13 +358,13 @@ Context: the student page and photo submissions designed on the "Photo Submissio
 4. **Mark Up shows to students when the work is returned.** It is saved as drawing data over the photo, never burned in, so the teacher can erase any mark before returning.
 5. **Keep Photos Until defaults to End of Year** (after June report cards), with End of Term offered, per class. A reminder comes a week before. Grades, comments and Mark Up stay; the photos and files are deleted.
 6. **No second copy of submitted photos** (Colin chose this over a nightly copy kept 30 days). Database backups don't include stored files, so a deleted photo can't come back. Keep Photos Until, Unsend, purging a class and deleting a student must say plainly that photos go for good.
-7. **Supabase's spend cap goes off before photo submissions launch,** with usage alerts at about 70% of each quota, so FullVision is never limited mid-semester. The pilot (about 22 teachers and 3,000 students) is estimated at 35–50 GB a semester, inside Pro's 100 GB.
+7. **Supabase's spend cap goes off before photo submissions launch,** with usage alerts at about 70% of each quota, so FullVision is never limited mid-semester. About 22 teachers and 3,000 students are estimated at 35–50 GB a semester, inside Pro's 100 GB.
 8. **Photos and PDFs only.** A Word or PowerPoint file gets "Save it as a PDF first", with how in Word, PowerPoint and Google, so every submission can be marked up. Every photo is made smaller in the browser before it uploads, on every path (about 2000 px, 300–500 KB a page; iPhone HEIC becomes JPEG; a thumbnail at the same time); PDFs upload as they are, up to 20 MB; the server refuses a photo over 2 MB. _The PDF part superseded 2026-11-09: see "Student page build answers" 2._
 9. **A student card lasts the course by default** (the class's last reporting date), with End of Term offered. Supersedes Student cards 1's term default. The identity check, the lock after five wrong tries and Reissue cover a lost card, and teachers print once per course.
 10. **A graded revision's new grade replaces the old one** when it is returned; the first version and its grade stay as history (the student's Before and After). This changes what counts in the grade math and gets Colin's review in the PR that builds it.
 11. **"Followed it" is the student's word.** When a student sends work they say whether they followed their plan from last time (Yes, Partly, Not This Time). It is shown and reused labelled as theirs ("Jordan says…"); no teacher confirmation.
 12. **The student page's tab is Questionnaires,** the same word teachers use, not Questions, which reads as asking the teacher something.
-13. **Cards for the pilot, built account-ready.** Semester 2 (from late January 2027) uses cards; a student with several FullVision teachers adds each card (Switching Classes). The student's session belongs to the student, not the card, so Microsoft sign-in and one account across teachers can come later without rework.
+13. **Cards, built account-ready.** Students use cards; a student with several FullVision teachers adds each card (Switching Classes). The student's session belongs to the student, not the card, so Microsoft sign-in and one account across teachers can come later without rework.
 
 ## Student page build answers (2026-11-09)
 
@@ -437,7 +476,7 @@ Words used here:
 **The rulings**
 
 1. **The database stores no card code or card password it can read back** (Colin, 2026-11-10: "yes, i would like the stronger fix to be built now rather than deferred"). Making a card and checking one both go through an edge function that holds the key. The database keeps only tags. So a copy of the database, a leaked backup or a stolen database password gives nobody a working card. With it come New Codes for This Class, and codes kept off the screen. There is no timed rotation: a code is replaced when the teacher asks, and it ends with the class's last reporting date.
-2. **Slips get the same fix next, as their own change** (Colin, 2026-11-10). Questionnaire and phone-report slips have the same weakness: their codes are salted hashes made inside the database, and `student.slip_password` is stored readable. They move to the same key right after cards are live and before the January pilot, with their own migration and review. Not inside the card migration: slips are live for both current users, and a card mistake must not be able to break them. Not left on the roadmap.
+2. **Slips get the same fix next, as their own change** (Colin, 2026-11-10). Questionnaire and phone-report slips have the same weakness: their codes are salted hashes made inside the database, and `student.slip_password` is stored readable. They move to the same key right after cards are live, with their own migration and review. Not inside the card migration: slips are live for both current users, and a card mistake must not be able to break them. Not left on the roadmap.
 3. **A card code is eight characters** (`K7M4-QX2P`); a slip stays six (Colin, 2026-11-10). Once the database cannot read a card's code it cannot compare one with a slip's, so the two are told apart by length. Eight characters also make a card 841 times harder to guess, which matters for a code that lasts the course. Students type two more characters; a scan is the same. No class but Colin's test class has cards, so this is the cheapest moment to change it.
 4. **Colin keeps a copy of the key in his password manager** (Colin, 2026-11-10). This reverses the design's advice to keep no copy. He asked what teachers would actually want: never to reprint every card because a key was lost. The copy adds little risk, because his password manager already holds his Supabase sign-in. He makes the key and the copy himself, in his Mac's own Terminal: the key goes to the clipboard, into the password manager, into the functions' settings, and the clipboard is cleared. No assistant ever sees it. The password manager should have two-step sign-in on. The copy is only for putting a lost key back; changing the key still stops every old card.
 5. **A replaced card says so** (Colin, 2026-11-10): "This card has been replaced. Ask your teacher for your new card." A reprint now always stops the old card, so after New Codes for This Class a whole class may be holding old cards; "That code didn't work" would send them looking for a typo. The line names no one, so it tells a guesser nothing.

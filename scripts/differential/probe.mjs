@@ -183,6 +183,7 @@ export function readView(page) {
         tagIds: a.tagIds || [],
         categoryId: a.categoryId || '',
         collaboration: a.collaboration || 'individual',
+        members: ((a.collaboration === 'pair' ? a.pairs : a.collaboration === 'group' ? a.groups : []) || []).flat(),
         criteria: a.rubricId && rubricsById[a.rubricId] ? rubricsById[a.rubricId].criteria.map(c => c.id) : [],
         date: a.date || '',
       })),

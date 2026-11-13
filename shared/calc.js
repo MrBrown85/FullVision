@@ -11,6 +11,33 @@
  * @property {number} [rawPoints] - Original points if converted from points mode
  */
 
+/**
+ * @typedef {Object} ReportTerm - A reporting term, as getReportingTerms gives it
+ * @property {number} ordinal
+ * @property {string} [label]
+ * @property {string} [ends_on]
+ * @property {string} [endsOn]
+ */
+
+/**
+ * @typedef {Object} GradeBadge - One part of a student's overall grade (studentGradeBadges)
+ * @property {string} text
+ * @property {number} level
+ * @property {string} [grade]
+ * @property {string} [pct]
+ * @property {string} [basis]
+ * @property {string} [title]
+ */
+
+/**
+ * @typedef {{ kind: 'points', points: number, base: number, criteria: number | null, factor: number, category: string | null }
+ *   | { kind: 'percent', factor: number, category: string | null }
+ *   | { kind: 'uncategorized' }
+ *   | { kind: 'zero', category: string }} CourseWorth - What one assessment is worth in the course % (assessmentCourseWorth)
+ */
+
+/** @typedef {{ name: string, before: any, after: any }} ChangeExample - One student whose grade a setting change moves */
+
 /* ── Memoization caches ─────────────────────────────────────── */
 var _tagScoresCache = {};
 var _criterionIndexCache = {};
@@ -78,6 +105,7 @@ function withReturnedOnly(fn) {
    leaves Missing work out (STATUS_EFFECT), so only the % and letter move.
    The left-out pieces are part of every cache key (_ck), so this never
    shares a cached number with the real grade. */
+/** @type {{ sid: string, ids: Record<string, boolean> | null, key: string } | null} */
 var _leftOut = null; // { sid, ids: { aid: true } | null, key } while withMissingLeftOut runs
 
 /** Run `fn` with one student's Missing work left out of their grade (read
@@ -87,11 +115,13 @@ var _leftOut = null; // { sid, ids: { aid: true } | null, key } while withMissin
  * as for withReturnedOnly. */
 function withMissingLeftOut(studentId, assessmentIds, fn) {
   var was = _leftOut;
+  /** @type {Record<string, boolean> | null} */
   var ids = null;
   if (assessmentIds) {
     ids = {};
     assessmentIds.forEach(function (aid) {
-      ids[aid] = true;
+      // ids was set to {} just above.
+      /** @type {Record<string, boolean>} */ (ids)[aid] = true;
     });
   }
   _leftOut = {
@@ -307,10 +337,12 @@ function _everyAssessmentIds(cid) {
 /* The reporting term before a report: the one before the active term, or
    with none active (the year so far) the last term that ended before
    today. null when there is none. */
+/** @returns {ReportTerm | null} */
 function previousReportTerm(cid) {
   var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
   var active = _activeTerm[cid];
-  var prev = null;
+  // Set inside the callbacks below, so typed as a cast (see latest in assessmentCellValue).
+  var prev = /** @type {ReportTerm | null} */ (null);
   if (active) {
     terms.forEach(function (t) {
       if (Number(t.ordinal) < active.ordinal && (!prev || Number(t.ordinal) > Number(prev.ordinal))) prev = t;
@@ -407,6 +439,7 @@ function _pieceIndex(cid) {
   var pieces = new Map();
   (getAssessments(cid) || []).filter(Boolean).forEach(function (a) {
     var rubric = _assessmentRubric(cid, a);
+    /** @type {Record<string, boolean> | null} */
     var fed = null;
     ((rubric && rubric.criteria) || []).forEach(function (c) {
       ((c && c.id && c.tagIds) || []).forEach(function (t) {
@@ -644,7 +677,9 @@ function _holdsPoints(e) {
 function _pieceScoreEntry(cid, sid, piece, holds) {
   var entries = _scoreRead.scores(cid)[sid] || [];
   var id = piece && typeof piece === 'object' ? piece.id : piece;
+  /** @type {string[] | null} */
   var keys = piece && typeof piece === 'object' ? scoreTagIds(piece, cid) : null;
+  /** @type {Score | null} */
   var best = null;
   var bestAt = Infinity;
   for (var i = 0; i < entries.length; i++) {
@@ -659,7 +694,13 @@ function _pieceScoreEntry(cid, sid, piece, holds) {
         else at = keys.length + 1;
       }
     }
-    if (at < bestAt || (at === bestAt && at > keys.length && String(e.tagId) < String(best.tagId))) {
+    // Past at < bestAt, best is set. keys is null only when at is 0, and the loop stops at the first 0.
+    if (
+      at < bestAt ||
+      (at === bestAt &&
+        at > /** @type {string[]} */ (keys).length &&
+        String(e.tagId) < String(/** @type {Score} */ (best).tagId))
+    ) {
       best = e;
       bestAt = at;
     }
@@ -841,7 +882,6 @@ function _rubricScoredCriteria(cid, assessment, entries, forPercent) {
    @returns {number | null | undefined} */
 function getRubricAssessmentScore(cid, assessment, entries) {
   var scored = _rubricScoredCriteria(cid, assessment, entries);
-  // @ts-expect-error -- here scored is null or undefined (no strictNullChecks)
   if (!scored) return scored;
   var totalWeight = 0;
   var weightedSum = 0;
@@ -1128,7 +1168,8 @@ function _assessmentPoints(cid, studentId, assessment) {
   var entry = _pieceScoreEntry(cid, studentId, assessment, _holdsPoints);
   if (!isScoreEntered(assessment, entry)) return null;
   var cap = isCompletionScored(assessment) ? possible : possible * POINTS_EXTRA_CREDIT_FACTOR;
-  return { earned: Math.max(0, Math.min(cap, Number(entry.score) || 0)), possible: possible };
+  // isScoreEntered is false when there is no entry.
+  return { earned: Math.max(0, Math.min(cap, Number(/** @type {Score} */ (entry).score) || 0)), possible: possible };
 }
 
 /* ── Class Averages ───────────────────────────────────────────
@@ -1289,10 +1330,12 @@ function getAssessmentGroupPercentage(cid, studentId, assessments, calcMode) {
      { kind: 'zero', category } its category is worth 0%.
    null when no % is shown (a Proficiency class) or the work counts toward
    no grade (DIBELS). category is the category's name, or null. */
+/** @returns {CourseWorth | null} */
 function assessmentCourseWorth(cid, assessment) {
   if (!assessment || isDibelsScored(assessment) || courseGradeMode(cid) === 'proficiency') return null;
   var categories = (typeof getCategories === 'function' && getCategories(cid)) || [];
   var categoryId = assessment.categoryId || assessment.category_id || null;
+  /** @type {{ id: string, name?: string, weight?: number } | null} */
   var category = null;
   if (categories.length) {
     category =
@@ -1793,7 +1836,9 @@ function getCourseLetterData(cid, studentId) {
 
   var categories = getCategories(cid) || [];
   var assessments = _scopedAssessments(cid);
+  /** @type {number | null} */
   var Q = null;
+  /** @type {number | null} */
   var R = null;
 
   if (categories.length > 0) {
@@ -1943,13 +1988,14 @@ function _lastScoredEntries(scores, n) {
  * @param {Object} [opts] - Additional options
  * @param {Object} [opts.categoryWeights] - { summative: number, formative: number }
  * @param {Object} [opts.assessmentWeights] - Map of assessmentId to weight multiplier
- * @param {number} [opts.recentLimit] - Count only the last N scored entries (any method but Most Recent)
+ * @param {number | null} [opts.recentLimit] - Count only the last N scored entries (any method but Most Recent); null counts all
  * @param {(entry: Score) => string} [opts.getScoreBucket] - The category bucket an entry counts in
  * @returns {number} Proficiency level (0-4)
  */
 function calcProficiency(scores, method, decayWeight, opts) {
   // Trimmed before the category split, so "the last 3" means the
   // competency's last 3, whatever their categories.
+  // @ts-expect-error -- recentLimit null or undefined compares false, so every entry counts, as meant.
   if (opts && opts.recentLimit >= 1 && method !== 'mostRecent') scores = _lastScoredEntries(scores, opts.recentLimit);
   const aw = opts && opts.assessmentWeights;
   const cw = opts && opts.categoryWeights;
@@ -2211,7 +2257,13 @@ function getTagScores(cid, studentId, tagId) {
     // As of a report, a score drops out only when its assessment is dated
     // after the report's end. A score whose assessment is gone stays, as it
     // does in the year so far, so the gradebook and the report agree.
-    if (termActive && !assessMap.has(entry.assessmentId) && everyIds.has(entry.assessmentId)) return;
+    // everyIds is set whenever termActive is true.
+    if (
+      termActive &&
+      !assessMap.has(entry.assessmentId) &&
+      /** @type {Set<string>} */ (everyIds).has(entry.assessmentId)
+    )
+      return;
     /* Excused work is left out. So is Missing work (Colin, 2026-11-09:
        "Missing wins everywhere"): a piece marked Missing counts no level,
        even if one is still stored for it. What Missing does to the course %
@@ -2600,7 +2652,7 @@ function rollUpSectionLevels(cid, levelOf) {
 /** Convert an average proficiency to a letter grade and percentage for PHIL12.
  * @param {number} avgProf - Average proficiency (0-4)
  * @param {string} [cid] - Class, for IE before the course ends
- * @returns {{letter: string, pct: number}} Letter grade and corresponding percentage
+ * @returns {{letter: string | null, pct: number | null}} Letter grade and corresponding percentage
  */
 function calcLetterGrade(avgProf, cid) {
   var pct = levelToPercent(cid, avgProf);
@@ -2995,7 +3047,7 @@ function assessmentCellValue(cid, sid, assessment) {
     text: '—',
     status: status || null,
     late: status === 'LATE',
-    mark: null,
+    mark: /** @type {string | null} */ (null),
     outOfRange: false,
   };
   if (status === 'NS' || status === 'EXC') {
@@ -3009,7 +3061,8 @@ function assessmentCellValue(cid, sid, assessment) {
   // it is never a score and never missing as 0.
   if (isDibelsScored(a)) {
     out.kind = 'dibels';
-    var latest = null;
+    // Typed as a cast: it is set inside the callback below, which a plain type would not see.
+    var latest = /** @type {{ period: string, level: string | null } | null} */ (null);
     ['eoy', 'moy', 'boy'].some(function (p) {
       var row = typeof getDibelsScore === 'function' ? _scoreRead.dibels(cid, sid, a.id, p) : null;
       if (row && row.orfWrc != null) latest = { period: p, level: dibelsLevel('orf', p, row.orfWrc) };
@@ -3213,6 +3266,7 @@ function viewedReportTerm(cid) {
    Letter Grade" for language or IEP goals, each with no %, and `basis` set. */
 function studentGradeBadges(cid, sid, termId) {
   var mode = courseGradeMode(cid);
+  /** @type {{ prof: GradeBadge | null, letter: GradeBadge | null }} */
   var out = { prof: null, letter: null };
   if (mode !== 'letter') {
     var overall = getOverallProficiency(cid, sid);
@@ -3256,6 +3310,7 @@ function levelCode(value) {
    the letter and %, as before. */
 function studentRosterBadges(cid, sid) {
   var badges = studentGradeBadges(cid, sid);
+  /** @type {GradeBadge | null} */
   var prof = null;
   if (courseGradeMode(cid) !== 'letter') {
     var level = badges.prof ? Math.max(1, Math.min(4, badges.prof.level)) : 0;
@@ -3270,7 +3325,7 @@ function studentRosterBadges(cid, sid) {
    (studentGradeBadges). */
 function studentGradeSummary(cid, sid, termId) {
   var b = studentGradeBadges(cid, sid, termId);
-  var parts = [b.prof, b.letter].filter(Boolean);
+  var parts = /** @type {GradeBadge[]} */ ([b.prof, b.letter].filter(Boolean));
   var lead = courseGradeMode(cid) === 'letter' ? b.letter : b.prof || b.letter;
   return {
     text: parts
@@ -3513,7 +3568,7 @@ function nextStepLevel(cid, sid, sectionId) {
    on it are left out. */
 function competencyDistribution(cid, studentIds, which) {
   var bands = [1, 2, 3, 4].map(function (level) {
-    return { level: level, label: PROF_LABELS[level], ids: [] };
+    return { level: level, label: PROF_LABELS[level], ids: /** @type {string[]} */ ([]) };
   });
   var values = {};
   var total = 0;
@@ -3760,6 +3815,7 @@ function previewCalcMethodChange(cid, method, decayWeight, recentLimit) {
   else cc.recentScoreLimit = keep.recentScoreLimit;
   clearProfCache();
   var changed = 0;
+  /** @type {ChangeExample | null} */
   var example = null;
   students.forEach(function (s, i) {
     if (before[i] === after[i]) return;
@@ -3810,6 +3866,7 @@ function previewCompetencyRemoval(cid, sectionIds) {
     clearProfCache();
   }
   var changed = 0;
+  /** @type {ChangeExample | null} */
   var example = null;
   students.forEach(function (s, i) {
     if (before[i] === after[i]) return;
@@ -3860,6 +3917,7 @@ function previewLearningMapChange(cid, change) {
     if (typeof clearProfCache === 'function') clearProfCache();
   }
   var changed = 0;
+  /** @type {ChangeExample | null} */
   var example = null;
   students.forEach(function (s, i) {
     if (before[i] === after[i]) return;
@@ -3899,6 +3957,7 @@ function _previewOverallChange(cid, target, field, value) {
     else delete target[field];
   }
   var changed = 0;
+  /** @type {ChangeExample | null} */
   var example = null;
   students.forEach(function (s, i) {
     if (before[i] === after[i]) return;
@@ -3989,7 +4048,8 @@ function classColumnLevelCounts(cid, students, col) {
   var spread = classColumnSpread(cid, students, col);
   if (spread)
     spread.values.forEach(function (v) {
-      var band = _spreadBand(cid, v, spread.points);
+      // Runs only when spread is set (the if above).
+      var band = _spreadBand(cid, v, /** @type {{ points: boolean }} */ (spread).points);
       counts[band]++;
       ids[band].push(v.sid);
     });
@@ -4098,6 +4158,7 @@ function classCompetencyGrid(cid, students, assessment) {
    score), the students with nothing yet (unmarked), and how many are
    scored (Late included). Each list holds student ids in roster order. */
 function classColumnStatusCounts(cid, students, assessment) {
+  /** @type {{ scored: number, total: number, missing: string[], excused: string[], late: string[], unmarked: string[] }} */
   var res = { scored: 0, total: (students || []).length, missing: [], excused: [], late: [], unmarked: [] };
   (students || []).forEach(function (s) {
     var status = _scoreRead.status(cid, s.id, assessment.id);
@@ -4115,6 +4176,7 @@ function classColumnStatusCounts(cid, students, assessment) {
    an overall comment, or a comment on any rubric criterion. Observations
    are not feedback here. { withComment: [sid], without: [sid] }. */
 function classFeedbackCounts(cid, students, assessment) {
+  /** @type {{ withComment: string[], without: string[] }} */
   var res = { withComment: [], without: [] };
   (students || []).forEach(function (s) {
     var status = _scoreRead.status(cid, s.id, assessment.id);
@@ -4228,6 +4290,7 @@ function pointsBands(cid, students, assessment, bandSize) {
    Missing and Excused, and its Class Average % (Missing as 0, Excused left
    out, as getClassPointsAverage counts it; null when nobody counts). */
 function completionCounts(cid, students, assessment) {
+  /** @type {{ complete: string[], incomplete: string[], unmarked: string[], missing: string[], excused: string[], pct: number | null | undefined }} */
   var res = { complete: [], incomplete: [], unmarked: [], missing: [], excused: [], pct: null };
   (students || []).forEach(function (s) {
     var status = _scoreRead.status(cid, s.id, assessment.id);
@@ -4292,11 +4355,13 @@ function dibelsClassResults(cid, students, assessment) {
   });
   var latest = tested.length ? tested[tested.length - 1] : null;
   var previous = tested.length > 1 ? tested[tested.length - 2] : null;
+  /** @type {Record<'up' | 'same' | 'down', { sid: string, from: any, to: any }[]>} */
   var moved = { up: [], same: [], down: [] };
   if (latest && previous)
     Object.keys(rows).forEach(function (sid) {
-      var now = rows[sid][latest];
-      var before = rows[sid][previous];
+      // Only run when latest and previous are both set (the if above).
+      var now = rows[sid][/** @type {string} */ (latest)];
+      var before = rows[sid][/** @type {string} */ (previous)];
       if (!now || !before) return;
       var d = DIBELS_RANK[now.level] - DIBELS_RANK[before.level];
       moved[d > 0 ? 'up' : d < 0 ? 'down' : 'same'].push({ sid: sid, from: before.level, to: now.level });
@@ -4337,7 +4402,12 @@ function assessmentCourseShare(cid, assessment) {
   var total = 0;
   mates.forEach(function (x) {
     var w = assessmentCourseWorth(cid, x);
-    if (w && w.kind === worth.kind) total += worth.kind === 'points' ? w.points : w.factor;
+    // worth is not null here (checked above, never changed), and w has worth's kind, so it has that field.
+    if (w && w.kind === /** @type {CourseWorth} */ (worth).kind)
+      total +=
+        /** @type {CourseWorth} */ (worth).kind === 'points'
+          ? /** @type {{ points: number }} */ (w).points
+          : /** @type {{ factor: number }} */ (w).factor;
   });
   if (!(total > 0) || !(own > 0)) return null;
   var catShare = 1;

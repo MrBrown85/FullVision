@@ -1,5 +1,5 @@
 {
-  "name": "teacher-dashboard",
+  "name": "fullvision",
   "version": "1.0.0",
   "description": "Standards-based gradebook for BC teachers",
   "private": true,
@@ -13,6 +13,7 @@
     "dev:local": "node scripts/dev-local.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:db": "node tests/db/run.mjs",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:real": "npx playwright test --config=playwright.real.config.js",
@@ -24,7 +25,8 @@
     "audit:html": "node scripts/audit-innerhtml.mjs --check",
     "lint": "eslint .",
     "lint:ratchet": "node scripts/lint-ratchet.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "typecheck:ratchet": "node scripts/typecheck-ratchet.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

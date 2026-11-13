@@ -52,7 +52,7 @@ window.CompetencyEvidence = (function () {
        scores   getTagScores rows (already scoped to the term), score > 0
        obs      tagObservations(...)
      → [{ kind: 'score', date, score } | { kind: 'obs', date, ob }] */
-  function mergeEvidence(scores, obs) {
+  function mergeEvidence(scores, obs, cid) {
     var rows = [];
     (scores || []).forEach(function (s) {
       rows.push({ kind: 'score', date: (s.date || '').slice(0, 10), created: '', score: s });
@@ -69,6 +69,11 @@ window.CompetencyEvidence = (function () {
         if (a.date !== b.date) return a.date < b.date ? 1 : -1;
         if (a.kind !== b.kind) return a.kind === 'obs' ? -1 : 1;
         if (a.created !== b.created) return a.created < b.created ? 1 : -1;
+        // Same-day scores: the piece made later first, as calc.js counts it.
+        if (a.kind === 'score' && cid != null) {
+          var made = samePieceDateOrder(cid, b.score.assessmentId, a.score.assessmentId);
+          if (made) return made;
+        }
         return a._i - b._i;
       })
       .map(function (r) {
@@ -111,7 +116,7 @@ window.CompetencyEvidence = (function () {
     var obs = tagObservations(getStudentQuickObs(cid, sid), tagId, term).filter(function (o) {
       return !isHidden(o);
     });
-    return { scores: scores, obs: obs, rows: mergeEvidence(scores, obs) };
+    return { scores: scores, obs: obs, rows: mergeEvidence(scores, obs, cid) };
   }
 
   /* ── HTML ───────────────────────────────────────────────── */

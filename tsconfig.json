@@ -6,6 +6,7 @@
     "target": "es2022",
     "lib": ["es2023", "dom", "dom.iterable"],
     "strict": false,
+    "strictNullChecks": true,
     "skipLibCheck": true,
     "types": []
   },
@@ -37,6 +38,8 @@
     "shared/data-profile-summaries.js",
     "shared/data-courses-terms.js",
     "shared/data-demo.js",
-    "shared/data-curriculum-index.js"
+    "shared/data-curriculum-index.js",
+    "teacher/report-qn-browse-cases.js",
+    "teacher/report-qn-voice-observations.js"
   ]
 }

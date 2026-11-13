@@ -483,10 +483,8 @@ describe('rubric-criterion-own-scores', () => {
       seed([entry(CRIT_Q1, 3)]);
       _teacherId = 'teacher-uuid';
       _saveClassMeta(CID, { schema: 3, owner: _teacherId, version: 9, lastOpenedAt: Date.now(), savedAt: Date.now() });
-      expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(false);
       expect(_savedCopyUsable(CID)).toBe(false);
       localStorage.setItem('gb-scores-' + CID, JSON.stringify({ [SID]: [entry(CI, 3)] }));
-      expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(true);
       expect(_savedCopyUsable(CID)).toBe(false);
       _saveClassMeta(CID, { schema: 4 });
       expect(_savedCopyUsable(CID)).toBe(false);

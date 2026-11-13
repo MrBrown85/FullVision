@@ -287,6 +287,8 @@ load('shared/bank-comment.js');
 load('shared/bank-sets.js');
 load('teacher/comment-bank.js');
 load('teacher/comment-personal.js');
+load('teacher/report-qn-browse-cases.js');
+load('teacher/report-qn-voice-observations.js');
 load('teacher/report-questionnaire.js');
 load('teacher/grade-report.js');
 load('teacher/report-one.js');
@@ -346,4 +348,5 @@ beforeEach(() => {
   _serverState = {};
   _localWrites = {};
   _refreshState = {};
+  _keptText = {}; // the fourth piece of per-session memory: each tab's own copy of scores and statuses
 });

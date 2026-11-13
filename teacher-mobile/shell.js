@@ -1039,7 +1039,7 @@
       : getAssessments(_cid)
           .slice()
           .sort(function (a, b) {
-            return (b.date || '').localeCompare(a.date || '');
+            return (b.date || '').localeCompare(a.date || '') || samePieceDateOrder(_cid, b.id, a.id);
           })[0];
     // The Grade tab opens on its list. A grading screen left open there
     // would come back under this one with the same ids, and the handlers

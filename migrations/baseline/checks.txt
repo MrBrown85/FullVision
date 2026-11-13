@@ -1,0 +1,74 @@
+-- Printed by scripts/db-baseline.sql from gradebook-prod's system catalogs.
+-- Don't edit by hand: refresh it with the Database baseline workflow (docs/database-rebuild.md).
+default privileges for role postgres in schema public on S: {authenticated=rU/postgres}
+default privileges for role postgres in schema public on f: {authenticated=X/postgres,service_role=X/postgres}
+default privileges for role postgres in schema public on r: {authenticated=arwd/postgres}
+default privileges for role postgres in schema storage on S: {postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}
+default privileges for role postgres in schema storage on f: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+default privileges for role postgres in schema storage on r: {postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}
+default privileges for role postgres on f: {postgres=X/postgres}
+default privileges for role supabase_admin in schema cron on S: {postgres=r*w*U*/supabase_admin}
+default privileges for role supabase_admin in schema cron on f: {postgres=X*/supabase_admin}
+default privileges for role supabase_admin in schema cron on r: {postgres=a*r*w*d*D*x*t*m*/supabase_admin}
+default privileges for role supabase_admin in schema extensions on S: {postgres=r*w*U*/supabase_admin}
+default privileges for role supabase_admin in schema extensions on f: {postgres=X*/supabase_admin}
+default privileges for role supabase_admin in schema extensions on r: {postgres=a*r*w*d*D*x*t*m*/supabase_admin}
+default privileges for role supabase_admin in schema graphql on S: {postgres=rwU/supabase_admin,anon=rwU/supabase_admin,authenticated=rwU/supabase_admin,service_role=rwU/supabase_admin}
+default privileges for role supabase_admin in schema graphql on f: {postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}
+default privileges for role supabase_admin in schema graphql on r: {postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}
+default privileges for role supabase_admin in schema graphql_public on S: {postgres=rwU/supabase_admin,anon=rwU/supabase_admin,authenticated=rwU/supabase_admin,service_role=rwU/supabase_admin}
+default privileges for role supabase_admin in schema graphql_public on f: {postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}
+default privileges for role supabase_admin in schema graphql_public on r: {postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}
+default privileges for role supabase_admin in schema realtime on S: {postgres=rwU/supabase_admin,dashboard_user=rwU/supabase_admin}
+default privileges for role supabase_admin in schema realtime on f: {postgres=X/supabase_admin,dashboard_user=X/supabase_admin}
+default privileges for role supabase_admin in schema realtime on r: {postgres=a*r*wdDxtm/supabase_admin,dashboard_user=arwdDxtm/supabase_admin}
+default privileges for role supabase_auth_admin in schema auth on S: {postgres=rwU/supabase_auth_admin,dashboard_user=rwU/supabase_auth_admin}
+default privileges for role supabase_auth_admin in schema auth on f: {postgres=X/supabase_auth_admin,dashboard_user=X/supabase_auth_admin}
+default privileges for role supabase_auth_admin in schema auth on r: {postgres=arwdDxtm/supabase_auth_admin,dashboard_user=arwdDxtm/supabase_auth_admin}
+event trigger ensure_rls on ddl_command_end runs public.rls_auto_enable() (enabled O)
+event trigger issue_graphql_placeholder on sql_drop runs extensions.set_graphql_placeholder() (enabled O)
+event trigger issue_pg_cron_access on ddl_command_end runs extensions.grant_pg_cron_access() (enabled O)
+event trigger issue_pg_graphql_access on ddl_command_end runs extensions.grant_pg_graphql_access() (enabled O)
+event trigger issue_pg_net_access on ddl_command_end runs extensions.grant_pg_net_access() (enabled O)
+event trigger pgrst_ddl_watch on ddl_command_end runs extensions.pgrst_ddl_watch() (enabled O)
+event trigger pgrst_drop_watch on sql_drop runs extensions.pgrst_drop_watch() (enabled O)
+extension pg_cron 1.6.4 in schema pg_catalog
+extension pg_net 0.20.0 in schema extensions
+extension pg_stat_statements 1.11 in schema extensions
+extension pgcrypto 1.3 in schema extensions
+extension plpgsql 1.0 in schema pg_catalog
+extension supabase_vault 0.3.1 in schema vault
+extension uuid-ossp 1.1 in schema extensions
+identity column (made in 50-table-extras.sql): public.grade_return_repair_log.id identity=a generated=
+identity column (made in 50-table-extras.sql): public.photo_check_log.id identity=a generated=
+identity column (made in 50-table-extras.sql): public.submission_file_removal.id identity=a generated=
+identity column (made in 50-table-extras.sql): student_submit.attempt.id identity=a generated=
+identity column (made in 50-table-extras.sql): student_submit.send_log.id identity=a generated=
+identity column (made in 50-table-extras.sql): student_submit.write_log.id identity=a generated=
+policy outside the app schemas: cron_job_policy on cron.job
+policy outside the app schemas: cron_job_run_details_policy on cron.job_run_details
+policy outside the app schemas: fv_handouts_read on storage.objects
+policy outside the app schemas: fv_handouts_upload on storage.objects
+policy outside the app schemas: fv_student_photos_fence on storage.objects
+policy outside the app schemas: fv_student_photos_read on storage.objects
+policy outside the app schemas: fv_student_photos_teachers_only on storage.objects
+policy outside the app schemas: fv_student_photos_upload on storage.objects
+publication supabase_realtime has public.course_sync_cursor
+publication supabase_realtime_messages_publication has realtime.messages
+publication zero_data for all tables
+schema auth
+schema cron
+schema extensions
+schema fv_backup
+schema fv_legacy
+schema fv_private
+schema graphql
+schema graphql_public
+schema net
+schema pgbouncer
+schema public
+schema realtime
+schema storage
+schema student_submit
+schema supabase_migrations
+schema vault

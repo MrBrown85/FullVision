@@ -206,4 +206,4 @@ One bank file (not built: `shared/curriculum-questions.json` does not exist), ke
 
 The bank is read-only reference data like `curriculum_data.js`: loaded lazily, never stored per class. When a class is created from a BC course, its curricular self-assessment is assembled from the bank for the competencies assessed that period. A custom class (no curriculum) gets the rating question only, from whatever I-can text the teacher typed. Teachers can edit a question for their class; the edit lives on the class's `question` row, the bank stays untouched.
 
-Size: generating and checking 223 courses is roughly ten sessions of batch work, not design work. Start with the courses you teach (Humanities 8, Socials 10, History 12, Philosophy 12) so the pilot has them, then fill the rest by subject.
+Size: generating and checking 223 courses is roughly ten sessions of batch work, not design work. Start with the courses you teach (Humanities 8, Socials 10, History 12, Philosophy 12), then fill the rest by subject.

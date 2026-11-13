@@ -2278,30 +2278,18 @@ window.MGrade = (function () {
       return crit ? { assessment: a, rubric: rubric, crit: crit } : null;
     }
 
-    /* A criterion's level, the desktop grid's rule: one level when its
-       competencies agree (with their ±), else the lowest, marked mixed. */
+    /* A criterion's level and ±. It is saved under one key
+       (rubricCriterionScoreKeys), so it is never mixed. */
     function _critState(cid, sid, aid, crit) {
       var entries = getScores(cid)[sid] || [];
-      var levels = [];
-      var mods = [];
-      rubricCriterionScoreKeys(crit).forEach(function (tid) {
-        var e = entries.find(function (s) {
+      var tid = rubricCriterionScoreKeys(crit)[0];
+      var e =
+        tid &&
+        entries.find(function (s) {
           return s.assessmentId === aid && s.tagId === tid;
         });
-        if (e && e.score > 0) {
-          levels.push(e.score);
-          mods.push(normalizeScoreMod(e.score, e.mod));
-        }
-      });
-      if (!levels.length) return { level: 0, mod: 0, mixed: false };
-      var same = levels.every(function (l) {
-        return l === levels[0];
-      });
-      var modsAgree = mods.every(function (m) {
-        return m === mods[0];
-      });
-      if (same) return { level: levels[0], mod: modsAgree ? mods[0] : 0, mixed: false };
-      return { level: Math.min.apply(null, levels), mod: 0, mixed: true };
+      if (!e || !(e.score > 0)) return { level: 0, mod: 0, mixed: false };
+      return { level: e.score, mod: normalizeScoreMod(e.score, e.mod), mixed: false };
     }
 
     function _viewSwitchHtml(cid, assessment) {
