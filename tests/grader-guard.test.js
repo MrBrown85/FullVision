@@ -67,6 +67,11 @@ const EXEMPT = new Set([
   'shared/data-markup.js',
   'shared/data-reflect.js',
   'shared/data-revisions.js',
+  'shared/data-roster.js',
+  'shared/data-withdrawn.js',
+  'shared/data-overrides.js',
+  'shared/data-profile-summaries.js',
+  'shared/data-courses-terms.js',
   'shared/grader.js',
   'shared/seed-data.js',
 ]);
