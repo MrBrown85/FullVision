@@ -1,15 +1,20 @@
+// @ts-check
 /* The BC curriculum index: the bank, the New Class wizard's course lists, and the learning map built from it.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
 /* ══════════════════════════════════════════════════════════════════
    BC Curriculum Index Loader (unchanged — not persisted data)
    ══════════════════════════════════════════════════════════════════ */
+/** @typedef {{ id?: string, tag?: string, short_label?: string, raw?: string, i_can_statements?: unknown[] }} CurriculumCompetency */
+/** @typedef {{ name: string, folder?: boolean, competencies?: CurriculumCompetency[] }} CurriculumCategory */
+/** @typedef {{ course_name: string, subject: string, grade: unknown, categories?: CurriculumCategory[] }} CurriculumCourse */
+/** @type {Record<string, CurriculumCourse> | null} */
 let CURRICULUM_INDEX = null;
 
 async function loadCurriculumIndex() {
   if (CURRICULUM_INDEX) return CURRICULUM_INDEX;
   if (window._CURRICULUM_DATA) {
-    CURRICULUM_INDEX = window._CURRICULUM_DATA;
+    CURRICULUM_INDEX = /** @type {Record<string, CurriculumCourse>} */ (window._CURRICULUM_DATA);
     return CURRICULUM_INDEX;
   }
   try {
@@ -27,7 +32,7 @@ async function loadCurriculumIndex() {
         document.head.appendChild(script);
       });
       if (window._CURRICULUM_DATA) {
-        CURRICULUM_INDEX = window._CURRICULUM_DATA;
+        CURRICULUM_INDEX = /** @type {Record<string, CurriculumCourse>} */ (window._CURRICULUM_DATA);
         return CURRICULUM_INDEX;
       }
       throw new Error('Script loaded but no data');
@@ -86,7 +91,10 @@ function buildLearningMapFromTags(shortTags, options) {
     return { subjects: [], sections: [], competencyGroups: [], _customized: true, _version: 1, _flatVersion: 2 };
   const skip = new Set((options && options.skip) || []);
   const courses = shortTags
-    .map(courseTag => ({ courseTag, course: CURRICULUM_INDEX[courseTag] }))
+    .map(courseTag => ({
+      courseTag,
+      course: /** @type {Record<string, CurriculumCourse>} */ (CURRICULUM_INDEX)[courseTag],
+    }))
     .filter(x => x.course && x.course.categories && x.course.categories.length);
   const isHybrid = courses.length > 1;
   const kept = (courseTag, cat) =>
@@ -122,6 +130,7 @@ function buildLearningMapFromTags(shortTags, options) {
       const comps = kept(courseTag, category);
       if (!comps.length) continue;
 
+      /** @type {{ id: string, name: string, color: string, sortOrder: number, displayOrder: number } | null} */
       let group = null;
       if (category.folder === true) {
         const shared = isHybrid && folderCourses[category.name].size > 1;
@@ -225,7 +234,7 @@ function curriculumCompKey(courseTag, comp) {
    or, when another course in the class has the same name (English First
    Peoples Literary Studies 10 and Literary Studies 10), the name and key. */
 function _curriculumFolderPrefix(courseTag, courses) {
-  const name = CURRICULUM_INDEX[courseTag].course_name;
+  const name = /** @type {Record<string, CurriculumCourse>} */ (CURRICULUM_INDEX)[courseTag].course_name;
   const twin = courses.some(x => x.courseTag !== courseTag && x.course.course_name === name);
   return twin ? name + ' (' + courseTag + ')' : name;
 }

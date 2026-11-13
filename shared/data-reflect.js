@@ -1,3 +1,4 @@
+// @ts-check
 /* Reflect on Feedback: a student's reflection on returned work, the class's two feedback switches (Reflect on Feedback, Show My Learning) and Send Answer.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -485,7 +486,7 @@ function getStudentFeedback(cid, sid) {
     v: 1,
     reflect_on_feedback: on,
     show_my_learning: demo && _courseFeedbackOptions(cid).show_my_learning,
-    assessments: [],
+    assessments: /** @type {unknown[]} */ ([]),
     last_plan: on ? getStudentLastPlan(cid, sid) : null,
   };
   if (!demo) return out;

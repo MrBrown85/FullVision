@@ -69,7 +69,7 @@ describe('service worker fingerprints', () => {
   });
 
   it('the files Reports and the other loaders fetch on demand are fingerprinted', () => {
-    for (const url of ['/teacher/page-reports.js', '/teacher/report-one-panel.js', '/teacher/competency-wording.js']) {
+    for (const url of ['/teacher/page-reports.js', '/teacher/report-one-panel.js', '/shared/competency-wording.js']) {
       expect(prints[url]).toMatch(/^[A-Za-z0-9+/]{43}=$/);
     }
   });

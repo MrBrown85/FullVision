@@ -81,10 +81,6 @@ window.MComponents = (function () {
     );
   }
 
-  function largeTitleHTML(title) {
-    return '<div class="m-title-large" aria-hidden="true">' + _esc(title) + '</div>';
-  }
-
   /* ── Sheet (present / dismiss) ─────────────────────────────── */
   var _sheetCloseCallback = null;
 
@@ -498,7 +494,6 @@ window.MComponents = (function () {
     avatarColor: avatarColor,
     avatarInitials: avatarInitials,
     navBar: navBar,
-    largeTitleHTML: largeTitleHTML,
     presentSheet: presentSheet,
     dismissSheet: dismissSheet,
     confirmSheet: confirmSheet,

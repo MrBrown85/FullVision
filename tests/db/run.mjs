@@ -28,6 +28,8 @@
  *   4. Links. Every column a same_teacher trigger guards is pointed at a
  *      record of teacher B from one of A's rows; each try must be refused
  *      (tests/db/same-teacher.sql).
+ *   5. Schemas. Neither a visitor nor a teacher may create a table or a
+ *      function in public, student_submit or fv_private.
  *
  * Runs psql (set PSQL to use another one), as scripts/db-rebuild.mjs does.
  */
@@ -115,6 +117,49 @@ function testSameTeacherLinks() {
   say(`  Refused by the same-teacher rule: ${count('refused by the rule')}.`);
   say(`  Refused by another check that fires first: ${count('refused by another check')}.`);
   return tries;
+}
+
+/* ---------- nothing new in the app's schemas ---------- */
+
+/* Neither a visitor nor a teacher may create an object in the app's
+   schemas. The catalog is asked, and then each role really tries. */
+function testNoCreate() {
+  const schemas = ['public', 'student_submit', 'fv_private'];
+  const roles = ['anon', 'authenticated'];
+  const held = json(
+    `select coalesce(jsonb_agg(jsonb_build_object('role', r, 'schema', s)), '[]'::jsonb)::text
+       from unnest(array[${roles.map(lit).join(', ')}]) r, unnest(array[${schemas.map(lit).join(', ')}]) s
+      where has_schema_privilege(r, s, 'CREATE')`,
+  );
+  for (const h of held)
+    fail('schemas', `${h.role} holds CREATE on schema ${h.schema}. Revoke it: nothing in the app creates objects.`);
+  const kinds = {
+    table: s => `create table ${s}.rls_probe (x int)`,
+    function: s => `create function ${s}.rls_probe() returns int language sql as 'select 1'`,
+  };
+  let tried = 0;
+  for (const role of roles)
+    for (const schema of schemas)
+      for (const [kind, make] of Object.entries(kinds)) {
+        tried++;
+        let refusal = null;
+        try {
+          psql(url, `begin;\nset local role ${role};\n${make(schema)};\nrollback;\n`);
+        } catch (e) {
+          refusal = String(e.message);
+        }
+        if (refusal === null) fail('schemas', `${role} created a ${kind} in schema ${schema}.`);
+        else if (!/permission denied for schema/.test(refusal))
+          fail(
+            'schemas',
+            `${role} creating a ${kind} in ${schema} failed for another reason: ${refusal.split('\n').pop()}`,
+          );
+      }
+  say(`Schemas: ${tried} tries by a visitor and a teacher to create a table or a function in ${schemas.join(', ')}.`);
+  say(
+    `  Refused for want of permission on the schema: ${tried - failures.filter(f => f.startsWith('schemas: ') && / created a | failed for another /.test(f)).length}.`,
+  );
+  return { held, tried };
 }
 
 /* ---------- the run ---------- */
@@ -593,10 +638,11 @@ function main() {
     const f = testFunctions(fns, seeded, uuids);
     const s = testStudentDoor(fns, seeded);
     const l = testSameTeacherLinks();
+    const c = testNoCreate();
     if (process.env.RLS_REPORT)
       writeFileSync(
         process.env.RLS_REPORT,
-        JSON.stringify({ tables: t, functions: f, student: s, links: l, failures }, null, 2),
+        JSON.stringify({ tables: t, functions: f, student: s, links: l, schemas: c, failures }, null, 2),
       );
     ok = failures.length === 0;
   } finally {

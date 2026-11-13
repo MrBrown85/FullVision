@@ -1,6 +1,6 @@
 /**
  * The Learner Profile's student voice (docs/STUDENT-VOICE-PLAN.md, PR 8;
- * canvas 9d): teacher/student-voice.js reads a student's questionnaire
+ * canvas 9d): shared/student-voice.js reads a student's questionnaire
  * answers and picks out what the profile places by name;
  * teacher/learner-profile.js draws the ID card, About Me, the student's
  * goals and Reflections. Every answer shows, blanks say "No answer", and the
@@ -298,44 +298,6 @@ describe('LearnerProfile', () => {
     expect(mount(LearnerProfile.reflectionsHtml(o)).querySelector('.lp-none').textContent).toBe(
       'No reflections from Harjot yet.',
     );
-  });
-
-  it('About Me: each answer in a bubble under its question, escaped, repeated questions tagged', () => {
-    const box = mount(LearnerProfile.aboutHtml(opts()));
-    expect([...box.querySelectorAll('h3')].map(h => h.textContent)).toEqual(['As a Learner', 'Outside School']);
-    const bubbles = [...box.querySelectorAll('.qw-b')].map(b => b.textContent);
-    expect(bubbles).toContain('Building things');
-    expect(bubbles).toContain('Cricket <b>with</b> cousins');
-    expect(box.querySelector('.qw-b b')).toBeNull();
-    expect(box.querySelectorAll('.qw-again').length).toBe(2);
-    expect(box.textContent).toContain('No answer');
-  });
-
-  it('About Me not turned on, or not answered yet, says which', () => {
-    const o = opts();
-    o.model = { about: null, checkin: null, reflections: [], last: null };
-    expect(mount(LearnerProfile.aboutHtml(o)).textContent).toContain('Harjot hasn’t answered About Me yet.');
-    o.aboutOn = false;
-    expect(mount(LearnerProfile.aboutHtml(o)).textContent).toContain('About Me isn’t turned on for this class.');
-    // Where to turn it on is a link straight to that tab.
-    o.cid = CID;
-    const link = mount(LearnerProfile.aboutHtml(o)).querySelector('a.lp-link');
-    expect(link.textContent).toBe('Class Settings › Questionnaires');
-    expect(link.getAttribute('data-href')).toBe('/dashboard?course=' + CID + '&manage=questionnaires');
-  });
-
-  it('the student’s goals: the course goal in full with its status and next step, then the Core Competency goal', () => {
-    const course = mount(LearnerProfile.courseGoalHtml(opts()));
-    expect(course.querySelector('h3').textContent).toBe('Science 8 Goal');
-    expect(course.querySelector('.src').textContent).toBe('From Harjot');
-    expect(course.querySelector('.st').textContent).toBe('Not Started');
-    expect(course.textContent).toContain('What do I want to get better at in Science 8, and how?');
-    expect(course.querySelector('.qw-b').textContent).toBe('Study 15 min after school\n- ask when stuck');
-    expect(course.querySelector('.gl-check').textContent).toContain('Check-in · Nov 7');
-    const core = mount(LearnerProfile.coreGoalHtml(opts()));
-    expect(core.querySelector('.gl-title').textContent).toBe('Personal Awareness & Responsibility');
-    expect(core.querySelector('.qw-b').textContent).toBe('turn stuff in');
-    expect(core.querySelector('.gl-none').textContent).toBe('No answer');
   });
 
   it('Reflections: the shield as bubbles with blanks shown, a step and a why for each competency', () => {

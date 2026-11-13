@@ -37,7 +37,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 - Entry point: `teacher/app.html`
 - Router: `teacher/router.js`
 - Main page modules:
-  - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`, and draws the block picker and the first screen for a teacher with no classes through `cm-block-picker.js`
+  - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`, and draws the block picker and the first screen for a teacher with no classes through `cm-block-picker.js`, and draws its Where These Appear help panel through `cm-std-help.js`, and its Reporting Terms section through `cm-terms.js`
   - `page-assignments.js`; its assessment form's competency picker (Choose Competencies, the Codes and List views, the focus box and type to narrow) is `assign-competency-picker.js`; the descriptor bar (a rubric level's or a competency level's wording while it is hovered, focused or held, on the class grid and in the grader) is `assign-descriptor-bar.js`
   - `page-student.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`; the Grades tab's Group By (which assessments fall in each category, unit, type or rubric) is `student-groups.js`; the Edit Student dialog (also opened from the Term Questionnaire) is `student-edit-dialog.js`
   - `page-gradebook.js`; its Export CSV is `gradebook-csv.js`, and the grid's hover, scroll sync, sticky Overall column, header height and slanted headers are `gradebook-chrome.js`
@@ -57,7 +57,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
   - `tab-students.js`, with `students-list.js` and `student-detail.js`
   - `tab-observe.js`
   - `tab-grade.js`: the list of assessments and the speed grader, with `sweep.js` and `grade-photos.js` (the student's work on a grading card and a student's To Grade list), `add-work.js` (Add Work: photographing a student's paper work) and `markup.js` (Mark Up: drawing on a page of the work)
-- It also loads `teacher/obs-capture.js`, `teacher/obs-card.js` and `teacher/work-wall.js` (the Work Wall, from the Grade tab's row menu) from the desktop.
+- It also loads `shared/obs-capture.js`, `shared/obs-card.js` and `shared/work-wall.js` (the Work Wall, from the Grade tab's row menu) from the desktop.
 
 The mobile experience reuses the same shared auth, data, queue, and calculation layers as desktop, but presents them through a separate shell and touch-first UI.
 
@@ -118,7 +118,7 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 38. `shared/rubric-draft.js`
 39. `shared/rubric-checks.js`
 
-The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `teacher/student-voice.js` and before `teacher/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
+The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 
 Desktop or mobile modules then layer on top of that shared runtime.
 

@@ -1,6 +1,6 @@
 /**
  * The Grade tab's row menu on the phone (S14 follow-up): Work Wall, which
- * opens teacher/work-wall.js, and Add Work for the N Not In; and the phone
+ * opens shared/work-wall.js, and Add Work for the N Not In; and the phone
  * grader in the order the wall shows (renderSwiper's `ids`). Demo Mode's
  * sample work (Science 8, Cell Microscope Lab).
  */
@@ -131,7 +131,7 @@ describe('the phone loads the Work Wall', () => {
   it('in its page; the shell opens it and grades in its order', () => {
     const html = readFileSync('teacher-mobile/index.html', 'utf-8');
     expect(html).toContain('<script src="../shared/work-thumbs.js"></script>');
-    expect(html).toContain('<script src="../teacher/work-wall.js"></script>');
+    expect(html).toContain('<script src="../shared/work-wall.js"></script>');
     expect(html).toContain('<link rel="stylesheet" href="../teacher/work-wall.css" />');
     const shell = readFileSync('teacher-mobile/shell.js', 'utf-8');
     expect(shell).toContain("action === 'm-work-wall'");

@@ -2206,18 +2206,6 @@ function _focusRosterRow(sid, tries) {
   else if (row) row.focus();
 }
 
-/* ── Proficiency badge HTML ─────────────────────────────────── */
-function profBadge(score, size) {
-  const s = roundLevel(score);
-  const sz = size || 'sm';
-  return `<span class="prof-badge prof-${s} prof-${sz}">${s || '\u2014'}</span>`;
-}
-
-function profBar(value, max, color) {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-  return `<div class="prof-bar"><div class="prof-bar-fill" style="width:${pct}%;background:${color || 'var(--active)'}"></div></div>`;
-}
-
 /* The roster keeps its scroll position when the sidebar is drawn again.
    Pages replace the whole sidebar on almost every change (picking a student
    on Assignments, a score landing, moving between students), and a new
@@ -2858,10 +2846,7 @@ window.addEventListener('unhandledrejection', function (event) {
 
 /* ── Namespace ──────────────────────────────────────────────── */
 window.UI = {
-  profBadge,
-  profBar,
   refreshSyncStatusUI,
-  retrySyncQueue,
   queueSessionExpiredRetry,
   copyTextToClipboard,
 };

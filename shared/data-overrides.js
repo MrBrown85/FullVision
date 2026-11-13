@@ -1,3 +1,4 @@
+// @ts-check
 /* The teacher's hand-set levels (section overrides) and the reason with each: getOverrides and saveOverrides, and the calculated level
    shown beside one after a class loads (_fillOverrideCalculated). Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -28,7 +29,7 @@ function _fillOverrideCalculated(cid) {
 function getOverrides(cid) {
   if (_cache.overrides[cid] !== undefined) return _cache.overrides[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-overrides-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-overrides-' + cid))) || {};
   } catch (e) {
     console.warn('Overrides parse fallback:', e);
     return {};

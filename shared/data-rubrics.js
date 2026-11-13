@@ -1,3 +1,4 @@
+// @ts-check
 /* Rubrics: getRubrics and saveRubrics, the load and save to the server, Advanced Rubric checkboxes (moveRubricScores), printed rubrics,
    competency descriptors and deleteRubric. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -5,7 +6,7 @@
 function getRubrics(cid) {
   if (_cache.rubrics[cid] !== undefined) return _cache.rubrics[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-rubrics-' + cid)) || [];
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-rubrics-' + cid))) || [];
   } catch (e) {
     console.warn('Rubrics parse fallback:', e);
     return [];
@@ -357,34 +358,34 @@ function _persistRubricsToCanonical(cid, prev, arr) {
           });
         }
         ops.push(
-          window.v2
-            .upsertRubric(
-              {
-                id: rubric.id,
-                courseId: cid,
-                name: _rubricName(rubric),
-                style: rubricStyle(rubric),
-                criteria: _rubricCriteriaPayload(rubric),
-                copyGroup: rubric.copyGroup || null,
-                // null when this copy never loaded them: the server keeps its own.
-                linkedTagIds: rubric && Array.isArray(rubric.tagIds) ? _rubricWholeTagIds(rubric) : null,
-              },
-              { entryId: rec ? rec.entryId : undefined },
-            )
-            .then(function (res) {
-              if (res && res.error) {
-                if (res.error.cancelled) return;
-                throw res.error;
-              }
-              var canonicalId = res && res.data ? res.data : _isUuid(rubric.id) ? rubric.id : null;
-              if (canonicalId) {
-                keptCanonicalIds[canonicalId] = true;
-                if (rubric.id && rubric.id !== canonicalId) idMap[rubric.id] = canonicalId;
-              }
-              // Re-keys the rubric, then reads the criteria ids back
-              // (already done when the outbox reported success).
-              if (rec) landed.push(_onCreateLanded(rec.entryId, res && res.data));
-            }),
+          /** @type {(params: unknown, options?: unknown) => Promise<RpcResult<'upsert_rubric'>>} */ (
+            window.v2.upsertRubric
+          )(
+            {
+              id: rubric.id,
+              courseId: cid,
+              name: _rubricName(rubric),
+              style: rubricStyle(rubric),
+              criteria: _rubricCriteriaPayload(rubric),
+              copyGroup: rubric.copyGroup || null,
+              // null when this copy never loaded them: the server keeps its own.
+              linkedTagIds: rubric && Array.isArray(rubric.tagIds) ? _rubricWholeTagIds(rubric) : null,
+            },
+            { entryId: rec ? rec.entryId : undefined },
+          ).then(function (res) {
+            if (res && res.error) {
+              if (res.error.cancelled) return;
+              throw res.error;
+            }
+            var canonicalId = res && res.data ? res.data : _isUuid(rubric.id) ? rubric.id : null;
+            if (canonicalId) {
+              keptCanonicalIds[canonicalId] = true;
+              if (rubric.id && rubric.id !== canonicalId) idMap[rubric.id] = canonicalId;
+            }
+            // Re-keys the rubric, then reads the criteria ids back
+            // (already done when the outbox reported success).
+            if (rec) landed.push(_onCreateLanded(rec.entryId, res && res.data));
+          }),
         );
       });
 
@@ -629,14 +630,17 @@ function setRubricPrints(cid, aid, marks) {
    "From competency" draft (RubricDraft.competencyKey makes the keys). Per
    teacher, not per class: loaded once a session, kept in localStorage so
    it works offline and in Demo Mode, written through the outbox. */
+/** @type {Record<string, Record<number, string>> | null} */
 var _competencyDescriptors = null;
+/** @type {Promise<Record<string, Record<number, string>>> | null} */
 var _competencyDescriptorsLoad = null;
+/** @returns {Record<string, Record<number, string>>} */
 function getCompetencyDescriptors() {
   if (!_competencyDescriptors) {
     var stored = _safeParseLS('gb-competency-descriptors', {});
     _competencyDescriptors = stored && typeof stored === 'object' ? stored : {};
   }
-  return _competencyDescriptors;
+  return /** @type {Record<string, Record<number, string>>} */ (_competencyDescriptors);
 }
 function getCompetencyDescriptor(key) {
   return (key && getCompetencyDescriptors()[key]) || null;
@@ -695,6 +699,7 @@ function loadCompetencyDescriptors() {
       _competencyDescriptorsLoad = null; // try again next time
       return getCompetencyDescriptors();
     }
+    /** @type {Record<string, Record<number, string>>} */
     var bank = {};
     res.data.forEach(function (r) {
       if (!r || !r.competency_key || !r.text) return;

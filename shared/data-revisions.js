@@ -1,3 +1,4 @@
+// @ts-check
 /* Revisions: returning work for another try (Return for Revision, its edit and Take Back, the student's revision in Demo Mode, Before and After).
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -392,7 +393,7 @@ function _revisionRequestOk(cid, a, req, patch) {
     allowed &&
     (!names.length ||
       names.some(function (k) {
-        return allowed.indexOf(k) < 0;
+        return /** @type {string[]} */ (allowed).indexOf(k) < 0;
       }))
   ) {
     return null;

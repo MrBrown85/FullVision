@@ -1,3 +1,4 @@
+// @ts-check
 /* Student profile summaries: getStudentProfileSummaries and loadStudentProfileSummaries, the rows they are read from, and how a summary
    fills the roster, flags, goals, reflections, hand-set levels and notes. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -79,6 +80,7 @@ function _applyStudentProfileSummaries(cid, rows) {
   var reflections = {};
   var overrides = {};
   var notes = {};
+  /** @type {Record<string, unknown> | null} */
   var noteIds = null;
 
   (rows || []).forEach(function (row) {
@@ -147,7 +149,7 @@ function _applyStudentProfileSummaries(cid, rows) {
 function getStudentProfileSummaries(cid) {
   if (_cache.studentProfileSummaries[cid] !== undefined) return _cache.studentProfileSummaries[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-student-profile-summaries-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-student-profile-summaries-' + cid))) || {};
   } catch (e) {
     console.warn('Student profile summaries parse fallback:', e);
     return {};

@@ -1,3 +1,4 @@
+// @ts-check
 /* The small helpers every part of the app uses: student names, dates, colours, ids and RPC results.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -109,6 +110,7 @@ function formatShortDate(ts, today) {
   if (isNaN(d.getTime())) return '';
   const now = today ? parseLocalDate(today) : new Date();
   const schoolYear = x => (x.getMonth() >= 7 ? x.getFullYear() : x.getFullYear() - 1);
+  /** @type {Intl.DateTimeFormatOptions} */
   const opts = { month: 'short', day: 'numeric' };
   if (schoolYear(d) !== schoolYear(now)) opts.year = 'numeric';
   return d.toLocaleDateString('en-CA', opts);
@@ -185,7 +187,7 @@ function _localDayOf(value) {
   if (!value) return '';
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   var d = new Date(value);
-  if (isNaN(d)) return '';
+  if (isNaN(/** @type {number} */ (/** @type {unknown} */ (d)))) return '';
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
@@ -229,4 +231,28 @@ function _rpcObject(data) {
 var _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function _isUuid(v) {
   return typeof v === 'string' && _UUID_RE.test(v);
+}
+
+/* A write the outbox refused (full, or the browser's storage is full): the
+   warning in the console, and one report to Sentry for each distinct text
+   per page load. The text is the function's name and the reason, and
+   nothing from the write itself. Never throws into the save. */
+/** @type {Record<string, true>} */
+var _refusalsReported = {};
+/**
+ * @param {string} name the server function that was refused
+ * @param {unknown} reason the reason the outbox gave
+ * @returns {void}
+ */
+function _warnWriteRefused(name, reason) {
+  console.warn(name + ' not queued (' + reason + '): the outbox has no room');
+  try {
+    var text = 'Write refused: ' + name + ' (' + String(reason) + ')';
+    if (_refusalsReported[text]) return;
+    _refusalsReported[text] = true;
+    var sentry = window.Sentry;
+    if (sentry && typeof sentry.captureMessage === 'function') sentry.captureMessage(text, 'warning');
+  } catch (e) {
+    /* reporting must never reach the save */
+  }
 }

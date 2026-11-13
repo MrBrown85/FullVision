@@ -49,7 +49,7 @@ window.MObserve = (function () {
     return d.toLocaleDateString('en-CA', o);
   }
 
-  /* One observation card, as the desktop feed draws it (teacher/obs-card.js):
+  /* One observation card, as the desktop feed draws it (shared/obs-card.js):
      type block, name, time, the note, and a meta line of context, linked
      assessment or competency, tags, and "Quoted in Report N". The whole
      card opens the edit sheet; the name filters the feed to that student.

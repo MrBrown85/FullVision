@@ -869,10 +869,7 @@
     anyClassTakesWork: anyClassTakesWork,
     photosNote: photosNote,
     parseBackup: parseBackup,
-    collectIds: collectIds,
     remapBackup: remapBackup,
-    restoredCourse: restoredCourse,
-    backupToPayload: backupToPayload,
     planRestore: planRestore,
     restoreClassFromBackup: restoreClassFromBackup,
   };
