@@ -1740,15 +1740,20 @@ window.PageAssignments = (function () {
         _CHEVRON_ICON +
         '</span>' +
         '</div>' +
+        // A closed card has no body: its grid is built when it opens. (Every
+        // card's whole-class grid used to be built and kept out of sight:
+        // 80,000 elements on a class of 30 with 36 pieces.)
         '<div class="assess-body">' +
-        (a.description
-          ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
-            esc(a.description) +
-            '</div>'
+        (isOpen
+          ? (a.description
+              ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
+                esc(a.description) +
+                '</div>'
+              : '') +
+            (focusSt
+              ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
+              : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : _groupRowStudents(cid, a, students), scores))
           : '') +
-        (focusSt
-          ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
-          : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : _groupRowStudents(cid, a, students), scores)) +
         '</div>' +
         '</div>';
       return c;
