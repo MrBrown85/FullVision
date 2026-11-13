@@ -44,6 +44,7 @@
     "teacher/cm-std-help.js",
     "teacher/cm-terms.js",
     "teacher/report-one-zoom.js",
-    "teacher/report-one-head.js"
+    "teacher/report-one-head.js",
+    "teacher/report-print-paper.js"
   ]
 }

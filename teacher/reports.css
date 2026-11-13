@@ -1380,6 +1380,20 @@
   color: var(--text-3);
   font-weight: 400;
 }
+/* Paper: the switch, and under it what that paper needs (report-print-paper.js). */
+#issue-paper-k {
+  padding-top: 3px;
+}
+.issue-card .confirm-ok:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.issue-paper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
 .issue-group {
   border: 0;
   padding: 0;
