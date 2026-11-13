@@ -1,3 +1,4 @@
+// @ts-check
 /* The v2 server-call wrappers: window.v2.upsertSubject through window.v2.getAssessmentDetail, and their small helpers.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). Loads just after shared/data.js, which makes window.v2. */
 
@@ -400,6 +401,7 @@ window.v2.toggleReportBlock = function (courseId, blockKey, enabled) {
 /* A list read's { data, error }: data is the rows, or null when nothing was
    read (Demo Mode, signed out, or an error), so a caller keeps its device
    copy rather than mistaking "no server" for "no rows". */
+/** @param {{ data: unknown, error: RpcError | null } | null | undefined} res */
 function _listResult(res) {
   var error = (res && res.error) || null;
   var data = res && res.data != null && !error ? _rpcRows(res.data) : null;
@@ -657,6 +659,12 @@ window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
    Every write is online only and never queued: the teacher is waiting on
    the result (the new report, the slip codes), and a failed call is simply
    made again. Each carries an idempotency key. */
+/**
+ * @template {RpcName} N
+ * @param {N} name
+ * @param {RpcArgs<N>} params
+ * @param {(data: RpcResult<N>['data']) => unknown} shape
+ */
 function _phoneReportCall(name, params, shape) {
   var sb = getSupabase();
   if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
