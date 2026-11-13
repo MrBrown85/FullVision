@@ -117,7 +117,7 @@ Through the screen's functions:
 
 ## Proof that it works
 
-Two pull requests hold the tables: #1304, which added it, and the one after it, "Differential run: the rest of the review's fixes", which has the tables for the tool as it is now. Main against main on six seeds (1, 2, 3, 7, 11 and 2741), each run twice, with no difference and the same summary both times. And main against fifteen throwaway copies of main, each with one small change in how marks are saved, cleared, deleted, returned, re-keyed or synced, every one caught on one of seeds 1 to 3.
+Two pull requests hold the tables: #1304, which added it, and #1319, which has the tables for the tool as it is now. Main against main on six seeds (1, 2, 3, 7, 11 and 2741), each run twice, with no difference and the same summary both times. And main against fifteen throwaway copies of main, each with one small change in how marks are saved, cleared, deleted, returned, re-keyed or synced, every one caught on one of seeds 1 to 3.
 
 ## Files
 
