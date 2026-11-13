@@ -3719,7 +3719,7 @@ function seedIfNeeded() {
   // About Me from September and the November Reflection with its Goal
   // Check-In, turned on in Science 8, with answers from Cece (all three),
   // Noor (About Me) and Sam (About Me and part of the reflection). Stored as
-  // teacher/questionnaires.js and teacher/student-voice.js keep them in Demo
+  // shared/questionnaires.js and shared/student-voice.js keep them in Demo
   // Mode, so the Questionnaires tab and the Learner Profile agree. Seeded
   // once per device, separately from the class, so a demo seeded before
   // these existed gets them too.

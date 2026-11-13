@@ -93,7 +93,7 @@
     "teacher/comment-personal.js",
     "teacher/comment-realiser.js",
     "teacher/competency-evidence.js",
-    "teacher/competency-wording.js",
+    "shared/competency-wording.js",
     "teacher/dash-class-manager.js",
     "teacher/dash-insights.js",
     "teacher/dash-observations.js",
@@ -109,8 +109,8 @@
     "teacher/grading-setup-copy.js",
     "teacher/learner-profile.js",
     "teacher/markup.js",
-    "teacher/obs-capture.js",
-    "teacher/obs-card.js",
+    "shared/obs-capture.js",
+    "shared/obs-card.js",
     "teacher/page-assignments.js",
     "teacher/page-dashboard.js",
     "teacher/page-gradebook.js",
@@ -121,7 +121,7 @@
     "teacher/phone-reports.js",
     "teacher/preview-student.js",
     "teacher/qr-slips.js",
-    "teacher/questionnaires.js",
+    "shared/questionnaires.js",
     "teacher/report-blocks.js",
     "teacher/report-feedback-cards.js",
     "teacher/report-feedback.js",
@@ -144,8 +144,8 @@
     "teacher/student-evidence.js",
     "teacher/student-groups.js",
     "teacher/student-overrides.js",
-    "teacher/student-voice.js",
+    "shared/student-voice.js",
     "teacher/ui.js",
-    "teacher/work-wall.js"
+    "shared/work-wall.js"
   ]
 }

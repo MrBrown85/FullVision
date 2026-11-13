@@ -75,7 +75,7 @@ declare var ReportOne: {
   offParts(model: unknown, cid: string, sid?: string): string[];
   label(key: string, cid: string): string;
 };
-// The observation card (teacher/obs-card.js, not checked yet). Only the
+// The observation card (shared/obs-card.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
 declare var ObsCard: {
   obDay(ob: unknown): string;

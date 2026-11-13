@@ -1,6 +1,6 @@
 /**
  * The Grade tab's row menu opens the Work Wall on the phone (S14 follow-up):
- * teacher/work-wall.js at 375 x 812, and Grade in This Order opens the
+ * shared/work-wall.js at 375 x 812, and Grade in This Order opens the
  * phone's grader on the students the wall shows, in its order. Demo Mode,
  * Science 8, Cell Microscope Lab.
  */

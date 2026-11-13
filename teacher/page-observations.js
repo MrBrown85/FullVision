@@ -14,7 +14,7 @@ window.PageObservations = (function () {
   var filterStudents = [];
   var filterTags = [];
   var searchQuery = '';
-  /* The shared capture strip (teacher/obs-capture.js). */
+  /* The shared capture strip (shared/obs-capture.js). */
   var _capture = null;
   var filterSentiment = null;
   var filterContext = null;

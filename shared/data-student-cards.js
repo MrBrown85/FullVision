@@ -28,7 +28,7 @@
    nothing. Each answers a promise of { data, error }. In Demo Mode the
    cards are made and kept on this device (gb-student-cards-<cid>), by the
    same rules, and nothing is sent. */
-var _CARD_CODE_LETTERS = 'ABCDEFGHJKMNPQRTUVWXYZ2346789'; // the slip alphabet (teacher/questionnaires.js)
+var _CARD_CODE_LETTERS = 'ABCDEFGHJKMNPQRTUVWXYZ2346789'; // the slip alphabet (shared/questionnaires.js)
 var _CARD_FIELDS = [
   'id',
   'enrollment_id',

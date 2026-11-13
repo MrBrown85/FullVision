@@ -12,8 +12,8 @@ let root;
 const LAZY = {
   desktop: [
     'shared/bank-core-competencies.js', // teacher/page-assignments.js:2298
-    'shared/bank-proficiency.js', // teacher/rubric-print.js:225, teacher/competency-wording.js:77
-    'shared/bank-comment.js', // teacher/competency-wording.js:80
+    'shared/bank-proficiency.js', // teacher/rubric-print.js:225, shared/competency-wording.js:77
+    'shared/bank-comment.js', // shared/competency-wording.js:80
     'shared/bank-sets.js', // teacher/comment-bank.js:1224
     'shared/comment-bank.js', // teacher/comment-bank.js:8244
     'curriculum_data.js', // shared/data-curriculum-index.js:23

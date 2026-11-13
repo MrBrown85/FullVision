@@ -466,7 +466,7 @@ window.MGrade = (function () {
 
     /* The ⋯ on a row: Grade the N Waiting (from the first waiting), Add
        Work for the N Not In (the not-in pile, S7-F3), Work Wall (S14-F1,
-       teacher/work-wall.js) and Grade Everyone (the whole class, in roster
+       shared/work-wall.js) and Grade Everyone (the whole class, in roster
        order). */
     // The row menu's icons (paths inside a 24-unit box).
     var _MENU_ICONS = {

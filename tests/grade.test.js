@@ -189,7 +189,7 @@ describe('grade-format-guard', () => {
     'teacher/comment-bank.js': 1,
     'teacher/comment-personal.js': 1,
     // The level word as a line's label ("Developing: …").
-    'teacher/competency-wording.js': 1,
+    'shared/competency-wording.js': 1,
     'teacher/dash-class-manager.js': 2,
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,

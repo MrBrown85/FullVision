@@ -79,8 +79,8 @@ const FILES = [
   'shared/bank-sets.js',
   'teacher/comment-bank.js',
   'shared/questionnaire-templates.js',
-  'teacher/questionnaires.js',
-  'teacher/student-voice.js',
+  'shared/questionnaires.js',
+  'shared/student-voice.js',
 ];
 
 let _report = 1;

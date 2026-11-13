@@ -5,7 +5,7 @@
    reporting period's Core Competency reflection with its Goal Check-In on
    the same slip. Each card says whether it is open, who has answered, and
    prints the QR slips. Show Questions opens the class's copy for editing;
-   every change saves the whole questionnaire (teacher/questionnaires.js).
+   every change saves the whole questionnaire (shared/questionnaires.js).
 
    DashClassManager renders the panel and hands over every sq* action,
    change and blur. */
