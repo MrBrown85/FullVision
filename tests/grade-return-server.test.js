@@ -364,8 +364,9 @@ describe('every caller of saveCourseConfig and update_course', () => {
     // copy of a class's settings: the tests below hold that neither of the
     // two is sent or changed whatever that copy says, so add it and move on.
     expect(found).toEqual({
-      // its definition; the class move's replay; Demo Mode's switch and the two settings' own writer
-      'shared/data.js': 4,
+      // the class move's replay; Demo Mode's switch and the two settings' own writer
+      'shared/data.js': 3,
+      'shared/data-config-settings.js': 1, // its definition
       'shared/data-courses-terms.js': 1, // the report-terms save
       // Reflect on Feedback's and Show My Learning's switches (S10, S13-W2: setCourseFeedbackOptions, Demo Mode only)
       'shared/data-reflect.js': 1,
@@ -376,7 +377,11 @@ describe('every caller of saveCourseConfig and update_course', () => {
   });
 
   it('update_course is sent from the places this test knows, and no others', () => {
-    const lines = (read('shared/data.js') + '\n' + read('shared/data-courses-terms.js')).split('\n');
+    // The class's settings (saveCourseConfig) moved to shared/data-config-settings.js, and
+    // updateCourse to shared/data-courses-terms.js; the other senders are in shared/data.js.
+    // The three files are read, in the order they load.
+    const SENDERS = ['shared/data.js', 'shared/data-config-settings.js', 'shared/data-courses-terms.js'];
+    const lines = SENDERS.map(read).join('\n').split('\n');
     const callers = [];
     let fn = null;
     lines.forEach(line => {
@@ -392,13 +397,13 @@ describe('every caller of saveCourseConfig and update_course', () => {
     expect(callers).toEqual([
       '_applyBundleCourseConfig', // a setting only this device has, sent up once
       '_sendUpCurriculumTags', // the BC Curriculum Link
-      'saveCourseConfig', // every other class setting
       'saveReturnSettings', // the two settings, when they stop the class holding
       '_startHolding', // the two settings, when they start it
+      'saveCourseConfig', // every other class setting (shared/data-config-settings.js)
       'updateCourse', // name, block, grade and the like (shared/data-courses-terms.js)
     ]);
     sources()
-      .filter(file => file !== 'shared/data.js' && file !== 'shared/data-courses-terms.js')
+      .filter(file => !SENDERS.includes(file))
       .forEach(file => expect(read(file), file).not.toMatch(/['"`]update_course['"`]/));
   });
 
@@ -409,7 +414,12 @@ describe('every caller of saveCourseConfig and update_course', () => {
      and is weighed against the server first. A new sender of update_course
      goes in this list with the answer to "does it mark its write?". */
   it('each sender of class settings marks its write as only what changed; the two settings’ own writers do not', () => {
-    const src = read('shared/data.js') + '\n' + read('shared/data-courses-terms.js');
+    const src =
+      read('shared/data.js') +
+      '\n' +
+      read('shared/data-config-settings.js') +
+      '\n' +
+      read('shared/data-courses-terms.js');
     const body = fn => {
       const from = src.search(new RegExp('^(?:async )?function ' + fn + '\\(', 'm'));
       expect(from, fn).toBeGreaterThan(-1);
