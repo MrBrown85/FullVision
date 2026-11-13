@@ -376,6 +376,54 @@ describe('dash-card-trend', () => {
       expect(html).not.toContain(DOWN);
     });
 
+    it('reads same-date pieces in the order they were made, whichever competency stores them first', () => {
+      // Two competencies. The two pieces made first are on t2 (Level 1), the two made later on t1
+      // (Level 4), all on one date. The cards read t1's scores before t2's, so by stored position
+      // the later pieces come first and the arrow points down; in made order it points up.
+      const made = n => '2026-09-01T09:0' + n + ':00.000Z';
+      const piece = (id, tag, n) => ({ id, title: id, date: '2026-10-05', tagIds: [tag], created: made(n) });
+      const assessments = [piece('p3', 't1', 3), piece('p4', 't1', 4), piece('p1', 't2', 1), piece('p2', 't2', 2)];
+      COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency' };
+      _cache.learningMaps[CID] = {
+        subjects: [],
+        sections: [
+          {
+            id: 'sec',
+            name: 'Inquiry',
+            tags: [
+              { id: 't1', label: 'Inquiry' },
+              { id: 't2', label: 'Design' },
+            ],
+          },
+        ],
+        _customized: true,
+        _version: 1,
+      };
+      _cache.categories[CID] = [];
+      _cache.assessments[CID] = assessments;
+      const entry = (aid, tag, score) => ({ assessmentId: aid, tagId: tag, score, date: '2026-10-05' });
+      _cache.scores[CID] = {
+        [SID]: [entry('p3', 't1', 4), entry('p4', 't1', 4), entry('p1', 't2', 1), entry('p2', 't2', 1)],
+      };
+      _cache.statuses[CID] = {};
+      _cache.rubrics[CID] = [];
+      _cache.overrides[CID] = {};
+      _cache.courseConfigs[CID] = { calcMethod: 'average' };
+      clearProfCache();
+      const st = { id: SID, firstName: 'Noor', lastName: 'Khan' };
+      const html = DashStudentCards.renderStudentCards(
+        CID,
+        [st],
+        [st],
+        getSections(CID),
+        assessments,
+        getScores(CID),
+        {},
+      );
+      expect(html).toContain(UP);
+      expect(html).not.toContain(DOWN);
+    });
+
     it('leaves Excused work out', () => {
       const html = card(
         [lvl('a'), lvl('b'), lvl('c'), lvl('d'), lvl('e')],

@@ -285,6 +285,29 @@ describe('competency-evidence', () => {
       expect(rows.map(r => (r.kind === 'obs' ? r.ob.id : r.score.assessmentId))).toEqual(['late', 'early', 'a1']);
     });
 
+    it('on one day lists the piece made later first, whatever order the scores are stored in', () => {
+      const CID = 'merge-order';
+      const piece = (id, created) => ({ id, title: id, date: '2026-10-05', tagIds: ['t1'], created });
+      COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency' };
+      _cache.assessments[CID] = [
+        piece('later', '2026-10-01T09:05:00.000Z'),
+        piece('first', '2026-10-01T09:00:00.000Z'),
+      ];
+      _cache.scores[CID] = {};
+      _cache.statuses[CID] = {};
+      _cache.rubrics[CID] = [];
+      _cache.categories[CID] = [];
+      clearProfCache();
+      try {
+        const stored = [sc('first', '2026-10-05', 2), sc('later', '2026-10-05', 3)];
+        const rows = H.mergeEvidence(stored, [], CID);
+        expect(rows.map(r => r.score.assessmentId)).toEqual(['later', 'first']);
+      } finally {
+        delete COURSES[CID];
+        clearProfCache();
+      }
+    });
+
     it('is empty with nothing to list', () => {
       expect(H.mergeEvidence([], [])).toEqual([]);
     });

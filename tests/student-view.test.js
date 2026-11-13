@@ -1371,3 +1371,34 @@ describe('Preview as Student: a returned piece looks the same whether or not the
     expect(opened.work.filter(p => p.unseen)).toEqual([]);
   });
 });
+
+/* ── Same-date pieces list in the order they were made ─────────────
+   DECISIONS, "the one made later counts later": on a skill's list, newest
+   first, two returned pieces with one date show the one made later first,
+   whatever order they are stored in. */
+describe('a skill’s pieces, newest first: same-date work shows the one made later first', () => {
+  const MADE_FIRST = piece('a-tie-first', 'Tie Made First', '2026-10-06', {
+    tagIds: ['t1'],
+    created: '2026-10-01T09:00:00.000Z',
+  });
+  const MADE_LATER = piece('a-tie-later', 'Tie Made Later', '2026-10-06', {
+    tagIds: ['t1'],
+    created: '2026-10-01T09:05:00.000Z',
+  });
+  const returned = { is_draft: false, returned_at: '2026-11-04T18:00:00Z' };
+  // Stored the other way round: the piece made later sits first in the list.
+  beforeEach(() => ASSESSMENTS.push(MADE_LATER, MADE_FIRST));
+  afterEach(() => ASSESSMENTS.splice(ASSESSMENTS.indexOf(MADE_LATER), 2));
+
+  it('lists the piece made later first', () => {
+    seed(
+      'proficiency',
+      { ...WORKING, 'a-tie-later': { tags: { t1: lv(3) } }, 'a-tie-first': { tags: { t1: lv(3) } } },
+      { ...ROWS, 'a-tie-later': returned, 'a-tie-first': returned },
+    );
+    const { view } = StudentView.fromCache(CID, S1, { learning: true });
+    const skill = view.learning.groups.flatMap(g => g.skills).find(s => s.id === 'sec1');
+    const titles = skill.pieces.map(p => p.title).filter(t => t.startsWith('Tie '));
+    expect(titles).toEqual(['Tie Made Later', 'Tie Made First']);
+  });
+});
