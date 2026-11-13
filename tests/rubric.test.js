@@ -2853,12 +2853,13 @@ describe('rubric-attached-to-scored-work', () => {
       ]);
     });
 
-    it('work whose rubric did not change is read as the class load sent it', () => {
+    it('the writers read the piece as this page holds it (tests/marks-read-current-piece.test.js)', () => {
       seed(false);
       loadedRows();
-      const row = _cache.v2Gradebook[CID].assessments.find(a => a.id === QUIZ);
-      expect(_assessmentById(CID, QUIZ)).toBe(row);
-      expect(_assessmentById(CID, ESSAY)).toBe(_cache.v2Gradebook[CID].assessments.find(a => a.id === ESSAY));
+      getScores(CID);
+      attach();
+      expect(_assessmentById(CID, ESSAY)).toBe(getAssessments(CID).find(a => a.id === ESSAY));
+      expect(_assessmentById(CID, QUIZ)).toBe(getAssessments(CID).find(a => a.id === QUIZ));
     });
   });
 });

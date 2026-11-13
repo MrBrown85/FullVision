@@ -10,7 +10,66 @@ function getAssessments(cid) {
     return [];
   }
 }
+/* A piece of work loaded from the server carries the server's snake_case
+   copies of some fields beside the app's own (score_mode beside scoreMode,
+   and so on); the editors change only the camelCase one. Readers take the
+   camelCase field and fall back to the snake_case one when it is empty, so
+   a field cleared in an edit (work switched from points to proficiency,
+   a due date taken off) read as it was at the load. Each snake_case copy a
+   row holds is made to agree with its camelCase field; a copy the row does
+   not hold is not added, and a row that already agrees is not touched. */
+function _assessmentFieldsAgree(list) {
+  (list || []).forEach(function (a) {
+    if (!a || typeof a !== 'object') return;
+    function agree(snake, value, same) {
+      if (!(snake in a)) return;
+      if (same ? same(a[snake], value) : (a[snake] == null ? null : a[snake]) === value) return;
+      a[snake] = value;
+    }
+    var empty = function (v) {
+      return v == null || v === '' ? null : v;
+    };
+    if ('scoreMode' in a) agree('score_mode', a.scoreMode || 'proficiency');
+    if ('maxPoints' in a) {
+      agree('max_points', a.maxPoints == null || a.maxPoints === '' ? null : Number(a.maxPoints), function (x, y) {
+        return (x == null || x === '' ? null : Number(x)) === y;
+      });
+    }
+    if (Array.isArray(a.tagIds)) {
+      agree('tag_ids', a.tagIds, function (x, y) {
+        return JSON.stringify(x || []) === JSON.stringify(y);
+      });
+    }
+    if ('categoryId' in a)
+      agree('category_id', empty(a.categoryId), function (x, y) {
+        return empty(x) === y;
+      });
+    if ('dueDate' in a)
+      agree('due_date', empty(a.dueDate), function (x, y) {
+        return empty(x) === y;
+      });
+    if ('date' in a)
+      agree('assigned_at', empty(a.date), function (x, y) {
+        return empty(x) === y;
+      });
+    if ('rubricId' in a) {
+      agree('rubric_id', empty(a.rubricId), function (x, y) {
+        return empty(x) === y;
+      });
+      agree('has_rubric', !!a.rubricId);
+    }
+    if ('collaboration' in a) {
+      agree('collab_mode', _canonicalCollabModeFromAssessment(a));
+      agree('collab_config', _collabConfigFromAssessment(a), function (x, y) {
+        return JSON.stringify(x || null) === JSON.stringify(y || null);
+      });
+    }
+  });
+  return list;
+}
+
 function saveAssessments(cid, arr) {
+  _assessmentFieldsAgree(arr);
   var prev = _loadPersistedCourseFieldSnapshot(
     'assessments',
     cid,
