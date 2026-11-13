@@ -47,6 +47,7 @@ interface Window {
     ): unknown;
     saveTermRating(enrollmentId: string, term: number, payload: unknown): unknown;
     saveTeacherPreferences(patch: import('./database').Json): unknown;
+    deleteRubric(id: string): Promise<RpcResult<'delete_rubric'>>;
     [name: string]: unknown;
   };
   // Set by shared/calc.js for tests and the console. Nothing checked reads it.
@@ -85,7 +86,7 @@ declare var _callRpcWithAuthGuard: <N extends RpcName>(
   options?: unknown,
 ) => Promise<RpcResult<N>>;
 // Set by shared/supabase.js (window.getSupabase): the client, or null.
-declare function getSupabase(): unknown;
+declare function getSupabase(): FvSupabase | null;
 // The Comment Bank's engine (teacher/comment-bank.js, not checked yet). Only
 // the members a checked file uses are typed.
 declare var CommentBank: {
@@ -201,3 +202,70 @@ type V2UpsertTagParams = {
 };
 // shared/data.js holds this while getRevisionFirstCell reads a first version.
 declare var _firstVersionScope: { cid: string; sid: string; aid: string; entries: unknown } | null;
+// Third batch of data files: what window.X = ... sets and what other files
+// define. Only the members the checked data files use are typed.
+interface Window {
+  createObservationRich(params: {
+    courseId: string;
+    body?: string;
+    sentiment?: string | null;
+    contextType?: string | null;
+    assessmentId?: string | null;
+    enrollmentIds?: string[];
+    tagIds?: string[];
+    customTagIds?: string[];
+    localId?: string;
+  }): Promise<RpcResult<'create_observation'> | undefined>;
+  updateObservationRich(
+    obId: string,
+    patch: import('./database').Json | null | undefined,
+    joins?: { enrollmentIds?: string[]; tagIds?: string[]; customTagIds?: string[] },
+  ): Promise<RpcResult<'update_observation'> | undefined>;
+  upsertObservationTemplate(
+    cid: string,
+    payload: {
+      id?: string | null;
+      body?: string;
+      defaultSentiment?: string | null;
+      defaultContextType?: string | null;
+      displayOrder?: number | string | null;
+      defaultDims?: string[] | null;
+    },
+    options?: unknown,
+  ): Promise<RpcResult<'upsert_observation_template'> | undefined>;
+  deleteObservationTemplate(tplId: string): Promise<RpcResult<'delete_observation_template'> | undefined>;
+  createCustomTag(cid: string, label: string): Promise<RpcResult<'create_custom_tag'> | undefined>;
+}
+// The Supabase client (shared/supabase.js), with only the members the data
+// files call. A query is awaited for { data, error }.
+interface FvSupabaseQuery extends PromiseLike<{
+  data: Record<string, string | null>[] | null;
+  error: RpcError | null;
+}> {
+  select(columns: string): FvSupabaseQuery;
+  eq(column: string, value: unknown): FvSupabaseQuery;
+  in(column: string, values: unknown[]): FvSupabaseQuery;
+}
+interface FvSupabase {
+  from(table: string): FvSupabaseQuery;
+  auth: { getSession(): Promise<{ data: { session: { access_token?: string } | null } }> };
+}
+// shared/supabase.js sets these on window; the data files call them by name.
+declare function refreshSupabaseSession(): Promise<{ session?: { access_token?: string } | null }>;
+declare function showSessionExpiredToast(): void;
+declare function isDemoMode(): boolean;
+declare function signOut(opts?: { force?: boolean; redirect?: string }): Promise<unknown>;
+// seed-data.js (loaded in Demo Mode only): the sample class and its seeder.
+declare var DEFAULT_COURSES: Record<string, unknown>;
+declare function seedIfNeeded(): void;
+interface Window {
+  // Set by the Netlify edge function (inject-env.js).
+  __ENV?: { SUPABASE_URL?: string; SUPABASE_KEY?: string };
+  // shared/photo-queue.js. Only the member the data files call is typed.
+  PhotoQueue: { wipe(): Promise<unknown> };
+  // Set by shared/data-demo.js.
+  loadSeedIfNeeded(): Promise<unknown>;
+  resetDemoData(): Promise<void>;
+  leaveDemoMode(href: string, opts?: { force?: boolean }): Promise<unknown>;
+  leaveDemoUnsentText(n: number): string;
+}

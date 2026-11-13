@@ -1,3 +1,4 @@
+// @ts-check
 /* Observations: quick observations, sentence starters, custom tags and the tag resolver.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -5,7 +6,7 @@
 function getQuickObs(cid) {
   if (_cache.observations[cid] !== undefined) return _cache.observations[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-quick-obs-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-quick-obs-' + cid))) || {};
   } catch (e) {
     console.warn('Observations parse fallback:', e);
     return {};
@@ -528,7 +529,8 @@ function _persistObservationTemplatesToCanonical(cid, prev, arr) {
     });
     // A starter removed before its create was sent: nothing to undo on the
     // server, so forget its local id.
-    var pending = _idmap()[cid] || {};
+    /** @typedef {Record<string, Record<string, { kind?: string; queued?: boolean; localId?: string }>>} PendingCreates */
+    var pending = /** @type {PendingCreates} */ (/** @type {unknown} */ (_idmap()))[cid] || {};
     Object.keys(pending).forEach(function (key) {
       var rec = pending[key];
       if (rec && rec.kind === 'observationTemplate' && !rec.queued && !kept[rec.localId]) _unregisterPendingCreate(rec);
@@ -557,7 +559,12 @@ function addObservationTemplates(cid, rows) {
       return t.text;
     });
   if (!added.length) return [];
-  var ok = saveObservationTemplates(cid, getObservationTemplates(cid).concat(added));
+  var ok = saveObservationTemplates(
+    cid,
+    /** @type {(cid: string) => ReturnType<typeof getObservationTemplates>} */ (getObservationTemplates)(cid).concat(
+      added,
+    ),
+  );
   return ok === false ? null : added;
 }
 
@@ -576,7 +583,9 @@ function _templateIndex(list, cid, id) {
 }
 
 function updateObservationTemplate(cid, id, patch) {
-  var list = getObservationTemplates(cid).slice();
+  var list = /** @type {(cid: string) => ReturnType<typeof getObservationTemplates>} */ (getObservationTemplates)(
+    cid,
+  ).slice();
   var i = _templateIndex(list, cid, id);
   if (i < 0) return false;
   list[i] = _cleanObservationTemplate(Object.assign({}, list[i], patch || {}, { id: list[i].id }));
@@ -584,7 +593,9 @@ function updateObservationTemplate(cid, id, patch) {
 }
 
 function removeObservationTemplate(cid, id) {
-  var list = getObservationTemplates(cid).slice();
+  var list = /** @type {(cid: string) => ReturnType<typeof getObservationTemplates>} */ (getObservationTemplates)(
+    cid,
+  ).slice();
   var i = _templateIndex(list, cid, id);
   if (i < 0) return false;
   list.splice(i, 1);
@@ -593,7 +604,9 @@ function removeObservationTemplate(cid, id) {
 
 /* dir -1 moves the starter up one place, +1 down. */
 function moveObservationTemplate(cid, id, dir) {
-  var list = getObservationTemplates(cid).slice();
+  var list = /** @type {(cid: string) => ReturnType<typeof getObservationTemplates>} */ (getObservationTemplates)(
+    cid,
+  ).slice();
   var i = _templateIndex(list, cid, id);
   var j = i + (dir < 0 ? -1 : 1);
   if (i < 0 || j < 0 || j >= list.length) return false;
@@ -682,7 +695,7 @@ function hasAssignmentFeedback(cid, sid, assessId) {
 function getCustomTags(cid) {
   if (_cache.customTags[cid] !== undefined) return _cache.customTags[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-custom-tags-' + cid)) || [];
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-custom-tags-' + cid))) || [];
   } catch (e) {
     console.warn('CustomTags parse fallback:', e);
     return [];

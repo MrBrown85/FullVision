@@ -1,3 +1,4 @@
+// @ts-check
 /* Mark Up and Reflect on Feedback for a signed-in teacher: the server's marks, reflections and revision requests, and Return with its marks.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -41,9 +42,12 @@ var _MARKUP_SAVE_WAIT_MS = 5000; // how long a save waits for the server's answe
 var _FB_REFRESH_MS = 30000; // refreshCourseFeedback's wait between reads, unless forced
 var _fbCourseRow = {}; // cid → { reflect_on_feedback, show_my_learning }, as the server last said
 var _fbCourseHere = {}; // cid → a change of the two on its way: { patch }
+/** @type {Record<string, { markup?: unknown; revisions?: { id?: string }[]; reflections?: { id?: string }[] }>} */
 var _fbServer = {}; // cid → list_course_feedback's answer, as last read
+/** @type {Record<string, Record<string, Record<string, { enrollment_id?: string; rev?: unknown; marks?: unknown; saved_at?: string | null; given?: unknown; given_rev?: unknown; given_at?: string | null; waiting?: boolean }>>>} */
 var _fbRows = {}; // cid → { assessment id → { file id → list_assessment_markup's row } }
 var _fbRead = {}; // cid → { running, again, at }
+/** @type {Record<string, number>} */
 var _fbWrites = {}; // cid → how many of this device's feedback writes have landed
 var _fbMemo = {}; // cid → { name → this turn's view }
 var _fbMemoClearing = false;
@@ -393,6 +397,7 @@ function refreshCourseFeedback(cid, opts) {
     return Promise.resolve({ changed: false });
   }
   st.running = (async function () {
+    /** @type {{ changed?: boolean; error?: unknown; skipped?: unknown }} */
     var out = { changed: false };
     try {
       var tries = 0;
@@ -525,6 +530,7 @@ function _fbWriteLanded(cid) {
 
 /* The class a Mark Up page or a reflection belongs to, from what is in memory. */
 function _fbClassOfFile(fileId) {
+  /** @type {string | null} */
   var found = null;
   Object.keys(_workServer).some(function (cid) {
     var subs = (_workServer[cid] && _workServer[cid].submissions) || [];
@@ -570,6 +576,7 @@ function _fbPutRow(cid, aid, fileId, row) {
 function _onFeedbackWriteEvent(kind, endpoint, payload, data) {
   try {
     payload = payload || {};
+    /** @type {string | null} */
     var cid = null;
     if (endpoint === 'set_course_feedback_options') cid = payload.p_course_id;
     else if (endpoint === 'save_markup') cid = _fbClassOfFile(payload.p_file_id);
@@ -599,7 +606,7 @@ function _onFeedbackWriteEvent(kind, endpoint, payload, data) {
         var given = data.given_rev != null && data.given_rev === data.rev;
         _fbPutRow(cid, aid, payload.p_file_id, {
           file_id: payload.p_file_id,
-          enrollment_id: page.submission.enrollment_id,
+          enrollment_id: /** @type {NonNullable<typeof page>} */ (page).submission.enrollment_id,
           rev: data.rev,
           marks: payload.p_marks,
           saved_at: new Date().toISOString(),
@@ -613,7 +620,7 @@ function _onFeedbackWriteEvent(kind, endpoint, payload, data) {
         var earlier = (_fbRows[cid] && _fbRows[cid][aid] && _fbRows[cid][aid][payload.p_file_id]) || {};
         _fbPutRow(cid, aid, payload.p_file_id, {
           file_id: payload.p_file_id,
-          enrollment_id: page.submission.enrollment_id,
+          enrollment_id: /** @type {NonNullable<typeof page>} */ (page).submission.enrollment_id,
           rev: data.rev,
           marks: data.marks,
           saved_at: earlier.saved_at || null,
@@ -746,7 +753,10 @@ function _returnWorkLive(cid, aid, ids) {
   var waiting = getAssessmentMarkup(cid, aid).filter(function (r) {
     return listed[r.enrollment_id] && r.waiting;
   });
-  var out = Object.assign({}, returnGrades(cid, aid, ids, true), { marks_given: 0, marks_enrollment_ids: [] });
+  var out = Object.assign({}, returnGrades(cid, aid, ids, true), {
+    marks_given: 0,
+    marks_enrollment_ids: /** @type {string[]} */ ([]),
+  });
   waiting.forEach(function (r) {
     out.marks_given++;
     if (out.marks_enrollment_ids.indexOf(r.enrollment_id) < 0) out.marks_enrollment_ids.push(r.enrollment_id);

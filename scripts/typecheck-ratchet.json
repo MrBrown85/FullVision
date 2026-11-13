@@ -21,7 +21,12 @@
     "shared/data-roster.js",
     "shared/data-term-ratings.js",
     "shared/data-learning-map.js",
-    "shared/data-student-records.js"
+    "shared/data-student-records.js",
+    "shared/data-observations.js",
+    "shared/data-rubrics.js",
+    "shared/data-student-cards.js",
+    "shared/data-demo.js",
+    "shared/data-feedback-live.js"
   ],
   "notYetChecked": [
     "s/app.js",
@@ -38,11 +43,6 @@
     "shared/auto-update.js",
     "shared/backup-restore.js",
     "shared/core-self.js",
-    "shared/data-demo.js",
-    "shared/data-feedback-live.js",
-    "shared/data-observations.js",
-    "shared/data-rubrics.js",
-    "shared/data-student-cards.js",
     "shared/data-student-work.js",
     "shared/data.js",
     "shared/device.js",

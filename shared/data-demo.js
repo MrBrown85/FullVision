@@ -1,14 +1,16 @@
+// @ts-check
 /* Demo Mode's data code: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
 /* seed-data.js, fetched once, in Demo Mode only. It holds the demo class
    (DEFAULT_COURSES), read when the classes are, and seedIfNeeded. Resolves
    at once where it has already run; a failed fetch resolves too. */
+/** @type {Promise<void> | null} */
 var _seedScript = null;
 function _loadSeedScript() {
   if (typeof DEFAULT_COURSES !== 'undefined') return Promise.resolve();
   if (!_seedScript) {
-    _seedScript = new Promise(function (resolve) {
+    _seedScript = new Promise(function (/** @type {() => void} */ resolve) {
       var s = document.createElement('script');
       s.src = '/shared/seed-data.js?v=46';
       s.onload = resolve;
@@ -63,6 +65,7 @@ var DEMO_STUDENT_KEY = 'gb-demo-student-page';
 var DEMO_STUDENT_CLASS = 'sci8';
 function applyDemoStudentPage() {
   if (!_isDemoSession()) return false;
+  /** @type {string | null} */
   var mark = null;
   try {
     mark = localStorage.getItem(DEMO_STUDENT_KEY);

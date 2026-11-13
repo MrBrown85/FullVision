@@ -1,3 +1,4 @@
+// @ts-check
 /* Student cards: the printed cards that open a student's page (list, make, print, unlock) and Cards Work Until.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -443,6 +444,7 @@ async function _askTeacherCards(url, token, body) {
       cache: 'no-store',
       credentials: 'omit',
     });
+    /** @type {{ replayed?: unknown; results?: unknown; error?: unknown } | null} */
     var json = null;
     try {
       json = await res.json();
@@ -468,6 +470,7 @@ async function _teacherCardsAsk(body) {
   var got = await _askTeacherCards(url, token, body);
   if (got.status === 0) got = await _askTeacherCards(url, token, body);
   if (got.status === 401 && typeof refreshSupabaseSession === 'function') {
+    /** @type {Awaited<ReturnType<typeof refreshSupabaseSession>> | null} */
     var renewed = null;
     try {
       renewed = await refreshSupabaseSession();
