@@ -227,6 +227,33 @@ describe('a real send: start, each file to its link, finish', () => {
     [token, CECE, WORK.fair, sub.id, 'Cece', 'Page 2 has my answers.'].forEach(s => expect(logged).not.toContain(s));
   });
 
+  it('uploads three pages at a time, each thumbnail beside its photo; the finish names the pages in order (speed, B2)', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    const bucket = page.storage;
+    let up = 0;
+    let most = 0;
+    page.storage = async (url, init) => {
+      if (init.method !== 'PUT') return bucket(url, init);
+      most = Math.max(most, ++up);
+      await new Promise(r => setTimeout(r, 0));
+      up -= 1;
+      return bucket(url, init);
+    };
+    await sendFair(page, 7);
+    await page.settle();
+    expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
+    // Three pages' photos and thumbnails in flight at once (was one file at a time); every file once.
+    expect(most).toBe(6);
+    expect(puts(page)).toHaveLength(14);
+    const start = bodyOf(page, 'send-start')[0];
+    expect(start.pages).toHaveLength(7);
+    const sub = [...dev.fn.world.subs.values()][0];
+    expect(sub.state).toBe('sent');
+    expect(bodyOf(page, 'send-finish')[0].files).toEqual(sub.files.map(f => f.id));
+    expect(dev.kept.rows.size).toBe(0);
+  });
+
   it('One Page Didn’t Send: Send Page 2 Again asks the same send for fresh links and sends only that page', async () => {
     const dev = school();
     const page = await signIn(dev);
@@ -244,7 +271,7 @@ describe('a real send: start, each file to its link, finish', () => {
     const starts = bodyOf(page, 'send-start');
     expect(starts).toHaveLength(2);
     expect(starts[1].request_id).toBe(starts[0].request_id);
-    // Page 1 and its thumbnail were up: only page 2's two files went again.
+    // Page 1 and both thumbnails were up (each thumbnail goes beside its photo): only page 2's photo went again.
     expect(puts(page)).toHaveLength(5);
     expect([...dev.fn.world.subs.values()].map(s => [s.state, s.files.length])).toEqual([['sent', 2]]);
   });
