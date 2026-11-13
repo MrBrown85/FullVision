@@ -2,6 +2,10 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Test-only code is deleted; code that tests use to reach real features stays (2026-11-13)
+
+This records decision 15 of the handoff review plan, which the plan's list approved but this file never carried. Code that only tests call is deleted, with its tests: 6 functions and 18 export keys that nothing called, 5 functions only tests called, and `tagScoresByAssessment` in `shared/calc.js`, the averaging Colin ruled against on Nov 3 (PRs 1350, 1351, 1354). "Only tests call it" is not enough on its own: each candidate is sorted first, because some code exists so a test can reach a real feature. That code stays: `GradeState.afterSeen`, `GradeState.studentCopy`, `isRubricCheckOn`, `PhotoQueue.isLocalId`, `GradesPrint.statusText`, `ReportQuestionnaire.skillTags`, `ReportQuestionnaire.iePending` and the `StudentCards` test hooks. `undoLastScore`, `getSyncStatus` and `setStudentPageSwitch` stay by ruling, and `DashClassManager.reorderCategory` is a live feature.
+
 ## Grade math may be touched; Colin's and Karen's scores must not break (2026-11-13)
 
 Context: during the alignment build ([`plans/alignment-plan.md`](plans/alignment-plan.md)) Colin wrote:
