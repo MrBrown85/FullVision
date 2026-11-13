@@ -242,11 +242,16 @@ window.PageDashboard = (function () {
     // Sort
     switch (sortMode) {
       case 'last-asc':
+        students = sortStudents(students, 'lastName');
+        break;
       case 'last-desc':
+        students = sortStudents(students, 'lastName').reverse();
+        break;
       case 'first-asc':
+        students = sortStudents(students, 'firstName');
+        break;
       case 'first-desc':
-        students = sortStudents(students, sortMode.indexOf('last') === 0 ? 'lastName' : 'firstName');
-        if (sortMode.slice(-5) === '-desc') students = students.reverse();
+        students = sortStudents(students, 'firstName').reverse();
         break;
       case 'overall-desc':
       case 'overall-asc':
