@@ -4182,6 +4182,32 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 11pt;
   font-weight: 700;
 }
+/* For printed copies saved before One Report (a copy reprints from its own
+   HTML with today's styles): the old Quick Report's smaller and two-column
+   lists, its summary under the list, and its "more not shown" line.
+   Nothing draws these now. */
+.gr-table.gr-small,
+.gr-table.gr-two {
+  font-size: 7.5pt;
+}
+.gr-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+  align-items: start;
+}
+.gr-tail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gr-facts {
+  font-size: 9pt;
+}
+.gr-cut {
+  font-size: 8pt;
+  font-style: italic;
+}
 /* The font the sheet prints in (styles.css, @media print --font-base),
    for measuring its columns on screen (grade-report.js _fitPx). */
 .gr-print-font {
