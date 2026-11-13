@@ -11,6 +11,10 @@
 -- schemas. Tables, columns, keys, indexes and triggers come from
 -- docs/schema.generated.sql (scripts/db-rebuild.mjs makes them).
 --
+-- The app's schemas are public, student_submit and fv_private (functions the
+-- storage policies call). fv_legacy (old code no role can reach) and
+-- fv_backup (copies of rows) are left out.
+--
 -- Each part starts with a line "-- @file NAME". node scripts/db-rebuild.mjs
 -- --import db-baseline.out writes each part to migrations/baseline/NAME.
 -- Every part is in a fixed order, so the same database prints the same text.
@@ -22,7 +26,7 @@ set search_path = pg_catalog;
 
 -- Things this baseline does not rebuild, or that a reader should know are
 -- there. Information only: nothing loads this part.
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit')),
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private')),
 lines as (
   select 'extension ' || e.extname || ' ' || e.extversion || ' in schema ' || n.nspname as line
   from pg_extension e join pg_namespace n on n.oid = e.extnamespace
@@ -40,7 +44,7 @@ lines as (
   from pg_proc p join app on app.oid = p.pronamespace
   where p.prosqlbody is not null
   union all
-  select 'not loaded, identity or generated column: ' || c.oid::regclass::text || '.' || quote_ident(a.attname)
+  select case when a.attgenerated <> '' then 'not loaded, generated column: ' else 'identity column (made in 50-table-extras.sql): ' end || c.oid::regclass::text || '.' || quote_ident(a.attname)
     || ' identity=' || a.attidentity::text || ' generated=' || a.attgenerated::text
   from pg_attribute a join pg_class c on c.oid = a.attrelid join app on app.oid = c.relnamespace
   where a.attnum > 0 and not a.attisdropped and (a.attidentity <> '' or a.attgenerated <> '')
@@ -48,6 +52,10 @@ lines as (
   select 'not loaded, relation of kind ' || c.relkind::text || ': ' || c.oid::regclass::text
   from pg_class c join app on app.oid = c.relnamespace
   where c.relkind in ('p', 'f')
+  union all
+  select 'not loaded, relation outside the snapshot (only public and student_submit are in it): ' || c.oid::regclass::text
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'fv_private' and c.relkind not in ('i', 'S')
   union all
   select 'not loaded, unlogged table: ' || c.oid::regclass::text
   from pg_class c join app on app.oid = c.relnamespace
@@ -78,9 +86,13 @@ lines as (
 )
 select '-- @file checks.txt' || E'\n' || coalesce(string_agg(line, E'\n' order by line), '') from lines;
 
+-- The app's schemas other than public, which every database has.
+select '-- @file 05-schemas.sql' || E'\n' || coalesce(string_agg(format('create schema %I;', nspname), E'\n' order by nspname), '')
+from pg_namespace where nspname in ('student_submit', 'fv_private');
+
 -- Enums, then domains, then composite types: a domain may be over an enum,
 -- and a composite type may use either.
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit')),
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private')),
 types as (
   select t.oid, t.typtype, app.nspname, t.typname, t.typrelid, t.typbasetype, t.typtypmod, t.typnotnull, t.typdefault
   from pg_type t join app on app.oid = t.typnamespace
@@ -112,7 +124,7 @@ lines as (
 select '-- @file 10-types.sql' || E'\n' || coalesce(string_agg(line, E'\n' order by ord, nspname, typname), '') from lines;
 
 -- Sequences, except those an identity column makes for itself.
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit'))
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private'))
 select '-- @file 20-sequences.sql' || E'\n' || coalesce(string_agg(
          format('create sequence %I.%I as %s increment by %s minvalue %s maxvalue %s start with %s cache %s%s;',
                 app.nspname, c.relname, format_type(s.seqtypid, null), s.seqincrement, s.seqmin, s.seqmax,
@@ -125,7 +137,7 @@ where not exists (select 1 from pg_depend d where d.classid = 'pg_class'::regcla
 
 -- Every function and procedure, whole. Aggregates and window functions are
 -- listed in checks.txt instead (pg_get_functiondef cannot print them).
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit'))
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private'))
 select '-- @file 30-functions.sql' || E'\n'
        || E'-- Bodies are read when a routine runs, not when it is made, so the order\n'
        || E'-- below (by name) needs nothing else to exist first.\n'
@@ -139,7 +151,7 @@ where p.prokind in ('f', 'p')
 
 -- One line per function and procedure, for the proof: its signature, the
 -- md5 of pg_get_functiondef, and that text's length.
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit'))
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private'))
 select '-- @file function-md5.txt' || E'\n' || coalesce(string_agg(
          app.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') '
            || md5(pg_get_functiondef(p.oid)) || ' ' || length(pg_get_functiondef(p.oid)),
@@ -150,7 +162,7 @@ where p.prokind in ('f', 'p')
   and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e');
 
 -- Views and materialized views, each after the views it reads.
-with recursive app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit')),
+with recursive app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private')),
 views as (
   select c.oid, c.relkind, app.nspname, c.relname, c.reloptions
   from pg_class c join app on app.oid = c.relnamespace
@@ -177,11 +189,11 @@ select '-- @file 40-views.sql' || E'\n' || coalesce(string_agg(
          E'\n\n' order by d.n, nspname, relname), '')
 from views join (select oid, max(n) as n from depth group by oid) d on d.oid = views.oid;
 
--- Policies, sequence owners, row security that binds owners too, the
+-- Policies, sequence owners, identity columns, row security that binds owners too, the
 -- realtime publication's app tables, and the app's pieces outside its two
 -- schemas: triggers on others' tables (auth.users), policies on
 -- storage.objects and storage.buckets, and event triggers.
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit')),
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private')),
 policies as (
   select pol.oid, c.relnamespace, pol.polrelid, pol.polname,
          format('create policy %I on %s as %s for %s to %s', pol.polname, pol.polrelid::regclass::text,
@@ -206,6 +218,21 @@ lines as (
   join pg_depend d on d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'a'
                   and d.refclassid = 'pg_class'::regclass and d.refobjsubid > 0
   where c.relkind = 'S'
+  union all
+  -- Identity columns, which docs/schema.generated.sql shows as plain
+  -- columns, with their sequences' names and settings.
+  select 3, c.oid::regclass::text, a.attname::text,
+         format('alter table %s alter column %I add generated %s as identity (sequence name %s start with %s increment by %s minvalue %s maxvalue %s cache %s%s);',
+                c.oid::regclass::text, a.attname, case a.attidentity when 'a' then 'always' else 'by default' end,
+                sq.oid::regclass::text, s.seqstart, s.seqincrement, s.seqmin, s.seqmax, s.seqcache,
+                case when s.seqcycle then ' cycle' else '' end)
+  from pg_attribute a
+  join pg_class c on c.oid = a.attrelid
+  join pg_depend d on d.refclassid = 'pg_class'::regclass and d.refobjid = c.oid and d.refobjsubid = a.attnum
+                  and d.classid = 'pg_class'::regclass and d.deptype = 'i'
+  join pg_class sq on sq.oid = d.objid and sq.relkind = 'S'
+  join pg_sequence s on s.seqrelid = sq.oid
+  where c.relnamespace in (select oid from app) and a.attidentity <> '' and a.attnum > 0 and not a.attisdropped
   union all
   select 3, c.oid::regclass::text, '', format('alter table %s force row level security;', c.oid::regclass::text)
   from pg_class c join app on app.oid = c.relnamespace
@@ -243,7 +270,7 @@ lines as (
   join pg_namespace p_n on p_n.oid = p.pronamespace
   where p.pronamespace in (select oid from app)
 )
-select '-- @file 50-policies-and-links.sql' || E'\n' || coalesce(string_agg(line, E'\n' order by ord, k, k2, line), '') from lines;
+select '-- @file 50-table-extras.sql' || E'\n' || coalesce(string_agg(line, E'\n' order by ord, k, k2, line), '') from lines;
 
 -- Grants to anon, authenticated, service_role and public, on the app's
 -- schemas, tables, views, sequences, columns, routines and types. Where an
@@ -251,7 +278,7 @@ select '-- @file 50-policies-and-links.sql' || E'\n' || coalesce(string_agg(line
 -- first takes everything from public, then grants what the ACL lists. An
 -- object never changed keeps PostgreSQL's defaults, as it would here.
 -- Grants to other roles (postgres, Supabase's own) and owners are left out.
-with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit')),
+with app as (select oid, nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private')),
 obj as (
   select 1 as ord, 'schema' as kind, quote_ident(n.nspname) as name, n.nspacl as acl, n.nspowner as owner
   from pg_namespace n where n.oid in (select oid from app)
