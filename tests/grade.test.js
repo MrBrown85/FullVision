@@ -195,7 +195,8 @@ describe('grade-format-guard', () => {
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
     'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
-    'teacher/page-gradebook.js': 2,
+    'teacher/gradebook-chrome.js': 1, // the name tip's word for a competency with no evidence (moved from page-gradebook.js)
+    'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
     'teacher/report-feedback-cards.js': 2,
