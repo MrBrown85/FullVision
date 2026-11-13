@@ -1301,12 +1301,8 @@ function _openServerWorkPage(cid, name) {
     return Promise.resolve(null);
   }
   var bucket = (_workServer[cid] && _workServer[cid].bucket) || 'student-photos';
-  return Promise.resolve()
-    .then(function () {
-      return sb.storage.from(bucket).createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
-    })
-    .then(function (res) {
-      var link = res && !res.error && res.data && res.data.signedUrl;
+  return _workSignLink(sb, bucket, name)
+    .then(function (link) {
       if (!link) return null;
       return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
         return r && r.ok ? r.blob() : null;
@@ -1329,6 +1325,67 @@ function _openServerWorkPage(cid, name) {
     .then(null, function () {
       return null;
     });
+}
+
+/* A 300-second link for one stored page. The links asked for in one turn
+   (a screen drawing its pictures) are signed together in one request when
+   the client can (createSignedUrls), instead of one request each. */
+var _workSigning = null; // { bucket, sb, names: { path: [resolve] } } for this turn
+function _workSignLink(sb, bucket, name) {
+  return new Promise(function (resolve) {
+    if (!_workSigning || _workSigning.bucket !== bucket || _workSigning.sb !== sb) {
+      var batch = (_workSigning = { bucket: bucket, sb: sb, names: {} });
+      Promise.resolve().then(function () {
+        if (_workSigning === batch) _workSigning = null;
+        _workSignBatch(batch);
+      });
+    }
+    (_workSigning.names[name] = _workSigning.names[name] || []).push(resolve);
+  });
+}
+function _workSignBatch(batch) {
+  var names = Object.keys(batch.names);
+  var give = function (name, link) {
+    batch.names[name].forEach(function (resolve) {
+      resolve(link || null);
+    });
+  };
+  var store = batch.sb.storage.from(batch.bucket);
+  var one = function (name) {
+    return Promise.resolve()
+      .then(function () {
+        return store.createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
+      })
+      .then(
+        function (res) {
+          give(name, res && !res.error && res.data && res.data.signedUrl);
+        },
+        function () {
+          give(name, null);
+        },
+      );
+  };
+  if (names.length < 2 || typeof store.createSignedUrls !== 'function') return names.forEach(one);
+  Promise.resolve()
+    .then(function () {
+      return store.createSignedUrls(names, STUDENT_WORK_LINK_SECONDS);
+    })
+    .then(
+      function (res) {
+        var got = {};
+        ((res && !res.error && res.data) || []).forEach(function (row) {
+          if (row && row.path && row.signedUrl && !row.error) got[row.path] = row.signedUrl;
+        });
+        names.forEach(function (name) {
+          give(name, got[name]);
+        });
+      },
+      function () {
+        names.forEach(function (name) {
+          give(name, null);
+        });
+      },
+    );
 }
 
 /* ── Add Work ── */
