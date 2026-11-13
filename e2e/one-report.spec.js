@@ -253,6 +253,75 @@ test.describe('working on the report', () => {
     await expect(part(page, 'teacher-narrative')).toContainText('She asks good questions.');
   });
 
+  /* Page Studio moved blocks with Move Up, Move Down and dragging on the
+     page; One Report moves a part in the panel. */
+  test('a part moves up and down in the panel, by keyboard and by dragging, and prints in its new place', async ({
+    page,
+  }) => {
+    const errors = await openOne(page, 'report-card', false);
+    const order = () => page.evaluate(() => getReportConfig('sci8').one.parts);
+    const printed = () =>
+      page
+        .locator('#rb-preview .sheet-student .sheet-cell[data-part]')
+        .evaluateAll(cells => [...new Set(cells.map(c => c.dataset.part))]);
+    const before = await order();
+    const at = before.indexOf('teacher-narrative');
+    // The keyboard: the part's handle and the up arrow.
+    const handle = page.locator('#studio-palette [data-action="oneDrag"][data-part="teacher-narrative"]');
+    await handle.focus();
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(order).toEqual(
+      before
+        .slice(0, at - 1)
+        .concat('teacher-narrative', before[at - 1])
+        .concat(before.slice(at + 1)),
+    );
+    await expect(page.locator('#studio-live')).toContainText('Teacher Comment, ');
+    expect((await printed()).indexOf('teacher-narrative')).toBeLessThan((await printed()).indexOf(before[at - 1]));
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(order).toEqual(before);
+    // Dragging: the comment held by its handle and let go over the
+    // Proficiency Legend's row lands above it.
+    const legend = page.locator('#studio-palette .one-onlist > .one-item[data-part="legend"]');
+    const from = await handle.boundingBox();
+    const to = await legend.boundingBox();
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++)
+      await page.mouse.move(from.x + from.width / 2, from.y + ((to.y + 4 - from.y) * i) / 8 + from.height / 2);
+    await page.mouse.up();
+    await expect
+      .poll(async () => {
+        const o = await order();
+        return o.indexOf('teacher-narrative') < o.indexOf('legend');
+      })
+      .toBe(true);
+    const now = await printed();
+    expect(now.indexOf('teacher-narrative')).toBeLessThan(now.indexOf('legend'));
+    // The letterhead stays first and the response last.
+    expect((await order())[0]).toBe('header');
+    expect((await order()).slice(-1)).toEqual(['parent-response']);
+    expect(errors).toEqual([]);
+  });
+
+  /* Page Studio's templates; One Report's Setups, from the panel's menu. */
+  test('a Setup from the menu sets the parts, and Undo puts the report back', async ({ page }) => {
+    await openOne(page, 'report-card', false);
+    await expect(part(page, 'parent-response')).toHaveCount(1);
+    await page.locator('#studio-palette [data-action="oneSetupMenu"]').click();
+    const menu = page.getByRole('menu', { name: 'Setups' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitemradio', { name: /^Report Card/ })).toHaveAttribute('aria-checked', 'true');
+    await menu.getByRole('menuitemradio', { name: /^Interim Update/ }).click();
+    await expect(part(page, 'parent-response')).toHaveCount(0);
+    await expect(part(page, 'assessments')).toHaveCount(0);
+    expect(await page.evaluate(() => getReportConfig('sci8').one.setup)).toBe('interim-update');
+    await expect(page.locator('#studio-palette .one-setup-name')).toHaveText('Interim Update');
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(part(page, 'parent-response')).toHaveCount(1);
+    expect(await page.evaluate(() => getReportConfig('sci8').one.setup)).toBe('report-card');
+  });
+
   test('Choose Assessments leaves one off and the dialog closes with Escape', async ({ page }) => {
     await openOne(page, 'report-card', false);
     await page.locator('#studio-palette [data-action="oneOpen"][data-part="assessments"]').click();
