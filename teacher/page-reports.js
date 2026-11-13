@@ -263,6 +263,7 @@ window.PageReports = (function () {
   }
 
   function _showProgressTab(on) {
+    if (!on) ReportOneHead.reset();
     document.getElementById('student-picker').style.display = on ? '' : 'none';
     const copySel = document.getElementById('report-copy');
     if (copySel && !on) copySel.style.display = 'none';
@@ -574,7 +575,7 @@ window.PageReports = (function () {
      on the right the fit line, Paper, One Student / Everyone and the
      pages, which the layout fills. The two report-one CSS files are scoped
      under .studio-one. */
-  // html-safe: fixed markup; _printSettingsHtml is literal buttons
+  // html-safe: fixed markup; _printSettingsHtml, ReportOneHead's and ReportOneZoom's controls are literal buttons
   function _layoutHtml() {
     var all = studioView === 'all';
     return (
@@ -582,8 +583,10 @@ window.PageReports = (function () {
       '<aside class="studio-palette no-print" id="studio-palette" aria-label="Report"></aside>' +
       '<div class="studio-canvas">' +
       '<div class="studio-head no-print">' +
+      ReportOneHead.navHtml() +
       '<span class="studio-fit" id="studio-fit"></span>' +
       '<div class="studio-tools">' +
+      ReportOneZoom.controlHtml() +
       _printSettingsHtml() +
       '<span class="seg seg-sm studio-view" role="radiogroup" aria-label="View">' +
       '<button type="button" class="seg-btn' +
@@ -596,7 +599,9 @@ window.PageReports = (function () {
       '" data-action="studioView" data-view="all" role="radio" aria-checked="' +
       all +
       '">Everyone</button>' +
-      '</span></div></div>' +
+      '</span>' +
+      ReportOneHead.panelsHtml() +
+      '</div></div>' +
       '<div class="rb-preview studio-pages' +
       (all ? ' studio-all' : '') +
       '" id="rb-preview"></div>' +
@@ -695,36 +700,12 @@ window.PageReports = (function () {
     if (preview) {
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
-      _applyStudioZoom(preview);
+      ReportOneHead.sync(studioView, previewSid);
+      ReportOneZoom.apply(preview, studioView);
       // The page's own controls (Hide, a row left off, a heading renamed,
       // the comment): never on a printed copy.
       if (!viewingIssue) ReportOnePage.decorate(preview, _oneApi());
     }
-  }
-
-  /* One student's pages are worked on directly (a row left off, a heading
-     renamed, the comment edited), so they are drawn at reading size: one
-     above the other at up to full size, or two side by side where the
-     canvas is wide enough for both at three quarters or more. Everyone
-     keeps the Fit Map's scale. */
-  function _applyStudioZoom(preview) {
-    if (studioView === 'all') {
-      preview.classList.remove('studio-stacked');
-      return;
-    }
-    var z = _oneZoom(preview.clientWidth || 800);
-    preview.style.setProperty('--sheet-zoom', String(z.zoom));
-    preview.classList.toggle('studio-stacked', !!z.stacked);
-  }
-
-  function _oneZoom(canvasWidth) {
-    var sheetW = 8.5 * 96;
-    // The canvas pads 24px a side; two pages sit 22px apart.
-    var two = (canvasWidth - 48 - 22) / (2 * sheetW);
-    if (two >= 0.75) return { zoom: Math.round(Math.min(1, two) * 1000) / 1000, stacked: false };
-    // Down to a phone's width (390 leaves 342 for the page), so the page is never cut off.
-    var one = Math.min(1, Math.max(0.3, (canvasWidth - 48) / sheetW));
-    return { zoom: Math.round(one * 1000) / 1000, stacked: true };
   }
 
   /* ── The rail: sheets per student ──────────────────────────────
@@ -879,7 +860,8 @@ window.PageReports = (function () {
     preview.classList.toggle('report-fitmap', studioView === 'all');
     preview.classList.toggle('studio-all', studioView === 'all');
     ReportSheets.setPageStyle(rec.paper || 'letter');
-    _applyStudioZoom(preview);
+    ReportOneHead.sync(studioView, previewSid);
+    ReportOneZoom.apply(preview, studioView);
     _syncPrintButton();
   }
 
@@ -2093,6 +2075,7 @@ window.PageReports = (function () {
   }
 
   function _teardownProgressTab() {
+    ReportOneHead.reset();
     if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
     _restoreSidebarBadges();
     closeIssueDialog();
