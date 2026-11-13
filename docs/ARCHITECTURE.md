@@ -92,19 +92,20 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 12. `shared/data-categories.js` (categories: an assessment's category, the save to the server, the category write guard and Class Settings' category draft)
 13. `shared/data-rubrics.js` (rubrics: the save to the server, Advanced Rubric checkboxes, printed rubrics and competency descriptors)
 14. `shared/data-assessments.js` (assessments: the save to the server, duplicate, tags and collab, and clearing the marks of deleted work)
-15. `shared/data-observations.js` (observations: quick observations, sentence starters, custom tags and the tag resolver)
-16. `shared/data-term-ratings.js` (term ratings and report preferences: the Term Questionnaire's ratings, comments and attendance, the report setup, and the teacher's card, dashboard and view settings)
-17. `shared/data-student-records.js` (student records: flags, goals and goal dates, Core Competency self-assessments, reflections and notes; and the class's modules)
-18. `shared/data-student-cards.js` (student cards: the printed cards that open a student's page, and Cards Work Until)
-19. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
-20. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
-21. `shared/offline-queue.js`
-22. `shared/auto-update.js`
-23. `shared/calc.js`
-24. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-25. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-26. `shared/rubric-draft.js`
-27. `shared/rubric-checks.js`
+15. `shared/data-config-settings.js` (class settings: saveConfig, getCourseConfig and saveCourseConfig, the changed-only settings patch and the old-settings write guard)
+16. `shared/data-observations.js` (observations: quick observations, sentence starters, custom tags and the tag resolver)
+17. `shared/data-term-ratings.js` (term ratings and report preferences: the Term Questionnaire's ratings, comments and attendance, the report setup, and the teacher's card, dashboard and view settings)
+18. `shared/data-student-records.js` (student records: flags, goals and goal dates, Core Competency self-assessments, reflections and notes; and the class's modules)
+19. `shared/data-student-cards.js` (student cards: the printed cards that open a student's page, and Cards Work Until)
+20. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
+21. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
+22. `shared/offline-queue.js`
+23. `shared/auto-update.js`
+24. `shared/calc.js`
+25. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+26. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+27. `shared/rubric-draft.js`
+28. `shared/rubric-checks.js`
 
 The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `teacher/student-voice.js` and before `teacher/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 

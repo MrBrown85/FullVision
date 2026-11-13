@@ -33,6 +33,7 @@ const PRECACHE_URLS = [
   '/shared/data-categories.js',
   '/shared/data-rubrics.js',
   '/shared/data-assessments.js',
+  '/shared/data-config-settings.js',
   '/shared/data-observations.js',
   '/shared/data-term-ratings.js',
   '/shared/data-student-records.js',
