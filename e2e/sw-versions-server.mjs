@@ -6,12 +6,15 @@
  *
  * A version is a set of files that differ from dist/: always sw.js with its
  * own cache name and the fingerprints scripts/sw-fingerprints.mjs computes
- * for that version's files, plus any changed files. Every request is logged.
+ * for that version's files, the pages naming that release as scripts/build.sh
+ * writes them (scripts/sw-release-pages.mjs), plus any changed files. Every
+ * request is logged.
  */
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { fingerprintsIn, withFingerprints } from '../scripts/sw-fingerprints.mjs';
+import { releasePages, withRelease } from '../scripts/sw-release-pages.mjs';
 
 // Playwright runs from the repository root (playwright.config.js).
 const ROOT = resolve(process.cwd());
@@ -108,9 +111,14 @@ export async function startServer() {
   return {
     origin,
     state,
-    /* Serve version `name`: its sw.js and changed files ({ rel: content }). */
+    /* Serve version `name`: its sw.js, its pages and changed files
+       ({ rel: content }). */
     release(name, changed = {}, options) {
-      state.files = { '/sw.js': Buffer.from(versionSw(name, changed, options)) };
+      const sw = versionSw(name, changed, options);
+      state.files = { '/sw.js': Buffer.from(sw) };
+      for (const rel of releasePages(sw)) {
+        state.files['/' + rel] = Buffer.from(withRelease(readFileSync(join(DIST, rel), 'utf-8'), 'fullvision-' + name));
+      }
       for (const [rel, body] of Object.entries(changed)) state.files['/' + rel] = Buffer.from(body);
     },
     /* The requests since the last call. */

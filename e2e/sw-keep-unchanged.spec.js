@@ -86,8 +86,10 @@ async function update(page, name, changed, options) {
   const state = await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration();
     const found = new Promise(r => reg.addEventListener('updatefound', () => r(reg.installing), { once: true }));
-    await reg.update().catch(() => {});
-    const worker = await Promise.race([found, new Promise(r => setTimeout(() => r(null), 15000))]);
+    // The browser's own look after the page load may have found it first.
+    const already = reg.installing;
+    if (!already) await reg.update().catch(() => {});
+    const worker = already || (await Promise.race([found, new Promise(r => setTimeout(() => r(null), 15000))]));
     if (!worker) return 'no update';
     await new Promise(r => {
       const done = () => (worker.state === 'activated' || worker.state === 'redundant') && r();
@@ -169,12 +171,20 @@ test('a bad copy in the old cache is noticed and downloaded instead', async ({ p
   await firstVisit(page, 'a');
   await page.goto(server.origin + '/favicon.svg');
 
-  // calc.js: a newer server answered with other bytes, and the running worker
-  // stored that answer over its copy (as it does with every good response).
-  // It is a real 200 for that address, so only its hash gives it away.
+  // calc.js: a newer server answered with other bytes, and that answer was
+  // stored over the copy. Workers released before the saved copy came first
+  // did that with every good response; this one never replaces a copy its
+  // install saved (sw.js, answerFile), so the test stores it itself. It is a
+  // real 200 for that address, so only its hash gives it away.
   server.state.files['/shared/calc.js'] = Buffer.from('/* not this release */');
   await page.evaluate(() => fetch('/shared/calc.js', { cache: 'reload' }));
-  await expect.poll(() => cachedText(page, '/shared/calc.js')).toBe('/* not this release */');
+  await page.waitForTimeout(300);
+  expect(await cachedText(page, '/shared/calc.js')).toBe(readFileSync(join(DIST, 'shared/calc.js'), 'utf-8'));
+  await page.evaluate(async () => {
+    const answer = await fetch('/shared/calc.js', { cache: 'reload' });
+    await (await caches.open('fullvision-a')).put('/shared/calc.js', answer);
+  });
+  expect(await cachedText(page, '/shared/calc.js')).toBe('/* not this release */');
   delete server.state.files['/shared/calc.js'];
   // constants.js: the right bytes, but not a response from the network.
   // offline-queue.js: removed from the old cache.

@@ -337,6 +337,7 @@ Demo Mode is the only sample data. `shared/seed-data.js` builds the Science 8 sa
 - `sw.js` is registered by both desktop and mobile entry points
 - the manifest and service worker provide installability and cached asset behavior
 - each release gives `sw.js` a new cache name and, from `scripts/sw-fingerprints.mjs`, a SHA-256 for every precached file but the HTML pages; the new worker's install copies a file from the previous cache only when the old version recorded the same fingerprint and the stored bytes hash to it, and downloads the rest (`docs/plans/caching-plan.md`, step 3). The source `sw.js` has no fingerprints and downloads everything
+- a file the install saved is answered from that saved copy without asking the network, but only for a page that names the worker's own release: `scripts/build.sh` writes the cache name into `login.html`, `launch.html`, `teacher/app.html` and `teacher-mobile/index.html` as `<meta name="fv-release">` (`scripts/sw-release-pages.mjs`), and the worker reads it from each page it hands over. HTML is always asked of the network first. A page from another release, a page with no tag (the student page) and a page the worker has lost track of get their files from the network first (`docs/plans/caching-plan.md`, section 8)
 
 ## Source-of-truth documents
 

@@ -406,7 +406,7 @@ All of it changes what loads or when, so none of it is tonight's. In order of va
 - **C4.** `defer` on the scripts, keeping the order rules in the map's loading report (section 6). Closed (Nov 12): no gain.
 - **C5.** Versioned file names and a long cache. Later; it needs S19-A9 first.
 - **C6.** A service worker that precaches each page's own files and stops re-downloading 12.66 MB on every deploy. Done and released (PR 1290).
-- **Plan for C5, C6 and C7:** `docs/plans/caching-plan.md` (Nov 12). The site never answers "not changed", so a repeat visit re-downloads 1.65 MB; it recommends C7 first, then keeping unchanged files across releases, and leaves versioned file names.
+- **Plan for C5, C6 and C7:** `docs/plans/caching-plan.md` (Nov 12). The site never answers "not changed", so a repeat visit re-downloads 1.65 MB; it recommends C7 first, then keeping unchanged files across releases, and leaves versioned file names. Its last step, the worker answering from its saved copy first behind a guard (option (a)), was approved by Colin on Nov 13 and is built, not released: it goes out on its own (the plan's section 8).
 - **C7.** Run the `inject-env` edge function on HTML only, not on every file. Done and released (PR 1289). The read-only check script is PR 1288.
 - **C8.** One boot call instead of `bootstrap_teacher` then `list_teacher_courses`. Needs Colin (server change). Waits for Colin.
 - **C9.** One mark saves one mark; redraw only what changed. Needs Colin (save and redraw paths). Waits for Colin.

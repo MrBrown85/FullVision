@@ -436,15 +436,150 @@ function cacheIfGood(request, response) {
   // The page still gets what the host sent; the cache does not keep a type
   // that does not fit the address.
   if (!isFitToKeep(response, response.url || (typeof request === 'string' ? request : request.url))) return;
-  const clone = response.clone();
-  caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+  // Keeping a copy must never cost the page its answer.
+  try {
+    const clone = response.clone();
+    caches
+      .open(CACHE_NAME)
+      .then(cache => cache.put(request, clone))
+      .catch(() => {});
+  } catch {
+    // Not kept.
+  }
+}
+
+// ── The saved copy first, with a guard (docs/plans/caching-plan.md, (a)) ──
+//
+// A file this release's install saved is answered from that copy without
+// asking the network, but only for a page known to belong to this release.
+// Pages are always asked of the network first, and each names its release in
+// a tag scripts/build.sh fills in with this worker's cache name:
+//   <meta name="fv-release" content="fullvision-…" />
+// The worker reads that tag from the page it hands to the browser and
+// remembers it under the browser's id for that page. A file is answered from
+// the saved copy only when all of these hold; anything else takes the network
+// first, as every request did before:
+//   - the address has a fingerprint: the install saved it and it is not a
+//     page (the source, served directly, has none, so nothing changes there);
+//   - the page asking is one this worker handed over, and it named this
+//     release;
+//   - the copy is in this release's cache.
+// So a page from a newer release, a page with no tag, and a page the worker
+// has lost track of (the browser stops an idle worker, and it starts again
+// with nothing remembered) all get their files from the network. No page runs
+// new HTML beside this release's saved files: a page that named another
+// release is never given this release's copy of an installed file, not even
+// when the network fails.
+const RELEASE_TAG = /<meta name="fv-release" content="([^"]*)"/;
+
+// The release each open page named: the browser's id for the page -> name.
+// Kept in memory only. A page that is not here uses the network.
+const pageReleases = new Map();
+const PAGES_REMEMBERED = 100;
+
+function rememberPage(clientId, release) {
+  if (!clientId) return;
+  pageReleases.delete(clientId);
+  if (!release) return;
+  pageReleases.set(clientId, release);
+  // The oldest page is forgotten first.
+  while (pageReleases.size > PAGES_REMEMBERED) pageReleases.delete(pageReleases.keys().next().value);
+}
+
+// The release a page names, or null: not a good HTML answer, no tag, or it
+// could not be read.
+async function releaseNamedBy(response) {
+  try {
+    if (!response || !response.ok) return null;
+    const type = (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+    if (type !== 'text/html') return null;
+    const named = (await response.clone().text()).match(RELEASE_TAG);
+    return named && named[1] ? named[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+// This release's saved copy of an address, or null. Only this release's cache
+// is read, never a newer one still being filled. The address is the whole
+// key, query string included; the host's Vary header is not part of it.
+async function savedCopy(request) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    return (await cache.match(request, { ignoreVary: true })) || null;
+  } catch {
+    return null;
+  }
+}
+
+// A file the install saved for this release: its address has a fingerprint.
+function isInstalledFile(url) {
+  return (
+    !!PRECACHE_FINGERPRINTS &&
+    url.origin === self.location.origin &&
+    Object.prototype.hasOwnProperty.call(PRECACHE_FINGERPRINTS, url.pathname + url.search)
+  );
+}
+
+// A page: the network first, the saved page when the network fails.
+async function answerPage(event, cacheKey) {
+  const isNavigation = event.request.mode === 'navigate';
+  let response;
+  try {
+    response = await fetch(event.request);
+  } catch {
+    // Network failed: the saved page, and the saved files with it when it
+    // names this release.
+    const saved = await savedCopy(cacheKey);
+    if (isNavigation) rememberPage(event.resultingClientId, await releaseNamedBy(saved));
+    return (
+      saved ||
+      new Response('Offline — please check your connection.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    );
+  }
+  const release = await releaseNamedBy(response);
+  if (isNavigation) rememberPage(event.resultingClientId, release);
+  // A page from another release is not kept: offline, the saved page must be
+  // the one the saved files belong to.
+  if (!release || release === CACHE_NAME) cacheIfGood(cacheKey, response);
+  return response;
+}
+
+// Anything else: the saved copy first when the guard allows it, otherwise the
+// network first with the saved copy as the fallback.
+async function answerFile(event, url) {
+  const installed = isInstalledFile(url);
+  const named = pageReleases.get(event.clientId);
+  if (installed && named === CACHE_NAME) {
+    const saved = await savedCopy(event.request);
+    if (saved) return saved;
+  }
+  try {
+    const response = await fetch(event.request);
+    // The install's copies are never replaced at run time: the network may
+    // already be serving the next release, and this cache must stay exactly
+    // this one. A file the install did not save is kept when first used.
+    if (!installed) cacheIfGood(event.request, response);
+    return response;
+  } catch {
+    // A page that named another release never gets this release's copy of an
+    // installed file, even when the network fails: a missing file is loud, a
+    // mix of releases is not.
+    const saved = installed && named && named !== CACHE_NAME ? null : await savedCopy(event.request);
+    return saved || new Response('', { status: 503 });
+  }
 }
 
 // Fetch strategy:
-// - HTML pages: Network first, fall back to cache (always get latest)
-// - JS/CSS files: Network first, fall back to cache (always get latest)
-// - Supabase API calls: Network only (never cache data)
-// - Curriculum JSON: Cache first (rarely changes)
+// - Supabase API calls, and anything but a GET: left to the browser, never
+//   cached
+// - HTML pages: network first, fall back to the saved page
+// - Files the install saved, asked for by a page of this release: the saved
+//   copy, no network (the guard above)
+// - Everything else: network first, fall back to the saved copy
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -458,45 +593,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HTML pages: network first, cache fallback
   if (
     event.request.mode === 'navigate' ||
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))
   ) {
-    const cacheKey = pageKey(url);
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          cacheIfGood(cacheKey, response);
-          return response;
-        })
-        .catch(() => {
-          // Network failed — serve from cache
-          return caches.match(cacheKey).then(
-            cached =>
-              cached ||
-              new Response('Offline — please check your connection.', {
-                status: 503,
-                headers: { 'Content-Type': 'text/plain' },
-              }),
-          );
-        }),
-    );
+    event.respondWith(answerPage(event, pageKey(url)));
     return;
   }
 
-  // JS, CSS, and other assets: network first, cache fallback
-  // This ensures users always get the latest code on deploy
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        cacheIfGood(event.request, response);
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request).then(cached => cached || new Response('', { status: 503 }));
-      }),
-  );
+  event.respondWith(answerFile(event, url));
 });
 
 // Listen for version update messages
