@@ -37,7 +37,7 @@ Exit codes:
 
 - 0: no difference.
 - 1: a difference.
-- 2: the run could not be done. A step over its 30-second limit is one (it names the step and action). So is a server the run started that stops while the run is going: the run ends at once and says that something outside it stopped the server. Run it again, alone if the machine is busy.
+- 2: the run could not be done. A step over its 30-second limit is one (it names the step and action). So is a server the run started that stops while the run is going: the run ends at once and says that something outside it stopped the server. Run it again, alone if the machine is busy. So is the run finding that it asked the two builds different things: that is a fault in the run, to be fixed in the run.
 
 Speed on an M5 Pro: 600 steps in both modes with `--offline --two-tabs` take eight to ten minutes with two other runs going, less alone. Three seeds can run at once.
 
@@ -50,6 +50,8 @@ Build A and build B each get a browser context. The same seeded sequence picks a
 3. **What a teacher and a student see** (every 25 steps and at the end): the text of every cell of the gradebook's Scores grid with its row and column titles, the Assignments page, the grader opened on one named student's rubric piece, that student's page, Preview as Student and its My Learning for two more named students, and the Quick Report's sheets. The students are picked by name: Student3, Student8 and Student12 signed in; Sam Blackwood, Cece Adeyemi and Liam Chen in Demo Mode.
 
 It also compares what each action answered and any page errors.
+
+A difference in a list of entries that have ids (a student's score entries, the roster, the pieces) is reported entry by entry, by id, and not place by place: an entry whose key changed is named as one entry (`st1[e1 in A, e9 in B].tagId  A: "CM1"  B: "PA5"`), where a place-by-place readout would list every entry after it.
 
 ### The classes
 
@@ -65,8 +67,9 @@ Signed in, the app talks to the fake Supabase of `e2e/helpers.js` (`mockAuth`), 
 
 ### Making A and B the same
 
-- **The clock.** Playwright's fake clock, installed paused at 15:00 UTC on 15 October 2026. Date, timers, `requestAnimationFrame` and `performance.now` move only when the run moves them: six seconds after each step, in three moves, and longer when the device comes back online so every outbox retry is due. No move depends on how long anything took in real time. A page that is starting (the first load, a new tab, a reload) is given the clock in rounds of twenty moves of 100 ms, and build A and build B are always given the same number of rounds. A wait for something on a screen (the grader opening, a toast) always moves the clock the same amount, found early or late.
+- **The clock.** Playwright's fake clock, installed paused at 15:00 UTC on 15 October 2026. Date, timers, `requestAnimationFrame` and `performance.now` move only when the run moves them: six seconds after each step, in three moves, and longer when the device comes back online so every outbox retry is due. No move depends on how long anything took in real time. A page that is starting (the first load, a new tab, a reload) is given the clock in rounds of twenty moves of 100 ms, and build A and build B are always given the same number of rounds. A wait for something on a screen (the grader opening, a toast) always moves the clock the same amount and then looks once.
 - **Real work first.** Before each move every tab finishes its real work: the page has loaded and is not leaving for another, nothing it started is on its way (the scripts and stylesheets it adds, its fetches, its IndexedDB work, a Web Lock it is owed), and what it saved, sent and drew has stopped changing.
+- **Both builds are read alike.** A read is not free: calling into the app can change what it holds in memory (`getScores` marks its scores as checked against the rubrics, for one). So everything the run reads from one build it reads from the other, in the same order: the class the next action is picked from, the saved copy, the calls, the screens. The two reads of the class must agree, or that is a difference. And the run checks itself: every `page.evaluate` it makes is noted per build (`scripts/differential/given.mjs`), and at every comparison the two lists must be the same, or the run stops with exit code 2 and says the fault is its own. The first version read the class from build A alone, which made main differ from main (seed 2741, Demo Mode, step 162).
 - **Random numbers.** `Math.random`, `crypto.getRandomValues` and `crypto.randomUUID` come from one seeded generator per page load (`scripts/differential/page-init.js`), so ids, idempotency keys and local ids come out the same in A and B.
 - **Messages between tabs.** The app's BroadcastChannels are held by the run: each tab's messages are delivered when the run says, in a fixed order, after a barrier that every other tab has seen. Without this, two tabs' messages arrive in an order the browser picks.
 - **Nothing is normalised.** Every value is compared as it is. If a value ever cannot be made the same, list it in `NORMALISE` in `scripts/differential/compare.mjs` and here.
@@ -114,7 +117,7 @@ Through the screen's functions:
 
 ## Proof that it works
 
-The pull request that added it (#1304) holds the tables: main against main on five seeds, each run twice, with no difference and the same summary both times; and main against fifteen throwaway copies of main, each with one small change in how marks are saved, cleared, deleted, returned, re-keyed or synced, every one caught on one of seeds 1 to 3.
+Two pull requests hold the tables: #1304, which added it, and the one after it, "Differential run: the rest of the review's fixes", which has the tables for the tool as it is now. Main against main on six seeds (1, 2, 3, 7, 11 and 2741), each run twice, with no difference and the same summary both times. And main against fifteen throwaway copies of main, each with one small change in how marks are saved, cleared, deleted, returned, re-keyed or synced, every one caught on one of seeds 1 to 3.
 
 ## Files
 
@@ -128,5 +131,7 @@ The pull request that added it (#1304) holds the tables: main against main on fi
 - `scripts/differential/actions.mjs`: the teacher actions.
 - `scripts/differential/probe.mjs`: reads the saved copy, the calls and the screens, and waits for a page to finish.
 - `scripts/differential/compare.mjs`: the comparisons and their readable output.
+- `scripts/differential/given.mjs`: the run's check that it asked both builds the same things.
 - `scripts/differential/prng.mjs`: the seeded sequence.
-- `tests/differential-run-helpers.test.js`: tests for the comparisons, the sequence and the command line.
+- `tests/differential-run-helpers.test.js`: tests for the comparisons, the sequence, the command line and the run's check on itself.
+- `tests/differential-fake-server.test.js`: tests for the fake server.
