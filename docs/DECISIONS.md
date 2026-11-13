@@ -2,6 +2,26 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Marks may be moved; Colin and Karen must see no change (2026-11-12)
+
+Context: the split of `shared/data.js` and the big page files (Track E) moved 19 pieces that do not touch marks, each as a move-only PR merged by an independent reviewer, all released. Six pieces were stopped with no change, because they read or write marks or could not move cleanly: the DIBELS benchmark, Copy From Another Class, the Reports Issue dialog, the v2 server-call wrappers, Reflect on Feedback, and Student work and feedback. The rest of the split is code that reads, writes, returns and syncs marks. Colin was asked. His answer, two lines sent together:
+
+> you can touch marks, but it shouldn't delete anything for colin or karen
+
+> change that to 'must not' delete colin or karen's marks as they see them. - they should not experience a change
+
+- **Rule:** code that touches marks may be moved, and it must not delete Colin's or Karen's marks as they see them. They must not experience a change.
+- **Who:** Colin and Karen are the two teachers who use the live site with real classes. There is still no district customer.
+- **The permission is for moving code, not for changing how marks behave.** The method:
+  1. Every such piece is a move-only PR with a byte-for-byte proof.
+  2. Before merge, it must be shown identical to main for a teacher. The same long sequence of real teacher actions runs on main and on the branch. After every step, three things are compared: the saved copy on the device, the calls sent to the server, and what the gradebook and the student page show.
+  3. An independent reviewer repeats that with a different sequence and tries to break it.
+  4. The full browser suite runs on GitHub before merge.
+  5. Pieces are released in small steps, so a problem points at one change.
+  6. Anything that cannot be shown identical stops and goes to Colin.
+- **Still needs Colin:** changing how a mark is saved, queued, synced, returned or deleted.
+- This replaces the plan's line that the score writers wait for a day's use on real classes after a release.
+
 ## Student-facing levels are proficiencies (2026-11-12)
 
 Context: Colin printed a Quick Report for a student and saw a level as a number. "when i print a quick report for students, it gives a score (1.8 out of 4) - that's not the bc provincial reporting order. students receive proficiencies. all student-facing scores need to be a proficiency" (Colin, 2026-11-12). Later the same day: "students don't see numbers-as-proficiencies. they only see the proficiency, because teachers may override it." A figure beside the level the teacher set by hand would contradict the teacher.
@@ -46,6 +66,7 @@ Context: after the overnight run of the handoff review (S19; 50 PRs merged, see 
 1. **Order of work.** The save guard fix first (S19-B3), then the loading work (S19-C2 to C4), then the split of the big files.
    Later the same day the save guard report was found to be wrong: Delete Assessment does not trip the guard (see `e2e/pin-delete-assessment-then-grade.spec.js`). So "the save guard fix" in rulings 1 and 5 now means the fix for the two rare cases in which the guard drops a real mark.
 2. **Staging is held** [4]. No second Supabase project and no branch for now: FullVision has one user and the district is not considering buying it. The same reason holds the District Review Package (S19-F2) and the account moves (S19-F4). Raise them again only if selling to schools comes up.
+   _Note, 2026-11-12 (later):_ the footing "one user" was wrong. Two teachers, Colin and Karen, use the live site with real classes. There is still no district customer, so the ruling stands. See "Marks may be moved; Colin and Karen must see no change (2026-11-12)".
 3. **The file split is not held** [21]. It matters to the builder now: sessions collide on the big files, agents work worse on them, and redrawing only what changed needs the pages untangled. The pieces that do not touch marks go first, as move-only PRs, each merged by an independent reviewer (Track E). This replaces the plan's rule that Track E waits for the decision to sell to schools.
 4. **"I approve whatever the council would approve."** For the open decisions in the plan's section 6, the council's recommendation stands as Colin's decision without asking him each time. The council is the panel named in "Student page build rulings (2026-11-10)": Beck, Fowler, Humble and Forsgren, Nygard and Kleppmann; OWASP and the privacy commissioner's office; Guskey, O'Connor, Wiliam and the Ministry's reporting policy; Krug and Nielsen. This does not change CLAUDE.md's rules:
    - SQL is shown to Colin before anything is applied to the production database.
@@ -982,3 +1003,20 @@ Context: the New Assessment form redesign on the "Assessment Form" design canvas
 3. **A link is any http or https address,** with an optional name; it opens in a new tab.
 4. **At most 50 handouts and links on one assessment** (the migration author's limit, so storage per class has a bound). Colin has not ruled on it.
 5. **Open:** whether Copy Assessment, Duplicate, Copy to Another Class and Restore carry handouts and links. They do not yet, as with Student Work.
+
+## One Report (2026-11-12)
+
+Context: the Progress Reports screen offered two things, the Quick Report (seven ticks) and Custom (Page Studio's blocks dragged onto a form). Colin, on the Quick Report's panel: "teachers should have more control over what can get included in the report on this screen", then: "retire the 'custom' report as an option altogether and roll features into the 'quick report'". The design, the decisions as he made them and a three-panel council review are in `docs/plans/quick-report-options-mockup.html`; the build plan is `docs/plans/one-report-build-plan.md`. Built behind a switch (`?onereport=1`) until it replaces both.
+
+- **One list of parts.** A class's report is the parts that are switched on, in the order they print. There is no Quick Report / Custom switch and no name for a mode. The four starting points (Grades, Report Card, Interim Update, Conference Pack) are Setups. This replaces "Page Studio is the Progress Reports screen" (Report forms 8) once the switch is on for everyone.
+- **Switches, not ticks** (Colin: "i don't love checkboxes"; he chose the switch cards). A choice between two or three values stays a segmented control.
+- **Order is set in the panel**, by dragging a part up or down (Colin: "we used to have it simpler, where you could just drag the icon up and down in the panel, so we'll stick with that. simplified is better"). Parts are not dragged or sized on the page.
+- **Parts flow.** A part that reaches the foot of a page carries on at the top of the next under its heading, "(continued)", so no page ends with room a row would have filled (Colin: "items going on the report should cut off at the bottom of the page and begin again at the top of the next page (or the back) so there isn't any wasted whitespace"). The Parent / Guardian Response docks at the foot of the report's last side, as it did on a built report. Nothing is kept blank behind it: the council's review asked for the back of the slip to be kept clear so a returned slip tears nothing off the report, it cost a second sheet for a student with a long list, and Colin took it out the same day ("I don't know where the tear-off rule came from, but let's change that").
+- **Teachers choose what is listed and can leave any row off** (Colin: "we would even like to be able to choose which assignments/whatever are added. maybe a way to delete rows"). Leaving an assessment or a row off changes what prints and never a grade. Nothing prints to say work was left off (Colin: "No note"). Missing Work reads the gradebook, not the list.
+- **A change can be for one student.** With Changes Apply To set to the student, a part switched on or off, or a row left off, is kept for that student only and goes into the printed copy's record. This replaces "There are no per-student layout exceptions" (Report forms 1).
+- **Teachers can reword the student reflections and the Parent / Guardian Response**, for one class at a time (Colin: "Per class only"), with Reset to Original Wording. The original wording stays the default. This replaces "The Parent / Guardian Response and the student reflection keep their wording" (Report forms 5) for a teacher's own edits.
+- **Core Competencies.** A student's Core Competency self-assessment and goal may print, in the student's own words or as a blank form the student fills in. The teacher never rates a student's Core Competencies (Colin, 2026-11-12: "so long as the teacher themselves are not rating students core competencies"; it replaces his "never on paper" of the same day).
+- **The Teacher Comment can be edited where it prints.** The edit is tracked and the teacher is asked to save when they click off (Colin: "that edit will get tracked and when they click off, it should ask them to save"). It saves to the Term Questionnaire: the comment is one comment in one place. Unsaved changes never print.
+- **Saved reports are read, never rewritten.** A class's Quick Report choices or built form open as a model with the same parts in the same order; the saved form is kept as it is, and a printed copy reprints as it went home.
+- **Letter and Legal** stay, beside the pages.
+- Not built yet, each its own change: Excuse It Instead on a missing piece (it changes a grade: Colin's review), IEP Goals for one student, Use in My Other Classes. The old editor's code stays, unreachable, until One Report has been the screen for a reporting period.

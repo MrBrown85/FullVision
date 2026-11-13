@@ -6645,3 +6645,22 @@ body.qn-roster #gb-sidebar .student-row-note {
     max-width: 100%;
   }
 }
+
+/* ── One Report (report-one.js): its parts on the sheet ────────── */
+/* The legend's descriptors are a sentence each: they wrap under the word. */
+/* (Keyed on the part, not the sheet, so the measuring stage wraps them too.) */
+.report-sheet .sheet-cell[data-part='legend'] .report-legend-desc {
+  white-space: normal;
+}
+/* The Assessments table, the Categories summary and the grade line are the
+   Quick Report's own, each a part here. */
+.one-part {
+  width: 100%;
+}
+.one-assessments > .report-block-title {
+  margin-bottom: 4px;
+}
+/* No inspector beside One Report's pages, so no gutter is kept for one. */
+.studio-one .rb-preview.studio-pages:not(.studio-all) .sheet-student {
+  padding-right: 0;
+}
