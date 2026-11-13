@@ -1,6 +1,6 @@
 /**
  * The Learner Profile's student voice (docs/STUDENT-VOICE-PLAN.md, PR 8;
- * canvas 9d): teacher/student-voice.js reads a student's questionnaire
+ * canvas 9d): shared/student-voice.js reads a student's questionnaire
  * answers and picks out what the profile places by name;
  * teacher/learner-profile.js draws the ID card, About Me, the student's
  * goals and Reflections. Every answer shows, blanks say "No answer", and the

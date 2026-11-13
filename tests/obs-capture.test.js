@@ -1,5 +1,5 @@
 /**
- * The shared observation capture strip — teacher/obs-capture.js.
+ * The shared observation capture strip — shared/obs-capture.js.
  *
  * Shorthand parsing (@name, #tag, !type, /starter), and the strip itself in
  * a real DOM: picks, Add, Keep tags, the flag offer on a concern, the

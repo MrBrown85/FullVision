@@ -2,7 +2,7 @@
    capture strip with the student fixed, the term's timeline with its gaps,
    Seen in Class (each competency and how many notes it has, which narrows
    the list), and the notes month by month as the Observations page's cards
-   (teacher/obs-card.js), narrowed by type. Private notes (Concern, Note, a
+   (shared/obs-card.js), narrowed by type. Private notes (Concern, Note, a
    reflection) keep their words off the screen until the teacher shows
    them, since the student may be looking (redesign R3,
    docs/plans/teacher-student-page-redesign-plan.md). */

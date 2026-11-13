@@ -1,6 +1,6 @@
 /**
  * The Questionnaires tab in Class Settings (docs/STUDENT-VOICE-PLAN.md,
- * PR 5): teacher/questionnaires.js, teacher/cm-questionnaires.js and
+ * PR 5): shared/questionnaires.js, teacher/cm-questionnaires.js and
  * teacher/qr-slips.js.
  *
  * In Demo Mode a questionnaire turns on from its template and saves on this

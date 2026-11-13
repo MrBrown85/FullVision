@@ -13474,7 +13474,7 @@ window.PageAssignments = (function () {
         _CLASS_RESULTS_ICON,
         'Class Results',
       ) + _cardPrintItem(cid, a);
-    // Work Wall (S14, teacher/work-wall.js): every student's work side by
+    // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
     if (!focusStudentId && window.WorkWall && GraderWork.workOn(cid, a))
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');

@@ -533,7 +533,7 @@ describe("the Work tab on the teacher's student page", () => {
 
 describe('no server', () => {
   it('names no server function', () => {
-    const src = readFileSync(new URL('../teacher/work-wall.js', import.meta.url), 'utf-8');
+    const src = readFileSync(new URL('../shared/work-wall.js', import.meta.url), 'utf-8');
     expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
   });
 });
