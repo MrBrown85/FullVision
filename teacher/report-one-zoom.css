@@ -155,3 +155,15 @@
 .studio.panels-hidden .studio-palette {
   display: none !important;
 }
+/* The roster, tucked by Hide Panels for this visit (ReportOneHead): the
+   teacher's saved sidebar setting is left as it is. Not in the narrow
+   layout, where the roster is an overlay. */
+@media (min-width: 1025px) {
+  .page-layout.fv-roster-tucked #sidebar-mount {
+    width: 0;
+    overflow: hidden;
+  }
+  .page-layout.fv-roster-tucked #sidebar-mount #gb-sidebar {
+    display: none;
+  }
+}

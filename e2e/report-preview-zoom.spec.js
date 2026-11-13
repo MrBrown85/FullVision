@@ -318,3 +318,69 @@ test('one pair of Previous and Next at any width, and both step the same way', a
   await expect.poll(() => visible('Previous Student')).toBe(1);
   expect(await visible('Next Student')).toBe(1);
 });
+
+test('Hide Panels writes no preference; a reload brings the panels back; the sidebar button shows the roster', async ({
+  page,
+}) => {
+  await open(page);
+  // Every way a preference or a queued write is made, counted.
+  await page.evaluate(() => {
+    window.__writes = [];
+    const wrap = (obj, name, label) => {
+      if (!obj || typeof obj[name] !== 'function') return;
+      const fn = obj[name];
+      obj[name] = function () {
+        window.__writes.push(label);
+        return fn.apply(this, arguments);
+      };
+    };
+    wrap(window, 'saveDashboardPrefs', 'saveDashboardPrefs');
+    wrap(window, 'saveViewPref', 'saveViewPref');
+    wrap(window.v2, 'saveTeacherPreferences', 'saveTeacherPreferences');
+    wrap(window.v2Queue, 'enqueue', 'queue');
+    wrap(window.v2Queue, 'push', 'queue');
+  });
+  // The stored preferences, byte for byte.
+  const stored = () =>
+    page.evaluate(() => [
+      localStorage.getItem('gb-config'),
+      JSON.stringify(getDashboardPrefs()),
+      localStorage.getItem('gb-sidebar-vis'),
+    ]);
+  const before = await stored();
+  const roster = page.locator('#gb-sidebar');
+  const parts = page.locator('#studio-palette');
+
+  await page.getByRole('button', { name: 'Hide Panels' }).click();
+  await expect(roster).toBeHidden();
+  await expect(parts).toBeHidden();
+  expect(await stored()).toEqual(before);
+
+  // The app's sidebar button while hidden: the roster comes back for this
+  // visit, the parts panel stays hidden, the saved setting is untouched.
+  await page.locator('[data-action="toggleSidebar"]').first().click();
+  await expect(roster).toBeVisible();
+  await expect(parts).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Show Panels' })).toBeVisible();
+  expect(await stored()).toEqual(before);
+
+  await page.getByRole('button', { name: 'Show Panels' }).click();
+  await expect(roster).toBeVisible();
+  await expect(parts).toBeVisible();
+  await page.getByRole('button', { name: 'Hide Panels' }).click();
+  await expect(roster).toBeHidden();
+  await page.getByRole('button', { name: 'Show Panels' }).click();
+  await expect(roster).toBeVisible();
+  expect(await stored()).toEqual(before);
+  expect(await page.evaluate(() => window.__writes)).toEqual([]);
+
+  // Hidden, then a reload: both panels are back.
+  await page.getByRole('button', { name: 'Hide Panels' }).click();
+  await expect(roster).toBeHidden();
+  await page.reload();
+  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await expect(page.locator('#studio-palette')).toBeVisible();
+  await expect(page.locator('#gb-sidebar')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hide Panels' })).toBeVisible();
+  expect(await stored()).toEqual(before);
+});

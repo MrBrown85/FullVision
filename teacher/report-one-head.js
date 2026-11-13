@@ -11,9 +11,9 @@
    Questionnaire's Previous does at its first student.
 
    Hide Panels tucks away the parts panel (#studio-palette) and the roster
-   (through ui.js's own toggleSidebar, so the teacher's own setting is what
-   comes back); Show Panels brings both back with their scroll positions.
-   It lasts this visit only: leaving Progress Reports shows them again. */
+   for this visit only, writing no preference; Show Panels brings both back
+   with their scroll positions. Leaving Progress Reports or reloading shows
+   them again. */
 window.ReportOneHead = (function () {
   'use strict';
 
@@ -101,14 +101,45 @@ window.ReportOneHead = (function () {
 
   /* ── Hide Panels ─────────────────────────────────────────── */
 
-  function _sidebarShown() {
-    var w = /** @type {Window & { _sidebarIsVisible?: () => boolean, _sidebarIsOverlay?: () => boolean }} */ (window);
-    if (typeof w._sidebarIsOverlay === 'function' && w._sidebarIsOverlay()) return false;
-    return typeof w._sidebarIsVisible === 'function' ? w._sidebarIsVisible() : false;
+  /* The roster is tucked with a class of this file's own on the page
+     layout (teacher/report-one-zoom.css), never through ui.js's
+     toggleSidebar: that saves the teacher's preference, which syncs to the
+     server and their other devices. Nothing here reads the preference into
+     a new value or writes it. */
+  var TUCK = 'fv-roster-tucked';
+
+  function _overlay() {
+    var w = /** @type {Window & { _sidebarIsOverlay?: () => boolean }} */ (window);
+    return typeof w._sidebarIsOverlay === 'function' && w._sidebarIsOverlay();
   }
-  function _toggleRoster() {
-    var w = /** @type {Window & { toggleSidebar?: () => void }} */ (window);
-    if (typeof w.toggleSidebar === 'function') w.toggleSidebar();
+  /* The roster is on screen beside the pages (not hidden by the teacher's
+     own setting, not the narrow layout's overlay). */
+  function _rosterBeside() {
+    var layout = document.getElementById('page-layout');
+    return !!layout && !_overlay() && !layout.classList.contains('sidebar-hidden');
+  }
+  /** @param {boolean} on */
+  function _tuck(on) {
+    var layout = document.getElementById('page-layout');
+    if (layout) layout.classList.toggle(TUCK, on);
+    if (on) document.addEventListener('click', _onSidebarButton, true);
+    else document.removeEventListener('click', _onSidebarButton, true);
+  }
+  /* The app's sidebar button, pressed while Hide Panels has the roster
+     tucked: it shows the roster for this visit and goes no further, so the
+     saved preference (the roster shown) is not flipped to hidden. The parts
+     panel stays hidden. */
+  /** @param {Event} e */
+  function _onSidebarButton(e) {
+    var t = /** @type {Element | null} */ (e.target);
+    if (!t || !t.closest || !t.closest('[data-action="toggleSidebar"]') || _overlay()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    _hidRoster = false;
+    _tuck(false);
+    _setTop('gb-roster-list', _scroll.roster);
+    _setTop('gb-sidebar', _scroll.sidebar);
+    _refit();
   }
   /** @param {string} id */
   function _top(id) {
@@ -120,28 +151,24 @@ window.ReportOneHead = (function () {
     var el = document.getElementById(id);
     if (el) el.scrollTop = v;
   }
+  function _refit() {
+    var Z = /** @type {Window & { ReportOneZoom?: { refit(glide: boolean): void } }} */ (window).ReportOneZoom;
+    if (Z) Z.refit(true);
+  }
 
   /** @param {boolean} hide */
   function setHidden(hide) {
     if (hide === _hidden) return;
     var studio = document.getElementById('studio');
-    var slide = false;
     if (hide) {
       _scroll = { palette: _top('studio-palette'), roster: _top('gb-roster-list'), sidebar: _top('gb-sidebar') };
-      _hidRoster = _sidebarShown();
-      if (_hidRoster) {
-        _toggleRoster();
-        slide = true;
-      }
+      // In the narrow layout the roster is an overlay: only the parts panel goes.
+      _hidRoster = _rosterBeside();
+      if (_hidRoster) _tuck(true);
       if (studio) studio.classList.remove('rail-open');
     } else if (_hidRoster) {
       _hidRoster = false;
-      // Only what Hide Panels tucked away comes back: a roster the teacher
-      // has opened or closed since stays as they left it.
-      if (!_sidebarShown()) {
-        _toggleRoster();
-        slide = true;
-      }
+      _tuck(false);
     }
     _hidden = hide;
     _paint();
@@ -150,18 +177,8 @@ window.ReportOneHead = (function () {
       _setTop('gb-roster-list', _scroll.roster);
       _setTop('gb-sidebar', _scroll.sidebar);
     }
-    var Z = /** @type {Window & { ReportOneZoom?: { refit(glide: boolean): void } }} */ (window).ReportOneZoom;
-    if (Z) {
-      var zoom = Z;
-      zoom.refit(true);
-      // The roster slides for 240 ms (ui.js): fit again once it has.
-      if (slide) {
-        setTimeout(function () {
-          zoom.refit(true);
-          if (!hide) _setTop('gb-roster-list', _scroll.roster);
-        }, 300);
-      }
-    }
+    // The roster goes at once; the pages fit the new width with the zoom's glide.
+    _refit();
   }
 
   function _paint() {
@@ -217,6 +234,7 @@ window.ReportOneHead = (function () {
     if (_hidden) setHidden(false);
     _hidden = false;
     _hidRoster = false;
+    _tuck(false);
   }
 
   return {
