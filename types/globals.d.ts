@@ -7,6 +7,13 @@ interface Window {
   v2: {
     saveSectionOverride(studentId: string, sectionId: string, level: number, reason: string): unknown;
     clearSectionOverride(studentId: string, sectionId: string): unknown;
+    // The category and profile calls (shared/data-rpc-wrappers.js). Each
+    // resolves with what _rpcOrNoop resolves with.
+    listCategories(courseId: string): Promise<RpcResult<'list_categories'>>;
+    reorderCategories(ids: string[]): Promise<RpcResult<'reorder_categories'>>;
+    saveCategories(courseId: string, rows: unknown, options?: unknown): Promise<RpcResult<'save_categories'>>;
+    getStudentProfile(enrollmentId: string): Promise<RpcResult<'get_student_profile'>>;
+    listCourseStudentProfiles(courseId: string): Promise<RpcResult<'list_course_student_profiles'>>;
     [name: string]: unknown;
   };
   // Set by shared/calc.js for tests and the console. Nothing checked reads it.
@@ -82,3 +89,22 @@ declare var ObsCard: {
   context(cid: string, opts?: unknown): unknown;
   html(ob: unknown, ctx: unknown, opts?: unknown): string;
 };
+// The offline queue (shared/offline-queue.js sets window.v2Queue). Only the
+// member the checked data files call is typed.
+// __fvPerf: shared/data-courses-terms.js keeps the last 50 load timings here.
+interface Window {
+  v2Queue: { dropBlockedOn(localId: string, opts?: unknown): number };
+  __fvPerf: unknown[];
+}
+// The grade state (shared/grade-state.js, not checked yet). Only the members
+// the checked data files use are typed.
+declare var GradeState: {
+  RETURNED: string;
+  holds(klass: unknown): boolean;
+  stateOf(cid: string, sid: string, aid: string): string | null;
+};
+// shared/reporting-term-presets.js (not checked yet): the school whose preset
+// a class's terms come from, or null.
+declare function reportingTermsSchoolMatch(terms: unknown): {
+  school: { terms: { starts_on: string; ends_on: string; report?: string }[] };
+} | null;
