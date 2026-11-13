@@ -1,3 +1,4 @@
+// @ts-check
 /* Term ratings and report preferences: the Term Questionnaire's ratings, comments and attendance, the report setup,
    and the teacher's card, dashboard and view settings. Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
@@ -5,7 +6,7 @@
 function getTermRatings(cid) {
   if (_cache.termRatings[cid] !== undefined) return _cache.termRatings[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-term-ratings-' + cid)) || {};
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-term-ratings-' + cid))) || {};
   } catch (e) {
     console.warn('TermRatings parse fallback:', e);
     return {};
@@ -185,6 +186,7 @@ var _TERM_RATING_WIRE = {
   draftMeta: 'draftMeta',
 };
 function _termRatingPatch(data) {
+  /** @type {Record<string, unknown>} */
   var payload = {};
   Object.keys(data || {}).forEach(function (key) {
     var wireKey = _TERM_RATING_WIRE[key];
@@ -223,7 +225,7 @@ function _habitsWire(habits) {
 function getReportConfig(cid) {
   if (_cache.reportConfig[cid] !== undefined) return _cache.reportConfig[cid];
   try {
-    return JSON.parse(localStorage.getItem('gb-report-config-' + cid)) || null;
+    return JSON.parse(/** @type {string} */ (localStorage.getItem('gb-report-config-' + cid))) || null;
   } catch (e) {
     console.warn('ReportConfig parse fallback:', e);
     return null;
