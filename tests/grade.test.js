@@ -198,7 +198,7 @@ describe('grade-format-guard', () => {
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
     'teacher/report-feedback-cards.js': 2,
-    'teacher/report-questionnaire.js': 1,
+    'teacher/report-qn-browse-cases.js': 1,
     'teacher/rubric-bank.js': 2,
     'teacher/student-overrides.js': 2,
     'teacher/ui.js': 2,

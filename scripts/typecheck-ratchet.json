@@ -1,5 +1,11 @@
 {
-  "checked": ["shared/calc.js", "shared/constants.js", "shared/data-rpc-wrappers.js", "shared/html.js"],
+  "checked": [
+    "shared/calc.js",
+    "shared/constants.js",
+    "shared/data-rpc-wrappers.js",
+    "shared/html.js",
+    "teacher/report-qn-browse-cases.js"
+  ],
   "notYetChecked": [
     "s/app.js",
     "s/assignments.js",
