@@ -255,7 +255,7 @@ function differentialFakeServer() {
   /* What a read answers with, or undefined to leave mockAuth's answer. */
   function readAnswer(name, params) {
     if (name === 'list_course_grade_returns') return read(SRV + 'rows-' + params.p_course_id, {}) || {};
-    if (name === 'list_course_submissions') {
+    if (name === 'list_course_submissions' || name === 'list_course_submissions_since') {
       var c = courseOf(params.p_course_id) || {};
       return {
         bucket: 'student-photos',
