@@ -288,6 +288,7 @@ load('shared/bank-sets.js');
 load('teacher/comment-bank.js');
 load('teacher/comment-personal.js');
 load('teacher/report-qn-browse-cases.js');
+load('teacher/report-qn-voice-observations.js');
 load('teacher/report-questionnaire.js');
 load('teacher/grade-report.js');
 load('teacher/report-one.js');
