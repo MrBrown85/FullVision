@@ -57,24 +57,42 @@ window.GradebookChrome = (function () {
     // Remove previous listener to prevent stacking
     if (_gridScrollHandler && _gridScrollHandler.el) {
       _gridScrollHandler.el.removeEventListener('scroll', _gridScrollHandler.fn);
+      _gridScrollHandler.win.removeEventListener('resize', _gridScrollHandler.resize);
     }
     var data = document.getElementById('gb-data');
     var colheads = document.getElementById('gb-colheads');
     var colheadsInner = colheads && colheads.querySelector('.gb-grid-colheads-inner');
     var rowheads = document.getElementById('gb-rowheads');
     if (!data || !colheads || !rowheads) return;
-    var pad = 0;
+    // A scroll only moves the headers and the names along: it reads no layout.
     var fn = function () {
-      // The data area's horizontal scrollbar shortens its view; the names
-      // get the same room at the bottom so the last rows still line up.
+      if (colheadsInner) colheadsInner.style.transform = 'translateX(-' + data.scrollLeft + 'px)';
+      rowheads.scrollTop = data.scrollTop;
+    };
+    // The data area's horizontal scrollbar shortens its view; the names
+    // get the same room at the bottom so the last rows still line up.
+    // Worked out after a draw and when the window is resized, in the frame
+    // that lays the page out anyway.
+    var pad = 0;
+    var waiting = false;
+    var fit = function () {
+      waiting = false;
+      if (!data.isConnected) return;
       var gap = data.scrollHeight - data.clientHeight - (rowheads.scrollHeight - rowheads.clientHeight);
       if (gap && pad + gap >= 0) {
         pad += gap;
         rowheads.style.setProperty('--gb-hscroll', pad + 'px');
+        rowheads.scrollTop = data.scrollTop;
       }
-      if (colheadsInner) colheadsInner.style.transform = 'translateX(-' + data.scrollLeft + 'px)';
-      rowheads.scrollTop = data.scrollTop;
     };
+    var resize = function () {
+      if (waiting) return;
+      waiting = true;
+      requestAnimationFrame(fit);
+    };
+    resize();
+    var win = data.ownerDocument.defaultView || window;
+    win.addEventListener('resize', resize);
     data.addEventListener('scroll', fn, { passive: true });
     // A name that takes the focus (Tab, or ← from a score) scrolls the
     // names' column into view; the scores follow so the rows stay in line.
@@ -85,7 +103,7 @@ window.GradebookChrome = (function () {
       },
       { passive: true },
     );
-    _gridScrollHandler = { el: data, fn: fn };
+    _gridScrollHandler = { el: data, fn: fn, resize: resize, win: win };
   }
 
   /* Put the data area back at a saved position and line the headers up with
@@ -247,24 +265,29 @@ window.GradebookChrome = (function () {
     });
   }
 
+  // The header and cells lit now, so the next column clears only them.
+  var _colLit = [];
   function showColTooltip(colEl, colIdx) {
     // Highlight the column header and its score cells; no card, so
     // nothing covers the scores below.
-    if (colEl) colEl.classList.add('gb-col-hover');
+    if (colEl) _colLit.push(colEl);
     var table = document.querySelector('#gb-data table');
     if (table) {
       table.querySelectorAll('tbody tr').forEach(function (row) {
-        var cell = row.children[colIdx];
-        if (cell) cell.classList.add('gb-col-hover');
+        if (row.children[colIdx]) _colLit.push(row.children[colIdx]);
       });
     }
+    _colLit.forEach(function (el) {
+      el.classList.add('gb-col-hover');
+    });
   }
 
   function hideColTooltip() {
     _hoveredColIdx = -1;
-    document.querySelectorAll('.gb-col-hover').forEach(function (el) {
+    _colLit.forEach(function (el) {
       el.classList.remove('gb-col-hover');
     });
+    _colLit = [];
   }
 
   return {
