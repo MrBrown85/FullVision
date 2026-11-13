@@ -4,15 +4,15 @@
     "saved": 110,
     "drawn": 931215,
     "elements": 3309,
-    "lookups": 70353,
+    "lookups": 37878,
     "class": 0
   },
   "Assignments: open one card": {
-    "copied": 89444,
+    "copied": 83036,
     "saved": 0,
-    "drawn": 555973,
+    "drawn": 292932,
     "elements": 5559,
-    "lookups": 52055,
+    "lookups": 6378,
     "class": 0
   },
   "Assignments: click a rubric level": {
@@ -21,6 +21,14 @@
     "drawn": 690,
     "elements": 5560,
     "lookups": 53,
+    "class": 0
+  },
+  "Assignments: close the card": {
+    "copied": 12816,
+    "saved": 0,
+    "drawn": 0,
+    "elements": 3315,
+    "lookups": 5401,
     "class": 0
   },
   "Gradebook: open": {

@@ -318,6 +318,8 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
       expect(levels.length).toBeGreaterThan(8);
       click(levels[5]);
     });
+    step('Assignments: close the card', () => click(card(AIDS[0]).querySelector('.assess-title')));
+    expect(card(AIDS[0]).querySelector('.rsg-criterion-row'), 'the card did not close').toBeNull();
   });
 
   it('the Gradebook', () => {
