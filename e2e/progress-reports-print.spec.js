@@ -401,8 +401,6 @@ test.describe('A Page Studio form, read as parts', () => {
     await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Parts', exact: true }).click();
     await expect(page.locator('#studio-palette')).toBeVisible();
-    // TODO(one-report): app bug, reported: Escape does not close the Parts
-    // panel on a phone (Page Studio's Blocks panel closed on Escape).
     await page.keyboard.press('Escape');
     await expect(page.locator('#studio-palette')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Parts', exact: true })).toHaveAttribute('aria-pressed', 'false');

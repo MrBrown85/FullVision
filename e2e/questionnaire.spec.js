@@ -139,9 +139,16 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   await expect(cards.nth(0).locator('.qn-info-row').nth(2)).toContainText(
     'The highest-marked assignment so far this year, and your note for the report on it.',
   );
-  const blocks = await page.evaluate(() =>
-    ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
-  );
+  // The class's One Report parts in print order, then the Feedback Pages that are on.
+  const blocks = await page.evaluate(() => {
+    const m = ReportOne.modelFor(getReportConfig('sci8') || {});
+    const on = ReportOne.order(m)
+      .filter(k => ReportOne.available(k, 'sci8'))
+      .concat(ReportOne.FEEDBACK.map(f => f.key).filter(k => ReportOne.isOn(m, k)));
+    return on.map(k => m.titles[k] || ReportOne.label(k, 'sci8'));
+  });
+  expect(blocks[0]).toBe('Letterhead');
+  expect(blocks.length).toBeGreaterThan(3);
   await expect(cards.nth(1).locator('.qn-info-row .qn-info-part')).toHaveText(blocks);
   await expect(cards.nth(1).locator('.qn-info-off')).toContainText('Add them in Progress Reports.');
   await expect(sheet).toContainText('Student Voice answers marked Private.');
