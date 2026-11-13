@@ -35,7 +35,7 @@
  * and say in the PR which numbers moved and why.
  */
 import './setup.js';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -48,6 +48,7 @@ import {
   openGrader,
   closePages,
   click,
+  fire,
   key,
 } from './helpers/pin-save-paths.js';
 import { mount, unmount, showCompetencies } from './helpers/gradebook-dom.js';
@@ -313,11 +314,24 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
     step('Assignments: open', () => openAssignments(quietSeed, CID, {}));
     step('Assignments: open one card', () => click(card(AIDS[0]).querySelector('.assess-title')));
     expect(card(AIDS[0]).querySelector('.rsg-criterion-row'), 'the card did not open').not.toBeNull();
-    step('Assignments: click a rubric level', () => {
-      const levels = card(AIDS[0]).querySelectorAll('.rsg-level[data-action="selectRubricScore"]');
-      expect(levels.length).toBeGreaterThan(8);
-      click(levels[5]);
-    });
+    // What the page does a moment after an event (its timers) is a step of its own.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      step('Assignments: click a rubric level', () => {
+        const levels = card(AIDS[0]).querySelectorAll('.rsg-level[data-action="selectRubricScore"]');
+        expect(levels.length).toBeGreaterThan(8);
+        click(levels[5]);
+      });
+      step('Assignments: what follows a click', () => vi.runOnlyPendingTimers());
+      const comment = card(AIDS[0]).querySelector('textarea');
+      expect(comment, 'no comment box in the card').not.toBeNull();
+      step('Assignments: a key typed in a comment', () => {
+        fire(comment, 'keyup');
+        vi.runOnlyPendingTimers();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
     step('Assignments: close the card', () => click(card(AIDS[0]).querySelector('.assess-title')));
     expect(card(AIDS[0]).querySelector('.rsg-criterion-row'), 'the card did not close').toBeNull();
   });

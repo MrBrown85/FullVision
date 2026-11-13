@@ -1768,7 +1768,7 @@ window.PageAssignments = (function () {
           ? '<span class="assess-returns" data-returns-aid="' +
             a.id +
             '">' +
-            _drawnReturn('c' + a.id, _returnChipsHtml(cid, a, shownIds, n.drafts)) +
+            _drawnReturn('c' + a.id, _returnChipsHtml(cid, a, shownIds, _drawnReturn('d' + a.id, n.drafts))) +
             '</span>'
           : '') +
         '</span>' +
@@ -2592,7 +2592,7 @@ window.PageAssignments = (function () {
     });
     root.querySelectorAll('.ldg-grid').forEach(refreshLedgerSummary);
     _refreshClassResultsSoon();
-    _refreshReturns(true, root);
+    _seedReturns(root);
     _drawnReturns = null;
   }
 
@@ -8788,8 +8788,11 @@ window.PageAssignments = (function () {
     el.classList.toggle('has-text', !!text);
     if (text === getScoreComment(activeCourse, el.dataset.sid, el.dataset.aid)) return;
     Grader.setOverallComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
-    // A comment saved off its timer follows no click: the Draft marks do.
-    _returnsAfterEvent();
+    // A comment saved off its timer follows no click: the status locks and
+    // the Draft marks do (the locks followed the next key typed).
+    var scope = _gradingScope(el.dataset.aid, el.dataset.sid);
+    _syncStatusLocks(scope);
+    _returnsAfterEvent(scope);
   }
   function _queueOverallComment(el) {
     el.classList.toggle('has-text', !!el.value.trim());
@@ -12952,10 +12955,13 @@ window.PageAssignments = (function () {
   function _statusLockAttrs(aid, sid, key) {
     return canSetAssignmentStatus(activeCourse, sid, aid, key) ? '' : ' disabled title="' + _STATUS_LOCKED_TITLE + '"';
   }
-  // Brings every status button on the page up to date after a score or
-  // comment changes, without redrawing anything.
-  function _syncStatusLocks() {
-    document.querySelectorAll('[data-action="toggleStudentStatus"]').forEach(function (btn) {
+  // Brings the status buttons up to date after a score or comment changes,
+  // without redrawing anything: every one on the page, or those of the
+  // piece of work (and student) in `scope` (_eventScope).
+  function _syncStatusLocks(scope) {
+    var sel = '[data-action="toggleStudentStatus"]';
+    if (scope) sel += '[data-aid="' + scope.aid + '"]' + (scope.sid ? '[data-sid="' + scope.sid + '"]' : '');
+    document.querySelectorAll(sel).forEach(function (btn) {
       var locked = !canSetAssignmentStatus(activeCourse, btn.dataset.sid, btn.dataset.aid, btn.dataset.status);
       if (btn.disabled === locked) return;
       btn.disabled = locked;
@@ -12963,8 +12969,44 @@ window.PageAssignments = (function () {
       else btn.removeAttribute('title');
     });
   }
-  function _statusLocksAfterEvent() {
-    setTimeout(_syncStatusLocks, 0);
+  /* What an event on the page can have changed: one student's piece of
+     work ({ aid, sid }), one piece ({ aid }), or anything (null). A click
+     or key on a student's row is that student's, except on pair and group
+     work, where one row writes every member. Elsewhere in a card (a
+     column's fill, Set Everyone To) it is the card's; outside every card
+     (a question's OK, Undo, the toolbar, Class Results) it is anything. */
+  function _eventScope(e) {
+    var t = e && e.target;
+    var card = t && t.closest ? t.closest('.assess-card') : null;
+    var main = document.getElementById('main');
+    if (!card || !main || !main.contains(card)) return null;
+    var row = t.closest('[data-sid], [data-student], [data-status-student]');
+    var sid = row && card.contains(row) && (row.dataset.sid || row.dataset.student || row.dataset.statusStudent);
+    return _gradingScope(card.id.slice(3), sid);
+  }
+  function _gradingScope(aid, sid) {
+    var a = sid && _assessmentById(activeCourse, aid);
+    return a && (!a.collaboration || a.collaboration === 'individual') ? { aid: aid, sid: sid } : { aid: aid };
+  }
+  // Typing in a box saves on Enter or on leaving it, so a key that is not
+  // Enter there brings nothing up to date (a key was two page-wide sweeps).
+  function _typingKey(e) {
+    var t = e.target;
+    if (e.type !== 'keyup' || e.key === 'Enter' || !t) return false;
+    if (t.isContentEditable || t.tagName === 'TEXTAREA') return true;
+    return (
+      t.tagName === 'INPUT' && /^(text|search|number|email|url|tel|password)?$/i.test(t.getAttribute('type') || '')
+    );
+  }
+  // After an event that may have saved a grade: the Missing | Excused locks,
+  // then the Draft marks and counts to return (S1-F2), for what it touched.
+  function _afterGradingEvent(e) {
+    if (_typingKey(e)) return;
+    var scope = _eventScope(e);
+    setTimeout(function () {
+      _syncStatusLocks(scope);
+    }, 0);
+    _returnsAfterEvent(scope);
   }
   // The Missing | Excused | Late control's buttons, in the order given.
   // html-safe: status keys and labels are constants; aid and sid are our ids
@@ -14095,35 +14137,46 @@ window.PageAssignments = (function () {
      loses its click. What a piece holds is remembered on its element, as
      the string its builder made: the browser's own copy of the HTML can
      differ from it (an apostrophe in a title), and would look changed.
-     render() calls this with `drawn` set once it has drawn the page (or
-     cards, under `root`), to remember what it drew and write nothing: the
+     `scope` ({ aid, sid } or { aid }, from _eventScope) is the one piece
+     of work, or one student's, an event can have changed; without it,
+     everything is. Each card remembers its drafts (_drafts), so the
+     toolbar's count is the sum without counting every card again.
+     render() calls _seedReturns once it has drawn the page (or cards,
+     under `root`), to remember what it drew and write nothing: the
      strings are the ones the draw built (_drawnReturns), not built again. */
   var _drawnReturns = null;
   function _drawnReturn(key, html) {
     if (_drawnReturns) _drawnReturns[key] = html;
     return html;
   }
-  function _refreshReturns(drawn, root) {
+  function _seedReturns(root) {
+    if (_grader || !_holdsGrades(activeCourse) || !document.getElementById('main')) return;
+    var kept = _drawnReturns || {};
+    root.querySelectorAll('[data-returns-aid]').forEach(function (el) {
+      el._drafts = kept['d' + el.dataset.returnsAid];
+    });
+    // Each piece's selector, its key's letter (_drawnReturn) and the data that names it.
+    [
+      ['returns-aid', 'c', 'returnsAid'],
+      ['return-slot-aid', 's', 'returnSlotAid'],
+      ['ret-aid', 'm', 'retAid', 'retSids'],
+      ['return-row-aid', 'r', 'returnRowAid', 'returnRowSid'],
+    ].forEach(function (k) {
+      root.querySelectorAll('[data-' + k[0] + ']').forEach(function (el) {
+        var key = k[1] + el.dataset[k[2]] + (k[3] ? '|' + el.dataset[k[3]] : '');
+        if (key in kept) el._returnsHtml = kept[key];
+      });
+    });
+  }
+  function _refreshReturns(scope) {
     if (_grader) return;
     var cid = activeCourse;
-    if (!_holdsGrades(cid) || !document.getElementById('main')) return;
-    root = root || document.getElementById('main');
-    if (drawn === true) {
-      var kept = _drawnReturns || {};
-      // Each piece's selector, its key's letter (_drawnReturn) and the data that names it.
-      [
-        ['returns-aid', 'c', 'returnsAid'],
-        ['return-slot-aid', 's', 'returnSlotAid'],
-        ['ret-aid', 'm', 'retAid', 'retSids'],
-        ['return-row-aid', 'r', 'returnRowAid', 'returnRowSid'],
-      ].forEach(function (k) {
-        root.querySelectorAll('[data-' + k[0] + ']').forEach(function (el) {
-          var key = k[1] + el.dataset[k[2]] + (k[3] ? '|' + el.dataset[k[3]] : '');
-          if (key in kept) el._returnsHtml = kept[key];
-        });
-      });
-      return;
-    }
+    var root = document.getElementById('main');
+    if (!_holdsGrades(cid) || !root) return;
+    var only = scope ? '="' + scope.aid + '"' : '';
+    var forStudent = function (sids) {
+      return !scope || !scope.sid || sids.indexOf(scope.sid) >= 0;
+    };
     var shownIds = _returnShownIds(cid);
     var set = function (el, html) {
       if (el._returnsHtml === html) {
@@ -14137,20 +14190,24 @@ window.PageAssignments = (function () {
     };
     var total = 0;
     root.querySelectorAll('[data-returns-aid]').forEach(function (el) {
-      var a = _assessmentById(cid, el.dataset.returnsAid);
-      if (!a) return;
-      total += GraderWork.draftsIn(cid, a.id, shownIds).length;
-      set(el, _returnChipsHtml(cid, a, shownIds));
+      if (!scope || el.dataset.returnsAid === scope.aid) {
+        var a = _assessmentById(cid, el.dataset.returnsAid);
+        if (!a) return;
+        el._drafts = GraderWork.draftsIn(cid, a.id, shownIds).length;
+        set(el, _returnChipsHtml(cid, a, shownIds, el._drafts));
+      }
+      total += el._drafts || 0;
     });
-    root.querySelectorAll('[data-return-slot-aid]').forEach(function (el) {
+    root.querySelectorAll('[data-return-slot-aid' + only + ']').forEach(function (el) {
       var a = _assessmentById(cid, el.dataset.returnSlotAid);
       if (a) set(el, _returnDraftsButtonHtml(cid, a, shownIds));
     });
-    root.querySelectorAll('[data-ret-aid]').forEach(function (el) {
-      set(el, _returnMarkInner(cid, el.dataset.retAid, el.dataset.retSids.split(',')));
+    root.querySelectorAll('[data-ret-aid' + only + ']').forEach(function (el) {
+      var sids = el.dataset.retSids.split(',');
+      if (forStudent(sids)) set(el, _returnMarkInner(cid, el.dataset.retAid, sids));
     });
-    root.querySelectorAll('[data-return-row-aid]').forEach(function (el) {
-      var a = _assessmentById(cid, el.dataset.returnRowAid);
+    root.querySelectorAll('[data-return-row-aid' + only + ']').forEach(function (el) {
+      var a = forStudent([el.dataset.returnRowSid]) && _assessmentById(cid, el.dataset.returnRowAid);
       if (!a) return;
       var html = _inlineReturnInner(cid, a, el.dataset.returnRowSid);
       if (set(el, html)) el.hidden = !html;
@@ -14163,9 +14220,11 @@ window.PageAssignments = (function () {
     // html-safe: built by _toReturnPillHtml
     if (slot) slot.innerHTML = _toReturnPillHtml();
   }
-  function _returnsAfterEvent() {
+  function _returnsAfterEvent(scope) {
     if (_grader || !_holdsGrades(activeCourse)) return;
-    setTimeout(_refreshReturns, 0);
+    setTimeout(function () {
+      _refreshReturns(scope);
+    }, 0);
   }
 
   /* Return the drafts `sids` hold on `aid`, and their partners': the
@@ -16417,14 +16476,11 @@ window.PageAssignments = (function () {
     _addDocListener('focusout', _afTipBlur);
     _addDocListener('change', _afTipChange);
     _addDocListener('scroll', _afTipScroll, true);
+    // Most grading here saves without a redraw: the Missing | Excused locks,
+    // the Draft marks and the counts to return follow each event (S1-F2).
+    // The returns part runs only in a class that holds grades.
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
-      _addDocListener(type, _statusLocksAfterEvent);
-    });
-    // Most grading here saves without a redraw: the Draft marks and the
-    // counts to return follow each event (S1-F2). Nothing runs in a class
-    // that holds no grades.
-    ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
-      _addDocListener(type, _returnsAfterEvent);
+      _addDocListener(type, _afterGradingEvent);
     });
 
     render();
