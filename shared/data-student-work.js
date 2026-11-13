@@ -151,19 +151,23 @@ function _studentWorkSubmissions(cid) {
       return s && s.state === 'sent' && aids[s.assessment_id];
     })
     .map(function (s) {
-      var out = _studentWorkCopy(s);
-      out.files = (Array.isArray(out.files) ? out.files : []).slice().sort(function (x, y) {
-        return (x.page || 0) - (y.page || 0);
-      });
-      // Who added each page (the contract's added_by); the sample's pages
-      // were all added by whoever sent the work.
-      out.files.forEach(function (f) {
-        if (f && f.added_by !== 'teacher' && f.added_by !== 'student') {
-          f.added_by = out.sent_by === 'teacher' ? 'teacher' : 'student';
-        }
-      });
-      return out;
+      return _studentWorkReadable(s);
     });
+}
+// One stored submission as the readers give it: a copy, its pages in order.
+function _studentWorkReadable(s) {
+  var out = _studentWorkCopy(s);
+  out.files = (Array.isArray(out.files) ? out.files : []).slice().sort(function (x, y) {
+    return (x.page || 0) - (y.page || 0);
+  });
+  // Who added each page (the contract's added_by); the sample's pages
+  // were all added by whoever sent the work.
+  out.files.forEach(function (f) {
+    if (f && f.added_by !== 'teacher' && f.added_by !== 'student') {
+      f.added_by = out.sent_by === 'teacher' ? 'teacher' : 'student';
+    }
+  });
+  return out;
 }
 
 function getCourseSubmissions(cid) {
@@ -322,19 +326,34 @@ function getStudentWorkGroup(cid, sid, aid) {
   return { kind: group.kind, index: group.index, members: members, separate: isGradedSeparately(a, sid) };
 }
 
-// The newest handed-in submission of each of `sids` on `aid`, in that order.
+/* The newest handed-in submission of each of `sids` on `aid`, in that
+   order. Every screen asks this for one student and one piece at a time,
+   hundreds of times a draw, so the class's work is sorted by piece and
+   student once for each stored copy of it, and only the submission asked
+   for is copied. (Copying the whole class's work for each ask took
+   seconds a draw in a class with 600 pieces of work in.) */
+var _workByPiece = { cid: null, stored: null, by: {} };
 function _newestSubmissionsOf(cid, sids, aid) {
-  var subs = _studentWorkSubmissions(cid);
+  var stored = _studentWorkStored(cid);
+  // The server takes an assessment's work with it when it is deleted.
+  var there = (getAssessments(cid) || []).some(function (a) {
+    return a && a.id === aid;
+  });
+  if (!stored || !there) return [];
+  if (_workByPiece.cid !== cid || _workByPiece.stored !== stored) {
+    var by = {};
+    (stored.submissions || []).forEach(function (s) {
+      if (!s || s.state !== 'sent') return;
+      var key = s.assessment_id + '|' + s.enrollment_id;
+      // The newest version; of two alike, the one stored first.
+      if (!by[key] || (s.version || 1) > (by[key].version || 1)) by[key] = s;
+    });
+    _workByPiece = { cid: cid, stored: stored, by: by };
+  }
   var out = [];
   sids.forEach(function (sid) {
-    var mine = subs
-      .filter(function (s) {
-        return s.enrollment_id === sid && s.assessment_id === aid;
-      })
-      .sort(function (x, y) {
-        return (y.version || 1) - (x.version || 1);
-      });
-    if (mine.length) out.push(mine[0]);
+    var mine = _workByPiece.by[aid + '|' + sid];
+    if (mine) out.push(_studentWorkReadable(mine));
   });
   return out;
 }
