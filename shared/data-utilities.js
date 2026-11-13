@@ -250,7 +250,7 @@ function _warnWriteRefused(name, reason) {
     var text = 'Write refused: ' + name + ' (' + String(reason) + ')';
     if (_refusalsReported[text]) return;
     _refusalsReported[text] = true;
-    var sentry = /** @type {any} */ (window).Sentry;
+    var sentry = window.Sentry;
     if (sentry && typeof sentry.captureMessage === 'function') sentry.captureMessage(text, 'warning');
   } catch (e) {
     /* reporting must never reach the save */
