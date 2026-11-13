@@ -789,14 +789,17 @@ window.ReportBlocks = (function () {
   function _namedWork(cid, sid, items, best) {
     if (!items.length) return null;
     const byMark = _byMark(cid, sid, best);
-    // At one mark: oldest first, same-date pieces as calc.js counts them.
+    // At one mark: newest first, and on one date the piece made later first
+    // (calc.js samePieceDateOrder, reversed). The Comment Bank names a tied
+    // piece the same way (CommentBank bestOrderOf), so the comment and this
+    // line do not name different pieces for one tie. Best and Lowest alike.
     const sorted = items
       .slice()
       .sort(
         (x, y) =>
           byMark(x, y) ||
-          _assessmentDate(x.a).localeCompare(_assessmentDate(y.a)) ||
-          samePieceDateOrder(cid, x.a.id, y.a.id),
+          _assessmentDate(y.a).localeCompare(_assessmentDate(x.a)) ||
+          samePieceDateOrder(cid, y.a.id, x.a.id),
       );
     // A piece that scored two of the tied competencies is named once, at
     // its best (or lowest) mark among them.
