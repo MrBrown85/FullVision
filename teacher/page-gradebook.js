@@ -4389,6 +4389,8 @@ window.PageGradebook = (function () {
     _scrollKey = null;
     _tipSource = null;
 
+    // For gradebook.css: the grid fills the page and #main does not scroll.
+    document.getElementById('main').classList.add('page-gradebook');
     // No sidebar for gradebook
     document.getElementById('page-layout').classList.add('sidebar-hidden');
     document.getElementById('sidebar-mount').style.display = 'none';
@@ -4499,6 +4501,7 @@ window.PageGradebook = (function () {
       gbTip.className = '';
     }
     _tipSource = null;
+    document.getElementById('main').classList.remove('page-gradebook');
     delete window._pageSwitchCourse;
   }
 

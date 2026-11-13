@@ -3480,6 +3480,11 @@ window.DashClassManager = (function () {
   var _cmEmptyStateHtml = CmBlockPicker._cmEmptyStateHtml;
   var cmOpenDemoMode = CmBlockPicker.cmOpenDemoMode;
 
+  // A class for dashboard.css on el (the body, or #main).
+  function _cmMark(el, name, on) {
+    if (el && el.classList) el.classList.toggle(name, on);
+  }
+
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
     // Class Settings reads the year so far for every class: its previews
@@ -3504,6 +3509,8 @@ window.DashClassManager = (function () {
           : 'Class Settings';
     // Class Settings belongs to the dashboard: its toolbar is a breadcrumb
     // back to it in place of the dashboard's own toolbar.
+    // dashboard.css keys Class Settings' layout on these two classes.
+    _cmMark(document.body, 'cm-open', true);
     var toolbarMount = document.getElementById('page-toolbar-mount');
     if (toolbarMount) {
       toolbarMount.innerHTML =
@@ -3528,9 +3535,11 @@ window.DashClassManager = (function () {
     // Empty state
     if (courseIds.length === 0 && cmMode !== 'create') {
       html += _cmEmptyStateHtml();
+      _cmMark(document.getElementById('main'), 'cm-listing', false);
       document.getElementById('main').innerHTML = html;
       return;
     }
+    _cmMark(document.getElementById('main'), 'cm-listing', true);
 
     html += '<div class="cm-layout">';
     if (sideMount) sideMount.innerHTML = renderCmSidebar(courseIds);
