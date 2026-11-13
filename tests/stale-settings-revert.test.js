@@ -144,6 +144,9 @@ async function openApp(opts) {
   DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
   DashClassManager.openClassManager();
   DashClassManager.handleAction('cmTermCancel', { dataset: {} }); // no term edits left from another test
+  // The categories are asked for on a timer (_cmCatPrepare): let it run. A
+  // draw that built every tab took long enough that it always had.
+  await new Promise(r => setTimeout(r, 5));
   await settle();
   if (connected) await quiet();
 }
