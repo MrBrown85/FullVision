@@ -147,12 +147,12 @@ describe('opening Mark Up', () => {
     );
   });
 
-  it('has no Mark Up button with Send Work off, or with nothing in', () => {
+  it('has no Mark Up button with nothing in; work that is in can be marked up with Send Work off', () => {
     let overlay = openGrader(() => seed({ sendWork: false }), CID, PIECE, ANA);
-    expect(overlay.querySelector('[data-grader="work-markup"]')).toBeNull();
+    expect(overlay.querySelector('[data-grader="work-markup"]')).not.toBeNull();
     closePages();
     overlay = openGrader(seed, CID, PIECE, BO);
-    expect(overlay.querySelector('[data-grader="work-markup"]')).toBeNull();
+    expect(overlay.querySelector('[data-grader="work-markup"]') === null).toBe(true);
   });
 });
 

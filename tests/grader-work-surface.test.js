@@ -83,12 +83,12 @@ describe('PageAssignments.workSurface', () => {
     expect(window.PageAssignments.workSurface()).toMatchObject({ fileId: 'a2', page: 2, turn: 90 });
   });
 
-  it('null with nothing in, with Send Work off, and with the dialog closed', () => {
+  it('null with nothing in and with the dialog closed; work that is in shows with Send Work off', () => {
     openGrader(seed, CID, PIECE, BO);
     expect(window.PageAssignments.workSurface()).toBeNull();
     closePages();
     openGrader(() => seed({ sendWork: false }), CID, PIECE, ANA);
-    expect(window.PageAssignments.workSurface()).toBeNull();
+    expect(window.PageAssignments.workSurface()).toMatchObject({ fileId: 'a1', page: 1 });
     window.PageAssignments.closeGrader();
     expect(window.PageAssignments.workSurface()).toBeNull();
   });

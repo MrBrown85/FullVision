@@ -172,8 +172,18 @@ describe('the grader on a group', () => {
     );
   });
 
-  it('without Send Work the members card is the same board card, after the criteria', () => {
-    const overlay = openGrader(() => seed({ sendWork: false }), CID, PIECE, S[0]);
+  it('without Send Work or work in, the members card is the same board card, after the criteria', () => {
+    const overlay = openGrader(
+      () => {
+        seed({ sendWork: false });
+        const work = getCourseSubmissions(CID);
+        work.submissions = [];
+        saveDemoStudentWork(CID, work);
+      },
+      CID,
+      PIECE,
+      S[0],
+    );
     const card = overlay.querySelector('.grader-members');
     expect(card.querySelector('.grader-members-title').textContent).toBe('Students in This Group');
     expect(card.querySelector('.grader-members-hint').textContent).toBe(
@@ -186,6 +196,6 @@ describe('the grader on a group', () => {
       el.className.split(' ').pop(),
     );
     expect(order).toEqual(['grdl-card', 'grader-members', 'grdt-overall']);
-    expect(overlay.querySelector('.grader-work')).toBeNull();
+    expect(overlay.querySelector('.grader-work') === null).toBe(true);
   });
 });

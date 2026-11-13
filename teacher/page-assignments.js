@@ -8551,6 +8551,7 @@ window.PageAssignments = (function () {
           _graderStatusButtons(aid, st.id, status, ['NS', 'EXC', 'LATE']) +
           '</div>' +
           (row && row.separateFrom ? _groupSeparateNoteHtml(aid, st.id, row.separateFrom) : '')) +
+      ((row && row.view) || !window.WorkWall ? '' : WorkWall.seeWorkHtml(cid, aid, st.id)) +
       '<div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Set this student\'s levels" aria-label="Set this student\'s levels">' +
       _ROW_FILL_ICON +
       '<div class="col-fill-menu" data-stop-prop="true">' +
@@ -12541,7 +12542,7 @@ window.PageAssignments = (function () {
     // the button being clicked.
     // The student's work beside the scoring (S6-F1), while the piece takes
     // work; the dialog is otherwise as it always was.
-    var work = GraderWork.workOn(cid, a);
+    var work = GraderWork.workShown(cid, a);
     if (!dialog.firstChild || _grader.workShell !== work) {
       if (dialog.firstChild) _graderForgetDrawn();
       // html-safe: fixed markup and icon constants; text is set with textContent below
@@ -13460,7 +13461,7 @@ window.PageAssignments = (function () {
       ) + _cardPrintItem(cid, a);
     // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
-    if (!focusStudentId && window.WorkWall && GraderWork.workOn(cid, a))
+    if (!focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
     var rubric = a.rubricId && getRubricById(cid, a.rubricId);
     if (rubric) {
@@ -13558,7 +13559,7 @@ window.PageAssignments = (function () {
      Logan when nothing is in; each opens the grader dialog on them. */
   // html-safe: names go through esc; ids are ours
   function _inlineWorkHtml(cid, a, sid) {
-    if (!GraderWork.workOn(cid, a)) return '';
+    if (!GraderWork.workShown(cid, a)) return '';
     var sub = _workSubOf(cid, sid, a.id);
     var st = _workStudent(cid, sid);
     var html = '<span class="grader-inline-work">' + esc(_workLineText(cid, a, sid, sub)) + '</span>';
@@ -14608,6 +14609,11 @@ window.PageAssignments = (function () {
     );
   }
 
+  // Mark Up is kept for the student to read: only where the student page's rows are kept.
+  function _markUpHere(cid) {
+    return _formWorkDemo() || (typeof studentWorkLive === 'function' && studentWorkLive(cid));
+  }
+
   /* The pane for `st`: their pages, or Add Work when nothing is in. */
   // html-safe: names and the note go through esc; ids are ours; labels are fixed words
   function _workPaneHtml(cid, a, st, view) {
@@ -14659,7 +14665,7 @@ window.PageAssignments = (function () {
       '</button>' +
       '<span class="grader-spacer"></span>' +
       // Mark Up (S9-F1): writes on this page, in teacher/markup.js.
-      (window.MarkUp && !onFirst
+      (window.MarkUp && !onFirst && _markUpHere(cid)
         ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup">Mark Up</button>'
         : '') +
       '<button type="button" class="grader-work-tool grader-work-focus" data-grader="work-focus" aria-pressed="' +
