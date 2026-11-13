@@ -674,6 +674,18 @@ window.ReportOneComment = (function () {
     return false;
   }
 
+  /* Before the preview moves to another student (Previous or Next Student,
+     teacher/report-one-head.js): a comment being edited, or changed and not
+     saved, for the student shown is asked about first, and `then` runs once
+     it is saved or discarded; Keep Editing or Escape leaves everything where
+     it was. With nothing to ask, `then` runs at once. */
+  function beforeLeave(api, then) {
+    if (_ed) return finish(false, then);
+    var st = api && api.view() === 'one' ? api.student() : null;
+    if (st && _drafts[_key(api.cid, _ctx(api).termId, st.id)] != null) return askToSave(api, null, then);
+    then();
+  }
+
   /* False stops Print Reports until a changed comment is saved or discarded. */
   function beforePrint(api) {
     if (!api) return true;
@@ -692,6 +704,7 @@ window.ReportOneComment = (function () {
     decorate: decorate,
     handle: handle,
     beforePrint: beforePrint,
+    beforeLeave: beforeLeave,
     _test: {
       tokens: tokens,
       diffOps: diffOps,

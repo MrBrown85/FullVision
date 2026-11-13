@@ -263,6 +263,7 @@ window.PageReports = (function () {
   }
 
   function _showProgressTab(on) {
+    if (!on) ReportOneHead.reset();
     document.getElementById('student-picker').style.display = on ? '' : 'none';
     const copySel = document.getElementById('report-copy');
     if (copySel && !on) copySel.style.display = 'none';
@@ -574,7 +575,7 @@ window.PageReports = (function () {
      on the right the fit line, Paper, One Student / Everyone and the
      pages, which the layout fills. The two report-one CSS files are scoped
      under .studio-one. */
-  // html-safe: fixed markup; _printSettingsHtml is literal buttons
+  // html-safe: fixed markup; _printSettingsHtml, ReportOneHead's and ReportOneZoom's controls are literal buttons
   function _layoutHtml() {
     var all = studioView === 'all';
     return (
@@ -582,8 +583,10 @@ window.PageReports = (function () {
       '<aside class="studio-palette no-print" id="studio-palette" aria-label="Report"></aside>' +
       '<div class="studio-canvas">' +
       '<div class="studio-head no-print">' +
+      ReportOneHead.navHtml() +
       '<span class="studio-fit" id="studio-fit"></span>' +
       '<div class="studio-tools">' +
+      ReportOneZoom.controlHtml() +
       _printSettingsHtml() +
       '<span class="seg seg-sm studio-view" role="radiogroup" aria-label="View">' +
       '<button type="button" class="seg-btn' +
@@ -596,7 +599,9 @@ window.PageReports = (function () {
       '" data-action="studioView" data-view="all" role="radio" aria-checked="' +
       all +
       '">Everyone</button>' +
-      '</span></div></div>' +
+      '</span>' +
+      ReportOneHead.panelsHtml() +
+      '</div></div>' +
       '<div class="rb-preview studio-pages' +
       (all ? ' studio-all' : '') +
       '" id="rb-preview"></div>' +
@@ -695,36 +700,12 @@ window.PageReports = (function () {
     if (preview) {
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
-      _applyStudioZoom(preview);
+      ReportOneHead.sync(studioView, _oneApi);
+      ReportOneZoom.apply(preview, studioView);
       // The page's own controls (Hide, a row left off, a heading renamed,
       // the comment): never on a printed copy.
       if (!viewingIssue) ReportOnePage.decorate(preview, _oneApi());
     }
-  }
-
-  /* One student's pages are worked on directly (a row left off, a heading
-     renamed, the comment edited), so they are drawn at reading size: one
-     above the other at up to full size, or two side by side where the
-     canvas is wide enough for both at three quarters or more. Everyone
-     keeps the Fit Map's scale. */
-  function _applyStudioZoom(preview) {
-    if (studioView === 'all') {
-      preview.classList.remove('studio-stacked');
-      return;
-    }
-    var z = _oneZoom(preview.clientWidth || 800);
-    preview.style.setProperty('--sheet-zoom', String(z.zoom));
-    preview.classList.toggle('studio-stacked', !!z.stacked);
-  }
-
-  function _oneZoom(canvasWidth) {
-    var sheetW = 8.5 * 96;
-    // The canvas pads 24px a side; two pages sit 22px apart.
-    var two = (canvasWidth - 48 - 22) / (2 * sheetW);
-    if (two >= 0.75) return { zoom: Math.round(Math.min(1, two) * 1000) / 1000, stacked: false };
-    // Down to a phone's width (390 leaves 342 for the page), so the page is never cut off.
-    var one = Math.min(1, Math.max(0.3, (canvasWidth - 48) / sheetW));
-    return { zoom: Math.round(one * 1000) / 1000, stacked: true };
   }
 
   /* ── The rail: sheets per student ──────────────────────────────
@@ -879,7 +860,8 @@ window.PageReports = (function () {
     preview.classList.toggle('report-fitmap', studioView === 'all');
     preview.classList.toggle('studio-all', studioView === 'all');
     ReportSheets.setPageStyle(rec.paper || 'letter');
-    _applyStudioZoom(preview);
+    ReportOneHead.sync(studioView, _oneApi);
+    ReportOneZoom.apply(preview, studioView);
     _syncPrintButton();
   }
 
@@ -1787,18 +1769,8 @@ window.PageReports = (function () {
         el.setAttribute('aria-pressed', open ? 'true' : 'false');
       },
       stepStudent: function () {
-        // One student at a time, in roster order; All becomes the first or last.
-        var students = sortStudents(getStudents(activeCourse), 'lastName');
-        if (!students.length) return;
-        var dir = Number(el.dataset.dir) || 1;
-        var ids = students.map(function (st) {
-          return st.id;
-        });
-        var at = selectedStudentIds && selectedStudentIds.length === 1 ? ids.indexOf(selectedStudentIds[0]) : -1;
-        var next = at < 0 ? (dir > 0 ? 0 : ids.length - 1) : Math.max(0, Math.min(ids.length - 1, at + dir));
-        selectedStudentIds = [ids[next]];
-        populateStudentSelect();
-        renderReports();
+        // The narrow toolbar's arrows step as the preview head's do (ReportOneHead).
+        ReportOneHead.go(Number(el.dataset.dir) || 1);
       },
       fitMapPick: function () {
         // In Everyone view a student's thumbnail opens that student.
@@ -2093,6 +2065,7 @@ window.PageReports = (function () {
   }
 
   function _teardownProgressTab() {
+    ReportOneHead.reset();
     if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
     _restoreSidebarBadges();
     closeIssueDialog();
@@ -2132,7 +2105,7 @@ window.PageReports = (function () {
   var TOOLBAR_HTML =
     '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        ' +
     _tabBarHtml(TABS) +
-    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Parts</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous Student" aria-label="Previous Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next Student" aria-label="Next Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Parts</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {

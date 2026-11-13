@@ -49,6 +49,8 @@ window.Router = (function () {
         '/teacher/report-one-panel.js',
         '/teacher/report-one-page.js',
         '/teacher/report-one-comment.js',
+        '/teacher/report-one-zoom.js',
+        '/teacher/report-one-head.js',
         '/teacher/page-reports.js',
       ],
     },
