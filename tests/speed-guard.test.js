@@ -49,6 +49,7 @@ import {
   closePages,
   click,
   key,
+  leave,
 } from './helpers/pin-save-paths.js';
 import { mount, unmount, showCompetencies } from './helpers/gradebook-dom.js';
 
@@ -336,10 +337,55 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
     expect(after, 'the typed score did not land').toBe(Number(typed));
   });
 
+  it('Edit Score in the Scores view', () => {
+    mount(quietSeed, { course: CID });
+    const cell = document.querySelector(
+      '#gb-data td.gb-scores-cell[data-aid="' + AIDS[1] + '"][data-sid="' + IDS[3] + '"]',
+    );
+    expect(cell, 'no Scores cell to type in').not.toBeNull();
+    cell.classList.add('gb-focus');
+    cell.focus();
+    const typed = getScores(CID)[IDS[3]].find(e => e.assessmentId === AIDS[1]).score === 4 ? '3' : '4';
+    step('Gradebook: Edit Score in the Scores view', () => {
+      key(cell, typed);
+      const box = document.querySelector('.gb-scores-input');
+      expect(box, 'Edit Score did not open').not.toBeNull();
+      leave(box);
+    });
+    expect(
+      getScores(CID)
+        [IDS[3]].filter(e => e.assessmentId === AIDS[1])
+        .map(e => e.score),
+    ).toEqual([Number(typed), Number(typed)]);
+  });
+
   it('the grader', () => {
     step('Grader: open on a student', () => openGrader(quietSeed, CID, AIDS[0], IDS[1]));
     expect(document.querySelector('#grader-overlay .grader-dialog'), 'the grader did not open').not.toBeNull();
     step('Grader: next student', () => key(document, 'ArrowRight'));
+  });
+
+  // Opened from a gradebook cell, so closing it is the gradebook's to draw.
+  it('closing the grader over the gradebook', () => {
+    openGrader(quietSeed, CID, AIDS[0], IDS[1]);
+    PageAssignments.closeGrader();
+    const open = () => {
+      click(
+        document.querySelector('#gb-data td.gb-scores-cell[data-aid="' + AIDS[0] + '"][data-sid="' + IDS[1] + '"]'),
+      );
+      expect(document.querySelector('#grader-overlay .grader-dialog'), 'the grader did not open').not.toBeNull();
+    };
+    open();
+    step('Grader: close', () => PageAssignments.closeGrader());
+    open();
+    // The first criterion is at 2 for this student: 4 changes it.
+    click(
+      document.querySelector(
+        '#grader-overlay [data-action="graderLevel"][data-critid="' + CRIT[0] + '"][data-level="4"]',
+      ),
+    );
+    expect(getScores(CID)[IDS[1]].find(e => e.assessmentId === AIDS[0] && e.tagId === CRIT[0]).score).toBe(4);
+    step('Grader: close after a level', () => PageAssignments.closeGrader());
   });
 
   it('counting the class’s work', () => {
