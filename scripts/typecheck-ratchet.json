@@ -1,5 +1,5 @@
 {
-  "checked": ["shared/calc.js", "shared/constants.js", "shared/html.js"],
+  "checked": ["shared/calc.js", "shared/constants.js", "shared/data-rpc-wrappers.js", "shared/html.js"],
   "notYetChecked": [
     "s/app.js",
     "s/assignments.js",
@@ -30,7 +30,6 @@
     "shared/data-reflect.js",
     "shared/data-revisions.js",
     "shared/data-roster.js",
-    "shared/data-rpc-wrappers.js",
     "shared/data-rubrics.js",
     "shared/data-student-cards.js",
     "shared/data-student-records.js",
