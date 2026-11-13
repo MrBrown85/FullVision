@@ -131,6 +131,8 @@ afterEach(async () => {
   await settled();
   closePages();
   clearClass(CID);
+  // A folder one test closed is saved with the teacher's preferences: the next test starts with none closed.
+  saveDashboardPrefs({ closedModules: {} });
   localStorage.clear();
   window.isDemoMode = wasDemo;
   vi.restoreAllMocks();
@@ -318,6 +320,105 @@ describe('Assignments: a card opened or closed brings its header counts up to da
     await settled();
     click(header(ESSAY));
     expect(document.querySelectorAll('#main .assess-card').length).toBe(0);
+    sameAsRedraw();
+  });
+});
+
+/* What a full redraw draws must hold after these too (the review of #1396).
+   Neither action draws the page itself: the Work Wall and the dialog sit
+   over it, and Expand changes which cards a folder holds open. */
+describe('Assignments: grading through the Work Wall leaves the page as a redraw draws it', () => {
+  const benRow = () => card(ESSAY).querySelector('.rsg-criterion-row[data-student="' + BEN + '"]');
+
+  /* ⋯ › Work Wall › Grade in This Order, Proficient for Ben in the dialog,
+     Done, and back to the page. */
+  function gradeBenOnTheWall() {
+    // In the app the router says this page is up, so the dialog opens over it (shared/work-wall.js).
+    vi.spyOn(Router, 'getCurrentPage').mockReturnValue(window.PageAssignments);
+    click(card(ESSAY).querySelector('[data-action="openWorkWall"]'));
+    click(document.querySelector('#work-wall-overlay .ww-grade'));
+    const dialog = document.getElementById('grader-overlay');
+    expect(dialog.querySelector('.grader-student').textContent).toBe('Ben Brown');
+    click(dialog.querySelector('.grdl-level[data-level="3"]'));
+    click(dialog.querySelector('[data-grader="close"]'));
+    click(document.querySelector('#work-wall-overlay [data-ww="close"]'));
+    expect(document.getElementById('grader-overlay')).toBe(null);
+    expect(document.getElementById('work-wall-overlay')).toBe(null);
+  }
+
+  it('a level picked in the dialog shows in the open card’s grid once the wall closes', async () => {
+    openAssignments(withWork, CID, { open: ESSAY });
+    await settled();
+    expect(benRow().querySelector('.rsg-level.active')).toBe(null);
+    gradeBenOnTheWall();
+    await settled();
+    expect(benRow().querySelector('.rsg-level.active').dataset.level).toBe('3');
+    expect(card(ESSAY).querySelector('.assess-to-grade')).toBe(null);
+    expect(card(ESSAY).querySelector('.assess-to-return').textContent).toBe('1 to return');
+    sameAsRedraw();
+    // And it is still there once another card is clicked.
+    click(header(LAB));
+    expect(benRow().querySelector('.rsg-level.active').dataset.level).toBe('3');
+    sameAsRedraw();
+  });
+
+  it('the cards open before the wall are the cards open after it', async () => {
+    openAssignments(withWork, CID, { open: ESSAY });
+    await settled();
+    click(header(QUIZ));
+    gradeBenOnTheWall();
+    await settled();
+    expect([ESSAY, LAB, QUIZ, EXIT].filter(isOpen)).toEqual([ESSAY, QUIZ]);
+    sameAsRedraw();
+    click(header(LAB));
+    expect([ESSAY, LAB, QUIZ, EXIT].filter(isOpen)).toEqual([ESSAY, LAB, QUIZ]);
+    sameAsRedraw();
+  });
+
+  it('a wall closed with nothing graded draws nothing again', async () => {
+    openAssignments(withWork, CID, { open: ESSAY });
+    await settled();
+    const list = document.querySelector('#main .settings-grid');
+    click(card(ESSAY).querySelector('[data-action="openWorkWall"]'));
+    click(document.querySelector('#work-wall-overlay [data-ww="close"]'));
+    await settled();
+    expect(document.querySelector('#main .settings-grid') === list).toBe(true);
+    sameAsRedraw();
+  });
+});
+
+describe('Assignments: Expand and Collapse leave every folder as a redraw draws it', () => {
+  const folderOpen = id =>
+    document.querySelector('.mod-folder[data-module-id="' + id + '"]').classList.contains('open');
+
+  it('Expand for one student closes a folder the teacher closed, once no card holds it open', async () => {
+    openAssignments(seed, CID, {});
+    await settled();
+    // Ungrouped Assignments (the Quiz) is saved closed.
+    click(document.querySelector('.mod-folder-header[data-uid="__none__"]'));
+    expect(folderOpen('__none__')).toBe(false);
+    // Expand with the whole class: the folder shows its open card.
+    click(document.querySelector('[data-action="expandAllAssess"]'));
+    expect(folderOpen('__none__')).toBe(true);
+    sameAsRedraw();
+    // A card in another folder closes, a student is picked, and Expand again.
+    click(header(ESSAY));
+    window.PageAssignments.toggleFocusStudent(AVA);
+    expect(folderOpen('__none__')).toBe(true);
+    click(document.querySelector('[data-action="expandAllAssess"]'));
+    expect(isOpen(ESSAY)).toBe(true);
+    expect(folderOpen('__none__')).toBe(false);
+    sameAsRedraw();
+  });
+
+  it('Collapse closes a folder the teacher closed that was open only to show a card', async () => {
+    openAssignments(seed, CID, {});
+    await settled();
+    click(document.querySelector('.mod-folder-header[data-uid="' + UNIT2 + '"]'));
+    click(document.querySelector('[data-action="expandAllAssess"]'));
+    expect(folderOpen(UNIT2)).toBe(true);
+    click(document.querySelector('[data-action="collapseAllAssess"]'));
+    expect(folderOpen(UNIT2)).toBe(false);
     sameAsRedraw();
   });
 });

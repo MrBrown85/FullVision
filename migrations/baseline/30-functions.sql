@@ -7294,6 +7294,23 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.list_course_submissions_since(p_course_id uuid, p_version text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _all     jsonb := public.list_course_submissions(p_course_id);
+    _version text  := md5(_all::text);
+begin
+    if p_version is not null and p_version = _version then
+        return jsonb_build_object('unchanged', true, 'version', _version);
+    end if;
+    return _all || jsonb_build_object('version', _version);
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_course_term_attendance(p_course_id uuid)
  RETURNS jsonb
  LANGUAGE sql

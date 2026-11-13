@@ -809,6 +809,7 @@ var _WORK_DROPPED_KEY = 'gb-work-dropped'; // { at }: photos refused after the s
 var _WORK_DROPPED_MS = 24 * 60 * 60 * 1000; // how long the sync dot says so, unless clicked
 var _workAwaited = {}; // start key → true while Add Work's screen still waits for the answer
 var _workServer = {}; // cid → list_course_submissions' answer, as last read
+var _workVersion = {}; // cid → that answer's version, until something here changes the copy
 var _workCourseRow = {}; // cid → { send_work, keep_photos_until }, as the server last said
 var _workCourseHere = {}; // cid → a change of the two on its way: { patch, at }
 var _workAssessHere = {}; // aid → a change of an assessment's settings on its way
@@ -1114,25 +1115,38 @@ async function _fetchStudentWork(cid) {
   var writes = _workWrites[cid] || 0;
   var res;
   try {
+    // The version of the copy held goes with the ask: an unchanged list is
+    // answered { unchanged, version } in a few bytes, not the whole list
+    // again (History 12's was 1.1 MB; migration 2026111310).
+    var held = (_workServer[cid] && _workVersion[cid]) || null;
     res = await _callRpcWithAuthGuard(
-      'list_course_submissions',
-      { p_course_id: cid },
+      'list_course_submissions_since',
+      { p_course_id: cid, p_version: held },
       { suppressSessionExpiredModal: true },
     );
   } catch (e) {
     res = { error: e };
   }
   var data = res && !res.error ? _rpcObject(res.data) : null;
-  if (!data || !Array.isArray(data.submissions)) {
+  var same = !!data && data.unchanged === true && !!held && data.version === held;
+  if (!same && (!data || !Array.isArray(data.submissions))) {
     // A read that failed changes nothing: the next one tries again.
     if (res && res.error && !res.error.handledSessionExpired)
-      console.warn('list_course_submissions failed:', res.error);
+      console.warn('list_course_submissions_since failed:', res.error);
     return { error: (res && res.error) || { message: 'no answer' } };
   }
   if (!_workOnServer(cid)) return { changed: false };
   // One of this device's writes landed while the read was out: it is from before that write.
   if ((_workWrites[cid] || 0) !== writes) return { skipped: true };
+  if (same) {
+    // The copy was changed here while the read was out: it is no longer that version. Read it whole.
+    if (_workVersion[cid] !== held) return { skipped: true };
+    (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
+    return { changed: false };
+  }
   var was = _workLook(cid);
+  _workVersion[cid] = typeof data.version === 'string' && data.version ? data.version : null;
+  delete data.version;
   _workServer[cid] = data;
   if (_plainObject(data.course)) _noteCourseSendWork(cid, Object.assign({ send_work: false }, data.course));
   (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
@@ -1177,6 +1191,7 @@ function _loadServerStudentWork(cid, fresh) {
 // A write of this device's landed: reads begun before it are dropped, and the class read again soon.
 function _workWriteLanded(cid) {
   _workWrites[cid] = (_workWrites[cid] || 0) + 1;
+  _workVersion[cid] = null;
   _workChanged(cid);
   setTimeout(function () {
     refreshStudentWork(cid, { force: true });
@@ -1274,6 +1289,7 @@ function saveAssessmentStudentWork(cid, aid, w) {
         });
         list.push(data);
         _workServer[cid].assessments = list;
+        _workVersion[cid] = null;
       }
       if (res && res.error && !res.error.handledSessionExpired) {
         console.warn('set_assessment_student_work failed:', res.error);
@@ -1301,12 +1317,8 @@ function _openServerWorkPage(cid, name) {
     return Promise.resolve(null);
   }
   var bucket = (_workServer[cid] && _workServer[cid].bucket) || 'student-photos';
-  return Promise.resolve()
-    .then(function () {
-      return sb.storage.from(bucket).createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
-    })
-    .then(function (res) {
-      var link = res && !res.error && res.data && res.data.signedUrl;
+  return _workSignLink(sb, bucket, name)
+    .then(function (link) {
       if (!link) return null;
       return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
         return r && r.ok ? r.blob() : null;
@@ -1329,6 +1341,67 @@ function _openServerWorkPage(cid, name) {
     .then(null, function () {
       return null;
     });
+}
+
+/* A 300-second link for one stored page. The links asked for in one turn
+   (a screen drawing its pictures) are signed together in one request when
+   the client can (createSignedUrls), instead of one request each. */
+var _workSigning = null; // { bucket, sb, names: { path: [resolve] } } for this turn
+function _workSignLink(sb, bucket, name) {
+  return new Promise(function (resolve) {
+    if (!_workSigning || _workSigning.bucket !== bucket || _workSigning.sb !== sb) {
+      var batch = (_workSigning = { bucket: bucket, sb: sb, names: {} });
+      Promise.resolve().then(function () {
+        if (_workSigning === batch) _workSigning = null;
+        _workSignBatch(batch);
+      });
+    }
+    (_workSigning.names[name] = _workSigning.names[name] || []).push(resolve);
+  });
+}
+function _workSignBatch(batch) {
+  var names = Object.keys(batch.names);
+  var give = function (name, link) {
+    batch.names[name].forEach(function (resolve) {
+      resolve(link || null);
+    });
+  };
+  var store = batch.sb.storage.from(batch.bucket);
+  var one = function (name) {
+    return Promise.resolve()
+      .then(function () {
+        return store.createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
+      })
+      .then(
+        function (res) {
+          give(name, res && !res.error && res.data && res.data.signedUrl);
+        },
+        function () {
+          give(name, null);
+        },
+      );
+  };
+  if (names.length < 2 || typeof store.createSignedUrls !== 'function') return names.forEach(one);
+  Promise.resolve()
+    .then(function () {
+      return store.createSignedUrls(names, STUDENT_WORK_LINK_SECONDS);
+    })
+    .then(
+      function (res) {
+        var got = {};
+        ((res && !res.error && res.data) || []).forEach(function (row) {
+          if (row && row.path && row.signedUrl && !row.error) got[row.path] = row.signedUrl;
+        });
+        names.forEach(function (name) {
+          give(name, got[name]);
+        });
+      },
+      function () {
+        names.forEach(function (name) {
+          give(name, null);
+        });
+      },
+    );
 }
 
 /* ── Add Work ── */
@@ -1549,6 +1622,7 @@ function _workServerTake(cid, sub) {
     );
   });
   if (sub.state === 'sent') srv.submissions.push(_studentWorkCopy(sub));
+  _workVersion[cid] = null;
   _workChanged(cid);
 }
 
