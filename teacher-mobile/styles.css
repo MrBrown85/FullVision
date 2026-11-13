@@ -918,6 +918,33 @@ body.fv-switching-course::after {
 #m-obs-cards {
   overflow-x: clip;
 }
+/* Show More under the feed's newest observations (MObserve.showMore). */
+.m-obs-more-wrap {
+  padding: 8px 16px 0;
+  text-align: center;
+}
+.m-obs-more {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--link);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-more:active {
+  background: var(--active-light);
+}
+.m-obs-more-count {
+  padding-top: 6px;
+  font-size: 13px;
+  color: var(--text-3);
+}
 .m-obs-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 14px;
