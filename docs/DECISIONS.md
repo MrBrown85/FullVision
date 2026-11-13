@@ -2,6 +2,30 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Wave 0 rulings (2026-11-13)
+
+Context: the alignment plan ([`plans/alignment-plan.md`](plans/alignment-plan.md)) began with a list of decisions waiting for Colin ("Wave 0"). Asked for them, he answered:
+
+> you make the best practice decisions for Wave 0
+
+So these are the orchestrator's rulings, made on what the council's members have published and on the rules already recorded here. Colin can reverse any of them. Three things do not change: nothing is released without his word, SQL is shown to him before it is applied to the live database, and anything that would delete a student's or a teacher's data goes to him.
+
+1. **One mark saves one mark** (S19-C9, with B4, B5, C10 and the on-save hooks). The design is written first and reviewed by an independent reviewer who tries to break it. If the review holds, the design is approved under this entry. It is built in small steps under "Marks may be moved; Colin and Karen must see no change", and released on its own, on Colin's word.
+2. **A criterion's level with mixed keys** (handoff review decision 17). Every screen shows the level `calc.js` counts, as rule 3 of `CLAUDE.md` already asks. Desktop and phone list students in one order when grading: the order the teacher chose for the roster.
+3. **The review of `87ed0faa`** (decision 11). The order was Colin's on Nov 10 ("The one made later"); what was owed was a check that the commit does that. An independent review makes the check. If it passes, S19-B6 goes ahead.
+4. **The phone gets an Undo button** (decision 16). `undoLastScore` stays. One tap grades a student on the phone, so a wrong tap must be one tap to take back.
+5. **The two `.xlsx` files stay where they are** (decision 1), with the scripts that build them. `CLAUDE.md` rule 10 stands.
+6. **The student page.**
+   - **Opened** (S4). A teacher sees whether a returned piece was opened, as Opened and the date, nothing finer. It counts when the student opens Your Feedback, not when the piece shows in a list. The privacy page says so before the first class uses it.
+   - **iPhone photos** (S5). No HEIC decoder is added: its licence and patent terms are not ones to take on for a free tool. The phone's own change to JPEG is used; a file the browser cannot read gets "Take the photo here, or save it as a JPEG first."
+   - **Keep Photos Until** (S8) follows the photos, not the switch. The reminder and the removal happen whether Send Work is on or off.
+   - **Mark Up counts as started grading** (S9). A student cannot unsend a page the teacher has marked up. The server's rule changes in its own migration.
+   - **"Only Mr. Brown sees this." is kept** (S10, S18-F2). A student's reflection is never quoted in anything a family reads, and an observation made from one stays out of reports. In Their Words (S18-F2) is not built. It can come back only with a choice on each reflection, in the student's hands, such as "My teacher can share this".
+   - **A regrade that is still a draft** (S11) shows in the teacher's own views, marked Draft, as every draft does. Students and reports keep the returned grade until the regrade is returned. The held S11 screens may merge after their independent review.
+   - **My Learning's math** (S13). Nothing is owed: PR 1081 merged on Nov 11.
+   - **Passkeys and MyEdBC Input** (S15, S16) stay as they are: not built, and paused.
+7. **Left for later:** who owns a class, and retiring the per-table load. Neither is needed until the work reaches them.
+
 ## Marks may be moved; Colin and Karen must see no change (2026-11-12)
 
 Context: the split of `shared/data.js` and the big page files (Track E) moved 19 pieces that do not touch marks, each as a move-only PR merged by an independent reviewer, all released. Six pieces were stopped with no change, because they read or write marks or could not move cleanly: the DIBELS benchmark, Copy From Another Class, the Reports Issue dialog, the v2 server-call wrappers, Reflect on Feedback, and Student work and feedback. The rest of the split is code that reads, writes, returns and syncs marks. Colin was asked. His answer, two lines sent together:
