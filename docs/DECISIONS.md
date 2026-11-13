@@ -2,6 +2,14 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## A refused score is not resent; refusals are counted first (2026-11-13)
+
+When the browser's outbox cannot take a score (it holds 500 waiting changes, or the browser's storage is full), the score is refused and can be lost at the next class load. The design for resending it (step 5 of `plans/one-mark-save-design.md`, draft PR 1329) was reviewed twice. It can put an older score over a newer one when the same cell is scored on another device. An independent review of a redesign found it still worse than today in three rare cases.
+
+- **Colin ruled on 2026-11-13:** do not build the resend.
+- **Count refusals first.** Each refused write sends one warning to Sentry, once per page load for each function and reason, for example `Write refused: upsert_score (queue_full)`. It carries nothing from the write: no ids, names, scores or comments.
+- **Design the lasting fix.** A version number on each score, checked by the server, so an older score can never replace a newer one.
+
 ## The signed-out and signed-in roles can no longer create objects in schema public (2026-11-13)
 
 The security rule tests' read of the catalogs showed that the two roles the browser uses (`anon` when signed out, `authenticated` when signed in) held CREATE on schema `public`, a grant from the project's first setup. Nothing in FullVision uses it: the browser reaches the database only through the API, and no function creates an object there. Colin was shown the one statement and said yes on 2026-11-13.

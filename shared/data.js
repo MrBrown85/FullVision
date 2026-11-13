@@ -2038,7 +2038,7 @@ var _writeRefusals = 0;
 
 function _onWriteRefused(name, params, undo, reason, entryId) {
   _writeRefusals++;
-  console.warn(name + ' not queued (' + reason + '): the outbox has no room');
+  _warnWriteRefused(name, reason);
   // A refused create is forgotten, and its row leaves the baseline, so the
   // next save of the field creates it again.
   var creates = _pendingCreatesByEntry(entryId);
