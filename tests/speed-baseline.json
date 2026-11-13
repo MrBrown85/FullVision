@@ -4,7 +4,7 @@
     "saved": 110,
     "drawn": 931215,
     "elements": 3309,
-    "lookups": 37878,
+    "lookups": 21646,
     "class": 0
   },
   "Assignments: open one card": {
@@ -12,7 +12,7 @@
     "saved": 0,
     "drawn": 292932,
     "elements": 5559,
-    "lookups": 6378,
+    "lookups": 3707,
     "class": 0
   },
   "Assignments: click a rubric level": {
@@ -20,7 +20,7 @@
     "saved": 464696,
     "drawn": 690,
     "elements": 5560,
-    "lookups": 53,
+    "lookups": 12,
     "class": 0
   },
   "Assignments: close the card": {
@@ -28,7 +28,7 @@
     "saved": 0,
     "drawn": 0,
     "elements": 3315,
-    "lookups": 5401,
+    "lookups": 3242,
     "class": 0
   },
   "Gradebook: open": {
@@ -36,7 +36,7 @@
     "saved": 55,
     "drawn": 651219,
     "elements": 5368,
-    "lookups": 19511,
+    "lookups": 11920,
     "class": 0
   },
   "Gradebook: type a score": {
@@ -44,7 +44,7 @@
     "saved": 464668,
     "drawn": 950514,
     "elements": 5148,
-    "lookups": 14277,
+    "lookups": 7671,
     "class": 0
   },
   "Grader: open on a student": {
@@ -52,7 +52,7 @@
     "saved": 55,
     "drawn": 663924,
     "elements": 5499,
-    "lookups": 20753,
+    "lookups": 12619,
     "class": 3
   },
   "Grader: next student": {
@@ -60,7 +60,7 @@
     "saved": 0,
     "drawn": 9213,
     "elements": 5499,
-    "lookups": 1242,
+    "lookups": 698,
     "class": 3
   },
   "Counting the class’s work": {
@@ -68,7 +68,7 @@
     "saved": 0,
     "drawn": 0,
     "elements": 0,
-    "lookups": 7598,
+    "lookups": 5438,
     "class": 0
   }
 }

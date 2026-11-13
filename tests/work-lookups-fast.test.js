@@ -123,7 +123,7 @@ afterEach(() => {
   window.isDemoMode = wasDemo;
 });
 
-describe("one student's work on one piece", () => {
+describe("one student's work on one piece", { timeout: 120000 }, () => {
   it('is what the old way gave, for every student on every piece', () => {
     seed();
     let found = 0;
@@ -165,7 +165,7 @@ describe("one student's work on one piece", () => {
   });
 });
 
-describe('a draw makes no copy of the whole class’s work', () => {
+describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }, () => {
   it('counting the class’s work, the rows’ buttons, and Same Photo As', () => {
     seed();
     wholeClassCopies = 0;

@@ -240,7 +240,7 @@ beforeEach(() => {
   fake = makeFakeSupabase();
   fake.on('get_class_bundle', () => ({ data: serverClass(), error: null }));
   fake.on('list_course_grade_returns', () => ({ data: {}, error: null }));
-  fake.on('list_course_submissions', () => ({ data: structuredClone(srv), error: null }));
+  fake.on('list_course_submissions_since', () => ({ data: structuredClone(srv), error: null }));
   fake.on('start_work_upload', answerStart);
   fake.on('finish_work_upload', answerFinish);
   fake.storage = {
@@ -295,7 +295,7 @@ afterEach(() => {
 describe('reading a signed-in class’s work', () => {
   it('reads it when the class loads with Send Work on, and every reader answers from it', async () => {
     await openClass();
-    expect(callsTo('list_course_submissions')).toEqual([{ p_course_id: CID }]);
+    expect(callsTo('list_course_submissions_since')).toEqual([{ p_course_id: CID, p_version: null }]);
     expect(getCourseSendWork(CID)).toEqual({ send_work: true, keep_photos_until: 'end_of_year' });
     expect(getAssessmentStudentWork(CID, CAUSES).students_send).toBe('photos');
     expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
@@ -307,7 +307,7 @@ describe('reading a signed-in class’s work', () => {
   it('with Send Work off on the course row, the class load asks nothing about work', async () => {
     course.send_work = false;
     await openClass();
-    expect(callsTo('list_course_submissions')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toEqual([]);
     expect(getCourseSendWork(CID).send_work).toBe(false);
   });
 
@@ -316,20 +316,20 @@ describe('reading a signed-in class’s work', () => {
     await openClass();
     expect((await refreshStudentWork(CID)).changed).toBe(false);
     expect((await refreshStudentWork(CID, { force: true })).changed).toBe(false);
-    expect(callsTo('list_course_submissions')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toEqual([]);
     // Turned on (still on its way): read again.
     fake.on('set_course_send_work', p => ({ data: Object.assign({}, srv.course, p.p_patch), error: null }));
     setOnline(false);
     setCourseSendWork(CID, { send_work: true });
     setOnline(true);
     await quiet();
-    expect(callsTo('list_course_submissions').length).toBeGreaterThan(0);
+    expect(callsTo('list_course_submissions_since').length).toBeGreaterThan(0);
   });
 
   it('with Send Work off, Delete Class reads the class’s work once and names the photos sent before', async () => {
     course.send_work = false;
     await openClass();
-    expect(callsTo('list_course_submissions')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toEqual([]);
     const doc = globalThis.document;
     globalThis.document = parseHTML('<!DOCTYPE html><html><body><div id="main"></div></body></html>').document;
     const message = () => document.querySelector('.confirm-card .confirm-message').textContent;
@@ -337,24 +337,24 @@ describe('reading a signed-in class’s work', () => {
     try {
       COURSES[CID].archived = true;
       // The read fails: the warning says photos go rather than miss them.
-      fake.on('list_course_submissions', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+      fake.on('list_course_submissions_since', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
       DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
       await settle();
       await settle();
       expect(message()).toMatch(PHOTOS);
       document.getElementById('confirm-cancel-btn').onclick();
       // It answers: Noor's photos, sent before Send Work was turned off, are named.
-      fake.on('list_course_submissions', () => ({ data: structuredClone(srv), error: null }));
+      fake.on('list_course_submissions_since', () => ({ data: structuredClone(srv), error: null }));
       DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
       await settle();
       await settle();
       expect(message()).toMatch(PHOTOS);
       document.getElementById('confirm-cancel-btn').onclick();
-      expect(callsTo('list_course_submissions')).toHaveLength(2);
+      expect(callsTo('list_course_submissions_since')).toHaveLength(2);
       // Read once this session: the next warning asks nothing more.
       DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
       expect(message()).toMatch(PHOTOS);
-      expect(callsTo('list_course_submissions')).toHaveLength(2);
+      expect(callsTo('list_course_submissions_since')).toHaveLength(2);
     } finally {
       DashClassManager.resetState();
       globalThis.document = doc;
@@ -374,9 +374,9 @@ describe('reading a signed-in class’s work', () => {
   it('a class whose student page is off, with Send Work on: its work is read and shown, and the settings stay closed', async () => {
     course.student_page_enabled = false;
     await openClass();
-    expect(callsTo('list_course_submissions')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toEqual([]);
     await refreshStudentWork(CID);
-    expect(callsTo('list_course_submissions')).toHaveLength(1);
+    expect(callsTo('list_course_submissions_since')).toHaveLength(1);
     expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
     expect(studentWorkLive(CID)).toBe(false);
     expect(GraderWork.workOnInClass(CID)).toBe(false);
@@ -398,6 +398,91 @@ describe('reading a signed-in class’s work', () => {
     const work = /submission|work|paper/;
     expect(fake.calls.map(c => c.name).filter(n => work.test(n))).toEqual([]);
     expect(getStudentSubmission(CID, NOOR, CAUSES)).toBeNull();
+  });
+
+  it('an unchanged list is answered in a few bytes: the version held goes with the ask', async () => {
+    let version = 'v1';
+    fake.on('list_course_submissions_since', p =>
+      p.p_version === version
+        ? { data: { unchanged: true, version }, error: null }
+        : { data: { ...structuredClone(srv), version }, error: null },
+    );
+    await openClass();
+    expect(callsTo('list_course_submissions_since')).toEqual([{ p_course_id: CID, p_version: null }]);
+    expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
+    // The same list again: the version is sent, nothing changes and nothing is redrawn.
+    expect(await refreshStudentWork(CID, { force: true })).toEqual({ changed: false });
+    expect(callsTo('list_course_submissions_since')[1]).toEqual({ p_course_id: CID, p_version: 'v1' });
+    expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
+    // The version is not part of the work the screens read.
+    expect('version' in getCourseSubmissions(CID)).toBe(false);
+    // The server's list changes: the whole list comes back and is taken.
+    srv.submissions = [];
+    version = 'v2';
+    expect(await refreshStudentWork(CID, { force: true })).toEqual({ changed: true });
+    expect(getStudentSubmission(CID, NOOR, CAUSES)).toBeNull();
+    expect(callsTo('list_course_submissions_since')[2]).toEqual({ p_course_id: CID, p_version: 'v1' });
+    expect((await refreshStudentWork(CID, { force: true })).changed).toBe(false);
+    expect(callsTo('list_course_submissions_since')[3]).toEqual({ p_course_id: CID, p_version: 'v2' });
+  });
+
+  it('once this device changes its copy of the list, the next read asks for the whole list', async () => {
+    fake.on('list_course_submissions_since', p =>
+      p.p_version === 'v1'
+        ? { data: { unchanged: true, version: 'v1' }, error: null }
+        : { data: { ...structuredClone(srv), version: 'v1' }, error: null },
+    );
+    await openClass();
+    expect(await deleteStudentWork(CID, NOOR, CAUSES)).toMatchObject({ result: 'deleted' });
+    await window.v2Queue.flush();
+    await quiet();
+    const asked = callsTo('list_course_submissions_since');
+    expect(asked.length).toBeGreaterThan(1);
+    expect(asked[asked.length - 1]).toEqual({ p_course_id: CID, p_version: null });
+  });
+
+  it('"unchanged" for a version this device does not hold is a failed read, not an empty class', async () => {
+    fake.on('list_course_submissions_since', () => ({ data: { unchanged: true, version: 'zz' }, error: null }));
+    await openClass();
+    expect(getStudentSubmission(CID, NOOR, CAUSES)).toBeNull();
+    expect((await refreshStudentWork(CID, { force: true })).error).toBeTruthy();
+    // The next good answer is taken whole.
+    fake.on('list_course_submissions_since', () => ({ data: { ...structuredClone(srv), version: 'v1' }, error: null }));
+    expect((await refreshStudentWork(CID, { force: true })).changed).toBe(true);
+    expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
+  });
+
+  it('the links asked for in one turn are signed in one request, where the client can', async () => {
+    await openClass();
+    const batches = [];
+    const from = fake.storage.from;
+    fake.storage.from = bucket => ({
+      ...from(bucket),
+      createSignedUrls: async (paths, seconds) => {
+        batches.push({ bucket, paths: [...paths], seconds });
+        return {
+          data: paths.map(path => ({ path, signedUrl: 'https://x.supabase.co/sign/' + path, error: null })),
+          error: null,
+        };
+      },
+    });
+    try {
+      const files = getStudentSubmission(CID, NOOR, CAUSES).files;
+      const pages = await Promise.all([
+        openStudentWorkPage(CID, files[0], 'thumb'),
+        openStudentWorkPage(CID, files[1], 'thumb'),
+        openStudentWorkPage(CID, files[0], 'page'),
+        openStudentWorkPage(CID, files[0], 'page'),
+      ]);
+      expect(pages.every(p => p && p.url === 'blob:page')).toBe(true);
+      // One request for the three different paths; none one at a time.
+      expect(batches).toEqual([
+        { bucket: 'student-photos', paths: [files[0].thumb_path, files[1].thumb_path, files[0].path], seconds: 300 },
+      ]);
+      expect(signed).toEqual([]);
+    } finally {
+      fake.storage.from = from;
+    }
   });
 
   it('shows a page through a 300-second signed link, as a blob: address, and only from this class', async () => {

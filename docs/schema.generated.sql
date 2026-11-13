@@ -1824,6 +1824,7 @@ function public.list_course_resources(p_course_id uuid) returns jsonb security d
 function public.list_course_responses(p_course_id uuid) returns jsonb
 function public.list_course_student_profiles(p_course_id uuid) returns TABLE(student jsonb, enrollment jsonb, overall_proficiency numeric, letter jsonb, counts jsonb, goals jsonb, reflections jsonb, section_overrides jsonb, is_flagged boolean, recent_observations jsonb)
 function public.list_course_submissions(p_course_id uuid) returns jsonb security definer
+function public.list_course_submissions_since(p_course_id uuid, p_version text) returns jsonb
 function public.list_course_term_attendance(p_course_id uuid) returns jsonb
 function public.list_phone_reports(p_course_id uuid) returns jsonb
 function public.list_questionnaire_templates() returns jsonb
