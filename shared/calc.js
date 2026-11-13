@@ -2295,37 +2295,6 @@ function getTagScores(cid, studentId, tagId) {
   return result;
 }
 
-/* A competency's scores with one entry per assessment, for a timeline: the
-   rubric criteria that feed the competency on one assessment average into
-   one point (its score is their mean, with no whole level or ±, and
-   criterionIds names them). Other entries pass through. Proficiency itself
-   counts each criterion as its own evidence (getTagScores). */
-function tagScoresByAssessment(cid, studentId, tagId) {
-  var out = [];
-  var merged = {};
-  getTagScores(cid, studentId, tagId).forEach(function (s) {
-    if (!(s.score > 0) || !s.criterionId) {
-      out.push(s);
-      return;
-    }
-    var cur = merged[s.assessmentId];
-    if (!cur) {
-      cur = Object.assign({}, s, { criterionIds: [s.criterionId] });
-      merged[s.assessmentId] = cur;
-      out.push(cur);
-      return;
-    }
-    var n = cur.criterionIds.length;
-    cur.score = (cur.score * n + Number(s.score)) / (n + 1);
-    cur.criterionIds.push(s.criterionId);
-    delete cur.level;
-    delete cur.mod;
-    delete cur.criterionId;
-    delete cur.criterionName;
-  });
-  return out;
-}
-
 /* A competency's mark on each piece of work, one entry per assessment, as
    the gradebook's competency cell shows it: rubric criteria that feed the
    competency give their one level, or the lowest when they disagree
@@ -4549,7 +4518,6 @@ window.Calc = {
   competencyLevelFromCriteria,
   rubricCompetencyRowKeys,
   rubricRowScoreKeys,
-  tagScoresByAssessment,
   tagMarksByAssessment,
   assessmentCourseWorth,
   assessmentGroupGrade,
