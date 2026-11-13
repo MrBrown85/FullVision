@@ -78,6 +78,26 @@ function inPage(page, body, args) {
   );
 }
 
+/* The gradebook's Scores view, with the column menu of piece `aid` open
+   (Return on the column title), as a teacher opens it. Answers null when
+   the menu is open, or what was missing. */
+async function openColumnMenu(page, aid) {
+  await closeOverlays(page);
+  const cid = await page.evaluate(() => getActiveCourse());
+  if (!(await page.evaluate(() => location.pathname === '/gradebook'))) await go(page, '/gradebook?course=' + cid);
+  const tab = page.locator('[data-action="setView"][data-mode="scores"]');
+  if ((await tab.count()) && (await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+    await tick(page);
+  }
+  const label = page.locator('#gb-colheads .gb-grid-colhead[data-aid="' + aid + '"] .gb-grid-colhead-label');
+  if (!(await label.count())) return 'no column';
+  await label.focus();
+  await page.keyboard.press('Enter');
+  if (!(await until(page, () => !!document.querySelector('.gb-ctx-menu [data-ctx="deleteAssess"]')))) return 'no menu';
+  return null;
+}
+
 export const ACTIONS = [
   /* ── Marks ─────────────────────────────────────────────────────── */
   {
@@ -322,6 +342,101 @@ export const ACTIONS = [
     },
   },
   {
+    kind: 'gradebookKey',
+    screen: true,
+    weight: 6,
+    pick(rng, view, ctx) {
+      // Half the time, + or − on a cell given an Overall Comment in the
+      // last steps: the key sends the comment again with the level.
+      const commented = again(rng, view, ctx, 0.5, (c, a) => c.kind === 'comment' && levelPieces(view).includes(a));
+      if (commented) return { sid: commented.sid, aid: commented.aid, key: rng.pick(['+', '-']), cell: 0 };
+      const c = pickCell(rng, view, levelPieces(view).concat(completePieces(view)), ctx, 0.3);
+      return (
+        c && {
+          ...c,
+          // + or − half the time: on most competency cells it sends the
+          // cell's comment again (fixtures.mjs).
+          key: rng.chance(0.5) ? rng.pick(['+', '-']) : rng.pick(['1', '2', '3', '4', '0', 'Backspace', 'c', 'i']),
+          cell: rng.int(4),
+        }
+      );
+    },
+    // The real keys on the gradebook's Competencies view: the cell is
+    // selected as the arrows or a click leave it (page-gradebook.js
+    // _selectCell), then a key: a level (Grader.typeLevel), + or − with the
+    // cell's comment (Grader.typePlusMinus), 0 or Backspace to clear, C or I
+    // on Complete/Incomplete work.
+    async run(page, a) {
+      await closeOverlays(page);
+      const cid = await page.evaluate(() => getActiveCourse());
+      if (!(await page.evaluate(() => location.pathname === '/gradebook'))) await go(page, '/gradebook?course=' + cid);
+      const tab = page.locator('[data-action="setView"][data-mode="detailed"]');
+      if ((await tab.count()) && (await tab.getAttribute('aria-selected')) !== 'true') {
+        await tab.click();
+        await tick(page);
+      }
+      const sel = '#gb-data td.gb-score[data-sid="' + a.sid + '"][data-aid="' + a.aid + '"]';
+      const picked = await page.evaluate(
+        ({ sel, i }) => {
+          const cells = document.querySelectorAll(sel);
+          if (!cells.length) return null;
+          const td = cells[i % cells.length];
+          document.querySelectorAll('#gb-data .gb-focus').forEach(el => el.classList.remove('gb-focus'));
+          td.classList.add('gb-focus');
+          td.tabIndex = 0;
+          td.focus({ preventScroll: true });
+          return td.dataset.kb ? 'a cell that opens on Return' : 'ok';
+        },
+        { sel, i: a.cell },
+      );
+      if (!picked) return 'no cell';
+      await page.keyboard.press(a.key);
+      await tick(page, 100);
+      return picked;
+    },
+  },
+  {
+    kind: 'markBlank',
+    screen: true,
+    weight: 2,
+    pick(rng, view) {
+      // The last pieces are the ones with blank cells (fixtures.mjs).
+      const a = rng.pick(rng.chance(0.7) ? view.assessments.slice(-12) : view.assessments);
+      return (
+        a && { aid: a.id, status: rng.pick(['NS', 'EXC']), undo: rng.chance(0.4) ? rng.pick(['toast', 'menu']) : '' }
+      );
+    },
+    // The real screen: the column menu's Mark Blank Cells Missing or
+    // Excused (Grader.markBlankCells), then its Undo from the toast or the
+    // menu's Undo Marking Blank Cells (Grader.undoMarkBlankCells).
+    async run(page, a) {
+      const opened = await openColumnMenu(page, a.aid);
+      if (opened) return opened;
+      await page.locator('.gb-ctx-menu [data-ctx="markUngraded' + a.status + '"]').click();
+      await tick(page, 100);
+      if (a.undo === 'toast') {
+        const btn = page.locator('#undo-toast .undo-toast-btn');
+        if (!(await btn.count())) return 'marked, no toast';
+        await btn.click();
+        await tick(page, 100);
+        return 'undone from the toast';
+      }
+      if (a.undo === 'menu') {
+        const again = await openColumnMenu(page, a.aid);
+        if (again) return 'marked, then ' + again;
+        const item = page.locator('.gb-ctx-menu [data-ctx="undoBulkStatus"]');
+        if (!(await item.count())) {
+          await closeOverlays(page);
+          return 'marked, nothing to undo';
+        }
+        await item.click();
+        await tick(page, 100);
+        return 'undone from the menu';
+      }
+      return 'marked';
+    },
+  },
+  {
     kind: 'setEveryone',
     weight: 3,
     pick(rng, view) {
@@ -421,7 +536,19 @@ export const ACTIONS = [
     kind: 'groupMark',
     weight: 4,
     pick(rng, view, ctx) {
-      const c = pickCell(rng, view, groupPieces(view), ctx, 0.2);
+      // A kind of scoring first (levels, points, Complete/Incomplete), so
+      // the one points piece and the one Complete piece are not rare; then,
+      // most of the time, a student who is in a pair or group.
+      const kinds = [
+        groupPieces(view).filter(a => !a.scoreMode),
+        groupPieces(view).filter(a => a.scoreMode === 'points'),
+        groupPieces(view).filter(a => a.scoreMode === 'complete'),
+      ].filter(list => list.length);
+      const pieces = kinds.length ? rng.pick(kinds) : [];
+      let c = pickCell(rng, view, pieces, ctx, 0.2);
+      const a = c && view.assessments.find(x => x.id === c.aid);
+      const inGroup = a ? view.students.filter(s => a.members.includes(s.id)) : [];
+      if (c && inGroup.length && rng.chance(0.8)) c = { ...c, sid: rng.pick(inGroup).id };
       return c && { ...c, level: rng.pick([0, ...LEVELS]), separate: rng.chance(0.15), back: rng.chance(0.1) };
     },
     run: (page, a) =>
@@ -430,6 +557,11 @@ export const ACTIONS = [
         `const cid = getActiveCourse(); const keys = __keysFor(cid, args.aid);
          if (args.separate) Grader.gradeSeparately(cid, args.aid, args.sid);
          else if (args.back) Grader.backToGroupGrade(cid, args.aid, args.sid);
+         const piece = getAssessments(cid).find(x => x.id === args.aid) || {};
+         if (piece.scoreMode === 'points') { Grader.setPoints(cid, args.sid, args.aid, args.level ? 4 * args.level : null); return 'points'; }
+         if (piece.scoreMode === 'complete') {
+           Grader.setMark(cid, args.sid, args.aid, args.level ? (args.level > 2 ? 'complete' : 'incomplete') : null); return 'mark';
+         }
          keys.forEach(k => Grader.setLevel(cid, args.sid, args.aid, k, args.level));
          return keys.length;`,
         a,
@@ -673,21 +805,9 @@ export const ACTIONS = [
     // or the toast left to time out (the run's clock), which commits the
     // delete (page-gradebook.js _deleteAssessWithUndo, _commitDeleteAssess).
     async run(page, a) {
-      await closeOverlays(page);
-      const cid = await page.evaluate(() => getActiveCourse());
-      if (!(await page.evaluate(() => location.pathname === '/gradebook'))) await go(page, '/gradebook?course=' + cid);
-      const tab = page.locator('[data-action="setView"][data-mode="scores"]');
-      if ((await tab.count()) && (await tab.getAttribute('aria-selected')) !== 'true') {
-        await tab.click();
-        await tick(page);
-      }
-      const label = page.locator('#gb-colheads .gb-grid-colhead[data-aid="' + a.aid + '"] .gb-grid-colhead-label');
-      if (!(await label.count())) return 'no column';
-      await label.focus();
-      await page.keyboard.press('Enter');
+      const opened = await openColumnMenu(page, a.aid);
+      if (opened) return opened;
       const item = page.locator('.gb-ctx-menu [data-ctx="deleteAssess"]');
-      if (!(await until(page, () => !!document.querySelector('.gb-ctx-menu [data-ctx="deleteAssess"]'))))
-        return 'no menu';
       await item.click();
       if (!(await until(page, () => !!document.getElementById('confirm-ok-btn')))) return 'no dialog';
       await page.locator('#confirm-ok-btn').click();
