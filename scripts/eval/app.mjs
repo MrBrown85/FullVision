@@ -49,6 +49,7 @@ const FILES = [
   'shared/data-withdrawn.js',
   'shared/data-overrides.js',
   'shared/data-profile-summaries.js',
+  'shared/data-courses-terms.js',
   'shared/data-observations.js',
   'shared/data-term-ratings.js',
   'shared/data-student-records.js',
