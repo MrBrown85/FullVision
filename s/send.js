@@ -711,8 +711,8 @@
   /* The student's own pages of each piece with work in and not back yet
      (the Sent card's pictures): `file-links` gives a link to each page and
      its thumbnail that lives five minutes; each thumbnail is fetched at
-     once and shown from a blob: address, so the page needs nothing of the
-     Content Security Policy it does not have. Asked once a submission. */
+     once and shown from a blob: address (the CSP needs nothing more), put
+     into its cards in place (assignments.js). Asked once a submission. */
   function loadThumbs(reply, student) {
     var back = {};
     list(S.reply && S.reply.assessments).forEach(function (a) {
@@ -744,7 +744,7 @@
           ),
         ).then(function (blobs) {
           thumbs[sub] = blobs.filter(Boolean).map(objectUrl).filter(Boolean);
-          if (S && S.realWork && S.realWork.student === student) repaint();
+          if (S && S.realWork && S.realWork.student === student && !StudentPage.placeThumbs(pieceOf(a.id))) repaint();
         });
       });
     });

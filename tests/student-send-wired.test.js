@@ -227,6 +227,32 @@ describe('a real send: start, each file to its link, finish', () => {
     [token, CECE, WORK.fair, sub.id, 'Cece', 'Page 2 has my answers.'].forEach(s => expect(logged).not.toContain(s));
   });
 
+  it('a Sent card’s pictures go into it in place as they land; the page is not drawn again for them (speed)', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    // The pictures' links don't come the first time: the Sent card is drawn without them.
+    dev.answer = body => (body.route === 'file-links' ? { ok: false, error: 'server' } : null);
+    await sendFair(page, 2);
+    await page.click('[data-act="send-done"]');
+    await page.click('[data-segment="sent"]');
+    const card = () => page.root().querySelector(piece(WORK.fair));
+    expect(card().querySelector('.sp-send-thumbs')).toBeNull();
+    dev.answer = null;
+    page.run(
+      'window.__paints = 0; var __p = StudentPage.paint; StudentPage.paint = function () { window.__paints += 1; return __p.apply(this, arguments); };',
+    );
+    await page.T.loadWork();
+    await page.settle();
+    expect(routes(page).filter(r => r === 'file-links')).toHaveLength(2);
+    // One draw for `work`'s answer, none for the pictures (there was one more, of the whole page).
+    expect(page.run('window.__paints')).toBe(1);
+    expect(card().querySelectorAll('.sp-send-thumb')).toHaveLength(2);
+    // Exactly as the page draws them.
+    const placed = card().outerHTML;
+    page.run('StudentPage.paint()');
+    expect(card().outerHTML).toBe(placed);
+  });
+
   it('One Page Didn’t Send: Send Page 2 Again asks the same send for fresh links and sends only that page', async () => {
     const dev = school();
     const page = await signIn(dev);
