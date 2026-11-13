@@ -487,15 +487,56 @@ describe("work on the teacher's other screens", () => {
     expect($('.ww-glance').getAttribute('aria-hidden')).toBe('true');
     expect($('.ww-glance-more')).toBeNull();
     await settle();
-    expect(asked).toEqual(['page:' + file(IDS[3], 1).path, 'page:' + file(IDS[3], 2).path]);
-    expect($$('.ww-glance-img').every(img => !!img.getAttribute('src'))).toBe(true);
+    // Each page and its thumbnail, asked for once.
+    expect([...asked].sort()).toEqual(
+      [
+        'page:' + file(IDS[3], 1).path,
+        'page:' + file(IDS[3], 2).path,
+        'thumb:' + file(IDS[3], 1).thumb_path,
+        'thumb:' + file(IDS[3], 2).thumb_path,
+      ].sort(),
+    );
+    // The full pages are shown once they are in.
+    expect($$('.ww-glance-img').map(img => img.getAttribute('data-sharp'))).toEqual(['1', '1']);
     fire(two, 'focusout');
     expect($('.ww-glance')).toBeNull();
+    // A second look is drawn from what is kept: sharp at once, nothing asked for again.
+    fire(two, 'focusin');
+    expect($$('.ww-glance-img').every(img => !!img.getAttribute('src'))).toBe(true);
+    expect($$('.ww-glance-img').map(img => img.getAttribute('data-sharp'))).toEqual(['1', '1']);
+    expect(asked).toHaveLength(4);
+    fire(two, 'focusout');
     fire(one, 'focusin');
     expect($$('.ww-glance .ww-glance-img')).toHaveLength(1);
     // A click on the button opens the grader; the glance goes.
     fire(one, 'click');
     expect($('.ww-glance')).toBeNull();
+  });
+
+  it('the pointer coming into an open card fetches every row’s thumbnails, ahead of any glance', async () => {
+    seed({ sendWork: false });
+    const main = doc.getElementById('main');
+    const fire = (el, type) => el.dispatchEvent(new doc.defaultView.Event(type, { bubbles: true }));
+    // Students no glance in this file has looked at: kept pictures outlive a test.
+    main.innerHTML =
+      '<div class="assess-card open"><span class="name">Row</span>' +
+      IDS.slice(10, 16)
+        .map(sid => WorkWall.seeWorkHtml(CID, PIECE, sid))
+        .join('') +
+      '</div>';
+    fire(main.querySelector('.name'), 'mouseover');
+    await settle();
+    const want = [];
+    IDS.slice(10, 16).forEach(sid => {
+      const sub = getStudentSubmission(CID, sid, PIECE);
+      if (sub) sub.files.slice(0, 2).forEach(f => want.push('thumb:' + f.thumb_path));
+    });
+    expect(want.length).toBeGreaterThan(4);
+    expect([...asked].sort()).toEqual(want.sort());
+    // Coming in again asks for nothing more.
+    fire(main.querySelector('.name'), 'mouseover');
+    await settle();
+    expect(asked).toHaveLength(want.length);
   });
 
   it('an open row of All Your Work: the pages whole, each opening full size', async () => {
