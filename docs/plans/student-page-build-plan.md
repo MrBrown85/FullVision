@@ -720,7 +720,7 @@ Colin, Nov 9 (Q25): not now. MyEdBC Input and the Export Sheet (S16) still ship.
 
 The rest of cleanup card cp1, after the build: what is still in `data.js` and the big page files, the write-path plan's Phase 6, dead code, and the docs. Not a phase of this build.
 
-The plan for S19, its slices and the decisions it needs are in [handoff-review-plan.md](handoff-review-plan.md).
+The plan for S19, its slices and the decisions it needs are in [handoff-review-plan.md](handoff-review-plan.md). The work that follows it, from Nov 13, is in [alignment-plan.md](alignment-plan.md).
 
 ### Where the cleanup card's items land
 
