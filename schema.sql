@@ -873,7 +873,9 @@ create table student_submit.device_session_enrollment (
 -- enrollment delete the rows (submission_gone).
 -- Nobody reads these through the API (row security on, no policy, no grant).
 -- Teachers: set_course_send_work, set_assessment_student_work,
--- list_course_submissions, start_work_upload, finish_work_upload,
+-- list_course_submissions (and list_course_submissions_since, the same list
+-- or "unchanged" for the version the browser holds), start_work_upload,
+-- finish_work_upload,
 -- mark_handed_in_paper, delete_submission, rotate_submission_page. Students,
 -- through the student-submit edge function: student_submit.work, send_start,
 -- send_finish, replace, unsend, file_links. A student acts only through a
