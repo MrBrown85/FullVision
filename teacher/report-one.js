@@ -902,9 +902,9 @@ window.ReportOne = (function () {
   }
 
   /* Lays one student's report out. opts: { paper, stage }. Returns what
-     ReportSheets.layoutStudent returns (the preview, the fit line, Everyone,
-     Print Reports and the printed copies read it), plus cards and
-     feedbackSides, and parts: the keys that printed something. */
+     ReportSheets.renderPreview and classSummary read (the preview, the fit
+     line, Everyone, Print Reports and the printed copies read it), plus
+     cards and feedbackSides, and parts: the keys that printed something. */
   function layoutStudent(m, cid, student, ctx, opts) {
     opts = opts || {};
     var sheetsApi = S();

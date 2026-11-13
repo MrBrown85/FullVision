@@ -265,7 +265,6 @@ const DOORS = {
       'categorySummary',
       'feedbackItems',
       'extraCards',
-      'layoutStudent',
       'listPart',
       '_summaryHtml',
       '_termHtml',

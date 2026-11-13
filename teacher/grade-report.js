@@ -12,20 +12,17 @@
    adds Percent; a Letter class prints Score, Out Of, % and the note, as it
    always has. Work with no mark yet leaves its Result (or Score) blank.
 
-   Every student gets one sheet: the front, and the back when the front is
-   full. When the rows don't fit, the table steps down to smaller rows, then
-   to two columns of rows on each side.
-
    Feedback Pages (the `feedback` option): after the grade sheet, a card for
    every assessment with a rubric or written feedback
    (ReportFeedback.forStudent and .cardHtml), down two columns, on as many
    sides as they need. Each card is measured at the column's width and the
    columns are filled by those heights (packColumns); a card never splits,
    except a rubric taller than a whole column, which splits between its
-   criterion rows (splitRows). The layout returns what
-   ReportSheets.layoutStudent returns, so the preview, the fit line, Everyone,
-   Print Reports and the printed copies all work as they do for a built
-   report (page-reports.js passes it as `layout`). */
+   criterion rows (splitRows).
+
+   The Quick Report is no longer drawn whole: One Report (report-one.js)
+   draws its parts with listPart, summaryHtml, termHtml, feedbackPages and
+   sideHtml, and reads a class's saved Quick Report choices with options. */
 window.GradeReport = (function () {
   'use strict';
 
@@ -40,14 +37,12 @@ window.GradeReport = (function () {
   categorySummary = _inReportScores(categorySummary);
   feedbackItems = _inReportScores(feedbackItems);
   extraCards = _inReportScores(extraCards);
-  layoutStudent = _inReportScores(layoutStudent);
   // The pieces One Report (report-one.js) draws its parts with.
   listPart = _inReportScores(listPart);
   _summaryHtml = _inReportScores(_summaryHtml);
   _termHtml = _inReportScores(_termHtml);
   _feedbackPages = _inReportScores(_feedbackPages);
 
-  var PX_PER_IN = 96;
   var GAP = 12;
   var ROW_W = 720;
   // ungraded: list the year's work with no mark yet, up to today (Colin,
@@ -71,13 +66,8 @@ window.GradeReport = (function () {
     termComment: false,
   };
   var FLAGS = ['summary', 'ungraded', 'numbers', 'feedback', 'rubrics', 'comments', 'observations', 'termComment'];
-  /* The table's sizes, largest first: row height and type in px, and
-     whether each side holds two columns of rows. */
-  var TIERS = [
-    { key: 'regular', rowPx: 19, cols: 1 },
-    { key: 'small', rowPx: 15, cols: 1 },
-    { key: 'two', rowPx: 15, cols: 2 },
-  ];
+  /* The table's size: row height and type in px. */
+  var TIERS = [{ key: 'regular', rowPx: 19 }];
 
   /* The class's choices, with the defaults filled in. */
   function options(saved) {
@@ -225,64 +215,59 @@ window.GradeReport = (function () {
 
   /* ── HTML ─────────────────────────────────────────────────── */
 
-  /* The columns of a row, by tier: two columns of rows leave the category
-     out so each row still reads in full. */
   /* The category and assignment columns share the width the others leave,
      by what the student's rows need (show.catPx and show.titlePx, measured
-     in layoutStudent): both print in full when they fit; when they don't,
+     in listPart): both print in full when they fit; when they don't,
      each gets a share in proportion to its need, the title never less
      than TITLE_MIN_PX and the category never less than 100px, and a row
      whose title or category is still too long prints on two lines. */
   var TITLE_MIN_PX = 200;
   var COL_GAP = 6; // reports.css .gr-row column-gap
   function _cols(show, tier) {
-    var two = tier.cols === 2;
     // Each fixed column is at least the width it has always had, and wider
     // when its widest text needs more in the fonts this machine shows and
-    // prints the sheet in (show.fit, measured in layoutStudent).
-    var fit = (show.fit && show.fit[tier.key === 'regular' ? 'regular' : 'small']) || {};
+    // prints the sheet in (show.fit, measured in listPart).
+    var fit = (show.fit && show.fit.regular) || {};
     var px = function (key, min) {
       return Math.max(min, fit[key] || 0) + 'px';
     };
     var cols = [];
     // Assignment Numbers: a narrow bold column, wide enough for the
-    // highest number (show.numPx, set in layoutStudent).
+    // highest number (show.numPx, set in listPart).
     if (show.numbers) cols.push(['n', '#', (show.numPx || 22) + 'px', 'r']);
     // One Report can leave the Date or the Category column off (show.hide).
     var hide = show.hide || {};
     if (!hide.date) cols.push(['date', 'Date', px('date', 42), '']);
     cols.push(['title', show.titleHead || 'Assignment', 'minmax(0,1fr)', '']);
-    if (!two && !hide.category) cols.push(['category', 'Category', null, '']);
+    if (!hide.category) cols.push(['category', 'Category', null, '']);
     if (show.byName) {
       // A Proficiency or Both class: one Result column, wide enough for
       // "Developing +", "Incomplete" and "Missing" in bold, read left to
       // right like the title beside it; Percent in a Both class; the note
       // holds only Late. The width Out Of had goes to the title.
-      cols.push(['result', 'Result', px('result', two ? 66 : 80), '']);
-      if (show.percent) cols.push(['percent', 'Percent', px('percent', two ? 40 : 48), 'r']);
-      cols.push(['note', '', px('note', two ? 28 : 32), '']);
+      cols.push(['result', 'Result', px('result', 80), '']);
+      if (show.percent) cols.push(['percent', 'Percent', px('percent', 48), 'r']);
+      cols.push(['note', '', px('note', 32), '']);
     } else {
       // Score holds "Incomplete"; the note "Excused" in bold.
-      cols.push(['score', 'Score', px('score', two ? 54 : 64), 'r']);
-      cols.push(['outOf', 'Out Of', px('outOf', two ? 34 : 40), 'r']);
-      if (show.percent) cols.push(['percent', '%', px('percent', two ? 32 : 36), 'r']);
-      cols.push(['note', '', px('note', two ? 46 : 52), '']);
+      cols.push(['score', 'Score', px('score', 64), 'r']);
+      cols.push(['outOf', 'Out Of', px('outOf', 40), 'r']);
+      if (show.percent) cols.push(['percent', '%', px('percent', 36), 'r']);
+      cols.push(['note', '', px('note', 52), '']);
     }
-    if (!two) {
-      var fixed = cols.reduce(function (sum, c) {
-        return sum + (c[2] && /px$/.test(c[2]) ? parseFloat(c[2]) : 0);
-      }, 0);
-      var avail = ROW_W - fixed - COL_GAP * (cols.length - 1);
-      var catNeed = show.catPx || 150;
-      var titleNeed = show.titlePx || avail - catNeed;
-      var cat =
-        catNeed + titleNeed <= avail
-          ? catNeed
-          : Math.max(100, Math.min(avail - TITLE_MIN_PX, (avail * catNeed) / (catNeed + titleNeed)));
-      cols.forEach(function (c) {
-        if (c[0] === 'category') c[2] = Math.round(cat) + 'px';
-      });
-    }
+    var fixed = cols.reduce(function (sum, c) {
+      return sum + (c[2] && /px$/.test(c[2]) ? parseFloat(c[2]) : 0);
+    }, 0);
+    var avail = ROW_W - fixed - COL_GAP * (cols.length - 1);
+    var catNeed = show.catPx || 150;
+    var titleNeed = show.titlePx || avail - catNeed;
+    var cat =
+      catNeed + titleNeed <= avail
+        ? catNeed
+        : Math.max(100, Math.min(avail - TITLE_MIN_PX, (avail * catNeed) / (catNeed + titleNeed)));
+    cols.forEach(function (c) {
+      if (c[0] === 'category') c[2] = Math.round(cat) + 'px';
+    });
     return cols;
   }
 
@@ -445,7 +430,7 @@ window.GradeReport = (function () {
     return w > 0 ? Math.ceil(w * FIT_ROOM) + 2 : 0;
   }
 
-  /* show.fit: each fixed column's need at the regular and the small type,
+  /* show.fit: each fixed column's need at the regular type,
      for this student's rows (_cols takes the larger of it and the
      column's usual width). */
   function _fitColumns(stage, show, list) {
@@ -456,7 +441,7 @@ window.GradeReport = (function () {
       });
     };
     var fit = {};
-    ['regular', 'small'].forEach(function (key) {
+    ['regular'].forEach(function (key) {
       var need = function (head, texts, boldTexts) {
         return Math.max(_fitPx(stage, key, [head].concat(boldTexts || []), true), _fitPx(stage, key, texts, false));
       };
@@ -481,12 +466,10 @@ window.GradeReport = (function () {
   }
 
   /* The assignment and category cells' widths at one tier, in px (the
-     category 0 when the tier has none). */
+     category 0 when it is left off). */
   function _cellWidths(show, tier) {
     var cols = _cols(show, tier);
-    // Two columns of rows: each table is half the side, less the gap
-    // between them (reports.css .gr-split).
-    var rowW = tier.cols === 2 ? (ROW_W - 16) / 2 : ROW_W;
+    var rowW = ROW_W;
     var fixed = 0;
     var cat = 0;
     cols.forEach(function (c) {
@@ -565,37 +548,6 @@ window.GradeReport = (function () {
       body +
       '</div>'
     );
-  }
-
-  /* A side's rows: one table, or two side by side, filled down the left
-     column and then the right. */
-  function _sideTableHtml(list, show, tier, wrap) {
-    if (!list.length) return '';
-    if (tier.cols === 1) return _tableHtml(list, show, tier, wrap);
-    var cut = Math.ceil(list.length / 2);
-    wrap = wrap || [];
-    return (
-      '<div class="gr-split">' +
-      _tableHtml(list.slice(0, cut), show, tier, wrap.slice(0, cut)) +
-      _tableHtml(list.slice(cut), show, tier, wrap.slice(cut)) +
-      '</div>'
-    );
-  }
-
-  /* Everything after the table: the summary by category, the course grade
-     (with the report's reporting basis: IE, or No Letter Grade for goals)
-     and the missing work count. A Proficiency class's summary has no
-     Weight and calls its grade Proficiency, and its last line is Overall
-     Proficiency (Colin, 2026-11-12). A Both class keeps Weight, Grade and
-     Course Grade, its grade column wider; a Letter class's is as it was. */
-  function _tailHtml(cid, student, opts, ctx, stage) {
-    var html = opts.summary ? _summaryHtml(cid, student, opts, stage) : '';
-    html += _termHtml(cid, student, ctx);
-    var missing = rows(cid, student, opts).filter(function (r) {
-      return r.note === 'Missing';
-    }).length;
-    html += '<div class="gr-facts">Missing Assignments: ' + missing + '</div>';
-    return '<div class="gr-tail">' + html + '</div>';
   }
 
   /* The course grade's line: Overall Proficiency in a Proficiency class. */
@@ -749,53 +701,11 @@ window.GradeReport = (function () {
     return { list: list, html: list.length ? _tableHtml(list, show, tier, tall) : '' };
   }
 
-  /* ── Fitting ───────────────────────────────────────────────── */
-
-  /* How the rows fall on the front and back at one tier, from the measured
-     heights: { front, back, tailOnFront, fits }. H is a side's height.
-     sizes.namePx: the line naming the student at the top of the Back (and
-     the gap under it), kept off the Back's room. sizes.tall: for each row,
-     true when it prints on two lines, tier.row2Px high. */
-  function plan(n, sizes, tier, H) {
-    var tall = sizes.tall || [];
-    var rowH = function (i) {
-      return tall[i] ? tier.row2Px || tier.rowPx : tier.rowPx;
-    };
-    // Rows from..from+k as the side prints them: the header, then one
-    // column, or the first half down the left and the rest down the right.
-    var tableH = function (from, k) {
-      if (!k) return 0;
-      var left = tier.cols === 2 ? Math.ceil(k / 2) : k;
-      var a = 0;
-      var b = 0;
-      for (var i = 0; i < k; i++) {
-        if (i < left) a += rowH(from + i);
-        else b += rowH(from + i);
-      }
-      return sizes.headPx + Math.max(a, b);
-    };
-    var per = function (from, room) {
-      var k = 0;
-      while (from + k < n && tableH(from, k + 1) <= room) k++;
-      return k;
-    };
-    var frontRoom = H - sizes.letterheadPx - GAP;
-    var front = per(0, frontRoom);
-    var rest = n - front;
-    if (!rest && sizes.letterheadPx + GAP + tableH(0, front) + (front ? GAP : 0) + sizes.tailPx <= H) {
-      return { front: front, back: 0, tailOnFront: true, fits: true };
-    }
-    var name = sizes.namePx ? sizes.namePx + GAP : 0;
-    var backRoom = H - name - sizes.tailPx - (rest ? GAP : 0);
-    var back = per(front, backRoom);
-    return { front: front, back: back, tailOnFront: false, fits: back === rest && name + sizes.tailPx <= H };
-  }
-
   function _measure(stage, html) {
     // The same markup is the same height (the table header, a sample row).
     var ok = _memoOk();
     if (ok && Object.prototype.hasOwnProperty.call(_heightMemo, html)) return _heightMemo[html];
-    // html-safe: html is the letterhead (ReportBlocks.renderBlockHeader), _tailHtml or _tableHtml, all escaped
+    // html-safe: html is _tableHtml, escaped
     stage.innerHTML = '<div class="sheet-item">' + html + '</div>';
     var h = stage.firstChild.offsetHeight;
     if (ok) {
@@ -803,18 +713,6 @@ window.GradeReport = (function () {
       _memoSize++;
     }
     return h;
-  }
-
-  function _stage(host) {
-    var st = document.createElement('div');
-    st.className = 'report-sheet report-sheet-measure';
-    st.setAttribute('aria-hidden', 'true');
-    st.style.cssText =
-      'position:absolute;left:-10000px;top:0;width:' +
-      ROW_W +
-      'px;height:auto;min-height:0;padding:0;margin:0;box-shadow:none;display:block;visibility:hidden;overflow:visible';
-    host.appendChild(st);
-    return st;
   }
 
   function _sideHtml(body, paper, kind, from, cls) {
@@ -1293,211 +1191,12 @@ window.GradeReport = (function () {
     };
   }
 
-  /* One student's sheet, and with Feedback Pages on, the sides after it.
-     opts: { paper, stage, grade (the class's choices) }. Returns the shape
-     ReportSheets.layoutStudent returns, plus cards and feedbackSides. */
-  function layoutStudent(cid, student, ctx, opts) {
-    opts = opts || {};
-    var o = options(opts.grade);
-    var paper = opts.paper === 'legal' ? 'legal' : 'letter';
-    var H = ReportSheets.sideHeight(paper);
-    var show = columnsFor(cid);
-    var list = rows(cid, student, o);
-    var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
-    var tail = '';
-    // The Back starts with the line naming the student, as every side after
-    // the Front of a built report does, so a sheet printed single-sided can
-    // be matched to its student (DECISIONS "Report forms" 13; Colin, Nov 3:
-    // "Yes, all three"). The Feedback Pages name the student in their head.
-    var nameLine = ReportBlocks.renderContinuedLine(cid, student, { name: o.name });
-    if (o.numbers) {
-      show.numbers = true;
-      show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;
-    }
-    var own = !opts.stage;
-    var stage = opts.stage || _stage(document.body);
-    var chosen = null;
-    var chosenTall = [];
-    var p = null;
-    var fb = null;
-    try {
-      // The fixed columns and the summary's, wide enough for their texts
-      // in this machine's fonts (_fitPx).
-      show.fit = _fitColumns(stage, show, list);
-      if (show.numbers) show.numPx = Math.max(show.numPx, _fitPx(stage, 'regular', ['#', String(list.length)], true));
-      tail = _tailHtml(cid, student, o, ctx, stage);
-      show.catPx = _textPx(
-        stage,
-        ['Category'].concat(
-          list.map(function (r) {
-            return r.category;
-          }),
-        ),
-      );
-      show.titlePx = _textPx(
-        stage,
-        ['Assignment'].concat(
-          list.map(function (r) {
-            return r.title;
-          }),
-        ),
-      );
-      // Each title's and category's width at each size of type, to find
-      // the rows too long for one line at a tier.
-      var titles = list.map(function (r) {
-        return r.title;
-      });
-      var cats = list.map(function (r) {
-        return r.category;
-      });
-      var textW = {};
-      ['regular', 'small'].forEach(function (key) {
-        textW[key] = { title: _textWidthsMemo(stage, titles, key), category: _textWidthsMemo(stage, cats, key) };
-      });
-      var sizes = {
-        letterheadPx: _measure(stage, letterhead),
-        tailPx: _measure(stage, tail),
-        namePx: _measure(stage, nameLine),
-      };
-      for (var t = 0; t < TIERS.length; t++) {
-        var tier = TIERS[t];
-        // The header row and one row, measured at this tier.
-        var one = _measure(stage, _tableHtml(list.slice(0, 1).concat(list.slice(0, 1)), show, tier));
-        var head = _measure(stage, _tableHtml([], show, tier));
-        tier = Object.assign({}, tier, { rowPx: Math.max(tier.rowPx, (one - head) / 2) });
-        // A title or category too long for its cell prints on two lines
-        // rather than ending in "…" (step 4 group 3 #91); such a row is as
-        // high as two lines need, measured here.
-        var cw = _cellWidths(show, tier);
-        var w = textW[tier.key === 'regular' ? 'regular' : 'small'];
-        var tall = list.map(function (r, i) {
-          return (w.title[i] || 0) > cw.title || (cw.category > 0 && (w.category[i] || 0) > cw.category);
-        });
-        if (tall.indexOf(true) >= 0) {
-          var sample = Object.assign({}, list[0], { title: new Array(80).join('Assignment ') });
-          var two = _measure(stage, _tableHtml([sample, sample], show, tier, [true, true]));
-          tier.row2Px = Math.max(tier.rowPx + 10, Math.ceil((two - head) / 2));
-        }
-        p = plan(
-          list.length,
-          {
-            letterheadPx: sizes.letterheadPx,
-            tailPx: sizes.tailPx,
-            namePx: sizes.namePx,
-            headPx: head,
-            tall: tall,
-          },
-          tier,
-          H,
-        );
-        chosen = tier;
-        chosenTall = tall;
-        if (p.fits) break;
-      }
-      // Still too many at the smallest size: two rows less on the back
-      // leave room (and the gap above it) to say how many are not shown.
-      if (!p.fits && p.back) p.back = Math.max(0, p.back - 2 * chosen.cols);
-      if (o.feedback) fb = _feedbackPages(cid, student, ctx, o, list, stage, H);
-    } finally {
-      if (own) stage.remove();
-    }
-    var frontRows = list.slice(0, p.front);
-    var backRows = list.slice(p.front, p.front + p.back);
-    var cut = list.length - p.front - p.back;
-    var frontBody =
-      letterhead + _sideTableHtml(frontRows, show, chosen, chosenTall.slice(0, p.front)) + (p.tailOnFront ? tail : '');
-    var backBody =
-      nameLine +
-      _sideTableHtml(backRows, show, chosen, chosenTall.slice(p.front, p.front + p.back)) +
-      (cut > 0 ? '<div class="gr-cut">' + cut + ' more not shown: they do not fit on one sheet.</div>' : '') +
-      tail;
-    var gradeSides = p.tailOnFront ? 1 : 2;
-    var bodies = [{ html: frontBody, cls: 'gr-sheet' }];
-    if (gradeSides === 2) bodies.push({ html: backBody, cls: 'gr-sheet' });
-    // The Feedback Pages start on the grade sheet's back when it has only
-    // a front, else on the next side.
-    if (fb) {
-      fb.body(bodies.length + 1, bodies.length + fb.count).forEach(function (html) {
-        bodies.push({ html: html, cls: 'fb-sheet' });
-      });
-    }
-    var sides = bodies.length;
-    var sheets = Math.ceil(sides / 2);
-    // over: the grade sheet's rows don't all fit. feedbackOver: a feedback
-    // card is taller than a page even after splitting.
-    var feedbackOver = !!(fb && fb.over);
-    var over = cut > 0 || feedbackOver;
-    var name = fullName(student);
-    var badge = over ? 'Too long' : sheets === 1 ? '1 sheet' : sheets + ' sheets';
-    var html =
-      '<div class="sheet-student" data-action="fitMapPick" data-sid="' +
-      esc(student.id) +
-      '" data-sheets="' +
-      sheets +
-      '" data-continued="0" data-after="0">' +
-      '<div class="sheet-student-head no-print"><span class="sheet-student-name">' +
-      esc(name) +
-      '</span><span class="sheet-badge ' +
-      (over ? 'over' : 'ok') +
-      '">' +
-      badge +
-      '</span></div>';
-    for (var s = 0; s < sheets * 2; s++) {
-      var b = bodies[s];
-      var label = sheets === 1 ? '' : 'Sheet ' + (Math.floor(s / 2) + 1) + ' · ';
-      label += b ? (s % 2 ? 'Back' : 'Front') : 'Blank';
-      if (sheets === 1 && !b) label = 'Blank';
-      html +=
-        '<div class="sheet-zoom" data-side="' +
-        s +
-        '"><div class="sheet-label no-print">' +
-        label +
-        '</div>' +
-        (b
-          ? _sideHtml(b.html, paper, 'side', s, b.cls)
-          : '<div class="report-sheet sheet-blank-side" data-paper="' +
-            paper +
-            '"><div class="sheet-body"><div class="sheet-blank">This side is left blank.</div></div></div>') +
-        '</div>';
-    }
-    html += '</div>';
-    return {
-      html: html,
-      sheets: sheets,
-      sides: sides,
-      continued: [],
-      after: [],
-      over: over,
-      feedbackOver: feedbackOver,
-      gradeOver: cut > 0,
-      used: 0,
-      free: [],
-      commentLines: 0,
-      room: 0,
-      noComment: false,
-      noAttendance: false,
-      badge: badge,
-      tier: chosen.key,
-      rows: list.length,
-      cards: fb ? fb.cards : 0,
-      feedbackSides: fb ? fb.count : 0,
-    };
-  }
-
-  /* A layout function for ReportSheets.renderPreview and classSummary. */
-  function layoutWith(grade) {
-    return function (cid, student, ctx, opts) {
-      return layoutStudent(cid, student, ctx, { paper: opts.paper, stage: opts.stage, grade: grade });
-    };
-  }
-
   return {
     options: options,
     columnsFor: columnsFor,
     rows: rows,
     resultText: resultText,
     categorySummary: categorySummary,
-    plan: plan,
     packColumns: packColumns,
     splitRows: splitRows,
     feedbackItems: feedbackItems,
@@ -1509,7 +1208,5 @@ window.GradeReport = (function () {
     termHtml: _termHtml,
     feedbackPages: _feedbackPages,
     sideHtml: _sideHtml,
-    layoutStudent: layoutStudent,
-    layoutWith: layoutWith,
   };
 })();

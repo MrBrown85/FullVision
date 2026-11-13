@@ -324,10 +324,14 @@ describe('Assignment Grades: the word column only in a Letter class', () => {
 
   it('a saved form keeps its Word option: it loads, draws without the column, and is not rewritten', () => {
     const S = ReportSheets;
-    const saved = S.setOption(S.insert(S.form(), 'grade-table', { side: 1 }), 'grade-table', 'word', true);
+    const saved = S.normalizeForm({
+      v: 6,
+      sides: [{ rows: [] }, { rows: [{ cells: [{ block: 'grade-table', options: { word: true } }] }] }],
+    });
+    const cellOf = (f, id) => f.sides[1].rows.map(r => r.cells[0]).find(c => c.block === id);
     const json = JSON.stringify(saved);
     const loaded = S.normalizeForm(JSON.parse(json));
-    expect(S.cellOf(loaded, 'grade-table').options.word).toBe(true);
+    expect(cellOf(loaded, 'grade-table').options.word).toBe(true);
     MODES.forEach(mode => {
       seed(mode);
       const html = ReportBlocks.renderReportBlock(
@@ -335,7 +339,7 @@ describe('Assignment Grades: the word column only in a Letter class', () => {
         CID,
         STUDENT,
         {},
-        S.optionsFor(S.cellOf(loaded, 'grade-table')),
+        S.optionsFor(cellOf(loaded, 'grade-table')),
       );
       if (mode === 'letter') expect(html).toMatch(WORD_ROWS);
       else expect(html).not.toMatch(WORD_ROWS);

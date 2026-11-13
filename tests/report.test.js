@@ -9,7 +9,6 @@ import { readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'acorn';
-import { parseHTML } from 'linkedom';
 import { runInThisContext } from 'vm';
 
 describe('report-academic-summary-letter', () => {
@@ -729,75 +728,6 @@ describe('report-continued-name', () => {
         '<div class="sheet-name-line">Nora Kim · Science 8 · Block A (continued)</div>',
       );
       expect(ReportBlocks.renderContinuedLine('c-cont', NORA, { name: 'first' })).toContain('Eleanor Kim');
-    });
-  });
-
-  describe('ReportSheets.layoutStudent: every side after the Front names its student', () => {
-    const LINE = 'Nora Kim · Science 8 · Block A (continued)';
-    let origDoc;
-    afterEach(() => {
-      globalThis.document = origDoc;
-      delete COURSES['c-cont'];
-    });
-    /* Lays Nora out on `sides` with each block `px` tall, and returns each
-     printed side's kind and its first line (or null). */
-    const layout = (sides, px) => {
-      COURSES['c-cont'] = { id: 'c-cont', name: 'Science 8', block: 'A' };
-      const dom = parseHTML('<!doctype html><html><body></body></html>');
-      origDoc = globalThis.document;
-      globalThis.document = dom.document;
-      // linkedom has no layout: each block is `px` tall, the line 16px.
-      Object.defineProperty(dom.HTMLElement.prototype, 'offsetHeight', {
-        configurable: true,
-        get() {
-          return this.classList.contains('sheet-name-line') ? HEAD : px[this.dataset.block] || 0;
-        },
-      });
-      const form = ReportSheets.normalizeForm({ v: 6, sides, pinned: null });
-      const stage = document.createElement('div');
-      document.body.appendChild(stage);
-      const probe = { linePx: 22, boxChromePx: 40 };
-      const r = ReportSheets.layoutStudent('c-cont', NORA, {}, { form, paper: 'letter', stage, probe });
-      stage.remove();
-      const host = document.createElement('div');
-      host.innerHTML = r.html;
-      return [...host.querySelectorAll('.report-sheet')].map(s => {
-        const first = s.querySelector('.sheet-body').firstElementChild;
-        return [
-          s.dataset.kind || 'blank',
-          first && first.classList.contains('sheet-name-line') ? first.textContent : null,
-          s.querySelectorAll('.sheet-name-line').length,
-        ];
-      });
-    };
-    const text = { block: 'text-block', size: 'row', options: { title: 'Notes', text: 'Field trip on Friday.' } };
-    const row = cell => ({ cells: [cell] });
-
-    it('prints the line on the Back, a Continued side and an After the Report side, not on the Front', () => {
-      const sides = layout(
-        [
-          { rows: [row({ block: 'header', size: 'row' }), row(text)] },
-          { rows: [row({ block: 'teacher-narrative', size: 'row' }), row({ block: 'parent-response', size: 'row' })] },
-        ],
-        { header: 600, 'text-block': 600, 'teacher-narrative': 300, 'parent-response': H - 10 },
-      );
-      expect(sides).toEqual([
-        ['side', null, 0],
-        ['continued', LINE, 1],
-        ['side', LINE, 1],
-        ['after', LINE, 1],
-      ]);
-    });
-
-    it('an empty Back prints no line', () => {
-      const sides = layout([{ rows: [row({ block: 'header', size: 'row' }), row(text)] }, { rows: [] }], {
-        header: 100,
-        'text-block': 100,
-      });
-      expect(sides).toEqual([
-        ['side', null, 0],
-        ['side', null, 0],
-      ]);
     });
   });
 });
@@ -3178,26 +3108,6 @@ describe('report-sheets', () => {
       expect(ReportSheets.sideHeight('legal')).toBe(14 * 96 - 60);
       expect(ReportSheets.cellWidth('row')).toBe(720);
       expect(ReportSheets.cellWidth('half')).toBe(354);
-      expect(ReportSheets.sideLabel({ kind: 'side', from: 0 })).toBe('Front');
-      expect(ReportSheets.sideLabel({ kind: 'side', from: 1 })).toBe('Back');
-      expect(ReportSheets.sideLabel({ kind: 'side', from: 2 })).toBe('Page 3');
-      expect(ReportSheets.sideLabel({ kind: 'continued', from: 0 })).toBe('Continued');
-      expect(ReportSheets.sideLabel({ kind: 'after' })).toBe('After the Report');
-      expect(ReportSheets.sideLabel(null)).toBe('Blank');
-    });
-  });
-
-  describe('ReportSheets.fitText', () => {
-    it('says how a comment sits in its lines, and names the second sheet when the report runs to one', () => {
-      expect(ReportSheets.fitText(null)).toBe('');
-      expect(ReportSheets.fitText({ room: 10, noComment: true })).toBe('No comment yet. The box holds 10 lines.');
-      expect(ReportSheets.fitText({ room: 10, commentLines: 4, sheets: 1 })).toBe('Fits. 4 lines; room for 6 more.');
-      expect(ReportSheets.fitText({ room: 10, commentLines: 13, sheets: 1 })).toBe(
-        '13 lines, 3 past the box; what is under it moves down. Nothing is cut.',
-      );
-      expect(ReportSheets.fitText({ room: 10, commentLines: 18, sheets: 2 })).toBe(
-        '18 lines, 8 past the box; this report runs to 2 sheets. Nothing is cut.',
-      );
     });
   });
 
@@ -3220,21 +3130,6 @@ describe('report-sheets', () => {
         'header@81',
         'short@80',
       ]);
-    });
-
-    it('pairsWell: the shorter is at least half the taller; unmeasured blocks pair', () => {
-      expect(ReportSheets.pairsWell('legend', 'support-home', { legend: 116, 'support-home': 118 })).toBe(true);
-      expect(ReportSheets.pairsWell('missing-work', 'legend', { 'missing-work': 44, legend: 116 })).toBe(false);
-      expect(ReportSheets.pairsWell('legend', 'support-home', {})).toBe(true);
-      expect(ReportSheets.pairsWell('legend', 'parent-response', {})).toBe(false);
-    });
-
-    it('Side by Side does not pair blocks of very different heights', () => {
-      const f = ReportSheets.setSize(ReportSheets.form(), 'legend', 'half');
-      const uneven = ReportSheets.setSize(f, 'proficiency', 'half', { legend: 116, proficiency: 360 });
-      expect(uneven.sides[0].rows[1].cells.map(c => c.block)).toEqual(['proficiency']);
-      const even = ReportSheets.setSize(f, 'proficiency', 'half', { legend: 200, proficiency: 360 });
-      expect(even.sides[0].rows[1].cells.map(c => c.block)).toEqual(['proficiency', 'legend']);
     });
   });
 

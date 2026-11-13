@@ -76,9 +76,9 @@ describe('reading what a class has today', () => {
   });
 
   it('a built form’s options, and the blocks left off one student, come with it', () => {
-    let form = S.normalizeForm(undefined);
-    form = S.setOption(form, 'proficiency', 'change', false);
-    form = S.hideFor(form, 'st-1', 'legend', true);
+    const form = S.normalizeForm(undefined);
+    form.sides[0].rows[1].cells[0].options = { change: false };
+    form.perStudent = { 'st-1': { hide: ['legend'] } };
     const before = JSON.stringify(form);
     const m = R.fromForm(form);
     expect(m.options.proficiency).toEqual({ change: false });

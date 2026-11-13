@@ -28,7 +28,20 @@ describe('what a class opens with', () => {
   });
 
   it('a class on Build Your Own opens with its form, and one that built a form before there was a choice too', () => {
-    const form = ReportSheets.starter('conference-pack');
+    // A form as Page Studio saved it (the Conference Pack starter).
+    const cell = block => ({ cells: [{ block, size: 'row' }] });
+    const form = {
+      v: 6,
+      id: 'conference-pack',
+      name: 'Conference Pack',
+      type: 'standard',
+      sides: [
+        { rows: [cell('header'), cell('proficiency'), cell('legend'), cell('teacher-narrative'), cell('next-steps')] },
+        { rows: [cell('learner-dimensions'), cell('grade-table'), cell('parent-response')] },
+      ],
+      pinned: 'parent-response',
+      perStudent: {},
+    };
     const built = R.fromForm(ReportSheets.normalizeForm(form));
     expect(model({ progressMode: 'build', form })).toEqual(built);
     expect(model({ form })).toEqual(built);
