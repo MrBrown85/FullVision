@@ -9,7 +9,8 @@ import { showAll } from './student-card-fake.js';
    not returned is nowhere on the page. */
 
 /* The scripts that work out a grade, as the page asked for them. The page
-   fetches them only when a screen that shows a grade is about to open. */
+   fetches them only on a card: ahead, on Is This You?, and runs them once
+   the student is in. */
 function gradeScripts(page) {
   const asked = [];
   page.on('request', req => {
@@ -73,8 +74,9 @@ for (const size of SIZES) {
       await page.getByLabel('Month').selectOption('3');
       await page.getByLabel('Day').selectOption('14');
       await page.getByLabel('Year').selectOption(String(new Date().getFullYear() - 13));
-      // Neither calc.js nor constants.js has been asked for yet.
-      expect(asked).toEqual([]);
+      // Is This You? fetched both ahead while the student typed (speed, B1), and ran neither.
+      await expect.poll(() => asked.slice().sort()).toEqual(['calc', 'constants']);
+      expect(await page.evaluate(() => typeof assessmentCellValue)).toBe('undefined');
       await press('Yes, That’s Me');
 
       // Assignments: both arrive, once, before the list is drawn.
@@ -102,6 +104,7 @@ for (const size of SIZES) {
       expect(html).not.toContain('3.3 · 83%');
       await fits();
 
+      // Once each: the sign-in ran the copies fetched ahead.
       expect(asked.sort()).toEqual(['calc', 'constants']);
       expect(posts).toEqual([]);
       expect(errors).toEqual([]);
