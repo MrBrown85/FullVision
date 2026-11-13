@@ -168,18 +168,60 @@ jobs:
         shell: bash
         run: xargs -0 npx prettier --check < /tmp/prettier-files.txt
 
+  # The security rule tests (tests/db/run.mjs, docs/database-rebuild.md).
+  # Rebuilds the database's structure from the repo in a throwaway
+  # PostgreSQL 17, proves it equals live (db-rebuild.mjs --check), then
+  # proves one teacher can neither read nor change another's rows and a
+  # visitor can do nothing. No data and no secrets: it never connects to
+  # Supabase.
+  db-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: db-rules-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Node built-ins and psql only, so no npm ci.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Rebuild the database and run the security rule tests
+        env:
+          DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+        run: |
+          psql --version
+          npm run test:db
+
   # The required check. Branch protection asks for a job of this name, so it
-  # stays: it passes only when every unit shard and the other checks passed.
+  # stays: it passes only when every unit shard, the other checks and the
+  # security rule tests passed.
   test-and-format:
     runs-on: ubuntu-latest
-    needs: [unit, checks]
+    needs: [unit, checks, db-rules]
     if: always()
     timeout-minutes: 5
     steps:
       - name: Every unit shard and check passed
         run: |
-          echo "unit: ${{ needs.unit.result }}, checks: ${{ needs.checks.result }}"
-          test "${{ needs.unit.result }}" = success && test "${{ needs.checks.result }}" = success
+          echo "unit: ${{ needs.unit.result }}, checks: ${{ needs.checks.result }}, db-rules: ${{ needs.db-rules.result }}"
+          test "${{ needs.unit.result }}" = success && test "${{ needs.checks.result }}" = success && test "${{ needs.db-rules.result }}" = success
 
   # Browser tests against dist/ served with the production CSP
   # (scripts/e2e-server.mjs) and a fake Supabase (e2e/helpers.js). They run
