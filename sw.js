@@ -212,6 +212,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/add-work.js',
   '/teacher-mobile/markup.js',
   '/teacher-mobile/tab-grade.js',
+  '/teacher-mobile/tab-bar.js',
   '/teacher-mobile/shell.js',
 ];
 

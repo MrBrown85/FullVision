@@ -1,5 +1,6 @@
 {
   "checked": [
+    "teacher-mobile/tab-bar.js",
     "shared/calc.js",
     "shared/constants.js",
     "shared/data-rpc-wrappers.js",
