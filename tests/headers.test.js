@@ -58,3 +58,26 @@ describe('security headers', () => {
     expect(read('scripts/build.sh')).toContain('cp roster-template.csv _headers dist/');
   });
 });
+
+// Scripts, styles and JSON say Vary: Accept-Encoding, so no cache between the
+// server and the browser hands a compressed-capable browser a copy it stored
+// uncompressed (111 of the app's 123 files arrived whole on Nov 13, 2026).
+describe('compressed and uncompressed copies are kept apart', () => {
+  const blocks = parseBlocks(read(HEADERS_FILE));
+  const toml = read('netlify.toml');
+
+  it('_headers: scripts and styles vary on Accept-Encoding', () => {
+    for (const path of ['/**/*.js', '/**/*.css']) {
+      expect(Object.fromEntries(blocks[path] || [])['Vary'], path).toBe('Accept-Encoding');
+    }
+  });
+
+  it('netlify.toml: scripts, styles and JSON vary on Accept-Encoding', () => {
+    for (const path of ['/**/*.js', '/**/*.css', '/**/*.json']) {
+      const at = toml.indexOf('for = "' + path + '"');
+      expect(at, path).toBeGreaterThan(-1);
+      const block = toml.slice(at, toml.indexOf('[[', at + 1));
+      expect(block, path).toContain('Vary = "Accept-Encoding"');
+    }
+  });
+});

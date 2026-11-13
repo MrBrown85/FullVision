@@ -11,6 +11,82 @@ function getAssessments(cid) {
     return [];
   }
 }
+
+/* Lookups on the class's list of work, asked for each cell of a draw. Each
+   is kept with the list it was made from, the one this page holds
+   (_cache.assessments), and checked against it on every ask: the list and
+   its pieces are changed in place (the assessment form, a re-key), so being
+   the same list is not enough. A list read fresh from this device's storage
+   on each ask gets the old way, as before. */
+
+// A piece by id: list → { len, rekeyed, at: Map of id → index of its first place }.
+var _assessmentIndexes = new WeakMap();
+// Counts up when a piece's id is changed in place (_rekeyField), which the length does not show.
+var _assessmentsRekeyed = 0;
+function _assessmentInClass(cid, aid) {
+  var held = _cache.assessments[cid];
+  var list = held === undefined ? getAssessments(cid) || [] : held || [];
+  var byId = function (/** @type {any} */ a) {
+    return a && a.id === aid;
+  };
+  if (held === undefined || !Array.isArray(list) || typeof aid !== 'string') return list.find(byId);
+  var index = _assessmentIndexes.get(list);
+  if (!index || index.len !== list.length || index.rekeyed !== _assessmentsRekeyed) {
+    index = { len: list.length, rekeyed: _assessmentsRekeyed, at: new Map() };
+    for (var i = 0; i < list.length; i++) {
+      var id = list[i] && list[i].id;
+      if (typeof id === 'string' && !index.at.has(id)) index.at.set(id, i);
+    }
+    _assessmentIndexes.set(list, index);
+  }
+  var at = index.at.get(aid);
+  if (at !== undefined && list[at] && list[at].id === aid) return list[at];
+  // Not where it was, or not there: the old way, and the index is made again next time it is stale.
+  var found = list.find(byId);
+  if (found || at !== undefined) _assessmentIndexes.delete(list);
+  return found;
+}
+
+/* What _migrateRubricScoreKeys keys a scores object to: the class's rubrics'
+   revision and which work is scored on which rubric. The same string is given
+   while the list and the fields it is made from are as they were, so an
+   unchanged class builds nothing; every field it reads is checked each time. */
+var _rubricSigs = new WeakMap(); // list → { rev, sig, seen: [piece, id, rubricId, rubric_id, scoreMode, score_mode, …] }
+function _rubricWorkSig(cid, rev) {
+  var held = _cache.assessments[cid];
+  var list = held === undefined ? getAssessments(cid) : held;
+  var kept = held !== undefined && Array.isArray(list) ? _rubricSigs.get(list) : null;
+  if (kept && kept.rev === rev && kept.seen.length === list.length * 6) {
+    var same = true;
+    for (var i = 0, k = 0; same && i < list.length; i++, k += 6) {
+      var a = list[i];
+      same =
+        a === kept.seen[k] &&
+        (!a ||
+          (a.id === kept.seen[k + 1] &&
+            a.rubricId === kept.seen[k + 2] &&
+            a.rubric_id === kept.seen[k + 3] &&
+            a.scoreMode === kept.seen[k + 4] &&
+            a.score_mode === kept.seen[k + 5]));
+    }
+    if (same) return kept.sig;
+  }
+  var sig = String(rev);
+  (list || []).forEach(function (/** @type {any} */ a) {
+    var rubricId = a && (a.rubricId || a.rubric_id);
+    if (rubricId && !isPointsScored(a)) sig += '|' + a.id + '=' + rubricId;
+  });
+  if (held !== undefined && Array.isArray(list)) {
+    /** @type {any[]} */
+    var seen = [];
+    for (var j = 0; j < list.length; j++) {
+      var b = list[j];
+      seen.push(b, b && b.id, b && b.rubricId, b && b.rubric_id, b && b.scoreMode, b && b.score_mode);
+    }
+    _rubricSigs.set(list, { rev: rev, sig: sig, seen: seen });
+  }
+  return sig;
+}
 /* A piece of work loaded from the server carries the server's snake_case
    copies of some fields beside the app's own (score_mode beside scoreMode,
    and so on); the editors change only the camelCase one. Readers take the
