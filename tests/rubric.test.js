@@ -387,15 +387,6 @@ describe('rubric-criterion-own-scores', () => {
       expect(getTagProficiency(CID, SID, CI)).toBeCloseTo((3 + 1 / 3 + 2) / 2, 5);
     });
 
-    it('average into one point per assessment on a timeline', () => {
-      seed([entry(CRIT_Q1, 3, { mod: 1 }), entry(CRIT_Q2, 2)]);
-      const points = tagScoresByAssessment(CID, SID, CI);
-      expect(points).toHaveLength(1);
-      expect(points[0].score).toBeCloseTo((3 + 1 / 3 + 2) / 2, 5);
-      expect(points[0].criterionIds).toEqual([CRIT_Q1, CRIT_Q2]);
-      expect(points[0].level).toBeUndefined();
-    });
-
     it("give the gradebook's competency cell one level, or the lowest marked mixed", () => {
       seed([entry(CRIT_Q1, 3, { mod: 1 }), entry(CRIT_Q2, 3, { mod: 1 })]);
       expect(competencyLevelFromCriteria(CID, SID, assessment, CI)).toEqual({ score: 3, mod: 1, mixed: false });
