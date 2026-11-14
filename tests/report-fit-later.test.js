@@ -191,6 +191,17 @@ describe('the Reports page’s kept layouts', () => {
     expect(calls.length).toBe(5);
   });
 
+  it('a new day lays out everyone (Missing Work says As of today)', () => {
+    let day = '2026-11-13';
+    const k = S.keptLayouts(() => ({ cid: 'x', ctx: { termId: 't1' }, paper: 'letter', set: 'all', model, day }));
+    const calls = [];
+    draw(k, calls);
+    calls.length = 0;
+    day = '2026-11-14';
+    draw(k, calls);
+    expect(calls.length).toBe(5);
+  });
+
   it('a change for one student (model.perStudent) lays out that student only', () => {
     const k = kept();
     const calls = [];

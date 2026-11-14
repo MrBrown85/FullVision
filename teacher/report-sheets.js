@@ -1318,7 +1318,7 @@ window.ReportSheets = (function () {
 
   /* The Reports page's kept layouts: the canvas's ('sheet') and the class
      fit's ('fit', measured off the canvas), and the fit's run. now() gives
-     what every student's report reads: { cid, ctx, paper, set, model }.
+     what every student's report reads: { cid, ctx, paper, set, model, day }.
      A student's key is that, their own changes (model.perStudent[sid]),
      their record, and the count of changes of data: dirty() for the
      class, dirty(sid) for one student. */
@@ -1329,7 +1329,7 @@ window.ReportSheets = (function () {
     var keyOf = function (where) {
       var n = now();
       var cls = Object.assign({}, n.model, { perStudent: 0 });
-      var base = [n.cid, JSON.stringify(n.ctx), n.paper, n.set, JSON.stringify(cls), gen.all, where].join('|');
+      var base = [n.cid, JSON.stringify(n.ctx), n.paper, n.set, JSON.stringify(cls), n.day, gen.all, where].join('|');
       return function (st) {
         return [base, JSON.stringify(n.model.perStudent[st.id] || 0), JSON.stringify(st), gen[st.id] || 0].join('|');
       };

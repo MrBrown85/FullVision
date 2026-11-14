@@ -101,9 +101,9 @@ test('Next Student redraws the sheet, not the tab', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-/* Everyone, One Student and the Print dialog (R7) are changes of view:
-   the class is laid out the first time only. */
-test('Everyone a second time, and the Print dialog, lay out no student again', async ({ page }) => {
+/* Everyone and One Student are changes of view: the class is laid out the
+   first time only. The Print dialog is not: what it shows is what prints. */
+test('Everyone a second time lays out no student again; the Print dialog lays out every one', async ({ page }) => {
   const errors = await open(page);
   const view = v => page.locator('[data-action="studioView"][data-view="' + v + '"]').click();
   const sheets = () => page.locator('#rb-preview .sheet-student').evaluateAll(els => els.map(e => e.outerHTML));
@@ -115,8 +115,52 @@ test('Everyone a second time, and the Print dialog, lay out no student again', a
   // The same pages as the first time.
   expect(await sheets()).toEqual(first);
   await counted(page, () => view('one'));
-  expect(await counted(page, () => page.locator('#tb-print-btn').click())).toBe(0);
+  expect(await counted(page, () => page.locator('#tb-print-btn').click())).toBeGreaterThanOrEqual(students);
   await expect(page.locator('#issue-title')).toHaveText('Print ' + students + ' Reports');
   await page.locator('[data-issue="cancel"]').click();
+  expect(errors).toEqual([]);
+});
+
+/* Every print path lays out from the data as it is now, as before layouts
+   were kept. A comment saved behind the page's back (the Questionnaire's
+   Undo saves through upsertTermRating and tells Reports nothing) is in the
+   Print dialog's pages, in what prints and in the copy saved. */
+test('the Print dialog, the print and the saved copy are laid out fresh', async ({ page }) => {
+  const errors = await open(page);
+  const view = v => page.locator('[data-action="studioView"][data-view="' + v + '"]').click();
+  const comment = page.locator('#studio-palette [data-action="oneSwitch"][data-part="teacher-narrative"]');
+  if ((await comment.getAttribute('aria-checked')) !== 'true')
+    await counted(page, () => comment.evaluate(b => b.click()));
+  await counted(page, () => view('all'));
+  await counted(page, () => view('one'));
+  const sid = await page.locator('#rb-preview .sheet-student').first().getAttribute('data-sid');
+  const say = text =>
+    page.evaluate(
+      ([sid, text]) => upsertTermRating('sci8', sid, ReportBlocks.reportContext().termId, { narrative: text }),
+      [sid, text],
+    );
+  const sheet = page.locator('#rb-preview .sheet-student[data-sid="' + sid + '"]');
+  await say('Written behind the page once.');
+  await page.locator('#tb-print-btn').click();
+  await expect(page.locator('#issue-title')).toBeVisible();
+  await expect(sheet).toContainText('Written behind the page once.');
+  // A paper changed and put back in the dialog keeps nothing from before either.
+  await say('Written behind the page twice.');
+  const paper = p => page.locator('#issue-overlay [data-paper="' + p + '"]').click();
+  await paper('legal');
+  await expect(page.locator('#issue-overlay [data-paper="legal"]')).toHaveAttribute('aria-checked', 'true');
+  await paper('letter');
+  await expect(page.locator('#issue-overlay [data-paper="letter"]')).toHaveAttribute('aria-checked', 'true');
+  await expect(sheet).toContainText('Written behind the page twice.');
+  await page.evaluate(sid => {
+    window.__printed = [];
+    window.print = () => window.__printed.push(document.getElementById('rb-preview').innerHTML);
+    const issue = ReportIssues.issue;
+    ReportIssues.issue = o => ((window.__issued = o.students.find(s => s.sid === sid).html), issue(o));
+  }, sid);
+  await page.locator('#issue-overlay [data-issue="go"]').click();
+  await expect.poll(() => page.evaluate(() => window.__printed.length)).toBe(1);
+  expect(await page.evaluate(() => window.__printed[0])).toContain('Written behind the page twice.');
+  expect(await page.evaluate(() => window.__issued)).toContain('Written behind the page twice.');
   expect(errors).toEqual([]);
 });

@@ -541,7 +541,9 @@ window.PageReports = (function () {
     _bankAsked = true;
     RubricPrint.loadBankLevels().then(function (ok) {
       _bankAsked = false;
-      if (ok && _mounted && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
+      if (!ok || !_mounted || activeTab === 'questionnaire' || activeCourse !== cid) return;
+      _classFitKey = ''; // the fit counts again in the bank's wording, even one already in
+      renderReports();
     });
   }
 
@@ -688,6 +690,7 @@ window.PageReports = (function () {
   /* keep: the draw follows a change of the report only (a tick, a comment
      saved through redraw), so kept layouts are used; any other may follow new data. */
   function renderReportPreview(keep) {
+    if (_issueState) keep = false; // the Print dialog's pages are what prints: laid out from the data now
     if (!keep && _kept.changed()) _classFitKey = '';
     if (viewingIssue) {
       _showIssue(viewingIssue.id);
@@ -925,7 +928,7 @@ window.PageReports = (function () {
         window.removeEventListener('afterprint', restore);
         if (wasOne) {
           studioView = 'one';
-          renderReports(true);
+          renderReports();
         }
       };
       window.addEventListener('afterprint', restore);
@@ -1060,11 +1063,12 @@ window.PageReports = (function () {
   var _restoreOneAfterPrint = false;
   function openIssueDialog() {
     closeIssueDialog();
+    // Laid out from the data now, as on every print path: what prints and is saved.
     if (studioView === 'one') {
       studioView = 'all';
       _restoreOneAfterPrint = true;
-      renderReports(true);
-    }
+      renderReports();
+    } else renderReportPreview();
     if (!_lastSummary || !Object.keys(_lastSummary.perStudent || {}).length) return;
     var c = _issueCounts();
     // The Name choice redraws the reports while the dialog is open; Cancel
@@ -1523,11 +1527,16 @@ window.PageReports = (function () {
   var _classFitKey = '';
   var _kept = ReportSheets.keptLayouts(function () {
     var ctx = ReportBlocks.reportContext();
-    return { cid: activeCourse, ctx: ctx, paper: reportPaper, set: _reportSet(), model: _oneModel() };
+    return { cid: activeCourse, ctx: ctx, paper: reportPaper, set: _reportSet(), model: _oneModel(), day: _day() };
   });
   function _classFitKeyNow() {
     var ctx = ReportBlocks.reportContext();
-    return [activeCourse, ctx.termId, reportPaper, 'one:' + JSON.stringify(_oneModel()), _reportSet()].join('|');
+    var form = 'one:' + JSON.stringify(_oneModel());
+    return [activeCourse, ctx.termId, reportPaper, form, _reportSet(), _day()].join('|');
+  }
+  // Missing Work says "As of" today: a page left open overnight lays out again.
+  function _day() {
+    return typeof courseToday === 'function' ? courseToday(activeCourse) : new Date().toDateString();
   }
   /* A piece of the class fit, run inside the report's set of scores. */
   function _classSummary(piece) {
