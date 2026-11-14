@@ -267,6 +267,7 @@ async function play(way, opts, steps) {
     let answer = steps[i]();
     if (answer && typeof answer.then === 'function') answer = await answer;
     await settle(3);
+    memoryMatchesStorage(i, steps[i]);
     seen.push({
       step: i,
       answer: answer === undefined || typeof answer === 'object' ? null : answer,
@@ -282,6 +283,31 @@ async function play(way, opts, steps) {
   const took = paths.slice();
   stop();
   return { seen, took };
+}
+
+/* The guard's run-time half (tests/scores-memory-guard.test.js holds the
+   source). The one-cell way trusts that, while _scoresApart is down, the
+   class's scores in memory are the text this tab last read or wrote
+   (_keptText), which is what storage holds whenever the way is taken
+   (_savedScoresAreMine). After every step, with _scoresApart down, memory
+   serialised as the save does (JSON.stringify) must be that text. A step
+   that changes memory and neither saves the list nor raises _scoresApart
+   fails here, named. One difference is let through: a student's empty
+   list in memory that the saved text does not have (a writer that found
+   nothing to change leaves one). It holds no cell, so no grade differs. */
+const withoutEmptyLists = text => {
+  const scores = JSON.parse(text);
+  Object.keys(scores).forEach(sid => Array.isArray(scores[sid]) && !scores[sid].length && delete scores[sid]);
+  return JSON.stringify(scores);
+};
+function memoryMatchesStorage(i, step) {
+  const kept = _keptText[SCORES_KEY];
+  if (_scoresApart[SCORES_KEY] || typeof kept !== 'string' || _cache.scores[CID] === undefined) return;
+  const what = 'step ' + (i + 1) + ' (' + (step.label || String(step)) + ')';
+  expect(
+    withoutEmptyLists(JSON.stringify(_cache.scores[CID])),
+    what + ' left the scores in memory apart from the saved copy with _scoresApart down',
+  ).toBe(withoutEmptyLists(kept));
 }
 
 function stop() {
@@ -649,6 +675,14 @@ function randomSteps(seed, count) {
         }),
       );
     }
+    // Named in a failure: the action, and the student it was picked for.
+    const step = steps[steps.length - 1];
+    step.label =
+      String(step)
+        .replace(/^\(\) =>\s*/, '')
+        .slice(0, 80) +
+      ', student ' +
+      (S.indexOf(sid) + 1);
   }
   return steps;
 }
