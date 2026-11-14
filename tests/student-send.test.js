@@ -299,6 +299,63 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
   });
 });
 
+describe('each photo shows as it is ready (speed, B3)', () => {
+  it('three files: each one’s page is on screen once it is shrunk, Send waits for all, the note keeps its caret', async () => {
+    const { page } = await demo();
+    await openSend(page, 'Science Fair Proposal');
+    const held = [];
+    page.T.setPrepare(file => new Promise(r => held.push(() => r(file))));
+    const one = n => ({ ok: true, kind: 'jpeg', pages: [{ blob: { n }, thumb: {}, hash: 'h' + n, blurry: false }] });
+    const going = page.T.sendFiles([one(1), one(2), one(3)], -1);
+    await page.settle();
+    const shown = () => page.root().querySelectorAll('.sp-send-pages .sp-send-page').length;
+    expect(shown()).toBe(0);
+    expect(held).toHaveLength(1); // one file at a time, in order
+    held[0]();
+    await page.settle();
+    // Page 1 is on screen while the other two are shrunk (it was drawn only once all three were).
+    expect(shown()).toBe(1);
+    expect(text(page, '.sp-send-msg[role="status"]')).toBe('Getting your photos ready…');
+    expect(page.root().querySelector('[data-act="send-go"]').hasAttribute('disabled')).toBe(true);
+    // The student writes the note meanwhile: the next page drawn leaves the focus in it (and, in a browser, the caret).
+    // (linkedom keeps no focus: here the note is the box in use, and each focus() is counted.)
+    page.run(
+      'Object.defineProperty(document, "activeElement", { configurable: true, get: () => document.getElementById("sp-send-note") });' +
+        'window.__focused = []; var __box = Object.getPrototypeOf(document.createElement("textarea"));' +
+        'var __focus = __box.focus; __box.focus = function () { window.__focused.push(this.id); return __focus && __focus.apply(this, arguments); };',
+    );
+    page.type('#sp-send-note', 'Page 3 is the graph');
+    held[1]();
+    await page.settle();
+    expect(shown()).toBe(2);
+    expect(page.run('window.__focused.join()')).toBe('sp-send-note');
+    expect(page.root().querySelector('#sp-send-note').value).toBe('Page 3 is the graph');
+    held[2]();
+    await going;
+    await page.settle();
+    expect(shown()).toBe(3);
+    expect(page.T.state().send.pages.map(p => p.hash)).toEqual(['h1', 'h2', 'h3']);
+    expect(page.root().querySelector('[data-act="send-go"]').hasAttribute('disabled')).toBe(false);
+    expect(text(page, '[data-act="send-go"]')).toBe('Send 3 Photos');
+  });
+
+  it('a Retake’s pages go in place of the page retaken, as each is ready', async () => {
+    const { page } = await demo();
+    await openSend(page, 'Science Fair Proposal');
+    await choose(page, [{ name: 'a.jpg' }, { name: 'b.jpg' }, { name: 'c.jpg' }]);
+    const before = page.T.state().send.pages.map(p => p.key);
+    page.T.setPrepare(() =>
+      Promise.resolve({ ok: true, kind: 'jpeg', pages: [{ blob: {}, thumb: {}, hash: 'new', blurry: false }] }),
+    );
+    await page.T.sendFiles([{}], 1);
+    await page.settle();
+    const keys = page.T.state().send.pages.map(p => p.key);
+    expect(keys).toHaveLength(3);
+    expect([keys[0], keys[2]]).toEqual([before[0], before[2]]);
+    expect(page.T.state().send.pages[1].hash).toBe('new');
+  });
+});
+
 describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend and Replace', () => {
   it('a blurry photo is shown first: Use It Anyway keeps it, Cancel takes it out', async () => {
     const { page } = await demo();

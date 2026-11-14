@@ -5871,27 +5871,67 @@ window.CommentBank = (function () {
      sentence counts for a classmate when its pattern is in their comment,
      or, for a sentence with no pattern, when this session drafted it for
      them and their comment still holds that text. comments: [{ sid, text }]
-     (or plain strings, which only patterns can match). */
-  function classUsage(bank, comments, cid, sid) {
-    var mine = sid == null ? null : String(sid);
-    var list = (comments || [])
-      .map(_comment)
-      .filter(function (c) {
-        return c.sid == null || c.sid !== mine;
-      })
-      .map(function (c) {
-        c.lower = c.text.toLowerCase();
-        return c;
+     (or plain strings, which only patterns can match). extra: sentences
+     after the bank's (draft()'s course-set ones). Which sentences a
+     comment holds is kept per text (_heldIn), so only a changed comment
+     is read again. */
+  var _held = new WeakMap();
+  function _heldIn(sentences) {
+    var memo = _held.get(sentences);
+    // The same sentences, with the same ids and wording, as when kept.
+    var same =
+      memo &&
+      memo.refs.length === sentences.length &&
+      sentences.every(function (s, i) {
+        return s === memo.refs[i] && s.id === memo.ids[i] && s.text === memo.texts[i];
       });
-    var out = {};
-    var add = function (id) {
-      out[id] = (out[id] || 0) + 1;
+    if (!same) {
+      memo = { refs: sentences.slice(), ids: [], texts: [], byText: new Map() };
+      sentences.forEach(function (s) {
+        memo.ids.push(s.id);
+        memo.texts.push(s.text);
+      });
+      _held.set(sentences, memo);
+    }
+    return function (text) {
+      var at = memo.byText.get(text);
+      if (at) return at;
+      if (memo.byText.size > 2000) memo.byText.clear();
+      var lower = text.toLowerCase();
+      at = [];
+      sentences.forEach(function (s, i) {
+        if (_holds(s, text, lower)) at.push(i);
+      });
+      memo.byText.set(text, at);
+      return at;
     };
-    bank.sentences.forEach(function (s) {
-      list.forEach(function (c) {
-        if (_holds(s, c.text, c.lower)) add(s.id);
-      });
+  }
+  function classUsage(bank, comments, cid, sid, extra) {
+    var mine = sid == null ? null : String(sid);
+    var list = (comments || []).map(_comment).filter(function (c) {
+      return c.sid == null || c.sid !== mine;
     });
+    var all = extra && extra.length ? bank.sentences.concat(extra) : bank.sentences;
+    var hits = new Array(all.length).fill(0);
+    var count = function (held, at) {
+      held.forEach(function (i) {
+        hits[at + i]++;
+      });
+    };
+    var inBank = _heldIn(bank.sentences);
+    var inExtra = all !== bank.sentences ? _heldIn(extra) : null;
+    list.forEach(function (c) {
+      count(inBank(c.text), 0);
+      if (inExtra) count(inExtra(c.text), bank.sentences.length);
+    });
+    var out = {};
+    var add = function (id, n) {
+      out[id] = (out[id] || 0) + (n || 1);
+    };
+    all.forEach(function (s, i) {
+      if (hits[i]) add(s.id, hits[i]);
+    });
+    if (all !== bank.sentences) bank = { parts: bank.parts, sentences: all };
     var record = (cid != null && _drafted[cid]) || {};
     list.forEach(function (c) {
       var seen = {};
@@ -6357,10 +6397,11 @@ window.CommentBank = (function () {
     // once more, so each part takes another of its frames where one fits
     // (Colin, Nov 4: a second press should change more than a sentence).
     var usage = classUsage(
-      { parts: bank.parts, sentences: bank.sentences.concat((ctx && ctx._extra) || []) },
+      bank,
       (opts.comments || []).concat(previous ? [{ sid: '\u0000previous', text: previous }] : []),
       cid,
       sid,
+      (ctx && ctx._extra) || [],
     );
     var exclude = {};
     (opts.exclude || []).forEach(function (id) {

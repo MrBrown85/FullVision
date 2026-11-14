@@ -10,22 +10,27 @@
    pics.fill(root, cid, lookup)
      For each <img data-work-pic> inside root with no src yet, shows the
      picture of the file lookup(img) gives: its thumbnail, or the whole page
-     when the img says data-work-which="page" (only for a page opened full
-     size). One address per file and size is asked for once and kept while
+     when the img says data-work-which="page" (a page opened full size, or
+     the phone grader's strip). One address per file and size is asked for once and kept while
      any img on the page shows it, so drawing the screen again asks for
      nothing new. An answer is drawn only if, when it comes, the holder has
      not been let go and lookup(img) still gives a file with the same id and
      address; otherwise that img is left alone, and an address no img took
      is let go.
+     An img that wants the whole page and also says data-work-first="thumb"
+     shows the file's thumbnail while the page is on its way, when that
+     thumbnail is already held or asked for (no request of its own), and
+     the page takes its place as soon as it is in. The browser keeps
+     showing the thumbnail until the page is ready, so nothing flashes.
    pics.sweep()       lets go of every address no img on the page shows.
    pics.releaseAll()  lets go of everything; answers still on their way are
                       let go when they come.
    pics.held()        how many addresses are held (for tests).
 
-   Other screens that show work today load their pictures their own way
-   (the grader's work pane in teacher/page-assignments.js,
-   teacher-mobile/grade-photos.js, teacher-mobile/add-work.js); they can move
-   to this later. Nothing here calls the server. */
+   The phone grader (teacher-mobile/grade-photos.js) uses it too. Other
+   screens that show work today load their pictures their own way (the
+   grader's work pane in teacher/page-assignments.js,
+   teacher-mobile/add-work.js); they can move to this later. Nothing here calls the server. */
 window.WorkThumbs = (function () {
   'use strict';
 
@@ -45,22 +50,43 @@ window.WorkThumbs = (function () {
   function holder() {
     var held = {}; // key → { page, imgs }
     var waiting = {}; // key → [img, …] asked for, answer not in yet
+    var early = {}; // thumbnail key → [img, …] that show it until their page is in
+    var standing = new WeakSet(); // imgs showing a thumbnail until their page is in
     var gen = 0;
 
-    function _show(entry, img) {
+    function _show(entry, img, standIn) {
       img.setAttribute('src', entry.page.url);
       if (entry.imgs.indexOf(img) < 0) entry.imgs.push(img);
+      if (standIn) standing.add(img);
+      else standing.delete(img);
+    }
+
+    // The img shows its own picture: nothing more to do for it.
+    function _done(img) {
+      return !!img.getAttribute('src') && !standing.has(img);
+    }
+
+    // The thumbnail while the page is on its way, if it is held or asked for already.
+    function _standIn(cid, img, file) {
+      if (img.getAttribute('src') || !_address(file, 'thumb')) return;
+      var key = _key(cid, file, 'thumb');
+      if (held[key]) return _show(held[key], img, true);
+      if (!waiting[key]) return;
+      early[key] = early[key] || [];
+      if (early[key].indexOf(img) < 0) early[key].push(img);
     }
 
     function fill(root, cid, lookup) {
       if (!root || typeof lookup !== 'function' || typeof openStudentWorkPage !== 'function') return;
+      var later = [];
       Array.prototype.forEach.call(root.querySelectorAll('img[data-work-pic]'), function (img) {
-        if (img.getAttribute('src')) return;
+        if (_done(img)) return;
         var which = _which(img);
         var file = lookup(img);
         if (!_address(file, which)) return;
         var key = _key(cid, file, which);
         if (held[key]) return _show(held[key], img);
+        if (which === 'page' && img.getAttribute('data-work-first') === 'thumb') later.push([img, file]);
         if (waiting[key]) {
           if (waiting[key].indexOf(img) < 0) waiting[key].push(img);
           return;
@@ -70,18 +96,31 @@ window.WorkThumbs = (function () {
         openStudentWorkPage(cid, file, which).then(function (page) {
           // Let go of everything since it was asked: no img takes it.
           var imgs = mine === gen ? waiting[key] || [] : [];
-          if (mine === gen) delete waiting[key];
+          var standIns = mine === gen ? early[key] || [] : [];
+          if (mine === gen) {
+            delete waiting[key];
+            delete early[key];
+          }
           if (!page) return;
           var entry = { page: page, imgs: [] };
-          imgs.forEach(function (one) {
-            if (!one.isConnected || one.getAttribute('src') || _which(one) !== which) return;
+          var still = function (one) {
             var now = lookup(one);
-            if (!_address(now, which) || _key(cid, now, which) !== key) return;
-            _show(entry, one);
+            return one.isConnected && !!_address(now, which) && _key(cid, now, which) === key;
+          };
+          imgs.forEach(function (one) {
+            if (!_done(one) && _which(one) === which && still(one)) _show(entry, one);
+          });
+          // A thumbnail standing in for a page not in yet.
+          standIns.forEach(function (one) {
+            if (!one.getAttribute('src') && still(one)) _show(entry, one, true);
           });
           if (!entry.imgs.length) return page.release();
           held[key] = entry;
         });
+      });
+      // Once every img has asked, so a thumbnail asked for further down counts too.
+      later.forEach(function (pair) {
+        _standIn(cid, pair[0], pair[1]);
       });
     }
 
@@ -104,6 +143,7 @@ window.WorkThumbs = (function () {
       });
       held = {};
       waiting = {};
+      early = {};
     }
 
     return {

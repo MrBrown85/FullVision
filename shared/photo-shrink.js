@@ -16,6 +16,9 @@
  *                steps down until the page is at or under 500 KB; if the
  *                lowest quality is still over the 2 MB bucket limit the page
  *                is redrawn smaller until it is under. Never enlarged.
+ *                A big JPEG or PNG is decoded at about 2000 px, not whole
+ *                (its size is read from its header), and the quality search
+ *                starts where the last page's ended; it finds the same step.
  *   Orientation  A sideways phone photo comes out upright. Browsers that
  *                turn a photo themselves are left to; for one that doesn't,
  *                the EXIF orientation is read here and applied in the redraw.
@@ -270,6 +273,30 @@ window.PhotoShrink = (function () {
     return out;
   }
 
+  /* A picture's stored width and height from its first bytes: a JPEG's
+     frame header or a PNG's IHDR. null for anything else (it is decoded
+     whole, as before). */
+  function storedSize(bytes) {
+    var kind = sniff(bytes);
+    if (kind === 'png' && bytes.length >= 24) {
+      var u32 = function (p) {
+        return ((bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]) >>> 0;
+      };
+      return u32(16) && u32(20) ? { width: u32(16), height: u32(20) } : null;
+    }
+    var frame = (kind === 'jpeg' && _segments(bytes)) || [];
+    for (var i = 0; i < frame.length; i++) {
+      var m = frame[i].marker;
+      // SOF0 to SOF15, without DHT (C4), JPG (C8) and DAC (CC).
+      if (m < 0xc0 || m > 0xcf || m === 0xc4 || m === 0xc8 || m === 0xcc) continue;
+      var at = frame[i].start;
+      var h = (bytes[at + 5] << 8) | bytes[at + 6];
+      var w = (bytes[at + 7] << 8) | bytes[at + 8];
+      return w && h ? { width: w, height: h } : null;
+    }
+    return null;
+  }
+
   /* A JPEG without its EXIF, XMP, IPTC and comment segments. Returns the
      same array when there was nothing to cut. */
   function stripMetadata(bytes) {
@@ -399,19 +426,31 @@ window.PhotoShrink = (function () {
         img.src = url;
       });
     }
+    function picture(bitmap) {
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        source: bitmap,
+        close: function () {
+          if (typeof bitmap.close === 'function') bitmap.close();
+        },
+      };
+    }
     return {
-      decode: function (blob) {
+      // hint: { resizeWidth } or { resizeHeight }, the long side wanted, so a 12-megapixel photo is
+      // decoded at about 2000 px and not whole. A browser that gives back less than that decodes it whole.
+      decode: function (blob, hint) {
         if (typeof createImageBitmap !== 'function') return decodeWithImg(blob);
-        return createImageBitmap(blob).then(function (bitmap) {
-          return {
-            width: bitmap.width,
-            height: bitmap.height,
-            source: bitmap,
-            close: function () {
-              if (typeof bitmap.close === 'function') bitmap.close();
-            },
-          };
-        });
+        var whole = function () {
+          return createImageBitmap(blob).then(picture);
+        };
+        if (!hint) return whole();
+        var want = hint.resizeWidth || hint.resizeHeight;
+        return createImageBitmap(blob, Object.assign({ resizeQuality: 'high' }, hint)).then(function (bitmap) {
+          if (Math.max(bitmap.width, bitmap.height) >= want) return picture(bitmap);
+          if (typeof bitmap.close === 'function') bitmap.close();
+          return whole();
+        }, whole);
       },
       canvas: function (w, h) {
         var c = makeCanvas(w, h);
@@ -561,6 +600,27 @@ window.PhotoShrink = (function () {
     });
   }
 
+  /* The highest of `steps` whose JPEG is at or under AIM_BYTES, else the
+     lowest, as stepping down from the top finds it. The search starts at
+     step `from` (where the last page's ended: pages from one camera end
+     alike) and walks up while a step fits, or down until one does.
+     → { blob, at } */
+  async function _quality(canvas, steps, from) {
+    var at = Math.min(from, steps.length - 1);
+    var blob = await canvas.toJpeg(steps[at]);
+    if (blob.size > AIM_BYTES) {
+      while (at < steps.length - 1 && blob.size > AIM_BYTES) blob = await canvas.toJpeg(steps[++at]);
+      return { blob: blob, at: at };
+    }
+    while (at > 0) {
+      var better = await canvas.toJpeg(steps[at - 1]);
+      if (better.size > AIM_BYTES) break;
+      blob = better;
+      at -= 1;
+    }
+    return { blob: blob, at: at };
+  }
+
   /* Redraw one decoded picture as a page: the JPEG, its thumbnail, its hash
      and its sharpness. turn is the EXIF orientation still to apply (1 when
      the picture is already upright). */
@@ -578,11 +638,10 @@ window.PhotoShrink = (function () {
       var dw = sideways ? size.h : size.w;
       var dh = sideways ? size.w : size.h;
       canvas.draw(img.source, turnMatrix(turn, dw, dh), dw, dh);
-      for (var i = 0; i < steps.length; i++) {
-        quality = steps[i];
-        blob = await canvas.toJpeg(quality);
-        if (blob.size <= AIM_BYTES) break;
-      }
+      var found = await _quality(canvas, steps, steps === QUALITY_STEPS ? surface._fvQuality || 0 : 0);
+      if (steps === QUALITY_STEPS) surface._fvQuality = found.at;
+      blob = found.blob;
+      quality = steps[found.at];
       if (blob.size < MAX_BYTES) break;
       canvas.release();
       if (longSide <= MIN_LONG_SIDE) throw _fail(REASONS.TOO_LARGE, 'The page could not be made small enough');
@@ -622,15 +681,26 @@ window.PhotoShrink = (function () {
     };
   }
 
-  /* Decode a Blob, and say which EXIF orientation is still to apply. */
+  /* Decode a Blob, and say which EXIF orientation is still to apply. A
+     picture whose stored size is known and over LONG_SIDE is decoded at
+     LONG_SIDE on its long side (as the browser will hand it over, turned
+     or not), not whole. */
   async function _decode(blob, surface) {
     var turn = 1;
+    var orientation = 1;
     var head = await _bytes(blob.slice(0, EXIF_SCAN_BYTES));
     if (sniff(head) === 'jpeg') {
-      var orientation = readExif(head).orientation;
+      orientation = readExif(head).orientation;
       if (orientation > 1 && !(await _rotatesItself(surface))) turn = orientation;
     }
-    return { img: await surface.decode(blob), turn: turn };
+    var stored = storedSize(head);
+    var hint = null;
+    if (stored && Math.max(stored.width, stored.height) > LONG_SIDE) {
+      // The browser turns a sideways photo as it decodes it (turn 1): its width is then the stored height.
+      var wide = orientation >= 5 && turn === 1 ? stored.height >= stored.width : stored.width >= stored.height;
+      hint = wide ? { resizeWidth: LONG_SIDE } : { resizeHeight: LONG_SIDE };
+    }
+    return { img: await surface.decode(blob, hint), turn: turn };
   }
 
   /* A decoder's picture, in any of the shapes the seams allow, as something
@@ -776,6 +846,7 @@ window.PhotoShrink = (function () {
     prepare: prepare,
     outputName: outputName,
     readExif: readExif,
+    storedSize: storedSize,
     stripMetadata: stripMetadata,
     sharpness: sharpness,
     isBlurry: isBlurry,
