@@ -22,12 +22,20 @@ window.ReportIssues = (function () {
 
   /* djb2, hex. Enough to tell "this student's sheets changed". The text of
      an element marked data-print-date (Missing Work's "As of" date) is left
-     out, so a report is not changed just because it is printed another day. */
+     out, so a report is not changed just because it is printed another day.
+     Each text's hash is kept: the Print dialog and the class fit hash the
+     same reports again and again. */
+  var _hashes = new Map();
   function hash(str) {
+    str = String(str || '');
+    var kept = _hashes.get(str);
+    if (kept) return kept;
     var h = 5381;
-    str = String(str || '').replace(/(<[^>]*\sdata-print-date\b[^>]*>)[^<]*/g, '$1');
-    for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
-    return (h >>> 0).toString(16);
+    var s = str.replace(/(<[^>]*\sdata-print-date\b[^>]*>)[^<]*/g, '$1');
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    if (_hashes.size > 500) _hashes.clear();
+    _hashes.set(str, (h >>> 0).toString(16));
+    return _hashes.get(str);
   }
 
   function _db() {
