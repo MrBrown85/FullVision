@@ -2077,8 +2077,13 @@ window.StudentPageView = (function () {
       '</span>' +
       chip +
       (fresh ? '<span class="sp-hidden-title">New</span>' : '');
+    /* A result not opened yet carries its id as data-unseen: it counts as
+       opened once its row has been on screen (DECISIONS, "Student page
+       build rulings (2026-11-10, later)" 5), as the Back cards' did. */
     return (
-      '<li>' +
+      '<li' +
+      (fresh ? ' data-unseen="' + esc(p.id) + '"' : '') +
+      '>' +
       (act
         ? '<button type="button" class="sp-ml-row" data-act="' +
           act +
