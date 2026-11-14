@@ -440,13 +440,16 @@ describe('the grader card', () => {
     expect(card).toBeGreaterThan(at);
     expect(src).toContain('Note for the Report</h2>');
     expect(src).toContain('<span class="grader-report-note-opt">Optional</span></summary>');
-    expect(src).toContain('One line about what the student did, written about them, not to them.');
+    expect(src).toContain(
+      'If this is the student\\u2019s best piece, their report comment names it. Write what they did well and the comment adds it.',
+    );
+    expect(src).toContain('placeholder="e.g. used evidence from two sources to explain the causes"');
     // Open where a note is written; closed for the next student otherwise.
     expect(src).toContain("card.open = !!String(input.value || '').trim();");
     expect(src).toContain('aria-label="Note for the report"');
-    expect(src).toContain('When this is the student\\u2019s best piece, the comment reads: \\u201C');
+    expect(src).toContain("'The comment will read: \\u201C'");
     expect(src).toContain(
-      'Start with what the student did, like \\u201Clinked \\u2026\\u201D or \\u201Cshowed \\u2026\\u201D.',
+      'Your note isn\\u2019t used yet: start it with what the student did, like \\u201Cused \\u2026\\u201D or \\u201Cexplained \\u2026\\u201D.',
     );
   });
 

@@ -83,7 +83,9 @@ async function useModel(page, setup) {
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
-  await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  // The fit line lays out the whole class while the page is idle: with 100
+  // assessments that takes CI's slower machines past the usual 5 s.
+  await expect(page.locator('#studio-fit')).not.toBeEmpty({ timeout: 30_000 });
 }
 
 /* The Assessments rows the Conference Pack lists for the student shown

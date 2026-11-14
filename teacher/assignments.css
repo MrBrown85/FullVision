@@ -6284,6 +6284,9 @@ button.grader-member-name {
   font-size: var(--text-base);
   outline: none;
 }
+.grader-report-note-input::placeholder {
+  color: var(--text-3);
+}
 .grader-report-note-input:focus {
   border-color: var(--active);
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
