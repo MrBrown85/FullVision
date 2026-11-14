@@ -16,8 +16,12 @@
  *   reached by calling _gradeBefore without a cell, which is the code the
  *   whole-list saves still run) and once as now. After every step the two
  *   must hold the same Draft and Returned rows in memory and in
- *   localStorage, the same scores, and have sent the same calls with the
- *   same contents in the same order.
+ *   localStorage, the same scores, draw the same thing from them (each
+ *   cell's Draft or Returned mark, its lock, the place beside Return, each
+ *   piece's drafts and the "to return" count), and have sent the same calls
+ *   with the same contents in the same order. The writes played include
+ *   Set Everyone To, Grade From Paper's Set To, the grader's own buttons
+ *   and a sync from another device.
  * - The new way is the one in use: a plain score click takes it.
  * - It is not used when this tab's memory and the saved copy have parted:
  *   a group copy in the middle of its save, a save the guard refused, a
@@ -112,6 +116,66 @@ function fillThenUndo(a, tid, value) {
   Grader.undo(CID, before, structuredClone(getScores(CID)));
 }
 
+/* Set Everyone To, as the Assignments page does it (_setEveryonePlan): every
+   criterion or competency with no score yet is set, through the grader, and
+   a student marked Missing or Excused is skipped. Answers how many were set. */
+function setEveryone(a, value) {
+  const piece = stored(a);
+  const groups = piece.rubricId
+    ? getRubricById(CID, piece.rubricId).criteria.map(rubricCriterionScoreKeys)
+    : scoreTagIds(piece, CID).map(t => [t]);
+  let set = 0;
+  S.forEach(sid => {
+    if (isScoreLocked(CID, sid, a.id)) return;
+    const entries = getScores(CID)[sid] || [];
+    groups.forEach(keys => {
+      const scored = keys.some(k =>
+        isScoreEntered(
+          piece,
+          entries.find(e => e.assessmentId === a.id && e.tagId === k),
+        ),
+      );
+      if (scored) return;
+      keys.forEach(k => Grader.setLevel(CID, sid, a.id, k, value));
+      set++;
+    });
+  });
+  return set;
+}
+// Grade From Paper's Set To: the levels are set, then the work is marked handed in
+// on paper; that mark and the read of the class's work it leads to are let finish.
+async function fromPaper(sid, a, value) {
+  const done = GraderWork.setToFromPaper(CID, a.id, sid, value);
+  await done.paper;
+  await settle(3);
+  return done.set;
+}
+// And its Undo, from the toast.
+function setEveryoneThenUndo(a, value) {
+  const before = structuredClone(getScores(CID));
+  setEveryone(a, value);
+  return Grader.undo(CID, before, structuredClone(getScores(CID)));
+}
+/* A sync from another device: the class's scores are read from the server
+   again (_persistLoadedField, as a load or a realtime refresh does), with
+   `change` made to them there, and then the server's rows. */
+function syncFromAnotherDevice(change) {
+  const theirs = structuredClone(getScores(CID));
+  change(theirs);
+  _persistLoadedField(CID, 'scores', theirs);
+  _loadGradeReturns(CID, structuredClone(getGradeReturns(CID)));
+}
+const essayEntry = (sid, tid, score) => ({
+  id: 'other-' + sid + '-' + tid,
+  assessmentId: ESSAY.id,
+  tagId: tid,
+  score,
+  date: ESSAY.date,
+  type: 'summative',
+  note: '',
+  created: '2026-11-09T17:00:00.000Z',
+});
+
 /* ── Playing a scenario one way ────────────────────────────────────── */
 let session = null;
 let realBefore = null;
@@ -148,6 +212,32 @@ function plain(scores) {
   return JSON.stringify(out);
 }
 
+/* What the screens draw from the rows, read the way they read it: each
+   cell's Draft or Returned mark, whether it is locked, what the place
+   beside Return says (the Return button), each piece's drafts, and the
+   class's "to return" count. */
+function drawn() {
+  const cells = {};
+  WORK.forEach(a => {
+    const piece = stored(a);
+    S.forEach(sid => {
+      cells[a.id + ':' + sid] = [
+        GradeState.stateOf(CID, sid, a.id),
+        isScoreLocked(CID, sid, a.id),
+        canSetAssignmentStatus(CID, sid, a.id, 'NS'),
+        JSON.stringify(GraderWork.returnArea(CID, piece, sid, [sid], { marks: true, revisions: true })),
+      ];
+    });
+    cells[a.id] = GradeState.draftsIn(CID, a.id, S);
+  });
+  cells.toReturn = GradeState.draftsWaiting(CID);
+  return JSON.stringify(cells);
+}
+
+/* Reads that come after Grade From Paper's mark, at a time of their own,
+   and change nothing: left out of the calls compared. */
+const READS = new Set(['list_course_submissions_since']);
+
 /* Play `steps` on a fresh class. `way` is 'whole' (as before: the rule is
    never told the cell) or 'cell' (as now). Answers what the class held
    after each step. */
@@ -174,7 +264,8 @@ async function play(way, opts, steps) {
   const seen = [];
   for (let i = 0; i < steps.length; i++) {
     vi.setSystemTime(new Date(T0 + (i + 1) * 60000));
-    const answer = steps[i]();
+    let answer = steps[i]();
+    if (answer && typeof answer.then === 'function') answer = await answer;
     await settle(3);
     seen.push({
       step: i,
@@ -183,7 +274,8 @@ async function play(way, opts, steps) {
       memory: JSON.stringify(getGradeReturns(CID)),
       scores: plain(getScores(CID)),
       savedScores: plain(JSON.parse(localStorage.getItem(SCORES_KEY) || '{}')),
-      sent: session ? session.since() : null,
+      drawn: drawn(),
+      sent: session ? session.since().filter(c => !READS.has(c[0])) : null,
       refreshes,
     });
   }
@@ -345,6 +437,51 @@ const SCENARIOS = {
       },
     ];
   },
+  'Set Everyone To, Set To From Paper, and the grader’s own buttons': () => [
+    () => Grader.setLevel(CID, S[0], LAB.id, C[0], 3),
+    () => Grader.setStatus(CID, S[3], LAB.id, 'EXC'),
+    () => give(LAB, S[0]),
+    () => setEveryone(LAB, 2), // a returned grade gains a criterion; Excused is skipped
+    () => Grader.setPlusMinus(CID, S[1], LAB.id, C[0], 2, 1),
+    () => give(LAB, S[0], S[1]),
+    () => setEveryoneThenUndo(ESSAY, 3),
+    () => setEveryone(ESSAY, 1),
+    () => Grader.setPoints(CID, S[2], QUIZ.id, 6),
+    () => Grader.setMark(CID, S[2], DONE.id, 'complete'),
+    () => Grader.setStatus(CID, S[2], ESSAY.id, 'LATE'),
+    () => Grader.setLevel(CID, S[2], ESSAY.id, T[0], 4),
+    () => Grader.setTick(CID, S[4], LAB.id, K[1], true),
+    () => give(ESSAY, ...S),
+    () => fromPaper(S[3], LAB, 4), // Excused: nothing set
+    () => Grader.setStatus(CID, S[3], LAB.id, null),
+    () => fromPaper(S[3], LAB, 4),
+    () => Grader.setLevel(CID, S[0], ESSAY.id, T[1], 4), // a returned grade changed
+    () => setEveryone(LAB, 4), // nothing left to set
+  ],
+  'a sync from another device': () => [
+    () => level(S[0], ESSAY, T[0], 3),
+    () => level(S[1], ESSAY, T[0], 2),
+    () => give(ESSAY, S[0], S[1]),
+    () => level(S[2], ESSAY, T[0], 1),
+    // The other device regraded a returned grade, graded a new student, and cleared a draft.
+    () =>
+      syncFromAnotherDevice(theirs => {
+        theirs[S[1]].find(e => e.assessmentId === ESSAY.id && e.tagId === T[0]).score = 4;
+        theirs[S[4]] = [essayEntry(S[4], T[0], 3)];
+        theirs[S[2]] = theirs[S[2]].filter(e => e.assessmentId !== ESSAY.id);
+      }),
+    () => level(S[0], ESSAY, T[1], 2),
+    () => level(S[1], ESSAY, T[0], 3),
+    () => level(S[4], ESSAY, T[1], 1),
+    () => give(ESSAY, S[1], S[4]),
+    () => syncFromAnotherDevice(() => {}), // nothing changed there: the saved copy is not rewritten
+    () => level(S[2], ESSAY, T[0], 4),
+    () =>
+      syncFromAnotherDevice(theirs => {
+        theirs[S[3]] = [essayEntry(S[3], T[1], 2)];
+      }),
+    () => level(S[3], ESSAY, T[0], 2),
+  ],
 };
 
 const KINDS = [
@@ -372,6 +509,26 @@ describe('the rule on one cell gives the rows the whole-class comparison gave', 
     const out = await bothWays({ config: HOLDS }, SCENARIOS['a level, a +, a −, another level and a clear']());
     expect(out.took.length).toBeGreaterThan(5);
     expect(out.took.every(p => p === 'cell')).toBe(true);
+  });
+
+  it('a sync from another device leaves the saved copy this tab’s own: the next click compares its cell', async () => {
+    const out = await bothWays({ config: HOLDS }, SCENARIOS['a sync from another device']());
+    expect(out.took.length).toBe(8);
+    expect(out.took.every(p => p === 'cell')).toBe(true);
+    // The other device's regrade is in memory and the saved copy; its rows come from the server.
+    expect(JSON.parse(out.seen[4].savedScores)[S[1]][0].score).toBe(4);
+    expect(JSON.parse(out.seen[4].scores)[S[4]][0].score).toBe(3);
+  });
+
+  it('Set Everyone To on rubric work skips Excused and leaves the "to return" count the same both ways', async () => {
+    const out = await bothWays(
+      { config: HOLDS },
+      SCENARIOS['Set Everyone To, Set To From Paper, and the grader’s own buttons'](),
+    );
+    expect(out.seen[3].answer).toBe(7); // S0's second criterion, and both for S1, S2 and S4
+    expect(JSON.parse(out.seen[3].drawn).toReturn).toBeGreaterThan(0);
+    expect(out.seen[14].answer).toBe(0);
+    expect(out.seen[16].answer).toBe(2);
   });
 
   it('a signed-in play sends calls, and the same ones', async () => {
@@ -475,9 +632,22 @@ function randomSteps(seed, count) {
       const tid = pick(C);
       const value = pick([1, 2, 3, 4]);
       steps.push(() => level(sid, ESSAY, tid, value));
-    } else {
+    } else if (roll < 0.994) {
       const text = pick(words);
       steps.push(() => reportNote(sid, ESSAY, text));
+    } else if (roll < 0.997) {
+      const a = pick([ESSAY, LAB]);
+      const value = pick([1, 2, 3, 4]);
+      steps.push(() => setEveryone(a, value));
+    } else {
+      // A sync from another device that regraded this student's Essay.
+      const value = pick([0, 1, 2, 3, 4]);
+      steps.push(() =>
+        syncFromAnotherDevice(theirs => {
+          theirs[sid] = (theirs[sid] || []).filter(e => !(e.assessmentId === ESSAY.id && e.tagId === T[0]));
+          if (value) theirs[sid].push(essayEntry(sid, T[0], value));
+        }),
+      );
     }
   }
   return steps;
