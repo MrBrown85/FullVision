@@ -175,7 +175,7 @@ test('rubric class view: no hover prompt; the bar starts after the student list'
   expect((await box(bar)).left).toBeGreaterThanOrEqual(sidebar.right);
 });
 
-// S0-F2 (Demo Mode only, switch on): the row sits above the dialog's footer, outside the part that scrolls: on a
+// S0-F2 (Demo Mode only, switch on): the row is in the dialog's footer (Nov 13), outside the part that scrolls: on a
 // long rubric piece Return and the Draft line are in view with no scrolling.
 test('Return and the Draft line are in view without scrolling on a rubric piece at 1280×720', async ({ page }) => {
   await demo(page, '/gradebook?course=sci8');
@@ -197,8 +197,11 @@ test('Return and the Draft line are in view without scrolling on a rubric piece 
   await cell.click();
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog).toBeVisible();
-  // The grading is longer than the dialog: it scrolls.
-  expect(await dialog.locator('.grader-scroll').evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  // The grading is longer than its room: it scrolls (beside the work, the scoring column scrolls on its own).
+  const scroller = (await dialog.evaluate(d => d.classList.contains('has-work')))
+    ? dialog.locator('.grader-panel-col')
+    : dialog.locator('.grader-scroll');
+  expect(await scroller.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
   await expect(dialog.locator('.grader-returned')).toBeInViewport({ ratio: 1 });
 
   // A level on the first criterion, with the dialog scrolled to its top.
