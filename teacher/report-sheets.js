@@ -1223,6 +1223,159 @@ window.ReportSheets = (function () {
     return typeof ReportIssues !== 'undefined' && ReportIssues.hash ? ReportIssues.hash(html) : '';
   }
 
+  /* classSummary in small pieces, so the click that asked for it ends at
+     once: each piece lays out students until about 8 ms have passed (one
+     at least), and the next piece is a task of its own. The
+     summary is the one classSummary gives. opts as classSummary, and:
+       run(fn)    runs each piece (in the page's set of scores)
+       alive()    false stops the run before the next piece
+       done(s)    the summary, or null when a layout throws
+     Returns a function that stops the run. */
+  // A task of its own, not requestIdleCallback: a background or headless
+  // tab may give no idle time until its timeout, and the class would take
+  // seconds. Clicks and keys still run between pieces.
+  var _idle = function (fn) {
+    var id = setTimeout(fn, 0);
+    return function () {
+      clearTimeout(id);
+    };
+  };
+  function classSummaryLater(cid, students, ctx, opts) {
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var lay = opts.layout;
+    var run =
+      opts.run ||
+      function (fn) {
+        return fn();
+      };
+    var made = [];
+    var cancel = null;
+    var stopped = false;
+    var piece = function () {
+      var stage = _stage(document.body, ROW_W);
+      var t0 = Date.now();
+      try {
+        do {
+          var st = students[made.length];
+          var r = lay(cid, st, ctx, { paper: paper, stage: stage });
+          if (r.hash === undefined) r.hash = ReportIssuesHash(r.html);
+          made.push(r);
+        } while (made.length < students.length && Date.now() - t0 < 8);
+      } finally {
+        stage.remove();
+      }
+    };
+    var next = function () {
+      cancel = null;
+      if (stopped || !opts.alive()) return;
+      try {
+        if (made.length < students.length) run(piece);
+      } catch (e) {
+        opts.done(null);
+        return;
+      }
+      if (made.length < students.length) {
+        cancel = _idle(next);
+        return;
+      }
+      var summary = _summary(students);
+      summary.sideHeight = sideHeight(paper);
+      students.forEach(function (st, i) {
+        _count(summary, st, made[i]).hash = made[i].hash;
+      });
+      opts.done(summary);
+    };
+    cancel = _idle(next);
+    return function () {
+      stopped = true;
+      if (cancel) cancel();
+    };
+  }
+
+  /* A student's laid-out report, kept by what it was drawn from, so a
+     change to one student lays out only that student again, and a change
+     put back finds its layout kept. keyOf(student) names everything the
+     layout reads; `keep` layouts per student, the newest kept. */
+  function keeper(keep) {
+    var kept = {};
+    return {
+      layout: function (lay, keyOf) {
+        return function (cid, st, ctx, o) {
+          var key = keyOf(st);
+          var list = kept[st.id] || (kept[st.id] = []);
+          for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i].r;
+          var r = lay(cid, st, ctx, o);
+          list.unshift({ key: key, r: r });
+          if (list.length > (keep || 4)) list.pop();
+          return r;
+        };
+      },
+      clear: function () {
+        kept = {};
+      },
+    };
+  }
+
+  /* The Reports page's kept layouts: the canvas's ('sheet') and the class
+     fit's ('fit', measured off the canvas), and the fit's run. now() gives
+     what every student's report reads: { cid, ctx, paper, set, model, day }.
+     A student's key is that, their own changes (model.perStudent[sid]),
+     their record, and the count of changes of data: dirty() for the
+     class, dirty(sid) for one student. */
+  function keptLayouts(now) {
+    var kept = { sheet: keeper(), fit: keeper() };
+    var gen = { all: 0 };
+    var stop = null;
+    var keyOf = function (where) {
+      var n = now();
+      var cls = Object.assign({}, n.model, { perStudent: 0 });
+      var base = [n.cid, JSON.stringify(n.ctx), n.paper, n.set, JSON.stringify(cls), n.day, gen.all, where].join('|');
+      return function (st) {
+        return [base, JSON.stringify(n.model.perStudent[st.id] || 0), JSON.stringify(st), gen[st.id] || 0].join('|');
+      };
+    };
+    return {
+      layout: function (which, lay, where) {
+        return kept[which].layout(lay, keyOf(which + '|' + where));
+      },
+      dirty: function (sid) {
+        if (sid != null) {
+          gen[sid] = (gen[sid] || 0) + 1;
+          return;
+        }
+        gen.all++;
+        kept.sheet.clear();
+        kept.fit.clear();
+      },
+      // The class's data may have changed (a full redraw): nothing kept is
+      // used again. True while a fit is running: it must start again.
+      changed: function () {
+        gen.all++;
+        return !!stop;
+      },
+      /* classSummaryLater over the kept layouts (run, alive and done as
+         its opts); a new fit, or a change of the class's data, stops the
+         last one. */
+      fit: function (students, lay, run, alive, done) {
+        if (stop) stop();
+        var n = now();
+        var at = gen.all;
+        stop = classSummaryLater(n.cid, students, n.ctx, {
+          paper: n.paper,
+          layout: this.layout('fit', lay, ''),
+          run: run,
+          alive: function () {
+            return at === gen.all && alive();
+          },
+          done: function (summary) {
+            stop = null;
+            done(summary);
+          },
+        });
+      },
+    };
+  }
+
   return {
     GAP: GAP,
     form: form,
@@ -1236,6 +1389,9 @@ window.ReportSheets = (function () {
     sideHeight: sideHeight,
     cellWidth: cellWidth,
     classSummary: classSummary,
+    classSummaryLater: classSummaryLater,
+    keeper: keeper,
+    keptLayouts: keptLayouts,
     paperSize: paperSize,
     renderPreview: renderPreview,
     clearPageStyle: clearPageStyle,

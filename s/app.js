@@ -1545,6 +1545,7 @@
       S.data = res;
       S.message = '';
       S.screen = 'cardcheck';
+      whenGradesAreIn(true);
     } else {
       S.data = null;
       S.message = cardMessage(res);
@@ -1633,6 +1634,7 @@
         S.bday = { m: '', d: '', y: '' };
         S.message = '';
         S.screen = 'cardcheck';
+        whenGradesAreIn(true);
         paint(res.check === 'password' ? '#sp-ident' : '#sp-bm');
         return;
       }
@@ -2069,6 +2071,9 @@
      a questionnaire or report slip never loads them (plan, section 5: the
      page stays light on a school Chromebook). A file already in is not
      fetched again; one that failed is tried again on the next call.
+     whenGradesAreIn(true), on a card's Is This You?, only preloads them:
+     they come down while the student types, and nothing runs them until
+     the student is in (the <script> added then finds them here).
      student-data.js comes with the page; it is fetched here only for a copy
      of index.html from before student cards. */
   var GRADE_FILES = [
@@ -2106,12 +2111,13 @@
   ];
   var fetching = null;
 
-  function whenGradesAreIn() {
+  function whenGradesAreIn(warm) {
     if (fetching) return fetching;
     var need = GRADE_FILES.filter(function (f) {
       return !f[1]();
     });
     if (!need.length || typeof document === 'undefined') return Promise.resolve();
+    if (warm) return Promise.resolve(need.forEach(preload));
     fetching = new Promise(function (done) {
       var left = need.length;
       need.forEach(function (f) {
@@ -2128,6 +2134,15 @@
       });
     });
     return fetching;
+  }
+
+  function preload(f) {
+    if (document.querySelector('link[rel="preload"][href="' + f[0] + '"]')) return;
+    var link = document.createElement('link');
+    link.setAttribute('rel', 'preload');
+    link.setAttribute('as', 'script');
+    link.setAttribute('href', f[0]);
+    document.head.appendChild(link);
   }
 
   /* `page` would not open. A session that has ended goes back to the card's

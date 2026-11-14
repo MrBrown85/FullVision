@@ -1293,9 +1293,9 @@ window.MGrade = (function () {
       // html-safe: copied from the checked renderSwiper markup above
       strip.innerHTML = tmp.querySelector('#m-thumb-strip').innerHTML;
       _fitCritComments(swiper);
-      MGradePhotos.hydrate(swiper, cid);
       var total = strip.querySelectorAll('.m-thumb').length;
       jumpToStudent(Math.min(idx, total - 1), true);
+      MGradePhotos.hydrate(swiper, cid); // after the jump: the cards round the one on screen
     }
 
     // ⋯ on a member: a sheet with their name, Grade Separately and Cancel.
@@ -1431,6 +1431,7 @@ window.MGrade = (function () {
       }
 
       var units = _swiperUnits(cid, assessment);
+      _drawn = { cid: cid, aid: aid, units: units };
       var students = units.map(function (u) {
         return u.st;
       });
@@ -1455,7 +1456,7 @@ window.MGrade = (function () {
       });
 
       // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
-      var chipText = _thumbTexts(students, units);
+      var chipText = MC.chipTexts(students, units);
       // One student's work has no strip of students (it is kept, hidden, for
       // the card count), and a tab for each piece instead.
       var thumbs = '<div class="m-thumb-strip' + (stuSt ? ' m-thumb-strip-off' : '') + '" id="m-thumb-strip">';
@@ -1789,9 +1790,15 @@ window.MGrade = (function () {
       });
     }
 
+    // The cards' units as renderSwiper drew them: a save does not sort the class again.
+    var _drawn = null;
+    function _drawnUnits(cid, a) {
+      return _drawn && _drawn.cid === cid && _drawn.aid === a.id ? _drawn.units : _swiperUnits(cid, a);
+    }
+
     // The card on screen's parts.
     function _returnBarNow(cid, a) {
-      var units = _swiperUnits(cid, a);
+      var units = _drawnUnits(cid, a);
       return _returnBarParts(cid, a, units[_currentIdx], _lastCard(units, _currentIdx));
     }
 
@@ -2266,9 +2273,7 @@ window.MGrade = (function () {
     }
 
     function _findCriterion(cid, aid, critId) {
-      var a = getAssessments(cid).find(function (x) {
-        return x.id === aid;
-      });
+      var a = _assessmentById(cid, aid);
       var rubric = _ownRubric(cid, a);
       var crit = rubric
         ? (rubric.criteria || []).find(function (c) {
@@ -2593,14 +2598,12 @@ window.MGrade = (function () {
     /* Redraw one student's card in place after a criterion change. */
     function _refreshCard(cid, sid, aid) {
       var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
-      var assessment = getAssessments(cid).find(function (a) {
-        return a.id === aid;
-      });
+      var assessment = _assessmentById(cid, aid);
       var st = getStudents(cid).find(function (s) {
         return s.id === sid;
       });
       if (!card || !assessment || !st) return;
-      var unit = _swiperUnits(cid, assessment).find(function (u) {
+      var unit = _drawnUnits(cid, assessment).find(function (u) {
         return u.st.id === sid;
       });
       // The card is its own vertical scroller: keep its place, or every tap on
@@ -2612,6 +2615,42 @@ window.MGrade = (function () {
       _fitCritComments(fresh);
       MGradePhotos.hydrate(fresh, cid);
       fresh.scrollTop = top;
+    }
+
+    /* A card's levels after a level or ± on it, without drawing the card
+       again (as _syncModBtns does for one row): each criterion's buttons, ±
+       and open checklist, and each competency row on rubric work, whose
+       level comes from its criteria. The button tapped keeps the focus. */
+    function _paintCard(cid, sid, a) {
+      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+      if (card && card.querySelector('.m-paper-crits')) return _refreshCard(cid, sid, a.id);
+      var crits = (card && (_ownRubric(cid, a) || {}).criteria) || [];
+      crits.forEach(function (crit) {
+        var group = card.querySelector('.m-crit-group[data-critid="' + crit.id + '"]');
+        if (!group) return;
+        var state = _critState(cid, sid, a.id, crit);
+        _paintRow(group, state.level || 0, state);
+        var list = group.querySelector('.m-checklist');
+        // html-safe: _checklistHtml escapes its labels; ids are ours
+        if (list) list.outerHTML = _checklistHtml(cid, sid, a.id, crit, state);
+      });
+      (card ? card.querySelectorAll('.m-score-mods[data-tid]') : []).forEach(function (box) {
+        var state = _rubricRowState(cid, sid, a, box.getAttribute('data-tid'));
+        if (state) _paintRow(box.parentNode, state.level ? roundLevel(state.level) : 0, state);
+      });
+    }
+
+    function _paintRow(row, level, state) {
+      MC.paintLevelButtons(row.querySelectorAll('.m-score-btns .m-score-btn'), level, state.mod, state.mixed);
+      var box = row.querySelector('.m-score-mods');
+      if (!box) return;
+      var tune = state.mixed ? 0 : level;
+      var held = box.contains(document.activeElement) ? document.activeElement.getAttribute('data-mod') : null;
+      box.setAttribute('aria-label', MC.fineTuneLabel(tune, box.getAttribute('data-name')));
+      // html-safe: MC.fineTuneButtonsHTML is fixed markup
+      box.innerHTML = MC.fineTuneButtonsHTML(tune, state.mod);
+      var again = held && box.querySelector('[data-mod="' + held + '"]');
+      if (again) again.focus({ preventScroll: true });
     }
 
     /* ── Grade From Paper: Set Logan To (S7-F3 follow-up) ──────────
@@ -2682,7 +2721,7 @@ window.MGrade = (function () {
       var after = structuredClone(getScores(cid));
       clearProfCache();
       _refreshCard(cid, sid, aid);
-      _updateThumbGraded(cid, aid);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
       // Once the paper mark is kept, the card says Handed in on paper.
       done.paper.then(function () {
@@ -2698,7 +2737,7 @@ window.MGrade = (function () {
             clearProfCache();
             if (_onScreen(cid, aid, sid)) {
               _refreshCard(cid, sid, aid);
-              _updateThumbGraded(cid, aid);
+              _updateThumbGraded(cid, aid, sid);
               _syncReturnBar();
             }
           },
@@ -2746,8 +2785,8 @@ window.MGrade = (function () {
       var cleared = state.level === level && !state.mixed;
       _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), cleared ? 0 : level, 0);
       MC.haptic();
-      _refreshCard(cid, sid, assessment.id);
-      _updateThumbGraded(cid, assessment.id);
+      _paintCard(cid, sid, assessment);
+      _updateThumbGraded(cid, assessment.id, sid);
       _syncReturnBar();
     }
 
@@ -2758,7 +2797,7 @@ window.MGrade = (function () {
       if (normalizeScoreMod(state.level, next) !== next) return;
       _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), state.level, next, true);
       MC.haptic();
-      _refreshCard(cid, sid, assessment.id);
+      _paintCard(cid, sid, assessment);
       _syncReturnBar();
     }
 
@@ -2770,8 +2809,8 @@ window.MGrade = (function () {
       var cleared = state.level === level && !state.mixed;
       _writeCriterion(cid, sid, found, cleared ? 0 : level, 0);
       MC.haptic();
-      _refreshCard(cid, sid, aid);
-      _updateThumbGraded(cid, aid);
+      _paintCard(cid, sid, found.assessment);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
     }
 
@@ -2785,7 +2824,7 @@ window.MGrade = (function () {
       if (normalizeScoreMod(state.level, next) !== next) return;
       _writeCriterion(cid, sid, found, state.level, next, true);
       MC.haptic();
-      _refreshCard(cid, sid, aid);
+      _paintCard(cid, sid, found.assessment);
       _syncReturnBar();
     }
 
@@ -2814,8 +2853,8 @@ window.MGrade = (function () {
         })
         .join('');
       _fitCritComments(swiper);
-      MGradePhotos.hydrate(swiper, cid);
       swiper.scrollLeft = left;
+      MGradePhotos.hydrate(swiper, cid);
     }
 
     function toggleChecklist(cid, sid, aid, critId) {
@@ -2837,7 +2876,7 @@ window.MGrade = (function () {
       if (next !== state.level) _writeCriterion(cid, sid, found, next, 0);
       MC.haptic();
       _refreshCard(cid, sid, aid);
-      _updateThumbGraded(cid, aid);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
     }
 
@@ -2885,9 +2924,7 @@ window.MGrade = (function () {
 
     // Tapping the active + or − again clears it.
     function setScoreMod(cid, sid, aid, tid, mod) {
-      var rowAssessment = getAssessments(cid).find(function (a) {
-        return a.id === aid;
-      });
+      var rowAssessment = _assessmentById(cid, aid);
       var rowState = rowAssessment ? _rubricRowState(cid, sid, rowAssessment, tid) : null;
       if (rowState) return _setRubricRowMod(cid, sid, rowAssessment, tid, rowState, mod);
       var e = _currentEntry(cid, sid, aid, tid);
@@ -2905,9 +2942,7 @@ window.MGrade = (function () {
 
     /* ── Score a student (auto-save) ────────────────────────────── */
     function setScore(cid, sid, aid, tid, score) {
-      var rowAssessment = getAssessments(cid).find(function (a) {
-        return a.id === aid;
-      });
+      var rowAssessment = _assessmentById(cid, aid);
       var rowState = rowAssessment ? _rubricRowState(cid, sid, rowAssessment, tid) : null;
       if (rowState) return _setRubricRowScore(cid, sid, rowAssessment, tid, rowState, score);
       var allScores = getScores(cid);
@@ -2936,7 +2971,7 @@ window.MGrade = (function () {
       _syncModBtns(cid, sid, aid, tid);
 
       // Update thumbnail graded state
-      _updateThumbGraded(cid, aid);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
 
       // Saves are silent, clearing included: the buttons show the result and
@@ -3023,7 +3058,7 @@ window.MGrade = (function () {
       clearProfCache();
 
       _syncModBtns(entry.cid, entry.sid, entry.aid, entry.tid);
-      _updateThumbGraded(entry.cid, entry.aid);
+      _updateThumbGraded(entry.cid, entry.aid, entry.sid);
       MC.showToast('Score reverted');
     }
 
@@ -3046,7 +3081,7 @@ window.MGrade = (function () {
       Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
       clearProfCache();
       _refreshCard(entry.cid, entry.sid, entry.aid);
-      _updateThumbGraded(entry.cid, entry.aid);
+      _updateThumbGraded(entry.cid, entry.aid, entry.sid);
       MC.showToast('Score reverted');
     }
 
@@ -3201,66 +3236,6 @@ window.MGrade = (function () {
       });
     }
 
-    /* Each chip's letters: the initials, or, where students share them (two
-       JC), the shortest start of the first name, with the last initial, that
-       tells them apart ("JaC" and "JoC"; "JasC" and "JaqC"), else of the last
-       name ("JCha" and "JChe"). A group's chip keeps its G1 / P1. */
-    function _thumbTexts(students, units) {
-      var first = function (st) {
-        return String(st.preferred || st.firstName || '');
-      };
-      var last = function (st) {
-        return String(st.lastName || '');
-      };
-      var cap = function (s) {
-        return s.charAt(0).toUpperCase() + s.slice(1);
-      };
-      var out = students.map(function (st, i) {
-        return units[i] && units[i].view ? units[i].thumb : MC.avatarInitials(st);
-      });
-      var groups = {};
-      out.forEach(function (txt, i) {
-        if (units[i] && units[i].view) return;
-        (groups[txt] = groups[txt] || []).push(i);
-      });
-      Object.keys(groups).forEach(function (key) {
-        var idxs = groups[key];
-        if (idxs.length < 2) return;
-        var ways = [];
-        for (var k = 2; k <= 5; k++) {
-          ways.push(
-            (function (n) {
-              return function (st) {
-                return cap(first(st).slice(0, n)) + last(st).charAt(0).toUpperCase();
-              };
-            })(k),
-          );
-        }
-        for (var m = 2; m <= 5; m++) {
-          ways.push(
-            (function (n) {
-              return function (st) {
-                return first(st).charAt(0).toUpperCase() + cap(last(st).slice(0, n));
-              };
-            })(m),
-          );
-        }
-        idxs.forEach(function (i) {
-          var st = students[i];
-          var mine = null;
-          for (var w = 0; w < ways.length && !mine; w++) {
-            var t = ways[w](st);
-            var clash = idxs.some(function (j) {
-              return j !== i && ways[w](students[j]) === t;
-            });
-            if (!clash) mine = t;
-          }
-          out[i] = mine || key;
-        });
-      });
-      return out;
-    }
-
     function _nextStudentPoints(swiper, inp) {
       var cards = Array.prototype.slice.call(swiper.querySelectorAll('.m-swiper-card'));
       var idx = cards.indexOf(inp.closest('.m-swiper-card'));
@@ -3314,19 +3289,19 @@ window.MGrade = (function () {
       }
     }
 
-    function _updateThumbGraded(cid, aid) {
+    // `sid`: only that student's card and circle, after a score of theirs changed.
+    function _updateThumbGraded(cid, aid, sid) {
       // A score just changed: M and EXC grey out once the work has one.
-      document.querySelectorAll('.m-status-pill[data-aid="' + aid + '"]').forEach(function (pill) {
+      var root = (sid && document.querySelector('.m-swiper-card[data-sid="' + sid + '"]')) || document;
+      root.querySelectorAll('.m-status-pill[data-aid="' + aid + '"]').forEach(function (pill) {
         pill.disabled = !canSetAssignmentStatus(cid, pill.dataset.sid, aid, pill.dataset.val);
       });
-      document.querySelectorAll('.m-status-hint[data-aid="' + aid + '"]').forEach(function (hint) {
+      root.querySelectorAll('.m-status-hint[data-aid="' + aid + '"]').forEach(function (hint) {
         hint.hidden = canSetAssignmentStatus(cid, hint.dataset.sid, aid, 'NS');
       });
       var allScores = getScores(cid);
-      var assessment = getAssessments(cid).find(function (a) {
-        return a.id === aid;
-      });
-      var thumbs = document.querySelectorAll('#m-thumb-strip .m-thumb');
+      var assessment = _assessmentById(cid, aid);
+      var thumbs = document.querySelectorAll('#m-thumb-strip .m-thumb' + (sid ? '[data-sid="' + sid + '"]' : ''));
       thumbs.forEach(function (t) {
         var stScores = allScores[t.dataset.sid] || [];
         var isGraded = stScores.some(function (s) {
@@ -3367,7 +3342,7 @@ window.MGrade = (function () {
       MC.haptic();
       var group = document.querySelector('.m-cmp-group[data-sid="' + sid + '"][data-aid="' + aid + '"]');
       if (group) group.innerHTML = _completionBtnsHtml(next);
-      _updateThumbGraded(cid, aid);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
     }
 
@@ -3382,7 +3357,7 @@ window.MGrade = (function () {
       var el = document.getElementById('m-pts-' + sid + '-' + aid);
       if (el) el.value = formatPoints(next);
       _updatePointsPct(sid, aid, next, maxPts);
-      _updateThumbGraded(cid, aid);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
     }
 
@@ -3410,7 +3385,7 @@ window.MGrade = (function () {
       if (raw === prev) return;
       Grader.setPoints(cid, sid, aid, raw);
       clearProfCache();
-      _updateThumbGraded(cid, aid);
+      _updateThumbGraded(cid, aid, sid);
       _syncReturnBar();
     }
 

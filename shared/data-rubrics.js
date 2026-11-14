@@ -68,6 +68,7 @@ function rubricStyle(rubric) {
 async function _loadCanonicalRubrics(cid) {
   var sb = getSupabase();
   if (!sb || !_isUuid(cid) || typeof sb.from !== 'function') return [];
+  if (_signInWait) await _signInWait; // not read before start-up's re-check has passed
 
   var rubricsQuery = sb.from('rubric').select('id,name,created_at,copy_group,style');
   if (typeof rubricsQuery.eq === 'function') rubricsQuery = rubricsQuery.eq('course_id', cid);

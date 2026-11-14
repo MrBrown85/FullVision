@@ -128,11 +128,13 @@ function _markupPage(cid, fileId) {
   if (!fileId) return null;
   // A signed-in class's page still uploading has a local id and no marks.
   if (_fbOn(cid) && !_isUuid(fileId)) return null;
-  var subs = _studentWorkSubmissions(cid);
+  // The submissions holding the page, through the work's index; only the one given is copied.
+  var subs = _workSentIn(cid, 'file', fileId);
   for (var i = 0; i < subs.length; i++) {
-    var files = subs[i].files || [];
+    var sub = _studentWorkReadable(subs[i]);
+    var files = sub.files || [];
     for (var j = 0; j < files.length; j++) {
-      if (files[j] && files[j].id === fileId) return { file: files[j], submission: subs[i] };
+      if (files[j] && files[j].id === fileId) return { file: files[j], submission: sub };
     }
   }
   return null;
@@ -178,14 +180,20 @@ function getPageMarkup(cid, fileId) {
   return _markupRow(fileId, page.submission.enrollment_id, _markupKeptMap(cid)[fileId] || null);
 }
 
+// Whether any page of the class has marks: none, and the readers below answer at once.
+function _markupAny(kept) {
+  for (var k in kept) return true;
+  return false;
+}
+
 /* list_assessment_markup: a row for every handed-in page of `aid` that
    has been marked, in the order of the students' work, each page in order. */
 function getAssessmentMarkup(cid, aid) {
   var kept = _markupKeptMap(cid);
   var out = [];
-  _studentWorkSubmissions(cid).forEach(function (s) {
-    if (s.assessment_id !== aid) return;
-    (s.files || []).forEach(function (f) {
+  if (!_markupAny(kept)) return out;
+  _workSentIn(cid, 'piece', aid).forEach(function (s) {
+    _workPagesInOrder(s).forEach(function (f) {
       if (f && kept[f.id]) out.push(_markupRow(f.id, s.enrollment_id, kept[f.id]));
     });
   });
@@ -324,9 +332,9 @@ function _studentMarkupFiles(cid, sid, aid) {
   if (status === 'NS' || status === 'EXC') return [];
   var kept = _markupKeptMap(cid);
   var out = [];
-  _studentWorkSubmissions(cid).forEach(function (s) {
-    if (s.assessment_id !== aid || s.enrollment_id !== sid) return;
-    (s.files || []).forEach(function (f) {
+  if (!_markupAny(kept)) return out;
+  _workSentIn(cid, 'pair', aid, sid).forEach(function (s) {
+    _workPagesInOrder(s).forEach(function (f) {
       var k = f && kept[f.id];
       if (k && k.given) out.push({ file_id: f.id, marks: _studentWorkCopy(k.given), given_at: k.given_at || null });
     });

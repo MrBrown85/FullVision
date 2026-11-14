@@ -2,6 +2,30 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Start-up draws the saved class list first (2026-11-13)
+
+Before anything drew on a repeat visit, three requests ran one after another: the sign-in re-check (`sb.auth.getUser()`, which stops a forged or revoked session), `bootstrap_teacher`, then `list_teacher_courses`. Decision 23 of the handoff review plan (`plans/handoff-review-plan.md`) asked whether the re-check may run beside the class load instead of before it. Colin consulted the council (OWASP and the privacy commissioner's office are the members for this one).
+
+- **Colin ruled on 2026-11-13:** run the three requests side by side, and draw this device's saved class list while they answer. His conditions:
+  - The server still refuses every request without a valid sign-in. Nothing changed there: row-level security and the session token.
+  - If the re-check fails, or names a user other than the one this device's saved session names, the app removes the device's saved class data and goes to Sign In exactly as it did, at once, whatever is on screen. Nothing a signed-out person could not already read from the device is shown, and nothing from the server is shown until the re-check has passed.
+  - Nothing is written until the re-check has passed: no outbox send, no save.
+  - Offline, start-up is as it was.
+- **This changes D9 of `class-loading-plan.md`** ("Cached class list renders after `requireAuth`, never before"). The new order is in that plan, under "Start-up order".
+- **What is drawn early, and when.** Only when this device holds a class list this same teacher saved (`gb-owner` is the saved session's user), the browser is online, and saved copies are on (`FV_CACHE_FIRST`). The saved list and the last class open on this device are drawn, locked the way a class is locked while it is checked. A device with no list for this teacher waits for the re-check first, as before: `bootstrap_teacher` makes a new teacher's rows, and nothing is written before the re-check. With a saved list those rows were made on an earlier visit and it only reads them. The one case it would write early: a teacher whose rows were purged (30 days after the account was deleted) signing in again on a device that still holds their old list.
+- **While the re-check has not answered** the outbox is paused, a write waits to be sent, photos left by an earlier visit wait, and no answer from the server is handed to the page: the class list waits, and so does the answer to any request that goes through the data layer's one sender (`_callRpcWithAuthGuard`), the class's own check among them. The page unlocks when both the re-check and the class's own check have answered.
+- **A re-check that cannot reach the server** (offline, the Auth server down) stands aside after its retries, as it always has: the page stays, and what waited goes. Only the server saying the session is gone, or naming someone else, is a sign-out.
+- **A session that names someone else** is new to check: the saved session's user is compared with the user the server names. Its saved sign-in is removed with the class data, or Sign In would come straight back in with it. The outbox stays in both cases, as before.
+- **The class on screen stays open** when the server's settings name another class as the last one open (the teacher used another device since). It used to switch to the server's.
+- **`bootstrap_teacher` and `list_teacher_courses` are still two requests**, now asked together everywhere, the phone included: neither needs the other's answer. Making them one request (S19-C8) is a database change and waits for its SQL to be shown to Colin.
+- **The phone is otherwise unchanged.** Its start-up has never had the re-check: it reads the saved session and asks the server for the class list. Drawing first there would mean adding the re-check to the phone, which is a change to its sign-in and Colin's to rule on.
+- **Colin ruled on 2026-11-14,** on the independent review's four choices:
+  1. A revoked session whose token has not yet run out shows the saved class, locked, until `getUser` answers. Accepted; no change.
+  2. "Gate them": the reads that skip the data layer's sender wait for the re-check too, and on a failed one never run. DIBELS scores, the rubric bank's tables, storage links to photos of student work and handout pages, photo uploads, the class's change counter and its realtime channel, and the two edge functions (`student-submit`'s sweep, `teacher-cards`) each wait on the same hold the sender uses (`_signInWait`).
+  3. "Drop on failure": a write queued while the re-check has not passed is held in the outbox (`v2Queue.hold`); no tab sends it, a second tab that owns the outbox included. A re-check that fails or names another user removes those writes unsent (`dropHeld`), as does the page leaving first. Writes queued on an earlier visit stay, as before.
+  4. "This device's": the class on screen stays the open one, as built. No change.
+- Held by `tests/boot-saved-list-first.test.js`, `tests/outbox-sign-in-hold.test.js` and `tests/session-hardening.test.js`.
+
 ## Older scores landing over newer ones: measured before anything is built (2026-11-13)
 
 The server keeps no version for a score: the last write to arrive wins. A laptop offline with scores waiting, while the same cells are scored on the phone, sends its older scores over the newer ones when it reconnects. The design for a time on every score (draft PR 1361) was reviewed independently. It holds only with nine changes. Six sequences would be worse than today, and seven of its claims about the code were wrong. Nobody had measured whether the problem happens to a real teacher.

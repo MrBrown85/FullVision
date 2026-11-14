@@ -439,14 +439,76 @@ window.MComponents = (function () {
       .join('');
   }
 
-  // A row's buttons after a save, without drawing the row again.
-  function paintLevelButtons(btns, level, mod) {
+  /* Each chip's letters on the grading screen's strip (tab-grade.js): the
+     initials, or, where students share them (two JC), the shortest start of
+     the first name, with the last initial, that tells them apart ("JaC" and
+     "JoC"; "JasC" and "JaqC"), else of the last name ("JCha" and "JChe"). A
+     group's chip keeps its G1 / P1. */
+  function chipTexts(students, units) {
+    var first = function (st) {
+      return String(st.preferred || st.firstName || '');
+    };
+    var last = function (st) {
+      return String(st.lastName || '');
+    };
+    var cap = function (s) {
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    var out = students.map(function (st, i) {
+      return units[i] && units[i].view ? units[i].thumb : avatarInitials(st);
+    });
+    var groups = {};
+    out.forEach(function (txt, i) {
+      if (units[i] && units[i].view) return;
+      (groups[txt] = groups[txt] || []).push(i);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var idxs = groups[key];
+      if (idxs.length < 2) return;
+      var ways = [];
+      for (var k = 2; k <= 5; k++) {
+        ways.push(
+          (function (n) {
+            return function (st) {
+              return cap(first(st).slice(0, n)) + last(st).charAt(0).toUpperCase();
+            };
+          })(k),
+        );
+      }
+      for (var m = 2; m <= 5; m++) {
+        ways.push(
+          (function (n) {
+            return function (st) {
+              return first(st).charAt(0).toUpperCase() + cap(last(st).slice(0, n));
+            };
+          })(m),
+        );
+      }
+      idxs.forEach(function (i) {
+        var st = students[i];
+        var mine = null;
+        for (var w = 0; w < ways.length && !mine; w++) {
+          var t = ways[w](st);
+          var clash = idxs.some(function (j) {
+            return j !== i && ways[w](students[j]) === t;
+          });
+          if (!clash) mine = t;
+        }
+        out[i] = mine || key;
+      });
+    });
+    return out;
+  }
+
+  // A row's buttons after a save, without drawing the row again; `mixed` as levelButtonsHTML draws it.
+  function paintLevelButtons(btns, level, mod, mixed) {
+    if (mixed) mod = 0;
     btns.forEach(function (btn) {
       var lv = parseInt(btn.getAttribute('data-score'), 10);
       var on = level === lv;
       var fig = on ? formatScoreLevel(lv, mod) : String(lv);
       btn.classList.toggle('m-score-active', on);
-      btn.classList.remove('m-score-mixed');
+      btn.classList.toggle('m-score-mixed', on && !!mixed);
       btn.setAttribute('aria-label', fig + ', ' + scoreLevelText(lv));
       var f = btn.querySelector('.m-level-fig');
       if (f) f.textContent = fig;
@@ -487,6 +549,7 @@ window.MComponents = (function () {
   return {
     levelButtonsHTML: levelButtonsHTML,
     paintLevelButtons: paintLevelButtons,
+    chipTexts: chipTexts,
     fineTuneLabel: fineTuneLabel,
     fineTuneButtonsHTML: fineTuneButtonsHTML,
     scoredAssessmentCount: scoredAssessmentCount,

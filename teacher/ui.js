@@ -689,8 +689,8 @@ function _helpPanelHTML() {
 
 /* ── Panel slide motion ───────────────────────────────────────
    The student list and the Help panel slide when the teacher presses their
-   button. The panel's width (and, for the student list, its position) moves
-   with the page beside it in one motion (styles.css, "Panel motion"). Nothing
+   button. The panel slides with transform; the page beside it takes its new
+   width once, as the slide starts (styles.css, "Panel motion"). Nothing
    slides on a page draw, under reduced motion, or in print. */
 const PANEL_SLIDE_MS = 240;
 function _panelMotionOK() {
@@ -698,8 +698,9 @@ function _panelMotionOK() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
   return !window.matchMedia('print').matches;
 }
-// Runs done() once el's width settles, or after a fallback so it never sticks.
-function _panelOnSettled(el, done) {
+// Runs done() once el's slide settles (its transform, or prop), or after a
+// fallback so it never sticks.
+function _panelOnSettled(el, done, prop) {
   if (el._fvCancel) el._fvCancel(); // a turn-round replaces the earlier end
   let finished = false;
   const cancel = () => {
@@ -714,7 +715,7 @@ function _panelOnSettled(el, done) {
     done();
   };
   const onEnd = e => {
-    if (e.target === el && e.propertyName === 'width') finish();
+    if (e.target === el && e.propertyName === (prop || 'transform')) finish();
   };
   const timer = setTimeout(finish, PANEL_SLIDE_MS + 120);
   el.addEventListener('transitionend', onEnd);
@@ -736,32 +737,26 @@ function _helpSync(animate) {
       panel.remove();
       return;
     }
-    // Slide shut, then leave the page. The width runs from where it is now.
-    panel.style.width = panel.getBoundingClientRect().width + 'px';
-    panel.classList.add('help-sliding', 'help-closing');
+    // Slide shut, then leave the page. The page beside it grows at once.
+    panel.classList.add('help-sliding');
     void panel.offsetWidth;
     _panelOnSettled(panel, function () {
       if (!_helpOpen) panel.remove();
     });
-    panel.style.width = '0px';
+    panel.classList.add('help-closing');
     return;
   }
   var fresh = !panel;
   if (panel && panel.classList.contains('help-closing')) {
-    // Opened again mid-slide: turn round from the current width.
-    panel.classList.remove('help-closing');
-    panel.style.width = panel.getBoundingClientRect().width + 'px';
-    void panel.offsetWidth;
+    // Opened again mid-slide: turn round from where it is.
     if (animate) {
       _panelOnSettled(panel, function () {
         panel.classList.remove('help-sliding');
-        panel.style.width = '';
       });
-      panel.style.width = '';
+      panel.classList.remove('help-closing');
     } else {
       if (panel._fvSettle) panel._fvSettle();
-      panel.classList.remove('help-sliding');
-      panel.style.width = '';
+      panel.classList.remove('help-closing', 'help-sliding');
     }
   }
   if (!panel) {
@@ -771,18 +766,14 @@ function _helpSync(animate) {
     panel.setAttribute('aria-labelledby', 'help-title');
     // html-safe: _helpPanelHTML is fixed markup.
     panel.innerHTML = _helpPanelHTML();
-    if (animate) {
-      panel.classList.add('help-sliding');
-      panel.style.width = '0px';
-    }
+    if (animate) panel.classList.add('help-sliding', 'help-entering');
     layout.appendChild(panel);
     if (animate) {
       void panel.offsetWidth;
       _panelOnSettled(panel, function () {
         panel.classList.remove('help-sliding');
-        panel.style.width = '';
       });
-      panel.style.width = '';
+      panel.classList.remove('help-entering');
     }
     var input = panel.querySelector('#help-search');
     input.value = _helpQuery;
@@ -2321,19 +2312,14 @@ function _slideSidebar() {
   const mount = document.getElementById('sidebar-mount');
   const sb = document.getElementById('gb-sidebar');
   if (!layout || !mount || !sb || !_panelMotionOK()) {
-    if (mount && mount._fvSettle) mount._fvSettle();
+    if (sb && sb._fvSettle) sb._fvSettle();
     applySidebarState();
     return;
   }
-  const from = mount.getBoundingClientRect().width;
-  mount.style.width = from + 'px';
   layout.classList.add('sidebar-sliding'); // draws the list even while hidden
-  const open = _sidebarIsVisible();
-  const full = sb.offsetWidth;
   void mount.offsetWidth;
-  _panelOnSettled(mount, () => {
+  _panelOnSettled(sb, () => {
     layout.classList.remove('sidebar-sliding');
-    mount.style.width = '';
     // The toolbar's own class picker takes the list's place: it fades in
     // now, not while the list is still sliding out.
     if (!_sidebarIsVisible()) {
@@ -2341,8 +2327,7 @@ function _slideSidebar() {
       setTimeout(() => layout.classList.remove('sidebar-settled'), 300);
     }
   });
-  applySidebarState();
-  mount.style.width = (open ? full : 0) + 'px';
+  applySidebarState(); // the page takes its new width now; the list slides
 }
 
 function _onSidebarOverlayKey(e) {

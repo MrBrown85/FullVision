@@ -281,7 +281,7 @@ describe('markup-reflect-server', () => {
       return { data: bundle, error: null };
     });
     fake.on('list_course_grade_returns', () => ({ data: structuredClone(gradeRows), error: null }));
-    fake.on('list_course_submissions', () => ({ data: structuredClone(work), error: null }));
+    fake.on('list_course_submissions_since', () => ({ data: structuredClone(work), error: null }));
     fake.on('list_course_feedback', () => ({
       data: {
         course: { reflect_on_feedback: fb.reflect, show_my_learning: false },

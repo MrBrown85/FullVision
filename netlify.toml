@@ -25,20 +25,32 @@
 # for a new copy on every load (a quick 304 when unchanged). With an hour of
 # caching, a browser could run a new page script against an old
 # shared/constants.js after a deploy and break.
+#
+# Vary: Accept-Encoding (2026-11-13). Since files stopped going through the
+# edge function, the live site answered with no Vary header, and Netlify's
+# edge kept one copy of each file for every browser: where that copy had been
+# stored uncompressed, a browser that takes brotli was sent it whole. A real
+# browser fetching all 123 app files got 111 of them uncompressed: 5.1 MB
+# where about 1.4 MB is right (docs/plans/speed-assessment.md, finding 8).
+# Vary tells every cache between the server and the browser to keep the
+# compressed and the uncompressed copies apart.
 [[headers]]
   for = "/**/*.js"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+    Vary = "Accept-Encoding"
 
 [[headers]]
   for = "/**/*.css"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+    Vary = "Accept-Encoding"
 
 [[headers]]
   for = "/**/*.json"
   [headers.values]
     Cache-Control = "public, max-age=86400"
+    Vary = "Accept-Encoding"
 
 [[headers]]
   for = "/**/*.html"

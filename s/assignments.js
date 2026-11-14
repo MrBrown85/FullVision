@@ -120,6 +120,32 @@
     if (box && typeof box.setSelectionRange === 'function') box.setSelectionRange(at, at);
   }
 
+  /* A Sent card's pictures, once this device has them (s/send.js, file-links): put into the cards
+     of piece `p` on screen in place, exactly as page-view.js draws them, and nothing else is drawn
+     again. true when that is done (or no card of it is on screen); false when a card on screen has
+     no place for them, and the page is to be drawn again. */
+  function placeThumbs(p) {
+    if (!S || S.screen !== 'assignments' || S.sendAsk || typeof document === 'undefined') return true;
+    var cards = p
+      ? document.querySelectorAll('#app .sp-piece[data-piece="' + String(p.id).replace(/["\\]/g, '') + '"]')
+      : [];
+    if (!cards.length) return true;
+    if (p.kind !== 'sent' || p.group || !p.send || !p.send.sent || typeof StudentPageView === 'undefined') return false;
+    // html-safe: StudentPageView.thumbsHtml escapes every address and label.
+    var html = StudentPageView.thumbsHtml(p.send.sent.thumbs, 'Your page');
+    return Array.prototype.every.call(cards, function (card) {
+      var old = card.querySelector('.sp-send-thumbs');
+      // Where page-view.js's sentBlockHtml puts them: after the title and its tags.
+      var after = card.querySelector('.sp-piece-card > .sp-piece-tags') || card.querySelector('.sp-piece-card > h2');
+      if (!old && !after) return false;
+      // html-safe: thumbsHtml escapes every address and label.
+      if (html) (old || after).insertAdjacentHTML(old ? 'beforebegin' : 'afterend', html);
+      if (old) old.remove();
+      return true;
+    });
+  }
+  StudentPage.placeThumbs = placeThumbs;
+
   // The state, as student.js hands it over.
   var S = null;
 

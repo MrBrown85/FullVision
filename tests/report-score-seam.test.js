@@ -473,7 +473,7 @@ describe('report files read scores only through ReportScores', () => {
     [
       'teacher/page-reports.js',
       '_classFit',
-      "return [activeCourse, ctx.termId, reportPaper, 'one:' + JSON.stringify(_oneModel()), _reportSet()].join('|');",
+      "return [activeCourse, ctx.termId, reportPaper, form, _reportSet(), _day()].join('|');",
     ],
     ['teacher/page-reports.js', '_lastSummary (kept)', '_lastSummary = summary;\n    _lastSummarySet = _reportSet();'],
     [

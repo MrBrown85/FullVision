@@ -67,7 +67,11 @@ function loadSupabaseProd({ getUserResult, getSessionResult }) {
   };
 
   const getUserSpy = vi.fn(async () => getUserResult);
-  const getSessionSpy = vi.fn(async () => getSessionResult || { data: { session: null }, error: null });
+  // A teacher the server knows has a session saved on the device; a test
+  // of a browser with none says so.
+  const getSessionSpy = vi.fn(
+    async () => getSessionResult || { data: { session: { access_token: 't', user: { id: 'u1' } } }, error: null },
+  );
   globalThis.supabase = {
     createClient() {
       return {
@@ -252,6 +256,41 @@ describe('requireAuth — server-side session validation', () => {
         if (had) Object.defineProperty(navigator, 'onLine', had);
         else delete navigator.onLine;
       }
+    });
+  });
+
+  // Start-up draws the saved class list first (docs/DECISIONS.md): the
+  // saved session is read before the server is asked.
+  describe('the saved session, read first', () => {
+    it('a server that names another user is a sign-out: saved classes and the saved sign-in go, the outbox stays', async () => {
+      loadSupabaseProd({
+        getUserResult: { data: { user: { id: 'someone-else' } }, error: null },
+      });
+      localStorage.setItem('gb-courses', '{}');
+      localStorage.setItem('gb_pref', 'x');
+      localStorage.setItem('sb-example-auth-token', '{}');
+      localStorage.setItem('fv-sync-queue-v1', '{}');
+      let settled = false;
+      window.requireAuth().then(() => (settled = true));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(window.location.href).toBe('/login.html');
+      expect(settled).toBe(false);
+      expect(Object.keys(localStorage._store)).toEqual(['fv-sync-queue-v1']);
+    });
+
+    it('a session the server refuses keeps the saved sign-in for supabase-js to remove, as before', async () => {
+      loadSupabaseProd({
+        getUserResult: { data: { user: null }, error: { message: 'invalid JWT', status: 403 } },
+      });
+      localStorage.setItem('gb-courses', '{}');
+      localStorage.setItem('sb-example-auth-token', '{}');
+      localStorage.setItem('fv-sync-queue-v1', '{}');
+      window.requireAuth();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(window.location.href).toBe('/login.html');
+      expect(Object.keys(localStorage._store).sort()).toEqual(['fv-sync-queue-v1', 'sb-example-auth-token']);
     });
   });
 
