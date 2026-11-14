@@ -1434,7 +1434,7 @@
 .af-comp-overlay[hidden] {
   display: none;
 }
-body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
+body.af-comp-open #gb-tooltip {
   z-index: calc(var(--z-popover) + 3);
 }
 .af-comp-dialog {
@@ -5073,7 +5073,7 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
 .rsg-descriptor-bar.is-idle {
   visibility: hidden;
 }
-body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
+.rsg-descriptor-bar.bar-wide {
   left: 16px;
 }
 @media (max-width: 1024px) {
@@ -5081,7 +5081,7 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
     left: 16px;
   }
   /* The student list open over the page covers the bar's place. */
-  body:has(#page-layout.sidebar-overlay) .rsg-descriptor-bar {
+  .rsg-descriptor-bar.bar-covered {
     display: none !important;
   }
 }
