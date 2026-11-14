@@ -2465,7 +2465,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.sp-btn-danger {
+.sp-view .sp-btn-danger {
   background: #d70015;
   color: #fff;
 }

@@ -231,7 +231,7 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     expect(p.kind).toBe('back');
     expect(p.result.text).toBe('Proficient · 75%');
     const box = drawn(view, UIS[7]);
-    expect(words(box.querySelector('.sp-fb-sub'))).toBe('Science 8 · Revision returned Nov 10');
+    expect(words(box.querySelector('.sp-fb-sub'))).toBe('Revision returned Nov 10');
     expect(parts(box.querySelector('.sp-ba-result .sp-ba-row'))).toEqual([
       'Your Result',
       'Proficient − · 67%',

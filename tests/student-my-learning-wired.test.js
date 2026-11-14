@@ -6,10 +6,12 @@
  * `category_id` on each piece. The student's returned scores are the ones
  * `page` already sends.
  *
- * - With the switch off (no key), nothing changes: no My Learning, and the
- *   page's readers are exactly the four the Assignments list uses.
- * - With it on, My Learning is worked out on the device from that page alone,
+ * - With the switch off (no key), no grade: My Learning lists the work alone,
+ *   and the page's readers are exactly the four the Assignments list uses.
+ * - With it on, the grade is worked out on the device from that page alone,
  *   by the same calc.js as Preview as Student, and reads no name the page lacks.
+ * - Demo Mode sends it on, as the server does with the switch on, except
+ *   #demo-card-no-learning.
  */
 import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
@@ -21,6 +23,21 @@ const WATCHED = [
   's/student-data.js',
   's/assignments.js',
 ];
+
+/* The sample class's page as the server sends it with Show My Learning
+   off: Demo Mode's page with the switch's keys taken out (Demo Mode sends
+   them, as the server does with it on). */
+function plainPage(page, system) {
+  const reply = page.T.demoPage(system);
+  delete reply.show_my_learning;
+  delete reply.learning;
+  reply.assessments = reply.assessments.map(a => {
+    const out = Object.assign({}, a);
+    delete out.category_id;
+    return out;
+  });
+  return reply;
+}
 
 // The sample class's page, with Show My Learning on: one course, one folder, a section per competency.
 function withLearning(reply) {
@@ -103,7 +120,7 @@ async function open() {
 describe('My Learning on a real card', () => {
   it('a hand-set level and the Next Step read as Preview reads them', async () => {
     const { page, view } = await open();
-    const reply = withLearning(page.T.demoPage('proficiency'));
+    const reply = withLearning(plainPage(page, 'proficiency'));
     const tags = Object.keys(reply.tags);
     const base = view(reply).learning.groups.flatMap(g => g.skills);
     // A skill with a level below Extending names its own Next Step, the bank's sentence for its level.
@@ -121,9 +138,9 @@ describe('My Learning on a real card', () => {
     expect(set.level).toBe(4);
     expect(set.next).toEqual({ top: true, text: '' });
     // A sensitive set's skill is never the Next Step My Learning names.
-    const next = view(withLearning(page.T.demoPage('proficiency'))).learning.next;
+    const next = view(withLearning(plainPage(page, 'proficiency'))).learning.next;
     if (next) {
-      const r2 = withLearning(page.T.demoPage('proficiency'));
+      const r2 = withLearning(plainPage(page, 'proficiency'));
       const bank = 'bank-' + tags.find(id => 'sec-' + id === next.id);
       r2.learning.next_steps[bank].sensitive = true;
       const again = view(r2).learning.next;
@@ -131,9 +148,9 @@ describe('My Learning on a real card', () => {
     }
   });
 
-  it('with Show My Learning off: no My Learning, and only the Assignments list’s four readers', async () => {
+  it('with Show My Learning off: no grade, and only the Assignments list’s four readers', async () => {
     const { page, view } = await open();
-    const v = view(page.T.demoPage('proficiency'));
+    const v = view(plainPage(page, 'proficiency'));
     expect(v.learning).toBeNull();
     expect(page.run('typeof getSections')).toBe('undefined');
     expect(page.run('StudentData.readers')).toEqual([
@@ -148,7 +165,7 @@ describe('My Learning on a real card', () => {
     'a %s class with it on: worked out on the device from the page alone, reading no name the page lacks',
     async system => {
       const { page, view } = await open();
-      const reply = withLearning(page.T.demoPage(system));
+      const reply = withLearning(plainPage(page, system));
       // The page with My Learning in puts its readers on; then every other name is watched.
       view(reply);
       const reached = page.watchGlobals(WATCHED);
@@ -166,24 +183,56 @@ describe('My Learning on a real card', () => {
       // Every name it reaches is given: the comment bank's two readers come from `learning.next_steps`.
       expect([...reached]).toEqual([]);
       // Off again (another class, or the switch turned off): the readers go with it.
-      view(page.T.demoPage(system));
+      view(plainPage(page, system));
       expect(page.run('typeof getSections')).toBe('undefined');
     },
   );
 
-  it('the My Learning tab draws from it, and says it is off without it', async () => {
+  it('the My Learning tab draws the grade from it; without it, the list of work and no grade', async () => {
     const { page, view } = await open();
-    const reply = withLearning(page.T.demoPage('proficiency'));
+    const reply = withLearning(plainPage(page, 'proficiency'));
     const read = page.run('StudentData.fromServer')(reply);
     page.run('StudentData.use')(read);
     const on = page.T.render({ screen: 'assignments', page: read, reply, tab: 'learning', demo: false });
-    expect(on).not.toContain('hasn’t turned on My Learning');
-    const plain = page.T.demoPage('proficiency');
+    expect(on).toContain('sp-ml-overall');
+    expect(on).toContain('This Year So Far');
+    expect(on).toContain('sp-ml-work');
+    const plain = plainPage(page, 'proficiency');
     const off = page.run('StudentData.fromServer')(plain);
     page.run('StudentData.use')(off);
-    expect(page.T.render({ screen: 'assignments', page: off, reply: plain, tab: 'learning', demo: false })).toContain(
-      'hasn’t turned on My Learning',
-    );
+    const drawn = page.T.render({ screen: 'assignments', page: off, reply: plain, tab: 'learning', demo: false });
+    expect(drawn).not.toContain('sp-ml-overall');
+    expect(drawn).not.toContain('You’re at');
+    expect(drawn).not.toContain('What Makes Up Your Grade');
+    expect(drawn).not.toContain('hasn’t turned on My Learning');
+    // The same rows, in the same order, with the switch on or off.
+    const rows = html => html.match(/<li[^>]*><(?:button|span) [^>]*class="sp-ml-row[^"]*"[^>]*>/g);
+    expect(rows(drawn)).toEqual(rows(on));
+    expect(rows(drawn).length).toBe(7);
     expect(view(plain).learning).toBeNull();
+  });
+
+  it('Demo Mode sends Show My Learning on, and #demo-card-no-learning sends it off', async () => {
+    const shown = async hash => {
+      const page = openStudentPage();
+      await page.start(hash);
+      await page.submit('form[data-form="card"]');
+      page.type('#sp-ident', page.T.DEMO.number);
+      await page.click('[data-act="card-yes"]');
+      await page.click('.sp-tabs-bottom [data-tab="learning"]');
+      return page;
+    };
+    const on = await shown('#demo-card');
+    expect(on.T.state().reply.show_my_learning).toBe(true);
+    expect(on.root().querySelector('.sp-ml-overall .sp-ml-period').textContent).toBe('This Year So Far');
+    const off = await shown('#demo-card-no-learning');
+    expect(off.T.state().reply.show_my_learning).toBe(false);
+    expect(off.T.state().reply.learning).toBeNull();
+    expect(off.root().querySelector('.sp-ml-overall')).toBeNull();
+    expect(off.root().querySelector('.sp-ml-title').classList.contains('sp-hidden-title')).toBe(false);
+    expect([...off.root().querySelectorAll('.sp-ml-work .sp-row-title')].map(el => el.textContent)).toEqual(
+      [...on.root().querySelectorAll('.sp-ml-work .sp-row-title')].map(el => el.textContent),
+    );
+    expect(off.calls).toEqual([]);
   });
 });

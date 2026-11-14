@@ -406,6 +406,12 @@ function serverPage(gradingSystem) {
    list opens) and student-view.js. */
 function studentSide() {
   const page = openStudentPage();
+  // The phone's clock reads NOW, as this file's does: the class's today (Outstanding, Upcoming, a due day's words) is the same day through both doors.
+  page.run(
+    '(function (D, at) { globalThis.Date = class extends D { constructor(...a) { if (a.length) super(...a); else super(at); } static now() { return at; } }; })(Date, ' +
+      Date.parse(NOW) +
+      ')',
+  );
   ['shared/constants.js', 'shared/calc.js', 'shared/student-view.js'].forEach(f =>
     vm.runInContext(read(f), page.ctx, { filename: f }),
   );
@@ -468,6 +474,8 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
     // Preview draws the page as a student who has opened nothing sees it (ruling 116).
     const phone = side.view(unopened(serverPage(system)));
     expect(cache.view).toEqual(phone);
+    // The class's today, which splits Outstanding from Upcoming: the day in the class's zone.
+    expect(cache.view.today).toBe('2026-11-10');
   });
 
   it('each piece reads as it should', () => {
@@ -1108,18 +1116,7 @@ function withoutNew(reply) {
   return out;
 }
 
-const NEW_PARTS = [
-  '.sp-piece-unit',
-  '.sp-piece-category',
-  '.sp-piece-about',
-  '.sp-graded-on-ican',
-  '.sp-core',
-  '.sp-piece-from',
-  '.sp-fb-from',
-  '.sp-fb-category',
-  '.sp-fb-toward',
-  '.sp-from-mark',
-];
+const NEW_PARTS = ['.sp-piece-unit', '.sp-piece-about', '.sp-piece-from', '.sp-fb-from', '.sp-from-mark'];
 
 // A document to draw into (tests run with no DOM of their own).
 const DOC = parseHTML('<!doctype html><html><body></body></html>').document;
@@ -1132,16 +1129,21 @@ function drawn(view, ui) {
 }
 const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
 const cardIn = (box, id) => [...box.querySelectorAll('.sp-piece')].find(c => c.getAttribute('data-piece') === id);
+// A button as StudentPageView.press reads one.
+const button = attrs => ({ getAttribute: name => (attrs && attrs[name]) || null, closest: () => null });
 
-// The choices that show every part: To Do, Back, Your Feedback on four pieces, All Assignments.
+/* The choices that show every part: Outstanding, Upcoming, My Learning,
+   Your Feedback on four pieces, The Whole Rubric, Reflections. */
 const UIS = [
-  { tab: 'assignments', segment: 'todo' },
-  { tab: 'assignments', segment: 'back' },
-  { tab: 'assignments', segment: 'back', feedback: 'a-essay', pick: 'a-essay' },
-  { tab: 'assignments', segment: 'back', feedback: 'a-lab', pick: 'a-lab' },
-  { tab: 'assignments', segment: 'back', feedback: 'a-quick', pick: 'a-quick' },
-  { tab: 'assignments', segment: 'back', feedback: 'a-contract', pick: 'a-contract' },
-  { tab: 'assignments', all: true },
+  { tab: 'assignments', segment: 'outstanding' },
+  { tab: 'assignments', segment: 'upcoming' },
+  { tab: 'learning' },
+  { tab: 'learning', feedback: 'a-essay' },
+  { tab: 'learning', feedback: 'a-lab' },
+  { tab: 'learning', feedback: 'a-quick' },
+  { tab: 'learning', feedback: 'a-contract' },
+  { tab: 'learning', feedback: 'a-lab', whole: true },
+  { tab: 'questionnaires' },
 ];
 
 // The page a phone draws for a reply and a choice: s/student-data.js, student-view.js and page-view.js on their own.
@@ -1193,30 +1195,25 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
       expect(html).toBe(phoneHtml(side, plain, ui));
     });
     const box = DOC.createElement('div');
-    box.innerHTML = phoneHtml(side, named, UIS[6]);
-    expect(words(box.querySelector('.sp-since-line'))).toBe('5 pieces came back and 1 result was updated.');
+    box.innerHTML = phoneHtml(side, named, UIS[2]);
+    // My Learning's count of what changed: five pieces back and one updated.
+    expect(words(box.querySelector('.sp-tabs-bottom [data-tab="learning"] .sp-hidden-title'))).toBe('6 new');
     expect(box.querySelector('.sp-piece-from, .sp-fb-from, .sp-from-mark')).toBe(null);
   });
 
-  it('the unit, and the category with what it counts as the class is set up', () => {
+  it('the unit on a card still to do; the category is on no card, row or feedback', () => {
+    _cache.assessments[CID].find(a => a.id === 'a-draft').moduleId = 'm1';
     const { view } = StudentView.fromCache(CID, S1);
-    expect(words(cardIn(drawn(view, UIS[1]), 'a-essay').querySelector('.sp-piece-unit'))).toBe('Unit 1: Cells');
-    expect(words(drawn(view, UIS[2]).querySelector('.sp-fb-category'))).toBe('Projects · counts 60% of your grade');
-    expect(words(drawn(view, UIS[4]).querySelector('.sp-fb-category'))).toBe('Tests · counts 40% of your grade');
-    expect(words(drawn(view, UIS[5]).querySelector('.sp-fb-category'))).toBe(
-      'Practice · doesn’t count toward your grade',
-    );
-    // A piece with no category says nothing of one.
-    expect(drawn(view, UIS[3]).querySelector('.sp-fb-category')).toBeNull();
-  });
-
-  it('in a Proficiency class a weighted category shows its name alone; one that weighs 0 still says so', () => {
-    seed('proficiency');
-    const { view } = StudentView.fromCache(CID, S1);
-    expect(words(drawn(view, UIS[2]).querySelector('.sp-fb-category'))).toBe('Projects');
-    expect(words(drawn(view, UIS[5]).querySelector('.sp-fb-category'))).toBe(
-      'Practice · doesn’t count toward your grade',
-    );
+    expect(words(cardIn(drawn(view, UIS[0]), 'a-draft').querySelector('.sp-piece-unit'))).toBe('Unit 1: Cells');
+    // The view still holds the category; the page draws it nowhere (Colin, 2026-11-14).
+    expect(view.work.find(p => p.id === 'a-essay').category).toMatchObject({ name: 'Projects' });
+    UIS.forEach(ui => {
+      const box = drawn(view, ui);
+      ['.sp-piece-category', '.sp-category-pill', '.sp-fb-category'].forEach(sel =>
+        expect(box.querySelector(sel)).toBeNull(),
+      );
+      expect(box.textContent).not.toContain('of your grade');
+    });
   });
 
   it('a percent only where the class’s weights total 100', () => {
@@ -1230,27 +1227,66 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
     expect(by['a-lab']).toMatchObject({ category_name: null, category_percent: null });
   });
 
-  it('each rubric row says what it counts toward; work not back yet lists its I Can lines and Core Competencies', () => {
-    _cache.assessments[CID].find(a => a.id === 'a-draft').coreCompetencyIds = ['PAR', 'COM'];
-    const { view } = StudentView.fromCache(CID, S1);
-    expect(
-      [...drawn(view, UIS[3]).querySelectorAll('.sp-fb-criterion')].map(c => words(c.querySelector('.sp-fb-toward'))),
-    ).toEqual(['Counts toward Questioning and Predicting', 'Counts toward Questioning and Predicting']);
-    const draft = cardIn(drawn(view, UIS[0]), 'a-draft');
-    expect([...draft.querySelectorAll('.sp-graded-on-ican')].map(words)).toEqual([
-      'I can ask a question that can be tested.',
-      'I can say what I expect.',
-    ]);
-    expect(words(draft.querySelector('.sp-core .sp-graded-on-title'))).toBe('Core Competencies');
-    expect([...draft.querySelectorAll('.sp-core-name')].map(words)).toEqual([
-      'Communicating',
-      'Personal Awareness & Responsibility',
-    ]);
-    // Only work still to do carries its Description, category name, I Can lines and Core Competencies.
-    const back = drawn(view, UIS[1]);
-    ['.sp-piece-about', '.sp-piece-category', '.sp-graded-on-ican', '.sp-core'].forEach(sel =>
-      expect(back.querySelector(sel)).toBeNull(),
+  it('work not back yet: See the Rubric, and none of What You’re Graded On, its I Can lines or Core Competencies', () => {
+    Object.assign(
+      _cache.assessments[CID].find(a => a.id === 'a-draft'),
+      { coreCompetencyIds: ['PAR', 'COM'], rubricId: 'r1' },
     );
+    const { view } = StudentView.fromCache(CID, S1);
+    const draft = cardIn(drawn(view, UIS[0]), 'a-draft');
+    ['.sp-graded-on', '.sp-graded-on-name', '.sp-graded-on-ican', '.sp-core', '.sp-core-name'].forEach(sel =>
+      expect(draft.querySelector(sel), sel).toBeNull(),
+    );
+    expect(draft.textContent).not.toContain('Graded On');
+    expect(draft.textContent).not.toContain('I can ask');
+    expect(draft.textContent).not.toContain('Personal Awareness');
+    const link = draft.querySelector('.sp-rubric-link');
+    expect(words(link)).toBe('See the Rubric');
+    expect([link.getAttribute('data-act'), link.getAttribute('data-piece')]).toEqual(['whole', 'a-draft']);
+    // It opens The Whole Rubric, every criterion with no level marked, and goes back to Assignments.
+    const next = StudentPageView.press(UIS[0], view, 'whole', button({ 'data-piece': 'a-draft' }));
+    expect(next.ui).toMatchObject({ tab: 'assignments', segment: 'outstanding', feedback: 'a-draft', whole: true });
+    const whole = drawn(view, next.ui);
+    expect(words(whole.querySelector('.sp-fb-title'))).toBe('The Whole Rubric');
+    expect(words(whole.querySelector('.sp-fb-back'))).toBe('Assignments');
+    expect([...whole.querySelectorAll('.sp-fb-whole .sp-fb-crit-name')].map(words)).toEqual([
+      'Method',
+      'Labelled Drawing',
+    ]);
+    expect(whole.querySelector('.sp-fb-you')).toBeNull();
+    // Work with no rubric has no link.
+    expect(cardIn(drawn(view, UIS[0]), 'a-undated').querySelector('.sp-rubric-link')).toBeNull();
+  });
+
+  it('Your Rubric: each criterion’s name, its level and the teacher’s comment on it, and nothing it counts toward', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const lab = view.work.find(p => p.id === 'a-lab');
+    const fb = drawn(view, UIS[4]);
+    const crits = [...fb.querySelectorAll('ul.sp-fb-crits > li.sp-fb-criterion')];
+    expect(
+      crits.map(c => [
+        words(c.querySelector('.sp-fb-crit-name')),
+        words(c.querySelector('.sp-level')),
+        words(c.querySelector('.sp-fb-note')),
+      ]),
+    ).toEqual([
+      ['Method', lab.rubric.rows[0].text, null],
+      ['Labelled Drawing', lab.rubric.rows[1].text, 'Label the axes.'],
+    ]);
+    expect(fb.querySelector('.sp-fb-toward')).toBeNull();
+    ['Counts toward', 'Means Here', 'To Reach', 'What You Showed', 'The Goal'].forEach(w =>
+      expect(fb.textContent).not.toContain(w),
+    );
+    // A rubric piece's result card lists no rows (they are under Your Rubric); a competency piece's lists each.
+    expect(fb.querySelector('.sp-fb-card .sp-fb-rows')).toBeNull();
+    expect(words(fb.querySelector('[data-act="whole"]'))).toBe('See the Whole Rubric');
+    expect([...drawn(view, UIS[3]).querySelectorAll('.sp-fb-row .sp-fb-row-name')].map(words)).toEqual([
+      'Questioning and Predicting',
+      'Communicating',
+    ]);
+    // Back to My Learning, where a returned piece lives; the line under the title says when it came back.
+    expect(words(fb.querySelector('.sp-fb-back'))).toBe('My Learning');
+    expect(words(fb.querySelector('.sp-fb-sub'))).toBe('Returned Nov 4');
   });
 
   it('none of it draws when the server does not send the keys: the page is as it was', () => {
@@ -1261,12 +1297,7 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
       box.innerHTML = phoneHtml(side, reply, ui);
       NEW_PARTS.forEach(sel => expect(box.querySelector(sel), sel).toBeNull());
     });
-    // And the line of what changed is the one with no name.
-    const box = DOC.createElement('div');
-    box.innerHTML = phoneHtml(side, reply, UIS[6]);
-    expect(words(box.querySelector('.sp-since-line'))).toBe('5 pieces came back and 1 result was updated.');
   });
-
   it('a key of the wrong type reads as none: no throw, nothing drawn, the rest of the page as it was', () => {
     const side = studentSide();
     const good = withoutNew(serverPage('letter'));

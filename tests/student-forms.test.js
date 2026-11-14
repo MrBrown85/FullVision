@@ -1,11 +1,12 @@
 /**
- * Questionnaires and My Reports on the student's page (S4-F4; the
- * artboard's "Questionnaires Tab", "My Reports Tab", "Questions on a
- * Chromebook" and "Reports on a Chromebook").
+ * Reflections on the student's page (S4-F4; the artboard's "Questionnaires
+ * Tab" and "Questions on a Chromebook"; the tab called Questionnaires until
+ * Colin's ruling of 2026-11-14). Phone reports are not on the student page
+ * any more (Colin, 2026-11-14): no Reports tab, and the reply's `reports`
+ * is not read.
  *
- * The server's `page` reply lists no questionnaire or report yet, and no
- * route opens one from a card's session, so a real card shows each tab's
- * plain line. The view reads the lists the reply will carry
+ * The server's `page` reply lists no questionnaire yet, so a real card
+ * shows the tab's plain line. The view reads the list the reply will carry
  * (shared/student-view.js); Demo Mode shows samples in that shape and opens
  * them on the slip's own screens. No test waits on real time.
  */
@@ -40,7 +41,7 @@ async function real() {
 const viewOf = page => page.T.viewOf(page.T.state());
 
 describe('the view reads the lists the server’s page will send', () => {
-  it('questionnaires by the server’s state, reports with New until opened; anything else is left out', async () => {
+  it('questionnaires by the server’s state, anything else left out; phone reports not read', async () => {
     const page = await real();
     const build = page.run('StudentView.build');
     const reply = Object.assign(samplePage(TODAY), {
@@ -78,23 +79,20 @@ describe('the view reads the lists the server’s page will send', () => {
       ['q3', 'soon'],
     ]);
     expect(view.questionnaires[0]).toMatchObject({ line: 'Two questions', minutes: 5, until: '2026-11-20' });
-    expect(view.reports.map(r => [r.id, r.isNew])).toEqual([
-      ['r1', true],
-      ['r0', false],
-    ]);
-    expect(view.reports[0]).toMatchObject({ result: { word: 'Proficient', text: '3.0', level: 3 }, comment: 'First.' });
-    // The reply of today has neither: both lists are empty, from either door.
+    // Phone reports in the reply are not read: the page has no place for them.
+    expect(view).not.toHaveProperty('reports');
+    // The reply of today has none: the list is empty, from either door.
     expect(viewOf(page).questionnaires).toEqual([]);
-    expect(viewOf(page).reports).toEqual([]);
+    expect(viewOf(page)).not.toHaveProperty('reports');
   });
 
-  it('a real card shows each tab’s plain line, and Start or See Your Report pressed anyway opens nothing', async () => {
+  it('a real card shows the plain line on Reflections, has no Reports tab, and Start or See Your Report pressed anyway opens nothing', async () => {
     const page = await real();
+    expect(qa(page, '.sp-tabs-bottom .sp-tab-label').map(words)).toEqual(['Assignments', 'My Learning', 'Reflections']);
+    expect(q(page, '[data-tab="reports"]')).toBeNull();
     await page.click('[data-tab="questionnaires"]');
-    expect(words(q(page, '.sp-empty'))).toBe('Questionnaires from your teacher will show here.');
-    await page.click('[data-tab="reports"]');
-    expect(words(q(page, '.sp-page-title'))).toBe('My Reports');
-    expect(words(q(page, '.sp-empty'))).toBe('Reports from your teacher will show here.');
+    expect(words(q(page, '.sp-page-title'))).toBe('Reflections');
+    expect(words(q(page, '.sp-empty'))).toBe('Reflections from your teacher will show here.');
     // A sample's id, pressed on a real card's page: nothing opens and nothing is asked.
     const asked = page.calls.length;
     for (const [act, id] of [
@@ -112,10 +110,21 @@ describe('the view reads the lists the server’s page will send', () => {
   });
 });
 
-describe('Questionnaires in Demo Mode', () => {
-  it('the open one as a card with Start, the rest as a list; on a Chromebook the list and the one picked', async () => {
+describe('Reflections in Demo Mode', () => {
+  it('Open Now as a card with Start, then Done and Coming Up as lists; on a Chromebook the list and the one picked', async () => {
     const page = await demo();
     await page.click('[data-tab="questionnaires"]');
+    expect(words(q(page, '.sp-page-title'))).toBe('Reflections');
+    expect(qa(page, '.sp-forms-phone .sp-list-head').map(words)).toEqual(['Open Now', 'Done', 'Coming Up']);
+    // Each part holds its own: the open one under Open Now, About Me under Done, March under Coming Up.
+    const under = head => {
+      const h = qa(page, '.sp-forms-phone .sp-list-head').find(x => words(x) === head);
+      const next = h.nextElementSibling;
+      return [...next.querySelectorAll('.sp-form-title, .sp-row-title')].map(words);
+    };
+    expect(under('Open Now')).toEqual(['November Reflection']);
+    expect(under('Done')).toEqual(['About Me']);
+    expect(under('Coming Up')).toEqual(['March Reflection']);
     const card = q(page, '.sp-forms-phone .sp-form-card');
     expect(words(card.querySelector('.sp-flag'))).toMatch(/^Open until \S+ \d+$/);
     expect(words(card.querySelector('.sp-form-title'))).toBe('November Reflection');
@@ -169,40 +178,34 @@ describe('Questionnaires in Demo Mode', () => {
   });
 });
 
-describe('My Reports in Demo Mode', () => {
-  it('the newest as a card, New until opened, with its result and comment; See Your Report opens it; back to the tab', async () => {
+describe('no phone reports in Demo Mode', () => {
+  it('no Reports tab, nothing of a report on the page, and See Your Report pressed anyway opens nothing', async () => {
     const page = await demo();
-    await page.click('[data-tab="reports"]');
-    const card = q(page, '.sp-forms-phone .sp-form-card');
-    const r = viewOf(page).reports[0];
-    expect(words(card.querySelector('.sp-form-title'))).toBe(r.title);
-    expect(words(card.querySelector('.sp-flag-new'))).toBe('New');
-    expect(words(card.querySelector('.sp-form-sub'))).toMatch(/^\S+ \d+ · Open until \S+ \d+$/);
-    expect(words(card.querySelector('.sp-report-result'))).toBe('Science 8' + r.result.word);
-    expect(words(card.querySelector('.sp-report-comment'))).toBe(r.comment);
-    expect(qa(page, '.sp-forms-phone .sp-row-title').map(words)).toEqual(['Interim Update']);
-    await page.click('.sp-forms-phone .sp-form-card [data-act="r-open"]');
-    expect(page.T.state().screen).toBe('report');
-    expect(q(page, '.pr-view')).toBeTruthy();
-    await page.click('[data-act="page-back"]');
-    expect(q(page, '.sp-tab[aria-current="page"]').getAttribute('data-tab')).toBe('reports');
+    expect(q(page, '[data-tab="reports"]')).toBeNull();
+    expect(page.root().textContent).not.toContain('My Reports');
+    const b = page.root().ownerDocument.createElement('button');
+    b.setAttribute('data-act', 'r-open');
+    b.setAttribute('data-form-id', 'demo-r-1');
+    q(page, '.sp-page').appendChild(b);
+    await page.click('.sp-page > button[data-act="r-open"]');
+    expect(page.T.state().screen).toBe('assignments');
+    expect(q(page, '.pr-view')).toBeNull();
     expect(page.calls).toEqual([]);
   });
 });
 
-describe('Preview as Student draws the same tabs', () => {
-  it.each(['questionnaires', 'reports'])('%s: the same HTML, character for character', async tab => {
+describe('Preview as Student draws the same tab', () => {
+  it('Reflections: the same HTML, character for character', async () => {
     const page = await demo();
-    await page.click('[data-tab="' + tab + '"]');
+    await page.click('[data-tab="questionnaires"]');
     const view = JSON.parse(JSON.stringify(viewOf(page)));
     const box = page.root().ownerDocument.createElement('div');
     box.innerHTML = globalThis.PreviewStudent.drawPage(view, {
-      tab,
-      segment: 'todo',
-      all: false,
+      tab: 'questionnaires',
+      segment: 'outstanding',
       pick: '',
-      search: '',
-      filter: 'all',
+      card: '',
+      logout: false,
       feedback: '',
       whole: false,
       levels: false,
