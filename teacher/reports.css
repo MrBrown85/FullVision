@@ -18,7 +18,10 @@
   color: var(--text);
   outline: none;
   width: 220px;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 .report-toolbar input[type='text']:focus {
   background: var(--surface);
@@ -101,7 +104,9 @@
   font-size: var(--text-sm);
   color: #fff;
   flex-shrink: 0;
-  transition: all 0.1s;
+  transition:
+    background-color 0.1s,
+    border-color 0.1s;
 }
 .student-picker-item.checked .student-picker-check {
   background: var(--text);
@@ -125,7 +130,9 @@
   padding: 4px 10px;
   cursor: pointer;
   color: var(--text-2);
-  transition: all 0.1s;
+  transition:
+    border-color 0.1s,
+    color 0.1s;
 }
 .student-picker-action:hover {
   border-color: var(--active);
@@ -1457,7 +1464,9 @@
   align-items: center;
   justify-content: center;
   font-size: var(--text-sm);
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 .tq-toolbar-arrow:hover {
   background: var(--divider-subtle);

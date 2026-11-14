@@ -272,11 +272,38 @@ window.PageAssignments = (function () {
       );
       return;
     }
+    var picked = null;
     rows.forEach(function (r) {
       var on = r.dataset.sid === focusStudentId;
       r.classList.toggle('selected', on);
-      if (on && r.scrollIntoView) r.scrollIntoView({ block: 'nearest' });
+      if (on) picked = r;
     });
+    _scrollIntoViewIfNeeded(picked, { block: 'nearest' });
+  }
+
+  /* Scrolls `el` into view only when part of it is out of sight: out of
+     the window, or of a box around it that scrolls. scrollIntoView lays the
+     page out and walks every scrolling box around it, for an element
+     already in view too. With `soon`, after this frame's own layout (a
+     click's writes first): the page is laid out once, not twice. */
+  function _scrollIntoViewIfNeeded(el, opts, soon) {
+    if (soon) {
+      return requestAnimationFrame(function () {
+        _scrollIntoViewIfNeeded(el, opts);
+      });
+    }
+    if (!el || !el.scrollIntoView || !el.isConnected) return;
+    var w = window.innerWidth;
+    var h = window.innerHeight;
+    var r = el.getBoundingClientRect && w && h ? el.getBoundingClientRect() : null;
+    var out = !r || r.top < 0 || r.left < 0 || r.bottom > h || r.right > w;
+    for (var p = el.parentElement; !out && p && p !== document.body; p = p.parentElement) {
+      var cs = getComputedStyle(p);
+      if (!/auto|scroll|hidden|clip/.test(cs.overflowX + ' ' + cs.overflowY)) continue;
+      var b = p.getBoundingClientRect();
+      out = r.top < b.top || r.left < b.left || r.bottom > b.bottom || r.right > b.right;
+    }
+    if (out) el.scrollIntoView(opts);
   }
 
   /* Left and Right arrows while grading one student: the previous or next
@@ -319,7 +346,7 @@ window.PageAssignments = (function () {
     render();
     var card = document.querySelector('.assess-card.open');
     if (_grader) _graderToTop();
-    else if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+    else _scrollIntoViewIfNeeded(card, { block: 'nearest' }, true);
     if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
     else _restoreGraderFocus(memo);
   }
@@ -4796,7 +4823,7 @@ window.PageAssignments = (function () {
       card.classList.toggle('joins-right', Math.abs(b.right - c.right) < 2);
     }
     var on = card.querySelector('.af-start-row.is-on');
-    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    _scrollIntoViewIfNeeded(on, { block: 'nearest' });
     if (_copy.focusFrom && _startOpen === 'copy') {
       _copy.focusFrom = false;
       var from = document.getElementById('af-copy-from');
@@ -4894,7 +4921,7 @@ window.PageAssignments = (function () {
       t.tabIndex = t === next ? 0 : -1;
     });
     next.focus();
-    if (next.scrollIntoView) next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    _scrollIntoViewIfNeeded(next, { block: 'nearest', inline: 'nearest' });
   }
 
   function _startKeydown(e) {
@@ -5534,26 +5561,35 @@ window.PageAssignments = (function () {
     _blankSizeCells();
   }
   // Each row's level cells take the height of its longest one, so the
-  // row reads as one band; the criterion name grows with its words.
+  // row reads as one band; the criterion name grows with its words. Every
+  // row is done in three passes (each height to auto, each read, each
+  // written), so the page is laid out once, not once a row.
   function _blankSizeCells() {
-    document.querySelectorAll('.af-ge-grid tbody tr').forEach(_blankSizeRow);
+    _blankSizeRows(document.querySelectorAll('.af-ge-grid tbody tr'));
   }
   function _blankSizeRow(tr) {
-    if (!tr) return;
-    var name = tr.querySelector('.af-ge-crit-name');
-    if (name) {
-      name.style.height = 'auto';
-      name.style.height = name.scrollHeight + 'px';
-    }
-    var cells = Array.from(tr.querySelectorAll('.af-ge-text'));
-    cells.forEach(function (t) {
-      t.style.height = 'auto';
+    if (tr) _blankSizeRows([tr]);
+  }
+  function _blankSizeRows(trs) {
+    var rows = Array.prototype.map.call(trs, function (tr) {
+      var name = tr.querySelector('.af-ge-crit-name');
+      return { boxes: (name ? [name] : []).concat(Array.from(tr.querySelectorAll('.af-ge-text'))), name: !!name };
     });
-    var tallest = cells.reduce(function (h, t) {
-      return Math.max(h, t.scrollHeight);
-    }, 88);
-    cells.forEach(function (t) {
-      t.style.height = tallest + 'px';
+    rows.forEach(function (r) {
+      r.boxes.forEach(function (t) {
+        t.style.height = 'auto';
+      });
+    });
+    rows.forEach(function (r) {
+      r.heights = r.boxes.map(function (t) {
+        return t.scrollHeight;
+      });
+    });
+    rows.forEach(function (r) {
+      var tallest = Math.max.apply(null, [88].concat(r.heights.slice(r.name ? 1 : 0)));
+      r.boxes.forEach(function (t, i) {
+        t.style.height = (r.name && !i ? r.heights[0] : tallest) + 'px';
+      });
     });
   }
 
@@ -10763,7 +10799,7 @@ window.PageAssignments = (function () {
       closeCriterionComment();
       return;
     }
-    next.scrollIntoView({ block: 'nearest' });
+    _scrollIntoViewIfNeeded(next, { block: 'nearest' });
     openCriterionComment(next.dataset.aid, next.dataset.sid, next.dataset.critid);
   }
   function removeCriterionComment() {
@@ -11142,12 +11178,14 @@ window.PageAssignments = (function () {
 
   /* ── Export / Import ────────────────────────────────────── */
   /* ── Keyboard Navigation ────────────────────────────────── */
+  // A level click ran scrollIntoView straight after its writes (49 ms of
+  // layout); the row is now scrolled to, when out of sight, after the frame's.
   function kbFocusCell(el) {
     if (_kbFocusEl) _kbFocusEl.classList.remove('kb-focus');
     _kbFocusEl = el;
     if (el) {
       el.classList.add('kb-focus');
-      el.scrollIntoView({ block: 'nearest' });
+      _scrollIntoViewIfNeeded(el, { block: 'nearest' }, true);
     }
   }
   function navigateKb(direction) {
@@ -12603,7 +12641,9 @@ window.PageAssignments = (function () {
     _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     render();
-    overlay.querySelector('.grader-dialog').focus();
+    // Kept straight after the draw, so the first key is the dialog's; it no
+    // longer scrolls, which laid the new dialog out at once (61 ms).
+    overlay.querySelector('.grader-dialog').focus({ preventScroll: true });
     // Points work: the box is ready to type in.
     _focusGraderPoints(aid);
   }
@@ -12709,7 +12749,7 @@ window.PageAssignments = (function () {
       e.preventDefault();
       if (to) {
         to.focus({ preventScroll: true });
-        to.scrollIntoView({ block: 'nearest' });
+        _scrollIntoViewIfNeeded(to, { block: 'nearest' });
       }
       return true;
     }
