@@ -8,28 +8,30 @@ window.GradebookChrome = (function () {
     var data = document.getElementById('gb-data');
     var rowheads = document.getElementById('gb-rowheads');
     if (!data || !rowheads) return;
-    var rowheadDivs = rowheads.querySelectorAll('.gb-grid-rowhead');
-    var dataRows = data.querySelectorAll('tbody tr:not(.gb-stats-row)');
-
-    // Hover Q4 row → highlight Q3 rowhead
-    dataRows.forEach(function (tr, i) {
-      tr.addEventListener('mouseenter', function () {
-        if (rowheadDivs[i]) rowheadDivs[i].classList.add('gb-row-hover');
+    // A student's row lights up their name, and their name the row. The
+    // two panes listen, not each row, so a row drawn again on its own
+    // (page-gradebook.js, _redrawStudent) keeps it. Class Average lights nothing.
+    var ROW = 'tr:not(.gb-stats-row)';
+    var NAME = '.gb-grid-rowhead:not(.gb-grid-rowhead-stats)';
+    var lit = null;
+    function hover(pane, sel, other, otherSel) {
+      var at = null;
+      pane.addEventListener('mouseover', function (e) {
+        var el = e.target.closest ? e.target.closest(sel) : null;
+        if (el === at) return;
+        at = el;
+        var i = el && pane.contains(el) ? Array.prototype.indexOf.call(el.parentNode.children, el) : -1;
+        if (lit) lit.classList.remove('gb-row-hover');
+        lit = i >= 0 ? other.querySelectorAll(otherSel)[i] || null : null;
+        if (lit) lit.classList.add('gb-row-hover');
       });
-      tr.addEventListener('mouseleave', function () {
-        if (rowheadDivs[i]) rowheadDivs[i].classList.remove('gb-row-hover');
+      pane.addEventListener('mouseleave', function () {
+        if (lit) lit.classList.remove('gb-row-hover');
+        lit = at = null;
       });
-    });
-
-    // Hover Q3 rowhead → highlight Q4 row
-    rowheadDivs.forEach(function (div, i) {
-      div.addEventListener('mouseenter', function () {
-        if (dataRows[i]) dataRows[i].classList.add('gb-row-hover');
-      });
-      div.addEventListener('mouseleave', function () {
-        if (dataRows[i]) dataRows[i].classList.remove('gb-row-hover');
-      });
-    });
+    }
+    hover(data, ROW, rowheads, NAME);
+    hover(rowheads, NAME, data, ROW);
 
     // Hover a Q4 cell → highlight its column too, header and all, so a
     // score reads against both its student and its assignment.
@@ -327,6 +329,261 @@ window.GradebookChrome = (function () {
     _colLit = [];
   }
 
+  /* The tooltip on a student's name, in two groups so the two kinds of
+     number never sit side by side: the course grade as the class shows it
+     (with how many assignments are NS, which count as 0 toward a %) and
+     each category's grade, then each competency as a proficiency word
+     with how many assignments it comes from, then how many competencies
+     have evidence. Every value comes from calc.js. Kept in a map, not an
+     attribute, so the HTML never round-trips through the DOM. */
+  // html-safe: names, category and section names and grade text go through esc; levels come from calc.js.
+  function nameTip(cid, student, sections) {
+    var grade = studentGradeSummary(cid, student.id, viewedReportTerm(cid));
+    var word = levelWord(cid, getOverallProficiency(cid, student.id));
+    // The full name first: the name column cuts long ones off.
+    var tip =
+      '<div class="gb-tip-name">' +
+      esc(displayName(student)) +
+      '</div>' +
+      '<div class="gb-tip-head">Course Grade</div>' +
+      '<div class="gb-tip-grade" style="color:' +
+      (grade.text ? PROF_COLORS[grade.level] || PROF_COLORS[0] : 'var(--text-3)') +
+      '">' +
+      (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
+      '</div>';
+    // NS lowers only a percentage; a Proficiency class shows none. Only work
+    // the grade above counts: the year so far, outside 0% categories.
+    if (courseGradeMode(cid) !== 'proficiency') {
+      var ns = _scopedAssessments(cid).filter(function (a) {
+        return getAssignmentStatus(cid, student.id, a.id) === 'NS' && countsTowardGrades(cid, a);
+      }).length;
+      if (ns > 0)
+        tip +=
+          '<div class="gb-tip-note">' +
+          ns +
+          (ns === 1 ? ' assessment missing (counts as 0)' : ' assessments missing (count as 0)') +
+          '</div>';
+    }
+    // Categories make up the course grade, so they sit under it, each graded
+    // as the class shows grades.
+    var cats = getCategories(cid) || [];
+    if (cats.length) {
+      var scoped = _scopedAssessments(cid);
+      tip += '<div class="gb-tip-head">Categories</div>';
+      cats.forEach(function (cat) {
+        var g = assessmentGroupGrade(
+          cid,
+          student.id,
+          scoped.filter(function (a) {
+            return (a.categoryId || a.category_id || null) === cat.id;
+          }),
+          categoryCalcMode(cat),
+        );
+        tip +=
+          '<div class="gb-tip-row"><span class="gb-tip-label">' +
+          esc(cat.name) +
+          '</span><span class="gb-tip-val" style="color:' +
+          (g ? PROF_COLORS[g.level] || PROF_COLORS[0] : 'var(--text-3)') +
+          '">' +
+          (g ? esc(g.text) : '\u2014') +
+          '</span></div>';
+      });
+    }
+    // Each competency's level rests only on work handed in (an NS clears its
+    // scores), so the group says how much work that is, and each row how
+    // many assignments it comes from.
+    var allIds = {};
+    var rows = '';
+    var withEvidence = 0;
+    sections.forEach(function (sec) {
+      var ids = {};
+      sec.tags.forEach(function (t) {
+        getCountedTagScores(cid, student.id, t.id).forEach(function (sc) {
+          if (_isScoredEvidence(sc)) ids[sc.assessmentId] = allIds[sc.assessmentId] = true;
+        });
+      });
+      var n = Object.keys(ids).length;
+      var sp = getSectionProficiency(cid, student.id, sec.id);
+      if (getSectionProficiencyRaw(cid, student.id, sec.id) > 0) withEvidence++;
+      var r = Math.max(0, Math.min(4, roundLevel(sp)));
+      rows +=
+        '<div class="gb-tip-row"><span class="gb-tip-label">' +
+        esc(sec.shortName || sec.name) +
+        '</span><span class="gb-tip-val" style="color:' +
+        (r ? PROF_COLORS[r] : 'var(--text-3)') +
+        '">' +
+        esc(r ? levelText(cid, sp) : PROF_LABELS[0]) +
+        (r && n ? ' <span class="gb-tip-count">· ' + n + (n === 1 ? ' assessment' : ' assessments') + '</span>' : '') +
+        '</span></div>';
+    });
+    var handedIn = Object.keys(allIds).length;
+    tip += '<div class="gb-tip-head">Competencies</div>';
+    if (handedIn > 0)
+      tip +=
+        '<div class="gb-tip-note">From ' +
+        handedIn +
+        (handedIn === 1 ? ' assessment' : ' assessments') +
+        ' handed in</div>';
+    tip += '<div class="gb-tip-rows">' + rows + '</div>';
+    tip +=
+      '<div class="gb-tip-note gb-tip-foot">Evidence in ' +
+      withEvidence +
+      ' of ' +
+      sections.length +
+      (sections.length === 1 ? ' competency' : ' competencies') +
+      '</div>';
+    return tip;
+  }
+
+  /* ── Sorting ─────────────────────────────────────────────── */
+  /* The rows in the order `sortCol` ({ key, dir, by }) gives, or as they are. */
+  function sortRows(cid, students, sortCol) {
+    if (!sortCol) return students;
+    var key = sortCol.key;
+    var dir = sortCol.dir === 'asc' ? 1 : -1;
+    return students.slice().sort(function (a, b) {
+      var va, vb;
+      if (key === 'name') {
+        var af = (a.firstName || '').toLowerCase();
+        var al = (a.lastName || '').toLowerCase();
+        var bf = (b.firstName || '').toLowerCase();
+        var bl = (b.lastName || '').toLowerCase();
+        va = sortCol.by === 'first' ? af + ' ' + al : al + ' ' + af;
+        vb = sortCol.by === 'first' ? bf + ' ' + bl : bl + ' ' + bf;
+        return va < vb ? -dir : va > vb ? dir : 0;
+      } else if (key === 'overall' && courseGradeMode(cid) === 'letter') {
+        va = (getCourseLetterData(cid, a.id) || {}).R || 0;
+        vb = (getCourseLetterData(cid, b.id) || {}).R || 0;
+      } else if (key === 'overall') {
+        va = getOverallProficiency(cid, a.id);
+        vb = getOverallProficiency(cid, b.id);
+      } else if (key === 'coverage') {
+        va = getCompletionPct(cid, a.id);
+        vb = getCompletionPct(cid, b.id);
+      } else if (key === 'grade') {
+        va = (getCourseLetterData(cid, a.id) || {}).R || 0;
+        vb = (getCourseLetterData(cid, b.id) || {}).R || 0;
+      } else if (key.startsWith('grp-')) {
+        var grpId = key.slice(4);
+        va = getGroupProficiency(cid, a.id, grpId);
+        vb = getGroupProficiency(cid, b.id, grpId);
+      } else if (key.startsWith('sec-')) {
+        var secId = key.slice(4);
+        va = getSectionProficiency(cid, a.id, secId);
+        vb = getSectionProficiency(cid, b.id, secId);
+      } else if (key.startsWith('avg-')) {
+        var aid = key.slice(4);
+        var sc = getScores(cid);
+        var assess = getAssessments(cid).find(function (a) {
+          return a.id === aid;
+        });
+        var tagIds = assess ? scoreTagIds(assess, cid) : [];
+        var getAvg = function (sid) {
+          var ss = sc[sid] || [];
+          var ts = tagIds
+            .map(function (tid) {
+              var e = ss.find(function (e) {
+                return e.assessmentId === aid && e.tagId === tid;
+              });
+              return e ? scoreModValue(e) : 0;
+            })
+            .filter(function (v) {
+              return v > 0;
+            });
+          var rubricVal = getRubricAssessmentScore(cid, assess, ss);
+          if (rubricVal !== undefined) return rubricVal || 0;
+          return ts.length > 0
+            ? ts.reduce(function (x, y) {
+                return x + y;
+              }, 0) / ts.length
+            : 0;
+        };
+        va = getAvg(a.id);
+        vb = getAvg(b.id);
+      } else {
+        va = getOverallProficiency(cid, a.id);
+        vb = getOverallProficiency(cid, b.id);
+      }
+      return (va - vb) * dir;
+    });
+  }
+
+  /* ── Drawing again only what changed ─────────────────── */
+  /* The piece's drafts and work to grade among the students shown, counted
+     again into `_drafts` and `_work` as page-gradebook.js's _countDrafts and
+     _countWork count them. */
+  function recountPiece(_drafts, _work, cid, a, ids) {
+    var mark = function (byAid) {
+      var bySid = {};
+      Object.keys(byAid).forEach(function (k) {
+        byAid[k].forEach(function (s) {
+          bySid[s] = true;
+        });
+      });
+      return bySid;
+    };
+    if (_drafts) {
+      var waiting = GraderWork.draftsIn(cid, a.id, ids);
+      _drafts.total += waiting.length - (_drafts.byAid[a.id] || []).length;
+      delete _drafts.byAid[a.id];
+      delete _drafts.returns[a.id];
+      if (waiting.length) {
+        _drafts.byAid[a.id] = waiting;
+        _drafts.returns[a.id] = GraderWork.draftsReturned(cid, a.id, ids);
+      }
+      _drafts.bySid = mark(_drafts.byAid);
+    }
+    if (_work && GraderWork.workOn(cid, a)) {
+      var c = GraderWork.workCounts(cid, a.id, ids);
+      _work.total += c.tograde - (_work.n[a.id] || 0);
+      _work.n[a.id] = c.tograde;
+      delete _work.byAid[a.id];
+      if (c.ids.tograde.length) _work.byAid[a.id] = c.ids.tograde;
+      _work.bySid = mark(_work.byAid);
+    }
+  }
+
+  /* Put `html` in place of `old`, or before `before` when there is no
+     `old`; '' takes `old` away. html-safe: the page hands it a part of its
+     own draw (page-gradebook.js), escaped there. */
+  function swapHtml(old, html, before) {
+    if (old && html) old.outerHTML = html;
+    else if (old) old.remove();
+    // html-safe: as above, the page's own draw.
+    else if (html && before) before.insertAdjacentHTML('beforebegin', html);
+  }
+
+  /* Write only the parts of draw `b` (page-gradebook.js, _build) that differ
+     from `d`, the draw on the page: students' rows and names, the Class Average row, the
+     toolbar. -1 when anything else differs (the columns, the rows' order),
+     and nothing is written; else how many parts were. */
+  function patch(d, b) {
+    var data = document.getElementById('gb-data');
+    var heads = document.getElementById('gb-rowheads');
+    var bar = document.querySelector('#main > .gb-toolbar');
+    if (!d || d.cid !== b.cid || d.frame !== b.frame || d.sids.join() !== b.sids.join() || !bar) return -1;
+    var n = 0;
+    var put = function (el, was, now) {
+      if (was !== now) {
+        // html-safe: `b`'s parts are page-gradebook.js's draw, escaped by its builders.
+        el.outerHTML = now;
+        n++;
+      }
+    };
+    if (b.sids.length) {
+      var trs = data ? data.querySelectorAll('tr') : [];
+      if (!heads || trs.length !== b.rows.length + 1 || heads.children.length !== b.rows.length + 1) return -1;
+      b.rows.forEach(function (row, i) {
+        put(trs[i], d.rows[i], row);
+        put(heads.children[i], d.rowheads[i], b.rowheads[i]);
+      });
+      put(trs[trs.length - 1], d.stats, b.stats);
+      put(heads.lastElementChild, d.statsHead, b.statsHead);
+    }
+    put(bar, d.toolbar, b.toolbar);
+    return n;
+  }
+
   return {
     initGridHoverSync: initGridHoverSync,
     initGridScrollSync: initGridScrollSync,
@@ -337,5 +594,10 @@ window.GradebookChrome = (function () {
     initColHoverTooltip: initColHoverTooltip,
     _slantedColAt: _slantedColAt,
     _inSlantedHeads: _inSlantedHeads,
+    nameTip: nameTip,
+    sortRows: sortRows,
+    swapHtml: swapHtml,
+    patch: patch,
+    recountPiece: recountPiece,
   };
 })();

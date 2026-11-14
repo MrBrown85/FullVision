@@ -67,7 +67,7 @@ window.PageGradebook = (function () {
   // header's tip; a mouse click keeps the tip its hover showed. Safari's
   // click carries no pointerType of its own.
   var _lastPointer = 'mouse';
-  /* Name-cell tooltip HTML, keyed on student.id. Populated by _setNameTip,
+  /* Name-cell tooltip HTML, keyed on student.id. Populated by GradebookChrome.nameTip,
    * read by _showNameTip. Replaces the previous round-trip through
    * data-tip="…" (which relied on every contributor to `tip` using esc()
    * correctly so the browser's attribute-decode-plus-innerHTML cycle
@@ -274,7 +274,18 @@ window.PageGradebook = (function () {
      MAIN RENDER
      ══════════════════════════════════════════════════════════ */
   function render() {
+    _paint(_build());
+  }
+
+  /* A draw, worked out and not yet written: its HTML, and its parts (the
+     toolbar, each student's row and name, the Class Average row, and the
+     rest as one string) so a redraw can write only the parts that changed
+     (GradebookChrome.patch). The table builders fill in _parts. */
+  var _parts = null;
+  var _drawn = null; // the draw on the page
+  function _build() {
     var cid = activeCourse;
+    _parts = { sids: [], head: '', rowheads: [], rows: [], statsHead: '', stats: '', t: null };
     var students = sortStudents(getStudents(cid), 'lastName');
     // The gradebook always shows the year so far (Colin, 2026-11-03): no
     // report's term is in view here.
@@ -346,6 +357,9 @@ window.PageGradebook = (function () {
 
     // Draft and Returned (S1-F1): the drafts among the students and columns
     // shown, and the "N to return" filter, which leaves only those.
+    _parts.ids = students.map(function (s) {
+      return s.id;
+    });
     _drafts = _countDrafts(cid, students, assessments);
     if (!_drafts || !_drafts.total) _toReturnOnly = false;
     // Work to grade (S6-F4), over the students and columns shown: the same
@@ -469,6 +483,7 @@ window.PageGradebook = (function () {
       '&new=1">+ New Assessment</a>' +
       '</div>';
     html += '</div>';
+    var toolbarEnd = html.length;
 
     // ── Filter strip ──
     html += '<div class="gb-filter-strip' + (_filterStripOpen ? ' open' : '') + '" id="gb-filter-strip">';
@@ -533,17 +548,29 @@ window.PageGradebook = (function () {
       html += '<button class="gb-filter-clear" data-action="clearAllFilters">Clear All</button>';
     }
     html += '</div>';
+    var stripEnd = html.length;
 
     // ── Table ──
     var empty = _emptyState(cid, everyAssessment, allAssessments, assessments, students);
-    if (empty) {
-      html += empty;
-    } else if (viewMode === 'scores') {
-      html += renderScoresTable(cid, students, assessments, sections, isLetter, scores) + _keyHtml();
-    } else {
-      html += renderDetailedTable(cid, students, assessments, sections, isLetter, scores) + _keyHtml();
-    }
+    var table = empty
+      ? ''
+      : viewMode === 'scores'
+        ? renderScoresTable(cid, students, assessments, sections, isLetter, scores)
+        : renderDetailedTable(cid, students, assessments, sections, isLetter, scores);
+    var key = empty ? '' : _keyHtml();
+    html += empty || table + key;
+    _parts.cid = cid;
+    _parts.view = viewMode;
+    _parts.html = html;
+    _parts.toolbar = html.slice(0, toolbarEnd);
+    _parts.frame = viewMode + html.slice(toolbarEnd, stripEnd) + (empty || _parts.head + key);
+    return _parts;
+  }
 
+  /* Write a draw (_build) to the page. */
+  function _paint(b) {
+    var cid = b.cid;
+    var html = b.html;
     // A redraw (a saved score, a sort, a filter) leaves the table where it
     // was; another class or view starts at the top, and so does the "N to
     // return" filter's shorter grid.
@@ -576,6 +603,7 @@ window.PageGradebook = (function () {
         '#gb-colheads .gb-grid-colhead[data-aid="' + CSS.escape(refocusHeadAid) + '"] .gb-grid-colhead-label',
       );
     if (headAgain) _focusColhead(headAgain);
+    _drawn = b;
     if (window.ClassResults && ClassResults.isOpen()) ClassResults.refresh();
   }
 
@@ -915,11 +943,12 @@ window.PageGradebook = (function () {
     var ids = students.map(function (s) {
       return s.id;
     });
-    var out = { total: 0, byAid: {}, bySid: {} };
+    var out = { total: 0, byAid: {}, bySid: {}, n: {} };
     assessments.forEach(function (a) {
       if (!GraderWork.workOn(cid, a)) return;
       var c = GraderWork.workCounts(cid, a.id, ids);
       out.total += c.tograde;
+      out.n[a.id] = c.tograde;
       if (c.ids.tograde.length) out.byAid[a.id] = c.ids.tograde;
       c.ids.tograde.forEach(function (sid) {
         out.bySid[sid] = true;
@@ -1452,7 +1481,7 @@ window.PageGradebook = (function () {
         return i >= g.startIdx && i < g.startIdx + g.count;
       });
     });
-    var sortedStudents = applySorting(cid, students, sections, isLetter);
+    var sortedStudents = GradebookChrome.sortRows(cid, students, sortCol);
 
     // 4-quadrant grid layout
     var html = '<div' + _headStyle('--gb-head-h', GradebookChrome.headerHeight([])) + ' class="gb-grid gb-grid-comp">';
@@ -1585,260 +1614,301 @@ window.PageGradebook = (function () {
     });
     html += '</div>';
     html += '</div>' + HEAD_HANDLE + '</div>';
+    _parts.head = html;
+    _parts.students = sortedStudents;
+    var t = (_parts.t = { cols: cols, map: colGroupMap, assessments: assessments, sections: sections, scores: scores });
 
     // Q3: Row headers — student name + overall
     html += '<div class="gb-grid-rowheads" id="gb-rowheads">';
     sortedStudents.forEach(function (s, si) {
-      var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
-      var overall = getOverallProficiency(cid, s.id);
-      // The term in view's reporting basis (IE, or No Letter Grade for goals).
-      var grade = studentGradeSummary(cid, s.id, viewedReportTerm(cid));
-      var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
-      var label = levelWord(cid, overall);
-      var basisRow = _basisRow(cid, s.id);
-      _setNameTip(cid, s, sections);
-      html +=
-        '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
-        altClass +
-        (basisRow ? ' gb-row-basis' : '') +
-        '">' +
-        _rowheadNameOpen(cid, s) +
-        esc(displayName(s)) +
-        '</a>' +
-        '<span class="gb-grid-rowhead-overall" style="color:' +
-        color +
-        '"' +
-        (basisRow ? ' title="' + esc(grade.text) + '"' : '') +
-        '>' +
-        (basisRow ? '<span class="gb-grade-text">' + esc(grade.text) + '</span>' : grade.text || '\u2014') +
-        (label ? '<small>' + label + '</small>' : '') +
-        '</span>' +
-        '</div>';
+      html += _part('rowheads', _detailRowhead(cid, s, si, sections), s.id);
     });
     // Stats row header, with the class's own Overall at the foot of that column
-    html +=
-      '<div class="gb-grid-rowhead gb-grid-rowhead-comp gb-grid-rowhead-stats">Class Average' +
-      _classOverallHtml(cid, 'gb-grid-rowhead-overall') +
-      '</div>';
+    html += _part('statsHead', _statsHead(cid, 'detailed'));
     html += '</div>';
 
     // Q4: Data cells — score grid
     html +=
       '<div class="gb-grid-data" id="gb-data"><table class="gb-table" role="grid" aria-label="Scores by competency"><tbody>';
     sortedStudents.forEach(function (s) {
-      html += '<tr data-sid="' + s.id + '">';
-      cols.forEach(function (col, i) {
-        var g = colGroupMap[i];
-        var startClass = g && g.groupIdx > 0 && g.startIdx === i ? ' gb-group-start' : '';
-        var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
-        var cellW = col.colWidth || 54;
-        var cellStyle = cellW !== 54 ? ' style="min-width:' + cellW + 'px;width:' + cellW + 'px"' : '';
-        var assess = assessments.find(function (a) {
-          return a.id === col.assessmentId;
-        });
-        // Not submitted and Excused replace the score.
-        var cellStatus = getAssignmentStatus(cid, s.id, col.assessmentId);
-        var statusMark = scoreStatusMarker(cellStatus, cid, assess);
-        var lateMark = cellStatus === 'LATE' ? lateMarkHtml() : '';
-        // A draft is the whole piece: each of its cells is dashed (S1-F1).
-        var draft = _isDraft(s.id, col.assessmentId);
-        var draftClass = draft ? ' gb-draft' : '';
-        if (col.isPointsCol && isCompletionScored(assess)) {
-          var mark = getCompletionMark(cid, s.id, col.assessmentId);
-          html +=
-            '<td class="gb-score gb-score-pts' +
-            startClass +
-            altClass +
-            draftClass +
-            '"' +
-            cellStyle +
-            ' tabindex="-1" role="gridcell" aria-label="' +
-            _compCellLabel(
-              s,
-              assess,
-              col,
-              cellStatus,
-              mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '',
-              '',
-              draft,
-            ) +
-            '" data-aid="' +
-            col.assessmentId +
-            '" data-pts="1" data-cmp="1" data-sid="' +
-            s.id +
-            '" data-action="editScoreCell" data-kb="1" title="' +
-            (mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
-            '">' +
-            (statusMark || completionCellHtml(mark) + (mark ? lateMark : '')) +
-            '</td>';
-        } else if (col.isPointsCol) {
-          var max = assess.maxPoints || 100;
-          var score = getPointsScore(cid, s.id, col.assessmentId);
-          var pct = score != null ? oneDecimal((score / max) * 100).toFixed(1) : '0.0';
-          var title = score != null ? formatPoints(score) + '/' + max + ' (' + pct + '%)' : '';
-          var cellContent =
-            score != null
-              ? '<div class="gb-pts-display"><span class="gb-pts-score">' +
-                formatPoints(score) +
-                '<span class="gb-pts-max">/' +
-                max +
-                '</span>' +
-                lateMark +
-                '</span><span class="gb-pts-pct">' +
-                pct +
-                '%</span></div>'
-              : '<span class="gb-pts-empty">\u2014</span>';
-          html +=
-            '<td class="gb-score gb-score-pts' +
-            startClass +
-            altClass +
-            draftClass +
-            '"' +
-            cellStyle +
-            ' tabindex="-1" role="gridcell" aria-label="' +
-            _compCellLabel(
-              s,
-              assess,
-              col,
-              cellStatus,
-              score != null ? formatPoints(score) + ' out of ' + max : '',
-              '',
-              draft,
-            ) +
-            '" data-aid="' +
-            col.assessmentId +
-            '" data-pts="1" data-sid="' +
-            s.id +
-            '" data-max="' +
-            max +
-            '" data-action="editScoreCell" data-kb="1" title="' +
-            title +
-            '">' +
-            (statusMark || cellContent) +
-            '</td>';
-        } else {
-          var studentScores = scores[s.id] || [];
-          // A competency column of rubric work reads the criteria that feed
-          // it, and is scored on the rubric, not here. Criteria that
-          // disagree show the lowest, marked.
-          var rubricCol = !!(col.rubricCriteria && assess);
-          var entry = rubricCol
-            ? competencyLevelFromCriteria(cid, s.id, assess, col.tagId, col.rubricCriteria)
-            : studentScores.find(function (e) {
-                return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
-              });
-          var score = entry ? entry.score : 0;
-          var mixed = !!(entry && entry.mixed);
-          var assigned = rubricCol || (assess && scoreTagIds(assess, cid).includes(col.tagId));
-          var content = statusMark
-            ? statusMark
-            : score > 0
-              ? formatScoreLevel(score, entry.mod) + lateMark
-              : assigned
-                ? '<span class="gb-unscored">\u2014</span>'
-                : '\u2014';
-          var rubricTitle =
-            entry && entry.whole
-              ? 'Scored by the whole rubric: its criteria come to ' +
-                formatPointsPercent(entry.average, 4) +
-                '. Click to grade it on the rubric.'
-              : mixed
-                ? 'The criteria on this competency disagree, so the lowest is shown. Click to grade it on the rubric.'
-                : 'Click to grade it on the rubric.';
-          html +=
-            '<td class="gb-score' +
-            startClass +
-            altClass +
-            draftClass +
-            '"' +
-            cellStyle +
-            ' tabindex="-1" role="gridcell" aria-label="' +
-            _compCellLabel(
-              s,
-              assess,
-              col,
-              cellStatus,
-              score > 0 ? formatScoreLevel(score, entry.mod) + ', ' + scoreLevelText(score, entry.mod) : '',
-              rubricCol ? 'Scored on the rubric. Press Return to open it.' : '',
-              draft,
-            ) +
-            '" data-aid="' +
-            col.assessmentId +
-            '" data-tid="' +
-            col.tagId +
-            (col.tagIds && col.tagIds.length > 1 ? '" data-tids="' + esc(col.tagIds.join(',')) : '') +
-            '" data-sid="' +
-            s.id +
-            '"' +
-            (rubricCol
-              ? ' data-action="editScoreCell" title="' + rubricTitle + '"'
-              : ' data-action="editScoreCell" data-kb="1"') +
-            '><span class="gb-score-val s' +
-            score +
-            (mixed ? ' gb-mixed' : '') +
-            '">' +
-            content +
-            '</span></td>';
-        }
-      });
-      html += '</tr>';
+      html += _part('rows', _detailRow(cid, s, t));
     });
 
     // Stats row (grid version — no name/overall cells, those are in Q3)
-    html += '<tr class="gb-stats-row">';
-    var _statsColGroupMap = cols.map(function (_, i) {
-      return groups.find(function (g) {
-        return i >= g.startIdx && i < g.startIdx + g.count;
-      });
-    });
+    var stats = '<tr class="gb-stats-row">';
     cols.forEach(function (col, i) {
-      var g = _statsColGroupMap[i];
-      var startClass = g && g.groupIdx > 0 && g.startIdx === i ? ' gb-group-start' : '';
-      var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
-      var cellW = col.colWidth || 54;
-      var wStyle = cellW !== 54 ? 'min-width:' + cellW + 'px;width:' + cellW + 'px;' : '';
-      if (col.isPointsCol) {
-        html += _pointsAverageCell(cid, _averageStudents || sortedStudents, col, startClass + altClass, wStyle);
-        return;
-      }
-      // calc.js's one column rule; a criterion column (Rubrics by Criterion)
-      // averages every competency the criterion feeds.
-      var colAssess = assessments.find(function (a) {
-        return a.id === col.assessmentId;
-      });
-      var stats = classColumnAverage(cid, _averageStudents || sortedStudents, {
-        assessment: colAssess,
-        tagIds: col.tagIds || [col.tagId],
-      });
-      if (!stats)
-        html +=
-          '<td class="gb-score gb-avg-cell' +
-          startClass +
-          altClass +
-          '" style="' +
-          wStyle +
-          '"' +
-          _avgCellAttrs(cid, colAssess) +
-          '><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
-      else {
-        html +=
-          '<td class="gb-score gb-avg-cell' +
-          startClass +
-          altClass +
-          '" style="' +
-          wStyle +
-          '"' +
-          _avgCellAttrs(cid, colAssess) +
-          '><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[roundLevel(stats.avg)] +
-          ';font-weight:700">' +
-          formatColumnAverageLevel(cid, stats.avg) +
-          '</span></td>';
-      }
+      stats += _detailAvgCell(cid, col, i, t, _averageStudents || sortedStudents);
     });
-    html += '</tr>';
+    html += _part('stats', stats + '</tr>');
     html += '</tbody></table></div></div>';
     return html;
+  }
+
+  /* Keep one part of the draw (_build) and hand it back for the HTML. */
+  function _part(kind, html, sid) {
+    if (Array.isArray(_parts[kind])) _parts[kind].push(html);
+    else _parts[kind] = html;
+    if (sid) _parts.sids.push(sid);
+    return html;
+  }
+
+  /* The Class Average row's name cell, with the class's own Overall. */
+  function _statsHead(cid, view) {
+    return view === 'scores'
+      ? '<div class="gb-grid-rowhead gb-grid-rowhead-stats gb-scores-stats-head">Class Average' +
+          _classOverallHtml(cid, 'gb-grid-rowhead-grade') +
+          '</div>'
+      : '<div class="gb-grid-rowhead gb-grid-rowhead-comp gb-grid-rowhead-stats">Class Average' +
+          _classOverallHtml(cid, 'gb-grid-rowhead-overall') +
+          '</div>';
+  }
+
+  // A student's name and Overall in the Competencies view.
+  function _detailRowhead(cid, s, si, sections) {
+    var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
+    var overall = getOverallProficiency(cid, s.id);
+    // The term in view's reporting basis (IE, or No Letter Grade for goals).
+    var grade = studentGradeSummary(cid, s.id, viewedReportTerm(cid));
+    var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
+    var label = levelWord(cid, overall);
+    var basisRow = _basisRow(cid, s.id);
+    _nameTipHtml[s.id] = GradebookChrome.nameTip(cid, s, sections);
+    return (
+      '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
+      altClass +
+      (basisRow ? ' gb-row-basis' : '') +
+      '">' +
+      _rowheadNameOpen(cid, s) +
+      esc(displayName(s)) +
+      '</a>' +
+      '<span class="gb-grid-rowhead-overall" style="color:' +
+      color +
+      '"' +
+      (basisRow ? ' title="' + esc(grade.text) + '"' : '') +
+      '>' +
+      (basisRow ? '<span class="gb-grade-text">' + esc(grade.text) + '</span>' : grade.text || '\u2014') +
+      (label ? '<small>' + label + '</small>' : '') +
+      '</span>' +
+      '</div>'
+    );
+  }
+
+  /* A student's row of the Competencies grid; `t` is the draw's columns
+     (renderDetailedTable). */
+  // html-safe: titles, names, codes and tips are escaped; colours go through cssColor; ids, levels and grades are ours or calc.js's.
+  function _detailRow(cid, s, t) {
+    var html = '<tr data-sid="' + s.id + '">';
+    t.cols.forEach(function (col, i) {
+      html += _detailCell(cid, s, col, i, t);
+    });
+    return html + '</tr>';
+  }
+
+  // One cell of that row: column `i` of `t`.
+  function _detailCell(cid, s, col, i, t) {
+    var colGroupMap = t.map;
+    var assessments = t.assessments;
+    var scores = t.scores;
+    var html = '';
+    var g = colGroupMap[i];
+    var startClass = g && g.groupIdx > 0 && g.startIdx === i ? ' gb-group-start' : '';
+    var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
+    var cellW = col.colWidth || 54;
+    var cellStyle = cellW !== 54 ? ' style="min-width:' + cellW + 'px;width:' + cellW + 'px"' : '';
+    var assess = assessments.find(function (a) {
+      return a.id === col.assessmentId;
+    });
+    // Not submitted and Excused replace the score.
+    var cellStatus = getAssignmentStatus(cid, s.id, col.assessmentId);
+    var statusMark = scoreStatusMarker(cellStatus, cid, assess);
+    var lateMark = cellStatus === 'LATE' ? lateMarkHtml() : '';
+    // A draft is the whole piece: each of its cells is dashed (S1-F1).
+    var draft = _isDraft(s.id, col.assessmentId);
+    var draftClass = draft ? ' gb-draft' : '';
+    if (col.isPointsCol && isCompletionScored(assess)) {
+      var mark = getCompletionMark(cid, s.id, col.assessmentId);
+      html +=
+        '<td class="gb-score gb-score-pts' +
+        startClass +
+        altClass +
+        draftClass +
+        '"' +
+        cellStyle +
+        ' tabindex="-1" role="gridcell" aria-label="' +
+        _compCellLabel(
+          s,
+          assess,
+          col,
+          cellStatus,
+          mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '',
+          '',
+          draft,
+        ) +
+        '" data-aid="' +
+        col.assessmentId +
+        '" data-pts="1" data-cmp="1" data-sid="' +
+        s.id +
+        '" data-action="editScoreCell" data-kb="1" title="' +
+        (mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
+        '">' +
+        (statusMark || completionCellHtml(mark) + (mark ? lateMark : '')) +
+        '</td>';
+    } else if (col.isPointsCol) {
+      var max = assess.maxPoints || 100;
+      var score = getPointsScore(cid, s.id, col.assessmentId);
+      var pct = score != null ? oneDecimal((score / max) * 100).toFixed(1) : '0.0';
+      var title = score != null ? formatPoints(score) + '/' + max + ' (' + pct + '%)' : '';
+      var cellContent =
+        score != null
+          ? '<div class="gb-pts-display"><span class="gb-pts-score">' +
+            formatPoints(score) +
+            '<span class="gb-pts-max">/' +
+            max +
+            '</span>' +
+            lateMark +
+            '</span><span class="gb-pts-pct">' +
+            pct +
+            '%</span></div>'
+          : '<span class="gb-pts-empty">\u2014</span>';
+      html +=
+        '<td class="gb-score gb-score-pts' +
+        startClass +
+        altClass +
+        draftClass +
+        '"' +
+        cellStyle +
+        ' tabindex="-1" role="gridcell" aria-label="' +
+        _compCellLabel(
+          s,
+          assess,
+          col,
+          cellStatus,
+          score != null ? formatPoints(score) + ' out of ' + max : '',
+          '',
+          draft,
+        ) +
+        '" data-aid="' +
+        col.assessmentId +
+        '" data-pts="1" data-sid="' +
+        s.id +
+        '" data-max="' +
+        max +
+        '" data-action="editScoreCell" data-kb="1" title="' +
+        title +
+        '">' +
+        (statusMark || cellContent) +
+        '</td>';
+    } else {
+      var studentScores = scores[s.id] || [];
+      // A competency column of rubric work reads the criteria that feed
+      // it, and is scored on the rubric, not here. Criteria that
+      // disagree show the lowest, marked.
+      var rubricCol = !!(col.rubricCriteria && assess);
+      var entry = rubricCol
+        ? competencyLevelFromCriteria(cid, s.id, assess, col.tagId, col.rubricCriteria)
+        : studentScores.find(function (e) {
+            return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
+          });
+      var score = entry ? entry.score : 0;
+      var mixed = !!(entry && entry.mixed);
+      var assigned = rubricCol || (assess && scoreTagIds(assess, cid).includes(col.tagId));
+      var content = statusMark
+        ? statusMark
+        : score > 0
+          ? formatScoreLevel(score, entry.mod) + lateMark
+          : assigned
+            ? '<span class="gb-unscored">\u2014</span>'
+            : '\u2014';
+      var rubricTitle =
+        entry && entry.whole
+          ? 'Scored by the whole rubric: its criteria come to ' +
+            formatPointsPercent(entry.average, 4) +
+            '. Click to grade it on the rubric.'
+          : mixed
+            ? 'The criteria on this competency disagree, so the lowest is shown. Click to grade it on the rubric.'
+            : 'Click to grade it on the rubric.';
+      html +=
+        '<td class="gb-score' +
+        startClass +
+        altClass +
+        draftClass +
+        '"' +
+        cellStyle +
+        ' tabindex="-1" role="gridcell" aria-label="' +
+        _compCellLabel(
+          s,
+          assess,
+          col,
+          cellStatus,
+          score > 0 ? formatScoreLevel(score, entry.mod) + ', ' + scoreLevelText(score, entry.mod) : '',
+          rubricCol ? 'Scored on the rubric. Press Return to open it.' : '',
+          draft,
+        ) +
+        '" data-aid="' +
+        col.assessmentId +
+        '" data-tid="' +
+        col.tagId +
+        (col.tagIds && col.tagIds.length > 1 ? '" data-tids="' + esc(col.tagIds.join(',')) : '') +
+        '" data-sid="' +
+        s.id +
+        '"' +
+        (rubricCol
+          ? ' data-action="editScoreCell" title="' + rubricTitle + '"'
+          : ' data-action="editScoreCell" data-kb="1"') +
+        '><span class="gb-score-val s' +
+        score +
+        (mixed ? ' gb-mixed' : '') +
+        '">' +
+        content +
+        '</span></td>';
+    }
+    return html;
+  }
+
+  /* One Class Average cell of the Competencies grid: column `i` of `t`. */
+  function _detailAvgCell(cid, col, i, t, students) {
+    var g = t.map[i];
+    var startClass = g && g.groupIdx > 0 && g.startIdx === i ? ' gb-group-start' : '';
+    var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
+    var cellW = col.colWidth || 54;
+    var wStyle = cellW !== 54 ? 'min-width:' + cellW + 'px;width:' + cellW + 'px;' : '';
+    if (col.isPointsCol) {
+      return _pointsAverageCell(cid, students, col, startClass + altClass, wStyle);
+    }
+    // calc.js's one column rule; a criterion column (Rubrics by Criterion)
+    // averages every competency the criterion feeds.
+    var colAssess = t.assessments.find(function (a) {
+      return a.id === col.assessmentId;
+    });
+    var stats = classColumnAverage(cid, students, {
+      assessment: colAssess,
+      tagIds: col.tagIds || [col.tagId],
+    });
+    if (!stats)
+      return (
+        '<td class="gb-score gb-avg-cell' +
+        startClass +
+        altClass +
+        '" style="' +
+        wStyle +
+        '"' +
+        _avgCellAttrs(cid, colAssess) +
+        '><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>'
+      );
+    return (
+      '<td class="gb-score gb-avg-cell' +
+      startClass +
+      altClass +
+      '" style="' +
+      wStyle +
+      '"' +
+      _avgCellAttrs(cid, colAssess) +
+      '><span class="gb-avg-val" style="color:' +
+      PROF_COLORS[roundLevel(stats.avg)] +
+      ';font-weight:700">' +
+      formatColumnAverageLevel(cid, stats.avg) +
+      '</span></td>'
+    );
   }
 
   /* A slanted title's second line: the date, what points work is out of
@@ -1866,7 +1936,7 @@ window.PageGradebook = (function () {
      ══════════════════════════════════════════════════════════ */
   // html-safe: titles, names and designations are escaped; colours go through cssColor; cell text comes from calc.js.
   function renderScoresTable(cid, students, assessments, sections, isLetter, scores) {
-    var sortedStudents = applySorting(cid, students, sections, isLetter);
+    var sortedStudents = GradebookChrome.sortRows(cid, students, sortCol);
     var cw = getCategoryWeights(cid);
     var rowH = '';
 
@@ -1964,76 +2034,16 @@ window.PageGradebook = (function () {
         '</div>';
     });
     html += '</div>' + HEAD_HANDLE + '</div>';
+    _parts.head = html;
+    _parts.students = sortedStudents;
+    var t = (_parts.t = { assessments: sortedAssess, sections: sections });
 
     // Q3: Row headers (bottom-left, scrolls vertically)
     html += '<div class="gb-grid-rowheads" id="gb-rowheads">';
     sortedStudents.forEach(function (s, si) {
-      var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
-      // The overall grade as the class is set to show it (calc.js): the
-      // proficiency, the letter and %, or both stacked, each in its colour,
-      // with the term in view's reporting basis (IE, or No Letter Grade).
-      var badges = studentGradeBadges(cid, s.id, viewedReportTerm(cid));
-      var gradeParts = [badges.prof, badges.letter].filter(Boolean);
-      var desTags = (s.designations || [])
-        .map(function (code) {
-          var d = designationInfo(code);
-          if (!d) return '';
-          return (
-            '<span class="gb-des-tag" title="' +
-            esc(code) +
-            ' \u2014 ' +
-            esc(d.name) +
-            (d.iep ? ' \u00b7 IEP' : '') +
-            (d.modified ? ' \u00b7 Modified' : '') +
-            '">' +
-            esc(code) +
-            '</span>'
-          );
-        })
-        .join('');
-      var basisRow = _basisRow(cid, s.id);
-      _setNameTip(cid, s, sections);
-      html +=
-        '<div class="gb-grid-rowhead' +
-        altClass +
-        (basisRow ? ' gb-row-basis' : '') +
-        '">' +
-        _rowheadNameOpen(cid, s) +
-        esc(displayName(s)) +
-        desTags +
-        '</a>' +
-        '<span class="gb-grid-rowhead-grade">' +
-        (gradeParts.length
-          ? gradeParts
-              .map(function (p) {
-                return (
-                  '<span class="gb-grade-text" style="color:' +
-                  (PROF_COLORS[p.level] || PROF_COLORS[0]) +
-                  '"' +
-                  (basisRow ? ' title="' + esc(p.text) + '"' : '') +
-                  '>' +
-                  esc(p.text) +
-                  '</span>'
-                );
-              })
-              .join('') +
-            // A Proficiency class's overall says its word under the number,
-            // as the Competencies view does, so colour isn't the only sign.
-            (gradeParts.length === 1 && badges.prof && levelWord(cid, getOverallProficiency(cid, s.id))
-              ? '<small class="gb-grade-word" style="color:' +
-                (PROF_COLORS[badges.prof.level] || PROF_COLORS[0]) +
-                '">' +
-                levelWord(cid, getOverallProficiency(cid, s.id)) +
-                '</small>'
-              : '')
-          : '<span style="color:var(--text-3)">\u2014</span>') +
-        '</span>' +
-        '</div>';
+      html += _part('rowheads', _scoresRowhead(cid, s, si, sections), s.id);
     });
-    html +=
-      '<div class="gb-grid-rowhead gb-grid-rowhead-stats gb-scores-stats-head">Class Average' +
-      _classOverallHtml(cid, 'gb-grid-rowhead-grade') +
-      '</div>';
+    html += _part('statsHead', _statsHead(cid, 'scores'));
     html += '</div>';
 
     // Q4: Data cells (bottom-right, scrolls both ways — drives the others)
@@ -2042,333 +2052,241 @@ window.PageGradebook = (function () {
       rowH +
       '" role="grid" aria-label="Scores"><tbody>';
     sortedStudents.forEach(function (s, si) {
-      var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
-      html += '<tr class="gb-scores-row' + altClass + '" data-sid="' + s.id + '">';
-
-      // Score cells per assignment
-      sortedAssess.forEach(function (a) {
-        // What the cell holds comes from calc.js, the same value the printed
-        // grade sheet prints; this view adds only its colours and markup.
-        var cell = assessmentCellValue(cid, s.id, a);
-        var val = cell.value;
-        var display,
-          cellStyle,
-          cellClass = '';
-        var cmpMark = cell.mark;
-        var cellStatus = cell.status;
-        var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus, cid, a) : '';
-        if (statusMark) {
-          // Not submitted and Excused replace the score.
-          cellStyle = 'color:var(--text-3)';
-          display = statusMark;
-        } else if (cmpMark) {
-          cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
-          display =
-            cell.text + (cell.late ? lateMarkHtml() : '') + (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
-        } else if (cell.kind === 'points' || cell.kind === 'level') {
-          var r = cell.level;
-          cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
-          display =
-            (cell.kind === 'level' ? _levelCellHtml(cid, cell.value, cell) : esc(cell.text)) +
-            (cell.late ? lateMarkHtml() : '') +
-            (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
-          // Warning for out-of-range: above 4 on proficiency work, above the
-          // extra-credit cap (twice the maximum) on points work.
-          if (cell.outOfRange) cellClass = ' gb-scores-warning';
-        } else if (cell.kind === 'dibels' && cell.dibels) {
-          // A DIBELS benchmark's latest reading level, as a word; not a grade.
-          var dl = { above: 4, core: 3, strategic: 2, intensive: 1 }[cell.dibels.level] || 0;
-          cellStyle = dl ? 'background:' + PROF_TINT[dl] + ';color:' + PROF_COLORS[dl] : 'color:var(--text-3)';
-          display = '<span class="gb-scores-dibels">' + esc(cell.text) + '</span>';
-        } else {
-          cellStyle = 'color:var(--text-3)';
-          display = '\u2014';
-        }
-        // A draft: the dashed outline in the level's colour, and no fill
-        // (S1-F1). A Missing or Excused piece is never one.
-        var draft = _isDraft(s.id, a.id);
-        if (draft) {
-          cellClass += ' gb-draft';
-          cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
-        }
-        // Work in (S6-F4): To Grade in place of the dash while it waits,
-        // the camera when photos came in, and a hover line saying what.
-        var work = _workCell(cid, a, s.id);
-        if (work && work.tograde) {
-          cellStyle = '';
-          // A filled blue chip, with the camera inside when photos came in.
-          display = '<span class="gb-to-grade">' + (work.photos ? WORK_CAMERA : '') + 'To Grade</span>';
-        } else if (work && work.photos) display += WORK_CAMERA;
-        // Out for revision (S11): "Revising" under the grade, nothing in yet.
-        var revising = _revisions && GraderWork.revisionStateOf(cid, s.id, a.id) === 'revising';
-        if (revising) display += '<span class="gb-revising">Revising</span>';
-        // A question waiting (S10-F4): the yellow dot and its hover line.
-        var question = _questionCell(a.id, s.id);
-        if (question) display += QUESTION_DOT;
-        var cellTitle = work ? work.title : '';
-        if (question) {
-          var asked = _askedOn(question);
-          cellTitle =
-            'Asked you a question' +
-            (asked ? ' ' + asked : '') +
-            '. ' +
-            (work && work.title ? work.title : 'Click to open in the grader.');
-        }
-        var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
-        var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
-        html +=
-          '<td class="gb-scores-cell' +
-          (isScoreModeCell ? ' gb-scores-focus' : '') +
-          (isScoreModeCol ? ' gb-scores-col-active' : '') +
-          cellClass +
-          '" style="' +
-          cellStyle +
-          '" tabindex="-1" role="gridcell" aria-label="' +
-          esc(displayName(s)) +
-          ', ' +
-          esc(a.title) +
-          ': ' +
-          (statusMark
-            ? cellStatus === 'NS'
-              ? 'Missing'
-              : 'Excused'
-            : cmpMark
-              ? cmpMark === 'complete'
-                ? 'Complete'
-                : 'Incomplete'
-              : val > 0
-                ? cell.kind === 'points'
-                  ? cell.text + ' out of ' + (a.maxPoints || 100)
-                  : cell.text + (levelWord(cid, cell.level) ? ', ' + levelWord(cid, cell.level) : '')
-                : 'no score') +
-          (cell.late && !statusMark ? ', Late' : '') +
-          (draft ? DRAFT_CELL_WORDS : '') +
-          (work ? esc(work.words) : '') +
-          (revising ? ', returned for revision' : '') +
-          (question ? ', question waiting' : '') +
-          '"' +
-          (cellTitle ? ' title="' + esc(cellTitle) + '"' : '') +
-          ' data-action="editScoreCell" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          s.id +
-          '">' +
-          '<span class="gb-scores-val">' +
-          display +
-          '</span>' +
-          '</td>';
-      });
-
-      html += '</tr>';
+      html += _part('rows', _scoresRow(cid, s, si, t));
     });
     // Class Average under each column: calc.js's one column rule, written
     // as the printed sheet and the CSV write it.
-    html += '<tr class="gb-stats-row gb-scores-stats">';
+    var stats = '<tr class="gb-stats-row gb-scores-stats">';
     sortedAssess.forEach(function (a) {
-      var stats = classColumnAverage(cid, _averageStudents || sortedStudents, { assessment: a });
-      if (!stats) {
-        html +=
-          '<td class="gb-scores-avg"' +
-          _avgCellAttrs(cid, a) +
-          '><span class="gb-avg-val" style="color:var(--text-3)">\u2014</span></td>';
-        return;
-      }
-      var level = isPointsScored(a)
-        ? pointsToProf(stats.pct != null ? stats.pct : 0, 100, getGradingScale(cid))
-        : roundLevel(stats.avg);
-      html +=
-        '<td class="gb-scores-avg"' +
-        _avgCellAttrs(cid, a) +
-        '><span class="gb-avg-val" style="color:' +
-        (PROF_COLORS[level] || PROF_COLORS[0]) +
-        '">' +
-        (isCompletionScored(a)
-          ? _csvAverageText(cid, a, stats)
-          : isPointsScored(a)
-            ? _pointsAverageText(a, stats)
-            : _levelCellHtml(cid, stats.avg)) +
-        '</span></td>';
+      stats += _scoresAvgCell(cid, a, _averageStudents || sortedStudents);
     });
-    html += '</tr>';
+    html += _part('stats', stats + '</tr>');
     html += '</tbody></table></div></div>'; // close table + data + grid
     return html;
   }
 
-  /* The tooltip on a student's name, in two groups so the two kinds of
-     number never sit side by side: the course grade as the class shows it
-     (with how many assignments are NS, which count as 0 toward a %) and
-     each category's grade, then each competency as a proficiency word
-     with how many assignments it comes from, then how many competencies
-     have evidence. Every value comes from calc.js. Kept in a map, not an
-     attribute, so the HTML never round-trips through the DOM. */
-  function _setNameTip(cid, student, sections) {
-    var grade = studentGradeSummary(cid, student.id, viewedReportTerm(cid));
-    var word = levelWord(cid, getOverallProficiency(cid, student.id));
-    // The full name first: the name column cuts long ones off.
-    var tip =
-      '<div class="gb-tip-name">' +
-      esc(displayName(student)) +
-      '</div>' +
-      '<div class="gb-tip-head">Course Grade</div>' +
-      '<div class="gb-tip-grade" style="color:' +
-      (grade.text ? PROF_COLORS[grade.level] || PROF_COLORS[0] : 'var(--text-3)') +
-      '">' +
-      (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
-      '</div>';
-    // NS lowers only a percentage; a Proficiency class shows none. Only work
-    // the grade above counts: the year so far, outside 0% categories.
-    if (courseGradeMode(cid) !== 'proficiency') {
-      var ns = _scopedAssessments(cid).filter(function (a) {
-        return getAssignmentStatus(cid, student.id, a.id) === 'NS' && countsTowardGrades(cid, a);
-      }).length;
-      if (ns > 0)
-        tip +=
-          '<div class="gb-tip-note">' +
-          ns +
-          (ns === 1 ? ' assessment missing (counts as 0)' : ' assessments missing (count as 0)') +
-          '</div>';
-    }
-    // Categories make up the course grade, so they sit under it, each graded
-    // as the class shows grades.
-    var cats = getCategories(cid) || [];
-    if (cats.length) {
-      var scoped = _scopedAssessments(cid);
-      tip += '<div class="gb-tip-head">Categories</div>';
-      cats.forEach(function (cat) {
-        var g = assessmentGroupGrade(
-          cid,
-          student.id,
-          scoped.filter(function (a) {
-            return (a.categoryId || a.category_id || null) === cat.id;
-          }),
-          categoryCalcMode(cat),
-        );
-        tip +=
-          '<div class="gb-tip-row"><span class="gb-tip-label">' +
-          esc(cat.name) +
-          '</span><span class="gb-tip-val" style="color:' +
-          (g ? PROF_COLORS[g.level] || PROF_COLORS[0] : 'var(--text-3)') +
+  // A student's name and Overall in the Scores view.
+  function _scoresRowhead(cid, s, si, sections) {
+    var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
+    // The overall grade as the class is set to show it (calc.js): the
+    // proficiency, the letter and %, or both stacked, each in its colour,
+    // with the term in view's reporting basis (IE, or No Letter Grade).
+    var badges = studentGradeBadges(cid, s.id, viewedReportTerm(cid));
+    var gradeParts = [badges.prof, badges.letter].filter(Boolean);
+    var desTags = (s.designations || [])
+      .map(function (code) {
+        var d = designationInfo(code);
+        if (!d) return '';
+        return (
+          '<span class="gb-des-tag" title="' +
+          esc(code) +
+          ' \u2014 ' +
+          esc(d.name) +
+          (d.iep ? ' \u00b7 IEP' : '') +
+          (d.modified ? ' \u00b7 Modified' : '') +
           '">' +
-          (g ? esc(g.text) : '\u2014') +
-          '</span></div>';
-      });
-    }
-    // Each competency's level rests only on work handed in (an NS clears its
-    // scores), so the group says how much work that is, and each row how
-    // many assignments it comes from.
-    var allIds = {};
-    var rows = '';
-    var withEvidence = 0;
-    sections.forEach(function (sec) {
-      var ids = {};
-      sec.tags.forEach(function (t) {
-        getCountedTagScores(cid, student.id, t.id).forEach(function (sc) {
-          if (_isScoredEvidence(sc)) ids[sc.assessmentId] = allIds[sc.assessmentId] = true;
-        });
-      });
-      var n = Object.keys(ids).length;
-      var sp = getSectionProficiency(cid, student.id, sec.id);
-      if (getSectionProficiencyRaw(cid, student.id, sec.id) > 0) withEvidence++;
-      var r = Math.max(0, Math.min(4, roundLevel(sp)));
-      rows +=
-        '<div class="gb-tip-row"><span class="gb-tip-label">' +
-        esc(sec.shortName || sec.name) +
-        '</span><span class="gb-tip-val" style="color:' +
-        (r ? PROF_COLORS[r] : 'var(--text-3)') +
-        '">' +
-        esc(r ? levelText(cid, sp) : PROF_LABELS[0]) +
-        (r && n ? ' <span class="gb-tip-count">· ' + n + (n === 1 ? ' assessment' : ' assessments') + '</span>' : '') +
-        '</span></div>';
-    });
-    var handedIn = Object.keys(allIds).length;
-    tip += '<div class="gb-tip-head">Competencies</div>';
-    if (handedIn > 0)
-      tip +=
-        '<div class="gb-tip-note">From ' +
-        handedIn +
-        (handedIn === 1 ? ' assessment' : ' assessments') +
-        ' handed in</div>';
-    tip += '<div class="gb-tip-rows">' + rows + '</div>';
-    tip +=
-      '<div class="gb-tip-note gb-tip-foot">Evidence in ' +
-      withEvidence +
-      ' of ' +
-      sections.length +
-      (sections.length === 1 ? ' competency' : ' competencies') +
-      '</div>';
-    _nameTipHtml[student.id] = tip;
+          esc(code) +
+          '</span>'
+        );
+      })
+      .join('');
+    var basisRow = _basisRow(cid, s.id);
+    _nameTipHtml[s.id] = GradebookChrome.nameTip(cid, s, sections);
+    return (
+      '<div class="gb-grid-rowhead' +
+      altClass +
+      (basisRow ? ' gb-row-basis' : '') +
+      '">' +
+      _rowheadNameOpen(cid, s) +
+      esc(displayName(s)) +
+      desTags +
+      '</a>' +
+      '<span class="gb-grid-rowhead-grade">' +
+      (gradeParts.length
+        ? gradeParts
+            .map(function (p) {
+              return (
+                '<span class="gb-grade-text" style="color:' +
+                (PROF_COLORS[p.level] || PROF_COLORS[0]) +
+                '"' +
+                (basisRow ? ' title="' + esc(p.text) + '"' : '') +
+                '>' +
+                esc(p.text) +
+                '</span>'
+              );
+            })
+            .join('') +
+          // A Proficiency class's overall says its word under the number,
+          // as the Competencies view does, so colour isn't the only sign.
+          (gradeParts.length === 1 && badges.prof && levelWord(cid, getOverallProficiency(cid, s.id))
+            ? '<small class="gb-grade-word" style="color:' +
+              (PROF_COLORS[badges.prof.level] || PROF_COLORS[0]) +
+              '">' +
+              levelWord(cid, getOverallProficiency(cid, s.id)) +
+              '</small>'
+            : '')
+        : '<span style="color:var(--text-3)">\u2014</span>') +
+      '</span>' +
+      '</div>'
+    );
   }
 
-  /* ── Sorting ─────────────────────────────────────────────── */
-  function applySorting(cid, students, sections, isLetter) {
-    if (!sortCol) return students;
-    var key = sortCol.key;
-    var dir = sortCol.dir === 'asc' ? 1 : -1;
-    return students.slice().sort(function (a, b) {
-      var va, vb;
-      if (key === 'name') {
-        var af = (a.firstName || '').toLowerCase();
-        var al = (a.lastName || '').toLowerCase();
-        var bf = (b.firstName || '').toLowerCase();
-        var bl = (b.lastName || '').toLowerCase();
-        va = sortCol.by === 'first' ? af + ' ' + al : al + ' ' + af;
-        vb = sortCol.by === 'first' ? bf + ' ' + bl : bl + ' ' + bf;
-        return va < vb ? -dir : va > vb ? dir : 0;
-      } else if (key === 'overall' && courseGradeMode(cid) === 'letter') {
-        va = _getStudentLetterData(cid, a.id).R || 0;
-        vb = _getStudentLetterData(cid, b.id).R || 0;
-      } else if (key === 'overall') {
-        va = getOverallProficiency(cid, a.id);
-        vb = getOverallProficiency(cid, b.id);
-      } else if (key === 'coverage') {
-        va = getCompletionPct(cid, a.id);
-        vb = getCompletionPct(cid, b.id);
-      } else if (key === 'grade') {
-        va = _getStudentLetterData(cid, a.id).R || 0;
-        vb = _getStudentLetterData(cid, b.id).R || 0;
-      } else if (key.startsWith('grp-')) {
-        var grpId = key.slice(4);
-        va = getGroupProficiency(cid, a.id, grpId);
-        vb = getGroupProficiency(cid, b.id, grpId);
-      } else if (key.startsWith('sec-')) {
-        var secId = key.slice(4);
-        va = getSectionProficiency(cid, a.id, secId);
-        vb = getSectionProficiency(cid, b.id, secId);
-      } else if (key.startsWith('avg-')) {
-        var aid = key.slice(4);
-        var sc = getScores(cid);
-        var assess = getAssessments(cid).find(function (a) {
-          return a.id === aid;
-        });
-        var tagIds = assess ? scoreTagIds(assess, cid) : [];
-        var getAvg = function (sid) {
-          var ss = sc[sid] || [];
-          var ts = tagIds
-            .map(function (tid) {
-              var e = ss.find(function (e) {
-                return e.assessmentId === aid && e.tagId === tid;
-              });
-              return e ? scoreModValue(e) : 0;
-            })
-            .filter(function (v) {
-              return v > 0;
-            });
-          var rubricVal = getRubricAssessmentScore(cid, assess, ss);
-          if (rubricVal !== undefined) return rubricVal || 0;
-          return ts.length > 0
-            ? ts.reduce(function (x, y) {
-                return x + y;
-              }, 0) / ts.length
-            : 0;
-        };
-        va = getAvg(a.id);
-        vb = getAvg(b.id);
-      } else {
-        va = getOverallProficiency(cid, a.id);
-        vb = getOverallProficiency(cid, b.id);
-      }
-      return (va - vb) * dir;
+  /* A student's row of the Scores grid; `t` is the draw's columns
+     (renderScoresTable). */
+  // html-safe: titles, names and designations are escaped; colours go through cssColor; cell text comes from calc.js.
+  function _scoresRow(cid, s, si, t) {
+    var sortedAssess = t.assessments;
+    var html = '';
+    var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
+    html += '<tr class="gb-scores-row' + altClass + '" data-sid="' + s.id + '">';
+
+    sortedAssess.forEach(function (a) {
+      html += _scoresCell(cid, s, si, a);
     });
+    return html + '</tr>';
+  }
+
+  // One cell of that row: piece `a`.
+  function _scoresCell(cid, s, si, a) {
+    var html = '';
+    // What the cell holds comes from calc.js, the same value the printed
+    // grade sheet prints; this view adds only its colours and markup.
+    var cell = assessmentCellValue(cid, s.id, a);
+    var val = cell.value;
+    var display,
+      cellStyle,
+      cellClass = '';
+    var cmpMark = cell.mark;
+    var cellStatus = cell.status;
+    var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus, cid, a) : '';
+    if (statusMark) {
+      // Not submitted and Excused replace the score.
+      cellStyle = 'color:var(--text-3)';
+      display = statusMark;
+    } else if (cmpMark) {
+      cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
+      display = cell.text + (cell.late ? lateMarkHtml() : '') + (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
+    } else if (cell.kind === 'points' || cell.kind === 'level') {
+      var r = cell.level;
+      cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
+      display =
+        (cell.kind === 'level' ? _levelCellHtml(cid, cell.value, cell) : esc(cell.text)) +
+        (cell.late ? lateMarkHtml() : '') +
+        (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
+      // Warning for out-of-range: above 4 on proficiency work, above the
+      // extra-credit cap (twice the maximum) on points work.
+      if (cell.outOfRange) cellClass = ' gb-scores-warning';
+    } else if (cell.kind === 'dibels' && cell.dibels) {
+      // A DIBELS benchmark's latest reading level, as a word; not a grade.
+      var dl = { above: 4, core: 3, strategic: 2, intensive: 1 }[cell.dibels.level] || 0;
+      cellStyle = dl ? 'background:' + PROF_TINT[dl] + ';color:' + PROF_COLORS[dl] : 'color:var(--text-3)';
+      display = '<span class="gb-scores-dibels">' + esc(cell.text) + '</span>';
+    } else {
+      cellStyle = 'color:var(--text-3)';
+      display = '\u2014';
+    }
+    // A draft: the dashed outline in the level's colour, and no fill
+    // (S1-F1). A Missing or Excused piece is never one.
+    var draft = _isDraft(s.id, a.id);
+    if (draft) {
+      cellClass += ' gb-draft';
+      cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
+    }
+    // Work in (S6-F4): To Grade in place of the dash while it waits,
+    // the camera when photos came in, and a hover line saying what.
+    var work = _workCell(cid, a, s.id);
+    if (work && work.tograde) {
+      cellStyle = '';
+      // A filled blue chip, with the camera inside when photos came in.
+      display = '<span class="gb-to-grade">' + (work.photos ? WORK_CAMERA : '') + 'To Grade</span>';
+    } else if (work && work.photos) display += WORK_CAMERA;
+    // Out for revision (S11): "Revising" under the grade, nothing in yet.
+    var revising = _revisions && GraderWork.revisionStateOf(cid, s.id, a.id) === 'revising';
+    if (revising) display += '<span class="gb-revising">Revising</span>';
+    // A question waiting (S10-F4): the yellow dot and its hover line.
+    var question = _questionCell(a.id, s.id);
+    if (question) display += QUESTION_DOT;
+    var cellTitle = work ? work.title : '';
+    if (question) {
+      var asked = _askedOn(question);
+      cellTitle =
+        'Asked you a question' +
+        (asked ? ' ' + asked : '') +
+        '. ' +
+        (work && work.title ? work.title : 'Click to open in the grader.');
+    }
+    var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
+    var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
+    html +=
+      '<td class="gb-scores-cell' +
+      (isScoreModeCell ? ' gb-scores-focus' : '') +
+      (isScoreModeCol ? ' gb-scores-col-active' : '') +
+      cellClass +
+      '" style="' +
+      cellStyle +
+      '" tabindex="-1" role="gridcell" aria-label="' +
+      esc(displayName(s)) +
+      ', ' +
+      esc(a.title) +
+      ': ' +
+      (statusMark
+        ? cellStatus === 'NS'
+          ? 'Missing'
+          : 'Excused'
+        : cmpMark
+          ? cmpMark === 'complete'
+            ? 'Complete'
+            : 'Incomplete'
+          : val > 0
+            ? cell.kind === 'points'
+              ? cell.text + ' out of ' + (a.maxPoints || 100)
+              : cell.text + (levelWord(cid, cell.level) ? ', ' + levelWord(cid, cell.level) : '')
+            : 'no score') +
+      (cell.late && !statusMark ? ', Late' : '') +
+      (draft ? DRAFT_CELL_WORDS : '') +
+      (work ? esc(work.words) : '') +
+      (revising ? ', returned for revision' : '') +
+      (question ? ', question waiting' : '') +
+      '"' +
+      (cellTitle ? ' title="' + esc(cellTitle) + '"' : '') +
+      ' data-action="editScoreCell" data-aid="' +
+      a.id +
+      '" data-sid="' +
+      s.id +
+      '">' +
+      '<span class="gb-scores-val">' +
+      display +
+      '</span>' +
+      '</td>';
+    return html;
+  }
+
+  // One Class Average cell of the Scores grid.
+  function _scoresAvgCell(cid, a, students) {
+    var stats = classColumnAverage(cid, students, { assessment: a });
+    if (!stats) {
+      return (
+        '<td class="gb-scores-avg"' +
+        _avgCellAttrs(cid, a) +
+        '><span class="gb-avg-val" style="color:var(--text-3)">\u2014</span></td>'
+      );
+    }
+    var level = isPointsScored(a)
+      ? pointsToProf(stats.pct != null ? stats.pct : 0, 100, getGradingScale(cid))
+      : roundLevel(stats.avg);
+    return (
+      '<td class="gb-scores-avg"' +
+      _avgCellAttrs(cid, a) +
+      '><span class="gb-avg-val" style="color:' +
+      (PROF_COLORS[level] || PROF_COLORS[0]) +
+      '">' +
+      (isCompletionScored(a)
+        ? _csvAverageText(cid, a, stats)
+        : isPointsScored(a)
+          ? _pointsAverageText(a, stats)
+          : _levelCellHtml(cid, stats.avg)) +
+      '</span></td>'
+    );
   }
 
   /* A Class Average cell opens Class Results (a click, Enter or Space;
@@ -2469,11 +2387,104 @@ window.PageGradebook = (function () {
       '"]' +
       (td.dataset.tid ? '[data-tid="' + CSS.escape(td.dataset.tid) + '"]' : '[data-pts="1"]');
     clearProfCache();
-    render();
-    refreshSidebar();
+    var sids = _redrawStudent(td.dataset.sid, td.dataset.aid);
+    if (!sids) render();
+    _sidebarAfter(sids);
     var cell = document.querySelector(sel);
     if (cell) _selectCell(cell);
     return cell;
+  }
+
+  /* One score entered draws again only what it changes (tests/gradebook-
+     redraw-one-row.test.js): the piece's cells in its student's row, and
+     their name and Overall; on pair or group work the partners' too; the
+     piece's Class Average cells and the class's Overall; and the piece's "N to return", Return N
+     Graded and "N to grade". Returns the students drawn again, or null
+     when the whole grid has to be: a sort by a grade, a filter a score can
+     change (To Grade, To Return, Questions), score mode. */
+  function _redrawStudent(sid, aid) {
+    var d = _drawn;
+    var cid = activeCourse;
+    var data = document.getElementById('gb-data');
+    var heads = document.getElementById('gb-rowheads');
+    if (!d || !d.t || d.cid !== cid || d.view !== viewMode || !data || !heads || _scoreMode) return null;
+    if (_toGradeOnly || _toReturnOnly || _questionsOnly || (sortCol && sortCol.key !== 'name')) return null;
+    var a = d.t.assessments.find(function (x) {
+      return x.id === aid;
+    });
+    var trs = data.querySelectorAll('tr');
+    if (!a || trs.length !== d.sids.length + 1 || heads.children.length !== d.sids.length + 1) return null;
+    var pill = _workPill();
+    var button = _returnDraftsButton(cid, a);
+    GradebookChrome.recountPiece(_drafts, _work, cid, a, d.ids);
+    d.t.scores = getScores(cid);
+    var lists = a.collaboration === 'pair' ? a.pairs : a.collaboration === 'group' ? a.groups : null;
+    var sids = (lists || []).find(function (m) {
+      return m && m.indexOf(sid) >= 0;
+    }) || [sid];
+    sids.forEach(function (m) {
+      var i = d.sids.indexOf(m);
+      if (i < 0) return;
+      var s = d.students[i];
+      var cells = trs[i].children;
+      if (d.view === 'scores') _put(cells[d.t.assessments.indexOf(a)], _scoresCell(cid, s, i, a));
+      else
+        d.t.cols.forEach(function (col, c) {
+          if (col.assessmentId === aid) _put(cells[c], _detailCell(cid, s, col, c, d.t));
+        });
+      d.rows[i] = null;
+      var head = d.view === 'scores' ? _scoresRowhead : _detailRowhead;
+      head = head(cid, s, i, d.t.sections);
+      if (head !== d.rowheads[i]) _put(heads.children[i], (d.rowheads[i] = head));
+    });
+    var avg = trs[trs.length - 1].children;
+    var everyone = _averageStudents || d.students;
+    if (d.view === 'scores') _put(avg[d.t.assessments.indexOf(a)], _scoresAvgCell(cid, a, everyone));
+    else
+      d.t.cols.forEach(function (col, i) {
+        if (col.assessmentId === aid) _put(avg[i], _detailAvgCell(cid, col, i, d.t, everyone));
+      });
+    d.stats = null;
+    var statsHead = _statsHead(cid, d.view);
+    if (statsHead !== d.statsHead) _put(heads.lastElementChild, (d.statsHead = statsHead));
+    if (_workPill() !== pill) {
+      var bar = document.querySelector('#main > .gb-toolbar');
+      if (bar) GradebookChrome.swapHtml(bar.querySelector('.gb-work-pill'), _workPill(), bar.lastElementChild);
+      d.toolbar = null;
+    }
+    if (d.view === 'detailed' && _returnDraftsButton(cid, a) !== button) {
+      var group = Array.prototype.find.call(data.parentNode.querySelectorAll('.gb-grid-assess-group'), function (g) {
+        var title = g.querySelector('.gb-assess-title');
+        return title && (title.dataset.href || '').split('&open=')[1] === aid;
+      });
+      if (group)
+        GradebookChrome.swapHtml(
+          group.querySelector('.gb-return-drafts'),
+          _returnDraftsButton(cid, a),
+          group.lastElementChild,
+        );
+      d.frame = null;
+    }
+    if (window.ClassResults && ClassResults.isOpen()) ClassResults.refresh();
+    return sids;
+  }
+
+  // html-safe: every caller hands it a part of the draw made by its own builders (renderDetailedTable, renderScoresTable), which escape every string.
+  function _put(el, html) {
+    el.outerHTML = html;
+  }
+
+  /* The roster beside the page after a score: the grades of `sids`, or
+     all of it (null, or a roster sorted by grade). The gradebook hides
+     the roster (init), and then nothing is drawn. */
+  function _sidebarAfter(sids) {
+    var mount = document.getElementById('sidebar-mount');
+    if (!mount || mount.style.display === 'none') return;
+    var mode = typeof _rosterSortMode === 'function' ? _rosterSortMode(activeCourse) : '';
+    if (!sids || mode === 'gradeLow' || mode === 'missing') return refreshSidebar();
+    sids.forEach(function (sid) {
+      refreshSidebarGrades(sid);
+    });
   }
 
   /* Remember the entries `keys` hold now, for Cmd+Z. Call _undoSaved with
@@ -3513,8 +3524,7 @@ window.PageGradebook = (function () {
       studentIds: ids,
       // Closing selects the cell of the student the grader ended on.
       onClose: function (lastSid) {
-        clearProfCache();
-        render();
+        _redraw();
         var at = key ? Object.assign({}, key) : { scores: viewMode === 'scores', aid: aid, sid: sid, tid: '' };
         if (lastSid) at.sid = lastSid;
         var back =
@@ -3531,6 +3541,15 @@ window.PageGradebook = (function () {
         if (back) _selectCell(back);
       },
     });
+  }
+  /* Draw again after a change that may be anywhere (the grader closing):
+     only the parts that differ are written (GradebookChrome.patch). */
+  function _redraw() {
+    clearProfCache();
+    var b = _build();
+    if (GradebookChrome.patch(_drawn, b) < 0) return _paint(b);
+    _drawn = b;
+    if (window.ClassResults && ClassResults.isOpen()) ClassResults.refresh();
   }
   function _graderOpen() {
     return !!(window.PageAssignments && PageAssignments.graderOpen());
@@ -3617,10 +3636,17 @@ window.PageGradebook = (function () {
         });
       }
       _undoSaved(undo);
+      return true;
+    }
+
+    // After a save, the student's row (_redrawStudent), or else everything;
+    // nothing saved leaves the grid as it is.
+    function redraw(saved) {
+      if (saved && !_redrawStudent(sid, aid)) render();
     }
 
     function commit(navDir) {
-      if (inp.value !== openedValue) save();
+      var saved = inp.value !== openedValue && save();
       clearProfCache();
       inp.remove();
       if (span) span.style.display = '';
@@ -3652,7 +3678,7 @@ window.PageGradebook = (function () {
           }
         }
         if (targetAid && targetSid) {
-          render();
+          redraw(saved);
           setTimeout(function () {
             var newCell = document.querySelector(
               '.gb-scores-cell[data-aid="' + targetAid + '"][data-sid="' + targetSid + '"]',
@@ -3663,7 +3689,7 @@ window.PageGradebook = (function () {
         }
       }
       var commitKey = _refocusAfterCommit ? _cellKey(td) : null;
-      render();
+      redraw(saved);
       var commitBack = commitKey && _findCell(commitKey);
       if (commitBack) _selectCell(commitBack);
     }
@@ -4077,7 +4103,7 @@ window.PageGradebook = (function () {
     var tipHtml = name.dataset.sid ? _nameTipHtml[name.dataset.sid] : null;
     if (!gbTip || !tipHtml) return;
     gbTip.className = '';
-    // html-safe: tipHtml is built by _setNameTip, which escapes category and section names and grade text.
+    // html-safe: tipHtml is built by GradebookChrome.nameTip, which escapes category and section names and grade text.
     gbTip.innerHTML = tipHtml;
     gbTip.style.display = 'block';
     // A long competency list goes into two columns so the card fits the

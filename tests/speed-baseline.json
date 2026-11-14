@@ -56,19 +56,27 @@
     "class": 0
   },
   "Gradebook: type a score": {
-    "copied": 472411,
+    "copied": 466181,
     "saved": 464668,
-    "drawn": 950514,
-    "elements": 5148,
-    "lookups": 6589,
+    "drawn": 3890,
+    "elements": 4966,
+    "lookups": 285,
+    "class": 0
+  },
+  "Gradebook: Edit Score in the Scores view": {
+    "copied": 935333,
+    "saved": 929336,
+    "drawn": 3350,
+    "elements": 5370,
+    "lookups": 260,
     "class": 0
   },
   "Gradebook: type a score with Class Results open": {
-    "copied": 472411,
+    "copied": 466181,
     "saved": 464668,
-    "drawn": 950512,
-    "elements": 5277,
-    "lookups": 6930,
+    "drawn": 3892,
+    "elements": 5095,
+    "lookups": 626,
     "class": 0
   },
   "Grader: open on a student": {
@@ -85,6 +93,22 @@
     "drawn": 9213,
     "elements": 5499,
     "lookups": 632,
+    "class": 0
+  },
+  "Grader: close": {
+    "copied": 1791348,
+    "saved": 0,
+    "drawn": 0,
+    "elements": 5368,
+    "lookups": 9759,
+    "class": 0
+  },
+  "Grader: close after a level": {
+    "copied": 1791348,
+    "saved": 0,
+    "drawn": 48964,
+    "elements": 5552,
+    "lookups": 9819,
     "class": 0
   },
   "Counting the class’s work": {
