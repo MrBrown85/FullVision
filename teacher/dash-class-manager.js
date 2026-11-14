@@ -7790,20 +7790,21 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* While the slider moves, only its words follow it; letting it go saves
+     (cmSaveDecay): a save clears the grade caches and goes to the server. */
   function cmUpdateDecay(val) {
     if (!cmSelectedCourse) return;
     document.getElementById('cm-decay-val').textContent = val + '%';
     var rule = document.getElementById('cm-method-rule');
     if (rule) rule.textContent = _cmMethodRule('decayingAvg', parseInt(val, 10) / 100);
+  }
+  function cmSaveDecay(val) {
+    if (!cmSelectedCourse) return;
     var cc = getCourseConfig(cmSelectedCourse);
     cc.decayWeight = parseInt(val, 10) / 100;
     saveCourseConfig(cmSelectedCourse, cc);
     updateCourse(cmSelectedCourse, { decayWeight: parseInt(val, 10) / 100 });
   }
-
-  // T-UI-02 retired: cmToggleReportPct (U16 replaced by grading_system),
-  // cmToggleCatWeights + cmUpdateCatWeights (legacy binary summative/formative
-  // slider, replaced by T-UI-12 Category management). Deleted 2026-04-21.
 
   /* ── Re-link Curriculum ─────────────────────────────────── */
   function cmStartRelink(cid) {
@@ -11036,7 +11037,6 @@ window.DashClassManager = (function () {
       cmTermLive(parseInt(el.dataset.idx, 10), el.dataset.field, el.value);
       return true;
     }
-    // T-UI-02 retired: cmCwRange (legacy summative/formative slider).
     return false;
   }
 
@@ -11119,8 +11119,9 @@ window.DashClassManager = (function () {
       cmRoundPercentSelect(el.value);
       return true;
     }
-    // Letting go of the decay slider redraws the examples and the student check.
+    // Letting go of the decay slider saves it and redraws the examples and the student check.
     if (el.dataset.actionChange === 'cmDecayCommit') {
+      cmSaveDecay(el.value);
       renderClassManager();
       return true;
     }
@@ -11128,7 +11129,6 @@ window.DashClassManager = (function () {
       cmTermSchool(el.value);
       return true;
     }
-    // T-UI-02 retired: cmCwEnabled + cmReportPct (deleted 2026-04-21).
     if (el.dataset.actionChange === 'cmSubjectColor') {
       cmUpdateSubjectColor(el.dataset.subid, el.value);
       return true;
