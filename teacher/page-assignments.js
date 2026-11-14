@@ -16584,6 +16584,8 @@ window.PageAssignments = (function () {
       delete _statusDebounce[k];
     });
 
+    document.body.classList.remove('af-comp-open');
+
     // Clean up descriptor bar (appended to body)
     var bar = document.getElementById('rsg-descriptor-bar');
     if (bar) bar.remove();

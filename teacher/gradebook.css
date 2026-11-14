@@ -3,8 +3,8 @@
 /* Force page-main to constrain children so the grid fills remaining viewport.
    overflow-y:hidden prevents page-main from becoming a scroll container,
    forcing flex children to fit within the available space instead.
-   Scoped via :has() so it only applies when the gradebook is active (not conflicting with reports.css). */
-.page-main:has(.gb-toolbar) {
+   Scoped by .page-gradebook (page-gradebook.js adds it to #main) so it only applies when the gradebook is active (not conflicting with reports.css). */
+.page-main.page-gradebook {
   overflow-y: hidden !important;
   min-height: 0 !important;
 }

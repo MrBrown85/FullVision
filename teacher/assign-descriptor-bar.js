@@ -25,6 +25,11 @@ window.AssignDescriptorBar = (function () {
       document.body.appendChild(bar);
       _resetDescriptorBarContent(bar);
     }
+    // Where the student list is now, for assignments.css: the bar spans the
+    // page beside the list, and is out of the way when the list is open over it.
+    var layout = document.getElementById('page-layout');
+    bar.classList.toggle('bar-wide', !!layout && layout.classList.contains('sidebar-hidden'));
+    bar.classList.toggle('bar-covered', !!layout && layout.classList.contains('sidebar-overlay'));
     return bar;
   }
   // Idle, the bar is empty and out of sight: the card's own hint ("Hover a

@@ -491,6 +491,8 @@ window.PageReports = (function () {
     _applyReportTerm();
     _syncUrl();
 
+    // reports.css: only the pages view (One Report) clips #report-output.
+    if (output) output.classList.remove('has-studio');
     var t = _tab();
     // A tab with no comment box of its own lets go of the last tab's.
     if (!t.longForm) _syncLongFormAuthContext();
@@ -558,6 +560,7 @@ window.PageReports = (function () {
 
     // Progress Reports: One Report's panel beside the pages.
     output.innerHTML = _layoutHtml();
+    output.classList.add('has-studio');
     // The panel and the page listen on these two, made new each time.
     ReportOnePanel.mount(document.getElementById('studio-palette'), _oneApi);
     ReportOnePage.mount(document.getElementById('rb-preview'), _oneApi);
@@ -2021,6 +2024,8 @@ window.PageReports = (function () {
     RQ.tqStudentIndex = 0;
     RQ.tqNarrativeDirty = false;
 
+    // For reports.css (the page's scroll and print rules).
+    document.getElementById('main').classList.add('page-reports');
     // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
@@ -2093,6 +2098,7 @@ window.PageReports = (function () {
 
   function destroy() {
     _mounted = false;
+    document.getElementById('main').classList.remove('page-reports');
     clearTimeout(_resizeTimer);
     TABS.forEach(function (t) {
       if (t.teardown) t.teardown();

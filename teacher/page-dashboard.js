@@ -174,6 +174,14 @@ window.PageDashboard = (function () {
     mount.dataset.cid = activeCourse;
   }
 
+  /* Class Settings sets two classes for dashboard.css (renderClassManager):
+     cm-open on the body and cm-listing on #main. The dashboard clears them. */
+  function _clearClassSettingsClasses() {
+    if (document.body && document.body.classList) document.body.classList.remove('cm-open');
+    var main = document.getElementById('main');
+    if (main && main.classList) main.classList.remove('cm-listing');
+  }
+
   /* ── Main render ────────────────────────────────────────── */
   function render() {
     // Every grade on this page, Class Settings' included, is the year so
@@ -184,6 +192,7 @@ window.PageDashboard = (function () {
       renderClassManager();
       return;
     }
+    _clearClassSettingsClasses();
     // If active course is archived, switch to first non-archived
     if (activeCourse && isCourseArchived(activeCourse)) {
       var nonArchived = Object.keys(COURSES).find(function (c) {
@@ -1433,6 +1442,7 @@ window.PageDashboard = (function () {
     _listeners = [];
     if (_dashSearchTimer) clearTimeout(_dashSearchTimer);
     document.getElementById('main').classList.remove('page-dashboard');
+    _clearClassSettingsClasses();
     delete window._pageSwitchCourse;
   }
 
