@@ -490,7 +490,7 @@ window.ReportOneComment = (function () {
     _write(cid, sid, termId, draft);
     delete _drafts[key];
     var st = _studentById(api, sid);
-    api.redraw();
+    api.redraw(sid);
     api.announce('Saved');
     _focusComment();
     if (typeof showUndoToast === 'function') {
@@ -504,7 +504,7 @@ window.ReportOneComment = (function () {
           approvedAt: prev.approvedAt,
         });
         var now = _api();
-        if (now && String(now.cid) === String(cid)) now.redraw();
+        if (now && String(now.cid) === String(cid)) now.redraw(sid);
       });
     }
     if (then) then();
