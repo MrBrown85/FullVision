@@ -1817,8 +1817,15 @@ body.af-comp-open #gb-tooltip {
   display: none;
 }
 /* Named for screen readers; the Rubric scoring card says it on screen. */
+/* Read by a screen reader, never seen. Pinned to the corner of the box it
+   is placed in (the page layout: no box between it and the page is
+   positioned): left where it sits in the form, it lay ~1000px down the
+   window, let the window itself scroll, and focusing the form's first
+   field scrolled it, leaving a grey band under the page (Nov 13). */
 .af-visually-hidden {
   position: absolute !important;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;
