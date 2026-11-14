@@ -32,7 +32,7 @@ for (const wide of [false, true]) {
       if (wide) await page.addStyleTag({ content: WIDE_FONT });
       // The Reports page loads the report code and styles.
       await page.evaluate(r => window.Router.navigate(r), '/reports');
-      await page.getByRole('tab', { name: 'Progress Reports' }).click();
+      await page.getByRole('tab', { name: 'Print Reports' }).click();
       await expect(page.locator('#studio')).toBeVisible();
       const copies = MAIN.copies[mode];
       expect(copies.map(c => c.name)).toEqual(['Ethan Dubois', 'Cece Adeyemi']);
@@ -73,7 +73,7 @@ for (const wide of [false, true]) {
       );
       await page.evaluate(() => window.Router.navigate('/dashboard'));
       await page.evaluate(r => window.Router.navigate(r), '/reports');
-      await page.getByRole('tab', { name: 'Progress Reports' }).click();
+      await page.getByRole('tab', { name: 'Print Reports' }).click();
       const copy = page.locator('#report-copy');
       await expect(copy).toBeVisible();
       const id = await copy.locator('option').nth(1).getAttribute('value');

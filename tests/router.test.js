@@ -118,7 +118,7 @@ describe('Router: a page that sends the teacher on from its init', () => {
     try {
       Router.navigate('/dashboard', true);
       expect(location.pathname).toBe('/reports');
-      expect(document.title).toBe('FullVision \u2014 Reports');
+      expect(document.title).toBe('FullVision \u2014 Reporting');
     } finally {
       history.replaceState = origReplace;
       PageDashboard.init = origInit;

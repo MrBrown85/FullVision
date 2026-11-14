@@ -236,6 +236,53 @@ describe('Add Work for a student with nothing in', () => {
   });
 });
 
+describe('Attach a Link (the row’s +)', () => {
+  it('with nothing in: new work sent by the teacher, no pages, the link kept', async () => {
+    expect(studentWorkLinksOffered(CID)).toBe(true);
+    const res = await addStudentWorkLink(CID, 'st11', LAB, 'docs.google.com/document/d/abc', '  Lab   Write-Up ');
+    expect(res.result).toBe('sent');
+    expect(res.submission).toMatchObject({ enrollment_id: 'st11', sent_by: 'teacher', on_paper: false, files: [] });
+    expect(res.submission.links).toEqual([
+      expect.objectContaining({
+        url: 'https://docs.google.com/document/d/abc',
+        host: 'docs.google.com',
+        title: 'Lab Write-Up',
+        added_by: 'teacher',
+      }),
+    ]);
+    // Read back after a reload of the cache; no photo was kept.
+    _studentWork = {};
+    expect(getStudentSubmission(CID, 'st11', LAB).links).toHaveLength(1);
+    expect(store.count()).toBe(0);
+  });
+
+  it('with work in: joins it; the name defaults to the address', async () => {
+    const before = getStudentSubmission(CID, 'st1', LAB);
+    const res = await addStudentWorkLink(CID, 'st1', LAB, 'https://www.example.com/lab/', '');
+    expect(res.result).toBe('sent');
+    expect(res.submission.id).toBe(before.id);
+    expect(res.submission.files).toHaveLength(before.files.length);
+    expect(res.submission.links.map(l => l.title)).toEqual(['example.com/lab']);
+  });
+
+  it('refuses what is not a web address, a student not in the class, and paper', async () => {
+    expect(await addStudentWorkLink(CID, 'st11', LAB, 'javascript:alert(1)')).toEqual({
+      result: 'invalid',
+      reason: 'not_web',
+    });
+    expect(await addStudentWorkLink(CID, 'st11', LAB, '')).toEqual({ result: 'invalid', reason: 'empty' });
+    expect(await addStudentWorkLink(CID, 'nobody', LAB, 'example.com')).toEqual({ result: 'not_found' });
+    await markStudentWorkOnPaper(CID, LAB, ['st12']);
+    expect((await addStudentWorkLink(CID, 'st12', LAB, 'example.com')).result).toBe('on_paper');
+  });
+
+  it('signed in: not offered, answers not_available and stores nothing', async () => {
+    window.isDemoMode = () => false;
+    expect(studentWorkLinksOffered(CID)).toBe(false);
+    expect(await addStudentWorkLink(CID, 'st11', LAB, 'example.com')).toEqual({ result: 'not_available' });
+  });
+});
+
 describe('Add as More Pages', () => {
   it('puts the teacher’s pages after the student’s, and the work stays the student’s', async () => {
     const before = getStudentSubmission(CID, 'st3', LAB);

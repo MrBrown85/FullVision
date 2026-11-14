@@ -127,7 +127,6 @@
     "teacher/page-reports.js",
     "teacher/page-starters.js",
     "teacher/page-student.js",
-    "teacher/phone-reports.js",
     "teacher/preview-student.js",
     "teacher/qr-slips.js",
     "shared/questionnaires.js",

@@ -30,8 +30,6 @@ const REPORTS = [
   '/teacher/report-questionnaire.js',
   '/teacher/grade-report.js',
   '/teacher/report-preview.js',
-  '/shared/phone-report-view.js',
-  '/teacher/phone-reports.js',
   '/teacher/report-feedback.js',
   '/teacher/report-feedback-cards.js',
   '/teacher/report-one.js',
@@ -83,10 +81,10 @@ test.describe('Reports loads its scripts when opened', () => {
     expect(await page.evaluate(() => typeof window.PageReports)).toBe('undefined');
 
     // A click on the dock's Reports tab.
-    await page.locator('#dock-mount').getByRole('link', { name: 'Reports' }).click();
+    await page.locator('#dock-mount').getByRole('link', { name: 'Reporting' }).click();
     await expect(page).toHaveURL(/\/reports/);
     await expectQuestionnaire(page);
-    await expect(page).toHaveTitle('FullVision — Reports');
+    await expect(page).toHaveTitle('FullVision — Reporting');
     expect(reportsAsked(asked)).toEqual(REPORTS);
     // They ran in order: each script is added once the one before has run.
     expect(
@@ -100,7 +98,7 @@ test.describe('Reports loads its scripts when opened', () => {
     ).toEqual(REPORTS);
 
     // Progress Reports and Page Studio, on the same load.
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await expect(page.locator('#studio')).toBeVisible();
     await expect(page.locator('.report-sheet').first()).toBeVisible();
 
@@ -142,7 +140,7 @@ test.describe('Reports loads its scripts when opened', () => {
     await page.route('**/teacher/report-one.js', route => (blocked ? route.abort() : route.continue()));
     await page.evaluate(r => window.Router.navigate(r), '/reports');
     const alert = page.getByRole('alert');
-    await expect(alert).toContainText('Reports Could Not Open');
+    await expect(alert).toContainText('Reporting Could Not Open');
     await expect(alert).toContainText('Check your internet connection');
     // Nothing after the failed file ran.
     expect(await page.evaluate(() => [typeof window.ReportOne, typeof window.PageReports])).toEqual([

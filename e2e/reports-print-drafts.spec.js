@@ -78,7 +78,7 @@ async function demoWithDrafts(page, config) {
 
 async function openProgress(page) {
   await page.evaluate(() => window.Router.navigate('/reports'));
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio')).toBeVisible();
   await expect(page.locator('.report-sheet').first()).toBeVisible();
 }

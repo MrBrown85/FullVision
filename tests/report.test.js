@@ -11,6 +11,22 @@ import { fileURLToPath } from 'url';
 import { parse } from 'acorn';
 import { runInThisContext } from 'vm';
 
+/* The Assessments part (GradeReport.listPart) as text, measured on a stage
+   with no DOM: every block 50px tall, every text 7px a character.
+   Assignment Grades' choices are its choices since Nov 13. */
+const listText = (cid, st, o) =>
+  GradeReport.listPart(cid, st, o || {}, {
+    innerHTML: '',
+    firstChild: { offsetHeight: 50 },
+    querySelectorAll() {
+      return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+        offsetWidth: m[1].length * 7,
+      }));
+    },
+  })
+    .html.replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ');
+
 describe('report-academic-summary-letter', () => {
   /**
    * The Progress Report's Academic Summary block. Letter and Both classes
@@ -1823,7 +1839,8 @@ describe('report-generation', () => {
 
 describe('report-grades-competency-range', () => {
   /**
-   * Assignment Grades by Competency follows its own Range (Nov 3 bug sweep,
+   * The Assessments list by Competency (Assignment Grades by Competency
+   * until Nov 13) follows its own Range (Nov 3 bug sweep,
    * reports group 2). On Report 2 the Reports page makes Term 2 the active
    * term, and the competency view read its marks from getTagScores, which
    * keeps only that term's work. Year to Date then printed only Term 2's
@@ -1867,10 +1884,20 @@ describe('report-grades-competency-range', () => {
     clearProfCache();
   }
   const text = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  // No DOM here: every block 50px tall, every text 7px a character.
+  const stage = () => ({
+    innerHTML: '',
+    firstChild: { offsetHeight: 50 },
+    querySelectorAll() {
+      return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+        offsetWidth: m[1].length * 7,
+      }));
+    },
+  });
   const grades = range =>
-    text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency', range, per: 8 }));
+    text(GradeReport.listPart(CID, STUDENT, { organize: 'competency', range, per: 8 }, stage()).html);
 
-  describe('Assignment Grades by Competency on Report 2', () => {
+  describe('the Assessments list by Competency on Report 2', () => {
     afterEach(() => {
       setActiveTerm(CID, null);
       delete COURSES[CID];
@@ -1895,7 +1922,7 @@ describe('report-grades-competency-range', () => {
 
 describe('report-grades-last10-future', () => {
   /**
-   * Assignment Grades on Last 10 leaves out work not yet due (Nov 3 bug
+   * The Assessments list on Last 10 (Assignment Grades until Nov 13) leaves out work not yet due (Nov 3 bug
    * sweep, reports group 3). Last 10 took the ten newest assessments with no
    * date filter, so three December pieces made ahead of time printed at the
    * top as dashes and pushed three graded October pieces off. Side by Side
@@ -1941,8 +1968,18 @@ describe('report-grades-last10-future', () => {
     clearProfCache();
   }
   const text = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  // No DOM here: every block 50px tall, every text 7px a character.
+  const stage = () => ({
+    innerHTML: '',
+    firstChild: { offsetHeight: 50 },
+    querySelectorAll() {
+      return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+        offsetWidth: m[1].length * 7,
+      }));
+    },
+  });
 
-  describe('Assignment Grades on Last 10', () => {
+  describe('the Assessments list on Last 10', () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-11-03T19:00:00Z'));
@@ -1954,8 +1991,8 @@ describe('report-grades-last10-future', () => {
 
     it('lists the ten newest pieces dated up to today, at either size', () => {
       seed();
-      [{ range: 'last10' }, { size: 'half' }].forEach(options => {
-        const out = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, options));
+      [{ range: 'last10' }, { range: 'last10', columns: 'two', order: 'newest' }].forEach(options => {
+        const out = text(GradeReport.listPart(CID, STUDENT, options, stage()).html);
         expect(out).not.toContain('December');
         for (let d = 3; d <= 12; d++) expect(out).toContain('October ' + pad(d));
         expect(out).not.toContain('October 02');
@@ -1969,8 +2006,7 @@ describe('report-grades-last10-future', () => {
       ];
       setActiveTerm(CID, 1);
       try {
-        const out = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { range: 'term' }));
-        expect(out).toContain('This term');
+        const out = text(GradeReport.listPart(CID, STUDENT, { range: 'term' }, stage()).html);
         expect(out).not.toContain('December');
         for (let d = 1; d <= 12; d++) expect(out).toContain('October ' + pad(d));
       } finally {
@@ -2108,7 +2144,7 @@ describe('report-issues', () => {
       expect(ReportIssues.changedSince(null, now)).toEqual(['s1', 's2', 's3']);
     });
 
-    it('a report printed another day is not changed: the Missing Work "As of" date is left out of the hash', () => {
+    it('a report printed another day is not changed: Only Missing Work’s "As of" date is left out of the hash', () => {
       vi.useFakeTimers({ toFake: ['Date'] });
       const MW = 'course-issues-asof';
       const st = { id: 's1', firstName: 'Noor', lastName: 'Khan' };
@@ -2117,19 +2153,26 @@ describe('report-issues', () => {
       _cache.assessments[MW] = [];
       _cache.scores[MW] = {};
       _cache.statuses[MW] = {};
-      const on = (day, options) => {
-        vi.setSystemTime(new Date(day + 'T19:00:00Z'));
-        return ReportBlocks.renderReportBlock('missing-work', MW, st, {}, options);
+      _cache.categories[MW] = [];
+      // No DOM here: every block 50px tall, every text 7px a character.
+      const stage = {
+        innerHTML: '',
+        firstChild: { offsetHeight: 50 },
+        querySelectorAll: () => [],
       };
-      ['row', 'half'].forEach(size => {
-        const nov20 = on('2026-11-20', { size });
-        const nov21 = on('2026-11-21', { size });
-        expect(nov20).toContain('As of Nov 20, 2026');
-        expect(nov21).toContain('As of Nov 21, 2026');
-        expect(ReportIssues.hash(nov21)).toBe(ReportIssues.hash(nov20));
-      });
+      // The Assessments list on Only Missing Work, with nothing missing: "None", as of the day.
+      const on = day => {
+        vi.setSystemTime(new Date(day + 'T19:00:00Z'));
+        return GradeReport.listPart(MW, st, { missingOnly: true }, stage).html;
+      };
+      const nov20 = on('2026-11-20');
+      const nov21 = on('2026-11-21');
+      expect(nov20).toContain('data-print-date');
+      expect(nov20).toContain('As of Nov 20, 2026');
+      expect(nov21).toContain('As of Nov 21, 2026');
+      expect(ReportIssues.hash(nov21)).toBe(ReportIssues.hash(nov20));
       // Anything else in the report still counts.
-      expect(ReportIssues.hash(on('2026-11-21', {}) + '<p>a</p>')).not.toBe(ReportIssues.hash(on('2026-11-20', {})));
+      expect(ReportIssues.hash(on('2026-11-21') + '<p>a</p>')).not.toBe(ReportIssues.hash(on('2026-11-20')));
       delete COURSES[MW];
     });
 
@@ -2431,9 +2474,10 @@ describe('report-points-own-percent', () => {
       // Its level (Proficient on Points to Proficiency) counts as 75%.
       expect(formatLevelAs(CID, getTagScores(CID, SID, 't1')[0].score, 'percent')).toBe('75%');
 
-      const byComp = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
-      const byDate = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'date' }));
-      expect(byDate).toContain('17 / 20 · 85%');
+      const byComp = listText(CID, STUDENT, { organize: 'competency' });
+      // Side by side, a Letter class's score and out of print joined.
+      const byDate = listText(CID, STUDENT, { organize: 'month', columns: 'two' });
+      expect(byDate).toContain('17 / 20 85%');
       expect(byComp).toContain('85%');
       expect(byComp).not.toContain('75%');
 
@@ -2447,15 +2491,13 @@ describe('report-points-own-percent', () => {
       expect(prog).toContain('Now 75%');
       const steps = text(ReportBlocks.renderBlockNextSteps(CID, STUDENT, {}, {}));
       expect(steps).toContain('Latest: Quiz A, Oct 1 · 85%');
-      const home = text(ReportBlocks.renderBlockSupportHome(CID, STUDENT, {}, {}));
-      expect(home).toContain('Ask to see Quiz A, Oct 1 · 85%');
     });
 
     it('prints its own % beside the level in a Both class', () => {
       seed('both', [quiz('A', '2026-10-01')], [sc('A', 17)]);
-      const byComp = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
+      const byComp = listText(CID, STUDENT, { organize: 'competency', hide: { category: true } });
       // The level as its proficiency beside the piece's own %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
-      expect(byComp).toContain('Quiz A Proficient · 85%');
+      expect(byComp).toContain('Quiz A Proficient 85%');
       const steps = text(ReportBlocks.renderBlockNextSteps(CID, STUDENT, {}, {}));
       expect(steps).toContain('Latest: Quiz A, Oct 1 · Proficient · 85%');
     });
@@ -2475,9 +2517,6 @@ describe('report-points-own-percent', () => {
       const pieces = [quiz('Q', '2026-10-01'), lab];
       const scores = [sc('Q', 17), { ...sc('L', 3), mod: 1 }];
       seed('letter', pieces, scores);
-      const home = text(ReportBlocks.renderBlockSupportHome(CID, STUDENT, {}, {}));
-      expect(home).toContain('Ask to see Quiz Q, Oct 1 · 85%');
-      expect(home).toContain('Ask about Lab, Oct 5 · 83%');
       const prog = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
       expect(prog).toContain('Best Quiz Q, Oct 1 · 85%');
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
@@ -2645,7 +2684,7 @@ describe('report-proficiency-one-figure', () => {
       expect(overallRow(html)).toContain('Overall');
       expect(overallRow(html)).toContain(course);
       expect(overallRow(html)).not.toContain(formatLevel(CID, getOverallProficiency(CID, SID)));
-      const back = ReportBlocks.renderBlockGradeTable(CID, STUDENT, {}, {});
+      const back = GradeReport.termHtml(CID, STUDENT, {});
       expect(text(back)).toContain('Course Grade ' + course);
     });
 
@@ -2688,7 +2727,7 @@ describe('report-proficiency-one-figure', () => {
   /* Best Work and Lowest Work gave a piece's mark on one competency
    (Pendulum Lab Report 4.0) while Assignment Grades gave its whole mark
    (3.0), and Complete/Incomplete work printed as 4.0 (step 4 group 2 #3). */
-  describe('best and lowest work print the mark Assignment Grades prints', () => {
+  describe('best and lowest work print the mark the Assessments list prints', () => {
     afterEach(() => delete COURSES[CID]);
 
     it('names a piece at its whole mark and leaves out Complete/Incomplete work', () => {
@@ -2704,7 +2743,7 @@ describe('report-proficiency-one-figure', () => {
       _cache.scores[CID][SID].push({ assessmentId: 'safety', tagId: 't1', score: 4, date: '2026-10-01' });
       clearProfCache();
       const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
-      const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { word: false }, {}));
+      const back = listText(CID, STUDENT, { hide: { category: true } });
       // The Inquiry is 4 on Evidence and 2 on Inquiry: 3.0 as a whole.
       expect(back).toContain('Local History Inquiry Proficient');
       expect(t).toMatch(/Best work: (Unit Quiz \(Oct 21\) and )?Local History Inquiry \(Oct 20\), Proficient\./);
@@ -2712,9 +2751,9 @@ describe('report-proficiency-one-figure', () => {
       expect(t).not.toMatch(/Best work: [^.]*Extending/);
     });
 
-    it('a Letter class names a piece at the % Assignment Grades prints', () => {
+    it('a Letter class names a piece at the % the Assessments list prints', () => {
       seed('letter');
-      const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { score: false, word: false }, {}));
+      const back = listText(CID, STUDENT, { hide: { category: true, score: true } });
       const pct = back.match(/Local History Inquiry (\d+%)/)[1];
       expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
         'Local History Inquiry (Oct 20)',
@@ -2787,7 +2826,7 @@ describe('report-rubric-competency-mark', () => {
         mixed: true,
       });
 
-      const grades = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
+      const grades = listText(CID, STUDENT, { organize: 'competency', hide: { category: true } });
       expect(grades).toContain('Causes of the War Emerging');
       expect(grades).not.toContain('Causes of the War Extending');
 
@@ -2797,7 +2836,7 @@ describe('report-rubric-competency-mark', () => {
 
     it('prints the one level, with its ±, when they agree', () => {
       seed([sc('essay', 'crit-thesis', 3, { mod: 1 }), sc('essay', 'crit-evidence', 3, { mod: 1 })]);
-      const grades = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
+      const grades = listText(CID, STUDENT, { organize: 'competency', hide: { category: true } });
       expect(grades).toContain('Causes of the War Proficient +');
     });
   });

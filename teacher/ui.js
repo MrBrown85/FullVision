@@ -351,7 +351,7 @@ function _helpPage() {
     '/gradebook': 'Gradebook',
     '/observations': 'Observations',
     '/observations/starters': 'Observations',
-    '/reports': 'Reports',
+    '/reports': 'Reporting',
   };
   var route = path === '/observations/starters' ? '/observations' : path;
   return { name: names[path] || 'Dashboard', routes: [names[path] ? route : '/dashboard'] };

@@ -21,4 +21,4 @@ next:
 3. [Record Observations](record-observations): add the notes the comments will draw on.
 4. [Fill In the Term Questionnaire](fill-in-the-term-questionnaire): rate each student's work habits and enter attendance.
 5. [Generate Report Comments](generate-report-comments): draft each comment from the Comment Bank, edit it, then approve it.
-6. [Print Report Cards](print-report-cards): choose the report layout in Progress Reports and print it for the class.
+6. [Print Report Cards](print-report-cards): choose the report layout in Print Reports and print it for the class.

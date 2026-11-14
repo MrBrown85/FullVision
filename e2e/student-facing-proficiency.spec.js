@@ -89,7 +89,7 @@ test('every surface a student or family reads names a proficiency and shows no s
   // The class's Quick Report choices: the Assessments list, its summary and
   // Overall Proficiency, then its Feedback Pages.
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   const sheet = page.locator('.report-sheet').first();
   await expect(sheet).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
@@ -168,14 +168,14 @@ test('the student page and the reports say the same for the same student', async
   // The reports: Overall Proficiency on the class's Quick Report choices, and a competency's Now on a
   // report built with the Proficiency block.
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('.report-sheet').first()).toBeVisible();
   const course = (await (await sheetOf(page, at.name)).locator('.gr-term-grade').innerText()).trim();
   expect(course).toMatch(WORD);
   await page.evaluate(layout => saveReportConfig('sci8', layout), ONE_BLOCK);
   await page.reload();
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('.sheet-cell[data-block="proficiency"]').first()).toBeVisible();
   const label = await page.evaluate(
     id => ReportBlocks.competencyLabel(getSections('sci8').find(s => s.id === id)),

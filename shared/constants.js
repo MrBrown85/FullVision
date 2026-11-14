@@ -877,13 +877,37 @@ const LINE_ICONS = {
   print:
     _LINE_SVG +
     '<path d="M4.5 6V2h7v4"/><rect x="1.5" y="6" width="13" height="5.5" rx="1"/><path d="M4.5 9.5h7V14h-7z"/></svg>',
+  grade: _LINE_SVG + '<rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="M5 8.2l2 2 4-4.4"/></svg>',
+  results:
+    _LINE_SVG + '<path d="M3 13.5V11"/><path d="M6.5 13.5V8"/><path d="M10 13.5V5.5"/><path d="M13.5 13.5v-11"/></svg>',
+  missing:
+    _LINE_SVG +
+    '<path d="M9.5 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5z"/><path d="M9.5 1.5V5H13"/><path d="M6.5 8.5l3 3M9.5 8.5l-3 3"/></svg>',
+  excused: _LINE_SVG + '<circle cx="8" cy="8" r="6"/><path d="M3.8 12.2l8.4-8.4"/></svg>',
+  late: _LINE_SVG + '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>',
+  undo: _LINE_SVG + '<path d="M5.5 3L2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/></svg>',
+  clear: _LINE_SVG + '<circle cx="8" cy="8" r="6"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4"/></svg>',
+  observe:
+    _LINE_SVG +
+    '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
+  send: _LINE_SVG + '<path d="M14.5 1.5L7 9"/><path d="M14.5 1.5l-4.5 13-3-5.5-5.5-3z"/></svg>',
+  work:
+    _LINE_SVG +
+    '<path d="M9.5 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5z"/><path d="M9.5 1.5V5H13"/><path d="M5.5 8.5h5M5.5 11h3.5"/></svg>',
+  plus: _LINE_SVG + '<path d="M8 3v10M3 8h10"/></svg>',
+  image:
+    _LINE_SVG +
+    '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><circle cx="5.5" cy="6.5" r="1.25"/><path d="M14.5 10.5l-3.5-3.5-6.5 6.5"/></svg>',
+  link:
+    _LINE_SVG +
+    '<path d="M6.8 9.2a2.8 2.8 0 0 0 4 0l2.4-2.4a2.8 2.8 0 0 0-4-4l-.9.9"/><path d="M9.2 6.8a2.8 2.8 0 0 0-4 0l-2.4 2.4a2.8 2.8 0 0 0 4 4l.9-.9"/></svg>',
 };
 const TB_PAGES = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
   { id: 'assignments', label: 'Assignments', href: '/assignments' },
   { id: 'observations', label: 'Observations', href: '/observations' },
   { id: 'spreadsheet', label: 'Gradebook', href: '/gradebook' },
-  { id: 'reports', label: 'Reports', href: '/reports' },
+  { id: 'reports', label: 'Reporting', href: '/reports' },
 ];
 
 /* ── Idempotent write RPCs ──────────────────────────────────── */

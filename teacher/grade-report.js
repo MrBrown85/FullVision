@@ -35,6 +35,7 @@ window.GradeReport = (function () {
   extraCards = _inReportScores(extraCards);
   // The pieces One Report (report-one.js) draws its parts with.
   listPart = _inReportScores(listPart);
+  printedRows = _inReportScores(printedRows);
   _summaryHtml = _inReportScores(_summaryHtml);
   _termHtml = _inReportScores(_termHtml);
   _feedbackPages = _inReportScores(_feedbackPages);
@@ -60,8 +61,22 @@ window.GradeReport = (function () {
     comments: true,
     observations: false,
     termComment: false,
+    // One Report's Assessments part: the rows' range (the year to date,
+    // this term, or the last 10 printed), and only the Missing rows.
+    range: 'all',
+    missingOnly: false,
   };
-  var FLAGS = ['summary', 'ungraded', 'numbers', 'feedback', 'rubrics', 'comments', 'observations', 'termComment'];
+  var FLAGS = [
+    'summary',
+    'ungraded',
+    'numbers',
+    'feedback',
+    'rubrics',
+    'comments',
+    'observations',
+    'termComment',
+    'missingOnly',
+  ];
   /* The table's size: its type and its row height in px (measured again
      for each student's list). */
   var TIER = { key: 'regular', rowPx: 19 };
@@ -75,6 +90,7 @@ window.GradeReport = (function () {
       });
       if (saved.order === 'newest' || saved.order === 'oldest') o.order = saved.order;
       if (saved.name === 'first' || saved.name === 'preferred') o.name = saved.name;
+      if (saved.range === 'term' || saved.range === 'last10') o.range = saved.range;
     }
     return o;
   }
@@ -115,7 +131,12 @@ window.GradeReport = (function () {
     });
     var list = getAssessments(cid)
       .filter(function (a) {
-        return a && !(typeof isDibelsScored === 'function' && isDibelsScored(a)) && assessmentInYearToDate(cid, a);
+        return (
+          a &&
+          !(typeof isDibelsScored === 'function' && isDibelsScored(a)) &&
+          assessmentInYearToDate(cid, a) &&
+          (opts.range !== 'term' || assessmentInTermWindow(cid, a))
+        );
       })
       .map(function (a) {
         return { a: a, d: _assessmentDate(a) || '' };
@@ -138,6 +159,7 @@ window.GradeReport = (function () {
         outOf: '',
         percent: '',
         note: cv.late ? 'Late' : '',
+        d: x.d,
       };
       if (cv.kind === 'dibels') return;
       var ungraded = cv.kind === 'none' || (cv.kind === 'level' && !(cv.value > 0));
@@ -152,6 +174,8 @@ window.GradeReport = (function () {
         row.score = formatPoints(cv.value);
         row.outOf = formatPoints(max);
         row.percent = formatPointsPercent(cv.value, max);
+        // A Letter class's Proficiency Word: the band the points fall in.
+        if (courseGradeMode(cid) === 'letter') row.word = _profWord(cv.level);
       } else if (cv.kind === 'level' && cv.value > 0) {
         // A Letter class prints the level out of 4 as it always has; a
         // Proficiency or Both class prints its name with its + or −
@@ -160,6 +184,7 @@ window.GradeReport = (function () {
         if (courseGradeMode(cid) === 'letter') {
           row.score = levelFigure(cv.value);
           row.outOf = '4';
+          row.word = _profWord(cv.value);
         } else {
           row.score = nearestScoreLevelName(cv.value);
         }
@@ -167,10 +192,22 @@ window.GradeReport = (function () {
       } else return;
       out.push(row);
     });
+    // Only Missing Work: the rows a student still owes.
+    if (opts.missingOnly)
+      out = out.filter(function (r) {
+        return r.note === 'Missing';
+      });
+    // Last 10: the ten newest of the rows that print.
+    if (opts.range === 'last10' && out.length > 10) out = opts.order === 'newest' ? out.slice(0, 10) : out.slice(-10);
     out.forEach(function (r, i) {
       r.n = i + 1;
     });
     return out;
+  }
+
+  /* A level's proficiency word, for a Letter class's Proficiency column. */
+  function _profWord(v) {
+    return window.ReportBlocks && ReportBlocks.profWord ? ReportBlocks.profWord(v) : '';
   }
 
   /* A row's Result in a Proficiency or Both class: what the piece was
@@ -191,7 +228,8 @@ window.GradeReport = (function () {
       return a && assessmentInYearToDate(cid, a);
     });
     var shown = {};
-    rows(cid, student, opts).forEach(function (r) {
+    // The count is of the work listed, not only the missing pieces.
+    rows(cid, student, Object.assign({}, opts, { missingOnly: false })).forEach(function (r) {
       // One Report: an assessment left off the list is not counted (opts.omit).
       if (!(opts && opts.omit && opts.omit[r.id])) shown[r.id] = true;
     });
@@ -244,25 +282,34 @@ window.GradeReport = (function () {
     if (!hide.date) cols.push(['date', 'Date', px('date', 42), '']);
     cols.push(['title', show.titleHead || 'Assignment', 'minmax(0,1fr)', '']);
     if (!hide.category) cols.push(['category', 'Category', null, '']);
-    if (show.byName) {
+    if (show.byName || show.compact) {
       // A Proficiency or Both class: one Result column, wide enough for
       // "Developing +", "Incomplete" and "Missing" in bold, read left to
       // right like the title beside it; Percent in a Both class; the note
       // holds only Late. The width Out Of had goes to the title.
-      cols.push(['result', 'Result', px('result', 80), '']);
-      if (show.percent) cols.push(['percent', 'Percent', px('percent', 48), 'r']);
-      cols.push(['note', '', px('note', 32), '']);
+      // Side by side (show.compact), a Letter class prints the same way,
+      // its score and out of joined ("2.2 / 4"), so the title keeps room.
+      if (!hide.score) cols.push(['result', show.byName ? 'Result' : 'Score', px('result', 80), '']);
+      if (show.percent)
+        cols.push(
+          show.byName ? ['percent', 'Percent', px('percent', 48), 'r'] : ['percent', '%', px('percent', 36), 'r'],
+        );
+      cols.push(['note', '', px('note', hide.score ? 52 : 32), '']);
     } else {
       // Score holds "Incomplete"; the note "Excused" in bold.
-      cols.push(['score', 'Score', px('score', 64), 'r']);
-      cols.push(['outOf', 'Out Of', px('outOf', 40), 'r']);
+      if (!hide.score) {
+        cols.push(['score', 'Score', px('score', 64), 'r']);
+        cols.push(['outOf', 'Out Of', px('outOf', 40), 'r']);
+      }
       if (show.percent) cols.push(['percent', '%', px('percent', 36), 'r']);
+      // Proficiency Word, a Letter class's choice: the level's word.
+      if (show.word) cols.push(['word', 'Proficiency', px('word', 70), '']);
       cols.push(['note', '', px('note', 52), '']);
     }
     var fixed = cols.reduce(function (sum, c) {
       return sum + (c[2] && /px$/.test(c[2]) ? parseFloat(c[2]) : 0);
     }, 0);
-    var avail = ROW_W - fixed - COL_GAP * (cols.length - 1);
+    var avail = (show.rowW || ROW_W) - fixed - COL_GAP * (cols.length - 1);
     var catNeed = show.catPx || 150;
     var titleNeed = show.titlePx || avail - catNeed;
     var cat =
@@ -452,16 +499,18 @@ window.GradeReport = (function () {
       var f = {
         date: need('Date', canon.dates.concat(col('date'))),
       };
-      if (show.byName) {
-        f.result = need('Result', canon.levels.concat(['Complete', 'Incomplete', '100 / 100'], list.map(resultText)), [
-          'Missing',
-          'Excused',
-        ]);
-        f.note = need('', [], ['Late']);
+      if (show.byName || show.compact) {
+        f.result = need(
+          show.byName ? 'Result' : 'Score',
+          canon.levels.concat(['Complete', 'Incomplete', '100 / 100'], list.map(resultText)),
+          ['Missing', 'Excused'],
+        );
+        f.note = need('', [], show.hide && show.hide.score ? ['Late', 'Missing', 'Excused'] : ['Late']);
       } else {
         f.score = need('Score', ['Complete', 'Incomplete', '4'].concat(col('score')));
         f.outOf = need('Out Of', ['100'].concat(col('outOf')));
         f.note = need('', [], ['Late', 'Missing', 'Excused']);
+        if (show.word) f.word = need('Proficiency', [1, 2, 3, 4].map(_profWord));
       }
       if (show.percent) f.percent = need(show.byName ? 'Percent' : '%', ['100%'].concat(col('percent')));
       fit[key] = f;
@@ -473,7 +522,7 @@ window.GradeReport = (function () {
      category 0 when it is left off). */
   function _cellWidths(show, tier) {
     var cols = _cols(show, tier);
-    var rowW = ROW_W;
+    var rowW = show.rowW || ROW_W;
     var fixed = 0;
     var cat = 0;
     cols.forEach(function (c) {
@@ -484,8 +533,11 @@ window.GradeReport = (function () {
   }
 
   /* wrap: for each row of list, true when its title or category is too
-     long for one line, so the row prints on two (reports.css .gr-wrap). */
-  function _tableHtml(list, show, tier, wrap) {
+     long for one line, so the row prints on two (reports.css .gr-wrap).
+     asParts: the table's opening tag, its header row and each row on its
+     own, each row naming its assessment (data-row), for a list in groups
+     or side by side (_assemble). */
+  function _tableHtml(list, show, tier, wrap, asParts) {
     var cols = _cols(show, tier);
     var tmpl = cols
       .map(function (c) {
@@ -496,9 +548,11 @@ window.GradeReport = (function () {
     // Excused in it in bold (gr-flag) as the note printed them; the note
     // is only Late.
     var text = function (c, v) {
-      if (!show.byName) return String(v[c[0]] || '');
+      if (!(show.byName || show.compact)) return String(v[c[0]] || '');
       if (c[0] === 'result') return resultText(v);
-      if (c[0] === 'note') return v.note === 'Late' ? 'Late' : '';
+      // With no Result column the note says Missing and Excused, as a
+      // Letter class's always has.
+      if (c[0] === 'note') return v.note === 'Late' || (show.hide && show.hide.score) ? v.note || '' : '';
       return String(v[c[0]] || '');
     };
     var cell = function (c, v, head) {
@@ -522,23 +576,22 @@ window.GradeReport = (function () {
         })
         .join('') +
       '</div>';
-    var body = list
-      .map(function (r, i) {
-        return (
-          '<div class="gr-row' +
-          (r.note === 'Missing' ? ' gr-missing' : '') +
-          (wrap && wrap[i] ? ' gr-wrap' : '') +
-          '">' +
-          cols
-            .map(function (c) {
-              return cell(c, r);
-            })
-            .join('') +
-          '</div>'
-        );
-      })
-      .join('');
-    return (
+    var body = list.map(function (r, i) {
+      return (
+        '<div class="gr-row' +
+        (r.note === 'Missing' ? ' gr-missing' : '') +
+        (wrap && wrap[i] ? ' gr-wrap' : '') +
+        (asParts && !show.allRows ? '" data-row="' + esc(String(r.id)) : '') +
+        '">' +
+        cols
+          .map(function (c) {
+            return cell(c, r);
+          })
+          .join('') +
+        '</div>'
+      );
+    });
+    var open =
       '<div class="gr-table gr-' +
       tier.key +
       '" style="--gr-cols:' +
@@ -547,11 +600,9 @@ window.GradeReport = (function () {
       tier.rowPx +
       'px;--gr-row2:' +
       (tier.row2Px ? tier.row2Px + 'px' : 'auto') +
-      '">' +
-      head +
-      body +
-      '</div>'
-    );
+      '">';
+    if (asParts) return { open: open, head: head, rows: body };
+    return open + head + body.join('') + '</div>';
   }
 
   /* The course grade's line: Overall Proficiency in a Proficiency class. */
@@ -658,22 +709,254 @@ window.GradeReport = (function () {
     return html;
   }
 
-  /* One Report's Assessments part: the student's rows as one table at the
-     regular size, with the rows too long for one line marked, and the rows
-     themselves. o.omit: { id: true } for the assessments left off the list.
-     The rows are numbered as they print. */
-  function listPart(cid, student, o, stage) {
-    var show = columnsFor(cid);
-    var omit = o.omit || {};
+  /* ── The Assessments part's rows, in groups ──────────────────── */
+
+  var HALF_W = (ROW_W - 16) / 2; // a column side by side (reports.css .gr-cols)
+  // A group's heading, in rows (reports.css .gr-ghead: about 1.3 rows).
+  var HEAD_U = 1.3;
+  var ORGANIZE = { list: 1, category: 1, month: 1, competency: 1 };
+  function _organize(o) {
+    var org = o && ORGANIZE[o.organize] ? o.organize : 'list';
+    // A Missing row has no mark on any competency.
+    if (org === 'competency' && o.missingOnly) org = 'list';
+    return org;
+  }
+  function _monthName(d) {
+    return parseLocalDate(d).toLocaleDateString('en-CA', { month: 'long' });
+  }
+  /* A row with the student's mark on one competency (the level from
+     tagMarksByAssessment) in place of the piece's own. */
+  function _levelRow(cid, sid, r, level, a) {
+    var x = Object.assign({}, r, {
+      score: '',
+      outOf: '',
+      percent: '',
+      word: '',
+      note: r.note === 'Late' ? 'Late' : '',
+    });
+    var own = null;
+    if (a && typeof isPointsScored === 'function' && isPointsScored(a)) {
+      var pc = getAssessmentGroupPercentage(cid, sid, [a]);
+      if (pc && pc.pct != null) own = formatPointsPercent(pc.pct, 100);
+    }
+    var mode = courseGradeMode(cid);
+    if (mode === 'letter') {
+      x.score = levelFigure(level);
+      x.outOf = '4';
+      x.percent = own || formatLevelAs(cid, level, 'percent');
+      x.word = _profWord(level);
+    } else {
+      x.score = nearestScoreLevelName(level);
+      x.percent = mode === 'both' ? own || formatLevelAs(cid, level, 'percent') : '';
+    }
+    return x;
+  }
+
+  /* The Assessments part's rows in the order they print, each with its
+     group: [{ r, g, gi, name, grade }], g the group's index, gi the row's
+     index in its group. One List is one group with no name. o: the
+     part's choices (ReportOne _listOpts): organize, catGrade, per, omit,
+     and what rows() reads. Rows are numbered in print order. */
+  function _entries(cid, student, o) {
+    // Missing Work reads the gradebook, not the list: no missing piece is
+    // left off it (DECISIONS, "One Report").
+    var omit = o.missingOnly ? {} : o.omit || {};
+    var org = _organize(o);
     var list = rows(cid, student, o).filter(function (r) {
       return !omit[r.id];
     });
-    list.forEach(function (r, i) {
-      r.n = i + 1;
+    var groups = [];
+    if (org === 'category') {
+      var termWork = getAssessments(cid).filter(function (a) {
+        return assessmentInYearToDate(cid, a);
+      });
+      var byCat = {};
+      var cats = (getCategories(cid) || []).map(function (c) {
+        var g = { name: c.name || '', grade: '', rows: [] };
+        if (o.catGrade !== false) {
+          var gg = assessmentGroupGrade(
+            cid,
+            student.id,
+            termWork.filter(function (a) {
+              return (a.categoryId || a.category_id || null) === c.id;
+            }),
+            categoryCalcMode(c),
+          );
+          g.grade = [Number(c.weight || 0) + '% of grade', studentGroupGradeText(cid, gg)].filter(Boolean).join(' · ');
+        }
+        byCat[c.name || ''] = g;
+        return g;
+      });
+      var none = { name: 'No Category', grade: '', rows: [] };
+      list.forEach(function (r) {
+        (r.category && byCat[r.category] ? byCat[r.category] : none).rows.push(r);
+      });
+      groups = cats.concat([none]);
+    } else if (org === 'month') {
+      list.forEach(function (r) {
+        var key = r.d ? r.d.slice(0, 7) : '';
+        var g = groups[groups.length - 1];
+        if (!g || g.key !== key) groups.push((g = { key: key, name: r.d ? _monthName(r.d) : 'Undated', rows: [] }));
+        g.rows.push(r);
+      });
+    } else if (org === 'competency') {
+      var per = Math.max(1, Number(o.per) || 5);
+      var byId = {};
+      getAssessments(cid).forEach(function (a) {
+        byId[a.id] = a;
+      });
+      var secs = window.ReportBlocks && ReportBlocks.reportSections ? ReportBlocks.reportSections(cid) : [];
+      secs.forEach(function (sec) {
+        var best = {};
+        (sec.tags || []).forEach(function (tag) {
+          tagMarksByAssessment(cid, student.id, tag.id).forEach(function (sc) {
+            if (sc.score > 0 && (best[sc.assessmentId] == null || sc.score > best[sc.assessmentId]))
+              best[sc.assessmentId] = sc.score;
+          });
+        });
+        var mine = list
+          .filter(function (r) {
+            return best[r.id] != null;
+          })
+          .slice(0, per)
+          .map(function (r) {
+            return _levelRow(cid, student.id, r, best[r.id], byId[r.id]);
+          });
+        if (mine.length) groups.push({ name: ReportBlocks.competencyLabel(sec), grade: '', rows: mine });
+      });
+    } else groups = [{ name: '', grade: '', rows: list }];
+    var out = [];
+    groups
+      .filter(function (g) {
+        return g.rows.length;
+      })
+      .forEach(function (g, gx) {
+        g.rows.forEach(function (r, gi) {
+          out.push({ r: r, g: gx, gi: gi, name: g.name, grade: g.grade });
+        });
+      });
+    out.forEach(function (e, i) {
+      e.r.n = i + 1;
     });
-    show.hide = o.hide || null;
+    return out;
+  }
+
+  /* The rows the Assessments part prints, in order, numbered as they
+     print: for the Feedback Pages' card numbers. */
+  function printedRows(cid, student, o) {
+    return _entries(cid, student, o).map(function (e) {
+      return e.r;
+    });
+  }
+
+  /* A group's heading over its first row in a column: its name, and the
+     category's weight and grade on its first row only. */
+  function _gheadHtml(name, grade, cont) {
+    if (!name) return '';
+    return (
+      '<div class="gr-ghead"><span>' +
+      esc(name + (cont ? ' (continued)' : '')) +
+      '</span>' +
+      (grade && !cont ? '<span class="gr-ggrade">' + esc(grade) + '</span>' : '') +
+      '</div>'
+    );
+  }
+
+  /* The list in groups, or side by side, from its rows' parts (_tableHtml
+     asParts). items: [{ row (its .gr-row), g, gi, name, grade, u }], u the
+     row's height in rows. Each row and the heading over it are one item
+     (.gr-item), so a page break never leaves a heading at the foot of a
+     page. A group cut by a page or by the columns carries on under its
+     name and "(continued)". Side by side, the rows split where the two
+     columns come out most nearly even, read down the left, then the right. */
+  function _assemble(t, items, two, headU) {
+    var item = function (x, first) {
+      var head = x.gi === 0 ? _gheadHtml(x.name, x.grade, false) : first ? _gheadHtml(x.name, '', true) : '';
+      return (
+        '<div class="gr-item" data-g="' +
+        x.g +
+        '" data-gi="' +
+        x.gi +
+        '" data-gn="' +
+        esc(x.name) +
+        '" data-gg="' +
+        esc(x.grade || '') +
+        '" data-u="' +
+        x.u +
+        '">' +
+        head +
+        x.row +
+        '</div>'
+      );
+    };
+    var col = function (list) {
+      return (
+        t.open +
+        t.head +
+        list
+          .map(function (x, i) {
+            return item(x, i === 0);
+          })
+          .join('') +
+        '</div>'
+      );
+    };
+    if (!two || items.length < 2) return two ? '<div class="gr-cols">' + col(items) + '</div>' : col(items);
+    var unit = function (x, first) {
+      return x.u + (x.name && (x.gi === 0 || first) ? headU : 0);
+    };
+    var best = 1;
+    var bestH = Infinity;
+    for (var k = 1; k < items.length; k++) {
+      var left = 0;
+      var right = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (i < k) left += unit(items[i], i === 0);
+        else right += unit(items[i], i === k);
+      }
+      var h = Math.max(left, right);
+      if (h < bestH) {
+        bestH = h;
+        best = k;
+      }
+    }
+    return '<div class="gr-cols">' + col(items.slice(0, best)) + col(items.slice(best)) + '</div>';
+  }
+
+  /* One Report's Assessments part: the student's rows as one table at the
+     regular size, with the rows too long for one line marked, and the rows
+     themselves. o: the part's choices (ReportOne _listOpts): omit ({ id:
+     true }, the assessments left off), hide (columns left off), numbers,
+     organize (list, category, month, competency), columns ('two': side
+     by side), word, catGrade, per, range, missingOnly. The rows are
+     numbered as they print. One List in one column is the table the
+     Assessments list has always been. */
+  function listPart(cid, student, o, stage) {
+    var show = columnsFor(cid);
+    var org = _organize(o);
+    var two = o.columns === 'two';
+    var entries = _entries(cid, student, o);
+    var list = entries.map(function (e) {
+      return e.r;
+    });
+    var hide = Object.assign({}, o.hide || {});
+    if (org === 'category') hide.category = true;
+    // A Proficiency or Both class always prints the Result.
+    if (show.byName) delete hide.score;
+    if (two) {
+      // Side by side there is no room for the category: grouped by it, it
+      // heads the rows instead.
+      hide.category = true;
+      show.rowW = HALF_W;
+      show.compact = true;
+    }
+    show.hide = Object.keys(hide).length ? hide : o.hide || null;
+    if (o.percent === false) show.percent = false;
+    show.word = !!o.word && !show.byName && !two;
     show.titleHead = 'Assessment';
-    if (o.numbers) {
+    // Only Missing Work: every row prints, none can be left off.
+    show.allRows = !!o.missingOnly;
+    if (o.numbers && org !== 'competency') {
       show.numbers = true;
       show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;
     }
@@ -699,10 +982,69 @@ window.GradeReport = (function () {
     });
     if (tall.indexOf(true) >= 0) {
       var sample = Object.assign({}, list[0], { title: new Array(80).join('Assignment ') });
-      var two = _measure(stage, _tableHtml([sample, sample], show, tier, [true, true]));
-      tier.row2Px = Math.max(tier.rowPx + 10, Math.ceil((two - head) / 2));
+      var two2 = _measure(stage, _tableHtml([sample, sample], show, tier, [true, true]));
+      tier.row2Px = Math.max(tier.rowPx + 10, Math.ceil((two2 - head) / 2));
     }
-    return { list: list, html: list.length ? _tableHtml(list, show, tier, tall) : '' };
+    if (!list.length) {
+      // Only Missing Work with none to list says so, with the day it is true.
+      if (!o.missingOnly) return { list: list, html: '' };
+      var day = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+      return {
+        list: list,
+        html:
+          '<div class="gr-none">None <span class="gr-asof" data-print-date>As of ' +
+          esc(parseLocalDate(day).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })) +
+          '</span></div>',
+      };
+    }
+    if (org === 'list' && !two) return { list: list, html: _tableHtml(list, show, tier, tall) };
+    var t = _tableHtml(list, show, tier, tall, true);
+    var row2 = tier.row2Px || tier.rowPx;
+    var items = entries.map(function (e, i) {
+      return {
+        row: t.rows[i],
+        g: e.g,
+        gi: e.gi,
+        name: e.name,
+        grade: e.grade,
+        u: tall[i] ? row2 / tier.rowPx : 1,
+      };
+    });
+    return { list: list, html: _assemble(t, items, two, HEAD_U) };
+  }
+
+  /* An Assessments part in groups or side by side (listPart) with only
+     its rows [start, end), laid out again as the whole list is. */
+  function listPiece(html, start, end) {
+    var tpl = document.createElement('div');
+    // html-safe: html is listPart's own render (escaped), parsed in a detached div
+    tpl.innerHTML = html;
+    var body = tpl.querySelector('.gr-cols') || tpl.querySelector('.gr-table');
+    var table = tpl.querySelector('.gr-table');
+    if (!body || !table) return html;
+    var headEl = table.querySelector('.gr-head');
+    var shell = table.cloneNode(false);
+    var t = { open: shell.outerHTML.replace(/<\/div>$/, ''), head: headEl ? headEl.outerHTML : '' };
+    var items = Array.prototype.map.call(tpl.querySelectorAll('.gr-item'), function (el) {
+      var row = el.querySelector('.gr-row');
+      return {
+        row: row ? row.outerHTML : '',
+        g: Number(el.getAttribute('data-g')) || 0,
+        gi: Number(el.getAttribute('data-gi')) || 0,
+        name: el.getAttribute('data-gn') || '',
+        grade: el.getAttribute('data-gg') || '',
+        u: Number(el.getAttribute('data-u')) || 1,
+      };
+    });
+    var fresh = document.createElement('div');
+    // html-safe: _assemble esc()s each name and grade; the rows are this part's own rows, already escaped
+    fresh.innerHTML = _assemble(t, items.slice(start, end), !!tpl.querySelector('.gr-cols'), HEAD_U);
+    body.replaceWith(fresh.firstElementChild);
+    if (start > 0) {
+      var title = tpl.querySelector('.report-block-title');
+      if (title) title.textContent = title.textContent.replace(/\s*\(continued\)$/, '') + ' (continued)';
+    }
+    return tpl.innerHTML;
   }
 
   function _measure(stage, html) {
@@ -1208,6 +1550,8 @@ window.GradeReport = (function () {
     extraHtml: _extraHtml,
     // One Report (report-one.js) draws its parts with these.
     listPart: listPart,
+    listPiece: listPiece,
+    printedRows: printedRows,
     summaryHtml: _summaryHtml,
     termHtml: _termHtml,
     feedbackPages: _feedbackPages,

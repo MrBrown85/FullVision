@@ -42,10 +42,9 @@ const SEAM_SOURCE = read(SEAM);
 /* ── 1. The source guard ─────────────────────────────────────── */
 
 /* A report file: anything in teacher/ named for a report, a comment, a
-   printout or the export, and the phone copy's own page. A new one is
+   printout or the export, and the student page's report view. A new one is
    guarded as soon as it is added. */
-const REPORT_FILE =
-  /^(page-reports|report-.*|comment-.*|grade-report|grades-print|rubric-print|phone-reports|export-all)\.js$/;
+const REPORT_FILE = /^(page-reports|report-.*|comment-.*|grade-report|grades-print|rubric-print|export-all)\.js$/;
 const REPORT_FILES = readdirSync(resolve(ROOT, 'teacher'))
   .filter(name => REPORT_FILE.test(name))
   .map(name => 'teacher/' + name)
@@ -247,12 +246,9 @@ const BLOCKS = [
   'renderBlockStudentReflectionHabits',
   'renderBlockSectionChart',
   'renderBlockScoreDistribution',
-  'renderBlockGradeTable',
   'renderBlockCoreCompetencies',
-  'renderBlockSupportHome',
   'renderBlockTermGlance',
   'renderBlockGrowth',
-  'renderBlockMissingWork',
   'renderBlockAttendance',
   'renderBlockSelfAssessment',
 ];
@@ -266,6 +262,7 @@ const DOORS = {
       'feedbackItems',
       'extraCards',
       'listPart',
+      'printedRows',
       '_summaryHtml',
       '_termHtml',
       '_feedbackPages',
@@ -284,7 +281,6 @@ const DOORS = {
     surface: 'questionnaire',
     names: ['headerGrade', 'notHandedIn', 'missingAndLate', '_basisHtml', '_requiredSource'],
   },
-  'teacher/phone-reports.js': { surface: 'phones', names: ['snapshot'] },
   'teacher/grades-print.js': { surface: 'printGrades', names: ['buildModel', 'cellText', 'columnAverageText'] },
   'teacher/export-all.js': { surface: 'exportData', names: ['rows'] },
   /* The rubric handout's doors (S2-F1): what prints and its preview, who
@@ -313,7 +309,6 @@ describe('report files read scores only through ReportScores', () => {
       'teacher/report-blocks.js',
       'teacher/report-questionnaire.js',
       'teacher/comment-bank.js',
-      'teacher/phone-reports.js',
       'teacher/grade-report.js',
       'teacher/report-feedback.js',
       'teacher/rubric-print.js',
@@ -420,9 +415,10 @@ describe('report files read scores only through ReportScores', () => {
       '\n  function draw() {}\n  return { draw: draw };\n})();';
     const first = "  draw = ReportScores.scoped('progress', draw);";
     expect(doorsOf(file(first))).toEqual({ surface: 'progress', names: ['draw'], late: [] });
-    const helper = "  var _inReportScores = function (fn) {\n    return ReportScores.scoped('phones', fn);\n  };\n";
+    const helper =
+      "  var _inReportScores = function (fn) {\n    return ReportScores.scoped('questionnaire', fn);\n  };\n";
     expect(doorsOf(file(helper + '  draw = _inReportScores(draw);'))).toEqual({
-      surface: 'phones',
+      surface: 'questionnaire',
       names: ['draw'],
       late: [],
     });
@@ -498,7 +494,7 @@ describe('report files read scores only through ReportScores', () => {
 
 /* The report rows the tests below start from: every one on all work, so
    they test the mechanism, not the table (which is pinned on its own). */
-const REPORT_ROWS = ['progress', 'handout', 'questionnaire', 'phones'];
+const REPORT_ROWS = ['progress', 'handout', 'questionnaire'];
 const ALL_WORK = Object.fromEntries(REPORT_ROWS.map(surface => [surface, 'all']));
 
 /* The seam's source with every report row on all work and then these
@@ -518,7 +514,6 @@ const REPORTS_ON_RETURNED = {
   progress: 'returned',
   handout: 'returned',
   questionnaire: 'returned',
-  phones: 'returned',
 };
 
 /* ── 2. The seam itself ──────────────────────────────────────── */
@@ -538,7 +533,6 @@ describe('ReportScores', () => {
       'progress',
       'handout',
       'questionnaire',
-      'phones',
       'grader',
       'printGrades',
       'exportData',
@@ -554,7 +548,6 @@ describe('ReportScores', () => {
       progress: 'returned',
       handout: 'returned',
       questionnaire: 'returned',
-      phones: 'returned',
       grader: 'all',
       printGrades: 'all',
       exportData: 'all',
@@ -584,10 +577,10 @@ describe('ReportScores', () => {
   });
 
   it('the outermost surface decides: a report drawn inside another takes its set', () => {
-    const seen = ReportScores.withReportScores('phones', () =>
+    const seen = ReportScores.withReportScores('questionnaire', () =>
       ReportScores.withReportScores('progress', () => ReportScores.running()),
     );
-    expect(seen).toBe('phones');
+    expect(seen).toBe('questionnaire');
   });
 
   it('scoped keeps the arguments, `this` and the result', () => {
@@ -649,9 +642,11 @@ describe('ReportScores', () => {
           ReportScores.withReportScores('progress', () => [_scoreSet, ReportScores.reportScoreSet('progress')]),
         ),
       ).toEqual(['all', 'all']);
-      // A phone copy (all work here) drawn inside a Progress Report takes the report's set.
+      // The questionnaire (all work here) drawn inside a Progress Report takes the report's set.
       expect(
-        ReportScores.withReportScores('progress', () => ReportScores.withReportScores('phones', () => _scoreSet)),
+        ReportScores.withReportScores('progress', () =>
+          ReportScores.withReportScores('questionnaire', () => _scoreSet),
+        ),
       ).toBe('returned');
     });
 
@@ -727,7 +722,7 @@ const NO_SCORE = new Set([
 
 // Each drawing of the class takes a few seconds; a slow runner gets a minute.
 describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
-  const REPORTS = ['progress', 'quick', 'questionnaire', 'phones'];
+  const REPORTS = ['progress', 'quick', 'questionnaire'];
   const TEACHERS = ['printGrades', 'export'];
   let cid;
   let working; // the teacher's working copy, drafts and all
@@ -1117,7 +1112,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     const autos = ReportBlocks.showDefaults(cid);
     // The blocks that read the start of the term and the last report's levels (report-blocks.js _pass).
     const blocks = () =>
-      ['proficiency', 'progress', 'next-steps', 'academic-summary', 'support-home']
+      ['proficiency', 'progress', 'next-steps', 'academic-summary']
         .map(id => ReportBlocks.renderReportBlock(id, cid, student, ctx, ReportSheets.optionsFor({ block: id }, autos)))
         .join('\n');
     setActiveTerm(cid, second.ordinal);

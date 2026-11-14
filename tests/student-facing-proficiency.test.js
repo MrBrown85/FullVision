@@ -19,7 +19,7 @@
  * 2. The output. Demo Mode's Science 8 is drawn as a Proficiency, a Both and
  *    a Letter class, every student-facing surface (every Progress Reports
  *    block, the Assessments list with its Feedback Pages and rubric sheets, the
- *    phone copy, the student page): no figure for a level in a Proficiency
+ *    phone report view, the student page): no figure for a level in a Proficiency
  *    or Both class, the proficiency words there, and a Letter class's output
  *    and every points or Complete/Incomplete score exactly what main gave
  *    before this change (tests/fixtures/student-facing-unchanged.json,
@@ -27,7 +27,7 @@
  *    UPDATE_STUDENT_FACING=1 npx vitest run tests/student-facing-proficiency.test.js).
  * 3. Overrides. A student whose competency the teacher set by hand reads the
  *    teacher's level on the Assessments list, a Progress Report, the student
- *    page and the phone copy, and nothing there shows the calculated figure.
+ *    page, and nothing there shows the calculated figure.
  */
 import './setup.js';
 import { createHash } from 'crypto';
@@ -58,7 +58,6 @@ const STUDENT_FACING = [
   'teacher/report-feedback.js',
   'teacher/report-feedback-cards.js',
   'teacher/rubric-print.js',
-  'teacher/phone-reports.js',
   'shared/phone-report-view.js',
   'shared/student-view.js',
 ].concat(
@@ -84,13 +83,19 @@ const FIGURE_CALLS = [
 const ALLOWED = {
   "teacher/report-blocks.js ' / 4'": [2, 'Assignment Grades in a Letter class (_rowMarks), as before'],
   'teacher/report-blocks.js levelFigure(': [2, 'the same two Letter-class marks'],
-  'teacher/report-blocks.js out of 4': [1, 'the Assignment Grades legend in a Letter class'],
   'teacher/report-blocks.js formatLevel(': [
     5,
     'a Letter class only (_levelHtml, the override note, the Proficiency block, the legend), or the % of a Both class (_levelHtml)',
   ],
   'teacher/report-blocks.js formatLevelAs(': [4, "always 'percent': a piece's % in a Letter or Both class"],
-  'teacher/grade-report.js levelFigure(': [1, 'the Assessments list in a Letter class'],
+  'teacher/grade-report.js levelFigure(': [
+    2,
+    'the Assessments list in a Letter class: a piece, and a piece’s mark on one competency (By Competency)',
+  ],
+  'teacher/grade-report.js formatLevelAs(': [
+    2,
+    "always 'percent': a piece's % on one competency, Letter or Both class",
+  ],
   'shared/student-view.js formatLevel(': [2, 'My Learning in a Letter class: the %'],
   'shared/student-view.js studentGradeSummary(': [1, 'the level and whether there is any grade, not its text'],
 };
@@ -183,7 +188,7 @@ const DRAWN = ['st1', 'st2', 'st3', 'st4', 'st5', 'st6'];
 /* The student-facing surfaces of the class as it is graded now. */
 function draw(cid) {
   clearProfCache();
-  const out = surfaces(cid, ['progress', 'quick', 'phones'], { students: DRAWN });
+  const out = surfaces(cid, ['progress', 'quick'], { students: DRAWN });
   DRAWN.forEach(sid => {
     const v = StudentView.fromCache(cid, sid, { learning: true });
     out['student page › ' + sid] = JSON.stringify(v.view || null);
@@ -282,7 +287,7 @@ describe('every student-facing surface of the Demo class', { timeout: 120000 }, 
 
   it.each(['proficiency', 'both'])('a %s class names the proficiency on every surface', system => {
     const d = drawn[system];
-    ['quick', 'phones', 'progress › proficiency (row)', 'progress › grade-table (row)'].forEach(part => {
+    ['quick', 'progress › proficiency (row)'].forEach(part => {
       const key = Object.keys(d).find(k => k.indexOf('year › ' + part) === 0);
       expect(d[key], part).toMatch(WORD);
     });
@@ -309,7 +314,7 @@ describe('every student-facing surface of the Demo class', { timeout: 120000 }, 
 
   it('a points or Complete/Incomplete score in a Proficiency class is shown exactly as before', () => {
     const points = Object.keys(unchanged.was).filter(k => k.indexOf('points › ') === 0);
-    expect(points.length).toBeGreaterThan(50);
+    expect(points.length).toBeGreaterThan(40);
     expect(points.filter(k => unchanged.now[k] !== unchanged.was[k])).toEqual([]);
     // And there are such scores: a 7/10 still reads 7 out of 10, with nothing out of 4 beside it.
     const q = JSON.parse(drawn.proficiency['year › quick › st1']);
@@ -378,23 +383,20 @@ describe('a competency the teacher set by hand', () => {
     const ctx = { termId: 'term-1', termLabel: 'Report 1' };
     expect(getSectionProficiencyRaw(CID, ME, 'ev')).toBe(2);
     expect(getSectionProficiency(CID, ME, 'ev')).toBe(4);
-    // The Course Grade line, a Progress Report, the phone copy and the student page.
+    // The Course Grade line, a Progress Report and the student page.
     // The Course Grade line and the Assignment Grades block print this (calc.js studentGradeText).
     const course = studentGradeText(CID, ME, 'term-1').text;
     expect(course).toMatch(/^Extending/);
     const prog = ['proficiency', 'section-outcomes', 'section-chart', 'progress', 'grade-table', 'competency-table']
       .map(id => shownOf(ReportBlocks.renderReportBlock(id, CID, st, ctx, { rows: 'each' })))
       .join(' ');
-    const phone = PhoneReports.snapshot(CID, st, ctx);
     const view = StudentView.fromCache(CID, ME, { learning: true }).view;
     const skill = view.learning.groups[0].skills[0];
-    expect(phone.skills[0].word).toBe('Extending');
-    expect(phone.overall.word).toBe('Extending');
     expect(skill.text).toBe('Extending');
     expect(view.learning.overall.word).toBe('Extending');
     expect(prog).toMatch(/Evidence\s+Extending/);
     // Nothing shows the calculated level beside it: no figure, no "calculated", no Developing for Evidence.
-    const all = [prog, JSON.stringify(phone), JSON.stringify(view.learning), course].join(' ');
+    const all = [prog, JSON.stringify(view.learning), course].join(' ');
     expect(all).not.toMatch(FIGURE);
     expect(all).not.toContain('calculated');
     expect(shownOf(ReportBlocks.renderReportBlock('section-outcomes', CID, st, ctx, {}))).not.toContain('Developing');

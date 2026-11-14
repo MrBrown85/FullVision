@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /* The Quick Report's columns in a Proficiency class (DECISIONS, "The Quick
    Report's columns", 2026-11-12), as One Report prints them: a class with
    no saved One Report opens on its Quick Report choices read as parts
-   (Letterhead, Assessments, Categories, Overall Proficiency, Missing Work). Colin: "now that students only see the
+   (Letterhead, Assessments, Categories, Overall Proficiency). Colin: "now that students only see the
    proficincey, the columns don't make a lot of sense." Demo Mode's Science
    8 is a Proficiency class. Ethan Dubois has a Missing piece and work with
    no mark yet; one of his levels is marked Late and one piece with no mark
@@ -37,7 +37,7 @@ async function openQuickReportFor(page, wide) {
   page.on('pageerror', e => errors.push(String(e)));
   await openDemo(page, wide);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   // GradeReport loads with the Reports page.
@@ -123,16 +123,10 @@ for (const wide of [false, true]) {
     expect(sum).toEqual(['Category', 'Assessments', 'Proficiency']);
     await expect(page.locator('.gr-term > span').first()).toHaveText('Overall Proficiency');
     await expect(page.locator('.gr-term-grade')).toHaveText(LEVEL);
-    // His one Missing piece: no "Missing Assignments" line under the grade;
-    // the Missing Work part names it, as of today.
+    // His one Missing piece: no "Missing Assignments" line under the grade.
     await expect(page.locator('#rb-preview .gr-facts')).toHaveCount(0);
     const missing = rows.filter(r => r.missing);
     expect(missing).toHaveLength(1);
-    const strip = page.locator('#rb-preview .sheet-cell[data-part="missing-work"] .report-missing-work');
-    await expect(strip).toHaveCount(1);
-    await expect(strip.locator('.report-strip-title')).toHaveText('Missing Work');
-    await expect(strip.locator('.report-strip-title + span')).toHaveText(missing[0].title);
-    await expect(strip.locator('.report-strip-meta')).toHaveText(/^As of [A-Z][a-z]{2}\.? \d{1,2}, \d{4}$/);
 
     // It still fits: one sheet, nothing cut off in a cell, nothing past the page.
     await expect(page.locator('.sheet-student .sheet-badge')).toHaveText('1 sheet');
@@ -144,6 +138,16 @@ for (const wide of [false, true]) {
       .locator('.sheet-student .report-sheet .sheet-body')
       .evaluateAll(bodies => bodies.filter(b => b.scrollHeight > b.clientHeight + 1).length);
     expect(over).toBe(0);
+
+    // Missing Work is the Assessments part's Only Missing Work (Colin,
+    // 2026-11-13): the part is headed Missing Work and lists only that piece.
+    await page.locator('#studio-palette [data-action="oneOpen"][data-part="assessments"]').click();
+    await page.locator('#one-opts-assessments [data-opt="missingOnly"]').click();
+    const part = page.locator('#rb-preview .sheet-cell[data-part="assessments"]').first();
+    await expect(part.locator('.report-block-title')).toHaveText('Missing Work');
+    const left = part.locator('.gr-row:not(.gr-head)');
+    await expect(left).toHaveCount(1);
+    await expect(left.locator('.gr-title')).toHaveText(missing[0].title);
     expect(errors).toEqual([]);
   });
 }
@@ -167,7 +171,7 @@ test('a long list carries on at the regular size, every row once, in a wider fon
   page.on('pageerror', e => errors.push(String(e)));
   await openDemo(page, true);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   const found = await page.evaluate(() => {
     const cid = 'sci8';

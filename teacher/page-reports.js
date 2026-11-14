@@ -94,7 +94,7 @@ window.PageReports = (function () {
     },
     {
       id: 'progress',
-      label: 'Progress Reports',
+      label: 'Print Reports',
       title: 'Build and print the class’s report cards.',
       hidden: false,
       show: _showProgressTab,
@@ -186,7 +186,6 @@ window.PageReports = (function () {
 
   var activeCourse;
   var activeTab = _tabIdFor(TABS);
-  var phonesView = false; // Progress Reports › Sent to Phones (teacher/phone-reports.js)
 
   // The open tab's entry.
   function _tab() {
@@ -269,19 +268,9 @@ window.PageReports = (function () {
     if (copySel && !on) copySel.style.display = 'none';
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = on ? '' : 'none';
-    if (!on) phonesView = false;
-    _syncPhonesButton();
     const stepper = document.getElementById('report-stepper');
     if (stepper) stepper.style.display = on ? '' : 'none';
     if (!on) _restoreSidebarBadges();
-  }
-
-  function _syncPhonesButton() {
-    var btn = document.getElementById('tb-phones-btn');
-    if (!btn) return;
-    btn.style.display = activeTab === 'progress' ? '' : 'none';
-    btn.classList.toggle('active', phonesView);
-    btn.setAttribute('aria-pressed', phonesView ? 'true' : 'false');
   }
 
   /* ── Multi-select student picker ─────────────────────────────── */
@@ -525,7 +514,7 @@ window.PageReports = (function () {
         if (ok) renderReports();
         else
           output.innerHTML =
-            '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reports again.</div></div>';
+            '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reporting again.</div></div>';
       });
       return;
     }
@@ -550,14 +539,6 @@ window.PageReports = (function () {
   }
 
   function _renderProgressTab(cid, output, keep) {
-    // Progress Reports › Sent to Phones: this period's report on the
-    // students' phones (teacher/phone-reports.js).
-    if (phonesView && typeof PhoneReports !== 'undefined') {
-      // html-safe: PhoneReports.panelHtml (phone-reports.js) escapes every value; marked here because student-evidence.js has its own panelHtml
-      output.innerHTML = PhoneReports.panelHtml(cid, ReportBlocks.reportContext());
-      return;
-    }
-
     // Progress Reports: One Report's panel beside the pages.
     output.innerHTML = _layoutHtml();
     output.classList.add('has-studio');
@@ -1412,7 +1393,7 @@ window.PageReports = (function () {
         previewSid = sid;
         previewAuto = false;
         // On One Student already: the panel and the sheet, not the whole tab.
-        if (studioView === 'one' && !phonesView && document.getElementById('rb-preview')) return _redrawStudio();
+        if (studioView === 'one' && document.getElementById('rb-preview')) return _redrawStudio();
         studioView = 'one';
         renderReports(true);
       },
@@ -1776,11 +1757,6 @@ window.PageReports = (function () {
         studioView = el.dataset.view === 'all' ? 'all' : 'one';
         renderReports(true);
       },
-      togglePhones: function () {
-        phonesView = !phonesView;
-        _syncPhonesButton();
-        renderReports();
-      },
       toggleRail: function () {
         // Narrow screens hide the palette; this opens it over the pages.
         var layout = document.getElementById('studio');
@@ -1847,12 +1823,7 @@ window.PageReports = (function () {
         RQ.tqEditStudent();
       },
     };
-    if (handlers[action]) {
-      handlers[action]();
-    } else if (/^pp[A-Z]/.test(action) && typeof PhoneReports !== 'undefined') {
-      e.preventDefault();
-      PhoneReports.handleAction(action, el, activeCourse, ReportBlocks.reportContext());
-    }
+    if (handlers[action]) handlers[action]();
   }
 
   function _handleStudioChange(e) {
@@ -2130,7 +2101,7 @@ window.PageReports = (function () {
   var TOOLBAR_HTML =
     '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        ' +
     _tabBarHtml(TABS) +
-    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous Student" aria-label="Previous Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next Student" aria-label="Next Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Parts</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous Student" aria-label="Previous Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next Student" aria-label="Next Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Parts</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {
@@ -2148,7 +2119,7 @@ window.PageReports = (function () {
       }
       if (_waitingForReturns && document.getElementById('report-output')) renderReports();
     },
-    // A redraw from elsewhere (Sent to Phones) only while the page is up.
+    // A redraw from elsewhere, only while the page is up.
     renderReports: function () {
       if (document.getElementById('report-output')) renderReports();
     },

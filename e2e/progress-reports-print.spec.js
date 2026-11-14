@@ -38,7 +38,7 @@ async function openGrade(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   await expect(page.locator('.report-sheet')).toHaveCount(2);
@@ -47,7 +47,9 @@ async function openGrade(page) {
 /* A Report Card built in Page Studio, saved for the class as main saved
    it, with Assignment Grades set to This Term, two columns, by category so
    it fits the Back. One Report reads it as its parts in the same order
-   (DECISIONS, "One Report is the Progress Reports screen", 3). */
+   (DECISIONS, "One Report is the Progress Reports screen", 3): Assignment
+   Grades as the Assessments part with its choices, and Missing Work, whose
+   rows are in that list, left off (report-one.js _fold, Nov 13). */
 const STARTING_LAYOUT = {
   progressMode: 'build',
   form: {
@@ -98,7 +100,7 @@ async function openStudio(page) {
   await page.evaluate(layout => saveReportConfig(getActiveCourse(), layout), STARTING_LAYOUT);
   await page.reload();
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   await expect(page.locator('.sheet-cell[data-part="parent-response"]')).toHaveCount(1);
@@ -114,7 +116,7 @@ async function openFeedback(page) {
     saveReportConfig(cid, { ...c, gradeReport: { ...(c.gradeReport || {}), feedback: true, numbers: true } });
   });
   await page.reload();
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('.fb-sheet').first()).toBeVisible();
 }
 
@@ -299,16 +301,19 @@ test.describe('A Page Studio form, read as parts', () => {
       'proficiency',
       'legend',
       'teacher-narrative',
-      'missing-work',
       'self-assessment',
-      'grade-table',
+      'assessments',
       'parent-response',
     ]);
     // The list flows over the sides: the Front holds the form's Front and
     // goes on into what the form put on the Back.
     expect(sides.length).toBeGreaterThan(1);
-    expect(sides[0].slice(0, 5)).toEqual(['header', 'proficiency', 'legend', 'teacher-narrative', 'missing-work']);
-    expect(sides[0].length).toBeGreaterThan(5);
+    expect(sides[0].slice(0, 4)).toEqual(['header', 'proficiency', 'legend', 'teacher-narrative']);
+    expect(sides[0].length).toBeGreaterThan(4);
+    // Assignment Grades' choices came with it: This Term, side by side, by category.
+    const list = student.locator('.sheet-cell[data-part="assessments"]').first();
+    await expect(list.locator('.gr-cols')).toHaveCount(1);
+    await expect(list.locator('.gr-ghead').first()).toBeVisible();
     expect(sides[1].length).toBeGreaterThan(0);
     expect(await overflowing(page)).toEqual([]);
     // The Response docks at the foot of the report's last side.
@@ -651,25 +656,21 @@ test.describe('A Page Studio form, read as parts', () => {
   });
 });
 
-test.describe('Assignment Grades', () => {
+/* Assignment Grades' choices are the Assessments part's now (Colin,
+   2026-11-13): Organize By, Columns and Range, with One List, One column
+   and the Year to Date the table it has always been. */
+test.describe('The Assessments part’s choices', () => {
   test.setTimeout(120_000);
 
-  test('Assignment Grades starts in one column, a heading per month, year to date', async ({ page }) => {
+  test('starts as one list in one column, year to date; organizes by month, category and competency, side by side', async ({
+    page,
+  }) => {
     await openGrade(page);
-    await page.evaluate(() =>
-      saveReportConfig(getActiveCourse(), {
-        ...getReportConfig(getActiveCourse()),
-        one: ReportOne.normalize({ parts: ['header', 'grade-table'], feedback: {} }),
-      }),
-    );
-    await page.evaluate(r => window.Router.navigate(r), '/dashboard');
-    await page.evaluate(r => window.Router.navigate(r), '/reports');
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
-    const opts = await openOptions(page, 'grade-table');
+    const opts = await openOptions(page, 'assessments');
     await expect(opts.getByRole('radiogroup', { name: 'Per Competency' })).toHaveCount(0);
     for (const [group, choice] of [
+      ['Organize By', 'One List'],
       ['Columns', 'One'],
-      ['Organize By', 'Date'],
       ['Range', 'Year to Date'],
     ]) {
       await expect(opts.getByRole('radiogroup', { name: group }).getByRole('radio', { name: choice })).toHaveAttribute(
@@ -677,10 +678,42 @@ test.describe('Assignment Grades', () => {
         'true',
       );
     }
-    const table = page.locator('#rb-preview .report-grades').first();
-    await expect(table.locator('.report-prof-meta')).toContainText('Year to date ·');
-    await expect(table.locator('.report-grades-cols')).toHaveCount(0);
-    await expect(table).toContainText('October');
+    const part = page.locator('#rb-preview .sheet-cell[data-part="assessments"]').first();
+    await expect(part.locator('.gr-cols')).toHaveCount(0);
+    await expect(part.locator('.gr-ghead')).toHaveCount(0);
+    const all = await page.locator('#rb-preview .gr-row[data-row]').count();
+    const choose = async (group, choice) => {
+      const radio = page
+        .locator('#one-opts-assessments')
+        .getByRole('radiogroup', { name: group })
+        .getByRole('radio', { name: choice });
+      await radio.click();
+      await expect(radio).toHaveAttribute('aria-checked', 'true');
+    };
+    // By month: a heading over each month, every row still there.
+    await choose('Organize By', 'Month');
+    await expect(part.locator('.gr-ghead').first()).toBeVisible();
+    await expect(page.locator('#rb-preview .gr-item')).toHaveCount(all);
+    // By category: the category heads its rows with its weight and grade,
+    // and is not a column too.
+    await choose('Organize By', 'Category');
+    await expect(part.locator('.gr-ggrade').first()).toContainText('% of grade');
+    await expect(part.locator('.gr-head .gr-category')).toHaveCount(0);
+    // Side by side: two tables, the rows split between them.
+    await choose('Columns', 'Two');
+    await expect(part.locator('.gr-cols > .gr-table')).toHaveCount(2);
+    await expect(page.locator('#rb-preview .gr-item')).toHaveCount(all);
+    // By competency: each competency's latest few, Per Competency offered.
+    await choose('Organize By', 'Competency');
+    await expect(page.locator('#one-opts-assessments').getByRole('radiogroup', { name: 'Per Competency' })).toHaveCount(
+      1,
+    );
+    await expect(part.locator('.gr-ghead').first()).toBeVisible();
+    // Last 10: ten rows at most for the class's list.
+    await choose('Organize By', 'One List');
+    await choose('Range', 'Last 10');
+    expect(await page.locator('#rb-preview .gr-row[data-row]').count()).toBeLessThanOrEqual(10);
+    expect(await overflowing(page)).toEqual([]);
   });
 });
 
@@ -789,7 +822,7 @@ test.describe('The Quick Report’s choices, read as parts', () => {
 
     // The choices stay after a reload.
     await page.reload();
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await expect(partSwitch(page, 'fb-rubrics')).toHaveAttribute('aria-checked', 'false');
     await expect(partSwitch(page, 'fb-comments')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('.fb-sheet').first()).toBeVisible();
@@ -857,7 +890,7 @@ test.describe('The Quick Report’s choices, read as parts', () => {
       saveReportConfig(cid, { ...c, gradeReport: { ...(c.gradeReport || {}), feedback: true, termComment: true } });
     });
     await page.reload();
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await showAllStudents(page);
     const withTerm = await page.evaluate(() => {
       const cid = getActiveCourse();
@@ -1087,7 +1120,7 @@ test.describe('The Quick Report’s choices, read as parts', () => {
     await partSwitch(page, 'category-summary').click();
     await expect(page.locator('#rb-preview .gr-summary')).toHaveCount(0);
     await page.reload();
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await expect(partSwitch(page, 'category-summary')).toHaveAttribute('aria-checked', 'false');
     await expect(page.locator('#rb-preview .gr-summary')).toHaveCount(0);
   });
@@ -1167,20 +1200,27 @@ test.describe('Printed progress reports', () => {
   }) => {
     await openStudio(page);
     const pinnedTop = () =>
-      page.locator('#rb-preview .sheet-zoom[data-side="1"] .sheet-pinned').evaluate(el => {
-        // In sheet px: the canvas scales the pages to fit beside the panel.
-        const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
-        return Math.round(
-          (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
-        );
-      });
+      // The Response docks at the foot of the report's last side.
+      page
+        .locator('#rb-preview .sheet-pinned')
+        .first()
+        .evaluate(el => {
+          // In sheet px: the canvas scales the pages to fit beside the panel.
+          const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
+          return Math.round(
+            (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
+          );
+        });
     const letter = await pinnedTop();
     const front = await rowsOf(page, 0);
     await page.getByRole('radio', { name: 'Legal' }).click();
     await expect(page.locator('#rb-preview .report-sheet[data-paper="legal"]')).toHaveCount(2);
     // 3in more paper (288 sheet px), less the margins the body keeps.
     expect((await pinnedTop()) - letter).toBeGreaterThan(270);
-    expect(await rowsOf(page, 0)).toEqual(front);
+    // The Front's parts are the same; the Response, docked at the foot of
+    // the last side, may now fit under them on the taller Front.
+    const body = rows => rows.filter(r => r !== 'parent-response');
+    expect(body(await rowsOf(page, 0))).toEqual(body(front));
     await showEveryone(page);
     const pdf = await printToPdf(page);
     const boxes = pageBoxes(pdf);
@@ -1189,7 +1229,7 @@ test.describe('Printed progress reports', () => {
     expect(countPages(pdf)).toBeLessThanOrEqual(STUDENTS * 2);
 
     await page.reload();
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await expect(page.getByRole('radio', { name: 'Legal' })).toHaveAttribute('aria-checked', 'true');
     await page.getByRole('radio', { name: 'Letter' }).click();
     for (const box of pageBoxes(await printToPdf(page))) expect(box).toEqual([612, 792]);
@@ -1208,16 +1248,25 @@ test.describe('Printed progress reports', () => {
       }),
     );
     await page.reload();
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await page.locator('.studio-view [data-view="all"]').click();
     await expect(page.locator('.report-sheet').first()).toBeVisible();
     const block = page.locator('.report-sheet .report-learner-profile');
     await expect(block).toHaveCount(1);
-    await expect(block.locator('.report-disp-row')).toHaveText([
-      /Completes Work\s*Consistently/,
-      /Takes Part\s*Sometimes/,
-    ]);
+    const rows = block.locator('.report-habits-tbl tbody tr');
+    await expect(rows.locator('.report-habit-name')).toHaveText(['Completes Work', 'Takes Part']);
+    await expect(rows.locator('.report-habit-t')).toHaveText(['Consistently', 'Sometimes']);
+    // What each habit and each word means, for families.
+    await expect(rows.first().locator('.report-habit-desc')).not.toBeEmpty();
+    await expect(block.locator('.report-habit-key')).toContainText('Consistently');
     await expect(block).not.toContainText('Not Seen');
+    // Student Self-Assessment: every habit, a circle for each word.
+    await page.locator('#studio-palette [data-action="oneOpen"][data-part="learner-dimensions"]').click();
+    await page.locator('#one-opts-learner-dimensions [data-opt="student"]').click();
+    // (A student's table may be cut between sides: their pieces together.)
+    const mine = page.locator('.sheet-student').first().locator('.report-habits-mine tbody tr');
+    await expect(mine).toHaveCount(6);
+    await expect(mine.first().locator('.report-bubble')).toHaveCount(4);
   });
 
   test('a dimension the teacher did not rate is left off the printed report', async ({ page }) => {

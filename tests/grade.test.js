@@ -504,6 +504,8 @@ describe('grade-report', () => {
         comments: true,
         observations: false,
         termComment: false,
+        range: 'all',
+        missingOnly: false,
       });
       expect(
         G.options({
@@ -526,6 +528,8 @@ describe('grade-report', () => {
         comments: true,
         observations: false,
         termComment: false,
+        range: 'all',
+        missingOnly: false,
       });
     });
 

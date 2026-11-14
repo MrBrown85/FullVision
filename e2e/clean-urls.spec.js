@@ -30,7 +30,7 @@ test('a reload keeps the page', async ({ page }) => {
   await page.reload();
   // Reports records the class, tab and student it opened on (Nov 3 sweep).
   await expect(page).toHaveURL(/\/reports(\?course=[^&]+&tab=questionnaire(&student=[^&]+)?)?$/);
-  await expect(page.locator('#dock-mount [aria-current="page"]')).toHaveText('Reports');
+  await expect(page.locator('#dock-mount [aria-current="page"]')).toHaveText('Reporting');
 });
 
 test('dock links switch pages without reloading, and back/forward work', async ({ page }) => {

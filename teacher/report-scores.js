@@ -3,8 +3,7 @@
 
    A report is anything a family, a student or the office is handed:
    Progress Reports and its Feedback Pages, the Term
-   Questionnaire's facts and Generate, Sent to Phones, Print Grades and
-   Export. Each is a surface below, and SURFACES is the one place that says
+   Questionnaire's facts and Generate, Print Grades and Export. Each is a surface below, and SURFACES is the one place that says
    which set of scores it uses:
    - 'all': the teacher's working copy, drafts included;
    - 'returned': only what students have been given (shared/calc.js,
@@ -48,8 +47,6 @@ window.ReportScores = (function () {
     handout: 'returned',
     // The Term Questionnaire's facts, At a Glance, its checks and Generate (S2-F2; Colin's answer 6).
     questionnaire: 'returned',
-    // Sent to Phones: each student's phone copy (S2-F2; Colin's answer 6).
-    phones: 'returned',
     /* The grader's own use of a report's reading: the Note for the Report's
        preview under the grader (teacher/page-assignments.js), which asks
        the questionnaire's facts. The grader is the teacher's screen, so all
