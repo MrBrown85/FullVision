@@ -1150,27 +1150,32 @@
       send.finishBy = Date.parse(String(res.finish_by || '').replace(/(\.\d{3})\d+/, '$1')) || 0;
       send.startedAt = send.finishBy ? send.finishBy - HOLD_MS : clock();
       savePatch(send);
-      return upload(send, 0);
+      return upload(send);
     });
   }
 
-  // Each page, then its thumbnail, in order; a page already up is not sent again.
-  function upload(send, i) {
-    if (i >= send.pages.length) return finishReal(send);
-    var pg = send.pages[i];
-    return part(send, pg, 'photo')
-      .then(function (got) {
-        return got === 'up' ? part(send, pg, 'thumb') : got;
-      })
-      .then(function (got) {
-        if (got !== 'up') {
-          if (got === 'network' && offline()) return stop(send, 'notsent');
-          send.failed = i;
-          return stop(send, 'pagefailed');
-        }
-        pg.sent = true;
-        return upload(send, i + 1);
+  /* The pages three at a time, in order, each with its thumbnail beside it; a file already up is not
+     sent again. A page that doesn't go starts no more; the first of them is the one named. */
+  function upload(send) {
+    var next = 0;
+    var bad = null; // { i, got } of the first page that didn't go
+    function lane() {
+      var i = next++;
+      if (bad || i >= send.pages.length) return null;
+      var pg = send.pages[i];
+      return Promise.all([part(send, pg, 'photo'), part(send, pg, 'thumb')]).then(function (got) {
+        got = got[0] !== 'up' ? got[0] : got[1];
+        if (got === 'up') pg.sent = true;
+        else if (!bad || i < bad.i) bad = { i: i, got: got };
+        return lane();
       });
+    }
+    return Promise.all([lane(), lane(), lane()]).then(function () {
+      if (!bad) return finishReal(send);
+      if (bad.got === 'network' && offline()) return stop(send, 'notsent');
+      send.failed = bad.i;
+      return stop(send, 'pagefailed');
+    });
   }
 
   function part(send, pg, which) {
