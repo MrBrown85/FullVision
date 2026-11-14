@@ -214,7 +214,7 @@ describe('the wall', () => {
     expect($$('.ww-card').length).toBe(28);
   });
 
-  it('a class of 28 loads thumbnails only, once, until a page is opened', async () => {
+  it('a class of 28 loads thumbnails only, once', async () => {
     seed({ all: true });
     WorkWall.open(CID, PIECE);
     await settle();
@@ -227,11 +227,11 @@ describe('the wall', () => {
     click(pill('3'));
     await settle();
     expect(asked.length).toBe(28);
-    // Opening a card asks for that one page, full size.
+    // Opening a card opens the grader; the wall asks for no page itself.
     click($('.ww-card[data-sid="' + IDS[3] + '"]'));
     await settle();
-    expect(asked.slice(28)).toEqual(['page:' + file(IDS[3], 1).path]);
-    expect($('.wv-img').getAttribute('src')).toMatch(/w103-1\.jpg$/);
+    expect(PageAssignments.openGrader.mock.calls[0][2]).toBe(IDS[3]);
+    expect(asked.length).toBe(28);
   });
 
   it('a thumbnail that comes after the wall closed is let go, not drawn', async () => {
@@ -427,9 +427,21 @@ describe('the door into the grader', () => {
     expect($('#work-viewer-overlay')).toBeNull();
   });
 
-  it("a page opened full size: step through the students' work, then Open in Grader", async () => {
+  it('a card with work in opens the grader on that student, in the order shown, with no page view', () => {
     seed();
     const spy = PageAssignments.openGrader;
+    WorkWall.open(CID, PIECE);
+    click($('.ww-seg-btn[data-sort="name"]'));
+    click($('.ww-card[data-sid="' + IDS[3] + '"]'));
+    expect($('#work-viewer-overlay')).toBeNull();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0].slice(0, 3)).toEqual([CID, PIECE, IDS[3]]);
+    expect(spy.mock.calls[0][3].studentIds).toContain(IDS[3]);
+  });
+
+  it('with no grader, a card opens the pages full size to step through', () => {
+    seed();
+    window.PageAssignments = {};
     WorkWall.open(CID, PIECE);
     click($('.ww-seg-btn[data-sort="name"]'));
     click($('.ww-card[data-sid="' + IDS[3] + '"]'));
@@ -440,12 +452,9 @@ describe('the door into the grader', () => {
     click($('[data-wv="item"][data-dir="1"]'));
     expect(text($('.wv-title'))).toBe(nameOf(IDS[4]));
     expect($('[data-wv="item"][data-dir="1"]').getAttribute('aria-label')).toBe('Next Student');
-    click($('[data-wv="grade"]'));
-    expect($('#work-viewer-overlay')).toBeNull();
-    expect(spy.mock.calls[0][2]).toBe(IDS[4]);
   });
 
-  it('Escape closes the page, then the wall; not while the grader is open', () => {
+  it('Escape closes the wall; not while the grader is open', () => {
     seed();
     WorkWall.open(CID, PIECE);
     click($('.ww-card[data-sid="' + IDS[0] + '"]'));
@@ -453,11 +462,8 @@ describe('the door into the grader', () => {
     globalThis.document = doc;
     PageAssignments.graderOpen.mockReturnValue(true);
     esc();
-    expect($('#work-viewer-overlay')).not.toBeNull();
-    PageAssignments.graderOpen.mockReturnValue(false);
-    esc();
-    expect($('#work-viewer-overlay')).toBeNull();
     expect(WorkWall.isOpen()).toBe(true);
+    PageAssignments.graderOpen.mockReturnValue(false);
     esc();
     expect(WorkWall.isOpen()).toBe(false);
   });
@@ -539,14 +545,14 @@ describe("work on the teacher's other screens", () => {
     expect(asked).toHaveLength(want.length);
   });
 
-  it('an open row of All Your Work: the pages whole, each opening full size', async () => {
+  it('an open row of All Your Work: the pages whole, each opening the grader on the piece', async () => {
     seed({ sendWork: false });
     expect(WorkWall.pieceHtml(CID, last, PIECE)).toBe('');
     const main = doc.getElementById('main');
     main.innerHTML = WorkWall.pieceHtml(CID, IDS[3], PIECE);
     expect($$('.stu-ov-work .ovw-page').map(b => b.getAttribute('aria-label'))).toEqual([
-      'Page 1 of 2, full size',
-      'Page 2 of 2, full size',
+      'Page 1 of 2, open in the grader',
+      'Page 2 of 2, open in the grader',
     ]);
     WorkWall.mountPiece(main, CID, IDS[3]);
     await settle();
@@ -557,10 +563,9 @@ describe("work on the teacher's other screens", () => {
     await settle();
     expect(asked).toHaveLength(2);
     click($$('.ovw-page')[1]);
-    expect(text($('.wv-title'))).toBe(nameOf(IDS[3]));
-    expect(text($('.wv-at'))).toBe('2 of 2');
-    WorkWall.unmountTab(true);
     expect($('#work-viewer-overlay')).toBeNull();
+    expect(PageAssignments.openGrader.mock.calls[0].slice(0, 3)).toEqual([CID, PIECE, IDS[3]]);
+    WorkWall.unmountTab(true);
   });
 });
 
@@ -687,6 +692,17 @@ describe("the Work tab on the teacher's student page", () => {
     pick('');
     expect($$('.sw-card')).toHaveLength(2);
     delete _cache.categories[CID];
+  });
+
+  it('a card opens the grader on that piece for this student, with no page view', () => {
+    seed();
+    const spy = PageAssignments.openGrader;
+    openStudent(IDS[0]);
+    click($('.sw-card[data-aid="' + OTHER + '"]'));
+    expect($('#work-viewer-overlay')).toBeNull();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0].slice(0, 3)).toEqual([CID, OTHER, IDS[0]]);
+    expect(spy.mock.calls[0][3].studentIds).toEqual([IDS[0]]);
   });
 
   it('View Full Size steps through the pieces; Open in Grader opens that piece for this student', () => {
