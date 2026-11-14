@@ -253,10 +253,10 @@ window.ReportQuestionnaire = (function () {
   }
   /* The sentences of a comment over 20 words, a quoted title counting as
      one (the realiser's rule; a teacher's edit can pass it). */
+  var _long = { text: null, list: [] }; // the last text's: a key asks two or three times
   function longSentences(text) {
-    return sentencesOf(text).filter(function (t) {
-      return CommentRealiser.tooLong(t);
-    });
+    if (text !== _long.text) _long = { text: text, list: sentencesOf(text).filter(CommentRealiser.tooLong) };
+    return _long.list.slice();
   }
   /* After the count: that it is past the class's limit or a sentence is
      over 20 words (the count turns orange), else the class's limit. Only
