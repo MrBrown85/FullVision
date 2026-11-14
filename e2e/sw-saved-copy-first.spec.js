@@ -780,3 +780,35 @@ test("opening an installed file's address as a page does not write over its save
   await context.setOffline(false);
   expect(errors).toEqual([]);
 });
+
+test("an undo's untagged page is not saved over this release's page: offline stays one release", async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+  const tagged = await cachedText(page, '/teacher/app.html');
+  expect(tagged).toContain('content="fullvision-a"');
+
+  // An undo of this build is live (pages with no tag, new files), but its
+  // sw.js cannot be fetched yet: worker a is still in charge.
+  server.release('u', filesOf('u'));
+  for (const rel of releasePages(distSw())) {
+    server.state.files['/' + rel] = Buffer.from(
+      readFileSync(join(DIST, rel), 'utf-8').replace(/<meta name="fv-release" content="[^"]*" \/>/g, ''),
+    );
+  }
+  server.state.fail.add('/sw.js');
+  await page.goto(server.origin + '/gradebook?course=sci8');
+  await appDrawn(page);
+  // The untagged page is not kept: the saved page is still release a's.
+  expect(await cachedText(page, '/teacher/app.html')).toBe(tagged);
+
+  // Offline, the saved page starts with its own files: all release a.
+  await context.setOffline(true);
+  await page.goto(server.origin + '/gradebook?course=sci8');
+  await appDrawn(page);
+  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await context.setOffline(false);
+});

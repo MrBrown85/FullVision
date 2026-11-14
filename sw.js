@@ -644,8 +644,12 @@ async function answerPage(event, url, cacheKey) {
   // so the address asked for and the key are both checked.
   if (isInstalledFile(url) || isInstalledFile(new URL(cacheKey, self.location.origin))) return response;
   // A page from another release is not kept: offline, the saved page must be
-  // the one the saved files belong to.
-  if (!release || release === CACHE_NAME) cacheIfGood(cacheKey, response);
+  // the one the saved files belong to. One of this release's own pages that
+  // arrives with no tag is from a release without tags (an undo of this
+  // build): not kept either, or offline it would run this release's files.
+  // Pages no release tags ("/", help, s/) are kept as before.
+  const tagged = !!PRECACHE_FINGERPRINTS && cacheKey !== '/' && PRECACHE_URLS.includes(cacheKey);
+  if (release === CACHE_NAME || (!release && !tagged)) cacheIfGood(cacheKey, response);
   return response;
 }
 
