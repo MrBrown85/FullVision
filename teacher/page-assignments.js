@@ -12929,8 +12929,9 @@ window.PageAssignments = (function () {
       '<summary class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
       '<span class="grader-report-note-opt">Optional</span></summary>' +
       '<div class="grader-report-note-body">' +
-      '<p class="grader-report-note-what">One line about what the student did, written about them, not to them. Report comments use it.</p>' +
+      '<p class="grader-report-note-what">If this is the student\u2019s best piece, their report comment names it. Write what they did well and the comment adds it.</p>' +
       '<input type="text" class="grader-report-note-input" aria-label="Note for the report" ' +
+      'placeholder="e.g. used evidence from two sources to explain the causes" ' +
       'aria-describedby="grader-report-note-preview" maxlength="300" autocomplete="off">' +
       '<p class="grader-report-note-preview" id="grader-report-note-preview"></p>' +
       '</div>' +
@@ -16596,8 +16597,7 @@ window.PageAssignments = (function () {
      sentence (score.report_note). Not on DIBELS or Complete/Incomplete
      work, which is never a best piece. It is saved with the student's
      score, so it waits for one. */
-  var _REPORT_NOTE_TITLE =
-    'One line about what the student did. The comment uses it when this is the student\u2019s best piece.';
+  var _REPORT_NOTE_TITLE = 'What the student did well here. Their report comment uses it if this is their best piece.';
   var _REPORT_NOTE_LOCKED_TITLE = 'Score this work first. The note is saved with the score.';
 
   function _refreshReportNote(dialog, cid, a, sid) {
@@ -16628,9 +16628,9 @@ window.PageAssignments = (function () {
      (teacher/comment-bank.js), the title's quotes turned single inside the
      preview's own. A note that does not start with a past-tense verb
      (CommentLint.startsPastTense) is saved but not used: the sentence
-     shows its no-note form and the hint turns orange to say why. */
+     shows its no-note form and an orange line, shown only then, says why. */
   var _REPORT_NOTE_HINT =
-    'Start with what the student did, like \u201Clinked \u2026\u201D or \u201Cshowed \u2026\u201D.';
+    'Your note isn\u2019t used yet: start it with what the student did, like \u201Cused \u2026\u201D or \u201Cexplained \u2026\u201D.';
   function _reportNotePreview(input) {
     var cid = activeCourse;
     var preview = input.parentNode.querySelector('.grader-report-note-preview');
@@ -16662,13 +16662,13 @@ window.PageAssignments = (function () {
     var typed = String(input.value || '').trim();
     var off = !!typed && !(window.CommentLint && CommentLint.startsPastTense(typed));
     preview.textContent = '';
-    var reads = document.createElement('span');
-    reads.textContent = 'When this is the student\u2019s best piece, the comment reads: \u201C' + sentence + '\u201D ';
-    var hint = document.createElement('span');
-    hint.className = 'grader-report-note-hint';
-    hint.textContent = _REPORT_NOTE_HINT;
-    preview.appendChild(reads);
-    preview.appendChild(hint);
+    preview.appendChild(document.createElement('span')).textContent =
+      'The comment will read: \u201C' + sentence + '\u201D ';
+    if (off) {
+      var hint = preview.appendChild(document.createElement('span'));
+      hint.className = 'grader-report-note-hint';
+      hint.textContent = _REPORT_NOTE_HINT;
+    }
     preview.classList.toggle('warn', off);
   }
 
