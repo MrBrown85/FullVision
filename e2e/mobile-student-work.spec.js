@@ -135,6 +135,50 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   // Full screen: every page.
   await card.locator('.m-work-full').click();
   await expect(page.locator('#m-sheet-container .m-work-sheet-page')).toHaveCount(2);
+  await expect(page.locator('#m-sheet-container .m-work-sheet-page').first()).toHaveAttribute(
+    'src',
+    /sample-work\/cell-lab-noor-1\.jpg$/,
+  );
+});
+
+test('the grader fills the card on screen and its neighbours, the rest when reached', async ({ page }) => {
+  await openPhone(page);
+  await openGradeTab(page);
+  await page.locator('.m-seg-btn[data-val="all"]').click();
+  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  const cards = page.locator('.m-swiper-card');
+  const withWork = await cards.evaluateAll(els =>
+    els.map((c, i) => (c.querySelector('.m-work-page img') ? i : -1)).filter(i => i >= 0),
+  );
+  const far = withWork.find(i => i > 2);
+  expect(far).toBeGreaterThan(2);
+  const strip = i => cards.nth(i).locator('.m-work-page img').first();
+  const fullPage = /sample-work\/[a-z-]+-\d\.jpg$/;
+  await expect(strip(withWork[0])).toHaveAttribute('src', fullPage);
+  await expect(strip(far)).not.toHaveAttribute('src', /./);
+  await page.locator('#m-thumb-strip .m-thumb').nth(far).click();
+  await expect(strip(far)).toHaveAttribute('src', fullPage);
+});
+
+test('the card on screen shows full pages in its strip once loaded, as sharp as before', async ({ page }) => {
+  await openPhone(page, { clear: ['st2', 'st3'] });
+  await openGradeTab(page);
+  await page.locator('.m-tg-row[data-aid="' + LAB + '"] [data-action="m-grade-row-menu"]').click();
+  await page.locator('#m-sheet-container .m-tg-menu [data-only="tograde"]').click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  const imgs = page.locator('.m-swiper-card').first().locator('.m-work-page img');
+  await expect(imgs).toHaveCount(2);
+  for (let i = 0; i < 2; i++) {
+    await expect(imgs.nth(i)).toHaveAttribute('src', /sample-work\/cell-lab-noor-\d\.jpg$/);
+    // The page itself (900 px wide), not the 150 px thumbnail, drawn about 340 px wide.
+    await expect.poll(() => imgs.nth(i).evaluate(img => img.complete && img.naturalWidth)).toBe(900);
+  }
+  // The pinned strip keeps its thumbnails.
+  await expect(page.locator('.m-swiper-card').first().locator('.m-work-pin img').first()).toHaveAttribute(
+    'src',
+    /-thumb\.jpg$/,
+  );
 });
 
 test('the filter applies as you tap', async ({ page }) => {
