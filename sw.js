@@ -141,7 +141,6 @@ const PRECACHE_URLS = [
   '/shared/student-voice.js',
   '/teacher/learner-profile.js',
   '/shared/phone-report-view.js',
-  '/teacher/phone-reports.js',
   '/shared/backup-restore.js',
   '/teacher/cm-roster-file.js',
   '/teacher/cm-block-picker.js',

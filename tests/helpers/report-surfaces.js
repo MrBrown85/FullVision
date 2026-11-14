@@ -42,8 +42,8 @@ export function freshGenerate() {
   });
 }
 
-/* Which of the six surfaces a part belongs to: the part's name starts with it. */
-export const SURFACES = ['progress', 'quick', 'questionnaire', 'phones', 'printGrades', 'export'];
+/* Which of the five surfaces a part belongs to: the part's name starts with it. */
+export const SURFACES = ['progress', 'quick', 'questionnaire', 'printGrades', 'export'];
 
 let _exportLoaded = false;
 function loadExport() {
@@ -184,13 +184,6 @@ function questionnaire(cid, students, ctx, out, view, ordinal) {
   });
 }
 
-function phones(cid, students, ctx, out, view) {
-  const sent = Object.assign({}, ctx, { issued: '2026-11-09T12:00:00.000Z' });
-  students.forEach(st => {
-    out[view + ' › phones › ' + st.id] = text(PhoneReports.snapshot(cid, st, sent));
-  });
-}
-
 function printGrades(cid, out, view, ordinal) {
   const GP = GradesPrint;
   [{}, { scoresAs: 'proficiency' }, { scoresAs: 'percent' }, { scoresAs: 'both' }, { sortBy: 'first' }].forEach(o => {
@@ -210,7 +203,7 @@ function exported(cid, out, view) {
 }
 
 /** Every surface for the class, for the year so far and as of each reporting term.
- * only: the surfaces to draw (all six without it). opts.handout false leaves
+ * only: the surfaces to draw (all five without it). opts.handout false leaves
  * out the rubric sheets asked for as Print Rubrics asks, which are the
  * grader's handout and not part of a report. opts.students: draw only the
  * students with these ids (all of them without it). */
@@ -231,7 +224,6 @@ export function surfaces(cid, only, opts) {
       if (want('progress')) progress(cid, students, ctx, out, view);
       if (want('quick')) quick(cid, students, ctx, out, view, handout);
       if (want('questionnaire')) questionnaire(cid, students, ctx, out, view, ordinal == null ? 1 : ordinal);
-      if (want('phones')) phones(cid, students, ctx, out, view);
       // Print Grades sets its own period; Export reads the year so far.
       if (want('printGrades')) printGrades(cid, out, view, ordinal);
       if (want('export') && ordinal == null) exported(cid, out, view);

@@ -4,7 +4,6 @@
   "teacher/grade-report.js": ["_entries", "_levelRow", "_termHtml", "categorySummary", "rows"],
   "teacher/grades-print.js": ["buildModel", "cellText", "columnAverageText"],
   "teacher/page-reports.js": ["_draftsInPrint"],
-  "teacher/phone-reports.js": ["snapshot"],
   "teacher/report-blocks.js": [
     "_areaRows",
     "_coursePct",

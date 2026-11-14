@@ -132,14 +132,6 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     expect(c.termScores.map(s => s.id)).toEqual(['dec']);
   });
 
-  it('the phone report sent to the student carries the year-to-date grade', () => {
-    setActiveTerm(CID, 2);
-    const snap = PhoneReports.snapshot(CID, STUDENT, { termId: 'term-2', termLabel: 'Report 2' });
-    // The word is the copy's own line; the text is the letter and %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
-    expect(snap.overall).toMatchObject({ word: 'Proficient', text: 'B 75%' });
-    expect(snap.skills[0].text).toBe('Proficient · 75%');
-  });
-
   it('the final report is the whole year, and its F is decided on the whole year', () => {
     _cache.scores[CID][SID] = [
       { assessmentId: 'oct', tagId: 't1', score: 1, date: '2026-10-15', type: 'summative' },

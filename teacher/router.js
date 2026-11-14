@@ -41,8 +41,6 @@ window.Router = (function () {
         '/teacher/report-questionnaire.js',
         '/teacher/grade-report.js',
         '/teacher/report-preview.js',
-        '/shared/phone-report-view.js',
-        '/teacher/phone-reports.js',
         '/teacher/report-feedback.js',
         '/teacher/report-feedback-cards.js',
         '/teacher/report-one.js',

@@ -1,13 +1,13 @@
 /**
- * The Term Questionnaire, Generate and Sent to Phones in a class that holds
+ * The Term Questionnaire and Generate in a class that holds
  * grades (student page build plan, S2-F2; Colin's answer 6: returned only
  * for anything a family reads).
  *
- * 1. One draft: the questionnaire's header grade and a phone copy give the
+ * 1. One draft: the questionnaire's header grade and Progress Reports give the
  *    returned number; the gradebook's own number is the all-work one.
  * 2. A class with drafts is drawn and every questionnaire part (the facts,
  *    At a Glance, the lists, the whole screen, the checks, what Generate
- *    drafts) and every phone copy is searched for the drafts' values: none
+ *    drafts) is searched for the drafts' values: none
  *    is there until it is returned.
  * 3. A Note for the Report reaches the questionnaire only once that piece's
  *    grade is returned (ruling 11).
@@ -62,17 +62,12 @@ function ungradedCell(cid) {
 const student = (cid, sid) => getStudents(cid).find(s => s.id === sid);
 const ctx = { termId: 'term-1', termLabel: 'Report 1' };
 
-/* The phone copy reads words, not figures (DECISIONS, "Student-facing levels
-   are proficiencies"), so a word may not move when a level does: what the
-   copy is built from is the overall level in Sent to Phones' set of scores,
-   with the copy's own overall beside it. */
-const phoneReads = (cid, st, ctx) =>
-  JSON.stringify([
-    ReportScores.withReportScores('phones', () => getOverallProficiency(cid, st.id)),
-    PhoneReports.snapshot(cid, st, ctx).overall,
-  ]);
+/* What a family reads: the overall level in Progress Reports' set of
+   scores (Sent to Phones, which read the same set, is retired). */
+const familyReads = (cid, st) =>
+  JSON.stringify(ReportScores.withReportScores('progress', () => getOverallProficiency(cid, st.id)));
 
-describe('the Term Questionnaire and Sent to Phones in a class that holds grades', { timeout: 120000 }, () => {
+describe('the Term Questionnaire and what a family reads in a class that holds grades', { timeout: 120000 }, () => {
   let wasDemo;
   beforeAll(() => {
     wasDemo = window.isDemoMode;
@@ -87,7 +82,7 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     clearProfCache();
   });
 
-  it('one draft: the questionnaire and a phone copy give the returned grade; the teacher’s own views all work', () => {
+  it('one draft: the questionnaire and Progress Reports give the returned grade; the teacher’s own views all work', () => {
     const cid = freshClass(HELD);
     // The student's whole course moves with one piece: their Extending lab drops to Emerging.
     const lab = getAssessments(cid).find(a => a.id === 'sci8a4');
@@ -100,7 +95,7 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     const st = student(cid, sid);
     const before = {
       overall: getOverallProficiency(cid, sid),
-      phone: phoneReads(cid, st, ctx),
+      family: familyReads(cid, st),
       facts: JSON.stringify(CommentBank.facts(cid, st, ctx.termId)),
     };
     crits.forEach(c => Grader.setLevel(cid, sid, lab.id, c.id, 1, 0));
@@ -110,17 +105,17 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     // The teacher's own number moved.
     expect(getOverallProficiency(cid, sid)).not.toBe(before.overall);
     // What a family reads did not.
-    expect(phoneReads(cid, st, ctx)).toBe(before.phone);
+    expect(familyReads(cid, st)).toBe(before.family);
     expect(JSON.stringify(CommentBank.facts(cid, st, ctx.termId))).toBe(before.facts);
     // Returned, it moves there too.
     Grader.returnGrades(cid, lab.id, [sid]);
     clearProfCache();
     freshGenerate();
     expect(JSON.stringify(CommentBank.facts(cid, st, ctx.termId))).not.toBe(before.facts);
-    expect(phoneReads(cid, st, ctx)).not.toBe(before.phone);
+    expect(familyReads(cid, st)).not.toBe(before.family);
   });
 
-  it('a class with drafts: no questionnaire part, Generate draft or phone copy holds a draft’s value until it is returned', () => {
+  it('a class with drafts: no questionnaire part or Generate draft holds a draft’s value until it is returned', () => {
     const cid = freshClass(HELD);
     const cell = ungradedCell(cid);
     expect(cell, 'a piece a student has no grade on').toBeTruthy();
@@ -141,13 +136,13 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     const draw = () => {
       clearProfCache();
       freshGenerate();
-      return surfaces(cid, ['questionnaire', 'phones', 'export']);
+      return surfaces(cid, ['questionnaire', 'export']);
     };
     const holding = (drawn, names, needle) =>
       Object.keys(drawn).filter(k => names.indexOf(surfaceOf(k)) >= 0 && drawn[k].indexOf(needle) >= 0);
 
     const held = draw();
-    expect(holding(held, ['questionnaire', 'phones'], 'ZZDRAFT')).toEqual([]);
+    expect(holding(held, ['questionnaire'], 'ZZDRAFT')).toEqual([]);
     // The piece itself is not in the student's facts: its grade was never returned.
     const facts = CommentBank.facts(cid, student(cid, cell.sid), ctx.termId);
     expect((facts.work || []).some(w => w.id === cell.aid)).toBe(false);
@@ -188,7 +183,7 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     expect((inQuestionnaire.work || []).some(w => w.id === cell.aid)).toBe(false);
   });
 
-  it('in a class that does not hold grades the questionnaire and the phone copies read all work', () => {
+  it('in a class that does not hold grades the questionnaire reads all work', () => {
     const cid = freshClass({ student_page_enabled: true, return_grades: 'on_save' });
     const cell = ungradedCell(cid);
     const st = student(cid, cell.sid);

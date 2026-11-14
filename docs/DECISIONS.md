@@ -1138,6 +1138,8 @@ Colin, in one list of fixes for one PR: rename Reports, fold the overlapping gra
 4. **Every part prints as the Assessments list does**: no boxes or rounded corners, the part's name, a black rule, grey rules between rows. A part led by its own table takes the rule from its header row.
 5. **Work Habits explains itself to a family**: a line under its name, what each habit means under it, and what the four words mean under the table. **Student Self-Assessment** adds a circle under each word for the student to rate each habit beside the teacher's rating, on paper; nothing is stored. Work Habits is one table now, so a long one is cut between its rows.
 6. **The two student reflections print as forms**: a table with a circle per row under each word of the scale, and each question with ruled lines 26px apart to write on (Lines to Write On: 2, 3, 4 or 6; 3 by default). Both are cut between their rows across pages.
+7. **Print Reports.** The Reporting page's second tab, Progress Reports, is called Print Reports (Colin, 2026-11-13).
+8. **Sent to Phones is removed** (Colin, 2026-11-13: "students have a live app that has replaced this functionality"). The teacher can no longer send a report to students' phones; its button, panel and code are gone. The student page still opens a phone report already sent, until it closes. The database's phone-report tables and functions are left as they are.
 
 ## The Student Page switch is in every class's Class Settings (2026-11-13)
 

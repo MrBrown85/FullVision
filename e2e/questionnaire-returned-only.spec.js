@@ -1,18 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 /* S2-F2: in a class whose student page is on (the hidden build switch) and
-   that returns grades When I Return Them, the Term Questionnaire and Sent
-   to Phones show what a family reads: returned grades only. Each piece of
+   that returns grades When I Return Them, the Term Questionnaire and Print
+   Reports show what a family reads: returned grades only. Each piece of
    Cece's rubric work is changed to Emerging on every criterion and left as
-   a draft. Her questionnaire's grade and the phone copy sent keep the grade
-   she was given, while the same copy drawn on all work has moved. In an As
-   Soon As I Save class the copy moves at once. A family reads the
-   proficiency word, not a figure (DECISIONS, "Student-facing levels are
-   proficiencies"), so the drafts must move the word: one lab's draft moves
-   her figure but leaves her Proficient, and the copy could not show whether
-   a draft got in; all of them take her to Developing. (Returning it
-   is held in tests/questionnaire-holds-drafts.test.js.) Demo Mode's
-   Science 8. */
+   a draft. Her questionnaire's grade and her overall proficiency in Print
+   Reports' set of scores keep the grade she was given, while the same
+   reading on all work has moved. In an As Soon As I Save class it moves at
+   once. A family reads the proficiency word, not a figure (DECISIONS,
+   "Student-facing levels are proficiencies"), so the drafts must move the
+   word: one lab's draft moves her figure but leaves her Proficient; all of
+   them take her to Developing. (Returning it is held in
+   tests/questionnaire-holds-drafts.test.js.) Sent to Phones, which this
+   also read, is retired (2026-11-13). Demo Mode's Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function demoWithDraft(page, config) {
@@ -31,7 +31,10 @@ async function demoWithDraft(page, config) {
     var st = getStudents(cid).find(function (s) {
       return s.id === 'st1';
     });
-    var before = PhoneReports.snapshot(cid, st, { termId: 'term-1', termLabel: 'Report 1' }).overall.text;
+    var family = function () {
+      return ReportBlocks.profWord(getOverallProficiency(cid, st.id));
+    };
+    var before = ReportScores.withReportScores('progress', family);
     var work = getAssessments(cid).filter(function (a) {
       return a.rubricId && getRubricById(cid, a.rubricId);
     });
@@ -43,10 +46,8 @@ async function demoWithDraft(page, config) {
     clearProfCache();
     return {
       before: before,
-      // The same copy drawn on all work (inside the grader's row, the teacher's own): the draft counts.
-      now: ReportScores.withReportScores('grader', function () {
-        return PhoneReports.snapshot(cid, st, { termId: 'term-1', termLabel: 'Report 1' }).overall.text;
-      }),
+      // The same reading on all work (inside the grader's row, the teacher's own): the draft counts.
+      now: ReportScores.withReportScores('grader', family),
       // One state for all of it: 'draft' or 'returned'.
       state: Array.from(
         new Set(
@@ -59,31 +60,15 @@ async function demoWithDraft(page, config) {
   }, config);
 }
 
-async function readPhoneCopy(page) {
-  await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Print Reports' }).click();
-  await page.getByRole('button', { name: 'Sent to Phones' }).click();
-  await page.getByRole('button', { name: 'Send to Phones and Print Slips' }).click();
-  await expect(page.locator('.pp-row')).toHaveCount(27);
-  // Read Report shows once a student has opened their copy: Cece's newest copy is marked opened.
-  await page.evaluate(() => {
-    const list = JSON.parse(localStorage.getItem('gb-phone-reports-sci8'));
-    list[0].students.find(s => s.enrollment_id === 'st1').opened_at = new Date().toISOString();
-    localStorage.setItem('gb-phone-reports-sci8', JSON.stringify(list));
-    PageReports.renderReports();
-  });
-  await page.locator('.pp-row', { hasText: 'Cece Adeyemi' }).getByRole('button', { name: 'Read Report' }).click();
-  const phone = page.getByRole('dialog', { name: 'Report as the student sees it' });
-  await expect(phone.locator('.pr-name')).toHaveText('Cece Adeyemi');
-  await phone.getByRole('button', { name: 'Close' }).click();
-  // The grade in the copy that was sent, as the phone has it.
+// What a family reads now: Cece's overall proficiency in Print Reports' set of scores.
+function readFamily(page) {
   return page.evaluate(() => {
-    const list = JSON.parse(localStorage.getItem('gb-phone-reports-sci8'));
-    return list[0].students.find(s => s.enrollment_id === 'st1').data.overall.text;
+    clearProfCache();
+    return ReportScores.withReportScores('progress', () => ReportBlocks.profWord(getOverallProficiency('sci8', 'st1')));
   });
 }
 
-test('the questionnaire and the phone copy keep the grade Cece was given until her draft is returned', async ({
+test('the questionnaire and Print Reports keep the grade Cece was given until her draft is returned', async ({
   page,
 }) => {
   // The questionnaire's grade for Cece before anything changes.
@@ -102,12 +87,12 @@ test('the questionnaire and the phone copy keep the grade Cece was given until h
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
   await expect(page.locator('.qn-grade-big')).toHaveText(given);
-  expect(await readPhoneCopy(page)).toBe(at.before);
+  expect(await readFamily(page)).toBe(at.before);
 });
 
 test('in an As Soon As I Save class they show the change at once', async ({ page }) => {
   const at = await demoWithDraft(page, { student_page_enabled: true, return_grades: 'on_save' });
   expect(at.state).toBe('returned');
   expect(at.before).toBe('Proficient');
-  expect(await readPhoneCopy(page)).toBe('Developing');
+  expect(await readFamily(page)).toBe('Developing');
 });
