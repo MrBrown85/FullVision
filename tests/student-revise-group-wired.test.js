@@ -38,6 +38,19 @@ const bodyOf = (page, route) => page.calls.filter(c => c.body.route === route).m
 const piece = id => '.sp-piece[data-piece="' + id + '"]';
 const viewOf = page => page.T.viewOf(page.T.state());
 const pieceIn = (page, id) => viewOf(page).work.find(p => p.id === id);
+const row = id => '.sp-ml-row[data-piece="' + id + '"]';
+
+// My Learning's Your Work: a row of work sent opens its card there; a row of work back opens Your Feedback.
+async function openRow(page, id) {
+  await page.click('.sp-tabs-bottom [data-tab="learning"]');
+  await page.click(row(id));
+}
+
+// Log Out, then Log Out again on the sheet that asks.
+async function logOut(page) {
+  await page.click('.sp-done[data-act="logout-ask"]');
+  await page.click('.sp-logout [data-act="card-done"]');
+}
 
 function memoryStore() {
   const rows = new Map();
@@ -190,6 +203,9 @@ describe('a revision asked for (S11-W1)', () => {
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback', 'group-work', 'file-links']);
     expect(bodyOf(page, 'file-links')[0]).toMatchObject({ enrollment_id: CECE, assessment_id: WORK.lab });
     expect(pieceIn(page, WORK.lab).kind).toBe('revise');
+    // On Outstanding, first: a revision goes before the work that is due.
+    expect(text(page, '.sp-segment-on')).toMatch(/^Outstanding \d+$/);
+    expect(page.root().querySelector('.sp-deck .sp-piece').getAttribute('data-piece')).toBe(WORK.lab);
     const card = piece(WORK.lab);
     expect(text(page, card + ' .sp-revise-fix')).toBe(
       'Write the magnification beside each drawing, then send it again.',
@@ -248,7 +264,13 @@ describe('a revision asked for (S11-W1)', () => {
     await page.settle();
     expect(pieceIn(page, WORK.lab).kind).toBe('sent');
     expect(pieceIn(page, WORK.lab).revision).toMatchObject({ state: 'sent', note: 'I added the magnification.' });
-    await page.click('[data-segment="sent"]');
+    // The revision sent leaves Outstanding and is a Sent row on My Learning, whose card holds Unsend.
+    expect(page.root().querySelector(piece(WORK.lab))).toBeNull();
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    expect(page.root().querySelector(row(WORK.lab)).getAttribute('data-act')).toBe('open-piece');
+    expect(text(page, row(WORK.lab) + ' .sp-row-sub')).toMatch(/^Sent \S+ \d+, .+ · waiting for feedback$/);
+    await page.click(row(WORK.lab));
+    expect(page.root().querySelector('.sp-ml-card-open ' + piece(WORK.lab))).toBeTruthy();
     expect(
       page
         .root()
@@ -265,6 +287,9 @@ describe('a revision asked for (S11-W1)', () => {
     expect(bodyOf(page, 'unsend')).toEqual([]);
     expect([...dev.fn.world.subs.values()].filter(s => s.version === 2)).toEqual([]);
     expect(pieceIn(page, WORK.lab).kind).toBe('revise');
+    // Unsent: the page goes to its card on Outstanding, Send My Revision again.
+    expect(page.T.state()).toMatchObject({ tab: 'assignments', segment: 'outstanding', pick: WORK.lab, card: '' });
+    expect(page.root().querySelector(piece(WORK.lab) + ' [data-act="revise-open"]')).toBeTruthy();
   });
 
   it('the teacher changed what to fix while the pages went up: the words say so, and the next press is a new request', async () => {
@@ -319,8 +344,19 @@ describe('a revision asked for (S11-W1)', () => {
       },
     ]);
     const page = await signIn(dev);
-    await page.click('[data-segment="back"]');
-    await page.click(piece(WORK.lab) + ' [data-act="compare"]');
+    // A returned revision is a row on My Learning, opening Your Feedback.
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    expect(page.root().querySelector(row(WORK.lab)).getAttribute('data-act')).toBe('feedback');
+    expect(page.root().querySelector(piece(WORK.lab))).toBeNull();
+    /* Before and After is the `compare` press. No button on the page makes
+       it now: its button was on the Back card, and Your Feedback has none
+       (reported with this change). Pressed here as that button would. */
+    const press = page.root().ownerDocument.createElement('button');
+    press.setAttribute('data-act', 'compare');
+    press.setAttribute('data-piece', WORK.lab);
+    page.root().querySelector('.sp-page').appendChild(press);
+    press.click();
+    await page.settle();
     expect(text(page, '.sp-ba-title')).toBe('Before and After');
     const photos = [...page.root().querySelectorAll('.sp-ba-photo')].map(img => img.getAttribute('src'));
     expect(photos).toHaveLength(2);
@@ -348,8 +384,10 @@ describe('group work (S12-W1)', () => {
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
     expect(bodyOf(page, 'group-work')).toEqual([{ route: 'group-work', session: token, enrollment_id: CECE }]);
-    await page.click('[data-segment="sent"]');
-    const card = piece(WORK.fair);
+    // A group-mate sent it: it is Sent for Cece too, a row on My Learning opening its card.
+    expect(page.root().querySelector(piece(WORK.fair))).toBeNull();
+    await openRow(page, WORK.fair);
+    const card = '.sp-ml-card-open ' + piece(WORK.fair);
     expect(text(page, card + ' .sp-group-line')).toBe('3 in your group. Someone in your group sent it.');
     expect(page.root().querySelector(card + ' [data-act="send-open"]').textContent).toBe('Add a Page');
 
@@ -371,8 +409,8 @@ describe('group work (S12-W1)', () => {
       { id: WORK.energy, marks: { pages: 1, notes: 0 }, revision: null, reflection: null },
     ]);
     const page = await signIn(dev);
-    await page.click('[data-segment="back"]');
-    await page.click(piece(WORK.energy) + ' [data-act="feedback"]');
+    await openRow(page, WORK.energy);
+    expect(page.root().querySelector('#sp-fb-title')).toBeTruthy();
     await page.click('[data-act="work"]');
     await page.settle();
     expect(bodyOf(page, 'group-links')).toEqual([
@@ -393,7 +431,7 @@ describe('nothing outlasts the session', () => {
     const page = await signIn(dev);
     expect(page.T.groupOf(page.T.state())).not.toBeNull();
     expect(page.T.state().realRevisionPages).not.toBeNull();
-    await page.click('[data-act="card-done"]');
+    await logOut(page);
     const s = page.T.state();
     expect(s.realGroups || null).toBeNull();
     expect(s.realRevisionPages || null).toBeNull();

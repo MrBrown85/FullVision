@@ -1,9 +1,10 @@
 /**
  * Revisions on the student's page (S11-F2; s/page-view.js, s/send.js,
- * s/feedback.js, shared/student-view.js): Needs Revision on the card, on
- * All Assignments and on Your Feedback; Send My Revision through the send
- * screens, with Unsend and Replace only until grading starts; Before and
- * After once the revision's grade is returned.
+ * s/feedback.js, shared/student-view.js): Needs Revision on its card, first
+ * in Outstanding, and on Your Feedback; Send My Revision through the send
+ * screens, then a Sent row on My Learning whose card has Unsend and Replace
+ * only until grading starts; Before and After once the revision's grade is
+ * returned.
  *
  * Demo Mode only (#demo-card-revise: Send Work on, a class graded by
  * both). A real card's page shows none of it: the server sends no
@@ -42,6 +43,22 @@ async function demo(hash) {
 const revs = page => page.T.demoRevisions(page.T.state());
 
 // Send My Revision on the lab, one photo, a note, Send.
+// The sent revision's card, from its Sent row on My Learning.
+async function openSentLab(page) {
+  await page.click('[data-tab="learning"]');
+  await page.click('.sp-ml-row[data-piece="demo-lab"]');
+  expect(q(page, '.sp-ml-card-open .sp-piece[data-piece="demo-lab"]')).not.toBeNull();
+}
+// Every list a student can see: Outstanding, Upcoming and My Learning.
+async function everyList(page) {
+  let html = '';
+  for (const sel of ['[data-segment="outstanding"]', '[data-segment="upcoming"]', '[data-tab="learning"]']) {
+    await page.click(sel);
+    html += page.root().innerHTML;
+  }
+  return html;
+}
+
 async function sendRevision(page, note) {
   await page.click('.sp-piece[data-piece="demo-lab"] [data-act="revise-open"]');
   expect(text(page, '#sp-send-title')).toBe('Check and Send');
@@ -61,8 +78,8 @@ describe('nothing new without revisions: every other address, and a real card', 
       expect(JSON.stringify(fb || {})).not.toMatch(/"revision":\{/);
       expect(page.T.demoRevisions(page.T.state())).toBeNull();
       expect(viewOf(page).work.every(p => p.revision === null && p.kind !== 'revise')).toBe(true);
-      await page.click('[data-act="all-open"]');
-      expect(page.root().innerHTML).not.toMatch(/Needs Revision|sp-revise|Before and After|Send My Revision/);
+      expect(await everyList(page)).not.toMatch(/Needs Revision|sp-revise|Before and After|Send My Revision/);
+      expect(viewOf(page).changes.some(c => c.why === 'revise')).toBe(false);
       expect(page.calls).toEqual([]);
     },
   );
@@ -99,10 +116,12 @@ describe('nothing new without revisions: every other address, and a real card', 
 });
 
 describe('Needs Revision (the board "Student: Needs Revision")', () => {
-  it('the card in To Do: Revise By, Your Teacher and What to Fix, the criterion, Your First Version, Send My Revision', async () => {
+  it('the card in Outstanding: Revise By, Your Teacher and What to Fix, the criterion, Your First Version, Send My Revision', async () => {
     const page = await demo();
     const by = revs(page)['demo-lab'].revise_by;
-    expect(text(page, '[data-segment="todo"]')).toBe('To Do 4');
+    // The lab, the Missing quick check and the poster past its due date.
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
+    expect(StudentPageView.segmentOf(piece(page, 'demo-lab'), viewOf(page))).toBe('outstanding');
     const card = cardOf(page, 'demo-lab');
     expect(card).not.toBeNull();
     expect(words(card.querySelector('.sp-flag-revise'))).toBe('Revise by ' + dueWord(by));
@@ -119,30 +138,45 @@ describe('Needs Revision (the board "Student: Needs Revision")', () => {
     expect(words(card.querySelector('[data-act="feedback"]'))).toBe('See Your Feedback');
     expect(card.querySelectorAll('.sp-btn-primary')).toHaveLength(1);
     expect(card.querySelector('[data-act="feedback"]').classList.contains('sp-btn-tint')).toBe(true);
-    // Needs Revision leads To Do (the board's "1 of 3").
-    expect(page.root().querySelector('.sp-deck .sp-piece').getAttribute('data-piece')).toBe('demo-lab');
+    // Needs Revision leads Outstanding, before older due dates.
+    expect(qa(page, '.sp-deck .sp-piece').map(c => c.getAttribute('data-piece'))).toEqual([
+      'demo-lab',
+      'demo-quick',
+      'demo-poster',
+    ]);
     // Never the teacher's name.
     expect(page.root().innerHTML).not.toMatch(/Rivera/);
   });
 
-  it('All Assignments: the Needs Revision filter, the row, and what changed since the student last looked', async () => {
+  it('the list beside the cards and the Assignments tab say a revision was asked for', async () => {
     const page = await demo();
     const by = revs(page)['demo-lab'].revise_by;
-    await page.click('[data-act="all-open"]');
-    expect(qa(page, '.sp-filter').map(words)).toContain('Needs Revision');
-    expect(words(q(page, '.sp-since-line'))).toMatch(/your teacher asked for 1 revision\.$/);
-    const row = qa(page, '.sp-row').find(r => words(r.querySelector('.sp-row-title')) === 'Cell Microscope Lab');
-    expect(words(row.querySelector('.sp-row-sub'))).toBe('Needs Revision · due ' + dayWord(by));
-    expect(words(row.querySelector('.sp-row-flag-revise'))).toBe('Revise by ' + dayWord(by));
-    await page.click('[data-act="filter"][data-filter="revise"]');
-    expect(qa(page, '.sp-row-title').map(words)).toEqual(['Cell Microscope Lab']);
+    // The Chromebook's list: the lab first, "Needs Revision · due Nov 17".
+    const side = qa(page, '.sp-side-row');
+    expect(side[0].getAttribute('data-piece')).toBe('demo-lab');
+    expect(words(side[0].querySelector('.sp-row-sub'))).toBe('Needs Revision · due ' + dayWord(by));
+    expect(page.T.rowView(piece(page, 'demo-lab')).sub).toBe('Needs Revision · due ' + dayWord(by));
+    // What changed since the student last looked: the revision is Assignments' badge, not My Learning's.
+    expect(
+      viewOf(page)
+        .changes.filter(c => c.why === 'revise')
+        .map(c => c.id),
+    ).toEqual(['demo-lab']);
+    const tab = q(page, '.sp-tabs-bottom [data-tab="assignments"]');
+    expect(words(tab.querySelector('.sp-tab-badge'))).toBe('1');
+    expect(words(tab.querySelector('.sp-hidden-title'))).toBe('1 new');
+    // Not a row on My Learning: it is still to do.
+    await page.click('[data-tab="learning"]');
+    expect(q(page, '.sp-ml-row[data-piece="demo-lab"]')).toBeNull();
   });
 
   it('Your Feedback on it: What to Fix and Send My Revision above the grade the student was given', async () => {
     const page = await demo();
     await page.click('.sp-piece[data-piece="demo-lab"] [data-act="feedback"]');
     expect(text(page, '#sp-fb-title')).toBe('Cell Microscope Lab');
-    expect(text(page, '.sp-fb-sub')).toMatch(/^Science 8 · Revise by /);
+    expect(text(page, '.sp-fb-sub')).toBe('Revise by ' + dueWord(revs(page)['demo-lab'].revise_by));
+    // It lives on Assignments, so that is the way back.
+    expect(text(page, '.sp-fb-back')).toBe('Assignments');
     expect(text(page, '.sp-revise-fb .sp-revise-fix')).toBe(
       'Write the magnification beside each drawing, then send it again.',
     );
@@ -154,7 +188,7 @@ describe('Needs Revision (the board "Student: Needs Revision")', () => {
 });
 
 describe('Send My Revision, with Unsend and Replace until grading starts', () => {
-  it('Check and Send, Sent, then the piece is Sent again; Unsend puts it back to Needs Revision', async () => {
+  it('Check and Send, Sent, then the piece is a Sent row on My Learning; Unsend puts it back to Needs Revision', async () => {
     const page = await demo();
     await sendRevision(page, 'I wrote 400x beside each drawing.');
     expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
@@ -164,8 +198,17 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     // Nothing went into the ordinary sends.
     expect(page.T.state().demoSent).toEqual({});
     await page.click('[data-act="send-done"]');
-    expect(text(page, '[data-segment="todo"]')).toBe('To Do 3');
-    await page.click('[data-segment="sent"]');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(cardOf(page, 'demo-lab')).toBeNull();
+    await page.click('[data-tab="learning"]');
+    const row = q(page, '.sp-ml-row[data-piece="demo-lab"]');
+    // Work sent goes first in Your Work.
+    expect(q(page, '.sp-ml-work .sp-ml-row')).toBe(row);
+    expect(words(row.querySelector('.sp-row-sub'))).toMatch(
+      /^Sent \S+ \d+, \d{1,2}:\d\d [ap]\.m\. · waiting for feedback$/,
+    );
+    expect(words(row.querySelector('.sp-level'))).toBe('Sent');
+    await page.click('.sp-ml-row[data-piece="demo-lab"]');
     const card = cardOf(page, 'demo-lab');
     expect(words(card.querySelector('.sp-send-line'))).toBe(
       'Your teacher hasn’t started grading it. You can still change it.',
@@ -182,7 +225,11 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     await page.click('[data-act="send-ask-yes"]');
     expect(revs(page)['demo-lab'].revision).toBeNull();
     expect(piece(page, 'demo-lab').kind).toBe('revise');
-    expect(text(page, '[data-segment="todo"]')).toBe('To Do 4');
+    // Back to its card, first in Outstanding.
+    expect(page.T.state()).toMatchObject({ tab: 'assignments', segment: 'outstanding', card: '' });
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
+    expect(q(page, '.sp-deck .sp-piece').getAttribute('data-piece')).toBe('demo-lab');
+    expect(cardOf(page, 'demo-lab').querySelector('[data-act="revise-open"]')).not.toBeNull();
     expect(page.calls).toEqual([]);
   });
 
@@ -190,7 +237,7 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     const page = await demo();
     await sendRevision(page);
     await page.click('[data-act="send-done"]');
-    await page.click('[data-segment="sent"]');
+    await openSentLab(page);
     await page.click('.sp-piece[data-piece="demo-lab"] [data-act="send-replace"]');
     await page.click('[data-act="send-ask-yes"]');
     expect(page.T.state().send.revision).toBe(true);
@@ -206,7 +253,7 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     const page = await demo();
     await sendRevision(page);
     await page.click('[data-act="send-done"]');
-    await page.click('[data-segment="sent"]');
+    await openSentLab(page);
     await page.click('.sp-piece[data-piece="demo-lab"] [data-act="send-unsend"]');
     // The teacher starts grading while the question is open (a grade changed, or her marks on a page).
     revs(page)['demo-lab'].revision.grading = true;
@@ -221,7 +268,7 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     const page = await demo();
     await sendRevision(page, 'First try.');
     await page.click('[data-act="send-done"]');
-    await page.click('[data-segment="sent"]');
+    await openSentLab(page);
     await page.click('.sp-piece[data-piece="demo-lab"] [data-act="send-replace"]');
     await page.click('[data-act="send-ask-yes"]');
     await page.T.sendFiles([{ name: 'b.jpg' }], -1);
@@ -265,6 +312,8 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     const page = await demo();
     await sendRevision(page);
     await page.click('[data-act="send-done"]');
+    await page.click('[data-act="logout-ask"]');
+    expect(text(page, '#sp-logout-title')).toBe('Log Out?');
     await page.click('[data-act="card-done"]');
     expect(page.T.state().demoRevisions).toBeNull();
   });
@@ -273,12 +322,20 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
 describe('Before and After (the boards "Before and After a Revision" and "… on a Chromebook")', () => {
   it('the board’s worked example: Proficient − · 67% before, Proficient · 75% after, with each row and both versions', async () => {
     const page = await demo();
-    await page.click('[data-segment="back"]');
-    const card = cardOf(page, 'demo-vaccine');
-    expect(words(card.querySelector('[data-act="compare"]'))).toBe('Before and After');
-    await page.click('.sp-piece[data-piece="demo-vaccine"] [data-act="compare"]');
+    // Returned work is on My Learning: the revision's row, with its new grade.
+    await page.click('[data-tab="learning"]');
+    const row = q(page, '.sp-ml-row[data-piece="demo-vaccine"]');
+    expect(row.getAttribute('data-act')).toBe('feedback');
+    expect(words(row.querySelector('.sp-level'))).toBe('Proficient · 75%');
+    // Its row opens Your Feedback, which carries Before and After.
+    row.click();
+    await page.settle();
+    expect(q(page, '[data-act="compare"][data-piece="demo-vaccine"]').textContent).toBe('Before and After');
+    q(page, '[data-act="compare"][data-piece="demo-vaccine"]').click();
+    await page.settle();
+    expect(page.T.state()).toMatchObject({ tab: 'learning', feedback: 'demo-vaccine', compare: true });
     expect(text(page, '#sp-fb-title')).toBe('How Vaccines Work');
-    expect(text(page, '.sp-fb-sub')).toMatch(/^Science 8 · Revision returned \S+ \d+$/);
+    expect(text(page, '.sp-fb-sub')).toMatch(/^Revision returned \S+ \d+$/);
     expect(text(page, '.sp-ba-title')).toBe('Before and After');
     expect(qa(page, '.sp-ba-label').map(words)).toEqual(['First Version', 'Your Revision']);
     expect(qa(page, '.sp-ba-sent').every(el => /^Sent \S+ \d+$/.test(words(el)))).toBe(true);

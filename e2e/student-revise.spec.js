@@ -5,7 +5,7 @@ import { PHONE, CHROMEBOOK, fits, named, shot } from './student-card-fake.js';
 /* Revisions on the student's page (S11-F2), in Demo Mode (#demo-card-revise:
    Send Work on, a class graded by both), against the built site with the
    live site's CSP: Needs Revision on the card, Send My Revision with a real
-   JPEG, Sent again, Unsend; then Before and After on the revision already
+   JPEG, Sent on My Learning, Unsend; then Before and After on the revision already
    returned, with the board's Proficient − · 67% and Proficient · 75%. Nothing leaves the
    browser. */
 
@@ -25,7 +25,9 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 4' })).toBeVisible();
+  // Outstanding: Cell Microscope Lab (Needs Revision), Immune System Quick Check (missing), Disease Research Poster (past due).
+  await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upcoming 1' })).toBeVisible();
   return { posts, errors };
 }
 
@@ -36,14 +38,18 @@ for (const [where, device] of [
   test.describe(where, () => {
     test.use(device);
 
-    test('Needs Revision, Send My Revision, Unsend; Before and After with Proficient − · 67% and Proficient · 75%', async ({
+    test('Needs Revision first in Outstanding; Send My Revision; Sent on My Learning; Unsend puts it back', async ({
       page,
     }) => {
       const { posts, errors } = await demo(page);
       const tag = where === 'on a phone' ? 'phone' : 'chromebook';
+      // A revision asked for is the first card of Outstanding (picked on a Chromebook).
       const lab = page.locator('.sp-deck .sp-piece', { hasText: 'Cell Microscope Lab' });
-      if (tag === 'chromebook') await page.locator('.sp-side-row', { hasText: 'Cell Microscope Lab' }).click();
-      else await lab.scrollIntoViewIfNeeded();
+      await expect(page.locator('.sp-deck .sp-piece').first()).toContainText('Cell Microscope Lab');
+      if (tag === 'chromebook') {
+        await expect(page.locator('.sp-side-row').first()).toContainText('Cell Microscope Lab');
+        await expect(page.locator('.sp-side-row').first()).toHaveAttribute('aria-pressed', 'true');
+      }
       await expect(lab.locator('.sp-flag-revise')).toHaveText(/^Revise by /);
       await expect(lab.getByText('Write the magnification beside each drawing, then send it again.')).toBeVisible();
       await expect(lab.getByRole('img', { name: 'First version, page 1' })).toBeVisible();
@@ -59,20 +65,40 @@ for (const [where, device] of [
       await page.getByRole('button', { name: 'Send 1 Photo' }).click();
       await expect(page.getByRole('heading', { name: 'Sent to Your Teacher' })).toBeVisible();
       await page.getByRole('button', { name: 'Back to My Work' }).click();
-      await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
-      await page.getByRole('button', { name: 'Sent 1' }).click();
+      // The revision sent leaves Outstanding and is the first row of My Learning's Your Work.
+      await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+      await page.getByRole('button', { name: /^My Learning/ }).click();
+      const row = page.locator('.sp-ml-work .sp-ml-row').first();
+      await expect(row).toContainText('Cell Microscope Lab');
+      await expect(row.locator('.sp-row-sub')).toHaveText(
+        /^Sent \w{3} \d{1,2}, \d{1,2}:\d\d [ap]\.m\. · waiting for feedback$/,
+      );
+      await expect(row.locator('.sp-level')).toHaveText('Sent');
+      await row.click();
       const sent = page.locator('.sp-deck .sp-piece', { hasText: 'Cell Microscope Lab' });
       await expect(sent.getByText('Your teacher hasn’t started grading it. You can still change it.')).toBeVisible();
       await shot(page, tag + '-s11f2-revision-sent');
       await sent.getByRole('button', { name: 'Unsend' }).click();
       await page.getByRole('alertdialog').getByRole('button', { name: 'Unsend' }).click();
-      await expect(page.getByRole('button', { name: 'To Do 4' })).toBeVisible();
+      // Unsent: the page goes to its card, Needs Revision again, first in Outstanding, its title focused.
+      await expect(page.getByRole('button', { name: 'Outstanding 3' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('.sp-deck .sp-piece').first().locator('.sp-flag-revise')).toHaveText(/^Revise by /);
+      await expect(lab.locator('.sp-piece-title')).toBeFocused();
+      await expect(lab.getByRole('button', { name: 'Send My Revision' })).toBeVisible();
+      // And it is off My Learning.
+      await page.getByRole('button', { name: /^My Learning/ }).click();
+      await expect(page.locator('.sp-ml-row', { hasText: 'Cell Microscope Lab' })).toHaveCount(0);
+      expect(posts).toEqual([]);
+      expect(errors).toEqual([]);
+    });
 
-      await page.getByRole('button', { name: /^Back \d/ }).click();
-      if (tag === 'chromebook') await page.locator('.sp-side-row', { hasText: 'How Vaccines Work' }).click();
-      const vaccine = page.locator('.sp-deck .sp-piece', { hasText: 'How Vaccines Work' });
-      if (tag === 'phone') await vaccine.scrollIntoViewIfNeeded();
-      await vaccine.getByRole('button', { name: 'Before and After' }).click();
+    // Before and After opens from the returned revision's Your Feedback, reached from its My Learning row.
+    test('Before and After on the revision returned: Proficient − · 67% and Proficient · 75%', async ({ page }) => {
+      const { posts, errors } = await demo(page);
+      const tag = where === 'on a phone' ? 'phone' : 'chromebook';
+      await page.getByRole('button', { name: /^My Learning/ }).click();
+      await page.locator('.sp-ml-row', { hasText: 'How Vaccines Work' }).click();
+      await page.getByRole('button', { name: 'Before and After' }).click();
       await expect(page.getByRole('heading', { name: 'Before and After' })).toBeVisible();
       const result = page.locator('.sp-ba-result');
       // The proficiency and the %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").

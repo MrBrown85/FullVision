@@ -295,6 +295,18 @@
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
   }
 
+  // Whether piece `id` is drawn where the student is going back to: a card on Assignments, or the sent card My Learning has open.
+  function onScreen(id) {
+    if (S.tab === 'learning') return S.card === id;
+    var view = typeof StudentPage.viewOf === 'function' ? StudentPage.viewOf(S) : null;
+    var p =
+      view &&
+      view.work.filter(function (x) {
+        return x.id === id;
+      })[0];
+    return !!(p && typeof StudentPageView !== 'undefined' && StudentPageView.segmentOf(p, view));
+  }
+
   function back() {
     var send = S.send;
     var id = send ? send.id : '';
@@ -302,8 +314,9 @@
     if (send && send.real && send.step === 'expired') forget(send);
     S.send = null;
     S.screen = 'assignments';
+    // Work just sent has moved to My Learning: the keyboard goes to the segments; otherwise to the card.
     StudentPage.paint(
-      id ? '[data-piece="' + String(id).replace(/["\\]/g, '') + '"] .sp-piece-title' : '.sp-segment-on',
+      id && onScreen(id) ? '[data-piece="' + String(id).replace(/["\\]/g, '') + '"] .sp-piece-title' : '.sp-segment-on',
     );
     // Sent: another send waiting on this device, if there is one, goes next.
     if (send && send.real && send.step === 'sent') resume();
@@ -1506,7 +1519,7 @@
           : photos +
             ' deleted and ' +
             p.title +
-            ' goes back to To Do. Deleted photos can’t come back. After grading starts, ask ' +
+            ' goes back to your Assignments. Deleted photos can’t come back. After grading starts, ask ' +
             teacher +
             ' instead.';
       yes = 'Unsend';

@@ -575,9 +575,7 @@ window.StudentPageView = (function () {
   function compareHtml(view, p) {
     var r = p.revision;
     var b = r.before;
-    var sub = [view.course && view.course.name, 'Revision returned ' + fmtDate(p.returnedAt, DAY)]
-      .filter(Boolean)
-      .join(SEP);
+    var sub = 'Revision returned ' + fmtDate(p.returnedAt, DAY);
     /* The Before and After boards: one card with both versions, each row's
        level then and now and Your Result; what was asked and what the
        student did in one card under it. On a Chromebook the versions sit
@@ -1194,6 +1192,12 @@ window.StudentPageView = (function () {
       yourResultHtml(p) +
       fbCommentHtml(p) +
       '</div>' +
+      // A returned revision (S11-F2): its first version beside it.
+      (hasCompare(p)
+        ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="compare" data-piece="' +
+          esc(p.id) +
+          '">Before and After</button>'
+        : '') +
       (crits
         ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
           '<ul class="sp-fb-crits">' +

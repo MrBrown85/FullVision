@@ -24,7 +24,22 @@ for (const [where, device] of [
       await page.getByRole('button', { name: 'Continue' }).click();
       await page.getByLabel('Student Number').fill('1234567');
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-      await page.getByRole('button', { name: 'Sent 1' }).click();
+      // Sent by a group-mate: not on Assignments, the first row of My Learning's Your Work.
+      await expect(page.locator('.sp-piece', { hasText: 'Cell Model Project' })).toHaveCount(0);
+      await page.getByRole('button', { name: /^My Learning/ }).click();
+      const row = page.locator('.sp-ml-work .sp-ml-row').first();
+      await expect(row).toContainText('Cell Model Project');
+      await expect(row.locator('.sp-row-sub')).toHaveText(
+        /^Sent \w{3} \d{1,2}(, \d{1,2}:\d\d [ap]\.m\.)? · waiting for feedback$/,
+      );
+      await row.click();
+      // Its card, on My Learning: on a phone with the way back; on a Chromebook beside My Learning's list.
+      if (where === 'on a phone') await expect(page.locator('.sp-fb-back')).toHaveText('My Learning');
+      else
+        await expect(page.locator('.sp-side-row', { hasText: 'Cell Model Project' })).toHaveAttribute(
+          'aria-pressed',
+          'true',
+        );
       const card = page.locator('.sp-piece', { hasText: 'Cell Model Project' });
       await expect(card.getByText('Group', { exact: true })).toBeVisible();
       await expect(card.getByText('3 in your group. Someone in your group sent it.')).toBeVisible();

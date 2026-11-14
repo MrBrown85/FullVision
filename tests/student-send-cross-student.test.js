@@ -1,6 +1,6 @@
 /* A send left on Not Sent Yet belongs to the student who made it (M1 of
-   the Send Work wiring review). When a session ends without Done (15 idle
-   minutes, Done in another tab), the page's unfinished sends go with it:
+   the Send Work wiring review). When a session ends without Log Out (15
+   idle minutes, Log Out in another tab), the page's unfinished sends go with it:
    coming back online under the next student's session sends nothing of
    the last student's. Against the real handler and send routes over the
    stand-in database. */
@@ -49,7 +49,7 @@ function omarCard() {
   });
 }
 
-describe('a send left on Not Sent Yet ends with the session, not only with Done', () => {
+describe('a send left on Not Sent Yet ends with the session, not only with Log Out', () => {
   for (const how of ['idle', 'other-tab-done']) {
     it(how + ': Cece’s photos are not handed in under Omar’s session when the device comes back online', async () => {
       const fn = fakeStudentSubmit({
@@ -75,6 +75,8 @@ describe('a send left on Not Sent Yet ends with the session, not only with Done'
 
       // Cece sends with the Wi-Fi down: Not Sent Yet. She goes back to the list and walks away.
       down = true;
+      // Science Fair Proposal is due in four days: its card is in Upcoming.
+      await page.click('[data-segment="upcoming"]');
       await page.click(piece(WORK.fair) + ' [data-act="send-open"]');
       await page.T.sendFiles([{}], -1);
       await page.settle();
@@ -84,8 +86,11 @@ describe('a send left on Not Sent Yet ends with the session, not only with Done'
       await page.settle();
       expect(kept.rows.size).toBe(1);
       await page.click('[data-act="send-done"]');
+      // Not sent: it is still on Upcoming, with Send My Work, and not on My Learning.
+      expect(page.root().querySelector('[data-segment="upcoming"]').textContent).toBe('Upcoming 1');
+      expect(page.root().querySelector(piece(WORK.fair) + ' [data-act="send-open"]')).toBeTruthy();
 
-      // Her session ends without Done.
+      // Her session ends without Log Out.
       if (how === 'idle') page.advance(16 * 60 * 1000);
       else delete store[KEY];
       page.T.checkSession();
@@ -105,6 +110,11 @@ describe('a send left on Not Sent Yet ends with the session, not only with Done'
       down = false;
       page.fire('online');
       await page.settle();
+
+      // Omar's page: Science Fair Proposal still to send, in Upcoming; nothing of his is waiting on My Learning.
+      expect(page.root().querySelector('[data-segment="upcoming"]').textContent).toBe('Upcoming 1');
+      await page.click('[data-tab="learning"]');
+      expect(page.root().querySelector('.sp-ml-row[data-piece="' + WORK.fair + '"]')).toBeNull();
 
       const subs = [...fn.world.subs.values()];
       // Nothing of Cece's is sent under Omar's session, and nothing of hers is started for him.
