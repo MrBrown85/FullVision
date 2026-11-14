@@ -1360,6 +1360,7 @@ function _workSignLink(sb, bucket, name) {
   });
 }
 function _workSignBatch(batch) {
+  if (_signInWait) return void _signInWait.then(_workSignBatch.bind(null, batch)); // not before the re-check has passed
   var names = Object.keys(batch.names);
   var give = function (name, link) {
     batch.names[name].forEach(function (resolve) {
@@ -1427,11 +1428,13 @@ function _wireWorkQueue() {
 function _workUploadFile(path, blob) {
   var sb = getSupabase();
   if (!sb || !sb.storage) return Promise.resolve({ error: { message: 'offline: no client', status: 503 } });
-  return Promise.resolve(
-    sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false }),
-  ).then(function (res) {
-    return { error: (res && res.error) || null };
-  });
+  return Promise.resolve(_signInWait)
+    .then(function () {
+      return sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    })
+    .then(function (res) {
+      return { error: (res && res.error) || null };
+    });
 }
 
 function _workPagesJson(rec) {
@@ -1893,6 +1896,7 @@ function _sweepWorkRemovals() {
   if (_workSweepTimer) clearTimeout(_workSweepTimer);
   _workSweepTimer = setTimeout(function () {
     _workSweepTimer = null;
+    if (_signInWait) return void _signInWait.then(_sweepWorkRemovals);
     var sb = getSupabase();
     var base = ((window.__ENV && window.__ENV.SUPABASE_URL) || '').replace(/\/$/, '');
     if (!sb || !sb.auth || !base) return;

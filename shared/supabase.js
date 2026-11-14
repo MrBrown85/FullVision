@@ -382,6 +382,7 @@
      is removed as well, or Sign In would come straight back in with it.
      Never resolves: the browser is leaving. */
   function _leaveSignedOut(forged) {
+    _dropHeldWrites();
     const wipe = function () {
       _removeSavedClassData(forged === true);
     };
@@ -394,6 +395,16 @@
     }
     window.location.href = '/login.html';
     return new Promise(function () {});
+  }
+
+  /* Writes queued while start-up's re-check had not passed (the outbox's
+     Held) are never sent: the re-check failed. Earlier ones stay. */
+  function _dropHeldWrites() {
+    try {
+      if (window.v2Queue && typeof window.v2Queue.dropHeld === 'function') window.v2Queue.dropHeld();
+    } catch (e) {
+      /* no outbox on this page */
+    }
   }
 
   function _postSignedOut() {
@@ -632,6 +643,7 @@
         try {
           const res = saved || (await _within(sb.auth.getSession(), _AUTH_CHECK_MS));
           if (!res.timedOut && res.data && !res.data.session && !res.error) {
+            _dropHeldWrites();
             window.location.href = '/login.html';
             return new Promise(function () {});
           }

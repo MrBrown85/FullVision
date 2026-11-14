@@ -47,6 +47,7 @@ let started; // every request, in the order it was asked
 let answered; // every request, in the order its answer came back
 let gates; // name → the answer waits until the test opens it
 let pagehide; // handlers the page registered for its way out
+let direct; // requests made without the data layer's sender: tables, storage, realtime
 
 const setOnline = on => Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => on });
 const isRead = name => /^(get|list)_/.test(name) || name === 'bootstrap_teacher' || name === 'getUser';
@@ -91,6 +92,8 @@ function forgetPage() {
   _recoveryProbeTimer = null;
   _teacherId = null;
   _signInWait = null;
+  _courseSyncChannel = null;
+  _courseSyncCourseId = null;
   _pageLocks.switching = 0;
   _pageLocks.checking = 0;
   _outboxConfigured = false;
@@ -194,6 +197,7 @@ beforeEach(() => {
   };
   tabs = [];
   pagehide = [];
+  direct = [];
   _REFRESH_QUIET_MS = 0;
   globalThis.__FV_CLASS_BUNDLE = true;
   localStorage._store = {};
@@ -215,12 +219,42 @@ beforeEach(() => {
     return gates[name] ? gates[name].promise.then(answer) : answer();
   };
   const rpc = server.fake.rpc;
+  // A table read goes when it is awaited, as supabase-js's builder does.
+  const table = name => {
+    const q = { select: () => q, eq: () => q, in: () => q, maybeSingle: () => q };
+    q.then = (ok, bad) => {
+      direct.push('from:' + name);
+      return Promise.resolve({ data: [], error: null }).then(ok, bad);
+    };
+    return q;
+  };
+  const signed = (kind, value) => {
+    direct.push('storage:' + kind);
+    return Promise.resolve({ data: value, error: null });
+  };
   // shared/supabase.js makes its client from this; the app's getSupabase()
   // then hands it out.
   globalThis.__ENV = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_KEY: 'sbp_example_key' };
   globalThis.supabase = {
     createClient: () => ({
       rpc: (name, params) => asked(name, () => rpc(name, params)),
+      from: table,
+      storage: {
+        from: () => ({
+          createSignedUrl: name => signed('sign', { signedUrl: 'https://example.test/' + name }),
+          createSignedUrls: names =>
+            signed(
+              'sign',
+              names.map(path => ({ path, signedUrl: 'https://example.test/' })),
+            ),
+          upload: () => signed('upload', {}),
+        }),
+      },
+      channel: name => {
+        const ch = { on: () => ch, subscribe: () => (direct.push('channel:' + name), ch) };
+        return ch;
+      },
+      removeChannel() {},
       auth: {
         getSession: () =>
           Promise.resolve({
@@ -720,5 +754,136 @@ describe('teacher/router.js', () => {
     const src = read('teacher/router.js');
     expect(src).not.toMatch(/await\s+requireAuth\(\)/);
     expect(src).toMatch(/await initAllCourses\(\{\s*signInCheck: requireAuth\(\),/);
+  });
+});
+
+/* Colin's rulings of 2026-11-14 (docs/DECISIONS.md): the reads made without
+   the data layer's sender are held too ("Gate them"), and a write queued
+   while the re-check has not passed is removed if it fails ("Drop on
+   failure"). */
+describe('reads made without the data layer’s sender wait for the re-check', () => {
+  const WORK =
+    [
+      CID,
+      'a0000000-0000-4000-8000-000000000001',
+      'b0000000-0000-4000-8000-000000000002',
+      'c0000000-0000-4000-8000-000000000003',
+      'd0000000-0000-4000-8000-000000000004',
+    ].join('/') + '.jpg';
+  const HANDOUT_ID = 'a0000000-0000-4000-8000-0000000000aa';
+  const HANDOUT = CID + '/handouts/' + HANDOUT_ID + '/1.jpg';
+  let restore;
+  beforeEach(() => {
+    restore = { fetch: globalThis.fetch, resFind: globalThis._resFind, sweep: globalThis.setTimeout };
+    globalThis.fetch = () => Promise.resolve({ ok: false });
+    globalThis._resFind = () => ({ kind: 'pdf', pages: [HANDOUT] });
+  });
+  afterEach(() => {
+    globalThis.fetch = restore.fetch;
+    globalThis._resFind = restore.resFind;
+  });
+
+  // Every read the ruling names, and the others found reachable then.
+  function readEverything() {
+    loadDibelsScores(CID);
+    _loadCanonicalRubrics(CID);
+    _openServerWorkPage(CID, WORK);
+    openAssessmentHandoutPage(CID, HANDOUT_ID, 0);
+    _teacherToken();
+  }
+  const HELD = ['list_course_dibels'];
+  const DIRECT = ['from:rubric', 'storage:sign', 'from:course_sync_cursor', 'channel:course-sync-' + CID];
+
+  it('asks none of them before the re-check has passed, then each one', async () => {
+    await firstVisit();
+    direct = [];
+    loadPage();
+    const page = boot();
+    await page.done;
+    readEverything();
+    gates.bootstrap_teacher.open();
+    gates.list_teacher_courses.open();
+    gates.get_class_bundle.open();
+    await settle();
+    expect(started.filter(n => HELD.includes(n))).toEqual([]);
+    expect(direct).toEqual([]);
+
+    gates.getUser.open();
+    await quiet();
+    await settle();
+    expect(started).toEqual(expect.arrayContaining(HELD));
+    expect(direct).toEqual(expect.arrayContaining(DIRECT));
+  });
+
+  it('never asks them when the re-check fails', async () => {
+    await firstVisit();
+    direct = [];
+    loadPage();
+    const page = boot();
+    await page.done;
+    readEverything();
+    auth.getUser = () => signedOut;
+    GATED.forEach(name => gates[name].open());
+    await settle();
+    await new Promise(r => setTimeout(r, 50));
+    await settle();
+    expect(location.href).toBe('/login.html');
+    expect(started.filter(n => HELD.includes(n))).toEqual([]);
+    expect(direct).toEqual([]);
+  });
+});
+
+describe('a write queued while the re-check has not passed', () => {
+  const queuedViewModes = () =>
+    JSON.parse(localStorage.getItem(OUTBOX_KEY)).entries.map(e => e.payload.p_view_mode || e.payload.p_prefs);
+
+  it('is removed, never sent, when the re-check fails; one from an earlier visit stays', async () => {
+    await firstVisit();
+    await leaveAWriteWaiting();
+    const earlier = window.v2Queue.queued('save_teacher_preferences');
+    loadPage();
+    const page = boot();
+    await page.done;
+    saveConfig(Object.assign({}, getConfig(), { viewMode: 'wide' }));
+    await settle();
+    expect(window.v2Queue.queued('save_teacher_preferences')).toHaveLength(2);
+
+    auth.getUser = () => signedOut;
+    GATED.forEach(name => gates[name].open());
+    await settle();
+    expect(location.href).toBe('/login.html');
+    const left = window.v2Queue.queued('save_teacher_preferences');
+    expect(left).toHaveLength(1);
+    expect(left[0].id).toBe(earlier[0].id);
+    expect(writesAsked()).toEqual([]);
+  });
+
+  it('is removed when the server names another user', async () => {
+    await firstVisit();
+    await leaveAWriteWaiting();
+    loadPage();
+    const page = boot();
+    await page.done;
+    saveConfig(Object.assign({}, getConfig(), { viewMode: 'wide' }));
+    await settle();
+    auth.getUser = () => ({ data: { user: { id: SOMEONE_ELSE } }, error: null });
+    GATED.forEach(name => gates[name].open());
+    await settle();
+    expect(window.v2Queue.queued('save_teacher_preferences')).toHaveLength(1);
+    expect(writesAsked()).toEqual([]);
+  });
+
+  it('goes, with the earlier one, once the re-check passes', async () => {
+    await firstVisit();
+    await leaveAWriteWaiting();
+    loadPage();
+    const page = boot();
+    await page.done;
+    saveConfig(Object.assign({}, getConfig(), { viewMode: 'wide' }));
+    await settle();
+    GATED.forEach(name => gates[name].open());
+    await quiet();
+    expect(writesAsked().filter(n => n === 'save_teacher_preferences')).toHaveLength(2);
+    expect(window.v2Queue.stats().queued).toBe(0);
   });
 });

@@ -19,8 +19,12 @@ Before anything drew on a repeat visit, three requests ran one after another: th
 - **The class on screen stays open** when the server's settings name another class as the last one open (the teacher used another device since). It used to switch to the server's.
 - **`bootstrap_teacher` and `list_teacher_courses` are still two requests**, now asked together everywhere, the phone included: neither needs the other's answer. Making them one request (S19-C8) is a database change and waits for its SQL to be shown to Colin.
 - **The phone is otherwise unchanged.** Its start-up has never had the re-check: it reads the saved session and asks the server for the class list. Drawing first there would mean adding the re-check to the phone, which is a change to its sign-in and Colin's to rule on.
-- **Not held until the re-check has passed:** a page's few reads that do not go through the data layer's sender (the rubric bank's tables, DIBELS scores, links to photos of student work). The server refuses each of them without a valid token.
-- Held by `tests/boot-saved-list-first.test.js` and `tests/session-hardening.test.js`.
+- **Colin ruled on 2026-11-14,** on the independent review's four choices:
+  1. A revoked session whose token has not yet run out shows the saved class, locked, until `getUser` answers. Accepted; no change.
+  2. "Gate them": the reads that skip the data layer's sender wait for the re-check too, and on a failed one never run. DIBELS scores, the rubric bank's tables, storage links to photos of student work and handout pages, photo uploads, the class's change counter and its realtime channel, and the two edge functions (`student-submit`'s sweep, `teacher-cards`) each wait on the same hold the sender uses (`_signInWait`).
+  3. "Drop on failure": a write queued while the re-check has not passed is held in the outbox (`v2Queue.hold`); no tab sends it, a second tab that owns the outbox included. A re-check that fails or names another user removes those writes unsent (`dropHeld`), as does the page leaving first. Writes queued on an earlier visit stay, as before.
+  4. "This device's": the class on screen stays the open one, as built. No change.
+- Held by `tests/boot-saved-list-first.test.js`, `tests/outbox-sign-in-hold.test.js` and `tests/session-hardening.test.js`.
 
 ## Older scores landing over newer ones: measured before anything is built (2026-11-13)
 

@@ -924,6 +924,13 @@ function _updateCourseSyncState(cid, row) {
 
 async function _subscribeCourseSyncCursor(cid) {
   if (!_useSupabase || !_isUuid(cid)) return;
+  if (_signInWait) {
+    // Not before start-up's re-check has passed; nothing waits on it.
+    _signInWait.then(function () {
+      if (cid === getActiveCourse()) _subscribeCourseSyncCursor(cid);
+    });
+    return;
+  }
   if (_courseSyncCourseId === cid && _courseSyncChannel) return;
   _unsubscribeCourseSyncCursor();
 
@@ -1294,7 +1301,12 @@ function _takeBootstrap(data, kept) {
      - nothing is sent: the outbox is paused, a write RPC waits, and uploads
        left by an earlier visit wait;
      - no server answer is handed over: a read RPC may be asked, but its
-       answer waits (_callRpcWithAuthGuard), and so does the class list.
+       answer waits (_callRpcWithAuthGuard), and so does the class list;
+     - a read made without that sender (DIBELS scores, the rubric tables,
+       storage links, the class's change counter and realtime channel, the
+       edge functions) is not asked at all: each waits on _signInWait;
+     - a write queued now is held in the outbox (v2Queue.hold), and is
+       removed unsent if the re-check fails (Colin, 2026-11-14).
    A re-check that fails, or names another user, removes the saved data and
    leaves for Sign In (shared/supabase.js); its promise never resolves, so
    none of this ever lifts. One that cannot reach the server stands aside
@@ -1319,11 +1331,14 @@ function _savedClassListFor(uid) {
 function _holdForSignIn(check) {
   _signInWait = check;
   setPageLock('checking', true);
+  var held = _outbox();
+  if (held && typeof held.hold === 'function') held.hold();
   check.then(function () {
     _signInWait = null;
     setPageLock('checking', false);
     // What waited in the outbox goes now.
     var outbox = _outbox();
+    if (outbox && typeof outbox.unhold === 'function') outbox.unhold();
     if (outbox) outbox.flush();
   });
 }
@@ -8798,6 +8813,7 @@ async function loadDibelsScores(cid) {
   if (!_useSupabase || !_isUuid(cid)) return false;
   var sb = getSupabase();
   if (!sb) return false;
+  if (_signInWait) await _signInWait; // not asked before start-up's re-check has passed
   try {
     var res = await sb.rpc('list_course_dibels', { p_course_id: cid });
     if (!res || res.error) return false;
@@ -9806,7 +9822,7 @@ function openAssessmentHandoutPage(cid, rid, i) {
   if (_isDemoSession() || !_HANDOUT_STORAGE_PATH.test(name) || name.indexOf(prefix) !== 0) return Promise.resolve(null);
   var sb = getSupabase();
   if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
-  return Promise.resolve()
+  return Promise.resolve(_signInWait) // not signed before start-up's re-check has passed
     .then(function () {
       return sb.storage.from('student-photos').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
     })
