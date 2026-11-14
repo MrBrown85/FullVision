@@ -36,3 +36,11 @@ grep -q "const CACHE_NAME = 'fullvision-${CACHE_ID:0:12}';" dist/sw.js
 # from the previous cache instead of downloading them (scripts/sw-fingerprints.mjs).
 node scripts/sw-fingerprints.mjs dist
 grep -q "^const PRECACHE_FINGERPRINTS = {" dist/sw.js
+
+# Each page the worker saves names this release, the same name as the cache
+# (scripts/sw-release-pages.mjs). The worker answers a file from its saved
+# copy only for a page that names its own release (sw.js, RELEASE_TAG).
+node scripts/sw-release-pages.mjs dist
+for page in login.html launch.html teacher/app.html teacher-mobile/index.html; do
+  grep -q "<meta name=\"fv-release\" content=\"fullvision-${CACHE_ID:0:12}\"" "dist/$page"
+done
