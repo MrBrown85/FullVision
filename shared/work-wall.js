@@ -451,6 +451,10 @@ window.WorkWall = (function () {
       (first ? '' : ' is-empty') +
       '" data-ww="open" data-sid="' +
       esc(r.st.id) +
+      '" data-cid="' +
+      esc(w.cid) +
+      '" data-aid="' +
+      esc(w.aid) +
       '"><span class="ww-pic">' +
       pic +
       (r.pages.length > 1 ? '<span class="ww-count">' + esc(r.pages.length + ' pages') + '</span>' : '') +
@@ -578,6 +582,7 @@ window.WorkWall = (function () {
     if (!w) return;
     var a = _piece(w.cid, w.aid);
     if (!a || !GraderWork.workShown(w.cid, a)) return close();
+    if (window.WorkRubricCard) WorkRubricCard.hide();
     var m = _wallModel(w);
     var drawn = _wallHtml(w, m, !!(w.onGrade || (window.PageAssignments && PageAssignments.openGrader)));
     var focus = document.activeElement;
@@ -734,6 +739,7 @@ window.WorkWall = (function () {
     overlay.addEventListener('click', _wallClick);
     overlay.addEventListener('change', _wallChange);
     _keys(true);
+    if (window.WorkRubricCard) WorkRubricCard.wire();
     _drawWall();
     var back = overlay.querySelector('.ww-back');
     _focus(back);
@@ -752,6 +758,7 @@ window.WorkWall = (function () {
     var w = _wall;
     if (!w) return;
     _wall = null;
+    if (window.WorkRubricCard) WorkRubricCard.hide();
     w.pics.releaseAll();
     w.overlay.remove();
     if (!_tab) _keys(false);
@@ -890,6 +897,10 @@ window.WorkWall = (function () {
             (first ? '' : ' is-empty') +
             '" data-sw="open" data-aid="' +
             esc(p.a.id) +
+            '" data-cid="' +
+            esc(cid) +
+            '" data-sid="' +
+            esc(sid) +
             '"><span class="sw-pic">' +
             (first
               ? '<img class="ww-img" data-work-pic data-aid="' +
@@ -965,6 +976,7 @@ window.WorkWall = (function () {
     });
     // Kept until the teacher leaves this student or the tab.
     _keys(true);
+    if (window.WorkRubricCard) WorkRubricCard.wire();
   }
 
   /* ── Work on the teacher's other screens ──────────────────────
@@ -1321,6 +1333,7 @@ window.WorkWall = (function () {
     var t = _tab;
     if (!t) return;
     _tab = null;
+    if (window.WorkRubricCard) WorkRubricCard.hide();
     _closeViewer(true);
     t.panel.removeEventListener('click', _tabClick);
     t.pics.releaseAll();
@@ -1339,6 +1352,13 @@ window.WorkWall = (function () {
     mountTab: mountTab,
     unmountTab: unmountTab,
     seeWorkHtml: seeWorkHtml,
+    // A piece's mark and chip as its card shows them: the rubric card's overall (teacher/work-rubric-card.js).
+    cardMark: function (cid, sid, aid) {
+      var a = _piece(cid, aid);
+      if (!a) return null;
+      var mark = _mark(cid, sid, a, null);
+      return { piece: a, mark: mark, chip: _chipHtml(mark), day: _day };
+    },
     pieceHtml: pieceHtml,
     mountPiece: mountPiece,
   };

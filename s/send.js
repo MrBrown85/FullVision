@@ -392,55 +392,51 @@
     });
   }
 
+  /* Each file's pages go on screen as soon as that file is ready (in place
+     of the Retake, or after the others), while Getting Your Photos Ready
+     shows and Send waits for the rest. */
   function shrink(send, files, at, prepare) {
-    var room = function () {
-      return send.room - send.pages.length + (at >= 0 ? 1 : 0);
-    };
-    var out = [];
+    var room = send.room - send.pages.length + (at >= 0 ? 1 : 0);
+    var retake = at >= 0 && at < send.pages.length;
+    var made = [];
     var why = '';
     var chain = Promise.resolve();
     files.forEach(function (file) {
       chain = chain.then(function () {
-        if (why) return null;
+        if (why || !current(send)) return null;
         // A PDF is asked for no more pages than fit in the send, and never more than 20.
-        var fit = Math.max(1, Math.min(PDF_PAGES, room() - out.length));
-        return Promise.resolve(prepare(file, { maxPages: fit, openPdf: openPdf() })).then(function (res) {
+        var fit = Math.max(1, Math.min(PDF_PAGES, room - made.length));
+        return StudentPage.whileCurrent(prepare(file, { maxPages: fit, openPdf: openPdf() })).then(function (res) {
           if (!res || !res.ok) {
             why = refusal(res || {});
             return;
           }
-          if (out.length + res.pages.length > room()) {
+          if (made.length + res.pages.length > room) {
             why = 'You can send ' + send.room + ' pages at most.';
             return;
           }
-          res.pages.forEach(function (pg) {
-            out.push({ pg: pg, from: res.kind });
+          // Not drawn if the student left, or another send started, while the file was shrunk.
+          if (!current(send)) return;
+          var pages = res.pages.map(function (pg) {
+            return pageOf(send, pg, res.kind);
           });
+          send.pages.splice.apply(
+            send.pages,
+            [retake ? at + made.length : send.pages.length, retake && !made.length ? 1 : 0].concat(pages),
+          );
+          made = made.concat(pages);
+          StudentPage.paintKeepingCaret();
         });
       });
     });
     return StudentPage.whileCurrent(
-      chain.then(
-        function () {
-          return true;
-        },
-        function () {
-          why = why || 'That file couldn’t be used. Try another photo.';
-          return true;
-        },
-      ),
+      chain.then(null, function () {
+        why = why || 'That file couldn’t be used. Try another photo.';
+      }),
     ).then(function () {
-      // The student left, or another send started, while the files were shrunk.
       if (!current(send)) return;
       send.busy = false;
       send.message = why;
-      var made = out.map(function (o) {
-        return pageOf(send, o.pg, o.from);
-      });
-      if (made.length) {
-        if (at >= 0 && at < send.pages.length) send.pages.splice.apply(send.pages, [at, 1].concat(made));
-        else Array.prototype.push.apply(send.pages, made);
-      }
       // A blurry photo is shown before anything else (the Blurry Photo board).
       var blurry = made.filter(function (m) {
         return m.blurry;
@@ -711,8 +707,8 @@
   /* The student's own pages of each piece with work in and not back yet
      (the Sent card's pictures): `file-links` gives a link to each page and
      its thumbnail that lives five minutes; each thumbnail is fetched at
-     once and shown from a blob: address, so the page needs nothing of the
-     Content Security Policy it does not have. Asked once a submission. */
+     once and shown from a blob: address (the CSP needs nothing more), put
+     into its cards in place (assignments.js). Asked once a submission. */
   function loadThumbs(reply, student) {
     var back = {};
     list(S.reply && S.reply.assessments).forEach(function (a) {
@@ -744,7 +740,7 @@
           ),
         ).then(function (blobs) {
           thumbs[sub] = blobs.filter(Boolean).map(objectUrl).filter(Boolean);
-          if (S && S.realWork && S.realWork.student === student) repaint();
+          if (S && S.realWork && S.realWork.student === student && !StudentPage.placeThumbs(pieceOf(a.id))) repaint();
         });
       });
     });
@@ -1150,27 +1146,32 @@
       send.finishBy = Date.parse(String(res.finish_by || '').replace(/(\.\d{3})\d+/, '$1')) || 0;
       send.startedAt = send.finishBy ? send.finishBy - HOLD_MS : clock();
       savePatch(send);
-      return upload(send, 0);
+      return upload(send);
     });
   }
 
-  // Each page, then its thumbnail, in order; a page already up is not sent again.
-  function upload(send, i) {
-    if (i >= send.pages.length) return finishReal(send);
-    var pg = send.pages[i];
-    return part(send, pg, 'photo')
-      .then(function (got) {
-        return got === 'up' ? part(send, pg, 'thumb') : got;
-      })
-      .then(function (got) {
-        if (got !== 'up') {
-          if (got === 'network' && offline()) return stop(send, 'notsent');
-          send.failed = i;
-          return stop(send, 'pagefailed');
-        }
-        pg.sent = true;
-        return upload(send, i + 1);
+  /* The pages three at a time, in order, each with its thumbnail beside it; a file already up is not
+     sent again. A page that doesn't go starts no more; the first of them is the one named. */
+  function upload(send) {
+    var next = 0;
+    var bad = null; // { i, got } of the first page that didn't go
+    function lane() {
+      var i = next++;
+      if (bad || i >= send.pages.length) return null;
+      var pg = send.pages[i];
+      return Promise.all([part(send, pg, 'photo'), part(send, pg, 'thumb')]).then(function (got) {
+        got = got[0] !== 'up' ? got[0] : got[1];
+        if (got === 'up') pg.sent = true;
+        else if (!bad || i < bad.i) bad = { i: i, got: got };
+        return lane();
       });
+    }
+    return Promise.all([lane(), lane(), lane()]).then(function () {
+      if (!bad) return finishReal(send);
+      if (bad.got === 'network' && offline()) return stop(send, 'notsent');
+      send.failed = bad.i;
+      return stop(send, 'pagefailed');
+    });
   }
 
   function part(send, pg, which) {
