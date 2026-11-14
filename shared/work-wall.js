@@ -1,9 +1,9 @@
 /* ── work-wall.js — seeing everyone's work (S14-F1 to F2) ──────────────
    The Work Wall: one assessment's work side by side, a card per student
    with the first page's thumbnail, sorted by Name, To Grade First or Level,
-   filtered by level, To Grade or Not In. A card opens the student's pages
-   full size; Grade in This Order opens the grader (PageAssignments.
-   openGrader, unchanged) on the students shown, in the order shown.
+   filtered by level, To Grade or Not In. A card, like Grade in This Order,
+   opens the grader (PageAssignments.openGrader) on the students shown, in
+   the order shown, from that card (Colin, Nov 14: no page view first).
 
    The Work tab: one student's work in one place on the teacher's student
    page (teacher/page-student.js draws the tab and calls tabHtml / mountTab
@@ -639,27 +639,17 @@ window.WorkWall = (function () {
     if (what === 'grade') return _gradeInOrder(w, w.shown[0]);
     if (what === 'open') {
       var sid = btn.getAttribute('data-sid');
+      // With no grader at all, the pages open full size.
+      if (w.onGrade || (window.PageAssignments && PageAssignments.openGrader)) return _gradeInOrder(w, sid);
       var withPages = w.shown.filter(function (id) {
         return _pages(getStudentSubmission(w.cid, id, w.aid)).length > 0;
       });
       var at = withPages.indexOf(sid);
-      // Nothing to look at: straight to the grader, where Add Work is.
-      if (at < 0) return _gradeInOrder(w, sid);
-      _openViewer(
-        withPages.map(function (id) {
-          return { cid: w.cid, sid: id, aid: w.aid };
-        }),
-        at,
-        {
-          step: 'Student',
-          onGrade:
-            w.onGrade || (window.PageAssignments && PageAssignments.openGrader)
-              ? function (it) {
-                  if (_wall === w) _gradeInOrder(w, it.sid);
-                }
-              : null,
-        },
-      );
+      if (at < 0) return;
+      var items = withPages.map(function (id) {
+        return { cid: w.cid, sid: id, aid: w.aid };
+      });
+      _openViewer(items, at, { step: 'Student' });
     }
   }
 
@@ -1236,11 +1226,12 @@ window.WorkWall = (function () {
     if (what === 'full') return _openViewer(items, 0, { step: 'Piece', onGrade: canGrade ? grade : null });
     if (what === 'open') {
       var aid = btn.getAttribute('data-aid');
+      // The grader on that piece; with none, the pages full size.
+      if (canGrade) return grade({ cid: t.cid, sid: t.sid, aid: aid });
       var at = items.findIndex(function (it) {
         return it.aid === aid;
       });
-      if (at < 0) return canGrade ? grade({ cid: t.cid, sid: t.sid, aid: aid }) : undefined;
-      _openViewer(items, at, { step: 'Piece', onGrade: canGrade ? grade : null });
+      if (at >= 0) _openViewer(items, at, { step: 'Piece', onGrade: null });
     }
   }
 
@@ -1291,7 +1282,7 @@ window.WorkWall = (function () {
      pieceHtml and mountPiece: the student's pages for one piece, whole,
      beside the rubric in an open row of All Your Work on the teacher's
      student page, to sit with a student and talk it through. A page opens
-     full size. unmountTab(true) lets these pictures go too. */
+     the grader on the piece. unmountTab(true) lets these pictures go too. */
   // html-safe: ids are ours; fixed words
   // icon: the Assignments page's row draws the button as that icon (fixed
   // markup, LINE_ICONS), named See the Work; it then answers null, not '',
@@ -1360,7 +1351,7 @@ window.WorkWall = (function () {
             '<button type="button" class="ovw-page" data-ovw="' +
             i +
             '" aria-label="' +
-            esc(what + ', full size') +
+            esc(what + ', open in the grader') +
             '"><img class="ovw-img" data-work-pic data-work-which="page" data-aid="' +
             esc(aid) +
             '" data-page="' +
@@ -1632,7 +1623,10 @@ window.WorkWall = (function () {
     var btn = e.target.closest && e.target.closest('[data-ovw]');
     var box = btn && btn.closest('.stu-ov-work');
     if (!r || !box) return;
-    _openViewer([{ cid: r.cid, sid: r.sid, aid: box.getAttribute('data-aid') }], 0, {
+    var aid = box.getAttribute('data-aid');
+    var pa = window.PageAssignments;
+    if (pa && pa.openGrader) return pa.openGrader(r.cid, aid, r.sid, { studentIds: [r.sid] });
+    _openViewer([{ cid: r.cid, sid: r.sid, aid: aid }], 0, {
       step: 'Piece',
       page: Number(btn.getAttribute('data-ovw')) || 0,
     });

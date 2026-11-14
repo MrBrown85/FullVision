@@ -106,10 +106,12 @@ test('the student page on and Send Work off: work that is in still shows', async
   const pages = page.locator('.stu-ov-work .ovw-img');
   await expect(pages).toHaveCount(2);
   await expect.poll(() => pages.first().evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+  // A page opens the grader on the piece, with no page view first.
   await page.locator('.stu-ov-work .ovw-page').nth(1).click();
-  await expect(page.locator('#work-viewer-overlay .wv-at')).toHaveText('2 of 2');
-  await page.keyboard.press('Escape');
+  await expect(page.locator('#grader-overlay .grader-dialog')).toHaveClass(/has-work/);
   await expect(page.locator('#work-viewer-overlay')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#grader-overlay')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -147,7 +149,7 @@ test('the + on a row with nothing in: attach a link, and it becomes See the Work
   expect(errors).toEqual([]);
 });
 
-test('the wall: thumbnails only, sorting, the level filters, a page, the grader', async ({ page }) => {
+test('the wall: thumbnails only, sorting, the level filters, a card, the grader', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   const at = await openDemo(page, { clear: ['st2', 'st3'] });
@@ -188,21 +190,19 @@ test('the wall: thumbnails only, sorting, the level filters, a page, the grader'
   // Sorting and filtering asked for nothing new.
   expect(seen.length).toBe(n);
 
-  // A card opens that student's page full size: the one page asked for.
+  // A card opens the grader on that student, with no page view first.
   await wall.locator('.ww-pill[data-filter="tograde"]').click();
+  const firstSid = await wall.locator('.ww-card').first().getAttribute('data-sid');
   await wall.locator('.ww-card').first().click();
-  const viewer = page.locator('#work-viewer-overlay');
-  await expect(viewer.locator('.wv-img')).toBeVisible();
-  await expect.poll(() => viewer.locator('.wv-img').evaluate(i => i.complete && i.naturalWidth)).toBeGreaterThan(0);
-  expect(seen.slice(n).length).toBe(1);
-  expect(seen[n]).not.toMatch(/-thumb\.jpg$/);
-  await shot(page, 'S14-F1-work-wall-page-1366');
-  await page.keyboard.press('Escape');
-  await expect(viewer).toHaveCount(0);
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog).toHaveClass(/has-work/);
+  await expect(page.locator('#work-viewer-overlay')).toHaveCount(0);
+  expect(firstSid).toBeTruthy();
+  await page.locator('#grader-overlay [data-grader="close"]').first().click();
+  await expect(page.locator('#grader-overlay')).toHaveCount(0);
 
   // Grade in This Order: the grader on the two waiting, then back to the wall.
   await wall.locator('.ww-grade').click();
-  const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog).toBeVisible();
   await page.locator('#grader-overlay [data-grader="close"]').first().click();
   await expect(page.locator('#grader-overlay')).toHaveCount(0);
