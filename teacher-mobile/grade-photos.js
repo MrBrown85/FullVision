@@ -248,7 +248,7 @@ window.MGradePhotos = (function () {
               '<div class="m-work-page"><img alt="' +
               MC.esc('Page ' + (i + 1) + ' of ' + first + '’s work') +
               '"' +
-              _picAttrs(f, i) +
+              _picAttrs(f, i, true) +
               '></div>'
             );
           })
@@ -459,18 +459,29 @@ window.MGradePhotos = (function () {
     );
   }
 
-  /* The pages' pictures (shared/work-thumbs.js). The strip on a card and
-     the pinned strip show thumbnails, one address for both; the whole page
-     is asked for only in the full-screen view (openFull), or where a page
-     has no thumbnail. An answer is drawn only if the same student's work
-     for the same piece still has that file on that element (the screen may
-     have changed meanwhile). An address already held is shown again with
-     no new request, so a card drawn again keeps its pictures. */
+  /* The pages' pictures (shared/work-thumbs.js). The strip on a card shows
+     the whole page, as sharp as the page itself; the pinned strip shows the
+     thumbnail, and the strip shows that same thumbnail while its page is on
+     its way, so the page takes its place with no new request and no jump
+     (the strip's box is a fixed height). The full-screen view (openFull)
+     shows the strip's own pages again. An answer is drawn only if the same
+     student's work for the same piece still has that file on that element
+     (the screen may have changed meanwhile). An address already held is
+     shown again with no new request, so a card drawn again keeps its
+     pictures. */
   var _pics = window.WorkThumbs ? WorkThumbs.holder() : null;
 
   // html-safe: a page number and fixed attributes
-  function _picAttrs(f, i) {
-    return ' data-work-pic data-fv-page="' + i + '"' + (f && f.thumb_path ? '' : ' data-work-which="page"');
+  // page: the whole page (the strip), the thumbnail first if there is one; else the thumbnail (the pinned strip).
+  function _picAttrs(f, i, page) {
+    var thumb = !!(f && f.thumb_path);
+    return (
+      ' data-work-pic data-fv-page="' +
+      i +
+      '"' +
+      (page || !thumb ? ' data-work-which="page"' : '') +
+      (page && thumb ? ' data-work-first="thumb"' : '')
+    );
   }
 
   function _fileOf(cid, img) {
@@ -480,7 +491,8 @@ window.MGradePhotos = (function () {
   }
 
   /* Pictures in `root`. On the grading screen's cards, only the card on
-     screen and the one each side: the rest as they come into view (wire). */
+     screen and the one each side, so a swipe lands on a sharp card: the
+     rest when the cards stop on them (wire). */
   function hydrate(root, cid) {
     if (!root || !_pics || !on(cid)) return;
     var lookup = function (img) {

@@ -1293,9 +1293,9 @@ window.MGrade = (function () {
       // html-safe: copied from the checked renderSwiper markup above
       strip.innerHTML = tmp.querySelector('#m-thumb-strip').innerHTML;
       _fitCritComments(swiper);
-      MGradePhotos.hydrate(swiper, cid);
       var total = strip.querySelectorAll('.m-thumb').length;
       jumpToStudent(Math.min(idx, total - 1), true);
+      MGradePhotos.hydrate(swiper, cid); // after the jump: the cards round the one on screen
     }
 
     // ⋯ on a member: a sheet with their name, Grade Separately and Cancel.
@@ -2814,8 +2814,8 @@ window.MGrade = (function () {
         })
         .join('');
       _fitCritComments(swiper);
-      MGradePhotos.hydrate(swiper, cid);
       swiper.scrollLeft = left;
+      MGradePhotos.hydrate(swiper, cid);
     }
 
     function toggleChecklist(cid, sid, aid, critId) {

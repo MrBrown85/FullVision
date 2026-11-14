@@ -4,11 +4,12 @@
  *
  * The grader asked for the full-size page of every student's every page
  * when it opened, for a 188 px strip, and asked again for a card's pages
- * each time the card was drawn again. Now the strip shows the thumbnail
- * (the same address as the pinned strip's), only the card on screen and
- * the one each side are filled at first, the rest as the cards come into
- * view, a card drawn again keeps the pictures it had, and the full-size
- * page is asked for only when the pages are opened full screen.
+ * each time the card was drawn again. Now only the card on screen and the
+ * one each side are filled at first, the rest when the cards stop on them,
+ * and a card drawn again keeps the pictures it had. The strip still shows
+ * the full page, so it is as sharp as before: the pinned strip's thumbnail
+ * stands in until the page is in. Full screen shows the strip's pages
+ * again, with no new request.
  *
  * The fixture: 25 students, each with two pages sent on Lab.
  */
@@ -119,17 +120,63 @@ afterEach(() => {
 });
 
 describe('the phone grader’s pictures', () => {
-  it('opening asks for thumbnails of the first card and its neighbour only, never a full page', async () => {
+  it('opening asks for the first card and its neighbour only: 4 full pages and 4 thumbnails', async () => {
     openGrader();
     await settle();
     expect(swiper().children.length).toBe(N);
-    // Before: 50 full pages and 50 thumbnails. Now: two cards × two pages, one address each.
-    expect(pages()).toBe(0);
+    // Before: 100 requests, 50 full pages and 50 thumbnails. Now: two cards × two pages, each page and its thumbnail.
+    expect(asked.length).toBe(8);
+    expect(pages()).toBe(4);
     expect(thumbs()).toBe(4);
-    expect(new Set(asked.map(a => a.id)).size).toBe(4);
+    expect(new Set(asked.map(a => a.which + a.id)).size).toBe(8);
     expect(shown(card(0))).toBe(4); // the strip's two pages and the pinned strip's two
-    expect(card(0).querySelector('.m-work-page img').getAttribute('src')).toBe('blob:thumb:f0p1');
+    expect(shown(card(1))).toBe(4);
     expect(shown(card(2))).toBe(0);
+  });
+
+  it('the card on screen shows full pages in its strip, thumbnails only in the pinned strip', async () => {
+    openGrader();
+    await settle();
+    const strip = [...card(0).querySelectorAll('.m-work-page img')].map(img => img.getAttribute('src'));
+    expect(strip).toEqual(['blob:page:f0p1', 'blob:page:f0p2']);
+    const pin = [...card(0).querySelectorAll('.m-work-pin img')].map(img => img.getAttribute('src'));
+    expect(pin).toEqual(['blob:thumb:f0p1', 'blob:thumb:f0p2']);
+    expect(card(1).querySelector('.m-work-page img').getAttribute('src')).toBe('blob:page:f1p1');
+  });
+
+  it('the thumbnail stands in until the full page is in, with no request of its own', async () => {
+    const later = [];
+    openStudentWorkPage.mockImplementation((cid, file, which) => {
+      asked.push({ id: file.id, which });
+      const page = { url: 'blob:' + which + ':' + file.id, release() {} };
+      if (which === 'thumb') return Promise.resolve(page);
+      return new Promise(r => later.push(() => r(page)));
+    });
+    openGrader();
+    await settle();
+    const img = card(0).querySelector('.m-work-page img');
+    expect(img.getAttribute('src')).toBe('blob:thumb:f0p1');
+    later.forEach(go => go());
+    await settle();
+    expect(img.getAttribute('src')).toBe('blob:page:f0p1');
+    expect(card(0).querySelector('.m-work-pin img').getAttribute('src')).toBe('blob:thumb:f0p1');
+    expect(asked.length).toBe(8);
+  });
+
+  it('a full page in before its thumbnail is not swapped back', async () => {
+    const later = [];
+    openStudentWorkPage.mockImplementation((cid, file, which) => {
+      asked.push({ id: file.id, which });
+      const page = { url: 'blob:' + which + ':' + file.id, release() {} };
+      if (which === 'page') return Promise.resolve(page);
+      return new Promise(r => later.push(() => r(page)));
+    });
+    openGrader();
+    await settle();
+    later.forEach(go => go());
+    await settle();
+    expect(card(0).querySelector('.m-work-page img').getAttribute('src')).toBe('blob:page:f0p1');
+    expect(card(0).querySelector('.m-work-pin img').getAttribute('src')).toBe('blob:thumb:f0p1');
   });
 
   it('a card further on is filled when the cards stop there', async () => {
@@ -145,8 +192,10 @@ describe('the phone grader’s pictures', () => {
     expect(shown(card(9))).toBe(4);
     expect(shown(card(11))).toBe(4);
     expect(shown(card(5))).toBe(0);
-    expect(pages()).toBe(0);
-    expect(thumbs()).toBe(4 + 3 * 2);
+    // Three more cards × two pages, each page and its thumbnail.
+    expect(pages()).toBe(4 + 6);
+    expect(thumbs()).toBe(4 + 6);
+    expect(card(10).querySelector('.m-work-page img').getAttribute('src')).toBe('blob:page:f10p1');
   });
 
   it('a card drawn again keeps its pictures, with no new request', async () => {
@@ -160,15 +209,18 @@ describe('the phone grader’s pictures', () => {
     await settle();
     expect(asked.length).toBe(before);
     expect(shown(card(0))).toBe(4);
+    expect(card(0).querySelector('.m-work-page img').getAttribute('src')).toBe('blob:page:f0p1');
   });
 
-  it('the full-size pages are asked for when opened full screen', async () => {
+  it('full screen shows the pages the strip already has, with no new request', async () => {
     openGrader();
     await settle();
+    const before = asked.length;
     MGradePhotos.openFull(CID, card(0).querySelector('.m-work-full'));
     await settle();
-    expect(pages()).toBe(2);
-    expect(asked.filter(a => a.which === 'page').map(a => a.id)).toEqual(['f0p1', 'f0p2']);
+    expect(asked.length).toBe(before);
+    const sheet = [...document.querySelectorAll('#m-sheet-container .m-work-sheet-page')];
+    expect(sheet.map(img => img.getAttribute('src'))).toEqual(['blob:page:f0p1', 'blob:page:f0p2']);
   });
 
   it('a page with no thumbnail shows the page in the strip', async () => {

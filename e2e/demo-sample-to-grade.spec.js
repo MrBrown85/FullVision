@@ -161,7 +161,7 @@ test.describe('phone, 375 wide', () => {
     await expect(card.locator('.m-work-sent')).toContainText('Submitted');
     await expect(card.locator('.m-work-page img').first()).toHaveAttribute(
       'src',
-      /sample-work\/light-lab-ines-1-thumb\.jpg$/,
+      /sample-work\/light-lab-ines-1\.jpg$/,
     );
     await page.waitForTimeout(400);
     await shot(page, 'Demo-sample-phone-speed-grader-375');
