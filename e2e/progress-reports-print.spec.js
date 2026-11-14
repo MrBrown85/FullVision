@@ -1022,6 +1022,8 @@ test.describe('The Quick Report’s choices, read as parts', () => {
         }));
         return [...list, { ...base, id: 'tall', title: 'Tall Rubric', rubric: { ...base.rubric, rows } }];
       };
+      // What the data layer does after a change: the reports keep no layout from before it.
+      PageReports.render();
     });
     // Redraw: Observations on and off.
     await partSwitch(page, 'fb-observations').click();
