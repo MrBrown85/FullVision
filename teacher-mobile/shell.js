@@ -68,7 +68,10 @@
     if (typeof migrateAllStudents === 'function') migrateAllStudents();
 
     MC.setupOfflineDetection();
-    _renderTab('students');
+    // The tab the teacher last used on this device; Students the first time.
+    _activeTab = MTabBar.saved();
+    MTabBar.paint(_activeTab);
+    _renderTab(_activeTab);
     _bindEvents();
     // Add Work, Then Grade It opens the grader on the work just filed (S7-F3).
     if (window.MAddWork) {
@@ -82,8 +85,7 @@
 
     _hideLoader();
     _initPullToRefresh();
-    // The teacher's other classes load in the background, so switching to
-    // one doesn't start from nothing.
+    // The teacher's other classes load in the background, so switching to one doesn't start from nothing.
     if (typeof preloadClasses === 'function') {
       var preload = function () {
         preloadClasses();
@@ -539,16 +541,8 @@
     _tabState[_activeTab] = _captureTabState();
     _activeTab = tab;
     _gradeReturnSid = null;
-
-    // Update tab bar active state
-    document.querySelectorAll('.m-tab-item').forEach(function (t) {
-      var isActive = t.getAttribute('data-tab') === tab;
-      t.classList.toggle('m-tab-active', isActive);
-      t.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      if (isActive) t.querySelector('.m-tab-icon').style.fill = 'var(--active)';
-      else t.querySelector('.m-tab-icon').style.fill = 'none';
-    });
-
+    MTabBar.remember(tab);
+    MTabBar.paint(tab);
     _renderTab(tab);
     _restoreTabState(_tabState[tab]);
     _tabState[tab] = null;

@@ -109,6 +109,8 @@ interface Window {
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
   ReportPrintPaper: unknown;
+  // The phone's tab bar and last tab (teacher-mobile/tab-bar.js).
+  MTabBar: unknown;
 }
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.

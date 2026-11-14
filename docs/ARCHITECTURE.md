@@ -51,7 +51,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 ### Mobile PWA
 
 - Entry point: `teacher-mobile/index.html`
-- Shell: `teacher-mobile/shell.js`
+- Shell: `teacher-mobile/shell.js`, with `tab-bar.js` (the tab bar, and the tab last used on this device, which the app reopens on)
 - Shared pieces: `components.js` (`MComponents` / `MC`), `card-stack.js`, `card-widgets.js`, `card-widget-editor.js`
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js`

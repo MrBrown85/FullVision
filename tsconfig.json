@@ -47,6 +47,7 @@
     "teacher/report-one-zoom.js",
     "teacher/report-one-head.js",
     "teacher/work-rubric-card.js",
-    "teacher/report-print-paper.js"
+    "teacher/report-print-paper.js",
+    "teacher-mobile/tab-bar.js"
   ]
 }
