@@ -20,7 +20,7 @@ const { tabs, unknownTab, tabFor, tabIdFor, tabBarHtml } = PageReports._helpers;
 // The bar as it was written out by hand before the list (the toolbar literal on main).
 const BAR_BEFORE =
   '<button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true" title="Write and approve each student’s report comment.">Term Questionnaire</button>\n' +
-  '        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false" title="Build and print the class’s report cards.">Progress Reports</button>';
+  '        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false" title="Build and print the class’s report cards.">Print Reports</button>';
 
 const hiddenTab = { id: 'myed', label: 'MyEdBC Input', title: 'Marks and comments for MyEdBC.', hidden: true };
 
@@ -29,11 +29,11 @@ function labels(html) {
 }
 
 describe('the Reports tab list', () => {
-  it('has two tabs today, Term Questionnaire then Progress Reports', () => {
+  it('has two tabs today, Term Questionnaire then Print Reports', () => {
     expect(tabs.map(t => t.id)).toEqual(['questionnaire', 'progress']);
-    expect(tabs.map(t => t.label)).toEqual(['Term Questionnaire', 'Progress Reports']);
+    expect(tabs.map(t => t.label)).toEqual(['Term Questionnaire', 'Print Reports']);
     expect(tabs.every(t => t.hidden === false)).toBe(true);
-    // Print Reports is Progress Reports' button.
+    // The toolbar's Print Reports button belongs to the Print Reports tab.
     expect(tabs.map(t => !!t.printButton)).toEqual([false, true]);
   });
 
@@ -51,7 +51,7 @@ describe('the Reports tab list', () => {
 
   it('draws one button for each tab, in the list’s order', () => {
     const three = tabs.concat([Object.assign({}, hiddenTab, { hidden: false })]);
-    expect(labels(tabBarHtml(three))).toEqual(['Term Questionnaire', 'Progress Reports', 'MyEdBC Input']);
+    expect(labels(tabBarHtml(three))).toEqual(['Term Questionnaire', 'Print Reports', 'MyEdBC Input']);
     expect(tabBarHtml(three)).toContain('data-tab="myed"');
     // Only the first is drawn selected.
     expect(tabBarHtml(three).match(/aria-selected="true"/g)).toHaveLength(1);

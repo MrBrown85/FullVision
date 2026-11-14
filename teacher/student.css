@@ -3311,10 +3311,14 @@ button.ced-obs-row {
   color: var(--text);
 }
 .stu-cp-scale {
+  --cp-gap: 4px;
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+  gap: var(--cp-gap);
+  /* The mark's caret stays inside the scale's own width at 4.0. */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 .stu-cp-cell {
   display: block;
@@ -3327,15 +3331,36 @@ button.ced-obs-row {
   display: block;
   height: 100%;
 }
-.stu-cp-ring {
+/* Where the first scores started: a small caret over the track and a
+   thin tick through it, at the place the fill would end for that level
+   (four cells and three gaps: --at is 0 to 1, --k the gaps before it). */
+.stu-cp-mark {
   position: absolute;
-  top: -5px;
-  width: 22px;
-  height: 22px;
-  margin-left: -11px;
-  border: 2px solid var(--text);
-  border-radius: 50%;
-  box-sizing: border-box;
+  top: -7px;
+  bottom: 0;
+  left: clamp(1px, calc((100% - 3 * var(--cp-gap)) * var(--at) + var(--cp-gap) * var(--k)), calc(100% - 1px));
+  width: 0;
+  pointer-events: none;
+}
+.stu-cp-mark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -5px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--text);
+}
+.stu-cp-mark::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--surface);
 }
 .stu-comp-level {
   text-align: right;
@@ -4394,11 +4419,11 @@ details.gl-rest > summary .gl-title {
   gap: 6px;
 }
 .stu-cp-ringkey i {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--text);
-  border-radius: 50%;
-  box-sizing: border-box;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--text);
 }
 
 /* Observations: ordinary facts read quietly. The latest gap is a plain
@@ -4417,4 +4442,12 @@ details.gl-rest > summary .gl-title {
   border: 1px dashed var(--border-2);
   background: transparent;
   color: var(--text-2);
+}
+
+/* A link the teacher attached as the student's work (shared/work-wall.js pieceHtml). */
+.stu-ov-link {
+  display: block;
+  color: var(--link);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }

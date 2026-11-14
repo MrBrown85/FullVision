@@ -222,13 +222,6 @@ describe.each(VALUES)('a level of %s', v => {
     expect(f.standing).toBe(s.word);
   });
 
-  it('a phone report gives each skill the level of its word', () => {
-    seed();
-    const s = said(v);
-    const snap = atLevel(v, () => PhoneReports.snapshot(CID, student(), ctx));
-    expect(snap.skills[0]).toMatchObject({ word: s.word, level: s.level });
-  });
-
   it('the dashboard counts a student below a rule as the word says', () => {
     seed();
     const s = said(v);

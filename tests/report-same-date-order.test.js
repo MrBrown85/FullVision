@@ -67,7 +67,6 @@ function noor(bundle) {
     best: progress.match(/Best (.*?) Latest /)[1],
     latest: progress.match(/ Latest (.*?) Date /)[1],
     list: progress.split('Every score this term Score ')[1],
-    home: text(ReportBlocks.renderBlockSupportHome(cid, student, ctx, {})),
   };
 }
 
@@ -90,9 +89,6 @@ describe('same-date work on a report', () => {
     list:
       'Oct 16 What Does the Poster Show, and What Does It Hide? 75% ' +
       'Oct 20 Current Events: Week 3 100% Oct 20 Current Events: Week 1 75% Oct 20 Current Events: Week 2 100%',
-    home:
-      'Ways to Support at Home Ask to see Current Events: Week 3, Oct 20 · 100% ' +
-      'Ask about Current Events: Week 1, Oct 20 · 75%, her lowest this term',
   };
   const ID_ORDER = {
     nextSteps:
@@ -102,9 +98,6 @@ describe('same-date work on a report', () => {
     list:
       'Oct 16 What Does the Poster Show, and What Does It Hide? 75% ' +
       'Oct 20 Current Events: Week 1 75% Oct 20 Current Events: Week 2 100% Oct 20 Current Events: Week 3 100%',
-    home:
-      'Ways to Support at Home Ask to see Current Events: Week 2, Oct 20 · 100% ' +
-      'Ask about Current Events: Week 1, Oct 20 · 75%, her lowest this term',
   };
 
   it('with the server’s times: the order made, Week 3 then Week 1 then Week 2, so Week 2 is the latest', () => {

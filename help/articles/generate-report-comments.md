@@ -1,6 +1,6 @@
 ---
 title: Generate Report Comments
-section: Reports
+section: Reporting
 order: 2
 summary: Generate Comment drafts a report comment from the Comment Bank's written sentences, filled in from the student's grades, work habits and Student Voice. No AI writes the text, and a sentence is used only when the student's record supports it.
 checked: 2026-11-05

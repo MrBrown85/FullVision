@@ -3029,23 +3029,36 @@ window.PageGradebook = (function () {
 
   var STATUS_LOCKED_TITLE =
     'This student has a score or feedback on this work. Clear it first to mark Missing or Excused.';
+  /* One cell or column menu item: its line icon, then its label, as on the
+     Assignments page's menus. A disabled item says why in its title. */
+  // html-safe: ctx, icon, cls and title are fixed; callers escape any label that is not
+  function _ctxItem(ctx, icon, label, cls, title, after) {
+    return (
+      '<div class="gb-ctx-item' +
+      (cls ? ' ' + cls : '') +
+      '"' +
+      (cls && cls.indexOf('is-disabled') !== -1 ? ' aria-disabled="true"' : '') +
+      (title ? ' title="' + title + '"' : '') +
+      ' data-ctx="' +
+      ctx +
+      '">' +
+      icon +
+      '<span class="gb-ctx-label">' +
+      label +
+      '</span>' +
+      (after || '') +
+      '</div>'
+    );
+  }
   function showScoreContextMenu(e, cell) {
     _dismissContextMenu();
     var aid = cell.dataset.aid;
     var sid = cell.dataset.sid;
     var status = getAssignmentStatus(activeCourse, sid, aid);
     // Missing and Excused never go on work with a score or feedback.
-    function statusItem(ctx, key, label) {
+    function statusItem(ctx, key, icon, label) {
       var locked = !canSetAssignmentStatus(activeCourse, sid, aid, key);
-      return (
-        '<div class="gb-ctx-item' +
-        (locked ? ' is-disabled" aria-disabled="true" title="' + STATUS_LOCKED_TITLE : '') +
-        '" data-ctx="' +
-        ctx +
-        '">' +
-        label +
-        '</div>'
-      );
+      return _ctxItem(ctx, icon, label, locked ? 'is-disabled' : '', locked ? STATUS_LOCKED_TITLE : '');
     }
     // Clear Score has nothing to clear on a cell with no score (Nov 3 sweep).
     var cellAssess = getAssessments(activeCourse).find(function (a) {
@@ -3057,18 +3070,22 @@ window.PageGradebook = (function () {
       }) || getRubricCheckIds(activeCourse, sid, aid).length > 0;
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
-    // html-safe: statusItem gets only fixed actions and labels.
+    // html-safe: _ctxItem gets only fixed actions, icons and labels.
     menu.innerHTML =
-      '<div class="gb-ctx-item" data-ctx="editCell">Edit Score</div>' +
-      '<div class="gb-ctx-item' +
-      (hasScore ? '' : ' is-disabled" aria-disabled="true" title="There is no score to clear.') +
-      '" data-ctx="clearCell">Clear Score</div>' +
+      _ctxItem('editCell', LINE_ICONS.edit, 'Edit Score') +
+      _ctxItem(
+        'clearCell',
+        LINE_ICONS.clear,
+        'Clear Score',
+        hasScore ? '' : 'is-disabled',
+        hasScore ? '' : 'There is no score to clear.',
+      ) +
       '<div class="gb-ctx-divider"></div>' +
-      statusItem('markMissing', 'NS', status === 'NS' ? 'Undo Missing' : 'Mark Missing') +
-      statusItem('excuseCell', 'EXC', status === 'EXC' ? 'Undo Excuse' : 'Excuse') +
-      statusItem('lateCell', 'LATE', status === 'LATE' ? 'Undo Late' : 'Mark Late') +
+      statusItem('markMissing', 'NS', LINE_ICONS.missing, status === 'NS' ? 'Undo Missing' : 'Mark Missing') +
+      statusItem('excuseCell', 'EXC', LINE_ICONS.excused, status === 'EXC' ? 'Undo Excuse' : 'Excuse') +
+      statusItem('lateCell', 'LATE', LINE_ICONS.late, status === 'LATE' ? 'Undo Late' : 'Mark Late') +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="addObservation">Add Observation</div>';
+      _ctxItem('addObservation', LINE_ICONS.observe, 'Add Observation');
     _placeContextMenu(menu, e.clientX, e.clientY);
     _wireMenu(menu, cell);
     menu.addEventListener('click', function (ev) {
@@ -3265,25 +3282,28 @@ window.PageGradebook = (function () {
         ? '<div class="gb-ctx-note">' +
           esc(GradeState.draftsSentence(activeCourse, waiting)) +
           '</div>' +
-          '<div class="gb-ctx-item gb-ctx-return" data-ctx="returnDrafts">' +
-          esc(GradeState.returnNGraded(waiting.length)) +
-          '</div>' +
+          _ctxItem('returnDrafts', LINE_ICONS.send, esc(GradeState.returnNGraded(waiting.length)), 'gb-ctx-return') +
           '<div class="gb-ctx-divider"></div>'
         : '') +
-      '<div class="gb-ctx-item" data-ctx="scoreMode">Grade This Assessment</div>' +
-      '<div class="gb-ctx-item gb-ctx-split" data-ctx="viewResults"><span>View Class Results</span>' +
-      (avgHint ? '<span class="gb-ctx-hint">' + esc(avgHint) + '</span>' : '') +
-      '</div>' +
-      '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assessment Details</div>' +
-      (printLabel ? '<div class="gb-ctx-item" data-ctx="printRubrics">' + esc(printLabel) + '</div>' : '') +
+      _ctxItem('scoreMode', LINE_ICONS.grade, 'Grade This Assessment') +
+      _ctxItem(
+        'viewResults',
+        LINE_ICONS.results,
+        'View Class Results',
+        '',
+        '',
+        avgHint ? '<span class="gb-ctx-hint">' + esc(avgHint) + '</span>' : '',
+      ) +
+      _ctxItem('editAssess', LINE_ICONS.edit, 'Edit Assessment Details') +
+      (printLabel ? _ctxItem('printRubrics', LINE_ICONS.print, esc(printLabel)) : '') +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="markUngradedNS">Mark Blank Cells Missing</div>' +
-      '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Mark Blank Cells Excused</div>' +
+      _ctxItem('markUngradedNS', LINE_ICONS.missing, 'Mark Blank Cells Missing') +
+      _ctxItem('markUngradedEXC', LINE_ICONS.excused, 'Mark Blank Cells Excused') +
       (_bulkStatusUndo(activeCourse, aid).length
-        ? '<div class="gb-ctx-item" data-ctx="undoBulkStatus">Undo Marking Blank Cells</div>'
+        ? _ctxItem('undoBulkStatus', LINE_ICONS.undo, 'Undo Marking Blank Cells')
         : '') +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assessment</div>';
+      _ctxItem('deleteAssess', LINE_ICONS.trash, 'Delete Assessment', 'gb-ctx-danger');
     // The column stays highlighted while its menu is open, so it is clear
     // which assignment the menu acts on.
     header.classList.add('gb-col-menu');

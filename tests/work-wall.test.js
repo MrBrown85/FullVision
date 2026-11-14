@@ -631,6 +631,64 @@ describe("the Work tab on the teacher's student page", () => {
     expect($$('.sw-card').length).toBe(2);
   });
 
+  it('Show and Sort: only the cards are drawn again, the count follows, and the picks stay with the student', () => {
+    seed();
+    const main = openStudent(IDS[0]);
+    const tile = main.querySelector('#stu-tab-work');
+    const kept = $('.sw-card[data-aid="' + OTHER + '"]');
+    expect(text($('.sw-count'))).toBe('2 Pieces');
+    expect($$('[data-sw="state"]').map(text)).toEqual(['All 2', 'To Grade 1', 'To Return 0', 'Returned 1']);
+    expect($$('[data-sw="sort"]').map(text)).toEqual(['Newest First', 'Oldest First']);
+    // No categories in this class: no Category list.
+    expect($('#sw-cat')).toBeNull();
+    click($('[data-sw="state"][data-key="tograde"]'));
+    expect($$('.sw-card .sw-title').map(text)).toEqual(['Vimy Ridge']);
+    // A card that stays is the same card, moved: its picture stays.
+    expect($('.sw-card[data-aid="' + OTHER + '"]')).toBe(kept);
+    expect(text($('.sw-count'))).toBe('1 of 2 Pieces');
+    expect($('[data-sw="state"][data-key="tograde"]').getAttribute('aria-pressed')).toBe('true');
+    // The page was not drawn again.
+    expect(main.querySelector('#stu-tab-work')).toBe(tile);
+    click($('[data-sw="state"][data-key="all"]'));
+    click($('[data-sw="sort"][data-key="old"]'));
+    expect($$('.sw-card .sw-title').map(text)).toEqual(['Vimy Ridge', 'Conscription']);
+    click($('[data-sw="state"][data-key="toreturn"]'));
+    expect($$('.sw-card')).toHaveLength(0);
+    expect($('.sw-none').hasAttribute('hidden')).toBe(false);
+    // Kept while the teacher stays on this student.
+    openStudent(IDS[0]);
+    expect($('[data-sw="sort"][data-key="old"]').getAttribute('aria-pressed')).toBe('true');
+    expect($('[data-sw="state"][data-key="toreturn"]').getAttribute('aria-pressed')).toBe('true');
+    click($('[data-sw="state"][data-key="all"]'));
+    click($('[data-sw="sort"][data-key="new"]'));
+    expect($$('.sw-card .sw-title').map(text)).toEqual(['Conscription', 'Vimy Ridge']);
+  });
+
+  it('a Category list when the work spans two categories', () => {
+    seed();
+    const [c1, c2] = [U(61), U(62)];
+    _cache.categories[CID] = [
+      { id: c1, name: 'Labs' },
+      { id: c2, name: 'Essays' },
+    ];
+    getAssessments(CID).find(a => a.id === PIECE).categoryId = c1;
+    getAssessments(CID).find(a => a.id === OTHER).categoryId = c2;
+    openStudent(IDS[0]);
+    expect([...$('#sw-cat').querySelectorAll('option')].map(text)).toEqual(['All Categories', 'Labs', 'Essays']);
+    const pick = id => {
+      const sel = $('#sw-cat');
+      sel.querySelectorAll('option').forEach(o => o.toggleAttribute('selected', o.value === id));
+      sel.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    };
+    pick(c2);
+    expect($$('.sw-card .sw-title').map(text)).toEqual(['Vimy Ridge']);
+    expect(text($('.sw-count'))).toBe('1 of 2 Pieces');
+    expect($('#sw-cat').value).toBe(c2);
+    pick('');
+    expect($$('.sw-card')).toHaveLength(2);
+    delete _cache.categories[CID];
+  });
+
   it('View Full Size steps through the pieces; Open in Grader opens that piece for this student', () => {
     seed();
     const spy = PageAssignments.openGrader;

@@ -1,6 +1,6 @@
 ---
 title: Fill In the Term Questionnaire
-section: Reports
+section: Reporting
 order: 1
 summary: The Term Questionnaire shows one student at a time, with work habits, grades, observations and Student Voice beside the report comment. Each student's comment is written and approved here.
 checked: 2026-11-05
@@ -8,7 +8,7 @@ pages:
   - /reports
 demo: /reports
 labels:
-  - Reports
+  - Reporting
   - Term Questionnaire
   - Needs Approval
   - Not Ready
@@ -46,7 +46,7 @@ shots:
 
 ## Steps
 
-1. Open **Reports** and choose **Term Questionnaire**. Choose the report in the list beside it. Each report keeps its own comments and attendance.
+1. Open **Reporting** and choose **Term Questionnaire**. Choose the report in the list beside it. Each report keeps its own comments and attendance.
 2. Select a student in the class list. A student without an approved comment shows **Needs Approval**. **Not Ready** lists only those students.
 3. Under **Work Habits**, rate each habit from **Rarely** to **Consistently**. A habit left blank is not used in the comment.
 

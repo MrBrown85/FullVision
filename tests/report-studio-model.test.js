@@ -7,6 +7,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { parseHTML } from 'linkedom';
 
 const S = ReportSheets;
 const blocksOf = f => f.sides.flatMap(sd => sd.rows.flatMap(r => r.cells.map(c => c.block)));
@@ -50,7 +51,7 @@ describe('normalizeForm', () => {
             { block: 'header', x: 0, y: 0, w: 12 },
             { block: 'teacher-narrative', x: 0, y: 5, w: 12, h: 13, options: { x: 1 } },
             { block: 'legend', x: 6, y: 18, w: 6, h: 6 },
-            { block: 'support-home', x: 0, y: 18, w: 6, h: 6 },
+            { block: 'missing-work', x: 0, y: 18, w: 6, h: 6 },
             { block: 'proficiency', x: 0, y: 24, w: 8, h: 13 },
             { block: 'observations', x: 8, y: 24, w: 4, h: 13 },
             { block: 'growth', x: 0, y: 37, w: 5, h: 8 },
@@ -66,7 +67,7 @@ describe('normalizeForm', () => {
     expect(rowsOf(f, 0)).toEqual([
       'header',
       'teacher-narrative',
-      'support-home/half+legend/half',
+      'missing-work/half+legend/half',
       'proficiency',
       'observations/half',
       'growth/half',
@@ -167,13 +168,11 @@ describe('normalizeForm', () => {
     expect(S.formFor({ preset: 'brief' }).id).toBe('grades');
     expect(S.formFor({ preset: 'standard' }).id).toBe('grades');
     expect(blocksOf(S.formFor(null))).toEqual(['header', 'grade-table']);
-    // Assignment Grades starts in one column, by date, year to date, on a
-    // new report.
-    expect(S.optionsFor(cellOf(S.formFor(null), 'grade-table'))).toMatchObject({
-      columns: 'one',
-      organize: 'date',
-      range: 'all',
-    });
+    // Assignment Grades is One Report's Assessments part now: the form's
+    // one column, by month, newest first, as it printed.
+    const m = ReportOne.fromForm(S.formFor(null));
+    expect(m.parts).toEqual(['header', 'assessments']);
+    expect(m.options.assessments).toEqual({ organize: 'month', order: 'newest', columns: 'one' });
     expect(S.formFor({ form: { v: 6, id: 'x', sides: [] } }).id).toBe('x');
   });
 });
@@ -357,15 +356,12 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {})).toBe('');
   });
 
-  it('a letter class reads every mark as a percent: Next Steps, Support at Home, Progress and Proficiency', () => {
+  it('a letter class reads every mark as a percent: Next Steps, Progress and Proficiency', () => {
     focusClass();
     COURSES[CID].gradingSystem = 'letter';
     try {
       expect(text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {}))).toContain(
         'Latest: Poster, Oct 20 · 67%',
-      );
-      expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, {}))).toContain(
-        'Ask to see Lab Report, Sep 10 · 75% Ask about Poster, Oct 20 · 67%, her lowest this term',
       );
       const prog = text(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {}));
       // Now is the level the Proficiency block prints (2.7 is 68%).
@@ -407,17 +403,10 @@ describe('stage 3 blocks', () => {
     }
   });
 
-  it('Ways to Support at Home names the best and lowest work in the Focus Area, with the teacher’s own line', () => {
+  it('Ways to Support at Home is gone: a saved form that has it prints nothing there', () => {
     focusClass();
-    const html = ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { note: 'Read together each night.' });
-    expect(text(html)).toBe(
-      'Ways to Support at Home Ask to see Lab Report, Sep 10 · Proficient Ask about Poster, Oct 20 · Proficient −, her lowest this term Read together each night.',
-    );
-    expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { about: false }))).toBe(
-      'Ways to Support at Home Ask to see Lab Report, Sep 10 · Proficient',
-    );
-    stub('getTagScores', () => []);
     expect(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, {})).toBe('');
+    expect(S.BLOCKS['support-home']).toBeUndefined();
   });
 
   it('Progress in One Area lists every score this term with the start, now, best, latest and the I Can statement', () => {
@@ -448,7 +437,7 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Missing Work names the work labelled Missing on one line, says None, or stays off', () => {
+  it('Only Missing Work lists the work labelled Missing, or says None as of today', () => {
     const work = [
       { id: 'a1', title: 'Lab Report', dueDate: '2026-10-02' },
       { id: 'a2', title: 'Quiz', date: '2026-10-05' },
@@ -467,20 +456,20 @@ describe('stage 3 blocks', () => {
           ? { kind: 'status', status: 'NS' }
           : { kind: 'level' },
     );
-    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
-      'Missing Work Quiz, Essay As of Oct 10, 2026',
-    );
-    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { titles: false }))).toBe(
-      'Missing Work 2 assignments As of Oct 10, 2026',
-    );
-    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { size: 'half' }))).toBe(
-      'Missing Work As of Oct 10, 2026 2 Quiz, Essay',
-    );
+    // The Missing Work block is the Assessments part's Only Missing Work now.
+    expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {})).toBe('');
+    const stage = { innerHTML: '', firstChild: { offsetHeight: 50 }, querySelectorAll: () => [] };
+    const list = o => text(GradeReport.listPart(CID, CECE, Object.assign({ missingOnly: true }, o), stage).html);
+    const t = list({});
+    expect(t).toContain('Quiz');
+    expect(t).toContain('Essay');
+    expect(t).not.toContain('Lab Report');
+    expect(t).not.toContain('Poster');
+    expect(GradeReport.rows(CID, CECE, { missingOnly: true }).map(r => r.title)).toEqual(['Quiz', 'Essay']);
     stub('assessmentCellValue', () => ({ kind: 'level' }));
-    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
-      'Missing Work None As of Oct 10, 2026',
-    );
-    expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { none: 'off' })).toBe('');
+    expect(list({})).toBe('None As of Oct 10, 2026');
+    // The whole list, Missing Work off: its rows and nothing about missing.
+    expect(GradeReport.listPart(CID, CECE, { ungraded: false }, stage).html).toBe('');
   });
 
   it('Attendance prints the questionnaire’s totals for this term or the year, and nothing when none are entered', () => {
@@ -509,10 +498,16 @@ describe('stage 3 blocks', () => {
   it('Learning Dispositions prints each rated habit as how often, Rarely to Consistently', () => {
     stub('getStudentTermRating', () => ({ habits: { completes: 4, part: 2, ready: 5, devices: 1 } }));
     const html = ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {});
-    expect(text(html)).toBe(
-      'Learning Dispositions Teacher observation · Rarely · Sometimes · Usually · Consistently Completes Work Consistently Takes Part Sometimes Uses Devices Well Rarely',
-    );
+    const t = text(html);
+    // A table: each rated habit, what it means for a family, the teacher's word.
+    expect(t).toContain('Learning Dispositions From my observation in class');
+    expect(t).toContain('Work Habit Teacher Completes Work Hands in assignments complete and on time');
+    expect(t).toMatch(/Completes Work [^]*? Consistently Takes Part [^]*? Sometimes Uses Devices Well [^]*? Rarely/);
+    // What the four words mean.
+    expect(t).toContain('Consistently almost always, without reminders');
     expect(html).not.toMatch(/[●○]|Thriving|Developing|Not Seen/);
+    expect(html).not.toContain('report-bubble');
+    expect((html.match(/<tr>/g) || []).length).toBe(4);
     const all = text(
       ReportBlocks.renderReportBlock(
         'learner-dimensions',
@@ -522,15 +517,32 @@ describe('stage 3 blocks', () => {
         { rated: false, scale: false },
       ),
     );
-    expect(all).toContain('Works With Others —');
+    expect(all).toMatch(/Works With Others [^]*? —/);
     expect(all).not.toContain('Comes Ready');
-    expect(all).not.toContain('Teacher observation');
+    expect(all).not.toContain('without reminders');
+    // Student Self-Assessment: every habit, with a circle under each word for the student.
+    const mine = ReportBlocks.renderReportBlock(
+      'learner-dimensions',
+      CID,
+      CECE,
+      { termId: 'term-2' },
+      { student: true },
+    );
+    expect(text(mine)).toContain(displayNameFirst(CECE) + '’s Own Rating');
+    expect(text(mine)).toContain('Rarely Sometimes Usually Consistently');
+    expect((mine.match(/report-bubble/g) || []).length).toBe(6 * 4);
+    expect(text(mine)).toContain('Comes Ready, Uses Class Time');
+    expect(mine).not.toContain('Not Seen');
     stub('getStudentTermRating', () => ({ habits: { ready: 5 } }));
     expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
     stub('getStudentTermRating', () => ({ dims: { engagement: 4 } }));
     expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
     stub('getStudentTermRating', () => ({ dims: {} }));
     expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
+    // With nothing rated, the student's own column still prints.
+    expect(
+      ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, { student: true }),
+    ).toContain('report-bubble');
   });
 
   it('Self-Assessment and Goal prints the student’s own words: strength, Core Competency answers, goal, check-in and next step', () => {
@@ -832,7 +844,7 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('legend', CID, CECE, {}, { size: 'half' })).toContain('report-legend-half');
   });
 
-  it('Assignment Grades prints one row per assessment with the marks the teacher picks, organized by category, date or competency', () => {
+  it('the Assessments part prints its rows as one list, or by month, category or competency, one column or two', () => {
     const work = [
       {
         id: 'a1',
@@ -885,111 +897,141 @@ describe('stage 3 blocks', () => {
           ]
         : [{ assessmentId: 'a2', score: 3.33 }],
     );
-    const opts = more => Object.assign(S.optionsFor({ block: 'grade-table' }), more);
-    // By default: one column, a heading per month, year to date.
-    const byDefault = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}));
-    expect(byDefault).not.toContain('report-grades-cols');
-    expect(text(byDefault)).toContain('Year to date · 3 assessments');
-    expect(text(byDefault)).toContain('October Oct 12 Energy Forms Quiz Missing Oct 5 Plate Tectonics');
-    // Year to date leaves out work dated after today.
+    // No DOM here: every block 50px tall, every text 7px a character.
+    const stage = {
+      innerHTML: '',
+      firstChild: { offsetHeight: 50 },
+      querySelectorAll() {
+        return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+          offsetWidth: m[1].length * 7,
+        }));
+      },
+    };
+    const list = o => GradeReport.listPart(CID, CECE, o || {}, stage).html;
+    // One List, one column: the table the Assessments list has always been.
+    const plain = list({});
+    expect(plain).not.toContain('gr-item');
+    expect(plain).not.toContain('class="gr-cols"');
+    expect(text(plain)).toContain('Sep 10 Chemical Formulas Quiz Quizzes 12 / 15');
+    // By month, newest first: a heading over each month's first row.
+    const byMonth = list({ organize: 'month', order: 'newest' });
+    expect(text(byMonth)).toContain('October Oct 12 Energy Forms Quiz Quizzes Missing Oct 5 Plate Tectonics');
+    expect(text(byMonth)).toContain('September Sep 10 Chemical Formulas Quiz');
+    // Work dated after the report's end is left out.
+    cells.a4 = { kind: 'none' };
     stub('getAssessments', () =>
       work.concat([{ id: 'a4', title: 'Final Exam', date: '2099-06-01', categoryId: 'c2' }]),
     );
-    expect(text(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({})))).not.toContain('Final Exam');
+    expect(text(list({ organize: 'month' }))).not.toContain('Final Exam');
     stub('getAssessments', () => work);
-    const byCat = { organize: 'category', columns: 'two', range: 'term' };
-    const html = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts(byCat));
-    const t = text(html);
-    // A proficiency class: score and word, no percent; newest first, by category.
-    // The course grade sits in the title row; each category heading carries
-    // its weight and the student's grade in it.
-    // A level reads as its proficiency with its ±, once; points work is as it was.
-    expect(t).toContain('Assignment Grades Course Grade Proficient This term · 3 assessments');
-    expect(t).toContain('Labs 40% of grade · Proficient Oct 5 Plate Tectonics Presentation Proficient +');
+    // By category, side by side: each heading carries its weight and the
+    // student's grade in it; no Category column; a level reads as its
+    // proficiency with its ±.
+    const byCat = list({ organize: 'category', columns: 'two', order: 'newest' });
+    const t = text(byCat);
+    expect(byCat).toContain('class="gr-cols"');
+    // Each column has its header row; the rows split where the columns come out most even.
     expect(t).toContain(
-      'Quizzes 60% of grade · Proficient Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12 / 15 Points shown as scored',
+      'Date Assessment Result Labs 40% of grade · Proficient Oct 5 Plate Tectonics Presentation Proficient +',
+    );
+    expect(t).toContain(
+      'Date Assessment Result Quizzes 60% of grade · Proficient Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12 / 15',
     );
     expect(t).not.toMatch(/\d\.\d|\/ 4|out of 4/);
-    const bare = text(
-      ReportBlocks.renderReportBlock(
-        'grade-table',
-        CID,
-        CECE,
-        {},
-        opts(Object.assign({ course: false, categoryGrade: false }, byCat)),
-      ),
-    );
-    expect(bare).toContain('Assignment Grades This term · 3 assessments');
-    expect(bare).toContain('Labs Oct 5 Plate Tectonics');
-    expect(t).toContain('Points shown as scored; other work shown as its proficiency.');
-    expect(html).not.toMatch(/[●○]/);
-    expect(html).toContain('report-grades-cols');
-    expect(
-      ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ organize: 'category', columns: 'one' })),
-    ).not.toContain('report-grades-cols');
-    // One category fills both columns: it splits evenly and carries on at the
-    // top of the right column under its name.
-    stub('getCategories', () => [{ id: 'c2', name: 'Quizzes', weight: 100 }]);
-    stub('getAssessments', () => work.map(a => Object.assign({}, a, { categoryId: 'c2' })));
-    const split = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts(byCat));
-    const cols = split.split('class="report-grades-col"').slice(1).map(text);
-    expect(cols).toHaveLength(2);
-    expect(cols[0]).toContain('Quizzes 100% of grade');
-    expect(cols[0]).toContain('Energy Forms Quiz');
-    expect(cols[1]).toContain('Quizzes (continued)');
-    expect(cols[1]).toContain('Chemical Formulas Quiz');
-    stub('getAssessments', () => work);
-    stub('getCategories', () => [
-      { id: 'c1', name: 'Labs', weight: 40 },
-      { id: 'c2', name: 'Quizzes', weight: 60 },
-    ]);
-    // Percent on, word off, oldest first, one column, by date.
-    const pct = text(
-      ReportBlocks.renderReportBlock(
-        'grade-table',
-        CID,
-        CECE,
-        {},
-        opts({ percent: true, word: false, order: 'oldest', columns: 'one', organize: 'date' }),
-      ),
-    );
-    expect(pct).toContain(
-      'September Sep 10 Chemical Formulas Quiz 12 / 15 · 80% October Oct 5 Plate Tectonics Presentation Proficient + Oct 12 Energy Forms Quiz Missing',
-    );
-    // Word off still prints a level's proficiency, and a Proficiency class prints no % for a level.
-    expect(pct).not.toContain('83%');
-    // By competency: the latest few pieces of work under each, marked on that competency.
-    const comp = text(
-      ReportBlocks.renderReportBlock(
-        'grade-table',
-        CID,
-        CECE,
-        {},
-        opts({ organize: 'competency', per: 1, range: 'term' }),
-      ),
-    );
-    expect(comp).toContain('This term · latest 1 for each competency');
-    expect(comp).toContain(
-      'Question and Predict Oct 5 Plate Tectonics Presentation Proficient + Plan Investigations Oct 5 Plate Tectonics Presentation Proficient +',
-    );
-    expect(comp).toContain('Each mark is for that competency.');
-    // Side by Side: one column, the last 10, never by competency.
-    const half = ReportBlocks.renderReportBlock(
-      'grade-table',
-      CID,
-      CECE,
-      {},
-      opts({ organize: 'competency', size: 'half' }),
-    );
-    expect(text(half)).toContain('Assignment Grades Course Grade Proficient Last 10 Labs 40% of grade');
-    expect(half).not.toContain('report-grades-cols');
-    // A letter class starts with score and percent, no word.
+    expect(t).not.toContain('Category');
+    expect(text(list({ organize: 'category', catGrade: false }))).toContain('Labs Oct 5 Plate Tectonics');
+    // By competency: the latest few under each, marked on that competency.
+    const comp = text(list({ organize: 'competency', per: 1, order: 'newest' }));
+    expect(comp).toContain('Question and Predict Oct 5 Plate Tectonics Presentation Labs Proficient +');
+    expect(comp).toContain('Plan Investigations Oct 5 Plate Tectonics Presentation Labs Proficient +');
+    expect(comp).not.toContain('Energy Forms Quiz');
+    // Numbers are left off by competency (a piece can print twice).
+    expect(list({ organize: 'competency', numbers: true })).not.toContain('gr-c gr-n ');
+    // Range: Last 10 and This Term.
+    stub('assessmentInTermWindow', (cid, a) => a.id !== 'a1');
+    expect(text(list({ range: 'term' }))).not.toContain('Chemical Formulas Quiz');
+    stub('assessmentInTermWindow', () => true);
+    // A Letter class: Score and Out Of, %, and the Proficiency Word when asked.
     COURSES[CID].gradingSystem = 'letter';
-    expect(ReportBlocks.showDefaults(CID)).toEqual({ percent: true, word: false });
-    expect(text(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({})))).toContain('12 / 15 · 80%');
+    const letter = text(list({ word: true }));
+    expect(letter).toContain('Score Out Of % Proficiency');
+    expect(letter).toContain('Chemical Formulas Quiz Quizzes 12 15 80% Proficient');
+    expect(text(list({ hide: { score: true }, percent: false }))).not.toContain('Out Of');
+    // Side by side the score and out of print joined, and no word.
+    const two = text(list({ columns: 'two', word: true }));
+    expect(two).toContain('12 / 15 80%');
+    expect(two).not.toContain('Proficiency');
     COURSES[CID].gradingSystem = 'proficiency';
     stub('getAssessments', () => []);
-    expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}))).toBe('');
+    expect(list({ organize: 'month' })).toBe('');
+  });
+
+  it('the Assessments part in groups or side by side cuts between its rows, a group carrying on under “(continued)”', () => {
+    const { document: doc } = parseHTML('<!doctype html><html><body></body></html>');
+    const was = globalThis.document;
+    globalThis.document = doc;
+    try {
+      const row = (id, t) => `<div class="gr-row" data-row="${id}"><span class="gr-c gr-title">${t}</span></div>`;
+      const t = {
+        open: '<div class="gr-table gr-regular" style="--gr-cols:1fr">',
+        head: '<div class="gr-row gr-head"><span class="gr-c">Assessment</span></div>',
+      };
+      const items = ['A', 'B', 'C', 'D', 'E', 'F'].map((x, i) => ({
+        row: row(x, 'Work ' + x),
+        g: i < 4 ? 0 : 1,
+        gi: i < 4 ? i : i - 4,
+        name: i < 4 ? 'Labs' : 'Quizzes',
+        grade: i < 4 ? '40% of grade · Proficient' : '',
+        u: 1,
+      }));
+      // A part as listPart assembles it, side by side: Labs A–D, Quizzes E–F.
+      const html =
+        '<div class="one-part one-assessments"><div class="report-block-title">Assessments</div><div class="gr-cols">' +
+        t.open +
+        t.head +
+        items
+          .slice(0, 3)
+          .map(
+            x =>
+              `<div class="gr-item" data-g="${x.g}" data-gi="${x.gi}" data-gn="${x.name}" data-gg="${x.grade}" data-u="1">${x.row}</div>`,
+          )
+          .join('') +
+        '</div>' +
+        t.open +
+        t.head +
+        items
+          .slice(3)
+          .map(
+            x =>
+              `<div class="gr-item" data-g="${x.g}" data-gi="${x.gi}" data-gn="${x.name}" data-gg="${x.grade}" data-u="1">${x.row}</div>`,
+          )
+          .join('') +
+        '</div></div></div>';
+      // The second page of it: rows C to F.
+      const piece = GradeReport.listPiece(html, 2, 6);
+      const p = parseHTML('<div>' + piece + '</div>').document;
+      const headings = [...p.querySelectorAll('.gr-ghead')].map(h => h.textContent);
+      // Labs began on the page before: it carries on; Quizzes starts here with its own heading.
+      expect(headings[0]).toBe('Labs (continued)');
+      expect(headings).toContain('Quizzes');
+      expect(p.querySelector('.report-block-title').textContent).toBe('Assessments (continued)');
+      // Still side by side, every row once, in order.
+      expect(p.querySelectorAll('.gr-cols > .gr-table')).toHaveLength(2);
+      expect([...p.querySelectorAll('.gr-row[data-row]')].map(r => r.getAttribute('data-row'))).toEqual([
+        'C',
+        'D',
+        'E',
+        'F',
+      ]);
+      // Each table keeps its header row.
+      expect(p.querySelectorAll('.gr-head')).toHaveLength(2);
+      // The first page: Labs' grade on its first heading.
+      const first = parseHTML('<div>' + GradeReport.listPiece(html, 0, 2) + '</div>').document;
+      expect(first.querySelector('.gr-ghead').textContent).toBe('Labs40% of grade · Proficient');
+      expect(first.querySelector('.report-block-title').textContent).toBe('Assessments');
+    } finally {
+      globalThis.document = was;
+    }
   });
 
   it('a saved layout keeps a retired block', () => {
@@ -997,14 +1039,10 @@ describe('stage 3 blocks', () => {
     expect(blocksOf(kept)).toContain('section-chart');
   });
 
-  it('Assignment Grades is Year to Date by default; Percent and Proficiency Word start from the class setting', () => {
-    const f = S.form();
-    expect(S.optionsFor(cellOf(f, 'grade-table')).range).toBe('all');
-    expect(S.optionsFor(cellOf(f, 'grade-table'), { percent: true, word: false })).toMatchObject({
-      percent: true,
-      word: false,
-      score: true,
-    });
+  it('Assignment Grades and Missing Work are read from a saved form, and print as the Assessments part', () => {
+    expect(S.BLOCKS['grade-table'].retired).toBe(true);
+    expect(S.BLOCKS['missing-work'].retired).toBe(true);
+    expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, {})).toBe('');
   });
 });
 
@@ -1031,6 +1069,6 @@ describe('measuring the class for One Report', () => {
     } finally {
       document.createElement = old;
     }
-    expect(seen).toEqual([{ cls: 'report-sheet report-sheet-measure', keys: ['paper', 'stage'] }]);
+    expect(seen).toEqual([{ cls: 'report-sheet report-sheet-measure one-flat', keys: ['paper', 'stage'] }]);
   });
 });

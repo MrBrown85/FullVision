@@ -7,7 +7,9 @@
 
    The Work tab: one student's work in one place on the teacher's student
    page (teacher/page-student.js draws the tab and calls tabHtml / mountTab
-   here), filtered by competency, each piece with its level.
+   here), filtered by competency, by where it stands (To Grade, To Return,
+   Returned) and by category, newest or oldest first, each piece with its
+   level. A filter redraws only the cards, which slide to their new places.
 
    Both are teacher views, so they read all work, drafts included (Colin,
    "Keep all grades", DECISIONS 2026-11-10 night 3); a draft is marked.
@@ -767,8 +769,22 @@ window.WorkWall = (function () {
   }
 
   /* ── The Work tab on the teacher's student page ──────────────── */
-  var _tab = null; // { cid, sid, comp, panel, pics, onChange, shown }
-  var _tabComp = { key: '', comp: '' }; // the chip picked, kept while the same student is shown
+  var _tab = null; // { cid, sid, panel, pics, lookup, onChange, gen }
+  // What the teacher picked, kept while the same student is shown: the
+  // competency, where the work stands, the category and the order.
+  var _tabPick = { key: '' };
+  // Where a piece stands, as the Assignments page's Show names it.
+  var TAB_STATES = [
+    { id: 'all', label: 'All' },
+    { id: 'tograde', label: 'To Grade' },
+    { id: 'toreturn', label: 'To Return' },
+    { id: 'returned', label: 'Returned' },
+  ];
+  var TAB_SORTS = [
+    { id: 'new', label: 'Newest First' },
+    { id: 'old', label: 'Oldest First' },
+  ];
+  var SLIDE_MS = 250; // the class dashboard's cards slide this long (dashboard.css .is-sliding)
 
   function tabOn(cid) {
     return !!cid && GraderWork.workShownInClass(cid);
@@ -801,6 +817,14 @@ window.WorkWall = (function () {
     return out;
   }
 
+  /* To Grade, To Return or Returned. Work that takes nothing new (Send Work
+     off) and has no grade yet is still to grade. */
+  function _tabState(cid, sid, a) {
+    var s = GraderWork.workStateOf(cid, a.id, sid);
+    if (s === 'tograde' || s === 'toreturn' || s === 'returned') return s;
+    return assessmentCellValue(cid, sid, a).kind === 'none' ? 'tograde' : 'returned';
+  }
+
   function tabSummary(cid, sid) {
     var list = _tabPieces(cid, sid);
     var waiting = list.filter(function (p) {
@@ -808,39 +832,197 @@ window.WorkWall = (function () {
     }).length;
     // Work to grade takes the figure's place as a blue badge.
     if (waiting) return { badge: waiting + ' to Grade', tone: 'todo' };
-    return { stat: list.length + (list.length === 1 ? ' Piece' : ' Pieces') };
+    return { stat: _piecesText(list.length) };
+  }
+
+  function _piecesText(n) {
+    return n + (n === 1 ? ' Piece' : ' Pieces');
   }
 
   function _tabModel(cid, sid) {
     var key = cid + '|' + sid;
-    if (_tabComp.key !== key) _tabComp = { key: key, comp: '' };
+    if (_tabPick.key !== key) _tabPick = { key: key, comp: '', state: 'all', cat: '', sort: 'new' };
+    var pick = _tabPick;
     var pieces = _tabPieces(cid, sid);
     var secIds = [];
+    var catIds = [];
     pieces.forEach(function (p) {
       p.secs = _pieceSections(cid, p.a);
       p.secs.forEach(function (id) {
         if (secIds.indexOf(id) < 0) secIds.push(id);
       });
+      p.state = _tabState(cid, sid, p.a);
+      p.cat = p.a.categoryId || p.a.category_id || '';
+      if (p.cat && catIds.indexOf(p.cat) < 0) catIds.push(p.cat);
     });
     var sections = (getSections(cid) || []).filter(function (s) {
       return secIds.indexOf(s.id) >= 0;
     });
     if (
-      _tabComp.comp &&
+      pick.comp &&
       !sections.some(function (s) {
-        return s.id === _tabComp.comp;
+        return s.id === pick.comp;
       })
     )
-      _tabComp.comp = '';
-    var shown = pieces.filter(function (p) {
-      return !_tabComp.comp || p.secs.indexOf(_tabComp.comp) >= 0;
+      pick.comp = '';
+    // A category list only when the work spans two or more.
+    var cats =
+      typeof getCategories === 'function'
+        ? (getCategories(cid) || []).filter(function (c) {
+            return c && catIds.indexOf(c.id) >= 0;
+          })
+        : [];
+    if (cats.length < 2) cats = [];
+    if (
+      pick.cat &&
+      !cats.some(function (c) {
+        return c.id === pick.cat;
+      })
+    )
+      pick.cat = '';
+    var inView = pieces.filter(function (p) {
+      return (!pick.comp || p.secs.indexOf(pick.comp) >= 0) && (!pick.cat || p.cat === pick.cat);
     });
-    return { pieces: pieces, sections: sections, shown: shown, comp: _tabComp.comp };
+    var counts = { all: inView.length, tograde: 0, toreturn: 0, returned: 0 };
+    inView.forEach(function (p) {
+      counts[p.state]++;
+    });
+    var shown = inView.filter(function (p) {
+      return pick.state === 'all' || p.state === pick.state;
+    });
+    if (pick.sort === 'old') shown.reverse();
+    return { pieces: pieces, sections: sections, cats: cats, counts: counts, shown: shown, pick: pick };
   }
 
   function _secName(sec) {
     var tag = (sec.tags || [])[0];
     return (tag && tag.label) || sec.name || '';
+  }
+
+  function _tabCountText(m) {
+    var all = _piecesText(m.pieces.length);
+    return m.shown.length === m.pieces.length ? all : m.shown.length + ' of ' + all;
+  }
+
+  // html-safe: ids are ours or through esc; labels through esc
+  function _tabControlsHtml(m) {
+    var pick = m.pick;
+    var chip = function (id, label) {
+      var on = pick.comp === id;
+      return (
+        '<button type="button" class="sw-chip' +
+        (on ? ' is-on' : '') +
+        '" data-sw="comp" data-comp="' +
+        esc(id) +
+        '" aria-pressed="' +
+        on +
+        '">' +
+        esc(label) +
+        '</button>'
+      );
+    };
+    var seg = function (what, list, now, labelId, counts) {
+      return (
+        '<div class="ww-seg sw-seg" role="group" aria-labelledby="' +
+        labelId +
+        '">' +
+        list
+          .map(function (s) {
+            var on = now === s.id;
+            return (
+              '<button type="button" class="ww-seg-btn' +
+              (on ? ' is-on' : '') +
+              '" data-sw="' +
+              what +
+              '" data-key="' +
+              s.id +
+              '" aria-pressed="' +
+              on +
+              '">' +
+              esc(s.label) +
+              (counts ? ' <span class="sw-n">' + esc(String(counts[s.id])) + '</span>' : '') +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      );
+    };
+    var anyPages = m.shown.some(function (p) {
+      return p.pages.length > 0;
+    });
+    return (
+      '<div class="sw-bar">' +
+      (m.sections.length > 1
+        ? chip('', 'All Competencies') +
+          m.sections
+            .map(function (s) {
+              return chip(s.id, _secName(s));
+            })
+            .join('')
+        : '') +
+      '<span class="ww-gap"></span>' +
+      '<button type="button" class="ww-grade" data-sw="full"' +
+      (anyPages ? '' : ' disabled') +
+      '><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>View Full Size</button>' +
+      '</div>' +
+      '<div class="sw-tools">' +
+      '<span class="ww-label" id="sw-state-label">Show</span>' +
+      seg('state', TAB_STATES, pick.state, 'sw-state-label', m.counts) +
+      (m.cats.length
+        ? '<label class="ww-label sw-cat-label" for="sw-cat">Category</label><select id="sw-cat" class="ww-by" data-sw="cat">' +
+          '<option value=""' +
+          (pick.cat ? '' : ' selected') +
+          '>All Categories</option>' +
+          m.cats
+            .map(function (c) {
+              return (
+                '<option value="' +
+                esc(c.id) +
+                '"' +
+                (pick.cat === c.id ? ' selected' : '') +
+                '>' +
+                esc(c.name || '') +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select>'
+        : '') +
+      '<span class="ww-gap"></span>' +
+      '<span class="ww-label" id="sw-sort-label">Sort</span>' +
+      seg('sort', TAB_SORTS, pick.sort, 'sw-sort-label', null) +
+      '</div>'
+    );
+  }
+
+  // html-safe: ids are ours, the title and words through esc
+  function _tabCardHtml(cid, sid, p) {
+    var first = p.pages[0];
+    var title = p.a.title || '';
+    return (
+      '<button type="button" class="sw-card' +
+      (first ? '' : ' is-empty') +
+      '" data-sw="open" data-aid="' +
+      esc(p.a.id) +
+      '" data-cid="' +
+      esc(cid) +
+      '" data-sid="' +
+      esc(sid) +
+      '"><span class="sw-pic">' +
+      (first
+        ? '<img class="ww-img" data-work-pic data-aid="' + esc(p.a.id) + '" alt="' + esc(title) + '" loading="lazy">'
+        : '<span class="ww-nopic">' +
+          esc(p.sub.on_paper ? 'Handed in on paper' : _links(p.sub).length ? 'A link' : 'No pages') +
+          '</span>') +
+      '</span><span class="sw-foot"><span class="sw-title">' +
+      esc(title) +
+      '</span><span class="sw-row"><span class="sw-date">' +
+      esc(_day(p.at)) +
+      '</span><span class="ww-gap"></span>' +
+      _chipHtml(_mark(cid, sid, p.a, null)) +
+      '</span></span></button>'
+    );
   }
 
   function tabHtml(cid, sid) {
@@ -855,72 +1037,171 @@ window.WorkWall = (function () {
         '</p></div>'
       );
     }
-    var chip = function (id, label) {
-      var on = m.comp === id;
-      return (
-        '<button type="button" class="sw-chip' +
-        (on ? ' is-on' : '') +
-        '" data-sw="comp" data-comp="' +
-        esc(id) +
-        '" aria-pressed="' +
-        on +
-        '">' +
-        esc(label) +
-        '</button>'
-      );
-    };
-    var anyPages = m.shown.some(function (p) {
-      return p.pages.length > 0;
-    });
-    var html =
-      '<div class="sw-tab"><div class="sw-bar">' +
-      (m.sections.length > 1
-        ? chip('', 'All Competencies') +
-          m.sections
-            .map(function (s) {
-              return chip(s.id, _secName(s));
-            })
-            .join('')
-        : '') +
-      '<span class="ww-gap"></span>' +
-      '<button type="button" class="ww-grade" data-sw="full"' +
-      (anyPages ? '' : ' disabled') +
-      '><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>View Full Size</button>' +
+    return (
+      '<div class="sw-tab"><div class="sw-controls">' +
+      _tabControlsHtml(m) +
       '</div>' +
-      '<h3 class="sw-head">All Work</h3><div class="sw-grid">' +
+      '<div class="sw-headrow"><h3 class="sw-head">All Work</h3><span class="sw-count" aria-live="polite">' +
+      esc(_tabCountText(m)) +
+      '</span></div><div class="sw-grid">' +
       m.shown
         .map(function (p) {
-          var first = p.pages[0];
-          var title = p.a.title || '';
-          return (
-            '<button type="button" class="sw-card' +
-            (first ? '' : ' is-empty') +
-            '" data-sw="open" data-aid="' +
-            esc(p.a.id) +
-            '" data-cid="' +
-            esc(cid) +
-            '" data-sid="' +
-            esc(sid) +
-            '"><span class="sw-pic">' +
-            (first
-              ? '<img class="ww-img" data-work-pic data-aid="' +
-                esc(p.a.id) +
-                '" alt="' +
-                esc(title) +
-                '" loading="lazy">'
-              : '<span class="ww-nopic">' + esc(p.sub.on_paper ? 'Handed in on paper' : 'No pages') + '</span>') +
-            '</span><span class="sw-foot"><span class="sw-title">' +
-            esc(title) +
-            '</span><span class="sw-row"><span class="sw-date">' +
-            esc(_day(p.at)) +
-            '</span><span class="ww-gap"></span>' +
-            _chipHtml(_mark(cid, sid, p.a, null)) +
-            '</span></span></button>'
-          );
+          return _tabCardHtml(cid, sid, p);
         })
         .join('') +
-      '</div></div>';
-    return html;
+      '</div><p class="ww-empty sw-none"' +
+      (m.shown.length ? ' hidden' : '') +
+      '>No work matches these filters.</p></div>'
+    );
+  }
+
+  function _tabMoves(el) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') return false;
+    if (typeof document !== 'undefined' && document.hidden) return false;
+    // Nothing laid out (a hidden panel, or no layout at all): nothing to slide.
+    if (!(el.getBoundingClientRect().width > 0)) return false;
+    var mq = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    return !(mq && mq.matches);
+  }
+
+  function _swKey(el) {
+    return el.getAttribute('data-comp') != null ? el.getAttribute('data-comp') : el.getAttribute('data-key') || '';
+  }
+
+  /* A filter or the order changed: the controls and the count are drawn
+     again, and the cards rearrange, not the page. */
+  function _tabRedraw(t) {
+    var root = t.panel.querySelector('.sw-tab');
+    var controls = root && root.querySelector('.sw-controls');
+    var grid = root && root.querySelector('.sw-grid');
+    if (!controls || !grid) {
+      if (t.onChange) t.onChange();
+      return;
+    }
+    var move = _tabMoves(grid);
+    // Where each card is now, before anything above it changes height.
+    var before = {};
+    Array.prototype.forEach.call(grid.querySelectorAll('.sw-card.is-leaving'), function (el) {
+      el.remove();
+    });
+    if (move) {
+      Array.prototype.forEach.call(grid.querySelectorAll('.sw-card[data-aid]'), function (el) {
+        before[el.getAttribute('data-aid')] = el.getBoundingClientRect();
+      });
+    }
+    var m = _tabModel(t.cid, t.sid);
+    var focus = document.activeElement;
+    var keep =
+      focus && controls.contains(focus) && focus.getAttribute('data-sw')
+        ? { sw: focus.getAttribute('data-sw'), key: _swKey(focus) }
+        : null;
+    // html-safe: _tabControlsHtml escapes every label and id
+    controls.innerHTML = _tabControlsHtml(m);
+    if (keep) {
+      _focus(
+        Array.prototype.find.call(controls.querySelectorAll('[data-sw="' + keep.sw + '"]'), function (el) {
+          return keep.sw === 'cat' || _swKey(el) === keep.key;
+        }),
+      );
+    }
+    var count = root.querySelector('.sw-count');
+    if (count) count.textContent = _tabCountText(m);
+    var none = root.querySelector('.sw-none');
+    if (none) {
+      if (m.shown.length) none.setAttribute('hidden', '');
+      else none.removeAttribute('hidden');
+    }
+    _tabRearrange(t, grid, m, move ? before : null);
+  }
+
+  /* FLIP, as the class dashboard's student cards (dash-student-cards.js
+     slideFrom): each card that stays starts where it was and slides to its
+     new place; a card that comes in fades and grows in; one that goes fades
+     out where it was. Cards that stay are moved, not drawn again, so their
+     pictures stay. With Reduce Motion on, everything happens at once. */
+  function _tabRearrange(t, grid, m, before) {
+    var old = {};
+    Array.prototype.forEach.call(grid.querySelectorAll('.sw-card[data-aid]'), function (el) {
+      old[el.getAttribute('data-aid')] = el;
+    });
+    var made = document.createElement('div');
+    var fresh = [];
+    var cards = m.shown.map(function (p) {
+      var el = old[p.a.id];
+      if (el) {
+        delete old[p.a.id];
+        return el;
+      }
+      // html-safe: _tabCardHtml escapes the title; ids are ours
+      made.innerHTML = _tabCardHtml(t.cid, t.sid, p);
+      el = made.firstElementChild;
+      fresh.push(el);
+      return el;
+    });
+    var leaving = Object.keys(old).map(function (k) {
+      return old[k];
+    });
+    leaving.forEach(function (el) {
+      if (!before || !before[el.getAttribute('data-aid')]) return el.remove();
+      var r = before[el.getAttribute('data-aid')];
+      // Out of the grid's flow, the size it was, until it has faded.
+      el.classList.add('is-leaving', 'is-placing');
+      el.removeAttribute('data-sw');
+      el.setAttribute('aria-hidden', 'true');
+      el.setAttribute('tabindex', '-1');
+      el.style.width = r.width + 'px';
+      el.style.height = r.height + 'px';
+    });
+    cards.forEach(function (el) {
+      grid.appendChild(el);
+    });
+    if (t.lookup) t.pics.fill(grid, t.cid, t.lookup);
+    if (!before) return;
+    t.gen = (t.gen || 0) + 1;
+    var gen = t.gen;
+    // Every new place is read before any card is moved.
+    var box = grid.getBoundingClientRect();
+    var now = cards.map(function (el) {
+      return el.getBoundingClientRect();
+    });
+    leaving.forEach(function (el) {
+      var r = before[el.getAttribute('data-aid')];
+      el.style.left = r.left - box.left + 'px';
+      el.style.top = r.top - box.top + 'px';
+      el.style.transform = '';
+    });
+    cards.forEach(function (el, n) {
+      var a = before[el.getAttribute('data-aid')];
+      el.classList.remove('is-sliding');
+      el.classList.add('is-placing');
+      if (fresh.indexOf(el) >= 0 || !a) {
+        el.style.transform = '';
+        el.classList.add('is-entering');
+        return;
+      }
+      var dx = a.left - now[n].left;
+      var dy = a.top - now[n].top;
+      el.style.transform = dx || dy ? 'translate(' + dx + 'px, ' + dy + 'px)' : '';
+    });
+    // One layout read, so the old places take before the change.
+    void grid.offsetHeight;
+    cards.concat(leaving).forEach(function (el) {
+      el.classList.remove('is-placing', 'is-entering');
+      el.classList.add('is-sliding');
+      if (!el.classList.contains('is-leaving')) el.style.transform = '';
+    });
+    leaving.forEach(function (el) {
+      el.classList.add('is-gone');
+    });
+    setTimeout(function () {
+      if (t.gen !== gen) return;
+      leaving.forEach(function (el) {
+        el.remove();
+      });
+      cards.forEach(function (el) {
+        el.classList.remove('is-sliding');
+      });
+    }, SLIDE_MS + 20);
   }
 
   function _tabClick(e) {
@@ -928,9 +1209,10 @@ window.WorkWall = (function () {
     var btn = e.target.closest && e.target.closest('[data-sw]');
     if (!t || !btn || btn.disabled) return;
     var what = btn.getAttribute('data-sw');
-    if (what === 'comp') {
-      _tabComp.comp = btn.getAttribute('data-comp') || '';
-      if (t.onChange) t.onChange();
+    if (what === 'comp' || what === 'state' || what === 'sort') {
+      if (what === 'comp') _tabPick.comp = btn.getAttribute('data-comp') || '';
+      else _tabPick[what] = btn.getAttribute('data-key') || (what === 'state' ? 'all' : 'new');
+      _tabRedraw(t);
       return;
     }
     var m = _tabModel(t.cid, t.sid);
@@ -962,18 +1244,38 @@ window.WorkWall = (function () {
     }
   }
 
+  function _tabChange(e) {
+    var t = _tab;
+    if (!t || !e.target || e.target.getAttribute('data-sw') !== 'cat') return;
+    _tabPick.cat = e.target.value || '';
+    _tabRedraw(t);
+  }
+
   function mountTab(panel, cid, sid, opts) {
     if (!panel) return unmountTab();
     var same = _tab && _tab.cid === cid && _tab.sid === sid;
     var pics = same ? _tab.pics : WorkThumbs.holder();
     if (!same) unmountTab();
-    _tab = { cid: cid, sid: sid, panel: panel, pics: pics, onChange: (opts && opts.onChange) || null };
+    else {
+      _tab.panel.removeEventListener('click', _tabClick);
+      _tab.panel.removeEventListener('change', _tabChange);
+    }
+    _tab = {
+      cid: cid,
+      sid: sid,
+      panel: panel,
+      pics: pics,
+      gen: 0,
+      onChange: (opts && opts.onChange) || null,
+      lookup: function (img) {
+        if (_tab !== t) return null;
+        return _pages(getStudentSubmission(cid, sid, img.getAttribute('data-aid')))[0] || null;
+      },
+    };
     var t = _tab;
     panel.addEventListener('click', _tabClick);
-    pics.fill(panel, cid, function (img) {
-      if (_tab !== t) return null;
-      return _pages(getStudentSubmission(cid, sid, img.getAttribute('data-aid')))[0] || null;
-    });
+    panel.addEventListener('change', _tabChange);
+    pics.fill(panel, cid, t.lookup);
     // Kept until the teacher leaves this student or the tab.
     _keys(true);
     if (window.WorkRubricCard) WorkRubricCard.wire();
@@ -991,21 +1293,42 @@ window.WorkWall = (function () {
      student page, to sit with a student and talk it through. A page opens
      full size. unmountTab(true) lets these pictures go too. */
   // html-safe: ids are ours; fixed words
-  function seeWorkHtml(cid, aid, sid) {
+  // icon: the Assignments page's row draws the button as that icon (fixed
+  // markup, LINE_ICONS), named See the Work; it then answers null, not '',
+  // when the piece shows work but none is in, so the row can offer its +
+  // without asking again. known: true or false when the caller has already
+  // looked for the student's work, so it is not looked up again.
+  function seeWorkHtml(cid, aid, sid, icon, known) {
     var a = _piece(cid, aid);
     if (!a || !GraderWork.workShown(cid, a)) return '';
-    var subs = typeof getGroupSubmissions === 'function' ? getGroupSubmissions(cid, sid, aid) : [];
-    if (!subs.length && !getStudentSubmission(cid, sid, aid)) return '';
+    var none = icon ? null : '';
+    if (known === false) return none;
+    if (known !== true) {
+      var subs = typeof getGroupSubmissions === 'function' ? getGroupSubmissions(cid, sid, aid) : [];
+      if (!subs.length && !getStudentSubmission(cid, sid, aid)) return none;
+    }
     _glanceWire();
     return (
-      '<button type="button" class="assess-add-work-btn rsg-see-work" data-stop-prop="true" data-action="gradeSubmissions" data-cid="' +
+      '<button type="button" class="' +
+      (icon ? 'rsg-work-btn' : 'assess-add-work-btn') +
+      ' rsg-see-work" data-stop-prop="true" data-action="gradeSubmissions" data-cid="' +
       esc(cid) +
       '" data-aid="' +
       esc(aid) +
       '" data-sid="' +
       esc(sid) +
-      '">See the Work</button>'
+      '"' +
+      (icon ? ' aria-label="See the Work" title="See the Work">' + icon : '>See the Work') +
+      '</button>'
     );
+  }
+
+  // The web links a teacher attached as the student's work (Demo Mode; the
+  // Assignments page's +), only http and https.
+  function _links(sub) {
+    return ((sub && sub.links) || []).filter(function (l) {
+      return l && /^https?:\/\//i.test(String(l.url || ''));
+    });
   }
 
   // html-safe: the title goes through esc; ids are ours; fixed words
@@ -1016,7 +1339,18 @@ window.WorkWall = (function () {
     if (!sub) return '';
     var pages = _pages(sub);
     var head = '<div class="stu-ov-work" data-aid="' + esc(aid) + '"><div class="stu-ov-label">Your Work</div>';
-    if (!pages.length) return head + '<div class="stu-ov-read">Handed in on paper.</div></div>';
+    var links = _links(sub)
+      .map(function (l) {
+        return (
+          '<a class="stu-ov-link" href="' +
+          esc(l.url) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          esc(l.title || l.url) +
+          '</a>'
+        );
+      })
+      .join('');
+    if (!pages.length) return head + (links || '<div class="stu-ov-read">Handed in on paper.</div>') + '</div>';
     return (
       head +
       pages
@@ -1336,6 +1670,7 @@ window.WorkWall = (function () {
     if (window.WorkRubricCard) WorkRubricCard.hide();
     _closeViewer(true);
     t.panel.removeEventListener('click', _tabClick);
+    t.panel.removeEventListener('change', _tabChange);
     t.pics.releaseAll();
     if (!_wall) _keys(false);
   }

@@ -687,6 +687,71 @@ function addStudentWorkPages(cid, sid, aid, pages, opts) {
   return _teacherWork(cid, sid, aid, pages, mode);
 }
 
+/* Attach a Link (the Assignments page's + on a student's row): a web
+   address the teacher adds as the student's work, kept on the submission
+   as links: [{ id, url, host, title, added_by: 'teacher', added_at }]. With
+   nothing in it is new work, sent by the teacher, with no pages; with work
+   in, the link joins it. Demo Mode only: the server's submission has no
+   place for a link yet (it keeps JPEG pages only), so a signed-in class
+   answers { result: 'not_available' } and calls nothing.
+   → Promise of { result: 'sent', submission } | { result: 'invalid', reason }
+   | 'on_paper' | 'not_found' | 'not_available'. */
+function studentWorkLinksOffered(cid) {
+  return !!cid && _isDemoSession() && !_workOnServer(cid);
+}
+function addStudentWorkLink(cid, sid, aid, address, title) {
+  if (!studentWorkLinksOffered(cid)) return Promise.resolve({ result: 'not_available' });
+  var check = typeof assessmentLinkCheck === 'function' ? assessmentLinkCheck(address) : null;
+  if (!check || !check.ok) return Promise.resolve({ result: 'invalid', reason: (check && check.reason) || 'not_web' });
+  var name = String(title || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+  return _teacherWorkQueued(cid, function () {
+    if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+    var draft = _studentWorkDraft(cid);
+    var now = _teacherWorkSent(draft, sid, aid);
+    if (now && now.on_paper) return { result: 'on_paper', submission: getStudentSubmission(cid, sid, aid) };
+    var stamp = new Date().toISOString();
+    var link = {
+      id: _teacherWorkId(),
+      url: check.url,
+      host: check.host,
+      title:
+        name ||
+        check.url
+          .replace(/^https?:\/\//i, '')
+          .replace(/^www\./i, '')
+          .replace(/\/$/, ''),
+      added_by: 'teacher',
+      added_at: stamp,
+    };
+    if (now) {
+      now.links = (Array.isArray(now.links) ? now.links : []).concat([link]);
+      now.updated_at = stamp;
+    } else {
+      draft.submissions.push({
+        id: _teacherWorkId(),
+        assessment_id: aid,
+        enrollment_id: sid,
+        version: 1,
+        state: 'sent',
+        sent_by: 'teacher',
+        on_paper: false,
+        is_late: false,
+        note: null,
+        followed_plan: null,
+        created_at: stamp,
+        sent_at: stamp,
+        files: [],
+        links: [link],
+      });
+    }
+    _studentWorkWrite(cid, draft);
+    return { result: 'sent', submission: getStudentSubmission(cid, sid, aid) };
+  });
+}
+
 /* Replace Them: the new pages take the place of every page that is in. */
 function replaceStudentWorkPages(cid, sid, aid, pages) {
   return _teacherWork(cid, sid, aid, pages, 'replace');

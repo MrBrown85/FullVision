@@ -77,8 +77,8 @@ describe('One Report block options', { timeout: 60000 }, () => {
     expect(html).toContain('Focus');
     expect(html).toContain('Effort');
     expect(html).not.toContain('Learning Dispositions');
-    expect(html).not.toContain('font-style:italic');
-    expect((html.match(/report-reflect-bubble/g) || []).length).toBe(8);
+    expect(html).not.toContain('report-habit-desc');
+    expect((html.match(/report-bubble/g) || []).length).toBe(8);
   });
 
   it('has no wording for other blocks', () => {
