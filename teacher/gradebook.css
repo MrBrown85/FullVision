@@ -1913,6 +1913,11 @@ th.gb-group-alt {
 .gb-grid-tag-header.gb-col-hover {
   background-color: var(--active-light) !important;
 }
+/* The column lights at once: its cells' background fade is for a row's hover. */
+.gb-scores-cell.gb-col-hover,
+.gb-score.gb-col-hover {
+  transition: none;
+}
 
 /* A row whose grade is IE or No Letter Grade (a reporting basis for the
    term in view): the name stays whole at every column width and the grade

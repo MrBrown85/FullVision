@@ -107,7 +107,7 @@ window.PageDashboard = (function () {
     clearTimeout(_dashSearchTimer);
     _dashSearchTimer = setTimeout(function () {
       searchQuery = val;
-      render();
+      renderStudents();
       requestAnimationFrame(function () {
         var inp = document.querySelector('.dash-search-input');
         if (inp) {
@@ -118,43 +118,7 @@ window.PageDashboard = (function () {
     }, 150);
   }
 
-  /* ── Sorting by a grid column ───────────────────────────── */
-  /* A competency (col:KEY:dir) by its proficiency, or Last Observed
-     (obs:dir) by days since. Ties and unscored students keep last-name
-     order; unscored students and the never-observed go last, except that
-     Longest Ago First puts the never-observed first. */
-  function _gridSorted(cid, students, mode) {
-    var sort = DashInsights.gridSortOf(mode || sortMode);
-    var byLast = sortStudents(students, 'lastName');
-    if (!sort) return byLast;
-    var sign = sort.dir === 'asc' ? 1 : -1;
-    var val = {};
-    if (sort.key === 'obs') {
-      var today = getTodayStr();
-      var term = getActiveTerm(cid);
-      byLast.forEach(function (st) {
-        var d = DashStudentCards.obsSummary(getStudentQuickObs(cid, st.id), today, term).daysSince;
-        val[st.id] = d == null ? Infinity : d;
-      });
-    } else {
-      var col = _gridColumn(cid, sort.key.slice(4));
-      if (!col) return byLast;
-      byLast.forEach(function (st) {
-        var v = col.which.groupId
-          ? getGroupProficiency(cid, st.id, col.which.groupId)
-          : getSectionProficiency(cid, st.id, col.which.sectionId);
-        val[st.id] = v > 0 ? v : null;
-      });
-    }
-    return byLast.sort(function (a, b) {
-      var va = val[a.id];
-      var vb = val[b.id];
-      if (va === vb) return 0;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      return (va - vb) * sign;
-    });
-  }
+  /* ── Sorting by a grid column (DashInsights.sortStudents) ── */
   function _gridColumn(cid, key) {
     return (
       DashInsights.columns(cid).filter(function (c) {
@@ -243,83 +207,10 @@ window.PageDashboard = (function () {
     var cid = activeCourse;
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
-    var students = getStudents(cid);
     var flags = getFlags(cid);
     var assessments = getAssessments(cid);
     var allScores = getScores(cid);
-
-    // Sort
-    switch (sortMode) {
-      case 'last-asc':
-        students = sortStudents(students, 'lastName');
-        break;
-      case 'last-desc':
-        students = sortStudents(students, 'lastName').reverse();
-        break;
-      case 'first-asc':
-        students = sortStudents(students, 'firstName');
-        break;
-      case 'first-desc':
-        students = sortStudents(students, 'firstName').reverse();
-        break;
-      case 'overall-desc':
-      case 'overall-asc':
-        // By the grade Overall shows (the course % in a Letter class);
-        // students with none go last either way.
-        var dir = sortMode === 'overall-asc' ? 1 : -1;
-        students = students.slice().sort(function (a, b) {
-          var pa = studentOverallSortValue(cid, a.id);
-          var pb = studentOverallSortValue(cid, b.id);
-          if (pa == null && pb == null) return 0;
-          if (pa == null) return 1;
-          if (pb == null) return -1;
-          return (pa - pb) * dir;
-        });
-        break;
-      case 'flagged':
-        students = students.slice().sort(function (a, b) {
-          var fa = flags[a.id] ? 0 : 1;
-          var fb = flags[b.id] ? 0 : 1;
-          if (fa !== fb) return fa - fb;
-          return (
-            (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '')
-          );
-        });
-        break;
-      default:
-        students = _gridSorted(cid, students);
-    }
-
-    // The competency filter (naComp, from Curricular Competencies): weakest
-    // first on it. The teacher's sort stays as it was
-    // for when the filter is cleared; choosing a sort (the sort menu or a
-    // grid heading) clears the filter, so the sort always wins and is
-    // never silently ignored.
-    var focusCol = naComp ? _gridColumn(cid, naComp) : null;
-    if (naComp && !focusCol) naComp = null;
-    var shownSort = focusCol ? 'col:' + focusCol.key + ':asc' : sortMode;
-    if (focusCol) students = _gridSorted(cid, students, shownSort);
-
-    // Search filter
-    if (searchQuery) {
-      var q = searchQuery.toLowerCase();
-      students = students.filter(function (s) {
-        return (
-          displayName(s).toLowerCase().includes(q) ||
-          (s.firstName || '').toLowerCase().includes(q) ||
-          (s.lastName || '').toLowerCase().includes(q) ||
-          (s.studentNumber || '').toLowerCase().includes(q)
-        );
-      });
-    }
-
-    if (showFlaggedOnly) {
-      students = students.filter(function (s) {
-        return flags[s.id];
-      });
-    }
-
-    var flagCount = Object.values(flags).filter(Boolean).length;
+    var list = _shownStudents(cid, flags);
     var allStudents = getStudents(cid);
 
     /* -- Compute class-level data -- */
@@ -348,17 +239,8 @@ window.PageDashboard = (function () {
       });
     });
 
-    // Observations tagged with each Core Competency (an observation's dims
-    // hold 'cc:<id>').
-    var ccObs = {};
-    allStudents.forEach(function (s) {
-      var obs = getStudentQuickObs(cid, s.id);
-      obs.forEach(function (o) {
-        (o.dims || []).forEach(function (d) {
-          if (typeof d === 'string' && d.indexOf('cc:') === 0) ccObs[d.slice(3)] = (ccObs[d.slice(3)] || 0) + 1;
-        });
-      });
-    });
+    var ccObs = _ccObs(cid, allStudents);
+    _ccObsSeen = JSON.stringify(ccObs);
 
     // Core Competency self-assessments this term (shared/core-self.js). The
     // students' own come with the questionnaire answers: ask for them once
@@ -381,12 +263,7 @@ window.PageDashboard = (function () {
       }),
     );
 
-    /* -- Toolbar (rendered to separate mount) -- */
-    // html-safe: DashOverview.renderDashToolbar escapes class names; the rest is a count.
-    document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
-      activeCourse: activeCourse,
-      students: students,
-    });
+    _toolbar(list.students);
 
     /* -- Overview Panel -- */
     // The photo reminder (S8-F1) first: only in the week before the class's
@@ -421,28 +298,11 @@ window.PageDashboard = (function () {
     // Questions From Students (S10-F4): only while a class has one waiting.
     html += Overview.questionsCardHtml(cid);
 
-    /* -- Students: cards or the grid -- */
-    if (focusCol && allStudents.length)
-      html += Overview.compFilterHtml(cid, focusCol, _belowIds(cid, allStudents, focusCol));
-    if (allStudents.length)
-      html += DashInsights.studentsHeaderHtml(
-        studentView,
-        Overview.studentControlsHtml({
-          sortMode: sortMode,
-          extraSort: _gridSortOption(cid),
-          searchQuery: searchQuery,
-          showFlaggedOnly: showFlaggedOnly,
-          flagCount: flagCount,
-        }),
-        allStudents.length,
-      );
-    if (studentView === 'grid' && students.length)
-      html += DashInsights.studentGridHtml(cid, students, allStudents, shownSort);
-    else
-      html += StudentCards.renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags, {
-        focusKey: focusCol ? focusCol.key : null,
-        rule: helpRule,
-      });
+    // The students, cards or the grid, in a box of their own (renderStudents).
+    html +=
+      '<div id="dash-students" style="display:contents">' +
+      _studentsHtml(cid, list, allStudents, flags, sections, assessments, allScores) +
+      '</div>';
 
     // Observations goes last, under the students (Colin, Nov 5).
     html += Overview.obsCardHtml({ cid: cid, allStudents: allStudents, obs: _lastObsState });
@@ -459,14 +319,14 @@ window.PageDashboard = (function () {
 
     _hidePop();
     openMenu = null;
-    var before = _slideCards ? _cardsBefore() : null;
+    var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
     document.getElementById('main').innerHTML = html;
-    if (before) _slideCardsFrom(before);
+    if (before) StudentCards.slideFrom(before);
     if (_compFade) _fadeCompRows();
     _compFade = false;
-    _afterObsRender(null, 0);
+    _afterObsRender(null);
     _placeMixPop();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
@@ -477,6 +337,141 @@ window.PageDashboard = (function () {
     // Restore sort dropdown
     var sortSelect = document.querySelector('.dash-sort-select');
     if (sortSelect) sortSelect.value = sortMode;
+  }
+
+  /* ── The students alone ─────────────────────────────────── */
+  /* The students the cards or the grid show, in order: the sort, then the
+     competency filter's order (naComp, weakest first), the search and
+     Flagged. Choosing a sort clears the filter, so the sort always wins. */
+  function _shownStudents(cid, flags) {
+    var focusCol = naComp ? _gridColumn(cid, naComp) : null;
+    if (naComp && !focusCol) naComp = null;
+    var shownSort = focusCol ? 'col:' + focusCol.key + ':asc' : sortMode;
+    var students = DashInsights.sortStudents(cid, getStudents(cid), sortMode, flags);
+    if (focusCol) students = DashInsights.sortStudents(cid, students, shownSort, flags);
+    if (searchQuery) students = DashInsights.searchStudents(students, searchQuery);
+    if (showFlaggedOnly)
+      students = students.filter(function (s) {
+        return flags[s.id];
+      });
+    return { students: students, focusCol: focusCol, shownSort: shownSort };
+  }
+
+  function _studentsHtml(cid, list, allStudents, flags, sections, assessments, allScores) {
+    var focusCol = list.focusCol;
+    var html = '';
+    if (focusCol && allStudents.length)
+      html += Overview.compFilterHtml(cid, focusCol, _belowIds(cid, allStudents, focusCol));
+    if (allStudents.length)
+      html += DashInsights.studentsHeaderHtml(
+        studentView,
+        Overview.studentControlsHtml({
+          sortMode: sortMode,
+          extraSort: _gridSortOption(cid),
+          searchQuery: searchQuery,
+          showFlaggedOnly: showFlaggedOnly,
+          flagCount: Object.values(flags).filter(Boolean).length,
+        }),
+        allStudents.length,
+      );
+    if (studentView === 'grid' && list.students.length)
+      return html + DashInsights.studentGridHtml(cid, list.students, allStudents, list.shownSort);
+    return (
+      html +
+      StudentCards.renderStudentCards(cid, list.students, allStudents, sections, assessments, allScores, flags, {
+        focusKey: focusCol ? focusCol.key : null,
+        rule: helpRule,
+      })
+    );
+  }
+
+  function _toolbar(students) {
+    // html-safe: DashOverview.renderDashToolbar escapes class names; the rest is a count.
+    document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
+      activeCourse: activeCourse,
+      students: students,
+    });
+  }
+
+  // Observations tagged with each Core Competency (dims hold 'cc:<id>').
+  var _ccObsSeen = '';
+  function _ccObs(cid, allStudents) {
+    var ccObs = {};
+    allStudents.forEach(function (s) {
+      getStudentQuickObs(cid, s.id).forEach(function (o) {
+        (o.dims || []).forEach(function (d) {
+          if (typeof d === 'string' && d.indexOf('cc:') === 0) ccObs[d.slice(3)] = (ccObs[d.slice(3)] || 0) + 1;
+        });
+      });
+    });
+    return ccObs;
+  }
+
+  /* A search, a sort, Flagged, a flag or Cards | Grid changes only the
+     students: they are drawn again alone, with the toolbar's count. The
+     rest of the page stays as it is. */
+  function renderStudents() {
+    var host = document.getElementById('dash-students');
+    if (!host || CM.classManagerOpen) return render();
+    var cid = activeCourse;
+    if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
+    var flags = getFlags(cid);
+    var list = _shownStudents(cid, flags);
+    _toolbar(list.students);
+    var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
+    _slideCards = false;
+    // html-safe: dash-overview, dash-insights and dash-student-cards escape every name, title and label.
+    host.innerHTML = _studentsHtml(
+      cid,
+      list,
+      getStudents(cid),
+      flags,
+      getSections(cid),
+      getAssessments(cid),
+      getScores(cid),
+    );
+    if (before) StudentCards.slideFrom(before);
+    if (_litKey && !naComp) _setLit(_litKey);
+    else _litKey = null;
+    var sortSelect = host.querySelector('.dash-sort-select');
+    if (sortSelect) sortSelect.value = sortMode;
+  }
+
+  /* After observations were added for these students: the Observations
+     card and their own cards (the "Last observed" line). All the students
+     after a flag, or when the grid or a Last Observed sort shows it; the
+     whole page when one was tagged with a Core Competency. */
+  function _afterObsAdded(sids, flagged) {
+    var cid = activeCourse;
+    var allStudents = getStudents(cid);
+    if (JSON.stringify(_ccObs(cid, allStudents)) !== _ccObsSeen) return render();
+    renderObsCard(null);
+    var sort = DashInsights.gridSortOf(sortMode);
+    if (flagged || studentView === 'grid' || (sort && sort.key === 'obs')) return renderStudents();
+    var flags = getFlags(cid);
+    var shown = _shownStudents(cid, flags).students;
+    sids.forEach(function (sid) {
+      var el = document.querySelector('#dash-students .dash-card[data-sid="' + _cssKey(sid) + '"]');
+      var st = shown.filter(function (s) {
+        return s.id === sid;
+      })[0];
+      if (!el || !st) return;
+      var box = document.createElement('div');
+      // html-safe: DashStudentCards escapes every name, title and label; colours are fixed score variables.
+      box.innerHTML = StudentCards.renderStudentCards(
+        cid,
+        [st],
+        allStudents,
+        getSections(cid),
+        getAssessments(cid),
+        getScores(cid),
+        flags,
+        { focusKey: naComp, rule: helpRule },
+      );
+      var card = box.querySelector('.dash-card[data-sid]');
+      if (card) el.parentNode.replaceChild(card, el);
+    });
+    if (_litKey && !naComp) _setLit(_litKey);
   }
 
   /* ── Observations card ──────────────────────────────────── */
@@ -521,21 +516,27 @@ window.PageDashboard = (function () {
     // html-safe: DashObservations.renderCard escapes names, labels and notes; types and flags are fixed keys.
     card.innerHTML = DashObservations.renderCard(activeCourse, getStudents(activeCourse), st);
     obsHighlight = st.highlight;
-    _afterObsRender(focusKey, (depth || 0) + 1);
+    _afterObsRender(focusKey, depth == null ? null : depth + 1);
   }
 
   /* After the card is drawn: measure it, redraw if the number of student
      columns or the sideways scroll should change, then set the roving tab
      stop. A redraw can add or remove the pane's scrollbar and so change the
-     width again: a second corrective pass is allowed, never more. */
+     width again: a second corrective pass is allowed, never more. Drawn to
+     the stored width in a window as wide, it is measured in the next frame
+     as the page is laid out to paint (a measure in the click lays it out). */
   var OBS_MAX_PASSES = 2;
+  var _obsWinWidth = 0;
   function _afterObsRender(focusKey, depth) {
     var card = _obsCard();
     if (!card) return;
     var m = DashObservations.lastModel();
-    var w = _measureObsWidth(card);
+    var later = depth == null && _obsWidth > 0 && window.innerWidth === _obsWinWidth;
+    if (later) requestAnimationFrame(_refitObs);
+    var w = later ? 0 : _measureObsWidth(card);
     if (m && w > 0) {
       _obsWidth = w;
+      _obsWinWidth = window.innerWidth;
       var layout =
         m.tab === 'competency' && m.sections.length > 7
           ? { cols: 1, compact: false }
@@ -553,7 +554,7 @@ window.PageDashboard = (function () {
         (depth || 0) < OBS_MAX_PASSES &&
         (cols !== m.cols || scrollX !== m.scrollX || !!layout.compact !== !!m.compact)
       ) {
-        renderObsCard(focusKey, depth);
+        renderObsCard(focusKey, depth || 0);
         return;
       }
     }
@@ -881,13 +882,12 @@ window.PageDashboard = (function () {
   function _onResize() {
     _placeMixPop();
     clearTimeout(_resizeTimer);
-    _resizeTimer = setTimeout(function () {
-      var card = _obsCard();
-      if (!card) return;
-      var active = document.activeElement;
-      var key = active && card.contains(active) ? active.getAttribute('data-focus-key') : null;
-      _afterObsRender(key, 0);
-    }, 150);
+    _resizeTimer = setTimeout(_refitObs, 150);
+  }
+  function _refitObs() {
+    var card = _obsCard();
+    var active = document.activeElement;
+    if (card) _afterObsRender(active && card.contains(active) ? active.getAttribute('data-focus-key') : null, 0);
   }
 
   /* "+" on a row: the capture strip in a dialog, the student fixed. */
@@ -898,12 +898,12 @@ window.PageDashboard = (function () {
     });
     if (!st || typeof ObsCapture === 'undefined') return;
     _hidePop();
-    var refresh = function () {
-      // After the dialog has closed: redraw the card and the student cards
-      // (their "Last observed" line), then put focus back on this row's "+".
+    // After the dialog has closed: redraw what changed (_afterObsAdded),
+    // then put focus back on this row's "+".
+    var refresh = function (flagged) {
       setTimeout(function () {
         if (!_obsCard()) return;
-        render();
+        _afterObsAdded([sid], typeof flagged === 'string');
         if (!document.querySelector('.obsc-dialog-overlay')) _focusKey('nav:' + sid + ':0');
       }, 0);
     };
@@ -959,10 +959,10 @@ window.PageDashboard = (function () {
       var btn = document.querySelector('.dash-comp-record');
       if (btn) btn.focus();
     };
-    var refresh = function () {
+    var refresh = function (flagged) {
       setTimeout(function () {
         if (!document.querySelector('.dash-comp-card')) return;
-        render();
+        _afterObsAdded(ids, typeof flagged === 'string');
         if (!document.querySelector('.obsc-dialog-overlay')) refocus();
       }, 0);
     };
@@ -993,81 +993,6 @@ window.PageDashboard = (function () {
     } catch (e) {
       return false;
     }
-  }
-
-  function _cardEls() {
-    return Array.prototype.slice.call(document.querySelectorAll('#main .dash-grid > .dash-card[data-sid]'));
-  }
-
-  /* Before a re-render that may move the student cards: where each card is,
-     which competency the chips were focused on, and which cards had the
-     amber border. */
-  function _cardsBefore() {
-    if (_reducedMotion()) return null;
-    var cards = _cardEls();
-    if (!cards.length || typeof cards[0].getBoundingClientRect !== 'function') return null;
-    var seg = document.querySelector('#main .dash-card-strip.has-focus .dash-card-seg.is-focus');
-    var out = { rects: {}, below: {}, focus: seg ? seg.getAttribute('data-key') : null };
-    cards.forEach(function (el) {
-      var sid = el.getAttribute('data-sid');
-      out.rects[sid] = el.getBoundingClientRect();
-      if (el.classList.contains('is-focus-below')) out.below[sid] = true;
-    });
-    return out;
-  }
-
-  /* FLIP: each card that was on screen starts where it was, in the look it
-     had (chips, border), then slides to its new place as the chips and the
-     border change (dashboard.css .is-sliding). New cards just appear. */
-  function _slideCardsFrom(before) {
-    var placed = [];
-    _cardEls().forEach(function (el) {
-      var sid = el.getAttribute('data-sid');
-      var a = before.rects[sid];
-      if (!a) return;
-      var b = el.getBoundingClientRect();
-      var strip = el.querySelector('.dash-card-strip');
-      var segs = strip ? Array.prototype.slice.call(strip.querySelectorAll('.dash-card-seg')) : [];
-      var now = {
-        el: el,
-        below: el.classList.contains('is-focus-below'),
-        strip: strip,
-        stripFocus: strip ? strip.classList.contains('has-focus') : false,
-        segs: segs.map(function (g) {
-          return g.classList.contains('is-focus');
-        }),
-        dx: a.left - b.left,
-        dy: a.top - b.top,
-      };
-      el.classList.add('is-placing');
-      el.classList.toggle('is-focus-below', !!before.below[sid]);
-      if (strip) strip.classList.toggle('has-focus', !!before.focus);
-      segs.forEach(function (g) {
-        g.classList.toggle('is-focus', !!before.focus && g.getAttribute('data-key') === before.focus);
-      });
-      if (now.dx || now.dy) el.style.transform = 'translate(' + now.dx + 'px, ' + now.dy + 'px)';
-      now.segEls = segs;
-      placed.push(now);
-    });
-    if (!placed.length) return;
-    // One layout read, so the old places and looks take before the change.
-    void document.body.offsetHeight;
-    placed.forEach(function (p) {
-      var el = p.el;
-      el.classList.remove('is-placing');
-      el.classList.add('is-sliding');
-      el.classList.toggle('is-focus-below', p.below);
-      if (p.strip) p.strip.classList.toggle('has-focus', p.stripFocus);
-      p.segEls.forEach(function (g, i) {
-        g.classList.toggle('is-focus', p.segs[i]);
-      });
-      el.style.transform = '';
-    });
-    setTimeout(function () {
-      placed.forEach(function (p) {
-        p.el.classList.remove('is-sliding');
-      });
-    }, 300);
   }
 
   // A new view on the Curricular Competencies card: its rows fade in.
@@ -1153,11 +1078,11 @@ window.PageDashboard = (function () {
       },
       toggleFlag: function () {
         toggleFlag(el.dataset.cid, el.dataset.sid);
-        render();
+        renderStudents();
       },
       toggleFlaggedFilter: function () {
         showFlaggedOnly = !showFlaggedOnly;
-        render();
+        renderStudents();
       },
       obsTab: function () {
         _setObsTab(el.dataset.tab);
@@ -1227,6 +1152,7 @@ window.PageDashboard = (function () {
       gridSort: function () {
         var key = el.dataset.key;
         // A sort clears the competency filter, so it is never ignored.
+        var hadComp = naComp;
         naComp = null;
         var cur = DashInsights.gridSortOf(sortMode);
         var dir = cur && cur.key === key ? (cur.dir === 'asc' ? 'desc' : 'asc') : key === 'name' ? 'asc' : 'desc';
@@ -1239,14 +1165,15 @@ window.PageDashboard = (function () {
               : key === 'obs'
                 ? 'obs:' + dir
                 : key + ':' + dir;
-        render();
+        if (hadComp) render();
+        else renderStudents();
         var again = document.querySelector('.dash-sg-sort[data-key="' + CSS.escape(key) + '"]');
         if (again) again.focus();
       },
       studentView: function () {
         studentView = el.dataset.view === 'grid' ? 'grid' : 'cards';
         saveDashboardPrefs({ studentView: studentView });
-        render();
+        renderStudents();
       },
       // The sort menu is handled on change (_handleChange). Handling it on
       // click too re-rendered the toolbar as the menu opened, which closed it
@@ -1276,11 +1203,14 @@ window.PageDashboard = (function () {
       return;
     }
     if (el.dataset.action === 'dashSort') {
-      // A sort clears the competency filter, so it is never ignored.
+      // A sort clears the competency filter, so it is never ignored; with
+      // one on, the Curricular Competencies card changes too.
+      var hadComp = naComp;
       naComp = null;
       sortMode = el.value;
       _slideCards = true;
-      render();
+      if (hadComp) render();
+      else renderStudents();
       return;
     }
     // Delegate cm/cw change handlers

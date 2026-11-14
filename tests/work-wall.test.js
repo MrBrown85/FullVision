@@ -658,6 +658,101 @@ describe("the Work tab on the teacher's student page", () => {
   });
 });
 
+describe('the rubric card: how a piece was scored, by its card', () => {
+  function openStudent(sid) {
+    runInThisContext(readFileSync('teacher/page-student.js', 'utf-8'), { filename: 'teacher/page-student.js' });
+    PageStudent.init({ id: sid, course: CID, tab: 'work' });
+    return doc.getElementById('main');
+  }
+  const fire = (el, type) => el.dispatchEvent(new doc.defaultView.Event(type, { bubbles: true }));
+  // Keyboard focus: linkedom knows no :focus-visible.
+  function keyFocus(card) {
+    const own = card.matches.bind(card);
+    card.matches = sel => sel === ':focus-visible' || own(sel);
+    fire(card, 'focusin');
+  }
+  const card = aid => $$('.sw-card').find(c => c.getAttribute('data-aid') === aid);
+  const piece = aid => getAssessments(CID).find(a => a.id === aid);
+
+  it('a rubric: the levels in their columns, the student’s filled in, comments and feedback', () => {
+    seed();
+    saveTagComment(CID, IDS[0], PIECE, P, 'Name the variable you will change.');
+    saveScoreComment(CID, IDS[0], PIECE, 'A clear question.\nNow plan it.');
+    openStudent(IDS[0]);
+    keyFocus(card(PIECE));
+    expect($('.wr-card').getAttribute('aria-hidden')).toBe('true');
+    expect(text($('.wr-title'))).toBe('Conscription');
+    // The overall is the card's own chip, through calc.js.
+    expect(text($('.wr-overall .ww-chip'))).toBe(assessmentCellValue(CID, IDS[0], piece(PIECE)).text);
+    // Columns in the class's level order, named as the scale names them.
+    expect($$('.wr-lv-head').map(text)).toEqual(levelOrderFor(CID).map(lv => PROF_LABELS[lv]));
+    expect($$('.wr-crit').map(text)).toEqual(['Question', 'Plan']);
+    // IDS[0]: Extending on Question, Proficient on Plan; one cell filled a row.
+    const rows = $$('.wr-row');
+    expect(rows[0].querySelectorAll('.wr-cell.is-on')).toHaveLength(1);
+    expect(rows[0].querySelector('.wr-cell.is-on').classList.contains('wr-lv-4')).toBe(true);
+    expect(text(rows[0].querySelector('.wr-mark'))).toBe('✓ Extending');
+    expect(rows[1].querySelector('.wr-cell.is-on').classList.contains('wr-lv-3')).toBe(true);
+    // Every level's wording is there, not just the one given.
+    expect([...rows[0].querySelectorAll('.wr-desc')].every(d => d.textContent.trim() !== '')).toBe(true);
+    expect(rows[0].querySelectorAll('.wr-desc')).toHaveLength(4);
+    expect($$('.wr-note-row').map(text)).toEqual(['Comment Name the variable you will change.']);
+    expect($('.wr-feedback-text').innerHTML).toBe('A clear question.<br>Now plan it.');
+    // A click (the card opens the work) or focus leaving takes the rubric away.
+    fire(card(PIECE), 'click');
+    expect($('.wr-card')).toBeNull();
+    keyFocus(card(PIECE));
+    fire(card(PIECE), 'focusout');
+    expect($('.wr-card')).toBeNull();
+  });
+
+  it('work still to grade says so, with no rubric', () => {
+    seed();
+    openStudent(IDS[0]);
+    keyFocus(card(OTHER));
+    expect(text($('.wr-empty'))).toBe('Not graded yet.');
+    expect($('.wr-table')).toBeNull();
+  });
+
+  it('a draft is marked as one (a teacher’s view)', () => {
+    seed();
+    saveReturnSettings(CID, { return_grades: 'on_return' });
+    Grader.setLevel(CID, TO_GRADE[0], PIECE, Q, 2, 0);
+    clearProfCache();
+    openStudent(TO_GRADE[0]);
+    keyFocus(card(PIECE));
+    expect($('.wr-overall .ww-chip').classList.contains('is-draft')).toBe(true);
+    expect(text($('.wr-draft'))).toBe('Draft, not returned');
+  });
+
+  it('points work: the score and its percent, and the feedback', () => {
+    seed();
+    const a = piece(PIECE);
+    a.scoreMode = 'points';
+    a.maxPoints = 20;
+    setPointsScore(CID, IDS[0], PIECE, 18);
+    saveScoreComment(CID, IDS[0], PIECE, 'Well argued.');
+    clearProfCache();
+    openStudent(IDS[0]);
+    keyFocus(card(PIECE));
+    expect(text($('.wr-overall .wr-label'))).toBe('Score');
+    expect(text($('.wr-score'))).toBe('18 / 20 90%');
+    expect($('.wr-table')).toBeNull();
+    expect(text($('.wr-feedback-text'))).toBe('Well argued.');
+  });
+
+  it('Escape and leaving the student take it away', () => {
+    seed();
+    openStudent(IDS[0]);
+    keyFocus(card(PIECE));
+    doc.dispatchEvent(Object.assign(new doc.defaultView.Event('keydown', { bubbles: true }), { key: 'Escape' }));
+    expect($('.wr-card')).toBeNull();
+    keyFocus(card(PIECE));
+    PageStudent.destroy();
+    expect($('.wr-card')).toBeNull();
+  });
+});
+
 describe('no server', () => {
   it('names no server function', () => {
     const src = readFileSync(new URL('../shared/work-wall.js', import.meta.url), 'utf-8');

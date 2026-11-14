@@ -247,9 +247,9 @@ window.MGradePhotos = (function () {
             return (
               '<div class="m-work-page"><img alt="' +
               MC.esc('Page ' + (i + 1) + ' of ' + first + '’s work') +
-              '" data-fv-page="' +
-              i +
-              '" data-fv-which="page"></div>'
+              '"' +
+              _picAttrs(f, i, true) +
+              '></div>'
             );
           })
           .join('') +
@@ -448,7 +448,7 @@ window.MGradePhotos = (function () {
       files
         .slice(0, 3)
         .map(function (f, i) {
-          return '<span class="m-work-pin-thumb"><img alt="" data-fv-page="' + i + '" data-fv-which="thumb"></span>';
+          return '<span class="m-work-pin-thumb"><img alt=""' + _picAttrs(f, i) + '></span>';
         })
         .join('') +
       '<span class="m-work-pin-name">' +
@@ -459,54 +459,57 @@ window.MGradePhotos = (function () {
     );
   }
 
-  /* The pages' pictures, once their addresses are known. Each answer is
-     drawn only if the same student's work for the same piece is still the
-     one on that element (the screen may have changed meanwhile). */
-  function hydrate(root, cid) {
-    if (!root || !on(cid) || typeof openStudentWorkPage !== 'function') return;
-    root.querySelectorAll('.m-work, .m-work-pin').forEach(function (box) {
-      var sid = box.getAttribute('data-sid');
-      var aid = box.getAttribute('data-aid');
-      var sub = work(cid, sid, aid);
-      if (!sub) return;
-      box.querySelectorAll('img[data-fv-page]').forEach(function (img) {
-        if (img.getAttribute('src')) return;
-        var file = (sub.files || [])[Number(img.getAttribute('data-fv-page'))];
-        var which = img.getAttribute('data-fv-which');
-        var asked = sub.id;
-        var askedFile = file && file.id;
-        openStudentWorkPage(cid, file, which).then(function (page) {
-          if (!page) return;
-          var now = work(cid, sid, aid);
-          var nowFile = now && (now.files || [])[Number(img.getAttribute('data-fv-page'))];
-          if (
-            !img.isConnected ||
-            !now ||
-            now.id !== asked ||
-            !nowFile ||
-            nowFile.id !== askedFile ||
-            box.getAttribute('data-sid') !== sid
-          ) {
-            page.release();
-            return;
-          }
-          img.setAttribute('src', page.url);
-          _held.push({ img: img, page: page });
-        });
-      });
-    });
-    _letGo();
+  /* The pages' pictures (shared/work-thumbs.js). The strip on a card shows
+     the whole page, as sharp as the page itself; the pinned strip shows the
+     thumbnail, and the strip shows that same thumbnail while its page is on
+     its way, so the page takes its place with no new request and no jump
+     (the strip's box is a fixed height). The full-screen view (openFull)
+     shows the strip's own pages again. An answer is drawn only if the same
+     student's work for the same piece still has that file on that element
+     (the screen may have changed meanwhile). An address already held is
+     shown again with no new request, so a card drawn again keeps its
+     pictures. */
+  var _pics = window.WorkThumbs ? WorkThumbs.holder() : null;
+
+  // html-safe: a page number and fixed attributes
+  // page: the whole page (the strip), the thumbnail first if there is one; else the thumbnail (the pinned strip).
+  function _picAttrs(f, i, page) {
+    var thumb = !!(f && f.thumb_path);
+    return (
+      ' data-work-pic data-fv-page="' +
+      i +
+      '"' +
+      (page || !thumb ? ' data-work-which="page"' : '') +
+      (page && thumb ? ' data-work-first="thumb"' : '')
+    );
   }
 
-  /* A photo still on the device is shown from an address that holds its
-     bytes: let it go once its picture has left the page. */
-  var _held = [];
+  function _fileOf(cid, img) {
+    var box = img.closest('.m-work, .m-work-pin');
+    var sub = box && work(cid, box.getAttribute('data-sid'), box.getAttribute('data-aid'));
+    return (sub && (sub.files || [])[Number(img.getAttribute('data-fv-page'))]) || null;
+  }
+
+  /* Pictures in `root`. On the grading screen's cards, only the card on
+     screen and the one each side, so a swipe lands on a sharp card: the
+     rest when the cards stop on them (wire). */
+  function hydrate(root, cid) {
+    if (!root || !_pics || !on(cid)) return;
+    var lookup = function (img) {
+      return _fileOf(cid, img);
+    };
+    if (root.classList && root.classList.contains('m-swiper')) {
+      var w = root.clientWidth;
+      var idx = w ? Math.round(root.scrollLeft / w) : 0;
+      var cards = root.children;
+      for (var i = Math.max(0, idx - 1); i <= idx + 1 && i < cards.length; i++) _pics.fill(cards[i], cid, lookup);
+    } else _pics.fill(root, cid, lookup);
+    _pics.sweep();
+  }
+
+  // Let go of every address no picture on the page shows.
   function _letGo() {
-    _held = _held.filter(function (h) {
-      if (h.img.isConnected) return true;
-      h.page.release();
-      return false;
-    });
+    if (_pics) _pics.sweep();
   }
 
   /* While a card scrolls, the work's strip stays pinned at its top once the
@@ -514,10 +517,19 @@ window.MGradePhotos = (function () {
   function wire(swiper, cid) {
     if (!swiper || !on(cid)) return;
     hydrate(swiper, cid);
+    var settle = null;
     swiper.addEventListener(
       'scroll',
       function (e) {
         var t = e.target;
+        // The cards stopped moving: fill the one on screen and its neighbours.
+        if (t === swiper) {
+          clearTimeout(settle);
+          settle = setTimeout(function () {
+            hydrate(swiper, cid);
+          }, 100);
+          return;
+        }
         if (t && t.classList && t.classList.contains('m-work-scroller')) return _syncDots(t);
         if (!t || !t.classList || !t.classList.contains('m-swiper-card')) return;
         var pages = t.querySelector('.m-work-pages');
@@ -590,9 +602,9 @@ window.MGradePhotos = (function () {
             return (
               '<img class="m-work-sheet-page" alt="' +
               MC.esc('Page ' + (i + 1) + ' of ' + first + '’s work') +
-              '" data-fv-page="' +
+              '" data-work-pic data-work-which="page" data-fv-page="' +
               i +
-              '" data-fv-which="page">' +
+              '">' +
               mark
             );
           })
