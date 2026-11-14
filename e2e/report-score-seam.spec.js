@@ -3,7 +3,7 @@
  * page build plan, S2-T1), checked on the page itself.
  *
  * The Reports page redraws from timers (a resize, the class fit) and
- * from promises (a sent phone report, a printed copy).
+ * from promises (a printed copy).
  * A grade read there outside ReportScores.withReportScores would count
  * drafts once reports are on returned grades (S2-F1), and nothing in a unit
  * test runs those timers. Two watches are set on the page. Every function
@@ -34,7 +34,7 @@ async function watch(page) {
   );
   await page.evaluate(() => {
     const REPORT_FILE =
-      /\/(page-reports|report-[a-z-]+|comment-[a-z-]+|grade-report|grades-print|rubric-print|phone-reports|export-all)\.js:\d+/g;
+      /\/(page-reports|report-[a-z-]+|comment-[a-z-]+|grade-report|grades-print|rubric-print|export-all)\.js:\d+/g;
     window.__seam = { outside: [], inside: 0, later: [], runs: 0 };
     const note = text => {
       if (window.__seam.outside.indexOf(text) < 0) window.__seam.outside.push(text);
@@ -200,13 +200,6 @@ test('every grade the Reports page draws, from a click, a timer or a promise, is
   await page.locator('#issue-overlay [data-issue="go"]').click();
   await expect(page.locator('#issue-overlay')).toHaveCount(0);
   await page.waitForTimeout(600);
-
-  // Sent to Phones: every copy is built after a promise.
-  await page.getByRole('button', { name: 'Sent to Phones' }).click();
-  await expect(page.locator('.pp-title')).toBeVisible();
-  await forget(page);
-  await page.getByRole('button', { name: 'Send to Phones and Print Slips' }).click();
-  await expect(page.locator('.pp-row')).toHaveCount(STUDENTS);
 
   const seam = await seen(page);
   expect(seam.outside).toEqual([]);
