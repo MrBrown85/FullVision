@@ -597,6 +597,97 @@ window.DashInsights = (function () {
     if (sortMode === 'overall-asc' || sortMode === 'overall-desc') return { key: 'overall', dir: sortMode.slice(8) };
     return null;
   }
+  /* The students in the dashboard's sort (sortMode). Names A→Z or Z→A;
+     Overall by the grade it shows (the course % in a Letter class), those
+     with none last either way; Flagged First; else a grid column. Moved
+     from page-dashboard.js. */
+  function orderStudents(cid, students, mode, flags) {
+    switch (mode) {
+      case 'last-asc':
+        return sortStudents(students, 'lastName');
+      case 'last-desc':
+        return sortStudents(students, 'lastName').reverse();
+      case 'first-asc':
+        return sortStudents(students, 'firstName');
+      case 'first-desc':
+        return sortStudents(students, 'firstName').reverse();
+      case 'overall-desc':
+      case 'overall-asc':
+        var dir = mode === 'overall-asc' ? 1 : -1;
+        return students.slice().sort(function (a, b) {
+          var pa = studentOverallSortValue(cid, a.id);
+          var pb = studentOverallSortValue(cid, b.id);
+          if (pa == null && pb == null) return 0;
+          if (pa == null) return 1;
+          if (pb == null) return -1;
+          return (pa - pb) * dir;
+        });
+      case 'flagged':
+        return students.slice().sort(function (a, b) {
+          var fa = flags[a.id] ? 0 : 1;
+          var fb = flags[b.id] ? 0 : 1;
+          if (fa !== fb) return fa - fb;
+          return (
+            (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '')
+          );
+        });
+      default:
+        return _gridSorted(cid, students, mode);
+    }
+  }
+  /* A competency (col:KEY:dir) by its proficiency, or Last Observed
+     (obs:dir) by days since. Ties and unscored students keep last-name
+     order; unscored students and the never-observed go last, except that
+     Longest Ago First puts the never-observed first. */
+  function _gridSorted(cid, students, mode) {
+    var sort = gridSortOf(mode);
+    var byLast = sortStudents(students, 'lastName');
+    if (!sort) return byLast;
+    var sign = sort.dir === 'asc' ? 1 : -1;
+    var val = {};
+    if (sort.key === 'obs') {
+      var today = getTodayStr();
+      var term = getActiveTerm(cid);
+      byLast.forEach(function (st) {
+        var d = DashStudentCards.obsSummary(getStudentQuickObs(cid, st.id), today, term).daysSince;
+        val[st.id] = d == null ? Infinity : d;
+      });
+    } else {
+      var key = sort.key.slice(4);
+      var col = columns(cid).filter(function (c) {
+        return c.key === key;
+      })[0];
+      if (!col) return byLast;
+      byLast.forEach(function (st) {
+        var v = col.which.groupId
+          ? getGroupProficiency(cid, st.id, col.which.groupId)
+          : getSectionProficiency(cid, st.id, col.which.sectionId);
+        val[st.id] = v > 0 ? v : null;
+      });
+    }
+    return byLast.sort(function (a, b) {
+      var va = val[a.id];
+      var vb = val[b.id];
+      if (va === vb) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return (va - vb) * sign;
+    });
+  }
+
+  // The students whose name or student number holds the search, any case.
+  function searchStudents(students, query) {
+    var q = query.toLowerCase();
+    return students.filter(function (s) {
+      return (
+        displayName(s).toLowerCase().includes(q) ||
+        (s.firstName || '').toLowerCase().includes(q) ||
+        (s.lastName || '').toLowerCase().includes(q) ||
+        (s.studentNumber || '').toLowerCase().includes(q)
+      );
+    });
+  }
+
   function _sortHead(key, label, current) {
     var on = current && current.key === key;
     return (
@@ -757,5 +848,7 @@ window.DashInsights = (function () {
     studentsHeaderHtml: studentsHeaderHtml,
     studentGridHtml: studentGridHtml,
     gridSortOf: gridSortOf,
+    sortStudents: orderStudents,
+    searchStudents: searchStudents,
   };
 })();
