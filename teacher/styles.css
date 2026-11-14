@@ -180,6 +180,16 @@
   --sidebar-w: 240px;
 }
 
+/* The printable QR slips (qr-slips.css, linked for print only) are drawn into
+   this box, kept off screen until they are printed. */
+#qr-slips-root {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  width: 8in;
+  pointer-events: none;
+}
+
 /* Printed sheets keep their print sizes. The progress report preview is
    the printout, so it keeps them on screen too. */
 @media print {
