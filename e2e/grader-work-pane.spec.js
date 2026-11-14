@@ -79,7 +79,8 @@ test('the work beside the scoring, Focus on Work, and To Grade', async ({ page }
   await expect(dialog).toHaveClass(/has-work/);
   await expect(dialog.locator('.grader-show [data-show="tograde"]')).toHaveText(/To Grade\s*2/);
   await expect(dialog.locator('.grader-work-what')).toHaveText(/^(Submitted|Added by you|Handed in on paper)/);
-  const img = dialog.locator('.grader-work-img');
+  // Every page at once: the first is enough to look at here.
+  const img = dialog.locator('.grader-work-img').first();
   await expect(img).toBeVisible();
   await expect.poll(() => img.evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);
   await shot(page, 'S6-F1-grader-with-work-1366');
@@ -120,7 +121,7 @@ test('Add Work for a student with nothing in, then Delete Work', async ({ page }
   await expect(pane).toContainText('Grade From Paper');
   await shot(page, 'S6-F2-nothing-in-1366');
   await pane.locator('.grader-work-files').setInputFiles(PHOTO);
-  await expect(dialog.locator('.grader-work-at')).toHaveText('1 of 1', { timeout: 15000 });
+  await expect(dialog.locator('.grader-work-at')).toHaveText('Page 1 of 1', { timeout: 15000 });
   await expect(dialog.locator('.grader-work-what')).toHaveText(/^Added by you .* · 1 photo$/);
   const img = dialog.locator('.grader-work-img');
   await expect.poll(() => img.evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);

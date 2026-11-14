@@ -147,33 +147,51 @@ describe('Send Work off: the pane follows the work', () => {
 });
 
 describe('the pages beside the scoring', () => {
-  it('the line, the pager, the note and the picture', async () => {
+  it('the line, every page at once, the note and the pictures', async () => {
     const overlay = openGrader(seed, CID, PIECE, ANA);
     expect($(overlay, '.grader-dialog').classList.contains('has-work')).toBe(true);
     expect(text($(overlay, '.grader-work-what'))).toMatch(/^Submitted Oct 30, \d{1,2}:\d\d (am|pm) · 2 photos$/);
     // The scoring sits in its own column, beside the pane.
     expect($(overlay, '.grader-panel-col .grader-body')).not.toBeNull();
-    expect(text($(overlay, '.grader-work-at'))).toBe('1 of 2');
-    expect($(overlay, '[data-grader="work-page"][data-dir="-1"]').disabled).toBe(true);
+    // Both pages at once, side by side (All Pages), each named on its corner: no pager.
+    expect(Array.from(overlay.querySelectorAll('.grader-work-at')).map(text)).toEqual(['Page 1 of 2', 'Page 2 of 2']);
+    expect($(overlay, '[data-grader="work-page"]')).toBeNull();
+    expect($(overlay, '.grader-work-pages').className).toBe('grader-work-pages fit-all cols-2 rows-1');
+    // How the pages show sits in the student's row, not over the pages.
+    expect($(overlay, '.grader-student-row .grader-work-view [data-grader="work-fit"][data-fit="all"]')).not.toBeNull();
     expect(text($(overlay, '.grader-work-note-title'))).toBe('Ana’s Note, Sent With the Work');
     expect(text($(overlay, '.grader-work-note p'))).toBe('I spent the most time on the letter.');
-    expect($(overlay, '.grader-work-img').getAttribute('alt')).toBe('Page 1 of Conscription');
+    const imgs = () => Array.from(overlay.querySelectorAll('.grader-work-img'));
+    expect(imgs().map(i => i.getAttribute('alt'))).toEqual(['Page 1 of Conscription', 'Page 2 of Conscription']);
     await settle();
-    expect($(overlay, '.grader-work-img').getAttribute('src')).toBe('/assets/sample-work/lab-p1.jpg');
-    $(overlay, '[data-grader="work-page"][data-dir="1"]').click();
-    expect(text($(overlay, '.grader-work-at'))).toBe('2 of 2');
-    await settle();
-    expect($(overlay, '.grader-work-img').getAttribute('src')).toBe('/assets/sample-work/lab-p2.jpg');
+    expect(imgs().map(i => i.getAttribute('src'))).toEqual([
+      '/assets/sample-work/lab-p1.jpg',
+      '/assets/sample-work/lab-p2.jpg',
+    ]);
   });
 
-  it('Whole Page, Fit Width and Rotate change the view only', () => {
+  it('Side by Side, Full Width, a click on a page and Rotate change the view only', () => {
     const overlay = openGrader(seed, CID, PIECE, ANA);
     const before = JSON.stringify(getCourseSubmissions(CID));
-    expect($(overlay, '.grader-work-page').classList.contains('fit-page')).toBe(true);
+    const pages = () => Array.from(overlay.querySelectorAll('.grader-work-page'));
+    expect(Array.from(overlay.querySelectorAll('[data-grader="work-fit"]')).map(text)).toEqual([
+      'Side by Side',
+      'Full Width',
+    ]);
+    expect(pages().every(p => p.classList.contains('fit-all'))).toBe(true);
     $(overlay, '[data-grader="work-fit"][data-fit="width"]').click();
-    expect($(overlay, '.grader-work-page').classList.contains('fit-width')).toBe(true);
-    $(overlay, '[data-grader="work-rotate"]').click();
-    expect($(overlay, '.grader-work-page').classList.contains('turn-90')).toBe(true);
+    expect(pages().every(p => p.classList.contains('fit-width'))).toBe(true);
+    // The choice is kept for the next dialog on this device.
+    expect(localStorage.getItem('fv-grader-work-fit')).toBe('width');
+    $(overlay, '[data-grader="work-fit"][data-fit="all"]').click();
+    expect(localStorage.getItem('fv-grader-work-fit')).toBe('all');
+    // Side by Side: a click on a page shows every page full width.
+    pages()[1].click();
+    expect(pages().every(p => p.classList.contains('fit-width'))).toBe(true);
+    expect(localStorage.getItem('fv-grader-work-fit')).toBe('all');
+    // Rotate turns its own page only.
+    $(overlay, '[data-grader="work-rotate"][data-at="1"]').click();
+    expect(pages().map(p => p.classList.contains('turn-90'))).toEqual([false, true]);
     expect(JSON.stringify(getCourseSubmissions(CID))).toBe(before);
   });
 
@@ -196,7 +214,8 @@ describe('the pages beside the scoring', () => {
     openGrader(seed, CID, PIECE, ANA);
     await settle();
     window.PageAssignments.closeGrader();
-    expect(release).toHaveBeenCalledTimes(1);
+    // Both pages' pictures.
+    expect(release).toHaveBeenCalledTimes(2);
   });
 
   it('Same photo as names the other student, and opens them', () => {

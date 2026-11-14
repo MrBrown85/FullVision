@@ -6,8 +6,8 @@ import { catchPrints, fakeTeacherCards, heldAnywhere, holds, serveTeacherCards, 
 // the browser, against a stand-in server.
 //
 // - With the class's student page off, nothing new is asked of the server
-//   and no screen shows any of it.
-// - At the build address the switch turns it on: the server is asked
+//   and Class Settings › Student Page shows the switch alone, off.
+// - The switch on Class Settings › Student Page turns it on: the server is asked
 //   first, for the switch alone, and the class is on only once it has
 //   answered; then the class and its rows are read.
 // - Starting to hold grades needs a connection: offline, the control says
@@ -256,7 +256,7 @@ async function openGrader(page, sid) {
 const level = (dialog, n) =>
   dialog.locator('[data-action="graderTagLevel"][data-tag="' + TAG + '"][data-level="' + n + '"]');
 
-test('with the student page off, a signed-in class asks the server nothing new and shows none of it', async ({
+test('with the student page off, a signed-in class asks the server nothing new and shows the switch alone', async ({
   page,
 }) => {
   const errors = [];
@@ -264,8 +264,10 @@ test('with the student page off, a signed-in class asks the server nothing new a
   // As every class made since Batch A is on the server: When I Return Them, the page off.
   await serverWithStudentPage(page, { course: { student_page_enabled: false, return_grades: 'on_return' } });
   await page.goto('/dashboard?manage=student-page');
-  await expect(page.locator('.cm-tabs [role="tab"]')).toHaveCount(6);
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveCount(0);
+  await expect(page.locator('.cm-tabs [role="tab"]')).toHaveCount(7);
+  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('switch', { name: 'Student Page' })).not.toBeChecked();
+  await expect(page.getByRole('radiogroup', { name: 'Return Grades' })).toHaveCount(0);
   expect(await page.evaluate(cid => getReturnSettings(cid), CID)).toEqual({
     student_page: false,
     return_grades: 'on_return',
@@ -295,7 +297,7 @@ test('with the student page off, a signed-in class asks the server nothing new a
   expect(errors).toEqual([]);
 });
 
-test('switch on at the build address, a draft, Return, and a card for each student', async ({ page }) => {
+test('switch on in Class Settings, a draft, Return, and a card for each student', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   const cards = await serverWithStudentPage(page, {
@@ -303,7 +305,7 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   });
 
   // The switch: the server is asked for it alone, then the class and its rows are read.
-  await page.goto('/dashboard?manage=student-page&build=student-page');
+  await page.goto('/dashboard?manage=student-page');
   const theSwitch = page.getByRole('switch', { name: 'Student Page' });
   await expect(theSwitch).not.toBeChecked();
   await page.locator('.sp-build .gpd-switch').click();
@@ -317,10 +319,10 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   const group = page.getByRole('radiogroup', { name: 'Return Grades' });
   await expect(group.getByRole('radio', { name: 'When I Return Them' })).toBeChecked();
 
-  // A reload at the plain address: the settings come back from the server with the class.
+  // A reload: the settings come back from the server with the class.
   await page.goto('/dashboard?manage=student-page');
   await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#sp-build-switch')).toHaveCount(0);
+  await expect(page.getByRole('switch', { name: 'Student Page' })).toBeChecked();
   await expect
     .poll(() => page.evaluate(cid => _gradeReturnsLoadedFor[cid] === true, CID), { timeout: 10000 })
     .toBe(true);
@@ -437,7 +439,7 @@ test('starting to hold grades needs a connection; stopping asks the server how m
   page.on('pageerror', e => errors.push(String(e)));
   // The class's student page is on, set to As Soon As I Save.
   await serverWithStudentPage(page, { course: { student_page_enabled: true, return_grades: 'on_save' } });
-  await page.goto('/dashboard?manage=student-page&build=student-page');
+  await page.goto('/dashboard?manage=student-page');
   const group = page.getByRole('radiogroup', { name: 'Return Grades' });
   const onReturn = group.getByRole('radio', { name: 'When I Return Them' });
   const onSave = group.getByRole('radio', { name: 'As Soon As I Save' });

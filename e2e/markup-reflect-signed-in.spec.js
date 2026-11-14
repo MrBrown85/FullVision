@@ -324,7 +324,7 @@ test('Mark Up on a student’s photo is saved to the server, and Return is retur
   await dialog.locator('[data-action="graderTagLevel"][data-tag="' + TAG + '"][data-level="3"]').click();
   await expect(dialog.locator('.grader-draft-mark')).toHaveText('Draft');
 
-  await dialog.locator('[data-grader="work-markup"]').click();
+  await dialog.locator('[data-grader="work-markup"]').first().click();
   const mk = page.locator('.markup-overlay');
   await expect(mk).toBeVisible();
   await expect(mk.locator('.markup-img')).toHaveJSProperty('complete', true);

@@ -315,7 +315,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
   const text = selector => (at(selector) ? at(selector).textContent : null);
   const today = () => formatShortDate('2026-11-09T18:00:00.000Z');
 
-  it('a save shows the Draft mark, "Saved. Not returned yet." and Return, in a row above the footer that does not scroll', async () => {
+  it('a save shows the Draft mark, "Saved. Not returned yet.", Return and Return & Next, in the footer by the grade', async () => {
     open(ESSAY, BEN);
     await settled();
     // Nothing to return yet.
@@ -328,10 +328,12 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     expect(text('[data-grader="return"]')).toBe('Return');
     expect(at('[data-grader="return"]').disabled).toBe(false);
     expect(at('.grader-draft-still')).toBe(null);
-    expect(row().nextElementSibling.className).toBe('grader-foot');
-    expect(row().previousElementSibling.className).toBe('grader-scroll');
+    // Where the grade is finished (the review council, Nov 13): in the footer, after the grade, which does not scroll.
+    expect(row().parentNode.className).toBe('grader-foot');
+    expect(row().previousElementSibling.className).toBe('grader-grade tone-l3');
+    expect(text('[data-grader="return-next"]')).toBe('Return & Next ›');
     expect(at('.grader-scroll .grader-return')).toBe(null);
-    expect(row().parentNode.className).toContain('has-return');
+    expect(at('.grader-dialog').className).toContain('has-return');
   });
 
   it('Return makes it Returned, with the date; a change after that says what the student still sees', async () => {
@@ -357,6 +359,29 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     await settled();
     expect(at('.grader-draft')).toBe(null);
     expect(text('.grader-returned')).toBe('Returned ' + today());
+  });
+
+  it('Return & Next returns the grade and opens the next student; Ctrl+Enter does the same', async () => {
+    // Ava (returned before), then Ben, the last in the class.
+    open(ESSAY, AVA);
+    click(tagLevel(QUESTION, 4));
+    await settled();
+    expect(text('[data-grader="return-next"]')).toBe('Return & Next ›');
+    click(at('[data-grader="return-next"]'));
+    await settled();
+    expect(GradeState.stateOf(CID, AVA, ESSAY)).toBe('returned');
+    expect(text('.grader-student')).toBe('Ben Brown');
+    click(tagLevel(QUESTION, 3));
+    await settled();
+    expect(GradeState.stateOf(CID, BEN, ESSAY)).not.toBe('returned');
+    const key = new document.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+    key.key = 'Enter';
+    key.ctrlKey = true;
+    at('.grader-dialog').dispatchEvent(key);
+    await settled();
+    expect(GradeState.stateOf(CID, BEN, ESSAY)).toBe('returned');
+    // Nothing waits now: no Return & Next.
+    expect(at('[data-grader="return-next"]')).toBe(null);
   });
 
   it('a grade from before the switch came on is Returned with no date, and a change to it waits', async () => {

@@ -34,7 +34,8 @@
     "shared/data-demo.js",
     "shared/data-feedback-live.js",
     "shared/overwrite-count.js",
-    "teacher/work-rubric-card.js"
+    "teacher/work-rubric-card.js",
+    "teacher/expand-motion.js"
   ],
   "notYetChecked": [
     "s/app.js",

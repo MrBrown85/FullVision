@@ -721,12 +721,12 @@ describe('restoreClassFromBackup', () => {
       var restored = FVBackupRestore.restoreClassFromBackup(backup, { name: 'Science 8 Copy' });
       await restored.sent;
       var cid = restored.cid;
-      // On this device: no switch, no tab, the choice kept.
+      // On this device: the switch off, the choice kept.
       expect('student_page_enabled' in getCourseConfig(cid)).toBe(false);
       expect(JSON.parse(localStorage.getItem('gb-courseconfig-' + cid)).student_page_enabled).toBeUndefined();
       expect(getReturnSettings(cid)).toEqual({ student_page: false, return_grades: 'on_return' });
-      expect(CmStudentPage.isShown(cid)).toBe(false);
-      expect(CmStudentPage.render(cid)).toBe('');
+      expect(CmStudentPage.isShown(cid)).toBe(true);
+      expect(CmStudentPage.render(cid)).not.toContain('sp-card');
       // In what the server is sent: off, and the same choice.
       var row = sent[0][1].p_payload.courses[0];
       expect(row.student_page_enabled).toBe(false);
@@ -747,7 +747,7 @@ describe('restoreClassFromBackup', () => {
       await restored.sent;
       expect(getReturnSettings(restored.cid)).toEqual({ student_page: false, return_grades: 'on_return' });
       expect('student_page_enabled' in getCourseConfig(restored.cid)).toBe(false);
-      expect(CmStudentPage.isShown(restored.cid)).toBe(false);
+      expect(CmStudentPage.render(restored.cid)).not.toContain('sp-card');
     });
 
     it('a backup with no choice made restores with none', () => {

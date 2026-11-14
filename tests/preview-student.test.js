@@ -177,7 +177,7 @@ describe('the door in Class Settings › Student Page', () => {
     seed({});
     openSettings();
     expect(doc.querySelector('.sp-preview')).toBeNull();
-    expect(DashClassManager.handleAction('spPreview', { dataset: {}, closest: () => null })).not.toBe(true);
+    DashClassManager.handleAction('spPreview', { dataset: {}, closest: () => null });
     expect(overlay()).toBeNull();
   });
 

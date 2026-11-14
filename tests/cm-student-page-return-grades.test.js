@@ -3,9 +3,10 @@
  * docs/plans/student-page-build-plan.md; board "Teacher: Class Settings,
  * Student Page").
  *
- * - The tab is there only for a class whose student page is on (the build
- *   switch). A signed-in teacher's switch is the server's (S0-W1): the two
- *   settings on the device alone show no tab and send nothing. Once the
+ * - Every class has the tab; Return Grades is on it only while the class's
+ *   student page is on (the switch). A signed-in teacher's switch is the
+ *   server's (S0-W1): the two settings on the device alone show the switch
+ *   off and send nothing. Once the
  *   server has said the page is on, a choice is asked of the server (the
  *   count of grades waiting, or the change itself) before it shows.
  * - Each choice is saved through saveCourseConfig and read back.
@@ -14,7 +15,8 @@
  * - Leaving When I Return Them with grades waiting asks first; Return and
  *   Change returns every one and saves, Cancel changes nothing. With none
  *   waiting there is no question.
- * - With the switch off, Class Settings draws exactly what main draws.
+ * - With the switch off, Class Settings draws the switch alone on the tab,
+ *   saves nothing and sends nothing.
  */
 import './setup.js';
 import { readFileSync } from 'node:fs';
@@ -138,42 +140,42 @@ describe('Class Settings › Student Page: Return Grades', () => {
       expect(html()).toContain('<div class="cm-section sp-card" data-cid="' + CID + '">');
     });
 
-    it('a class with it off does not: no button, no panel, no way in', () => {
-      expect(CmStudentPage.isShown(OTHER)).toBe(false);
+    it('a class with it off has it too, with the switch alone: no Return Grades', () => {
+      expect(CmStudentPage.isShown(OTHER)).toBe(true);
       expect(CmStudentPage.isShown(undefined)).toBe(false);
       expect(CmStudentPage.isShown('no-such-class')).toBe(false);
-      expect(CmStudentPage.render(OTHER)).toBe('');
       open('student-page', OTHER);
-      expect(tabIds()).toEqual(SIX);
-      expect(activeTab()).toBe('details');
-      expect(html()).not.toContain('data-tab="student-page"');
+      expect(tabIds()).toEqual(SEVEN);
+      expect(activeTab()).toBe('student-page');
+      expect(html()).toContain('id="sp-build-switch"');
       expect(html()).not.toContain('sp-card');
-      // A choice made earlier does not bring the tab back with the switch off.
+      expect(html()).not.toContain('Return Grades');
+      // A choice made earlier does not bring Return Grades with the switch off.
       seed(OTHER, { return_grades: 'on_return' });
-      expect(CmStudentPage.isShown(OTHER)).toBe(false);
+      expect(CmStudentPage.render(OTHER)).not.toContain('sp-card');
       // Nor does anything but true.
       seed(OTHER, { student_page_enabled: 'yes', return_grades: 'on_return' });
-      expect(CmStudentPage.isShown(OTHER)).toBe(false);
+      expect(CmStudentPage.render(OTHER)).not.toContain('sp-card');
     });
 
     it('follows the class picked in the list, and the switch as it is turned on and off', () => {
       open();
       DashClassManager.handleAction('cmSelectClass', { tagName: 'BUTTON', dataset: { cid: OTHER } });
-      expect(tabIds()).toEqual(SIX);
-      expect(activeTab()).toBe('details');
+      expect(tabIds()).toEqual(SEVEN);
+      expect(html()).not.toContain('sp-card');
 
       expect(setStudentPageSwitch(OTHER, true)).toBe(true);
       DashClassManager.renderClassManager();
-      expect(tabIds()).toEqual(SEVEN);
+      expect(html()).toContain('sp-card');
       setStudentPageSwitch(OTHER, false);
       DashClassManager.renderClassManager();
-      expect(tabIds()).toEqual(SIX);
+      expect(html()).not.toContain('sp-card');
     });
 
-    it('a click meant for a class without the tab saves nothing', () => {
+    it('a click meant for a class with its student page off saves nothing', () => {
       open('details', OTHER);
       var before = stored('courseconfig', OTHER);
-      expect(choose('on_return', OTHER)).toBe(false);
+      choose('on_return', OTHER);
       // Even handed straight to the module.
       CmStudentPage.handleAction('spReturnGrades', {
         dataset: { value: 'on_return' },
@@ -530,16 +532,14 @@ describe('Class Settings › Student Page: Return Grades', () => {
     // server's word (shared/data.js _serverSaysStudentPage). These three are
     // the tests main had, but for the console switch, which now asks the
     // server for a signed-in teacher (tests/grade-return-server.test.js).
-    it('never has the tab, whatever the class holds on this device', () => {
+    it('shows the switch off, whatever the class holds on this device', () => {
       expect(getReturnSettings(REAL).student_page).toBe(false);
-      expect(CmStudentPage.isShown(REAL)).toBe(false);
-      expect(CmStudentPage.render(REAL)).toBe('');
       open('student-page', REAL);
-      expect(tabIds()).toEqual(SIX);
-      expect(activeTab()).toBe('details');
+      expect(tabIds()).toEqual(SEVEN);
+      expect(html()).toMatch(/id="sp-build-switch" data-action-change="spBuildSwitch">/);
+      expect(html()).not.toContain('sp-card');
       SIX.forEach(tab => {
         DashClassManager.handleAction('cmSetTab', { tagName: 'BUTTON', dataset: { tab: tab } });
-        expect(html(), tab).not.toContain('data-tab="student-page"');
         expect(html(), tab).not.toContain('Return Grades');
         expect(html(), tab).not.toContain('sp-card');
         expect(html(), tab).not.toContain('sc-card');
@@ -550,17 +550,12 @@ describe('Class Settings › Student Page: Return Grades', () => {
     it('never sends the setting: a click that reaches the module saves and sends nothing', async () => {
       open('details', REAL);
       var before = stored('courseconfig', REAL);
-      expect(choose('on_save', REAL)).toBe(false);
+      choose('on_save', REAL);
       CmStudentPage.handleAction('spReturnGrades', {
         dataset: { value: 'on_save' },
         closest: () => ({ dataset: { cid: REAL } }),
       });
       CmStudentPage.handleAction('spCardsMake', { closest: () => ({ dataset: { cid: REAL } }) });
-      CmStudentPage.handleChange({
-        checked: true,
-        dataset: { actionChange: 'spBuildSwitch' },
-        closest: () => ({ dataset: { cid: REAL } }),
-      });
       await settle();
       expect(confirms).toEqual([]);
       expect(stored('courseconfig', REAL)).toBe(before);
@@ -585,12 +580,12 @@ describe('Class Settings › Student Page: Return Grades', () => {
         serverSaysStudentPageOn(REAL, false);
       });
 
-      it('never has the tab, whatever Return Grades the class holds', () => {
+      it('shows the switch alone, whatever Return Grades the class holds', () => {
         expect(getReturnSettings(REAL).student_page).toBe(false);
-        expect(CmStudentPage.isShown(REAL)).toBe(false);
         open('student-page', REAL);
-        expect(tabIds()).toEqual(SIX);
-        expect(activeTab()).toBe('details');
+        expect(tabIds()).toEqual(SEVEN);
+        expect(activeTab()).toBe('student-page');
+        expect(html()).not.toContain('sp-card');
       });
 
       it('and a class setting saved goes without the two keys, as it always has', async () => {
@@ -632,8 +627,8 @@ describe('Class Settings › Student Page: Return Grades', () => {
         expect(activeTab()).toBe('student-page');
         expect(checked()).toEqual(['on_return']);
         expect(html()).toContain('sc-card');
-        // The switch itself is not offered: that needs the build address.
-        expect(html()).not.toContain('sp-build');
+        // The switch is there too, on, above the rest.
+        expect(html()).toMatch(/id="sp-build-switch" data-action-change="spBuildSwitch" checked>/);
       });
 
       it('As Soon As I Save with nothing waiting: the server is asked how many wait, then that one setting is sent', async () => {
@@ -815,7 +810,7 @@ describe('Class Settings › Student Page: Return Grades', () => {
    class); nothing else of Class Settings is changed by S1-F4. Each class
    below is drawn on every tab, and from the tab's own address, once with
    main's module and once with this one. */
-describe('Class Settings with the switch off is what main draws', () => {
+describe('Class Settings with the switch off: the switch alone, nothing saved or sent', () => {
   const ON_MAIN = readFileSync(new URL('./fixtures/cm-student-page-on-main.js.txt', import.meta.url), 'utf-8');
   const mainModule = () => new Function(ON_MAIN + '\nreturn CmStudentPage;')();
   var mounts;
@@ -906,9 +901,12 @@ describe('Class Settings with the switch off is what main draws', () => {
     globalThis.CmStudentPage = original.module;
     var here = drawn(CID);
     expect(here.length).toBe(8);
-    expect(here).toEqual(onMain);
-    expect(here.join('')).not.toContain('student-page');
+    // Main's six tabs are drawn as they were; the Student Page tab is added.
+    expect(onMain[0]).not.toContain('student-page');
+    expect(here[0]).toContain('student-page');
+    expect(here[0]).toContain('sp-build-switch');
     expect(here.join('')).not.toContain('sp-return');
+    expect(here.join('')).not.toContain('sp-card');
     // And looking saved nothing.
     expect(localStorage.getItem('gb-courseconfig-' + CID)).toBe(before);
   });
@@ -923,8 +921,9 @@ describe('Class Settings with the switch off is what main draws', () => {
       var onMain = drawn(U(1));
       globalThis.CmStudentPage = original.module;
       var here = drawn(U(1));
-      expect(here).toEqual(onMain);
-      expect(here.join('')).not.toContain('student-page');
+      expect(onMain[0]).not.toContain('student-page');
+      expect(here[0]).toContain('sp-build-switch');
+      expect(here.join('')).not.toContain('sp-card');
       await settle();
       // Class Settings reads; it writes nothing.
       expect(session.sent().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([]);
@@ -947,17 +946,15 @@ describe('Class Settings with the switch off is what main draws', () => {
       globalThis.CmStudentPage = mainModule();
       var onMain = drawn(U(1));
       await settle();
-      var asked = session.since().map(c => c[0]);
       globalThis.CmStudentPage = original.module;
       var here = drawn(U(1));
-      expect(here).toEqual(onMain);
-      expect(here.join('')).not.toContain('student-page');
+      expect(onMain[0]).not.toContain('student-page');
+      expect(here[0]).toContain('sp-build-switch');
+      expect(here.join('')).not.toContain('sp-card');
       await settle();
       // Class Settings reads; it writes nothing.
       expect(session.sent().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([]);
-      // And it reads nothing main's module did not read.
-      var askedHere = session.since().map(c => c[0]);
-      expect(askedHere.filter(name => asked.indexOf(name) < 0)).toEqual([]);
+      // And it reads nothing of the student page's.
       expect(session.sent().filter(c => /grade_return|student_card|draft_count/.test(c[0]))).toEqual([]);
     } finally {
       session.signOut();

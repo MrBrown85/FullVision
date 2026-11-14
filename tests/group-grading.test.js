@@ -118,7 +118,7 @@ describe('the grader on a group', () => {
     expect(overlay.querySelector('.grader-work-what').textContent).toBe(
       'Sent by Priya A. for the group, Nov 3 · 2 photos',
     );
-    expect(overlay.querySelector('.grader-work-at').textContent).toBe('1 of 2');
+    expect(overlay.querySelector('.grader-work-at').textContent).toBe('Page 1 of 2');
     expect(overlay.querySelector('.grader-work-note-title').textContent).toBe('Priya’s Note, Sent for the Group');
     expect(overlay.querySelector('.grader-work-delete')).toBeNull();
     const strip = overlay.querySelector('.grader-work-strip');

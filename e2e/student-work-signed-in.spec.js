@@ -296,8 +296,9 @@ test('Send Work on, a student’s photos in the grader, Add Work, a grade and Re
   // Alice's photos, from storage through a 300-second link.
   let dialog = await openGrader(page, ALICE);
   await expect(dialog).toHaveClass(/has-work/);
-  await expect(dialog.locator('.grader-work-at')).toHaveText('1 of 2');
-  const img = dialog.locator('.grader-work-img');
+  // Both pages at once, each named on its corner.
+  await expect(dialog.locator('.grader-work-at')).toHaveText(['Page 1 of 2', 'Page 2 of 2']);
+  const img = dialog.locator('.grader-work-img').first();
   await expect.poll(() => img.evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);
   expect(await img.getAttribute('src')).toMatch(/^blob:/);
   const sign = (await calls(page, 'storage.sign'))[0];
