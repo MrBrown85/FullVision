@@ -240,7 +240,7 @@ test('a first visit installs everything; a repeat visit asks the network for the
   // First visit: the page's files and the install both came from the network.
   const first = server.takeLog();
   expect(URLS.filter(u => !first.includes(u))).toEqual([]);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
 
   // Repeat visits: the Dashboard, the Gradebook, then Reports on demand.
   await page.goto(server.origin + '/dashboard');
@@ -248,7 +248,7 @@ test('a first visit installs everything; a repeat visit asks the network for the
   let log = server.takeLog();
   expect(filesAsked(log)).toEqual([]);
   expect(notSw(log)).toEqual(['/dashboard']);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
 
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
@@ -256,7 +256,7 @@ test('a first visit installs everything; a repeat visit asks the network for the
   log = server.takeLog();
   expect(filesAsked(log)).toEqual([]);
   expect(notSw(log)).toEqual(['/gradebook?course=sci8']);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
 
   // A plain reload is a repeat visit too.
   await page.reload();
@@ -363,7 +363,7 @@ test('offline, every page opens from the saved copy as one release', async ({ pa
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   await openReports(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
   await page.goto(server.origin + '/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await appDrawn(page);
@@ -384,7 +384,7 @@ test('a release while a tab is open: the tab stays on one release until the quie
   server.takeLog();
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
   await ownLookPassed(page);
 
   // The release. The open tab has not looked for it yet: Reports, opened
@@ -393,7 +393,7 @@ test('a release while a tab is open: the tab stays on one release until the quie
   server.release('b', filesOf('b'));
   await openReports(page);
   expect(notSw(server.state.log)).toEqual([]);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
 
   // The teacher leaves the tab and comes back: shared/auto-update.js looks
   // for a new version, the new worker installs and takes over, and the tab
@@ -404,7 +404,7 @@ test('a release while a tab is open: the tab stays on one release until the quie
   await reloaded;
   await expect(page.locator('#studio')).toBeVisible();
   await expect.poll(() => cacheNames(page)).toEqual(['fullvision-b']);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook', 'reports']);
 
   // The network was asked for the new worker, and for the pages and the
   // changed files once each (the install), and for the reloaded page: no file
@@ -431,7 +431,7 @@ test('a release before a fresh load: that load runs the new release from the net
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   await openReports(page);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook', 'reports']);
   // Its files came from the network, as before this change.
   const log = server.takeLog();
   expect(log).toContain('/shared/calc.js');
@@ -446,7 +446,7 @@ test('a release before a fresh load: that load runs the new release from the net
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   expect(filesAsked(server.takeLog())).toEqual([]);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook']);
   expect(errors).toEqual([]);
 });
 
@@ -463,7 +463,7 @@ test('new HTML with an old worker: the files come from the network, never the ol
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   expect(filesAsked(server.takeLog())).toEqual([]);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
 
   // Release b, but this device cannot fetch the new sw.js: the old worker
   // stays in charge, holding release a's files.
@@ -476,7 +476,7 @@ test('new HTML with an old worker: the files come from the network, never the ol
     else await page.goto(server.origin + '/gradebook?course=sci8');
     await appDrawn(page);
     await openReports(page);
-    await expectOneRelease(page, 'b', ['constants', 'gradebook', 'reports']);
+    await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook', 'reports']);
     const log = server.takeLog();
     // Every stamped file, and an unchanged one, was asked of the network.
     for (const key of ['constants', 'gradebook', 'reports']) expect(log, visit).toContain('/' + STAMPED[key]);
@@ -496,7 +496,7 @@ test('new HTML with an old worker: the files come from the network, never the ol
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   await openReports(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
   expect(await page.evaluate(() => fetch('/shared/calc.js').then(r => r.status))).toBe(200);
   await context.setOffline(false);
 
@@ -507,7 +507,7 @@ test('new HTML with an old worker: the files come from the network, never the ol
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   expect(filesAsked(server.takeLog())).toEqual([]);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook']);
   expect(errors).toEqual([]);
 });
 
@@ -537,7 +537,7 @@ test('a failed install: no mix online, the old release offline, and the next try
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   await openReports(page);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook', 'reports']);
   expect(server.takeLog()).toContain('/shared/calc.js');
 
   // Offline, the old release still opens, whole.
@@ -545,7 +545,7 @@ test('a failed install: no mix online, the old release offline, and the next try
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   await openReports(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
   await context.setOffline(false);
 
   // The download works again: the next look installs b, and b is a repeat visit.
@@ -567,7 +567,7 @@ test('a failed install: no mix online, the old release offline, and the next try
   await appDrawn(page);
   await openReports(page);
   expect(filesAsked(server.takeLog())).toEqual([]);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook', 'reports']);
   expect(errors).toEqual([]);
 });
 
@@ -591,7 +591,7 @@ test('a worker that has lost track of a page sends its files to the network', as
   expect(server.takeLog()).toContain('/' + STAMPED.reports);
   // The network still serves release a, so the tab is still one release, and
   // the saved copy was not written over.
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
 
   // Offline, a lost page still gets the saved copy, as it did before.
   await context.setOffline(true);
@@ -669,7 +669,7 @@ test('after Sign Out the worker installs again: the next visits come from the sa
   await page.goto(server.origin + '/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await appDrawn(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
   await expect.poll(() => missingFromInstall(page, 'a'), { timeout: 30000 }).toEqual([]);
   expect(await cacheNames(page)).toEqual(['fullvision-a']);
   for (const rel of Object.values(STAMPED)) expect(await cachedText(page, '/' + rel), rel).toBe(filesOf('a')[rel]);
@@ -680,7 +680,7 @@ test('after Sign Out the worker installs again: the next visits come from the sa
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await appDrawn(page);
   expect(filesAsked(server.takeLog())).toEqual([]);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
 
   // Offline, the app starts and draws the class, and Reports, never opened
   // since the sign-out, loads its scripts.
@@ -689,7 +689,7 @@ test('after Sign Out the worker installs again: the next visits come from the sa
   await appDrawn(page);
   await expect(page.locator('body')).toContainText('Science 8');
   await openReports(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook', 'reports']);
   expect(failed).toEqual([]);
   await context.setOffline(false);
   expect(errors).toEqual([]);
@@ -728,7 +728,7 @@ test('a file that arrives stale during an install is not saved: the install fail
     await appDrawn(page);
     const now = await running(page);
     expect(now.page, 'load ' + load).toBe('fullvision-b');
-    expect(now.stamps, 'load ' + load).toEqual({ constants: 'b', gradebook: 'b' });
+    expect(now.stamps, 'load ' + load).toEqual({ constants: 'b', device: 'b', gradebook: 'b' });
     // Whichever release's cache holds the file, it holds that release's bytes.
     const held = await page.evaluate(async url => {
       const out = {};
@@ -749,7 +749,7 @@ test('a file that arrives stale during an install is not saved: the install fail
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   expect(filesAsked(server.takeLog())).toEqual([]);
-  await expectOneRelease(page, 'b', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook']);
   expect(errors).toEqual([]);
 });
 
@@ -776,7 +776,7 @@ test("opening an installed file's address as a page does not write over its save
   await context.setOffline(true);
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
   await context.setOffline(false);
   expect(errors).toEqual([]);
 });
@@ -809,6 +809,6 @@ test("an undo's untagged page is not saved over this release's page: offline sta
   await context.setOffline(true);
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
-  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expectOneRelease(page, 'a', ['constants', 'device', 'gradebook']);
   await context.setOffline(false);
 });

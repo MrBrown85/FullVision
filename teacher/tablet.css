@@ -21,6 +21,15 @@
     padding-left: 10px;
     padding-right: 10px;
   }
+  /* An iPad mini (744 wide) has about 516 points for the five tabs: the
+     narrower sides keep about 60 spare, room for a wider font than an
+     iPad's (CI's Linux font cut Reporting off with 10 px sides). */
+  @media (max-width: 799px) {
+    html.fv-tablet .tb-seg .tb-seg-link {
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+  }
 
   /* ── Help ───────────────────────────────────────────────────────── */
 
