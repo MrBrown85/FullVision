@@ -1378,7 +1378,7 @@
       if (!e) {
         S.sendAsk = null;
         return loadWork().then(function () {
-          if (S && S.screen === 'assignments') StudentPage.paint('.sp-segment-on');
+          if (S && S.screen === 'assignments') unsent(id);
         });
       }
       S.sendAsk = {
@@ -1404,6 +1404,26 @@
   }
 
   /* ── Unsend and Replace (S5-F3), asked over the card ─────────── */
+
+  /* After an Unsend: the piece is to do again, so the page goes to its card
+     on Assignments (Outstanding or Upcoming by its due date), out of the
+     sent card My Learning had open (Colin, 2026-11-14). A piece that is not
+     to do (the teacher's pages keep it handed in) stays where it is. */
+  function unsent(id) {
+    var view = typeof StudentPage.viewOf === 'function' ? StudentPage.viewOf(S) : null;
+    var p =
+      view &&
+      view.work.filter(function (x) {
+        return x.id === id;
+      })[0];
+    var seg = p && typeof StudentPageView !== 'undefined' ? StudentPageView.segmentOf(p, view) : '';
+    if (!seg) return StudentPage.paint(S.card ? '.sp-piece-title' : '.sp-segment-on');
+    S.tab = 'assignments';
+    S.segment = seg;
+    S.pick = id;
+    S.card = '';
+    StudentPage.paint('[data-piece="' + String(id).replace(/["\\]/g, '') + '"] .sp-piece-title');
+  }
 
   function ask(kind, id) {
     var p = pieceOf(id);
@@ -1439,7 +1459,7 @@
     var revs = p.revision && typeof StudentPage.demoRevisions === 'function' ? StudentPage.demoRevisions(S) : null;
     if (revs && revs[q.id] && revs[q.id].revision) {
       revs[q.id].revision = null;
-      StudentPage.paint('.sp-segment-on');
+      unsent(q.id);
       return;
     }
     var rec = S.demoSent[q.id];
@@ -1451,7 +1471,7 @@
     } else {
       delete S.demoSent[q.id];
     }
-    StudentPage.paint('.sp-segment-on');
+    unsent(q.id);
   }
 
   /* The question over the card: Unsend Your Work? or Replace Your Photos?
