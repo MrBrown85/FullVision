@@ -174,7 +174,14 @@ export async function runSession() {
     await each([
       ['Calculation Method: Most Recent', () => act('cmSetCalcMethod', { value: 'mostRecent' })],
       ['Calculation Method: Decaying Average', () => act('cmSetCalcMethod', { value: 'decayingAvg' })],
-      ['Decay Weight: 70%', () => input('cmDecaySlider', {}, 70)],
+      // The slider saves when it is let go (its change event), as a drag ends.
+      [
+        'Decay Weight: 70%',
+        () => {
+          input('cmDecaySlider', {}, 70);
+          change('cmDecayCommit', { value: '70' });
+        },
+      ],
       ['Count Only the Most Recent: 3', () => change('cmRecentLimit', { value: '3' })],
       ['Folders Count as One: off', () => change('cmFoldersCountAsOne', { checked: false })],
       ['Each Course Counts Equally: on', () => change('cmCoursesCountEqually', { checked: true })],

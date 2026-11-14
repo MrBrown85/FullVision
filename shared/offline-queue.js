@@ -1397,6 +1397,27 @@
       });
   }
 
+  /* queued() for several endpoints from one read of the outbox and one look
+     at who is signed in: { endpoint: what queued(endpoint) gives }. For a
+     reader that asks about several at once (shared/data-student-work.js
+     _workServerView, worked out once a turn). */
+  function queuedEach(endpoints) {
+    var owner = currentOwner();
+    var out = {};
+    endpoints.forEach(function (endpoint) {
+      out[endpoint] = [];
+    });
+    _readQueue().entries.forEach(function (e) {
+      if (!Object.prototype.hasOwnProperty.call(out, e.endpoint) || _isForeign(e, owner)) return;
+      out[e.endpoint].push({
+        id: e.id,
+        created_at: e.created_at,
+        payload: JSON.parse(JSON.stringify(e.payload || {})),
+      });
+    });
+    return out;
+  }
+
   /* Let the caller change queued payloads, for example to put a server id
      where a local id was. fn(entry) returns { payload, blockedOn } or null
      to leave the entry alone. Entries in flight are skipped. A key that was
@@ -1695,6 +1716,7 @@
     stats: stats,
     has: has,
     queued: queued,
+    queuedEach: queuedEach,
     rewrite: rewrite,
     remove: remove,
     dropBlockedOn: dropBlockedOn,

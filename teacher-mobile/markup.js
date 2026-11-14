@@ -400,8 +400,11 @@ window.MMarkUp = (function () {
 
   /* ── Where a finger is on the page ──────────────────────────── */
 
-  // The page's box on screen before the view moves it: fitted to the stage, centred.
+  /* The page's box on screen before the view moves it: fitted to the stage,
+     centred. Measured once while fingers are down (_onDown keeps it in
+     _s.held), so a move does not make the browser lay the page out. */
   function _base() {
+    if (_s.held) return _s.held;
     var stage = document.querySelector('#m-markup .m-markup-stage');
     var r = stage ? stage.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
     var ratio = _s.size.h / _s.size.w;
@@ -455,6 +458,7 @@ window.MMarkUp = (function () {
     // the phone turned): lay it out again, so a finger lands where it looks.
     var b = _base();
     if (!_s.laid || _s.laid.w !== b.w || _s.laid.h !== b.h || _s.laid.ox !== b.ox || _s.laid.oy !== b.oy) _drawPage();
+    _s.held = b;
     if (e.target.setPointerCapture && e.pointerId != null) {
       try {
         e.target.setPointerCapture(e.pointerId);
@@ -510,7 +514,8 @@ window.MMarkUp = (function () {
       var last = _s.stroke.points[_s.stroke.points.length - 1];
       if (Math.abs(p[0] - last[0]) + Math.abs(p[1] - last[1]) >= 0.002) {
         _s.stroke.points.push(p);
-        _drawPage();
+        // Every point is kept as it comes; the line is drawn once a frame.
+        if (!_s.frame) _s.frame = requestAnimationFrame(_drawStroke) || 0;
       }
     } else if (_s.erasing) {
       _erase(e.clientX, e.clientY);
@@ -523,6 +528,7 @@ window.MMarkUp = (function () {
     var g = _s.gesture;
     if (Object.keys(_s.ptrs).length) return; // a finger is still down
     _s.gesture = null;
+    _s.held = null;
     if (!g || g.kind !== 'one') return _drawPage();
     _endTool(e.clientX, e.clientY, g.moved);
   }
@@ -532,6 +538,7 @@ window.MMarkUp = (function () {
     delete _s.ptrs[e.pointerId];
     if (Object.keys(_s.ptrs).length) return;
     _s.gesture = null;
+    _s.held = null;
     _s.stroke = null;
     _s.erasing = null;
     _drawPage();
@@ -647,6 +654,7 @@ window.MMarkUp = (function () {
     _ro = null;
     if (!stage || typeof ResizeObserver !== 'function') return;
     _ro = new ResizeObserver(function () {
+      if (_s) _s.held = null;
       if (_s && !_s.gesture) _drawPage();
     });
     _ro.observe(stage);
@@ -662,8 +670,24 @@ window.MMarkUp = (function () {
     var shown = _s.marks.filter(function (m) {
       return !hidden[m.id];
     });
-    if (_s.stroke) shown = shown.concat([_s.stroke]);
     return MarkupDraw.svgHtml({ v: 1, marks: shown }, _s.size.h / _s.size.w);
+  }
+
+  /* The line being drawn, on its own layer over the page's marks, where it
+     was last in the one set: once a frame, only this line is drawn again. */
+  function _drawStroke() {
+    if (!_s) return;
+    _s.frame = 0;
+    var box = document.querySelector('#m-markup .m-markup-marks');
+    if (!box || !_s.stroke) return;
+    var live = box.querySelector('.m-markup-live');
+    if (!live) {
+      live = document.createElement('div');
+      live.className = 'm-markup-live';
+      box.appendChild(live);
+    }
+    // html-safe: MarkupDraw.svgHtml escapes a note's words; a line is numbers and fixed words
+    live.innerHTML = MarkupDraw.svgHtml({ v: 1, marks: [_s.stroke] }, _s.size.h / _s.size.w);
   }
 
   /* The page's notes, each by its number, and what the student sees, in a
@@ -703,6 +727,7 @@ window.MMarkUp = (function () {
     layer.style.height = b.h + 'px';
     // html-safe: _marksHtml escapes note text; the rest is numbers and fixed words
     box.innerHTML = _marksHtml();
+    if (_s.stroke) _drawStroke();
     _applyView();
   }
 
