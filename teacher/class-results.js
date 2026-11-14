@@ -1492,7 +1492,7 @@ window.ClassResults = (function () {
     return document.getElementById('class-results');
   }
 
-  function _draw(keepScroll) {
+  function _draw(keepScroll, onlyChanged) {
     var panel = _panel();
     if (!panel || !_state) return;
     var a = _assessment(_state.cid, _state.aid);
@@ -1502,11 +1502,13 @@ window.ClassResults = (function () {
     }
     // A picked cell, band or window that no longer holds anyone lets go.
     if (_state.sel) _state.sel = _pick(_state.sel.key);
+    var html = _bodyHtml(_state.cid, a);
+    if (onlyChanged && html === _state.drawn) return _markOpener(); // a page's redraw (refresh), nothing new
     var top = keepScroll ? panel.scrollTop : 0;
     var focusKey =
       document.activeElement && panel.contains(document.activeElement) ? _focusKey(document.activeElement) : null;
     // html-safe: every string goes through esc; figures come from calc.js
-    panel.innerHTML = _bodyHtml(_state.cid, a);
+    panel.innerHTML = _state.drawn = html;
     panel.scrollTop = top;
     if (focusKey) {
       var again = panel.querySelector(focusKey);
@@ -1607,8 +1609,7 @@ window.ClassResults = (function () {
   }
 
   function refresh() {
-    if (!_state || !_panel()) return;
-    _draw(true);
+    if (_state && _panel()) _draw(true, true);
   }
 
   function isOpen() {

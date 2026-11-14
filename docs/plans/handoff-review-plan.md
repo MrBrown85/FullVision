@@ -554,7 +554,7 @@ Each Nov 2 item not covered above, with where it stands.
 - **`duplicate_course` and `import_teams_class` in `FV_IDEMPOTENT_RPCS`, and `fv_status_counts`** (Phase 1 #11). Both names are still in the list (`shared/constants.js`); `fv_status_counts` is live in the generated schema. Both go only with decision 3 on the server functions. Needs Colin.
 - **`recent-work-mockups/`** (Phase 1 #1). It does not exist and was never in the history. Nothing to do.
 - **The stale `teacher/app.html` comment** (Phase 1 #9, `docs-audit-27`). Refuted: the same stale claim sits in `codex.md:431`, and `app.html` is a script list file. Later, with `codex.md`.
-- **Faster first draw** (Phase 2 #2): drawing from the saved copy before the server answers instead of keeping the page inert, `getSession()` first with the `getUser()` re-check in parallel, and one boot scan of local storage instead of three. Each changes when the page draws or when the sign-in check runs. Later (Track C); the sign-in order needs Colin's OK.
+- **Faster first draw** (Phase 2 #2): drawing from the saved copy before the server answers instead of keeping the page inert, `getSession()` first with the `getUser()` re-check in parallel, and one boot scan of local storage instead of three. Each changes when the page draws or when the sign-in check runs. Colin ruled on the sign-in order on Nov 13 (decision 23), and the first two are built on the desktop (DECISIONS, "Start-up draws the saved class list first"). The one boot scan is still later (Track C).
 - **The phone redirect check before any stylesheet loads** (Phase 2 #3). It changes load order on every desktop page. Later, with S19-C4.
 - **Index lookups in the gradebook loops** (Phase 2 #8). It reshapes the Gradebook's draw code, which Track D holds and S19-C9 changes. Later.
 - **Splash images as WebP or AVIF** (Phase 2 #9; `assets/splash/` is 3.5 MB). It changes images a visitor sees. Later.
@@ -647,7 +647,7 @@ The seven open decisions on card cp1, the server change the Nov 2 plan marked "y
 | 20  | What `*.nsvcs.net` in the content policy is for; the Sentry build credentials; Netlify's Node version; the edge function deploy command.                                                                    | S19-F1 and F2 final versions                                   |
 | 21  | Phase 4 (ES modules and splits) with the decision to sell to schools. **Ruled Nov 12: the split goes ahead, safe pieces first.** **Ruled Nov 12: marks may be moved; no change for Colin or Karen.**        | Track E                                                        |
 | 22  | Accept or drop each of the five `CLAUDE.md` edits in the S19-A14b draft, and say what has been released.                                                                                                    | S19-A14b                                                       |
-| 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it.                                                                                                             | Faster first draw (Nov 2 Phase 2 #2)                           |
+| 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it. **Ruled Nov 13: yes; the saved class list is drawn meanwhile (DECISIONS).**                                 | Faster first draw (Nov 2 Phase 2 #2)                           |
 
 ---
 
@@ -727,7 +727,7 @@ Reviewed against the council on 2026-11-12. Items marked "yours" wait for Colin;
 12. The small tidyings: generic helpers into utilities, the self-guards, the second `window.v2` init. **Not started.**
 13. The operations guide's four public sections (S19-F1), with Colin's answers for its gaps (F7). **Off Colin's list (2026-11-13).**
 14. A Content-Type check in the service worker's copy step. **Done and released** (PR 1330).
-15. The sign-in re-check runs alongside the class load, and nothing is drawn or sent until both finish (decision 23). **Not started.**
+15. The sign-in re-check runs alongside the class load (decision 23). Colin's ruling of Nov 13 goes further: the saved class list is drawn while it answers, and nothing is sent or shown from the server until it passes (DECISIONS, "Start-up draws the saved class list first"). **Built on the desktop; the phone has no re-check and is unchanged.**
 16. Delete the test-only dead code with its tests (S19-A40, decision 15); keep `undoLastScore` for a phone Undo button (decision 16). **Done except `cmShowImportPreview`** (PRs 1350, 1351, 1354); `undoLastScore` kept.
 17. `docs/README.md` as an index; the file moves in S19-A41 are dropped. **Not started.**
 18. Bring the write-path docs up to date after item 8 (S19-B7). **Waits for item 8.**

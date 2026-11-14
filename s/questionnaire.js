@@ -886,7 +886,8 @@
     if (!q) return;
     setAnswer(S, q, el);
     if (el.tagName === 'TEXTAREA') grow(el);
-    saveDraft();
+    // Kept once the student pauses (student.js): not every key turns every answer into text.
+    (StudentPage.saveDraftSoon || saveDraft)();
     updateCount();
   }
 

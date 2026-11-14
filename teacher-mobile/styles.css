@@ -3838,6 +3838,16 @@ body.fv-switching-course::after {
   padding: 20px;
   margin: 8px;
 }
+/* A card away from the screen is not laid out or painted until it comes
+   near it, so opening the grader and a tap lay out a card, not the class.
+   On the surface, not the card: the card is the scroller, and keeps the
+   scroll a redraw or a tab switch gives it. A surface not drawn yet is
+   taken as tall, so that scroll is never cut short; once drawn it keeps its
+   own height (auto). */
+.m-swiper-card > .m-grade-card-surface {
+  content-visibility: auto;
+  contain-intrinsic-height: auto 5000px;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    REDUCED MOTION
