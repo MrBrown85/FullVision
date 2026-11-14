@@ -51,6 +51,7 @@ var _courseLetterCache = {};
 var _pieceIndexCache = {}; // cid → Map<assessmentId, { keys, fed }>: what each piece of work measures now
 var _pieceRankCache = {}; // cid → Map<assessmentId, n>: the order same-date pieces count in
 var _orderedEntriesCache = {}; // class, term, set and student → the student's score entries in counting order
+var _countedScoresCache = {}; // class, term, set, student and competency → getCountedTagScores, with what it was made from
 
 /* ── The score set and its reader ──────────────────────────────
    Every score, status, points score, Complete/Incomplete mark, Overall
@@ -384,6 +385,7 @@ function clearProfCache() {
   _pieceIndexCache = {};
   _pieceRankCache = {};
   _orderedEntriesCache = {};
+  _countedScoresCache = {};
 }
 
 /** Get or build assessment weights map for a course. */
@@ -2343,11 +2345,28 @@ function countsTowardGrades(cid, assessment) {
  * @returns {Score[]} Score entries that count toward the competency level
  */
 function getCountedTagScores(cid, studentId, tagId) {
-  var assessMap = _getAssessMap(cid);
-  return getTagScores(cid, studentId, tagId).filter(function (s) {
-    var assessment = assessMap.get(s.assessmentId);
-    return !assessment || countsTowardGrades(cid, assessment);
+  // Kept with the evidence list and the category list it was made from, so
+  // it is made again when either is (the same test as countsTowardGrades,
+  // with the categories read once instead of once per score).
+  var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
+  var scores = getTagScores(cid, studentId, tagId);
+  var categories = getCategories(cid) || [];
+  var hit = _countedScoresCache[cacheKey];
+  if (hit && hit.scores === scores && hit.categories === categories) return hit.counted;
+  var byId = {};
+  categories.forEach(function (c) {
+    if (c && !Object.prototype.hasOwnProperty.call(byId, c.id)) byId[c.id] = c;
   });
+  var assessMap = _getAssessMap(cid);
+  var counted = scores.filter(function (s) {
+    var assessment = assessMap.get(s.assessmentId);
+    var categoryId = assessment && (assessment.categoryId || assessment.category_id);
+    if (!categoryId) return true;
+    var category = byId[categoryId];
+    return !category || Number(category.weight || 0) > 0;
+  });
+  _countedScoresCache[cacheKey] = { scores: scores, categories: categories, counted: counted };
+  return counted;
 }
 
 /* Which side of the legacy summative / formative split a score falls on:
