@@ -1705,20 +1705,14 @@ window.ReportQuestionnaire = (function () {
       proficiency: ['Nothing to fill in. Comes from scores.', 'FullVision'],
       legend: ['Nothing to fill in. Same for everyone.', 'FullVision'],
       'competency-table': ['Nothing to fill in. Comes from scores.', 'FullVision'],
-      'grade-table': ['Nothing to fill in. Comes from scores.', 'FullVision'],
       assessments: ['Nothing to fill in. Each assessment and its score, from your gradebook.', 'FullVision'],
       'category-summary': ['Nothing to fill in. Comes from scores and your category weights.', 'FullVision'],
       'course-grade': [SCREEN_SOURCES[0][1], 'FullVision'],
-      'missing-work': ['Nothing to fill in. Comes from assignments.', 'FullVision'],
       'teacher-narrative': [SCREEN_SOURCES[7][1], 'You'],
       'term-attendance': [SCREEN_SOURCES[6][1], 'You'],
       'learner-dimensions': [SCREEN_SOURCES[1][1], 'You'],
       'next-steps': ['The Focus Area: the competency that changed most since the last report.', 'FullVision'],
       progress: ['The Focus Area: the competency that changed most since the last report.', 'FullVision'],
-      'support-home': [
-        'The Focus Area: the competency that changed most since the last report. The work comes from this term’s scores.',
-        'FullVision',
-      ],
       'self-assessment': [
         (phones.length ? CommentBank.list(phones) : 'The reflection and Goal Check-In') + ', on phones.',
         'Student',
@@ -1726,7 +1720,7 @@ window.ReportQuestionnaire = (function () {
       'student-reflection-learning': ['Nothing to fill in. The student writes on the printed page.', 'Student'],
       'student-reflection-habits': ['Nothing to fill in. The student writes on the printed page.', 'Student'],
       'parent-response': ['Nothing to fill in. The family writes it.', 'Family'],
-      'text-block': ['Nothing to fill in. Your text on the form, in Progress Reports.', 'You'],
+      'text-block': ['Nothing to fill in. Your text on the form, in Print Reports.', 'You'],
       'fb-rubrics': ['Nothing to fill in. Your rubrics on each assessment, on pages after the report.', 'You'],
       'fb-comments': ['Nothing to fill in. Your comments on each assessment, on pages after the report.', 'You'],
       'fb-observations': ['Nothing to fill in. Your observations this term, on pages after the report.', 'You'],
@@ -1782,7 +1776,7 @@ window.ReportQuestionnaire = (function () {
         ${blocks}
         ${
           off.length
-            ? `<div class="qn-info-off"><span class="qn-info-off-title">Not on this report</span><span>${esc(off.join(' · '))}</span><span>Add them in Progress Reports.</span></div>`
+            ? `<div class="qn-info-off"><span class="qn-info-off-title">Not on this report</span><span>${esc(off.join(' · '))}</span><span>Add them in Print Reports.</span></div>`
             : ''
         }
       </div>

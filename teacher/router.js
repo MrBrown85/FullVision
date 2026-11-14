@@ -19,7 +19,7 @@ window.Router = (function () {
     '/gradebook': 'Gradebook',
     '/observations': 'Observations',
     '/observations/starters': 'My Sentence Starters',
-    '/reports': 'Reports',
+    '/reports': 'Reporting',
   };
 
   /* Pages whose scripts load the first time the page is opened, and

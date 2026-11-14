@@ -22,14 +22,14 @@ async function open(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await page.evaluate(() => {
     saveReportConfig('sci8', Object.assign({}, getReportConfig('sci8'), { one: ReportOne.fromSetup('report-card') }));
   });
   await page.evaluate(r => window.Router.navigate(r), '/dashboard');
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   // Every size at once: the app's reduced-motion rule still leaves each
   // transition a frame long, and the page clock is fixed.
@@ -84,7 +84,7 @@ test('Automatic puts a sheet’s two sides in one row; the choice survives a rel
 
   await pick(page, '75%');
   await page.reload();
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio-zoom-btn')).toHaveText('75%');
   await expect.poll(async () => (await layout(page)).zoom).toBe(0.75);
   expect(errors).toEqual([]);
@@ -379,7 +379,7 @@ test('Hide Panels writes no preference; a reload brings the panels back; the sid
   await page.getByRole('button', { name: 'Hide Panels' }).click();
   await expect(roster).toBeHidden();
   await page.reload();
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio-palette')).toBeVisible();
   await expect(page.locator('#gb-sidebar')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Hide Panels' })).toBeVisible();

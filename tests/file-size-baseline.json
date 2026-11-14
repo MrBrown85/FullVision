@@ -3,7 +3,7 @@
   "s/page-view.js": 2993,
   "s/send.js": 2101,
   "shared/calc.js": 4586,
-  "shared/data-student-work.js": 2040,
+  "shared/data-student-work.js": 2105,
   "shared/data.js": 9955,
   "shared/offline-queue.js": 1738,
   "shared/student-view.js": 1658,
@@ -15,13 +15,15 @@
   "teacher/dash-class-manager.js": 11449,
   "teacher/grades-print.js": 1784,
   "shared/obs-capture.js": 1839,
-  "teacher/page-assignments.js": 16854,
-  "teacher/page-gradebook.js": 4565,
+  "teacher/page-assignments.js": 17188,
+  "teacher/page-gradebook.js": 4585,
   "teacher/page-reports.js": 2166,
   "teacher/page-student.js": 3191,
   "teacher/report-blocks.js": 2771,
   "teacher/report-questionnaire.js": 8429,
   "teacher/rubric-bank.js": 1510,
   "teacher/rubric-print.js": 1970,
-  "teacher/ui.js": 2868
+  "teacher/ui.js": 2868,
+  "shared/work-wall.js": 1700,
+  "teacher/grade-report.js": 1560
 }

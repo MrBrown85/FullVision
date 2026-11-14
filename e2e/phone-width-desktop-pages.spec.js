@@ -45,7 +45,7 @@ for (const [path, tab] of [
   ['/assignments', 'Assignments'],
   ['/observations', 'Observations'],
   ['/gradebook', 'Gradebook'],
-  ['/reports', 'Reports'],
+  ['/reports', 'Reporting'],
 ]) {
   test(`top tabs fit a phone on ${tab}`, async ({ page }) => {
     await openDesktop(page, path);

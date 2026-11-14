@@ -94,7 +94,7 @@ window.PageReports = (function () {
     },
     {
       id: 'progress',
-      label: 'Progress Reports',
+      label: 'Print Reports',
       title: 'Build and print the class’s report cards.',
       hidden: false,
       show: _showProgressTab,
@@ -525,7 +525,7 @@ window.PageReports = (function () {
         if (ok) renderReports();
         else
           output.innerHTML =
-            '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reports again.</div></div>';
+            '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reporting again.</div></div>';
       });
       return;
     }

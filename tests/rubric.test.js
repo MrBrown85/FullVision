@@ -7,6 +7,17 @@ import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { U, signIn, seedClass, clearClass, stored, settle } from './helpers/pin-save-paths.js';
 
+// No DOM here: every block 50px tall, every text 7px a character.
+const fakeStage = () => ({
+  innerHTML: '',
+  firstChild: { offsetHeight: 50 },
+  querySelectorAll() {
+    return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+      offsetWidth: m[1].length * 7,
+    }));
+  },
+});
+
 describe('rubric-bank-stats', () => {
   /**
    * Rubric Bank class stats (teacher/rubric-bank.js): per criterion, one level
@@ -1542,8 +1553,10 @@ describe('rubric-piece-percent', () => {
       // The printed graded rubric's Overall.
       expect(RubricPrint.sheetData(CID, 'lhi', SID).overall).toMatchObject({ text: '87%' });
 
-      const grades = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, {}));
-      expect(grades).toContain('Local History Inquiry 3.3 / 4 \u00B7 87%');
+      // Side by side, a Letter class's score and out of print joined.
+      const grades = text(GradeReport.listPart(CID, STUDENT, { columns: 'two' }, fakeStage()).html);
+      expect(grades).toContain('Local History Inquiry');
+      expect(grades).toContain('3.3 / 4 87%');
     });
 
     it('Generate’s best and weakest piece print the same %', () => {

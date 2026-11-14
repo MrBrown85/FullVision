@@ -61,7 +61,7 @@ async function demoWithDraft(page, config) {
 
 async function readPhoneCopy(page) {
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await page.getByRole('button', { name: 'Sent to Phones' }).click();
   await page.getByRole('button', { name: 'Send to Phones and Print Slips' }).click();
   await expect(page.locator('.pp-row')).toHaveCount(27);

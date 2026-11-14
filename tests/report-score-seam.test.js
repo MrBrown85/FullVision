@@ -247,12 +247,9 @@ const BLOCKS = [
   'renderBlockStudentReflectionHabits',
   'renderBlockSectionChart',
   'renderBlockScoreDistribution',
-  'renderBlockGradeTable',
   'renderBlockCoreCompetencies',
-  'renderBlockSupportHome',
   'renderBlockTermGlance',
   'renderBlockGrowth',
-  'renderBlockMissingWork',
   'renderBlockAttendance',
   'renderBlockSelfAssessment',
 ];
@@ -266,6 +263,7 @@ const DOORS = {
       'feedbackItems',
       'extraCards',
       'listPart',
+      'printedRows',
       '_summaryHtml',
       '_termHtml',
       '_feedbackPages',
@@ -1117,7 +1115,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     const autos = ReportBlocks.showDefaults(cid);
     // The blocks that read the start of the term and the last report's levels (report-blocks.js _pass).
     const blocks = () =>
-      ['proficiency', 'progress', 'next-steps', 'academic-summary', 'support-home']
+      ['proficiency', 'progress', 'next-steps', 'academic-summary']
         .map(id => ReportBlocks.renderReportBlock(id, cid, student, ctx, ReportSheets.optionsFor({ block: id }, autos)))
         .join('\n');
     setActiveTerm(cid, second.ordinal);

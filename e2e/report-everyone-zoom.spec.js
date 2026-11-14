@@ -30,14 +30,14 @@ async function openEveryone(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await page.evaluate(() => {
     saveReportConfig('sci8', Object.assign({}, getReportConfig('sci8'), { one: ReportOne.fromSetup('report-card') }));
   });
   await page.evaluate(r => window.Router.navigate(r), '/dashboard');
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await page.getByRole('radio', { name: 'Legal' }).click();
   await page.locator('.studio-view [data-view="all"]').click();
@@ -122,7 +122,7 @@ test('50% shows fewer students a row, whole blocks, a sheet’s sides side by si
   await expect(page.locator('#studio-fit')).toHaveText(fit);
 
   await page.reload();
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio-zoom-btn')).toHaveText(/./);
   await page.locator('.studio-view [data-view="one"]').click();
   await expect(page.locator('#studio-zoom-btn')).toHaveText('Automatic');

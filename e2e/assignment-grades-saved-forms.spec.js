@@ -3,18 +3,18 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /* A report saved on main with Assignment Grades' Proficiency Word on, and
-   one with it off, open on this build in each grading style (Assignment
-   Grades layout, 2026-11-12). e2e/fixtures/report-config-main.json holds
-   what main stored after the teacher's clicks in Page Studio (main
-   9953ecc3: Custom, then the Word box ticked, then unticked). Page Studio
-   is gone; One Report reads the saved form as its parts (DECISIONS, "One
-   Report is the Progress Reports screen", 3).
+   one with it off, open on this build in each grading style. e2e/fixtures/
+   report-config-main.json holds what main stored after the teacher's clicks
+   in Page Studio (main 9953ecc3: Custom, then the Word box ticked, then
+   unticked). Assignment Grades is the Assessments part now (Colin,
+   2026-11-13; report-one.js _fold): the saved block opens as Assessments
+   organized by month, with its choices.
 
-   In a Proficiency or Both class the report draws with no word column and
-   the panel does not offer Word; in a Letter class Word is offered with
-   the saved choice and the column follows it. Opening the report, opening
-   the part's options and printing it leave the stored report exactly as
-   main stored it. */
+   In a Proficiency or Both class the list has no word column and the panel
+   does not offer Word; in a Letter class Word is offered with the saved
+   choice and the column follows it. Opening the report, opening the part's
+   options and printing it leave the stored report exactly as main stored
+   it. */
 
 const SAVED = JSON.parse(readFileSync(resolve('e2e/fixtures/report-config-main.json'), 'utf8'));
 const stored = page => page.evaluate(() => localStorage.getItem('gb-report-config-sci8'));
@@ -40,16 +40,18 @@ for (const word of ['on', 'off']) {
         window.Router.navigate('/dashboard');
       }, mode);
       await page.evaluate(r => window.Router.navigate(r), '/reports');
-      await page.getByRole('tab', { name: 'Progress Reports' }).click();
-      const cell = page.locator('#rb-preview .sheet-cell[data-block="grade-table"]').first();
+      await page.getByRole('tab', { name: 'Print Reports' }).click();
+      const cell = page.locator('#rb-preview .sheet-cell[data-part="assessments"]').first();
       await expect(cell).toBeVisible();
-      await expect(cell.locator('.report-grades-row').first()).toBeVisible();
+      // By month: a heading over each month's first row.
+      await expect(cell.locator('.gr-ghead').first()).toBeVisible();
+      await expect(cell.locator('.gr-row:not(.gr-head)').first()).toBeVisible();
       // The part's options, in the panel.
-      await page.locator('#studio-palette [data-action="oneOpen"][data-part="grade-table"]').click();
-      const bar = page.locator('#one-opts-grade-table');
+      await page.locator('#studio-palette [data-action="oneOpen"][data-part="assessments"]').click();
+      const bar = page.locator('#one-opts-assessments');
       await expect(bar).toBeVisible();
       const box = bar.locator('[data-opt="word"]');
-      const words = page.locator('#rb-preview .report-grades-word');
+      const words = page.locator('#rb-preview .gr-row:not(.gr-head) .gr-word');
       if (mode === 'letter') {
         // The option and the column come back with the saved choice.
         await expect(box).toHaveCount(1);

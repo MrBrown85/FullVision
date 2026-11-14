@@ -1672,11 +1672,21 @@ th.gb-group-alt {
   font-family: var(--font-base);
   font-size: var(--text-sm);
 }
+/* Each item: its line icon, then its label, as on the Assignments menus. */
 .gb-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 8px 16px;
   cursor: pointer;
   color: var(--text);
+  white-space: nowrap;
   transition: background 0.08s;
+}
+.gb-ctx-item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 .gb-ctx-menu:focus {
   outline: none;
@@ -1701,13 +1711,9 @@ th.gb-group-alt {
   background: var(--priority);
   color: #fff;
 }
-.gb-ctx-split {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
 .gb-ctx-hint {
+  margin-left: auto;
+  padding-left: 6px;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-3);

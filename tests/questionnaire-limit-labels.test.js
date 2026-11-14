@@ -395,7 +395,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       expect(off).not.toContain('Letterhead');
       // A Letter class has no Proficiency Legend to add.
       expect(off).not.toContain('Proficiency Legend');
-      expect(html).toContain('Add them in Progress Reports.');
+      expect(html).toContain('Add them in Print Reports.');
     });
 
     it('a class with nothing saved lists the Grades setup', () => {
@@ -403,7 +403,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       open(byName('Tyler'));
       const html = sheet().innerHTML;
       RQ.tqCloseInfo();
-      expect(partsOf(html)).toEqual(['Letterhead', 'Assessments', 'Categories', 'Course Grade', 'Missing Work']);
+      expect(partsOf(html)).toEqual(['Letterhead', 'Assessments', 'Categories', 'Course Grade']);
       expect(html).toContain('Each assessment and its score, from your gradebook.');
       expect(html).toContain('Comes from scores and your category weights.');
     });

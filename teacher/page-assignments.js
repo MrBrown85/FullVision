@@ -4442,7 +4442,7 @@ window.PageAssignments = (function () {
         ? document.querySelector('[data-action="editAssess"][data-aid="' + CSS.escape(aid) + '"]')
         : document.querySelector('.tb-action-btn[data-action="showNewForm"]');
       var menu = back && back.closest('.assess-menu');
-      if (menu) back = menu.parentNode.querySelector('[data-action="toggleCardMenu"]');
+      if (menu) back = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
       if (back) back.focus({ preventScroll: true });
     });
   }
@@ -8771,7 +8771,7 @@ window.PageAssignments = (function () {
           _graderStatusButtons(aid, st.id, status, ['NS', 'EXC', 'LATE']) +
           '</div>' +
           (row && row.separateFrom ? _groupSeparateNoteHtml(aid, st.id, row.separateFrom) : '')) +
-      ((row && row.view) || !window.WorkWall ? '' : WorkWall.seeWorkHtml(cid, aid, st.id)) +
+      (row && row.view ? '' : _workIconHtml(cid, aid, st)) +
       '<div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Set this student\'s levels" aria-label="Set this student\'s levels">' +
       _ROW_FILL_ICON +
       '<div class="col-fill-menu" data-stop-prop="true">' +
@@ -11233,7 +11233,9 @@ window.PageAssignments = (function () {
       _closeGroupMenus();
     // A card's menu closes on any click but its own button's (an item's
     // action still runs).
-    if (!e.target.closest('[data-action="toggleCardMenu"]')) _closeCardMenus();
+    if (!e.target.closest('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]')) _closeCardMenus();
+    // The row's Attach a Link form closes on a click anywhere else.
+    if (!e.target.closest('.rsg-attach-link, [data-action="attachWorkLink"]')) _closeAttachLink(false);
     // KB focus on score cells
     var critRow = e.target.closest('.rsg-criterion-row');
     if (critRow) {
@@ -11316,6 +11318,9 @@ window.PageAssignments = (function () {
       },
       toggleCardMenu: function () {
         _toggleCardMenu(el);
+      },
+      attachWorkMenu: function () {
+        _attachMenuOpen(el);
       },
       copyAssessToClass: function () {
         copyAssessToClass(el.dataset.aid);
@@ -11466,6 +11471,21 @@ window.PageAssignments = (function () {
       },
       gradeSubmissions: function () {
         _openGraderOnWork(el.dataset.aid, el.dataset.sid || null);
+      },
+      // The + on a student's row (Attach Work).
+      attachWorkFiles: function () {
+        var wrap = el.closest('.rsg-attach');
+        var file = wrap && wrap.querySelector('.rsg-attach-file');
+        if (file) file.click();
+      },
+      attachWorkLink: function () {
+        _openAttachLink(el);
+      },
+      attachLinkAdd: function () {
+        _attachLinkAdd(el.closest('.rsg-attach-link'));
+      },
+      attachLinkCancel: function () {
+        _closeAttachLink(true);
       },
       openWorkWall: function () {
         var aid = el.dataset.aid;
@@ -11830,6 +11850,10 @@ window.PageAssignments = (function () {
       _formResPdf(el);
       return;
     }
+    if (el.dataset.actionChange === 'attachWorkFile') {
+      _attachWorkFiles(el);
+      return;
+    }
     if (el.dataset.actionChange === 'setFormWorkUntil') {
       _setFormWorkUntil(el);
       return;
@@ -11992,6 +12016,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (_cardMenuKeydown(e)) return;
+    if (_attachLinkKeydown(e)) return;
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
     if (e.key === 'Escape' && document.querySelector('.rsg-group-members .grader-member-menu:not([hidden])')) {
@@ -13825,7 +13850,7 @@ window.PageAssignments = (function () {
     document.querySelectorAll('.assess-menu-wrap .assess-menu').forEach(function (menu) {
       if (menu === except || menu.hidden) return;
       menu.hidden = true;
-      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"]');
+      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
       if (btn) btn.setAttribute('aria-expanded', 'false');
     });
   }
@@ -13847,7 +13872,7 @@ window.PageAssignments = (function () {
     if (e.key === 'Escape') {
       e.preventDefault();
       _closeCardMenus();
-      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"]');
+      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
       if (btn) btn.focus({ preventScroll: true });
       return true;
     }
@@ -13871,8 +13896,8 @@ window.PageAssignments = (function () {
   }
 
   /* One student's grader on the page: what came in ("Submitted Oct 30 ·
-     2 photos", "Not In · 7 days late"), Same photo as, and Add Work for
-     Logan when nothing is in; each opens the grader dialog on them. */
+     2 photos", "Not In · 7 days late"), Same photo as, and the work icon
+     (See the Work, or + to attach work when nothing is in). */
   // html-safe: names go through esc; ids are ours
   function _inlineWorkHtml(cid, a, sid) {
     if (!GraderWork.workShown(cid, a)) return '';
@@ -13891,23 +13916,260 @@ window.PageAssignments = (function () {
           esc('Same photo as ' + _workShortName(o)) +
           '</button>';
     });
-    if (!sub && st)
-      html +=
-        '<button type="button" class="assess-add-work-btn" data-action="gradeSubmissions" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        sid +
-        '">' +
-        esc('Add Work for ' + displayNameFirst(st)) +
-        '</button>';
-    else if (sub)
-      html +=
-        '<button type="button" class="assess-add-work-btn" data-action="gradeSubmissions" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        sid +
-        '">See the Work</button>';
+    if (st) html += _workIconHtml(cid, a.id, st, sub);
     return html;
+  }
+
+  /* The work icon on a student's row (Colin, Nov 13: an icon in place of
+     the words). Work in: See the Work, the page icon, which opens the
+     grader on their pages; pointing at it still shows the glance
+     (shared/work-wall.js, which finds it by .rsg-see-work). Nothing in: +,
+     Attach Work, a menu of Image or PDF… (the grader's Add Work, from the
+     row) and, where links can be kept, Link…. What is attached shows as
+     the teacher's added work, and the + becomes See the Work. */
+  var _attachBusy = {}; // 'aid|sid' → true while the row's + adds files
+
+  // html-safe: ids are ours (and go through esc); the name goes through esc; icons and labels are fixed
+  // known: the student's work when the caller has looked it up already
+  // (null for none), so a row's work is read once: the speed guard counts it.
+  function _workIconHtml(cid, aid, st, known) {
+    if (!st || !window.GraderWork) return '';
+    var ids = ' data-cid="' + esc(cid) + '" data-aid="' + esc(aid) + '" data-sid="' + esc(st.id) + '"';
+    if (window.WorkWall) {
+      // See the Work: WorkWall draws it (and wires the glance), as an icon;
+      // '' when the piece shows no work, null when none is in.
+      var see = WorkWall.seeWorkHtml(cid, aid, st.id, LINE_ICONS.work, known === undefined ? undefined : !!known);
+      if (see) return see;
+      if (see === '') return '';
+    } else {
+      var a = _assessmentById(cid, aid);
+      if (!a || !GraderWork.workShown(cid, a)) return '';
+      if (known !== undefined ? known : _workSubOf(cid, st.id, aid))
+        return (
+          '<button type="button" class="rsg-work-btn rsg-see-work" data-stop-prop="true" data-action="gradeSubmissions"' +
+          ids +
+          ' aria-label="See the Work" title="See the Work">' +
+          LINE_ICONS.work +
+          '</button>'
+        );
+    }
+    var label = 'Attach Work for ' + displayNameFirst(st);
+    if (_attachBusy[aid + '|' + st.id])
+      return (
+        '<button type="button" class="rsg-work-btn rsg-attach-btn is-busy" disabled aria-label="' +
+        esc('Adding work for ' + displayNameFirst(st)) +
+        '"><span class="rsg-attach-spin" aria-hidden="true"></span></button>'
+      );
+    // The menu and its file picker are made when the + is first clicked
+    // (_attachMenuOpen): a class's grid has a + on most rows.
+    return (
+      '<div class="assess-menu-wrap rsg-attach">' +
+      '<button type="button" class="rsg-work-btn rsg-attach-btn" data-stop-prop="true" data-action="attachWorkMenu" aria-haspopup="menu" aria-expanded="false"' +
+      ids +
+      ' aria-label="' +
+      esc(label) +
+      '" title="' +
+      esc(label) +
+      '">' +
+      LINE_ICONS.plus +
+      '</button></div>'
+    );
+  }
+
+  /* The + menu for one row, made the first time it opens: Image or PDF…
+     and, where links can be kept, Link…, with the hidden file picker. */
+  // html-safe: ids are ours (and go through esc); the label goes through esc; icons and words are fixed
+  function _attachMenuHtml(cid, aid, sid, label) {
+    var ids = ' data-cid="' + esc(cid) + '" data-aid="' + esc(aid) + '" data-sid="' + esc(sid) + '"';
+    var item = function (action, icon, text) {
+      return (
+        '<button type="button" role="menuitem" class="assess-menu-item" data-stop-prop="true" data-action="' +
+        action +
+        '"' +
+        ids +
+        '>' +
+        icon +
+        '<span>' +
+        text +
+        '</span></button>'
+      );
+    };
+    return (
+      '<div class="assess-menu rsg-attach-menu" role="menu" aria-label="' +
+      esc(label) +
+      '" hidden>' +
+      item('attachWorkFiles', LINE_ICONS.image, 'Image or PDF…') +
+      (typeof studentWorkLinksOffered === 'function' && studentWorkLinksOffered(cid)
+        ? item('attachWorkLink', LINE_ICONS.link, 'Link…')
+        : '') +
+      '</div>' +
+      '<input type="file" class="rsg-attach-file" multiple accept="image/*,.heic,.heif,application/pdf" hidden tabindex="-1" aria-hidden="true" data-action-change="attachWorkFile"' +
+      ids +
+      '>'
+    );
+  }
+  function _attachMenuOpen(btn) {
+    var wrap = btn.closest('.rsg-attach');
+    if (!wrap) return;
+    if (!wrap.querySelector('.rsg-attach-menu')) {
+      var cid = btn.getAttribute('data-cid');
+      var aid = btn.getAttribute('data-aid');
+      var sid = btn.getAttribute('data-sid');
+      // html-safe: _attachMenuHtml escapes its ids and label; the rest is fixed
+      wrap.insertAdjacentHTML('beforeend', _attachMenuHtml(cid, aid, sid, btn.getAttribute('aria-label') || ''));
+    }
+    _toggleCardMenu(btn);
+  }
+
+  // The row's work icon for `sid`, once the page is drawn again.
+  function _focusWorkIcon(aid, sid) {
+    var sel = '.rsg-work-btn[data-aid="' + aid + '"][data-sid="' + sid + '"]';
+    var btn = null;
+    try {
+      btn = document.querySelector(sel);
+    } catch (e) {
+      btn = null;
+    }
+    if (btn && !btn.disabled) btn.focus({ preventScroll: true });
+  }
+
+  // A file the row's + couldn't use, or an answer that isn't "added": said once, in a toast.
+  function _attachSay(text) {
+    if (!text || typeof showSyncToast !== 'function') return;
+    try {
+      showSyncToast(text, 'info');
+    } catch (e) {
+      /* a toast is only a courtesy */
+    }
+  }
+
+  // Image or PDF…: the files go in as the grader's Add Work puts them (shrunk, in order).
+  function _attachWorkFiles(input) {
+    var files = Array.prototype.slice.call(input.files || []);
+    input.value = '';
+    var cid = activeCourse;
+    var aid = input.getAttribute('data-aid');
+    var sid = input.getAttribute('data-sid');
+    var key = aid + '|' + sid;
+    if (!files.length || !window.PhotoShrink || !cid || !aid || !sid || _attachBusy[key]) return;
+    _attachBusy[key] = true;
+    render();
+    _prepareWorkFiles(files)
+      .then(function (got) {
+        if (got.said || !got.pages.length) return { result: 'refused', said: got.said };
+        return addStudentWorkPages(cid, sid, aid, got.pages, { mode: 'new' });
+      })
+      .then(null, function () {
+        return { result: 'store_failed' };
+      })
+      .then(function (res) {
+        delete _attachBusy[key];
+        if (res.result !== 'sent') _attachSay(res.said || _addWorkAnswer(res));
+        if (activeCourse !== cid) return;
+        render();
+        if (!document.activeElement || document.activeElement === document.body) _focusWorkIcon(aid, sid);
+      });
+  }
+
+  /* Link…: a small form under the +, a web address and an optional name,
+     checked as the assessment form's links are (assessmentLinkCheck). */
+  // html-safe: the name goes through esc; ids are ours (and go through esc); labels are fixed
+  function _attachLinkHtml(cid, aid, sid) {
+    var st = _workStudent(cid, sid);
+    return (
+      '<div class="rsg-attach-link" role="dialog" aria-label="' +
+      esc('Attach a Link for ' + (st ? displayNameFirst(st) : 'this student')) +
+      '" data-aid="' +
+      esc(aid) +
+      '" data-sid="' +
+      esc(sid) +
+      '">' +
+      '<input class="af-input rsg-attach-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Web Address" placeholder="Paste a web address">' +
+      '<input class="af-input rsg-attach-title" type="text" autocomplete="off" maxlength="200" aria-label="Name (optional)" placeholder="Name (optional)">' +
+      '<p class="rsg-attach-msg" role="status" hidden></p>' +
+      '<div class="rsg-attach-actions">' +
+      '<button type="button" class="btn btn-ghost" data-stop-prop="true" data-action="attachLinkCancel">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-stop-prop="true" data-action="attachLinkAdd">Add Link</button>' +
+      '</div></div>'
+    );
+  }
+  function _openAttachLink(el) {
+    var wrap = el && el.closest('.rsg-attach');
+    if (!wrap) return;
+    _closeAttachLink(false);
+    _closeCardMenus();
+    // html-safe: built by _attachLinkHtml, which escapes the name and the ids
+    wrap.insertAdjacentHTML('beforeend', _attachLinkHtml(activeCourse, el.dataset.aid, el.dataset.sid));
+    var btn = wrap.querySelector('.rsg-attach-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    var url = wrap.querySelector('.rsg-attach-url');
+    if (url) url.focus({ preventScroll: true });
+  }
+  function _closeAttachLink(refocus) {
+    var open = document.querySelector('.rsg-attach-link');
+    if (!open) return;
+    var wrap = open.closest('.rsg-attach');
+    open.remove();
+    var btn = wrap && wrap.querySelector('.rsg-attach-btn');
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      if (refocus) btn.focus({ preventScroll: true });
+    }
+  }
+  function _attachLinkAdd(form) {
+    if (!form || form.dataset.busy) return;
+    var cid = activeCourse;
+    var aid = form.dataset.aid;
+    var sid = form.dataset.sid;
+    var urlEl = form.querySelector('.rsg-attach-url');
+    var msg = form.querySelector('.rsg-attach-msg');
+    var say = function (text) {
+      if (!msg) return;
+      msg.textContent = text;
+      msg.hidden = !text;
+    };
+    var check = typeof assessmentLinkCheck === 'function' ? assessmentLinkCheck(urlEl ? urlEl.value : '') : null;
+    if (!check || !check.ok) {
+      say(RES_LINK_WORDS[(check && check.reason) || 'not_web'] || RES_LINK_WORDS.not_web);
+      if (urlEl) {
+        urlEl.setAttribute('aria-invalid', 'true');
+        urlEl.focus();
+      }
+      return;
+    }
+    var titleEl = form.querySelector('.rsg-attach-title');
+    form.dataset.busy = '1';
+    addStudentWorkLink(cid, sid, aid, check.url, titleEl ? titleEl.value : '').then(function (res) {
+      delete form.dataset.busy;
+      if (res.result !== 'sent') {
+        say(
+          res.result === 'invalid'
+            ? RES_LINK_WORDS[res.reason] || RES_LINK_WORDS.not_web
+            : res.result === 'on_paper'
+              ? 'This was handed in on paper.'
+              : res.result === 'not_found'
+                ? 'This student is no longer in this class.'
+                : 'Links can be added in Demo Mode only for now.',
+        );
+        return;
+      }
+      if (activeCourse !== cid) return;
+      render();
+      _focusWorkIcon(aid, sid);
+    });
+  }
+  // Enter adds the link and Esc closes the form; every other key is the field's own.
+  function _attachLinkKeydown(e) {
+    var form = e.target && e.target.closest ? e.target.closest('.rsg-attach-link') : null;
+    if (!form) return false;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _closeAttachLink(true);
+    } else if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+      e.preventDefault();
+      _attachLinkAdd(form);
+    }
+    return true;
   }
 
   /* The grader dialog over this page, on `sid` or the first student whose
@@ -14754,6 +15016,14 @@ window.PageAssignments = (function () {
   function _workPhotos(n) {
     return n + (n === 1 ? ' photo' : ' photos');
   }
+  // "2 photos", "1 link", "2 photos · 1 link": a submission's pages and the links added to it (Demo Mode).
+  function _workPhotosAndLinks(sub) {
+    var n = ((sub && sub.files) || []).length;
+    var links = ((sub && sub.links) || []).length;
+    if (!links) return _workPhotos(n);
+    var said = links + (links === 1 ? ' link' : ' links');
+    return n ? _workPhotos(n) + ' · ' + said : said;
+  }
 
   /* The work the grader shows for `sid` (S12-F2): on a One per Group
      piece the group's, whoever sent it (getGroupWorkFiles), as one
@@ -14812,7 +15082,7 @@ window.PageAssignments = (function () {
       if (sub.on_paper) return 'Handed in on paper';
       var when = _workWhen(sub.sent_at || sub.created_at);
       var verb = sub.sent_by === 'teacher' ? 'Added by you' : 'Submitted';
-      return verb + (when ? ' ' + when : '') + ' · ' + _workPhotos((sub.files || []).length);
+      return verb + (when ? ' ' + when : '') + ' · ' + _workPhotosAndLinks(sub);
     }
     var status = getAssignmentStatus(cid, sid, a.id);
     if (status === 'EXC') return 'Excused';
@@ -15059,66 +15329,70 @@ window.PageAssignments = (function () {
     var first = view ? view.label : displayNameFirst(st);
     var files = (sub && sub.files) || [];
     if (!sub) return _addWorkHtml(cid, a, st, first);
-    if (!files.length)
+    var links = _workLinksHtml(sub);
+    if (!files.length && !links)
       return '<div class="grader-work-empty"><p>Handed in on paper. Grade it from the paper.</p></div>';
     var fit = _workFit(w, files.length);
     var grid = _workGrid(files.length);
     var markUp = !!(window.MarkUp && !onFirst && _markUpHere(cid));
-    var html =
-      // Every page the student sent at once (Colin, Nov 13: "I shouldn't
-      // have to switch pages"). On each page's corner: its number, Rotate
-      // (the view only) and Mark Up (S9-F1, teacher/markup.js).
-      '<div class="grader-work-pages fit-' +
-      fit +
-      (fit === 'all' ? ' cols-' + grid.cols + ' rows-' + grid.rows : '') +
-      '">' +
-      files
-        .map(function (file, at) {
-          var turn = w.turns[file.id] || 0;
-          var what = 'Page ' + (at + 1) + ' of ' + files.length;
-          var size =
-            file.width > 0 && file.height > 0
-              ? ' width="' + Math.round(file.width) + '" height="' + Math.round(file.height) + '"'
-              : '';
-          return (
-            '<section class="grader-work-sheet" aria-label="' +
-            esc(what) +
-            '"><div class="grader-work-corner"><span class="grader-work-at">' +
-            esc(what) +
-            '</span><span class="grader-spacer"></span>' +
-            '<button type="button" class="grader-work-tool grader-work-rotate" data-grader="work-rotate" data-at="' +
-            at +
-            '" aria-label="' +
-            esc('Rotate ' + what) +
-            '" title="Rotate">' +
-            _WORK_ROTATE_ICON +
-            '</button>' +
-            (markUp
-              ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup" data-at="' +
-                at +
-                '">Mark Up</button>'
-              : '') +
-            '</div>' +
-            '<div class="grader-work-page fit-' +
-            fit +
-            ' turn-' +
-            turn +
-            (fit === 'all' ? '" title="Click to see this page full width' : '') +
-            // The page's surface (S9-T1): the picture, and whatever is drawn
-            // over it (Mark Up), turn and fit together inside it.
-            '"><div class="grader-work-surface" data-file-id="' +
-            esc(file.id) +
-            '" data-page="' +
-            (at + 1) +
-            '"><img class="grader-work-img" alt="' +
-            esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
-            '"' +
-            size +
-            '></div></div></section>'
-          );
-        })
-        .join('') +
-      '</div>';
+    var html = !files.length
+      ? ''
+      : // Every page the student sent at once (Colin, Nov 13: "I shouldn't
+        // have to switch pages"). On each page's corner: its number, Rotate
+        // (the view only) and Mark Up (S9-F1, teacher/markup.js).
+        '<div class="grader-work-pages fit-' +
+        fit +
+        (fit === 'all' ? ' cols-' + grid.cols + ' rows-' + grid.rows : '') +
+        '">' +
+        files
+          .map(function (file, at) {
+            var turn = w.turns[file.id] || 0;
+            var what = 'Page ' + (at + 1) + ' of ' + files.length;
+            var size =
+              file.width > 0 && file.height > 0
+                ? ' width="' + Math.round(file.width) + '" height="' + Math.round(file.height) + '"'
+                : '';
+            return (
+              '<section class="grader-work-sheet" aria-label="' +
+              esc(what) +
+              '"><div class="grader-work-corner"><span class="grader-work-at">' +
+              esc(what) +
+              '</span><span class="grader-spacer"></span>' +
+              '<button type="button" class="grader-work-tool grader-work-rotate" data-grader="work-rotate" data-at="' +
+              at +
+              '" aria-label="' +
+              esc('Rotate ' + what) +
+              '" title="Rotate">' +
+              _WORK_ROTATE_ICON +
+              '</button>' +
+              (markUp
+                ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup" data-at="' +
+                  at +
+                  '">Mark Up</button>'
+                : '') +
+              '</div>' +
+              '<div class="grader-work-page fit-' +
+              fit +
+              ' turn-' +
+              turn +
+              (fit === 'all' ? '" title="Click to see this page full width' : '') +
+              // The page's surface (S9-T1): the picture, and whatever is drawn
+              // over it (Mark Up), turn and fit together inside it.
+              '"><div class="grader-work-surface" data-file-id="' +
+              esc(file.id) +
+              '" data-page="' +
+              (at + 1) +
+              '"><img class="grader-work-img" alt="' +
+              esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
+              '"' +
+              size +
+              '></div></div></section>'
+            );
+          })
+          .join('') +
+        '</div>';
+    // Links the teacher attached from the row's + (Demo Mode), under the pages.
+    html += links;
     // A revision's note is on its Revision card (S11-F3).
     if (sub.note && !(versions && !onFirst)) {
       var noteBy = sub.group ? _workStudent(cid, sub.noteBy) : null;
@@ -15138,6 +15412,39 @@ window.PageAssignments = (function () {
     return (
       html +
       '<div class="grader-work-foot"><button type="button" class="grader-work-delete" data-grader="work-delete">Delete Work</button></div>'
+    );
+  }
+
+  /* The links on a submission, each opening in a new tab. Only http(s)
+     addresses are drawn (addStudentWorkLink checked them as they came in). */
+  // html-safe: the address, its site and its name go through esc; the icon is fixed
+  function _workLinksHtml(sub) {
+    var links = ((sub && sub.links) || []).filter(function (l) {
+      return l && /^https?:\/\//i.test(String(l.url || ''));
+    });
+    if (!links.length) return '';
+    return (
+      '<div class="grader-work-links"><h3 class="grader-work-note-title">' +
+      (links.length === 1 ? 'Link' : 'Links') +
+      '</h3><ul class="grader-work-link-list">' +
+      links
+        .map(function (l) {
+          return (
+            '<li><a class="grader-work-link" href="' +
+            esc(l.url) +
+            '" target="_blank" rel="noopener noreferrer" title="' +
+            esc(l.url) +
+            '">' +
+            LINE_ICONS.link +
+            '<span class="grader-work-link-name">' +
+            esc(l.title || l.url) +
+            '</span><span class="grader-work-link-host">' +
+            esc(l.host || '') +
+            '</span></a></li>'
+          );
+        })
+        .join('') +
+      '</ul></div>'
     );
   }
 
@@ -15482,6 +15789,29 @@ window.PageAssignments = (function () {
     if (res.result === 'not_found') return 'This student is no longer in this class.';
     return "The photos couldn't be kept. Try again.";
   }
+  /* Each file shrunk in turn, its pages kept in order: a Promise of
+     { pages, said }, `said` the first refusal ('' when every file is used).
+     The grader's Add Work and the row's + both use it. */
+  function _prepareWorkFiles(files) {
+    var pages = [];
+    var said = '';
+    return files
+      .reduce(function (p, file) {
+        return p.then(function () {
+          if (said) return;
+          return PhotoShrink.prepare(file, { openPdf: window.PhotoReaders && PhotoReaders.openPdf }).then(
+            function (res) {
+              if (!res || !res.ok) said = _addWorkRefusal(res);
+              else pages = pages.concat(res.pages);
+              if (!said && pages.length > STUDENT_WORK_MAX_PAGES) said = 'A piece of work can have 30 pages at most.';
+            },
+          );
+        });
+      }, Promise.resolve())
+      .then(function () {
+        return { pages: pages, said: said };
+      });
+  }
   function _graderAddWorkFiles(input) {
     if (!_grader || _grader.work.busy) return;
     var files = Array.prototype.slice.call(input.files || []);
@@ -15497,24 +15827,12 @@ window.PageAssignments = (function () {
     g.work.busy = true;
     g.work.msg = '';
     render();
-    var pages = [];
     var said = '';
-    files
-      .reduce(function (p, file) {
-        return p.then(function () {
-          if (said) return;
-          return PhotoShrink.prepare(file, { openPdf: window.PhotoReaders && PhotoReaders.openPdf }).then(
-            function (res) {
-              if (!res || !res.ok) said = _addWorkRefusal(res);
-              else pages = pages.concat(res.pages);
-              if (!said && pages.length > STUDENT_WORK_MAX_PAGES) said = 'A piece of work can have 30 pages at most.';
-            },
-          );
-        });
-      }, Promise.resolve())
-      .then(function () {
-        if (said || !pages.length) return { result: 'refused' };
-        return addStudentWorkPages(cid, sid, aid, pages, { mode: 'new' });
+    _prepareWorkFiles(files)
+      .then(function (got) {
+        said = got.said;
+        if (said || !got.pages.length) return { result: 'refused' };
+        return addStudentWorkPages(cid, sid, aid, got.pages, { mode: 'new' });
       })
       .then(null, function () {
         return { result: 'store_failed' };
@@ -15541,6 +15859,22 @@ window.PageAssignments = (function () {
     var yours = files.length - theirs;
     var first = displayNameFirst(st);
     var p = _workPronoun(st);
+    // Only links (the row's Link…): no photos to lose.
+    var links = ((sub && sub.links) || []).length;
+    if (!files.length && links)
+      return (
+        (links === 1 ? 'The link' : 'The ' + links + ' links') +
+        ' you added for ' +
+        first +
+        ' on ' +
+        (a.title || 'this work') +
+        (links === 1 ? ' is' : ' are') +
+        ' deleted, and ' +
+        (p ? p.subj : first) +
+        ' can send work again. ' +
+        (p ? p.poss : first + '’s') +
+        ' grade and your comments stay.'
+      );
     var what = theirs
       ? first +
         '’s ' +

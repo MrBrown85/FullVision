@@ -84,13 +84,19 @@ const FIGURE_CALLS = [
 const ALLOWED = {
   "teacher/report-blocks.js ' / 4'": [2, 'Assignment Grades in a Letter class (_rowMarks), as before'],
   'teacher/report-blocks.js levelFigure(': [2, 'the same two Letter-class marks'],
-  'teacher/report-blocks.js out of 4': [1, 'the Assignment Grades legend in a Letter class'],
   'teacher/report-blocks.js formatLevel(': [
     5,
     'a Letter class only (_levelHtml, the override note, the Proficiency block, the legend), or the % of a Both class (_levelHtml)',
   ],
   'teacher/report-blocks.js formatLevelAs(': [4, "always 'percent': a piece's % in a Letter or Both class"],
-  'teacher/grade-report.js levelFigure(': [1, 'the Assessments list in a Letter class'],
+  'teacher/grade-report.js levelFigure(': [
+    2,
+    'the Assessments list in a Letter class: a piece, and a piece’s mark on one competency (By Competency)',
+  ],
+  'teacher/grade-report.js formatLevelAs(': [
+    2,
+    "always 'percent': a piece's % on one competency, Letter or Both class",
+  ],
   'shared/student-view.js formatLevel(': [2, 'My Learning in a Letter class: the %'],
   'shared/student-view.js studentGradeSummary(': [1, 'the level and whether there is any grade, not its text'],
 };
@@ -282,7 +288,7 @@ describe('every student-facing surface of the Demo class', { timeout: 120000 }, 
 
   it.each(['proficiency', 'both'])('a %s class names the proficiency on every surface', system => {
     const d = drawn[system];
-    ['quick', 'phones', 'progress › proficiency (row)', 'progress › grade-table (row)'].forEach(part => {
+    ['quick', 'phones', 'progress › proficiency (row)'].forEach(part => {
       const key = Object.keys(d).find(k => k.indexOf('year › ' + part) === 0);
       expect(d[key], part).toMatch(WORD);
     });
@@ -309,7 +315,7 @@ describe('every student-facing surface of the Demo class', { timeout: 120000 }, 
 
   it('a points or Complete/Incomplete score in a Proficiency class is shown exactly as before', () => {
     const points = Object.keys(unchanged.was).filter(k => k.indexOf('points › ') === 0);
-    expect(points.length).toBeGreaterThan(50);
+    expect(points.length).toBeGreaterThan(40);
     expect(points.filter(k => unchanged.now[k] !== unchanged.was[k])).toEqual([]);
     // And there are such scores: a 7/10 still reads 7 out of 10, with nothing out of 4 beside it.
     const q = JSON.parse(drawn.proficiency['year › quick › st1']);

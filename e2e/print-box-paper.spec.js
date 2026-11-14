@@ -23,7 +23,7 @@ async function openReports(page, paper) {
   // The class's paper as this computer remembers it (page-reports.js _loadPaper).
   if (paper) await page.evaluate(p => localStorage.setItem('gb-report-paper-sci8', p), paper);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty({ timeout: 30_000 });
   await recordPrints(page);
@@ -124,7 +124,7 @@ test('switching to Letter in the box counts again, the toolbar follows, and it p
   await page.reload();
   await page.waitForFunction(() => window.Router && getStudents('sci8').length > 0, null, { timeout: 15000 });
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio-fit')).not.toBeEmpty({ timeout: 30_000 });
   await expect(toolbarPaper(page)).toHaveText('Letter');
   box = await openBox(page);

@@ -75,9 +75,10 @@ test('the student page on and Send Work off: work that is in still shows', async
   expect(await page.evaluate(({ cid, LAB }) => GraderWork.workCounts(cid, LAB).notin, { cid: at.cid, LAB })).toBe(0);
   await page.goto('/assignments?open=' + LAB);
   await page.waitForSelector('#dock-mount nav');
-  // See the Work on a student's row opens the grader on their pages.
+  // See the Work (an icon) on a student's row opens the grader on their pages.
   const see = page.locator('#ac-' + LAB + ' .rsg-see-work[data-sid="st2"]');
-  await expect(see).toHaveText('See the Work');
+  await expect(see).toHaveAccessibleName('See the Work');
+  await expect(see).toHaveAttribute('title', 'See the Work');
   // Pointing at it shows the pages in a card; moving away takes the card off.
   await see.hover();
   const glance = page.locator('.ww-glance .ww-glance-img');
@@ -109,6 +110,40 @@ test('the student page on and Send Work off: work that is in still shows', async
   await expect(page.locator('#work-viewer-overlay .wv-at')).toHaveText('2 of 2');
   await page.keyboard.press('Escape');
   await expect(page.locator('#work-viewer-overlay')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('the + on a row with nothing in: attach a link, and it becomes See the Work', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const at = await openDemo(page);
+  expect(
+    await page.evaluate(({ cid, LAB }) => getStudentSubmission(cid, 'st11', LAB), { cid: at.cid, LAB }),
+  ).toBeNull();
+  await page.goto('/assignments?open=' + LAB);
+  await page.waitForSelector('#dock-mount nav');
+  const card = page.locator('#ac-' + LAB);
+  const plus = card.getByRole('button', { name: 'Attach Work for Ines' });
+  await expect(plus).toHaveAttribute('title', 'Attach Work for Ines');
+  await plus.click();
+  await expect(card.getByRole('menuitem', { name: 'Image or PDF…' })).toBeVisible();
+  await card.getByRole('menuitem', { name: 'Link…' }).click();
+  const form = card.getByRole('dialog', { name: 'Attach a Link for Ines' });
+  await form.getByRole('textbox', { name: 'Web Address' }).fill('not a web address');
+  await form.getByRole('button', { name: 'Add Link' }).click();
+  await expect(form.getByRole('status')).toContainText('isn’t a web address');
+  await form.getByRole('textbox', { name: 'Web Address' }).fill('docs.google.com/document/d/abc');
+  await form.getByRole('textbox', { name: 'Name (optional)' }).fill('Lab Write-Up');
+  await page.keyboard.press('Enter');
+  const see = card.getByRole('button', { name: 'See the Work' }).and(card.locator('[data-sid="st11"]'));
+  await expect(see).toBeFocused();
+  await see.click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog.locator('.grader-work-what')).toContainText('1 link');
+  await expect(dialog.getByRole('link', { name: /Lab Write-Up/ })).toHaveAttribute(
+    'href',
+    'https://docs.google.com/document/d/abc',
+  );
   expect(errors).toEqual([]);
 });
 
@@ -245,6 +280,15 @@ test("the Work tab: one student's work, thumbnails only", async ({ page }) => {
   await expect(card).toHaveCount(1);
   await expect(card.locator('.sw-title')).toHaveText('Cell Microscope Lab');
   await expect(card.locator('.ww-chip')).toHaveText('To Grade');
+  await expect(page.locator('.sw-count')).toHaveText('1 Piece');
+  await expect.poll(() => card.locator('img').evaluate(i => i.complete && i.naturalWidth)).toBeGreaterThan(0);
+  // Show filters the cards in place: the page is not drawn again.
+  await page.locator('[data-sw="state"][data-key="returned"]').click();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator('.sw-none')).toBeVisible();
+  await expect(tile).toBeVisible();
+  await page.locator('[data-sw="state"][data-key="all"]').click();
+  await expect(card).toHaveCount(1);
   await expect.poll(() => card.locator('img').evaluate(i => i.complete && i.naturalWidth)).toBeGreaterThan(0);
   expect(seen.length).toBe(1);
   expect(seen[0]).toMatch(/-thumb\.jpg$/);

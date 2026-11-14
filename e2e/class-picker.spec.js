@@ -83,7 +83,7 @@ const TABS = [
   ['Student', '/student?id=' + CLASS_A.students[0][0], '#gb-course-select', '#main'],
   ['Gradebook', '/gradebook', '.gb-course-select', '#main'],
   ['Observations', '/observations', '#gb-course-select', '#gb-roster-list'],
-  ['Reports', '/reports', '#gb-course-select', '#gb-roster-list'],
+  ['Reporting', '/reports', '#gb-course-select', '#gb-roster-list'],
 ];
 
 test.describe('Class picker', () => {

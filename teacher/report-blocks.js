@@ -27,12 +27,9 @@ window.ReportBlocks = (function () {
   renderBlockStudentReflectionHabits = _inReportScores(renderBlockStudentReflectionHabits);
   renderBlockSectionChart = _inReportScores(renderBlockSectionChart);
   renderBlockScoreDistribution = _inReportScores(renderBlockScoreDistribution);
-  renderBlockGradeTable = _inReportScores(renderBlockGradeTable);
   renderBlockCoreCompetencies = _inReportScores(renderBlockCoreCompetencies);
-  renderBlockSupportHome = _inReportScores(renderBlockSupportHome);
   renderBlockTermGlance = _inReportScores(renderBlockTermGlance);
   renderBlockGrowth = _inReportScores(renderBlockGrowth);
-  renderBlockMissingWork = _inReportScores(renderBlockMissingWork);
   renderBlockAttendance = _inReportScores(renderBlockAttendance);
   renderBlockSelfAssessment = _inReportScores(renderBlockSelfAssessment);
 
@@ -368,18 +365,37 @@ window.ReportBlocks = (function () {
     const rating = getStudentTermRating(cid, student.id, termId);
     const habits = (rating && rating.habits) || {};
     const bank = window.CommentBank;
-    const scale = bank.SCALE;
+    // Rarely to Consistently (the bank's scale ends in Not Seen).
+    const scale = bank.SCALE.slice(0, 4);
     const rated = h => habits[h.key] >= 1 && habits[h.key] <= 4;
-    if (!bank.HABITS.some(rated)) return '';
-    const rows = bank.HABITS.filter(h => rated(h) || (options.rated === false && habits[h.key] !== bank.NOT_SEEN))
+    // The student rates every habit beside the teacher's, on paper.
+    const mine = options.student === true;
+    if (!bank.HABITS.some(rated) && !mine) return '';
+    const list = bank.HABITS.filter(
+      h => rated(h) || mine || (options.rated === false && habits[h.key] !== bank.NOT_SEEN),
+    );
+    const desc = options.desc !== false;
+    const first = esc(displayNameFirst(student));
+    const bubbles = mine
+      ? scale.map(() => '<td class="report-habit-o"><span class="report-bubble"></span></td>').join('')
+      : '';
+    const rows = list
       .map(
         h =>
-          `<div class="report-disp-row"><span>${esc(h.name)}</span><span class="report-disp-word" data-level="${rated(h) ? habits[h.key] : 0}">${esc(rated(h) ? scale[habits[h.key] - 1] : '\u2014')}</span></div>`,
+          `<tr><td class="report-habit-k"><span class="report-habit-name">${esc(h.name)}</span>${desc && h.desc ? `<span class="report-habit-desc">${esc(h.desc)}</span>` : ''}</td><td class="report-habit-t report-disp-word" data-level="${rated(h) ? habits[h.key] : 0}">${esc(rated(h) ? scale[habits[h.key] - 1] : '—')}</td>${bubbles}</tr>`,
       )
       .join('');
-    return `<div class="report-block-box report-learner-profile${half ? ' report-disp-half' : ''}">
-    <div class="report-prof-head report-disp-head"><div class="report-block-title">Learning Dispositions</div>${options.scale !== false ? '<div class="report-prof-meta">Teacher observation · Rarely · Sometimes · Usually · Consistently</div>' : ''}</div>
-    <div class="report-disp">${rows}</div>
+    const head = `<thead>${mine ? `<tr class="report-habit-over"><th></th><th></th><th colspan="${scale.length}">${first}’s Own Rating</th></tr>` : ''}<tr><th>Work Habit</th><th class="report-habit-t">Teacher</th>${mine ? scale.map(w => `<th class="report-habit-o">${esc(w)}</th>`).join('') : ''}</tr></thead>`;
+    // What the four words mean, for a family reading them for the first time.
+    const key =
+      options.scale !== false
+        ? `<div class="report-habit-key"><b>Consistently</b> almost always, without reminders · <b>Usually</b> most of the time · <b>Sometimes</b> now and then, often with a reminder · <b>Rarely</b> seldom so far</div>`
+        : '';
+    return `<div class="report-block-box report-learner-profile${half ? ' report-disp-half' : ''}${mine ? ' report-habits-mine' : ''}">
+    <div class="report-prof-head report-disp-head"><div class="report-block-title">Learning Dispositions</div><div class="report-prof-meta">From my observation in class</div></div>
+    <div class="report-habit-intro">How often ${first} showed each habit this term.${mine ? ` ${first}: fill in one circle per row for how often you think you do it.` : ''}</div>
+    <table class="report-ct report-habits-tbl">${head}<tbody>${rows}</tbody></table>
+    ${key}
   </div>`;
   }
 
@@ -697,8 +713,7 @@ window.ReportBlocks = (function () {
   /* A section's scored work, in date order: [{ a, d, score }], the highest
      mark per assessment. Each mark is the competency's on the piece, as the
      gradebook shows it: rubric criteria that disagree give the lowest
-     (Colin, 2026-11-03). Progress in One Area, Next Steps and Ways to
-     Support at Home read it. Pieces with the same date are in the order the
+     (Colin, 2026-11-03). Progress in One Area and Next Steps read it. Pieces with the same date are in the order the
      grades count them in (calc.js samePieceDateOrder: the one made later is
      later), so "Latest" here is the piece the grade treats as latest. */
   function _sectionWork(cid, sid, sec) {
@@ -1545,88 +1560,78 @@ window.ReportBlocks = (function () {
     return html;
   }
 
+  /* ── Student Self-Reflections ──
+     Printed forms the student fills in by hand, laid out like the rest of
+     the report: a table with a circle per row under each word of the
+     scale, then each question with ruled lines to write on
+     (options.writeLines a question, 3 unless the part says). One table, so
+     a long form is cut between its rows; the questions print with its last
+     rows. */
+  function _writeLines(options) {
+    const n = Number(options && options.writeLines);
+    return n >= 1 && n <= 8 ? Math.round(n) : 3;
+  }
+  function _openHtml(list, options) {
+    if (!list.length) return '';
+    const lines = _writeLines(options);
+    return `<div class="report-reflect-write">${list
+      .map(
+        o =>
+          `<div class="report-reflect-q"><div class="report-reflect-q-label">${_say(o)}</div><div class="report-write-lines" style="height:${lines * 26}px"></div></div>`,
+      )
+      .join('')}</div>`;
+  }
+  function _scaleHead(scale, first) {
+    return `<thead><tr><th>${first}</th>${scale.map(s => `<th class="report-habit-o">${_say(s)}</th>`).join('')}</tr></thead>`;
+  }
+  function _bubbleCells(scale) {
+    return scale.map(() => '<td class="report-habit-o"><span class="report-bubble"></span></td>').join('');
+  }
+
   /* ── Student Self-Reflection: My Learning ── */
   function renderBlockStudentReflectionLearning(cid, student, options) {
     const w = _wording('student-reflection-learning', options);
     const scale = w.scale;
-    let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">${_say(w.title)}</div>`;
-    html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${_intro(w.intro, student)}</div>`;
-    // Scale header
-    html += `<div style="display:flex;justify-content:flex-end;gap:0;margin-bottom:4px;padding-right:4px">`;
-    scale.forEach(s => {
-      html += `<span style="width:68px;text-align:center;font-size:0.56rem;font-weight:700;color:var(--text-3)">${_say(s)}</span>`;
-    });
-    html += `</div>`;
-    // Disposition rows, under their group's name
+    let rows = '';
     let group = null;
     w.items.forEach(it => {
       const item = typeof it === 'string' ? { label: it } : it || {};
       const g = item.group == null ? '' : String(item.group);
-      if (g !== group && g) {
-        html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-2);padding:10px 0 2px;border-top:1.5px solid var(--border)">${_say(g)}</div>`;
-      }
+      if (g !== group && g)
+        rows += `<tr class="report-ct-group"><td colspan="${scale.length + 1}">${_say(g)}</td></tr>`;
       group = g;
       const prompt = item.prompt == null ? '' : String(item.prompt);
-      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--divider-subtle)">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${_say(item.label)}</div>
-          ${prompt ? `<div style="font-size:0.7rem;color:var(--text-2);font-style:italic;line-height:1.3">${_say(prompt)}</div>\n        ` : ''}</div>
-        <div style="display:flex;gap:0;flex-shrink:0">`;
-      scale.forEach(() => {
-        html += `<span style="width:68px;display:flex;justify-content:center"><span class="report-reflect-bubble"></span></span>`;
-      });
-      html += `</div></div>`;
+      rows += `<tr><td class="report-habit-k"><span class="report-habit-name">${_say(item.label)}</span>${prompt ? `<span class="report-habit-desc">${_say(prompt)}</span>` : ''}</td>${_bubbleCells(scale)}</tr>`;
     });
-    // Open response
-    if (w.open.length) {
-      html += `<div class="report-reflect-open" style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--border)">
-    ${w.open.map(o => `<div class="report-reflect-open-line"><span class="report-reflect-open-label">${_say(o)}</span><span class="report-reflect-open-field"></span></div>`).join('\n    ')}
+    return `<div class="report-block-box report-reflect">
+    <div class="report-block-title">${_say(w.title)}</div>
+    <div class="report-habit-intro">${_intro(w.intro, student)}</div>
+    <table class="report-ct report-reflect-tbl">${_scaleHead(scale, '')}<tbody>${rows}</tbody></table>
+    ${_openHtml(w.open, options)}
   </div>`;
-    }
-    html += `</div>`;
-    return html;
   }
 
   /* ── Student Self-Reflection: My Habits ── */
   function renderBlockStudentReflectionHabits(cid, student, options) {
     const w = _wording('student-reflection-habits', options);
     const scale = w.scale;
-    let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">${_say(w.title)}</div>`;
-    html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${_intro(w.intro, student)}</div>`;
-    // Rating table
-    html += `<table class="report-habits-table"><thead><tr><th></th>`;
-    scale.forEach(s => {
-      html += `<th>${_say(s)}</th>`;
-    });
-    html += `</tr></thead><tbody>`;
-    w.items.forEach(h => {
-      html += `<tr><td>${_say(typeof h === 'string' ? h : h && h.label)}</td>`;
-      scale.forEach(() => {
-        html += `<td><span class="report-habits-bubble"></span></td>`;
-      });
-      html += `</tr>`;
-    });
-    html += `</tbody></table>`;
-    // Quick-check section
-    if (w.checks.length) {
-      html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
-    <div style="font-size:0.72rem;font-weight:700;color:var(--text-2);margin-bottom:10px">${_say(w.checkHead)}</div>
-    <div class="report-habits-checks">`;
-      w.checks.forEach(c => {
-        html += `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${_say(c)}</div>`;
-      });
-      html += `</div></div>`;
-    }
-    // Open response
-    if (w.open.length) {
-      html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
-    ${w.open.map(o => `<div class="report-reflect-open-line"><span class="report-reflect-open-label">${_say(o)}</span><span class="report-reflect-open-field"></span></div>`).join('\n    ')}
+    const rows = w.items
+      .map(
+        h =>
+          `<tr><td class="report-habit-k"><span class="report-habit-name">${_say(typeof h === 'string' ? h : h && h.label)}</span></td>${_bubbleCells(scale)}</tr>`,
+      )
+      .join('');
+    const checks = w.checks.length
+      ? `<div class="report-reflect-checks"><div class="report-reflect-q-label">${_say(w.checkHead)}</div><div class="report-habits-checks">${w.checks
+          .map(c => `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${_say(c)}</div>`)
+          .join('')}</div></div>`
+      : '';
+    return `<div class="report-block-box report-reflect">
+    <div class="report-block-title">${_say(w.title)}</div>
+    <div class="report-habit-intro">${_intro(w.intro, student)}</div>
+    <table class="report-ct report-reflect-tbl">${_scaleHead(scale, '')}<tbody>${rows}</tbody></table>
+    ${checks}${_openHtml(w.open, options)}
   </div>`;
-    }
-    html += `</div>`;
-    return html;
   }
 
   /* ── Section Proficiency Bar Chart (horizontal bars) ── */
@@ -1929,25 +1934,11 @@ window.ReportBlocks = (function () {
     return html;
   }
 
-  /* ── Assignment Grades ──────────────────────────────────────────
-     One row per assessment: the date, the full title, and the marks the
-     teacher picks under Show: the Score (12 / 15; work scored on
-     proficiency as its proficiency, or 3.3 / 4 in a Letter class; blank
-     with no mark yet), the Percent and, in a Letter class, the Proficiency
-     Word. Percent and the word start from the class grading setting
-     (showDefaults). Organized by
-     Category, by Date (a heading per month) or by Competency (a heading per
-     competency over its latest few pieces of work, each row the mark on
-     that competency). Newest or oldest first; one column or two, a
-     heading never split across columns. Range: the last 10, this term or
-     the year to date (all); each leaves out work dated after today. It starts in one column, by date, year to
-     date. Side by Side is one column of the last 10 (never by competency). No dots (DECISIONS "Report forms" 13). */
+  /* Which marks a class shows by default: the percent outside a
+     Proficiency class, the proficiency word outside a Letter class. */
   function showDefaults(cid) {
     const mode = courseGradeMode(cid);
     return { percent: mode !== 'proficiency', word: mode !== 'letter' };
-  }
-  function _monthName(d) {
-    return parseLocalDate(d).toLocaleDateString('en-CA', { month: 'long' });
   }
   /* The marks for one row: { score, percent, word } as strings ('' when
      there is none). cv: calc.js assessmentCellValue. level: the mark on
@@ -2008,271 +1999,6 @@ window.ReportBlocks = (function () {
       percent: courseGradeMode(cid) === 'both' ? pct : '',
       word: '',
     };
-  }
-
-  /* The width in px the mark column needs for texts (this student's
-     marks): each measured in the sheet's type, at the size it prints at
-     (11px: the sheet sets --text-xs itself, reports.css .report-sheet, and
-     the stage is a .report-sheet), in the font the page shows it in and in
-     the one it prints in (reports.css .gr-print-font), the wider kept, with
-     4% and 2px of headroom, as the Assessments list sizes its columns
-     (grade-report.js _fitPx). 0 where nothing can be measured (no layout): the column keeps
-     its usual width. A fixed 90px cut off a Both class's "Proficient − ·
-     67%" (Nov 12). */
-  const MARK_ROOM = 1.04;
-  const _markMemo = {};
-  function _gradesMarkNeeds(texts) {
-    if (typeof document === 'undefined' || !document.body || typeof getComputedStyle !== 'function') return {};
-    const names = texts.filter((t, i, all) => t && all.indexOf(t) === i);
-    if (!names.length) return {};
-    // A stage on <body> for this call only, as ReportSheets measures.
-    const stage = document.createElement('div');
-    stage.className = 'report-sheet report-sheet-measure';
-    stage.setAttribute('aria-hidden', 'true');
-    stage.style.cssText =
-      'position:absolute;left:-10000px;top:0;width:auto;height:auto;min-height:0;padding:0;margin:0;box-shadow:none;display:block;visibility:hidden;overflow:visible';
-    // html-safe: fixed markup, no data
-    stage.innerHTML =
-      '<div class="report-grades"><div class="report-grades-row" style="display:block"></div><div class="report-grades-row gr-print-font" style="display:block"></div></div>';
-    document.body.appendChild(stage);
-    let memo;
-    try {
-      const rows = stage.querySelectorAll('.report-grades-row');
-      // The widths hold for this type: a font put on the sheet later is measured afresh.
-      const cs = getComputedStyle(rows[0]);
-      const key = [cs.fontSize, cs.fontFamily, cs.letterSpacing, getComputedStyle(rows[1]).fontFamily].join('|');
-      memo = _markMemo[key] || (_markMemo[key] = {});
-      const todo = names.filter(n => !Object.prototype.hasOwnProperty.call(memo, n));
-      if (todo.length) {
-        const spans = todo
-          .map(n => `<span class="report-grades-figs" style="display:inline-block">${esc(n)}</span>`)
-          .join('');
-        // html-safe: every name goes through esc
-        rows[0].innerHTML = spans;
-        // html-safe: every name goes through esc
-        rows[1].innerHTML = spans;
-        todo.forEach((n, i) => {
-          const px = Math.max(
-            rows[0].children[i].getBoundingClientRect().width,
-            rows[1].children[i].getBoundingClientRect().width,
-          );
-          // Nothing measured (no layout): kept out of the memo.
-          if (px > 0) memo[n] = px;
-        });
-      }
-    } finally {
-      stage.remove();
-    }
-    const need = {};
-    names.forEach(n => (need[n] = memo[n] > 0 ? Math.ceil(memo[n] * MARK_ROOM) + 2 : 0));
-    return need;
-  }
-
-  /* The Assignment Grades groups ({ name, grade?, rows: [row html] }) laid
-     in one column or two. Also lays out each part of a table too long for
-     one side (ReportSheets cuts it at its rows), so a part reads as the
-     whole table does. */
-  function gradeColumnsHtml(groups, one) {
-    const groupHtml = g =>
-      `<div class="report-grades-head"><span>${esc(g.name)}</span>${g.grade ? `<span class="report-grades-headgrade">${esc(g.grade)}</span>` : ''}</div>${g.rows.join('')}`;
-    if (one) return `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
-    // The rows split evenly between the columns, read down the left and
-    // then the right. A group cut by the split carries on at the top of the
-    // right column under its name again; a heading never ends a column.
-    const total = groups.reduce((t, g) => t + g.rows.length + 1, 0);
-    const cut = Math.ceil(total / 2);
-    const left = [];
-    const right = [];
-    let used = 0;
-    groups.forEach(g => {
-      const room = cut - used;
-      if (room >= g.rows.length + 1) left.push(g);
-      else if (room >= 2 && !right.length) {
-        left.push(Object.assign({}, g, { rows: g.rows.slice(0, room - 1) }));
-        right.push({ name: g.name + ' (continued)', rows: g.rows.slice(room - 1) });
-      } else right.push(g);
-      used += g.rows.length + 1;
-    });
-    return `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
-  }
-
-  function renderBlockGradeTable(cid, student, options, ctx) {
-    options = options || {};
-    const sid = student.id;
-    const half = options.size === 'half';
-    const autos = showDefaults(cid);
-    const pick = (k, dflt) => (options[k] === 'auto' || options[k] == null ? dflt : options[k] !== false);
-    const showScore = pick('score', true);
-    const showPct = pick('percent', autos.percent);
-    // A Proficiency or Both class names its levels, with no number for one.
-    const byName = courseGradeMode(cid) !== 'letter';
-    // There a level's mark is its proficiency and points carry no word
-    // (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12),
-    // so the Proficiency Word column would be empty: it is not printed,
-    // and a saved form's Word is read as the class's default, which prints
-    // the legend's scale line (ReportSheets.BLOCKS hides the option there).
-    // A Letter class prints the word beside a mark when Word is on.
-    const showWord = !byName && pick('word', autos.word);
-    const showScale = byName || showWord;
-    const showCourse = pick('course', true);
-    const showCatGrade = pick('categoryGrade', true);
-    const organize = half && options.organize === 'competency' ? 'category' : options.organize || 'date';
-    const oldest = options.order === 'oldest';
-    const one = half || options.columns !== 'two';
-    const range = half ? 'last10' : options.range === 'term' || options.range === 'last10' ? options.range : 'all';
-    const per = Math.max(1, Number(options.per) || 5);
-
-    const dated = getAssessments(cid)
-      .filter(a => !isDibelsScored || !isDibelsScored(a))
-      .map(a => ({ a, d: typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || '' }))
-      .sort((x, y) => (y.d || '').localeCompare(x.d || ''));
-    // Every range leaves out work dated after today (This Term too:
-    // Colin, 2026-11-03).
-    const today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
-    // A report reads the year to date as of its end, so work dated after
-    // the report's end is left out too (Colin, 2026-11-03).
-    const report = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-    const until = report && report.endsOn && report.endsOn < today ? report.endsOn : today;
-    let pool = dated.filter(x => !x.d || x.d <= until);
-    if (range === 'term') pool = pool.filter(x => assessmentInTermWindow(cid, x.a));
-    else if (range === 'last10') pool = pool.slice(0, 10);
-    if (oldest) pool = pool.slice().reverse();
-    if (!pool.length) return '';
-
-    const figs = m => [showScore && m.score, showPct && m.percent].filter(Boolean).join(' · ') || m.score;
-    const when = d => (d ? parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '—');
-    // Every mark printed, for sizing the mark column (_gradesMarkPx).
-    // Each row's mark, for the room a wide one needs (below); the row and
-    // its title carry the mark's number until then.
-    const printed = [];
-    const rowHtml = (x, marks) => {
-      const mark = figs(marks);
-      const slot = '\u0000' + printed.push(mark) + '\u0000';
-      return `<div class="report-grades-row"${slot}><span class="report-grades-date">${esc(when(x.d))}</span><span class="report-grades-title">${esc(x.a.title || '')}${slot}</span><span class="report-grades-figs">${esc(mark)}</span>${showWord ? `<span class="report-grades-word">${esc(marks.word)}</span>` : ''}</div>`;
-    };
-
-    // The groups: a heading and its rows, in the order they print.
-    const groups = [];
-    if (organize === 'competency') {
-      const sections = _reportSections(cid);
-      // The marks are read as of the report (the year to date to its end),
-      // which holds every range's pieces.
-      const marks = {};
-      // The competency's mark on each piece, as the gradebook shows it.
-      sections.forEach(sec =>
-        (sec.tags || []).forEach(tag => (marks[tag.id] = tagMarksByAssessment(cid, sid, tag.id))),
-      );
-      sections.forEach(sec => {
-        const byAssessment = {};
-        (sec.tags || []).forEach(tag => {
-          marks[tag.id].forEach(sc => {
-            if (sc.score > 0 && (byAssessment[sc.assessmentId] == null || sc.score > byAssessment[sc.assessmentId])) {
-              byAssessment[sc.assessmentId] = sc.score;
-            }
-          });
-        });
-        const rows = pool.filter(x => byAssessment[x.a.id] != null).slice(0, per);
-        if (rows.length) {
-          groups.push({
-            name: _competencyLabel(sec),
-            rows: rows.map(x => rowHtml(x, _rowMarks(cid, x.a, null, byAssessment[x.a.id], sid))),
-          });
-        }
-      });
-    } else {
-      const cells = {};
-      pool.forEach(x => (cells[x.a.id] = assessmentCellValue(cid, sid, x.a)));
-      if (organize === 'date') {
-        const months = [];
-        pool.forEach(x => {
-          const key = x.d ? x.d.slice(0, 7) : '';
-          let g = months.find(m => m.key === key);
-          if (!g) months.push((g = { key, name: x.d ? _monthName(x.d) : 'Undated', rows: [] }));
-          g.rows.push(rowHtml(x, _rowMarks(cid, x.a, cells[x.a.id])));
-        });
-        months.forEach(m => groups.push({ name: m.name, rows: m.rows }));
-      } else {
-        // Each category heading carries its weight and the student's grade
-        // in it, the year to date as of the report's end, worked out as the
-        // gradebook does (the Course Grade's footing; Colin, 2026-11-03).
-        const termWork = getAssessments(cid).filter(a => assessmentInYearToDate(cid, a));
-        const catGrade = c => {
-          if (!showCatGrade) return '';
-          const g = assessmentGroupGrade(
-            cid,
-            sid,
-            termWork.filter(a => (a.categoryId || a.category_id || null) === c.id),
-            categoryCalcMode(c),
-          );
-          return [Number(c.weight || 0) + '% of grade', studentGroupGradeText(cid, g)].filter(Boolean).join(' · ');
-        };
-        const cats = (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, grade: catGrade(c), rows: [] }));
-        const none = { id: null, name: 'No Category', rows: [] };
-        pool.forEach(x => {
-          const id = x.a.categoryId || x.a.category_id || null;
-          const g = cats.find(c => c.id === id) || none;
-          g.rows.push(rowHtml(x, _rowMarks(cid, x.a, cells[x.a.id])));
-        });
-        cats.concat([none]).forEach(g => {
-          if (g.rows.length) groups.push({ name: g.name, grade: g.grade, rows: g.rows });
-        });
-      }
-    }
-    if (!groups.length) return '';
-
-    const body = gradeColumnsHtml(groups, one);
-    const n = pool.length;
-    const meta = half
-      ? 'Last 10'
-      : (range === 'last10' ? 'Last 10' : range === 'all' ? 'Year to date' : 'This term') +
-        (organize === 'competency'
-          ? ` · latest ${per} for each competency`
-          : ` · ${n} assessment${n === 1 ? '' : 's'}`);
-    // The course grade, the year to date as of the report's end, as the
-    // gradebook shows it, with the report's reporting basis (IE, or No
-    // Letter Grade for goals).
-    const course = showCourse ? studentGradeText(cid, sid, ctx && ctx.termId).text : '';
-    const courseHtml = course
-      ? `<div class="report-grades-course">Course Grade <strong>${esc(course)}</strong></div>`
-      : '';
-    const legend = [
-      showScore
-        ? byName
-          ? 'Points shown as scored; other work shown as its proficiency.'
-          : 'Points shown as scored; other work scored out of 4.'
-        : '',
-      showScale
-        ? byName
-          ? 'Proficiency: Emerging · Developing · Proficient · Extending.'
-          : 'Proficiency: 1 Emerging · 2 Developing · 3 Proficient · 4 Extending.'
-        : '',
-      organize === 'competency' ? 'Each mark is for that competency.' : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-    // A mark wider than its column, in a Proficiency or Both class ("Proficient
-    // − · 67%"), reaches left past it onto the title's last line: the row
-    // carries the width it needs (--grades-mark, measured in the sheet's
-    // fonts) and the title ends in a spacer that wide less the column
-    // (reports.css), which drops to a line of its own only when the last
-    // line has no room. The columns keep their widths, so a title wraps
-    // where it did. A Letter class is as it was: none of its marks was ever
-    // cut off, and nothing is measured.
-    const needs = byName ? _gradesMarkNeeds(printed) : {};
-    const html = body.replace(
-      /<div class="report-grades-row"\u0000(\d+)\u0000([\s\S]*?)\u0000\1\u0000/g,
-      (m, i, mid) => {
-        const need = needs[printed[i - 1]] || 0;
-        // 90px, the narrowest the column is, holds it: nothing added.
-        if (need <= 90) return '<div class="report-grades-row"' + mid;
-        return `<div class="report-grades-row report-grades-wide" style="--grades-mark:${need}px"${mid}<span class="report-grades-room" aria-hidden="true"></span>`;
-      },
-    );
-    return `<div class="report-block-box report-grades${half ? ' report-grades-half' : ''}${showWord ? '' : ' report-grades-noword'}">
-    <div class="report-prof-head"><div class="report-block-title">Assignment Grades</div>${courseHtml}<div class="report-prof-meta">${esc(meta)}</div></div>
-    ${html}
-    <div class="report-grades-legend">${legend}</div>
-  </div>`;
   }
 
   /* ── Core Competencies ── */
@@ -2346,66 +2072,6 @@ window.ReportBlocks = (function () {
     });
     html += `</div></div>`;
     return html;
-  }
-
-  /* ── Ways to Support at Home ──
-     Lines for the family from the I-can statements of the student's
-     weakest assessed competencies ("I can plan a fair test" becomes "Ask
-     Cece to show you how she can plan a fair test."), and the teacher's
-     own line for the class. Nothing generated beyond that wording. */
-  /* ── Ways to Support at Home ──
-     Lines for the family from the I-can statements of the student's
-     weakest assessed competencies ("I can plan a fair test" becomes "Ask
-     Cece to show you how she can plan a fair test."), and the teacher's
-     own line for the class. Nothing generated beyond that wording. */
-  function _forFamily(student, stmt) {
-    const p = getPronouns(student);
-    const name = displayNameFirst(student);
-    const m = String(stmt || '')
-      .trim()
-      .match(/^I can (.+?)\.?$/i);
-    if (!m) return `Talk with ${name} about this: ${String(stmt).trim()}`;
-    const rest = m[1]
-      .replace(/\bmyself\b/gi, p.refl)
-      .replace(/\bmy\b/gi, p.poss)
-      .replace(/\bme\b/gi, p.obj)
-      .replace(/\bI\b/g, p.subj)
-      .replace(/\bI'm\b/g, p.subj + (p.subj === 'they' ? "'re" : "'s"));
-    return `Ask ${name} to show you how ${p.subj} can ${rest}.`;
-  }
-  /* ── Ways to Support at Home ────────────────────────────────────
-     The student's best and lowest work in the Focus Area this term, for
-     the family to ask to see and ask about, and the teacher's own line.
-     The student's goal prints in Self-Assessment and Goal, not here. */
-  function renderBlockSupportHome(cid, student, ctx, options) {
-    options = options || {};
-    const half = options.size === 'half';
-    const p = getPronouns(student);
-    const lines = [];
-    const focus = focusArea(cid, student, ctx, 'focus');
-    if (focus) {
-      const work = _sectionWork(cid, student.id, focus.sec).filter(w => assessmentInTermWindow(cid, w.a));
-      if (work.length) {
-        const hi = _byMark(cid, student.id, true);
-        const lo = _byMark(cid, student.id, false);
-        const best = work.slice().sort((a, b) => hi(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
-        const low = work.slice().sort((a, b) => lo(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
-        if (options.see !== false && best) lines.push(['Ask to see', _workLine(cid, student.id, best)]);
-        if (options.about !== false && low && (work.length > 1 || options.see === false)) {
-          lines.push([
-            'Ask about',
-            _workLine(cid, student.id, low) + (low !== best ? ', ' + esc(p.poss) + ' lowest this term' : ''),
-          ]);
-        }
-      }
-    }
-    const note = String(options.note || '').trim();
-    if (note) lines.push(['', esc(note)]);
-    if (!lines.length) return '';
-    return `<div class="report-block-box report-support-home${half ? ' report-support-half' : ''}">
-    <div class="report-block-title">Ways to Support at Home</div>
-    <div class="report-support">${lines.map(([k, v]) => `<span class="report-support-k">${k}</span><span>${v}</span>`).join('')}</div>
-  </div>`;
   }
 
   /* The assessments dated in the report's term (all when no term is
@@ -2498,36 +2164,6 @@ window.ReportBlocks = (function () {
     return `<div class="report-block-box report-growth">
     <div class="report-block-title">Growth Since Last Report</div>
     <table class="report-ct"><thead><tr><th>Competency</th><th class="col-before">${esc(reportName(prev))}</th><th>${esc(reportName(now))}</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-  </div>`;
-  }
-
-  /* ── Missing Work ────────────────────────────────────────────────
-     Work labelled Missing up to the report's end, whatever term it was
-     assigned in, as of today: one line at Row width ("None", or the
-     titles), a count over its words at Side by Side. When there is none it says so, or stays off. The As Of
-     date is marked data-print-date: "changed since the last print" skips it. */
-  function _asOf(cid) {
-    const d = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
-    return (
-      'As of ' + parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
-    );
-  }
-  function renderBlockMissingWork(cid, student, ctx, options) {
-    options = options || {};
-    const half = options.size === 'half';
-    const missing = _missingCells(cid, student);
-    if (!missing.length && options.none === 'off') return '';
-    const n = missing.length;
-    const titles = missing.map(c => esc(c.a.title || '')).join(', ');
-    const words = n ? (options.titles !== false ? titles : n + (n === 1 ? ' assignment' : ' assignments')) : 'None';
-    if (half) {
-      return `<div class="report-block-box report-missing-work report-strip-half">
-    <div class="report-strip-head"><b>Missing Work</b><span class="report-prof-meta" data-print-date>${esc(_asOf(cid))}</span></div>
-    <div class="report-strip-fig"><b>${n}</b><span>${words}</span></div>
-  </div>`;
-    }
-    return `<div class="report-block-box report-missing-work report-strip">
-    <b class="report-strip-title">Missing Work</b><span>${words}</span><span class="report-strip-meta" data-print-date>${esc(_asOf(cid))}</span>
   </div>`;
   }
 
@@ -2678,8 +2314,6 @@ window.ReportBlocks = (function () {
         return renderBlockSectionChart(cid, student);
       case 'score-distribution':
         return renderBlockScoreDistribution(cid, student);
-      case 'grade-table':
-        return renderBlockGradeTable(cid, student, options, ctx);
       case 'section-outcomes':
         return renderBlockSectionOutcomes(cid, student);
       case 'core-competencies':
@@ -2706,14 +2340,10 @@ window.ReportBlocks = (function () {
         return renderBlockStudentReflectionLearning(cid, student, options);
       case 'student-reflection-habits':
         return renderBlockStudentReflectionHabits(cid, student, options);
-      case 'support-home':
-        return renderBlockSupportHome(cid, student, ctx, options);
       case 'term-glance':
         return renderBlockTermGlance(cid, student);
       case 'growth':
         return renderBlockGrowth(cid, student);
-      case 'missing-work':
-        return renderBlockMissingWork(cid, student, ctx, options);
       case 'self-assessment':
         return renderBlockSelfAssessment(cid, student, ctx, options);
       case 'term-attendance':
@@ -2739,7 +2369,6 @@ window.ReportBlocks = (function () {
     renderBlockTeacherNarrative: renderBlockTeacherNarrative,
     renderCommentBox: renderCommentBox,
     printableComment: printableComment,
-    gradeColumnsHtml: gradeColumnsHtml,
     renderBlockCompetencyTable: renderBlockCompetencyTable,
     renderBlockObservations: renderBlockObservations,
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,
@@ -2752,17 +2381,15 @@ window.ReportBlocks = (function () {
     reportSections: _reportSections,
     competencyLabel: _competencyLabel,
     showDefaults: showDefaults,
+    profWord: _profWord,
     renderBlockParentResponse: renderBlockParentResponse,
     renderBlockStudentReflectionLearning: renderBlockStudentReflectionLearning,
     renderBlockStudentReflectionHabits: renderBlockStudentReflectionHabits,
     renderBlockSectionChart: renderBlockSectionChart,
     renderBlockScoreDistribution: renderBlockScoreDistribution,
-    renderBlockGradeTable: renderBlockGradeTable,
     renderBlockCoreCompetencies: renderBlockCoreCompetencies,
-    renderBlockSupportHome: renderBlockSupportHome,
     renderBlockTermGlance: renderBlockTermGlance,
     renderBlockGrowth: renderBlockGrowth,
-    renderBlockMissingWork: renderBlockMissingWork,
     renderBlockAttendance: renderBlockAttendance,
     attendanceSentence: attendanceSentence,
     wordingOf: wordingOf,

@@ -31,7 +31,7 @@ async function openOne(page, setup, wide) {
   await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
   if (wide) await page.addStyleTag({ content: WIDE_FONT });
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   if (setup) {
     await page.evaluate(id => {
@@ -39,7 +39,7 @@ async function openOne(page, setup, wide) {
     }, setup);
     await page.evaluate(r => window.Router.navigate(r), '/dashboard');
     await page.evaluate(r => window.Router.navigate(r), '/reports');
-    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.getByRole('tab', { name: 'Print Reports' }).click();
     await expect(page.locator('#studio.studio-one')).toBeVisible();
   }
   await page.getByRole('button', { name: 'Select students' }).click();
@@ -153,7 +153,7 @@ test('leaving an assessment off the list changes the page and no grade', async (
   }, NAME);
   await page.evaluate(r => window.Router.navigate(r), '/dashboard');
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#rb-preview .sheet-student')).toContainText(NAME);
   const list = page.locator('#rb-preview .sheet-cell[data-part="assessments"] .gr-row[data-row]');
   await expect(list).toHaveCount(before.count - 1);

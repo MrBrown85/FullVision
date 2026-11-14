@@ -67,7 +67,7 @@ describe('what each report surface gives for the Demo class', { timeout: 60000 }
     expect(bySurface.phones).toBe(81);
     expect(bySurface.printGrades).toBe(15);
     expect(bySurface.export).toBe(1);
-    expect(bySurface.progress).toBeGreaterThan(150);
+    expect(bySurface.progress).toBeGreaterThan(130);
     // A grade is in there: the output is not a page of dashes.
     const one = Object.keys(drawn).find(k => k.indexOf('year › phones › ') === 0);
     // A phone copy reads the proficiency, not a figure (DECISIONS, "Student-facing levels are proficiencies").

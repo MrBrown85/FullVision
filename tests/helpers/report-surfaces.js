@@ -84,7 +84,10 @@ function withReportPicked(ordinal, label, fn) {
 
 function progress(cid, students, ctx, out, view) {
   const autos = ReportBlocks.showDefaults(cid);
+  // Assignment Grades and Missing Work are the Assessments part now (the
+  // 'quick' surface): their ids are kept only so a saved form is read.
   Object.keys(ReportSheets.BLOCKS).forEach(id => {
+    if (id === 'grade-table' || id === 'missing-work') return;
     ['row', 'half'].forEach(size => {
       const options = ReportSheets.optionsFor({ block: id, size }, autos);
       out[view + ' › progress › ' + id + ' (' + size + ')'] = students

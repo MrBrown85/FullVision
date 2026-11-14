@@ -9,7 +9,7 @@ test('send to phones, print slips, preview a copy, close the links', async ({ pa
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await page.getByRole('button', { name: 'Sent to Phones' }).click();
   await expect(page.locator('.pp-title')).toContainText('to Students’ Phones');
   await page.evaluate(() => {

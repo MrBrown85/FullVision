@@ -1958,9 +1958,8 @@
   color: #636366;
 }
 
-/* ── Next Steps, Progress in One Area, Ways to Support at Home (plan PR 5) ── */
-.report-steps,
-.report-support {
+/* ── Next Steps, Progress in One Area (plan PR 5) ── */
+.report-steps {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
   column-gap: 14px;
@@ -1968,18 +1967,10 @@
   font-size: var(--text-base);
   line-height: 1.35;
 }
-.report-support {
-  grid-template-columns: 96px minmax(0, 1fr);
-  row-gap: 4px;
-}
 .report-steps-half .report-steps {
   grid-template-columns: 86px minmax(0, 1fr);
 }
-.report-support-half .report-support {
-  grid-template-columns: 74px minmax(0, 1fr);
-}
 .report-steps-k,
-.report-support-k,
 .report-progress-k {
   color: #636366;
 }
@@ -2059,8 +2050,7 @@
 .report-progress-n {
   text-align: right;
 }
-.report-sheet .report-progress,
-.report-sheet .report-support-home {
+.report-sheet .report-progress {
   margin-bottom: 0 !important;
 }
 
@@ -2191,6 +2181,9 @@
 }
 
 /* ── Assignment Grades as rows (plan PR 4) ─────────────────────── */
+/* Nothing draws these now (the Assessments part took its place, Nov 13);
+   kept for printed copies saved before, which reprint from their own
+   HTML with today's styles. */
 .report-grades-cols {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4226,6 +4219,42 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 8pt;
   font-style: italic;
 }
+/* The Assessments part in groups or side by side (grade-report.js
+   _assemble): each row with the heading over it is one item, so a page
+   break never strands a heading. Side by side, two tables 16px apart. */
+.gr-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  align-items: start;
+}
+.gr-ghead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0 2px;
+  border-bottom: 1px solid #000;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.gr-ggrade {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.gr-none {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0 3px;
+  border-bottom: 1px solid #d0d0d0;
+  font-size: 9pt;
+  font-weight: 700;
+}
+.gr-asof {
+  font-weight: 400;
+  color: #636366;
+}
 /* The font the sheet prints in (styles.css, @media print --font-base),
    for measuring its columns on screen (grade-report.js _fitPx). */
 .gr-print-font {
@@ -6027,4 +6056,144 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .one-assessments > .report-block-title {
   margin-bottom: 4px;
+}
+
+/* ── One look for every part on the sheet (Colin, 2026-11-13) ──────
+   Every part prints as the Assessments list does: no box and no rounded
+   corners, its name, then its content under a black rule with grey rules
+   between rows, so the parts read as one document and a part cut between
+   pages reads the same on both. A part led by its own table takes the
+   rule from the table's header row; any other part's name is ruled.
+   Only on sheets drawn from Nov 13 on (.one-flat, report-one.js and the
+   measuring stage): a copy printed before reprints as it went home. */
+.one-flat .report-block-box,
+.one-flat .report-legend {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.one-flat .report-block-title {
+  color: #000;
+  font-weight: 700;
+}
+.one-flat .report-block-box:not(:has(> table, > .report-prof-cols, > .report-legend-items)) > .report-block-title,
+.one-flat .report-block-box:not(:has(> table, > .report-prof-cols)) > .report-prof-head,
+.one-flat .report-legend > .report-legend-title {
+  padding-bottom: 3px;
+  margin-bottom: 6px !important;
+  border-bottom: 1.5px solid #000;
+}
+.one-flat .report-ct th {
+  border-bottom: 1.5px solid #000;
+  color: #000;
+  font-weight: 700;
+}
+.one-flat .report-ct td {
+  border-bottom: 1px solid #d0d0d0;
+}
+.one-flat .report-ct-group td {
+  background: transparent;
+  border-bottom: 1px solid #000;
+  color: #000;
+  padding-top: 7px;
+}
+.one-flat .report-parent-comments-box,
+.one-flat .report-level-pill,
+.one-flat .report-glance {
+  border-radius: 0 !important;
+}
+.one-flat .report-strip {
+  padding: 0 !important;
+}
+
+/* Work Habits (report-blocks.js renderBlockLearnerDimensions) and the
+   student's printed reflections: a habit or disposition, what it means
+   under it, then the teacher's word and the student's circles. */
+.report-habit-intro {
+  margin-bottom: 4px;
+  font-size: var(--text-xs);
+  color: #333;
+}
+.report-habits-tbl,
+.report-reflect-tbl {
+  table-layout: auto;
+}
+.report-habit-k {
+  width: 100%;
+}
+.report-habit-name {
+  display: block;
+  font-weight: 600;
+}
+.report-habit-desc {
+  display: block;
+  font-size: var(--text-2xs);
+  font-style: italic;
+  color: #444;
+  line-height: 1.3;
+}
+.report-sheet .report-ct .report-habit-t {
+  white-space: nowrap;
+  font-weight: 700;
+  text-align: left;
+  padding-right: 14px;
+}
+.report-sheet .report-ct .report-habit-o {
+  width: 74px;
+  min-width: 74px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.report-habit-over th {
+  border-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: var(--text-2xs);
+  text-align: center;
+}
+.report-sheet .report-ct td.report-habit-k,
+.report-sheet .report-ct td.report-habit-o {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.report-bubble {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid #000;
+  border-radius: 50%;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+.report-habit-key {
+  margin-top: 5px;
+  font-size: var(--text-2xs);
+  color: #333;
+  line-height: 1.4;
+}
+.report-reflect-checks {
+  margin-top: 10px;
+}
+.report-reflect-write {
+  margin-top: 6px;
+}
+.report-reflect-q {
+  margin-top: 10px;
+  break-inside: avoid;
+}
+.report-reflect-q-label {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+/* Writing lines 26px apart: room for a student's handwriting. */
+.report-write-lines {
+  background: repeating-linear-gradient(to bottom, transparent 0 25px, #888 25px 26px);
+}
+.report-disp-half .report-ct .report-habit-o {
+  width: 40px;
+  min-width: 40px;
+  font-size: 7pt;
 }

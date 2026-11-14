@@ -32,7 +32,6 @@ describe('the Setups', () => {
       'teacher-narrative',
       'self-assessment',
       'term-attendance',
-      'missing-work',
       'assessments',
       'parent-response',
     ]);
@@ -45,33 +44,36 @@ describe('the Setups', () => {
 });
 
 describe('reading what a class has today', () => {
-  it('the Quick Report’s choices become its parts: the list, the summary, the grade, missing work', () => {
+  it('the Quick Report’s choices become its parts: the list, the summary, the grade', () => {
     const m = R.modelFor({ progressMode: 'grade', gradeReport: { summary: true, numbers: true, order: 'newest' } });
-    expect(m.parts).toEqual(['header', 'assessments', 'category-summary', 'course-grade', 'missing-work']);
+    expect(m.parts).toEqual(['header', 'assessments', 'category-summary', 'course-grade']);
     expect(m.options.assessments).toMatchObject({ numbers: true, order: 'newest', ungraded: true });
     expect(m.feedback).toEqual({ rubrics: false, comments: false, observations: false });
   });
 
   it('Category Summary off leaves the summary off; Feedback Pages bring their choices and the Term Comment', () => {
     const m = R.fromGrade({ summary: false, feedback: true, rubrics: true, comments: false, termComment: true });
-    expect(m.parts).toEqual(['header', 'assessments', 'course-grade', 'missing-work', 'teacher-narrative']);
+    expect(m.parts).toEqual(['header', 'assessments', 'course-grade', 'teacher-narrative']);
     expect(m.feedback).toEqual({ rubrics: true, comments: false, observations: false });
   });
 
   it('a built form keeps its blocks in the order they print, side by side, row by row, the docked block last', () => {
     const form = S.normalizeForm(undefined); // the Report Card starter
     const m = R.fromForm(form);
+    // Assignment Grades is the Assessments part, by month, newest first;
+    // Missing Work beside it is in its list and goes.
     expect(m.parts).toEqual([
       'header',
       'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance',
-      'missing-work',
       'self-assessment',
-      'grade-table',
+      'assessments',
       'parent-response',
     ]);
+    expect(m.options.assessments).toEqual({ organize: 'month', order: 'newest' });
+    expect(m.options.assessments.missingOnly).toBeUndefined();
     expect(m.lines).toEqual({ 'teacher-narrative': 10, 'parent-response': 3 });
   });
 
@@ -91,7 +93,8 @@ describe('reading what a class has today', () => {
 
   it('a class on Build Your Own reads its form; one on the Quick Report its choices; a saved model wins', () => {
     const form = S.normalizeForm(undefined);
-    expect(R.modelFor({ progressMode: 'build', form }).parts).toContain('grade-table');
+    expect(R.modelFor({ progressMode: 'build', form }).parts).toContain('assessments');
+    expect(R.modelFor({ progressMode: 'build', form }).parts).not.toContain('grade-table');
     expect(R.modelFor({ progressMode: 'grade', form }).parts).toContain('assessments');
     expect(R.modelFor({ progressMode: 'build', form, one: R.fromSetup('interim-update') }).setup).toBe(
       'interim-update',
@@ -156,6 +159,37 @@ describe('changing the model', () => {
     expect(R.setWording(m, 'parent-response', null).wording).toEqual({});
   });
 
+  it('a saved model with Assignment Grades or Missing Work has the Assessments part in its place', () => {
+    const g = R.normalize({
+      parts: ['header', 'grade-table', 'legend'],
+      options: { 'grade-table': { organize: 'competency', per: 8, columns: 'two', range: 'term', percent: false } },
+      perStudent: { s1: { on: ['missing-work'], off: [] } },
+      titles: { 'grade-table': 'Grades' },
+    });
+    expect(g.parts).toEqual(['header', 'assessments', 'legend']);
+    expect(g.options.assessments).toEqual({
+      organize: 'competency',
+      per: 8,
+      columns: 'two',
+      range: 'term',
+      order: 'newest',
+      percent: false,
+    });
+    expect(g.options['grade-table']).toBeUndefined();
+    expect(g.titles).toEqual({});
+    expect(g.perStudent.s1.on).toEqual(['assessments']);
+    const miss = R.normalize({ parts: ['header', 'term-attendance', 'missing-work'] });
+    expect(miss.parts).toEqual(['header', 'term-attendance', 'assessments']);
+    expect(miss.options.assessments).toEqual({ missingOnly: true });
+    // Beside the Assessments part, Missing Work goes and the list is unchanged.
+    const both = R.normalize({
+      parts: ['header', 'missing-work', 'assessments'],
+      options: { assessments: { numbers: true } },
+    });
+    expect(both.parts).toEqual(['header', 'assessments']);
+    expect(both.options.assessments).toEqual({ numbers: true });
+  });
+
   it('normalize drops what the registry does not know and keeps the letterhead first', () => {
     const m = R.normalize({ parts: ['legend', 'no-such-part', 'header', 'legend'], perStudent: { x: {} } });
     expect(m.parts).toEqual(['header', 'legend']);
@@ -165,10 +199,10 @@ describe('changing the model', () => {
 
 describe('options for the panel', () => {
   it('a block’s options come from the form engine’s registry with the class’s values', () => {
-    const m = R.setOption(CARD(), 'missing-work', 'none', 'off');
-    const opts = R.optionsFor(m, 'missing-work', 'c1');
-    expect(opts.find(o => o.key === 'none')).toMatchObject({ kind: 'choice', value: 'off' });
-    expect(opts.find(o => o.key === 'titles')).toMatchObject({ kind: 'toggle', value: true });
+    const m = R.setOption(CARD(), 'term-attendance', 'period', 'year');
+    const opts = R.optionsFor(m, 'term-attendance', 'c1');
+    expect(opts.find(o => o.key === 'period')).toMatchObject({ kind: 'choice', value: 'year' });
+    expect(opts.find(o => o.key === 'late')).toMatchObject({ kind: 'toggle', value: true });
   });
 
   it('Proficiency’s Rows starts on As Graded, one of its choices, until the teacher picks another', () => {
@@ -184,11 +218,29 @@ describe('options for the panel', () => {
     expect(R.optionsFor(m, 'teacher-narrative', 'c1').find(o => o.kind === 'lines')).toMatchObject({ value: 6 });
     expect(R.optionsFor(CARD(), 'assessments', 'c1').map(o => o.key)).toEqual([
       'ungraded',
+      'missingOnly',
       'numbers',
       'date',
       'category',
+      'organize',
       'order',
+      'columns',
+      'range',
     ]);
+    // Each choice shows only where it means something.
+    let m2 = R.setOption(CARD(), 'assessments', 'organize', 'category');
+    m2 = R.setOption(m2, 'assessments', 'columns', 'two');
+    m2 = R.setOption(m2, 'assessments', 'missingOnly', true);
+    const keys = R.optionsFor(m2, 'assessments', 'c1').map(o => o.key);
+    expect(keys).toContain('catGrade');
+    expect(keys).not.toContain('category');
+    expect(keys).not.toContain('ungraded');
+    expect(
+      R.optionsFor(R.setOption(CARD(), 'assessments', 'organize', 'competency'), 'assessments', 'c1').map(o => o.key),
+    ).toEqual(expect.arrayContaining(['per']));
+    expect(
+      R.optionsFor(R.setOption(CARD(), 'assessments', 'organize', 'competency'), 'assessments', 'c1').map(o => o.key),
+    ).not.toContain('numbers');
   });
 
   it('the self-assessment offers the student’s words or a blank form, never a rating', () => {

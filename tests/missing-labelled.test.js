@@ -77,11 +77,14 @@ describe('missing means labelled Missing', () => {
   });
 
   it('the report blocks list only the labelled work', () => {
-    const blocks = ['missing-work', 'term-glance', 'section-chart', 'score-distribution'].map(id =>
+    const blocks = ['term-glance', 'term-glance', 'section-chart', 'score-distribution'].map(id =>
       ReportBlocks.renderReportBlock(id, CID, NOOR, {}, {}),
     );
     blocks.forEach(html => expect(html).not.toContain('Lab Report'));
-    expect(blocks[0]).toContain('Poster');
+    // Missing Work is the Assessments list's Only Missing Work.
+    const missing = GradeReport.rows(CID, NOOR, { missingOnly: true }).map(r => r.title);
+    expect(missing).toContain('Poster');
+    expect(missing).not.toContain('Lab Report');
     expect(blocks[2]).toContain('Poster');
     expect(blocks[3]).toContain('Missing Assignments (1)');
     // Lev has nothing labelled Missing.

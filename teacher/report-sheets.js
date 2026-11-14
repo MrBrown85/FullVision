@@ -186,90 +186,13 @@ window.ReportSheets = (function () {
         { key: 'assignments', label: 'Assignment Names', def: false },
       ],
     },
-    // One row per assessment: date, full title and the marks the teacher
-    // picks under Show. Percent and Proficiency Word start from the class
-    // grading setting ('auto': ReportBlocks.showDefaults). It always starts
-    // in one column, a heading per month, year to date (Colin, Oct 29).
-    'grade-table': {
-      label: 'Assignment Grades',
-      group: 'Grades',
-      // Cut at its rows, as a table is, when it is too long for a side.
-      gradeRows: true,
-      options: [
-        { key: 'course', label: 'Course Grade', def: true },
-        { key: 'categoryGrade', label: 'Category Grades', def: true },
-        { key: 'score', label: 'Score', def: true },
-        { key: 'percent', label: 'Percent', def: 'auto' },
-        // A Proficiency or Both class prints no word beside a mark (a level
-        // is its proficiency; points carry none), so Word is not offered
-        // there and a saved form's Word is not read (ReportBlocks.
-        // renderBlockGradeTable).
-        { key: 'word', label: 'Proficiency Word', def: 'auto', hideIn: ['proficiency', 'both'] },
-        {
-          key: 'organize',
-          label: 'Organize By',
-          def: 'date',
-          choices: [
-            { v: 'category', label: 'Category' },
-            { v: 'date', label: 'Date' },
-            { v: 'competency', label: 'Competency' },
-          ],
-        },
-        {
-          key: 'order',
-          label: 'Order',
-          def: 'newest',
-          choices: [
-            { v: 'newest', label: 'Newest First' },
-            { v: 'oldest', label: 'Oldest First' },
-          ],
-        },
-        {
-          key: 'columns',
-          label: 'Columns',
-          def: 'one',
-          choices: [
-            { v: 'one', label: 'One' },
-            { v: 'two', label: 'Two' },
-          ],
-        },
-        {
-          key: 'range',
-          label: 'Range',
-          def: 'all',
-          choices: [
-            { v: 'last10', label: 'Last 10' },
-            { v: 'term', label: 'This Term' },
-            { v: 'all', label: 'Year to Date' },
-          ],
-        },
-        {
-          key: 'per',
-          label: 'Per Competency',
-          def: 5,
-          choices: [3, 5, 8],
-          showIf: { key: 'organize', v: 'competency' },
-        },
-      ],
-    },
+    // Assignment Grades and Missing Work are One Report's Assessments part
+    // now (report-one.js _fold): kept so a saved form's cell is read, with
+    // its options, and becomes that part.
+    'grade-table': { label: 'Assignment Grades', group: 'Grades', retired: true },
     'term-glance': { label: 'This Term at a Glance', group: 'Grades', retired: true },
     growth: { label: 'Growth Since Last Report', table: true, group: 'Grades', retired: true },
-    'missing-work': {
-      label: 'Missing Work',
-      group: 'Grades',
-      options: [
-        {
-          key: 'none',
-          label: 'When None',
-          def: 'say',
-          choices: [
-            { v: 'say', label: 'Say None' },
-            { v: 'off', label: 'Leave Off' },
-          ],
-        },
-        { key: 'titles', label: 'Assignment Titles', def: true },
-      ],
-    },
+    'missing-work': { label: 'Missing Work', group: 'Grades', retired: true },
     // Totals to date from the Term Questionnaire (classes absent, times late).
     // Not 'attendance': an older block by that name was retired, and forms
     // saved with it drop it.
@@ -301,7 +224,7 @@ window.ReportSheets = (function () {
       group: 'Comments and Evidence',
     },
     observations: { label: 'Observations', group: 'Comments and Evidence', retired: true },
-    // Next Steps, Ways to Support at Home and Progress in One Area share
+    // Next Steps and Progress in One Area share
     // the student's Focus Area: the competency picked in the Term
     // Questionnaire, else the one with the biggest change (plan PR 5).
     'next-steps': {
@@ -347,8 +270,11 @@ window.ReportSheets = (function () {
       label: 'Learning Dispositions',
       group: 'Learner Profile',
       options: [
-        { key: 'rated', label: 'Only Rated Dispositions', def: true },
-        { key: 'scale', label: 'Scale Line', def: true },
+        { key: 'rated', label: 'Only Rated Habits', def: true },
+        { key: 'desc', label: 'What Each Habit Means', def: true },
+        { key: 'scale', label: 'What the Words Mean', def: true },
+        // A column of circles for the student to rate each habit by hand.
+        { key: 'student', label: 'Student Self-Assessment', def: false },
       ],
     },
     'core-competencies': {
@@ -369,8 +295,18 @@ window.ReportSheets = (function () {
         { key: 'goal', label: 'Goal and Check-In', def: true },
       ],
     },
-    'student-reflection-learning': { label: 'Reflection: My Learning', half: false, group: 'Student Voice' },
-    'student-reflection-habits': { label: 'Reflection: My Habits', half: false, group: 'Student Voice' },
+    'student-reflection-learning': {
+      label: 'Reflection: My Learning',
+      half: false,
+      group: 'Student Voice',
+      options: [{ key: 'writeLines', label: 'Lines to Write On', def: 3, choices: [2, 3, 4, 6] }],
+    },
+    'student-reflection-habits': {
+      label: 'Reflection: My Habits',
+      half: false,
+      group: 'Student Voice',
+      options: [{ key: 'writeLines', label: 'Lines to Write On', def: 3, choices: [2, 3, 4, 6] }],
+    },
     'parent-response': {
       label: 'Parent / Guardian Response',
       fill: true,
@@ -382,15 +318,6 @@ window.ReportSheets = (function () {
       pinnable: true,
     },
     legend: { label: 'Proficiency Legend', group: 'Family' },
-    'support-home': {
-      label: 'Ways to Support at Home',
-      group: 'Family',
-      options: [
-        { key: 'see', label: 'Ask to See (best work)', def: true },
-        { key: 'about', label: 'Ask About (lowest work)', def: true },
-        { key: 'note', label: 'Your Own Line', def: '', text: true },
-      ],
-    },
     'text-block': { label: 'Text Block', fill: true, group: 'Family' },
   };
 
@@ -1011,7 +938,8 @@ window.ReportSheets = (function () {
      Report prints in. */
   function _stage(host, contentW) {
     var st = document.createElement('div');
-    st.className = 'report-sheet report-sheet-measure';
+    // one-flat: measured in the look One Report's sheets print in (reports.css).
+    st.className = 'report-sheet report-sheet-measure one-flat';
     st.setAttribute('aria-hidden', 'true');
     st.style.cssText =
       'position:absolute;left:-10000px;top:0;width:' +
@@ -1023,91 +951,6 @@ window.ReportSheets = (function () {
 
   function cellWidth(size) {
     return size === 'half' ? HALF_W : ROW_W;
-  }
-
-  /* Assignment Grades is rows of divs in one column or two, not a table:
-     each row's height is the distance to the next item's top in its
-     column, a group's heading counted with the row under it; the last
-     reaches the column's bottom. chrome is the rest of the block, plus
-     room for the one heading a part may add ("March (continued)"), so a
-     part laid out from these heights is never taller than it is said to
-     be. In two columns the rows' sum is about twice the table's height,
-     so a part takes no more than a side holds. */
-  function _measureGradeRows(el, c) {
-    var cols = el.querySelectorAll('.report-grades-col');
-    var rows = [];
-    var headMax = 0;
-    var top = Infinity;
-    var bottom = -Infinity;
-    Array.prototype.forEach.call(cols, function (col) {
-      var box = col.getBoundingClientRect();
-      top = Math.min(top, box.top);
-      bottom = Math.max(bottom, box.bottom);
-      var kids = col.children;
-      var carry = 0;
-      for (var k = 0; k < kids.length; k++) {
-        var from = k === 0 ? box.top : kids[k].getBoundingClientRect().top;
-        var to = k + 1 < kids.length ? kids[k + 1].getBoundingClientRect().top : box.bottom;
-        if (kids[k].classList.contains('report-grades-head')) {
-          carry += to - from;
-          headMax = Math.max(headMax, to - from);
-        } else {
-          rows.push(to - from + carry);
-          carry = 0;
-        }
-      }
-    });
-    if (rows.length < 2) return;
-    c.rows = rows;
-    c.chrome = Math.max(0, c.px - (bottom - top)) + headMax;
-  }
-
-  /* Assignment Grades with only rows [start, end): the groups those rows
-     are in, laid out again as the whole table is (ReportBlocks.
-     gradeColumnsHtml); a group begun on an earlier part carries on under
-     its name with "(continued)", as a group the column split cuts does. */
-  function _gradesPartHtml(html, start, end) {
-    var tpl = document.createElement('div');
-    // html-safe: html is one cell from _cellHtml (ReportBlocks.renderReportBlock), parsed in a detached div
-    tpl.innerHTML = html;
-    var cols = tpl.querySelectorAll('.report-grades-col');
-    if (!cols.length) return html;
-    var one = !tpl.querySelector('.report-grades-cols');
-    var body = one ? cols[0] : tpl.querySelector('.report-grades-cols');
-    var entries = [];
-    Array.prototype.forEach.call(cols, function (col) {
-      var head = null;
-      Array.prototype.forEach.call(col.children, function (k) {
-        if (k.classList.contains('report-grades-head')) {
-          var name = k.firstElementChild ? k.firstElementChild.textContent : '';
-          var grade = k.querySelector('.report-grades-headgrade');
-          head = { base: name.replace(/\s*\(continued\)$/, ''), grade: grade ? grade.textContent : '' };
-        } else if (k.classList.contains('report-grades-row') && head) {
-          var prev = entries[entries.length - 1];
-          entries.push({ head: head, base: head.base, first: !prev || prev.base !== head.base, html: k.outerHTML });
-        }
-      });
-    });
-    var groups = [];
-    entries.slice(start, end).forEach(function (e) {
-      var g = groups[groups.length - 1];
-      if (g && g.base === e.base) return g.rows.push(e.html);
-      groups.push({
-        base: e.base,
-        name: e.first ? e.base : e.base + ' (continued)',
-        grade: e.first ? e.head.grade : '',
-        rows: [e.html],
-      });
-    });
-    var fresh = document.createElement('div');
-    // html-safe: gradeColumnsHtml esc()s each name and grade; the rows are this cell's own rows, already escaped
-    fresh.innerHTML = ReportBlocks.gradeColumnsHtml(groups, one);
-    body.replaceWith(fresh.firstElementChild);
-    if (start > 0) {
-      var title = tpl.querySelector('.report-block-title');
-      if (title) title.textContent = title.textContent.replace(/\s*\(continued\)$/, '') + ' (continued)';
-    }
-    return tpl.innerHTML;
   }
 
   /* ── Preview ────────────────────────────────────────────────── */
@@ -1400,8 +1243,6 @@ window.ReportSheets = (function () {
     one: {
       PAPER: PAPER,
       cellHtml: _cellHtml,
-      measureGradeRows: _measureGradeRows,
-      gradesPartHtml: _gradesPartHtml,
     },
   };
 })();

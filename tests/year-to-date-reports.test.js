@@ -11,6 +11,17 @@
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+// No DOM here: every block 50px tall, every text 7px a character.
+const fakeStage = () => ({
+  innerHTML: '',
+  firstChild: { offsetHeight: 50 },
+  querySelectorAll() {
+    return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+      offsetWidth: m[1].length * 7,
+    }));
+  },
+});
+
 const CID = 'ytd-reports';
 const SID = 'stu-1';
 const STUDENT = { id: SID, firstName: 'Noor', lastName: 'Khan', pronouns: 'she/her' };
@@ -80,23 +91,25 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     expect(t).toContain('Overall Developing · C- 50% Proficient · B 75%');
   });
 
-  it('Assignment Grades: the Course Grade and the category grade are the year to date, matching the list', () => {
+  it('Assessments by category: the Course Grade and the category grade are the year to date, matching the list', () => {
     setActiveTerm(CID, 2);
-    const t = text(
-      ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'category', range: 'all' }, { termId: 'term-2' }),
-    );
-    expect(t).toContain('Course Grade Proficient · B 75%');
+    const stage = fakeStage();
+    const t = text(GradeReport.listPart(CID, STUDENT, { organize: 'category' }, stage).html);
+    expect(text(GradeReport.termHtml(CID, STUDENT, { termId: 'term-2' }))).toContain('Course Grade Proficient · B 75%');
     expect(t).toContain('Labs 100% of grade · Proficient · B 75%');
     expect(t).toContain('October Lab');
     expect(t).toContain('December Lab');
   });
 
-  it("Assignment Grades leaves out work dated after the report's end", () => {
+  it("Assessments by month leave out work dated after the report's end", () => {
     setActiveTerm(CID, 1);
-    const t = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { range: 'all' }, { termId: 'term-1' }));
+    const stage = fakeStage();
+    const t = text(GradeReport.listPart(CID, STUDENT, { organize: 'month', columns: 'two' }, stage).html);
     expect(t).toContain('October Lab');
     expect(t).not.toContain('December Lab');
-    expect(t).toContain('Course Grade Developing · C- 50%');
+    expect(text(GradeReport.termHtml(CID, STUDENT, { termId: 'term-1' }))).toContain(
+      'Course Grade Developing · C- 50%',
+    );
   });
 
   it('the Assessments list lists the year to date and the Course Grade line prints', () => {
@@ -167,9 +180,10 @@ describe("Missing Work lists anything still Missing up to the report's end (deci
     delete COURSES[CID];
   });
 
-  it('the Missing Work block on Report 2 lists a Term 1 piece still Missing, not work after the end', () => {
+  it('Only Missing Work on Report 2 lists a Term 1 piece still Missing, not work after the end', () => {
     setActiveTerm(CID, 2);
-    const t = text(ReportBlocks.renderReportBlock('missing-work', CID, STUDENT, { termId: 'term-2' }, {}));
+    const stage = fakeStage();
+    const t = text(GradeReport.listPart(CID, STUDENT, { missingOnly: true }, stage).html);
     expect(t).toContain('September Quiz');
     expect(t).toContain('Undated Poster');
     expect(t).not.toContain('February Quiz');
@@ -178,8 +192,8 @@ describe("Missing Work lists anything still Missing up to the report's end (deci
 
   it('Report 1 lists only what was assigned up to its end', () => {
     setActiveTerm(CID, 1);
-    const t = text(ReportBlocks.renderReportBlock('missing-work', CID, STUDENT, { termId: 'term-1' }, {}));
-    expect(t).toContain('September Quiz, Undated Poster');
+    const t = GradeReport.rows(CID, STUDENT, { missingOnly: true }).map(r => r.title);
+    expect(t).toEqual(expect.arrayContaining(['September Quiz', 'Undated Poster']));
   });
 
   it('This Term at a Glance, the questionnaire, Generate and the Assessments list count the same work', () => {

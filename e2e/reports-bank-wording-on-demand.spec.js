@@ -17,7 +17,7 @@ test('Progress Reports fetches the bank wording only when its Feedback Pages pri
   // Demo Mode's Science 8 has competencies from the bank.
   expect(await page.evaluate(() => RubricPrint.classUsesBankLevels('sci8'))).toBe(true);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   expect(await page.evaluate(() => !!((getReportConfig('sci8') || {}).one || {}).feedback?.rubrics)).toBe(false);
   await page.waitForTimeout(1500);
@@ -49,7 +49,7 @@ test('the fit counts the class again when the bank wording arrives after it', as
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await page.evaluate(() => {
     window.__layouts = 0;

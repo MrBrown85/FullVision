@@ -75,11 +75,40 @@ window.ReportOne = (function () {
       group: 1,
       own: true,
       split: 'gr',
+      // One list of the student's work, with what Assignment Grades and
+      // Missing Work printed folded in as choices (Colin, 2026-11-13: the
+      // three overlapped). One List, One column is the table it has always
+      // been.
       options: [
-        { key: 'ungraded', label: 'Work Not Yet Assessed', def: true },
-        { key: 'numbers', label: 'Numbers', def: false },
+        { key: 'ungraded', label: 'Work Not Yet Assessed', def: true, showIf: { key: 'missingOnly', v: false } },
+        { key: 'missingOnly', label: 'Only Missing Work', def: false },
+        { key: 'numbers', label: 'Numbers', def: false, showIf: { key: 'organize', not: 'competency' } },
         { key: 'date', label: 'Date', def: true },
-        { key: 'category', label: 'Category', def: true },
+        { key: 'category', label: 'Category', def: true, showIf: { key: 'columns', v: 'one' } },
+        // A Letter class's Score and Out Of; a Proficiency or Both class
+        // always prints its Result.
+        { key: 'score', label: 'Score', def: true, hideIn: ['proficiency', 'both'] },
+        { key: 'percent', label: 'Percent', def: true, hideIn: ['proficiency'] },
+        { key: 'word', label: 'Proficiency Word', def: false, hideIn: ['proficiency', 'both'] },
+        { key: 'catGrade', label: 'Category Grades', def: true, showIf: { key: 'organize', v: 'category' } },
+        {
+          key: 'organize',
+          label: 'Organize By',
+          def: 'list',
+          choices: [
+            { v: 'list', label: 'One List' },
+            { v: 'category', label: 'Category' },
+            { v: 'month', label: 'Month' },
+            { v: 'competency', label: 'Competency' },
+          ],
+        },
+        {
+          key: 'per',
+          label: 'Per Competency',
+          def: 5,
+          choices: [3, 5, 8],
+          showIf: { key: 'organize', v: 'competency' },
+        },
         {
           key: 'order',
           label: 'Order',
@@ -87,6 +116,25 @@ window.ReportOne = (function () {
           choices: [
             { v: 'oldest', label: 'Oldest First' },
             { v: 'newest', label: 'Newest First' },
+          ],
+        },
+        {
+          key: 'columns',
+          label: 'Columns',
+          def: 'one',
+          choices: [
+            { v: 'one', label: 'One' },
+            { v: 'two', label: 'Two' },
+          ],
+        },
+        {
+          key: 'range',
+          label: 'Range',
+          def: 'all',
+          choices: [
+            { v: 'last10', label: 'Last 10' },
+            { v: 'term', label: 'This Term' },
+            { v: 'all', label: 'Year to Date' },
           ],
         },
       ],
@@ -98,8 +146,6 @@ window.ReportOne = (function () {
       group: 1,
       own: true,
     },
-    'grade-table': { label: 'Assignment Grades', group: 1, split: 'grades' },
-    'missing-work': { label: 'Missing Work', group: 1, half: true },
     'term-attendance': { label: 'Attendance', group: 1, half: true },
     progress: { label: 'Progress in One Area', group: 1 },
     'next-steps': { label: 'Next Steps', group: 2 },
@@ -128,11 +174,11 @@ window.ReportOne = (function () {
       label: 'Work Habits',
       group: 2,
       title: 'Work Habits',
-      rows: { sel: '.report-disp-row', name: 'span' },
+      split: 'table',
+      rows: { sel: 'table.report-habits-tbl tbody tr', name: '.report-habit-name' },
     },
-    'student-reflection-learning': { label: 'Reflection: My Learning', group: 2, wording: true },
+    'student-reflection-learning': { label: 'Reflection: My Learning', group: 2, wording: true, split: 'table' },
     'student-reflection-habits': { label: 'Reflection: My Habits', group: 2, wording: true, split: 'table' },
-    'support-home': { label: 'Ways to Support at Home', group: 3 },
     'text-block': { label: 'Your Own Text', group: 3 },
     'parent-response': { label: 'Parent / Guardian Response', group: 3, pinned: true, wording: true },
   };
@@ -149,7 +195,7 @@ window.ReportOne = (function () {
       id: 'grades',
       name: 'Grades',
       blurb: 'Assessments, categories and feedback pages',
-      parts: ['header', 'assessments', 'category-summary', 'course-grade', 'missing-work'],
+      parts: ['header', 'assessments', 'category-summary', 'course-grade'],
       feedback: { rubrics: true, comments: true, observations: false },
     },
     {
@@ -163,7 +209,6 @@ window.ReportOne = (function () {
         'teacher-narrative',
         'self-assessment',
         'term-attendance',
-        'missing-work',
         'assessments',
         'parent-response',
       ],
@@ -209,8 +254,85 @@ window.ReportOne = (function () {
     return d && !d.own && S().BLOCKS[key] ? S().BLOCKS[key] : null;
   }
 
+  /* Assignment Grades and Missing Work are the Assessments part now
+     (Colin, 2026-11-13): a report saved with one has Assessments in its
+     place, with the choices it had. Missing Work beside Assessments is
+     already in the list (its Missing rows) and goes. */
+  var FOLDED = { 'grade-table': 1, 'missing-work': 1 };
+  function _fold(raw) {
+    var parts = Array.isArray(raw.parts) ? raw.parts.slice() : [];
+    var per = raw.perStudent && typeof raw.perStudent === 'object' ? raw.perStudent : {};
+    var lists = [parts];
+    Object.keys(per).forEach(function (sid) {
+      if (per[sid] && Array.isArray(per[sid].on)) lists.push(per[sid].on);
+      if (per[sid] && Array.isArray(per[sid].off)) lists.push(per[sid].off);
+    });
+    var any = lists.some(function (l) {
+      return l.some(function (k) {
+        return FOLDED[k];
+      });
+    });
+    if (!any) return raw;
+    raw = _clone(raw);
+    var options = raw.options && typeof raw.options === 'object' ? raw.options : {};
+    // Assignment Grades becomes the list where both are on (Missing Work's
+    // rows are in it); Missing Work alone becomes Only Missing Work.
+    var into =
+      parts.indexOf('assessments') >= 0 ? null : parts.indexOf('grade-table') >= 0 ? 'grade-table' : 'missing-work';
+    var out = [];
+    parts.forEach(function (k) {
+      if (!FOLDED[k]) return out.push(k);
+      if (k !== into) return;
+      out.push('assessments');
+      var o = {};
+      if (k === 'grade-table') {
+        var g = options['grade-table'] || {};
+        o.organize = g.organize === 'date' || g.organize == null ? 'month' : g.organize;
+        ['order', 'columns', 'range', 'per'].forEach(function (x) {
+          if (g[x] != null) o[x] = g[x];
+        });
+        if (o.order == null) o.order = 'newest';
+        if (g.categoryGrade === false) o.catGrade = false;
+        if (g.score === false) o.score = false;
+        if (g.percent === false) o.percent = false;
+        if (g.word === true) o.word = true;
+      } else o.missingOnly = true;
+      options.assessments = Object.assign(o, options.assessments || {});
+    });
+    raw.parts = out;
+    delete options['grade-table'];
+    delete options['missing-work'];
+    raw.options = options;
+    var swap = function (l) {
+      var seen = {};
+      return (l || [])
+        .map(function (k) {
+          return FOLDED[k] ? 'assessments' : k;
+        })
+        .filter(function (k) {
+          if (seen[k]) return false;
+          seen[k] = true;
+          return true;
+        });
+    };
+    Object.keys(raw.perStudent || {}).forEach(function (sid) {
+      var p = raw.perStudent[sid];
+      if (!p || typeof p !== 'object') return;
+      p.on = swap(p.on);
+      p.off = swap(p.off);
+    });
+    ['removed', 'titles', 'lines'].forEach(function (bag) {
+      if (raw[bag] && typeof raw[bag] === 'object') {
+        delete raw[bag]['grade-table'];
+        delete raw[bag]['missing-work'];
+      }
+    });
+    return raw;
+  }
+
   function normalize(raw) {
     raw = raw && typeof raw === 'object' ? raw : {};
+    raw = _fold(raw);
     var seen = {};
     var parts = (Array.isArray(raw.parts) ? raw.parts : []).filter(function (k) {
       if (typeof k !== 'string' || seen[k] || !_def(k)) return false;
@@ -266,7 +388,7 @@ window.ReportOne = (function () {
     var o = G().options(saved);
     var parts = ['header', 'assessments'];
     if (o.summary) parts.push('category-summary');
-    parts.push('course-grade', 'missing-work');
+    parts.push('course-grade');
     if (o.feedback && o.termComment) parts.push('teacher-narrative');
     return normalize({
       setup: 'grades',
@@ -434,17 +556,18 @@ window.ReportOne = (function () {
     var mode = _mode(cid);
     var saved = m.options[key] || {};
     var b = _blockOf(key);
-    var defs = (b && b.options ? b.options : [])
-      .filter(function (o) {
-        if (d.hide && d.hide.indexOf(o.key) >= 0) return false;
-        if (o.hideIn && o.hideIn.indexOf(mode) >= 0) return false;
-        if (o.showIf && (saved[o.showIf.key] != null ? saved[o.showIf.key] : _defOf(b, o.showIf.key)) !== o.showIf.v)
-          return false;
-        // Overall prints once: on its own line when that part is on.
-        if (key === 'proficiency' && o.key === 'overall' && isOn(m, 'course-grade')) return false;
-        return true;
-      })
-      .concat(d.options || []);
+    var all = (b && b.options ? b.options : []).concat(d.options || []);
+    var defs = all.filter(function (o) {
+      if (d.hide && d.hide.indexOf(o.key) >= 0) return false;
+      if (o.hideIn && o.hideIn.indexOf(mode) >= 0) return false;
+      if (o.showIf) {
+        var v = saved[o.showIf.key] != null ? saved[o.showIf.key] : _defOf(all, o.showIf.key);
+        if ('not' in o.showIf ? v === o.showIf.not : v !== o.showIf.v) return false;
+      }
+      // Overall prints once: on its own line when that part is on.
+      if (key === 'proficiency' && o.key === 'overall' && isOn(m, 'course-grade')) return false;
+      return true;
+    });
     var out = defs.map(function (o) {
       // 'auto' on a switch means the class's grading style decides; on a
       // choice it is one of the choices (Rows: As Graded).
@@ -479,8 +602,8 @@ window.ReportOne = (function () {
     }
     return out;
   }
-  function _defOf(b, optKey) {
-    var o = (b.options || []).filter(function (x) {
+  function _defOf(list, optKey) {
+    var o = (list || []).filter(function (x) {
       return x.key === optKey;
     })[0];
     return o ? o.def : undefined;
@@ -646,12 +769,18 @@ window.ReportOne = (function () {
     var html = '';
     var ids = null; // the Assessments rows' assessment ids, in print order
     if (key === 'assessments') {
-      var part = G().listPart(cid, student, _listOpts(m, sid), stage);
-      ids = part.list.map(function (r) {
-        return r.id;
-      });
+      var lo = _listOpts(m, sid);
+      var part = G().listPart(cid, student, lo, stage);
+      // Only Missing Work lists every missing piece: no row can be left off.
+      ids = lo.missingOnly
+        ? null
+        : part.list.map(function (r) {
+            return r.id;
+          });
       html = part.html
-        ? '<div class="one-part one-assessments"><div class="report-block-title">Assessments</div>' +
+        ? '<div class="one-part one-assessments"><div class="report-block-title">' +
+          (lo.missingOnly ? 'Missing Work' : 'Assessments') +
+          '</div>' +
           part.html +
           '</div>'
         : '';
@@ -726,7 +855,22 @@ window.ReportOne = (function () {
      assessments left off the list. */
   function _listOpts(m, sid) {
     var o = Object.assign(
-      { ungraded: true, numbers: false, order: 'oldest', date: true, category: true },
+      {
+        ungraded: true,
+        numbers: false,
+        order: 'oldest',
+        date: true,
+        category: true,
+        score: true,
+        percent: true,
+        word: false,
+        catGrade: true,
+        organize: 'list',
+        per: 5,
+        columns: 'one',
+        range: 'all',
+        missingOnly: false,
+      },
       m.options.assessments || {},
     );
     var omit = {};
@@ -736,6 +880,9 @@ window.ReportOne = (function () {
     var hide = {};
     if (o.date === false) hide.date = true;
     if (o.category === false) hide.category = true;
+    // Score is a Letter class's choice: a Result always prints
+    // (GradeReport.listPart).
+    if (o.score === false) hide.score = true;
     return {
       summary: true,
       ungraded: o.ungraded !== false,
@@ -744,6 +891,14 @@ window.ReportOne = (function () {
       name: (m.options.header || {}).name === 'first' ? 'first' : 'preferred',
       omit: omit,
       hide: hide,
+      percent: o.percent !== false,
+      word: o.word === true,
+      catGrade: o.catGrade !== false,
+      organize: o.organize,
+      per: o.per,
+      columns: o.columns === 'two' ? 'two' : 'one',
+      range: o.range === 'term' || o.range === 'last10' ? o.range : 'all',
+      missingOnly: o.missingOnly === true,
     };
   }
 
@@ -804,11 +959,7 @@ window.ReportOne = (function () {
       c.px = el.offsetHeight;
       var split = (_def(c.key) || {}).split;
       if (!split || c.size === 'half') return;
-      if (split === 'grades') {
-        c.cell = { block: c.key };
-        S().one.measureGradeRows(el, c);
-        return;
-      }
+      if (split === 'gr' && el.querySelector('.gr-item')) return _measureItems(el, c);
       // One table only: a block that lays its rows out in two tables is
       // not cut.
       if (split === 'table' && el.querySelectorAll('table').length !== 1) return;
@@ -825,11 +976,39 @@ window.ReportOne = (function () {
     });
   }
 
+  /* The Assessments list in groups or side by side (GradeReport.listPart):
+     each row with the heading over it is one item. Side by side, an item
+     counts half its height (two columns share the depth), and the rest
+     (chrome) keeps room for a heading a piece may add ("March
+     (continued)", at its top and at the right column's) and for the
+     columns coming out a row uneven, so a piece is never taller than it
+     is said to be. */
+  function _measureItems(el, c) {
+    var items = el.querySelectorAll('.gr-item');
+    if (items.length < 2) return;
+    var two = !!el.querySelector('.gr-cols');
+    var head = 0;
+    Array.prototype.forEach.call(el.querySelectorAll('.gr-ghead'), function (h) {
+      head = Math.max(head, h.getBoundingClientRect().height);
+    });
+    var hs = Array.prototype.map.call(items, function (it) {
+      return it.getBoundingClientRect().height;
+    });
+    var sum = hs.reduce(function (a, b) {
+      return a + b;
+    }, 0);
+    var tallest = Math.max.apply(null, hs);
+    c.rows = hs.map(function (h) {
+      return two ? h / 2 : h;
+    });
+    c.chrome = Math.max(0, c.px - (two ? sum / 2 : sum)) + head * (two ? 2 : 1) + (two ? tallest : 0);
+  }
+
   /* A part with only rows [start, end); a later piece's heading ends
      "(continued)". */
   function _pieceHtml(key, html, part) {
     var split = (_def(key) || {}).split;
-    if (split === 'grades') return S().one.gradesPartHtml(html, part.start, part.end);
+    if (split === 'gr' && html.indexOf('gr-item') >= 0) return G().listPiece(html, part.start, part.end);
     var tpl = document.createElement('div');
     // html-safe: html is this part's own render (partHtml), parsed in a detached div
     tpl.innerHTML = html;
@@ -1011,14 +1190,7 @@ window.ReportOne = (function () {
           return c.key === 'assessments';
         })
       ) {
-        numbered = G()
-          .rows(cid, student, lo)
-          .filter(function (r) {
-            return !lo.omit[r.id];
-          });
-        numbered.forEach(function (r, i) {
-          r.n = i + 1;
-        });
+        numbered = G().printedRows(cid, student, lo);
       }
       removedOf(m, 'fb', sid).forEach(function (id) {
         lo.omit[id] = true;
@@ -1085,7 +1257,7 @@ window.ReportOne = (function () {
         var prints = side.pinned || side.rows.length > 0;
         html +=
           _sideLabel(s, sheetCount, side.kind === 'after' ? 'After the Report' : '') +
-          '</div><div class="report-sheet one-sheet' +
+          '</div><div class="report-sheet one-sheet one-flat' +
           (side.over ? ' sheet-overflow' : '') +
           '" data-paper="' +
           paper +

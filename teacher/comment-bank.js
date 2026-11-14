@@ -4162,8 +4162,8 @@ window.CommentBank = (function () {
       return top && tenths(w.v) < tenths(top.v);
     });
 
-    // The Focus Area's work, for the family to see and ask about (the Ways
-    // to Support at Home block's rule).
+    // The Focus Area's work, for the family to see and ask about: the best
+    // and the lowest piece this term.
     var seeWork = '';
     var aboutWork = '';
     var seeId = null;

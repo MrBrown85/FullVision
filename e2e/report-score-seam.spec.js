@@ -146,7 +146,7 @@ test('every grade the Reports page draws, from a click, a timer or a promise, is
   // Progress Reports: One Report on the class's Quick Report choices, with
   // its class-fit timer.
   await forget(page);
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   // The Feedback Pages, switched on in the panel.

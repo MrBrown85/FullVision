@@ -31,7 +31,7 @@ export const SECTIONS = [
   'Assignments',
   'Gradebook',
   'Observations',
-  'Reports',
+  'Reporting',
   'Student Page and Student Voice',
   'Phone App',
   'Privacy and Your Data',

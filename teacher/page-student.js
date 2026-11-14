@@ -960,7 +960,10 @@ window.PageStudent = (function () {
 
   /* ── Competencies tab ───────────────────────────────────── */
   /* One 1–4 scale (design rule 5): four cells filled to the level in its
-     colour, and a ring where the first scores started (startAndNow). */
+     colour, and a mark where the first scores started (startAndNow): a
+     caret over the track and a tick through it. --at is the place on the
+     scale (0 to 1) and --k the gaps before it, so the mark sits where the
+     fill would end at that level (student.css .stu-cp-mark). */
   function _cpScaleHtml(v, start) {
     var lvl = v > 0 ? Math.max(1, Math.min(4, roundLevel(v))) : 0;
     var html = '<span class="stu-cp-scale" aria-hidden="true">';
@@ -973,7 +976,11 @@ window.PageStudent = (function () {
         (PROF_COLORS[lvl] || PROF_COLORS[0]) +
         '"></span></span>';
     }
-    if (start > 0) html += '<span class="stu-cp-ring" style="left:' + (Math.min(start, 4) / 4) * 100 + '%"></span>';
+    if (start > 0) {
+      var at = Math.max(0, Math.min(start, 4));
+      var gaps = Math.max(0, Math.min(3, Math.ceil(at) - 1));
+      html += '<span class="stu-cp-mark" style="--at:' + at / 4 + ';--k:' + gaps + '"></span>';
+    }
     return html + '</span>';
   }
 
