@@ -79,9 +79,12 @@ async function tickRubric(page) {
       .map(i => i.dataset.checkid)
       .filter(id => /_(2a|3a|3b|3c)$/.test(id) || /lab_inquiry_4a$/.test(id)),
   );
+  // The Overall Comment is pinned to the foot of the scoring column, so a box
+  // low in the column sits under it until scrolled to the middle.
   for (const id of ids) {
     const box = page.locator('#grader-overlay input[data-checkid="' + id + '"]').first();
-    await box.scrollIntoViewIfNeeded();
+    await box.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await pause(page, 200);
     if (!(await box.isChecked())) await box.click({ force: true });
     await pause(page, 300);
   }
@@ -165,8 +168,16 @@ const SHOTS = [
       await openGrader(page, base);
       await tickRubric(page);
       await pause(page, 600);
-      // The rubric half of the grader: ticks and the suggested level.
-      return { clip: [740, 225, 640, 540] };
+      // The rubric half of the grader: ticks and the suggested level, from
+      // the first criterion down to the pinned Overall Comment.
+      return {
+        clip: await page.evaluate(() => {
+          const crit = document.querySelector('.grader-panel-col .grdt-crit[data-critid]').getBoundingClientRect();
+          const foot = document.querySelector('.grader-panel-col .grdt-overall').getBoundingClientRect();
+          const pad = 12;
+          return [crit.left - pad, crit.top - pad, crit.width + 2 * pad, foot.top - crit.top];
+        }),
+      };
     },
   },
   {
@@ -260,7 +271,7 @@ const SHOTS = [
     async run(page, base) {
       await page.goto(base + '/reports');
       await pause(page, 1200);
-      await page.getByRole('tab', { name: 'Progress Reports' }).click();
+      await page.getByRole('tab', { name: 'Print Reports' }).click();
       await page.waitForSelector('#studio.studio-one', { timeout: 10000 });
       await pause(page, 800);
       await page.locator('.one-setup-btn').click();
@@ -274,6 +285,8 @@ const SHOTS = [
       await list.locator('.student-picker-item', { hasText: 'Cece Adeyemi' }).click();
       await page.getByRole('button', { name: 'Select students' }).click();
       await page.locator('#rb-preview .sheet-student').first().waitFor({ timeout: 10000 });
+      // The Setup change's Undo toast, gone before the picture.
+      await page.locator('#undo-toast').waitFor({ state: 'detached', timeout: 15000 });
       await page.mouse.move(0, 0);
       await pause(page, 2500);
       // The parts panel and the student's first page, side by side.
