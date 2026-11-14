@@ -115,7 +115,9 @@ window.StudentPageView = (function () {
       if (p.late) view.sub = ['Late', due].filter(Boolean).join(SEP);
       return view;
     }
-    var bits = [(p.updated ? 'Updated ' : 'Returned ') + fmtDate(p.updated ? p.updatedAt || p.returnedAt : p.returnedAt, DAY)];
+    var bits = [
+      (p.updated ? 'Updated ' : 'Returned ') + fmtDate(p.updated ? p.updatedAt || p.returnedAt : p.returnedAt, DAY),
+    ];
     if (p.result.kind === 'level' && p.result.word) bits.push(p.result.word);
     view.result = p.result.text || '';
     if (p.late) bits.push('Late');
@@ -410,13 +412,7 @@ window.StudentPageView = (function () {
       var sent = (p.send && p.send.sent) || {};
       var at = sent.at || (p.group && p.group.sentAt) || '';
       var pages = p.group && p.group.sent ? p.group.pages : sent.pages;
-      out.push(
-        pillHtml(
-          'sent',
-          [sentAt(at), photosWord(pages)].filter(Boolean).join(SEP),
-          'camera',
-        ),
-      );
+      out.push(pillHtml('sent', [sentAt(at), photosWord(pages)].filter(Boolean).join(SEP), 'camera'));
     }
     // "Closed Nov 13" (the Closed Assignment board).
     if (isClosed(p))
@@ -901,9 +897,7 @@ window.StudentPageView = (function () {
   // Over a piece opened from Assignments, the segments (hidden on a phone, page-view.css).
   function homeTop(ui, view, home) {
     return home.tab === 'assignments'
-      ? '<div class="sp-fb-segments">' +
-          segmentsHtml(Object.assign({}, ui, { segment: home.segment }), view) +
-          '</div>'
+      ? '<div class="sp-fb-segments">' + segmentsHtml(Object.assign({}, ui, { segment: home.segment }), view) + '</div>'
       : '';
   }
   function backWord(p, view) {
@@ -2272,7 +2266,8 @@ window.StudentPageView = (function () {
     var block = String(course.block || '').trim();
     var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
     var ready = !ui.waiting && view;
-    var open = ready && (handoutOpen(view, ui) || feedbackPiece(view, ui) || (tab === 'learning' && cardOpen(view, ui)));
+    var open =
+      ready && (handoutOpen(view, ui) || feedbackPiece(view, ui) || (tab === 'learning' && cardOpen(view, ui)));
     return (
       '<div class="sp-view' +
       (open ? ' sp-on-feedback' : '') +
@@ -2333,9 +2328,7 @@ window.StudentPageView = (function () {
   // Where focus goes back to on a piece's list: its row on My Learning, its card on Assignments.
   function backFocus(p, view) {
     if (!p) return '.sp-segment-on';
-    return homeOf(p, view).tab === 'learning'
-      ? '.sp-ml-row[data-piece="' + cssId(p.id) + '"]'
-      : '#' + domId(p.id);
+    return homeOf(p, view).tab === 'learning' ? '.sp-ml-row[data-piece="' + cssId(p.id) + '"]' : '#' + domId(p.id);
   }
 
   // Open piece `p` where it lives: its tab, and its segment on Assignments.

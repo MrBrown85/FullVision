@@ -151,7 +151,10 @@ window.PreviewStudent = (function () {
       _item('Your private notes', 'Observations marked Private stay with you.') +
       (StudentView.learningOn(cid) || (_open && _open.learning)
         ? ''
-        : _item('Their grade', 'Show My Learning is off for this class. Turn it on in Class Settings › Student Page.')) +
+        : _item(
+            'Their grade',
+            'Show My Learning is off for this class. Turn it on in Class Settings › Student Page.',
+          )) +
       '</ul></section>'
     );
   }

@@ -908,7 +908,12 @@
 
   // A sample category's id, from its name: "Labs and Investigations" is demo-cat-labs-and-investigations.
   function demoCategoryId(name) {
-    return 'demo-cat-' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return (
+      'demo-cat-' +
+      String(name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+    );
   }
 
   /* The Next Step sentences of the sample's competencies, as the class's
@@ -1951,9 +1956,7 @@
   // The `forms` lists for the page showing, or null.
   function formsOf(state) {
     var f = state && state.realForms;
-    return f && state.page && f.student === state.page.student.id
-      ? { questionnaires: f.questionnaires }
-      : null;
+    return f && state.page && f.student === state.page.student.id ? { questionnaires: f.questionnaires } : null;
   }
 
   // The page drawn again where the student is, the focus kept on what had it.

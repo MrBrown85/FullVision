@@ -900,7 +900,9 @@ var CmStudentPage = (function () {
       '<div class="sp-row-head">' +
       '<div class="sp-row-title">Questionnaires</div>' +
       '<div class="cm-hint">' +
-      esc('Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.') +
+      esc(
+        'Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.',
+      ) +
       '</div>' +
       '</div>' +
       '</div>'
