@@ -62,29 +62,8 @@ window.StudentPageView = (function () {
     return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
   }
 
-  /* ── What the server also tells (S4-M1) ────────────────────────
-     Each part below draws only when the view holds it: until the server
-     sends a unit, a category, a Description, Core Competencies or I Can
-     lines, the page is as it was. The page never names the teacher
-     (Colin's ruling 112, "Leave the name off."): it says "your teacher". */
-
-  /* A category and what it counts: "Practice Questions · counts 40% of your
-     grade"; "Practice · doesn't count toward your grade" for a category
-     that counts toward nothing; the name alone where no percent is true. */
-  function categoryLine(category) {
-    if (!category || !category.name) return '';
-    var pct = category.percent;
-    if (pct === 0) return category.name + SEP + 'doesn’t count toward your grade';
-    if (typeof pct === 'number' && pct > 0) return category.name + SEP + 'counts ' + pct + '% of your grade';
-    return category.name;
-  }
-
-  // "Counts toward Perspective", "Counts toward Evidence and Ethical Judgment".
-  function towardLine(names) {
-    if (!names || !names.length) return '';
-    var all = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
-    return 'Counts toward ' + all;
-  }
+  /* The page never names the teacher (Colin's ruling 112, "Leave the
+     name off."): it says "your teacher". */
 
   /* ── One row ───────────────────────────────────────────────── */
 
@@ -267,69 +246,6 @@ window.StudentPageView = (function () {
   function chipHtml(text, level) {
     var lv = Math.round(Number(level));
     return '<span class="sp-level sp-lv-' + (lv >= 1 && lv <= 4 ? lv : 0) + '">' + esc(text) + '</span>';
-  }
-
-  /* What came back with a piece: Your Result, then each competency or
-     rubric criterion with the level given, worded by the view. */
-  function resultRows(p) {
-    var rows = [];
-    if (p.result && p.result.text)
-      rows.push({ name: 'Your Result', text: p.result.text, level: null, was: p.result.was });
-    (p.rubric ? p.rubric.rows : p.competencies || []).forEach(function (r) {
-      // A rubric criterion names the competencies it counts toward under it (the Returned Work board).
-      var toward = p.rubric && r.toward ? r.toward.join(', ') : '';
-      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level, was: r.was, toward: toward });
-    });
-    if (!rows.length) return '';
-    return (
-      '<ul class="sp-piece-rows">' +
-      rows
-        .map(function (r) {
-          return (
-            '<li class="sp-piece-row">' +
-            (r.toward
-              ? '<span class="sp-piece-row-label"><span class="sp-piece-row-name">' +
-                esc(r.name) +
-                '</span><span class="sp-piece-row-sub">' +
-                esc(r.toward) +
-                '</span></span>'
-              : '<span class="sp-piece-row-name">' + esc(r.name) + '</span>') +
-            (r.was
-              ? '<span class="sp-was-wrap">' +
-                chipHtml(r.text, r.level) +
-                '<span class="sp-was">' +
-                esc('Was ' + r.was) +
-                '</span></span>'
-              : chipHtml(r.text, r.level)) +
-            '</li>'
-          );
-        })
-        .join('') +
-      '</ul>'
-    );
-  }
-
-  /* What changed on an updated grade, under its rows: who and when, and
-     each level that moved: "Your result was updated on Nov 12". */
-  function updatedNoteHtml(p) {
-    var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
-      return r.was && r.text;
-    });
-    // A result-only piece (points, Complete) says how its result moved.
-    if (p.result && p.result.was && p.result.text)
-      moved = moved.concat([{ name: 'Your result', was: p.result.was, text: p.result.text }]);
-    if (!p.updated || !moved.length) return '';
-    return (
-      '<div class="sp-updated-note"><p class="sp-updated-title">' +
-      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
-      '</p>' +
-      moved
-        .map(function (r) {
-          return '<p class="sp-updated-line">' + esc(r.name + ' went from ' + r.was + ' to ' + r.text + '.') + '</p>';
-        })
-        .join('') +
-      '</div>'
-    );
   }
 
   var PILL_ICON = {
@@ -709,11 +625,6 @@ window.StudentPageView = (function () {
   }
 
   // The teacher's comment on a returned card.
-  function cardCommentHtml(p) {
-    if (!p.comment) return '';
-    return '<p class="sp-piece-comment">' + esc(p.comment) + '</p>';
-  }
-
   /* A card's first line: its unit on the left and, on work still to do, when
      it is due on the right (the To Do Card board). Nothing when it has neither. */
   function headHtml(p, view) {
@@ -1184,14 +1095,6 @@ window.StudentPageView = (function () {
 
   function wordsHtml(text) {
     return '<span class="sp-fb-words">' + esc(text) + '</span>';
-  }
-
-  function checksHtml(checks, mark) {
-    return checks
-      .map(function (k) {
-        return '<span class="sp-fb-check">' + mark + '<span>' + esc(k.label) + '</span></span>';
-      })
-      .join('');
   }
 
   /* One criterion under Your Rubric: its name, the level given, and the
@@ -1832,10 +1735,8 @@ window.StudentPageView = (function () {
 
   var ML_ICON = {
     next: '<path d="M4 12h15M13 6l6 6-6 6"/>',
-    star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor" stroke="none"/>',
     up: '<path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/>',
     down: '<path d="M12 5v13M6.5 12.5L12 18l5.5-5.5"/>',
-    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/>',
   };
   function mlIcon(name, size) {
     return (
