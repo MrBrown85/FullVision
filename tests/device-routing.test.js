@@ -68,3 +68,40 @@ describe('home-screen launcher', () => {
     expect(readFileSync(resolve(root, 'scripts/build.sh'), 'utf-8')).toMatch(/cp [^\n]*launch\.html/);
   });
 });
+
+describe('isTablet', () => {
+  const savedNav = globalThis.navigator;
+  function tablet(width, height, userAgent, maxTouchPoints = 0) {
+    globalThis.window = { screen: { width, height } };
+    globalThis.localStorage = { getItem: () => null };
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent, maxTouchPoints },
+      configurable: true,
+      writable: true,
+    });
+    runInThisContext(source, { filename: 'shared/device.js' });
+    return globalThis.isTablet();
+  }
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'navigator', { value: savedNav, configurable: true, writable: true });
+  });
+
+  const MAC =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+  const WIN =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+
+  it('finds an iPad asking for desktop sites by its touch points', () => {
+    expect(tablet(820, 1180, MAC, 5)).toBe(true);
+    expect(tablet(744, 1133, MAC, 5)).toBe(true);
+  });
+
+  it('never marks a computer, a touch-screen laptop included', () => {
+    expect(tablet(1728, 1117, MAC, 0)).toBe(false);
+    expect(tablet(1920, 1080, WIN, 10)).toBe(false);
+  });
+
+  it('never marks a phone', () => {
+    expect(tablet(390, 844, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 5)).toBe(false);
+  });
+});
