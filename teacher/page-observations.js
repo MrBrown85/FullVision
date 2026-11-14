@@ -149,9 +149,7 @@ window.PageObservations = (function () {
       cid: activeCourse,
       students: students,
       draftKey: 'obs-page',
-      onAdd: function () {
-        refreshFeedAndCount();
-      },
+      onAdd: refreshFeedAndCount,
     });
   }
 
@@ -631,9 +629,9 @@ window.PageObservations = (function () {
   }
 
   /* ── Feed HTML ──────────────────────────────────────────── */
-  /* The observations (less those waiting on Undo), the cards' context and
-     the search text, made once per change (feedChanged, or a new list or
-     length from a sync), so a search or a filter only filters. */
+  /* The observations (less those waiting on Undo, in the order drawn: by
+     observed day), the cards' context and the search text, made once per
+     change (feedChanged, a re-key, or a new list or length from a sync). */
   var _feed = null;
   function feedChanged() {
     _feed = null;
@@ -648,11 +646,28 @@ window.PageObservations = (function () {
       cid: activeCourse,
       of: byStudent,
       n: n,
-      obs: visibleObs(every),
+      obs: visibleObs(every).sort(function (a, b) {
+        return obDay(b).localeCompare(obDay(a));
+      }),
       ctx: Card.context(activeCourse, { hidden: _pendingDeletes, all: every }),
       hay: {},
     };
     return _feed;
+  }
+
+  /* An id changed in place (a save landed): drop the kept feed; a card on
+     screen, a pending delete and the open editor take the server id. */
+  function onRekeyed(e) {
+    var d = (e && e.detail) || {};
+    if (!_alive || d.cid !== activeCourse) return;
+    feedChanged();
+    if (d.kind !== 'observation') return;
+    var rec = _pendingDeletes[d.from];
+    if (rec) ((rec.id = d.to), (_pendingDeletes[d.to] = rec), delete _pendingDeletes[d.from]);
+    if (_focusObId === d.from) _focusObId = d.to;
+    document.querySelectorAll('#obs-feed [data-obid]').forEach(function (el) {
+      if (el.getAttribute('data-obid') === d.from) el.setAttribute('data-obid', d.to);
+    });
   }
 
   // html-safe: day labels go through ObsCard.dayHeaderHtml's esc; ObsCard.html escapes names, text, tags and titles.
@@ -827,7 +842,7 @@ window.PageObservations = (function () {
   function deleteOb(sid, obId) {
     if (!sid || !obId || _pendingDeletes[obId]) return;
     var cid = activeCourse;
-    _pendingDeletes[obId] = { cid: cid, sid: sid };
+    var rec = (_pendingDeletes[obId] = { cid: cid, sid: sid, id: obId });
     refreshFeedAndCount();
     var settled = false;
     showUndoToast(
@@ -835,14 +850,14 @@ window.PageObservations = (function () {
       function () {
         if (settled) return;
         settled = true;
-        delete _pendingDeletes[obId];
+        delete _pendingDeletes[rec.id];
         if (_alive && activeCourse === cid) refreshFeedAndCount();
       },
       function () {
         if (settled) return;
         settled = true;
-        delete _pendingDeletes[obId];
-        deleteQuickOb(cid, sid, obId);
+        delete _pendingDeletes[rec.id];
+        deleteQuickOb(cid, sid, rec.id);
         if (_alive && activeCourse === cid) refreshFeedAndCount();
       },
       UNDO_MS,
@@ -1302,12 +1317,8 @@ window.PageObservations = (function () {
       setFilterOption: function () {
         setFilterOption(el.dataset.filter, el.dataset.value);
       },
-      clearAllFilters: function () {
-        clearAllFilters();
-      },
-      obsShowMore: function () {
-        showMore();
-      },
+      clearAllFilters: clearAllFilters,
+      obsShowMore: showMore,
       deleteOb: function () {
         deleteOb(el.dataset.sid, el.dataset.obid);
       },
@@ -1318,30 +1329,20 @@ window.PageObservations = (function () {
       openFocus: function () {
         openFocus(el.dataset.sid, el.dataset.obid);
       },
-      closeFocus: function () {
-        closeFocus();
-      },
+      closeFocus: closeFocus,
       focusToggleSentiment: function () {
         focusToggleSentiment(el.dataset.value);
       },
-      focusToggleCtxMenu: function () {
-        focusToggleCtxMenu();
-      },
+      focusToggleCtxMenu: focusToggleCtxMenu,
       focusPickContext: function () {
         focusPickContext(el.dataset.value);
       },
-      focusSave: function () {
-        focusSave();
-      },
-      focusDelete: function () {
-        focusDelete();
-      },
+      focusSave: focusSave,
+      focusDelete: focusDelete,
       focusRemoveDim: function () {
         focusRemoveDim(el.dataset.value);
       },
-      toggleFocusTagPopover: function () {
-        toggleFocusTagPopover();
-      },
+      toggleFocusTagPopover: toggleFocusTagPopover,
     };
     if (handlers[action]) {
       if (el.tagName !== 'SELECT') e.preventDefault();
@@ -1429,6 +1430,7 @@ window.PageObservations = (function () {
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
+    _addDocListener('fv:id-rekeyed', onRekeyed);
 
     render();
     if (typeof setLongFormAuthContext === 'function') {

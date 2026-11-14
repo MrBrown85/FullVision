@@ -31,6 +31,7 @@ describe('the Observations feed', () => {
     stub = {
       document: globalThis.document,
       getComputedStyle: globalThis.getComputedStyle,
+      CustomEvent: globalThis.CustomEvent,
       PageObservations: globalThis.PageObservations,
       getAllQuickObs: globalThis.getAllQuickObs,
       context: ObsCard.context,
@@ -39,6 +40,7 @@ describe('the Observations feed', () => {
       '<!DOCTYPE html><html><body><div id="page-layout"><div id="page-toolbar-mount"></div><div id="sidebar-mount"></div><main id="main"></main></div></body></html>',
     ).document;
     globalThis.document = doc;
+    globalThis.CustomEvent = doc.defaultView.CustomEvent; // the re-key's event, on this document
     globalThis.getComputedStyle = () => ({ paddingLeft: '0', paddingRight: '0' });
     COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency' };
     const students = Array.from({ length: N }, (_, i) => ({
@@ -104,6 +106,7 @@ describe('the Observations feed', () => {
     page.destroy();
     globalThis.document = stub.document;
     globalThis.getComputedStyle = stub.getComputedStyle;
+    globalThis.CustomEvent = stub.CustomEvent;
     globalThis.PageObservations = stub.PageObservations;
     globalThis.getAllQuickObs = stub.getAllQuickObs;
     ObsCard.context = stub.context;
@@ -175,6 +178,80 @@ describe('the Observations feed', () => {
     expect(pages).toBe(0);
     expect(cards()).toBe(PER);
     expect(doc.getElementById('filter-student-btn').classList.contains('active')).toBe(true);
+  });
+
+  /* A save lands: the server id is swapped in on the stored observation, and
+     the list and its count stay the same (PR #1421 review). */
+  const ids = () => [...doc.querySelectorAll('#obs-feed .obs-card')].map(c => c.getAttribute('data-obid'));
+  const stored = () => getQuickObs(CID).s0.map(o => o.id);
+  function addAndLand(text) {
+    addQuickOb(CID, 's0', text, [], 'strength', null);
+    page.render();
+    const local = stored().find(id => id.startsWith('qo_'));
+    _rekey(CID, 'observation', local, 'srv-' + local);
+    return { local, server: 'srv-' + local };
+  }
+
+  it('an added observation that reached the server is found, opened and deleted by its server id', () => {
+    const { local, server } = addAndLand('Brand new note');
+    // The card already on screen takes the server id.
+    expect(ids()).toContain(server);
+    expect(ids()).not.toContain(local);
+    search('brand new');
+    expect(ids()).toEqual([server]);
+    click(doc.querySelector('#obs-feed .obs-card'));
+    expect(doc.getElementById('obs-focus-backdrop')).toBeTruthy();
+    click(doc.querySelector('#obs-focus-backdrop [data-action="closeFocus"]'));
+    click(doc.querySelector('#obs-feed .obs-card-delete'));
+    expect(ids()).toEqual([]);
+    vi.advanceTimersByTime(7000);
+    expect(stored()).not.toContain(server);
+    expect(stored()).toHaveLength(PER);
+  });
+
+  it('an observation re-keyed in place is edited by its server id, and a search finds the edit', () => {
+    const { server } = addAndLand('First wording');
+    search('first wording');
+    click(doc.querySelector('#obs-feed .obs-card'));
+    const ta = doc.getElementById('focus-textarea');
+    expect(ta).toBeTruthy();
+    ta.value = 'Second wording';
+    ta.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    click(doc.querySelector('#obs-focus-backdrop [data-action="focusSave"]'));
+    expect(getQuickObs(CID).s0.find(o => o.id === server).text).toBe('Second wording');
+    search('second wording');
+    expect(ids()).toEqual([server]);
+  });
+
+  it('a delete waiting on Undo when the save lands still deletes', () => {
+    addQuickOb(CID, 's0', 'Gone soon', [], 'strength', null);
+    page.render();
+    click(doc.querySelector('#obs-feed .obs-card-delete'));
+    const local = stored().find(id => id.startsWith('qo_'));
+    _rekey(CID, 'observation', local, 'srv-' + local);
+    expect(ids()).not.toContain('srv-' + local);
+    vi.advanceTimersByTime(7000);
+    expect(stored()).toHaveLength(PER);
+  });
+
+  it('Show More puts focus on the first new card when an observation was dated before it was written', () => {
+    // Written last, observed a month before the rest: drawn at the bottom.
+    getQuickObs(CID).s1.push({
+      id: 'late-entry',
+      text: 'Written up late',
+      dims: [],
+      date: '2026-09-01',
+      created: '2026-10-30T12:00:00.000Z',
+    });
+    page.render();
+    const before = new Set(ids());
+    let focused = null;
+    doc.defaultView.HTMLElement.prototype.focus = function () {
+      focused = this;
+    };
+    click(doc.querySelector('#obs-feed [data-action="obsShowMore"]'));
+    const firstNew = ids().find(id => !before.has(id));
+    expect(focused && focused.getAttribute('data-obid')).toBe(firstNew);
   });
 
   it('an added observation is in the feed at once', () => {
