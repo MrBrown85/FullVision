@@ -355,4 +355,5 @@ beforeEach(() => {
   _refreshState = {};
   _refusalsReported = {}; // the refusals already reported to Sentry this page load
   _keptText = {}; // the fourth piece of per-session memory: each tab's own copy of scores and statuses
+  _scoresApart = {}; // and whether a class's scores in memory may have parted from that copy
 });

@@ -9,11 +9,11 @@
 /* Class Settings puts its class list where the student list goes
    (renderClassManager). It shows even when the student list is
    collapsed, so the sidebar button has nothing to do there. */
-#page-layout:has(.cm-toolbar) #sidebar-mount {
+body.cm-open #page-layout #sidebar-mount {
   width: auto;
   overflow: visible;
 }
-body:has(.cm-toolbar) #app-dock [data-action='toggleSidebar'] {
+body.cm-open #app-dock [data-action='toggleSidebar'] {
   visibility: hidden;
 }
 #main.page-main.page-dashboard {
@@ -2716,7 +2716,7 @@ a.dash-ins-name:hover {
   color: var(--text-3);
 }
 
-#main.page-main.page-dashboard:has(> .cm-layout) {
+#main.page-main.page-dashboard.cm-listing {
   padding: 0;
 }
 .cm-layout {
@@ -7590,35 +7590,35 @@ label.cm-cr-row {
    couldn't be reached (Nov 3 sweep). It keeps its own width on a tablet
    and, on a phone, sits above the class as a short list of its own. */
 @media (max-width: 1024px) {
-  #page-layout:has(.cm-toolbar) .cm-sidebar {
+  body.cm-open #page-layout .cm-sidebar {
     width: 220px;
   }
 }
 @media (max-width: 600px) {
-  #page-layout:has(.cm-toolbar) {
+  body.cm-open #page-layout {
     flex-direction: column;
   }
-  #page-layout:has(.cm-toolbar) #sidebar-mount {
+  body.cm-open #page-layout #sidebar-mount {
     height: auto;
     flex-shrink: 0;
   }
-  #page-layout:has(.cm-toolbar) .cm-sidebar {
+  body.cm-open #page-layout .cm-sidebar {
     width: 100%;
     height: auto;
     max-height: 40vh;
     border-right: 0;
     border-bottom: 1px solid var(--divider-subtle);
   }
-  #page-layout:has(.cm-toolbar) .cm-sidebar-header {
+  body.cm-open #page-layout .cm-sidebar-header {
     height: 44px;
   }
-  #page-layout:has(.cm-toolbar) .cm-class-list {
+  body.cm-open #page-layout .cm-class-list {
     min-height: 0;
   }
-  #page-layout:has(.cm-toolbar) .cm-new-btn {
+  body.cm-open #page-layout .cm-new-btn {
     min-height: 44px;
   }
-  #page-layout:has(.cm-toolbar) .page-main {
+  body.cm-open #page-layout .page-main {
     flex: 1 1 auto;
     min-height: 0;
   }
