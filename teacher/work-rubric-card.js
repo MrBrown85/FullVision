@@ -1,14 +1,18 @@
+// @ts-check
 /* ── work-rubric-card.js — how a piece was scored, by its card ─────────
    Moved out of shared/work-wall.js, which calls wire() when the Work tab
    or the Work Wall opens and hide() when either is drawn again or goes.
    Teacher desktop only: it reads the printed handout (rubric-print.js). */
-window.WorkRubricCard = (function () {
+/** @type {any} */ (window).WorkRubricCard = (function () {
   'use strict';
+
+  // The other modules this reads, loaded before it in app.html.
+  var G = /** @type {any} */ (window);
 
   /* The rubric card: how a piece was scored, beside a card on the Work
      tab or the Work Wall while the pointer rests on it (or it has
      keyboard focus). It is the printed handout's rubric
-     (RubricPrint.sheetData): the level descriptors with the student's
+     (G.RubricPrint.sheetData): the level descriptors with the student's
      level filled in its colour, each criterion's comment, a single-point
      rubric's Work On and Went Beyond, an Advanced Rubric's ticks, and the
      feedback. Points and Complete/Incomplete work show the score and the
@@ -19,8 +23,11 @@ window.WorkRubricCard = (function () {
   var RUB_WAIT = 250; // ms the pointer rests on a card before the rubric shows
   var RUB_WIDE = 860; // px, the card's widest
   var RUB_NARROW = 560; // px, the narrowest it is drawn beside a card before it goes over it
-  var _rub = null; // { card, el }
-  var _rubTimer = null;
+  /** @type {{ card: Element, el: HTMLElement } | null} */
+  var _rub = null;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  var _rubTimer;
+  /** @type {Document | null} */
   var _rubDoc = null;
   var _rubBankAsked = false;
   function _rubCard(e) {
@@ -29,7 +36,7 @@ window.WorkRubricCard = (function () {
   }
   function wire() {
     if (typeof document === 'undefined' || _rubDoc === document || !document.addEventListener) return;
-    if (typeof window === 'undefined' || !window.RubricPrint) return;
+    if (typeof window === 'undefined' || !G.RubricPrint) return;
     _rubDoc = document;
     document.addEventListener(
       'mouseover',
@@ -81,8 +88,8 @@ window.WorkRubricCard = (function () {
   }
 
   function _rubChecksHtml(criterion, level, ticked) {
-    if (typeof RubricChecks === 'undefined') return '';
-    var boxes = RubricChecks.checksAt(criterion, level);
+    if (!G.RubricChecks) return '';
+    var boxes = G.RubricChecks.checksAt(criterion, level);
     if (!boxes.length) return '';
     return (
       '<span class="wr-checks">' +
@@ -195,11 +202,11 @@ window.WorkRubricCard = (function () {
 
   // html-safe: every title, name, descriptor, comment and label goes through esc; the rest is fixed markup
   function _rubHtml(cid, sid, aid) {
-    var got = WorkWall.cardMark(cid, sid, aid);
+    var got = G.WorkWall.cardMark(cid, sid, aid);
     if (!got) return '';
     var a = got.piece;
     var mark = got.mark;
-    var data = RubricPrint.sheetData(cid, aid, sid);
+    var data = G.RubricPrint.sheetData(cid, aid, sid);
     var sub = getStudentSubmission(cid, sid, aid);
     var day = got.day((sub && (sub.sent_at || sub.created_at)) || a.date);
     var head =
@@ -245,9 +252,9 @@ window.WorkRubricCard = (function () {
     var html = _rubHtml(cid, sid, aid);
     if (!html) return;
     // A competency rubric's wording from the curriculum bank loads the first time; the card is drawn again then.
-    if (!_rubBankAsked && RubricPrint.classUsesBankLevels(cid)) {
+    if (!_rubBankAsked && G.RubricPrint.classUsesBankLevels(cid)) {
       _rubBankAsked = true;
-      RubricPrint.loadBankLevels().then(function () {
+      G.RubricPrint.loadBankLevels().then(function () {
         if (_rub && _rub.card === card) _rubShow(card);
       });
     }
