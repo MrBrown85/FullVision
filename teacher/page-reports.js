@@ -110,7 +110,7 @@ window.PageReports = (function () {
       resize: function () {
         clearTimeout(_resizeTimer);
         _resizeTimer = setTimeout(function () {
-          if (_mounted) renderReportPreview();
+          if (_mounted) renderReportPreview(true);
         }, 150);
       },
       pickStudent: function (sid) {
@@ -231,7 +231,7 @@ window.PageReports = (function () {
       /* per-device preference only */
     }
     _applyPaper();
-    if (activeTab === 'progress') renderReportPreview();
+    if (activeTab === 'progress') renderReportPreview(true);
   }
 
   /* ── Tab switching ───────────────────────────────────────────── */
@@ -483,12 +483,16 @@ window.PageReports = (function () {
     Router.setUrl(url);
   }
 
-  function renderReports() {
+  /* keep: a change of view only (One Student, Everyone, the Print dialog):
+     the canvas uses the layouts it kept (renderReportPreview). */
+  function renderReports(keep) {
     const cid = activeCourse;
     const output = document.getElementById('report-output');
     _applyReportTerm();
     _syncUrl();
 
+    // reports.css: only the pages view (One Report) clips #report-output.
+    if (output) output.classList.remove('has-studio');
     var t = _tab();
     // A tab with no comment box of its own lets go of the last tab's.
     if (!t.longForm) _syncLongFormAuthContext();
@@ -506,7 +510,7 @@ window.PageReports = (function () {
       return;
     }
     _waitingForReturns = false;
-    t.render(cid, output);
+    t.render(cid, output, keep);
   }
   var _waitingForReturns = false; // the page drew the waiting line, not the tab
 
@@ -530,16 +534,22 @@ window.PageReports = (function () {
     RQ.afterRender();
   }
 
-  function _renderProgressTab(cid, output) {
-    // Feedback Pages print Tag Rubrics in the curriculum bank's wording, which
-    // loads the first time a class with bank competencies needs it; draw now
-    // and again once it is here.
-    if (window.RubricPrint && RubricPrint.classUsesBankLevels && RubricPrint.classUsesBankLevels(cid)) {
-      RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && _mounted && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
-      });
-    }
+  /* Feedback Pages print Tag Rubrics in the curriculum bank's wording (858 KB),
+     which loads the first time a report that prints them (Rubrics on) needs
+     it, once: drawn now and again once it is here. */
+  var _bankAsked = false;
+  function _bankLevels(cid) {
+    if (_bankAsked || !_oneModel().feedback.rubrics || !RubricPrint.classUsesBankLevels(cid)) return;
+    _bankAsked = true;
+    RubricPrint.loadBankLevels().then(function (ok) {
+      _bankAsked = false;
+      if (!ok || !_mounted || activeTab === 'questionnaire' || activeCourse !== cid) return;
+      _classFitKey = ''; // the fit counts again in the bank's wording, even one already in
+      renderReports();
+    });
+  }
 
+  function _renderProgressTab(cid, output, keep) {
     // Progress Reports › Sent to Phones: this period's report on the
     // students' phones (teacher/phone-reports.js).
     if (phonesView && typeof PhoneReports !== 'undefined') {
@@ -550,11 +560,12 @@ window.PageReports = (function () {
 
     // Progress Reports: One Report's panel beside the pages.
     output.innerHTML = _layoutHtml();
+    output.classList.add('has-studio');
     // The panel and the page listen on these two, made new each time.
     ReportOnePanel.mount(document.getElementById('studio-palette'), _oneApi);
     ReportOnePage.mount(document.getElementById('rb-preview'), _oneApi);
     renderStudioPanels();
-    renderReportPreview();
+    renderReportPreview(keep);
 
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
@@ -679,7 +690,11 @@ window.PageReports = (function () {
     return one ? [one] : [];
   }
 
-  function renderReportPreview() {
+  /* keep: the draw follows a change of the report only (a tick, a comment
+     saved through redraw), so kept layouts are used; any other may follow new data. */
+  function renderReportPreview(keep) {
+    if (_issueState) keep = false; // the Print dialog's pages are what prints: laid out from the data now
+    if (!keep && _kept.changed()) _classFitKey = '';
     if (viewingIssue) {
       _showIssue(viewingIssue.id);
       return;
@@ -688,15 +703,19 @@ window.PageReports = (function () {
     // Print Reports must not open on the last render's students.
     _lastSummary = null;
     _lastSummarySet = '';
+    _bankLevels(activeCourse);
+    var preview = document.getElementById('rb-preview');
+    // Kept by the canvas's classes too (report-sheets-on, set by the first draw, reaches no part).
+    var where = studioView + (preview && preview.className.replace(' report-sheets-on', ''));
+    var lay = _kept.layout('sheet', ReportOne.layoutWith(_oneModel()), where);
     Preview.renderReportPreview({
       cid: activeCourse,
       students: _previewStudents(),
       paper: reportPaper,
-      layout: ReportOne.layoutWith(_oneModel()),
+      layout: lay,
       onSheets: _rememberSummary,
     });
     _syncPrintButton();
-    var preview = document.getElementById('rb-preview');
     if (preview) {
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
@@ -1047,11 +1066,12 @@ window.PageReports = (function () {
   var _restoreOneAfterPrint = false;
   function openIssueDialog() {
     closeIssueDialog();
+    // Laid out from the data now, as on every print path: what prints and is saved.
     if (studioView === 'one') {
       studioView = 'all';
       _restoreOneAfterPrint = true;
       renderReports();
-    }
+    } else renderReportPreview();
     if (!_lastSummary || !Object.keys(_lastSummary.perStudent || {}).length) return;
     var c = _issueCounts();
     // The Name choice redraws the reports while the dialog is open; Cancel
@@ -1185,13 +1205,12 @@ window.PageReports = (function () {
       else delete reportConfig.one;
       _saveReportConfig();
       _classFitKey = '';
-      renderStudioPanels();
-      renderReportPreview();
+      _redrawStudio();
     }
     if (_restoreOneAfterPrint && !keepEveryone) {
       _restoreOneAfterPrint = false;
       studioView = 'one';
-      renderReports();
+      renderReports(true);
     }
     if (_issueState) {
       if (_issueState.keyHandler) document.removeEventListener('keydown', _issueState.keyHandler);
@@ -1356,8 +1375,7 @@ window.PageReports = (function () {
     reportConfig.one = ReportOne.normalize(model);
     _saveReportConfig();
     _classFitKey = '';
-    renderStudioPanels();
-    renderReportPreview();
+    _redrawStudio();
     if (label && typeof showUndoToast === 'function') {
       var cid = activeCourse;
       showUndoToast(label, function () {
@@ -1366,8 +1384,7 @@ window.PageReports = (function () {
         else delete reportConfig.one;
         _saveReportConfig();
         _classFitKey = '';
-        renderStudioPanels();
-        renderReportPreview();
+        _redrawStudio();
       });
     }
   }
@@ -1389,14 +1406,15 @@ window.PageReports = (function () {
       },
       setScope: function (forStudent) {
         _oneForStudent = !!forStudent;
-        renderStudioPanels();
-        renderReportPreview();
+        _redrawStudio();
       },
       goStudent: function (sid) {
         previewSid = sid;
         previewAuto = false;
+        // On One Student already: the panel and the sheet, not the whole tab.
+        if (studioView === 'one' && !phonesView && document.getElementById('rb-preview')) return _redrawStudio();
         studioView = 'one';
-        renderReports();
+        renderReports(true);
       },
       view: function () {
         return studioView;
@@ -1411,10 +1429,10 @@ window.PageReports = (function () {
       fit: function () {
         return _classFitKey === _classFitKeyNow() ? _classFit : null;
       },
-      redraw: function () {
+      redraw: function (sid) {
+        _kept.dirty(sid); // a change of data: one student's (a saved comment), or the class's
         _classFitKey = '';
-        renderStudioPanels();
-        renderReportPreview();
+        _redrawStudio();
       },
       announce: _announce,
     };
@@ -1480,6 +1498,11 @@ window.PageReports = (function () {
     return sel;
   }
 
+  /* The panel and the canvas again after a change of the report only. */
+  function _redrawStudio() {
+    renderStudioPanels();
+    renderReportPreview(true);
+  }
   function renderStudioPanels() {
     var palette = document.getElementById('studio-palette');
     var refocus = _focusedPaletteControl(palette);
@@ -1499,22 +1522,28 @@ window.PageReports = (function () {
     line.classList.toggle('ok', !line.querySelector('.one-fit-over'));
   }
 
-  /* The whole class laid out, for the fit line, once per class, report,
-     paper, model and set of scores, after the canvas has rendered. In
-     Everyone view the canvas render is that summary. */
+  /* The whole class laid out, for the fit line, once per class, report, paper,
+     model and set of scores, a piece at a time while the page is idle (the line
+     keeps the last count until then), each student's layout kept by what it
+     reads (ReportSheets.keptLayouts). In Everyone view the canvas is the summary. */
   var _classFit = null;
   var _classFitKey = '';
+  var _kept = ReportSheets.keptLayouts(function () {
+    var ctx = ReportBlocks.reportContext();
+    return { cid: activeCourse, ctx: ctx, paper: reportPaper, set: _reportSet(), model: _oneModel(), day: _day() };
+  });
   function _classFitKeyNow() {
     var ctx = ReportBlocks.reportContext();
-    return [activeCourse, ctx.termId, reportPaper, 'one:' + JSON.stringify(_oneModel()), _reportSet()].join('|');
+    var form = 'one:' + JSON.stringify(_oneModel());
+    return [activeCourse, ctx.termId, reportPaper, form, _reportSet(), _day()].join('|');
   }
-  /* Every student laid out, off the canvas: the grades are read here, when
-     the timer below runs, inside the report's set of scores. */
-  function _classSummary(students) {
-    return ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
-      paper: reportPaper,
-      layout: ReportOne.layoutWith(_oneModel()),
-    });
+  // Missing Work says "As of" today: a page left open overnight lays out again.
+  function _day() {
+    return typeof courseToday === 'function' ? courseToday(activeCourse) : new Date().toDateString();
+  }
+  /* A piece of the class fit, run inside the report's set of scores. */
+  function _classSummary(piece) {
+    return piece();
   }
   function _scheduleClassFit() {
     if (activeTab !== 'progress') return;
@@ -1527,31 +1556,30 @@ window.PageReports = (function () {
       return;
     }
     _classFitKey = key;
-    setTimeout(function () {
-      if (!_mounted || key !== _classFitKey || activeTab !== 'progress') return;
-      try {
-        var students = sortStudents(getStudents(activeCourse), 'lastName');
-        _classFit = _classSummary(students);
-      } catch (e) {
-        _classFit = null;
-      }
-      // The panel and the fit line are redrawn once the fit is in, and
-      // every student's badge in the rail is redrawn from it: a render of
-      // one student only redraws that student's (step 4 group 2 #9).
-      renderStudioPanels();
-      if (_classFit) _annotateSidebar(_classFit);
-      // The summary names the longest report; the canvas moves to it.
-      if (previewAuto && studioView === 'one') {
-        var longest = _longestStudent(_classFit);
-        if (longest) {
-          previewAuto = false;
-          if (longest !== previewSid) {
-            previewSid = longest;
-            renderReportPreview();
-          }
+    var alive = function () {
+      return _mounted && key === _classFitKey && activeTab === 'progress';
+    };
+    var students = sortStudents(getStudents(activeCourse), 'lastName');
+    _kept.fit(students, ReportOne.layoutWith(_oneModel()), _classSummary, alive, _fitIn);
+  }
+  function _fitIn(summary) {
+    _classFit = summary;
+    // The panel and the fit line are redrawn once the fit is in, and
+    // every student's badge in the rail is redrawn from it: a render of
+    // one student only redraws that student's (step 4 group 2 #9).
+    renderStudioPanels();
+    if (_classFit) _annotateSidebar(_classFit);
+    // The summary names the longest report; the canvas moves to it.
+    if (previewAuto && studioView === 'one') {
+      var longest = _longestStudent(_classFit);
+      if (longest) {
+        previewAuto = false;
+        if (longest !== previewSid) {
+          previewSid = longest;
+          renderReportPreview(true);
         }
       }
-    }, 0);
+    }
   }
 
   function _announce(text) {
@@ -1579,6 +1607,7 @@ window.PageReports = (function () {
     reportPaper = _loadPaper(cid);
     _applyPaper();
     reportConfig = _loadReportConfig(cid);
+    _kept.dirty();
     _classFitKey = '';
     previewSid = null;
     previewAuto = true;
@@ -1634,14 +1663,6 @@ window.PageReports = (function () {
       },
     });
   }
-
-  /* ── Init ────────────────────────────────────────────────────── */
-
-  // ── Delegated click handler for reports ──
-
-  // Handle report-period select change via delegation
-
-  // Intercept sidebar clicks — navigate to that student contextually
 
   /* -- Delegated click handler ---------------------------- */
   function _handleClick(e) {
@@ -1753,7 +1774,7 @@ window.PageReports = (function () {
       },
       studioView: function () {
         studioView = el.dataset.view === 'all' ? 'all' : 'one';
-        renderReports();
+        renderReports(true);
       },
       togglePhones: function () {
         phonesView = !phonesView;
@@ -1778,7 +1799,7 @@ window.PageReports = (function () {
         previewSid = el.dataset.sid;
         previewAuto = false;
         studioView = 'one';
-        renderReports();
+        renderReports(true);
       },
       toggleStudentSelection: function () {
         e.stopPropagation();
@@ -1995,6 +2016,7 @@ window.PageReports = (function () {
     selectedStudentIds = null;
 
     reportConfig = _loadReportConfig(activeCourse);
+    _kept.dirty();
     _classFitKey = '';
     _classFit = null;
     previewSid = null;
@@ -2002,6 +2024,8 @@ window.PageReports = (function () {
     RQ.tqStudentIndex = 0;
     RQ.tqNarrativeDirty = false;
 
+    // For reports.css (the page's scroll and print rules).
+    document.getElementById('main').classList.add('page-reports');
     // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
@@ -2074,6 +2098,7 @@ window.PageReports = (function () {
 
   function destroy() {
     _mounted = false;
+    document.getElementById('main').classList.remove('page-reports');
     clearTimeout(_resizeTimer);
     TABS.forEach(function (t) {
       if (t.teardown) t.teardown();
@@ -2114,8 +2139,13 @@ window.PageReports = (function () {
     /* The data layer's redraw (_invalidateAndRerender) after the class's
        returned grades load: the page draws what it was waiting for. While
        nothing was waiting it does nothing, as before this page had a
-       render(), so no other change of data redraws Reports. */
+       render(), so no other change of data redraws Reports; but no layout
+       kept from before it is used again, and a fit counting is restarted. */
     render: function () {
+      if (_kept.changed() && _mounted) {
+        _classFitKey = '';
+        _scheduleClassFit();
+      }
       if (_waitingForReturns && document.getElementById('report-output')) renderReports();
     },
     // A redraw from elsewhere (Sent to Phones) only while the page is up.

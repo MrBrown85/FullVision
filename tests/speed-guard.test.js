@@ -35,11 +35,12 @@
  * and say in the PR which numbers moved and why.
  */
 import './setup.js';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parseHTML } from 'linkedom';
+import { runInThisContext } from 'vm';
 import {
   U,
   seedClass,
@@ -48,7 +49,9 @@ import {
   openGrader,
   closePages,
   click,
+  fire,
   key,
+  leave,
 } from './helpers/pin-save-paths.js';
 import { mount, unmount, showCompetencies } from './helpers/gradebook-dom.js';
 
@@ -313,11 +316,26 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
     step('Assignments: open', () => openAssignments(quietSeed, CID, {}));
     step('Assignments: open one card', () => click(card(AIDS[0]).querySelector('.assess-title')));
     expect(card(AIDS[0]).querySelector('.rsg-criterion-row'), 'the card did not open').not.toBeNull();
-    step('Assignments: click a rubric level', () => {
-      const levels = card(AIDS[0]).querySelectorAll('.rsg-level[data-action="selectRubricScore"]');
-      expect(levels.length).toBeGreaterThan(8);
-      click(levels[5]);
-    });
+    // What the page does a moment after an event (its timers) is a step of its own.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      step('Assignments: click a rubric level', () => {
+        const levels = card(AIDS[0]).querySelectorAll('.rsg-level[data-action="selectRubricScore"]');
+        expect(levels.length).toBeGreaterThan(8);
+        click(levels[5]);
+      });
+      step('Assignments: what follows a click', () => vi.runOnlyPendingTimers());
+      const comment = card(AIDS[0]).querySelector('textarea');
+      expect(comment, 'no comment box in the card').not.toBeNull();
+      step('Assignments: a key typed in a comment', () => {
+        fire(comment, 'keyup');
+        vi.runOnlyPendingTimers();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    step('Assignments: close the card', () => click(card(AIDS[0]).querySelector('.assess-title')));
+    expect(card(AIDS[0]).querySelector('.rsg-criterion-row'), 'the card did not close').toBeNull();
   });
 
   it('the Gradebook', () => {
@@ -336,10 +354,74 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
     expect(after, 'the typed score did not land').toBe(Number(typed));
   });
 
+  it('Edit Score in the Scores view', () => {
+    mount(quietSeed, { course: CID });
+    const cell = document.querySelector(
+      '#gb-data td.gb-scores-cell[data-aid="' + AIDS[1] + '"][data-sid="' + IDS[3] + '"]',
+    );
+    expect(cell, 'no Scores cell to type in').not.toBeNull();
+    cell.classList.add('gb-focus');
+    cell.focus();
+    const typed = getScores(CID)[IDS[3]].find(e => e.assessmentId === AIDS[1]).score === 4 ? '3' : '4';
+    step('Gradebook: Edit Score in the Scores view', () => {
+      key(cell, typed);
+      const box = document.querySelector('.gb-scores-input');
+      expect(box, 'Edit Score did not open').not.toBeNull();
+      leave(box);
+    });
+    expect(
+      getScores(CID)
+        [IDS[3]].filter(e => e.assessmentId === AIDS[1])
+        .map(e => e.score),
+    ).toEqual([Number(typed), Number(typed)]);
+  });
+
+  it('the Gradebook with Class Results open', () => {
+    if (!window.ClassResults)
+      runInThisContext(readFileSync('teacher/class-results.js', 'utf-8'), { filename: 'teacher/class-results.js' });
+    mount(quietSeed, { course: CID });
+    showCompetencies();
+    // Open on one piece; a score typed on another.
+    ClassResults.open(CID, AIDS[3]);
+    expect(document.querySelector('#class-results'), 'Class Results did not open').not.toBeNull();
+    const cell = document.querySelector(
+      '#gb-data td.gb-score[data-aid="' + AIDS[1] + '"][data-sid="' + IDS[4] + '"][data-tid="' + TAGS[0] + '"]',
+    );
+    cell.classList.add('gb-focus');
+    cell.focus();
+    const typed =
+      getScores(CID)[IDS[4]].find(e => e.assessmentId === AIDS[1] && e.tagId === TAGS[0]).score === 4 ? '3' : '4';
+    step('Gradebook: type a score with Class Results open', () => key(cell, typed));
+    ClassResults.close();
+  });
+
   it('the grader', () => {
     step('Grader: open on a student', () => openGrader(quietSeed, CID, AIDS[0], IDS[1]));
     expect(document.querySelector('#grader-overlay .grader-dialog'), 'the grader did not open').not.toBeNull();
     step('Grader: next student', () => key(document, 'ArrowRight'));
+  });
+
+  // Opened from a gradebook cell, so closing it is the gradebook's to draw.
+  it('closing the grader over the gradebook', () => {
+    openGrader(quietSeed, CID, AIDS[0], IDS[1]);
+    PageAssignments.closeGrader();
+    const open = () => {
+      click(
+        document.querySelector('#gb-data td.gb-scores-cell[data-aid="' + AIDS[0] + '"][data-sid="' + IDS[1] + '"]'),
+      );
+      expect(document.querySelector('#grader-overlay .grader-dialog'), 'the grader did not open').not.toBeNull();
+    };
+    open();
+    step('Grader: close', () => PageAssignments.closeGrader());
+    open();
+    // The first criterion is at 2 for this student: 4 changes it.
+    click(
+      document.querySelector(
+        '#grader-overlay [data-action="graderLevel"][data-critid="' + CRIT[0] + '"][data-level="4"]',
+      ),
+    );
+    expect(getScores(CID)[IDS[1]].find(e => e.assessmentId === AIDS[0] && e.tagId === CRIT[0]).score).toBe(4);
+    step('Grader: close after a level', () => PageAssignments.closeGrader());
   });
 
   it('counting the class’s work', () => {

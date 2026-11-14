@@ -164,6 +164,7 @@ const PRECACHE_URLS = [
   '/shared/work-wall.js',
   '/teacher/student-overrides.js',
   '/teacher/rubric-print.js',
+  '/teacher/work-rubric-card.js',
   '/shared/competency-wording.js',
   '/teacher/report-feedback.js',
   '/teacher/report-feedback-cards.js',
@@ -212,6 +213,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/add-work.js',
   '/teacher-mobile/markup.js',
   '/teacher-mobile/tab-grade.js',
+  '/teacher-mobile/tab-bar.js',
   '/teacher-mobile/shell.js',
 ];
 

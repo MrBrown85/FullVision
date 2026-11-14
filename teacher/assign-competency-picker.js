@@ -63,6 +63,7 @@ window.AssignCompPicker = (function () {
     _hideAfTip();
     _compPickerStart = _compTicks();
     overlay.hidden = false;
+    document.body.classList.add('af-comp-open'); // assignments.css: the tooltip stays above the window
     overlay.onkeydown = _compPickerKey;
     var find = document.getElementById('af-comp-find');
     if (find) find.focus();
@@ -111,6 +112,7 @@ window.AssignCompPicker = (function () {
     }
     _hideAfTip();
     overlay.hidden = true;
+    document.body.classList.remove('af-comp-open');
     var back = document.getElementById('af-comp-choose');
     if (back) back.focus({ preventScroll: true });
   }

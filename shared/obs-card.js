@@ -97,19 +97,40 @@ window.ObsCard = (function () {
     return new Date(ob.created || obDay(ob) + 'T12:00:00');
   }
 
+  /* One formatter each, made once: a formatter is slow to make, and a list
+     dates every card. */
+  var _fmts = {};
+  function _format(key, opts) {
+    // An unreadable date reads "Invalid Date", as toLocaleDateString gave, not a thrown error.
+    if (!_fmts[key]) {
+      var f = new Intl.DateTimeFormat('en-CA', opts);
+      _fmts[key] = {
+        format: function (d) {
+          return isNaN(d) ? 'Invalid Date' : f.format(d);
+        },
+      };
+    }
+    return _fmts[key];
+  }
+  // The same, for other lists (the Observations page's day headings and filter dates).
+  function dateFormat(opts) {
+    return _format(JSON.stringify(opts), opts);
+  }
+
   /* "12:00 p.m." The feed's day header carries the date. */
   function cardTime(ob) {
     if (!ob.created) return '';
-    return _date(ob).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    return _format('time', { hour: 'numeric', minute: '2-digit' }).format(_date(ob));
   }
 
   /* "Fri, Oct 16 · 12:00 p.m." for lists without day headers; "Fri, Oct 16"
      with dayOnly. */
   function cardWhen(ob, dayOnly) {
     var d = _date(ob);
-    var opts = { weekday: 'short', month: 'short', day: 'numeric' };
-    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-    var day = d.toLocaleDateString('en-CA', opts);
+    var day =
+      d.getFullYear() !== new Date().getFullYear()
+        ? _format('dayYear', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(d)
+        : _format('day', { weekday: 'short', month: 'short', day: 'numeric' }).format(d);
     var t = dayOnly ? '' : cardTime(ob);
     return t ? day + ' · ' + t : day;
   }
@@ -244,7 +265,8 @@ window.ObsCard = (function () {
   }
 
   /* opts.hidden: obId → truthy for observations the list is hiding (a
-     delete waiting on its Undo toast); they do not count as "with …". */
+     delete waiting on its Undo toast); they do not count as "with …".
+     opts.all: getAllQuickObs(cid), when the caller has it already. */
   function context(cid, opts) {
     opts = opts || {};
     var hidden = opts.hidden || {};
@@ -257,7 +279,7 @@ window.ObsCard = (function () {
       quoted: quotedIndex(getTermRatings(cid)),
       hasTerms: getReportingTerms(cid).length > 0,
       sameCapture: sameCaptureIndex(
-        getAllQuickObs(cid).filter(function (o) {
+        (opts.all || getAllQuickObs(cid)).filter(function (o) {
           return !hidden[o.id];
         }),
       ),
@@ -391,6 +413,7 @@ window.ObsCard = (function () {
     parts: parts,
     cardTime: cardTime,
     cardWhen: cardWhen,
+    dateFormat: dateFormat,
     assessmentTitle: assessmentTitle,
     isLinked: isLinked,
     obDay: obDay,

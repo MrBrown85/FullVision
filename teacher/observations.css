@@ -94,7 +94,10 @@
   flex-shrink: 0;
   font-size: var(--text-2xs);
   color: transparent;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 .obs-popover-item.selected .obs-popover-check {
   background: var(--active);
@@ -164,7 +167,10 @@
   color: var(--text);
   outline: none;
   width: 180px;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 .obs-search-input:focus {
   background: var(--surface);
@@ -209,7 +215,10 @@
   background: var(--surface);
   color: var(--text-2);
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
   white-space: nowrap;
 }
 .obs-filter-chip:hover {
@@ -262,7 +271,9 @@
   padding: 2px 6px;
   text-decoration: underline;
   text-decoration-color: transparent;
-  transition: all 0.12s;
+  transition:
+    color 0.12s,
+    text-decoration-color 0.12s;
   white-space: nowrap;
   margin-left: auto;
 }
@@ -302,6 +313,17 @@
 }
 .obs-feed .obs-card {
   margin-bottom: 12px;
+}
+/* Under the newest observations: how many show, and Show More. */
+.obs-feed-more {
+  max-width: 860px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-3);
 }
 
 /* One observation: a fixed type column so names line up, the note, a

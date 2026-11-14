@@ -148,7 +148,7 @@ async function server(page) {
         });
       }
       if (name === 'list_course_grade_returns') return (log(name, params), ok(s.rows));
-      if (name === 'list_course_submissions') {
+      if (name === 'list_course_submissions_since') {
         log(name, params);
         return ok({
           bucket: 'student-photos',

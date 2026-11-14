@@ -161,3 +161,48 @@ describe('the page’s controls', () => {
     expect(ReportOne.removedOf(api.model(), 'proficiency')).toEqual([]);
   });
 });
+
+/* Speed assessment R2: the − buttons beside the rows read every row's
+   place, then place every button. Reading a place after a write makes the
+   browser lay the page out again; the old loop did that once a row (50 to
+   80 times a draw). Counted on the fake page: a rect read after a write
+   to the page is a forced layout. */
+describe('placing the row buttons', () => {
+  it('lays the page out once for every row button, not once a row', () => {
+    // The prototype that holds `name` (the fake DOM's Node or Element).
+    const owner = name => {
+      let p = preview;
+      while (p && !Object.prototype.hasOwnProperty.call(p, name)) p = Object.getPrototypeOf(p);
+      return p;
+    };
+    let dirty = false;
+    let forced = 0;
+    const restore = [];
+    // A write to the page (not to a button not yet on it) makes the layout stale.
+    ['appendChild', 'insertBefore', 'setAttribute', 'removeChild'].forEach(name => {
+      const at = owner(name);
+      const old = at[name];
+      restore.push(() => (at[name] = old));
+      at[name] = function () {
+        if (this.isConnected) dirty = true;
+        return old.apply(this, arguments);
+      };
+    });
+    const rectAt = owner('getBoundingClientRect') || owner('setAttribute');
+    const oldRect = rectAt.getBoundingClientRect;
+    rectAt.getBoundingClientRect = function () {
+      if (dirty) forced++;
+      dirty = false;
+      return { top: 0, left: 0, width: 100, height: 10 };
+    };
+    try {
+      ReportOnePage.decorate(preview, fakeApi());
+    } finally {
+      restore.forEach(f => f());
+      if (oldRect) rectAt.getBoundingClientRect = oldRect;
+      else delete rectAt.getBoundingClientRect;
+    }
+    expect(preview.querySelectorAll('.one-rm').length).toBe(3);
+    expect(forced).toBe(1);
+  });
+});

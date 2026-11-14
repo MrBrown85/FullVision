@@ -89,9 +89,16 @@ window.GradeReport = (function () {
     return { percent: mode !== 'proficiency', byName: mode !== 'letter' };
   }
 
+  /* One formatter, made once: toLocaleDateString with options makes one
+     each call, and Everyone dates every row of every report (about 15% of
+     its draw). An unreadable date still reads "Invalid Date", as before. */
+  var _whenFormat = null;
   function _when(d) {
     if (!d) return '';
-    return parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+    var date = parseLocalDate(d);
+    if (isNaN(date)) return 'Invalid Date';
+    if (!_whenFormat) _whenFormat = new Intl.DateTimeFormat('en-CA', { month: 'short', day: 'numeric' });
+    return _whenFormat.format(date);
   }
 
   /* One student's rows: the assessments in the year to date as of the

@@ -329,6 +329,7 @@ load('teacher/competency-evidence.js');
 load('shared/work-wall.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
+load('teacher/work-rubric-card.js');
 load('shared/competency-wording.js');
 load('teacher/report-feedback.js');
 load('teacher/report-feedback-cards.js');
@@ -354,4 +355,5 @@ beforeEach(() => {
   _refreshState = {};
   _refusalsReported = {}; // the refusals already reported to Sentry this page load
   _keptText = {}; // the fourth piece of per-session memory: each tab's own copy of scores and statuses
+  _scoresApart = {}; // and whether a class's scores in memory may have parted from that copy
 });

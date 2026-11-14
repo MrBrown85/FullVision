@@ -22,6 +22,7 @@ window.ReportOnePanel = (function () {
   var _menu = false; // the Setup menu is open
   var _focusAfter = null; // a selector to focus once the panel is redrawn
   var _drag = null; // a pointer drag in progress
+  var _owed = false; // a redraw asked for during the drag
   var _lit = null; // the part lit on the page while a row is pointed to
   var _docBound = false;
   var GLIDE = 200; // ms
@@ -503,6 +504,13 @@ window.ReportOnePanel = (function () {
 
   function render(palette, api) {
     if (!palette) return;
+    // Never under a part being dragged: the drop reads the rows it moved.
+    // The redraw is owed until the part is let go.
+    if (_drag && palette === _palette) {
+      _owed = true;
+      return;
+    }
+    _owed = false;
     _palette = palette;
     var before = _tops(palette);
     // html-safe: every label, name and value goes through esc(); keys are registry keys (esc()'d too); icons are this file's literals
@@ -693,7 +701,11 @@ window.ReportOnePanel = (function () {
     document.removeEventListener('pointercancel', _onPointerUp);
     var d = _drag;
     _drag = null;
-    if (!d) return;
+    if (d) _drop(d);
+    // A redraw that came while the part was held (the class fit coming in).
+    if (_owed) _redrawPanel();
+  }
+  function _drop(d) {
     d.item.classList.remove('dragging');
     var panel = _palette && _palette.querySelector('.one-panel');
     if (panel) panel.classList.remove('is-dragging');

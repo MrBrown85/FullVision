@@ -406,6 +406,58 @@ describe('with the student page and Send Work on', () => {
   });
 });
 
+describe('the pen on a slow phone (speed assessment)', () => {
+  beforeEach(() => turnOn());
+  let frames;
+  let raf;
+  beforeEach(() => {
+    frames = [];
+    raf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = fn => frames.push(fn);
+  });
+  afterEach(() => {
+    globalThis.requestAnimationFrame = raf;
+  });
+  const flush = () => frames.splice(0).forEach(fn => fn());
+
+  it('keeps every point, draws only the line, once a frame, and measures the page once a stroke', () => {
+    MMarkUp.open(CID, LAB, jordan, 0);
+    flush();
+    const n = MMarkUp.marks().length;
+    expect(n).toBeGreaterThan(2);
+    let measured = 0;
+    const el = stage();
+    const rect = el.getBoundingClientRect.bind(el);
+    el.getBoundingClientRect = () => {
+      measured++;
+      return rect();
+    };
+    const svg = vi.spyOn(MarkupDraw, 'svgHtml');
+    const moves = Array.from({ length: 10 }, (_, i) => [60 + i * 10, 100 + i * 5]);
+    ptr('down', 1, 50, 100);
+    measured = 0;
+    svg.mockClear();
+    moves.forEach(p => ptr('move', 1, ...p));
+    // Ten moves in one frame: no layout read, nothing drawn yet, one frame asked for.
+    expect(measured).toBe(0);
+    expect(svg).not.toHaveBeenCalled();
+    expect(frames).toHaveLength(1);
+    flush();
+    // One draw, of the line alone: the page's other marks are not drawn again.
+    expect(svg).toHaveBeenCalledTimes(1);
+    expect(svg.mock.calls[0][0].marks).toHaveLength(1);
+    expect(root().querySelectorAll('.m-markup-live polyline')).toHaveLength(1);
+    ptr('up', 1, ...moves[moves.length - 1]);
+    // On lift the page is drawn whole, with the line in it and no separate layer.
+    expect(svg.mock.calls.pop()[0].marks).toHaveLength(n + 1);
+    expect(root().querySelector('.m-markup-live')).toBeNull();
+    // Every point is kept, in order.
+    const pts = MMarkUp.marks().pop().points;
+    expect(pts).toHaveLength(moves.length + 1);
+    pts.slice(1).forEach((p, i) => expect(p[0]).toBeGreaterThan(pts[i][0]));
+  });
+});
+
 describe('the phone loads Mark Up', () => {
   it('in its page, its offline copy and its tests; the shell opens it', () => {
     expect(readFileSync('teacher-mobile/index.html', 'utf-8')).toContain(

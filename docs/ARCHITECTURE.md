@@ -51,7 +51,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 ### Mobile PWA
 
 - Entry point: `teacher-mobile/index.html`
-- Shell: `teacher-mobile/shell.js`
+- Shell: `teacher-mobile/shell.js`, with `tab-bar.js` (the tab bar, and the tab last used on this device, which the app reopens on)
 - Shared pieces: `components.js` (`MComponents` / `MC`), `card-stack.js`, `card-widgets.js`, `card-widget-editor.js`
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js`
@@ -149,12 +149,14 @@ Modules in `shared/` that are not in the boot list above, each loaded by the pag
 
 Desktop boot is orchestrated by `Router.boot()` in `teacher/router.js`:
 
-1. `requireAuth()`
-2. `initAllCourses()`
+1. `requireAuth()` is asked, not waited for
+2. `initAllCourses({ signInCheck })`: with this teacher's class list saved on the device it returns at once and the server's list answers beside the re-check; otherwise it waits for the re-check first
 3. `initData(activeCourseId)`
 4. `loadSeedIfNeeded()`
 5. `migrateAllStudents()`
 6. route initial render
+
+Until the re-check passes the page is locked, nothing is sent, and no server answer is shown (`class-loading-plan.md`, "Start-up order").
 
 ### Mobile boot
 

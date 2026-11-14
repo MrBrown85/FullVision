@@ -78,6 +78,7 @@ const _cache = {
   // device) and _loadGradeReturns (rows from the server) are the only ways
   // in. Both drop the returned set and calc.js's cached numbers.
   gradeReturns: {},
+  gradeReturnsNone: {}, // keyed by cid — true: this device held no rows when getGradeReturns last read it
   dibels: {}, // keyed by cid — DIBELS raw scores { 'sid:aid': { boy|moy|eoy: { orfWrc, orfErrors, mazeCorrect, mazeIncorrect } } }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
@@ -441,17 +442,17 @@ async function _attemptInitialBootstrap(sb) {
   const displayName =
     (session && session.user && session.user.user_metadata && session.user.user_metadata.display_name) || null;
 
-  const bootRes = await sb.rpc('bootstrap_teacher', {
-    p_email: email,
-    p_display_name: displayName,
-  });
+  // Side by side: neither needs the other's answer. list_teacher_courses
+  // only reads the caller's classes, so a teacher whose rows
+  // bootstrap_teacher is still making gets an empty list either way.
+  const [bootRes, coursesRes] = await Promise.all([
+    sb.rpc('bootstrap_teacher', { p_email: email, p_display_name: displayName }),
+    sb.rpc('list_teacher_courses'),
+  ]);
   if (bootRes.error) throw bootRes.error;
-  const teacher = bootRes.data || {};
-
-  const coursesRes = await sb.rpc('list_teacher_courses');
   if (coursesRes.error) throw coursesRes.error;
 
-  return { teacher, courseRows: coursesRes.data || [] };
+  return { teacher: bootRes.data || {}, courseRows: coursesRes.data || [] };
 }
 
 /* Wrap _attemptInitialBootstrap with retry-with-backoff. 1 initial attempt
@@ -536,22 +537,11 @@ function _exitDegradedMode(bootstrapData) {
   // compare against canonical state, not the pre-degraded snapshot.
   if (bootstrapData) {
     var teacher = bootstrapData.teacher || {};
-    var prefs = teacher.preferences || {};
     _teacherId = teacher.id || _teacherId;
     var prevCourses = _coursesBeforeBoot();
     _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || [], prevCourses);
     _sendUpCurriculumTags(bootstrapData.courseRows, prevCourses);
-    _cache.config = {
-      activeCourse: prefs.active_course_id || null,
-      viewMode: prefs.view_mode || null,
-      mobileViewMode: prefs.mobile_view_mode || null,
-      mobileSortMode: prefs.mobile_sort_mode || null,
-      cardWidgetConfig: prefs.card_widget_config || null,
-      dashboardPrefs: prefs.dashboard_prefs || null,
-      displayName: teacher.display_name || null,
-      email: teacher.email || null,
-      accountDeletedAt: teacher.deleted_at || null,
-    };
+    _cache.config = _configFromTeacher(teacher);
     COURSES = _cache.courses;
     _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
     _safeLSSet('gb-config', JSON.stringify(_cache.config));
@@ -935,6 +925,13 @@ function _updateCourseSyncState(cid, row) {
 
 async function _subscribeCourseSyncCursor(cid) {
   if (!_useSupabase || !_isUuid(cid)) return;
+  if (_signInWait) {
+    // Not before start-up's re-check has passed; nothing waits on it.
+    _signInWait.then(function () {
+      if (cid === getActiveCourse()) _subscribeCourseSyncCursor(cid);
+    });
+    return;
+  }
   if (_courseSyncCourseId === cid && _courseSyncChannel) return;
   _unsubscribeCourseSyncCursor();
 
@@ -1247,12 +1244,146 @@ function _removeLocalKeys(test) {
   }
 }
 
-async function initAllCourses() {
-  // Run one-time LS format migrations before any read of cached data.
-  _migrateAssignmentStatusFormat();
-  // A student delete the old client held for its Undo toast can't be sent.
-  dropHeldStudentDeletes();
+/* The teacher's own settings, as bootstrap_teacher(email, display_name)
+   answers them: { id, email, display_name, created_at, deleted_at,
+   preferences: { active_course_id, view_mode, mobile_view_mode,
+   mobile_sort_mode, card_widget_config, dashboard_prefs } }. It makes the
+   teacher and teacher_preference rows on a first sign-in and only reads
+   them after that. */
+function _configFromTeacher(teacher) {
+  var prefs = teacher.preferences || {};
+  return {
+    activeCourse: prefs.active_course_id || null,
+    viewMode: prefs.view_mode || null,
+    mobileViewMode: prefs.mobile_view_mode || null,
+    mobileSortMode: prefs.mobile_sort_mode || null,
+    cardWidgetConfig: prefs.card_widget_config || null,
+    dashboardPrefs: prefs.dashboard_prefs || null,
+    displayName: teacher.display_name || null,
+    email: teacher.email || null,
+    // deleted_at non-null ⇒ pending soft-delete; Pass C §5 prompts restore.
+    accountDeletedAt: teacher.deleted_at || null,
+  };
+}
 
+/* Take the server's class list (list_teacher_courses) and the teacher's
+   settings, and save both on this device so an offline reload, a transient
+   Supabase failure or the next start-up opens from them. `kept`, after a
+   start-up that drew the saved list first: the class on screen, which stays
+   the open one while the server still lists it, and this device's settings
+   when one was changed since the draw (its save is newer than the answer). */
+function _takeBootstrap(data, kept) {
+  const teacher = data.teacher || {};
+  _teacherId = teacher.id || _teacherId;
+  const prevCourses = _coursesBeforeBoot();
+  _cache.courses = _canonicalCoursesToBlob(data.courseRows || [], prevCourses);
+  _sendUpCurriculumTags(data.courseRows, prevCourses);
+  COURSES = _cache.courses;
+  _cache.config = (kept && kept.config) || _configFromTeacher(teacher);
+  var open = kept && kept.open;
+  if (open && getActiveCourse() !== open && COURSES[open] && !isCourseArchived(open)) _cache.config.activeCourse = open;
+  _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
+  _safeLSSet('gb-config', JSON.stringify(_cache.config));
+  _purgeUnlistedCourseData(_cache.courses);
+  _purgeStaleSavedCopies();
+  _releaseDiscardsByClassList(data.courseRows);
+  _syncStatus = 'idle';
+  _updateSyncIndicator();
+}
+
+/* ── Start-up draws the saved class list first ────────────────
+   Colin's ruling of 2026-11-13 (docs/DECISIONS.md, "Start-up draws the saved
+   class list first"; docs/class-loading-plan.md, D9). The desktop asks its
+   sign-in re-check (requireAuth: getUser) and hands the promise to
+   initAllCourses. With this teacher's class list saved on this device, the
+   server's list is asked for beside the re-check and the saved list and
+   class are drawn at once. Until the re-check has answered (_signInWait):
+     - the page is locked, as it is while a class is checked (setPageLock);
+     - nothing is sent: the outbox is paused, a write RPC waits, and uploads
+       left by an earlier visit wait;
+     - no server answer is handed over: a read RPC may be asked, but its
+       answer waits (_callRpcWithAuthGuard), and so does the class list;
+     - a read made without that sender (DIBELS scores, the rubric tables,
+       storage links, the class's change counter and realtime channel, the
+       edge functions) is not asked at all: each waits on _signInWait;
+     - a write queued now is held in the outbox (v2Queue.hold), and is
+       removed unsent if the re-check fails (Colin, 2026-11-14).
+   A re-check that fails, or names another user, removes the saved data and
+   leaves for Sign In (shared/supabase.js); its promise never resolves, so
+   none of this ever lifts. One that cannot reach the server stands aside
+   after its retries, as it always has. */
+var _signInWait = null; // the re-check's promise until it has answered
+
+/* The class list this device saved for this teacher, or null: none saved,
+   someone else's, offline (start-up is then as it always was), or saved
+   copies switched off (FV_CACHE_FIRST). */
+function _savedClassListFor(uid) {
+  if (!_cacheFirstEnabled() || !_classBundleEnabled()) return null;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+  try {
+    if (localStorage.getItem('gb-owner') !== uid) return null;
+  } catch (e) {
+    return null;
+  }
+  var list = _safeParseLS('gb-courses', null);
+  return list && typeof list === 'object' && Object.keys(list).length ? list : null;
+}
+
+function _holdForSignIn(check) {
+  _signInWait = check;
+  setPageLock('checking', true);
+  var held = _outbox();
+  if (held && typeof held.hold === 'function') held.hold();
+  check.then(function () {
+    _signInWait = null;
+    setPageLock('checking', false);
+    // What waited in the outbox goes now.
+    var outbox = _outbox();
+    if (outbox && typeof outbox.unhold === 'function') outbox.unhold();
+    if (outbox) outbox.flush();
+  });
+}
+
+/* The saved class list is on screen. The server's was asked for at the
+   same moment as the re-check; it is taken only once the re-check has
+   passed, and the page is drawn again (`redraw`) only if what the server
+   holds differs from what is showing. */
+async function _serverClassListAfterDraw(sb, check, drawnConfig, redraw) {
+  var asked = _bootstrapWithRetry(sb).then(
+    function (data) {
+      return { data: data };
+    },
+    function (e) {
+      return { error: e };
+    },
+  );
+  await check;
+  var got = await asked;
+  if (got.error) {
+    console.warn('v2 course load failed after retry; entering degraded mode:', got.error);
+    _enterDegradedMode(got.error);
+    return;
+  }
+  var showing = function () {
+    return JSON.stringify([_cache.courses, Object.assign({}, _cache.config, { activeCourse: getActiveCourse() })]);
+  };
+  var before = showing();
+  var open = getActiveCourse();
+  _takeBootstrap(got.data, { open: open, config: _cache.config !== drawnConfig ? _cache.config : null });
+  if (showing() === before) return;
+  // The class that was open is gone from the server's list: the one that
+  // opens in its place is loaded before the page is drawn on it.
+  var now = getActiveCourse();
+  if (now && now !== open) await initData(now);
+  if (typeof redraw === 'function') redraw();
+}
+
+/* opts.signInCheck: the desktop's sign-in re-check, already asked (see above).
+   opts.onChange: draws the page again when the server's class list differs
+   from the saved one already drawn. The phone passes neither: it has no
+   re-check, and starts as it always has. */
+async function initAllCourses(opts) {
+  var check = (opts && opts.signInCheck) || null;
   // Demo mode: hard-skip Supabase, force local-only, ensure seed data exists.
   // Set by the "Try Demo Mode" button on the login page. Gated on the
   // companion token set by login-auth.js so a lone gb-demo-mode='1' written
@@ -1267,7 +1398,9 @@ async function initAllCourses() {
     await _loadSeedScript();
   }
 
-  // Check Supabase availability
+  // Who this device says is signed in: getSession reads the saved session,
+  // with no request unless its token has run out.
+  var uid = null;
   if (!_demoMode && typeof getSupabase === 'function') {
     const sb = getSupabase();
     if (sb) {
@@ -1275,60 +1408,40 @@ async function initAllCourses() {
         const {
           data: { session },
         } = await sb.auth.getSession();
-        if (session && session.user) {
-          _useSupabase = true;
-          _teacherId = session.user.id;
-          _scopeLocalDataToTeacher(session.user.id);
-        }
+        if (session && session.user) uid = session.user.id;
       } catch (e) {
         console.warn('Supabase session check failed, falling back to localStorage:', e);
       }
     }
   }
+  // With this teacher's class list saved here, it is drawn while the
+  // re-check and the server's list answer. With none, nothing is read or
+  // asked until the re-check has answered, as before: bootstrap_teacher
+  // makes a new teacher's rows, and nothing is written before it.
+  var savedList = uid && check ? _savedClassListFor(uid) : null;
+  if (check && !savedList) await check;
+  // Run one-time LS format migrations before any read of cached data.
+  _migrateAssignmentStatusFormat();
+  // A student delete the old client held for its Undo toast can't be sent.
+  dropHeldStudentDeletes();
+  if (uid) {
+    _useSupabase = true;
+    _teacherId = uid;
+    _scopeLocalDataToTeacher(uid);
+  }
 
-  // Load global state from v2 RPCs:
-  //   bootstrap_teacher(email, display_name) → { id, email, display_name,
-  //     created_at, deleted_at, preferences: { active_course_id, view_mode,
-  //     mobile_view_mode, mobile_sort_mode, card_widget_config, dashboard_prefs } }
-  //     Creates teacher + teacher_preference on first sign-in;
-  //     returns existing rows on subsequent sign-ins.
-  //   list_teacher_courses() → [{ id, name, grade_level, description, color,
-  //     is_archived, display_order, grading_system, calc_method, decay_weight,
-  //     timezone, late_work_policy, created_at, updated_at, block,
-  //     curriculum_tags }, ...]
-  // On any failure fall back to localStorage so the app still loads offline.
-  if (_useSupabase) {
-    const sb = getSupabase();
+  // Load global state from v2 RPCs (_takeBootstrap). On any failure fall
+  // back to localStorage so the app still loads offline.
+  if (_useSupabase && savedList) {
+    _cache.courses = savedList;
+    _cache.config = _safeParseLS('gb-config', {});
+    _holdForSignIn(check);
+    _serverClassListAfterDraw(getSupabase(), check, _cache.config, opts.onChange).catch(function (e) {
+      console.warn('The class list could not be taken from the server:', e);
+    });
+  } else if (_useSupabase) {
     try {
-      const data = await _bootstrapWithRetry(sb);
-      const teacher = data.teacher || {};
-      const prefs = teacher.preferences || {};
-      _teacherId = teacher.id || _teacherId;
-
-      const prevCourses = _coursesBeforeBoot();
-      _cache.courses = _canonicalCoursesToBlob(data.courseRows || [], prevCourses);
-      _sendUpCurriculumTags(data.courseRows, prevCourses);
-      _cache.config = {
-        activeCourse: prefs.active_course_id || null,
-        viewMode: prefs.view_mode || null,
-        mobileViewMode: prefs.mobile_view_mode || null,
-        mobileSortMode: prefs.mobile_sort_mode || null,
-        cardWidgetConfig: prefs.card_widget_config || null,
-        dashboardPrefs: prefs.dashboard_prefs || null,
-        displayName: teacher.display_name || null,
-        email: teacher.email || null,
-        // deleted_at non-null ⇒ pending soft-delete; Pass C §5 prompts restore.
-        accountDeletedAt: teacher.deleted_at || null,
-      };
-      // Mirror to localStorage so offline reloads (or transient Supabase failures)
-      // can boot from cache instead of starting empty.
-      _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
-      _safeLSSet('gb-config', JSON.stringify(_cache.config));
-      _purgeUnlistedCourseData(_cache.courses);
-      _purgeStaleSavedCopies();
-      _releaseDiscardsByClassList(data.courseRows);
-      _syncStatus = 'idle';
-      _updateSyncIndicator();
+      _takeBootstrap(await _bootstrapWithRetry(getSupabase()));
     } catch (e) {
       console.warn('v2 course load failed after retry; entering degraded mode:', e);
       _enterDegradedMode(e);
@@ -1844,11 +1957,20 @@ function _forgetServerState(cid) {
    from it too. The save guard still reads the saved copy. Forgotten with
    the baseline. In memory only. */
 var _keptText = {}; // 'gb-scores-<cid>' or 'gb-statuses-<cid>' → text
+/* 'gb-scores-<cid>' → true while this tab's memory of a class's scores may
+   hold a change its kept text does not: a whole-list save has started, a
+   group copy has changed memory before its save, a write to storage
+   failed, or old rubric keys were moved. It goes when a text is next kept.
+   While it is set the Draft and Returned rule compares the whole class with
+   the saved copy (_gradeBefore). In memory only. */
+var _scoresApart = {};
 
 function _keepText(key, text) {
   if (key.indexOf('gb-scores-') !== 0 && key.indexOf('gb-statuses-') !== 0) return;
-  if (typeof text === 'string') _keptText[key] = text;
-  else delete _keptText[key];
+  if (typeof text === 'string') {
+    _keptText[key] = text;
+    delete _scoresApart[key];
+  } else delete _keptText[key];
 }
 
 // The kept text read back, or `fallback` when nothing was kept or it can't
@@ -2432,6 +2554,7 @@ function _rekeyField(field, cid, transform) {
   if (value !== undefined && transform(value)) {
     _cache[field][cid] = value;
     if (field === 'rubrics') _noteRubricsSet(cid);
+    if (field === 'assessments') _assessmentsRekeyed++; // an id changed in place: _assessmentInClass
     // A re-key from another tab: it wrote the shared copy already.
     if (dataKey && !_applyingRemoteRekey) wrote = _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
     if (!_applyingRemoteRekey) {
@@ -2443,7 +2566,8 @@ function _rekeyField(field, cid, transform) {
   // This tab's own copy gets the change the baseline gets, unless the
   // write above just kept the new text.
   var kept = dataKey && !wrote && _keptValue(_keptText['gb-' + dataKey + '-' + cid], null);
-  if (kept && transform(kept)) _keepText('gb-' + dataKey + '-' + cid, JSON.stringify(kept));
+  // Set directly: this text is the kept one re-keyed, not memory just read or saved (_scoresApart stays).
+  if (kept && transform(kept)) _keptText['gb-' + dataKey + '-' + cid] = JSON.stringify(kept);
   if (field === 'statuses' || _withdrawnRecordFields()[field]) _rekeyWithdrawnRecords(field, cid, transform);
 }
 
@@ -3393,9 +3517,7 @@ function _scoreEntryFromCanonical(
    as the piece's overall score, and filled no group-mates: that row has
    collab_mode and collab_config, not collaboration and groups. */
 function _assessmentById(cid, aid) {
-  var mine = (getAssessments(cid) || []).find(function (assessment) {
-    return assessment && assessment.id === aid;
-  });
+  var mine = _assessmentInClass(cid, aid); // shared/data-assessments.js: by an index kept with the list
   if (mine) return mine;
   var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
   return (
@@ -4903,6 +5025,7 @@ function _loadCourseFromLS(cid) {
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
   _cache.rubricPrints[cid] = _safeParseLS('gb-rubric-prints-' + cid, {});
   delete _cache.gradeReturns[cid]; // read again when asked for (getGradeReturns)
+  delete _cache.gradeReturnsNone[cid];
   delete _serverStudentPage[cid]; // and the server's word on its student page (_serverSaysStudentPage)
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
@@ -4958,6 +5081,7 @@ function _safeLSSet(key, value) {
       }
     }
     console.warn('localStorage write failed (' + key + '):', e);
+    if (key.indexOf('gb-scores-') === 0) _scoresApart[key] = true;
     // Every quota failure counts until that key saves again; the sync dot
     // says so (getSaveProblem).
     if (e.name === 'QuotaExceededError' && !_storageFullKeys.has(key)) {
@@ -5128,6 +5252,7 @@ function _upsertScoreOne(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   // Update cache blob
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  var cellWas = _cellEntries(scores, sid, aid); // for the Draft and Returned rule
   const existing = scores[sid].find(function (e) {
     return e.assessmentId === aid && e.tagId === tid;
   });
@@ -5156,7 +5281,7 @@ function _upsertScoreOne(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   }
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   // A realtime refresh that started before this edit must not overwrite it.
@@ -5360,6 +5485,7 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  var cellWas = _cellEntries(scores, sid, aid);
   var level = 0;
   var mod = 0;
   var changed = false;
@@ -5391,7 +5517,7 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   });
   if (!changed) return true;
   _cache.scores[cid] = scores;
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
@@ -5441,6 +5567,7 @@ function _saveTagCommentOne(cid, sid, aid, tagId, text) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  var cellWas = _cellEntries(scores, sid, aid);
   var entry = scores[sid].find(function (e) {
     return e && e.assessmentId === aid && e.tagId === tagId;
   });
@@ -5462,7 +5589,7 @@ function _saveTagCommentOne(cid, sid, aid, tagId, text) {
   else delete entry.critNote;
   var level = Number(entry.score) > 0 ? Number(entry.score) : 0;
   _cache.scores[cid] = scores;
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
@@ -5505,6 +5632,7 @@ function getScoreComment(cid, sid, aid) {
 function _saveScoreCommentOne(cid, sid, aid, text) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
+  var cellWas = _cellEntries(scores, sid, aid);
   var entries = (scores[sid] || []).filter(function (e) {
     return e && e.assessmentId === aid;
   });
@@ -5532,7 +5660,7 @@ function _saveScoreCommentOne(cid, sid, aid, text) {
     e.note = note;
   });
   _cache.scores[cid] = scores;
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
@@ -6153,12 +6281,7 @@ function _noteRubricsSet(cid) {
    the list itself, so a rubric given to work in any way (the assessment
    form, a linked copy's edit, another tab, a load) is seen. */
 function _rubricKeySig(cid) {
-  var sig = String(_rubricsRev[cid] || 0);
-  (getAssessments(cid) || []).forEach(function (a) {
-    var rubricId = a && (a.rubricId || a.rubric_id);
-    if (rubricId && !isPointsScored(a)) sig += '|' + a.id + '=' + rubricId;
-  });
-  return sig;
+  return _rubricWorkSig(cid, _rubricsRev[cid] || 0); // shared/data-assessments.js: built only when they change
 }
 /* Rubric work whose criteria feed competencies: { assessmentId: criteria }
    and, per assessment, the competency ids an old entry would sit under. */
@@ -6207,6 +6330,7 @@ function _migrateRubricScoreKeys(cid, scores) {
     _rubricKeyedScores.set(scores, sig);
     return scores;
   }
+  _scoresApart['gb-scores-' + cid] = true; // entries move below, and nothing is saved here
   Object.keys(scores).forEach(function (sid) {
     var entries = scores[sid];
     if (!Array.isArray(entries) || !entries.length) return;
@@ -6310,6 +6434,9 @@ function _scoresOfLiveRows(cid, prev) {
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
   var kept = _keptText['gb-scores-' + cid];
+  // `obj` is often this tab's memory, already changed: until it is saved
+  // (the guard below can refuse it), the rule compares the whole class.
+  _scoresApart['gb-scores-' + cid] = true;
   _applyIdRekeysToScores(cid, obj);
   // The baseline is read in the same key space as the scores, or a copy
   // saved with rubric scores under competencies would make every criterion
@@ -6454,7 +6581,9 @@ function restoreScoreCells(cid, before, after) {
    _saveTagCommentOne, _saveScoreCommentOne), saveScores (fills, clears,
    undo, group copies), and the two tick writers. _gradeBefore reads the
    grades as they were from the saved copy; _gradeAfter compares cell by
-   cell and runs the rule on each cell that changed. Neither can stop or
+   cell and runs the rule on each cell that changed. A one-cell writer
+   whose saved copy is this tab's own compares its own cell only, from the
+   entries it held before the write (_savedScoresAreMine). Neither can stop or
    reorder a save: both read the switch from the class's settings before
    anything else, touch GradeState only when it is on, and catch and report
    a failure (_gradeStateFailed). Loads, re-keys, withdrawing a student and
@@ -6954,14 +7083,29 @@ function _returnSettingsSaved(cid, was) {
 }
 
 /* A class's rows. A class with none saved has none: nothing is put in the
-   cache or in localStorage for it. */
+   cache or in localStorage for it. That this device holds none is kept
+   (gradeReturnsNone), so a class with its student page off, asked for each
+   cell, does not read localStorage each time. It holds until the class's
+   cache is dropped (every way rows come in on this page sets the cache
+   first) or another tab writes the rows. */
 function getGradeReturns(cid) {
   if (_cache.gradeReturns[cid] !== undefined) return _cache.gradeReturns[cid];
+  if (_cache.gradeReturnsNone[cid]) return {};
   var stored = _safeParseLS('gb-grade-returns-' + cid, null);
-  if (!_plainObject(stored)) return {};
+  if (!_plainObject(stored)) {
+    _cache.gradeReturnsNone[cid] = true;
+    return {};
+  }
   _cache.gradeReturns[cid] = stored;
   return stored;
 }
+// Another tab wrote a class's rows, or cleared this device's storage.
+function _gradeReturnsElsewhere(e) {
+  if (!e.key) _cache.gradeReturnsNone = {};
+  else if (e.key.indexOf('gb-grade-returns-') === 0) delete _cache.gradeReturnsNone[e.key.slice(17)];
+}
+if (typeof window !== 'undefined' && window.addEventListener)
+  window.addEventListener('storage', _gradeReturnsElsewhere);
 // One student's row on one assessment, or null.
 function getGradeReturn(cid, sid, aid) {
   return (getGradeReturns(cid)[aid] || {})[sid] || null;
@@ -7221,6 +7365,43 @@ function _gradeOf(a, entries, checks) {
   return grade;
 }
 
+/* One cell's score entries, each copied, as they are now: what a one-cell
+   writer takes before it changes them. Never throws. */
+function _cellEntries(scores, sid, aid) {
+  var list = scores && Array.isArray(scores[sid]) ? scores[sid] : [];
+  return list
+    .filter(function (e) {
+      return e && aid && e.assessmentId === aid;
+    })
+    .map(function (e) {
+      return Object.assign({}, e);
+    });
+}
+// One cell as _gradeCells gives it, from those entries: null when it has no entry and no ticks.
+function _gradeCell(entries, checks, sid, aid) {
+  var ticks = (checks || {})[sid + ':' + aid];
+  if (!entries.length && !Array.isArray(ticks)) return null;
+  return { entries: entries, checks: Array.isArray(ticks) ? ticks : [] };
+}
+/* True when the saved copy of a class's scores, read back, would be what
+   this tab's memory held before the write in hand. It is, letter for
+   letter, the text this tab last read or wrote; memory has not changed
+   since but through a writer that saved it (_scoresApart); and memory holds
+   no rubric score under a competency, which a read of the saved copy would
+   move under its criterion (_migrateRubricScoreKeys) and memory, checked
+   once, would not. Another tab's write, a cleared or purged copy and a
+   failed write all answer false. */
+function _savedScoresAreMine(cid) {
+  var key = 'gb-scores-' + cid;
+  try {
+    if (_scoresApart[key] || typeof _keptText[key] !== 'string') return false;
+    if (_hasLegacyRubricKeys(_cache.scores[cid] || {}, _rubricLegacyKeyIndex(cid).legacyTags)) return false;
+    return localStorage.getItem(key) === _keptText[key];
+  } catch (e) {
+    return false;
+  }
+}
+
 // Every cell of a class: { aid: { sid: { entries, checks } } }.
 function _gradeCells(scores, checks) {
   var cells = {};
@@ -7242,13 +7423,19 @@ function _gradeCells(scores, checks) {
 
 /* A score writer, before it saves the class's scores or ticks (`field`):
    the grades as they were, from the saved copy. null when no rows are kept
-   for the class, which is all the switch-off path does. Never throws. */
-function _gradeBefore(cid, field) {
+   for the class, which is all the switch-off path does. Never throws.
+   A one-cell score writer also passes its cell and that cell's entries as
+   they were before it changed them (`entries`, from _cellEntries). While
+   the saved copy is this tab's own (_savedScoresAreMine) every other cell
+   in it is the cell in memory, so only that cell can have changed: the
+   saved copy is not read, and _gradeRule looks at that cell alone. The
+   rows that follow are the ones the whole-class comparison gives. */
+function _gradeBefore(cid, field, sid, aid, entries) {
   try {
     if (!_gradesKept(cid) || _movingClass) return null;
-    return field === 'scores'
-      ? { scores: _migrateRubricScoreKeys(cid, _safeParseLS('gb-scores-' + cid, {})) }
-      : { checks: _safeParseLS('gb-rubric-checks-' + cid, {}) };
+    if (field !== 'scores') return { checks: _safeParseLS('gb-rubric-checks-' + cid, {}) };
+    if (entries && _savedScoresAreMine(cid)) return { cells: [{ sid: sid, aid: aid, entries: entries }] };
+    return { scores: _migrateRubricScoreKeys(cid, _safeParseLS('gb-scores-' + cid, {})) };
   } catch (e) {
     _gradeStateFailed('reading the grades before a save', e);
     return null;
@@ -7267,33 +7454,49 @@ function _gradeAfter(cid, was, next) {
 }
 function _gradeRule(cid, was, next) {
   var klass = getReturnSettings(cid);
-  var scores = was.scores ? next : getScores(cid);
+  var scores = was.scores || was.cells ? next : getScores(cid);
   var checks = was.checks ? next : getRubricChecks(cid);
-  var now = _gradeCells(scores, checks);
-  var before = _gradeCells(was.scores || scores, was.checks || checks);
+  var now = was.cells ? null : _gradeCells(scores, checks);
+  var before = was.cells ? null : _gradeCells(was.scores || scores, was.checks || checks);
   var rows = getGradeReturns(cid);
   var out = Object.assign({}, rows);
   var at = new Date().toISOString();
   var changed = false;
-  Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
+  // One cell of work `a`: `b` is the cell as it was, `n` as it is now.
+  var cell = function (a, aid, sid, b, n) {
+    var copyWas = b ? _gradeOf(a, b.entries, b.checks) : null;
+    var copyNow = n ? _gradeOf(a, n.entries, n.checks) : null;
+    if (GradeState.sameCopy(copyWas, copyNow)) return;
+    var kept = GradeState.afterWrite(klass, (out[aid] || {})[sid] || null, copyWas, copyNow, at);
+    out[aid] = Object.assign({}, out[aid]);
+    if (kept) out[aid][sid] = kept;
+    else delete out[aid][sid];
+    if (!Object.keys(out[aid]).length) delete out[aid];
+    changed = true;
+  };
+  // A DIBELS benchmark is a reading record, not a grade that is returned:
+  // nothing saved on it, its Overall Comment included, makes or changes a row.
+  var graded = function (aid) {
     var a = _assessmentById(cid, aid);
-    // A DIBELS benchmark is a reading record, not a grade that is returned:
-    // nothing saved on it, its Overall Comment included, makes or changes a row.
-    if (!a || isDibelsScored(a)) return;
-    Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
-      var b = (before[aid] || {})[sid];
-      var n = (now[aid] || {})[sid];
-      var copyWas = b ? _gradeOf(a, b.entries, b.checks) : null;
-      var copyNow = n ? _gradeOf(a, n.entries, n.checks) : null;
-      if (GradeState.sameCopy(copyWas, copyNow)) return;
-      var kept = GradeState.afterWrite(klass, (out[aid] || {})[sid] || null, copyWas, copyNow, at);
-      out[aid] = Object.assign({}, out[aid]);
-      if (kept) out[aid][sid] = kept;
-      else delete out[aid][sid];
-      if (!Object.keys(out[aid]).length) delete out[aid];
-      changed = true;
+    return a && !isDibelsScored(a) ? a : null;
+  };
+  if (was.cells) {
+    // A one-cell writer whose saved copy was this tab's own (_gradeBefore).
+    was.cells.forEach(function (c) {
+      var a = graded(c.aid);
+      if (!a) return;
+      var b = _gradeCell(c.entries, checks, c.sid, c.aid);
+      cell(a, c.aid, c.sid, b, _gradeCell(_cellEntries(scores, c.sid, c.aid), checks, c.sid, c.aid));
     });
-  });
+  } else {
+    Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
+      var a = graded(aid);
+      if (!a) return;
+      Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
+        cell(a, aid, sid, (before[aid] || {})[sid], (now[aid] || {})[sid]);
+      });
+    });
+  }
   if (changed) {
     _saveGradeReturns(cid, out);
     // The server's triggers keep the same rows as the writes land; read them then.
@@ -8097,6 +8300,7 @@ function _restoreGroupGradeAside(cid, aid, sid) {
    them, or on an empty entry when there are none. */
 function _replaceGroupEntries(cid, scores, a, m, entries) {
   var aid = a.id;
+  _scoresApart['gb-scores-' + cid] = true; // memory changes here; the save comes later
   var reportNote = getScoreReportNote(cid, m, aid);
   var next = entries.map(function (e) {
     var copy = _cloneValue(e);
@@ -8361,6 +8565,10 @@ async function _callRpcWithAuthGuard(name, params, options) {
   options = options || {};
   var sb = getSupabase();
   if (!sb || _isDemoSession()) return { data: null, error: null };
+  // Start-up's sign-in re-check has not answered (_holdForSignIn): a read
+  // is asked beside it and its answer waits; anything else waits to be sent.
+  var hold = _signInWait;
+  if (hold && !_isReadRpc(name)) await hold;
 
   // Draft and Returned: no update_course carries the student page's switch
   // or Return Grades beside another setting, whoever queued it.
@@ -8405,6 +8613,7 @@ async function _callRpcWithAuthGuard(name, params, options) {
   }
 
   var res = await execRpc();
+  if (hold) await hold;
   if (res && res.error && _isSessionExpiredRpcError(res.error)) {
     var refreshed = false;
     if (typeof refreshSupabaseSession === 'function') {
@@ -8475,7 +8684,7 @@ function _outbox() {
         return _callRpcWithAuthGuard(name, params, Object.assign({}, options, { viaOutbox: true }));
       },
       isPaused: function () {
-        return _supabaseDegraded;
+        return _supabaseDegraded || !!_signInWait;
       },
       onSend: _noteOutboxSend,
     });
@@ -8702,6 +8911,7 @@ async function loadDibelsScores(cid) {
   if (!_useSupabase || !_isUuid(cid)) return false;
   var sb = getSupabase();
   if (!sb) return false;
+  if (_signInWait) await _signInWait; // not asked before start-up's re-check has passed
   try {
     var res = await sb.rpc('list_course_dibels', { p_course_id: cid });
     if (!res || res.error) return false;
@@ -9657,6 +9867,7 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 
 /* A signed-in page opening: handout pages left waiting by an earlier visit go. */
 function _resumeHandoutUploads() {
+  if (_signInWait) return void _signInWait.then(_resumeHandoutUploads); // not before start-up's re-check has answered
   if (_isDemoSession() || !_writesEnabled() || !Object.keys(_handoutUploads()).length) return;
   var q = _wireWorkQueue();
   if (q && typeof q.send === 'function') q.send();
@@ -9709,7 +9920,7 @@ function openAssessmentHandoutPage(cid, rid, i) {
   if (_isDemoSession() || !_HANDOUT_STORAGE_PATH.test(name) || name.indexOf(prefix) !== 0) return Promise.resolve(null);
   var sb = getSupabase();
   if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
-  return Promise.resolve()
+  return Promise.resolve(_signInWait) // not signed before start-up's re-check has passed
     .then(function () {
       return sb.storage.from('student-photos').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
     })

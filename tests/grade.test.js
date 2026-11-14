@@ -187,6 +187,7 @@ describe('grade-format-guard', () => {
     'teacher-mobile/student-detail.js': 7,
     'teacher-mobile/tab-grade.js': 4, // the checklist's level names; the level buttons' words are scoreLevelText's (MComponents.levelButtonsHTML)
     'teacher/comment-bank.js': 1,
+    'teacher/work-rubric-card.js': 1, // the rubric card's level column heads (a rubric column)
     'teacher/comment-personal.js': 1,
     // The level word as a line's label ("Developing: …").
     'shared/competency-wording.js': 1,
@@ -195,7 +196,8 @@ describe('grade-format-guard', () => {
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
     'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
-    'teacher/page-gradebook.js': 2,
+    'teacher/gradebook-chrome.js': 1, // the name tip's word for a competency with no evidence (moved from page-gradebook.js)
+    'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
     'teacher/report-feedback-cards.js': 2,
@@ -541,6 +543,32 @@ describe('grade-report', () => {
   });
 
   describe('rows', () => {
+    it('dates each row with one formatter made once, in the words toLocaleDateString gave', () => {
+      seed();
+      stub('courseToday', () => '2026-10-29');
+      G.rows(CID, ST); // the formatter is made on the first use
+      const Real = Intl.DateTimeFormat;
+      const realDate = Date.prototype.toLocaleDateString;
+      let made = 0;
+      Intl.DateTimeFormat = function (l, o) {
+        made++;
+        return new Real(l, o);
+      };
+      Date.prototype.toLocaleDateString = function () {
+        made++;
+        return realDate.apply(this, arguments);
+      };
+      let rows;
+      try {
+        rows = G.rows(CID, ST);
+      } finally {
+        Intl.DateTimeFormat = Real;
+        Date.prototype.toLocaleDateString = realDate;
+      }
+      expect(made).toBe(0);
+      expect(rows[0].date).toBe(new Date(2026, 8, 10).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }));
+    });
+
     it('lists this term’s marked, missing and excused work, oldest first, and unmarked work with its score blank', () => {
       seed();
       stub('courseToday', () => '2026-10-29');

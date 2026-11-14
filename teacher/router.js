@@ -434,8 +434,20 @@ window.Router = (function () {
     var startPath = _parseUrl(location.pathname, location.search).path;
     if (_onDemand[startPath] && !_pageFor(startPath)) _loadPage(startPath).catch(function () {});
 
-    await requireAuth();
-    await initAllCourses();
+    // The sign-in re-check (getUser) is asked now and answers beside the
+    // class list, not before it (docs/DECISIONS.md, "Start-up draws the
+    // saved class list first"). With this teacher's list saved on this
+    // device, initAllCourses returns before the re-check has answered and
+    // the saved list and class are drawn, locked, with nothing sent until
+    // it passes. With none saved it waits for the re-check, as before.
+    var drawn = false;
+    await initAllCourses({
+      signInCheck: requireAuth(),
+      // The server's list differs from the saved one already drawn.
+      onChange: function () {
+        if (drawn) _onRoute();
+      },
+    });
     // Open the class a deep link names, not the last one used.
     var linked = _parseUrl(location.pathname, location.search).params.course;
     if (_needsCourseLoad(linked)) setActiveCourse(linked);
@@ -443,6 +455,8 @@ window.Router = (function () {
     var loadStarted = performance.now();
     await initData(cid);
     recordLoadTiming('class.boot', cid, performance.now() - loadStarted);
+    // The server's list, taken while that class loaded, no longer has it.
+    if (getActiveCourse() !== cid) await initData(getActiveCourse());
     // Seed demo data if no courses/students exist — lazy-loads seed-data.js on demand
     await loadSeedIfNeeded();
     migrateAllStudents();
@@ -473,6 +487,7 @@ window.Router = (function () {
 
     // A page loaded on demand keeps the loading screen up until it draws.
     var drawing = _onRoute();
+    drawn = true;
     if (drawing) await drawing;
     _hideLoading();
     // Then the teacher's other classes, in the background once the first
