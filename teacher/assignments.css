@@ -170,7 +170,8 @@
   padding: 0 16px 16px;
   border-top: 0.5px solid var(--divider-medium);
 }
-.assess-card.open .assess-body {
+.assess-card.open .assess-body,
+.assess-card.is-closing .assess-body {
   display: block;
 }
 /* Focus banner */
@@ -2386,7 +2387,8 @@ body.af-comp-open #gb-tooltip {
   display: none;
   padding-top: 12px;
 }
-.mod-folder.open .mod-folder-body {
+.mod-folder.open .mod-folder-body,
+.mod-folder.is-closing .mod-folder-body {
   display: block;
 }
 .mod-folder-body .assess-card:last-child {
