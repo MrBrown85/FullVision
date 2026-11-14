@@ -12093,6 +12093,8 @@ window.PageAssignments = (function () {
     if (['+', '=', '-', '_'].includes(key) && _kbFocusEl.classList.contains('rsg-criterion-row')) {
       e.preventDefault();
       setScoreMod(_kbFocusEl, key === '+' || key === '=' ? 1 : -1);
+      // Its keyup lands on what has the browser's focus, perhaps another row.
+      _afterGradingEvent({ type: 'keydown', target: _kbFocusEl });
       return;
     }
     if (key === '0' || key === 'Backspace' || key === 'Delete') {
