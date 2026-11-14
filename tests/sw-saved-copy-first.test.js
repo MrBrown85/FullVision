@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { webcrypto } from 'crypto';
+import { createHash, webcrypto } from 'crypto';
 import { cacheName, releaseIn, releasePages, withRelease } from '../scripts/sw-release-pages.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,13 +25,17 @@ const NEXT = 'fullvision-r2';
 
 // sw.js as scripts/build.sh leaves it: a cache name, and a fingerprint for
 // each file the install saves (two files here, one with a query string).
+// Release r1's files are 'a-r1' and 'b-r1'.
+const RECORD = '/__sw-precache-fingerprints.json';
+const print = text => createHash('sha256').update(text).digest('base64');
+const PRINTS = { '/a.js': print('a-r1'), '/b.css?v=3': print('b-r1') };
 const built = swSource
   .replace(/const CACHE_NAME = '[^']*';/, `const CACHE_NAME = '${THIS}';`)
   .replace(
     /const PRECACHE_URLS = \[[\s\S]*?\n\];/,
     "const PRECACHE_URLS = ['/teacher/app.html', '/a.js', '/b.css?v=3'];",
   )
-  .replace('const PRECACHE_FINGERPRINTS = null;', "const PRECACHE_FINGERPRINTS = { '/a.js': 'x', '/b.css?v=3': 'y' };");
+  .replace('const PRECACHE_FINGERPRINTS = null;', `const PRECACHE_FINGERPRINTS = ${JSON.stringify(PRINTS)};`);
 
 const absolute = key => new URL(typeof key === 'string' ? key : key.url, ORIGIN).href;
 
@@ -96,6 +100,12 @@ function loadWorker({ source = built, saved = {}, network = {} } = {}) {
   const caches = fakeCaches({ [THIS]: saved });
   const asked = [];
   const state = { offline: false, network };
+  // The worker's own requests (an install's downloads) name an address only.
+  class FakeRequest {
+    constructor(address) {
+      this.url = new URL(address, ORIGIN).href;
+    }
+  }
   const fetch = async request => {
     const address = request.url.replace(ORIGIN, '');
     asked.push(address);
@@ -114,12 +124,13 @@ function loadWorker({ source = built, saved = {}, network = {} } = {}) {
     'console',
     source + '\nreturn { pageReleases, rememberPage, releaseNamedBy, PAGES_REMEMBERED, CACHE_NAME };',
   );
-  const inner = run(self, caches, fetch, Request, webcrypto, btoa, { warn: () => {} });
+  const inner = run(self, caches, fetch, FakeRequest, webcrypto, btoa, { warn: () => {} });
 
   // Send a request through the worker's fetch listener. Returns the
   // response, or undefined when the worker left it to the browser.
   async function ask(address, { client = '', navigate = false, method = 'GET', accept } = {}) {
     let answer;
+    const behind = [];
     const url = /^https?:/.test(address) ? address : ORIGIN + address;
     listeners.fetch({
       request: {
@@ -131,9 +142,11 @@ function loadWorker({ source = built, saved = {}, network = {} } = {}) {
       clientId: navigate ? '' : client,
       resultingClientId: navigate ? client : '',
       respondWith: promise => (answer = promise),
+      waitUntil: promise => void behind.push(promise),
     });
     const response = await answer;
-    // Let a run-time cache write finish.
+    // Let a run-time cache write, and any work behind the request, finish.
+    await Promise.all(behind);
     await new Promise(done => setTimeout(done, 0));
     return response;
   }
@@ -144,15 +157,17 @@ function loadWorker({ source = built, saved = {}, network = {} } = {}) {
   return { ...inner, ask, asked, caches, state, savedText };
 }
 
-// The cache as the install leaves it for release r1, and the network
-// serving release r1 too.
+// The cache as the install leaves it for release r1 (its record written
+// last), and the network serving release r1 too.
 const installed = () => ({
   '/teacher/app.html': page(THIS, '/teacher/app.html'),
   '/a.js': fromSite('a-r1', 'text/javascript', '/a.js'),
   '/b.css?v=3': fromSite('b-r1', 'text/css', '/b.css?v=3'),
+  [RECORD]: new Response(JSON.stringify({ files: PRINTS }), { headers: { 'Content-Type': 'application/json' } }),
 });
 const serving = (release, tag) => ({
   '/dashboard': () => page(release, '/dashboard'),
+  '/teacher/app.html': () => page(release, '/teacher/app.html'),
   '/a.js': () => fromSite('a-' + tag, 'text/javascript', '/a.js'),
   '/b.css?v=3': () => fromSite('b-' + tag, 'text/css', '/b.css?v=3'),
   '/c.js': () => fromSite('c-' + tag, 'text/javascript', '/c.js'),
@@ -315,7 +330,7 @@ describe('what is not answered from the saved copy', () => {
     expect(await worker.ask('https://abc.supabase.co/rest/v1/rpc/x', { client: 'tab1' })).toBeUndefined();
     expect(await worker.ask('/a.js', { client: 'tab1', method: 'POST' })).toBeUndefined();
     expect(worker.asked).toEqual(['/dashboard']);
-    expect(worker.caches.stores.get(THIS).size).toBe(3);
+    expect(worker.caches.stores.get(THIS).size).toBe(4);
   });
 
   it('another site with the same path is never the saved file, and is not kept', async () => {
@@ -323,7 +338,7 @@ describe('what is not answered from the saved copy', () => {
     await worker.ask('/dashboard', { client: 'tab1', navigate: true });
     worker.state.network['https://cdn.example/a.js'] = () => new Response('theirs');
     expect(await (await worker.ask('https://cdn.example/a.js', { client: 'tab1' })).text()).toBe('theirs');
-    expect(worker.caches.stores.get(THIS).size).toBe(3);
+    expect(worker.caches.stores.get(THIS).size).toBe(4);
   });
 
   it('the source served directly has no fingerprints: every file takes the network first, as before', async () => {
@@ -345,6 +360,73 @@ describe('what is not answered from the saved copy', () => {
         .clone()
         .text(),
     ).toBe('a-edited');
+  });
+});
+
+describe('an install that is gone (Sign Out deletes every cache)', () => {
+  // The network serving release r1, whose files are the fingerprinted bytes.
+  const r1 = () => serving(THIS, 'r1');
+  const keys = worker => [...worker.caches.stores.get(THIS).keys()].map(key => key.replace(ORIGIN, '')).sort();
+
+  it('is installed again behind the first page that misses a file, and later files come from the saved copy', async () => {
+    const worker = loadWorker({ saved: {}, network: r1() });
+    await worker.ask('/dashboard', { client: 'tab1', navigate: true });
+    expect(await (await worker.ask('/a.js', { client: 'tab1' })).text()).toBe('a-r1');
+    // The page's own request, then the install: the page and both files.
+    expect(worker.asked.slice(0, 2)).toEqual(['/dashboard', '/a.js']);
+    expect(worker.asked.slice(2).sort()).toEqual(['/a.js', '/b.css?v=3', '/teacher/app.html']);
+    expect(keys(worker)).toEqual([RECORD, '/a.js', '/b.css?v=3', '/teacher/app.html']);
+    expect(await worker.savedText('/a.js')).toBe('a-r1');
+    expect(await worker.savedText(RECORD)).toBe(JSON.stringify({ files: PRINTS }));
+
+    worker.asked.length = 0;
+    expect(await (await worker.ask('/b.css?v=3', { client: 'tab1' })).text()).toBe('b-r1');
+    expect(worker.asked).toEqual([]);
+  });
+
+  it('is not installed again while its record is there: one missing file is put back alone', async () => {
+    const worker = loadWorker({ saved: installed(), network: r1() });
+    await worker.ask('/dashboard', { client: 'tab1', navigate: true });
+    worker.caches.stores.get(THIS).delete(ORIGIN + '/a.js');
+    expect(await (await worker.ask('/a.js', { client: 'tab1' })).text()).toBe('a-r1');
+    expect(worker.asked).toEqual(['/dashboard', '/a.js']);
+    expect(await worker.savedText('/a.js')).toBe('a-r1');
+  });
+
+  it('keeps nothing when the network serves another release: no file, no record, and one try', async () => {
+    const worker = loadWorker({ saved: {}, network: serving(THIS, 'r2') });
+    await worker.ask('/dashboard', { client: 'tab1', navigate: true });
+    // The page still gets the network's answer.
+    expect(await (await worker.ask('/a.js', { client: 'tab1' })).text()).toBe('a-r2');
+    expect(keys(worker)).toEqual(['/teacher/app.html']);
+    // A file whose bytes are wrong was asked for once more, under another address.
+    expect(worker.asked.filter(address => address.startsWith('/a.js?sw='))).toHaveLength(1);
+
+    // The same start of the worker does not try the install again.
+    worker.asked.length = 0;
+    expect(await (await worker.ask('/b.css?v=3', { client: 'tab1' })).text()).toBe('b-r2');
+    expect(worker.asked).toEqual(['/b.css?v=3']);
+    expect(keys(worker)).toEqual(['/teacher/app.html']);
+  });
+
+  it('keeps the files that are right when one is wrong, and never the wrong one', async () => {
+    const worker = loadWorker({ saved: {}, network: r1() });
+    worker.state.network['/b.css?v=3'] = () => fromSite('b-r2', 'text/css', '/b.css?v=3');
+    await worker.ask('/dashboard', { client: 'tab1', navigate: true });
+    await worker.ask('/a.js', { client: 'tab1' });
+    await worker.ask('/b.css?v=3', { client: 'tab1' });
+    // a.js was put back by its own request; the install as a whole failed.
+    expect(keys(worker)).toEqual(['/a.js', '/teacher/app.html']);
+    expect(await worker.savedText('/a.js')).toBe('a-r1');
+  });
+
+  it('is left alone for a page of another release, a page it does not know and the source served directly', async () => {
+    const other = loadWorker({ saved: {}, network: serving(NEXT, 'r1') });
+    await other.ask('/dashboard', { client: 'tab1', navigate: true });
+    await other.ask('/a.js', { client: 'tab1' });
+    await other.ask('/a.js', { client: 'unknown-tab' });
+    expect(other.asked).toEqual(['/dashboard', '/a.js', '/a.js']);
+    expect(other.caches.stores.get(THIS).size).toBe(0);
   });
 });
 
@@ -383,6 +465,26 @@ describe('the page kept for offline', () => {
     worker.state.network['/login.html'] = () => page(NEXT, '/login.html');
     await worker.ask('/login.html', { client: 'tab3', navigate: true });
     expect(await worker.savedText('/login.html')).toContain(THIS);
+  });
+
+  it("an installed file's address opened as a page is answered from the network and never written", async () => {
+    const worker = loadWorker({ saved: installed(), network: serving(NEXT, 'r2') });
+    worker.state.network['/a.js?x=1'] = worker.state.network['/a.js'];
+    worker.state.network['/b.css'] = () => fromSite('b-plain', 'text/css', '/b.css');
+    for (const address of ['/a.js', '/a.js?x=1', '/b.css?v=3']) {
+      const shown = await worker.ask(address, { client: 'tab1', navigate: true });
+      expect(await shown.text(), address).toMatch(/-r2$/);
+    }
+    expect(await worker.savedText('/a.js')).toBe('a-r1');
+    expect(await worker.savedText('/b.css?v=3')).toBe('b-r1');
+    expect(worker.caches.stores.get(THIS).size).toBe(4);
+    // Offline it is still readable as a page, from the install's copy.
+    worker.state.offline = true;
+    expect(await (await worker.ask('/a.js', { client: 'tab1', navigate: true })).text()).toBe('a-r1');
+    // An address the install did not save is kept as before.
+    worker.state.offline = false;
+    await worker.ask('/b.css', { client: 'tab1', navigate: true });
+    expect(await worker.savedText('/b.css')).toBe('b-plain');
   });
 });
 

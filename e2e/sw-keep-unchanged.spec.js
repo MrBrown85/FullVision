@@ -31,8 +31,10 @@ const sorted = list => [...list].sort();
 let server;
 test.beforeAll(() => {
   URLS = precacheUrls(distSw());
-  // What every update fetches whatever changed: the new sw.js and the pages.
-  ALWAYS = ['/sw.js', ...URLS.filter(isPage)];
+  // What every install fetches whatever changed: the pages. The looks for
+  // sw.js itself are not counted: the browser makes its own after a page
+  // load, when it likes, beside the one a test asks for.
+  ALWAYS = URLS.filter(isPage);
 });
 test.beforeEach(async () => {
   server = await startServer();
@@ -77,19 +79,28 @@ async function firstVisit(page, name) {
 /* Release version `name` and have the browser find it. The page first leaves
    the app for a plain file, so nothing but the worker asks the server for
    anything while the update runs (no app code, no quiet reload). Returns the
-   new worker's final state and every request the update made. */
+   new worker's final state and every request the update made, the looks for
+   sw.js aside. */
 async function update(page, name, changed, options) {
   await page.goto(server.origin + '/favicon.svg');
-  server.release(name, changed, options);
+  // Listen before the release: the browser's own look for sw.js after the
+  // page load may find it, and start the install, before the test asks.
+  await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    window.__fvFound = new Promise(r =>
+      reg.addEventListener('updatefound', () => r((window.__fvInstalling = reg.installing)), { once: true }),
+    );
+  });
+  // The log is emptied before the release and not after it: an install may
+  // be writing to it from the moment the release is there. The left page's
+  // last requests reach the server first.
   await page.waitForTimeout(200);
   server.takeLog();
+  server.release(name, changed, options);
   const state = await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration();
-    const found = new Promise(r => reg.addEventListener('updatefound', () => r(reg.installing), { once: true }));
-    // The browser's own look after the page load may have found it first.
-    const already = reg.installing;
-    if (!already) await reg.update().catch(() => {});
-    const worker = already || (await Promise.race([found, new Promise(r => setTimeout(() => r(null), 15000))]));
+    if (!window.__fvInstalling) await reg.update().catch(() => {});
+    const worker = await Promise.race([window.__fvFound, new Promise(r => setTimeout(() => r(null), 15000))]);
     if (!worker) return 'no update';
     await new Promise(r => {
       const done = () => (worker.state === 'activated' || worker.state === 'redundant') && r();
@@ -98,7 +109,7 @@ async function update(page, name, changed, options) {
     });
     return worker.state;
   });
-  return { state, asked: server.takeLog().filter(u => u !== '/favicon.ico') };
+  return { state, asked: server.takeLog().filter(u => u !== '/favicon.ico' && u !== '/sw.js') };
 }
 
 async function cachedText(page, url) {
@@ -217,7 +228,7 @@ test('an install over a cache from a worker without fingerprints downloads every
 
   const b = await update(page, 'b', {});
   expect(b.state).toBe('activated');
-  expect(sorted(b.asked)).toEqual(sorted(['/sw.js', ...URLS]));
+  expect(sorted(b.asked)).toEqual(sorted(URLS));
   const state = await cacheState(page);
   expect(state.names).toEqual(['fullvision-b']);
   expect(state.missing['fullvision-b']).toEqual([]);

@@ -315,25 +315,53 @@ function isFitToKeep(response, address) {
   return false;
 }
 
-async function downloadAll(cache, urls) {
-  // Like addAll, nothing is stored if any download fails or is not a 200. It
-  // also fails on a type that does not fit, so this version never takes over
-  // with a page where a script should be and the previous one keeps working.
-  const responses = await Promise.all(
-    urls.map(async url => {
-      const response = await fetch(new Request(url, { cache: 'reload' }));
-      if (!isFitToKeep(response, url)) throw new Error('Service worker: ' + url + ' is not the file it should be.');
-      return response;
-    }),
-  );
-  await Promise.all(responses.map((response, i) => cache.put(urls[i], response)));
-}
-
 async function sha256(buffer) {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', buffer));
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
+}
+
+// Whether a response's bytes are the ones a fingerprint names. The response
+// itself is left unread, to be stored or handed on.
+async function hasFingerprint(response, want) {
+  return (await sha256(await response.clone().arrayBuffer())) === want;
+}
+
+// One file for an install, or an error. The answer must be OK, of a type that
+// fits the address and, for a file with a fingerprint, the bytes this release
+// was built with. Status 200 and a script's type do not make it this
+// release's file: a server or a cache on the way can answer with the previous
+// release's bytes while a release goes out, and that copy would then be
+// served on every load until the next release. A file whose bytes do not
+// match is asked for once more under an address no cache has seen; still
+// wrong, it fails the install. A page has no fingerprint (each answer carries
+// its own nonce); one that names another release fails the install too.
+async function downloadForInstall(url) {
+  const want = PRECACHE_FINGERPRINTS ? PRECACHE_FINGERPRINTS[url] : null;
+  const response = await fetch(new Request(url, { cache: 'reload' }));
+  if (!isFitToKeep(response, url)) throw new Error('Service worker: ' + url + ' is not the file it should be.');
+  if (!want) {
+    const release = await releaseNamedBy(response);
+    if (release && release !== CACHE_NAME) throw new Error('Service worker: ' + url + ' is from another release.');
+    return response;
+  }
+  if (await hasFingerprint(response, want)) return response;
+  const again = await fetch(
+    new Request(url + (url.includes('?') ? '&' : '?') + 'sw=' + encodeURIComponent(want), { cache: 'reload' }),
+  );
+  if (isFitToKeep(again, url) && (await hasFingerprint(again, want))) return again;
+  console.warn('Service worker: not keeping ' + url + ". Its bytes are not this release's.");
+  throw new Error('Service worker: ' + url + " is not this release's file.");
+}
+
+async function downloadAll(cache, urls) {
+  // Like addAll, nothing is stored if any download fails, is not a 200, has a
+  // type that does not fit or is not this release's bytes. So this version
+  // never takes over with a page where a script should be, or with another
+  // release's file among its own, and the previous one keeps working.
+  const responses = await Promise.all(urls.map(downloadForInstall));
+  await Promise.all(responses.map((response, i) => cache.put(urls[i], response)));
 }
 
 // The other versions' caches that finished an install with fingerprints,
@@ -464,6 +492,10 @@ function cacheIfGood(request, response) {
 //   - the page asking is one this worker handed over, and it named this
 //     release;
 //   - the copy is in this release's cache.
+// Every copy of an installed file in that cache has this release's bytes:
+// the install, the install done again and the one write at run time
+// (keepIfThisRelease) each check the fingerprint first, and nothing else
+// writes under an installed file's address.
 // So a page from a newer release, a page with no tag, and a page the worker
 // has lost track of (the browser stops an idle worker, and it starts again
 // with nothing remembered) all get their files from the network. No page runs
@@ -521,8 +553,72 @@ function isInstalledFile(url) {
   );
 }
 
+// ── An install that is gone ──
+//
+// Sign Out and Leave Demo Mode delete every cache on the device
+// (shared/supabase.js signOut), this release's install with them, and the
+// browser does not run an install again until the next release. So the worker
+// does. When a page of this release asks for an installed file and the copy
+// is missing, it looks for the record a finished install writes last and,
+// finding none, installs again behind the page. It is the same install: a
+// file is copied from another finished cache or downloaded, every one is
+// checked against its fingerprint, nothing is stored unless every one is
+// right, and the record is written last. Until it is done, a missing file
+// comes from the network and is kept when its bytes are this release's.
+// One try each time the browser starts the worker: a try that fails (the
+// network is down, or already serving the next release) is left for the next
+// start, or for the next release's own install.
+let reinstall = null;
+let reinstallFailed = false;
+
+// Keep the worker running until work behind a request is done.
+function stayAwakeFor(event, work) {
+  try {
+    event.waitUntil(work);
+  } catch {
+    // The work goes on for as long as the worker runs.
+  }
+}
+
+function reinstallIfGone(event) {
+  if (!PRECACHE_FINGERPRINTS || reinstall || reinstallFailed) return;
+  reinstall = (async () => {
+    const cache = await caches.open(CACHE_NAME);
+    if (await cache.match(FINGERPRINTS_KEY)) return;
+    await precacheKeepingUnchanged();
+  })()
+    .catch(() => {
+      reinstallFailed = true;
+    })
+    .then(() => {
+      reinstall = null;
+    });
+  stayAwakeFor(event, reinstall);
+}
+
+// The network's answer for an installed file whose copy is missing, kept when
+// its bytes are this release's. Any other bytes go to the page and are not
+// kept: the network may already be serving the next release.
+function keepIfThisRelease(event, url, response) {
+  if (!response || !response.ok || response.type !== 'basic') return;
+  const address = url.pathname + url.search;
+  if (!isFitToKeep(response, address)) return;
+  try {
+    const copy = response.clone();
+    stayAwakeFor(
+      event,
+      (async () => {
+        if (!(await hasFingerprint(copy, PRECACHE_FINGERPRINTS[address]))) return;
+        await (await caches.open(CACHE_NAME)).put(address, copy);
+      })().catch(() => {}),
+    );
+  } catch {
+    // Not kept.
+  }
+}
+
 // A page: the network first, the saved page when the network fails.
-async function answerPage(event, cacheKey) {
+async function answerPage(event, url, cacheKey) {
   const isNavigation = event.request.mode === 'navigate';
   let response;
   try {
@@ -542,6 +638,11 @@ async function answerPage(event, cacheKey) {
   }
   const release = await releaseNamedBy(response);
   if (isNavigation) rememberPage(event.resultingClientId, release);
+  // An installed file opened as a page (its address typed into a tab) is not
+  // kept: the network may be serving the next release's file, and the
+  // install's copy is never written over. The key here has no query string,
+  // so the address asked for and the key are both checked.
+  if (isInstalledFile(url) || isInstalledFile(new URL(cacheKey, self.location.origin))) return response;
   // A page from another release is not kept: offline, the saved page must be
   // the one the saved files belong to.
   if (!release || release === CACHE_NAME) cacheIfGood(cacheKey, response);
@@ -553,16 +654,21 @@ async function answerPage(event, cacheKey) {
 async function answerFile(event, url) {
   const installed = isInstalledFile(url);
   const named = pageReleases.get(event.clientId);
+  let missing = false;
   if (installed && named === CACHE_NAME) {
     const saved = await savedCopy(event.request);
     if (saved) return saved;
+    missing = true;
+    reinstallIfGone(event);
   }
   try {
     const response = await fetch(event.request);
     // The install's copies are never replaced at run time: the network may
     // already be serving the next release, and this cache must stay exactly
-    // this one. A file the install did not save is kept when first used.
+    // this one. A missing copy is put back only when the answer's bytes are
+    // this release's. A file the install did not save is kept when first used.
     if (!installed) cacheIfGood(event.request, response);
+    else if (missing) keepIfThisRelease(event, url, response);
     return response;
   } catch {
     // A page that named another release never gets this release's copy of an
@@ -597,7 +703,7 @@ self.addEventListener('fetch', event => {
     event.request.mode === 'navigate' ||
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))
   ) {
-    event.respondWith(answerPage(event, pageKey(url)));
+    event.respondWith(answerPage(event, url, pageKey(url)));
     return;
   }
 

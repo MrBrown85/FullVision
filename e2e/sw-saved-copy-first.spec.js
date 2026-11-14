@@ -81,6 +81,21 @@ function watch(page) {
   return errors;
 }
 
+/* A log without the looks for sw.js: the browser makes its own a moment
+   after each page load, when it likes, so one may land in any log. */
+const notSw = log => log.filter(u => u !== '/sw.js');
+
+/* Wait for the browser's own look for sw.js after the page load just made
+   (the log was emptied before it), so a release made next is found only when
+   the test has the tab look. Goes on without it after ten seconds. */
+async function ownLookPassed(page) {
+  await expect
+    .poll(() => server.state.log.includes('/sw.js'), { timeout: 10000 })
+    .toBe(true)
+    .catch(() => {});
+  await page.waitForTimeout(200);
+}
+
 /* The requests since the last call that asked the network for a file the
    install saved. A repeat visit must have none. */
 function filesAsked(log) {
@@ -141,15 +156,30 @@ async function firstVisit(page, name) {
 
 /* Have the browser look for a new sw.js now, from a plain file so no app
    code runs meanwhile. Returns the new worker's final state, or 'no update'
-   when the browser's own look after the page load had already finished. */
-async function update(page) {
+   when the browser's own look after the page load had already finished.
+   `release`, when given, makes the release once the tab is listening, so an
+   install the browser's own look starts is the one waited for, and the log
+   is emptied just before it, never after. */
+async function update(page, release) {
   await page.goto(server.origin + '/favicon.svg');
+  await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    window.__fvFound = new Promise(r =>
+      reg.addEventListener('updatefound', () => r((window.__fvInstalling = reg.installing)), { once: true }),
+    );
+    if (reg.installing) window.__fvInstalling = reg.installing;
+  });
+  if (release) {
+    await page.waitForTimeout(200);
+    server.takeLog();
+    release();
+  }
   return page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration();
-    const found = new Promise(r => reg.addEventListener('updatefound', () => r(reg.installing), { once: true }));
-    const already = reg.installing;
-    if (!already) await reg.update().catch(() => {});
-    const worker = already || (await Promise.race([found, new Promise(r => setTimeout(() => r(null), 5000))]));
+    if (!window.__fvInstalling) await reg.update().catch(() => {});
+    const worker =
+      window.__fvInstalling ||
+      (await Promise.race([window.__fvFound, new Promise(r => setTimeout(() => r(null), 5000))]));
     if (!worker) return 'no update';
     await new Promise(r => {
       const done = () => (worker.state === 'activated' || worker.state === 'redundant') && r();
@@ -217,7 +247,7 @@ test('a first visit installs everything; a repeat visit asks the network for the
   await appDrawn(page);
   let log = server.takeLog();
   expect(filesAsked(log)).toEqual([]);
-  expect(log.filter(u => u !== '/sw.js')).toEqual(['/dashboard']);
+  expect(notSw(log)).toEqual(['/dashboard']);
   await expectOneRelease(page, 'a', ['constants', 'gradebook']);
 
   await page.goto(server.origin + '/gradebook?course=sci8');
@@ -225,7 +255,7 @@ test('a first visit installs everything; a repeat visit asks the network for the
   await openReports(page);
   log = server.takeLog();
   expect(filesAsked(log)).toEqual([]);
-  expect(log.filter(u => u !== '/sw.js')).toEqual(['/gradebook?course=sci8']);
+  expect(notSw(log)).toEqual(['/gradebook?course=sci8']);
   await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
 
   // A plain reload is a repeat visit too.
@@ -255,7 +285,7 @@ test('Demo Mode and the phone app open from the saved copy, with the sample clas
   await expect(page.locator('body')).toContainText('Science 8');
   let log = server.takeLog();
   expect(filesAsked(log)).toEqual([]);
-  expect(sorted(log.filter(u => u !== '/sw.js'))).toEqual(['/dashboard', '/login.html?demo=1']);
+  expect(sorted(notSw(log))).toEqual(['/dashboard', '/login.html?demo=1']);
   await expectOneRelease(page, 'a');
 
   // The phone app, at a phone's size.
@@ -266,7 +296,7 @@ test('Demo Mode and the phone app open from the saved copy, with the sample clas
   await expect(page.locator('body')).toContainText('Science 8');
   log = server.takeLog();
   expect(filesAsked(log)).toEqual([]);
-  expect(log.filter(u => u !== '/sw.js')).toEqual(['/teacher-mobile/']);
+  expect(notSw(log)).toEqual(['/teacher-mobile/']);
   await expectOneRelease(page, 'a', ['constants', 'shell']);
   expect(errors).toEqual([]);
 });
@@ -351,16 +381,18 @@ test('a release while a tab is open: the tab stays on one release until the quie
   const errors = watch(page);
   server.release('a', filesOf('a'));
   await firstVisit(page, 'a');
+  server.takeLog();
   await page.goto(server.origin + '/gradebook?course=sci8');
   await appDrawn(page);
   await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await ownLookPassed(page);
 
   // The release. The open tab has not looked for it yet: Reports, opened
   // now, comes from the saved copy, the same release as the rest of the tab.
-  server.release('b', filesOf('b'));
   server.takeLog();
+  server.release('b', filesOf('b'));
   await openReports(page);
-  expect(server.takeLog()).toEqual([]);
+  expect(notSw(server.state.log)).toEqual([]);
   await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
 
   // The teacher leaves the tab and comes back: shared/auto-update.js looks
@@ -374,12 +406,13 @@ test('a release while a tab is open: the tab stays on one release until the quie
   await expect.poll(() => cacheNames(page)).toEqual(['fullvision-b']);
   await expectOneRelease(page, 'b', ['constants', 'gradebook', 'reports']);
 
-  // The network was asked for the new worker, the pages and the changed
-  // files once each (the install), and for the reloaded page: no file twice,
-  // so the reload took its files from the new saved copy.
+  // The network was asked for the new worker, and for the pages and the
+  // changed files once each (the install), and for the reloaded page: no file
+  // twice, so the reload took its files from the new saved copy.
   const log = server.takeLog();
   const changed = Object.values(STAMPED).map(rel => '/' + rel);
-  expect(sorted(log)).toEqual(sorted([...ALWAYS, ...changed, '/reports?course=sci8&tab=progress']));
+  expect(log).toContain('/sw.js');
+  expect(sorted(notSw(log))).toEqual(sorted(notSw([...ALWAYS, ...changed, '/reports?course=sci8&tab=progress'])));
   expect(errors).toEqual([]);
 });
 
@@ -548,12 +581,12 @@ test('a worker that has lost track of a page sends its files to the network', as
   // Known: a file comes from the saved copy.
   server.takeLog();
   expect(await page.evaluate(() => fetch('/shared/calc.js').then(r => r.status))).toBe(200);
-  expect(server.takeLog()).toEqual([]);
+  expect(notSw(server.takeLog())).toEqual([]);
 
   // The browser stops the idle worker. Started again, it remembers no page.
   await stopWorker(context, page);
   expect(await page.evaluate(() => fetch('/shared/calc.js').then(r => r.status))).toBe(200);
-  expect(server.takeLog()).toEqual(['/shared/calc.js']);
+  expect(notSw(server.takeLog())).toEqual(['/shared/calc.js']);
   await openReports(page);
   expect(server.takeLog()).toContain('/' + STAMPED.reports);
   // The network still serves release a, so the tab is still one release, and
@@ -588,4 +621,162 @@ test('a page that names no release gets its files from the network: the student 
   expect(log).toContain('/shared/html.js');
   expect(log).toContain('/shared/loading-screen.js');
   expect(log).toContain('/s/page-view.js');
+});
+
+/* What this release's cache is missing of the install: the pages, the files
+   and the record a finished install writes last. */
+async function missingFromInstall(page, name) {
+  return page.evaluate(
+    async ({ cacheName, urls, record }) => {
+      if (!(await caches.keys()).includes(cacheName)) return ['no cache'];
+      const cache = await caches.open(cacheName);
+      const missing = [];
+      for (const url of [...urls, record]) if (!(await cache.match(url))) missing.push(url);
+      return missing;
+    },
+    { cacheName: 'fullvision-' + name, urls: URLS, record: RECORD },
+  );
+}
+
+test('after Sign Out the worker installs again: the next visits come from the saved copy and the app starts offline', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(120_000);
+  const errors = watch(page);
+  const failed = [];
+  page.on('response', r => r.status() >= 500 && failed.push(r.status() + ' ' + r.url()));
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+  expect(await missingFromInstall(page, 'a')).toEqual([]);
+
+  // Sign Out and Leave Demo Mode both end in signOut, which deletes every
+  // cache on the device. Two things that are not the install's show it did.
+  await page.evaluate(async () => {
+    await (await caches.open('fullvision-a')).put('/__not-the-installs', new Response('x'));
+    await (await caches.open('another-cache')).put('/x', new Response('x'));
+  });
+  await Promise.all([
+    page.waitForURL(/\/login\.html/, { timeout: 30000 }),
+    page.evaluate(() => void window.signOut({ force: true })),
+  ]);
+  await page.waitForLoadState('load');
+  await expect.poll(() => cacheNames(page)).not.toContain('another-cache');
+  expect(await cachedText(page, '/__not-the-installs')).toBeNull();
+
+  // The first visit after it: the worker finds its install gone, sends the
+  // files to the network and installs again behind the page.
+  await page.goto(server.origin + '/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await appDrawn(page);
+  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await expect.poll(() => missingFromInstall(page, 'a'), { timeout: 30000 }).toEqual([]);
+  expect(await cacheNames(page)).toEqual(['fullvision-a']);
+  for (const rel of Object.values(STAMPED)) expect(await cachedText(page, '/' + rel), rel).toBe(filesOf('a')[rel]);
+
+  // The second visit is a repeat visit again: no file asked of the network.
+  server.takeLog();
+  await page.goto(server.origin + '/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await appDrawn(page);
+  expect(filesAsked(server.takeLog())).toEqual([]);
+  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+
+  // Offline, the app starts and draws the class, and Reports, never opened
+  // since the sign-out, loads its scripts.
+  await context.setOffline(true);
+  await page.goto(server.origin + '/gradebook?course=sci8');
+  await appDrawn(page);
+  await expect(page.locator('body')).toContainText('Science 8');
+  await openReports(page);
+  await expectOneRelease(page, 'a', ['constants', 'gradebook', 'reports']);
+  expect(failed).toEqual([]);
+  await context.setOffline(false);
+  expect(errors).toEqual([]);
+});
+
+test('a file that arrives stale during an install is not saved: the install fails and no load mixes releases', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const errors = watch(page);
+  const stale = '/' + STAMPED.constants;
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+
+  // Release b. While it installs, one address still answers release a's
+  // bytes: a real 200 with a script's type, so only its fingerprint tells.
+  const installed = await update(page, () => {
+    server.release('b', filesOf('b'));
+    server.state.files[stale] = Buffer.from(filesOf('a')[STAMPED.constants]);
+  });
+  // Each try asked for it twice: as the install asks for every file, then
+  // again under an address no cache on the way has seen.
+  const tries = server.takeLog().filter(u => u.split('?')[0] === stale);
+  server.state.files[stale] = Buffer.from(filesOf('b')[STAMPED.constants]);
+  expect(installed).toBe('redundant');
+  expect(tries[0]).toBe(stale);
+  expect(tries.filter(u => u === stale).length).toBeGreaterThan(0);
+  expect(tries.filter(u => /\?sw=/.test(u)).length).toBe(tries.filter(u => u === stale).length);
+  expect(await cachedText(page, stale)).toBe(filesOf('a')[STAMPED.constants]);
+
+  // Three loads: each runs one release, whichever worker answers it. The
+  // first is the old worker sending a newer page's files to the network; the
+  // look for sw.js behind it installs b, now that every file matches.
+  for (const load of [1, 2, 3]) {
+    await page.goto(server.origin + '/gradebook?course=sci8');
+    await appDrawn(page);
+    const now = await running(page);
+    expect(now.page, 'load ' + load).toBe('fullvision-b');
+    expect(now.stamps, 'load ' + load).toEqual({ constants: 'b', gradebook: 'b' });
+    // Whichever release's cache holds the file, it holds that release's bytes.
+    const held = await page.evaluate(async url => {
+      const out = {};
+      for (const name of await caches.keys()) {
+        const copy = await (await caches.open(name)).match(url);
+        if (copy) out[name] = await copy.text();
+      }
+      return out;
+    }, stale);
+    for (const [name, text] of Object.entries(held)) {
+      expect(text, name).toBe(filesOf(name.replace('fullvision-', ''))[STAMPED.constants]);
+    }
+  }
+  await installs(page, 'b');
+  expect(await missingFromInstall(page, 'b')).toEqual([]);
+  expect(await cachedText(page, stale)).toBe(filesOf('b')[STAMPED.constants]);
+  server.takeLog();
+  await page.goto(server.origin + '/gradebook?course=sci8');
+  await appDrawn(page);
+  expect(filesAsked(server.takeLog())).toEqual([]);
+  await expectOneRelease(page, 'b', ['constants', 'gradebook']);
+  expect(errors).toEqual([]);
+});
+
+test("opening an installed file's address as a page does not write over its saved copy", async ({ page, context }) => {
+  test.setTimeout(90_000);
+  const errors = watch(page);
+  const file = '/' + STAMPED.constants;
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+
+  // Release b is live, but this device cannot fetch the new sw.js: worker a
+  // is in charge, holding release a's files.
+  server.release('b', filesOf('b'));
+  server.state.fail.add('/sw.js');
+  for (const address of [file, file + '?x=1']) {
+    const answer = await page.goto(server.origin + address);
+    // The network's file is what the tab shows.
+    expect(await answer.text()).toBe(filesOf('b')[STAMPED.constants]);
+    expect(await cachedText(page, file), address).toBe(filesOf('a')[STAMPED.constants]);
+  }
+  expect(await cacheNames(page)).toEqual(['fullvision-a']);
+
+  // Offline, the saved page starts with its own files: all release a.
+  await context.setOffline(true);
+  await page.goto(server.origin + '/gradebook?course=sci8');
+  await appDrawn(page);
+  await expectOneRelease(page, 'a', ['constants', 'gradebook']);
+  await context.setOffline(false);
+  expect(errors).toEqual([]);
 });
