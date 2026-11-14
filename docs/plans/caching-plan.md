@@ -1,6 +1,6 @@
 # Caching: a fast repeat visit, and no one left on old code (2026-11-12)
 
-The plan for S19-C5, C6 and C7 in `docs/plans/handoff-review-plan.md` (Track C). Step 3, option (d), is built (S19-C6); the rest is design only. Measured on the live site (fullvision.ca, release `dce10ed6`) and checked against `origin/main` at `9eddcecb`.
+The plan for S19-C5, C6 and C7 in `docs/plans/handoff-review-plan.md` (Track C). Steps 1 to 3 are built and released: the live check, option (e) (PR 1289) and option (d) (PR 1290). Step 6, option (a) with the guard, is built and not released: Colin approved it on 2026-11-13, to be released on its own (section 8). Steps 4 and 5 and options (b) and (c) are design only. Measured on the live site (fullvision.ca, release `dce10ed6`) and checked against `origin/main` at `9eddcecb`.
 
 ## 1. What a visit and a release cost today
 
@@ -57,7 +57,7 @@ Escape hatches that work for every option: Ctrl+Shift+R (Shift-Reload on a Mac) 
 Needs Colin:
 
 - **(e), the edge function on HTML only (C7).** It is deploy configuration that only a release proves, and it touches the page that carries the content policy.
-- **(a), the worker answering first.** It changes the path every file takes to a teacher's screen, and its worst case is a device on old code.
+- **(a), the worker answering first.** It changes the path every file takes to a teacher's screen, and its worst case is a device on old code. Approved with the guard on 2026-11-13 (section 8); its release still waits for his word.
 - **(b), fingerprinted names.** It changes the no-bundler rule.
 - **Moving the security headers (S19-A9).** Only a release proves it; a mistake silently drops a protection.
 - **The on-demand reload (step 5 below).** A click on Reports in a tab that is behind would reload the page.
@@ -80,7 +80,7 @@ Do (e), then (d), then (a) with the guard. Leave (b) and (c). Each step is one s
    - Pages are cached under one address each (`sw.js`, `pageKey`): the desktop app's routes under `/teacher/app.html`, a folder under its `index.html`, and no query string. Before, the phone app opened as `/teacher-mobile/` and Demo Mode as `/login.html?demo=1` missed their precached copies and showed the worker's "Offline" page. Files loaded on demand (`shared/bank-sets.js`, `shared/bank-proficiency.js`, `vendor/exceljs.min.js`) are precached too; `tests/sw-precache.test.js` fails when app code names a script that is neither listed nor excused. Proof: `e2e/phone-offline-start.spec.js`.
 4. Once (e) works, the install can also use `cache: 'no-cache'` instead of `'reload'`, so a file missing from the old cache becomes a 304, not a download. Proof: as in step 3.
 5. **Close the on-demand mix.** When `auto-update.js` already knows a newer version has taken over, opening Reports does a full page load instead of fetching scripts, if it is a safe moment; otherwise it behaves as today. Needs Colin. Proof: a browser test that releases a new build while a tab is open and checks that Reports runs one version.
-6. **(a) with the guard.** Needs Colin. Proof: the browser tests in section 2; after the release, step 1 shows no file requests on a repeat visit.
+6. **Built, not released: (a) with the guard.** Colin approved it on 2026-11-13 on these terms: built with the guard, the proof tests passing, released on its own. Section 8 has what was built, the tests and the undo. After the release, `node scripts/check-repeat-visit.mjs --expect-no-files` shows no file sent to the network on a repeat visit.
 
 Expected result: a repeat visit on slow Wi-Fi drops from about 8 s to under 1 s, a release costs a device about a quarter of what it does now, and a page load after a release still runs new code.
 
@@ -139,3 +139,62 @@ Pages: two GETs each
   /help/                   200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 5/5  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
 Pages verdict: all 14 pages have their policy, a fresh nonce on every script and the Supabase address.
 ```
+
+## 8. Option (a) as built (2026-11-13)
+
+Colin approved (a) on 2026-11-13: build it with the guard, with the proof tests passing, and release it on its own. It is built on `main` and not released. It changes how every file reaches a teacher's screen, so its release carries nothing else.
+
+**What the worker does with each request** (`sw.js`, "The saved copy first"):
+
+| Request                                                                                  | Answer                                                                                                 |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Supabase, anything that is not a GET                                                     | Left to the browser, as before. Nothing is saved.                                                      |
+| An HTML page                                                                             | The network first, the saved page when the network fails, as before.                                   |
+| A file the install saved (a script, stylesheet, JSON, icon), from a page of this release | The saved copy. The network is not asked.                                                              |
+| The same file from any other page                                                        | The network first, the saved copy when the network fails, as before.                                   |
+| A file the install did not save (help pages, the student page's own files, PDF fonts)    | The network first, kept when first used for the network failing, as before.                            |
+| Another site (Sentry)                                                                    | The network, as before. Never saved.                                                                   |
+| The source served directly (`npm run dev`)                                               | Network first for everything, as before: the source `sw.js` has no fingerprints, so no file qualifies. |
+
+Nothing new is saved: no student data, no answer from Supabase. The install is option (d), unchanged.
+
+**The guard.** `scripts/build.sh` runs `scripts/sw-release-pages.mjs`, which reads the cache name from `dist/sw.js` and writes it into each page the worker saves (`login.html`, `launch.html`, `teacher/app.html`, `teacher-mobile/index.html`) as `<meta name="fv-release" content="fullvision-…" />`. The two names come from one place and cannot differ; a page without exactly one tag fails the build. The worker reads the tag from the page it hands to the browser, whether that page came from the network or from its saved copy, and remembers it under the browser's id for that page. A file is answered from the saved copy only when three things hold: its address has a fingerprint (so the install saved it, and it is not a page), the page asking is one this worker handed over and it named this worker's release, and the copy is in this release's cache.
+
+**Every way out is the network, as before:**
+
+- The page names another release (a release has happened and the new worker has not installed yet, or its install failed): every file from the network, so the tab runs the new release whole. Nothing from that load is saved over the old cache, the page included. If the network then fails for an installed file, that page gets the failure, not the old copy: a missing file is loud, a mix is not.
+- The page names no release (the student page, the help site, the privacy page, the home page): the network.
+- The worker does not know the page: the browser stopped the idle worker and started it again, the page was opened before this worker took over, the page's answer was an error or could not be read, or the browser gave no id. The network, with the saved copy when the network fails.
+- The copy is missing or the cache cannot be read: the network.
+- More than 100 pages remembered: the oldest is forgotten and uses the network.
+
+Two smaller changes keep the cache exactly one release, which did not matter while it was used only offline. A copy the install saved is never replaced at run time (the network may already be serving the next release). And the worker reads only its own cache, never a newer one that is still being filled.
+
+**How a release reaches people now.** As section 3's row "(a) with guard" says. A fresh load after a release gets new HTML, the guard sees a different release, and the load runs the new release from the network at today's speed; the new worker installs behind it (changed files only, option (d)), and the next load comes from the saved copy. An open tab is found and reloaded by `shared/auto-update.js` exactly as before, which needed no change: a worker never waits (`skipWaiting` at install, `clients.claim` at activate), the updater hears the takeover (`controllerchange`) and reloads at the next safe moment. Until then the open tab keeps getting its release's saved files while the old worker is still running and remembers it, which closes part of section 1's on-demand risk; once the new worker has taken over, a file that tab loads on demand comes from the network, as today (step 5 is still open). A failed install changes nothing online: the old worker sends new pages to the network. The student page has no worker and is not affected.
+
+**Tests.** `tests/sw-saved-copy-first.test.js` runs `sw.js` against fakes: each row of the table, each way out, the tag in every page and after the edge function has rewritten it, and the build step. `e2e/sw-saved-copy-first.spec.js` runs the built site in Chrome on its own server, counting every request that reaches the network, with five scripts stamped per release so a mix would show as two names:
+
+- a first visit installs everything; a repeat visit (Dashboard, Gradebook, Reports on demand, a reload) asks the network for the page and no file;
+- Demo Mode and the phone app open from the saved copy with the sample class;
+- the content policy is the one the site sends, every script tag carries its nonce, and nothing is refused, online and offline;
+- offline, every page opens as one release with no request;
+- a release while a tab is open: Reports opened before the update comes from the saved copy, then leaving and returning to the tab installs the new worker and reloads into the new release, each changed file fetched once;
+- a release before a fresh load: that load runs the new release from the network, the next from the saved copy;
+- new HTML with an old worker (the device cannot fetch `sw.js`): a tab that was on the old release reloads into the new one whole from the network, twice; the old cache is untouched; offline the old release opens whole;
+- a failed install: the new release online, the old release offline, and the next try installs;
+- a worker that has lost track of a page (stopped and started again) sends its files to the network;
+- a page that names no release (the student page on a teacher's device) gets its files from the network.
+
+Breaking the guard on purpose (trusting every page) fails five of these. `e2e/sw-keep-unchanged.spec.js` still passes; its bad-copy test now stores the bad copy itself, since the worker no longer writes over an installed copy.
+
+**After the release.** `node scripts/check-repeat-visit.mjs --expect-no-files` opens Demo Mode in a fresh Chrome and prints what a repeat visit sent to the network. On the live site before this release it printed 127 files for the Dashboard; on a local build with this change, 0.
+
+**Not proven on a static build:**
+
+- Safari on an iPhone or iPad. The guard needs the browser's id for a page to be the same when the page is fetched and when its files are. Chrome's is (the browser tests). Safari's has been since Safari 16, except on pages that send a `Cross-Origin-Opener-Policy` header (WebKit bug 291315, fixed in 2025), which FullVision does not. If Safari's ids differ, the worker does not know the page and uses the network: as fast as today, no faster.
+- Netlify itself: that the release's pages reach browsers with the tag `build.sh` wrote. A page without it uses the network.
+- The gain on school Wi-Fi. On a fast connection the live site's repeat visit is already about 0.6 s since option (e); the saving is the 127 round trips.
+
+**Limits.** Only files the install saved come from the saved copy. A tab left open usually outlives the worker's memory of it (the browser stops an idle worker after about 30 seconds), so files it loads later, such as Reports' scripts on first use, come from the network as today. The first load is what got faster.
+
+**Undo.** Release the previous `sw.js` (revert this change's PR and release, or "Publish deploy" on the previous deploy in Netlify, which needs no build). Browsers check `sw.js` on every page load, so the next load installs it and files go back to the network first. The tags in the pages are harmless to an older worker. Ctrl+Shift+R (Shift-Reload on a Mac) skips the worker for one load on any device.

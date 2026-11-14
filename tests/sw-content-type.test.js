@@ -235,12 +235,17 @@ describe('install that copies unchanged files from the old cache', () => {
     };
     const caches = fakeCaches({ 'fullvision-old': old });
     const fetched = [];
-    const fetch = async request => (fetched.push(request.url), answers(good)(request));
+    // The download is this release's file: a script with the bytes its
+    // fingerprint names.
+    const network = { ...good, '/a.js': [200, 'application/javascript', 'same bytes'] };
+    const fetch = async request => (fetched.push(request.url), answers(network)(request));
     await install(loadWorker({ source, caches, fetch, warn: () => {} }));
     // b.css was copied; a.js was downloaded because its stored copy was a page.
     expect(fetched.sort()).toEqual(['/', '/a.js']);
     const kept = caches.stores.get('fullvision-dev');
-    expect(await (await kept.get('/a.js')).text()).toBe('a()');
+    const copy = await kept.get('/a.js');
+    expect(copy.headers.get('Content-Type')).toBe('application/javascript');
+    expect(await copy.text()).toBe('same bytes');
   });
 
   it('fails the install when the stored copy is refused and the download is a page too', async () => {

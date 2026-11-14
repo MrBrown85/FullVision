@@ -148,7 +148,7 @@ Required Netlify environment variables:
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
 
-`scripts/build.sh` names the service-worker cache after the deploy's commit, so installed PWAs drop stale caches on every deploy; there's nothing to bump by hand. When a page starts loading a new file, add it to `PRECACHE_URLS` in [sw.js](sw.js); `tests/sw-precache.test.js` fails until you do.
+`scripts/build.sh` names the service-worker cache after the deploy's commit, so installed PWAs drop stale caches on every deploy; there's nothing to bump by hand. When a page starts loading a new file, add it to `PRECACHE_URLS` in [sw.js](sw.js); `tests/sw-precache.test.js` fails until you do. A page the worker saves also carries `<meta name="fv-release" content="fullvision-dev" />`, which the build fills in; the worker answers files from its saved copy only for a page that names its own release (`docs/plans/caching-plan.md`, section 8).
 
 ## Backend and data model
 
