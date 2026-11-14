@@ -514,8 +514,8 @@
     function level(tagId, value, modifier) {
       return { tag_id: tagId, value: value, modifier: modifier || 0, comment: null };
     }
-    function criterion(id, value, modifier) {
-      return { criterion_id: id, value: value, modifier: modifier || 0, comment: null };
+    function criterion(id, value, modifier, comment) {
+      return { criterion_id: id, value: value, modifier: modifier || 0, comment: comment || null };
     }
     function at(offset) {
       return isoDay(offset) + 'T20:15:00Z';
@@ -643,7 +643,11 @@
           category: 'Labs and Investigations',
           working: {
             score: { value: null, comment: 'Careful focusing. Label the nucleus next time.' },
-            rubric_scores: [criterion('demo-crit-method', 3), criterion('demo-crit-drawing', 2, 1)],
+            // The teacher's comment on each criterion, as Your Rubric shows it under the level.
+            rubric_scores: [
+              criterion('demo-crit-method', 3, 0, 'Every step is there, in order.'),
+              criterion('demo-crit-drawing', 2, 1, 'Label the nucleus and the cell wall.'),
+            ],
           },
           ret: { is_draft: false, returned_at: at(-10), returned_copy: null },
         },
@@ -902,6 +906,108 @@
     return t.toISOString();
   }
 
+  // A sample category's id, from its name: "Labs and Investigations" is demo-cat-labs-and-investigations.
+  function demoCategoryId(name) {
+    return 'demo-cat-' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
+  /* The Next Step sentences of the sample's competencies, as the class's
+     comment bank holds them (learning.next_steps). */
+  var DEMO_STEPS = {
+    'demo-qp': {
+      Emerging: 'write one question you could test with a simple experiment',
+      Developing: 'say what you think will happen and why before you start',
+      Proficient: 'change one thing at a time so your test is fair',
+    },
+    'demo-pc': {
+      Emerging: 'list the steps of your test in order',
+      Developing: 'check your steps would let someone else repeat your test',
+      Proficient: 'plan how many times to repeat each trial',
+    },
+    'demo-pa': {
+      Emerging: 'put your results in a table',
+      Developing: 'look for a pattern in your table and name it',
+      Proficient: 'explain what the pattern in your data shows',
+    },
+    'demo-com': {
+      Emerging: 'label every part of your diagrams',
+      Developing: 'use a diagram and words together to explain one idea',
+      Proficient: 'explain your results to someone who was not there',
+    },
+    'demo-hum-evidence': {
+      Emerging: 'name one source that backs up your idea',
+      Developing: 'quote or point to the part of the source you mean',
+      Proficient: 'explain how your evidence supports your point',
+    },
+  };
+
+  /* What My Learning needs for a sample class (Batch E E9,
+     my-learning-contract.md): the class's calculation settings, its
+     categories, and its learning map, in get_class_bundle's own shapes,
+     as the server sends them when Show My Learning is on. */
+  function demoLearning(cls, system) {
+    var tagIds = [];
+    cls.work.forEach(function (w) {
+      (w.tag_ids || []).forEach(function (id) {
+        if (DEMO_TAGS[id] && tagIds.indexOf(id) < 0) tagIds.push(id);
+      });
+    });
+    var steps = {};
+    tagIds.forEach(function (id) {
+      if (DEMO_STEPS[id]) steps['bank-' + id] = DEMO_STEPS[id];
+    });
+    return {
+      course: {
+        grading_system: system,
+        calc_method: 'mostRecent',
+        decay_weight: 0.65,
+        recent_score_limit: null,
+        grading_scale: null,
+        category_weights: null,
+        round_percent: true,
+        level_order: 'desc',
+        reporting_terms: [],
+        timezone: 'America/Vancouver',
+        folders_count_as_one: false,
+        courses_count_equally: false,
+        grade_level: '8',
+      },
+      categories: (cls.categories || []).map(function (c, i) {
+        return { id: demoCategoryId(c.name), name: c.name, weight: c.weight, display_order: i, calc_mode: 'points' };
+      }),
+      competency_groups: [],
+      subjects: [
+        {
+          id: 'demo-subject-' + cls.course.id,
+          name: cls.course.name,
+          display_order: 0,
+          sections: tagIds.map(function (id, i) {
+            return {
+              id: 'demo-sec-' + id,
+              name: DEMO_TAGS[id].label,
+              display_order: i,
+              competency_group_id: null,
+              tags: [
+                {
+                  id: id,
+                  code: DEMO_TAGS[id].code,
+                  label: DEMO_TAGS[id].label,
+                  i_can_text: '',
+                  i_can_statements: DEMO_TAGS[id].i_can,
+                  bank_id: DEMO_STEPS[id] ? 'bank-' + id : null,
+                  display_order: 0,
+                },
+              ],
+            };
+          }),
+        },
+      ],
+      section_overrides: {},
+      next_steps: steps,
+      rubric_tags: {},
+    };
+  }
+
   /* The `page` reply for the sample class, in the server's shape
      (student_submit.page). A draft is in none of it. `system`:
      proficiency, letter or both. The one thing here the server does not
@@ -910,9 +1016,13 @@
   function demoPage(system, enrollment) {
     var cls = demoClassFor(enrollment);
     var seen = (demo && demo.seen) || {};
+    var learning = !(demo && demo.noLearning);
     return {
       ok: true,
       v: 1,
+      // Show My Learning is on in Demo Mode (#demo-card-no-learning: off), so My Learning shows the grade.
+      show_my_learning: learning,
+      learning: learning ? demoLearning(cls, system || 'proficiency') : null,
       expires_at: nextMidnight(),
       student: cls.student,
       course: Object.assign({}, cls.course, {
@@ -944,6 +1054,8 @@
           description: w.about || null,
           module_name: w.unit || null,
           category_name: w.category || null,
+          // My Learning's What Makes Up Your Grade groups pieces by it.
+          category_id: w.category ? demoCategoryId(w.category) : null,
           category_percent: demoPercent(cls, w, system || 'proficiency'),
           core_competencies: demoCore(w.core),
           resources: w.resources || [],
@@ -1718,11 +1830,11 @@
   var UI_KEYS = [
     'tab',
     'segment',
-    'all',
     'pick',
-    'search',
-    'filter',
     'feedback',
+    // A sent piece's card open on My Learning, and Log Out? asking (Colin, 2026-11-14).
+    'card',
+    'logout',
     'whole',
     'levels',
     'form',
@@ -1765,16 +1877,16 @@
     watchRows();
   }
 
-  /* ── Questionnaires and My Reports (S4-F4) ─────────────────── */
+  /* ── Reflections (S4-F4; the Questionnaires tab until 2026-11-14) ── */
 
   /* Demo Mode's samples, in the shape the server's page is to send them
-     (shared/student-view.js, questionnairesOf and reportsOf). Kept out of
-     the page reply itself, which is the server's shape today. */
+     (shared/student-view.js, questionnairesOf). Kept out of the page reply
+     itself, which is the server's shape today. Phone reports are not on
+     the student page (Colin, 2026-11-14). */
   function demoForms() {
     function at(offset) {
       return isoDay(offset) + 'T20:15:00Z';
     }
-    var report = StudentPage.demoReport();
     return {
       questionnaires: [
         {
@@ -1788,30 +1900,17 @@
         { id: 'demo-q-about', title: 'About Me', state: 'sent', sent_at: at(-58) },
         { id: 'demo-q-march', title: 'March Reflection', state: 'not_open_yet', opens_on: isoDay(112) },
       ],
-      reports: [
-        {
-          id: 'demo-r-1',
-          title: report.report,
-          issued_at: at(-1),
-          expires_on: isoDay(6),
-          opened_at: null,
-          overall: report.overall,
-          comment: report.comment,
-        },
-        { id: 'demo-r-0', title: 'Interim Update', issued_at: at(-40), opened_at: at(-39) },
-      ],
     };
   }
 
-  /* Start, or See Your Report, from the card's page. Each opens on the
-     slip's own screens, with the student already known: in Demo Mode the
-     sample questionnaire and report, for a real card what `form` and
-     `report` answer (openRealForm). */
+  /* Start, from the card's page. It opens on the slip's own screens, with
+     the student already known: in Demo Mode the sample questionnaire, for
+     a real card what `form` answers (openRealForm). */
   function openForm(act, id) {
     if (!S.page || S.screen !== 'assignments') return;
     var forms = S.demo ? demoForms() : formsOf(S);
-    if (!forms) return;
-    var known = (act === 'q-start' ? forms.questionnaires : forms.reports).some(function (x) {
+    if (!forms || act !== 'q-start') return;
+    var known = forms.questionnaires.some(function (x) {
       return x && x.id === id;
     });
     if (!known) return;
@@ -1820,20 +1919,6 @@
     stopWatchingRows();
     S.back = S.tab;
     S.sheet = false;
-    if (act === 'r-open') {
-      S.data = {
-        ok: true,
-        kind: 'report',
-        token: 'demo',
-        student: { first_name: S.page.student.firstName },
-        course: { name: S.page.course.name, block: S.page.course.block },
-        report: { title: StudentPage.demoReport().report },
-      };
-      S.report = StudentPage.demoReport();
-      S.screen = 'report';
-      paint('.pr-view h1, .pr-view h2');
-      return;
-    }
     S.screen = 'loading';
     paint();
     var mine = S;
@@ -1847,16 +1932,17 @@
     });
   }
 
-  /* ── A real card's questionnaires and reports (S4-F4) ──────────
+  /* ── A real card's questionnaires (S4-F4) ──────────
      The routes of supabase/functions/student-submit/forms-routes.ts, through
-     askClass: `forms` once the page is up (the two tabs' lists), `form` and
-     `report` to open one, `answer` to send (questionnaire.js). What `forms`
-     answers is kept on the page's state with the student it is for, so
+     askClass: `forms` once the page is up (Reflections' list), `form` to
+     open one, `answer` to send (questionnaire.js). `forms` also lists phone
+     reports; the student page no longer shows them (Colin, 2026-11-14).
+     What `forms` answers is kept on the page's state with the student it is for, so
      Done, another student or another class leaves nothing behind. A
      function without these routes (bad_request) or a failed ask leaves the
-     page as it was drawn: both tabs say their empty line. */
+     page as it was drawn: Reflections says its empty line. */
   var formsAsked = 0; // each `forms` ask, so an older answer never replaces a newer one
-  var formAsked = 0; // each `form` or `report` ask, so only the last one opens
+  var formAsked = 0; // each `form` ask, so only the last one opens
 
   function listOf(v) {
     return Array.isArray(v) ? v : [];
@@ -1866,7 +1952,7 @@
   function formsOf(state) {
     var f = state && state.realForms;
     return f && state.page && f.student === state.page.student.id
-      ? { questionnaires: f.questionnaires, reports: f.reports }
+      ? { questionnaires: f.questionnaires }
       : null;
   }
 
@@ -1897,11 +1983,10 @@
     var mine = ++formsAsked;
     return askClass('forms', {}, student).then(function (res) {
       if (S !== state || mine !== formsAsked || !state.page || state.page.student.id !== student) return;
-      if (!(res && res.ok === true && (Array.isArray(res.questionnaires) || Array.isArray(res.reports)))) return;
+      if (!(res && res.ok === true && Array.isArray(res.questionnaires))) return;
       state.realForms = {
         student: student,
         questionnaires: listOf(res.questionnaires),
-        reports: listOf(res.reports),
       };
       repaintPage();
     });
@@ -1923,14 +2008,12 @@
     return loadForms();
   }
 
-  /* What `form`, `answer` and `report` refuse with, in words. The slip's
+  /* What `form` and `answer` refuse with, in words. The slip's
      words where they fit (MESSAGES); a card has no slip or link, so the
      rest say it plainly. `answer` keeps the answers on screen, and says so. */
   var FORM_WORDS = {
     already_sent: 'You already sent your answers to these questions.',
     not_found: 'These questions aren\u2019t open for you any more. Ask your teacher.',
-    report_closed: 'This report has closed. Your official report card is in MyEd.',
-    report_not_found: 'This report can\u2019t be opened any more. Ask your teacher.',
     bad_request: 'Something went wrong. Try again later, or ask your teacher.',
   };
   var FORM_SLIP_WORDS = { closed: 1, not_open_yet: 1, invalid: 1, empty: 1 };
@@ -1942,20 +2025,18 @@
       var mins = Math.max(1, Math.ceil((Number(res.retry_after_s) || 60) / 60));
       return 'You\u2019ve sent a lot this hour. Try again in ' + mins + ' ' + (mins === 1 ? 'minute' : 'minutes') + '.';
     }
-    if (e === 'not_found' && route === 'report') return FORM_WORDS.report_not_found;
-    if (has(FORM_WORDS, e) && e !== 'report_not_found') return FORM_WORDS[e];
+    if (has(FORM_WORDS, e)) return FORM_WORDS[e];
     return route === 'answer' ? MESSAGES.network : MESSAGES.card_network;
   }
 
-  /* A refusal that says the session or the class is over, as `page`
-     saying it. `form` and `answer` say `closed` of the questionnaire; only
-     `report` and `forms` say it of the class. */
+  /* A refusal that says the session is over, as `page` saying it. `form`
+     and `answer` say `closed` of the questionnaire, not of the class. */
   function formSessionOver(route, res) {
     var e = res && res.ok === false ? res.error : '';
-    return e === 'signed_out' || e === 'card_stopped' || e === 'card_expired' || (e === 'closed' && route === 'report');
+    return e === 'signed_out' || e === 'card_stopped' || e === 'card_expired';
   }
 
-  // A questionnaire or report that would not open: why, and the way back to the page.
+  // A questionnaire that would not open: why, and the way back to the page.
   function renderFormMessage(state) {
     return (
       header(TITLE, (state.page && className(state.page.course)) || 'FullVision') +
@@ -1968,13 +2049,13 @@
     );
   }
 
-  /* Start, or See Your Report, for a real card: `form` or `report`, then
-     the slip's screens with what it answered. The page's other asks
+  /* Start, for a real card: `form`, then the slip's screens with what it
+     answered. The page's other asks
      (`work`, `feedback`) are left to land: nothing here starts a new turn. */
   function openRealForm(act, id) {
     var state = S;
     var student = S.page.student.id;
-    var route = act === 'q-start' ? 'form' : 'report';
+    var route = 'form';
     var mine = ++formAsked;
     stopWatchingRows();
     S.back = S.tab;
@@ -1983,31 +2064,13 @@
     S.heading = TITLE;
     S.screen = 'loading';
     paint();
-    var body = route === 'form' ? { questionnaire_id: id } : { report_id: id };
+    var body = { questionnaire_id: id };
     return askClass(route, body, student).then(function (res) {
       if (S !== state || mine !== formAsked || S.screen !== 'loading' || !S.back) return;
       if (!S.page || S.page.student.id !== student) return;
       if (formSessionOver(route, res)) return pageRefused(res);
       var course = { name: S.page.course.name, block: S.page.course.block };
       var who = { first_name: S.page.student.firstName };
-      if (route === 'report' && res && res.ok === true && res.report && typeof res.report === 'object') {
-        var listed = (formsOf(S) || { reports: [] }).reports.filter(function (r) {
-          return r && r.id === id;
-        })[0];
-        S.data = {
-          ok: true,
-          kind: 'report',
-          student: who,
-          course: course,
-          report: { title: String((listed && listed.title) || res.report.report || '') },
-        };
-        S.report = res.report;
-        // Opened: it is no longer New on My Reports.
-        if (listed && !listed.opened_at) listed.opened_at = new Date().toISOString();
-        S.screen = 'report';
-        paint('.pr-view h1, .pr-view h2');
-        return;
-      }
       if (route === 'form' && res && res.ok === true && Array.isArray(res.parts) && res.parts.length) {
         S.data = {
           ok: true,
@@ -2034,7 +2097,7 @@
     });
   }
 
-  // Back to Your Page from a questionnaire sent or a report read: the tab it was opened from.
+  // Back to Your Page from a questionnaire sent: the tab it was opened from.
   function pageBack() {
     if (!S.back || !S.page) return;
     StudentPage.newTurn();
@@ -2204,11 +2267,10 @@
       // A class opened afresh starts on Assignments, To Do.
       if (!S.page) {
         S.tab = 'assignments';
-        S.segment = 'todo';
-        S.all = false;
+        S.segment = 'outstanding';
         S.pick = '';
-        S.search = '';
-        S.filter = 'all';
+        S.card = '';
+        S.logout = false;
         S.feedback = '';
         S.whole = false;
         S.levels = false;
@@ -2240,7 +2302,7 @@
       watchRows();
       // What the class takes, asked once the page is up (s/send.js): a class that takes no work stays as drawn.
       if (!S.demo && typeof StudentPage.pageOpened === 'function') StudentPage.pageOpened();
-      // Its questionnaires and phone reports (S4-F4): a function without the route leaves both tabs as drawn.
+      // Its questionnaires (S4-F4): a function without the route leaves Reflections as drawn.
       if (!S.demo) loadForms();
     });
   }
@@ -2264,11 +2326,10 @@
     reflect: 1,
     reply: 1,
     'answer-seen': 1,
-    // Questionnaires and phone reports from the card (S4-F4; supabase/functions/student-submit/forms-routes.ts).
+    // Questionnaires from the card (S4-F4; supabase/functions/student-submit/forms-routes.ts).
     forms: 1,
     form: 1,
     answer: 1,
-    report: 1,
     // Revisions and group work (S11-W1, S12-W1; s/send.js and s/feedback.js).
     'revise-start': 1,
     'revise-finish': 1,
@@ -2367,7 +2428,8 @@
     // #demo-card-group: Send Work on, and a piece sent as One per Group (S12-F1).
     // #demo-card-revise: Send Work on, a piece returned for revision and a revision returned (S11-F2),
     // in a class graded by both, so Before and After shows the board's "2.7 · 67%" and "3.0 · 75%".
-    var m = /^demo-card(?:-(password|letter|both|send|reflect|group|revise))?$/i.exec(hash || '');
+    // #demo-card-no-learning: Show My Learning off, so My Learning lists the work without the grade.
+    var m = /^demo-card(?:-(password|letter|both|send|reflect|group|revise|no-learning))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
@@ -2379,6 +2441,7 @@
       classes: [],
       group: kind === 'group',
       revise: kind === 'revise',
+      noLearning: kind === 'no-learning',
     };
     adding = null;
     S.demo = true;
@@ -2483,12 +2546,12 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page)$/.test(
+      /^(tab|segment|pick|open-piece|card-close|logout-ask|logout-cancel|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page)$/.test(
         act,
       )
     ) {
       showPart(act, el);
-    } else if (act === 'q-start' || act === 'r-open') {
+    } else if (act === 'q-start') {
       openForm(act, el.getAttribute('data-form-id') || '');
     } else if (act === 'page-back') {
       pageBack();

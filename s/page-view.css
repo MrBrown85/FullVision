@@ -289,27 +289,21 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The cards (S4-F2): side by side on a phone, swiped between. */
+/* The cards: one under another on a phone, scrolled through (Colin,
+   2026-11-14: "they're used to scroll"). */
 .sp-view .sp-side {
   display: none;
 }
 .sp-view .sp-split {
-  margin: 0 -16px;
+  margin: 0;
 }
 .sp-view .sp-deck {
   display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-}
-.sp-view .sp-deck::-webkit-scrollbar {
-  display: none;
+  flex-direction: column;
+  gap: 14px;
 }
 .sp-view .sp-piece {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  padding: 0 16px;
+  scroll-margin-top: 12px;
 }
 .sp-view .sp-piece-card {
   height: 100%;
@@ -413,12 +407,6 @@
   background: #f0f6ff;
   font-size: 14px;
   line-height: 1.45;
-}
-.sp-view .sp-deck-count {
-  margin: 4px 0 0;
-  text-align: center;
-  font-size: 13px;
-  color: #58585d;
 }
 
 /* All Assignments (S4-F2): search, filters, rows that open a card. */
@@ -1267,9 +1255,6 @@
     font-size: 28px;
     font-weight: 800;
   }
-  .sp-view .sp-deck-count {
-    display: none;
-  }
   .sp-view .sp-page {
     width: 100%;
     max-width: 1040px;
@@ -1382,8 +1367,20 @@
   color: var(--sp-ml-4);
 }
 
-/* The grade: the word (or letter) on the left, the ladder beside it. */
+/* The grade: what it covers, then the word (or letter) on the left and
+   the ladder beside it, then Work On Next. */
 .sp-view .sp-ml-overall {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-view .sp-ml-period {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-overall-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -1423,7 +1420,7 @@
 .sp-view .sp-ml-trend-down {
   color: var(--sp-text-2);
 }
-.sp-view .sp-ml-overall-letter {
+.sp-view .sp-ml-overall-letter .sp-ml-overall-row {
   align-items: center;
   justify-content: flex-start;
   gap: 16px;
@@ -1580,12 +1577,13 @@
 }
 
 /* Next Step and Your Strongest: an icon, a coloured title, the words. */
-.sp-view .sp-ml-next,
-.sp-view .sp-ml-strongest {
+.sp-view .sp-ml-next {
   display: flex;
   align-items: center;
-  gap: 12px;
-  cursor: pointer;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sp-ml-amber-bg);
 }
 .sp-view .sp-ml-next-still {
   cursor: default;
@@ -1596,6 +1594,7 @@
   color: var(--sp-ml-amber-ink);
 }
 .sp-view .sp-ml-next-text {
+  margin: 0;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -2884,4 +2883,97 @@
     grid-row: auto;
     margin-top: 24px;
   }
+}
+
+/* ── Three tabs (Colin, 2026-11-14) ─────────────────────────── */
+
+/* A due date that has passed. */
+.sp-view .sp-flag-overdue {
+  background: #fde2e1;
+  color: #9b1c1c;
+}
+.sp-view .sp-piece-head {
+  flex-wrap: wrap;
+}
+.sp-view .sp-rubric-link {
+  align-self: flex-start;
+}
+
+/* My Learning's list: a dot for feedback not opened, the title and its
+   line, what it got. */
+.sp-view .sp-ml-work .sp-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.sp-view .sp-ml-work .sp-row-title {
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-ml-new {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.sp-view .sp-ml-new-on {
+  background: #007aff;
+}
+.sp-view .sp-lv-0 {
+  background: var(--sp-fill);
+  color: #3a3a3c;
+}
+.sp-view .sp-lv-missing {
+  background: #fde2e1;
+  color: #9b1c1c;
+}
+.sp-view .sp-ml {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-view .sp-deck-one .sp-piece {
+  display: block;
+}
+
+/* Your Rubric: one card, a row per criterion, its level and the teacher's comment. */
+.sp-view ul.sp-fb-crits {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  list-style: none;
+  margin: 0;
+  padding: 4px 16px;
+  gap: 0;
+  background: var(--sp-card);
+  border-radius: 18px;
+}
+.sp-view li.sp-fb-criterion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view li.sp-fb-criterion:first-child {
+  border-top: 0;
+}
+.sp-view li.sp-fb-criterion .sp-fb-crit-name {
+  font-size: 16px;
+}
+/* Reflections on a phone: Open Now, Done, Coming Up. */
+.sp-view .sp-forms-phone .sp-list-head {
+  margin: 6px 2px -4px;
+}
+
+/* Log Out? */
+.sp-logout .sp-lead {
+  margin: 0 0 16px;
+}
+.sp-logout-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.sp-btn-danger {
+  background: #d70015;
+  color: #fff;
 }

@@ -647,13 +647,12 @@ window.StudentView = (function () {
        course:  { name, block, gradingSystem },
        counts:  { toDo, sent, back, missing },
        work:    [ piece ], newest first,
-       changes: [ { id, title, why: 'updated' | 'back' } ],
+       today:   the class's today, YYYY-MM-DD,
+       changes: [ { id, title, why: 'updated' | 'back' | 'revise' } ],
        levels:  [ { level, name } ], Emerging to Extending (What the
                 Levels Mean), or none while constants.js is not in,
        questionnaires: [ { id, title, line, minutes, state: 'open' |
                 'sent' | 'soon', opensOn, until, sentOn } ],
-       reports: [ { id, title, issued, until, isNew, result: { word, text,
-                level }, comment } ],
        learning: null here; fromCache's My Learning (learning() below) }
      piece: { id, title, date, dueDate, kind: 'due' | 'sent' | 'back' | 'missing' |
               'excused', late, returnedAt, updated, unseen,
@@ -1138,10 +1137,11 @@ window.StudentView = (function () {
         missing: count('missing'),
       },
       work: work,
+      // The class's today, YYYY-MM-DD: Outstanding is work due by then, Upcoming after it.
+      today: todayIn(cid),
       changes: changes,
       levels: levelsLegend(),
       questionnaires: questionnairesOf(page),
-      reports: reportsOf(page),
       // My Learning: fromCache fills it when the class shows it. The
       // server's `page` sends nothing for it yet, so on the student's own
       // device it stays null and the tab says it is off.
@@ -1156,17 +1156,32 @@ window.StudentView = (function () {
     };
   }
 
-  /* The Questionnaires and Reports tabs (S4-F4), from the reply's
-     `questionnaires` and `reports` when it has them. The server's `page`
-     sends neither yet (see the S4-F4 pull request): until it does both lists
-     are empty, from either door. The server decides each questionnaire's
-     state, so nothing here reads a clock.
+  /* Today where the class is: calc.js's courseToday when it is on the
+     page, otherwise the date in British Columbia (every class's zone
+     unless the class says otherwise). */
+  function todayIn(cid) {
+    if (typeof courseToday === 'function' && cid) {
+      try {
+        var t = String(courseToday(cid) || '');
+        if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+      } catch (e) {
+        // Fall through to the date in Vancouver.
+      }
+    }
+    try {
+      return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+    } catch (e) {
+      return new Date().toISOString().slice(0, 10);
+    }
+  }
+
+  /* The Reflections tab (S4-F4; called Questionnaires until Colin's
+     ruling of 2026-11-14), from the reply's `questionnaires` when it has
+     them. The server decides each questionnaire's state, so nothing here
+     reads a clock. Phone reports are not on the student page (Colin,
+     2026-11-14), so the reply's `reports` is not read.
        questionnaire: { id, title, description, minutes, state: 'open' |
-                        'sent' | 'not_open_yet', opens_on, closes_on, sent_at }
-       report:        { id, title, issued_at, expires_on, opened_at,
-                        overall: { word, text, level }, comment: [ text ] }
-     The report's overall and comment are the phone report as the teacher
-     sent it (worded by calc.js when it was sent), as s/report.js shows it. */
+                        'sent' | 'not_open_yet', opens_on, closes_on, sent_at } */
   var Q_STATES = { open: 'open', sent: 'sent', not_open_yet: 'soon' };
   function questionnairesOf(page) {
     return (Array.isArray(page.questionnaires) ? page.questionnaires : [])
@@ -1186,25 +1201,6 @@ window.StudentView = (function () {
         };
       });
   }
-  function reportsOf(page) {
-    return (Array.isArray(page.reports) ? page.reports : [])
-      .filter(function (r) {
-        return r && r.id;
-      })
-      .map(function (r) {
-        var o = r.overall && typeof r.overall === 'object' ? r.overall : {};
-        return {
-          id: str(r.id),
-          title: str(r.title),
-          issued: str(r.issued_at),
-          until: str(r.expires_on).slice(0, 10),
-          isNew: !r.opened_at,
-          result: { word: str(o.word), text: str(o.text), level: num(o.level) },
-          comment: Array.isArray(r.comment) ? str(r.comment[0]) : str(r.comment),
-        };
-      });
-  }
-
   /* Newest first, by due date, or the date with none. Two pieces with the
      same date: the one made later first (Colin, Nov 10); two made at the
      same instant by id. As s/assignments.js orders its list. */
