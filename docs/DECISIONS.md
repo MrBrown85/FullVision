@@ -1127,3 +1127,11 @@ Colin: "make one report the screen for everyone and remove the old editor. clean
 4. **What a class that used the old screens now sees.** A built form's Front and Back are not kept: its parts print in the same order and flow from one side to the next (no class had a front-only form, 2026-11-13). A long Quick Report no longer drops to smaller type or two columns to stay on one sheet: it stays regular size and carries on at the top of the next side. "Missing Assignments: N" is replaced by the Missing Work part. A Quick Report's Term Comment card is the Teacher Comment part on the report. Proficiency's "When a Student Has No Evidence" choice has no control (no class had it set); a saved choice still applies, and any row can be left off on the page.
 5. **Kept for what was already printed or saved.** The old Quick Report's print styles (two columns, smaller type, the summary under the list) stay in `teacher/reports.css`, marked, because a printed copy reprints from its own saved HTML. A feedback card still carries its row's number when the Assessments list is numbered.
 6. **The Term Questionnaire's "Where This Information Comes From" lists One Report's parts** for the class (`ReportOne.modelFor`), not the old built form.
+
+## The Student Page switch is in every class's Class Settings (2026-11-13)
+
+Colin: "Student Page should show, by default, for every single user in Class Settings- there should be no hidden option. That is absolutely not user friendly … Even if it is 'off' switched by default." (Colin, 2026-11-13.)
+
+1. **Every class has the Student Page tab in Class Settings, for every teacher.** Its first card is the Student Page switch (`course.student_page_enabled`). The `?build=student-page` address that used to be the only way to see the switch is gone; the address still opens the app, and does nothing more.
+2. **The switch is still off for every class until its teacher turns it on.** Nothing about a class changes until then: a class with the switch off has the switch alone on the tab, and grades are returned as soon as they are saved, as before.
+3. **Turning it on and off works as it did at the build address.** Signed in, the server is asked first; turning it off with grades waiting asks first ("Student page build rulings" 8).

@@ -1,13 +1,11 @@
 /**
- * The student page's build switch in Class Settings (S0-W1,
- * docs/plans/student-page-build-plan.md: "Build switch: a hidden per-class
- * setting, off by default").
+ * The Student Page switch in Class Settings (S0-W1,
+ * docs/plans/student-page-build-plan.md). Off by default for every class.
  *
- * - Nothing in the app offers the switch. It is drawn, as a Student Page
- *   switch in a card of its own, only when the app was opened at an address
- *   that carries ?build=student-page.
- * - Opened that way, a class whose student page is off has the Student Page
- *   tab too, with the switch alone on it.
+ * - Every class has the Student Page tab, and the switch is drawn on it for
+ *   every teacher, as a Student Page switch in a card of its own (Colin,
+ *   Nov 13: no hidden build address).
+ * - A class whose student page is off has the switch alone on the tab.
  * - Turning it on changes that one setting. In Demo Mode at once; signed
  *   in, the server is asked first and the class is on only when it has
  *   answered. The class's Return Grades choice is left as it is, and is
@@ -95,7 +93,6 @@ describe('Class Settings: the student page’s build switch', () => {
     globalThis.showConfirm = (title, message, okLabel, okStyle, onConfirm) =>
       confirms.push({ title, message, okLabel, okStyle, onConfirm });
     _useSupabase = false;
-    CmStudentPage._setBuildFlag(false);
     StudentCards._reset();
   });
 
@@ -113,77 +110,31 @@ describe('Class Settings: the student page’s build switch', () => {
     clearClass(LIVE);
   });
 
-  describe('the address', () => {
-    it.each([
-      ['?manage=student-page&build=student-page', true],
-      ['?build=student-page', true],
-      ['', false],
-      ['?manage=student-page', false],
-      ['?build=1', false],
-      ['?build=student-pages', false],
-      ['?student-page', false],
-    ])('opened at %s: %s', (search, shown) => {
+  it('whatever the address, every class has the tab, with the switch on it', () => {
+    ['', '?manage=student-page', '?build=student-page'].forEach(search => {
       seed(CID, {});
       location.search = search;
-      CmStudentPage._reset(); // reads the address, as the file does when it loads
-      expect(CmStudentPage.isShown(CID)).toBe(shown);
-    });
-
-    it('is read once: the app tidying its address afterwards does not take the switch away', () => {
-      seed(CID, {});
-      location.search = '?build=student-page';
       CmStudentPage._reset();
-      location.search = '';
-      expect(CmStudentPage.isShown(CID)).toBe(true);
+      open(CID);
+      expect(tabIds(), search).toEqual(SEVEN);
+      expect(switchDrawn(), search).toBe(false);
+    });
+    seed(CID, HELD);
+    open(CID);
+    expect(switchDrawn()).toBe(true);
+  });
+
+  it('the switch is on the Student Page tab only', () => {
+    seed(CID, { return_grades: 'on_return' });
+    open(CID);
+    SIX.forEach(tab => {
+      DashClassManager.handleAction('cmSetTab', { tagName: 'BUTTON', dataset: { tab: tab } });
+      expect(html(), tab).not.toContain('sp-build');
+      expect(html(), tab).not.toContain('spBuildSwitch');
     });
   });
 
-  describe('opened at any other address', () => {
-    it('a class with its student page off has no tab and no switch, on any tab', () => {
-      seed(CID, { return_grades: 'on_return' });
-      open(CID);
-      expect(tabIds()).toEqual(SIX);
-      SIX.forEach(tab => {
-        DashClassManager.handleAction('cmSetTab', { tagName: 'BUTTON', dataset: { tab: tab } });
-        expect(html(), tab).not.toContain('sp-build');
-        expect(html(), tab).not.toContain('spBuildSwitch');
-      });
-    });
-
-    it('a class with it on has the tab without the switch', () => {
-      seed(CID, HELD);
-      open(CID);
-      expect(tabIds()).toEqual(SEVEN);
-      expect(switchDrawn()).toBe(null);
-      expect(html()).not.toContain('sp-build');
-    });
-
-    it('a change that reaches the tab turns nothing on or off', () => {
-      seed(CID, {});
-      const off = stored(CID);
-      expect(flip(CID, true).handled).not.toBe(true);
-      CmStudentPage.handleChange({
-        checked: true,
-        dataset: { actionChange: 'spBuildSwitch' },
-        closest: () => ({ dataset: { cid: CID } }),
-      });
-      expect(stored(CID)).toBe(off);
-      seed(CID, HELD);
-      const on = stored(CID);
-      open(CID);
-      CmStudentPage.handleChange({
-        checked: false,
-        dataset: { actionChange: 'spBuildSwitch' },
-        closest: () => ({ dataset: { cid: CID } }),
-      });
-      expect(stored(CID)).toBe(on);
-      expect(confirms).toEqual([]);
-    });
-  });
-
-  describe('opened at the build address', () => {
-    beforeEach(() => CmStudentPage._setBuildFlag(true));
-
+  describe('the switch', () => {
     it('a class with its student page off has the tab, with the switch alone on it, off', () => {
       seed(CID, {});
       const before = stored(CID);
@@ -192,9 +143,7 @@ describe('Class Settings: the student page’s build switch', () => {
       expect(activeTab()).toBe('student-page');
       expect(switchDrawn()).toBe(false);
       expect(html()).toContain('<label class="cm-label" for="sp-build-switch">Student Page</label>');
-      expect(html()).toContain(
-        'Off for this class. Still being built: turn it on only for a class you are testing with.',
-      );
+      expect(html()).toContain('Off for this class. Turn it on to give students a card that opens their own page.');
       expect(html()).not.toContain('sp-card');
       expect(html()).not.toContain('Return Grades');
       expect(html()).not.toContain('sc-card');
@@ -214,9 +163,7 @@ describe('Class Settings: the student page’s build switch', () => {
       expect(getReturnSettings(CID)).toEqual({ student_page: true, return_grades: null });
       expect(JSON.parse(stored(CID))).toEqual({ student_page_enabled: true });
       expect(switchDrawn()).toBe(true);
-      expect(html()).toContain(
-        'On for this class: grades are Draft or Returned, and students can have cards. Still being built.',
-      );
+      expect(html()).toContain('On for this class: grades are Draft or Returned, and students can have cards.');
       expect(html()).toContain('sp-card');
       expect(html()).toContain('sc-card');
       // The switch's card comes first.

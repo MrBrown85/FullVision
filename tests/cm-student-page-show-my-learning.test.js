@@ -241,6 +241,6 @@ describe('Show My Learning for a signed-in class', () => {
   it('is not offered with the class’s student page off', () => {
     seed(REAL, 'letter', { return_grades: 'on_return' });
     expect(CmStudentPage.learningSettings(REAL)).toEqual({ offered: false, on: false });
-    expect(CmStudentPage.render(REAL)).toBe('');
+    expect(CmStudentPage.render(REAL)).not.toContain('sp-card');
   });
 });

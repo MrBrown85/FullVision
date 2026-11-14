@@ -1,10 +1,10 @@
 /* Class Settings → Student Page tab (docs/plans/student-page-build-plan.md,
    S1; board "Teacher: Class Settings, Student Page").
 
-   The tab is there only for a class whose student page is on (the build
-   switch, course.student_page_enabled, read through getReturnSettings). For
-   every other class it has no button, no address and no panel, unless the
-   app was opened at the build address (below).
+   Every class has the tab. Its first card is the Student Page switch
+   (course.student_page_enabled, read through getReturnSettings), off for
+   every class until its teacher turns it on; the rest of the tab shows only
+   while it is on.
 
    What is on it:
 
@@ -12,7 +12,7 @@
    - S0-W1, S3-W1, S3-F2: Student Cards, the list (no code shown) with
      Make and Print, Print Again, Print New Card, New Codes for This Class,
      Unlock and Unlock All (teacher/student-cards.js).
-   - S0-W1: the build switch itself, at the build address only.
+   - S0-W1: the Student Page switch itself.
    - S4-F6: Preview as Student, a student list and Preview
      (teacher/preview-student.js).
 
@@ -44,18 +44,14 @@
      and names how many; Cancel leaves the setting and every one of them as
      they were.
 
-   THE BUILD SWITCH is the class's student_page_enabled, off for every class
-   until its teacher turns it on. Nothing in the app offers it, except in a
-   Demo Mode begun at the front page's Try Demo Mode link (below). It shows, as
-   a Student Page switch in a card of its own above the rest, only when the
-   app was opened at an address that carries ?build=student-page, for
-   example
-     /dashboard?manage=student-page&build=student-page
-   The address is read once, when this file loads (the app tidies its
-   address afterwards), and holds until the page is reloaded without it.
-   Opened that way, a class whose student page is off has the tab too, with
-   the switch alone on it. Turning the switch off is leaving When I Return
-   Them: with grades waiting it asks first, in the same words.
+   THE SWITCH is the class's student_page_enabled, off for every class
+   until its teacher turns it on. It is drawn for every class, as a Student
+   Page switch in a card of its own above the rest; a class whose student
+   page is off has the switch alone on its tab. It used to be offered only
+   at a build address (?build=student-page); Colin ruled on Nov 13 that it
+   shows for every teacher, off by default. Turning the switch off is
+   leaving When I Return Them: with grades waiting it asks first, in the
+   same words.
 
    BOTH ARE SAVED through saveReturnSettings (shared/data.js), the one
    writer of the two settings, and through nothing else: a change of either
@@ -80,36 +76,18 @@ var CmStudentPage = (function () {
     { value: 'on_save', label: 'As Soon As I Save' },
   ];
 
-  // True when the app was opened at the build address (see the top).
-  function _addressHasBuildFlag() {
-    try {
-      if (new URLSearchParams(window.location.search).get('build') === 'student-page') return true;
-    } catch (e) {
-      return false;
-    }
-    return _demoShowsStudentPage();
-  }
-
-  // A Demo Mode that began at the front page's Try Demo Mode link (data.js,
-  // demoShowsStudentPage) offers the tab the way the build address does, and
-  // keeps offering it when the page is reloaded.
-  function _demoShowsStudentPage() {
-    return typeof demoShowsStudentPage === 'function' && demoShowsStudentPage();
-  }
-  var _buildFlag = _addressHasBuildFlag();
-
   function _settings(cid) {
     return typeof getReturnSettings === 'function' && cid ? getReturnSettings(cid) : null;
   }
 
-  // Whether this class has the tab: with its student page on, or, at the
-  // build address, any class (to turn it on).
+  // Whether this class has the tab: every class there is, on or off (the
+  // switch turns it on).
   function isShown(cid) {
     // Class Settings asks this of the class it is on, each time it draws.
     _classOnScreen = cid || null;
     var s = _settings(cid);
     if (!s) return false;
-    return s.student_page === true || (_buildFlag && typeof COURSES !== 'undefined' && !!COURSES[cid]);
+    return s.student_page === true || (typeof COURSES !== 'undefined' && !!COURSES[cid]);
   }
 
   // The class Class Settings last asked this tab about: the one it is on.
@@ -180,7 +158,7 @@ var CmStudentPage = (function () {
   // question was up or the server was answering.
   function _mayChange(cid, row) {
     if (!isShown(cid)) return false;
-    return row === 'switch' ? _buildFlag : _settings(cid).student_page === true;
+    return row === 'switch' ? true : _settings(cid).student_page === true;
   }
 
   /* The tab's one writer. `change` is what saveReturnSettings takes: the
@@ -805,10 +783,10 @@ var CmStudentPage = (function () {
     PreviewStudent.open(cid, sid, el, 'sp-learning-see', { tab: 'learning', learning: true });
   }
 
-  /* ── The build switch ──────────────────────────────────────── */
+  /* ── The Student Page switch ───────────────────────────────── */
 
-  // The switch's card: only at the build address. The row is Class
-  // Settings' own switch row (Folders Count as One).
+  // The switch's card, on every class's tab. The row is Class Settings'
+  // own switch row (Folders Count as One).
   function _buildSwitchCard(cid) {
     var on = _settings(cid).student_page;
     var busy = _st(cid).busy;
@@ -824,8 +802,8 @@ var CmStudentPage = (function () {
       '<span class="cm-hint">' +
       esc(
         on
-          ? 'On for this class: grades are Draft or Returned, and students can have cards. Still being built.'
-          : 'Off for this class. Still being built: turn it on only for a class you are testing with.',
+          ? 'On for this class: grades are Draft or Returned, and students can have cards.'
+          : 'Off for this class. Turn it on to give students a card that opens their own page.',
       ) +
       '</span></span>' +
       '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-build-switch" data-action-change="spBuildSwitch"' +
@@ -947,7 +925,7 @@ var CmStudentPage = (function () {
     if (!isShown(cid)) return '';
     var on = _settings(cid).student_page;
     return (
-      (_buildFlag ? _buildSwitchCard(cid) : '') +
+      _buildSwitchCard(cid) +
       (on
         ? '<div class="sp-layout"><div class="sp-main">' +
           '<div class="cm-section sp-card" data-cid="' +
@@ -1043,18 +1021,12 @@ var CmStudentPage = (function () {
     return false;
   }
 
-  // Put the tab back as the address has it, with nothing under way (tests).
+  // Put the tab back with nothing under way (tests).
   function _reset() {
-    _buildFlag = _addressHasBuildFlag();
     _state = {};
     _classOnScreen = null;
     _previewFor = {};
   }
-  // Tests: as if the app had been opened at the build address, or not.
-  function _setBuildFlag(on) {
-    _buildFlag = !!on;
-  }
-
   return {
     followPreview: followPreview,
     isShown: isShown,
@@ -1073,7 +1045,6 @@ var CmStudentPage = (function () {
     handleChange: handleChange,
     handleBlur: handleBlur,
     _reset: _reset,
-    _setBuildFlag: _setBuildFlag,
   };
 })();
 if (typeof window !== 'undefined') window.CmStudentPage = CmStudentPage;

@@ -39,7 +39,7 @@ const pause = (page, ms) => page.waitForTimeout(ms);
 // The class's Student Page, Send Work, Reflect on Feedback and Show My
 // Learning on, and grades returned by hand: the setup the splash shows.
 async function studentPageOn(page, base) {
-  await page.goto(base + '/dashboard?manage=student-page&build=student-page');
+  await page.goto(base + '/dashboard?manage=student-page');
   await page.waitForSelector('#sp-build-switch', { state: 'attached', timeout: 15000 });
   for (const id of ['sp-build-switch', 'sp-send-switch', 'sp-reflect-switch', 'sp-learning-switch']) {
     await page.waitForSelector('#' + id, { state: 'attached', timeout: 5000 });
