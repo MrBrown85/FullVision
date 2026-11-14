@@ -1148,3 +1148,12 @@ Colin: "Student Page should show, by default, for every single user in Class Set
 1. **Every class has the Student Page tab in Class Settings, for every teacher.** Its first card is the Student Page switch (`course.student_page_enabled`). The `?build=student-page` address that used to be the only way to see the switch is gone; the address still opens the app, and does nothing more.
 2. **The switch is still off for every class until its teacher turns it on.** Nothing about a class changes until then: a class with the switch off has the switch alone on the tab, and grades are returned as soon as they are saved, as before.
 3. **Turning it on and off works as it did at the build address.** Signed in, the server is asked first; turning it off with grades waiting asks first ("Student page build rulings" 8).
+
+## The desktop app on an iPad held upright (2026-11-14)
+
+Colin: "many of the pages look super janky on ipad when viewed portrait. i don't want the desktop app changed. it's perfect" (Colin, 2026-11-14).
+
+1. **An iPad still gets the desktop app**, with a touch layer on top. `shared/device.js` sets `html.fv-tablet` on an iPad (iPadOS asks for desktop sites as a Mac, so: a Mac's user agent with more than one touch point) or an Android tablet. A computer never gets it, a touch-screen laptop included.
+2. **Every iPad rule is in `teacher/tablet.css`**, under `html.fv-tablet` and inside `max-width: 1099px` (upright iPads are 744 to 1024 wide; on its side an iPad is 1133 or more, and keeps the desktop layout). Nothing else in the desktop CSS changes for the iPad. A fix for the iPad goes there, not in the page's own stylesheet.
+3. **What it does upright:** the grader fills the screen, its title above Print Rubrics and the tabs, the work above the scoring, each scrolling on its own; Help slides over the page instead of squeezing it; the student dashboard's six tabs fit, and Learner Profile keeps to the screen; a score row's comment takes its own line; toolbars wrap or scroll sideways instead of running off the screen.
+4. **`e2e/ipad-portrait.spec.js` keeps it so**: each screen at 744, 820 and 1024 wide is checked for anything off the side, cut off or on top of something else, and a computer is checked to draw the same with `tablet.css` taken away.
