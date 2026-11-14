@@ -7285,14 +7285,29 @@ window.PageAssignments = (function () {
           return st.id === focusStudentId;
         })
       : null;
+    // One card opened or closed moves (teacher/expand-motion.js); Expand
+    // and Collapse, which change many, do not.
+    var motion = cards.length === 1 ? window.ExpandMotion : null;
     cards.forEach(function (c) {
       var open = _cardOpen(c.a.id);
       var body = c.card.querySelector('.assess-body');
+      var wasOpen = c.card.classList.contains('open');
+      if (motion) motion.settle(c.card, body, 'is-closing');
       c.card.className = 'assess-card' + (open ? ' open active' : '');
+      if (motion && wasOpen && !open && body.firstChild) {
+        // It folds away first; its content goes when it has, unless it opened again.
+        motion.close(c.card, body, 'is-closing', function () {
+          if (c.card.classList.contains('open')) return;
+          body.innerHTML = '';
+          _afterCardsDrawn(body);
+        });
+        return;
+      }
       _drawnReturns = {};
       // html-safe: _cardBodyHtml escapes the description; the grading builders are reviewed
       body.innerHTML = open ? _cardBodyHtml(cid, c.a, focusSt, students, scores) : '';
       _afterCardsDrawn(body);
+      if (motion && open && !wasOpen) motion.open(body);
     });
     var on = _expandSegOn();
     document.querySelectorAll('.assess-seg-control .seg-btn').forEach(function (btn, i) {
@@ -10946,6 +10961,11 @@ window.PageAssignments = (function () {
       render();
     });
   }
+  // A folder opened or closed by its header, with its motion (teacher/expand-motion.js).
+  function _showFolderOpen(folder, open) {
+    if (window.ExpandMotion) ExpandMotion.toggle(folder, folder.querySelector('.mod-folder-body'), open, 'is-closing');
+    else folder.classList.toggle('open', open);
+  }
   function toggleModuleFolder(moduleId) {
     var folder = document.querySelector('.mod-folder[data-module-id="' + moduleId + '"]');
     // The header acts on what the teacher sees: a module shown open closes,
@@ -10954,7 +10974,7 @@ window.PageAssignments = (function () {
     if (filterCategories.length > 0 || showUngraded || !!assessSearch) {
       // A search or filter's open/closed is for now; the saved state stays.
       _filterClosedModules[moduleId] = shownOpen;
-      if (folder) folder.classList.toggle('open', !shownOpen);
+      if (folder) _showFolderOpen(folder, !shownOpen);
       return;
     }
     collapsedModules[moduleId] = shownOpen;
@@ -10968,8 +10988,9 @@ window.PageAssignments = (function () {
       });
     }
     if (closedCards) render();
-    else if (folder) folder.classList.toggle('open', !shownOpen);
+    else if (folder) _showFolderOpen(folder, !shownOpen);
   }
+
   function addModuleInline() {
     var cid = activeCourse;
     var modules = getModules(cid);
