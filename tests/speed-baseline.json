@@ -23,11 +23,27 @@
     "lookups": 12,
     "class": 0
   },
+  "Assignments: what follows a click": {
+    "copied": 0,
+    "saved": 0,
+    "drawn": 539,
+    "elements": 5563,
+    "lookups": 216,
+    "class": 0
+  },
+  "Assignments: a key typed in a comment": {
+    "copied": 0,
+    "saved": 0,
+    "drawn": 0,
+    "elements": 5563,
+    "lookups": 0,
+    "class": 0
+  },
   "Assignments: close the card": {
     "copied": 12816,
     "saved": 0,
     "drawn": 0,
-    "elements": 3315,
+    "elements": 3318,
     "lookups": 2162,
     "class": 0
   },
