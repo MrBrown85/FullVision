@@ -1405,6 +1405,10 @@ test.describe('the Sentences card', () => {
     await expect(sheet.locator('.qn-browse-use[disabled]')).toHaveCount(0);
     // Search filters across the groups and opens the ones with a match.
     await sheet.locator('#tq-browse-search').fill('At home');
+    // The list follows the box once typing pauses (120 ms).
+    await expect
+      .poll(async () => (await sheet.locator('.qn-browse-sentence').allTextContents()).every(t => /at home/i.test(t)))
+      .toBe(true);
     const matched = sheet.locator('.qn-browse-group');
     expect(await matched.count()).toBeGreaterThan(1);
     for (const g of await matched.all()) {

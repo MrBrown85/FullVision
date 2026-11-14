@@ -194,32 +194,59 @@ function _revisionsAfterRowSave(cid) {
    first. [] while revisionsOn is false. */
 function _classRevisions(cid) {
   if (!revisionsOn(cid)) return [];
-  var all = _revisionsOf(_studentFeedbackStored(cid));
   var students = {};
   (getStudents(cid) || []).forEach(function (s) {
     if (s && s.id) students[s.id] = true;
   });
-  return (
-    _isDemoSession()
-      ? Object.keys(all).map(function (id) {
+  return _revisionsByTime(cid).list.filter(function (r) {
+    return students[r.enrollment_id] && _assessmentById(cid, r.assessment_id);
+  });
+}
+
+/* The class's requests oldest first, and by piece then student, kept for the
+   list they were read from: Demo Mode's stored requests (a new object at each
+   save) or the server's (_fbRevisions, worked out once a turn). The gradebook
+   asks for each cell, so the sort is not done again for each ask; who is on
+   the roster and which pieces are in the class are read at each ask. */
+var _revisionsSorted = new WeakMap(); // the list read → { list, byPair: Map of aid → Map of sid → [requests] }
+function _revisionsByTime(cid) {
+  var all = _isDemoSession() ? _revisionsOf(_studentFeedbackStored(cid)) : _fbRevisions(cid);
+  var kept = _revisionsSorted.get(all);
+  if (kept) return kept;
+  var list = (
+    Array.isArray(all)
+      ? all
+      : Object.keys(all).map(function (id) {
           return all[id];
         })
-      : _fbRevisions(cid)
   )
-    .filter(function (r) {
-      return _plainObject(r) && students[r.enrollment_id] && _assessmentById(cid, r.assessment_id);
-    })
+    .filter(_plainObject)
     .sort(function (x, y) {
       return String(x.created_at) < String(y.created_at) ? -1 : String(x.created_at) > String(y.created_at) ? 1 : 0;
     });
+  var byPair = new Map();
+  list.forEach(function (r) {
+    if (!byPair.has(r.assessment_id)) byPair.set(r.assessment_id, new Map());
+    var piece = byPair.get(r.assessment_id);
+    if (!piece.has(r.enrollment_id)) piece.set(r.enrollment_id, []);
+    piece.get(r.enrollment_id).push(r);
+  });
+  kept = { list: list, byPair: byPair };
+  _revisionsSorted.set(all, kept);
+  return kept;
 }
 
 // The newest request for one student and piece, cancelled or not, or null.
 function _revisionNewest(cid, sid, aid) {
-  var mine = _classRevisions(cid).filter(function (r) {
-    return r.enrollment_id === sid && r.assessment_id === aid;
+  if (!revisionsOn(cid)) return null;
+  var piece = _revisionsByTime(cid).byPair.get(aid);
+  var mine = piece && piece.get(sid);
+  if (!mine) return null;
+  // As _classRevisions keeps them: the student on the roster and the piece in the class.
+  var onRoster = (getStudents(cid) || []).some(function (s) {
+    return s && s.id && s.id === sid;
   });
-  return mine[mine.length - 1] || null;
+  return onRoster && _assessmentById(cid, aid) ? mine[mine.length - 1] : null;
 }
 // The open request for one student and piece, or null.
 function _revisionOpen(cid, sid, aid) {
