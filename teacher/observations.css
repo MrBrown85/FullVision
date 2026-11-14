@@ -303,6 +303,17 @@
 .obs-feed .obs-card {
   margin-bottom: 12px;
 }
+/* Under the newest observations: how many show, and Show More. */
+.obs-feed-more {
+  max-width: 860px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
 
 /* One observation: a fixed type column so names line up, the note, a
    meta line, and a delete that shows on hover or focus. */
