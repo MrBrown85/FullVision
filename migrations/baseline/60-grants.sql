@@ -594,6 +594,9 @@ grant execute on routine public.list_course_student_profiles(p_course_id uuid) t
 revoke all on routine public.list_course_submissions(p_course_id uuid) from public;
 grant execute on routine public.list_course_submissions(p_course_id uuid) to authenticated;
 grant execute on routine public.list_course_submissions(p_course_id uuid) to service_role;
+revoke all on routine public.list_course_submissions_since(p_course_id uuid, p_version text) from public;
+grant execute on routine public.list_course_submissions_since(p_course_id uuid, p_version text) to authenticated;
+grant execute on routine public.list_course_submissions_since(p_course_id uuid, p_version text) to service_role;
 revoke all on routine public.list_course_term_attendance(p_course_id uuid) from public;
 grant execute on routine public.list_course_term_attendance(p_course_id uuid) to authenticated;
 grant execute on routine public.list_course_term_attendance(p_course_id uuid) to service_role;

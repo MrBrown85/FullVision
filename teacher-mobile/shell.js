@@ -16,8 +16,7 @@
   var _gradeReturnSid = null;
   var _userEmail = '';
   var _userName = '';
-  // Set when Back here calls history.back(), so that popstate is not a
-  // second Back.
+  // Set when Back here calls history.back(), so that popstate is not a second Back.
   var _ignorePop = false;
   // A swipe back in progress.
   var _swipeActive = false;
@@ -125,7 +124,6 @@
   var _pull = null; // { content, startX, startY, decided, on, dy }
   var _pullIndicator = null;
   var _refreshing = false;
-
   var _pullToRefreshInitialized = false;
   function _initPullToRefresh() {
     if (_pullToRefreshInitialized) return;
@@ -134,6 +132,7 @@
       'touchstart',
       function (e) {
         _pull = null;
+        _pullOff();
         if (_refreshing) return;
         var content = e.target.closest('.m-screen-content');
         if (!content || content.scrollTop > 0) return;
@@ -147,61 +146,62 @@
           on: false,
           dy: 0,
         };
+        // Only an armed pull listens to the moves (and can stop the scroll), so no other touch waits for this script.
+        document.addEventListener('touchmove', _pullMove, { passive: false });
       },
       { passive: true },
     );
+    document.addEventListener('touchend', _pullEnd, { passive: true });
+    document.addEventListener('touchcancel', _pullOff, { passive: true });
+  }
 
-    document.addEventListener(
-      'touchmove',
-      function (e) {
-        if (!_pull) return;
-        var dx = e.touches[0].clientX - _pull.startX;
-        var dy = e.touches[0].clientY - _pull.startY;
-        if (!_pull.decided) {
-          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-          _pull.decided = true;
-          if (dy <= 0 || Math.abs(dx) > dy || _pull.content.scrollTop > 0) {
-            _pull = null;
-            return;
-          }
-          _pull.on = true;
-          _pull.content.classList.add('m-pulling');
-          _showPullIndicator();
-        }
-        if (!_pull.on) return;
-        e.preventDefault();
-        // Resistance: the content moves less and less as the pull grows.
-        var pull = Math.min(120, Math.max(0, dy) * 0.5);
-        _pull.dy = pull;
-        _pull.content.style.transform = 'translateY(' + pull + 'px)';
-        _pullIndicator.style.height = pull + 'px';
-        _pullIndicator.classList.toggle('m-pull-ready', pull >= PULL_THRESHOLD);
-        _pullIndicator.style.setProperty('--m-pull', String(Math.min(1, pull / PULL_THRESHOLD)));
-      },
-      { passive: false },
-    );
+  function _pullOff() {
+    document.removeEventListener('touchmove', _pullMove);
+  }
 
-    document.addEventListener(
-      'touchend',
-      function () {
-        if (!_pull || !_pull.on) {
-          _pull = null;
-          return;
-        }
-        var p = _pull;
+  function _pullMove(e) {
+    if (!_pull) return;
+    var dx = e.touches[0].clientX - _pull.startX;
+    var dy = e.touches[0].clientY - _pull.startY;
+    if (!_pull.decided) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      _pull.decided = true;
+      if (dy <= 0 || Math.abs(dx) > dy || _pull.content.scrollTop > 0) {
         _pull = null;
-        p.content.classList.remove('m-pulling');
-        if (p.dy >= PULL_THRESHOLD) {
-          _settlePull(p.content, PULL_HOLD);
-          _doRefresh().then(function () {
-            _settlePull(p.content, 0);
-          });
-        } else {
-          _settlePull(p.content, 0);
-        }
-      },
-      { passive: true },
-    );
+        return _pullOff();
+      }
+      _pull.on = true;
+      _pull.content.classList.add('m-pulling');
+      _showPullIndicator();
+    }
+    if (!_pull.on) return;
+    e.preventDefault();
+    // Resistance: the content moves less and less as the pull grows.
+    var pull = Math.min(120, Math.max(0, dy) * 0.5);
+    _pull.dy = pull;
+    _pull.content.style.transform = 'translateY(' + pull + 'px)';
+    _pullIndicator.style.height = pull + 'px';
+    _pullIndicator.classList.toggle('m-pull-ready', pull >= PULL_THRESHOLD);
+    _pullIndicator.style.setProperty('--m-pull', String(Math.min(1, pull / PULL_THRESHOLD)));
+  }
+
+  function _pullEnd() {
+    _pullOff();
+    if (!_pull || !_pull.on) {
+      _pull = null;
+      return;
+    }
+    var p = _pull;
+    _pull = null;
+    p.content.classList.remove('m-pulling');
+    if (p.dy >= PULL_THRESHOLD) {
+      _settlePull(p.content, PULL_HOLD);
+      _doRefresh().then(function () {
+        _settlePull(p.content, 0);
+      });
+    } else {
+      _settlePull(p.content, 0);
+    }
   }
 
   function _showPullIndicator() {
@@ -842,8 +842,7 @@
     below.classList.remove('m-pop-enter-active');
     _navStacks[_activeTab].pop();
     if (top.id === 'm-screen-obs-sweep') MSweep.close();
-    // Drop the screen's history entry too, when it has one (a screen put
-    // back by a tab switch has none).
+    // Drop the screen's history entry too, when it has one (a screen put back by a tab switch has none).
     if (!fromHistory && history.state && history.state.m > 0) {
       _ignorePop = true;
       history.back();
@@ -909,11 +908,11 @@
     var width = 0;
     var decided = false;
     var active = false;
-
     stack.addEventListener(
       'touchstart',
       function (e) {
         top = null;
+        off();
         var screens = stack.querySelectorAll('.m-screen');
         if (screens.length < 2) return;
         if (!document.getElementById('m-sheet-backdrop').classList.contains('u-hidden')) return;
@@ -931,43 +930,45 @@
         width = stack.clientWidth;
         decided = false;
         active = false;
+        // Only a swipe that starts at the edge listens to the moves.
+        stack.addEventListener('touchmove', move, { passive: false });
       },
       { passive: true },
     );
+    var off = function () {
+      stack.removeEventListener('touchmove', move);
+    };
+    stack.addEventListener('touchcancel', off, { passive: true });
 
-    stack.addEventListener(
-      'touchmove',
-      function (e) {
-        if (!top) return;
-        var t = e.touches[0];
-        dx = t.clientX - startX;
-        var dy = t.clientY - startY;
-        if (!decided) {
-          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-          decided = true;
-          if (dx <= 0 || Math.abs(dy) > dx) {
-            top = null;
-            return;
-          }
-          active = true;
-          _swipeActive = true;
-          _refreshUnder(below);
-          below.style.display = '';
-          top.classList.add('m-swipe-back');
-          below.classList.add('m-swipe-back');
+    function move(e) {
+      if (!top) return;
+      var t = e.touches[0];
+      dx = t.clientX - startX;
+      var dy = t.clientY - startY;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true;
+        if (dx <= 0 || Math.abs(dy) > dx) {
+          top = null;
+          return off();
         }
-        e.preventDefault();
-        var x = Math.max(0, dx);
-        top.style.transform = 'translateX(' + x + 'px)';
-        below.style.transform = 'translateX(' + -0.3 * (width - x) + 'px)';
-        below.style.setProperty('--m-dim', String(0.12 * (1 - x / width)));
-      },
-      { passive: false },
-    );
-
+        active = true;
+        _swipeActive = true;
+        _refreshUnder(below);
+        below.style.display = '';
+        top.classList.add('m-swipe-back');
+        below.classList.add('m-swipe-back');
+      }
+      e.preventDefault();
+      var x = Math.max(0, dx);
+      top.style.transform = 'translateX(' + x + 'px)';
+      below.style.transform = 'translateX(' + -0.3 * (width - x) + 'px)';
+      below.style.setProperty('--m-dim', String(0.12 * (1 - x / width)));
+    }
     stack.addEventListener(
       'touchend',
       function () {
+        off();
         if (!top || !active) {
           top = null;
           return;
@@ -1803,8 +1804,7 @@
       if (e.key === 'Escape') {
         MC.dismissSheet();
       }
-      // A row that acts as a button (role="button") answers Enter and Space
-      // as a real button does.
+      // A row that acts as a button (role="button") answers Enter and Space as a real button does.
       if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.getAttribute) {
         var t = e.target;
         if (t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON' && t.hasAttribute('data-action')) {

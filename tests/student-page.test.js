@@ -296,6 +296,7 @@ describe('student page', () => {
     await tick();
     click('[data-act="start"]');
     type('[data-q="q2"][data-kind="text"]', 'Half written');
+    await new Promise(r => setTimeout(r, 450)); // the draft is kept once the student pauses
     expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toContain('Half written');
     const fresh = root.cloneNode(false);
     root.replaceWith(fresh);
@@ -309,6 +310,63 @@ describe('student page', () => {
     click('[data-act="send"]');
     for (let i = 0; i < 3; i++) await tick();
     expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toBeNull();
+  });
+});
+
+describe('typing an answer (speed)', () => {
+  beforeEach(setup);
+  afterEach(() => Object.assign(globalThis, originals));
+
+  it('keeps the draft once the student pauses, not on every key, and never after it is cleared', async () => {
+    replies.push(OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    click('[data-act="start"]');
+    const saves = [];
+    const set = sessionStorage.setItem;
+    sessionStorage.setItem = function (k, v) {
+      if (k === 'fv-s-draft-K7M4QX') saves.push(v);
+      return set.call(this, k, v);
+    };
+    try {
+      const words = 'Twenty keys, one by one';
+      for (let i = 1; i <= 20; i++) type('[data-q="q2"][data-kind="text"]', words.slice(0, i));
+      expect(saves).toHaveLength(0); // was 20, one a key
+      await new Promise(r => setTimeout(r, 450));
+      expect(saves).toHaveLength(1);
+      expect(saves[0]).toContain(words.slice(0, 20));
+      // A key, then the answers cleared before the pause ends: nothing is written after.
+      type('[data-q="q2"][data-kind="text"]', 'One more');
+      StudentPage.clearDraft();
+      await new Promise(r => setTimeout(r, 450));
+      expect(saves).toHaveLength(1);
+      expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toBeNull();
+      // Next (any other keep) keeps at once what was typed.
+      type('[data-q="q2"][data-kind="text"]', 'Kept on Next');
+      click('[data-act="next"]');
+      expect(saves).toHaveLength(2);
+      expect(saves[1]).toContain('Kept on Next');
+    } finally {
+      sessionStorage.setItem = set;
+    }
+  });
+
+  it('sets every box’s height after reading them all: one layout, not one a box', () => {
+    const log = [];
+    const box = name => ({
+      style: {
+        set height(v) {
+          log.push('set ' + name);
+        },
+      },
+      get scrollHeight() {
+        log.push('read ' + name);
+        return 40;
+      },
+    });
+    StudentPage._test.growAll([box('a'), box('b'), box('c')]);
+    // Before: set a, read a, set a, set b, read b, set b... (a layout forced at each read after a set).
+    expect(log).toEqual(['set a', 'set b', 'set c', 'read a', 'read b', 'read c', 'set a', 'set b', 'set c']);
   });
 });
 

@@ -179,6 +179,58 @@ test('the wall: thumbnails only, sorting, the level filters, a page, the grader'
   expect(errors).toEqual([]);
 });
 
+// The review of #1396: the page under the wall was never drawn again, so a
+// level picked in the dialog was missing from the card's grid.
+test('a level picked through Grade in This Order is on the page once the wall closes', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await openDemo(page, { clear: ['st2', 'st3'] });
+  await page.goto('/assignments');
+  await page.waitForSelector('#dock-mount nav');
+  const card = page.locator('#ac-' + LAB);
+  if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
+  await expect(card).toHaveClass(/open/);
+  // A second card is open too: both are open afterwards.
+  const otherId = await page.locator('.assess-card:not(.open)').first().getAttribute('id');
+  const other = page.locator('#' + otherId);
+  await other.locator('.assess-title').click();
+  await expect(other).toHaveClass(/open/);
+
+  await card.locator('.assess-more-btn').click();
+  await card.locator('.assess-work-wall-btn').click();
+  const wall = page.locator('#work-wall-overlay');
+  await wall.locator('.ww-grade').click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog).toBeVisible();
+  const sid = await dialog.locator('[data-action="toggleStudentStatus"]').first().getAttribute('data-sid');
+  expect(['st2', 'st3']).toContain(sid);
+  const tile = dialog.locator('.grdt-crit').first();
+  const crit = await tile.getAttribute('data-critid');
+  await tile.locator('[data-action="graderLevel"][data-level="3"]').click();
+  await expect(tile.locator('.grdl-level.is-on')).toHaveText('Proficient');
+  await page.locator('#grader-overlay [data-grader="close"]').first().click();
+  await expect(page.locator('#grader-overlay')).toHaveCount(0);
+  await wall.locator('.ww-back').click();
+  await expect(wall).toHaveCount(0);
+
+  const row = card.locator('.rsg-criterion-row[data-student="' + sid + '"][data-criterion="' + crit + '"]');
+  await expect(row.locator('.rsg-level.active')).toHaveAttribute('data-level', '3');
+  await expect(card).toHaveClass(/open/);
+  await expect(other).toHaveClass(/open/);
+  await expect(card.locator('.assess-more-btn')).toBeFocused();
+  // The page is what a whole redraw draws.
+  const drawn = () =>
+    page.evaluate(() => {
+      const now = () =>
+        document.getElementById('page-toolbar-mount').innerHTML + document.getElementById('main').innerHTML;
+      const kept = now();
+      PageAssignments.render();
+      return kept === now();
+    });
+  await expect.poll(drawn).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("the Work tab: one student's work, thumbnails only", async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));

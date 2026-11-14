@@ -541,12 +541,15 @@ var CmQuestionnaires = (function () {
     });
   }
 
-  function render(cid) {
+  /* What every draw of Class Settings asks for, on this tab or another:
+     the class's questionnaires (the tab's count), and once read, a fresh
+     read when they are old. False while they are not read yet. */
+  function prepare(cid) {
     if (!Questionnaires.loaded(cid)) {
       Questionnaires.load(cid, function (loadedCid) {
         if (loadedCid === cid) _rerender();
       });
-      return '<div class="cm-section"><div class="cm-hint">Loading questionnaires…</div></div>';
+      return false;
     }
     // Answers sent since the last read show when the tab opens again,
     // redrawn only when who has answered changed.
@@ -561,6 +564,11 @@ var CmQuestionnaires = (function () {
     Questionnaires.refreshIfStale(cid, FRESH_MS, function (loadedCid) {
       if (loadedCid === cid && answeredSig() !== was) _rerender();
     });
+    return true;
+  }
+
+  function render(cid) {
+    if (!prepare(cid)) return '<div class="cm-section"><div class="cm-hint">Loading questionnaires…</div></div>';
     var current = Questionnaires.periodFor(new Date());
     var reflections = Questionnaires.list(cid).filter(function (x) {
       return x.kind === 'core_reflection';
@@ -877,6 +885,7 @@ var CmQuestionnaires = (function () {
   }
 
   return {
+    prepare: prepare,
     render: render,
     countOn: countOn,
     handleAction: handleAction,

@@ -126,17 +126,20 @@ function rgba(img) {
      rotates   the decoder turns a photo upright itself (default true)
      sizeFor   (w, h, quality) → bytes of that JPEG
      leak      every JPEG it makes carries EXIF with GPS (to prove the strip)
-     reads     kinds beyond JPEG the decoder can read (e.g. ['heic']) */
+     reads     kinds beyond JPEG the decoder can read (e.g. ['heic'])
+     resizes   the decoder honours a size hint, as createImageBitmap's
+               resizeWidth / resizeHeight do (each hint is logged either way) */
 function fakeSurface(opts = {}) {
   const rotates = opts.rotates !== false;
   const sizeFor = opts.sizeFor || ((w, h, q) => Math.round(w * h * q * 0.15));
-  const log = { decodes: [], encodes: [], canvases: 0, released: 0, closed: 0 };
+  const log = { decodes: [], hints: [], encodes: [], canvases: 0, released: 0, closed: 0 };
   const surface = {
     log,
-    async decode(blob) {
+    async decode(blob, hint) {
       const bytes = await blobBytes(blob);
       const kind = PS.sniff(bytes);
       log.decodes.push(kind);
+      log.hints.push(hint || null);
       if (kind !== 'jpeg') {
         if (!(opts.reads || []).includes(kind)) throw new Error('The picture could not be read');
         return { ...grid(40, 30), source: grid(40, 30), close: () => log.closed++ };
@@ -144,6 +147,12 @@ function fakeSurface(opts = {}) {
       const jpeg = readJpeg(bytes);
       let img = grid(jpeg.width, jpeg.height, jpeg.pixels);
       if (rotates) img = upright(img, PS.readExif(bytes).orientation);
+      if (hint && opts.resizes) {
+        const s = (hint.resizeWidth || hint.resizeHeight) / (hint.resizeWidth ? img.width : img.height);
+        const src = img;
+        img = { width: Math.round(src.width * s), height: Math.round(src.height * s) };
+        img.at = (x, y) => src.at(Math.floor(x / s), Math.floor(y / s));
+      }
       return { width: img.width, height: img.height, source: img, close: () => log.closed++ };
     },
     canvas(w, h) {
@@ -469,6 +478,106 @@ describe('shrinking a photo', () => {
     expect(PS.outputName('C:\\Users\\me\\scan.PNG', 1, 1)).toBe('scan.jpg');
     expect(PS.outputName('', 1, 1)).toBe('page.jpg');
     expect(PS.outputName(undefined, 3, 4)).toBe('page-page-3.jpg');
+  });
+});
+
+/* ── Speed: decoded at the size wanted, and the quality found sooner ─────────
+   (docs/plans/speed-assessment.md, section 7, B3). Counted, not timed. */
+
+describe('a photo is decoded at the size wanted, not whole', () => {
+  it('asks for a 12-megapixel photo at 2000 px on its long side, and the page is the same', async () => {
+    const surface = fakeSurface({ resizes: true });
+    const page = (await PS.prepare(photo({ width: 4000, height: 3000 }), { surface })).pages[0];
+    // No decode of the whole photo (there was one).
+    expect(surface.log.hints).toEqual([{ resizeWidth: 2000 }]);
+    expect([page.width, page.height]).toEqual([2000, 1500]);
+    const thumb = readJpeg(await blobBytes(page.thumb));
+    expect([thumb.width, thumb.height]).toEqual([400, 300]);
+    expect(page.bytes).toBeLessThanOrEqual(PS.AIM_BYTES);
+    expect(page.hash).toBe(
+      createHash('sha256')
+        .update(await blobBytes(page.blob))
+        .digest('hex'),
+    );
+    // The same page as a decoder that ignores the hint gives.
+    const whole = (await PS.prepare(photo({ width: 4000, height: 3000 }), { surface: fakeSurface() })).pages[0];
+    expect([whole.width, whole.height, whole.bytes, whole.quality]).toEqual([
+      page.width,
+      page.height,
+      page.bytes,
+      page.quality,
+    ]);
+  });
+
+  it('names the long side: tall by height, wide by width, a sideways photo as the browser turns it', async () => {
+    const hintFor = async (file, o) => {
+      const surface = fakeSurface(o);
+      await PS.prepare(file, { surface });
+      return surface.log.hints.filter(Boolean);
+    };
+    expect(await hintFor(photo({ width: 3000, height: 4000 }))).toEqual([{ resizeHeight: 2000 }]);
+    expect(await hintFor(photo({ width: 4000, height: 3000 }))).toEqual([{ resizeWidth: 2000 }]);
+    // Stored 4000 × 3000 on its side: upright it is tall. A browser that turns it decodes it tall.
+    const sideways = () => photo({ width: 4000, height: 3000, exif: { orientation: 6 } });
+    expect(await hintFor(sideways(), { rotates: true })).toEqual([{ resizeHeight: 2000 }]);
+    expect(await hintFor(sideways(), { rotates: false })).toEqual([{ resizeWidth: 2000 }]);
+    for (const o of [{ rotates: true }, { rotates: false }]) {
+      const page = (await PS.prepare(sideways(), { surface: fakeSurface({ ...o, resizes: true }) })).pages[0];
+      expect([page.width, page.height]).toEqual([1500, 2000]);
+    }
+  });
+
+  it('decodes a photo already small enough whole, and one it cannot size whole', async () => {
+    const small = fakeSurface();
+    await PS.prepare(photo({ width: 2000, height: 1500 }), { surface: small });
+    expect(small.log.hints).toEqual([null]);
+    expect(PS.storedSize(new Uint8Array([1, 2, 3, 4]))).toBeNull();
+    expect(PS.storedSize(jpegBytes({ width: 4032, height: 3024 }))).toEqual({ width: 4032, height: 3024 });
+    const png = new Uint8Array(24);
+    png.set([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, ...u32(3000), ...u32(2000)]);
+    expect(PS.storedSize(png)).toEqual({ width: 3000, height: 2000 });
+  });
+});
+
+describe('the quality search starts where the last page ended', () => {
+  // KB at each quality. A busy page: 0.58 is the first at or under 500 KB.
+  const BUSY = { 0.82: 760, 0.74: 640, 0.66: 540, 0.58: 470, 0.5: 400 };
+  const LIGHT = { 0.82: 760, 0.74: 480, 0.66: 450, 0.58: 420, 0.5: 400 };
+  const HEAVY = { 0.82: 900, 0.74: 800, 0.66: 700, 0.58: 600, 0.5: 520 };
+  let kb = BUSY;
+  const sizeFor = (w, h, q) => (w === 2000 ? kb[q] * 1000 : 20000);
+  const full = s => s.log.encodes.filter(e => e.w === 2000).map(e => e.quality);
+  const next = async (surface, weights) => {
+    kb = weights;
+    surface.log.encodes.length = 0;
+    return (await PS.prepare(photo(), { surface })).pages[0];
+  };
+
+  it('finds the same quality in two encodes on the next page, not four', async () => {
+    const surface = fakeSurface({ sizeFor });
+    const first = await next(surface, BUSY);
+    expect(full(surface)).toEqual([0.82, 0.74, 0.66, 0.58]);
+    const second = await next(surface, BUSY);
+    expect(full(surface)).toEqual([0.58, 0.66]);
+    expect([second.quality, second.bytes]).toEqual([first.quality, first.bytes]);
+  });
+
+  it('still takes the highest quality that fits, up or down from there, as stepping down from the top does', async () => {
+    const surface = fakeSurface({ sizeFor });
+    await next(surface, BUSY); // ends at 0.58
+    const lighter = await next(surface, LIGHT);
+    expect(full(surface)).toEqual([0.58, 0.66, 0.74, 0.82]);
+    expect(lighter.quality).toBe(0.74);
+    const heavier = await next(surface, HEAVY); // starts at 0.74
+    expect(full(surface)).toEqual([0.74, 0.66, 0.58, 0.5]);
+    expect([heavier.quality, heavier.bytes]).toEqual([0.5, 520000]);
+    // The same answers a fresh search from the top gives.
+    for (const [w, q] of [
+      [LIGHT, 0.74],
+      [HEAVY, 0.5],
+    ]) {
+      expect((await next(fakeSurface({ sizeFor }), w)).quality).toBe(q);
+    }
   });
 });
 

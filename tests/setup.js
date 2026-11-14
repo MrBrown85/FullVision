@@ -329,6 +329,7 @@ load('teacher/competency-evidence.js');
 load('shared/work-wall.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
+load('teacher/work-rubric-card.js');
 load('shared/competency-wording.js');
 load('teacher/report-feedback.js');
 load('teacher/report-feedback-cards.js');

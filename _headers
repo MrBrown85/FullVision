@@ -9,9 +9,11 @@
 # JS and CSS: check for a new copy on every load (see netlify.toml)
 /**/*.js
   Cache-Control: public, max-age=0, must-revalidate
+  Vary: Accept-Encoding
 
 /**/*.css
   Cache-Control: public, max-age=0, must-revalidate
+  Vary: Accept-Encoding
 
 # HTML pages — don't cache
 /**/*.html

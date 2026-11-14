@@ -58,7 +58,11 @@ test('Mark Up from the photos full screen: draw, a tick, a note, two fingers zoo
   await page.mouse.down();
   await page.mouse.move(...at(0.35, 0.57), { steps: 4 });
   await page.mouse.move(...at(0.5, 0.56), { steps: 4 });
+  // While the finger is down the line shows, on its own layer over the page's marks, drawn once a frame.
+  await expect(mk.locator('.m-markup-live polyline')).toHaveCount(1);
+  await expect(mk.locator('.m-markup-marks > .markup-layer .markup-pin')).toHaveCount(3);
   await page.mouse.up();
+  await expect(mk.locator('.m-markup-live')).toHaveCount(0);
   // A tick.
   await mk.getByRole('button', { name: 'Tick' }).click();
   await page.mouse.click(...at(0.15, 0.3));
