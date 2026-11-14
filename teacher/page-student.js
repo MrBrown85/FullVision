@@ -312,8 +312,10 @@ window.PageStudent = (function () {
   function _tabSummaries(ctx) {
     var cid = ctx.cid;
     var out = {};
-    var ov = _overviewModel(ctx);
-    var nMiss = ov.missing.length;
+    // The Missing count only (the Overview's own list, without its grades).
+    var nMiss = ctx.assessments.filter(function (a) {
+      return countsTowardGrades(cid, a) && ctx.statuses[studentId + ':' + a.id] === 'NS';
+    }).length;
     out.overview = nMiss ? { badge: nMiss + ' Missing', tone: 'miss' } : { stat: '0 Missing' };
     var profs = ctx.sections
       .map(function (sec) {
@@ -337,16 +339,16 @@ window.PageStudent = (function () {
     out.evidence = _evidenceSummary(ctx.obs);
     // The Learner Profile: goals set (the student's own and the competency
     // goals), or the feedback reflections once there are any (S10-F4).
-    var voice = _voiceModel(cid);
     var goals = getGoals(cid)[studentId] || {};
     var goalCount =
-      LearnerProfile.goalCount(voice) +
+      LearnerProfile.goalCount(ctx.voice) +
       ctx.sections.filter(function (sec) {
         return !!(goals[sec.id] || '').trim();
       }).length;
     out.profile = { stat: _plural(goalCount, 'Goal', 'Goals') };
-    var fb = LearnerProfile.feedbackOf(cid, studentId);
-    if (fb && fb.list.length) out.profile = { stat: _plural(fb.list.length, 'Reflection', 'Reflections') };
+    // The Learner Profile's own feedback when it is the tab drawn; the two counts otherwise.
+    var fb = _tab === 'profile' ? _feedbackOf(ctx) : LearnerProfile.feedbackCounts(cid, studentId);
+    if (fb && fb.count) out.profile = { stat: _plural(fb.count, 'Reflection', 'Reflections') };
     if (fb && fb.waiting) out.profile = { badge: fb.waiting + ' to Answer', tone: 'todo' };
     return out;
   }
@@ -398,7 +400,9 @@ window.PageStudent = (function () {
     return (lg.S ? lg.S + ' ' : '') + lg.R + '%';
   }
 
+  // Worked out once a draw (the Overview and Grades tabs both read it), and only on those tabs.
   function _overviewModel(ctx) {
+    if (ctx.ov) return ctx.ov;
     var cid = ctx.cid;
     var course = COURSES[cid] || {};
     var letterOnly = courseGradeMode(cid) === 'letter';
@@ -491,7 +495,7 @@ window.PageStudent = (function () {
       if (noted) better.comment = { text: String(noted.s.note), a: noted.a };
     }
 
-    return {
+    return (ctx.ov = {
       cid: cid,
       course: course,
       now: now,
@@ -506,7 +510,7 @@ window.PageStudent = (function () {
       cellOf: cellOf,
       statusOf: statusOf,
       dueOf: dueOf,
-    };
+    });
   }
 
   /* The letter bands from C− to A as a strip, with where the student is
@@ -1061,6 +1065,7 @@ window.PageStudent = (function () {
     }
     var drawerId = 'ced-' + sec.id;
     var open = _openTags.has(tag.id);
+    var ev = CompetencyEvidence.evidenceFor(cid, studentId, tag.id); // once; a closed drawer is built when it opens
     var sub = tag.ican || (tag.label && tag.label !== sec.name ? tag.label : '');
     return (
       '<div class="stu-comp' +
@@ -1093,13 +1098,13 @@ window.PageStudent = (function () {
       esc(tr.text) +
       '</span>' +
       '<span class="stu-cp-ev dash-tag-evidence">' +
-      esc(CompetencyEvidence.rowCount(cid, studentId, tag.id)) +
+      esc(CompetencyEvidence.rowCount(cid, studentId, tag.id, ev)) +
       '</span>' +
       '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
       '</button>' +
       _compNowHtml(cid, tag, sp) +
       _compWhereHtml(ctx, entries) +
-      CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId) +
+      CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId, { later: !open, ev: ev, map: ctx.assessMap }) +
       _cpFactsHtml(ctx, sec, sp, entries, tr, override) +
       '<div class="stu-comp-override">' +
       '<button type="button" class="override-btn' +
@@ -1858,26 +1863,6 @@ window.PageStudent = (function () {
     );
   }
 
-  /* The competency reflections in the student's words (+ Reflection): how
-     many, and when the newest was saved. They count as reflections and
-     answers wherever the Learner Profile counts them. */
-  function _compReflections(cid, sections) {
-    var mine = getReflections(cid)[studentId] || {};
-    var out = { count: 0, last: null };
-    (sections || []).forEach(function (sec) {
-      var r = mine[sec.id];
-      if (!r || !(r.text || r.confidence)) return;
-      out.count++;
-      out.last = _latest(out.last, r.date);
-    });
-    return out;
-  }
-  function _latest(a, b) {
-    if (!a) return b || null;
-    if (!b) return a;
-    return String(a) > String(b) ? a : b;
-  }
-
   /* The student's answers as the Learner Profile reads them, once the class's
      questionnaires and responses are in (a redraw follows when they arrive). */
   var _EMPTY_VOICE = { about: null, checkin: null, reflections: [], last: null };
@@ -1911,6 +1896,12 @@ window.PageStudent = (function () {
       });
     }
     return StudentVoice.profile(StudentVoice.entries(cid, studentId));
+  }
+
+  // Reflect on Feedback as the Learner Profile shows it, once a draw (null while it is off).
+  function _feedbackOf(ctx) {
+    if (!('fb' in ctx)) ctx.fb = LearnerProfile.feedbackOf(ctx.cid, studentId);
+    return ctx.fb;
   }
 
   /* A competency goal's editor (ids are what editGoal / saveGoalField use). */
@@ -2334,7 +2325,7 @@ window.PageStudent = (function () {
     var cid = ctx.cid;
     var course = COURSES[cid] || {};
     var first = displayNameFirst(ctx.student);
-    var model = _voiceModel(cid);
+    var model = ctx.voice;
     var goals = getGoals(cid)[studentId] || {};
     var block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     var o = {
@@ -2346,7 +2337,7 @@ window.PageStudent = (function () {
       grade: course.gradeLevel || '',
       pronouns: ctx.student.pronouns || '',
       courseName: course.name || 'Course',
-      compRefl: _compReflections(cid, ctx.sections),
+      compRefl: LearnerProfile.compReflections(cid, studentId, ctx.sections),
       aboutOn:
         typeof Questionnaires !== 'undefined' &&
         Questionnaires.list(cid).some(function (q) {
@@ -2358,7 +2349,7 @@ window.PageStudent = (function () {
           return !!(goals[sec.id] || '').trim();
         }).length,
       // Reflect on Feedback (S10-F4), or null while it is off.
-      feedback: LearnerProfile.feedbackOf(cid, studentId),
+      feedback: _feedbackOf(ctx),
     };
     var waiting = !!(o.feedback && o.feedback.waiting > 0);
     return (
@@ -2703,13 +2694,13 @@ window.PageStudent = (function () {
     );
   }
 
-  /* The students in the sidebar's order, and this one's neighbours. */
-  function _neighbours() {
+  /* The students in the sidebar's order (sorted once a draw), and this one's neighbours as ‹ and ›. */
+  function _stepButtonsHtml() {
     var list = sortStudents(getStudents(activeCourse), 'lastName');
     var i = list.findIndex(function (s) {
       return s.id === studentId;
     });
-    return { prev: i > 0 ? list[i - 1] : null, next: i >= 0 && i < list.length - 1 ? list[i + 1] : null };
+    return _stepButtonHtml('prev', i > 0 ? list[i - 1] : null) + _stepButtonHtml('next', i >= 0 ? list[i + 1] : null);
   }
 
   function _stepButtonHtml(dir, st) {
@@ -2778,8 +2769,7 @@ window.PageStudent = (function () {
       '<div class="student-toolbar">' +
       renderBreadcrumb('Dashboard', '/dashboard', displayName(student)) +
       '<span class="stu-step">' +
-      _stepButtonHtml('prev', _neighbours().prev) +
-      _stepButtonHtml('next', _neighbours().next) +
+      _stepButtonsHtml() +
       '</span>' +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
       '</div>';
@@ -2820,6 +2810,7 @@ window.PageStudent = (function () {
       cells: termAssessments.map(function (a) {
         return { a: a, cell: assessmentCellValue(cid, studentId, a) };
       }),
+      voice: _voiceModel(cid), // the tab's count and the Learner Profile both read it
     };
     html += _tabBarHtml(_tabSummaries(ctx));
     // Grade Breakdown's sections are cards of their own on the page.

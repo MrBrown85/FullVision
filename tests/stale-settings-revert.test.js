@@ -224,7 +224,11 @@ const SETTINGS = [
     harm: true,
     was: 0.7,
     now: 0.9,
-    set: v => input('cmDecaySlider', {}, Math.round(v * 100)),
+    // The slider saves when it is let go (its change event), as a drag ends.
+    set: v => {
+      input('cmDecaySlider', {}, Math.round(v * 100));
+      change('cmDecayCommit', { value: String(Math.round(v * 100)) });
+    },
     // shared/calc.js: cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65
     held: () => {
       const cc = getCourseConfig(CID) || {};
@@ -2612,6 +2616,7 @@ describe('a class made on this device reaches the server with the settings this 
     await openApp();
     act('cmSetCalcMethod', { value: 'decayingAvg' });
     input('cmDecaySlider', {}, 80);
+    change('cmDecayCommit', { value: '80' });
     await quiet();
     COURSES[CID].calcMethod = 'average';
     COURSES[CID].decayWeight = 0.65;
