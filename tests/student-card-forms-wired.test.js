@@ -246,6 +246,7 @@ describe('nothing outlasts the session', () => {
     const page = await signIn(school({}));
     await openQuestions(page);
     page.type('#q-q1', 'Half an answer');
+    await new Promise(r => setTimeout(r, 450)); // the draft is kept once the student pauses
     expect(Object.keys(page.tab)).toEqual(['fv-s-card-drafts']);
     await page.click('[data-act="back"]');
     await page.click('[data-act="card-done"]');

@@ -506,7 +506,25 @@ var StudentPage = (function () {
   function draftKey() {
     return 'fv-s-draft-' + S.code;
   }
+  /* While a student types, the draft is kept once they pause (DRAFT_PAUSE_MS), not on every key:
+     each keep turns every answer into text. Any other keep, a clear, and the page being hidden or
+     closed keep or drop it at once. */
+  var DRAFT_PAUSE_MS = 400;
+  var draftLater = null;
+  function saveDraftSoon() {
+    var mine = S;
+    clearTimeout(draftLater);
+    draftLater = setTimeout(function () {
+      draftLater = null;
+      if (S === mine) saveDraft();
+    }, DRAFT_PAUSE_MS);
+  }
+  function draftNow() {
+    if (draftLater) saveDraft();
+  }
   function saveDraft() {
+    clearTimeout(draftLater);
+    draftLater = null;
     if (!S || S.demo) return;
     try {
       if (S.cardForm) {
@@ -531,6 +549,8 @@ var StudentPage = (function () {
     }
   }
   function clearDraft() {
+    clearTimeout(draftLater);
+    draftLater = null;
     try {
       if (S.cardForm) {
         var all = cardDrafts();
@@ -546,6 +566,8 @@ var StudentPage = (function () {
   }
   // Every card's draft in this tab, at sign-out.
   function wipeCardDrafts() {
+    clearTimeout(draftLater);
+    draftLater = null;
     try {
       sessionStorage.removeItem(CARD_DRAFTS);
     } catch (e) {
@@ -651,7 +673,7 @@ var StudentPage = (function () {
     // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js, report.js, app.js and assignments.js add: every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report; a result on the Assignments list is calc.js's text, escaped.
     root.innerHTML = render(S);
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
-    root.querySelectorAll('textarea.sp-text').forEach(grow);
+    growAll(root.querySelectorAll('textarea.sp-text'));
     rovingRadios(root);
     // A screen file's own step once its screen is drawn (assignments.js: the cards follow the swipe).
     files.forEach(function (f) {
@@ -679,6 +701,20 @@ var StudentPage = (function () {
   function grow(el) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 2 + 'px';
+  }
+  // Every box at once: all heights let go, then all read, then all set (one layout, not one a box).
+  function growAll(list) {
+    var els = Array.prototype.slice.call(list);
+    els.forEach(function (el) {
+      el.style.height = 'auto';
+    });
+    els
+      .map(function (el) {
+        return el.scrollHeight;
+      })
+      .forEach(function (h, i) {
+        els[i].style.height = h + 2 + 'px';
+      });
   }
 
   /* A slip that locked on this phone stays locked when the page is opened
@@ -1119,6 +1155,16 @@ var StudentPage = (function () {
     else fetchMissing();
   }
 
+  // A draft waiting on a pause is kept before the tab goes away.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('pagehide', draftNow);
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') draftNow();
+    });
+  }
+
   var app = typeof document !== 'undefined' && document.getElementById ? document.getElementById('app') : null;
   if (app && typeof app.addEventListener === 'function' && typeof location !== 'undefined') {
     whenScreensAreIn(function () {
@@ -1157,6 +1203,7 @@ var StudentPage = (function () {
     call: call,
     messageFor: messageFor,
     saveDraft: saveDraft,
+    saveDraftSoon: saveDraftSoon,
     loadDraft: loadDraft,
     clearDraft: clearDraft,
     wipeCardDrafts: wipeCardDrafts,
@@ -1166,6 +1213,7 @@ var StudentPage = (function () {
     paint: paint,
     grow: grow,
     _test: {
+      growAll: growAll,
       freshState: freshState,
       render: render,
       demoData: demoData,
