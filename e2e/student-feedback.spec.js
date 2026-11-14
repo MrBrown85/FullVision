@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 import { PHONE, CHROMEBOOK, fits, named, contrast } from './student-card-fake.js';
 
 /* Your Feedback and The Whole Rubric (S4-F3), in Demo Mode, against the
-   built site with the live site's CSP: opened from a returned card, on a
-   phone as a screen of its own and on a Chromebook beside the list, and
-   inside Preview as Student. Nothing is sent.
+   built site with the live site's CSP: opened from My Learning's Your
+   Work, on a phone as a screen of its own and on a Chromebook beside the
+   list, and inside Preview as Student. Nothing is sent.
    Set S4_SHOTS to a folder to save a picture of each screen (light). */
 
 const SHOTS = process.env.S4_SHOTS || '';
@@ -23,57 +23,71 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Outstanding \d+$/ })).toBeVisible();
   return posts;
 }
 
-async function openLab(page) {
-  await page.getByRole('button', { name: 'Back 6' }).click();
-  const lab = page.locator('.sp-piece', { hasText: 'Cell Microscope Lab' });
-  if (await page.locator('.sp-side').isVisible()) {
-    await page.locator('.sp-side-row', { hasText: 'Cell Microscope Lab' }).click();
-  } else {
-    await page.locator('.sp-deck').evaluate((d, title) => {
-      const card = [...d.querySelectorAll('.sp-piece')].find(c => c.textContent.includes(title));
-      d.scrollTo({ left: card.offsetLeft - d.offsetLeft, behavior: 'auto' });
-    }, 'Cell Microscope Lab');
-  }
-  await lab.getByRole('button', { name: 'See Your Feedback' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Cell Microscope Lab' })).toBeFocused();
+// The My Learning tab: along the bottom on a phone, in the header on a Chromebook.
+async function myLearning(page) {
+  await page.locator('.sp-tab[data-tab="learning"]:visible').click();
+  await expect(page.locator('.sp-ml-work')).toBeVisible();
 }
+
+// Your Feedback opens from the piece's row in My Learning's Your Work.
+async function openFeedback(page, id, title) {
+  await myLearning(page);
+  await page.locator('.sp-ml-row[data-act="feedback"][data-piece="' + id + '"]').click();
+  await expect(page.getByRole('heading', { level: 1, name: title })).toBeFocused();
+}
+const openLab = page => openFeedback(page, 'demo-lab', 'Cell Microscope Lab');
 
 test.describe('on a phone', () => {
   test.use(PHONE);
 
-  test('a returned card opens Your Feedback as a screen of its own; Assignments goes back', async ({ page }) => {
+  test('a row in My Learning opens Your Feedback as a screen of its own; My Learning goes back', async ({ page }) => {
     const posts = await demo(page);
     await openLab(page);
-    // The board's phone screen: no class header, no To Do, Sent and Back, no tabs along the bottom.
+    // The board's phone screen: no class header, no tabs along the bottom.
     await expect(page.locator('.sp-head')).toBeHidden();
     await expect(page.locator('.sp-tabs-bottom')).toBeHidden();
-    await expect(page.locator('.sp-segments')).toBeHidden();
+    await expect(page.locator('.sp-fb-sub')).toHaveText(/^Returned \S+ \d+$/);
     await expect(page.getByText('Your Result', { exact: true })).toBeVisible();
+    await expect(page.locator('.sp-fb-comment')).toHaveText('Careful focusing. Label the nucleus next time.');
+    // Your Rubric: each criterion, its level and the teacher's comment on it, and nothing more.
     await expect(page.getByRole('heading', { name: 'Your Rubric' })).toBeVisible();
-    await expect(page.getByText('What Proficient Means Here')).toBeVisible();
-    await expect(page.getByText('To Reach Extending')).toBeVisible();
+    const method = page.locator('.sp-fb-criterion', { hasText: 'Method' });
+    await expect(method.locator('.sp-level')).toHaveText('Proficient');
+    await expect(method.getByText('Every step is there, in order.')).toBeVisible();
+    const drawing = page.locator('.sp-fb-criterion', { hasText: 'Labelled Drawing' });
+    await expect(drawing.locator('.sp-level')).toHaveText('Developing +');
+    await expect(drawing.getByText('Label the nucleus and the cell wall.')).toBeVisible();
+    await expect(
+      page.locator('.sp-feedback').getByText(/Means Here|To Reach|What You Showed|Counts toward/),
+    ).toHaveCount(0);
     await fits(page);
     await named(page);
     await contrast(page);
     await picture(page, 'phone-feedback-rubric');
 
-    // What the Levels Mean starts open (the board), and closes.
-    await expect(page.getByRole('button', { name: 'What the Levels Mean' })).toHaveAttribute('aria-expanded', 'true');
+    // What the Levels Mean is at the foot, closed at first; it opens and closes.
+    const levels = page.getByRole('button', { name: 'What the Levels Mean' });
+    await expect(levels).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByText('You went beyond the goal')).toBeHidden();
+    await levels.click();
+    await expect(levels).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByText('You went beyond the goal')).toBeVisible();
     await fits(page);
     await contrast(page);
     await picture(page, 'phone-feedback-levels');
-    await page.getByRole('button', { name: 'What the Levels Mean' }).click();
-    await expect(page.getByRole('button', { name: 'What the Levels Mean' })).toHaveAttribute('aria-expanded', 'false');
+    await levels.click();
+    await expect(levels).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByText('You went beyond the goal')).toBeHidden();
 
+    // The Whole Rubric still shows what each level asks.
     await page.getByRole('button', { name: 'See the Whole Rubric' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'The Whole Rubric' })).toBeFocused();
     await expect(page.locator('.sp-fb-you')).toHaveCount(2);
+    await expect(page.getByText('Lists every step in order, so someone else could repeat it.')).toBeVisible();
     await fits(page);
     await named(page);
     await contrast(page);
@@ -81,23 +95,16 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: 'Your Feedback' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Cell Microscope Lab' })).toBeFocused();
 
-    await page.getByRole('button', { name: 'Assignments' }).first().click();
+    await expect(page.locator('.sp-fb-back')).toHaveText('My Learning');
+    await page.locator('.sp-fb-back').click();
     await expect(page.locator('.sp-head')).toBeVisible();
-    await expect(page.locator('.sp-piece.sp-picked h2')).toBeFocused();
+    await expect(page.locator('.sp-ml-row[data-piece="demo-lab"]')).toBeFocused();
     expect(posts).toEqual([]);
   });
 
   test('points: the score, its percent and a bar', async ({ page }) => {
     await demo(page);
-    await page.getByRole('button', { name: 'Back 6' }).click();
-    await page.locator('.sp-deck').evaluate(d => {
-      const card = [...d.querySelectorAll('.sp-piece')].find(c => c.textContent.includes('Cell Structure Quiz'));
-      d.scrollTo({ left: card.offsetLeft - d.offsetLeft, behavior: 'auto' });
-    });
-    await page
-      .locator('.sp-piece', { hasText: 'Cell Structure Quiz' })
-      .getByRole('button', { name: 'See Your Feedback' })
-      .click();
+    await openFeedback(page, 'demo-quiz', 'Cell Structure Quiz');
     await expect(page.locator('.sp-fb-score')).toHaveText('8 / 10');
     await expect(page.locator('.sp-fb-pct')).toHaveText('80%');
     const width = await page.locator('.sp-fb-fill').evaluate(el => el.offsetWidth / el.parentElement.offsetWidth);
@@ -107,37 +114,47 @@ test.describe('on a phone', () => {
     await picture(page, 'phone-feedback-points');
   });
 
-  test('a card not back yet says what it is graded on', async ({ page }) => {
+  test('a card not due yet is on Upcoming, with when it is due and no What You’re Graded On', async ({ page }) => {
     await demo(page);
+    await page.getByRole('button', { name: /^Upcoming \d+$/ }).click();
     const fair = page.locator('.sp-piece', { hasText: 'Science Fair Proposal' });
-    await expect(fair.getByText('What You’re Graded On')).toBeVisible();
-    await expect(fair.getByText('Questioning and Predicting')).toBeVisible();
+    await expect(fair).toBeVisible();
+    await expect(fair.locator('.sp-flag-due')).toHaveText(/ · in 4 days$/);
+    await expect(fair.getByText('What You’re Graded On')).toHaveCount(0);
+    await expect(fair.getByText('Questioning and Predicting')).toHaveCount(0);
     await fits(page);
     await contrast(page);
-    await picture(page, 'phone-todo-graded-on');
+    await picture(page, 'phone-upcoming-card');
   });
 });
 
 test.describe('on a Chromebook', () => {
   test.use(CHROMEBOOK);
 
-  test('Your Feedback takes the card’s place beside the list', async ({ page }) => {
+  test('Your Feedback sits beside My Learning’s list; another row opens its own', async ({ page }) => {
     const posts = await demo(page);
     await openLab(page);
     await expect(page.locator('.sp-side')).toBeVisible();
     await expect(page.locator('.sp-head')).toBeVisible();
     await expect(page.locator('.sp-fb-back')).toBeHidden();
+    await expect(page.locator('.sp-side-row.sp-side-on')).toContainText('Cell Microscope Lab');
     // On a Chromebook the levels are always shown, the chips in a row (the board), with no button.
     await expect(page.getByRole('button', { name: 'What the Levels Mean' })).toBeHidden();
     await expect(page.getByText('You went beyond the goal')).toBeVisible();
+    await expect(page.getByText('Every step is there, in order.')).toBeVisible();
     await fits(page);
     await named(page);
     await contrast(page);
     await picture(page, 'chromebook-feedback-rubric');
-    // Another piece in the list shows its card.
+    // Another returned piece in the list opens its feedback.
     await page.locator('.sp-side-row', { hasText: 'Cell Structure Quiz' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Cell Structure Quiz' })).toBeFocused();
+    await expect(page.locator('.sp-fb-score')).toHaveText('8 / 10');
+    // Missing work goes to its card on Outstanding.
+    await page.locator('.sp-side-row', { hasText: 'Immune System Quick Check' }).click();
     await expect(page.locator('.sp-feedback')).toHaveCount(0);
-    await expect(page.locator('.sp-piece.sp-picked h2')).toHaveText('Cell Structure Quiz');
+    await expect(page.locator('.sp-piece.sp-picked h2')).toHaveText('Immune System Quick Check');
+    await expect(page.getByRole('button', { name: /^Outstanding \d+$/ })).toHaveAttribute('aria-pressed', 'true');
     expect(posts).toEqual([]);
   });
 });
@@ -181,9 +198,8 @@ test.describe('inside Preview as Student', () => {
       [found.advanced, 'advanced'],
       [found.single, 'single-point'],
     ]) {
-      await dialog.getByRole('button', { name: /^Back \d+$/ }).click();
-      await dialog.locator('.sp-side-row[data-piece="' + id + '"]').click();
-      await dialog.locator('.sp-piece.sp-picked').getByRole('button', { name: 'See Your Feedback' }).click();
+      await dialog.locator('.sp-tabs-top [data-tab="learning"]').click();
+      await dialog.locator('.sp-ml-row[data-act="feedback"][data-piece="' + id + '"]').click();
       await expect(dialog.locator('.sp-feedback')).toBeVisible();
       await dialog
         .locator('.sp-fb-criterion')
@@ -192,7 +208,10 @@ test.describe('inside Preview as Student', () => {
       await expect(dialog.locator('.sp-fb-criterion').first()).toBeVisible();
       await picture(page, 'preview-chromebook-' + name);
     }
-    await expect(dialog.getByText(/^What You Showed$|^The Goal$/).first()).toBeVisible();
+    // A Single-Point Rubric: each criterion's level, with no goal written out and no whole rubric to see.
+    await expect(dialog.locator('.sp-fb-criterion .sp-level').first()).toBeVisible();
+    await expect(dialog.locator('.sp-feedback').getByText(/^What You Showed$|^The Goal$/)).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'See the Whole Rubric' })).toHaveCount(0);
     await dialog.getByRole('radio', { name: 'Phone' }).click();
     await picture(page, 'preview-phone-single-point');
     expect(errors).toEqual([]);

@@ -21,22 +21,14 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Outstanding \d+$/ })).toBeVisible();
   return { posts, errors };
 }
 
+// Your Feedback opens from the lab's row in My Learning's Your Work.
 async function openLab(page) {
-  await page.getByRole('button', { name: /^Back \d+$/ }).click();
-  const lab = page.locator('.sp-piece', { hasText: 'Cell Microscope Lab' });
-  if (await page.locator('.sp-side').isVisible()) {
-    await page.locator('.sp-side-row', { hasText: 'Cell Microscope Lab' }).click();
-  } else {
-    await page.locator('.sp-deck').evaluate((d, title) => {
-      const card = [...d.querySelectorAll('.sp-piece')].find(c => c.textContent.includes(title));
-      d.scrollTo({ left: card.offsetLeft - d.offsetLeft, behavior: 'auto' });
-    }, 'Cell Microscope Lab');
-  }
-  await lab.getByRole('button', { name: 'See Your Feedback' }).click();
+  await page.locator('.sp-tab[data-tab="learning"]:visible').click();
+  await page.locator('.sp-ml-row[data-act="feedback"][data-piece="demo-lab"]').click();
   await expect(page.getByRole('heading', { level: 1, name: 'Cell Microscope Lab' })).toBeFocused();
 }
 
@@ -97,7 +89,7 @@ test.describe('Send Work off', () => {
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-    await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Outstanding \d+$/ })).toBeVisible();
     await openLab(page);
     await expect(page.getByRole('button', { name: /See Your Work/ })).toHaveCount(0);
   });

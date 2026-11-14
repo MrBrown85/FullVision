@@ -51,14 +51,19 @@ async function real(reply) {
 const viewOf = page => page.T.viewOf(page.T.state());
 const piece = (page, title) => viewOf(page).work.find(p => p.title === title);
 
-// Opens Your Feedback from the piece's card in Back.
+// Opens Your Feedback from the piece's row in My Learning's Your Work.
 async function openFeedback(page, title) {
-  if (!q(page, '[data-segment="back"]')) await page.click('[data-tab="assignments"]');
-  await page.click('[data-segment="back"]');
+  await page.click('[data-tab="learning"]');
   const p = piece(page, title);
-  await page.click('.sp-piece[data-piece="' + p.id + '"] [data-act="feedback"]');
+  await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + p.id + '"]');
   return p;
 }
+const critWords = page =>
+  qa(page, '.sp-fb-criterion').map(c => [
+    words(c.querySelector('.sp-fb-crit-name')),
+    words(c.querySelector('.sp-level')),
+    words(c.querySelector('.sp-fb-note')),
+  ]);
 
 const crit = (page, name) =>
   qa(page, '.sp-fb-criterion').find(c => words(c.querySelector('.sp-fb-crit-name')) === name);
@@ -186,40 +191,47 @@ function boardsPage(system) {
   return page;
 }
 
-describe('a returned card opens Your Feedback', () => {
-  it('See Your Feedback is on a returned card with a result, and on no other card', async () => {
+describe('a returned piece opens Your Feedback from My Learning', () => {
+  it('each returned piece with a result opens it from its row in Your Work; no other row, and no card, does', async () => {
     const page = await demo();
-    expect(qa(page, '.sp-deck [data-act="feedback"]')).toHaveLength(0);
-    await page.click('[data-segment="back"]');
-    const withButton = qa(page, '.sp-deck .sp-piece')
-      .filter(c => c.querySelector('[data-act="feedback"]'))
-      .map(c => words(c.querySelector('.sp-piece-title')));
-    expect(withButton).toEqual(
+    expect(qa(page, '[data-act="feedback"]')).toHaveLength(0);
+    await page.click('[data-tab="learning"]');
+    const rows = qa(page, '.sp-ml-work .sp-ml-row[data-act="feedback"]').map(r => r.getAttribute('data-piece'));
+    expect(rows).toEqual(
       viewOf(page)
         .work.filter(p => p.kind === 'back' && p.result.text)
-        .map(p => p.title),
+        .map(p => p.id),
     );
-    expect(words(q(page, '.sp-deck [data-act="feedback"]'))).toBe('See Your Feedback');
+    expect(rows).toContain('demo-lab');
   });
 
-  it('the title, the class and when it came back; nothing is asked of the server', async () => {
+  it('the title and when it came back, with no class name; nothing is asked of the server', async () => {
     const { page } = await real();
     const before = page.calls.length;
     const p = await openFeedback(page, 'Cell Microscope Lab');
     expect(words(q(page, '.sp-fb-title'))).toBe('Cell Microscope Lab');
-    expect(words(q(page, '.sp-fb-sub'))).toMatch(/^Science 8 · Returned \S+ \d+$/);
+    expect(words(q(page, '.sp-fb-sub'))).toMatch(/^Returned \S+ \d+$/);
+    expect(words(q(page, '.sp-fb-sub'))).not.toContain('Science 8');
     expect(page.T.state().feedback).toBe(p.id);
+    expect(page.T.state().tab).toBe('learning');
     expect(page.calls.slice(before).filter(c => c.body.route !== 'seen')).toEqual([]);
-    // On a phone the way back is Assignments; it goes back to the card.
-    expect(words(q(page, '[data-act="feedback-close"]'))).toBe('Assignments');
+    // On a phone the way back is My Learning; it goes back to the piece's row there.
+    expect(words(q(page, '[data-act="feedback-close"]'))).toBe('My Learning');
+    const back = page.run('StudentPageView.press')(
+      page.T.state(),
+      viewOf(page),
+      'feedback-close',
+      q(page, '.sp-fb-back'),
+    );
+    expect(back.focus).toBe('.sp-ml-row[data-piece="' + p.id + '"]');
     await page.click('[data-act="feedback-close"]');
     expect(q(page, '.sp-feedback')).toBeNull();
-    expect(q(page, '.sp-piece.sp-picked .sp-piece-title').textContent).toBe('Cell Microscope Lab');
+    expect(q(page, '.sp-ml-row[data-piece="' + p.id + '"]')).toBeTruthy();
   });
 
-  it('another tab, To Do, Sent or Back, or All Assignments leaves it', async () => {
+  it('another tab leaves it', async () => {
     const page = await demo();
-    for (const sel of ['[data-tab="reports"]', '[data-segment="back"]', '[data-act="all-open"]']) {
+    for (const sel of ['[data-tab="questionnaires"]', '[data-tab="assignments"]', '[data-tab="learning"]']) {
       await openFeedback(page, 'Cell Microscope Lab');
       expect(q(page, '.sp-feedback')).toBeTruthy();
       await page.click(sel);
@@ -230,7 +242,7 @@ describe('a returned card opens Your Feedback', () => {
 });
 
 describe.each(['proficiency', 'letter', 'both'])('Your Result in a %s class', system => {
-  it('the level’s word large with the result beside it, then a row per criterion, all the view’s', async () => {
+  it('the level’s word large, the overall comment, then Your Rubric with each criterion’s level, all the view’s', async () => {
     const { page } = await real(boardsPage(system));
     const p = await openFeedback(page, 'Cell Microscope Lab');
     const big = words(q(page, '.sp-fb-big'));
@@ -248,60 +260,79 @@ describe.each(['proficiency', 'letter', 'both'])('Your Result in a %s class', sy
       expect(q(page, '.sp-fb-beside')).toBeNull();
     }
     expect(q(page, '.sp-fb-big').className).toContain('sp-lvt-' + p.result.level);
-    expect(
-      qa(page, '.sp-fb-row').map(r => [words(r.querySelector('.sp-fb-row-name')), words(r.querySelector('.sp-level'))]),
-    ).toEqual(p.rubric.rows.map(r => [r.name, r.text]));
+    // A rubric piece lists no rows in its result: its criteria are under Your Rubric.
+    expect(qa(page, '.sp-fb-row')).toHaveLength(0);
     expect(words(q(page, '.sp-fb-comment'))).toBe(p.comment);
+    expect(critWords(page).map(c => c.slice(0, 2))).toEqual(p.rubric.rows.map(r => [r.name, r.text]));
+    expect(p.rubric.rows.every(r => r.text)).toBe(true);
+    // The result, then the comment, then Your Rubric.
+    const html = page.root().innerHTML;
+    expect(html.indexOf('sp-fb-big')).toBeLessThan(html.indexOf('sp-fb-comment'));
+    expect(html.indexOf('sp-fb-comment')).toBeLessThan(html.indexOf('>Your Rubric<'));
   });
 });
 
 describe('Your Rubric', () => {
-  it('a Rubric: what the level given means here, what the next level asks, and the criterion’s comment', async () => {
+  it('a Rubric: each criterion’s name, the level given and the teacher’s comment on it, and nothing more', async () => {
     const page = await demo();
     const p = await openFeedback(page, 'Cell Microscope Lab');
     expect(words(q(page, '.sp-fb-section'))).toBe('Your Rubric');
-    const [method, drawing] = p.rubric.rows;
-    expect(parts(crit(page, 'Method'))).toEqual([
-      ['What ' + method.levelName + ' Means Here', [method.descriptor]],
-      ['To Reach ' + method.next.name, [method.next.descriptor]],
+    expect(q(page, 'ul.sp-fb-crits')).toBeTruthy();
+    expect(critWords(page)).toEqual([
+      ['Method', 'Proficient', 'Every step is there, in order.'],
+      ['Labelled Drawing', 'Developing +', 'Label the nucleus and the cell wall.'],
     ]);
-    expect(method.levelName).toBe('Proficient');
-    expect(method.descriptor).toBe('Lists every step in order, so someone else could repeat it.');
-    expect(parts(crit(page, 'Labelled Drawing'))[0][0]).toBe('What Developing Means Here');
-    expect(words(crit(page, 'Labelled Drawing').querySelector('.sp-level'))).toBe(drawing.text);
+    expect(critWords(page)).toEqual(p.rubric.rows.map(r => [r.name, r.text, r.comment]));
+    // What each level means is on The Whole Rubric, not here.
+    const fb = words(q(page, '.sp-feedback'));
+    for (const gone of ['Means Here', 'To Reach', 'What You Showed', 'The Goal', 'Counts toward']) {
+      expect(fb).not.toContain(gone);
+    }
+    for (const row of p.rubric.rows) {
+      for (const d of row.descriptors) expect(fb).not.toContain(d);
+    }
+    expect(qa(page, '.sp-fb-criterion .sp-fb-part')).toHaveLength(0);
     expect(words(q(page, '[data-act="whole"]'))).toBe('See the Whole Rubric');
   });
 
-  it('at the top level there is no next level to reach', async () => {
+  it('a criterion with no comment shows its name and level alone', async () => {
     const reply = boardsPage();
     reply.assessments.find(a => a.id === WORK.lab).grade.criteria[CRITERIA.method].value = 4;
     const { page } = await real(reply);
     await openFeedback(page, 'Cell Microscope Lab');
-    expect(parts(crit(page, 'Method'))).toEqual([['What Extending Means Here', [LEVEL_WORDS[3]]]]);
+    expect(critWords(page)).toEqual([
+      ['Method', 'Extending', ''],
+      ['Labelled Drawing', 'Developing +', ''],
+    ]);
+    expect(qa(page, '.sp-fb-note')).toHaveLength(0);
+    expect(words(q(page, '.sp-feedback'))).not.toContain(LEVEL_WORDS[3]);
   });
 
-  it('an Advanced Rubric: the boxes ticked, then the next level’s boxes still to show', async () => {
+  it('an Advanced Rubric: the level and the comment; the boxes are on The Whole Rubric, ticked ones marked', async () => {
     const { page } = await real(boardsPage());
     await openFeedback(page, 'Conscription Advanced');
-    const c = crit(page, 'Support and Opposition');
-    expect(parts(c)).toEqual([
-      ['What You Showed', ['Explains Borden’s reason with a fact', 'Gives each group’s own reason']],
-      ['To Reach Extending, Also Show', ['Links the groups to Canadian unity']],
+    expect(critWords(page)).toEqual([['Support and Opposition', 'Proficient', 'Add the unity link.']]);
+    expect(qa(page, '.sp-fb-crits .sp-fb-check')).toHaveLength(0);
+    expect(words(q(page, '.sp-feedback'))).not.toContain('Explains Borden’s reason with a fact');
+    await page.click('[data-act="whole"]');
+    const checks = qa(page, '.sp-whole .sp-fb-check').map(k => [
+      words(k),
+      !k.querySelector('.sp-fb-box').classList.contains('sp-fb-box-open'),
     ]);
-    expect(words(c.querySelector('.sp-fb-note'))).toBe('Add the unity link.');
+    expect(checks).toEqual([
+      ['Explains Borden’s reason with a fact', true],
+      ['Gives each group’s own reason', true],
+      ['Links the groups to Canadian unity', false],
+    ]);
   });
 
-  it('a Single-Point Rubric: the goal, then Went Beyond or Work On; no whole rubric to see', async () => {
+  it('a Single-Point Rubric: Went Beyond or Work On, the teacher’s words; no goal and no whole rubric to see', async () => {
     const { page } = await real(boardsPage());
     await openFeedback(page, 'Conscription Single-Point');
-    expect(parts(crit(page, 'Support and Opposition'))).toEqual([
-      ['The Goal', ['Gives each group’s own reason.']],
-      ['Went Beyond', ['You tied the vote to the split.']],
-    ]);
-    expect(parts(crit(page, 'Letter to the Editor'))).toEqual([
-      ['The Goal', ['Gives three of his reasons.']],
-      ['Work On', ['Add a third reason.']],
-    ]);
+    expect(parts(crit(page, 'Support and Opposition'))).toEqual([['Went Beyond', ['You tied the vote to the split.']]]);
+    expect(parts(crit(page, 'Letter to the Editor'))).toEqual([['Work On', ['Add a third reason.']]]);
+    expect(words(q(page, '.sp-feedback'))).not.toContain('The Goal');
+    expect(words(q(page, '.sp-feedback'))).not.toContain('Gives three of his reasons.');
     expect(q(page, '[data-act="whole"]')).toBeNull();
   });
 
@@ -328,14 +359,20 @@ describe('Your Rubric', () => {
 });
 
 describe('What the Levels Mean', () => {
-  it('starts open, above Your Rubric (the board): the four levels with the board’s lines and what + and − mean; it closes', async () => {
+  it('at the foot of Your Feedback, closed at first; it opens on the four levels with the board’s lines and what + and − mean', async () => {
     const page = await demo();
     await openFeedback(page, 'Cell Microscope Lab');
     const btn = () => q(page, '[data-act="levels"]');
     expect(words(btn())).toBe('What the Levels Mean');
-    expect(btn().getAttribute('aria-expanded')).toBe('true');
+    expect(btn().getAttribute('aria-expanded')).toBe('false');
+    expect(q(page, '.sp-fb-levels-shut')).toBeTruthy();
     const html = page.root().innerHTML;
-    expect(html.indexOf('sp-fb-levels')).toBeLessThan(html.indexOf('>Your Rubric<'));
+    expect(html.indexOf('sp-fb-levels')).toBeGreaterThan(html.indexOf('>Your Rubric<'));
+    expect(html.indexOf('sp-fb-levels')).toBeGreaterThan(html.indexOf('data-act="whole"'));
+    expect(q(page, '.sp-feedback').lastElementChild.classList.contains('sp-fb-levels')).toBe(true);
+    await page.click('[data-act="levels"]');
+    expect(btn().getAttribute('aria-expanded')).toBe('true');
+    expect(q(page, '.sp-fb-levels-shut')).toBeNull();
     expect(
       qa(page, '.sp-fb-legend-row').map(r => [words(r.querySelector('.sp-level')), words(r.lastElementChild)]),
     ).toEqual([
@@ -383,22 +420,24 @@ describe('The Whole Rubric', () => {
 });
 
 describe('work not back yet', () => {
-  it('its card says What You’re Graded On; See the Rubric shows the rubric with no level, and goes back to the card', async () => {
+  it('its Upcoming card has See the Rubric and no What You’re Graded On; the rubric shows with no level, and goes back to the card', async () => {
     const { page } = await real(boardsPage());
+    await page.click('[data-segment="upcoming"]');
     const card = qa(page, '.sp-deck .sp-piece').find(
       c => words(c.querySelector('.sp-piece-title')) === 'Wartime Elections Letter',
     );
-    expect(words(card.querySelector('.sp-graded-on-title'))).toBe('What You’re Graded On');
-    expect([...card.querySelectorAll('.sp-graded-on-name')].map(words)).toEqual([
-      'Questioning and Predicting',
-      'Communicating',
-    ]);
-    await page.click('.sp-piece[data-piece="' + A_TODO + '"] [data-act="whole"]');
+    expect(card).toBeTruthy();
+    expect(card.querySelector('.sp-graded-on-title')).toBeNull();
+    expect(words(card)).not.toContain('What You’re Graded On');
+    expect(words(card.querySelector('.sp-rubric-link'))).toBe('See the Rubric');
+    await page.click('.sp-piece[data-piece="' + A_TODO + '"] .sp-rubric-link');
     expect(words(q(page, '.sp-fb-title'))).toBe('The Whole Rubric');
     expect(qa(page, '.sp-fb-you')).toHaveLength(0);
     expect(qa(page, '.sp-fb-whole-level')).toHaveLength(8);
+    expect(words(q(page, '.sp-whole'))).toContain(LEVEL_WORDS[0]);
     expect(words(q(page, '[data-act="whole-close"]'))).toBe('Assignments');
     await page.click('[data-act="whole-close"]');
+    expect(page.T.state().segment).toBe('upcoming');
     expect(q(page, '.sp-piece.sp-picked .sp-piece-title').textContent).toBe('Wartime Elections Letter');
   });
 
@@ -432,18 +471,18 @@ describe('opened means opened', () => {
 
 describe('Preview as Student draws the same feedback', () => {
   it.each([
-    ['Your Feedback', { feedback: WORK.lab, segment: 'back', pick: WORK.lab, levels: true }],
-    ['The Whole Rubric', { feedback: WORK.lab, whole: true, segment: 'back', pick: WORK.lab }],
-    ['a points piece', { feedback: WORK.quiz, segment: 'back', pick: WORK.quiz }],
+    ['Your Feedback', { feedback: WORK.lab, pick: WORK.lab, levels: true }],
+    ['The Whole Rubric', { feedback: WORK.lab, whole: true, pick: WORK.lab }],
+    ['a points piece', { feedback: WORK.quiz, pick: WORK.quiz }],
   ])('%s: the same HTML, character for character', async (name, ui) => {
     const { page } = await real(boardsPage('both'));
-    Object.assign(page.T.state(), ui, { tab: 'assignments', all: false });
+    Object.assign(page.T.state(), ui, { tab: 'learning' });
     page.run('StudentPage.paint')();
     const view = JSON.parse(JSON.stringify(viewOf(page)));
     const student = q(page, '.sp-view').outerHTML;
     expect(student).toContain('sp-feedback');
     const box = page.root().ownerDocument.createElement('div');
-    box.innerHTML = globalThis.PreviewStudent.drawPage(view, Object.assign({ tab: 'assignments', all: false }, ui));
+    box.innerHTML = globalThis.PreviewStudent.drawPage(view, Object.assign({ tab: 'learning' }, ui));
     expect(box.innerHTML).toBe(student);
   });
 });

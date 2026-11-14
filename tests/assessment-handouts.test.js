@@ -218,7 +218,13 @@ describe('in Demo Mode', () => {
     expect(built.ready).toBe(true);
     const p = built.view.work.find(x => x.id === AID);
     expect(p.resources.map(r => r.kind)).toEqual(['handout', 'link', 'link']);
-    const { document } = parseHTML('<main>' + StudentPageView.html(built.view, { pick: AID }) + '</main>');
+    // Due next week: its card is on Upcoming, not Outstanding.
+    expect(StudentPageView.segmentOf(p, built.view)).toBe('upcoming');
+    const outstanding = parseHTML('<main>' + StudentPageView.html(built.view, { pick: AID }) + '</main>').document;
+    expect(outstanding.querySelector('.sp-piece[data-piece="' + AID + '"]')).toBeNull();
+    const { document } = parseHTML(
+      '<main>' + StudentPageView.html(built.view, { segment: 'upcoming', pick: AID }) + '</main>',
+    );
     const card = document.querySelector('.sp-piece[data-piece="' + AID + '"]');
     const block = card.querySelector('.sp-res');
     expect(block.previousElementSibling.className).toBe('sp-piece-about');
@@ -265,11 +271,15 @@ describe('in Demo Mode', () => {
   it('a handout opens in the page, one page at a time, and Back goes to its card', async () => {
     const h = await addAssessmentHandout(CID, AID, 'Density Lab Instructions', shrunk(2));
     const view = StudentView.fromCache(CID, SID).view;
-    const { document } = parseHTML('<main>' + StudentPageView.html(view, { pick: AID }) + '</main>');
-    const row = document.querySelector('[data-act="handout"]');
-    const opened = StudentPageView.press({ pick: AID }, view, 'handout', row);
+    const { document } = parseHTML(
+      '<main>' + StudentPageView.html(view, { segment: 'upcoming', pick: AID }) + '</main>',
+    );
+    const row = document.querySelector('.sp-piece[data-piece="' + AID + '"] [data-act="handout"]');
+    const opened = StudentPageView.press({ segment: 'upcoming', pick: AID }, view, 'handout', row);
     expect(opened.handout).toEqual({ piece: AID, resource: h.resource.id });
     expect(opened.focus).toBe('#sp-handout-title');
+    // It opens where its card lives: Assignments, on Upcoming.
+    expect([opened.ui.tab, opened.ui.segment, opened.ui.pick]).toEqual(['assignments', 'upcoming', AID]);
     let ui = opened.ui;
     expect(StudentPageView.html(view, ui)).toContain('Getting the handout…');
     ui = Object.assign({}, ui, {
@@ -292,6 +302,8 @@ describe('in Demo Mode', () => {
     const back = StudentPageView.press(ui, view, 'handout-close', null);
     expect(back.ui.handout).toBe('');
     expect(back.focus).toBe('[data-act="handout"][data-resource="' + h.resource.id + '"]');
+    const card = parseHTML('<main>' + StudentPageView.html(view, back.ui) + '</main>').document;
+    expect(card.querySelector('.sp-piece.sp-picked[data-piece="' + AID + '"] [data-act="handout"]')).toBeTruthy();
     // Any other press leaves it too.
     const tab = parseHTML('<main>' + html + '</main>').document.querySelector('[data-act="segment"]');
     expect(StudentPageView.press(ui, view, 'segment', tab).ui.handout).toBe('');
