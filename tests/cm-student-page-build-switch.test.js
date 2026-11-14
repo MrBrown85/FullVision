@@ -385,6 +385,10 @@ describe('Class Settings: the student page’s build switch', () => {
         const online = Object.getOwnPropertyDescriptor(navigator, 'onLine');
         Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
         try {
+          // The draws above ask for the categories a timer tick later
+          // (_cmCatPrepare): let that read go first, so only the flip is watched.
+          await new Promise(r => setTimeout(r, 0));
+          await settle();
           session.since();
           flip(LIVE, true);
           await settle();
