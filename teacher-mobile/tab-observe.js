@@ -11,6 +11,13 @@ window.MObserve = (function () {
   var _pendingDeletes = {};
   var UNDO_MS = 6000;
 
+  /* The feed draws the newest FEED_PAGE observations, and FEED_PAGE more on
+     each Show More: a class's whole year of notes is never drawn at once.
+     A visit or a filter starts again at FEED_PAGE; a save, an edit or a
+     delete keeps what is shown, so a card below the first page stays. */
+  var FEED_PAGE = 30;
+  var _feedShown = FEED_PAGE;
+
   /* Type, context and tags render as text; tags keep their colour dot. */
   function typePill(sentiment) {
     var s = OBS_SENTIMENTS[sentiment];
@@ -156,7 +163,8 @@ window.MObserve = (function () {
     });
     quickBar += '</div>';
 
-    // Render observation cards grouped by date
+    // Render observation cards grouped by date, the newest first page of them
+    _feedShown = FEED_PAGE;
     var cardHTML = _renderObsCards(cid, getAllQuickObs(cid), 'all');
 
     // FAB
@@ -180,8 +188,8 @@ window.MObserve = (function () {
     );
   }
 
-  // html-safe: fixed markup, the escaped day label, and cardHtml (checked above).
-  function _renderObsCards(cid, allObs, filter) {
+  // The feed's observations under a filter, newest first.
+  function _feedList(allObs, filter) {
     var filtered = allObs.filter(function (ob) {
       return !_pendingDeletes[ob.id];
     });
@@ -209,15 +217,17 @@ window.MObserve = (function () {
     filtered.sort(function (a, b) {
       return new Date(b.created) - new Date(a.created);
     });
+    return filtered;
+  }
 
-    if (!filtered.length) {
-      return '<div class="m-empty"><div class="m-empty-title">No observations</div><div class="m-empty-subtitle">Tap + to record one</div></div>';
-    }
-
+  // html-safe: fixed markup, the escaped day label, and cardHtml (checked above).
+  // The cards from `from` up to `to`, each day's header once (a page that
+  // starts mid-day goes on under the day already shown).
+  function _feedCardsHtml(cid, list, from, to) {
     var ctx = ObsCard.context(cid, { hidden: _pendingDeletes });
     var html = '';
-    var lastGroup = '';
-    filtered.forEach(function (ob) {
+    var lastGroup = from > 0 ? dayLabel(ObsCard.obDay(list[from - 1])) : '';
+    list.slice(from, to).forEach(function (ob) {
       var group = dayLabel(ObsCard.obDay(ob));
       if (group !== lastGroup) {
         html += '<div class="m-obs-date-group">' + MC.esc(group) + '</div>';
@@ -225,13 +235,51 @@ window.MObserve = (function () {
       }
       html += cardHtml(cid, ob, ctx);
     });
-
     return html;
+  }
+
+  // html-safe: fixed words and numbers.
+  function _feedMoreHtml(shown, total) {
+    if (shown >= total) return '';
+    return (
+      '<div class="m-obs-more-wrap"><button type="button" class="m-obs-more">Show More</button>' +
+      '<div class="m-obs-more-count">Showing ' +
+      shown +
+      ' of ' +
+      total +
+      '.</div></div>'
+    );
+  }
+
+  // html-safe: the empty state is fixed markup; the rest is _feedCardsHtml and _feedMoreHtml.
+  function _renderObsCards(cid, allObs, filter) {
+    var list = _feedList(allObs, filter);
+    if (!list.length) {
+      return '<div class="m-empty"><div class="m-empty-title">No observations</div><div class="m-empty-subtitle">Tap + to record one</div></div>';
+    }
+    var shown = Math.min(_feedShown, list.length);
+    return _feedCardsHtml(cid, list, 0, shown) + _feedMoreHtml(shown, list.length);
+  }
+
+  /* Show More: the next page of cards goes under the ones drawn; nothing
+     above them is drawn again. */
+  function showMore(cid) {
+    var container = document.getElementById('m-obs-cards');
+    if (!container) return;
+    var list = _feedList(getAllQuickObs(cid), _activeFilter);
+    var from = Math.min(_feedShown, list.length);
+    _feedShown = from + FEED_PAGE;
+    var to = Math.min(_feedShown, list.length);
+    var more = container.querySelector('.m-obs-more-wrap');
+    if (more) more.remove();
+    // html-safe: _feedCardsHtml and _feedMoreHtml are checked above.
+    container.insertAdjacentHTML('beforeend', _feedCardsHtml(cid, list, from, to) + _feedMoreHtml(to, list.length));
   }
 
   /* ── Apply filter ───────────────────────────────────────────── */
   function applyFilter(cid, filter) {
     _activeFilter = filter;
+    _feedShown = FEED_PAGE;
     // Update pill active states
     document.querySelectorAll('.m-filter-pill').forEach(function (pill) {
       pill.classList.toggle('m-filter-active', pill.getAttribute('data-filter') === filter);
@@ -1134,6 +1182,9 @@ window.MObserve = (function () {
     document.addEventListener('touchend', _swipeEnd);
     document.addEventListener('touchcancel', _swipeEnd);
     document.addEventListener('click', _swipeClick, true);
+    document.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('#m-obs-cards .m-obs-more')) showMore(getActiveCourse());
+    });
   }
 
   function _refreshFeed(cid, highlightFirst) {
@@ -1158,6 +1209,7 @@ window.MObserve = (function () {
     renderFeed: renderFeed,
     isPending: isPending,
     applyFilter: applyFilter,
+    showMore: showMore,
     presentNewObsSheet: presentNewObsSheet,
     resetSheetState: resetSheetState,
     toggleStudentPicker: toggleStudentPicker,
