@@ -420,6 +420,7 @@ function _teacherCardsUrl() {
 async function _teacherToken() {
   var sb = getSupabase();
   if (!sb || !sb.auth || typeof sb.auth.getSession !== 'function') return null;
+  if (_signInWait) await _signInWait; // teacher-cards waits for start-up's re-check
   try {
     var got = await sb.auth.getSession();
     var session = got && got.data && got.data.session;

@@ -115,7 +115,19 @@ function pageHelpers() {
     };
   }
 
-  window.T = { exifSegment, withExif, toBlob, worksheet, quarters, corners };
+  // Every picture createImageBitmap hands PhotoShrink from now on, by its long side (speed, B3).
+  function watchDecodes() {
+    const seen = [];
+    const real = window.createImageBitmap;
+    window.createImageBitmap = (...args) =>
+      real(...args).then(bitmap => {
+        seen.push(Math.max(bitmap.width, bitmap.height));
+        return bitmap;
+      });
+    return () => ((window.createImageBitmap = real), seen);
+  }
+
+  window.T = { exifSegment, withExif, toBlob, worksheet, quarters, corners, watchDecodes };
 }
 
 async function openBlank(page) {
@@ -135,7 +147,9 @@ test.describe('PhotoShrink in a browser', () => {
       const shot = await T.toBlob(T.worksheet(4000, 3000, 6), 'image/jpeg', 0.92);
       const file = await T.withExif(shot, 1, true);
       const before = PhotoShrink.readExif(new Uint8Array(await file.arrayBuffer()));
+      const done = T.watchDecodes();
       const res = await PhotoShrink.prepare(file);
+      const decodes = done();
       const p = res.pages[0];
       const bytes = new Uint8Array(await p.blob.arrayBuffer());
       const thumbBytes = new Uint8Array(await p.thumb.arrayBuffer());
@@ -145,6 +159,7 @@ test.describe('PhotoShrink in a browser', () => {
       return {
         inputBytes: file.size,
         before,
+        decodes,
         ok: res.ok,
         kind: res.kind,
         width: p.width,
@@ -174,6 +189,8 @@ test.describe('PhotoShrink in a browser', () => {
 
     expect(out.ok).toBe(true);
     expect(out.kind).toBe('jpeg');
+    // Decoded at 2000 px, never whole (4000 px).
+    expect(out.decodes).toEqual([2000]);
     expect([out.width, out.height]).toEqual([2000, 1500]);
     expect(out.decoded).toEqual([2000, 1500]);
     expect(out.type).toBe('image/jpeg');
@@ -231,10 +248,15 @@ test.describe('PhotoShrink in a browser', () => {
     await openBlank(page);
     const out = await page.evaluate(async () => {
       const shot = await T.toBlob(T.worksheet(4000, 3000, 0), 'image/jpeg', 0.9);
-      const page = (await PhotoShrink.prepare(await T.withExif(shot, 6, true))).pages[0];
-      return { width: page.width, height: page.height, bytes: page.bytes, max: PhotoShrink.MAX_BYTES };
+      const file = await T.withExif(shot, 6, true);
+      const done = T.watchDecodes();
+      const page = (await PhotoShrink.prepare(file)).pages[0];
+      const decodes = done();
+      return { width: page.width, height: page.height, bytes: page.bytes, max: PhotoShrink.MAX_BYTES, decodes };
     });
     expect([out.width, out.height]).toEqual([1500, 2000]);
+    // The page's own decode at 2000 px (beside the 2-pixel check of whether the browser turns photos).
+    expect(out.decodes.filter(n => n > 2)).toEqual([2000]);
     expect(out.bytes).toBeLessThan(out.max);
   });
 

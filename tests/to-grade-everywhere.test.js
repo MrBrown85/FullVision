@@ -242,7 +242,7 @@ describe('the Assignments page', () => {
     const btn = document.querySelector('.assess-work-wall-btn[data-aid="' + LAB + '"]');
     expect(btn.textContent).toBe('Work Wall');
     click(btn);
-    expect(opened).toHaveBeenCalledWith(CID, LAB);
+    expect(opened).toHaveBeenCalledWith(CID, LAB, { onClose: expect.any(Function) });
     opened.mockRestore();
     closePages();
     // Send Work off: the pieces with work in keep the wall.

@@ -588,7 +588,6 @@ window.PageGradebook = (function () {
     var refocusHeadAid = refocusHead ? refocusHead.dataset.aid : null;
     // html-safe: names, titles and category/section/module names are escaped; colours go through cssColor; grades come from calc.js.
     document.getElementById('main').innerHTML = html;
-    applyStickyLeft();
     initScrollShadows();
     initGridScrollSync();
     if (keepScroll) restoreGridScroll(keepScroll);
@@ -644,7 +643,7 @@ window.PageGradebook = (function () {
     td.classList.add('gb-focus');
     td.tabIndex = 0;
     if (focus !== false) td.focus({ preventScroll: true });
-    td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    GradebookChrome.scrollToCell(td);
     return td;
   }
   function _clearSelection() {
@@ -1211,8 +1210,8 @@ window.PageGradebook = (function () {
     return '<div class="gb-empty"><p class="gb-empty-text">' + text + '</p>' + (action || '') + '</div>';
   }
 
-  /* The grid's row and column hover, scroll sync, sticky Overall column,
-     header height and slanted header hit-test are teacher/gradebook-chrome.js. */
+  /* The grid's row and column hover, scroll sync, header height and
+     slanted header hit-test are teacher/gradebook-chrome.js. */
   function initGridHoverSync() {
     return GradebookChrome.initGridHoverSync();
   }
@@ -1221,9 +1220,6 @@ window.PageGradebook = (function () {
   }
   function restoreGridScroll(pos) {
     return GradebookChrome.restoreGridScroll(pos);
-  }
-  function applyStickyLeft() {
-    return GradebookChrome.applyStickyLeft();
   }
   function initHeaderResize() {
     return GradebookChrome.initHeaderResize();
@@ -1488,7 +1484,7 @@ window.PageGradebook = (function () {
     var sortedStudents = GradebookChrome.sortRows(cid, students, sortCol);
 
     // 4-quadrant grid layout
-    var html = '<div class="gb-grid gb-grid-comp">';
+    var html = '<div' + _headStyle('--gb-head-h', GradebookChrome.headerHeight([])) + ' class="gb-grid gb-grid-comp">';
 
     // Q1: Corner (Student + Overall labels)
     html +=
@@ -1617,7 +1613,7 @@ window.PageGradebook = (function () {
         '</div>';
     });
     html += '</div>';
-    html += '</div></div>';
+    html += '</div>' + HEAD_HANDLE + '</div>';
     _parts.head = html;
     _parts.students = sortedStudents;
     var t = (_parts.t = { cols: cols, map: colGroupMap, assessments: assessments, sections: sections, scores: scores });
@@ -1915,6 +1911,26 @@ window.PageGradebook = (function () {
     );
   }
 
+  /* A slanted title's second line: the date, what points work is out of
+     (Complete/Incomplete has no total), Pair or Group, Needs a Category.
+     `text` is what it reads, for the header's height. */
+  function _titleMeta(cid, a) {
+    var m = { date: formatShortDate(a.date), collab: _collabMetaText(a), needs: assessmentNeedsCategory(cid, a) };
+    m.maxPts =
+      isPointsScored(a) && !isCompletionScored(a) ? (m.date ? ' \u00b7 ' : '') + 'Out of ' + (a.maxPoints || 100) : '';
+    m.sep = m.date || m.maxPts ? ' \u00b7 ' : '';
+    m.text = m.date + m.maxPts + (m.collab ? m.sep + m.collab : '') + (m.needs ? m.sep + NEEDS_CATEGORY_LABEL : '');
+    return m;
+  }
+
+  /* The header's height on the grid (--gb-head-h) or a title (height), written
+     with the HTML; '' when it is set once the draw is on the page
+     (GradebookChrome.headerHeight). The drag handle under the headers. */
+  function _headStyle(prop, px) {
+    return px ? ' style="' + prop + ':' + px + 'px"' : '';
+  }
+  var HEAD_HANDLE = '<div class="gb-header-resize-handle"></div>';
+
   /* ══════════════════════════════════════════════════════════
      SCORES VIEW — Apple Numbers-inspired spreadsheet
      ══════════════════════════════════════════════════════════ */
@@ -1930,8 +1946,18 @@ window.PageGradebook = (function () {
     var html = '';
     var rowPx = 40;
 
+    // The titles' second lines, and the header's height for them, before anything is written.
+    var metas = sortedAssess.map(function (a) {
+      return _titleMeta(cid, a);
+    });
+    var headH = GradebookChrome.headerHeight(
+      sortedAssess.map(function (a, i) {
+        return { name: a.title, meta: metas[i].text };
+      }),
+    );
+
     // 4-quadrant grid: corner | col-headers / row-headers | data
-    html += '<div class="gb-grid">';
+    html += '<div' + _headStyle('--gb-head-h', headH) + ' class="gb-grid">';
 
     // Q1: Corner (top-left, fixed)
     html +=
@@ -1950,15 +1976,12 @@ window.PageGradebook = (function () {
     })
       ? _colheadStopAid
       : sortedAssess[0] && sortedAssess[0].id;
-    sortedAssess.forEach(function (a) {
+    sortedAssess.forEach(function (a, ai) {
+      var m = metas[ai];
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
       var typeClass = _getAssessmentAccentClass(a, 'gb-scores');
       var isScoreOnly = isPointsScored(a);
-      var shortDate = formatShortDate(a.date);
-      // Points work says what it's out of; Complete/Incomplete has no total.
-      var maxPts =
-        isScoreOnly && !isCompletionScored(a) ? (shortDate ? ' \u00b7 ' : '') + 'Out of ' + (a.maxPoints || 100) : '';
       var tagSecs = (a.tagIds || [])
         .map(function (tid) {
           return getSectionForTag(cid, tid);
@@ -1968,7 +1991,9 @@ window.PageGradebook = (function () {
       var fillColor = isScoreOnly ? 'var(--surface)' : stripeColor;
       var stripeBottom = isScoreOnly ? 'var(--border)' : stripeColor;
       html +=
-        '<div class="gb-grid-colhead' +
+        '<div' +
+        _headStyle('height', headH) +
+        ' class="gb-grid-colhead' +
         typeClass +
         (isScoreOnly ? ' gb-colhead-score-only' : '') +
         '" data-aid="' +
@@ -1989,11 +2014,11 @@ window.PageGradebook = (function () {
         esc(a.title) +
         '</span><span class="gb-colhead-menu-mark" aria-hidden="true">\u25BE</span></span>' +
         '<span class="gb-scores-assess-meta">' +
-        shortDate +
-        maxPts +
-        (_collabMetaText(a) ? (shortDate || maxPts ? ' \u00b7 ' : '') + _collabMetaText(a) : '') +
-        (assessmentNeedsCategory(cid, a)
-          ? (shortDate || maxPts ? ' \u00b7 ' : '') +
+        m.date +
+        m.maxPts +
+        (m.collab ? m.sep + m.collab : '') +
+        (m.needs
+          ? m.sep +
             '<span class="gb-needs-category" title="' +
             esc(NEEDS_CATEGORY_TIP) +
             '">' +
@@ -2008,7 +2033,7 @@ window.PageGradebook = (function () {
         '"></div>' +
         '</div>';
     });
-    html += '</div></div>';
+    html += '</div>' + HEAD_HANDLE + '</div>';
     _parts.head = html;
     _parts.students = sortedStudents;
     var t = (_parts.t = { assessments: sortedAssess, sections: sections });

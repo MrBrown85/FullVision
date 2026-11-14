@@ -40,6 +40,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parseHTML } from 'linkedom';
+import { runInThisContext } from 'vm';
 import {
   U,
   seedClass,
@@ -319,6 +320,8 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
       expect(levels.length).toBeGreaterThan(8);
       click(levels[5]);
     });
+    step('Assignments: close the card', () => click(card(AIDS[0]).querySelector('.assess-title')));
+    expect(card(AIDS[0]).querySelector('.rsg-criterion-row'), 'the card did not close').toBeNull();
   });
 
   it('the Gradebook', () => {
@@ -357,6 +360,25 @@ describe('a class the size of History 12, with 635 pieces of work in', { timeout
         [IDS[3]].filter(e => e.assessmentId === AIDS[1])
         .map(e => e.score),
     ).toEqual([Number(typed), Number(typed)]);
+  });
+
+  it('the Gradebook with Class Results open', () => {
+    if (!window.ClassResults)
+      runInThisContext(readFileSync('teacher/class-results.js', 'utf-8'), { filename: 'teacher/class-results.js' });
+    mount(quietSeed, { course: CID });
+    showCompetencies();
+    // Open on one piece; a score typed on another.
+    ClassResults.open(CID, AIDS[3]);
+    expect(document.querySelector('#class-results'), 'Class Results did not open').not.toBeNull();
+    const cell = document.querySelector(
+      '#gb-data td.gb-score[data-aid="' + AIDS[1] + '"][data-sid="' + IDS[4] + '"][data-tid="' + TAGS[0] + '"]',
+    );
+    cell.classList.add('gb-focus');
+    cell.focus();
+    const typed =
+      getScores(CID)[IDS[4]].find(e => e.assessmentId === AIDS[1] && e.tagId === TAGS[0]).score === 4 ? '3' : '4';
+    step('Gradebook: type a score with Class Results open', () => key(cell, typed));
+    ClassResults.close();
   });
 
   it('the grader', () => {
