@@ -887,6 +887,24 @@ function _workQueued(endpoint, match) {
   });
 }
 
+/* _workQueued for several endpoints from one read of the outbox: a function
+   (endpoint, match) answering as _workQueued does, for the endpoints named. */
+function _workQueuedReader(endpoints) {
+  var q = window.v2Queue;
+  if (!q || typeof q.queued !== 'function' || typeof q.queuedEach !== 'function') return _workQueued;
+  var each = {};
+  try {
+    each = q.queuedEach(endpoints) || {};
+  } catch (e) {
+    each = {};
+  }
+  return function (endpoint, match) {
+    return (each[endpoint] || []).filter(function (e) {
+      return e && e.payload && match(e.payload);
+    });
+  };
+}
+
 function _workAssessmentOfClass(cid, aid) {
   return (getAssessments(cid) || []).some(function (a) {
     return a && a.id === aid;
@@ -900,8 +918,15 @@ function _workAssessmentOfClass(cid, aid) {
 function _workServerView(cid) {
   if (_workViewMemo[cid]) return _workViewMemo[cid];
   var srv = _workServer[cid] || null;
+  // The outbox read once for the four endpoints below, not once for each.
+  var queuedTo = _workQueuedReader([
+    'set_course_send_work',
+    'set_assessment_student_work',
+    'delete_submission',
+    'mark_handed_in_paper',
+  ]);
   var course = Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _workCourseRow[cid] || {});
-  _workQueued('set_course_send_work', function (p) {
+  queuedTo('set_course_send_work', function (p) {
     return p.p_course_id === cid;
   }).forEach(function (e) {
     if (_plainObject(e.payload.p_patch)) Object.assign(course, e.payload.p_patch);
@@ -912,7 +937,7 @@ function _workServerView(cid) {
   ((srv && srv.assessments) || []).forEach(function (a) {
     if (a && a.id) byId[a.id] = _studentWorkCopy(a);
   });
-  _workQueued('set_assessment_student_work', function (p) {
+  queuedTo('set_assessment_student_work', function (p) {
     return _workAssessmentOfClass(cid, p.p_assessment_id);
   }).forEach(function (e) {
     var aid = e.payload.p_assessment_id;
@@ -925,7 +950,7 @@ function _workServerView(cid) {
   var subs = _studentWorkCopy((srv && srv.submissions) || []);
   // Deleted here, not answered yet.
   var deleted = {};
-  _workQueued('delete_submission', function () {
+  queuedTo('delete_submission', function () {
     return true;
   }).forEach(function (e) {
     deleted[e.payload.p_submission_id] = true;
@@ -942,7 +967,7 @@ function _workServerView(cid) {
     return at || new Date().toISOString();
   };
   // Handed In on Paper, not answered yet.
-  _workQueued('mark_handed_in_paper', function (p) {
+  queuedTo('mark_handed_in_paper', function (p) {
     return _workAssessmentOfClass(cid, p.p_assessment_id);
   }).forEach(function (e) {
     var aid = e.payload.p_assessment_id;
