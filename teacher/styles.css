@@ -180,6 +180,16 @@
   --sidebar-w: 240px;
 }
 
+/* The printable QR slips (qr-slips.css, linked for print only) are drawn into
+   this box, kept off screen until they are printed. */
+#qr-slips-root {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  width: 8in;
+  pointer-events: none;
+}
+
 /* Printed sheets keep their print sizes. The progress report preview is
    the printout, so it keeps them on screen too. */
 @media print {
@@ -684,20 +694,26 @@ body.offline-active #app-dock {
   font-family: var(--font-base);
   color: var(--text);
 }
-/* Panel motion: the width runs between 0 and 400px while the content keeps
-   its full width, so it slides in from the edge instead of squashing. */
+/* Panel motion: the panel slides with transform. The page beside it takes its
+   new width once, as the slide starts. Closing, the panel's -400px margin
+   gives it no width in the row, so the page grows at once while the panel
+   slides out over it. */
 @media (prefers-reduced-motion: no-preference) {
   .help-panel.help-sliding {
-    overflow: hidden;
-    transition: width var(--motion-panel) var(--motion-ease);
+    position: relative;
+    z-index: 3;
+    transform: translateX(0);
+    transition: transform var(--motion-panel) var(--motion-ease);
+    will-change: transform;
+  }
+  .help-panel.help-sliding.help-entering {
+    transform: translateX(100%);
   }
   .help-panel.help-sliding.help-closing {
+    margin-left: -400px;
+    transform: translateX(100%);
     transition-duration: 200ms;
     transition-timing-function: var(--motion-ease-in);
-  }
-  .help-panel.help-sliding > * {
-    width: 399px;
-    flex-shrink: 0;
   }
 }
 @media print {
@@ -1646,20 +1662,25 @@ body.offline-active #app-dock {
 
 /* ── Panel motion ──────────────────────────────────────────────
    Only while ui.js has set a class for a button press: the student list and
-   the Help panel slide, and the page beside them resizes with them. */
+   the Help panel slide with transform, which costs no layout per frame. The
+   page beside them takes its new width once, as the slide starts. */
 @media (prefers-reduced-motion: no-preference) {
+  /* Opening: the list's column is full width at once and the list slides in,
+     clipped to its column. Closing: the column is 0 wide at once and the list
+     slides out over the page, which has already grown. */
   .page-layout.sidebar-sliding #sidebar-mount {
+    position: relative;
+    z-index: 3;
     overflow: hidden;
-    transition: width var(--motion-panel) var(--motion-ease);
   }
   .page-layout.sidebar-sliding.sidebar-hidden #sidebar-mount {
-    transition-timing-function: var(--motion-ease-in);
-    transition-duration: 200ms;
+    overflow: visible;
   }
   .page-layout.sidebar-sliding #sidebar-mount #gb-sidebar {
     display: flex;
     transform: translateX(0);
     transition: transform var(--motion-panel) var(--motion-ease);
+    will-change: transform;
   }
   .page-layout.sidebar-sliding.sidebar-hidden #sidebar-mount #gb-sidebar {
     transform: translateX(-100%);

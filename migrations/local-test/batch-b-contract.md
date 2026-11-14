@@ -368,6 +368,10 @@ Signed-in teachers, through the API. Each checks the caller owns the class. Each
 - A submission changing does not move the class's sync cursor. Call this when the grader or the Assignments page opens, and again when you need it fresh.
 - "Same photo as": two pages of one assessment with the same `sha256`.
 
+### `list_course_submissions_since(p_course_id uuid, p_version text)`
+
+The same list, or a few bytes when the browser already holds it (migration `2026111310`, 2026-11-13). It calls `list_course_submissions`, so who may read what is decided there. `p_version` null: the whole list, with `"version"` added (the md5 of the list). `p_version` equal to that md5: `{ "unchanged": true, "version": "<md5>" }` and nothing else. Any other `p_version`: the whole list. The browser keeps the version beside its copy, sends it with every read, and forgets it whenever it changes its own copy (a write of its own landing, a setting saved), so the next read is whole. The teacher's screens read through this one; `list_course_submissions` stays for anything that wants the list alone.
+
 ### `start_work_upload(p_assessment_id uuid, p_enrollment_id uuid, p_pages jsonb, p_mode text, p_idempotency_key uuid)`
 
 Add Work, first half. `p_mode`: `new`, `add` (Add as More Pages) or `replace` (Replace Them: every page of what is in goes, the student's among them). `p_pages` as for `send_start`. Works whatever Send Work and Students Send say.

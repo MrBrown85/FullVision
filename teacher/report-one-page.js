@@ -137,6 +137,7 @@ window.ReportOnePage = (function () {
     var sid = student.id;
     var seen = {};
     var cells = _cells(preview);
+    var rows = [];
     cells.forEach(function (cell) {
       var key = cell.getAttribute('data-part');
       if (key === 'header') return;
@@ -156,8 +157,14 @@ window.ReportOnePage = (function () {
         }
         _chip(cell, h, api, m, key, student);
       }
-      _rowButtons(cell, key);
+      var r = _rowsOf(cell, key);
+      if (r) rows.push(r);
     });
+    // Every row is read, then every − placed: the page is laid out once,
+    // not once a row. (Nothing written above moves a row within its sheet
+    // once its own part's controls are in: parts stack, top-aligned.)
+    rows.forEach(_readRows);
+    rows.forEach(_rowButtons);
   }
 
   /* The dashed chip beside a heading: rows left off this part. */
@@ -193,12 +200,14 @@ window.ReportOnePage = (function () {
   }
 
   /* A − button beside each row that can be left off, in the page's left
-     margin (the sheet's body clips what overflows it). */
-  function _rowButtons(cell, key) {
+     margin (the sheet's body clips what overflows it). In three steps, so
+     no read follows a write: a cell's rows and its sheet's layer
+     (_rowsOf), every rect (_readRows), then the buttons (_rowButtons). */
+  function _rowsOf(cell, key) {
     var rows = cell.querySelectorAll('[data-row]');
-    if (!rows.length) return;
+    if (!rows.length) return null;
     var sheet = cell.closest('.report-sheet');
-    if (!sheet) return;
+    if (!sheet) return null;
     var layer = null;
     _each(sheet.children, function (x) {
       if (x.classList.contains('one-rows')) layer = x;
@@ -207,22 +216,32 @@ window.ReportOnePage = (function () {
       layer = _el('div', MINE + ' no-print one-rows');
       sheet.appendChild(layer);
     }
-    var sr = _rect(sheet);
-    var scale = sheet.offsetWidth ? sr.width / sheet.offsetWidth || 1 : 1;
-    _each(rows, function (row) {
+    return { key: key, rows: rows, sheet: sheet, layer: layer };
+  }
+  function _readRows(job) {
+    var sheet = job.sheet;
+    job.sr = _rect(sheet);
+    job.scale = sheet.offsetWidth ? job.sr.width / sheet.offsetWidth || 1 : 1;
+    job.rects = Array.prototype.map.call(job.rows, _rect);
+  }
+  function _rowButtons(job) {
+    var key = job.key;
+    var sr = job.sr;
+    var scale = job.scale;
+    _each(job.rows, function (row, i) {
       var rowKey = row.getAttribute('data-row');
       var name = key === 'assessments' ? _rowName(row) : rowKey;
       var b = _btn('one-rm', '', 'oneRowOff', { part: key, row: rowKey });
       b.setAttribute('aria-label', 'Remove ' + name + ' from the report');
       b.setAttribute('title', 'Remove from the report');
       b.appendChild(_el('span', '', '−')).setAttribute('aria-hidden', 'true');
-      var rr = _rect(row);
+      var rr = job.rects[i];
       // Positions in px to a tenth (Math.round: toFixed is kept for grades, in calc.js).
       b.style.top = Math.round(((rr.top - sr.top) / scale + rr.height / scale / 2) * 10) / 10 + 'px';
       b.style.left = Math.round(((rr.left - sr.left) / scale) * 10) / 10 + 'px';
       b._oneRow = row;
       row._oneBtn = b;
-      layer.appendChild(b);
+      job.layer.appendChild(b);
     });
   }
   function _rect(el) {

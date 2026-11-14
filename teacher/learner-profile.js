@@ -302,6 +302,21 @@ var LearnerProfile = (function () {
     return n;
   }
 
+  /* The competency reflections in the student's words (+ Reflection): how
+     many, and when the newest was saved. They count as reflections and
+     answers wherever the Learner Profile counts them. */
+  function compReflections(cid, sid, sections) {
+    var mine = getReflections(cid)[sid] || {};
+    var out = { count: 0, last: null };
+    (sections || []).forEach(function (sec) {
+      var r = mine[sec.id];
+      if (!r || !(r.text || r.confidence)) return;
+      out.count++;
+      if (r.date && (!out.last || String(r.date) > String(out.last))) out.last = r.date;
+    });
+    return out;
+  }
+
   /* ── Reflections ──────────────────────────────────────────── */
 
   function steps(level, label) {
@@ -441,16 +456,21 @@ var LearnerProfile = (function () {
     _feedbackFilter = f === 'questions' || f === 'plans' ? f : 'all';
   }
 
+  // This student's reflections on the class's pieces (feedbackOf and feedbackCounts).
+  function _reflectionsOf(cid, sid, pieces) {
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (a && a.id) pieces[a.id] = a;
+    });
+    return getStudentReflections(cid, sid).filter(function (r) {
+      return !!pieces[r.assessment_id];
+    });
+  }
+
   // Everything the three parts show, or null while Reflect on Feedback is off.
   function feedbackOf(cid, sid) {
     if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return null;
     var pieces = {};
-    (getAssessments(cid) || []).forEach(function (a) {
-      if (a && a.id) pieces[a.id] = a;
-    });
-    var list = getStudentReflections(cid, sid).filter(function (r) {
-      return !!pieces[r.assessment_id];
-    });
+    var list = _reflectionsOf(cid, sid, pieces);
     var returned = Object.keys(pieces).filter(function (aid) {
       return GradeState.stateOf(cid, sid, aid) === GradeState.RETURNED;
     }).length;
@@ -464,12 +484,20 @@ var LearnerProfile = (function () {
       cid: cid,
       sid: sid,
       list: list,
+      count: list.length,
       pieces: pieces,
       grades: grades,
       returned: returned,
       waiting: getQuestionsWaiting(cid, sid).length,
       lastPlan: getStudentLastPlan(cid, sid),
     };
+  }
+
+  /* Only the two numbers the student page's tab shows (feedbackOf's count
+     and waiting), for a draw of another tab: no grades, no returned count. */
+  function feedbackCounts(cid, sid) {
+    if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return null;
+    return { count: _reflectionsOf(cid, sid, {}).length, waiting: getQuestionsWaiting(cid, sid).length };
   }
 
   function _title(f, aid) {
@@ -663,12 +691,14 @@ var LearnerProfile = (function () {
   return {
     SECTIONS: SECTIONS,
     feedbackOf: feedbackOf,
+    feedbackCounts: feedbackCounts,
     feedbackAsideHtml: feedbackAsideHtml,
     feedbackHtml: feedbackHtml,
     setFeedbackFilter: setFeedbackFilter,
     idCardHtml: idCardHtml,
     reflectionsHtml: reflectionsHtml,
     goalCount: goalCount,
+    compReflections: compReflections,
     wordsItems: wordsItems,
     privateNote: privateNote,
     studentGoals: studentGoals,
