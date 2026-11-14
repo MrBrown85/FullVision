@@ -683,6 +683,19 @@ var StudentPage = (function () {
     if (f && f.focus) f.focus({ preventScroll: false });
   }
 
+  /* paint(), with the text box being typed in (s/send.js's note) given
+     back its focus and caret: a page drawn again under the student's
+     typing, as a photo is ready. */
+  function paintKeepingCaret() {
+    var el = typeof document !== 'undefined' ? document.activeElement : null;
+    var at = el && el.id && el.tagName === 'TEXTAREA' ? [el.id, el.selectionStart, el.selectionEnd] : null;
+    paint();
+    var box = at && document.getElementById(at[0]);
+    if (!box || !root.contains(box)) return;
+    box.focus({ preventScroll: true });
+    if (box.setSelectionRange) box.setSelectionRange(at[1], at[2]);
+  }
+
   /* Each set of choices is one Tab stop, as a radio group is: the chosen
      one, or the first; the arrow keys move inside it. */
   function rovingRadios(el) {
@@ -1211,6 +1224,7 @@ var StudentPage = (function () {
     demoData: demoData,
     loadDemoTemplates: loadDemoTemplates,
     paint: paint,
+    paintKeepingCaret: paintKeepingCaret,
     grow: grow,
     _test: {
       growAll: growAll,
