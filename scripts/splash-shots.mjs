@@ -2,9 +2,10 @@
 /**
  * Retakes the splash page's pictures (assets/splash/*.jpg) from Demo Mode.
  *
- * Each shot opens a fresh Demo Mode at 1440 wide and 2x (a phone shot at 390
- * wide), walks to its screen, and saves the element or area. macOS `sips`
- * then scales it to 1800px on the long side as JPEG quality 78, as
+ * Each shot opens a fresh Demo Mode at 1728 by 1117, a 16-inch MacBook Pro,
+ * at 2x (a phone shot at 390 wide), walks to its screen, and saves the
+ * element or area. macOS `sips` then scales it to 1800px on the long side as
+ * JPEG quality 78, as
  * scripts/help-shots.mjs does for the help site.
  *
  * Shots of the student's side and of sent work turn the class's Student Page
@@ -35,6 +36,10 @@ if (spawnSync('which', ['sips']).status !== 0) {
 }
 
 const pause = (page, ms) => page.waitForTimeout(ms);
+
+// A 16-inch MacBook Pro at its default size: what a teacher's screen shows.
+const W = 1728;
+const H = 1117;
 
 // The class's Student Page, Send Work, Reflect on Feedback and Show My
 // Learning on, and grades returned by hand: the setup the splash shows.
@@ -228,7 +233,7 @@ const SHOTS = [
       await studentPageOn(page, base);
       await page.goto(base + '/dashboard');
       await pause(page, 1800);
-      return { clip: [0, 0, 1440, 900] };
+      return { clip: [0, 0, W, H] };
     },
   },
   {
@@ -237,7 +242,7 @@ const SHOTS = [
       await page.goto(base + '/gradebook');
       await pause(page, 1800);
       // A corner of the grid: ten students and the newest pieces.
-      return { clip: [0, 100, 920, 600] };
+      return { clip: [0, 100, 1104, 720] };
     },
   },
 
@@ -260,14 +265,11 @@ const SHOTS = [
       }
       await page.getByText('Teacher Comment', { exact: true }).first().click();
       await pause(page, 300);
-      return { clip: [0, 0, 1440, 900] };
+      return { clip: [0, 0, W, H] };
     },
   },
   {
     file: 'progress-report.jpg',
-    // Narrow enough that the page is drawn beside the panel at reading size.
-    width: 1100,
-    height: 1000,
     async run(page, base) {
       await page.goto(base + '/reports');
       await pause(page, 1200);
@@ -290,7 +292,36 @@ const SHOTS = [
       await page.mouse.move(0, 0);
       await pause(page, 2500);
       // The parts panel and the student's first page, side by side.
-      return { clip: [182, 105, 908, 890] };
+      return {
+        clip: await page.evaluate(h => {
+          const r = document.getElementById('studio').getBoundingClientRect();
+          return [r.left, r.top, r.width, Math.min(r.height, h - r.top)];
+        }, H),
+      };
+    },
+  },
+
+  {
+    file: 'curriculum.jpg',
+    async run(page, base) {
+      // New Class, English Language Arts 8: its competencies in the
+      // Ministry's words, ready to untick.
+      await page.locator('[data-action="openClassManager"]').first().click();
+      await page.locator('[data-action="cmStartCreate"]').first().click();
+      await page.locator('.cw-grade-btn', { hasText: 'Grade 8' }).click();
+      await page.locator('.cw-subject-btn', { hasText: 'English Language Arts' }).first().click();
+      await page.locator('.cw-course-item').first().click();
+      await page.locator('[data-action="cwGoToStep2"]').click();
+      await page.locator('[data-action="cwCompsNext"]').waitFor();
+      await page.mouse.move(0, 0);
+      await pause(page, 800);
+      return {
+        clip: await page.evaluate(h => {
+          const r = document.querySelector('.cw-steps').parentElement.getBoundingClientRect();
+          const pad = 20;
+          return [r.left - pad, r.top - pad, r.width + 2 * pad, Math.min(r.height + 2 * pad, h - r.top + pad)];
+        }, H),
+      };
     },
   },
 
@@ -362,7 +393,7 @@ let failed = 0;
 try {
   for (const shot of shots) {
     const context = await browser.newContext({
-      viewport: { width: shot.width || 1440, height: shot.height || 900 },
+      viewport: { width: shot.width || W, height: shot.height || H },
       deviceScaleFactor: 2,
     });
     const page = await context.newPage();
