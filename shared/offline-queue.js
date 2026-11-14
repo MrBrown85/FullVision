@@ -76,6 +76,13 @@
  * Signed out: an expired session that a token refresh could not fix pauses
  *   the whole queue instead of failing the entry. Nothing is sent until
  *   resume(), which shared/supabase.js calls on SIGNED_IN.
+ * Held: while start-up's sign-in re-check has not passed (hold(), from
+ *   shared/data.js), each entry this tab queues carries held: <tab id>. No
+ *   tab sends it, the owner tab included, and this tab asks no other to
+ *   send. unhold() (the re-check passed) clears the marks; dropHeld() (it
+ *   failed, named another user, or the page left first) removes the entries
+ *   unsent. Entries queued before the hold are untouched. A mark left by a
+ *   tab that crashed is dropped after HOLD_STALE_MS.
  * Cap: 500 entries or ~5 MB serialized, whichever first. An over-cap write
  *   is refused: push() resolves { error: { refused } } and sends nothing.
  * Coalescing: a cell write (COALESCE_ENDPOINTS) replaces a queued, unsent
@@ -100,6 +107,7 @@
   var LEASE_STALE_MS = 15000; // a lease this old belongs to a tab that is gone
   var HEARTBEAT_MS = 5000;
   var FLUSH_REPLY_MS = 10000; // how long a tab waits for the owner to finish a flush
+  var HOLD_STALE_MS = 10 * 60 * 1000; // a held entry this old belongs to a tab that is gone
 
   /* Endpoints that accept `p_idempotency_key` on the server side. The list
    * lives in shared/constants.js (FV_IDEMPOTENT_RPCS) so the queued-write and
@@ -127,6 +135,7 @@
     return false;
   };
   var _signedOut = false; // paused until resume(): the session expired
+  var _holding = false; // start-up's sign-in re-check has not passed (Held, above)
   var _inFlight = {}; // entry id → Promise of its settle
   var _waiters = {}; // entry id → [resolve] for push() callers
   var _sendOptions = {}; // entry id → options for _send (not persisted)
@@ -424,7 +433,7 @@
      older saves still waiting to go for that row, so the approval made with
      the old narrative never lands on the new one. A save left with no field
      still goes, as an empty one, so whoever waits on it hears back. */
-  function _unapproveQueued(entries, entry) {
+  function _unapproveQueued(entries, entry, upTo) {
     var mine = _fields(entry);
     if (!mine || mine.indexOf('narrative_html') < 0) return;
     var target = _target(entry.endpoint, entry.payload);
@@ -433,6 +442,7 @@
     });
     if (!target || !drop.length) return;
     entries.forEach(function (e, i) {
+      if (upTo !== undefined && i >= upTo) return;
       if (_isInFlight(e) || _target(e.endpoint, e.payload) !== target) return;
       var left = _withoutKeys(e, drop);
       if (left === e) return;
@@ -818,6 +828,7 @@
 
   /* A tab that doesn't send asks the owner to. */
   function _askOwner(force) {
+    if (_holding) return; // nothing goes from here until the re-check has passed
     if (!_usingLocks) _claimLease();
     if (_owner) return _pump(force);
     _post({ type: 'flush', force: !!force });
@@ -879,6 +890,7 @@
     };
     if (opts && Array.isArray(opts.blockedOn) && opts.blockedOn.length) entry.blocked_on = opts.blockedOn.slice();
     if (opts && opts.guard && typeof opts.guard === 'object') entry.guard = opts.guard;
+    if (_holding) entry.held = _tabId;
     // A replacement doesn't grow the queue, so a full queue still takes it.
     var at = _coalesceIndex(q.entries, entry);
     var replaced = at >= 0 ? q.entries[at] : null;
@@ -892,7 +904,7 @@
       entry.payload = _carryKept(entry, replaced);
       q.entries[at] = entry;
     } else {
-      _unapproveQueued(q.entries, entry);
+      if (!entry.held) _unapproveQueued(q.entries, entry); // a held one does it when let go (unhold)
       q.entries.push(entry);
     }
     try {
@@ -929,7 +941,8 @@
       // not move to before it.
       if (assessment && _isBarrier(e) && _assessmentOf(e) === assessment) return -1;
       if (e.key !== entry.key) continue;
-      if (_isInFlight(e) || e.endpoint !== entry.endpoint || e.owner !== entry.owner) return -1;
+      if (_isInFlight(e) || e.endpoint !== entry.endpoint || e.owner !== entry.owner || e.held !== entry.held)
+        return -1;
       // A Mark Up save already tried may have landed with its answer lost: the
       // next save's base rev is then the one after it, so the two stay apart.
       if (entry.endpoint === 'save_markup' && e.attempts > 0) return -1;
@@ -1256,6 +1269,7 @@
       if (busyKeys[key]) continue;
       busyKeys[key] = true;
       if (gated) continue;
+      if (entry.held) continue; // its tab's re-check has not passed (Held)
       if (_inFlight[entry.id]) continue;
       if (_isBlocked(entry)) continue;
       if (_isForeign(entry, owner)) continue;
@@ -1308,6 +1322,7 @@
      settled. Returns this flush's { processed, succeeded, deadLettered }. */
   async function flush() {
     if (_owner && !_usingLocks && !_leaseIsMine()) _owner = false;
+    if (_holding) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'paused' };
     if (!_owner) return _delegateFlush();
     if (!navigator.onLine) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'offline' };
     if (_isPaused()) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'paused' };
@@ -1318,6 +1333,9 @@
     try {
       var owner = currentOwner();
       if (_discardForeign(owner) > 0) _notify('discard:foreign');
+      _dropHeldBy(function (e) {
+        return e.held !== _tabId && !(Date.now() - Date.parse(e.created_at) < HOLD_STALE_MS);
+      });
       _pump(true);
       await _idle();
     } finally {
@@ -1377,6 +1395,27 @@
       .map(function (e) {
         return { id: e.id, created_at: e.created_at, payload: JSON.parse(JSON.stringify(e.payload || {})) };
       });
+  }
+
+  /* queued() for several endpoints from one read of the outbox and one look
+     at who is signed in: { endpoint: what queued(endpoint) gives }. For a
+     reader that asks about several at once (shared/data-student-work.js
+     _workServerView, worked out once a turn). */
+  function queuedEach(endpoints) {
+    var owner = currentOwner();
+    var out = {};
+    endpoints.forEach(function (endpoint) {
+      out[endpoint] = [];
+    });
+    _readQueue().entries.forEach(function (e) {
+      if (!Object.prototype.hasOwnProperty.call(out, e.endpoint) || _isForeign(e, owner)) return;
+      out[e.endpoint].push({
+        id: e.id,
+        created_at: e.created_at,
+        payload: JSON.parse(JSON.stringify(e.payload || {})),
+      });
+    });
+    return out;
   }
 
   /* Let the caller change queued payloads, for example to put a server id
@@ -1463,6 +1502,49 @@
     var owner = currentOwner();
     return _readDead().filter(function (e) {
       return !_isForeign(e, owner);
+    });
+  }
+
+  /* Start-up's sign-in re-check (Held, above): hold() as it is asked,
+     unhold() once it passes, dropHeld() when it fails or names another user. */
+  function hold() {
+    _holding = true;
+  }
+  function unhold() {
+    _holding = false;
+    var q = _readQueue();
+    var n = 0;
+    q.entries.forEach(function (e, i) {
+      if (e.held !== _tabId) return;
+      delete e.held;
+      n++;
+      _unapproveQueued(q.entries, e, i);
+    });
+    if (!n) return 0;
+    _writeQueue(q);
+    _notify('rewrite', { count: n }); // the owner, in whichever tab, sends them now
+    _pump(false);
+    return n;
+  }
+  function _dropHeldBy(test) {
+    var q = _readQueue();
+    var dropped = [];
+    q.entries = q.entries.filter(function (e) {
+      var hit = !!e.held && !_isInFlight(e) && test(e);
+      if (hit) dropped.push(e);
+      return !hit;
+    });
+    if (!dropped.length) return 0;
+    _writeQueue(q);
+    dropped.forEach(function (e) {
+      _resolveWaiters(e.id, { data: null, error: { message: 'cancelled', cancelled: true } });
+      _notify('remove', { id: e.id });
+    });
+    return dropped.length;
+  }
+  function dropHeld() {
+    return _dropHeldBy(function (e) {
+      return e.held === _tabId;
     });
   }
 
@@ -1610,6 +1692,10 @@
   // A tab that is going away lets the next one send; one shown again from
   // the back-forward cache asks for the queue back.
   window.addEventListener('pagehide', release);
+  // A page that leaves before its re-check passed never had it pass.
+  window.addEventListener('pagehide', function () {
+    if (_holding) dropHeld();
+  });
   window.addEventListener('pageshow', claim);
   _retryDeadOnLoad();
   _readDead().forEach(function (e) {
@@ -1630,6 +1716,7 @@
     stats: stats,
     has: has,
     queued: queued,
+    queuedEach: queuedEach,
     rewrite: rewrite,
     remove: remove,
     dropBlockedOn: dropBlockedOn,
@@ -1638,6 +1725,9 @@
     markReloaded: markReloaded,
     releaseDiscarded: releaseDiscarded,
     resume: resume,
+    hold: hold,
+    unhold: unhold,
+    dropHeld: dropHeld,
     clear: clear,
     claim: claim,
     release: release,

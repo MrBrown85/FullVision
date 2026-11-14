@@ -549,6 +549,7 @@ window.PageAssignments = (function () {
 
   /* ── Toolbar ────────────────────────────────────────────── */
   function renderAssessToolbar(cid, assessments) {
+    var seg = _expandSegOn();
     var courseOptions = getPickerCourses(cid)
       .map(function (c) {
         return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + '</option>';
@@ -574,14 +575,10 @@ window.PageAssignments = (function () {
       _toGradeSegHtml(cid) +
       '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
       '<button class="seg-btn assess-seg-btn"' +
-      segAttr(
-        focusStudentId
-          ? _allExpanded && _collapsedIds.size === 0
-          : openAssessIds.size > 0 && openAssessIds.size >= getAssessments(activeCourse).length,
-      ) +
+      segAttr(seg[0]) +
       ' data-action="expandAllAssess">Expand</button>' +
       '<button class="seg-btn assess-seg-btn"' +
-      segAttr(focusStudentId ? !_allExpanded && openAssessIds.size === 0 : openAssessIds.size === 0) +
+      segAttr(seg[1]) +
       ' data-action="collapseAllAssess">Collapse</button>' +
       '</div>' +
       (focusStudentId
@@ -1589,8 +1586,80 @@ window.PageAssignments = (function () {
     );
   }
 
+  // Whether a card is drawn open: one student's view opens every card but
+  // the ones closed (Expand), or the ones opened.
+  function _cardOpen(aid) {
+    return focusStudentId && _allExpanded ? !_collapsedIds.has(aid) : openAssessIds.has(aid);
+  }
+
+  // An open card's body: its description and its grading controls.
+  // html-safe: the description goes through esc; the grading builders are reviewed
+  function _cardBodyHtml(cid, a, focusSt, students, scores) {
+    var tagObjs = _scoreTagObjs(cid, a);
+    return (
+      (a.description
+        ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
+          esc(a.description) +
+          '</div>'
+        : '') +
+      (focusSt
+        ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
+        : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : _groupRowStudents(cid, a, students), scores))
+    );
+  }
+
+  /* The counts in a card's header that grading in place leaves as they
+     were drawn: Missing, To Grade and Grade Submissions. Opening or closing
+     a card brings them up to date (_refreshCardCounts), as the whole
+     redraw it replaced did. */
+  // html-safe: numbers, fixed words and icons; the builders are reviewed
+  function _cardCounts(cid, a, students, shownIds, tograde) {
+    // Students whose work is labelled Missing, whatever the due date.
+    var missingCount = students.filter(function (st) {
+      return getAssignmentStatus(cid, st.id, a.id) === 'NS';
+    }).length;
+    var meta =
+      (missingCount
+        ? '<span class="assess-missing" title="' +
+          missingCount +
+          (missingCount === 1 ? ' student' : ' students') +
+          ' labelled Missing">' +
+          _WARNING_ICON +
+          missingCount +
+          ' missing</span>'
+        : '') + _toGradeChipHtml(cid, a, shownIds, tograde);
+    var out = { meta: meta, button: _gradeSubmissionsHtml(cid, a, shownIds, tograde) };
+    _drawnReturn('n' + a.id, meta + '|' + out.button);
+    return out;
+  }
+  function _refreshCardCounts(cid, byId, students, shownIds) {
+    var classOn = GraderWork.workOnInClass(cid);
+    var total = 0;
+    document.querySelectorAll('#main .assess-card').forEach(function (card) {
+      var a = byId[card.id.slice(3)];
+      var head = card.querySelector('.assess-header');
+      if (!a || !head) return;
+      var tograde = classOn ? GraderWork.workCounts(cid, a.id, shownIds).tograde : undefined;
+      total += tograde || 0;
+      var c = _cardCounts(cid, a, students, shownIds, tograde);
+      if (head._countsHtml === c.meta + '|' + c.button) return;
+      head._countsHtml = c.meta + '|' + c.button;
+      head.querySelectorAll('.assess-missing, .assess-to-grade, .assess-grade-work-btn').forEach(function (el) {
+        el.remove();
+      });
+      // html-safe: built by _cardCounts
+      head.querySelector('.assess-date').insertAdjacentHTML('afterend', c.meta);
+      // html-safe: built by _gradeSubmissionsHtml
+      head.querySelector('.assess-header-actions').insertAdjacentHTML('afterbegin', c.button);
+    });
+    if (!classOn || total === _toGradeTotal) return;
+    _toGradeTotal = total;
+    var n = document.querySelector('.assess-tograde-n');
+    if (n) n.textContent = String(total);
+  }
+
   // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
-  function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules) {
+  function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds) {
     var html =
       '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
     html += '<div>';
@@ -1623,14 +1692,10 @@ window.PageAssignments = (function () {
       : null;
     // What is waiting to return (S1-F2), in a class that holds grades.
     var holds = _holdsGrades(cid);
-    var shownIds = holds ? _returnShownIds(cid) : null;
     function renderAssessCard(a, isUncategorized) {
-      var isOpen = focusStudentId
-        ? _allExpanded
-          ? !_collapsedIds.has(a.id)
-          : openAssessIds.has(a.id)
-        : openAssessIds.has(a.id);
-      var tagObjs = _scoreTagObjs(cid, a);
+      var isOpen = _cardOpen(a.id);
+      var n = nums[a.id] || {};
+      var counts = _cardCounts(cid, a, students, shownIds, n.tograde);
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
       var c =
@@ -1725,39 +1790,23 @@ window.PageAssignments = (function () {
         formatDate(a.dateAssigned || a.date) +
         (a.dueDate ? ' \u2192 ' + formatDate(a.dueDate) : '') +
         '</span>' +
-        (function () {
-          // Students whose work is labelled Missing, whatever the due date.
-          var missingCount = students.filter(function (st) {
-            return getAssignmentStatus(cid, st.id, a.id) === 'NS';
-          }).length;
-          if (!missingCount) return '';
-          return (
-            '<span class="assess-missing" title="' +
-            missingCount +
-            (missingCount === 1 ? ' student' : ' students') +
-            ' labelled Missing">' +
-            _WARNING_ICON +
-            missingCount +
-            ' missing</span>'
-          );
-        })() +
-        _toGradeChipHtml(cid, a, shownIds) +
+        counts.meta +
         (holds && !isDibelsScored(a)
           ? '<span class="assess-returns" data-returns-aid="' +
             a.id +
             '">' +
-            _returnChipsHtml(cid, a, shownIds) +
+            _drawnReturn('c' + a.id, _returnChipsHtml(cid, a, shownIds, n.drafts)) +
             '</span>'
           : '') +
         '</span>' +
         '</div>' +
         '<div class="assess-header-actions" data-stop-prop="true">' +
-        _gradeSubmissionsHtml(cid, a, shownIds) +
+        counts.button +
         (holds && !isDibelsScored(a)
           ? '<span class="assess-return-slot" data-return-slot-aid="' +
             a.id +
             '">' +
-            _returnDraftsButtonHtml(cid, a, shownIds) +
+            _drawnReturn('s' + a.id, _returnDraftsButtonHtml(cid, a, shownIds)) +
             '</span>'
           : '') +
         _setEveryoneMenuHtml(cid, a) +
@@ -1771,16 +1820,7 @@ window.PageAssignments = (function () {
         // card's whole-class grid used to be built and kept out of sight:
         // 80,000 elements on a class of 30 with 36 pieces.)
         '<div class="assess-body">' +
-        (isOpen
-          ? (a.description
-              ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
-                esc(a.description) +
-                '</div>'
-              : '') +
-            (focusSt
-              ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
-              : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : _groupRowStudents(cid, a, students), scores))
-          : '') +
+        (isOpen ? _cardBodyHtml(cid, a, focusSt, students, scores) : '') +
         '</div>' +
         '</div>';
       return c;
@@ -2450,6 +2490,7 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var course = COURSES[cid];
     if (!course) return;
+    _pageBehind = false;
     // A signed-in class's student work, read again now and then (S6-W1).
     if (typeof refreshStudentWork === 'function') refreshStudentWork(cid);
     _loadDibelsOnce(cid);
@@ -2501,19 +2542,24 @@ window.PageAssignments = (function () {
     // What is waiting to return (S1-F2): the toolbar's count is the drafts
     // on screen, summed over the assessments listed; pressed, it leaves
     // only the assessments with one. A class that holds no grades has none.
+    // Each card's counts are worked out here, once a draw, and handed to
+    // the cards (nums).
+    var shownIds = _returnShownIds(cid);
+    var nums = {};
+    assessments.forEach(function (a) {
+      nums[a.id] = {};
+    });
     _toReturnTotal = 0;
     if (_holdsGrades(cid)) {
-      var shownIds = _returnShownIds(cid);
-      var waitingIn = {};
       assessments.forEach(function (a) {
-        waitingIn[a.id] = GraderWork.draftsIn(cid, a.id, shownIds).length;
-        _toReturnTotal += waitingIn[a.id];
+        nums[a.id].drafts = GraderWork.draftsIn(cid, a.id, shownIds).length;
+        _toReturnTotal += nums[a.id].drafts;
       });
       // Returning the last draft turns the filter off.
       if (!_toReturnTotal) _toReturnOnly = false;
       if (_toReturnOnly)
         assessments = assessments.filter(function (a) {
-          return waitingIn[a.id] > 0;
+          return nums[a.id].drafts > 0;
         });
     } else _toReturnOnly = false;
 
@@ -2522,15 +2568,13 @@ window.PageAssignments = (function () {
     // on screen. With To Grade on, only the assessments with work waiting.
     _toGradeTotal = 0;
     if (GraderWork.workOnInClass(cid)) {
-      var gradeIn = {};
-      var onScreen = _returnShownIds(cid);
       assessments.forEach(function (a) {
-        gradeIn[a.id] = GraderWork.workCounts(cid, a.id, onScreen).tograde;
-        _toGradeTotal += gradeIn[a.id];
+        nums[a.id].tograde = GraderWork.workCounts(cid, a.id, shownIds).tograde;
+        _toGradeTotal += nums[a.id].tograde;
       });
       if (_toGradeOnly)
         assessments = assessments.filter(function (a) {
-          return gradeIn[a.id] > 0;
+          return nums[a.id].tograde > 0;
         });
     } else _toGradeOnly = false;
 
@@ -2543,6 +2587,7 @@ window.PageAssignments = (function () {
     var keptForm = _openFormToKeep(cid);
     var keptFocus = keptForm && keptForm.contains(document.activeElement) ? document.activeElement : null;
     _keepingForm = !!keptForm;
+    _drawnReturns = {};
     try {
       document.getElementById('main').innerHTML = renderAssessmentList(
         cid,
@@ -2551,6 +2596,8 @@ window.PageAssignments = (function () {
         students,
         scores,
         modules,
+        nums,
+        shownIds,
       );
     } finally {
       _keepingForm = false;
@@ -2560,12 +2607,25 @@ window.PageAssignments = (function () {
       if (freshForm) freshForm.replaceWith(keptForm);
       if (keptFocus && keptFocus.isConnected) keptFocus.focus({ preventScroll: true });
     }
-    document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
-    _refreshClassResultsSoon();
-    // The marks and counts to return, as just drawn (S1-F2).
-    _refreshReturns(true);
+    _afterCardsDrawn(document.getElementById('main'));
+    _syncDescriptorBar(cid, assessments);
+  }
 
-    // Show/hide descriptor bar
+  /* After a draw of the list or of cards: the ledgers' counts, the Class
+     Results panel, and what was drawn to return remembered (S1-F2). */
+  function _afterCardsDrawn(root) {
+    var kept = _drawnReturns || {};
+    root.querySelectorAll('.assess-header[data-aid]').forEach(function (head) {
+      head._countsHtml = kept['n' + head.dataset.aid];
+    });
+    root.querySelectorAll('.ldg-grid').forEach(refreshLedgerSummary);
+    _refreshClassResultsSoon();
+    _refreshReturns(true, root);
+    _drawnReturns = null;
+  }
+
+  // The rubric's hover bar shows while an open card shows a rubric.
+  function _syncDescriptorBar(cid, assessments) {
     var hasActiveRubricView = false;
     if (openAssessIds.size > 0 || (focusStudentId && _allExpanded)) {
       var checkIds =
@@ -7163,6 +7223,92 @@ window.PageAssignments = (function () {
   }
 
   /* ── Expand/Collapse ────────────────────────────────────── */
+  // Whether Expand and Collapse show pressed.
+  function _expandSegOn() {
+    return focusStudentId
+      ? [_allExpanded && _collapsedIds.size === 0, !_allExpanded && openAssessIds.size === 0]
+      : [openAssessIds.size > 0 && openAssessIds.size >= getAssessments(activeCourse).length, openAssessIds.size === 0];
+  }
+
+  /* Opening or closing cards draws or empties those cards' bodies and sets
+     Expand and Collapse; the rest of the page stays as drawn (a whole
+     redraw took 260 ms of script). False when the page must be drawn
+     again instead: a card not on the page, or a folder the teacher closed
+     that must now open or close. */
+  function _redrawCards(aids) {
+    var cid = activeCourse;
+    var main = document.getElementById('main');
+    if (_grader || !main || !COURSES[cid]) return false;
+    // A filter on grades (Ungraded, To Return, To Grade) can drop a card graded since the draw.
+    if (showUngraded || _toReturnOnly || _toGradeOnly) return false;
+    var filtersActive = filterCategories.length > 0 || !!assessSearch;
+    var all = getAssessments(cid);
+    var byId = {};
+    all.forEach(function (a) {
+      byId[a.id] = a;
+    });
+    var cards = [];
+    for (var i = 0; i < aids.length; i++) {
+      var card = document.getElementById('ac-' + aids[i]);
+      var a = card && main.contains(card) && byId[aids[i]];
+      if (!a) return false;
+      cards.push({ card: card, a: a });
+    }
+    // A folder the teacher closed is drawn open only while a card in it is
+    // held open (renderAssessmentList): every folder is checked, since Expand
+    // lets go of cards that stay open.
+    var folders = filtersActive ? [] : main.querySelectorAll('.mod-folder');
+    for (var f = 0; f < folders.length; f++) {
+      if (!collapsedModules[folders[f].dataset.moduleId]) continue;
+      var holds = Array.prototype.some.call(folders[f].querySelectorAll('.assess-card'), function (el) {
+        return openAssessIds.has(el.id.slice(3));
+      });
+      if (holds !== folders[f].classList.contains('open')) return false;
+    }
+    _hideChipTip();
+    _hideAfTip();
+    if (typeof refreshStudentWork === 'function') refreshStudentWork(cid);
+    var students = sortStudents(getStudents(cid), 'lastName');
+    var scores = getScores(cid);
+    _refreshCardCounts(
+      cid,
+      byId,
+      students,
+      focusStudentId
+        ? [focusStudentId]
+        : students.map(function (st) {
+            return st.id;
+          }),
+    );
+    var focusSt = focusStudentId
+      ? students.find(function (st) {
+          return st.id === focusStudentId;
+        })
+      : null;
+    cards.forEach(function (c) {
+      var open = _cardOpen(c.a.id);
+      var body = c.card.querySelector('.assess-body');
+      c.card.className = 'assess-card' + (open ? ' open active' : '');
+      _drawnReturns = {};
+      // html-safe: _cardBodyHtml escapes the description; the grading builders are reviewed
+      body.innerHTML = open ? _cardBodyHtml(cid, c.a, focusSt, students, scores) : '';
+      _afterCardsDrawn(body);
+    });
+    var on = _expandSegOn();
+    document.querySelectorAll('.assess-seg-control .seg-btn').forEach(function (btn, i) {
+      btn.setAttribute('aria-pressed', on[i] ? 'true' : 'false');
+    });
+    _syncDescriptorBar(
+      cid,
+      Array.prototype.map
+        .call(main.querySelectorAll('.assess-card'), function (el) {
+          return byId[el.id.slice(3)];
+        })
+        .filter(Boolean),
+    );
+    return true;
+  }
+
   function toggleAssess(aid) {
     if (focusStudentId) {
       if (_allExpanded) {
@@ -7176,23 +7322,41 @@ window.PageAssignments = (function () {
       if (openAssessIds.has(aid)) openAssessIds.delete(aid);
       else openAssessIds.add(aid);
     }
-    render();
+    if (!_redrawCards([aid])) render();
+  }
+  // Expand and Collapse draw or empty only the cards that change.
+  function _setAllOpen(change) {
+    var was = _cardsOnPage().filter(_cardOpen);
+    change();
+    var now = _cardsOnPage();
+    var changed = now.filter(function (aid) {
+      var wasOpen = was.indexOf(aid) >= 0;
+      return _cardOpen(aid) !== wasOpen;
+    });
+    if (!_redrawCards(changed)) render();
+  }
+  function _cardsOnPage() {
+    return Array.prototype.map.call(document.querySelectorAll('#main .assess-card'), function (el) {
+      return el.id.slice(3);
+    });
   }
   function expandAllAssess() {
-    _allExpanded = true;
-    _collapsedIds.clear();
-    openAssessIds.clear();
-    if (!focusStudentId)
-      getAssessments(activeCourse).forEach(function (a) {
-        openAssessIds.add(a.id);
-      });
-    render();
+    _setAllOpen(function () {
+      _allExpanded = true;
+      _collapsedIds.clear();
+      openAssessIds.clear();
+      if (!focusStudentId)
+        getAssessments(activeCourse).forEach(function (a) {
+          openAssessIds.add(a.id);
+        });
+    });
   }
   function collapseAllAssess() {
-    _allExpanded = false;
-    _collapsedIds.clear();
-    openAssessIds.clear();
-    render();
+    _setAllOpen(function () {
+      _allExpanded = false;
+      _collapsedIds.clear();
+      openAssessIds.clear();
+    });
   }
 
   /* ── Rubric view toggle ─────────────────────────────────── */
@@ -11280,7 +11444,18 @@ window.PageAssignments = (function () {
         _openGraderOnWork(el.dataset.aid, el.dataset.sid || null);
       },
       openWorkWall: function () {
-        if (window.WorkWall && activeCourse) WorkWall.open(activeCourse, el.dataset.aid);
+        var aid = el.dataset.aid;
+        if (!window.WorkWall || !activeCourse) return;
+        // Grade in This Order grades in the dialog over the wall, and the
+        // page under both is not drawn: it is drawn, whole, as the wall closes.
+        WorkWall.open(activeCourse, aid, {
+          onClose: function () {
+            if (!_pageBehind) return;
+            render();
+            var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
+            if (more) more.focus({ preventScroll: true });
+          },
+        });
       },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
@@ -12325,6 +12500,8 @@ window.PageAssignments = (function () {
      listeners run alongside the gradebook's (which stand aside, see
      PageAssignments.graderOpen). */
   var _grader = null;
+  // True from a dialog over this page closing until the page is next drawn.
+  var _pageBehind = false;
 
   function openGrader(cid, aid, sid, opts) {
     if (_grader) closeGrader();
@@ -12333,6 +12510,17 @@ window.PageAssignments = (function () {
     if (typeof refreshStudentWork === 'function') refreshStudentWork(cid, { force: true });
     activeCourse = cid;
     _loadDibelsOnce(cid);
+    // Over this page (Grade Submissions, the Work Wall): the page's cards and
+    // student, put back when the dialog closes.
+    var page = opts.overPage
+      ? {
+          open: openAssessIds,
+          focus: focusStudentId,
+          expanded: _allExpanded,
+          collapsed: _collapsedIds,
+          rubricViews: rubricViewStates,
+        }
+      : null;
     openAssessIds = new Set([aid]);
     focusStudentId = sid;
     _allExpanded = false;
@@ -12365,6 +12553,7 @@ window.PageAssignments = (function () {
       rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
       pageListeners: opts.overPage ? pageListeners : null,
+      page: page,
       // Show: To Grade, To Return, Returned, Not In or All (S1-F2, S6-F3).
       show: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
       // The student's work beside the scoring (S6-F1): its page, the fit,
@@ -13372,17 +13561,18 @@ window.PageAssignments = (function () {
     );
   }
 
+  // `tograde`, when given, is the card's To Grade count as render() worked it out.
   // html-safe: a number and fixed words
-  function _toGradeChipHtml(cid, a, shownIds) {
+  function _toGradeChipHtml(cid, a, shownIds, tograde) {
     if (!GraderWork.workOn(cid, a)) return '';
-    var n = GraderWork.workCounts(cid, a.id, shownIds).tograde;
+    var n = tograde != null ? tograde : GraderWork.workCounts(cid, a.id, shownIds).tograde;
     return n ? '<span class="assess-to-grade">' + n + ' to grade</span>' : '';
   }
 
   // html-safe: ids are ours; fixed words
-  function _gradeSubmissionsHtml(cid, a, shownIds) {
+  function _gradeSubmissionsHtml(cid, a, shownIds, tograde) {
     if (focusStudentId || !GraderWork.workOn(cid, a)) return '';
-    if (!GraderWork.workCounts(cid, a.id, shownIds).tograde) return '';
+    if (!(tograde != null ? tograde : GraderWork.workCounts(cid, a.id, shownIds).tograde)) return '';
     return (
       '<button type="button" class="assess-grade-work-btn" data-action="gradeSubmissions" data-aid="' +
       a.id +
@@ -13650,18 +13840,8 @@ window.PageAssignments = (function () {
     var waiting = GraderWork.workCounts(cid, aid, ids).ids.tograde;
     var to = sid || waiting[0];
     if (!to) return;
-    var page = { open: Array.from(openAssessIds), focus: focusStudentId, expanded: _allExpanded };
-    openGrader(cid, aid, to, {
-      show: !sid && waiting.length ? 'tograde' : 'all',
-      overPage: true,
-      onClose: function () {
-        // The page as it was before the dialog opened.
-        openAssessIds = new Set(page.open);
-        focusStudentId = page.focus;
-        _allExpanded = page.expanded;
-        render();
-      },
-    });
+    // closeGrader puts the page back as it was before the dialog opened.
+    openGrader(cid, aid, to, { show: !sid && waiting.length ? 'tograde' : 'all', overPage: true, onClose: render });
   }
 
   /* ── Draft and Returned (S0-F2) ───────────────────────────
@@ -13858,9 +14038,10 @@ window.PageAssignments = (function () {
 
   /* A card's chips: the drafts among the students on screen, and with the
      whole class on screen how many have their grade. */
+  // `drafts`, when given, is the count render() worked out.
   // html-safe: numbers and fixed words
-  function _returnChipsHtml(cid, a, shownIds) {
-    var n = GraderWork.draftsIn(cid, a.id, shownIds).length;
+  function _returnChipsHtml(cid, a, shownIds, drafts) {
+    var n = drafts != null ? drafts : GraderWork.draftsIn(cid, a.id, shownIds).length;
     var given = focusStudentId
       ? 0
       : shownIds.filter(function (sid) {
@@ -13930,7 +14111,7 @@ window.PageAssignments = (function () {
       '" data-ret-sids="' +
       ids.join(',') +
       '">' +
-      _returnMarkInner(cid, aid, ids) +
+      _drawnReturn('m' + aid + '|' + ids.join(','), _returnMarkInner(cid, aid, ids)) +
       '</span>'
     );
   }
@@ -13959,7 +14140,7 @@ window.PageAssignments = (function () {
   // html-safe: ids are ours; the row is _inlineReturnInner's
   function _inlineReturnRowHtml(cid, a, sid) {
     if (!_holdsGrades(cid) || isDibelsScored(a)) return '';
-    var html = _inlineReturnInner(cid, a, sid);
+    var html = _drawnReturn('r' + a.id + '|' + sid, _inlineReturnInner(cid, a, sid));
     return (
       '<div class="grader-return grader-return-inline" data-return-row-aid="' +
       a.id +
@@ -13979,15 +14160,38 @@ window.PageAssignments = (function () {
      loses its click. What a piece holds is remembered on its element, as
      the string its builder made: the browser's own copy of the HTML can
      differ from it (an apostrophe in a title), and would look changed.
-     render() calls this with `drawn` set once it has drawn the page, to
-     remember what it drew and write nothing. */
-  function _refreshReturns(drawn) {
+     render() calls this with `drawn` set once it has drawn the page (or
+     cards, under `root`), to remember what it drew and write nothing: the
+     strings are the ones the draw built (_drawnReturns), not built again. */
+  var _drawnReturns = null;
+  function _drawnReturn(key, html) {
+    if (_drawnReturns) _drawnReturns[key] = html;
+    return html;
+  }
+  function _refreshReturns(drawn, root) {
     if (_grader) return;
     var cid = activeCourse;
     if (!_holdsGrades(cid) || !document.getElementById('main')) return;
+    root = root || document.getElementById('main');
+    if (drawn === true) {
+      var kept = _drawnReturns || {};
+      // Each piece's selector, its key's letter (_drawnReturn) and the data that names it.
+      [
+        ['returns-aid', 'c', 'returnsAid'],
+        ['return-slot-aid', 's', 'returnSlotAid'],
+        ['ret-aid', 'm', 'retAid', 'retSids'],
+        ['return-row-aid', 'r', 'returnRowAid', 'returnRowSid'],
+      ].forEach(function (k) {
+        root.querySelectorAll('[data-' + k[0] + ']').forEach(function (el) {
+          var key = k[1] + el.dataset[k[2]] + (k[3] ? '|' + el.dataset[k[3]] : '');
+          if (key in kept) el._returnsHtml = kept[key];
+        });
+      });
+      return;
+    }
     var shownIds = _returnShownIds(cid);
     var set = function (el, html) {
-      if (drawn === true || el._returnsHtml === html) {
+      if (el._returnsHtml === html) {
         el._returnsHtml = html;
         return false;
       }
@@ -13997,26 +14201,26 @@ window.PageAssignments = (function () {
       return true;
     };
     var total = 0;
-    document.querySelectorAll('#main [data-returns-aid]').forEach(function (el) {
+    root.querySelectorAll('[data-returns-aid]').forEach(function (el) {
       var a = _assessmentById(cid, el.dataset.returnsAid);
       if (!a) return;
       total += GraderWork.draftsIn(cid, a.id, shownIds).length;
       set(el, _returnChipsHtml(cid, a, shownIds));
     });
-    document.querySelectorAll('#main [data-return-slot-aid]').forEach(function (el) {
+    root.querySelectorAll('[data-return-slot-aid]').forEach(function (el) {
       var a = _assessmentById(cid, el.dataset.returnSlotAid);
       if (a) set(el, _returnDraftsButtonHtml(cid, a, shownIds));
     });
-    document.querySelectorAll('#main [data-ret-aid]').forEach(function (el) {
+    root.querySelectorAll('[data-ret-aid]').forEach(function (el) {
       set(el, _returnMarkInner(cid, el.dataset.retAid, el.dataset.retSids.split(',')));
     });
-    document.querySelectorAll('#main [data-return-row-aid]').forEach(function (el) {
+    root.querySelectorAll('[data-return-row-aid]').forEach(function (el) {
       var a = _assessmentById(cid, el.dataset.returnRowAid);
       if (!a) return;
       var html = _inlineReturnInner(cid, a, el.dataset.returnRowSid);
       if (set(el, html)) el.hidden = !html;
     });
-    if (drawn === true || total === _toReturnTotal) return;
+    if (total === _toReturnTotal) return;
     _toReturnTotal = total;
     // The last draft is returned: the filter turns off and the list is whole again.
     if (!total && _toReturnOnly) return render();
@@ -16141,6 +16345,15 @@ window.PageAssignments = (function () {
     // The student it ended on, so the gradebook selects their cell.
     var lastSid = focusStudentId;
     focusStudentId = null;
+    // The page under the dialog is as it was, and has not seen what was graded.
+    if (g.page) {
+      openAssessIds = g.page.open;
+      focusStudentId = g.page.focus;
+      _allExpanded = g.page.expanded;
+      _collapsedIds = g.page.collapsed;
+      rubricViewStates = g.page.rubricViews;
+      _pageBehind = true;
+    }
     g.overlay.remove();
     if (g.onClose) g.onClose(lastSid);
   }
@@ -16355,6 +16568,7 @@ window.PageAssignments = (function () {
 
   function destroy() {
     _hideChipTip();
+    _pageBehind = false;
     closeColorPop();
     if (window.ClassResults) ClassResults.setPage(null);
     // Remove all tracked listeners

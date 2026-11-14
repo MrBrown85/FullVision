@@ -301,12 +301,16 @@
     ]);
   }
 
-  function _removeSavedClassData() {
+  // `andSession`: the saved sign-in (sb-*) goes too.
+  function _removeSavedClassData(andSession) {
     try {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('gb-') || key.startsWith('gb_'))) keys.push(key);
+        if (!key) continue;
+        if (key.startsWith('gb-') || key.startsWith('gb_') || (andSession === true && key.startsWith('sb-'))) {
+          keys.push(key);
+        }
       }
       keys.forEach(k => localStorage.removeItem(k));
     } catch (e) {
@@ -367,6 +371,41 @@
      not used: a failed token refresh raises it too, and that must keep the
      outbox. */
   let _authChannel = null;
+
+  /* The sign-in re-check says the session is gone (expired or revoked), or
+     that it is not the user this device's saved session names (`forged`).
+     Saved class data is removed, so it isn't left on a shared computer, and
+     the browser goes to Sign In. Start-up may have drawn the saved class
+     already (docs/DECISIONS.md, "Start-up draws the saved class list
+     first"): the page is hidden at once, and whatever it saves on its way
+     out is removed again. The outbox (fv-*) always stays. A forged session
+     is removed as well, or Sign In would come straight back in with it.
+     Never resolves: the browser is leaving. */
+  function _leaveSignedOut(forged) {
+    _dropHeldWrites();
+    const wipe = function () {
+      _removeSavedClassData(forged === true);
+    };
+    wipe();
+    window.addEventListener('pagehide', wipe);
+    try {
+      document.documentElement.style.visibility = 'hidden';
+    } catch (e) {
+      /* no page to hide */
+    }
+    window.location.href = '/login.html';
+    return new Promise(function () {});
+  }
+
+  /* Writes queued while start-up's re-check had not passed (the outbox's
+     Held) are never sent: the re-check failed. Earlier ones stay. */
+  function _dropHeldWrites() {
+    try {
+      if (window.v2Queue && typeof window.v2Queue.dropHeld === 'function') window.v2Queue.dropHeld();
+    } catch (e) {
+      /* no outbox on this page */
+    }
+  }
 
   function _postSignedOut() {
     try {
@@ -543,6 +582,12 @@
     // straight from storage and is editable; getUser() re-validates the
     // JWT signature server-side.
     //
+    // getSession() is read first all the same, for the one thing only it
+    // can say: whose session the saved one claims to be. The server naming
+    // anyone else is a forged session. The caller need not wait for the
+    // answer: start-up draws this device's saved class while it comes
+    // (shared/data.js, _holdForSignIn).
+    //
     // Only a real signed-out state goes to Sign In: the server saying the
     // session is gone, or no session saved at all. A check that throws or
     // can't reach the server (another tab holding the auth lock, a network
@@ -555,28 +600,34 @@
       _authCheckPromise = (async function () {
         const waits = _AUTH_RETRY_WAITS_MS;
         const started = Date.now();
+        let saved = null; // what getSession said; null when it could not tell
+        try {
+          const read = await _within(sb.auth.getSession(), _AUTH_CHECK_MS);
+          if (!read.timedOut && read.data) saved = read;
+        } catch (e) {
+          /* the server's answer below decides */
+        }
+        const session = saved && saved.data.session;
+        const expected = (session && session.user && session.user.id) || null;
         for (let attempt = 0; ; attempt++) {
           let passing = null;
           try {
             const res = await _within(sb.auth.getUser(), _AUTH_CHECK_MS);
             if (res.timedOut) throw new Error('The session check timed out');
             const { data, error } = res;
-            if (!error && data && data.user) return;
-            if (!error || !_isPassingAuthError(error)) {
-              // The session is gone (expired or revoked), not just unreachable:
-              // remove saved class data so it isn't left on a shared computer.
-              // The outbox (fv-*) always stays.
-              _removeSavedClassData();
-              window.location.href = '/login.html';
-              return new Promise(function () {});
+            if (!error && data && data.user) {
+              if (expected && data.user.id !== expected) return _leaveSignedOut(true);
+              return;
             }
+            // The session is gone (expired or revoked), not just unreachable.
+            if (!error || !_isPassingAuthError(error)) return _leaveSignedOut();
             passing = error;
           } catch (e) {
             passing = e;
           }
           // Offline, or out of time: asking again can't tell either.
           const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-          if (attempt >= waits.length || offline || Date.now() - started > _AUTH_TOTAL_MS) {
+          if (attempt >= waits.length || offline || Date.now() - started >= _AUTH_TOTAL_MS) {
             console.warn('Session check could not tell after retries:', passing);
             break;
           }
@@ -587,10 +638,12 @@
         // Still unsure. A browser with no saved session is signed out. A
         // session that is saved but can't be refreshed right now (offline the
         // next morning: getSession returns no session with an error) stays,
-        // as does a read that times out.
+        // as does a read that times out. The first read's answer stands;
+        // only one that could not tell is read again.
         try {
-          const res = await _within(sb.auth.getSession(), _AUTH_CHECK_MS);
+          const res = saved || (await _within(sb.auth.getSession(), _AUTH_CHECK_MS));
           if (!res.timedOut && res.data && !res.data.session && !res.error) {
+            _dropHeldWrites();
             window.location.href = '/login.html';
             return new Promise(function () {});
           }

@@ -221,10 +221,12 @@ window.CompetencyEvidence = (function () {
   }
 
   /* The drawer under a card's tag row: the explanation, the list, and
-     the Add observation slot. `id` ties it to the row's aria-controls. */
-  function drawerHtml(cid, sid, sec, tag, id) {
-    var ev = evidenceFor(cid, sid, tag.id);
-    var override = getSectionOverride(cid, sid, sec.id);
+     the Add observation slot. `id` ties it to the row's aria-controls.
+     opts (all optional): ev, the card's evidenceFor already worked out;
+     map, the class's assessments by id; later, true for a closed drawer,
+     drawn empty and built by fill() when its row is opened. */
+  function drawerHtml(cid, sid, sec, tag, id, opts) {
+    var o = opts || {};
     return (
       '<div class="tag-detail ced" id="' +
       esc(id) +
@@ -232,7 +234,17 @@ window.CompetencyEvidence = (function () {
       esc(tag.id) +
       '" data-secid="' +
       esc(sec.id) +
-      '">' +
+      '"' +
+      (o.later ? ' data-ced-later>' : '>' + innerHtml(cid, sid, sec, tag, o.ev, o.map)) +
+      '</div>'
+    );
+  }
+
+  // html-safe: the explanation and the label through esc; the list from listHtml, which escapes its rows.
+  function innerHtml(cid, sid, sec, tag, ev, map) {
+    ev = ev || evidenceFor(cid, sid, tag.id);
+    var override = getSectionOverride(cid, sid, sec.id);
+    return (
       '<div class="ced-explain">' +
       esc(
         explainText(
@@ -245,20 +257,19 @@ window.CompetencyEvidence = (function () {
       '<ul class="ced-list" aria-label="Evidence for ' +
       esc(tag.label) +
       ', newest first">' +
-      listHtml(cid, sid, ev, assessMapFor(cid)) +
+      listHtml(cid, sid, ev, map || assessMapFor(cid)) +
       '</ul>' +
       '<div class="ced-capture" data-ced-slot></div>' +
       '<div class="ced-foot">' +
       '<button type="button" class="ced-add-btn" data-ced="add">Add observation</button>' +
       '<button type="button" class="ced-done-btn" data-ced="done" hidden>Done</button>' +
-      '</div>' +
       '</div>'
     );
   }
 
-  /* The count on the tag row. */
-  function rowCount(cid, sid, tagId) {
-    var ev = evidenceFor(cid, sid, tagId);
+  /* The count on the tag row (ev: the card's evidenceFor, when worked out already). */
+  function rowCount(cid, sid, tagId, ev) {
+    ev = ev || evidenceFor(cid, sid, tagId);
     return countLabel(ev.scores.length, ev.obs.length);
   }
 
@@ -277,6 +288,26 @@ window.CompetencyEvidence = (function () {
 
   function rowFor(drawer) {
     return _root && _root.querySelector('.dash-tag-row[aria-controls="' + drawer.id + '"]');
+  }
+
+  /* Build a drawer drawn closed (drawerHtml's later), from the data layer,
+     as it opens. A drawer already built is left as it is. */
+  function fill(drawer) {
+    if (!drawer || !drawer.hasAttribute('data-ced-later') || !_cid) return;
+    var secId = drawer.getAttribute('data-secid');
+    var tagId = drawer.getAttribute('data-tagid');
+    var sec = (getSections(_cid) || []).find(function (x) {
+      return x.id === secId;
+    });
+    var tag =
+      sec &&
+      (sec.tags || []).find(function (t) {
+        return t.id === tagId;
+      });
+    if (!tag) return;
+    drawer.removeAttribute('data-ced-later');
+    // html-safe: innerHtml escapes the explanation and the label, and listHtml every row.
+    drawer.innerHTML = innerHtml(_cid, _sid, sec, tag);
   }
 
   /* Redraw every drawer's list and its row's count from the data layer. */
@@ -339,6 +370,9 @@ window.CompetencyEvidence = (function () {
   }
 
   function onClick(e) {
+    // A closed drawer's row, pressed: the drawer is built before the page opens it.
+    var row = e.target.closest && e.target.closest('.dash-tag-row[aria-controls]');
+    if (row && _root && _root.contains(row)) fill(document.getElementById(row.getAttribute('aria-controls')));
     var el = e.target.closest && e.target.closest('[data-ced]');
     if (!el || !_root || !_root.contains(el)) return;
     var drawer = el.closest('.ced');
@@ -375,6 +409,7 @@ window.CompetencyEvidence = (function () {
         return x.getAttribute('data-tagid') === _captureTag;
       });
       if (d) {
+        fill(d);
         _capture.mount(d.querySelector('[data-ced-slot]'));
         setCaptureOpen(d, true);
       } else closeCapture();
@@ -390,6 +425,8 @@ window.CompetencyEvidence = (function () {
   return {
     drawerHtml: drawerHtml,
     rowCount: rowCount,
+    evidenceFor: evidenceFor,
+    fill: fill,
     mount: mount,
     refresh: refresh,
     destroy: destroy,

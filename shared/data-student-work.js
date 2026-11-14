@@ -126,12 +126,8 @@ function getCourseSendWork(cid) {
 }
 
 function getAssessmentStudentWork(cid, aid) {
-  var stored = _studentWorkStored(cid);
-  var own =
-    stored &&
-    (stored.assessments || []).find(function (a) {
-      return a && a.id === aid;
-    });
+  var ix = _workIndexOf(cid, true); // the piece's settings by id; only they are copied
+  var own = ix && ix.settings.get(aid);
   var out = Object.assign({ id: aid }, _STUDENT_WORK_DEFAULTS, own ? _studentWorkCopy(own) : {});
   out.id = aid;
   if (out.after_due !== 'until') out.accept_until = null;
@@ -157,9 +153,7 @@ function _studentWorkSubmissions(cid) {
 // One stored submission as the readers give it: a copy, its pages in order.
 function _studentWorkReadable(s) {
   var out = _studentWorkCopy(s);
-  out.files = (Array.isArray(out.files) ? out.files : []).slice().sort(function (x, y) {
-    return (x.page || 0) - (y.page || 0);
-  });
+  out.files = _workPagesInOrder(out);
   // Who added each page (the contract's added_by); the sample's pages
   // were all added by whoever sent the work.
   out.files.forEach(function (f) {
@@ -333,26 +327,82 @@ function getStudentWorkGroup(cid, sid, aid) {
    for is copied. (Copying the whole class's work for each ask took
    seconds a draw in a class with 600 pieces of work in.) */
 var _workByPiece = { cid: null, stored: null, by: {} };
-function _newestSubmissionsOf(cid, sids, aid) {
+/* The same index serves the other readers (Mark Up, revisions, reflections):
+   every handed-in submission, in stored order, by piece, by piece and
+   student, by student, by submission id and by page id; and each piece's
+   settings (the first of an id). Nothing in it is a copy; a reader copies
+   only what it gives. */
+function _workIndexOf(cid, settings) {
   var stored = _studentWorkStored(cid);
+  if (!stored) return null;
+  if (_workByPiece.cid !== cid || _workByPiece.stored !== stored) _workByPiece = { cid: cid, stored: stored };
+  var ix = _workByPiece;
+  if (settings && !ix.settings) {
+    var own = new Map();
+    (stored.assessments || []).forEach(function (a) {
+      if (a && !own.has(a.id)) own.set(a.id, a);
+    });
+    ix.settings = own;
+  }
+  if (settings || ix.by) return ix;
+  var maps = { by: {} };
+  ['piece', 'pair', 'student', 'sub', 'file'].forEach(function (k) {
+    maps[k] = new Map();
+  });
+  var add = function (map, key, s) {
+    var list = map.get(key);
+    if (!list) map.set(key, (list = []));
+    if (list[list.length - 1] !== s) list.push(s);
+  };
+  (stored.submissions || []).forEach(function (s) {
+    if (!s || s.state !== 'sent') return;
+    var key = s.assessment_id + '|' + s.enrollment_id;
+    // The newest version; of two alike, the one stored first.
+    if (!maps.by[key] || (s.version || 1) > (maps.by[key].version || 1)) maps.by[key] = s;
+    add(maps.piece, s.assessment_id, s);
+    if (!maps.pair.has(s.assessment_id)) maps.pair.set(s.assessment_id, new Map());
+    add(maps.pair.get(s.assessment_id), s.enrollment_id, s);
+    add(maps.student, s.enrollment_id, s);
+    add(maps.sub, s.id, s);
+    (Array.isArray(s.files) ? s.files : []).forEach(function (f) {
+      if (f) add(maps.file, f.id, s);
+    });
+  });
+  return Object.assign(ix, maps);
+}
+/* Handed-in submissions of pieces still in the class, in stored order, not
+   copied (for reading only), by 'piece', 'student', 'sub' (its id) or 'file'
+   (a page's id) under `key`, or by 'pair': piece `key`, student `sid`. [] at
+   once when there are none. */
+function _workSentIn(cid, by, key, sid) {
+  var ix = _workIndexOf(cid);
+  var map = ix && (by === 'pair' ? ix.pair.get(key) : ix[by]);
+  var found = map ? map.get(by === 'pair' ? sid : key) : null;
+  if (!found) return [];
+  var aids = {};
+  (getAssessments(cid) || []).forEach(function (a) {
+    if (a && a.id) aids[a.id] = true;
+  });
+  return found.filter(function (s) {
+    return aids[s.assessment_id];
+  });
+}
+// A stored submission's pages in order, as _studentWorkReadable gives them; not copied.
+function _workPagesInOrder(s) {
+  return (Array.isArray(s.files) ? s.files : []).slice().sort(function (x, y) {
+    return (x.page || 0) - (y.page || 0);
+  });
+}
+function _newestSubmissionsOf(cid, sids, aid) {
   // The server takes an assessment's work with it when it is deleted.
   var there = (getAssessments(cid) || []).some(function (a) {
     return a && a.id === aid;
   });
-  if (!stored || !there) return [];
-  if (_workByPiece.cid !== cid || _workByPiece.stored !== stored) {
-    var by = {};
-    (stored.submissions || []).forEach(function (s) {
-      if (!s || s.state !== 'sent') return;
-      var key = s.assessment_id + '|' + s.enrollment_id;
-      // The newest version; of two alike, the one stored first.
-      if (!by[key] || (s.version || 1) > (by[key].version || 1)) by[key] = s;
-    });
-    _workByPiece = { cid: cid, stored: stored, by: by };
-  }
+  var ix = there ? _workIndexOf(cid) : null;
+  if (!ix) return [];
   var out = [];
   sids.forEach(function (sid) {
-    var mine = _workByPiece.by[aid + '|' + sid];
+    var mine = ix.by[aid + '|' + sid];
     if (mine) out.push(_studentWorkReadable(mine));
   });
   return out;
@@ -809,6 +859,7 @@ var _WORK_DROPPED_KEY = 'gb-work-dropped'; // { at }: photos refused after the s
 var _WORK_DROPPED_MS = 24 * 60 * 60 * 1000; // how long the sync dot says so, unless clicked
 var _workAwaited = {}; // start key → true while Add Work's screen still waits for the answer
 var _workServer = {}; // cid → list_course_submissions' answer, as last read
+var _workVersion = {}; // cid → that answer's version, until something here changes the copy
 var _workCourseRow = {}; // cid → { send_work, keep_photos_until }, as the server last said
 var _workCourseHere = {}; // cid → a change of the two on its way: { patch, at }
 var _workAssessHere = {}; // aid → a change of an assessment's settings on its way
@@ -886,6 +937,24 @@ function _workQueued(endpoint, match) {
   });
 }
 
+/* _workQueued for several endpoints from one read of the outbox: a function
+   (endpoint, match) answering as _workQueued does, for the endpoints named. */
+function _workQueuedReader(endpoints) {
+  var q = window.v2Queue;
+  if (!q || typeof q.queued !== 'function' || typeof q.queuedEach !== 'function') return _workQueued;
+  var each = {};
+  try {
+    each = q.queuedEach(endpoints) || {};
+  } catch (e) {
+    each = {};
+  }
+  return function (endpoint, match) {
+    return (each[endpoint] || []).filter(function (e) {
+      return e && e.payload && match(e.payload);
+    });
+  };
+}
+
 function _workAssessmentOfClass(cid, aid) {
   return (getAssessments(cid) || []).some(function (a) {
     return a && a.id === aid;
@@ -899,8 +968,15 @@ function _workAssessmentOfClass(cid, aid) {
 function _workServerView(cid) {
   if (_workViewMemo[cid]) return _workViewMemo[cid];
   var srv = _workServer[cid] || null;
+  // The outbox read once for the four endpoints below, not once for each.
+  var queuedTo = _workQueuedReader([
+    'set_course_send_work',
+    'set_assessment_student_work',
+    'delete_submission',
+    'mark_handed_in_paper',
+  ]);
   var course = Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _workCourseRow[cid] || {});
-  _workQueued('set_course_send_work', function (p) {
+  queuedTo('set_course_send_work', function (p) {
     return p.p_course_id === cid;
   }).forEach(function (e) {
     if (_plainObject(e.payload.p_patch)) Object.assign(course, e.payload.p_patch);
@@ -911,7 +987,7 @@ function _workServerView(cid) {
   ((srv && srv.assessments) || []).forEach(function (a) {
     if (a && a.id) byId[a.id] = _studentWorkCopy(a);
   });
-  _workQueued('set_assessment_student_work', function (p) {
+  queuedTo('set_assessment_student_work', function (p) {
     return _workAssessmentOfClass(cid, p.p_assessment_id);
   }).forEach(function (e) {
     var aid = e.payload.p_assessment_id;
@@ -924,7 +1000,7 @@ function _workServerView(cid) {
   var subs = _studentWorkCopy((srv && srv.submissions) || []);
   // Deleted here, not answered yet.
   var deleted = {};
-  _workQueued('delete_submission', function () {
+  queuedTo('delete_submission', function () {
     return true;
   }).forEach(function (e) {
     deleted[e.payload.p_submission_id] = true;
@@ -941,7 +1017,7 @@ function _workServerView(cid) {
     return at || new Date().toISOString();
   };
   // Handed In on Paper, not answered yet.
-  _workQueued('mark_handed_in_paper', function (p) {
+  queuedTo('mark_handed_in_paper', function (p) {
     return _workAssessmentOfClass(cid, p.p_assessment_id);
   }).forEach(function (e) {
     var aid = e.payload.p_assessment_id;
@@ -1114,25 +1190,38 @@ async function _fetchStudentWork(cid) {
   var writes = _workWrites[cid] || 0;
   var res;
   try {
+    // The version of the copy held goes with the ask: an unchanged list is
+    // answered { unchanged, version } in a few bytes, not the whole list
+    // again (History 12's was 1.1 MB; migration 2026111310).
+    var held = (_workServer[cid] && _workVersion[cid]) || null;
     res = await _callRpcWithAuthGuard(
-      'list_course_submissions',
-      { p_course_id: cid },
+      'list_course_submissions_since',
+      { p_course_id: cid, p_version: held },
       { suppressSessionExpiredModal: true },
     );
   } catch (e) {
     res = { error: e };
   }
   var data = res && !res.error ? _rpcObject(res.data) : null;
-  if (!data || !Array.isArray(data.submissions)) {
+  var same = !!data && data.unchanged === true && !!held && data.version === held;
+  if (!same && (!data || !Array.isArray(data.submissions))) {
     // A read that failed changes nothing: the next one tries again.
     if (res && res.error && !res.error.handledSessionExpired)
-      console.warn('list_course_submissions failed:', res.error);
+      console.warn('list_course_submissions_since failed:', res.error);
     return { error: (res && res.error) || { message: 'no answer' } };
   }
   if (!_workOnServer(cid)) return { changed: false };
   // One of this device's writes landed while the read was out: it is from before that write.
   if ((_workWrites[cid] || 0) !== writes) return { skipped: true };
+  if (same) {
+    // The copy was changed here while the read was out: it is no longer that version. Read it whole.
+    if (_workVersion[cid] !== held) return { skipped: true };
+    (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
+    return { changed: false };
+  }
   var was = _workLook(cid);
+  _workVersion[cid] = typeof data.version === 'string' && data.version ? data.version : null;
+  delete data.version;
   _workServer[cid] = data;
   if (_plainObject(data.course)) _noteCourseSendWork(cid, Object.assign({ send_work: false }, data.course));
   (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
@@ -1177,6 +1266,7 @@ function _loadServerStudentWork(cid, fresh) {
 // A write of this device's landed: reads begun before it are dropped, and the class read again soon.
 function _workWriteLanded(cid) {
   _workWrites[cid] = (_workWrites[cid] || 0) + 1;
+  _workVersion[cid] = null;
   _workChanged(cid);
   setTimeout(function () {
     refreshStudentWork(cid, { force: true });
@@ -1274,6 +1364,7 @@ function saveAssessmentStudentWork(cid, aid, w) {
         });
         list.push(data);
         _workServer[cid].assessments = list;
+        _workVersion[cid] = null;
       }
       if (res && res.error && !res.error.handledSessionExpired) {
         console.warn('set_assessment_student_work failed:', res.error);
@@ -1301,12 +1392,8 @@ function _openServerWorkPage(cid, name) {
     return Promise.resolve(null);
   }
   var bucket = (_workServer[cid] && _workServer[cid].bucket) || 'student-photos';
-  return Promise.resolve()
-    .then(function () {
-      return sb.storage.from(bucket).createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
-    })
-    .then(function (res) {
-      var link = res && !res.error && res.data && res.data.signedUrl;
+  return _workSignLink(sb, bucket, name)
+    .then(function (link) {
       if (!link) return null;
       return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
         return r && r.ok ? r.blob() : null;
@@ -1329,6 +1416,68 @@ function _openServerWorkPage(cid, name) {
     .then(null, function () {
       return null;
     });
+}
+
+/* A 300-second link for one stored page. The links asked for in one turn
+   (a screen drawing its pictures) are signed together in one request when
+   the client can (createSignedUrls), instead of one request each. */
+var _workSigning = null; // { bucket, sb, names: { path: [resolve] } } for this turn
+function _workSignLink(sb, bucket, name) {
+  return new Promise(function (resolve) {
+    if (!_workSigning || _workSigning.bucket !== bucket || _workSigning.sb !== sb) {
+      var batch = (_workSigning = { bucket: bucket, sb: sb, names: {} });
+      Promise.resolve().then(function () {
+        if (_workSigning === batch) _workSigning = null;
+        _workSignBatch(batch);
+      });
+    }
+    (_workSigning.names[name] = _workSigning.names[name] || []).push(resolve);
+  });
+}
+function _workSignBatch(batch) {
+  if (_signInWait) return void _signInWait.then(_workSignBatch.bind(null, batch)); // not before the re-check has passed
+  var names = Object.keys(batch.names);
+  var give = function (name, link) {
+    batch.names[name].forEach(function (resolve) {
+      resolve(link || null);
+    });
+  };
+  var store = batch.sb.storage.from(batch.bucket);
+  var one = function (name) {
+    return Promise.resolve()
+      .then(function () {
+        return store.createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
+      })
+      .then(
+        function (res) {
+          give(name, res && !res.error && res.data && res.data.signedUrl);
+        },
+        function () {
+          give(name, null);
+        },
+      );
+  };
+  if (names.length < 2 || typeof store.createSignedUrls !== 'function') return names.forEach(one);
+  Promise.resolve()
+    .then(function () {
+      return store.createSignedUrls(names, STUDENT_WORK_LINK_SECONDS);
+    })
+    .then(
+      function (res) {
+        var got = {};
+        ((res && !res.error && res.data) || []).forEach(function (row) {
+          if (row && row.path && row.signedUrl && !row.error) got[row.path] = row.signedUrl;
+        });
+        names.forEach(function (name) {
+          give(name, got[name]);
+        });
+      },
+      function () {
+        names.forEach(function (name) {
+          give(name, null);
+        });
+      },
+    );
 }
 
 /* ── Add Work ── */
@@ -1354,11 +1503,13 @@ function _wireWorkQueue() {
 function _workUploadFile(path, blob) {
   var sb = getSupabase();
   if (!sb || !sb.storage) return Promise.resolve({ error: { message: 'offline: no client', status: 503 } });
-  return Promise.resolve(
-    sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false }),
-  ).then(function (res) {
-    return { error: (res && res.error) || null };
-  });
+  return Promise.resolve(_signInWait)
+    .then(function () {
+      return sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    })
+    .then(function (res) {
+      return { error: (res && res.error) || null };
+    });
 }
 
 function _workPagesJson(rec) {
@@ -1549,6 +1700,7 @@ function _workServerTake(cid, sub) {
     );
   });
   if (sub.state === 'sent') srv.submissions.push(_studentWorkCopy(sub));
+  _workVersion[cid] = null;
   _workChanged(cid);
 }
 
@@ -1819,6 +1971,7 @@ function _sweepWorkRemovals() {
   if (_workSweepTimer) clearTimeout(_workSweepTimer);
   _workSweepTimer = setTimeout(function () {
     _workSweepTimer = null;
+    if (_signInWait) return void _signInWait.then(_sweepWorkRemovals);
     var sb = getSupabase();
     var base = ((window.__ENV && window.__ENV.SUPABASE_URL) || '').replace(/\/$/, '');
     if (!sb || !sb.auth || !base) return;
@@ -1876,6 +2029,7 @@ var _WORK_ENDPOINTS = {
    waiting by an earlier visit go (an upload whose start has no answer
    waits for the outbox). */
 function _resumeWorkUploads() {
+  if (_signInWait) return void _signInWait.then(_resumeWorkUploads); // not before start-up's re-check has answered
   if (_isDemoSession() || !_writesEnabled() || !Object.keys(_workUploads()).length) return;
   var q = _wireWorkQueue();
   var all = _workUploads();

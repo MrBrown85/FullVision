@@ -194,6 +194,7 @@ public.list_course_resources(p_course_id uuid) aedc2494e8d6236cc287a0c1afc9b412 
 public.list_course_responses(p_course_id uuid) 42393243ca177fda5aac1239a33d9bb5 1157
 public.list_course_student_profiles(p_course_id uuid) 382e0819ec46b04a2d431b7e00bcb609 3078
 public.list_course_submissions(p_course_id uuid) 525db92cdf4129afb9e2bc15aa7d4725 1620
+public.list_course_submissions_since(p_course_id uuid, p_version text) e049269c4cb6b33dda39919a4e614678 554
 public.list_course_term_attendance(p_course_id uuid) 87c2d03a93034ecb3e78d5c0dca87a0f 637
 public.list_phone_reports(p_course_id uuid) e30b974b9b852de21e01049e16e3d7d3 348
 public.list_questionnaire_templates() b6d8ed2e20be3fdedeecd751be620771 305

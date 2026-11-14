@@ -451,6 +451,10 @@ window.WorkWall = (function () {
       (first ? '' : ' is-empty') +
       '" data-ww="open" data-sid="' +
       esc(r.st.id) +
+      '" data-cid="' +
+      esc(w.cid) +
+      '" data-aid="' +
+      esc(w.aid) +
       '"><span class="ww-pic">' +
       pic +
       (r.pages.length > 1 ? '<span class="ww-count">' + esc(r.pages.length + ' pages') + '</span>' : '') +
@@ -578,6 +582,7 @@ window.WorkWall = (function () {
     if (!w) return;
     var a = _piece(w.cid, w.aid);
     if (!a || !GraderWork.workShown(w.cid, a)) return close();
+    if (window.WorkRubricCard) WorkRubricCard.hide();
     var m = _wallModel(w);
     var drawn = _wallHtml(w, m, !!(w.onGrade || (window.PageAssignments && PageAssignments.openGrader)));
     var focus = document.activeElement;
@@ -734,6 +739,7 @@ window.WorkWall = (function () {
     overlay.addEventListener('click', _wallClick);
     overlay.addEventListener('change', _wallChange);
     _keys(true);
+    if (window.WorkRubricCard) WorkRubricCard.wire();
     _drawWall();
     var back = overlay.querySelector('.ww-back');
     _focus(back);
@@ -752,6 +758,7 @@ window.WorkWall = (function () {
     var w = _wall;
     if (!w) return;
     _wall = null;
+    if (window.WorkRubricCard) WorkRubricCard.hide();
     w.pics.releaseAll();
     w.overlay.remove();
     if (!_tab) _keys(false);
@@ -890,6 +897,10 @@ window.WorkWall = (function () {
             (first ? '' : ' is-empty') +
             '" data-sw="open" data-aid="' +
             esc(p.a.id) +
+            '" data-cid="' +
+            esc(cid) +
+            '" data-sid="' +
+            esc(sid) +
             '"><span class="sw-pic">' +
             (first
               ? '<img class="ww-img" data-work-pic data-aid="' +
@@ -965,6 +976,7 @@ window.WorkWall = (function () {
     });
     // Kept until the teacher leaves this student or the tab.
     _keys(true);
+    if (window.WorkRubricCard) WorkRubricCard.wire();
   }
 
   /* ── Work on the teacher's other screens ──────────────────────
@@ -1033,18 +1045,110 @@ window.WorkWall = (function () {
      See the Work button while the pointer rests on it or it has focus. It
      takes no clicks and no focus, and goes when the pointer or focus
      leaves, on a click, a scroll or Escape, and when the row is drawn
-     again. The pictures are kept for half a minute after the last glance,
-     so moving down a class list does not fetch a page twice. */
-  var GLANCE_WAIT = 200; // ms the pointer rests before the card shows
-  var GLANCE_KEEP = 30000; // ms the pictures are kept after the last card
+     again.
+
+     It is meant to be there the moment the pointer arrives:
+     - when the pointer first comes into an open card, the thumbnails of
+       every row's first pages are fetched (small: about 20 KB each), the
+       links for all of them signed in one request (openStudentWorkPage
+       batches the links asked for in one turn);
+     - when the pointer comes onto a button, its full pages start at once,
+       and the card shows after a tenth of a second with the thumbnail,
+       then the full page as soon as it is in;
+     - pictures are kept in this tab's memory, the most recent 240
+       thumbnails and 16 full pages, for ten minutes at most, so a second
+       look fetches nothing. Nothing is written to the device. */
+  var GLANCE_WAIT = 100; // ms the pointer rests before the card shows
   var GLANCE_WIDE = 340; // px, a page's width in the card
-  var _glance = null; // { btn, el }
-  var _glancePics = null;
+  var GLANCE_MAX = { thumb: 240, page: 16 }; // pictures kept in memory, of each size
+  var GLANCE_AGE = 10 * 60 * 1000; // ms a kept picture is used for
+  var _glance = null; // { btn, el, shown, cid }
   var _glanceTimer = null;
-  var _glanceLetGo = null;
   var _glanceDoc = null;
+  var _glanceKept = new Map(); // which|path -> { which, at, page: { url, release } | null | undefined, wait: Promise }
+  var _glanceWarmed = typeof WeakSet === 'function' ? new WeakSet() : null; // the buttons whose thumbnails are asked for
   function _glanceBtn(e) {
     return e.target && e.target.closest ? e.target.closest('.rsg-see-work') : null;
+  }
+  // The pages a button's glance shows: the student's, or their group's, first two.
+  function _glancePages(btn) {
+    var cid = btn.getAttribute('data-cid');
+    var aid = btn.getAttribute('data-aid');
+    var sid = btn.getAttribute('data-sid');
+    var sub = getStudentSubmission(cid, sid, aid);
+    if (!sub && typeof getGroupSubmissions === 'function') sub = getGroupSubmissions(cid, sid, aid)[0] || null;
+    var pages = _pages(sub);
+    return { cid: cid, all: pages, shown: pages.slice(0, 2) };
+  }
+  function _glanceKey(which, f) {
+    var path = which === 'thumb' ? f.thumb_path : f.path;
+    return path ? which + '|' + path : null;
+  }
+  // A kept picture, or one asked for now: { page, wait }. Its address is let go when it is pushed out.
+  function _glanceGet(cid, f, which) {
+    var key = _glanceKey(which, f);
+    if (!key) return null;
+    var kept = _glanceKept.get(key);
+    if (kept && Date.now() - kept.at > GLANCE_AGE) {
+      _glanceDrop(key, kept);
+      kept = null;
+    }
+    if (kept) {
+      // The most recently used goes last, and is pushed out last.
+      _glanceKept.delete(key);
+      _glanceKept.set(key, kept);
+      return kept;
+    }
+    var entry = { which: which, at: Date.now(), page: undefined, wait: null };
+    entry.wait = openStudentWorkPage(cid, f, which).then(
+      function (page) {
+        entry.page = page || null;
+        if (_glanceKept.get(key) !== entry && page && page.release) page.release();
+        return entry.page;
+      },
+      function () {
+        entry.page = null;
+        return null;
+      },
+    );
+    _glanceKept.set(key, entry);
+    _glanceTrim(which);
+    return entry;
+  }
+  function _glanceDrop(key, entry) {
+    _glanceKept.delete(key);
+    if (entry.page && entry.page.release) {
+      var page = entry.page;
+      // Not while the card shows it: it is let go when it is pushed out again.
+      if (!(_glance && _glance.el.querySelector('img[src="' + page.url + '"]'))) page.release();
+    }
+  }
+  function _glanceTrim(which) {
+    var n = 0;
+    _glanceKept.forEach(function (e) {
+      if (e.which === which) n++;
+    });
+    if (n <= GLANCE_MAX[which]) return;
+    var over = n - GLANCE_MAX[which];
+    Array.from(_glanceKept.entries()).some(function (pair) {
+      if (pair[1].which !== which) return false;
+      _glanceDrop(pair[0], pair[1]);
+      return --over <= 0;
+    });
+  }
+  // The thumbnails of every See the Work in an open card, the first time the pointer comes into it.
+  function _glanceWarm(card) {
+    if (!card || !card.querySelectorAll) return;
+    Array.prototype.forEach.call(card.querySelectorAll('.rsg-see-work'), function (btn) {
+      if (_glanceWarmed) {
+        if (_glanceWarmed.has(btn)) return;
+        _glanceWarmed.add(btn);
+      }
+      var p = _glancePages(btn);
+      p.shown.forEach(function (f) {
+        _glanceGet(p.cid, f, 'thumb');
+      });
+    });
   }
   function _glanceWire() {
     if (typeof document === 'undefined' || _glanceDoc === document || !document.addEventListener) return;
@@ -1054,9 +1158,19 @@ window.WorkWall = (function () {
       'mouseover',
       function (e) {
         var btn = _glanceBtn(e);
-        if (!btn) return _glance && _glanceHide();
+        if (!btn) {
+          var card = e.target && e.target.closest ? e.target.closest('.assess-card.open') : null;
+          if (card) _glanceWarm(card);
+          return _glance && _glanceHide();
+        }
         if (_glance && _glance.btn === btn) return;
         clearTimeout(_glanceTimer);
+        // The full pages start now; the card shows when the pointer has rested.
+        var p = _glancePages(btn);
+        p.shown.forEach(function (f) {
+          _glanceGet(p.cid, f, 'thumb');
+          _glanceGet(p.cid, f, 'page');
+        });
         _glanceTimer = setTimeout(function () {
           // Still there and still under the pointer: the page may have scrolled meanwhile.
           if (btn.isConnected && btn.matches(':hover')) _glanceShow(btn);
@@ -1099,23 +1213,37 @@ window.WorkWall = (function () {
     if (!_glance) return;
     _glance.el.remove();
     _glance = null;
-    clearTimeout(_glanceLetGo);
-    _glanceLetGo = setTimeout(function () {
-      if (_glance || !_glancePics) return;
-      _glancePics.releaseAll();
-      _glancePics = null;
-    }, GLANCE_KEEP);
+  }
+  // The sharpest picture there is for page `i` of the card on screen: the full page, else its thumbnail.
+  function _glancePaint(el, i, f, cid) {
+    var img = el.querySelector('img[data-page="' + i + '"]');
+    if (!img) return;
+    var page = _glanceGet(cid, f, 'page');
+    var thumb = _glanceGet(cid, f, 'thumb');
+    var put = function (entry, sharp) {
+      if (!entry || !entry.page || !(_glance && _glance.el === el)) return;
+      if (!sharp && img.getAttribute('data-sharp') === '1') return;
+      img.setAttribute('src', entry.page.url);
+      if (sharp) img.setAttribute('data-sharp', '1');
+    };
+    if (page && page.page) return put(page, true);
+    if (thumb && thumb.page) put(thumb, false);
+    else if (thumb && thumb.wait)
+      thumb.wait.then(function () {
+        put(thumb, false);
+      });
+    if (page && page.wait)
+      page.wait.then(function () {
+        put(page, true);
+      });
   }
   function _glanceShow(btn) {
     _glanceHide();
-    var cid = btn.getAttribute('data-cid');
-    var aid = btn.getAttribute('data-aid');
-    var sid = btn.getAttribute('data-sid');
-    var sub = getStudentSubmission(cid, sid, aid);
-    if (!sub && typeof getGroupSubmissions === 'function') sub = getGroupSubmissions(cid, sid, aid)[0] || null;
-    var pages = _pages(sub);
+    var p = _glancePages(btn);
+    var cid = p.cid;
+    var pages = p.all;
     if (!pages.length) return;
-    var shown = pages.slice(0, 2);
+    var shown = p.shown;
     // A page keeps its shape, and the card fits the window.
     var win = typeof window !== 'undefined' ? window : {};
     var roomW = (win.innerWidth || 1280) - 24;
@@ -1137,7 +1265,7 @@ window.WorkWall = (function () {
       shown
         .map(function (f, i) {
           return (
-            '<img class="ww-glance-img" data-work-pic data-work-which="page" data-page="' +
+            '<img class="ww-glance-img" data-page="' +
             i +
             '" alt="" width="' +
             wide +
@@ -1149,6 +1277,11 @@ window.WorkWall = (function () {
         .join('') +
       '</div>' +
       (more > 0 ? '<div class="ww-glance-more">' + (more === 1 ? '1 more page' : more + ' more pages') + '</div>' : '');
+    _glance = { btn: btn, el: el };
+    // The pictures first, so one already kept is in place when the card is first painted.
+    shown.forEach(function (f, i) {
+      _glancePaint(el, i, f, cid);
+    });
     document.body.appendChild(el);
     // Under the button, or over it when there is more room there; kept inside the window.
     var at = btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 0, top: 0, bottom: 0 };
@@ -1157,13 +1290,6 @@ window.WorkWall = (function () {
     var top = below >= box.height + 12 || below >= at.top ? at.bottom + 8 : at.top - 8 - box.height;
     el.style.left = Math.max(12, Math.min(at.left, roomW + 12 - box.width)) + 'px';
     el.style.top = Math.max(12, Math.min(top, roomH + 12 - box.height)) + 'px';
-    _glance = { btn: btn, el: el };
-    clearTimeout(_glanceLetGo);
-    if (!_glancePics) _glancePics = WorkThumbs.holder();
-    _glancePics.sweep();
-    _glancePics.fill(el, cid, function (img) {
-      return _glance && _glance.el === el ? shown[Number(img.getAttribute('data-page')) || 0] || null : null;
-    });
   }
 
   var _row = null; // { cid, sid, root, pics }: the open rows' pictures on the student page
@@ -1207,6 +1333,7 @@ window.WorkWall = (function () {
     var t = _tab;
     if (!t) return;
     _tab = null;
+    if (window.WorkRubricCard) WorkRubricCard.hide();
     _closeViewer(true);
     t.panel.removeEventListener('click', _tabClick);
     t.pics.releaseAll();
@@ -1225,6 +1352,13 @@ window.WorkWall = (function () {
     mountTab: mountTab,
     unmountTab: unmountTab,
     seeWorkHtml: seeWorkHtml,
+    // A piece's mark and chip as its card shows them: the rubric card's overall (teacher/work-rubric-card.js).
+    cardMark: function (cid, sid, aid) {
+      var a = _piece(cid, aid);
+      if (!a) return null;
+      var mark = _mark(cid, sid, a, null);
+      return { piece: a, mark: mark, chip: _chipHtml(mark), day: _day };
+    },
     pieceHtml: pieceHtml,
     mountPiece: mountPiece,
   };

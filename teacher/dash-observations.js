@@ -375,12 +375,24 @@ window.DashObservations = (function () {
 
   var _last = null;
 
+  /* One formatter each, made once: a formatter is slow to make, and the
+     card labels every week of every student. */
+  var _fmts = {};
+  function _utcFormat(key, opts) {
+    // An unreadable date reads "Invalid Date", as toLocaleDateString gave, not a thrown error.
+    if (!_fmts[key]) {
+      var f = new Intl.DateTimeFormat('en-CA', Object.assign({ timeZone: 'UTC' }, opts));
+      _fmts[key] = {
+        format: function (d) {
+          return isNaN(d) ? 'Invalid Date' : f.format(d);
+        },
+      };
+    }
+    return _fmts[key];
+  }
+
   function _weekLabel(week) {
-    return new Date(_dayNum(week) * DAY_MS).toLocaleDateString('en-CA', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
+    return _utcFormat('md', { month: 'short', day: 'numeric' }).format(new Date(_dayNum(week) * DAY_MS));
   }
 
   /* Everything the card draws, for the class as it is now.
@@ -625,7 +637,7 @@ window.DashObservations = (function () {
     var prevMonth = '';
     m.win.weeks.forEach(function (w) {
       var d = new Date(_dayNum(w) * DAY_MS);
-      var month = d.toLocaleDateString('en-CA', { month: 'short', timeZone: 'UTC' });
+      var month = _utcFormat('m', { month: 'short' }).format(d);
       h +=
         '<span class="dash-ob2-wk"><span class="dash-ob2-wk-m">' +
         (month !== prevMonth ? esc(month) : '') +
@@ -681,9 +693,9 @@ window.DashObservations = (function () {
   }
 
   function _weekCellHtml(m, r, c, wi) {
+    if (c.obs.length === 0) return '<span class="dash-ob2-cell" aria-hidden="true"></span>';
     var name = displayName(r.student);
     var when = 'week of ' + _weekLabel(c.week);
-    if (c.obs.length === 0) return '<span class="dash-ob2-cell" aria-hidden="true"></span>';
     var types = {};
     c.obs.forEach(function (o) {
       var t = obType(o);
