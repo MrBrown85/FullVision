@@ -13,11 +13,11 @@ import {
   shot,
   contrast,
   signIn,
-  showAll,
+  logOut,
 } from './student-card-fake.js';
 
 /* The rest of the student's sign-in screens (S3-F3), against the built site
-   with the live site's CSP: After Done, Switching Classes (Your Classes and
+   with the live site's CSP: After Done (Log Out), Switching Classes (Your Classes and
    Add Another Card), Is This You? on a Chromebook, and Scan the Code With
    the Camera. The student-submit function is answered in the test by its
    own handler and routes over a stand-in database, as in
@@ -89,8 +89,10 @@ for (const size of [
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Humanities 8 Block A' })).toBeVisible();
-      await showAll(page);
-      await expect(page.locator('.sp-row-title')).toHaveText(['Medieval Europe Map']);
+      // Its one piece is due in four days: Upcoming.
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 0', 'Upcoming 1']);
+      await page.getByRole('button', { name: 'Upcoming 1' }).click();
+      await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText(['Medieval Europe Map']);
       await expect.poll(() => routes(posts)).toEqual(['card', 'add-card', 'page', 'work', 'forms']);
       // One session: the token is the same; the class it opens is the new one.
       const kept = JSON.parse((await stored(page)).local[KEY]);
@@ -132,10 +134,10 @@ for (const size of [
       expect((await stored(page)).local[KEY]).toBeTruthy();
     });
 
-    test('After Done', async ({ page }) => {
+    test('After Done: Log Out, and Log Out on its sheet', async ({ page }) => {
       await serve(page, twoClasses());
       await signIn(page);
-      await page.getByRole('button', { name: 'Done' }).click();
+      await logOut(page);
       await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
       await expect(
         page.getByText(

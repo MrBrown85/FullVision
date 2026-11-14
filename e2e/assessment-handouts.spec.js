@@ -18,14 +18,14 @@ async function demo(page) {
   await page.waitForFunction(cid => getAssessments(cid).length > 0 && getStudents(cid).length > 0, CID);
 }
 
-// A piece the first student still has To Do, and that student.
+// A piece the first student still has to do, that student, and the segment its card is on.
 async function toDoPiece(page) {
   return page.evaluate(cid => {
     setStudentPageSwitch(cid, true);
     const st = sortStudents(getStudents(cid), 'lastName')[0];
     const built = StudentView.fromCache(cid, st.id);
     const p = built.view.work.find(x => x.kind === 'due');
-    return { sid: st.id, aid: p ? p.id : '' };
+    return { sid: st.id, aid: p ? p.id : '', segment: p ? StudentPageView.segmentOf(p, built.view) : '' };
   }, CID);
 }
 
@@ -47,8 +47,10 @@ test('a teacher adds a handout and a link, and the student sees them on the card
   await demo(page);
 
   // Off while the class's Student Page is off.
-  const { sid, aid } = await toDoPiece(page);
+  const { sid, aid, segment } = await toDoPiece(page);
   expect(aid).not.toBe('');
+  expect(['outstanding', 'upcoming']).toContain(segment);
+  const segmentName = new RegExp('^' + (segment === 'upcoming' ? 'Upcoming' : 'Outstanding') + ' \\d+$');
   await page.evaluate(cid => setStudentPageSwitch(cid, false), CID);
   await editForm(page, aid);
   await expect(page.locator('#af-res')).toHaveCount(0);
@@ -123,7 +125,8 @@ test('a teacher adds a handout and a link, and the student sees them on the card
   await page.getByRole('button', { name: 'Open Preview' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('radio', { name: 'Chromebook' }).click();
-  await dialog.getByRole('button', { name: /^To Do \d+$/ }).click();
+  // The card is on Outstanding or Upcoming, by when it is due.
+  await dialog.getByRole('button', { name: segmentName }).click();
   await dialog.locator('.sp-side-row[data-piece="' + aid + '"]').click();
   const card = dialog.locator('.sp-piece.sp-picked');
   const block = card.locator('.sp-res');

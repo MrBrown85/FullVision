@@ -1176,20 +1176,20 @@ describe('cm-student-page-my-learning', () => {
       const r = row();
       expect(r).toBeTruthy();
       // After Return Grades, Send Work and Reflect on Feedback (S10 follow-up),
-      // inside the Student Page card, before Questionnaires and Reports.
+      // inside the Student Page card, before Questionnaires.
       expect([...doc.querySelectorAll('.sp-card .sp-row-title')].map(text)).toEqual([
         'Return Grades',
         'Send Work',
         'Reflect on Feedback',
         'Show My Learning',
-        'Questionnaires and Reports',
+        'Questionnaires',
       ]);
       expect(text(r.querySelector('label[for="sp-learning-switch"]'))).toBe('Show My Learning');
       expect(text(r.querySelector('#sp-learning-hint'))).toBe(
-        'Students see their skills, their grade and how it changes over the term.',
+        'Students see their grade, from work you’ve returned, above the list of their work.',
       );
       expect(text(r.querySelector('#sp-learning-would'))).toBe(
-        "Students would see their level on each skill and their grade in this class’s grading style (Both), only from work you've returned.",
+        "Students would see their grade in this class’s grading style (Both), only from work you've returned.",
       );
       // Students' own devices show it (S13-W2): no line says they can't.
       expect(r.querySelector('#sp-learning-device')).toBeNull();
@@ -1226,13 +1226,26 @@ describe('cm-student-page-my-learning', () => {
       expect(StudentView.learningOn(CID)).toBe(false);
     });
 
-    it('off, the My Learning tab in Preview as Student shows nothing of a grade', () => {
+    it('off, the My Learning tab in Preview as Student shows the returned work but no grade for the class', () => {
       openSettings();
+      const select = doc.getElementById('sp-preview-student');
+      pick(select, S1);
+      DashClassManager.handleChange(select);
       DashClassManager.handleAction('spPreview', doc.getElementById('sp-preview-open'));
       const screen = pressMyLearning();
-      expect(text(screen)).toContain('Your teacher hasn’t turned on My Learning for this class.');
-      expect(screen.querySelector('.sp-ml')).toBeNull();
-      expect(text(screen)).not.toMatch(/Proficient|Developing|Emerging|Extending|%/);
+      expect(screen.querySelector('.sp-ml-overall')).toBeNull();
+      expect(text(screen)).not.toContain('This Year So Far');
+      expect(text(screen)).not.toContain('What Makes Up Your Grade');
+      // Your Work still lists what came back, with its result.
+      const { view } = StudentView.fromCache(CID, S1);
+      const essay = view.work.find(p => p.id === 'essay');
+      expect(
+        [...screen.querySelectorAll('.sp-ml-work .sp-ml-row')].map(r => [
+          text(r.querySelector('.sp-row-title')),
+          text(r.querySelector('.sp-level')),
+        ]),
+      ).toEqual([['Returned Essay', essay.result.text]]);
+      expect(overlay().innerHTML).not.toMatch(SECRET);
       expect(text(overlay().querySelector('#ps-sees-title').parentNode)).not.toContain('My Learning');
     });
 
@@ -1246,7 +1259,15 @@ describe('cm-student-page-my-learning', () => {
       const screen = pressMyLearning();
       expect(screen.querySelector('.sp-ml')).toBeTruthy();
       expect(text(screen.querySelector('.sp-ml-title'))).toBe('My Learning');
-      expect(text(screen)).toContain('Questioning');
+      // The grade for the class, from the returned essay only, above Your Work.
+      const learning = StudentView.fromCache(CID, S1).view.learning;
+      expect(learning).toBeTruthy();
+      expect(text(screen.querySelector('.sp-ml-overall .sp-ml-period'))).toBe('This Year So Far');
+      expect(text(screen.querySelector('.sp-ml-letter'))).toBe(learning.overall.letter.grade);
+      expect(text(screen.querySelector('.sp-ml-pct'))).toBe(learning.overall.letter.pct);
+      const html = screen.innerHTML;
+      expect(html.indexOf('sp-ml-overall')).toBeLessThan(html.indexOf('sp-ml-work'));
+      expect([...screen.querySelectorAll('.sp-ml-work .sp-row-title')].map(text)).toEqual(['Returned Essay']);
       expect(overlay().innerHTML).not.toMatch(SECRET);
       expect(text(overlay().querySelector('#ps-sees-title').parentNode)).toContain('My Learning');
     });
@@ -1323,14 +1344,13 @@ describe('cm-student-page-my-learning', () => {
       const screen = el.querySelector('.ps-screen');
       // On the My Learning tab, drawn as with the switch on.
       expect(screen.querySelector('.sp-tabs-bottom .sp-tab-on')).toBeTruthy();
-      expect(text(screen.querySelector('.sp-tabs-bottom .sp-tab-on'))).toBe('My Learning');
-      expect(screen.querySelector('.sp-ml')).toBeTruthy();
-      expect(text(screen)).toContain('Questioning');
+      expect(text(screen.querySelector('.sp-tabs-bottom .sp-tab-on .sp-tab-label'))).toBe('My Learning');
+      expect(screen.querySelector('.sp-ml-overall')).toBeTruthy();
       expect(el.innerHTML).not.toMatch(SECRET);
       expect(text(el.querySelector('#ps-sees-title').parentNode)).toContain('My Learning');
       // A press inside keeps My Learning shown (Assignments, then back).
       click(screen.querySelector('.sp-tabs-bottom [data-act="tab"][data-tab="assignments"]'));
-      expect(pressMyLearning().querySelector('.sp-ml')).toBeTruthy();
+      expect(pressMyLearning().querySelector('.sp-ml-overall')).toBeTruthy();
       // The class is still off: nothing saved, and every other screen reads it as it is.
       expect(StudentView.learningOn(CID)).toBe(false);
       expect(getCourseConfig(CID).show_my_learning).toBeUndefined();
@@ -1342,7 +1362,7 @@ describe('cm-student-page-my-learning', () => {
       expect(doc.activeElement.id).toBe('sp-learning-see');
       // Open Preview afterwards shows the class as it is: off.
       DashClassManager.handleAction('spPreview', doc.getElementById('sp-preview-open'));
-      expect(pressMyLearning().querySelector('.sp-ml')).toBeNull();
+      expect(pressMyLearning().querySelector('.sp-ml-overall')).toBeNull();
     });
 
     it('opens the first student by last name when none has been chosen', () => {
@@ -1491,7 +1511,7 @@ describe('cm-student-page-reflect', () => {
         'Keep Photos Until',
         'Reflect on Feedback',
         'Show My Learning',
-        'Questionnaires and Reports',
+        'Questionnaires',
       ]);
       expect(doc.querySelector('label[for="sp-reflect-switch"]').textContent).toBe('Reflect on Feedback');
       expect(doc.getElementById('sp-reflect-hint').textContent).toBe(HINT);

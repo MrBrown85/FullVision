@@ -1,7 +1,10 @@
 /**
- * The assignment cards and All Assignments (S4-F2; the artboard's "To Do
- * Card", "Returned Work", "All Assignments" and "Page on a Chromebook"),
- * drawn by s/page-view.js from shared/student-view.js's view.
+ * The Assignments tab (Colin, 2026-11-14): Outstanding and Upcoming, each
+ * piece a card, one under another on a phone and the list on the left on a
+ * Chromebook, drawn by s/page-view.js from shared/student-view.js's view.
+ * Outstanding is work due by the class's today (or with no due date), work
+ * marked Missing and work returned for revision; Upcoming is work due
+ * after today. Work sent or returned is on My Learning.
  *
  * The page runs as a browser loads it (tests/helpers/student-page-context.js),
  * in Demo Mode and against the student-submit function's real handler over a
@@ -14,14 +17,10 @@ import { WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-subm
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const cards = page => [...page.root().querySelectorAll('.sp-deck .sp-piece')];
+const titles = page => cards(page).map(c => c.querySelector('.sp-piece-title').textContent);
 const card = (page, title) => cards(page).find(c => c.querySelector('.sp-piece-title').textContent === title);
 const tags = c => [...c.querySelectorAll('.sp-flag')].map(t => t.textContent);
-const rowsOf = c =>
-  [...c.querySelectorAll('.sp-piece-row')].map(r => [
-    r.querySelector('.sp-piece-row-name').textContent,
-    r.querySelector('.sp-level').textContent,
-  ]);
-const listed = page => [...page.root().querySelectorAll('.sp-row-title')].map(el => el.textContent);
+const segments = page => [...page.root().querySelectorAll('.sp-segment')].map(b => b.textContent);
 
 async function demo(hash) {
   const page = openStudentPage();
@@ -45,90 +44,216 @@ async function real() {
 const viewOf = page => page.T.viewOf(page.T.state());
 const piece = (page, title) => viewOf(page).work.find(p => p.title === title);
 
-describe('the cards of To Do', () => {
-  it('one card a piece, newest first, each with when it is due; Missing says so', async () => {
+// How far a day is from the view's today, in days, and the day as a due pill names it.
+const daysOff = (day, today) => Math.round((Date.parse(day + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 864e5);
+const dueDay = day =>
+  new Date(day + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+
+// A view of the page's own shape, with the class's today fixed, for drawing one case.
+const TODAY_FIXED = '2026-11-14';
+const viewWith = work => ({
+  course: { name: 'Science 8', block: 'B', gradingSystem: 'proficiency' },
+  today: TODAY_FIXED,
+  work,
+  changes: [],
+  levels: [],
+  questionnaires: [],
+  learning: null,
+});
+const due = (id, dueDate, more) => Object.assign({ id, title: 'Piece ' + id, kind: 'due', dueDate, date: '' }, more);
+
+// Draws a view with a choice into an element of the page's own document.
+function drawIn(page, view, ui) {
+  const box = page.root().ownerDocument.createElement('div');
+  box.innerHTML = page.run('StudentPageView.html')(view, ui || {});
+  return box;
+}
+const button = attrs => ({ getAttribute: name => (attrs && attrs[name]) || null, closest: () => null });
+
+describe('Outstanding: work due by today, Missing, and revisions', () => {
+  it('the two segments with their counts; Outstanding first, the oldest due first; Missing says so', async () => {
     const page = await demo();
-    expect(cards(page).map(c => c.querySelector('.sp-piece-title').textContent)).toEqual([
-      'Science Fair Proposal',
-      'Disease Research Poster',
-      'Immune System Quick Check',
-    ]);
-    expect(tags(card(page, 'Science Fair Proposal'))[0]).toMatch(/^Due \S+ \S+ \d+$/);
-    // The due pill on the unit's line, then Missing under the title (the To Do Card board).
+    expect(segments(page)).toEqual(['Outstanding 2', 'Upcoming 1']);
+    expect(page.root().querySelector('.sp-segment-on').getAttribute('data-segment')).toBe('outstanding');
+    // The Quick Check was due five days ago and is Missing; the Poster was due two days ago.
+    expect(titles(page)).toEqual(['Immune System Quick Check', 'Disease Research Poster']);
     expect(tags(card(page, 'Immune System Quick Check'))).toContain('Missing');
     // Work still to do shows no result and no comment.
     cards(page).forEach(c => {
       expect(c.querySelector('.sp-piece-rows')).toBeNull();
       expect(c.querySelector('.sp-piece-comment')).toBeNull();
+      expect(c.querySelector('[data-act="feedback"]')).toBeNull();
     });
+  });
+
+  it('past its day, the due pill says how long ago, in red', async () => {
+    const page = await demo();
+    const view = viewOf(page);
+    const poster = piece(page, 'Disease Research Poster');
+    const n = -daysOff(poster.dueDate, view.today);
+    expect(n).toBeGreaterThan(0);
+    const pill = card(page, 'Disease Research Poster').querySelector('.sp-piece-head .sp-flag');
+    expect(pill.textContent).toBe('Due ' + dueDay(poster.dueDate) + ' · ' + (n === 1 ? 'yesterday' : n + ' days ago'));
+    expect(pill.classList.contains('sp-flag-overdue')).toBe(true);
   });
 
   it('a draft’s card is a not-graded card: no level, no comment, nothing that says a draft exists', async () => {
     const page = await demo();
-    const draft = card(page, 'Disease Research Poster');
-    const plain = card(page, 'Science Fair Proposal');
     const shape = el =>
       el.outerHTML
         .replace(/>[^<]+</g, '><')
         .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
-        .replace(' sp-picked', '');
-    expect(shape(draft)).toBe(shape(plain));
+        .replace(' sp-picked', '')
+        .replace('sp-flag-overdue', 'sp-flag-due');
+    const draft = shape(card(page, 'Disease Research Poster'));
     expect(page.root().innerHTML).not.toContain('two of your sources');
+    await page.click('[data-segment="upcoming"]');
+    expect(draft).toBe(shape(card(page, 'Science Fair Proposal')));
   });
 
-  it('“1 of 3” under the cards; the first card is the one picked', async () => {
+  it('the cards sit one under another, with no count of them; the first is the one picked', async () => {
     const page = await demo();
-    expect(page.root().querySelector('.sp-deck-count').textContent).toBe('1 of 3');
-    expect(page.root().querySelector('.sp-piece.sp-picked .sp-piece-title').textContent).toBe('Science Fair Proposal');
+    expect(page.root().querySelector('.sp-deck-count')).toBeNull();
+    expect(page.root().querySelectorAll('.sp-deck > .sp-piece')).toHaveLength(2);
+    expect(page.root().querySelector('.sp-piece.sp-picked .sp-piece-title').textContent).toBe(
+      'Immune System Quick Check',
+    );
+  });
+
+  it('work sent, returned or excused is not on Assignments', async () => {
+    const page = await demo();
+    const view = viewOf(page);
+    expect(view.work.filter(p => p.kind === 'back')).toHaveLength(6);
+    const shown = [...cards(page)];
+    await page.click('[data-segment="upcoming"]');
+    shown.push(...cards(page));
+    const kinds = shown.map(c => view.work.find(p => p.id === c.getAttribute('data-piece')).kind);
+    expect(kinds.sort()).toEqual(['due', 'due', 'missing']);
   });
 });
 
-describe('the cards of Back', () => {
-  it('Returned and the date, Your Result, each competency’s level, and the comment, all as the view gives them', async () => {
+describe('Upcoming: work due after today, soonest first', () => {
+  it('the Science Fair Proposal, with how many days off in a plain pill', async () => {
     const page = await demo();
-    await page.click('[data-segment="back"]');
-    const energy = card(page, 'Energy Transfer Investigation');
-    const p = piece(page, 'Energy Transfer Investigation');
-    expect(tags(energy)[0]).toMatch(/^Returned \S+ \d+$/);
-    expect(rowsOf(energy)).toEqual([['Your Result', p.result.text]].concat(p.competencies.map(r => [r.name, r.text])));
-    expect(energy.querySelector('.sp-piece-comment').textContent).toBe(p.comment);
-    expect(p.comment).toBe('Your data table shows every transfer. Well done.');
-    // Each level beside its competency's name.
-    expect(rowsOf(energy)[1]).toEqual(['Processing and Analyzing Data', 'Extending']);
+    await page.click('[data-segment="upcoming"]');
+    expect(page.root().querySelector('.sp-segment-on').textContent).toBe('Upcoming 1');
+    expect(titles(page)).toEqual(['Science Fair Proposal']);
+    const fair = piece(page, 'Science Fair Proposal');
+    const n = daysOff(fair.dueDate, viewOf(page).today);
+    const pill = card(page, 'Science Fair Proposal').querySelector('.sp-piece-head .sp-flag');
+    expect(pill.textContent).toBe('Due ' + dueDay(fair.dueDate) + ' · in ' + n + ' days');
+    expect(pill.classList.contains('sp-flag-due')).toBe(true);
   });
+});
 
-  it('a rubric piece lists each criterion with its level; points and Complete show their result alone', async () => {
+describe('which segment and in what order, by the class’s today', () => {
+  // Stored newest first, as the view keeps them.
+  const WORKS = [
+    due('later', '2026-11-30'),
+    due('tomorrow', '2026-11-15'),
+    due('today', '2026-11-14'),
+    due('dated', '', { date: '2026-11-11' }),
+    due('late', '2026-11-10'),
+    due('undated', ''),
+    {
+      id: 'revise',
+      title: 'Revise',
+      kind: 'revise',
+      dueDate: '2026-11-12',
+      revision: { reviseBy: '2026-11-20', whatToFix: 'Add a label.', criteria: [], firstThumbs: [] },
+    },
+    { id: 'missing', title: 'Missing', kind: 'missing', dueDate: '2026-11-01' },
+    { id: 'sent', title: 'Sent', kind: 'sent', dueDate: '2026-11-13' },
+    { id: 'back', title: 'Back', kind: 'back', dueDate: '2026-11-02', result: { kind: 'none', text: '' } },
+    { id: 'excused', title: 'Excused', kind: 'excused', dueDate: '2026-11-03' },
+  ];
+
+  it('due today is Outstanding, tomorrow Upcoming; no due date is Outstanding; a revision first', async () => {
     const page = await demo();
-    await page.click('[data-segment="back"]');
-    const lab = piece(page, 'Cell Microscope Lab');
-    expect(rowsOf(card(page, 'Cell Microscope Lab'))).toEqual(
-      [['Your Result', lab.result.text]].concat(lab.rubric.rows.map(r => [r.name, r.text])),
+    const view = viewWith(WORKS);
+    const ids = seg =>
+      page
+        .run('StudentPageView.inSegment')(view, seg)
+        .map(p => p.id);
+    // A revision, then the oldest due date first; a piece with no due date by its date; nothing dated last.
+    expect(ids('outstanding')).toEqual(['revise', 'missing', 'late', 'dated', 'today', 'undated']);
+    expect(ids('upcoming')).toEqual(['tomorrow', 'later']);
+    expect({ ...page.run('StudentPageView.counts')(view) }).toEqual({ outstanding: 6, upcoming: 2 });
+    const segmentOf = page.run('StudentPageView.segmentOf');
+    expect(
+      ['sent', 'back', 'excused'].map(id =>
+        segmentOf(
+          WORKS.find(p => p.id === id),
+          view,
+        ),
+      ),
+    ).toEqual(['', '', '']);
+    // The tab draws the same split.
+    expect([...drawIn(page, view, {}).querySelectorAll('.sp-segment')].map(b => b.textContent)).toEqual([
+      'Outstanding 6',
+      'Upcoming 2',
+    ]);
+  });
+});
+
+describe('the due pill', () => {
+  it('Today, Tomorrow, in N days, yesterday, N days ago; red once the day has passed', async () => {
+    const page = await demo();
+    const view = viewWith([
+      due('d0', '2026-11-14'),
+      due('d1', '2026-11-15'),
+      due('d4', '2026-11-18'),
+      due('p1', '2026-11-13'),
+      due('p2', '2026-11-12'),
+      { id: 'm', title: 'Piece m', kind: 'missing', dueDate: '2026-11-01' },
+    ]);
+    const pill = (ui, id) => {
+      const box = drawIn(page, view, ui);
+      const el = box.querySelector('.sp-piece[data-piece="' + id + '"] .sp-piece-head .sp-flag');
+      return [el.textContent, el.className.replace(/^sp-flag /, '')];
+    };
+    const up = { segment: 'upcoming' };
+    expect(pill({}, 'd0')).toEqual(['Due Today', 'sp-flag-due']);
+    expect(pill(up, 'd1')).toEqual(['Due Tomorrow', 'sp-flag-due']);
+    expect(pill(up, 'd4')).toEqual(['Due Wed, Nov 18 · in 4 days', 'sp-flag-due']);
+    expect(pill({}, 'p1')).toEqual(['Due Fri, Nov 13 · yesterday', 'sp-flag-overdue']);
+    expect(pill({}, 'p2')).toEqual(['Due Thu, Nov 12 · 2 days ago', 'sp-flag-overdue']);
+    expect(pill({}, 'm')).toEqual(['Due Sun, Nov 1 · 13 days ago', 'sp-flag-overdue']);
+  });
+});
+
+describe('All caught up', () => {
+  it('nothing outstanding: All caught up, and See What’s Coming Up only while something is', async () => {
+    const page = await demo();
+    const view = viewWith([due('d4', '2026-11-18')]);
+    const box = drawIn(page, view, {});
+    expect(box.querySelector('.sp-caught-up-words').textContent).toBe('All caught up');
+    const go = box.querySelector('.sp-caught-up [data-act="segment"]');
+    expect([go.textContent, go.getAttribute('data-segment')]).toEqual(['See What’s Coming Up', 'upcoming']);
+    expect(
+      page.run('StudentPageView.press')({}, view, 'segment', button({ 'data-segment': 'upcoming' })).ui,
+    ).toMatchObject({ tab: 'assignments', segment: 'upcoming' });
+    // With nothing coming either: All caught up alone; Upcoming says nothing is coming.
+    const none = viewWith([]);
+    const empty = drawIn(page, none, {});
+    expect(empty.querySelector('.sp-caught-up-words').textContent).toBe('All caught up');
+    expect(empty.querySelector('.sp-caught-up [data-act="segment"]')).toBeNull();
+    expect(drawIn(page, none, { segment: 'upcoming' }).querySelector('.sp-empty').textContent).toBe(
+      'Nothing coming up yet.',
     );
-    expect(rowsOf(card(page, 'Cell Structure Quiz'))).toEqual([['Your Result', '8 / 10']]);
-    expect(rowsOf(card(page, 'Lab Safety Contract'))).toEqual([['Your Result', 'Complete']]);
+    expect(drawIn(page, none, {}).textContent).not.toContain('No assignments yet');
   });
+});
 
-  it('a returned grade changed since: Updated; the grade shown is the one returned, not the draft over it', async () => {
-    const page = await demo();
-    await page.click('[data-segment="back"]');
-    // Updated, with the day it was updated (S4-F5), in place of Returned.
-    expect(tags(card(page, 'Lab Safety Contract'))[0]).toMatch(/^Updated \S+ \d+$/);
-    const essay = card(page, 'Ecosystem Connections Essay');
-    expect(rowsOf(essay)[0]).toEqual(['Your Result', 'Developing']);
-    expect(essay.textContent).not.toContain('much clearer after your rewrite');
-    expect(essay.querySelector('.sp-piece-comment').textContent).toBe(
-      'Explain how the food web changes when one species goes.',
-    );
-  });
-
-  it('a returned card not yet opened is watched for "opened", and told to the server once', async () => {
+describe('a returned piece not yet opened, on My Learning', () => {
+  it('its row is watched for "opened", and told to the server once', async () => {
     const { page } = await real();
-    await page.click('[data-segment="back"]');
-    const unseen = cards(page)
-      .filter(c => c.hasAttribute('data-unseen'))
-      .map(c => c.getAttribute('data-unseen'));
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    const unseen = [...page.root().querySelectorAll('.sp-ml-work li[data-unseen]')].map(li =>
+      li.getAttribute('data-unseen'),
+    );
     expect(unseen).toEqual([WORK.energy, WORK.quiz, WORK.lab, WORK.essay, WORK.kmt, WORK.contract]);
-    // Only the card on screen counts.
+    // Only the row on screen counts.
     page.onScreen(el => el.getAttribute('data-unseen') === WORK.energy);
     page.advance(700);
     await page.T.tellSeen();
@@ -138,179 +263,109 @@ describe('the cards of Back', () => {
 });
 
 describe('on a Chromebook: the list on the left, the card picked on the right', () => {
-  it('pressing a piece in the list shows its card; the list says which is showing', async () => {
+  it('pressing a piece in the list picks its card; the list says which is picked', async () => {
     const page = await demo();
-    await page.click('[data-segment="back"]');
     const side = () => [...page.root().querySelectorAll('.sp-side-row')];
-    expect(side().map(b => b.getAttribute('aria-pressed'))).toEqual([
-      'true',
-      'false',
-      'false',
-      'false',
-      'false',
-      'false',
+    expect(side().map(b => [b.querySelector('.sp-side-title').textContent, b.getAttribute('aria-pressed')])).toEqual([
+      ['Immune System Quick Check', 'true'],
+      ['Disease Research Poster', 'false'],
     ]);
-    const quiz = side().find(b => b.textContent.includes('Cell Structure Quiz'));
-    await page.click('.sp-side-row[data-piece="' + quiz.getAttribute('data-piece') + '"]');
-    expect(page.root().querySelector('.sp-piece.sp-picked .sp-piece-title').textContent).toBe('Cell Structure Quiz');
-    expect(page.root().querySelector('.sp-side-row[aria-pressed="true"]').textContent).toContain('Cell Structure Quiz');
-    expect(page.root().querySelector('.sp-deck-count').textContent).toBe('2 of 6');
+    const poster = piece(page, 'Disease Research Poster');
+    expect(side()[1].getAttribute('data-act')).toBe('pick');
+    await page.click('.sp-side-row[data-piece="' + poster.id + '"]');
+    expect(page.root().querySelector('.sp-piece.sp-picked .sp-piece-title').textContent).toBe(
+      'Disease Research Poster',
+    );
+    expect(page.root().querySelector('.sp-side-row[aria-pressed="true"]').textContent).toContain(
+      'Disease Research Poster',
+    );
     expect(page.calls).toEqual([]);
-  });
-});
-
-describe('All Assignments: search, filters, and a row opens its card', () => {
-  it('the board’s header, search box and filters', async () => {
-    const page = await demo();
-    await page.click('[data-act="all-open"]');
-    expect(page.root().querySelector('[data-act="all-close"]').getAttribute('aria-label')).toBe('Back to cards');
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('All Assignments');
-    const search = page.root().querySelector('#sp-search');
-    expect(search.getAttribute('placeholder')).toBe('Search assignments');
-    expect(page.root().querySelector('label[for="sp-search"]').textContent).toBe('Search assignments');
-    expect([...page.root().querySelectorAll('.sp-filter')].map(b => b.textContent)).toEqual([
-      'All',
-      'To Do',
-      'Sent',
-      'Back',
-      // What changed since the student last looked (S4-F5).
-      'New ' + viewOf(page).changes.length,
-    ]);
-    expect(listed(page)).toHaveLength(9);
-  });
-
-  it('grouped as the board: work to hand in under This Week, the rest under its unit', async () => {
-    const page = await demo();
-    await page.click('[data-act="all-open"]');
-    const root = page.root();
-    const heads = [...root.querySelectorAll('.sp-list-head')].map(h => h.textContent);
-    const view = viewOf(page);
-    const units = [];
-    view.work.forEach(p => {
-      if (p.kind !== 'due' && p.kind !== 'missing' && p.unit && units.indexOf(p.unit) < 0) units.push(p.unit);
-    });
-    expect(heads).toEqual(['This Week'].concat(units));
-    const lists = [...root.querySelectorAll('.sp-list')];
-    const titles = l => [...l.querySelectorAll('.sp-row-title')].map(el => el.textContent);
-    expect(titles(lists[0])).toEqual(view.work.filter(p => p.kind === 'due' || p.kind === 'missing').map(p => p.title));
-    // Every piece is listed once.
-    expect(lists.flatMap(titles).sort()).toEqual(view.work.map(p => p.title).sort());
-  });
-
-  it('search narrows by the title’s words, any case; nothing found says so', async () => {
-    const page = await demo();
-    await page.click('[data-act="all-open"]');
-    page.type('#sp-search', 'cell');
-    expect(listed(page)).toEqual(['Cell Structure Quiz', 'Cell Microscope Lab']);
-    page.type('#sp-search', 'LAB cell');
-    expect(listed(page)).toEqual(['Cell Microscope Lab']);
-    page.type('#sp-search', 'volcano');
-    expect(listed(page)).toEqual([]);
-    expect(page.root().querySelector('.sp-empty').textContent).toBe('Nothing matches.');
-    expect(page.root().querySelector('#sp-search').getAttribute('value')).toBe('volcano');
-    expect(page.calls).toEqual([]);
-  });
-
-  it('the filters: To Do, Sent, Back and All, with the search still applied', async () => {
-    const page = await demo();
-    await page.click('[data-act="all-open"]');
-    await page.click('[data-filter="todo"]');
-    expect(listed(page)).toEqual(['Science Fair Proposal', 'Disease Research Poster', 'Immune System Quick Check']);
-    await page.click('[data-filter="back"]');
-    expect(listed(page)).toHaveLength(6);
-    page.type('#sp-search', 'lab');
-    expect(listed(page)).toEqual(['Cell Microscope Lab', 'KMT & States of Matter Lab', 'Lab Safety Contract']);
-    await page.click('[data-filter="sent"]');
-    expect(page.root().querySelector('.sp-empty').textContent).toBe('Nothing matches.');
-    await page.click('[data-filter="todo"]');
-    expect(page.root().querySelector('.sp-empty').textContent).toBe('Nothing matches.');
-    await page.click('[data-filter="all"]');
-    expect(listed(page)).toEqual(['Cell Microscope Lab', 'KMT & States of Matter Lab', 'Lab Safety Contract']);
-  });
-
-  it('a row opens its card in To Do or Back, picked, with the keyboard on its title', async () => {
-    const page = await demo();
-    await page.click('[data-act="all-open"]');
-    const lab = piece(page, 'Cell Microscope Lab');
-    await page.click('[data-act="open-piece"][data-piece="' + lab.id + '"]');
-    expect(page.root().querySelector('.sp-segment[aria-pressed="true"]').textContent).toBe('Back 6');
-    expect(page.root().querySelector('.sp-piece.sp-picked .sp-piece-title').textContent).toBe('Cell Microscope Lab');
-    expect(page.root().querySelector('.sp-deck-count').textContent).toBe('3 of 6');
-  });
-
-  it('Back to cards returns to the segment that was showing', async () => {
-    const page = await demo();
-    await page.click('[data-segment="back"]');
-    await page.click('[data-act="all-open"]');
-    await page.click('[data-act="all-close"]');
-    expect(page.root().querySelector('.sp-segment[aria-pressed="true"]').textContent).toBe('Back 6');
   });
 });
 
 describe('what a press changes is decided in one place, for the page and the preview', () => {
-  const press = (page, ui, act, attrs) => {
-    const el = { getAttribute: name => (attrs && attrs[name]) || null, closest: () => null };
-    return page.run('StudentPageView.press')(ui, viewOf(page), act, el);
-  };
+  const press = (page, ui, act, attrs) => page.run('StudentPageView.press')(ui, viewOf(page), act, button(attrs));
 
-  it('an id that is no piece, an Excused piece, or a press that is not the page’s own changes nothing', async () => {
+  it('an id that is no piece, an Excused piece, a removed press, or one that is not the page’s own changes nothing', async () => {
     const page = await demo();
     expect(press(page, {}, 'open-piece', { 'data-piece': 'nope' })).toBeNull();
-    expect(press(page, {}, 'filter', { 'data-filter': 'drafts' })).toBeNull();
+    // All Assignments and its filters are gone.
+    expect(press(page, {}, 'all-open')).toBeNull();
+    expect(press(page, {}, 'filter', { 'data-filter': 'todo' })).toBeNull();
+    expect(press(page, {}, 'segment', { 'data-segment': 'back' })).toBeNull();
     expect(press(page, {}, 'card-done')).toBeNull();
     expect(press(page, {}, 'classes-open')).toBeNull();
     const excused = { kind: 'excused', id: 'x', title: 'Excused Piece' };
-    const ui = page.run('StudentPageView.press')({}, { work: [excused] }, 'open-piece', {
-      getAttribute: () => 'x',
-      closest: () => null,
-    });
-    expect(ui).toBeNull();
+    expect(
+      page.run('StudentPageView.press')({}, { work: [excused] }, 'open-piece', button({ 'data-piece': 'x' })),
+    ).toBeNull();
   });
 
-  it('opening a piece picks it in its own segment', async () => {
+  it('opening a piece picks it in its own segment; a returned one opens its feedback on My Learning', async () => {
     const page = await demo();
+    const fair = piece(page, 'Science Fair Proposal');
+    const quick = piece(page, 'Immune System Quick Check');
     const quiz = piece(page, 'Cell Structure Quiz');
-    expect(press(page, { all: true }, 'open-piece', { 'data-piece': quiz.id }).ui).toMatchObject({
+    expect(press(page, { tab: 'learning' }, 'open-piece', { 'data-piece': fair.id }).ui).toMatchObject({
       tab: 'assignments',
-      segment: 'back',
-      all: false,
-      pick: quiz.id,
+      segment: 'upcoming',
+      pick: fair.id,
+    });
+    expect(
+      press(page, { tab: 'learning', segment: 'upcoming' }, 'open-piece', { 'data-piece': quick.id }).ui,
+    ).toMatchObject({
+      tab: 'assignments',
+      segment: 'outstanding',
+      pick: quick.id,
+    });
+    // A returned piece has no card to open; its row opens Your Feedback.
+    expect(press(page, {}, 'open-piece', { 'data-piece': quiz.id })).toBeNull();
+    expect(press(page, {}, 'feedback', { 'data-piece': quiz.id }).ui).toMatchObject({
+      tab: 'learning',
+      feedback: quiz.id,
     });
   });
 });
 
-/* S4-W1: what the server now sends about each piece and class, in Demo
+/* S4-W1: what the server also sends about each piece and class, in Demo
    Mode's sample (which sends it as the database does since S4-M1). */
 describe('what the server also tells, in Demo Mode (S4-W1)', () => {
-  it('a card still to do: its unit, category, Description, I Can lines and Core Competencies', async () => {
+  it('a card still to do: its unit and due pill on one line, the title and the Description; nothing more about grading', async () => {
     const page = await demo();
+    await page.click('[data-segment="upcoming"]');
     const fair = card(page, 'Science Fair Proposal');
     const text = sel => [...fair.querySelectorAll(sel)].map(el => el.textContent);
     expect(text('.sp-piece-unit')).toEqual(['Unit 2: Body Systems']);
-    expect(text('.sp-piece-category')).toEqual(['Projects']);
     expect(text('.sp-piece-about')).toEqual([
       'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
     ]);
-    expect(text('.sp-graded-on-name')).toEqual(['Questioning and Predicting', 'Planning and Conducting']);
-    expect(text('.sp-graded-on-ican')).toEqual([
-      'I can ask a question that can be tested and say what I expect to happen.',
-      'I can plan a fair test and carry it out safely.',
-    ]);
-    expect(text('.sp-core-name')).toEqual(['Creative Thinking', 'Critical & Reflective Thinking']);
-    // The To Do Card board: the unit and the due pill share the first line; the category is a pill.
     expect(fair.querySelector('.sp-piece-head .sp-piece-unit')).not.toBeNull();
     expect(fair.querySelector('.sp-piece-head .sp-flag-due').textContent).toMatch(/^Due /);
-    expect(text('.sp-category-pill')).toEqual(['Projects']);
+    // No category, What You’re Graded On, I Can lines or Core Competencies (Colin, 2026-11-14), though the sample sends them.
+    ['.sp-piece-category', '.sp-category-pill', '.sp-graded-on', '.sp-graded-on-ican', '.sp-core'].forEach(sel =>
+      expect(fair.querySelector(sel), sel).toBeNull(),
+    );
+    ['Projects', 'Graded On', 'Questioning and Predicting', 'I can ', 'Creative Thinking'].forEach(w =>
+      expect(fair.textContent).not.toContain(w),
+    );
+    expect(piece(page, 'Science Fair Proposal').coreCompetencies.map(c => c.name)).toEqual([
+      'Creative Thinking',
+      'Critical & Reflective Thinking',
+    ]);
+    // No rubric on it, so no See the Rubric.
+    expect(fair.querySelector('.sp-rubric-link')).toBeNull();
   });
 
-  it('a returned card: no teacher’s name over the comment, though the sample sends one (ruling 112)', async () => {
+  it('a returned piece: no teacher’s name on My Learning or over its feedback, though the sample sends one (ruling 112)', async () => {
     const page = await demo();
-    await page.click('[data-segment="back"]');
-    const lab = card(page, 'Cell Microscope Lab');
-    expect(lab.querySelector('.sp-piece-from')).toBe(null);
-    expect(lab.querySelector('.sp-piece-comment')).not.toBe(null);
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
     expect(page.root().innerHTML).not.toContain('Rivera');
-    expect(lab.querySelector('.sp-piece-unit').textContent).toBe('Unit 1: Cells');
+    const lab = piece(page, 'Cell Microscope Lab');
+    await page.click('.sp-ml-row[data-piece="' + lab.id + '"]');
+    expect(page.root().querySelector('.sp-fb-title').textContent).toBe('Cell Microscope Lab');
+    expect(page.root().querySelector('.sp-fb-comment').textContent).toBe(lab.comment);
+    expect(page.root().querySelector('.sp-piece-from, .sp-fb-from')).toBe(null);
+    expect(page.root().innerHTML).not.toContain('Rivera');
   });
 
   it('Your Classes says how many pieces wait in each class; none where nothing waits or the server does not say', async () => {

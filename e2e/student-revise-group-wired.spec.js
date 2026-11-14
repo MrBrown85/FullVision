@@ -10,9 +10,10 @@ import { C1, PAGE_JPEG } from '../tests/helpers/fake-send-world.js';
    and bucket, the bucket's links served here at the Supabase address.
    Cell Microscope Lab came back for revision: Needs Revision shows What to
    Fix and the first version from its own pages; a real JPEG goes up as the
-   revision through revise-start and revise-finish; the card is Sent again.
+   revision through revise-start and revise-finish; it is Sent again, a row
+   on My Learning.
    Science Fair Proposal is group work a group-mate sent: the card shows
-   the group's counts and Add a Page. */
+   the group's counts and Add a Page, opened from its row on My Learning. */
 
 const PHOTO = resolve('assets/sample-work/cell-lab-cece-1.jpg');
 const STORAGE = 'https://e2e-test.supabase.co/storage/v1';
@@ -123,8 +124,9 @@ test('a real card sends a revision through the revise routes and sees its group 
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
 
-  // Needs Revision, with the first version shown from this device's own copy of its page.
+  // Needs Revision, first in Outstanding, with the first version shown from this device's own copy of its page.
   const lab = page.locator('.sp-piece', { hasText: 'Cell Microscope Lab' });
+  await expect(page.locator('.sp-deck .sp-piece').first()).toContainText('Cell Microscope Lab');
   await expect(lab.locator('.sp-revise-fix')).toHaveText(
     'Write the magnification beside each drawing, then send it again.',
   );
@@ -142,13 +144,26 @@ test('a real card sends a revision through the revise routes and sees its group 
   expect(revision).toMatchObject({ state: 'sent', assessment: WORK.lab, enrollment: CECE });
   await page.getByRole('button', { name: 'Back to My Work' }).click();
 
-  // The group's work: counts only, and Add a Page.
-  await page.locator('[data-segment="sent"]').click();
+  // Both are off Assignments: the revision sent, and the group's work a group-mate sent.
+  await expect(page.locator('.sp-piece', { hasText: 'Cell Microscope Lab' })).toHaveCount(0);
+  await expect(page.locator('.sp-piece', { hasText: 'Science Fair Proposal' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^My Learning/ }).click();
+  const waiting = /^Sent \w{3} \d{1,2}, \d{1,2}:\d\d [ap]\.m\. · waiting for feedback$/;
+  // The revision is Sent again, a row of Your Work.
+  const labRow = page.locator('.sp-ml-row', { hasText: 'Cell Microscope Lab' });
+  await expect(labRow.locator('.sp-row-sub')).toHaveText(waiting);
+  await expect(labRow.locator('.sp-level')).toHaveText('Sent');
+  const fairRow = page.locator('.sp-ml-row', { hasText: 'Science Fair Proposal' });
+  await expect(fairRow.locator('.sp-row-sub')).toHaveText(waiting);
+  // Sent work comes first in Your Work.
+  await expect(page.locator('.sp-ml-work .sp-ml-row').nth(0).locator('.sp-level')).toHaveText('Sent');
+  await expect(page.locator('.sp-ml-work .sp-ml-row').nth(1).locator('.sp-level')).toHaveText('Sent');
+  await fits(page);
+  // The group's work, opened from its row: counts only, and Add a Page.
+  await fairRow.click();
   const fair = page.locator('.sp-piece', { hasText: 'Science Fair Proposal' });
   await expect(fair.locator('.sp-group-line')).toHaveText('3 in your group. Someone in your group sent it.');
   await expect(fair.getByRole('button', { name: 'Add a Page' })).toBeVisible();
-  // The revision is Sent again.
-  await expect(page.locator('.sp-piece', { hasText: 'Cell Microscope Lab' })).toBeVisible();
   await fits(page);
 
   const sent = posts.map(p => p.body.route).filter(r => r !== 'seen');

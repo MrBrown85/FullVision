@@ -5,7 +5,7 @@
    server's `page` reply (StudentView.fromPage, with s/student-data.js's
    reading of it), says whether the results loaded, and hands both to
    StudentPageView.html with what the student chose to look at (the tab,
-   To Do, Sent or Back, All Assignments; s/app.js keeps those). The teacher's
+   Outstanding or Upcoming, a piece open; s/app.js keeps those). The teacher's
    Preview as Student hands StudentPageView the same kind of view, so the
    two draw the same thing.
 
@@ -52,7 +52,7 @@
     if (!state || !state.page || !state.reply) return null;
     if (typeof StudentView === 'undefined' || !StudentView || typeof StudentView.fromPage !== 'function') return null;
     var reply = gradesAreIn() ? state.reply : withoutGrades(state.reply);
-    // Questionnaires and My Reports (S4-F4): Demo Mode's samples, or what a real card's `forms` answered (app.js).
+    // Reflections (S4-F4): Demo Mode's samples, or what a real card's `forms` answered (app.js).
     var forms = state.demo
       ? StudentPage.demoForms && StudentPage.demoForms()
       : StudentPage.formsOf && StudentPage.formsOf(state);
@@ -75,10 +75,9 @@
     var ui = {
       tab: state.tab,
       segment: state.segment,
-      all: state.all,
       pick: state.pick,
-      search: state.search,
-      filter: state.filter,
+      card: state.card,
+      logout: state.logout,
       feedback: state.feedback,
       whole: state.whole,
       compare: state.compare,
@@ -108,17 +107,6 @@
   }
 
   StudentPage.viewOf = viewOf;
-
-  /* All Assignments' search: each letter typed draws the list again, and
-     the box keeps the focus and the place being typed in. */
-  function onInput(el) {
-    if (!el || el.id !== 'sp-search' || !S || S.screen !== 'assignments') return;
-    S.search = String(el.value || '').slice(0, 100);
-    var at = typeof el.selectionStart === 'number' ? el.selectionStart : S.search.length;
-    StudentPage.paint('#sp-search');
-    var box = typeof document !== 'undefined' ? document.getElementById('sp-search') : null;
-    if (box && typeof box.setSelectionRange === 'function') box.setSelectionRange(at, at);
-  }
 
   /* A Sent card's pictures, once this device has them (s/send.js, file-links): put into the cards
      of piece `p` on screen in place, exactly as page-view.js draws them, and nothing else is drawn
@@ -152,13 +140,10 @@
   StudentPage.addScreens({
     file: 'assignments',
     render: { assignments: renderAssignments },
-    input: onInput,
-    // Once the page is drawn: the phone's cards start at the one picked, and the count follows the swipe.
+    // Once the page is drawn: on a phone, a card picked from elsewhere is brought into view.
     drawn: function (root, state) {
       if (state.screen !== 'assignments' || typeof StudentPageView === 'undefined') return;
-      StudentPageView.settle(root, function (id) {
-        state.pick = id;
-      });
+      StudentPageView.settle(root);
     },
     share: function (state) {
       S = state;

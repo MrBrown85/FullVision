@@ -15,14 +15,15 @@ import {
   named,
   shot,
   contrast,
-  signIn,
-  showAll,
+  signIn as signInCard,
+  openLearning,
+  logOut,
 } from './student-card-fake.js';
 
 /* The card session's rules in a real browser (S0-W1, after PR 998's review
    and the owner's rulings of Nov 10): who is signed out by a scanned card,
    what the page says before it knows whether a code is a card or a slip,
-   replies that arrive too late, the session's end (midnight, Done, fifteen
+   replies that arrive too late, the session's end (midnight, Log Out, fifteen
    idle minutes) checked before the list can be seen again, and what counts
    as a piece being opened. tests/student-card-session.test.js has each
    rule's cases; this is the browser's own events, layout and clock.
@@ -31,6 +32,15 @@ import {
    database (e2e/student-card-fake.js). Nothing real is called. */
 
 const UNREACHED = "Couldn't reach FullVision. Check your internet and try again.";
+// What of the student's page is drawn: My Learning's rows or the cards on Assignments.
+const LIST = '.sp-ml-row, .sp-piece';
+
+/* Signed in, on My Learning: the returned work, each row watched for
+   "opened" (the redesign of 2026-11-14 moved it there from Back). */
+async function signIn(page) {
+  await signInCard(page);
+  await openLearning(page);
+}
 const MIN = 60 * 1000;
 const SLIP = {
   ok: true,
@@ -68,7 +78,7 @@ async function setHidden(page, hidden) {
 const WATCH_FRAMES = () => {
   window.__drew = [];
   const look = () => {
-    const rowEl = document.querySelector('.sp-row');
+    const rowEl = document.querySelector('.sp-ml-row, .sp-piece');
     const seen = !!rowEl && getComputedStyle(rowEl).visibility !== 'hidden' && rowEl.getClientRects().length > 0;
     window.__drew.push(seen);
   };
@@ -124,7 +134,7 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
       // And Cece's own tab, still open, is taken down.
       await page.bringToFront();
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-      await expect(page.locator('.sp-row')).toHaveCount(0);
+      await expect(page.locator(LIST)).toHaveCount(0);
       expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending/);
     });
   }
@@ -145,7 +155,9 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
     expect(JSON.parse((await stored(tab)).local[KEY]).t).toBe(JSON.parse(kept).t);
   });
 
-  test('a questionnaire opened in the tab that was signed in is not taken down by Done elsewhere', async ({ page }) => {
+  test('a questionnaire opened in the tab that was signed in is not taken down by Log Out elsewhere', async ({
+    page,
+  }) => {
     const fn = school(null, { slips: { K7M4QX: SLIP } });
     await serve(page, fn);
     await signIn(page);
@@ -156,11 +168,11 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
     await expect(page.getByText('How did it go?')).toBeVisible();
     await page.getByLabel('How did it go?').fill('Half way through my answer');
 
-    // Done in another tab on the device.
+    // Log Out in another tab on the device.
     const tab = await page.context().newPage();
     await serve(tab, fn);
     await tab.goto('/s/');
-    await tab.getByRole('button', { name: 'Done' }).click();
+    await logOut(tab);
     await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     await tab.close();
 
@@ -282,7 +294,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.getByLabel('Day').selectOption('15');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(page);
+    await openLearning(page);
     await named(page);
   });
 
@@ -298,7 +310,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await expect(page.getByLabel('Student Number')).toHaveValue('0123456');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(page);
+    await openLearning(page);
     // Every call the page makes on opening has been answered (questionnaires, `forms`, come last).
     await expect.poll(() => fn.logs.map(l => l.route)).toContain('forms');
     // One wrong try was counted, not two; every other call was answered.
@@ -319,7 +331,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await expect(page.getByLabel('Password')).toHaveValue('4821');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(page);
+    await openLearning(page);
   });
 });
 
@@ -351,7 +363,7 @@ test.describe('a reply that comes too late is dropped', () => {
     await signIn(page);
     await page.evaluate(() => (location.hash = '#ABCD-EFGH'));
     await page.evaluate(WATCH_FRAMES);
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator(LIST)).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
     expect(await drewTheList(page)).toBe(false);
   });
@@ -369,7 +381,7 @@ test.describe('the session’s end is checked before the list can be seen again'
     await expect(page.getByRole('status')).toHaveText(SIGNED_OUT, { timeout: 6000 });
     // On its own timer, at the end time: not on a slow sweep.
     expect(Date.now() - started).toBeLessThan(5000);
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator(LIST)).toHaveCount(0);
     expect((await stored(page)).local).toEqual({});
   });
 
@@ -387,10 +399,10 @@ test.describe('the session’s end is checked before the list can be seen again'
       await page.mouse.move(600, 500);
       await page.clock.setSystemTime(Date.now() + 4 * 60 * MIN);
       await expect(page.getByRole('status')).toHaveText(SIGNED_OUT, { timeout: 4000 });
-      await expect(page.locator('.sp-row')).toHaveCount(0);
+      await expect(page.locator(LIST)).toHaveCount(0);
       expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending|8 \/ 10/);
       expect((await stored(page)).local).toEqual({});
-      // Idle ends it as Done does; a session past its midnight is already over on the server.
+      // Idle ends it as Log Out does; a session past its midnight is already over on the server.
       await page.waitForTimeout(300);
       expect(posts.filter(p => p.body.route === 'done')).toHaveLength(name === 'past its midnight' ? 0 : 1);
     });
@@ -422,14 +434,14 @@ test.describe('the session’s end is checked before the list can be seen again'
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await setHidden(page, false);
     await expect(page.locator('#app')).toHaveCSS('visibility', 'visible');
-    await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
+    await expect(row(page, 'Cell Structure Quiz').locator('.sp-level')).toHaveText('8 / 10');
   });
 });
 
 test.describe('fifteen minutes with no activity', () => {
   test.use(CHROMEBOOK);
 
-  test('fourteen minutes stays; fifteen signs out as Done does, and the server is told once', async ({ page }) => {
+  test('fourteen minutes stays; fifteen signs out as Log Out does, and the server is told once', async ({ page }) => {
     await page.clock.install();
     const fn = school();
     const posts = await serve(page, fn);
@@ -440,7 +452,7 @@ test.describe('fifteen minutes with no activity', () => {
     expect((await stored(page)).local[KEY]).toBeTruthy();
     await page.clock.fastForward(1 * MIN + 1000);
     await expect(page.getByRole('status')).toHaveText(SIGNED_OUT);
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator(LIST)).toHaveCount(0);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8|Extending/);
     expect((await stored(page)).local).toEqual({});
     // Looked at again in every way: still told once.
@@ -516,7 +528,7 @@ test.describe('fifteen minutes with no activity', () => {
     await expect(page.getByLabel('Card Code')).toBeVisible();
     await page.waitForTimeout(300);
     expect(await drewTheList(page)).toBe(false);
-    // The server is told, as Done tells it, and the page is not asked for.
+    // The server is told, as Log Out tells it, and the page is not asked for.
     await expect.poll(() => posts.map(p => p.body)).toEqual([{ route: 'done', session: token }]);
     expect((await stored(page)).local).toEqual({});
     expect(fn.state.sessions).toEqual({});
@@ -549,7 +561,7 @@ test.describe('fifteen minutes with no activity', () => {
     const twoPosts = await serve(two, fn);
     await two.goto('/s/');
     await expect(two.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(two);
+    await openLearning(two);
 
     // Ten minutes on, the student is working in the second tab.
     await page.clock.fastForward(10 * MIN);
@@ -605,11 +617,12 @@ test.describe('"opened" means the row was on screen', () => {
   // The rows the student can see now: most of the row below the header and above the bottom of the screen.
   const onScreen = page =>
     page.evaluate(() => {
+      // My Learning's Your Work rows.
       const top = document.querySelector('.sp-head').getBoundingClientRect().bottom;
       // On a phone the tabs sit over the bottom of the screen.
       const tabs = document.querySelector('.sp-tabs-bottom').getBoundingClientRect();
       const bottom = tabs.top > window.innerHeight / 2 ? tabs.top : window.innerHeight;
-      return [...document.querySelectorAll('.sp-row')]
+      return [...document.querySelectorAll('.sp-ml-work .sp-ml-row')]
         .filter(el => {
           const b = el.getBoundingClientRect();
           const seen = Math.min(b.bottom, bottom) - Math.max(b.top, top);
@@ -626,9 +639,9 @@ test.describe('"opened" means the row was on screen', () => {
     const fn = school({ page: longPage() });
     const posts = await serve(page, fn);
     await signIn(page);
-    await expect(page.locator('.sp-row')).toHaveCount(39);
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(39);
     const first = await onScreen(page);
-    // Fewer than a whole screen of rows: the line over the list (S4-F5) takes some room.
+    // Fewer than a whole screen of rows: the heading over the list (Your Work) takes some room.
     expect(first.length).toBeGreaterThan(4);
     expect(first.length).toBeLessThan(20);
     expect(first[0]).toBe('Piece 01');
@@ -653,15 +666,15 @@ test.describe('"opened" means the row was on screen', () => {
     await expect.poll(() => sent(fn, posts).flat()).toContain('Piece 39');
     const done = sent(fn, posts).flat();
     expect(new Set(done).size).toBe(done.length);
-    // Done stays in reach all the way down.
-    await expect(page.getByRole('button', { name: 'Done' })).toBeInViewport();
+    // Log Out stays in reach all the way down.
+    await expect(page.getByRole('button', { name: 'Log Out' })).toBeInViewport();
   });
 
   test('a flick to the bottom: the rows that flew past are not sent, the ones it rests on are', async ({ page }) => {
     const fn = school({ page: longPage() });
     const posts = await serve(page, fn);
     await signIn(page);
-    await expect(page.locator('.sp-row')).toHaveCount(39);
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(39);
     const top = await onScreen(page);
     await expect.poll(() => sent(fn, posts)).toEqual([top]);
     // The whole list in about half a second.
@@ -682,7 +695,7 @@ test.describe('"opened" means the row was on screen', () => {
     all.forEach(title => expect(top.concat(bottom)).toContain(title));
     expect(all).not.toContain('Piece 20');
     expect(all.length).toBeLessThan(30);
-    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/^Updated /);
 
     // A row that flew past can still count on a later look: scroll back to it and stay.
     await row(page, 'Piece 20').scrollIntoViewIfNeeded();
@@ -703,9 +716,9 @@ test.describe('"opened" means the row was on screen', () => {
     await page.waitForTimeout(1500);
     expect(sent(fn, posts).flat()).not.toContain('Piece 39');
     await page.reload();
-    await showAll(page);
-    await expect(page.locator('.sp-row')).toHaveCount(39);
-    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
+    await openLearning(page);
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(39);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/^Updated /);
   });
 
   test('Updated stays on a changed grade never scrolled to, and goes once it has been on screen', async ({ page }) => {
@@ -713,21 +726,21 @@ test.describe('"opened" means the row was on screen', () => {
     const posts = await serve(page, fn);
     await signIn(page);
     await expect.poll(() => sent(fn, posts).length).toBe(1);
-    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/^Updated /);
     // The list is loaded again: still marked, never having been on screen.
     await page.reload();
-    await showAll(page);
-    await expect(page.locator('.sp-row')).toHaveCount(39);
-    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
+    await openLearning(page);
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(39);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/^Updated /);
     // Scrolled to: told to the server; the mark stays for this visit.
     posts.length = 0;
     await row(page, 'Piece 39').scrollIntoViewIfNeeded();
     await expect.poll(() => sent(fn, posts).flat()).toContain('Piece 39');
-    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/^Updated /);
     // The next time the list is loaded, it is gone.
     await page.reload();
-    await showAll(page);
-    await expect(page.locator('.sp-row')).toHaveCount(39);
+    await openLearning(page);
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(39);
     await expect(row(page, 'Piece 39').locator('.sp-row-sub')).not.toHaveText(/Updated/);
   });
 
@@ -750,15 +763,13 @@ test.describe('"opened" means the row was on screen', () => {
     });
     posts.length = 0;
     await page.reload();
-    // All Assignments, pressed while the tab is still covered.
-    await page.locator('[data-act="all-open"]').waitFor({ state: 'attached' });
-    await page.evaluate(() => document.querySelector('[data-act="all-open"]').click());
-    // Only what is back, so every returned piece fits on the screen.
-    await page.evaluate(() => document.querySelector('[data-filter="back"]').click());
-    await expect(page.locator('.sp-row')).toHaveCount(6);
+    // My Learning, pressed while the tab is still covered: one Missing row and the six returned.
+    await page.locator('.sp-tabs-bottom [data-tab="learning"]').waitFor({ state: 'attached' });
+    await page.evaluate(() => document.querySelector('.sp-tabs-bottom [data-tab="learning"]').click());
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(7);
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
-    // Only the page's reads (its questionnaires and reports come in `forms`); no "opened" mark yet.
+    // Only the page's reads (its questionnaires come in `forms`); no "opened" mark yet.
     expect(routes(posts)).toEqual(['page', 'work', 'forms']);
     // It is switched to.
     await page.evaluate(() => {
@@ -766,8 +777,10 @@ test.describe('"opened" means the row was on screen', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect(page.locator('#app')).toHaveCSS('visibility', 'visible');
-    // The line over the list (What Changed Since You Last Looked, S4-F5) takes room: the student scrolls to the last row.
-    await page.evaluate(() => [...document.querySelectorAll('.sp-row')].pop().scrollIntoView({ block: 'center' }));
+    // The student scrolls to the last row.
+    await page.evaluate(() =>
+      [...document.querySelectorAll('.sp-ml-work .sp-ml-row')].pop().scrollIntoView({ block: 'center' }),
+    );
     await expect.poll(() => sent(fn, posts).length).toBe(1);
     expect(sent(fn, posts)[0]).toContain('Lab Safety Contract');
   });
@@ -780,7 +793,7 @@ test.describe('"opened" means the row was on screen', () => {
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(page);
+    await openLearning(page);
     await page.waitForTimeout(1200);
     expect(routes(posts)).toEqual([]);
   });

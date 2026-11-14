@@ -722,7 +722,7 @@ var CmStudentPage = (function () {
       '<div class="cm-recent-limit sp-send-row">' +
       '<span class="cm-recent-text"><label class="sp-row-title" for="sp-learning-switch">Show My Learning</label>' +
       '<span class="cm-hint" id="sp-learning-hint">' +
-      esc('Students see their skills, their grade and how it changes over the term.') +
+      esc('Students see their grade, from work you’ve returned, above the list of their work.') +
       '</span></span>' +
       '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-learning-switch" data-action-change="spShowLearning" aria-describedby="sp-learning-hint"' +
       (l.on ? ' checked' : '') +
@@ -732,9 +732,7 @@ var CmStudentPage = (function () {
       '<div class="sp-learning-panel">' +
       '<span id="sp-learning-would">' +
       esc(
-        'Students would see their level on each skill and their grade in this class’s grading style (' +
-          style +
-          "), only from work you've returned.",
+        'Students would see their grade in this class’s grading style (' + style + "), only from work you've returned.",
       ) +
       '</span> ' +
       '<button type="button" class="sp-link-btn" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
@@ -891,16 +889,18 @@ var CmStudentPage = (function () {
     PreviewStudent.open(cid, sid, el, 'sp-preview-open');
   }
 
-  /* ── Questionnaires and Reports ────────────────────────────── */
+  /* ── Questionnaires ─────────────────────────────────────────── */
 
   // Nothing to choose here: the row says where they are set up (the board's last row).
   function _questionnairesRow() {
     return (
       '<div class="sp-row sp-questionnaires">' +
       '<div class="sp-row-head">' +
-      '<div class="sp-row-title">Questionnaires and Reports</div>' +
+      '<div class="sp-row-title">Questionnaires</div>' +
       '<div class="cm-hint">' +
-      esc('Open with the same card. Set them up on the Questionnaires tab and in Reports.') +
+      esc(
+        'Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.',
+      ) +
       '</div>' +
       '</div>' +
       '</div>'

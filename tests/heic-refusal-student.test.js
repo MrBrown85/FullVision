@@ -21,6 +21,8 @@ async function openSend() {
   page.type('#sp-ident', page.T.DEMO.number);
   await page.click('[data-act="card-yes"]');
   const id = page.T.state().reply.assessments.find(a => a.title === 'Science Fair Proposal').id;
+  // It is due in four days: its card is in Upcoming.
+  await page.click('[data-segment="upcoming"]');
   await page.click('.sp-piece[data-piece="' + id + '"] [data-act="send-open"]');
   return page;
 }

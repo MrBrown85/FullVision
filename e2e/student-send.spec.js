@@ -26,7 +26,9 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+  // Disease Research Poster (past due) and Immune System Quick Check (missing); Science Fair Proposal is due later.
+  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upcoming 1' })).toBeVisible();
   return { posts, errors };
 }
 
@@ -41,6 +43,7 @@ for (const [where, device] of [
       const { posts, errors } = await demo(page);
       const tag = where === 'on a phone' ? 'phone' : 'chromebook';
       const fair = page.locator('.sp-piece', { hasText: 'Science Fair Proposal' });
+      await page.getByRole('button', { name: 'Upcoming 1' }).click();
       if (tag === 'chromebook') await page.locator('.sp-side-row', { hasText: 'Science Fair Proposal' }).click();
       await fair.getByRole('button', { name: 'Send My Work' }).click();
       await expect(page.getByRole('heading', { name: 'Check and Send' })).toBeVisible();
@@ -60,15 +63,33 @@ for (const [where, device] of [
       await expect(page.getByRole('heading', { name: 'Sent to Your Teacher' })).toBeVisible();
       await shot(page, tag + '-s5f2-sent');
       await page.getByRole('button', { name: 'Back to My Work' }).click();
-      await page.getByRole('button', { name: 'Sent 1' }).click();
+      // Sent work leaves Assignments: Upcoming is empty now.
+      await expect(page.getByRole('button', { name: 'Upcoming 0' })).toBeVisible();
+      await expect(page.getByText('Nothing coming up yet.')).toBeVisible();
+      // It is the first row of My Learning's Your Work, Sent and waiting.
+      await page.getByRole('button', { name: /^My Learning/ }).click();
+      const row = page.locator('.sp-ml-work .sp-ml-row').first();
+      await expect(row).toContainText('Science Fair Proposal');
+      await expect(row.locator('.sp-row-sub')).toHaveText(
+        /^Sent \w{3} \d{1,2}, \d{1,2}:\d\d [ap]\.m\. · waiting for feedback$/,
+      );
+      await expect(row.locator('.sp-level')).toHaveText('Sent');
+      await row.click();
+      await expect(page.getByRole('heading', { name: 'Science Fair Proposal' })).toBeVisible();
       await expect(page.getByText('Your teacher hasn’t started grading it. You can still change it.')).toBeVisible();
       await shot(page, tag + '-s5f3-sent-card');
       await page.getByRole('button', { name: 'Unsend' }).click();
       await expect(page.getByRole('alertdialog', { name: 'Unsend Your Work?' })).toBeVisible();
       await shot(page, tag + '-s5f3-unsend');
       await page.getByRole('alertdialog').getByRole('button', { name: 'Unsend' }).click();
-      await expect(page.getByRole('button', { name: 'Sent 0' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+      // Unsent: the page goes to its card on Assignments, in Upcoming by its due date, its title focused.
+      await expect(page.getByRole('button', { name: 'Upcoming 1' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+      await expect(fair.locator('.sp-piece-title')).toBeFocused();
+      await expect(fair.getByRole('button', { name: 'Send My Work' })).toBeVisible();
+      // And it is off My Learning.
+      await page.getByRole('button', { name: /^My Learning/ }).click();
+      await expect(page.locator('.sp-ml-row', { hasText: 'Science Fair Proposal' })).toHaveCount(0);
       expect(posts).toEqual([]);
       expect(errors).toEqual([]);
     });
@@ -106,6 +127,7 @@ test.describe('on a Chromebook, a PDF', () => {
       if (/\/vendor\/pdfjs\//.test(req.url())) pdfjs.push(req.url());
     });
     const { posts, errors } = await demo(page);
+    await page.getByRole('button', { name: 'Upcoming 1' }).click();
     await page.locator('.sp-side-row', { hasText: 'Science Fair Proposal' }).click();
     await page
       .locator('.sp-piece', { hasText: 'Science Fair Proposal' })

@@ -17,7 +17,8 @@ import {
   shot,
   contrast,
   signIn,
-  showAll,
+  openLearning,
+  logOut,
 } from './student-card-fake.js';
 
 /* A real student card on the student page, /s/#CODE (docs/plans/
@@ -39,7 +40,7 @@ for (const size of [
   test.describe('a real card on ' + size.name, () => {
     test.use(size.use);
 
-    test('the card, Is This You?, the Assignments list, the page again, and Done', async ({ page }) => {
+    test('the card, Is This You?, Assignments and My Learning, the page again, and Log Out', async ({ page }) => {
       const fn = school();
       const posts = await serve(page, fn);
       const errors = [];
@@ -73,27 +74,45 @@ for (const size of [
       await page.getByLabel('Year').selectOption('2012');
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
 
-      // The Assignments list: returned results only.
-      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-      await showAll(page);
-      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('Extending');
-      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
-      await expect(row(page, 'Cell Microscope Lab').locator('.sp-row-result')).toHaveText('Proficient −');
-      await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
-      await expect(row(page, 'Lab Safety Contract').locator('.sp-row-result')).toHaveText('Complete');
-      await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+ · Updated$/);
-      await expect(row(page, 'Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Missing · Due /);
-      await expect(row(page, 'Immune System Quick Check').locator('.sp-row-result')).toHaveCount(0);
-      await expect(row(page, 'Disease Research Poster').locator('.sp-row-result')).toHaveCount(0);
-      await expect(row(page, 'Ecosystem Connections Essay').locator('.sp-row-result')).toHaveText('Developing');
-      expect(await page.locator('#app').innerHTML()).not.toMatch(/draft|Demo Mode/i);
-      await expect(page.getByRole('button', { name: 'Done' })).toBeVisible();
+      // Assignments: what is still to hand in, with no result.
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
+      await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText([
+        'Immune System Quick Check',
+        'Disease Research Poster',
+      ]);
+      await expect(page.locator('.sp-deck .sp-level')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Log Out' })).toBeVisible();
       await fits(page);
       await named(page);
       await contrast(page);
       await shot(page, size.name === 'a phone' ? '03-assignments' : 'chromebook-03-assignments');
+      // Nothing that came back is on screen yet, so nothing is told.
+      await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'verify', 'page', 'work', 'forms']);
 
+      // My Learning: returned results only.
+      await openLearning(page);
+      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-level')).toHaveText('Extending');
+      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Returned \S+ \d+$/);
+      await expect(row(page, 'Cell Microscope Lab').locator('.sp-level')).toHaveText('Proficient −');
+      await expect(row(page, 'Cell Structure Quiz').locator('.sp-level')).toHaveText('8 / 10');
+      await expect(row(page, 'Lab Safety Contract').locator('.sp-level')).toHaveText('Complete');
+      await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(
+        /^Updated \S+ \d+ · was Incomplete$/,
+      );
+      await expect(row(page, 'Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Due \S+ \d+$/);
+      await expect(row(page, 'Immune System Quick Check').locator('.sp-level')).toHaveText('Missing');
+      await expect(row(page, 'Disease Research Poster')).toHaveCount(0);
+      await expect(row(page, 'Ecosystem Connections Essay').locator('.sp-level')).toHaveText('Developing');
+      // Not opened yet: each returned row has the blue dot.
+      await expect(page.locator('.sp-ml-work .sp-ml-new-on')).toHaveCount(6);
+      expect(await page.locator('#app').innerHTML()).not.toMatch(/draft|Demo Mode/i);
+      await fits(page);
+      await named(page);
+      await contrast(page);
+      await shot(page, size.name === 'a phone' ? '03-my-learning' : 'chromebook-03-my-learning');
+
+      // The rows on screen are told to the server as opened.
       await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'verify', 'page', 'work', 'forms', 'seen']);
       expect(posts[2].body).toEqual({
         route: 'verify',
@@ -122,26 +141,25 @@ for (const size of [
       expect(JSON.stringify(kept)).not.toMatch(/Cece|Science|P3R|0123456|2012-05|Extending/);
       expect(await page.context().cookies()).toEqual([]);
 
-      // The student reads down the list: every returned piece has been on screen
-      // (the line over the list, What Changed Since You Last Looked, takes some room).
-      await page.locator('.sp-row').last().scrollIntoViewIfNeeded();
+      // The student reads down the list: every returned piece has been on screen.
+      await page.locator('.sp-ml-work .sp-ml-row').last().scrollIntoViewIfNeeded();
       await expect
         .poll(() => posts.filter(p => p.body.route === 'seen').flatMap(p => p.body.assessment_ids).length)
         .toBe(6);
-      await page.getByRole('button', { name: 'Back', exact: true }).click();
 
       // The page opened again: the student's page, with no card and no check.
       posts.length = 0;
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-      await showAll(page);
-      await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
+      await openLearning(page);
+      await expect(row(page, 'Cell Structure Quiz').locator('.sp-level')).toHaveText('8 / 10');
       // Opened last time: no longer marked, and nothing more to tell the server.
-      await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
+      await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Returned \S+ \d+$/);
+      await expect(page.locator('.sp-ml-work .sp-ml-new-on')).toHaveCount(0);
       await expect.poll(() => routes(posts)).toEqual(['page', 'work', 'forms']);
 
-      // Done.
-      await page.getByRole('button', { name: 'Done' }).click();
+      // Log Out, and Log Out on the sheet that asks first.
+      await logOut(page);
       // After Done (the artboard's board): nothing of the student, and Scan a Card.
       await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
       await expect(
@@ -178,7 +196,7 @@ for (const size of [
 test.describe('a real card: the keyboard alone', () => {
   test.use(CHROMEBOOK);
 
-  test('the code, the check, the list and Done, without a mouse', async ({ page }) => {
+  test('the code, the check, the list and Log Out, without a mouse', async ({ page }) => {
     const fn = school();
     await serve(page, fn);
     await page.goto('/s/');
@@ -203,12 +221,16 @@ test.describe('a real card: the keyboard alone', () => {
     await page.keyboard.type('0123456');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
-    // Back up the header: All Assignments, then Done.
+    // Back up the header: Log Out is its last button.
     await page.keyboard.press('Shift+Tab');
-    await expect(page.getByRole('button', { name: 'All assignments' })).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
-    // The class's name (Your Classes) comes before Done.
-    await expect(page.getByRole('button', { name: 'Done' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Log Out' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    // Log Out? asks first, with the focus on its question; Cancel, then Log Out.
+    await expect(page.getByRole('heading', { name: 'Log Out?' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.sp-logout [data-act="logout-cancel"]')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.sp-logout [data-act="card-done"]')).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
     await page.keyboard.press('Tab');
@@ -310,9 +332,9 @@ test.describe('a real card: what stops it, and what each one says', () => {
       { route: 'card', code: 'ABC234' },
       { route: 'open', code: 'ABC234' },
     ]);
-    // On the card's screen (after Done): the card's words.
+    // On the card's screen (after Log Out): the card's words.
     await signIn(page);
-    await page.getByRole('button', { name: 'Done' }).tap();
+    await logOut(page);
     await page.getByRole('button', { name: 'Scan a Card' }).tap();
     await page.getByLabel('Card Code').fill('ABC-234');
     await page.getByRole('button', { name: 'Continue' }).tap();
@@ -355,7 +377,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     offline = '';
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(page);
+    await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
   });
 
   const GONE = [
@@ -376,7 +398,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
       posts.length = 0;
       await page.reload();
       await expect(page.getByRole('alert'), error).toHaveText(line);
-      await expect(page.locator('.sp-row')).toHaveCount(0);
+      await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Try Again' })).toHaveCount(0);
       await expect.poll(() => routes(posts), error).toEqual(['page', 'done']);
       expect((await stored(page)).local, error).toEqual({});
@@ -394,15 +416,18 @@ test.describe('a real card: what stops it, and what each one says', () => {
     await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('0123456');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
-    await showAll(page);
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await openLearning(page);
+    // My Learning, where the results would be, says they didn't load: only Missing has a chip.
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
-    await expect(page.locator('.sp-row')).toHaveCount(9);
-    await expect(page.locator('.sp-row-result')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(7);
+    await expect(page.locator('.sp-ml-work .sp-level')).toHaveText(['Missing']);
+    await expect(page.locator('.sp-ml-work [data-unseen]')).toHaveCount(0);
     await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     await shot(page, '14-results-did-not-load');
     await page.unroute('**/shared/calc.js');
     await page.getByRole('button', { name: 'Try Again' }).tap();
-    await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
+    await expect(row(page, 'Cell Structure Quiz').locator('.sp-level')).toHaveText('8 / 10');
     await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen']);
   });
 });
@@ -418,10 +443,15 @@ test.describe('a real card: a class graded by letter, and by both', () => {
       const fn = school({ page: samplePage(TODAY, system) });
       await serve(page, fn);
       await signIn(page);
-      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-result')).toHaveText(four);
-      await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText(quiz);
+      await openLearning(page);
+      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-level')).toHaveText(four);
+      await expect(row(page, 'Cell Structure Quiz').locator('.sp-level')).toHaveText(quiz);
+      // Missing counts as 0 in a class with a course %.
+      await expect(row(page, 'Immune System Quick Check').locator('.sp-row-sub')).toHaveText(
+        /^Due \S+ \d+ · counts as 0 until it’s in$/,
+      );
       await fits(page);
-      await shot(page, '03-assignments-' + system);
+      await shot(page, '03-my-learning-' + system);
     });
   }
 });
@@ -462,20 +492,21 @@ test.describe('a real card: a shared Chromebook', () => {
     // Cece's tab, still open behind it, is taken down when it is looked at again.
     await page.bringToFront();
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveText(SIGNED_OUT);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8/);
 
     await tab.bringToFront();
     await tab.getByLabel('Student Number').fill('7654321');
     await tab.getByRole('button', { name: 'Yes, That’s Me' }).click();
-    await expect(tab.getByText('No assignments yet.')).toBeVisible();
+    await expect(tab.getByText('All caught up')).toBeVisible();
+    await expect(tab.locator('.sp-segment')).toHaveText(['Outstanding 0', 'Upcoming 0']);
     expect(await tab.locator('body').innerText()).not.toContain('Cece');
     const now = JSON.parse((await stored(tab)).local[KEY]);
     expect(now.e).toBe(OMAR);
     expect(now.t).not.toBe(cece);
     expect(posts.elsewhere.concat(tabPosts.elsewhere)).toEqual([]);
-    await shot(tab, 'chromebook-05-no-assignments-yet');
+    await shot(tab, 'chromebook-05-all-caught-up');
   });
 
   test('the next card opened in the same tab signs the last student out too', async ({ page }) => {
@@ -488,7 +519,7 @@ test.describe('a real card: a shared Chromebook', () => {
     // The address changes under the open page, as a scanned link does in a tab that is already there.
     await page.evaluate(() => (location.hash = '#K7M4-QX2P'));
     await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending/);
     await expect
       .poll(() => posts.map(p => p.body))
@@ -500,45 +531,45 @@ test.describe('a real card: a shared Chromebook', () => {
     expect((await stored(page)).local).toEqual({});
   });
 
-  test('after Done, Back and Forward bring back nothing of the last student', async ({ page }) => {
+  test('after Log Out, Back and Forward bring back nothing of the last student', async ({ page }) => {
     const fn = school();
     const posts = await serve(page, fn);
     await page.goto('/login.html');
     await signIn(page);
-    await page.getByRole('button', { name: 'Done' }).click();
+    await logOut(page);
     await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     posts.length = 0;
     await page.goBack();
     await page.goForward();
     await expect(page.locator('#app')).toBeVisible();
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8|Extending/);
     expect(await page.url()).not.toMatch(/P3R/i);
     expect(routes(posts)).not.toContain('page');
     expect((await stored(page)).local).toEqual({});
   });
 
-  test('a page left open is taken down when Done is pressed in another tab, and when Back returns to it', async ({
+  test('a page left open is taken down when Log Out is pressed in another tab, and when Back returns to it', async ({
     page,
   }) => {
     const fn = school();
     await serve(page, fn);
     await signIn(page);
-    // The student goes somewhere else in this tab without pressing Done…
+    // The student goes somewhere else in this tab without logging out…
     await page.goto('/login.html');
-    // …and presses Done in another.
+    // …and logs out in another.
     const tab = await page.context().newPage();
     await serve(tab, fn);
     await tab.goto('/s/');
     await expect(tab.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(tab);
-    await tab.getByRole('button', { name: 'Done' }).click();
+    await openLearning(tab);
+    await logOut(tab);
     await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     await tab.close();
     // Back in the first tab: whatever the browser kept of the page, the list is not shown.
     await page.goBack();
     await expect(page.locator('#app')).toBeVisible();
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending|Cell Structure Quiz/);
   });
 
@@ -549,11 +580,12 @@ test.describe('a real card: a shared Chromebook', () => {
     const fn = school(null, { lasts: 3000 });
     const posts = await serve(page, fn);
     await signIn(page);
+    await openLearning(page);
     await expect(row(page, 'Cell Structure Quiz')).toBeVisible();
     await page.waitForTimeout(3200);
     // The page checks every few seconds, and whenever it is looked at again.
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveText(SIGNED_OUT);
     expect((await stored(page)).local).toEqual({});
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8/);
@@ -563,7 +595,7 @@ test.describe('a real card: a shared Chromebook', () => {
     posts.length = 0;
     await page.reload();
     expect(routes(posts)).toEqual([]);
-    await expect(page.locator('.sp-row')).toHaveCount(0);
+    await expect(page.locator('.sp-ml-row, .sp-piece')).toHaveCount(0);
   });
 
   test('a device that kept a token past its midnight opens nothing and asks nothing', async ({ page }) => {

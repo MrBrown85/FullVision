@@ -32,10 +32,11 @@ async function demo(hash) {
 const viewOf = page => page.T.viewOf(page.T.state());
 const piece = (page, title) => viewOf(page).work.find(p => p.title === title);
 
+// Your Feedback opens from the piece's row in My Learning's Your Work.
 async function openFeedback(page, title) {
-  await page.click('[data-segment="back"]');
+  await page.click('[data-tab="learning"]');
   const p = piece(page, title);
-  await page.click('.sp-piece[data-piece="' + p.id + '"] [data-act="feedback"]');
+  await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + p.id + '"]');
   return p;
 }
 async function openReflect(page, title) {
@@ -153,7 +154,7 @@ describe('S10-F1: reflecting, on returned work only', () => {
     const fair = piece(page, 'Science Fair Proposal');
     expect(fair.kind).toBe('due');
     page.T.state().screen = 'assignments';
-    await page.click('[data-segment="todo"]');
+    await page.click('[data-segment="upcoming"]');
     const fake = page.root().ownerDocument.createElement('button');
     fake.setAttribute('data-act', 'reflect-open');
     fake.setAttribute('data-piece', fair.id);
@@ -270,7 +271,7 @@ describe('answers that arrive late, or wrong', () => {
     expect(q(page, '#sp-reflect-msg')).toBeNull();
   });
 
-  it('a send that lands after Done draws nothing', async () => {
+  it('a send that lands after Log Out draws nothing', async () => {
     const page = await demo();
     const h = held();
     page.T.setFeedbackAnswer(() => h.promise);
@@ -278,7 +279,7 @@ describe('answers that arrive late, or wrong', () => {
     await page.click('[data-act="reflect-sense"][data-value="yes"]');
     page.type('#sp-reflect-plan', 'A plan.');
     await page.click('[data-act="reflect-send"]');
-    // Done, as the page's header button sends it.
+    // Log Out, as the Log Out? sheet's button sends it.
     const done = page.root().ownerDocument.createElement('button');
     done.setAttribute('data-act', 'card-done');
     page.root().appendChild(done);
@@ -324,6 +325,8 @@ describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
       fromTitle: 'KMT & States of Matter Lab',
     });
     expect(piece(page, 'Disease Research Poster').plan).toBeNull();
+    // The Science Fair Proposal is due after today: its card is on Upcoming.
+    await page.click('[data-segment="upcoming"]');
     const card = q(page, '.sp-piece[data-piece="' + fair.id + '"] .sp-plan');
     expect([...card.children].map(words)).toEqual([
       'Your Plan From Last Time',
@@ -425,6 +428,7 @@ describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
     page.T.setPrepare(file =>
       Promise.resolve({ ok: true, kind: 'jpeg', pages: [{ blob: { size: 1 }, thumb: { size: 1 }, hash: 'h' }] }),
     );
+    await page.click('[data-segment="upcoming"]');
     await page.click('.sp-piece[data-piece="demo-fair"] [data-act="send-open"]');
     expect(words(q(page, '.sp-send-plan .sp-plan-title'))).toBe('Your Plan From Last Time');
     expect(words(q(page, '.sp-send-plan-ask'))).toBe('Did You Do It?');

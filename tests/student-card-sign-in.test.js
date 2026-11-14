@@ -22,8 +22,26 @@ const SIGNED_OUT = 'You are signed out. Scan or type your card to open your page
 const routes = page => page.calls.map(c => c.body.route);
 const text = page => page.root().textContent;
 const alertText = page => (page.root().querySelector('[role="alert"]') || {}).textContent || '';
-// Every piece's title, as All Assignments lists them (S4-F1: the tab opens on To Do).
-const titles = page => (page.showAll(), [...page.root().querySelectorAll('.sp-row-title')].map(el => el.textContent));
+/* Every piece's title, once each: the cards of Outstanding and Upcoming,
+   then My Learning's Your Work. The page is left on Assignments. */
+async function titles(page) {
+  const seen = [];
+  const add = sel =>
+    page
+      .root()
+      .querySelectorAll(sel)
+      .forEach(el => seen.push(el.textContent));
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
+  await page.click('[data-segment="outstanding"]');
+  add('.sp-deck .sp-piece-title');
+  await page.click('[data-segment="upcoming"]');
+  add('.sp-deck .sp-piece-title');
+  await page.click('.sp-tabs-bottom [data-tab="learning"]');
+  add('.sp-ml-work .sp-row-title');
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
+  await page.click('[data-segment="outstanding"]');
+  return [...new Set(seen)];
+}
 const has = (page, sel) => !!page.root().querySelector(sel);
 // Waits, a turn at a time, until `ok()` holds, however long a busy machine takes (never a fixed number of turns).
 async function until(ok, what) {
@@ -80,9 +98,10 @@ async function addCard(page, code) {
 }
 
 describe('After Done', () => {
-  it('Done shows After Done: the board’s words, nothing of the student, and Scan a Card', async () => {
+  it('Log Out, then Log Out on its sheet, shows After Done: the board’s words, nothing of the student, and Scan a Card', async () => {
     const dev = school();
     const page = await signIn(dev);
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     expect(page.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     // A phone and a Chromebook each say what they are; the stylesheet shows one.
@@ -98,7 +117,7 @@ describe('After Done', () => {
     expect(page.root().querySelector('.sp-msg')).toBeNull();
   });
 
-  it('only Done shows it: midnight and fifteen idle minutes still say so on the card’s first screen', async () => {
+  it('only Log Out shows it: midnight and fifteen idle minutes still say so on the card’s first screen', async () => {
     const dev = school({ lasts: 10 * 60 * 1000 });
     const page = await signIn(dev);
     const ends = Date.parse(JSON.parse(dev.store[KEY]).x);
@@ -107,12 +126,13 @@ describe('After Done', () => {
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
   });
 
-  it('Demo Mode: Done shows After Done, and Scan a Card starts the sample again with nothing sent', async () => {
+  it('Demo Mode: Log Out shows After Done, and Scan a Card starts the sample again with nothing sent', async () => {
     const demo = openStudentPage();
     await demo.start('#demo-card');
     await demo.submit('form[data-form="card"]');
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
+    await demo.click('[data-act="logout-ask"]');
     await demo.click('[data-act="card-done"]');
     expect(demo.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     await demo.click('[data-act="card-restart"]');
@@ -182,7 +202,7 @@ describe('Switching Classes: Your Classes', () => {
       enrollment_id: HUM,
     });
     expect(head(page)).toBe('Humanities 8 · Block A');
-    expect(titles(page)).toEqual(['Medieval Europe Map']);
+    expect(await titles(page)).toEqual(['Medieval Europe Map']);
   });
 
   it('both classes are listed, and choosing one opens it in the same session', async () => {
@@ -202,7 +222,7 @@ describe('Switching Classes: Your Classes', () => {
       { route: 'page', session: token, enrollment_id: CECE },
       // What the class takes (s/send.js), once its page is in.
       { route: 'work', session: token, enrollment_id: CECE },
-      // Its questionnaires and phone reports (S4-F4).
+      // Its questionnaires, for Reflections (S4-F4).
       { route: 'forms', session: token, enrollment_id: CECE },
     ]);
     expect(head(page)).toBe('Science 8 · Block B');
@@ -249,7 +269,7 @@ describe('Switching Classes: Your Classes', () => {
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     release();
     await page.settle();
-    expect(has(page, '.sp-row')).toBe(false);
+    expect(has(page, '.sp-view')).toBe(false);
     expect(page.root().innerHTML).not.toContain('Science 8');
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
   });
@@ -276,7 +296,7 @@ describe('Switching Classes: what stops Add Another Card', () => {
       await page.click('[data-act="card-back"]');
       expect(page.calls, field).toEqual([]);
       expect(head(page), field).toBe('Science 8 · Block B');
-      expect(titles(page).length, field).toBeGreaterThan(0);
+      expect((await titles(page)).length, field).toBeGreaterThan(0);
     }
   });
 
@@ -603,7 +623,7 @@ describe('Demo Mode: Switching Classes on the device', () => {
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
     expect(head(demo)).toBe('Humanities 8 · Block A');
-    expect(titles(demo)).toContain('Medieval Europe Map');
+    expect(await titles(demo)).toContain('Medieval Europe Map');
     // The draft in the second class is nowhere.
     expect(demo.root().innerHTML).not.toContain('one more piece of evidence');
     await demo.click('[data-act="classes-open"]');

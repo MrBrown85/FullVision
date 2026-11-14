@@ -29,6 +29,21 @@ const routes = page => page.calls.map(c => c.body.route);
 const bodyOf = (page, route) => page.calls.filter(c => c.body.route === route).map(c => c.body);
 const puts = page => page.storageCalls.filter(c => c.method === 'PUT');
 const piece = id => '.sp-piece[data-piece="' + id + '"]';
+const row = id => '.sp-ml-row[data-piece="' + id + '"]';
+
+/* Work sent and waiting is on My Learning, at the top of Your Work: its row
+   opens its card there, with Replace Photos and Unsend. */
+async function openSent(page, id) {
+  await page.click('.sp-tabs-bottom [data-tab="learning"]');
+  await page.click(row(id));
+  expect(page.root().querySelector('.sp-ml-card-open ' + piece(id))).toBeTruthy();
+}
+
+// Log Out, then Log Out again on the sheet that asks.
+async function logOut(page) {
+  await page.click('.sp-done[data-act="logout-ask"]');
+  await page.click('.sp-logout [data-act="card-done"]');
+}
 
 // shared/photo-queue.js's store, kept in memory: the same five calls, the same shapes.
 function memoryStore() {
@@ -101,8 +116,9 @@ async function signIn(dev) {
   return page;
 }
 
-// Send My Work on Science Fair Proposal, with `n` pages chosen.
+// Send My Work on Science Fair Proposal (due in four days: Upcoming), with `n` pages chosen.
 async function sendFair(page, n, note) {
+  if (page.T.state().screen === 'assignments') await page.click('[data-segment="upcoming"]');
   await page.click(piece(WORK.fair) + ' [data-act="send-open"]');
   await page.T.sendFiles(
     Array.from({ length: n }, () => ({})),
@@ -149,9 +165,14 @@ describe('a real send: start, each file to its link, finish', () => {
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback', 'group-work']);
-    expect(page.root().querySelector(piece(WORK.fair) + ' [data-act="send-open"]')).toBeTruthy();
-    // A piece the class does not take work for says nothing of sending.
+    // Outstanding: the poster, past its due date, takes work; the quick check takes none and says nothing of sending.
+    expect(page.root().querySelector(piece(WORK.poster) + ' [data-act="send-open"]')).toBeTruthy();
+    expect(page.root().querySelector(piece(WORK.quick))).toBeTruthy();
     expect(page.root().querySelector(piece(WORK.quick) + ' .sp-send-closed')).toBeNull();
+    expect(page.root().querySelector(piece(WORK.quick) + ' [data-act="send-open"]')).toBeNull();
+    // Science Fair Proposal is due in four days: it is on Upcoming, not Outstanding.
+    expect(page.root().querySelector(piece(WORK.fair))).toBeNull();
+    expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 1');
 
     await sendFair(page, 2, 'Page 2 has my answers.');
     expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
@@ -204,8 +225,18 @@ describe('a real send: start, each file to its link, finish', () => {
       'work',
       'file-links',
     ]);
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 1');
-    await page.click('[data-segment="sent"]');
+    // Sent work leaves Assignments: Upcoming is empty, and the piece is a Sent row at the top of My Learning.
+    expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 0');
+    expect(page.root().querySelector(piece(WORK.fair))).toBeNull();
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    const first = page.root().querySelector('.sp-ml-work .sp-ml-row');
+    expect(first.getAttribute('data-piece')).toBe(WORK.fair);
+    expect(first.getAttribute('data-act')).toBe('open-piece');
+    expect(words(first.querySelector('.sp-row-sub'))).toMatch(
+      /^Sent \S+ \d+, \d{1,2}:\d\d [ap]\.m\. · waiting for feedback$/,
+    );
+    expect(words(first.querySelector('.sp-level'))).toBe('Sent');
+    await openSent(page, WORK.fair);
     const thumbs = [...page.root().querySelectorAll(piece(WORK.fair) + ' .sp-send-thumb')];
     expect(thumbs.map(img => img.getAttribute('src'))).toEqual([
       expect.stringMatching(/^blob:/),
@@ -454,18 +485,18 @@ describe('a send survives a reload, within its two hours', () => {
     await sendFair(page, 1);
     expect(dev.kept.rows.size).toBe(1);
     await page.click('[data-act="send-done"]');
-    await page.click('[data-act="card-done"]');
+    await logOut(page);
     expect(dev.kept.rows.size).toBe(0);
   });
 });
 
 describe('Unsend and Replace, and the teacher’s pages', () => {
-  it('Unsend asks the server, and the piece is back to To Do; Replace sends through `replace`', async () => {
+  it('Unsend asks the server, and the piece is back on Upcoming; Replace sends through `replace`', async () => {
     const dev = school();
     const page = await signIn(dev);
     await sendFair(page, 2);
     await page.click('[data-act="send-done"]');
-    await page.click('[data-segment="sent"]');
+    await openSent(page, WORK.fair);
 
     await page.click(piece(WORK.fair) + ' [data-act="send-replace"]');
     await page.click('[data-act="send-ask-yes"]');
@@ -476,7 +507,9 @@ describe('Unsend and Replace, and the teacher’s pages', () => {
     expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(page, 'replace')).toHaveLength(1);
     expect([...dev.fn.world.subs.values()].map(s => [s.state, s.files.length])).toEqual([['sent', 1]]);
+    // Back to the card it was replaced from, on My Learning.
     await page.click('[data-act="send-done"]');
+    expect(page.root().querySelector('.sp-ml-card-open ' + piece(WORK.fair) + ' .sp-send-change')).toBeTruthy();
 
     dev.answer = body => (body.route === 'unsend' ? { ok: false, error: 'grading_started' } : null);
     await page.click(piece(WORK.fair) + ' [data-act="send-unsend"]');
@@ -497,9 +530,15 @@ describe('Unsend and Replace, and the teacher’s pages', () => {
     await page.click('[data-act="send-ask-yes"]');
     expect(bodyOf(page, 'unsend').slice(-1)[0]).toMatchObject({ assessment_id: WORK.fair, enrollment_id: CECE });
     expect(page.root().querySelector('.sp-send-ask')).toBeNull();
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 0');
-    await page.click('[data-segment="todo"]');
+    // Unsent: the page goes to the piece's card on Upcoming (it is due in four days), with Send My Work again.
+    expect(page.T.state()).toMatchObject({ tab: 'assignments', segment: 'upcoming', pick: WORK.fair, card: '' });
+    expect(text(page, '.sp-segment-on')).toBe('Upcoming 1');
+    expect(page.root().querySelector('.sp-ml-card-open')).toBeNull();
     expect(page.root().querySelector(piece(WORK.fair) + ' [data-act="send-open"]')).toBeTruthy();
+    expect(page.root().querySelector(piece(WORK.fair) + ' .sp-send-change')).toBeNull();
+    // And it is off My Learning.
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    expect(page.root().querySelector(row(WORK.fair))).toBeNull();
     expect(dev.fn.world.subs.size).toBe(0);
   });
 
@@ -532,7 +571,7 @@ describe('Unsend and Replace, and the teacher’s pages', () => {
           }
         : null;
     const page = await signIn(dev);
-    await page.click('[data-segment="sent"]');
+    await openSent(page, WORK.fair);
     expect(text(page, piece(WORK.fair) + ' .sp-send-line')).toBe(
       'Your photos go before the 2 pages your teacher added.',
     );
@@ -550,7 +589,7 @@ describe('a Sent card’s pictures, as they land', () => {
     dev.answer = body => (body.route === 'file-links' ? { ok: false, error: 'server' } : null);
     await sendFair(page, 2);
     await page.click('[data-act="send-done"]');
-    await page.click('[data-segment="sent"]');
+    await openSent(page, WORK.fair);
     const card = () => page.root().querySelector(piece(WORK.fair));
     expect(card().querySelector('.sp-send-thumbs')).toBeNull();
     dev.answer = null;
