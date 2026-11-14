@@ -120,8 +120,13 @@ export async function runSession() {
   globalThis.getSupabase = () => server.fake;
   setOnline(true);
 
+  /* Class Settings asks for the categories a timer tick after a draw
+     (_cmCatPrepare). settle() turns over only setImmediate rounds, which can
+     all run before a setTimeout(0) is due, so a timer of our own goes first:
+     timers fire in the order they were set, so the draw's has run by then. */
   async function quiet() {
     for (let i = 0; i < 80; i++) {
+      await new Promise(r => setTimeout(r, 0));
       await settle();
       const refresh = _refreshState[CID];
       if (!(refresh && refresh.running) && !_hasUnsentWrites()) return;
