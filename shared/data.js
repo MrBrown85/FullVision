@@ -78,6 +78,7 @@ const _cache = {
   // device) and _loadGradeReturns (rows from the server) are the only ways
   // in. Both drop the returned set and calc.js's cached numbers.
   gradeReturns: {},
+  gradeReturnsNone: {}, // keyed by cid — true: this device held no rows when getGradeReturns last read it
   dibels: {}, // keyed by cid — DIBELS raw scores { 'sid:aid': { boy|moy|eoy: { orfWrc, orfErrors, mazeCorrect, mazeIncorrect } } }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
@@ -2432,6 +2433,7 @@ function _rekeyField(field, cid, transform) {
   if (value !== undefined && transform(value)) {
     _cache[field][cid] = value;
     if (field === 'rubrics') _noteRubricsSet(cid);
+    if (field === 'assessments') _assessmentsRekeyed++; // an id changed in place: _assessmentInClass
     // A re-key from another tab: it wrote the shared copy already.
     if (dataKey && !_applyingRemoteRekey) wrote = _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
     if (!_applyingRemoteRekey) {
@@ -3393,9 +3395,7 @@ function _scoreEntryFromCanonical(
    as the piece's overall score, and filled no group-mates: that row has
    collab_mode and collab_config, not collaboration and groups. */
 function _assessmentById(cid, aid) {
-  var mine = (getAssessments(cid) || []).find(function (assessment) {
-    return assessment && assessment.id === aid;
-  });
+  var mine = _assessmentInClass(cid, aid); // shared/data-assessments.js: by an index kept with the list
   if (mine) return mine;
   var gb = _cache.v2Gradebook && _cache.v2Gradebook[cid];
   return (
@@ -4903,6 +4903,7 @@ function _loadCourseFromLS(cid) {
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
   _cache.rubricPrints[cid] = _safeParseLS('gb-rubric-prints-' + cid, {});
   delete _cache.gradeReturns[cid]; // read again when asked for (getGradeReturns)
+  delete _cache.gradeReturnsNone[cid];
   delete _serverStudentPage[cid]; // and the server's word on its student page (_serverSaysStudentPage)
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
@@ -6153,12 +6154,7 @@ function _noteRubricsSet(cid) {
    the list itself, so a rubric given to work in any way (the assessment
    form, a linked copy's edit, another tab, a load) is seen. */
 function _rubricKeySig(cid) {
-  var sig = String(_rubricsRev[cid] || 0);
-  (getAssessments(cid) || []).forEach(function (a) {
-    var rubricId = a && (a.rubricId || a.rubric_id);
-    if (rubricId && !isPointsScored(a)) sig += '|' + a.id + '=' + rubricId;
-  });
-  return sig;
+  return _rubricWorkSig(cid, _rubricsRev[cid] || 0); // shared/data-assessments.js: built only when they change
 }
 /* Rubric work whose criteria feed competencies: { assessmentId: criteria }
    and, per assessment, the competency ids an old entry would sit under. */
@@ -6954,14 +6950,29 @@ function _returnSettingsSaved(cid, was) {
 }
 
 /* A class's rows. A class with none saved has none: nothing is put in the
-   cache or in localStorage for it. */
+   cache or in localStorage for it. That this device holds none is kept
+   (gradeReturnsNone), so a class with its student page off, asked for each
+   cell, does not read localStorage each time. It holds until the class's
+   cache is dropped (every way rows come in on this page sets the cache
+   first) or another tab writes the rows. */
 function getGradeReturns(cid) {
   if (_cache.gradeReturns[cid] !== undefined) return _cache.gradeReturns[cid];
+  if (_cache.gradeReturnsNone[cid]) return {};
   var stored = _safeParseLS('gb-grade-returns-' + cid, null);
-  if (!_plainObject(stored)) return {};
+  if (!_plainObject(stored)) {
+    _cache.gradeReturnsNone[cid] = true;
+    return {};
+  }
   _cache.gradeReturns[cid] = stored;
   return stored;
 }
+// Another tab wrote a class's rows, or cleared this device's storage.
+function _gradeReturnsElsewhere(e) {
+  if (!e.key) _cache.gradeReturnsNone = {};
+  else if (e.key.indexOf('gb-grade-returns-') === 0) delete _cache.gradeReturnsNone[e.key.slice(17)];
+}
+if (typeof window !== 'undefined' && window.addEventListener)
+  window.addEventListener('storage', _gradeReturnsElsewhere);
 // One student's row on one assessment, or null.
 function getGradeReturn(cid, sid, aid) {
   return (getGradeReturns(cid)[aid] || {})[sid] || null;

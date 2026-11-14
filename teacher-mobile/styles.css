@@ -68,7 +68,10 @@ body.fv-switching-course::after {
 }
 
 /* ── Tab Bar (iOS style) ───────────────────────────────────── */
-/* The bar lies over the content, which scrolls under its blur. */
+/* The bar lies over the content. It is solid --surface, the colour its old
+   82% glass and 20px blur gave over the page: a blur on every scroll frame
+   cost old phones the most (speed, P8). The nav bar, the grader's strip
+   and the piece tabs below are solid the same way. */
 #m-tab-bar {
   position: absolute;
   left: 0;
@@ -913,6 +916,33 @@ body.fv-switching-course::after {
 }
 #m-obs-cards {
   overflow-x: clip;
+}
+/* Show More under the feed's newest observations (MObserve.showMore). */
+.m-obs-more-wrap {
+  padding: 8px 16px 0;
+  text-align: center;
+}
+.m-obs-more {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--link);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-more:active {
+  background: var(--active-light);
+}
+.m-obs-more-count {
+  padding-top: 6px;
+  font-size: 13px;
+  color: var(--text-3);
 }
 .m-obs-card {
   display: grid;
@@ -3807,6 +3837,16 @@ body.fv-switching-course::after {
     0 1px 4px rgba(0, 0, 0, 0.04);
   padding: 20px;
   margin: 8px;
+}
+/* A card away from the screen is not laid out or painted until it comes
+   near it, so opening the grader and a tap lay out a card, not the class.
+   On the surface, not the card: the card is the scroller, and keeps the
+   scroll a redraw or a tab switch gives it. A surface not drawn yet is
+   taken as tall, so that scroll is never cut short; once drawn it keeps its
+   own height (auto). */
+.m-swiper-card > .m-grade-card-surface {
+  content-visibility: auto;
+  contain-intrinsic-height: auto 5000px;
 }
 
 /* ═══════════════════════════════════════════════════════════════
