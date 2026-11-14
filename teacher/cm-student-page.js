@@ -732,9 +732,7 @@ var CmStudentPage = (function () {
       '<div class="sp-learning-panel">' +
       '<span id="sp-learning-would">' +
       esc(
-        'Students would see their level on each skill and their grade in this class’s grading style (' +
-          style +
-          "), only from work you've returned.",
+        'Students would see their grade in this class’s grading style (' + style + "), only from work you've returned.",
       ) +
       '</span> ' +
       '<button type="button" class="sp-link-btn" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +

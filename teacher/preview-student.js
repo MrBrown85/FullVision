@@ -258,7 +258,7 @@ window.PreviewStudent = (function () {
       device: 'phone',
       trigger: trigger || null,
       returnTo: returnFocusId || null,
-      // What the student looks at, as on the phone: the page opens on Assignments, To Do.
+      // What the student looks at, as on the phone: the page opens on Assignments, Outstanding.
       ui: opts && opts.tab ? { tab: opts.tab } : {},
       learning: !!(opts && opts.learning),
     };
