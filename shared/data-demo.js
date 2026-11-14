@@ -58,8 +58,7 @@ window.loadSeedIfNeeded = function () {
    the sample class is there, this turns on for it, through the same writers
    Class Settings uses: the Student Page switch, Return Grades set to When I
    Return Them, Send Work, Reflect on Feedback and Show My Learning. It does
-   this once; the key then reads 'on', so a visitor's own changes stick, and
-   Class Settings keeps offering the Student Page tab (cm-student-page.js).
+   this once; the key then reads 'on', so a visitor's own changes stick.
    Any other way into Demo Mode never sets the key and nothing changes. */
 var DEMO_STUDENT_KEY = 'gb-demo-student-page';
 var DEMO_STUDENT_CLASS = 'sci8';
@@ -85,19 +84,6 @@ function applyDemoStudentPage() {
     /* storage blocked: it applies again next load, harmlessly */
   }
   return true;
-}
-
-/* Whether this Demo Mode began at the front page's Try Demo Mode link, so
-   Class Settings offers the Student Page tab (cm-student-page.js asks here
-   rather than reading storage itself). */
-function demoShowsStudentPage() {
-  if (!_isDemoSession()) return false;
-  try {
-    var mark = localStorage.getItem(DEMO_STUDENT_KEY);
-    return mark === 'pending' || mark === 'on';
-  } catch (e) {
-    return false;
-  }
 }
 
 /* Reset Demo Data: every class goes back to the sample Science 8 class.

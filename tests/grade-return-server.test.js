@@ -596,14 +596,14 @@ describe('the device’s own stored value alone turns nothing on', () => {
     localStorage.setItem('gb-courseconfig-' + CID, JSON.stringify(cfg));
   };
 
-  it('reads off, shows no tab, keeps no row, and sends and reads nothing new', async () => {
+  it('reads off, shows the switch alone, keeps no row, and sends and reads nothing new', async () => {
     await openClass();
     onThisDeviceOnly();
     fake.calls.length = 0;
     expect(getCourseConfig(CID).student_page_enabled).toBe(true);
     expect(getReturnSettings(CID).student_page).toBe(false);
-    expect(CmStudentPage.isShown(CID)).toBe(false);
-    expect(CmStudentPage.render(CID)).toBe('');
+    expect(CmStudentPage.isShown(CID)).toBe(true);
+    expect(CmStudentPage.render(CID)).not.toContain('sp-card');
     level(NOOR, CAUSES, SIGNIFICANCE, 2);
     expect(state(NOOR, CAUSES)).toBe('returned');
     expect(getGradeReturns(CID)).toEqual({});

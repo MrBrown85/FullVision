@@ -1254,7 +1254,7 @@ describe('cm-student-page-my-learning', () => {
     it('a stray change where the row is not drawn saves nothing', () => {
       seed({});
       expect(CmStudentPage.learningSettings(CID)).toEqual({ offered: false, on: false });
-      expect(CmStudentPage.render(CID)).toBe('');
+      expect(CmStudentPage.render(CID)).not.toContain('sp-card');
       const at = {
         checked: true,
         dataset: { actionChange: 'spShowLearning' },
@@ -1267,13 +1267,12 @@ describe('cm-student-page-my-learning', () => {
   });
 
   describe('a signed-in teacher', () => {
-    it('with the build switch off, the class is unchanged: no tab, nothing saved, nothing sent', () => {
+    it('with the Student Page switch off, the class is unchanged: the switch alone, nothing saved, nothing sent', () => {
       window.isDemoMode = () => false;
       const session = signIn();
       try {
         seed({});
-        expect(CmStudentPage.isShown(CID)).toBe(false);
-        expect(CmStudentPage.render(CID)).toBe('');
+        expect(CmStudentPage.render(CID)).not.toContain('sp-card');
         expect(CmStudentPage.learningSettings(CID).offered).toBe(false);
         const at = {
           checked: true,
@@ -1747,7 +1746,7 @@ describe('cm-student-page-send-work', () => {
         send_work: false,
         keep_photos_until: 'end_of_year',
       });
-      expect(CmStudentPage.render(CID)).toBe('');
+      expect(CmStudentPage.render(CID)).not.toContain('sp-card');
       const before = localStorage.getItem('gb-student-work-' + CID);
       CmStudentPage.handleChange(at({ checked: false, dataset: { actionChange: 'spSendWork' } }));
       expect(localStorage.getItem('gb-student-work-' + CID)).toBe(before);
@@ -1849,7 +1848,7 @@ describe('cm-student-page-tab', () => {
   const OTHER = 'hum8';
   const SIX = ['details', 'students', 'questionnaires', 'grading', 'terms', 'competencies'];
 
-  describe('Class Settings: the hidden Student Page tab', () => {
+  describe('Class Settings: the Student Page tab', () => {
     var main;
     var urls;
     var original;
@@ -1916,14 +1915,21 @@ describe('cm-student-page-tab', () => {
       DashClassManager.resetState();
     });
 
-    describe('as shipped', () => {
-      it('the module shows the tab for no class and renders an empty panel', () => {
-        expect(CmStudentPage.isShown(CID)).toBe(false);
-        expect(CmStudentPage.isShown(undefined)).toBe(false);
-        expect(CmStudentPage.render(CID)).toBe('');
-        expect(CmStudentPage.handleAction('spAnything', { dataset: {} })).toBe(false);
-        expect(CmStudentPage.handleChange({ dataset: {} })).toBe(false);
-        expect(CmStudentPage.handleBlur({ dataset: {} })).toBe(false);
+    it('as shipped, the module shows the tab for every class, with the switch alone on it while it is off', () => {
+      expect(CmStudentPage.isShown(CID)).toBe(true);
+      expect(CmStudentPage.isShown(OTHER)).toBe(true);
+      expect(CmStudentPage.isShown('no-such-class')).toBe(false);
+      expect(CmStudentPage.isShown(undefined)).toBe(false);
+      expect(CmStudentPage.render(CID)).toContain('id="sp-build-switch"');
+      expect(CmStudentPage.render(CID)).not.toContain('sp-card');
+      expect(CmStudentPage.handleAction('spAnything', { dataset: {} })).toBe(false);
+      expect(CmStudentPage.handleChange({ dataset: {} })).toBe(false);
+      expect(CmStudentPage.handleBlur({ dataset: {} })).toBe(false);
+    });
+
+    describe('when its module hides it', () => {
+      beforeEach(() => {
+        CmStudentPage.isShown = () => false;
       });
 
       it('draws the six tabs and no Student Page button on any of them', () => {
@@ -2045,7 +2051,7 @@ describe('cm-student-page-tab', () => {
       it('a remembered Student Page tab opens Details once the tab is hidden again', () => {
         showFor(CID);
         DashClassManager.openClassManager('student-page');
-        CmStudentPage.isShown = original.isShown;
+        CmStudentPage.isShown = () => false;
         DashClassManager.renderClassManager();
         expect(tabIds()).toEqual(SIX);
         expect(activeTab()).toBe('details');
