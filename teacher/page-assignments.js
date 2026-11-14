@@ -12563,7 +12563,7 @@ window.PageAssignments = (function () {
       show: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
       // The student's work beside the scoring (S6-F1): its page, the fit,
       // each page's turn, and Focus on Work.
-      work: { page: 0, fit: 'page', turns: {}, focus: false },
+      work: { page: 0, fit: _workFitSaved(), turns: {}, focus: false, pics: {} },
       // A reflection's answer being written, by reflection (S10-F3), the
       // one being sent, and a line about it.
       reflectDrafts: {},
@@ -12577,12 +12577,16 @@ window.PageAssignments = (function () {
       // Grade From Paper's Set Logan To menu (S6-F2): a grid row's fill options.
       var fill = e.target.closest('.grader-setto-menu [data-action="graderSetTo"]');
       if (fill) return _graderWorkAction('work-setto', fill);
+      // Side by Side: a click on a page shows it full width, scrolled to it.
+      var tile = e.target.closest('.grader-work-pages.fit-all .grader-work-page');
+      if (tile) return _graderWorkEnlarge(tile);
       var btn = e.target.closest('[data-grader]');
       if (!btn) return;
       var what = btn.dataset.grader;
       if (what === 'close') closeGrader();
       else if (what === 'next' || what === 'prev') stepFocusStudent(what === 'next' ? 1 : -1);
       else if (what === 'return') _graderReturn();
+      else if (what === 'return-next') _graderReturnNext();
       else if (what === 'show') _graderSetShow(btn.dataset.show);
       else if (what === 'returnAll') _graderReturnAll(btn);
       else if (what.indexOf('work-') === 0) _graderWorkAction(what, btn);
@@ -12658,6 +12662,15 @@ window.PageAssignments = (function () {
      puts back the saved points (_graderCardKey); a second Escape closes. */
   function _graderKeydown(e) {
     if (!_grader || e.defaultPrevented) return;
+    // ⌘/Ctrl+Enter: Return & Next, from anywhere in the dialog, a comment box too.
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      var rn = _grader.overlay.querySelector('[data-grader="return-next"]:not(:disabled)');
+      if (rn && !_critCommentState && !_commentPopoverState) {
+        e.preventDefault();
+        _graderReturnNext();
+        return;
+      }
+    }
     if (_graderCardKey(e)) return;
     if (e.key !== 'Escape') return;
     var t = e.target;
@@ -12864,15 +12877,18 @@ window.PageAssignments = (function () {
       '<div class="grader-separate-line" hidden></div>' +
       '<section class="grader-members" aria-labelledby="grader-members-title" hidden></section>' +
       '<div class="grader-body"></div>' +
-      '<section class="grader-report-note" aria-labelledby="grader-report-note-title">' +
-      '<div class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
-      '<p>Optional. One line about what the student did, written about them, not to them.</p></div>' +
+      // Closed unless a note is written (Colin, Nov 13: teachers were
+      // confused by the open box). One quiet line until it is opened.
+      '<details class="grader-report-note">' +
+      '<summary class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
+      '<span class="grader-report-note-opt">Optional</span></summary>' +
       '<div class="grader-report-note-body">' +
+      '<p class="grader-report-note-what">One line about what the student did, written about them, not to them. Report comments use it.</p>' +
       '<input type="text" class="grader-report-note-input" aria-label="Note for the report" ' +
       'aria-describedby="grader-report-note-preview" maxlength="300" autocomplete="off">' +
       '<p class="grader-report-note-preview" id="grader-report-note-preview"></p>' +
       '</div>' +
-      '</section>'
+      '</details>'
     );
   }
 
@@ -13914,7 +13930,13 @@ window.PageAssignments = (function () {
     var area = GraderWork.returnArea(cid, a, sid, _graderReturnIds(sid, view), { marks: true, revisions: true });
     if (!area) return '';
     // The page's own view says where a revision stands; its buttons are the dialog's.
-    return _graderReturnOwnHtml(cid, a, sid, view, act, area) + _graderRevisionReturnHtml(cid, a, sid, area, !attrs);
+    var own = _graderReturnOwnHtml(cid, a, sid, view, act, area);
+    // In the dialog, Return & Next beside Return (Colin's review council, Nov 13):
+    // where the eye is after the last level, one click or ⌘/Ctrl+Enter.
+    if (!attrs && own.indexOf('class="grader-return-btn" data-grader="return">') >= 0)
+      own +=
+        '<button type="button" class="grader-return-next" data-grader="return-next" title="Return, then the next student (Ctrl+Enter or ⌘+Enter)">Return &amp; Next ›</button>';
+    return own + _graderRevisionReturnHtml(cid, a, sid, area, !attrs);
   }
 
   // html-safe: fixed labels; the name and the date go through esc; `act` is the caller's
@@ -13963,9 +13985,10 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* The row is made only when there is something to say, between the
-     scrolling part of the dialog and its footer, so Return is in view
-     however long the grading is. It is redrawn only when it changes: a
+  /* The row is made only when there is something to say, in the footer
+     with the grade (Colin's review council, Nov 13: Return where the eye is
+     after the last level, beside the grade it returns), so Return is in
+     view however long the grading is. It is redrawn only when it changes: a
      button swapped out under the mouse loses its click. */
   function _refreshGraderReturn(dialog, cid, a, sid, view) {
     var html = _graderReturnHtml(cid, a, sid, view);
@@ -13980,8 +14003,7 @@ window.PageAssignments = (function () {
     if (!box) {
       box = document.createElement('div');
       box.className = 'grader-return';
-      dialog.querySelector('.grader-foot').insertAdjacentElement('beforebegin', box);
-      // The level-wording bar sits above the row, not over it.
+      dialog.querySelector('.grader-foot').appendChild(box);
       dialog.classList.add('has-return');
       _grader.returnHtml = null;
     }
@@ -14003,6 +14025,16 @@ window.PageAssignments = (function () {
     // The button is gone: the dialog keeps the keys.
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     if (dialog && !_grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
+  }
+
+  // Return & Next: the grade on screen goes back, then the next student opens.
+  function _graderReturnNext() {
+    if (!_grader || !focusStudentId) return;
+    // A comment being typed is saved first (its change event).
+    var t = document.activeElement;
+    if (t && _grader.overlay.contains(t) && typeof t.blur === 'function') t.blur();
+    _graderReturn();
+    stepFocusStudent(1);
   }
 
   /* ── What is waiting to return (S1-F2) ────────────────────
@@ -14516,7 +14548,9 @@ window.PageAssignments = (function () {
     if (!box) {
       box = document.createElement('div');
       box.className = 'grader-show';
-      dialog.querySelector('.grader-toolbar').insertAdjacentElement('afterend', box);
+      var slot = dialog.querySelector('.grader-show-slot');
+      if (slot) slot.appendChild(box);
+      else dialog.querySelector('.grader-toolbar').insertAdjacentElement('afterend', box);
       _grader.showHtml = null;
     }
     var html = _graderShowHtml(cid, a, counts);
@@ -14597,9 +14631,10 @@ window.PageAssignments = (function () {
        · 2 photos", "Not In · 7 days late"), "Same photo as Mia K." when a
        page is byte for byte another student's, and a strip of the students
        whose work waits;
-     - the page, with ‹ 1 of 2 ›, Whole Page and Fit Width, Rotate (the
-       view only: nothing saved), Focus on Work, the student's note and
-       Delete Work;
+     - every page the student sent, one under the other, each with its
+       own bar (its number, Rotate, the view only, and Mark Up); over them
+       Whole Page and Fit Width and Focus on Work; under them the
+       student's note and Delete Work;
      - with nothing in: Add Work (Choose Files, shrunk as a student's are,
        shared/photo-shrink.js) and Grade From Paper's Set Logan To.
      Focus on Work gives the page the room and narrows the scoring to a
@@ -14615,10 +14650,18 @@ window.PageAssignments = (function () {
   // html-safe: the parts' fixed markup
   function _graderWorkShellHtml() {
     return (
-      _graderToolbarHtml() +
+      // The Show bar sits in the top bar here, beside Print Rubrics, not in a row of its own.
+      _graderToolbarHtml().replace(
+        '<div class="grader-toolbar-start"></div>',
+        '<div class="grader-toolbar-lead"><div class="grader-toolbar-start"></div><div class="grader-show-slot"></div></div>',
+      ) +
       '<div class="grader-scroll grader-scroll-work">' +
-      _graderHeadHtml() +
-      '<div class="grader-work-line"></div>' +
+      // One row over the work and the scoring (Colin, Nov 13): the name,
+      // when the work came in, how the pages show, and the status.
+      _graderHeadHtml().replace(
+        '<span class="grader-spacer"></span>',
+        '<div class="grader-work-line"></div><div class="grader-work-view"></div><span class="grader-spacer"></span>',
+      ) +
       '<div class="grader-split">' +
       '<section class="grader-work" aria-label="Student work"></section>' +
       '<div class="grader-panel-col">' +
@@ -14639,6 +14682,7 @@ window.PageAssignments = (function () {
       'showHtml',
       'workHtml',
       'workLineHtml',
+      'workToolsHtml',
       'reflectHtml',
       'revisionHtml',
     ].forEach(function (k) {
@@ -14650,11 +14694,11 @@ window.PageAssignments = (function () {
   // A photo's address holds its bytes until it is let go (openStudentWorkPage).
   function _graderReleasePage(g) {
     if (!g || !g.work) return;
-    if (g.work.release) g.work.release();
-    g.work.release = null;
-    g.work.imgKey = null;
-    g.work.url = null;
-    g.work.shownKey = null;
+    var pics = g.work.pics || {};
+    g.work.pics = {};
+    Object.keys(pics).forEach(function (key) {
+      if (pics[key].release) pics[key].release();
+    });
   }
 
   function _workStudent(cid, sid) {
@@ -14924,77 +14968,136 @@ window.PageAssignments = (function () {
     return _formWorkDemo() || (typeof studentWorkLive === 'function' && studentWorkLive(cid));
   }
 
-  /* The pane for `st`: their pages, or Add Work when nothing is in. */
-  // html-safe: names and the note go through esc; ids are ours; labels are fixed words
-  function _workPaneHtml(cid, a, st, view) {
+  /* All Pages: the columns and rows that show `n` pages at once, as large
+     as a portrait page can be in a pane about as tall as it is wide: side
+     by side up to three, then two or three rows (four at most across). */
+  function _workGrid(n) {
+    var cols = n <= 3 ? n : n === 4 ? 2 : n <= 6 ? 3 : 4;
+    return { cols: Math.max(1, cols), rows: Math.min(3, Math.ceil(n / Math.max(1, cols))) };
+  }
+
+  /* How the pages are shown, in the student row beside the name (Colin,
+     Nov 13: fewer rows of buttons over the page): New and First while a
+     revision is in, All Pages, Whole Page and Fit Width, and Focus on
+     Work. '' with no pages. */
+  // html-safe: fixed labels; the versions' dates go through esc
+  // `sub` and `versions` are worked out once a draw, in _drawGraderWork.
+  function _workToolsHtml(sub, versions) {
     var w = _grader.work;
-    var versions = view ? '' : _workVersionsHtml(cid, a, st.id);
-    // The first version is for looking at: Mark Up and Delete Work are the new one's.
-    var onFirst = !!versions && w.version === 'first';
-    var sub = _workPaneSubOf(cid, st.id, a.id);
-    var first = view ? view.label : displayNameFirst(st);
     var files = (sub && sub.files) || [];
-    if (!sub) return _addWorkHtml(cid, a, st, first);
-    if (!files.length)
-      return '<div class="grader-work-empty"><p>Handed in on paper. Grade it from the paper.</p></div>';
-    var at = Math.min(Math.max(w.page, 0), files.length - 1);
-    var file = files[at];
-    var turn = w.turns[file.id] || 0;
-    var html =
-      '<div class="grader-work-tools">' +
+    if (!files.length) return '';
+    var fit = _workFit(w, files.length);
+    return (
       versions +
-      '<span class="grader-work-pager">' +
-      '<button type="button" class="grader-work-step" data-grader="work-page" data-dir="-1" aria-label="Previous page"' +
-      (at > 0 ? '' : ' disabled') +
-      '>‹</button>' +
-      '<span class="grader-work-at">' +
-      (at + 1) +
-      ' of ' +
-      files.length +
-      '</span>' +
-      '<button type="button" class="grader-work-step" data-grader="work-page" data-dir="1" aria-label="Next page"' +
-      (at < files.length - 1 ? '' : ' disabled') +
-      '>›</button></span>' +
-      '<div class="seg seg-sm grader-work-fit" role="group" aria-label="Fit">' +
-      ['page', 'width']
-        .map(function (fit) {
+      '<div class="seg seg-sm grader-work-fit" role="group" aria-label="Show">' +
+      // Two choices (the review council, Nov 13: three read alike): every
+      // page side by side, or each page the column's full width, one under
+      // the other. One page: the whole page, or full width.
+      (files.length > 1 ? ['all', 'width'] : ['page', 'width'])
+        .map(function (f) {
           return (
             '<button type="button" class="seg-btn"' +
-            segAttr(w.fit === fit) +
+            segAttr(fit === f) +
             ' data-grader="work-fit" data-fit="' +
-            fit +
+            f +
             '">' +
-            (fit === 'page' ? 'Whole Page' : 'Fit Width') +
+            (f === 'all' ? 'Side by Side' : f === 'page' ? 'Whole Page' : 'Full Width') +
             '</button>'
           );
         })
         .join('') +
       '</div>' +
-      '<button type="button" class="grader-work-tool" data-grader="work-rotate" aria-label="Rotate" title="Rotate">' +
-      _WORK_ROTATE_ICON +
-      '</button>' +
-      '<span class="grader-spacer"></span>' +
-      // Mark Up (S9-F1): writes on this page, in teacher/markup.js.
-      (window.MarkUp && !onFirst && _markUpHere(cid)
-        ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup">Mark Up</button>'
-        : '') +
       '<button type="button" class="grader-work-tool grader-work-focus" data-grader="work-focus" aria-pressed="' +
       !!w.focus +
-      '">Focus on Work</button>' +
-      '</div>' +
-      '<div class="grader-work-page fit-' +
-      (w.fit === 'width' ? 'width' : 'page') +
-      ' turn-' +
-      turn +
-      // The page's surface (S9-T1): the picture, and whatever is drawn over
-      // it later (Mark Up), turn and fit together inside it.
-      '"><div class="grader-work-surface" data-file-id="' +
-      esc(file.id) +
-      '" data-page="' +
-      (at + 1) +
-      '"><img class="grader-work-img" alt="' +
-      esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
-      '"></div></div>';
+      '">Focus on Work</button>'
+    );
+  }
+
+  // Side by Side (every page in view at once) or Full Width; one page shows whole or full width.
+  function _workFit(w, n) {
+    if (w.fit === 'width') return 'width';
+    return n > 1 ? 'all' : 'page';
+  }
+
+  // The teacher's choice of Side by Side or Full Width, kept on this device for the next dialog.
+  var _WORK_FIT_KEY = 'fv-grader-work-fit';
+  function _workFitSaved() {
+    try {
+      return localStorage.getItem(_WORK_FIT_KEY) === 'width' ? 'width' : 'all';
+    } catch (e) {
+      return 'all';
+    }
+  }
+
+  /* The pane for `st`: their pages, or Add Work when nothing is in. */
+  // html-safe: names and the note go through esc; ids are ours; labels are fixed words
+  function _workPaneHtml(cid, a, st, view, sub, versions) {
+    var w = _grader.work;
+    // The first version is for looking at: Mark Up and Delete Work are the new one's.
+    var onFirst = !!versions && w.version === 'first';
+    var first = view ? view.label : displayNameFirst(st);
+    var files = (sub && sub.files) || [];
+    if (!sub) return _addWorkHtml(cid, a, st, first);
+    if (!files.length)
+      return '<div class="grader-work-empty"><p>Handed in on paper. Grade it from the paper.</p></div>';
+    var fit = _workFit(w, files.length);
+    var grid = _workGrid(files.length);
+    var markUp = !!(window.MarkUp && !onFirst && _markUpHere(cid));
+    var html =
+      // Every page the student sent at once (Colin, Nov 13: "I shouldn't
+      // have to switch pages"). On each page's corner: its number, Rotate
+      // (the view only) and Mark Up (S9-F1, teacher/markup.js).
+      '<div class="grader-work-pages fit-' +
+      fit +
+      (fit === 'all' ? ' cols-' + grid.cols + ' rows-' + grid.rows : '') +
+      '">' +
+      files
+        .map(function (file, at) {
+          var turn = w.turns[file.id] || 0;
+          var what = 'Page ' + (at + 1) + ' of ' + files.length;
+          var size =
+            file.width > 0 && file.height > 0
+              ? ' width="' + Math.round(file.width) + '" height="' + Math.round(file.height) + '"'
+              : '';
+          return (
+            '<section class="grader-work-sheet" aria-label="' +
+            esc(what) +
+            '"><div class="grader-work-corner"><span class="grader-work-at">' +
+            esc(what) +
+            '</span><span class="grader-spacer"></span>' +
+            '<button type="button" class="grader-work-tool grader-work-rotate" data-grader="work-rotate" data-at="' +
+            at +
+            '" aria-label="' +
+            esc('Rotate ' + what) +
+            '" title="Rotate">' +
+            _WORK_ROTATE_ICON +
+            '</button>' +
+            (markUp
+              ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup" data-at="' +
+                at +
+                '">Mark Up</button>'
+              : '') +
+            '</div>' +
+            '<div class="grader-work-page fit-' +
+            fit +
+            ' turn-' +
+            turn +
+            (fit === 'all' ? '" title="Click to see this page full width' : '') +
+            // The page's surface (S9-T1): the picture, and whatever is drawn
+            // over it (Mark Up), turn and fit together inside it.
+            '"><div class="grader-work-surface" data-file-id="' +
+            esc(file.id) +
+            '" data-page="' +
+            (at + 1) +
+            '"><img class="grader-work-img" alt="' +
+            esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
+            '"' +
+            size +
+            '></div></div></section>'
+          );
+        })
+        .join('') +
+      '</div>';
     // A revision's note is on its Revision card (S11-F3).
     if (sub.note && !(versions && !onFirst)) {
       var noteBy = sub.group ? _workStudent(cid, sub.noteBy) : null;
@@ -15057,66 +15160,90 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* The pane, drawn only when it changes; the page's picture is fetched
-     when the page shown changes, and the last one let go. */
+  /* The pane, drawn only when it changes; every page's picture is fetched
+     once, and let go when its page is no longer shown. Where the pages had
+     been scrolled to is kept when the pane is drawn again. */
   function _drawGraderWork(dialog, cid, a, st, view) {
     var pane = dialog.querySelector('.grader-work');
     if (!pane) return;
-    var html = _workPaneHtml(cid, a, st, view);
+    // The submission and its versions, read once for the whole draw.
+    var sub = _workPaneSubOf(cid, st.id, a.id);
+    var versions = view ? '' : _workVersionsHtml(cid, a, st.id);
+    var tools = dialog.querySelector('.grader-work-view');
+    var toolsHtml = _workToolsHtml(sub, versions);
+    if (tools && _grader.workToolsHtml !== toolsHtml) {
+      _grader.workToolsHtml = toolsHtml;
+      // html-safe: built by _workToolsHtml
+      tools.innerHTML = toolsHtml;
+    }
+    var html = _workPaneHtml(cid, a, st, view, sub, versions);
     if (_grader.workHtml !== html) {
       _grader.workHtml = html;
+      var was = pane.querySelector('.grader-work-pages');
+      var top = was ? was.scrollTop : 0;
       // html-safe: built by _workPaneHtml
       pane.innerHTML = html;
-      _grader.work.shownKey = null;
+      var now = pane.querySelector('.grader-work-pages');
+      if (now && top) now.scrollTop = top;
     }
-    var img = pane.querySelector('.grader-work-img');
-    var sub = _workPaneSubOf(cid, st.id, a.id);
     var files = (sub && sub.files) || [];
-    var file = files[Math.min(Math.max(_grader.work.page, 0), files.length - 1)];
-    if (!img || !file) return _graderReleasePage(_grader);
-    _drawGraderMarks(pane, cid, file);
-    var key = [cid, a.id, st.id, file.id, file.path].join('|');
-    if (_grader.work.imgKey === key) {
-      // The pane was drawn again: the picture already fetched goes back in.
-      if (_grader.work.url && _grader.work.shownKey !== key) {
-        img.src = _grader.work.url;
-        _grader.work.shownKey = key;
-      }
-      return;
-    }
-    _graderReleasePage(_grader);
-    _grader.work.imgKey = key;
+    var surfaces = pane.querySelectorAll('.grader-work-surface');
+    if (!surfaces.length || !files.length) return _graderReleasePage(_grader);
+    var w = _grader.work;
+    if (!w.pics) w.pics = {};
     var g = _grader;
-    openStudentWorkPage(cid, file, 'page').then(function (res) {
-      // The dialog moved on (another student, page or piece, or closed).
-      if (_grader !== g || g.work.imgKey !== key) {
-        if (res) res.release();
+    var keep = {};
+    Array.prototype.forEach.call(surfaces, function (surface) {
+      var file = files.find(function (f) {
+        return f && String(f.id) === surface.dataset.fileId;
+      });
+      var img = surface.querySelector('.grader-work-img');
+      if (!file || !img) return;
+      _drawGraderMarks(surface, cid, file);
+      var key = [cid, a.id, st.id, file.id, file.path].join('|');
+      keep[key] = true;
+      var pic = w.pics[key];
+      if (pic) {
+        // The pane was drawn again: a picture already fetched goes back in.
+        if (pic.url && img.getAttribute('src') !== pic.url) img.src = pic.url;
         return;
       }
-      if (!res) return;
-      g.work.release = res.release;
-      g.work.url = res.url;
-      var now = g.overlay.querySelector('.grader-work-img');
-      if (now) {
-        now.src = res.url;
-        g.work.shownKey = key;
-      }
+      pic = w.pics[key] = { url: null, release: null };
+      openStudentWorkPage(cid, file, 'page').then(function (res) {
+        // The dialog moved on (another student, version or piece, or closed).
+        if (_grader !== g || g.work.pics[key] !== pic) {
+          if (res) res.release();
+          return;
+        }
+        if (!res) return;
+        pic.url = res.url;
+        pic.release = res.release;
+        Array.prototype.forEach.call(g.overlay.querySelectorAll('.grader-work-surface'), function (el) {
+          var shown = el.dataset.fileId === String(file.id) && el.querySelector('.grader-work-img');
+          if (shown) shown.src = res.url;
+        });
+      });
+    });
+    // Pictures of pages no longer shown are let go.
+    Object.keys(w.pics).forEach(function (key) {
+      if (keep[key]) return;
+      if (w.pics[key].release) w.pics[key].release();
+      delete w.pics[key];
     });
   }
 
-  /* The teacher's marks on the page shown (S9-F1), over the picture on
-     its surface: the working copy, what Return gives the student. Drawn
+  /* The teacher's marks on a page (S9-F1), over the picture on its
+     surface: the working copy, what Return gives the student. Drawn
      again only when the marks or the page's shape change; the shape is the
      picture's, once it has loaded. */
-  function _drawGraderMarks(pane, cid, file) {
-    var surface = pane.querySelector('.grader-work-surface');
+  function _drawGraderMarks(surface, cid, file) {
     var img = surface && surface.querySelector('.grader-work-img');
     if (!surface || !img || !window.MarkupDraw) return;
     if (!img._markupLoad) {
       img._markupLoad = true;
       var g = _grader;
       img.addEventListener('load', function () {
-        if (_grader === g && img.isConnected) _drawGraderMarks(pane, cid, file);
+        if (_grader === g && img.isConnected) _drawGraderMarks(surface, cid, file);
       });
     }
     var row = typeof getPageMarkup === 'function' ? getPageMarkup(cid, file.id) : null;
@@ -15138,7 +15265,10 @@ window.PageAssignments = (function () {
      absolute and inset: 0 lies exactly on the page. */
   function workSurface() {
     if (!_grader || !_grader.workShell) return null;
-    var el = _grader.overlay.querySelector('.grader-work-surface');
+    // The page last acted on (Rotate or Mark Up on its bar), else the first.
+    var el =
+      _grader.overlay.querySelector('.grader-work-surface[data-page="' + (_grader.work.page + 1) + '"]') ||
+      _grader.overlay.querySelector('.grader-work-surface');
     if (!el) return null;
     var a = _assessmentById(activeCourse, _grader.aid);
     var sub = a && _workPaneSubOf(activeCourse, focusStudentId, a.id);
@@ -15188,11 +15318,16 @@ window.PageAssignments = (function () {
     if (!a || !sid) return;
     var w = _grader.work;
     var again = null;
-    if (what === 'work-page') {
-      w.page = Math.max(0, w.page + (parseInt(btn.dataset.dir, 10) || 0));
-      again = '[data-grader="work-page"][data-dir="' + btn.dataset.dir + '"]';
-    } else if (what === 'work-fit') {
-      w.fit = btn.dataset.fit === 'width' ? 'width' : 'page';
+    // The page a page's own button acts on (its bar's data-at).
+    var at = parseInt(btn.dataset.at, 10);
+    if (at >= 0) w.page = at;
+    if (what === 'work-fit') {
+      w.fit = btn.dataset.fit === 'width' ? 'width' : 'all';
+      try {
+        localStorage.setItem(_WORK_FIT_KEY, w.fit);
+      } catch (e) {
+        /* the choice lasts this dialog only */
+      }
       again = '[data-grader="work-fit"][data-fit="' + w.fit + '"]';
     } else if (what === 'work-version') {
       // New or First (S11-F3): the chosen version opens on its first page.
@@ -15204,7 +15339,7 @@ window.PageAssignments = (function () {
       var sub = _workPaneSubOf(cid, sid, a.id);
       var file = sub && (sub.files || [])[w.page];
       if (file) w.turns[file.id] = ((w.turns[file.id] || 0) + 90) % 360;
-      again = '[data-grader="work-rotate"]';
+      again = '[data-grader="work-rotate"][data-at="' + w.page + '"]';
     } else if (what === 'work-focus') {
       w.focus = !w.focus;
       // The page fills the width it is given, as the board draws it.
@@ -15231,6 +15366,19 @@ window.PageAssignments = (function () {
     if (to && !to.disabled) to.focus({ preventScroll: true });
   }
 
+  /* A page clicked in Side by Side: every page full width, this one at the
+     top of the column. Not kept as the teacher's choice. */
+  function _graderWorkEnlarge(tile) {
+    var surface = tile.querySelector('.grader-work-surface');
+    var at = surface ? parseInt(surface.dataset.page, 10) - 1 : 0;
+    _grader.work.fit = 'width';
+    _grader.work.page = Math.max(0, at);
+    render();
+    var pages = _grader && _grader.overlay.querySelector('.grader-work-pages');
+    var sheet = pages && pages.querySelectorAll('.grader-work-sheet')[_grader.work.page];
+    if (sheet) pages.scrollTop = sheet.offsetTop - pages.offsetTop;
+  }
+
   /* Mark Up (S9-F1), on the page the pane shows. Done comes back here with
      the marks drawn over the page and the Return row up to date. */
   function _graderOpenMarkUp(cid, a, sid) {
@@ -15245,7 +15393,7 @@ window.PageAssignments = (function () {
       onClose: function () {
         if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
         render();
-        var b = g.overlay.querySelector('[data-grader="work-markup"]');
+        var b = g.overlay.querySelector('[data-grader="work-markup"][data-at="' + w.page + '"]');
         if (b) b.focus({ preventScroll: true });
       },
     });
@@ -16110,6 +16258,8 @@ window.PageAssignments = (function () {
       input.dataset.sid = sid;
       input.dataset.aid = a.id;
       input.value = getScoreReportNote(cid, sid, a.id);
+      // Open where a note is written; closed for the next student otherwise.
+      card.open = !!String(input.value || '').trim();
     }
     var scored = (getScores(cid)[sid] || []).some(function (e) {
       return e && e.assessmentId === a.id;

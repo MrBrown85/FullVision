@@ -433,13 +433,16 @@ describe('the grader card', () => {
   const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
   const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
 
-  it('sits under the grading with the mockup’s wording', () => {
+  it('sits under the grading, one quiet line until opened (Colin, Nov 13)', () => {
     const at = src.indexOf('<div class="grader-body"></div>');
-    const card = src.indexOf('<section class="grader-report-note"');
+    const card = src.indexOf('<details class="grader-report-note">');
     expect(at).toBeGreaterThan(0);
     expect(card).toBeGreaterThan(at);
     expect(src).toContain('Note for the Report</h2>');
-    expect(src).toContain('Optional. One line about what the student did, written about them, not to them.');
+    expect(src).toContain('<span class="grader-report-note-opt">Optional</span></summary>');
+    expect(src).toContain('One line about what the student did, written about them, not to them.');
+    // Open where a note is written; closed for the next student otherwise.
+    expect(src).toContain("card.open = !!String(input.value || '').trim();");
     expect(src).toContain('aria-label="Note for the report"');
     expect(src).toContain('When this is the student\\u2019s best piece, the comment reads: \\u201C');
     expect(src).toContain(

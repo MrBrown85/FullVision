@@ -103,10 +103,9 @@ afterEach(() => {
 });
 
 describe('opening Mark Up', () => {
-  it('opens from the work pane on the page shown, named as the board names it', async () => {
+  it('opens from a page’s own Mark Up, on that page, named as the board names it', async () => {
     const overlay = openGrader(seed, CID, PIECE, ANA);
-    click(overlay.querySelector('[data-grader="work-page"][data-dir="1"]'));
-    click(overlay.querySelector('[data-grader="work-markup"]'));
+    click(overlay.querySelector('[data-grader="work-markup"][data-at="1"]'));
     await settle();
     expect(mk().getAttribute('role')).toBe('dialog');
     expect(mk().querySelector('.markup-title').textContent).toBe('Mark Up');
