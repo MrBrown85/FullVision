@@ -49,7 +49,7 @@ data grows.
 | D6  | Conflict detection (version-checked saves) | Later, separate project. Until then, editing is locked while the version check runs                                                                    |
 | D7  | Timing                                     | `performance` marks plus a `window.__fvPerf` buffer, logged when `localStorage['fv-perf'] === '1'`. Sentry tracing stays off (`tracesSampleRate` is 0) |
 | D8  | Supabase plan                              | Stay on Free for now. Open risks: the project pauses after 7 idle days (a summer break would trigger it), and there are no backups                     |
-| D9  | Boot                                       | Cached class list renders after `requireAuth`, never before                                                                                            |
+| D9  | Boot                                       | ~~Cached class list renders after `requireAuth`, never before.~~ Changed by Colin on 2026-11-13: see "Start-up order" below                            |
 
 **No TanStack Query.** It would keep its own copy of server data next to
 `_cache`/`_serverState`, giving two sources of truth. It has no build that
@@ -266,6 +266,52 @@ after the scores.
    - Never remove anything while the outbox has entries; the outbox shares the
      5 MB quota.
 7. **Kill switch:** `FV_CACHE_FIRST`.
+
+## Start-up order (D9 changed, 2026-11-13)
+
+D9 said the saved class list is never drawn before `requireAuth` (the
+`getUser()` sign-in re-check) has answered. Colin changed it on 2026-11-13,
+after consulting the council, ruling on decision 23 of
+`plans/handoff-review-plan.md`. The ruling and its conditions are in
+`DECISIONS.md`, "Start-up draws the saved class list first".
+
+**Before.** On a repeat visit three requests ran one after another before
+anything drew: `getUser()`, `bootstrap_teacher`, `list_teacher_courses`. The
+class then drew from its saved copy (Phase 4).
+
+**Now, on the desktop, with this teacher's class list saved on the device:**
+
+1. `Router.boot()` asks the re-check (`requireAuth()`) and does not wait for
+   it. `requireAuth` reads the saved session (`getSession()`, no request
+   unless the token has run out), then asks `getUser()`.
+2. `initAllCourses` reads the saved session too. If the device's saved class
+   list belongs to that user (`gb-owner`), the browser is online and
+   `FV_CACHE_FIRST` is on, it asks `bootstrap_teacher` and
+   `list_teacher_courses` together, beside the re-check, and returns with
+   the saved list.
+3. `initData` opens the last class open on this device from its saved copy
+   and asks the class's own check (`get_class_bundle` with the saved
+   version), as in Phase 4.
+4. The page is drawn, locked. Until the re-check has answered, nothing is
+   sent (the outbox is paused, a write waits) and no server answer is handed
+   to the page.
+5. The re-check passes: what waited is sent, the server's class list is
+   taken, and the page is drawn again only if the list or the teacher's
+   settings differ from what was drawn. The class on screen stays open. The
+   page unlocks once the class's own check has answered too.
+6. The re-check fails, or names another user: the saved class data is
+   removed, the page is hidden, and the browser goes to Sign In. No server
+   answer was shown and nothing was written.
+
+**Unchanged.** With no class list saved for this teacher (a new teacher, a
+new device, another teacher's data on the device, the kill switch off), and
+offline, nothing is read or asked until the re-check has answered, then
+`bootstrap_teacher` and `list_teacher_courses` are asked, now together. The
+phone has no re-check and starts as before, with the same two requests asked
+together.
+
+**Tests:** `tests/boot-saved-list-first.test.js`,
+`tests/session-hardening.test.js`.
 
 ## Phase 5: Realtime by version
 
