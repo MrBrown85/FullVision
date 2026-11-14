@@ -57,7 +57,10 @@ export function signIn() {
 /* A class in the cache and in localStorage, as a loaded class is. Fields
    left out start empty. It also tells data.js the server holds these
    scores and statuses, as a load does (_persistLoadedField), so a later
-   whole-list save sends only what changed.
+   whole-list save sends only what changed, and that the saved text of the
+   scores and statuses is this tab's own copy (_keepText), as a load does:
+   a score click then runs the Draft and Returned rule as it does for a
+   teacher, on the cell it changed.
 
    And it tells data.js the class is loaded (_classLoads), as a load does.
    teacher/router.js, which tests/setup.js loads, starts loading the
@@ -82,7 +85,10 @@ export function seedClass(cid, data) {
   Object.keys(fields).forEach(field => {
     _cache[field][cid] = structuredClone(fields[field]);
     const dataKey = _DATA_KEYS[field];
-    if (dataKey) localStorage.setItem('gb-' + dataKey + '-' + cid, JSON.stringify(fields[field]));
+    if (!dataKey) return;
+    const text = JSON.stringify(fields[field]);
+    localStorage.setItem('gb-' + dataKey + '-' + cid, text);
+    _keepText('gb-' + dataKey + '-' + cid, text);
   });
   _rememberServerState('scores', cid, fields.scores);
   _rememberServerState('statuses', cid, fields.statuses);

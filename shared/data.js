@@ -1957,11 +1957,20 @@ function _forgetServerState(cid) {
    from it too. The save guard still reads the saved copy. Forgotten with
    the baseline. In memory only. */
 var _keptText = {}; // 'gb-scores-<cid>' or 'gb-statuses-<cid>' → text
+/* 'gb-scores-<cid>' → true while this tab's memory of a class's scores may
+   hold a change its kept text does not: a whole-list save has started, a
+   group copy has changed memory before its save, a write to storage
+   failed, or old rubric keys were moved. It goes when a text is next kept.
+   While it is set the Draft and Returned rule compares the whole class with
+   the saved copy (_gradeBefore). In memory only. */
+var _scoresApart = {};
 
 function _keepText(key, text) {
   if (key.indexOf('gb-scores-') !== 0 && key.indexOf('gb-statuses-') !== 0) return;
-  if (typeof text === 'string') _keptText[key] = text;
-  else delete _keptText[key];
+  if (typeof text === 'string') {
+    _keptText[key] = text;
+    delete _scoresApart[key];
+  } else delete _keptText[key];
 }
 
 // The kept text read back, or `fallback` when nothing was kept or it can't
@@ -2557,7 +2566,8 @@ function _rekeyField(field, cid, transform) {
   // This tab's own copy gets the change the baseline gets, unless the
   // write above just kept the new text.
   var kept = dataKey && !wrote && _keptValue(_keptText['gb-' + dataKey + '-' + cid], null);
-  if (kept && transform(kept)) _keepText('gb-' + dataKey + '-' + cid, JSON.stringify(kept));
+  // Set directly: this text is the kept one re-keyed, not memory just read or saved (_scoresApart stays).
+  if (kept && transform(kept)) _keptText['gb-' + dataKey + '-' + cid] = JSON.stringify(kept);
   if (field === 'statuses' || _withdrawnRecordFields()[field]) _rekeyWithdrawnRecords(field, cid, transform);
 }
 
@@ -5071,6 +5081,7 @@ function _safeLSSet(key, value) {
       }
     }
     console.warn('localStorage write failed (' + key + '):', e);
+    if (key.indexOf('gb-scores-') === 0) _scoresApart[key] = true;
     // Every quota failure counts until that key saves again; the sync dot
     // says so (getSaveProblem).
     if (e.name === 'QuotaExceededError' && !_storageFullKeys.has(key)) {
@@ -5241,6 +5252,7 @@ function _upsertScoreOne(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   // Update cache blob
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  var cellWas = _cellEntries(scores, sid, aid); // for the Draft and Returned rule
   const existing = scores[sid].find(function (e) {
     return e.assessmentId === aid && e.tagId === tid;
   });
@@ -5269,7 +5281,7 @@ function _upsertScoreOne(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   }
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   // A realtime refresh that started before this edit must not overwrite it.
@@ -5473,6 +5485,7 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  var cellWas = _cellEntries(scores, sid, aid);
   var level = 0;
   var mod = 0;
   var changed = false;
@@ -5504,7 +5517,7 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   });
   if (!changed) return true;
   _cache.scores[cid] = scores;
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
@@ -5554,6 +5567,7 @@ function _saveTagCommentOne(cid, sid, aid, tagId, text) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  var cellWas = _cellEntries(scores, sid, aid);
   var entry = scores[sid].find(function (e) {
     return e && e.assessmentId === aid && e.tagId === tagId;
   });
@@ -5575,7 +5589,7 @@ function _saveTagCommentOne(cid, sid, aid, tagId, text) {
   else delete entry.critNote;
   var level = Number(entry.score) > 0 ? Number(entry.score) : 0;
   _cache.scores[cid] = scores;
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
@@ -5618,6 +5632,7 @@ function getScoreComment(cid, sid, aid) {
 function _saveScoreCommentOne(cid, sid, aid, text) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
+  var cellWas = _cellEntries(scores, sid, aid);
   var entries = (scores[sid] || []).filter(function (e) {
     return e && e.assessmentId === aid;
   });
@@ -5645,7 +5660,7 @@ function _saveScoreCommentOne(cid, sid, aid, text) {
     e.note = note;
   });
   _cache.scores[cid] = scores;
-  var gradesWere = _gradeBefore(cid, 'scores');
+  var gradesWere = _gradeBefore(cid, 'scores', sid, aid, cellWas);
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
@@ -6315,6 +6330,7 @@ function _migrateRubricScoreKeys(cid, scores) {
     _rubricKeyedScores.set(scores, sig);
     return scores;
   }
+  _scoresApart['gb-scores-' + cid] = true; // entries move below, and nothing is saved here
   Object.keys(scores).forEach(function (sid) {
     var entries = scores[sid];
     if (!Array.isArray(entries) || !entries.length) return;
@@ -6418,6 +6434,9 @@ function _scoresOfLiveRows(cid, prev) {
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
   var kept = _keptText['gb-scores-' + cid];
+  // `obj` is often this tab's memory, already changed: until it is saved
+  // (the guard below can refuse it), the rule compares the whole class.
+  _scoresApart['gb-scores-' + cid] = true;
   _applyIdRekeysToScores(cid, obj);
   // The baseline is read in the same key space as the scores, or a copy
   // saved with rubric scores under competencies would make every criterion
@@ -6562,7 +6581,9 @@ function restoreScoreCells(cid, before, after) {
    _saveTagCommentOne, _saveScoreCommentOne), saveScores (fills, clears,
    undo, group copies), and the two tick writers. _gradeBefore reads the
    grades as they were from the saved copy; _gradeAfter compares cell by
-   cell and runs the rule on each cell that changed. Neither can stop or
+   cell and runs the rule on each cell that changed. A one-cell writer
+   whose saved copy is this tab's own compares its own cell only, from the
+   entries it held before the write (_savedScoresAreMine). Neither can stop or
    reorder a save: both read the switch from the class's settings before
    anything else, touch GradeState only when it is on, and catch and report
    a failure (_gradeStateFailed). Loads, re-keys, withdrawing a student and
@@ -7344,6 +7365,43 @@ function _gradeOf(a, entries, checks) {
   return grade;
 }
 
+/* One cell's score entries, each copied, as they are now: what a one-cell
+   writer takes before it changes them. Never throws. */
+function _cellEntries(scores, sid, aid) {
+  var list = scores && Array.isArray(scores[sid]) ? scores[sid] : [];
+  return list
+    .filter(function (e) {
+      return e && aid && e.assessmentId === aid;
+    })
+    .map(function (e) {
+      return Object.assign({}, e);
+    });
+}
+// One cell as _gradeCells gives it, from those entries: null when it has no entry and no ticks.
+function _gradeCell(entries, checks, sid, aid) {
+  var ticks = (checks || {})[sid + ':' + aid];
+  if (!entries.length && !Array.isArray(ticks)) return null;
+  return { entries: entries, checks: Array.isArray(ticks) ? ticks : [] };
+}
+/* True when the saved copy of a class's scores, read back, would be what
+   this tab's memory held before the write in hand. It is, letter for
+   letter, the text this tab last read or wrote; memory has not changed
+   since but through a writer that saved it (_scoresApart); and memory holds
+   no rubric score under a competency, which a read of the saved copy would
+   move under its criterion (_migrateRubricScoreKeys) and memory, checked
+   once, would not. Another tab's write, a cleared or purged copy and a
+   failed write all answer false. */
+function _savedScoresAreMine(cid) {
+  var key = 'gb-scores-' + cid;
+  try {
+    if (_scoresApart[key] || typeof _keptText[key] !== 'string') return false;
+    if (_hasLegacyRubricKeys(_cache.scores[cid] || {}, _rubricLegacyKeyIndex(cid).legacyTags)) return false;
+    return localStorage.getItem(key) === _keptText[key];
+  } catch (e) {
+    return false;
+  }
+}
+
 // Every cell of a class: { aid: { sid: { entries, checks } } }.
 function _gradeCells(scores, checks) {
   var cells = {};
@@ -7365,13 +7423,19 @@ function _gradeCells(scores, checks) {
 
 /* A score writer, before it saves the class's scores or ticks (`field`):
    the grades as they were, from the saved copy. null when no rows are kept
-   for the class, which is all the switch-off path does. Never throws. */
-function _gradeBefore(cid, field) {
+   for the class, which is all the switch-off path does. Never throws.
+   A one-cell score writer also passes its cell and that cell's entries as
+   they were before it changed them (`entries`, from _cellEntries). While
+   the saved copy is this tab's own (_savedScoresAreMine) every other cell
+   in it is the cell in memory, so only that cell can have changed: the
+   saved copy is not read, and _gradeRule looks at that cell alone. The
+   rows that follow are the ones the whole-class comparison gives. */
+function _gradeBefore(cid, field, sid, aid, entries) {
   try {
     if (!_gradesKept(cid) || _movingClass) return null;
-    return field === 'scores'
-      ? { scores: _migrateRubricScoreKeys(cid, _safeParseLS('gb-scores-' + cid, {})) }
-      : { checks: _safeParseLS('gb-rubric-checks-' + cid, {}) };
+    if (field !== 'scores') return { checks: _safeParseLS('gb-rubric-checks-' + cid, {}) };
+    if (entries && _savedScoresAreMine(cid)) return { cells: [{ sid: sid, aid: aid, entries: entries }] };
+    return { scores: _migrateRubricScoreKeys(cid, _safeParseLS('gb-scores-' + cid, {})) };
   } catch (e) {
     _gradeStateFailed('reading the grades before a save', e);
     return null;
@@ -7390,33 +7454,49 @@ function _gradeAfter(cid, was, next) {
 }
 function _gradeRule(cid, was, next) {
   var klass = getReturnSettings(cid);
-  var scores = was.scores ? next : getScores(cid);
+  var scores = was.scores || was.cells ? next : getScores(cid);
   var checks = was.checks ? next : getRubricChecks(cid);
-  var now = _gradeCells(scores, checks);
-  var before = _gradeCells(was.scores || scores, was.checks || checks);
+  var now = was.cells ? null : _gradeCells(scores, checks);
+  var before = was.cells ? null : _gradeCells(was.scores || scores, was.checks || checks);
   var rows = getGradeReturns(cid);
   var out = Object.assign({}, rows);
   var at = new Date().toISOString();
   var changed = false;
-  Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
+  // One cell of work `a`: `b` is the cell as it was, `n` as it is now.
+  var cell = function (a, aid, sid, b, n) {
+    var copyWas = b ? _gradeOf(a, b.entries, b.checks) : null;
+    var copyNow = n ? _gradeOf(a, n.entries, n.checks) : null;
+    if (GradeState.sameCopy(copyWas, copyNow)) return;
+    var kept = GradeState.afterWrite(klass, (out[aid] || {})[sid] || null, copyWas, copyNow, at);
+    out[aid] = Object.assign({}, out[aid]);
+    if (kept) out[aid][sid] = kept;
+    else delete out[aid][sid];
+    if (!Object.keys(out[aid]).length) delete out[aid];
+    changed = true;
+  };
+  // A DIBELS benchmark is a reading record, not a grade that is returned:
+  // nothing saved on it, its Overall Comment included, makes or changes a row.
+  var graded = function (aid) {
     var a = _assessmentById(cid, aid);
-    // A DIBELS benchmark is a reading record, not a grade that is returned:
-    // nothing saved on it, its Overall Comment included, makes or changes a row.
-    if (!a || isDibelsScored(a)) return;
-    Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
-      var b = (before[aid] || {})[sid];
-      var n = (now[aid] || {})[sid];
-      var copyWas = b ? _gradeOf(a, b.entries, b.checks) : null;
-      var copyNow = n ? _gradeOf(a, n.entries, n.checks) : null;
-      if (GradeState.sameCopy(copyWas, copyNow)) return;
-      var kept = GradeState.afterWrite(klass, (out[aid] || {})[sid] || null, copyWas, copyNow, at);
-      out[aid] = Object.assign({}, out[aid]);
-      if (kept) out[aid][sid] = kept;
-      else delete out[aid][sid];
-      if (!Object.keys(out[aid]).length) delete out[aid];
-      changed = true;
+    return a && !isDibelsScored(a) ? a : null;
+  };
+  if (was.cells) {
+    // A one-cell writer whose saved copy was this tab's own (_gradeBefore).
+    was.cells.forEach(function (c) {
+      var a = graded(c.aid);
+      if (!a) return;
+      var b = _gradeCell(c.entries, checks, c.sid, c.aid);
+      cell(a, c.aid, c.sid, b, _gradeCell(_cellEntries(scores, c.sid, c.aid), checks, c.sid, c.aid));
     });
-  });
+  } else {
+    Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
+      var a = graded(aid);
+      if (!a) return;
+      Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
+        cell(a, aid, sid, (before[aid] || {})[sid], (now[aid] || {})[sid]);
+      });
+    });
+  }
   if (changed) {
     _saveGradeReturns(cid, out);
     // The server's triggers keep the same rows as the writes land; read them then.
@@ -8220,6 +8300,7 @@ function _restoreGroupGradeAside(cid, aid, sid) {
    them, or on an empty entry when there are none. */
 function _replaceGroupEntries(cid, scores, a, m, entries) {
   var aid = a.id;
+  _scoresApart['gb-scores-' + cid] = true; // memory changes here; the save comes later
   var reportNote = getScoreReportNote(cid, m, aid);
   var next = entries.map(function (e) {
     var copy = _cloneValue(e);
