@@ -272,8 +272,9 @@ function getQuestionsWaiting(cid, sid) {
    yes, partly, no or null), or null when none is in yet. For the Learner
    Profile's Reflections on Feedback and "2 of 3 plans followed". */
 function getStudentReflections(cid, sid) {
-  var subs = _studentWorkSubmissions(cid).filter(function (s) {
-    return s.enrollment_id === sid && s.sent_at;
+  // Read only, through the work's index: nothing is copied.
+  var subs = _workSentIn(cid, 'student', sid).filter(function (s) {
+    return s.sent_at;
   });
   return _classReflections(cid)
     .filter(function (r) {

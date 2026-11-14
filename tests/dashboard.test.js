@@ -762,7 +762,8 @@ describe('dashboard-overall-sort', () => {
 
   describe('the dashboard Overall sort', () => {
     it('sorts by studentOverallSortValue, not the proficiency', () => {
-      const src = readFileSync(resolve(root, 'teacher/page-dashboard.js'), 'utf-8');
+      // The sort moved to DashInsights.sortStudents (teacher/dash-insights.js).
+      const src = readFileSync(resolve(root, 'teacher/dash-insights.js'), 'utf-8');
       const block = src.slice(src.indexOf("case 'overall-desc':"), src.indexOf("case 'flagged':"));
       expect(block).toContain('studentOverallSortValue(cid, a.id)');
       expect(block).not.toContain('getOverallProficiency');

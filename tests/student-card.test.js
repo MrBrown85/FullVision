@@ -40,6 +40,11 @@ async function walk(hash) {
 
 const GRADES_IN = 'typeof PROF_LABELS + " " + typeof formatLevel + " " + typeof assessmentCellValue';
 const CALC = ['../shared/constants.js', '../shared/calc.js'];
+// The scripts the page has asked the browser to fetch ahead and not run (<link rel="preload">).
+const preloads = page =>
+  page.run(
+    '[].map.call(document.querySelectorAll(\'link[rel="preload"][as="script"]\'), l => l.getAttribute("href")).join()',
+  );
 
 describe('the student page fetches calc.js only when a grade is about to show', () => {
   it('the page itself names no calc.js, constants.js, Supabase client, key or Sentry', () => {
@@ -107,6 +112,27 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     expect(page.calls.map(c => c.body.route)).toEqual(['open', 'verify']);
     expect(page.root().textContent).toContain('How did it go?');
     expect(page.fetched).toEqual([]);
+    expect(preloads(page)).toBe('');
+  });
+
+  it('Is This You? on a card fetches both ahead and runs neither; the sign-in runs them (speed, B1)', async () => {
+    const page = openStudentPage();
+    await page.start('#demo-card');
+    expect(preloads(page)).toBe('');
+    await page.submit('form[data-form="card"]');
+    expect(page.root().querySelector('#sp-ident')).not.toBeNull();
+    // On their way while the student types, the 230 KB the list waited on after the check.
+    expect(preloads(page)).toBe(CALC.join());
+    expect(page.fetched).toEqual([]);
+    expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');
+    page.type('#sp-ident', '999');
+    await page.click('[data-act="card-yes"]');
+    expect(page.fetched).toEqual([]);
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    expect(page.fetched).toEqual(CALC);
+    expect(preloads(page)).toBe(CALC.join()); // asked for once
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
   });
 
   it('the card and Is This You? fetch neither; reaching Assignments fetches both, once', async () => {
