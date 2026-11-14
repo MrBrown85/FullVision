@@ -91,7 +91,7 @@ test('the student page on and Send Work off: work that is in still shows', async
   await see.click();
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog).toHaveClass(/has-work/);
-  await expect(dialog.locator('.grader-work-img')).toBeVisible();
+  await expect(dialog.locator('.grader-work-img').first()).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   // The wall opens for the piece.

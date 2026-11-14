@@ -80,19 +80,19 @@
     "class": 0
   },
   "Grader: open on a student": {
-    "copied": 1864709,
+    "copied": 1864531,
     "saved": 55,
-    "drawn": 663924,
-    "elements": 5499,
-    "lookups": 10393,
+    "drawn": 665844,
+    "elements": 5514,
+    "lookups": 10391,
     "class": 0
   },
   "Grader: next student": {
-    "copied": 73306,
+    "copied": 73128,
     "saved": 0,
-    "drawn": 9213,
-    "elements": 5499,
-    "lookups": 632,
+    "drawn": 9689,
+    "elements": 5514,
+    "lookups": 630,
     "class": 0
   },
   "Grader: close": {

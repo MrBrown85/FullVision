@@ -78,8 +78,8 @@ describe('PageAssignments.workSurface', () => {
       page: 1,
       turn: 0,
     });
-    overlay.querySelector('[data-grader="work-page"][data-dir="1"]').click();
-    overlay.querySelector('[data-grader="work-rotate"]').click();
+    // Every page shows; the surface named is the page last acted on: here, page 2's Rotate.
+    overlay.querySelector('[data-grader="work-rotate"][data-at="1"]').click();
     expect(window.PageAssignments.workSurface()).toMatchObject({ fileId: 'a2', page: 2, turn: 90 });
   });
 
