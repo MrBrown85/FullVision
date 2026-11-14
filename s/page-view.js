@@ -2052,6 +2052,8 @@ window.StudentPageView = (function () {
       '<div class="sp-ml"><h1 class="sp-page-title sp-ml-title' +
       (grade ? ' sp-hidden-title' : '') +
       '" tabindex="-1">My Learning</h1>' +
+      // The results didn't load: say so over the list, with Try Again.
+      noResultsHtml(ui, view) +
       grade +
       list +
       '</div>'

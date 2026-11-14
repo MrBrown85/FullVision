@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { PHONE, CHROMEBOOK, fits, named, contrast, shot } from './student-card-fake.js';
 
-/* The student page's shell (S4-F1), in Demo Mode, against the built site
-   with the live site's CSP: the four tabs (along the bottom on a phone, in
-   the header on a Chromebook), To Do, Sent and Back with their counts, and
-   All Assignments. Nothing is sent anywhere. */
+/* The student page's shell (S4-F1; redesigned 2026-11-14), in Demo Mode,
+   against the built site with the live site's CSP: the three tabs (along
+   the bottom on a phone, in the header on a Chromebook), Outstanding and
+   Upcoming with their counts, My Learning's list of work, Reflections, and
+   Log Out with the sheet that asks first. Nothing is sent anywhere. */
 
 async function demo(page) {
   const posts = [];
@@ -15,7 +16,7 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
   return posts;
 }
 
@@ -26,75 +27,93 @@ for (const size of [
   test.describe('the shell on a ' + size.tag, () => {
     test.use(size.use);
 
-    test('the tabs, To Do, Sent and Back, and All Assignments', async ({ page }) => {
+    test('the tabs, Outstanding and Upcoming, My Learning, Reflections and Log Out', async ({ page }) => {
       const posts = await demo(page);
-      const nav = page.getByRole('navigation', { name: 'Your Page' });
-      await expect(nav.locator('.sp-tab-label')).toHaveText([
-        'Assignments',
-        'My Learning',
-        'Questionnaires',
-        'Reports',
-      ]);
+      const nav = page.getByRole('navigation', { name: 'Your Page' }).locator('visible=true');
+      await expect(nav.locator('.sp-tab-label')).toHaveText(['Assignments', 'My Learning', 'Reflections']);
       await expect(nav.getByRole('button', { name: 'Assignments' })).toHaveAttribute('aria-current', 'page');
+      // What came back is new on My Learning: its badge says how many.
+      await expect(nav.locator('[data-tab="learning"] .sp-tab-badge')).toHaveText('6');
       // On a phone the tabs sit along the bottom; on a Chromebook in the header.
       const box = await nav.boundingBox();
       const vh = page.viewportSize().height;
       if (size.tag === 'phone') expect(box.y + box.height).toBeGreaterThan(vh - 4);
       else expect(box.y).toBeLessThan(60);
 
-      await expect(page.locator('.sp-segment')).toHaveText(['To Do 3', 'Sent 0', 'Back 6']);
-      await expect(page.getByRole('button', { name: 'To Do 3' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
+      await expect(page.getByRole('button', { name: 'Outstanding 2' })).toHaveAttribute('aria-pressed', 'true');
+      // The oldest due date first; work past its day says so in red.
       await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText([
-        'Science Fair Proposal',
-        'Disease Research Poster',
         'Immune System Quick Check',
+        'Disease Research Poster',
       ]);
-      // A draft is in To Do with no result, as work never graded is.
-      await expect(page.locator('.sp-piece-rows')).toHaveCount(0);
+      await expect(
+        page.locator('.sp-piece', { hasText: 'Disease Research Poster' }).locator('.sp-flag-overdue'),
+      ).toHaveText(/^Due \S+ \S+ \d+ · 2 days ago$/);
+      // A draft is Outstanding with no result, as work never graded is.
+      await expect(page.locator('.sp-deck .sp-level')).toHaveCount(0);
       await fits(page);
       await named(page);
       await contrast(page);
-      await shot(page, size.tag + '-s4f1-to-do');
+      await shot(page, size.tag + '-s4f1-outstanding');
 
-      // The card is not hidden behind the tabs.
+      // The last card is not hidden behind the tabs.
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      const last = await page.locator('.sp-piece.sp-picked .sp-piece-card').boundingBox();
+      const last = await page.locator('.sp-deck .sp-piece-card').locator('visible=true').last().boundingBox();
       const tabs = await nav.boundingBox();
       if (size.tag === 'phone') expect(last.y + last.height).toBeLessThanOrEqual(tabs.y);
 
-      await page.getByRole('button', { name: 'Back 6' }).click();
-      await expect(page.locator('.sp-deck .sp-piece')).toHaveCount(6);
-      await expect(page.locator('.sp-piece', { hasText: 'Cell Structure Quiz' }).locator('.sp-level')).toHaveText(
-        '8 / 10',
+      await page.getByRole('button', { name: 'Upcoming 1' }).click();
+      await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText(['Science Fair Proposal']);
+      await expect(page.locator('.sp-piece', { hasText: 'Science Fair Proposal' }).locator('.sp-flag-due')).toHaveText(
+        /^Due \S+ \S+ \d+ · in 4 days$/,
       );
       await fits(page);
       await contrast(page);
-      await shot(page, size.tag + '-s4f1-back');
+      await shot(page, size.tag + '-s4f1-upcoming');
 
-      await page.getByRole('button', { name: 'Sent 0' }).click();
-      await expect(page.getByText('Nothing sent yet.')).toBeVisible();
+      // My Learning: the grade, then Your Work with each result.
+      await nav.getByRole('button', { name: 'My Learning' }).click();
+      await expect(nav.getByRole('button', { name: 'My Learning' })).toHaveAttribute('aria-current', 'page');
+      await expect(page.locator('.sp-ml-overall .sp-ml-period')).toHaveText('This Year So Far');
+      await expect(page.locator('.sp-ml-overall .sp-ml-at-word')).toHaveText('Proficient');
+      await expect(page.locator('.sp-ml-work .sp-ml-card-title')).toHaveText('Your Work');
+      await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(7);
+      await expect(page.locator('.sp-ml-row', { hasText: 'Cell Structure Quiz' }).locator('.sp-level')).toHaveText(
+        '8 / 10',
+      );
+      await expect(
+        page.locator('.sp-ml-row', { hasText: 'Immune System Quick Check' }).locator('.sp-level'),
+      ).toHaveText('Missing');
+      await expect(page.locator('.sp-ml-work .sp-ml-new-on')).toHaveCount(6);
+      await fits(page);
+      await named(page);
+      await contrast(page);
+      await shot(page, size.tag + '-s4f1-my-learning');
 
-      await page.getByRole('button', { name: 'All assignments' }).click();
-      await expect(page.getByRole('heading', { name: 'All Assignments' })).toBeFocused();
-      await expect(page.locator('.sp-row')).toHaveCount(9);
-      await page.getByRole('button', { name: 'Back to cards' }).click();
-      await expect(page.locator('.sp-segment[aria-pressed="true"]')).toHaveText('Sent 0');
+      // Reflections: Demo Mode's sample questionnaires (S4-F4).
+      await nav.getByRole('button', { name: 'Reflections' }).click();
+      await expect(nav.getByRole('button', { name: 'Reflections' })).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('heading', { level: 1, name: 'Reflections', exact: true })).toBeVisible();
+      await expect(
+        page.getByText('November Reflection', { exact: true }).locator('visible=true').first(),
+      ).toBeVisible();
+      await fits(page);
+      await named(page);
+      await contrast(page);
+      await shot(page, size.tag + '-s4f1-reflections');
 
-      // Demo Mode lists sample questionnaires and reports (S4-F4); My Learning says it is off.
-      for (const [tab, heading, line] of [
-        ['My Learning', 'My Learning', 'Your teacher hasn’t turned on My Learning for this class.'],
-        ['Questionnaires', 'Questionnaires', 'November Reflection'],
-        ['Reports', 'My Reports', 'Interim Update'],
-      ]) {
-        await nav.getByRole('button', { name: tab }).click();
-        await expect(nav.getByRole('button', { name: tab })).toHaveAttribute('aria-current', 'page');
-        await expect(page.getByRole('heading', { level: 1, name: heading, exact: true })).toBeVisible();
-        await expect(page.getByText(line, { exact: true }).locator('visible=true').first()).toBeVisible();
-        await fits(page);
-        await named(page);
-        await contrast(page);
-      }
-      await shot(page, size.tag + '-s4f1-reports');
+      // Log Out asks first; Cancel leaves the page as it was.
+      await page.locator('.sp-head [data-act="logout-ask"]').click();
+      const sheet = page.getByRole('alertdialog', { name: 'Log Out?' });
+      await expect(sheet).toBeVisible();
+      await expect(sheet).toContainText('You’ll need your card to open your page again.');
+      await expect(page.locator('#sp-logout-title')).toBeFocused();
+      await contrast(page);
+      await shot(page, size.tag + '-s4f1-log-out');
+      await sheet.getByRole('button', { name: 'Cancel' }).click();
+      await expect(sheet).toHaveCount(0);
+      await expect(page.getByRole('heading', { level: 1, name: 'Reflections', exact: true })).toBeVisible();
       expect(posts).toEqual([]);
     });
   });

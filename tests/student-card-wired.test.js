@@ -31,15 +31,44 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const KEY = 'fv-s-session';
 const SIGNED_OUT = 'You are signed out. Scan or type your card to open your page again.';
 
-// Every piece, as All Assignments lists it (S4-F1: the tab opens on To Do).
-const rows = page =>
-  (page.showAll(), [...page.root().querySelectorAll('.sp-row')]).map(li => ({
+/* Every piece, as the page lists it (redesign of 2026-11-14): Outstanding,
+   then Upcoming, as the Chromebook's list beside the cards shows them
+   (title, line, dot), then My Learning's Your Work (title, line, the
+   chip's words as `result`: a result, or Missing or Excused; its blue dot
+   as `fresh`). Work Missing is on both. The page is left on My Learning. */
+async function rows(page) {
+  const side = () =>
+    [...page.root().querySelectorAll('.sp-side .sp-side-row')].map(b => ({
+      where: 'assignments',
+      title: b.querySelector('.sp-side-title').textContent,
+      sub: (b.querySelector('.sp-row-sub') || {}).textContent || '',
+      result: '',
+      dot: b.querySelector('.sp-dot').getAttribute('class'),
+    }));
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
+  await page.click('[data-segment="outstanding"]');
+  const outstanding = side();
+  await page.click('[data-segment="upcoming"]');
+  const upcoming = side();
+  await page.click(LEARNING);
+  const learning = [...page.root().querySelectorAll('.sp-ml-work .sp-ml-row')].map(li => ({
+    where: 'learning',
     title: li.querySelector('.sp-row-title').textContent,
     sub: (li.querySelector('.sp-row-sub') || {}).textContent || '',
-    result: (li.querySelector('.sp-row-result') || {}).textContent || '',
-    dot: li.querySelector('.sp-dot').getAttribute('class'),
+    result: (li.querySelector('.sp-level') || {}).textContent || '',
+    fresh: !!li.querySelector('.sp-ml-new-on'),
   }));
-const row = (page, title) => rows(page).find(r => r.title === title);
+  return outstanding.concat(upcoming, learning);
+}
+// One piece's row: `where` it is listed, or its My Learning row when it has one.
+const row = async (page, title, where) => {
+  const all = (await rows(page)).filter(r => r.title === title);
+  return where ? all.find(r => r.where === where) : all.find(r => r.where === 'learning') || all[0];
+};
+// My Learning, along the bottom: the returned work, each row watched for "opened".
+const LEARNING = '.sp-tabs-bottom [data-tab="learning"]';
+// What of the student's page is drawn: My Learning's rows or the cards on Assignments.
+const LIST = '.sp-ml-row, .sp-piece';
 const routes = page => page.calls.map(c => c.body.route);
 const text = page => page.root().textContent;
 const alertText = page => (page.root().querySelector('[role="alert"]') || {}).textContent || '';
@@ -47,7 +76,7 @@ const alertText = page => (page.root().querySelector('[role="alert"]') || {}).te
    server at once. A piece counts as opened only once its row has been on
    screen (tests/student-card-session.test.js has that rule's own tests). */
 async function scrollThroughAll(page) {
-  page.showAll();
+  await page.click(LEARNING);
   page.onScreen(() => true);
   page.advance(700); // on screen long enough to count
   await page.T.tellSeen();
@@ -88,7 +117,9 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
 
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
-    // `forms` is S4-F4's: the Questionnaires and My Reports tabs.
+    // The page opens on Assignments.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    // `forms` is S4-F4's: the Reflections tab.
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     await scrollThroughAll(page);
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen']);
@@ -112,13 +143,16 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(fns[5]).toBe('seen');
     expect(dev.fn.sql[1].add).toBe(false);
 
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    // Scrolling through My Learning's rows left the page there.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('My Learning');
     // The class's name and its block, as the board draws them (S4-F1).
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
     expect(page.root().querySelector('.sp-pill').textContent).toBe('Block B');
-    expect(rows(page).map(r => r.title)).toEqual([
-      'Science Fair Proposal',
+    // Outstanding, the oldest due date first; then Upcoming; then My Learning's Your Work, newest first.
+    expect((await rows(page)).map(r => r.title)).toEqual([
+      'Immune System Quick Check',
       'Disease Research Poster',
+      'Science Fair Proposal',
       'Immune System Quick Check',
       'Energy Transfer Investigation',
       'Cell Structure Quiz',
@@ -128,15 +162,15 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
       'Lab Safety Contract',
     ]);
     // A student reads the proficiency, once, in the result (DECISIONS, "Student-facing levels are proficiencies").
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
-    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
-    expect(row(page, 'Cell Microscope Lab').result).toBe('Proficient −');
-    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
-    expect(row(page, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Late$/);
-    expect(row(page, 'Lab Safety Contract').result).toBe('Complete');
-    expect(row(page, 'Immune System Quick Check')).toMatchObject({ result: '' });
-    expect(row(page, 'Immune System Quick Check').sub).toMatch(/^Missing · Due /);
-    expect(row(page, 'Disease Research Poster').result).toBe('');
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe('Extending');
+    expect((await row(page, 'Energy Transfer Investigation')).sub).toMatch(/^Returned \S+ \d+$/);
+    expect((await row(page, 'Cell Microscope Lab')).result).toBe('Proficient −');
+    expect((await row(page, 'Cell Structure Quiz')).result).toBe('8 / 10');
+    expect((await row(page, 'KMT & States of Matter Lab')).sub).toMatch(/^Returned \S+ \d+ · Late$/);
+    expect((await row(page, 'Lab Safety Contract')).result).toBe('Complete');
+    expect(await row(page, 'Immune System Quick Check')).toMatchObject({ result: 'Missing' });
+    expect((await row(page, 'Immune System Quick Check', 'assignments')).sub).toMatch(/^Missing · Due /);
+    expect((await row(page, 'Disease Research Poster')).result).toBe('');
     expect(text(page)).not.toContain('Demo Mode');
     expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
   });
@@ -145,6 +179,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     const dev = school();
     const page = await signIn(dev);
     await scrollThroughAll(page);
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen', 'done']);
     page.calls.forEach(c => {
@@ -171,7 +206,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
       student_number: null,
       password: null,
     });
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 
   it('a card with nothing on file asks for the card’s password and sends it', async () => {
@@ -188,7 +223,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
       student_number: null,
       password: '4821',
     });
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 
   it('a password printed before a birthday was added still works: the box takes either', async () => {
@@ -199,7 +234,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     page.type('#sp-ident', '4821');
     await page.click('[data-act="card-yes"]');
     expect(page.calls[1].body).toMatchObject({ student_number: '4821', password: '4821', birthday: null });
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 
   it('a code typed on the slip screen opens the card too', async () => {
@@ -436,12 +471,13 @@ describe('a card that won’t open says why', () => {
     expect(page.root().querySelector('[data-act="card-yes"]').hasAttribute('disabled')).toBe(false);
     offline = false;
     await page.click('[data-act="card-yes"]');
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 
   it('a code typed on the card’s screen that opens nothing gets the card’s words, and stays there', async () => {
     const dev = school();
     const page = await signIn(dev);
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     await page.click('[data-act="card-restart"]');
     page.calls.length = 0;
@@ -479,6 +515,7 @@ describe('a card that won’t open says why', () => {
       },
     });
     const page = await signIn(dev);
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     await page.click('[data-act="card-restart"]');
     page.type('#sp-code', 'K7M-4QX');
@@ -506,7 +543,7 @@ describe('the page won’t open: each refusal has its line', () => {
     expect(routes(page)).toEqual(['page', 'done']);
     expect(page.calls[1].body).toEqual({ route: 'done', session: token });
     expect(alertText(page)).toBe(line);
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('[data-act="page-retry"]')).toBeNull();
     // The session can open nothing now: it is gone from the device and the server.
     expect(dev.store).toEqual({});
@@ -544,8 +581,8 @@ describe('the page won’t open: each refusal has its line', () => {
     expect(dev.store[KEY]).toBe(kept);
     offline = false;
     await page.click('[data-act="page-retry"]');
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
-    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect((await row(page, 'Cell Structure Quiz')).result).toBe('8 / 10');
   });
 
   it('a database failure on page reads as a call that never arrived', async () => {
@@ -567,7 +604,7 @@ describe('the page won’t open: each refusal has its line', () => {
     await page.click('[data-act="card-yes"]');
     await scrollThroughAll(page);
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen']);
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(dev.store).toEqual({});
   });
@@ -607,8 +644,8 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
       { route: 'work', session: token, enrollment_id: CECE },
       { route: 'forms', session: token, enrollment_id: CECE },
     ]);
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe('Extending');
     expect(dev.store[KEY]).toBeTruthy();
   });
 
@@ -619,16 +656,17 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     page.server = body => dev.fn.handle(body);
     page.T.start(page.root(), '');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('Student Page');
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector(LIST)).toBeNull();
     await page.settle();
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 
-  it('Done ends it: the server is told, the token is gone, and nothing of the student is left on the page', async () => {
+  it('Log Out ends it: the server is told, the token is gone, and nothing of the student is left on the page', async () => {
     const dev = school();
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
-    expect(page.root().querySelector('[data-act="card-done"]').textContent).toBe('Done');
+    expect(page.root().querySelector('[data-act="logout-ask"]').textContent).toBe('Log Out');
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     expect(page.calls[page.calls.length - 1].body).toEqual({ route: 'done', session: token });
     expect(dev.fn.state.sessions).toEqual({});
@@ -663,9 +701,10 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     page.server = () => {
       throw new Error('offline');
     };
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     expect(dev.store).toEqual({});
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('.sp-signed-out')).toBeTruthy();
   });
 
@@ -675,10 +714,10 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const page = await signIn(dev);
     const ends = Date.parse(JSON.parse(dev.store[KEY]).x);
     page.T.checkSession(ends - 1000);
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect(dev.store[KEY]).toBeTruthy();
     page.T.checkSession(ends);
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(page.root().querySelector('.sp-msg').getAttribute('role')).toBe('status');
     expect(dev.store).toEqual({});
@@ -706,29 +745,30 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const dev = school();
     const first = await signIn(dev);
     const second = await dev.open('');
-    expect(second.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(second.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    await second.click('[data-act="logout-ask"]');
     await second.click('[data-act="card-done"]');
     first.T.checkSession();
-    expect(first.root().querySelector('.sp-row')).toBeNull();
+    expect(first.root().querySelector(LIST)).toBeNull();
     expect(first.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
   });
 
-  it('in a private window nothing can be kept: the page still opens, for this tab, and Done still ends it', async () => {
+  it('in a private window nothing can be kept: the page still opens, for this tab, and Log Out still ends it', async () => {
     const dev = school();
     const page = openStudentPage({ noStorage: true });
     page.server = body => dev.fn.handle(body);
     await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
-    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect((await row(page, 'Cell Structure Quiz')).result).toBe('8 / 10');
     // The session's check does not mistake "nothing kept" for "signed out elsewhere".
     page.T.checkSession();
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('My Learning');
     // Its midnight still takes the page down.
     const token = Object.keys(dev.fn.state.sessions)[0];
     page.T.checkSession(Date.parse(dev.fn.state.sessions[token].expires) + 1);
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
 
     const again = openStudentPage({ noStorage: true });
@@ -736,6 +776,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     await again.start('#P3R8-WDK4');
     again.type('#sp-ident', '0123456');
     await again.click('[data-act="card-yes"]');
+    await again.click('[data-act="logout-ask"]');
     await again.click('[data-act="card-done"]');
     expect(again.calls[again.calls.length - 1].body.route).toBe('done');
     expect(again.root().querySelector('.sp-signed-out')).toBeTruthy();
@@ -750,13 +791,13 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
       if (a.seen_at) a.seen_at = a.seen_at.replace('+00:00', '.482912+00:00');
     });
     const page = await signIn(dev);
-    expect(row(page, 'Lab Safety Contract').sub).toMatch(/^Back \S+ \d+ · Updated$/);
-    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
+    expect((await row(page, 'Lab Safety Contract')).sub).toMatch(/^Updated \S+ \d+( · was .+)?$/);
+    expect((await row(page, 'Energy Transfer Investigation')).sub).toMatch(/^Returned \S+ \d+$/);
     // A session's end written that way is kept and read.
     const kept = JSON.parse(dev.store[KEY]);
     dev.store[KEY] = JSON.stringify(Object.assign(kept, { x: '2099-06-30T07:00:00.123456+00:00' }));
     const next = await dev.open('');
-    expect(next.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(next.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 
   it('what is kept is only ever a token: anything else found there is not used', async () => {
@@ -833,7 +874,7 @@ describe('a shared device: a card from the start screen starts fresh', () => {
     expect(omarToken).not.toBe(cece);
     expect(Object.keys(dev.fn.state.sessions)).toEqual([omarToken]);
     expect(JSON.parse(dev.store[KEY]).e).toBe(OMAR);
-    expect(text(page)).toContain('No assignments yet.');
+    expect(page.root().querySelector('.sp-caught-up-words').textContent).toBe('All caught up');
     expect(text(page)).not.toContain('Cece');
     // Cece's token opens nothing.
     expect(await dev.fn.handle({ route: 'page', session: cece, enrollment_id: CECE })).toEqual({
@@ -851,7 +892,7 @@ describe('a shared device: a card from the start screen starts fresh', () => {
     await second.click('[data-act="card-yes"]');
     const omarKept = dev.store[KEY];
     first.T.checkSession();
-    expect(first.root().querySelector('.sp-row')).toBeNull();
+    expect(first.root().querySelector(LIST)).toBeNull();
     expect(first.root().innerHTML).not.toContain('Cece');
     // Omar's session is left as it is.
     expect(dev.store[KEY]).toBe(omarKept);
@@ -913,17 +954,17 @@ describe('what the list shows from a page reply', () => {
       // Returned, and nothing of the grade is left in use (or it was cleared).
       piece(4, 'Back With Nothing', { returned_at: at, grade: null }),
     ]);
-    expect(row(page, 'Returned')).toMatchObject({ result: 'Proficient', dot: 'sp-dot sp-dot-back' });
-    expect(row(page, 'Returned').sub).toMatch(/^Back \S+ \d+$/);
-    expect(row(page, 'Never Graded')).toMatchObject({ result: '', dot: 'sp-dot sp-dot-due' });
-    expect(row(page, 'Change Waiting')).toEqual({
-      ...row(page, 'Never Graded'),
+    expect(await row(page, 'Returned')).toMatchObject({ where: 'learning', result: 'Proficient', fresh: true });
+    expect((await row(page, 'Returned')).sub).toMatch(/^Returned \S+ \d+$/);
+    expect(await row(page, 'Never Graded')).toMatchObject({ where: 'assignments', dot: 'sp-dot sp-dot-due' });
+    expect(await row(page, 'Change Waiting')).toEqual({
+      ...(await row(page, 'Never Graded')),
       title: 'Change Waiting',
       sub: 'Oct 3',
     });
-    expect(row(page, 'Back With Nothing').result).toBe('');
-    expect(row(page, 'Back With Nothing').sub).toMatch(/^Back \S+ \d+$/);
-    expect(page.root().querySelectorAll('.sp-row-result')).toHaveLength(1);
+    expect((await row(page, 'Back With Nothing')).result).toBe('');
+    expect((await row(page, 'Back With Nothing')).sub).toMatch(/^Returned \S+ \d+$/);
+    expect(page.root().querySelectorAll('.sp-ml-work .sp-level')).toHaveLength(1);
     expect(page.root().innerHTML).not.toMatch(/draft/i);
     expect(Object.keys(page.T.state().page.grades)).toEqual([id(101)]);
   });
@@ -935,12 +976,17 @@ describe('what the list shows from a page reply', () => {
       piece(3, 'Missing Unreturned', { status: 'NS' }),
       piece(4, 'Late And Back', { status: 'LATE', returned_at: at, grade: three }),
     ]);
-    expect(row(page, 'Missing Now')).toMatchObject({ result: '', dot: 'sp-dot sp-dot-missing' });
-    expect(row(page, 'Missing Now').sub).toMatch(/^Missing · Due /);
-    expect(row(page, 'Excused Now')).toMatchObject({ result: '', sub: 'Excused · Oct 2' });
-    expect(row(page, 'Missing Unreturned')).toMatchObject({ result: '', sub: 'Missing · Oct 3' });
-    expect(row(page, 'Late And Back').result).toBe('Proficient');
-    expect(row(page, 'Late And Back').sub).toMatch(/^Back \S+ \d+ · Late$/);
+    expect(await row(page, 'Missing Now', 'assignments')).toMatchObject({ dot: 'sp-dot sp-dot-missing' });
+    expect((await row(page, 'Missing Now', 'assignments')).sub).toMatch(/^Missing · Due /);
+    expect(await row(page, 'Missing Now', 'learning')).toMatchObject({ result: 'Missing', fresh: false });
+    expect((await row(page, 'Missing Now', 'learning')).sub).toMatch(/^Due \S+ \d+$/);
+    // Excused is not on Assignments: on My Learning it says so, with no result.
+    expect(await row(page, 'Excused Now', 'assignments')).toBeUndefined();
+    expect(await row(page, 'Excused Now')).toMatchObject({ result: 'Excused', sub: '', fresh: false });
+    expect(await row(page, 'Missing Unreturned', 'assignments')).toMatchObject({ sub: 'Missing · Oct 3' });
+    expect(await row(page, 'Missing Unreturned', 'learning')).toMatchObject({ result: 'Missing', sub: '' });
+    expect((await row(page, 'Late And Back')).result).toBe('Proficient');
+    expect((await row(page, 'Late And Back')).sub).toMatch(/^Returned \S+ \d+ · Late$/);
     // A Missing or Excused piece is not counted as opened: no result was shown.
     await scrollThroughAll(page);
     const seen = page.calls.find(c => c.body.route === 'seen').body;
@@ -951,7 +997,9 @@ describe('what the list shows from a page reply', () => {
     const dirty = [piece(1, 'Missing Now', { status: 'NS', returned_at: at, grade: three, previous: two })];
     // The function's allow-list passes what the SQL sent (the SQL holds this rule), so the page checks too.
     const { page } = await listOf(dirty);
-    expect(row(page, 'Missing Now')).toMatchObject({ result: '', dot: 'sp-dot sp-dot-missing' });
+    expect(await row(page, 'Missing Now', 'assignments')).toMatchObject({ dot: 'sp-dot sp-dot-missing' });
+    expect(await row(page, 'Missing Now', 'learning')).toMatchObject({ result: 'Missing', fresh: false });
+    expect(page.root().querySelector('.sp-ml-work').textContent).not.toMatch(/Proficient|Developing/);
     expect(page.T.state().page.grades).toEqual({});
     expect(page.run('JSON.stringify(getScores("class"))')).toBe(JSON.stringify({ [CECE]: [] }));
   });
@@ -979,8 +1027,8 @@ describe('what the list shows from a page reply', () => {
       );
     };
     const again = await dev.open('');
-    expect(row(again, 'Never Returned').result).toBe('');
-    expect(row(again, 'Returned').result).toBe('Developing');
+    expect((await row(again, 'Never Returned')).result).toBe('');
+    expect((await row(again, 'Returned')).result).toBe('Developing');
     for (const where of [again.root().innerHTML, JSON.stringify(again.T.state().page)]) {
       expect(where).not.toContain('DRAFT-ONLY');
       expect(where).not.toMatch(/draft|working_copy|returned_copy|report_note/i);
@@ -1025,18 +1073,18 @@ describe('what the list shows from a page reply', () => {
         previous: null,
       }),
     ]);
-    const updated = title => / · Updated$/.test(row(page, title).sub);
-    expect(row(page, 'Changed Since').sub).toMatch(/^Back \S+ \d+ · Updated$/);
-    expect(updated('Changed Since')).toBe(true);
-    expect(updated('Changed Unseen')).toBe(true);
-    expect(updated('Seen Since')).toBe(false);
-    expect(updated('Plain')).toBe(false);
-    expect(updated('Same Again')).toBe(false);
-    expect(updated('Changed Then Missing')).toBe(false);
-    expect(updated('Changed From Nothing')).toBe(true);
+    const updated = async title => /^Updated /.test((await row(page, title)).sub);
+    expect((await row(page, 'Changed Since')).sub).toMatch(/^Updated \S+ \d+( · was .+)?$/);
+    expect(await updated('Changed Since')).toBe(true);
+    expect(await updated('Changed Unseen')).toBe(true);
+    expect(await updated('Seen Since')).toBe(false);
+    expect(await updated('Plain')).toBe(false);
+    expect(await updated('Same Again')).toBe(false);
+    expect(await updated('Changed Then Missing')).toBe(false);
+    expect(await updated('Changed From Nothing')).toBe(true);
     // The earlier grade is compared, never kept or shown.
     expect(JSON.stringify(page.T.state().page)).not.toContain('"previous"');
-    expect(row(page, 'Changed Since').result).toBe('Proficient');
+    expect((await row(page, 'Changed Since')).result).toBe('Proficient');
     expect(text(page)).not.toContain('Developing');
   });
 
@@ -1074,15 +1122,15 @@ describe('what the list shows from a page reply', () => {
     );
     const format = v => page.run('studentMarkText("class", ' + v + ')');
     expect(format(10 / 3)).toBe(plus);
-    expect(row(page, 'Competency').result).toBe(plus);
-    expect(row(page, 'Rubric').result).toBe(rubric);
-    expect(row(page, 'Overall').result).toBe(plus);
-    expect(row(page, 'Whole').result).toBe(whole);
-    expect(row(page, 'Points').result).toBe('17.5 / 20');
-    expect(row(page, 'Zero').result).toBe('0 / 5');
-    expect(row(page, 'Incomplete').result).toBe('Incomplete');
+    expect((await row(page, 'Competency')).result).toBe(plus);
+    expect((await row(page, 'Rubric')).result).toBe(rubric);
+    expect((await row(page, 'Overall')).result).toBe(plus);
+    expect((await row(page, 'Whole')).result).toBe(whole);
+    expect((await row(page, 'Points')).result).toBe('17.5 / 20');
+    expect((await row(page, 'Zero')).result).toBe('0 / 5');
+    expect((await row(page, 'Incomplete')).result).toBe('Incomplete');
     // A DIBELS benchmark is a reading record, not work a student gets back.
-    expect(row(page, 'Reading Benchmark')).toBeUndefined();
+    expect(await row(page, 'Reading Benchmark')).toBeUndefined();
   });
 
   it('the class’s own Counts As percents reach calc.js', async () => {
@@ -1091,7 +1139,7 @@ describe('what the list shows from a page reply', () => {
     base.assessments = [piece(1, 'Whole', { returned_at: at, grade: three })];
     const dev = school({ card: { page: base } });
     const page = await signIn(dev);
-    expect(row(page, 'Whole').result).toBe('Proficient · 80%');
+    expect((await row(page, 'Whole')).result).toBe('Proficient · 80%');
   });
 });
 
@@ -1117,9 +1165,19 @@ describe('two pieces with the same date: the one made later counts later', () =>
       },
       more,
     );
-  const titles = async assessments => {
-    const dev = school({ card: { page: Object.assign(samplePage(TODAY), { assessments }) } });
-    return rows(await signIn(dev)).map(r => r.title);
+  /* The titles in the view's order, newest first: My Learning lists
+     returned work in it, so each piece is returned with a level here.
+     where 'assignments': the pieces as given, on Outstanding, which goes by
+     due date, oldest first, and keeps the view's order within a day. */
+  const titles = async (assessments, where = 'learning') => {
+    const back = a =>
+      Object.assign({}, a, {
+        returned_at: '2026-11-03T20:00:00+00:00',
+        grade: { v: 1, value: 3, modifier: 0, comment: null, tags: {}, criteria: {}, checks: [] },
+      });
+    const list = where === 'learning' ? assessments.map(back) : assessments;
+    const dev = school({ card: { page: Object.assign(samplePage(TODAY), { assessments: list }) } });
+    return (await rows(await signIn(dev))).filter(r => r.where === where).map(r => r.title);
   };
 
   it('with created_at, the list is newest first within a date too', async () => {
@@ -1132,6 +1190,19 @@ describe('two pieces with the same date: the one made later counts later', () =>
         piece(5, 'Due Earlier', { due_date: '2026-10-26', created_at: '2026-10-25T09:00:00+00:00' }),
       ]),
     ).toEqual(['Due Later', 'Made Last', 'Made Second', 'Made First', 'Due Earlier']);
+    // Outstanding goes by due date, and within a day keeps that order.
+    expect(
+      await titles(
+        [
+          piece(1, 'Made First', { created_at: '2026-10-19T16:00:00.000001+00:00' }),
+          piece(2, 'Made Last', { created_at: '2026-10-19T18:30:00+00:00' }),
+          piece(3, 'Made Second', { created_at: '2026-10-19T17:00:00+00:00' }),
+          piece(4, 'Due Later', { due_date: '2026-10-28', created_at: '2026-10-01T09:00:00+00:00' }),
+          piece(5, 'Due Earlier', { due_date: '2026-10-26', created_at: '2026-10-25T09:00:00+00:00' }),
+        ],
+        'assignments',
+      ),
+    ).toEqual(['Due Earlier', 'Made Last', 'Made Second', 'Made First', 'Due Later']);
   });
 
   it('two made at the same instant fall to their ids, whatever order they arrive in', async () => {
@@ -1232,8 +1303,9 @@ describe('Demo Mode and a real card cannot drift', () => {
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
     expect(demo.calls).toEqual([]);
-    const demoRows = rows(demo);
-    expect(demoRows).toHaveLength(9);
+    const demoRows = await rows(demo);
+    // Three on Assignments, seven on My Learning (the Missing one on both).
+    expect(demoRows).toHaveLength(10);
 
     // The sample class's reply before anything was opened (the walk above has opened its own).
     const sent = realIds(openStudentPage().T.demoPage(system));
@@ -1245,18 +1317,17 @@ describe('Demo Mode and a real card cannot drift', () => {
     delete dropped.course.id;
     expect(dropped.course.teacher_name).toBeTruthy();
     delete dropped.course.teacher_name;
+    // My Learning's Next Step sentences the function writes from its own copy of the comment bank
+    // (card-routes.ts, nextSteps); the sample's made-up bank ids are in none of it.
+    dropped.learning.next_steps = {};
     expect(passed).toEqual(dropped);
     expect(withoutS4M1(dropped)).not.toEqual(dropped);
 
     const dev = school({ card: { page: sent } });
     const real = await signIn(dev);
-    expect(rows(real)).toEqual(demoRows);
+    expect(await rows(real)).toEqual(demoRows);
     // The same marks, in the same places.
-    expect(
-      rows(real)
-        .filter(r => / · Updated$/.test(r.sub))
-        .map(r => r.title),
-    ).toEqual(['Lab Safety Contract']);
+    expect((await rows(real)).filter(r => /^Updated /.test(r.sub)).map(r => r.title)).toEqual(['Lab Safety Contract']);
     // And each walked the same steps: card, verify, page, then seen for the rows that came on screen.
     expect(routes(real)).toEqual(['card', 'verify', 'page', 'work']);
     await scrollThroughAll(demo);
@@ -1271,19 +1342,25 @@ describe('Demo Mode and a real card cannot drift', () => {
     await demo.submit('form[data-form="card"]');
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
-    expect(row(demo, 'Lab Safety Contract').sub).toMatch(/^Back \S+ \d+ · Updated$/);
+    expect((await row(demo, 'Lab Safety Contract')).sub).toMatch(/^Updated \S+ \d+( · was .+)?$/);
     // On screen now: the demo's own `seen` records it, as the server would.
     await scrollThroughAll(demo);
     const reply = demo.T.demoPage('proficiency');
     const contract = reply.assessments.find(a => a.id === 'demo-contract');
     expect(Date.parse(contract.seen_at)).toBeGreaterThan(Date.parse(contract.updated_at));
-    expect(Object.keys(reply).sort()).toEqual(Object.keys(samplePage(TODAY)).sort());
+    // Show My Learning is on in Demo Mode, so its reply carries My Learning as the server's does.
+    expect(Object.keys(reply).sort()).toEqual(
+      Object.keys(samplePage(TODAY)).concat(['learning', 'show_my_learning']).sort(),
+    );
+    expect(reply.show_my_learning).toBe(true);
     // The database's shape since S4-M1: every key the page had, and the five new ones on each piece.
     expect(Object.keys(contract).sort()).toEqual(
       Object.keys(samplePage(TODAY).assessments[0])
         .concat(S4M1.assessments)
         // Handouts and Links (2026111170): the page sends each assessment's resources.
         .concat(Object.keys(samplePage(TODAY).assessments[0]).includes('resources') ? [] : ['resources'])
+        // With My Learning: each piece's category, which What Makes Up Your Grade groups by.
+        .concat(['category_id'])
         .sort(),
     );
     expect(Object.keys(contract.grade).sort()).toEqual([
@@ -1296,6 +1373,7 @@ describe('Demo Mode and a real card cannot drift', () => {
       'value',
     ]);
     // Done shows After Done, and Scan a Card starts the sample again; nothing is kept.
+    await demo.click('[data-act="logout-ask"]');
     await demo.click('[data-act="card-done"]');
     expect(demo.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     await demo.click('[data-act="card-restart"]');
@@ -1316,6 +1394,7 @@ describe('Demo Mode and a real card cannot drift', () => {
     await demo.submit('form[data-form="card"]');
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
+    await demo.click('[data-act="logout-ask"]');
     await demo.click('[data-act="card-done"]');
     expect(demo.calls).toEqual([]);
     expect(dev.store[KEY]).toBe(kept);

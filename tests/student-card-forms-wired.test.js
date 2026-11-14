@@ -1,17 +1,18 @@
 /**
- * Questionnaires and My Reports from a real card (S4-F4; s/app.js's
+ * Questionnaires from a real card, on the Reflections tab (S4-F4; s/app.js's
  * loadForms and openRealForm, s/questionnaire.js's sendFromCard), against
  * the routes of supabase/functions/student-submit/forms-routes.ts as
  * phase2-routes-contract.md (Batch E) writes them: `forms` once the page is
- * up, `form` and `report` to open one, `answer` to send, each with the
- * session and the student it is for.
+ * up, `form` to open one, `answer` to send, each with the session and the
+ * student it is for.
  *
- * - The two tabs list what `forms` gave; a function without the route
- *   (bad_request) leaves the page exactly as drawn.
+ * - Reflections lists the questionnaires `forms` gave; a function without
+ *   the route (bad_request) leaves the page exactly as drawn.
  * - Start opens the questions from `form`; Send posts `answer` once, with
  *   no token, and shows Sent (already_sent too); a refusal says why.
- * - See Your Report shows what `report` gave.
- * - Nothing outlasts the session: Done, then the next student is asked
+ * - The phone reports `forms` also lists are not on the card's page
+ *   (Colin, 2026-11-14): no Reports tab, and `report` is never asked.
+ * - Nothing outlasts the session: Log Out, then the next student is asked
  *   their own `forms`, and this tab keeps no draft.
  * The stand-in answers only these routes; the rest of the function is the
  * real handler over the stand-in database.
@@ -130,7 +131,7 @@ async function answerAndSend(page) {
   await page.settle();
 }
 
-describe('the two tabs', () => {
+describe('Reflections', () => {
   it('asks `forms` once after sign-in, with the session and the student', async () => {
     const page = await signIn(school({}));
     const asks = bodies(page, 'forms');
@@ -144,8 +145,8 @@ describe('the two tabs', () => {
     expect(viewOf(page).questionnaires.map(q => [q.id, q.title, q.state])).toEqual([
       [Q, 'November Reflection', 'open'],
     ]);
-    expect(viewOf(page).reports.map(r => [r.id, r.title, r.isNew])).toEqual([[R, 'Report 1', true]]);
     await page.click('[data-act="tab"][data-tab="questionnaires"]');
+    expect(words(page.root().querySelector('.sp-page-title'))).toBe('Reflections');
     expect(page.root().querySelector('[data-act="q-start"][data-form-id="' + Q + '"]')).toBeTruthy();
   });
 
@@ -160,9 +161,8 @@ describe('the two tabs', () => {
     expect(bodies(off, 'forms')).toHaveLength(1);
     expect(off.root().innerHTML).toBe(before.root().innerHTML);
     expect(viewOf(off).questionnaires).toEqual([]);
-    expect(viewOf(off).reports).toEqual([]);
     await off.click('[data-act="tab"][data-tab="questionnaires"]');
-    expect(words(off.root())).toContain('Questionnaires from your teacher will show here.');
+    expect(words(off.root())).toContain('Reflections from your teacher will show here.');
   });
 });
 
@@ -227,28 +227,31 @@ describe('a questionnaire', () => {
 });
 
 describe('a phone report', () => {
-  it('See Your Report asks `report` and shows it', async () => {
+  it('one `forms` lists is not shown on the card’s page, and `report` is never asked', async () => {
     const page = await signIn(school({}));
-    await page.click('[data-act="tab"][data-tab="reports"]');
-    await page.click('[data-act="r-open"][data-form-id="' + R + '"]');
-    await page.settle();
-    expect(bodies(page, 'report')).toEqual([expect.objectContaining({ enrollment_id: CECE, report_id: R })]);
-    expect(page.T.state().screen).toBe('report');
-    expect(page.T.state().report).toEqual(REPORT);
-    expect(words(page.root().querySelector('.pr-view'))).toContain('Proficient');
-    await page.click('[data-act="page-back"]');
-    expect(viewOf(page).reports[0].isNew).toBe(false);
+    expect(bodies(page, 'forms')).toHaveLength(1);
+    expect(viewOf(page).reports).toBeUndefined();
+    expect(page.T.state().realForms).not.toHaveProperty('reports');
+    expect(page.root().querySelector('[data-tab="reports"]')).toBeNull();
+    for (const tab of ['assignments', 'learning', 'questionnaires']) {
+      await page.click('.sp-tabs-bottom [data-act="tab"][data-tab="' + tab + '"]');
+      expect(page.root().querySelector('[data-act="r-open"]'), tab).toBeNull();
+      expect(page.root().innerHTML, tab).not.toContain('Report 1');
+      expect(page.root().innerHTML, tab).not.toContain(R);
+    }
+    expect(bodies(page, 'report')).toEqual([]);
   });
 });
 
 describe('nothing outlasts the session', () => {
-  it('Done, then another student signs in and is asked their own `forms`; no draft is left', async () => {
+  it('Log Out, then another student signs in and is asked their own `forms`; no draft is left', async () => {
     const page = await signIn(school({}));
     await openQuestions(page);
     page.type('#q-q1', 'Half an answer');
     await new Promise(r => setTimeout(r, 450)); // the draft is kept once the student pauses
     expect(Object.keys(page.tab)).toEqual(['fv-s-card-drafts']);
     await page.click('[data-act="back"]');
+    await page.click('[data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     expect(page.tab).toEqual({});
     expect(page.T.state().realForms).toBeNull();
