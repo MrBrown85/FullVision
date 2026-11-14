@@ -150,7 +150,7 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   expect(blocks[0]).toBe('Letterhead');
   expect(blocks.length).toBeGreaterThan(3);
   await expect(cards.nth(1).locator('.qn-info-row .qn-info-part')).toHaveText(blocks);
-  await expect(cards.nth(1).locator('.qn-info-off')).toContainText('Add them in Progress Reports.');
+  await expect(cards.nth(1).locator('.qn-info-off')).toContainText('Add them in Print Reports.');
   await expect(sheet).toContainText('Student Voice answers marked Private.');
   const inside = () => page.evaluate(() => !!document.activeElement.closest('#tq-info-overlay'));
   for (let i = 0; i < 4; i++) {
@@ -288,9 +288,12 @@ test('the roster marks survive a sidebar redraw; arrows move without approving a
   await page.locator('.report-seg-btn[data-tab="progress"]').click();
   await expect(page.locator('#gb-sidebar .student-row-note')).toHaveCount(0);
   await expect(page.locator('#gb-sidebar-extra')).toHaveCount(0);
-  // Every Demo student's Report Card runs to two sheets, and each row
-  // says so, as the fit line does (step 4 group 2 #9).
-  await expect(row(noor).locator('.student-row-sheets')).toHaveText('2 sheets');
+  // A row names its sheets only when the report runs past one (step 4
+  // group 2 #9). Noor's Report Card fits one sheet since Nov 13 (no
+  // boxes, Missing Work in the Assessments list): her row keeps its grade.
+  await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  await expect(row(noor).locator('.student-row-sheets')).toHaveCount(0);
+  await expect(row(noor).locator('.student-row-grades')).not.toBeEmpty();
 });
 
 test('Generate Comment drafts from the bank; the box grows, the count follows, ⌘Z brings the old text back', async ({
