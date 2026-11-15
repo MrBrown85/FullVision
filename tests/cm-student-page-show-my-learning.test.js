@@ -120,12 +120,12 @@ describe('Show My Learning for a signed-in class', () => {
       'Return Grades',
       'Send Work',
       'Reflect on Feedback',
-      'Show My Learning',
-      'Questionnaires and Reports',
+      'Show Overall Grade',
+      'Questionnaires',
     ]);
     expect(sw().hasAttribute('checked')).toBe(false);
     expect(text(row().querySelector('#sp-learning-would'))).toBe(
-      "Students would see their level on each skill and their grade in this class’s grading style (Letter), only from work you've returned.",
+      "Students would see their grade in this class’s grading style (Letter), only from work you've returned.",
     );
     // Nothing says students' own devices can't show it: they can.
     expect(text(row())).not.toMatch(/can't show|can’t show|only Preview/);

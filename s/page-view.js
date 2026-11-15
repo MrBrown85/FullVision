@@ -20,21 +20,26 @@
    which calc.js and constants.js gave it. A grade never returned is not in
    the view, so it cannot be drawn.
 
-   ui: { tab: 'assignments' | 'learning' | 'questionnaires' | 'reports',
-         segment: 'todo' | 'sent' | 'back', pick: the id of the card
-         showing, all: true for All Assignments, search and filter: All
-         Assignments' search words and filter ('all' | 'todo' | 'sent' |
-         'back' | 'new' | 'revise'),
+   ui: { tab: 'assignments' | 'learning' | 'questionnaires' (the tab
+         called Reflections), segment: 'outstanding' | 'upcoming', pick:
+         the id of the card picked on a Chromebook,
          feedback: the id of the piece Your Feedback is open on, whole:
          true for its The Whole Rubric (also for work not back yet, from
          See the Rubric), compare: true for its Before and After (a
-         returned revision, S11-F2), levels: What the Levels Mean is closed
-         (it starts open),
-         form: the questionnaire or report picked on a Chromebook,
+         returned revision, S11-F2), levels: What the Levels Mean is open
+         (it starts closed), card: the id of a sent piece opened from My
+         Learning, logout: Log Out? is asking,
+         form: the questionnaire picked on a Chromebook,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
          note: a line under the body (Demo Mode's), sheet: Your Classes is
-         open, skill: the id of the skill One Skill is open on }. */
+         open }.
+
+   The three tabs (Colin, 2026-11-14): Assignments is what the student
+   still has to do, Outstanding and Upcoming, the cards one under another
+   to scroll; My Learning is their report card, the grade and every piece
+   handed in or returned, each opening its feedback; Reflections is the
+   questionnaires. */
 window.StudentPageView = (function () {
   'use strict';
 
@@ -57,29 +62,8 @@ window.StudentPageView = (function () {
     return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
   }
 
-  /* ── What the server also tells (S4-M1) ────────────────────────
-     Each part below draws only when the view holds it: until the server
-     sends a unit, a category, a Description, Core Competencies or I Can
-     lines, the page is as it was. The page never names the teacher
-     (Colin's ruling 112, "Leave the name off."): it says "your teacher". */
-
-  /* A category and what it counts: "Practice Questions · counts 40% of your
-     grade"; "Practice · doesn't count toward your grade" for a category
-     that counts toward nothing; the name alone where no percent is true. */
-  function categoryLine(category) {
-    if (!category || !category.name) return '';
-    var pct = category.percent;
-    if (pct === 0) return category.name + SEP + 'doesn’t count toward your grade';
-    if (typeof pct === 'number' && pct > 0) return category.name + SEP + 'counts ' + pct + '% of your grade';
-    return category.name;
-  }
-
-  // "Counts toward Perspective", "Counts toward Evidence and Ethical Judgment".
-  function towardLine(names) {
-    if (!names || !names.length) return '';
-    var all = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
-    return 'Counts toward ' + all;
-  }
+  /* The page never names the teacher (Colin's ruling 112, "Leave the
+     name off."): it says "your teacher". */
 
   /* ── One row ───────────────────────────────────────────────── */
 
@@ -110,11 +94,12 @@ window.StudentPageView = (function () {
       if (p.late) view.sub = ['Late', due].filter(Boolean).join(SEP);
       return view;
     }
-    var bits = ['Back ' + fmtDate(p.returnedAt, DAY)];
+    var bits = [
+      (p.updated ? 'Updated ' : 'Returned ') + fmtDate(p.updated ? p.updatedAt || p.returnedAt : p.returnedAt, DAY),
+    ];
     if (p.result.kind === 'level' && p.result.word) bits.push(p.result.word);
     view.result = p.result.text || '';
     if (p.late) bits.push('Late');
-    if (p.updated) bits.push('Updated');
     view.sub = bits.join(SEP);
     if (p.unseen && view.result !== '') view.unseen = p.id;
     return view;
@@ -131,45 +116,71 @@ window.StudentPageView = (function () {
     return n > 0 ? (n === 1 ? '1 photo' : n + ' photos') : '';
   }
 
-  /* ── To Do, Sent and Back ──────────────────────────────────── */
+  /* ── Outstanding and Upcoming (Colin, 2026-11-14) ─────────────
 
-  /* To Do is what is still to hand in: work not back yet, work marked
-     Missing, and work returned for revision (S11-F2). Sent is work sent and
-     waiting for its grade (S5-F2).
-     Back is work that came back. */
+     Assignments holds what the student still has to hand in. Outstanding:
+     work due today or earlier (or with no due date), work marked Missing,
+     and work returned for revision (S11-F2), a revision first and then the
+     oldest due date first. Upcoming: work due after today, soonest first.
+     Work sent and waiting, and work that came back, are on My Learning. */
   var SEGMENTS = [
-    { id: 'todo', label: 'To Do' },
-    { id: 'sent', label: 'Sent' },
-    { id: 'back', label: 'Back' },
+    { id: 'outstanding', label: 'Outstanding' },
+    { id: 'upcoming', label: 'Upcoming' },
   ];
+
+  // The class's today (the view's), or this device's, as YYYY-MM-DD.
+  function todayOf(view) {
+    if (view && /^\d{4}-\d{2}-\d{2}$/.test(String(view.today || ''))) return view.today;
+    var d = new Date();
+    var pad = function (n) {
+      return (n < 10 ? '0' : '') + n;
+    };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  // Which of Outstanding and Upcoming a piece is in, or '' (on My Learning, or Excused).
+  function segmentOf(p, view) {
+    if (!p) return '';
+    if (p.kind === 'revise' || p.kind === 'missing') return 'outstanding';
+    if (p.kind !== 'due') return '';
+    return p.dueDate && p.dueDate > todayOf(view) ? 'upcoming' : 'outstanding';
+  }
+
   function inSegment(view, id) {
     var list = view.work.filter(function (p) {
-      if (id === 'todo') return p.kind === 'due' || p.kind === 'missing' || p.kind === 'revise';
-      if (id === 'back') return p.kind === 'back';
-      return id === 'sent' && p.kind === 'sent';
+      return segmentOf(p, view) === id;
     });
-    // A revision asked for leads To Do (the Needs Revision board: "1 of 3"); the rest keep their order.
-    if (id !== 'todo') return list;
+    // Soonest first, by due date (its date when it has none); undated work last.
+    var day = function (p) {
+      return p.dueDate || p.date || '9999-12-31';
+    };
     return list
-      .filter(function (p) {
-        return p.kind === 'revise';
+      .map(function (p, i) {
+        return { p: p, i: i };
       })
-      .concat(
-        list.filter(function (p) {
-          return p.kind !== 'revise';
-        }),
-      );
+      .sort(function (x, y) {
+        var r = (x.p.kind === 'revise' ? 0 : 1) - (y.p.kind === 'revise' ? 0 : 1);
+        if (r) return r;
+        var a = day(x.p);
+        var b = day(y.p);
+        if (a !== b) return a < b ? -1 : 1;
+        return x.i - y.i;
+      })
+      .map(function (x) {
+        return x.p;
+      });
   }
   function counts(view) {
-    return { todo: view.counts.toDo + view.counts.missing, sent: view.counts.sent, back: view.counts.back };
+    return { outstanding: inSegment(view, 'outstanding').length, upcoming: inSegment(view, 'upcoming').length };
   }
 
   function segmentsHtml(ui, view) {
     var n = counts(view);
+    var at = segmentIn(ui);
     return (
       '<div class="sp-segments" role="group" aria-label="Assignments">' +
       SEGMENTS.map(function (s) {
-        var on = (ui.segment || 'todo') === s.id;
+        var on = at === s.id;
         return (
           '<button type="button" class="sp-segment' +
           (on ? ' sp-segment-on' : '') +
@@ -186,16 +197,25 @@ window.StudentPageView = (function () {
     );
   }
 
+  // The segment showing: Outstanding unless Upcoming was picked.
+  function segmentIn(ui) {
+    return ui && ui.segment === 'upcoming' ? 'upcoming' : 'outstanding';
+  }
+
   var TICK =
     '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
-  // The artboard's "All Caught Up".
-  function caughtUpHtml() {
+  // Nothing outstanding: All Caught Up, and the way to what is coming when something is.
+  function caughtUpHtml(view) {
+    var next = counts(view).upcoming;
     return (
       '<div class="sp-caught-up"><span class="sp-out-mark">' +
       TICK +
       '</span><p class="sp-caught-up-words">All caught up</p>' +
-      '<button type="button" class="sp-btn sp-btn-tint sp-btn-pill" data-act="segment" data-segment="back">See What’s Back</button></div>'
+      (next
+        ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-pill" data-act="segment" data-segment="upcoming">See What’s Coming Up</button>'
+        : '') +
+      '</div>'
     );
   }
 
@@ -217,10 +237,7 @@ window.StudentPageView = (function () {
     );
   }
 
-  var EMPTY = {
-    sent: '<p class="sp-lead sp-empty">Nothing sent yet.</p>',
-    back: '<p class="sp-lead sp-empty">Nothing back yet.</p>',
-  };
+  var NOTHING_UPCOMING = '<p class="sp-lead sp-empty">Nothing coming up yet.</p>';
 
   /* ── One piece as a card (the artboard's "To Do Card" and "Returned
      Work") ─────────────────────────────────────────────────── */
@@ -229,69 +246,6 @@ window.StudentPageView = (function () {
   function chipHtml(text, level) {
     var lv = Math.round(Number(level));
     return '<span class="sp-level sp-lv-' + (lv >= 1 && lv <= 4 ? lv : 0) + '">' + esc(text) + '</span>';
-  }
-
-  /* What came back with a piece: Your Result, then each competency or
-     rubric criterion with the level given, worded by the view. */
-  function resultRows(p) {
-    var rows = [];
-    if (p.result && p.result.text)
-      rows.push({ name: 'Your Result', text: p.result.text, level: null, was: p.result.was });
-    (p.rubric ? p.rubric.rows : p.competencies || []).forEach(function (r) {
-      // A rubric criterion names the competencies it counts toward under it (the Returned Work board).
-      var toward = p.rubric && r.toward ? r.toward.join(', ') : '';
-      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level, was: r.was, toward: toward });
-    });
-    if (!rows.length) return '';
-    return (
-      '<ul class="sp-piece-rows">' +
-      rows
-        .map(function (r) {
-          return (
-            '<li class="sp-piece-row">' +
-            (r.toward
-              ? '<span class="sp-piece-row-label"><span class="sp-piece-row-name">' +
-                esc(r.name) +
-                '</span><span class="sp-piece-row-sub">' +
-                esc(r.toward) +
-                '</span></span>'
-              : '<span class="sp-piece-row-name">' + esc(r.name) + '</span>') +
-            (r.was
-              ? '<span class="sp-was-wrap">' +
-                chipHtml(r.text, r.level) +
-                '<span class="sp-was">' +
-                esc('Was ' + r.was) +
-                '</span></span>'
-              : chipHtml(r.text, r.level)) +
-            '</li>'
-          );
-        })
-        .join('') +
-      '</ul>'
-    );
-  }
-
-  /* What changed on an updated grade, under its rows: who and when, and
-     each level that moved: "Your result was updated on Nov 12". */
-  function updatedNoteHtml(p) {
-    var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
-      return r.was && r.text;
-    });
-    // A result-only piece (points, Complete) says how its result moved.
-    if (p.result && p.result.was && p.result.text)
-      moved = moved.concat([{ name: 'Your result', was: p.result.was, text: p.result.text }]);
-    if (!p.updated || !moved.length) return '';
-    return (
-      '<div class="sp-updated-note"><p class="sp-updated-title">' +
-      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
-      '</p>' +
-      moved
-        .map(function (r) {
-          return '<p class="sp-updated-line">' + esc(r.name + ' went from ' + r.was + ' to ' + r.text + '.') + '</p>';
-        })
-        .join('') +
-      '</div>'
-    );
   }
 
   var PILL_ICON = {
@@ -321,11 +275,39 @@ window.StudentPageView = (function () {
     return (p.kind === 'due' || p.kind === 'missing') && !!(p.send && p.send.takes && !p.send.open);
   }
 
-  /* The pill at the top right of a card still to do, on the unit's line: when
-     it is due, with a clock (the To Do Card board). A closed piece has none. */
-  function duePill(p) {
+  /* How far off a day is from today, in the words a student counts in:
+     "Today", "Tomorrow", "in 4 days", "Yesterday", "3 days ago". */
+  function daysFrom(day, today) {
+    var a = Date.parse(String(day).slice(0, 10) + 'T12:00:00Z');
+    var b = Date.parse(String(today).slice(0, 10) + 'T12:00:00Z');
+    if (isNaN(a) || isNaN(b)) return null;
+    return Math.round((a - b) / 86400000);
+  }
+  function dueWhen(p, view) {
+    var n = daysFrom(p.dueDate, todayOf(view));
+    if (n === 0) return { text: 'Due Today', past: false };
+    if (n === 1) return { text: 'Due Tomorrow', past: false };
+    var day = 'Due ' + fmtDate(p.dueDate, DUE_DAY);
+    if (n == null) return { text: day, past: false };
+    if (n > 1) return { text: day + SEP + 'in ' + n + ' days', past: false };
+    return { text: day + SEP + (n === -1 ? 'yesterday' : -n + ' days ago'), past: true };
+  }
+
+  /* The pill at the top right of a card still to do, on the unit's line:
+     when it is due and how far off, with a clock; red once the day has
+     passed. A closed piece has none. */
+  function duePill(p, view) {
     if ((p.kind !== 'due' && p.kind !== 'missing') || !p.dueDate || isClosed(p)) return '';
-    return pillHtml('due', 'Due ' + fmtDate(p.dueDate, DUE_DAY), 'clock');
+    var w = dueWhen(p, view);
+    return pillHtml(w.past ? 'overdue' : 'due', w.text, 'clock');
+  }
+
+  // When work was sent, to the minute: "Sent Nov 12, 3:41 p.m.".
+  function sentAt(at) {
+    if (!at) return 'Sent';
+    var t = new Date(at);
+    if (isNaN(t) || String(at).length <= 10) return 'Sent ' + fmtDate(at, DAY);
+    return 'Sent ' + fmtDate(at, DAY) + ', ' + t.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
   }
 
   /* The card's pills under its title: where it stands (Returned, Updated,
@@ -346,13 +328,7 @@ window.StudentPageView = (function () {
       var sent = (p.send && p.send.sent) || {};
       var at = sent.at || (p.group && p.group.sentAt) || '';
       var pages = p.group && p.group.sent ? p.group.pages : sent.pages;
-      out.push(
-        pillHtml(
-          'sent',
-          [at ? 'Sent ' + fmtDate(at, DAY) : 'Sent', photosWord(pages)].filter(Boolean).join(SEP),
-          'camera',
-        ),
-      );
+      out.push(pillHtml('sent', [sentAt(at), photosWord(pages)].filter(Boolean).join(SEP), 'camera'));
     }
     // "Closed Nov 13" (the Closed Assignment board).
     if (isClosed(p))
@@ -373,36 +349,18 @@ window.StudentPageView = (function () {
     return 'sp-piece-' + String(id).replace(/[^A-Za-z0-9_-]/g, '');
   }
 
-  /* What You're Graded On, on work not back yet (the To Do card board): its
-     competencies by name, each with its I Can lines when the server sends
-     them, and See the Rubric when it has one. */
-  function gradedOnHtml(p) {
-    var names = p.gradedOn || [];
-    if (!names.length && !p.rubric) return '';
+  /* See the Rubric, on work not back yet that has one: the one thing
+     about how it is graded a student looks for before starting. What
+     You're Graded On, its I Can lines and its Core Competencies came off
+     the card (Colin, 2026-11-14: "far too wordy"). */
+  function rubricLinkHtml(p) {
+    if (!p.rubric) return '';
     return (
-      '<div class="sp-graded-on"><span class="sp-graded-on-title">What You’re Graded On</span>' +
-      names
-        .map(function (g) {
-          return (
-            '<span class="sp-graded-on-name">' +
-            esc(g.name) +
-            '</span>' +
-            (g.iCan || [])
-              .map(function (line) {
-                return '<span class="sp-graded-on-ican">' + esc(line) + '</span>';
-              })
-              .join('')
-          );
-        })
-        .join('') +
-      (p.rubric
-        ? '<button type="button" class="sp-link-btn" data-act="whole" data-piece="' +
-          esc(p.id) +
-          '">See the Rubric' +
-          GO_ARROW +
-          '</button>'
-        : '') +
-      '</div>'
+      '<button type="button" class="sp-link-btn sp-rubric-link" data-act="whole" data-piece="' +
+      esc(p.id) +
+      '">See the Rubric' +
+      GO_ARROW +
+      '</button>'
     );
   }
 
@@ -412,26 +370,6 @@ window.StudentPageView = (function () {
   function hasFeedback(p) {
     if (!p || !p.result || !p.result.text) return false;
     return p.kind === 'back' || (!!p.revision && (p.kind === 'revise' || p.kind === 'sent'));
-  }
-
-  /* One card. A returned piece not opened since it came back carries its
-     id as data-unseen: the student page counts it opened once the card has
-     been on screen. */
-  // The Core Competencies a piece is for, under What You're Graded On.
-  function coreHtml(p) {
-    var list = p.coreCompetencies || [];
-    if (!list.length) return '';
-    return (
-      '<div class="sp-core"><span class="sp-graded-on-title sp-core-label">' +
-      (list.length === 1 ? 'Core Competency' : 'Core Competencies') +
-      '</span>' +
-      list
-        .map(function (c) {
-          return '<span class="sp-core-name">' + esc(c.name) + '</span>';
-        })
-        .join('') +
-      '</div>'
-    );
   }
 
   /* ── Sending (S5-F2, S5-F3; the artboard's "To Do Card", "Closed
@@ -637,9 +575,7 @@ window.StudentPageView = (function () {
   function compareHtml(view, p) {
     var r = p.revision;
     var b = r.before;
-    var sub = [view.course && view.course.name, 'Revision returned ' + fmtDate(p.returnedAt, DAY)]
-      .filter(Boolean)
-      .join(SEP);
+    var sub = 'Revision returned ' + fmtDate(p.returnedAt, DAY);
     /* The Before and After boards: one card with both versions, each row's
        level then and now and Your Result; what was asked and what the
        student did in one card under it. On a Chromebook the versions sit
@@ -647,7 +583,7 @@ window.StudentPageView = (function () {
     var reflect = reflectButtonHtml(view, p, true);
     return (
       '<section class="sp-feedback sp-ba" aria-labelledby="sp-fb-title">' +
-      feedbackHead('Assignments', 'feedback-close', p.title, sub, p.unseen ? p.id : '', 'sp-fb-title') +
+      feedbackHead(backWord(p, view), 'feedback-close', p.title, sub, p.unseen ? p.id : '', 'sp-fb-title') +
       '<div class="sp-ba-body"><div class="sp-ba-card">' +
       '<h2 class="sp-ba-title">Before and After</h2>' +
       '<div class="sp-ba-versions">' +
@@ -687,15 +623,10 @@ window.StudentPageView = (function () {
   }
 
   // The teacher's comment on a returned card.
-  function cardCommentHtml(p) {
-    if (!p.comment) return '';
-    return '<p class="sp-piece-comment">' + esc(p.comment) + '</p>';
-  }
-
   /* A card's first line: its unit on the left and, on work still to do, when
      it is due on the right (the To Do Card board). Nothing when it has neither. */
-  function headHtml(p) {
-    var due = duePill(p);
+  function headHtml(p, view) {
+    var due = duePill(p, view);
     if (!p.unit && !due) return '';
     return (
       '<div class="sp-piece-head">' +
@@ -862,23 +793,43 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* Where a piece lives: Outstanding or Upcoming on Assignments, or My
+     Learning for work sent, back or excused. { tab, segment }. */
+  function homeOf(p, view) {
+    var seg = segmentOf(p, view);
+    return seg ? { tab: 'assignments', segment: seg } : { tab: 'learning', segment: '' };
+  }
+  // The pieces listed beside an open one on a Chromebook: its segment's, or My Learning's.
+  function homeList(view, home) {
+    return home.tab === 'assignments' ? inSegment(view, home.segment) : learningPieces(view);
+  }
+  // Over a piece opened from Assignments, the segments (hidden on a phone, page-view.css).
+  function homeTop(ui, view, home) {
+    return home.tab === 'assignments'
+      ? '<div class="sp-fb-segments">' + segmentsHtml(Object.assign({}, ui, { segment: home.segment }), view) + '</div>'
+      : '';
+  }
+  function backWord(p, view) {
+    return homeOf(p, view).tab === 'learning' ? 'My Learning' : 'Assignments';
+  }
+
   // A handout open in place of the cards, with the list on the left on a Chromebook.
   function handoutBody(ui, view, open) {
-    var seg = segmentOf(open.piece) || ui.segment || 'todo';
-    var pieces = inSegment(view, seg);
+    var home = homeOf(open.piece, view);
     return (
-      '<div class="sp-fb-segments">' +
-      segmentsHtml(Object.assign({}, ui, { segment: seg }), view) +
-      '</div>' +
+      homeTop(ui, view, home) +
       '<div class="sp-split sp-split-feedback">' +
-      sideHtml(pieces, open.piece) +
+      sideHtml(homeList(view, home), open.piece, view) +
       handoutPaneHtml(ui, open) +
       '</div>'
     );
   }
 
-  function cardHtml(p, picked) {
-    var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
+  /* One card: its unit and when it is due, the title, where it stands,
+     the teacher's instructions (the Description), the handouts and links,
+     the student's plan from last time, See the Rubric, and Send My Work.
+     The same card shows work sent, opened from My Learning. */
+  function cardHtml(p, picked, view) {
     var todo = p.kind === 'due' || p.kind === 'missing';
     var tags = pills(p);
     return (
@@ -887,28 +838,23 @@ window.StudentPageView = (function () {
       (picked ? ' sp-picked' : '') +
       '" data-piece="' +
       esc(p.id) +
-      '"' +
-      (unseen ? ' data-unseen="' + esc(p.id) + '"' : '') +
-      ' aria-labelledby="' +
+      '" aria-labelledby="' +
       domId(p.id) +
       '"><div class="sp-piece-card">' +
-      headHtml(p) +
+      headHtml(p, view) +
       '<h2 class="sp-piece-title" id="' +
       domId(p.id) +
       '" tabindex="-1">' +
       esc(p.title) +
       '</h2>' +
       (tags ? '<div class="sp-piece-tags">' + tags + '</div>' : '') +
-      (todo && p.category
-        ? '<p class="sp-piece-category"><span class="sp-category-pill">' + esc(p.category.name) + '</span></p>'
+      ((todo || p.kind === 'sent' || p.kind === 'revise') && p.description
+        ? '<p class="sp-piece-about">' + esc(p.description) + '</p>'
         : '') +
-      (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
-      (todo ? resourcesHtml(p) : '') +
+      (todo || p.kind === 'revise' ? resourcesHtml(p) : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
-      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
-      (p.kind === 'back' ? cardCommentHtml(p) : '') +
       (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) : '') +
-      (todo ? gradedOnHtml(p) + coreHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
+      (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
       reviseBlockHtml(p, 'card') +
       (hasCompare(p)
         ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="compare" data-piece="' +
@@ -933,32 +879,33 @@ window.StudentPageView = (function () {
     return pieces[0] || null;
   }
 
-  /* The cards of one of To Do, Sent and Back. On a phone they sit side by
-     side and the student swipes between them ("1 of 3"); on a Chromebook
-     the list is on the left and the card picked on the right (the
-     Chromebook board). page-view.css shows one or the other. */
+  /* The cards of Outstanding or Upcoming. On a phone they sit one under
+     another and the student scrolls down through them (Colin, 2026-11-14:
+     "they're used to scroll"); on a Chromebook the list is on the left and
+     the card picked on the right. page-view.css shows one or the other. */
   function deckHtml(ui, pieces, view) {
     var picked = pieceIn(pieces, ui.pick);
     return (
       '<div class="sp-split">' +
-      sideHtml(pieces, picked) +
+      sideHtml(pieces, picked, view) +
       '<div class="sp-deck">' +
       pieces
         .map(function (p) {
-          return cardHtml(p, p === picked);
+          return cardHtml(p, p === picked, view);
         })
         .join('') +
-      '</div></div>' +
-      (pieces.length > 1
-        ? '<p class="sp-deck-count" aria-hidden="true">' +
-          esc(pieces.indexOf(picked) + 1 + ' of ' + pieces.length) +
-          '</p>'
-        : '')
+      '</div></div>'
     );
   }
 
+  // A side row's press: a card on Assignments; on My Learning, the feedback, or the card of work sent.
+  function sideAct(p, view) {
+    if (segmentOf(p, view)) return 'pick';
+    return hasFeedback(p) && p.kind !== 'sent' ? 'feedback' : 'open-piece';
+  }
+
   // The Chromebook's list on the left, the piece picked marked.
-  function sideHtml(pieces, picked) {
+  function sideHtml(pieces, picked, view) {
     return (
       '<ul class="sp-side">' +
       pieces
@@ -968,7 +915,9 @@ window.StudentPageView = (function () {
           return (
             '<li><button type="button" class="sp-side-row' +
             (on ? ' sp-side-on' : '') +
-            '" data-act="pick" data-piece="' +
+            '" data-act="' +
+            sideAct(p, view) +
+            '" data-piece="' +
             esc(p.id) +
             '" aria-pressed="' +
             (on ? 'true' : 'false') +
@@ -1017,15 +966,9 @@ window.StudentPageView = (function () {
     if (!view || !ui.feedback) return null;
     var p = pieceIn(view.work, ui.feedback);
     if (!p || p.id !== ui.feedback) return null;
-    if (ui.whole) return p.rubric && segmentOf(p) ? p : null;
+    if (ui.whole) return p.rubric && p.kind !== 'excused' ? p : null;
     if (ui.compare) return hasCompare(p) ? p : null;
     return hasFeedback(p) ? p : null;
-  }
-
-  // Under Your Result: the piece's category and what it counts, when the server sends it.
-  function categoryHtml(p) {
-    var line = categoryLine(p.category);
-    return line ? '<p class="sp-fb-category">' + esc(line) + '</p>' : '';
   }
 
   /* Your Result: the level's word, large, with the result beside it, then a
@@ -1048,13 +991,13 @@ window.StudentPageView = (function () {
         '" style="width:' +
         Math.max(0, Math.min(100, Number(r.bar) || 0)) +
         '%"></span></span></span>' +
-        categoryHtml(p) +
         '</section>'
       );
     }
     var big = r.word || r.text;
     var beside = r.word ? r.text : '';
-    var rows = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (row) {
+    // A rubric's rows are under Your Rubric; competencies marked without one are listed here.
+    var rows = (p.rubric ? [] : p.competencies || []).filter(function (row) {
       return row.text;
     });
     return (
@@ -1066,7 +1009,6 @@ window.StudentPageView = (function () {
       '</span>' +
       (beside ? '<span class="sp-fb-beside">' + esc(beside) + '</span>' : '') +
       '</span>' +
-      categoryHtml(p) +
       (rows.length
         ? '<ul class="sp-fb-rows">' +
           rows
@@ -1100,13 +1042,13 @@ window.StudentPageView = (function () {
     });
   }
 
-  /* What the Levels Mean: open until the student closes it (ui.levels set
-     means closed), above Your Rubric (the Your Feedback board). On a
-     Chromebook it is always open, the four chips in a row (page-view.css). */
+  /* What the Levels Mean: closed until the student opens it (ui.levels set
+     means open), at the foot of Your Feedback. On a Chromebook it is always
+     open, the four chips in a row (page-view.css). */
   function levelsHtml(view, ui) {
     var levels = view.levels || [];
     if (!levels.length) return '';
-    var open = !ui.levels;
+    var open = !!ui.levels;
     return (
       '<section class="sp-fb-card sp-fb-levels' +
       (open ? '' : ' sp-fb-levels-shut') +
@@ -1153,68 +1095,37 @@ window.StudentPageView = (function () {
     return '<span class="sp-fb-words">' + esc(text) + '</span>';
   }
 
-  function checksHtml(checks, mark) {
-    return checks
-      .map(function (k) {
-        return '<span class="sp-fb-check">' + mark + '<span>' + esc(k.label) + '</span></span>';
-      })
-      .join('');
-  }
-
-  /* One criterion's card under Your Rubric. A Standard rubric: what the
-     level given means here and what the next level up asks. An Advanced
-     Rubric: the boxes ticked, and the next level's boxes still to show. A
-     Single-Point Rubric: the goal, then Went Beyond or Work On. Then the
-     teacher's comment on the criterion (on a Single-Point Rubric that is
-     Work On). */
+  /* One criterion under Your Rubric: its name, the level given, and the
+     teacher's comment on it; on a Single-Point Rubric the teacher's two
+     notes, Went Beyond and Work On. What each level means is on The Whole
+     Rubric, not here (Colin, 2026-11-14: the rubric scores and the
+     teacher's comments, cleanly). */
   function criterionHtml(style, row) {
-    var parts = '';
-    var lv = lvClass(row.level);
+    var notes = '';
     if (style === 'single_point') {
-      if (row.goal) parts += partHtml('plain sp-fb-goal', 'The Goal', wordsHtml(row.goal));
-      if (row.beyond) parts += partHtml('blue', 'Went Beyond', wordsHtml(row.beyond));
-      if (row.comment) parts += partHtml('amber', 'Work On', wordsHtml(row.comment));
-    } else {
-      if (style === 'advanced') {
-        if (row.shown && row.shown.length) {
-          parts += partHtml('plain sp-fb-lvt-' + lv, 'What You Showed', checksHtml(row.shown, TICKED));
-        }
-        if (row.next && row.next.checks.length) {
-          parts += partHtml('amber', 'To Reach ' + row.next.name + ', Also Show', checksHtml(row.next.checks, NOT_YET));
-        }
-      } else {
-        if (row.descriptor && row.levelName) {
-          parts += partHtml(
-            'plain sp-fb-lvt-' + lv,
-            'What ' + row.levelName + ' Means Here',
-            wordsHtml(row.descriptor),
-          );
-        }
-        if (row.next && row.next.descriptor) {
-          parts += partHtml('amber', 'To Reach ' + row.next.name, wordsHtml(row.next.descriptor), TO_ARROW);
-        }
-      }
-      if (row.comment) parts += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
+      if (row.beyond) notes += partHtml('blue', 'Went Beyond', wordsHtml(row.beyond));
+      if (row.comment) notes += partHtml('amber', 'Work On', wordsHtml(row.comment));
+    } else if (row.comment) {
+      notes += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
     }
     return (
-      '<section class="sp-fb-card sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
+      '<li class="sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
       esc(row.name) +
       '</h3>' +
       (row.text ? chipHtml(row.text, row.level) : '') +
       '</div>' +
-      (towardLine(row.toward) ? '<p class="sp-fb-toward">' + esc(towardLine(row.toward)) + '</p>' : '') +
-      parts +
-      '</section>'
+      notes +
+      '</li>'
     );
   }
 
-  // The piece's class and when it came back: "Science 8 · Returned Nov 3".
+  // When a piece came back, or when its revision is due: "Returned Nov 3".
   function feedbackSub(view, p) {
-    var when = p.kind === 'back' ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '';
     if (p.kind === 'revise' && p.revision) {
-      when = p.revision.reviseBy ? 'Revise by ' + fmtDate(p.revision.reviseBy, DUE_DAY) : 'Needs Revision';
+      return p.revision.reviseBy ? 'Revise by ' + fmtDate(p.revision.reviseBy, DUE_DAY) : 'Needs Revision';
     }
-    return [view.course && view.course.name, when].filter(Boolean).join(SEP);
+    if (p.updated) return 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY);
+    return p.returnedAt ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '';
   }
 
   /* The top of Your Feedback and The Whole Rubric: the way back (on a
@@ -1266,7 +1177,7 @@ window.StudentPageView = (function () {
     return (
       '<section class="sp-feedback" aria-labelledby="sp-fb-title">' +
       feedbackHead(
-        'Assignments',
+        backWord(p, view),
         'feedback-close',
         p.title,
         feedbackSub(view, p),
@@ -1281,21 +1192,25 @@ window.StudentPageView = (function () {
       yourResultHtml(p) +
       fbCommentHtml(p) +
       '</div>' +
+      // A returned revision (S11-F2): its first version beside it.
+      (hasCompare(p)
+        ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="compare" data-piece="' +
+          esc(p.id) +
+          '">Before and After</button>'
+        : '') +
       (crits
-        ? (withLevels ? levelsHtml(view, ui) : '') +
-          '<h2 class="sp-fb-section">Your Rubric</h2>' +
-          '<div class="sp-fb-crits">' +
+        ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
+          '<ul class="sp-fb-crits">' +
           crits +
-          '</div>' +
+          '</ul>' +
           (style !== 'single_point'
             ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="whole" data-piece="' +
               esc(p.id) +
               '">See the Whole Rubric</button>'
             : '')
-        : withLevels
-          ? levelsHtml(view, ui)
-          : '') +
+        : '') +
       reflectButtonHtml(view, p) +
+      (withLevels ? levelsHtml(view, ui) : '') +
       '</section>'
     );
   }
@@ -1614,19 +1529,16 @@ window.StudentPageView = (function () {
     );
   }
 
-  /* Your Feedback, or The Whole Rubric, in place of the cards. On a
-     Chromebook the list stays on the left, as on the board; on a phone the
-     screen is the feedback alone. */
+  /* Your Feedback, The Whole Rubric, Before and After or See Your Work, in
+     place of the list it was opened from. On a Chromebook that list stays
+     on the left; on a phone the screen is the piece alone. */
   function feedbackBody(ui, view, p) {
-    var seg = segmentOf(p);
-    var pieces = inSegment(view, seg);
+    var home = homeOf(p, view);
     return (
-      '<div class="sp-fb-segments">' +
-      segmentsHtml(Object.assign({}, ui, { segment: seg }), view) +
-      '</div>' +
+      homeTop(ui, view, home) +
       noResultsHtml(ui, view) +
       '<div class="sp-split sp-split-feedback">' +
-      sideHtml(pieces, p) +
+      sideHtml(homeList(view, home), p, view) +
       (ui.whole
         ? wholeHtml(view, p)
         : ui.compare
@@ -1639,105 +1551,14 @@ window.StudentPageView = (function () {
   }
 
   function assignmentsBody(ui, view) {
-    var seg = ui.segment || 'todo';
+    var seg = segmentIn(ui);
     var pieces = inSegment(view, seg);
     return (
       // The tab's name, for the keyboard and a screen reader; the segments say the rest.
       '<h1 class="sp-page-title sp-hidden-title" tabindex="-1">Assignments</h1>' +
       segmentsHtml(ui, view) +
-      noResultsHtml(ui, view) +
-      (!view.work.length
-        ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
-        : pieces.length
-          ? deckHtml(ui, pieces, view)
-          : seg === 'todo'
-            ? caughtUpHtml()
-            : EMPTY[seg])
+      (pieces.length ? deckHtml(ui, pieces, view) : seg === 'outstanding' ? caughtUpHtml(view) : NOTHING_UPCOMING)
     );
-  }
-
-  /* ── All Assignments (the artboard's board): search, filters, every
-     piece; a row opens its card. ───────────────────────────── */
-
-  var FILTERS = [
-    { id: 'all', label: 'All' },
-    { id: 'todo', label: 'To Do' },
-    { id: 'sent', label: 'Sent' },
-    { id: 'back', label: 'Back' },
-  ];
-  // Needs Revision (the All Assignments board's), shown while a piece of the class has a revision (S11-F2).
-  var REVISE_FILTER = { id: 'revise', label: 'Needs Revision' };
-
-  /* What Changed Since You Last Looked (the artboard's board): the pieces
-     back or updated that the student has not opened since. */
-  function changedIds(view) {
-    var ids = {};
-    (view.changes || []).forEach(function (c) {
-      ids[c.id] = c.why;
-    });
-    return ids;
-  }
-
-  /* "3 Things Since You Last Looked", and a line saying what they are. The
-     board's line named the teacher ("Mr. Brown answered your question…");
-     the page never does (Colin's ruling 112). Answers and revisions come
-     with S10 and S11. */
-  function sinceHtml(view) {
-    var changes = view.changes || [];
-    if (!changes.length) return '';
-    var back = changes.filter(function (c) {
-      return c.why === 'back';
-    }).length;
-    var revise = changes.filter(function (c) {
-      return c.why === 'revise';
-    }).length;
-    var updated = changes.length - back - revise;
-    var bits = [];
-    if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
-    if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
-    // The board's "…asked for 1 revision.", with no name (S11-F2).
-    if (revise) bits.push('your teacher asked for ' + (revise === 1 ? '1 revision' : revise + ' revisions'));
-    var line =
-      (bits.length > 2 ? bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1] : bits.join(' and ')) + '.';
-    return (
-      '<div class="sp-since"><p class="sp-since-title">' +
-      esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
-      '</p><p class="sp-since-line">' +
-      esc(line.charAt(0).toUpperCase() + line.slice(1)) +
-      '</p></div>'
-    );
-  }
-
-  // What the search words and the filter leave of the list. The words are matched against the title.
-  function matching(view, ui) {
-    var words = String(ui.search || '')
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
-    var filter = ui.filter || 'all';
-    var changed = changedIds(view);
-    return view.work.filter(function (p) {
-      if (filter === 'new') {
-        if (!changed[p.id]) return false;
-      } else if (filter === 'revise') {
-        if (p.kind !== 'revise') return false;
-      } else if (filter !== 'all' && segmentOf(p) !== filter) return false;
-      var title = String(p.title || '').toLowerCase();
-      return words.every(function (w) {
-        return title.indexOf(w) >= 0;
-      });
-    });
-  }
-
-  // Which of To Do, Sent and Back a piece is in, or '' (Excused).
-  function segmentOf(p) {
-    return p.kind === 'back'
-      ? 'back'
-      : p.kind === 'sent'
-        ? 'sent'
-        : p.kind === 'due' || p.kind === 'missing' || p.kind === 'revise'
-          ? 'todo'
-          : '';
   }
 
   var BACK_ARROW =
@@ -1745,145 +1566,20 @@ window.StudentPageView = (function () {
   var NEXT_ARROW =
     '<svg class="sp-row-go" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>';
 
-  /* One row of All Assignments. It opens the piece's card; Excused work has
-     no card, so its row opens nothing. */
-  function allRowHtml(p, why) {
-    var by = p.revision && p.revision.reviseBy;
-    var v = rowView(p);
-    var inner =
-      '<span class="sp-dot sp-dot-' +
-      kindOf(p) +
-      '" aria-hidden="true"></span><span class="sp-row-text"><span class="sp-row-title">' +
-      esc(v.title) +
-      '</span>' +
-      (v.sub ? '<span class="sp-row-sub">' + esc(v.sub) + '</span>' : '') +
-      // A piece back since the student last looked says so (the board's "Returned").
-      (why === 'back' ? '<span class="sp-row-flags"><span class="sp-row-flag">Returned</span></span>' : '') +
-      // A revision asked for since the student last looked (the board's "Revise by Nov 10").
-      (why === 'revise' && by
-        ? '<span class="sp-row-flags"><span class="sp-row-flag sp-row-flag-revise">' +
-          esc('Revise by ' + fmtDate(by, DAY)) +
-          '</span></span>'
-        : '') +
-      '</span>' +
-      (v.result ? '<span class="sp-row-result">' + esc(v.result) + '</span>' : '');
-    return (
-      '<li class="sp-row"' +
-      (v.unseen ? ' data-unseen="' + esc(v.unseen) + '"' : '') +
-      '>' +
-      (segmentOf(p)
-        ? '<button type="button" class="sp-row-open" data-act="open-piece" data-piece="' +
-          esc(p.id) +
-          '">' +
-          inner +
-          NEXT_ARROW +
-          '</button>'
-        : '<span class="sp-row-open">' + inner + '</span>') +
-      '</li>'
-    );
-  }
-
-  function allBody(ui, view) {
-    var changed = changedIds(view);
-    var news = (view.changes || []).length;
-    var revising = view.work.some(function (p) {
-      return !!p.revision;
-    });
-    // New with nothing new (it was all opened) shows everything; so does Needs Revision with no revision.
-    var filter = (ui.filter === 'new' && !news) || (ui.filter === 'revise' && !revising) ? 'all' : ui.filter || 'all';
-    var shown = matching(view, Object.assign({}, ui, { filter: filter }));
-    return (
-      '<div class="sp-all-head"><button type="button" class="sp-head-icon" data-act="all-close" aria-label="Back to cards">' +
-      BACK_ARROW +
-      '</button><h1 class="sp-page-title" tabindex="-1">All Assignments</h1></div>' +
-      '<label class="sp-hidden-title" for="sp-search">Search assignments</label>' +
-      '<input id="sp-search" class="sp-search" type="search" placeholder="Search assignments" autocomplete="off" value="' +
-      esc(ui.search || '') +
-      '">' +
-      '<div class="sp-filters" role="group" aria-label="Show">' +
-      FILTERS.concat(news ? [{ id: 'new', label: 'New ' + news }] : [], revising ? [REVISE_FILTER] : [])
-        .map(function (f) {
-          var on = f.id === filter;
-          return (
-            '<button type="button" class="sp-filter' +
-            (on ? ' sp-filter-on' : '') +
-            '" data-act="filter" data-filter="' +
-            f.id +
-            '" aria-pressed="' +
-            (on ? 'true' : 'false') +
-            '">' +
-            esc(f.label) +
-            '</button>'
-          );
-        })
-        .join('') +
-      '</div>' +
-      noResultsHtml(ui, view) +
-      sinceHtml(view) +
-      (!view.work.length
-        ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
-        : shown.length
-          ? groupsOf(shown)
-              .map(function (g) {
-                return (
-                  (g.head ? '<h2 class="sp-list-head">' + esc(g.head) + '</h2>' : '') +
-                  '<ul class="sp-list">' +
-                  g.rows
-                    .map(function (p) {
-                      return allRowHtml(p, changed[p.id]);
-                    })
-                    .join('') +
-                  '</ul>'
-                );
-              })
-              .join('')
-          : '<p class="sp-lead sp-empty" role="status">Nothing matches.</p>')
-    );
-  }
-
-  /* All Assignments' groups (the board's "This Week" and "Unit 1 ·
-     Medieval Europe"): work still to hand in first, under This Week; then
-     the rest under its unit, in the order the units come; work with no
-     unit last, in a list of its own with no heading. With no unit and
-     nothing to hand in, one list as before. */
-  function groupsOf(rows) {
-    var now = rows.filter(function (p) {
-      return p.kind === 'due' || p.kind === 'missing';
-    });
-    var rest = rows.filter(function (p) {
-      return p.kind !== 'due' && p.kind !== 'missing';
-    });
-    var units = [];
-    var byUnit = {};
-    var loose = [];
-    rest.forEach(function (p) {
-      var u = String(p.unit || '').trim();
-      if (!u) return loose.push(p);
-      if (!byUnit[u]) units.push((byUnit[u] = { head: u, rows: [] }));
-      byUnit[u].rows.push(p);
-    });
-    var out = [];
-    // A heading only says something when another group sits beside it.
-    if (now.length) out.push({ head: rest.length ? 'This Week' : '', rows: now });
-    return out.concat(units, loose.length ? [{ head: '', rows: loose }] : []);
-  }
-
-  /* The other three tabs. My Learning is a class switch, Show My Learning,
-     that comes with S13 and is off until then. Questionnaires and Reports
-     list what the view holds (S4-F4); with nothing there, each says so
-     plainly. */
+  /* The tabs besides Assignments. Reflections (the student's
+     questionnaires: Core Competency self-reflections and the rest; Colin,
+     2026-11-14, "change questionnaires to reflections") lists what the
+     view holds; with nothing there it says so plainly. */
   var TAB_BODIES = {
-    learning: { title: 'My Learning', line: 'Your teacher hasn’t turned on My Learning for this class.' },
-    questionnaires: { title: 'Questionnaires', line: 'Questionnaires from your teacher will show here.' },
-    reports: { title: 'My Reports', line: 'Reports from your teacher will show here.' },
+    learning: { title: 'My Learning', line: '' },
+    questionnaires: { title: 'Reflections', line: 'Reflections from your teacher will show here.' },
   };
 
-  /* ── Questionnaires and My Reports (the artboard's "Questionnaires Tab",
-     "My Reports Tab", "Questions on a Chromebook" and "Reports on a
-     Chromebook"). On a phone: what is open as a card, the rest as a list.
-     On a Chromebook: the list on the left, the one picked on the right.
-     Start and See Your Report are the student page's own presses
-     (s/app.js); in the preview nothing answers them. ───────── */
+  /* ── Reflections (the artboard's "Questionnaires Tab" and "Questions on
+     a Chromebook"). On a phone: Open Now as cards with Start, then Done
+     and Coming Up as lists. On a Chromebook: the list on the left, the one
+     picked on the right. Start is the student page's own press
+     (s/app.js); in the preview nothing answers it. ───────── */
 
   var DONE_MARK =
     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -1895,10 +1591,6 @@ window.StudentPageView = (function () {
     if (q.state === 'sent') return q.sentOn ? 'Sent ' + fmtDate(q.sentOn, DAY) : 'Sent';
     if (q.state === 'soon') return q.opensOn ? 'Opens ' + fmtDate(q.opensOn, DAY) : '';
     return q.until ? 'Open until ' + fmtDate(q.until, DAY) : '';
-  }
-  // A report's date and how long it stays open: "Nov 20 · Open until Nov 27".
-  function reportWhen(r) {
-    return [fmtDate(r.issued, DAY), r.until ? 'Open until ' + fmtDate(r.until, DAY) : ''].filter(Boolean).join(SEP);
   }
   function aboutMinutes(q) {
     return q.minutes > 0 ? 'about ' + q.minutes + ' minutes' : '';
@@ -1986,17 +1678,35 @@ window.StudentPageView = (function () {
     );
   }
 
+  // A heading over one part of the phone's list: Open Now, Done, Coming Up.
+  function formsPartHtml(title, html) {
+    return html ? '<h2 class="sp-list-head">' + esc(title) + '</h2>' + html : '';
+  }
+
   function questionnairesBody(view, ui) {
     var items = view.questionnaires;
-    var open = items.filter(function (q) {
-      return q.state === 'open';
-    });
-    var rest = items.filter(function (q) {
-      return q.state !== 'open';
-    });
+    var of = function (state) {
+      return items.filter(function (q) {
+        return q.state === state;
+      });
+    };
+    var open = of('open');
+    var done = of('sent');
+    var soon = of('soon');
+    var rows = function (list, mark) {
+      return list.length
+        ? '<ul class="sp-list">' +
+            list
+              .map(function (q) {
+                return formRow(q, formWhen(q), mark, '');
+              })
+              .join('') +
+            '</ul>'
+        : '';
+    };
     var picked = pieceIn(items, ui.form);
     return (
-      '<h1 class="sp-page-title" tabindex="-1">Questionnaires</h1>' +
+      '<h1 class="sp-page-title" tabindex="-1">Reflections</h1>' +
       '<div class="sp-split sp-forms">' +
       formSide(items, picked, formWhen, function (q) {
         return q.state === 'open' ? 'missing' : q.state === 'sent' ? 'back' : 'due';
@@ -2004,94 +1714,33 @@ window.StudentPageView = (function () {
       '<div class="sp-forms-main"><div class="sp-forms-desk">' +
       formCard(view, picked, true) +
       '</div><div class="sp-forms-phone">' +
-      open
-        .map(function (q) {
-          return formCard(view, q, false);
-        })
-        .join('') +
-      (rest.length
-        ? '<ul class="sp-list">' +
-          rest
-            .map(function (q) {
-              return formRow(q, formWhen(q), q.state === 'sent' ? ['done', DONE_MARK] : ['soon', SOON_MARK], '');
-            })
-            .join('') +
-          '</ul>'
-        : '') +
+      formsPartHtml(
+        'Open Now',
+        open
+          .map(function (q) {
+            return formCard(view, q, false);
+          })
+          .join(''),
+      ) +
+      formsPartHtml('Done', rows(done, ['done', DONE_MARK])) +
+      formsPartHtml('Coming Up', rows(soon, ['soon', SOON_MARK])) +
       '</div></div></div>'
     );
   }
 
-  /* One report as a card: its title (New until it is opened), when, the
-     class with the report's result as the teacher sent it, the comment. */
-  function reportCard(view, r) {
-    var shown = r.result.word || r.result.text;
-    return (
-      '<section class="sp-form-card"><div class="sp-report-head"><h2 class="sp-form-title" tabindex="-1">' +
-      esc(r.title) +
-      '</h2>' +
-      (r.isNew ? '<span class="sp-flag sp-flag-new">New</span>' : '') +
-      '</div><p class="sp-form-sub">' +
-      esc(reportWhen(r)) +
-      '</p>' +
-      (shown
-        ? '<div class="sp-report-result"><span class="sp-report-class">' +
-          esc((view.course && view.course.name) || '') +
-          '</span>' +
-          chipHtml(shown, r.result.level) +
-          '</div>'
-        : '') +
-      (r.comment ? '<p class="sp-report-comment">' + esc(r.comment) + '</p>' : '') +
-      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="r-open" data-form-id="' +
-      esc(r.id) +
-      '">See Your Report</button></section>'
-    );
-  }
-
-  function reportsBody(view, ui) {
-    var items = view.reports;
-    var picked = pieceIn(items, ui.form);
-    var line = function (r) {
-      return [r.isNew ? 'New' : '', reportWhen(r)].filter(Boolean).join(SEP);
-    };
-    return (
-      '<h1 class="sp-page-title" tabindex="-1">My Reports</h1>' +
-      '<div class="sp-split sp-forms">' +
-      formSide(items, picked, line, function (r) {
-        return r.isNew ? 'new' : 'due';
-      }) +
-      '<div class="sp-forms-main"><div class="sp-forms-desk">' +
-      reportCard(view, picked) +
-      '</div><div class="sp-forms-phone">' +
-      reportCard(view, items[0]) +
-      (items.length > 1
-        ? '<ul class="sp-list">' +
-          items
-            .slice(1)
-            .map(function (r) {
-              return formRow(r, fmtDate(r.issued, DAY), null, 'r-open');
-            })
-            .join('') +
-          '</ul>'
-        : '') +
-      '</div></div></div>'
-    );
-  }
-
-  /* ── My Learning (the artboard's "My Learning" boards for each grading
-     style, "One Skill" with its First Piece and Top Step forms, "Nothing
-     Marked Yet", "Skills Across Two Courses", "Points-Only Class" and "My
-     Learning on a Chromebook"; S13-F2 and F3). Drawn only from
-     view.learning, which shared/student-view.js builds from calc.js on
-     returned work when the class shows My Learning. Every level, letter
-     and % is the view's text. ───────────────────────────────── */
+  /* ── My Learning (Colin, 2026-11-14: "the student's report card, the
+     screen students really want"). The grade at the top when the class
+     shows My Learning (Show My Learning; view.learning, which
+     shared/student-view.js builds from calc.js on returned work), then
+     every piece the student has handed in, that is missing, or that came
+     back, each with what it got; a piece that came back opens Your
+     Feedback. With the switch off the grade is not shown and the list is.
+     Every level, letter and % is the view's text. ──────────────── */
 
   var ML_ICON = {
     next: '<path d="M4 12h15M13 6l6 6-6 6"/>',
-    star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor" stroke="none"/>',
     up: '<path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/>',
     down: '<path d="M12 5v13M6.5 12.5L12 18l5.5-5.5"/>',
-    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/>',
   };
   function mlIcon(name, size) {
     return (
@@ -2105,21 +1754,6 @@ window.StudentPageView = (function () {
       ML_ICON[name] +
       '</svg>'
     );
-  }
-
-  /* A small four-bar picture of a level (the boards' skill rows): the bars
-     up to it in its colour. Words say the level; the picture only repeats it. */
-  function miniBarsHtml(level) {
-    var at = lvClass(level);
-    var out = '<span class="sp-ml-mini sp-ml-at-' + at + '" aria-hidden="true">';
-    for (var i = 1; i <= 4; i++) out += '<i' + (i <= at ? ' class="sp-ml-mini-on"' : '') + '></i>';
-    return out + '</span>';
-  }
-
-  // A skill's level as its row shows it: the little ladder and its word (or %) in a chip, or Not Yet.
-  function skillLevelHtml(s) {
-    if (!s.text) return '<span class="sp-ml-level sp-ml-none">Not Yet</span>';
-    return '<span class="sp-ml-level">' + miniBarsHtml(s.level) + chipHtml(s.text, s.level) + '</span>';
   }
 
   /* What a ladder says to a screen reader: the proficiency and the four
@@ -2186,23 +1820,19 @@ window.StudentPageView = (function () {
     );
   }
 
-  /* Next Step: the comment bank's step for the skill Generate would name,
-     opening that skill. */
+  /* Work On Next: the comment bank's step for the skill Generate would
+     name, one line under the grade. */
   function nextHtml(l) {
     var n = l.next;
     if (!n) return '';
     return (
-      '<button type="button" class="sp-ml-card sp-ml-next" data-act="skill" data-skill="' +
-      esc(n.id) +
-      '">' +
-      mlIcon('next', 20) +
-      '<span class="sp-ml-next-text"><span class="sp-ml-next-title">' +
-      esc('Next Step: ' + n.name) +
+      '<div class="sp-ml-next">' +
+      mlIcon('next', 18) +
+      '<p class="sp-ml-next-text"><span class="sp-ml-next-title">' +
+      esc('Work On Next: ' + n.name) +
       '</span><span class="sp-ml-next-line">' +
       esc(n.text) +
-      '</span></span>' +
-      NEXT_ARROW +
-      '</button>'
+      '</span></p></div>'
     );
   }
 
@@ -2217,7 +1847,9 @@ window.StudentPageView = (function () {
     if (o.letter && l.mode !== 'proficiency') {
       var ie = o.letter.grade === 'IE';
       return (
-        '<section class="sp-ml-card sp-ml-overall sp-ml-overall-letter"><span class="sp-ml-letter sp-lv-' +
+        '<section class="sp-ml-card sp-ml-overall sp-ml-overall-letter">' +
+        PERIOD +
+        '<div class="sp-ml-overall-row"><span class="sp-ml-letter sp-lv-' +
         lvClass(o.level) +
         '" role="img" aria-label="' +
         esc(ie ? 'IE, In Progress' : o.letter.grade) +
@@ -2229,12 +1861,16 @@ window.StudentPageView = (function () {
         esc(o.letter.pct) +
         '</span>' +
         trendHtml(l) +
-        '</span></section>'
+        '</span></div>' +
+        nextHtml(l) +
+        '</section>'
       );
     }
     if (!o.word) return '';
     return (
-      '<section class="sp-ml-card sp-ml-overall"><div class="sp-ml-overall-text"><p class="sp-ml-at"><span class="sp-ml-at-lead">You’re at</span>' +
+      '<section class="sp-ml-card sp-ml-overall">' +
+      PERIOD +
+      '<div class="sp-ml-overall-row"><div class="sp-ml-overall-text"><p class="sp-ml-at"><span class="sp-ml-at-lead">You’re at</span>' +
       '<span class="sp-ml-at-word sp-ml-ink-' +
       lvClass(o.level) +
       '">' +
@@ -2243,67 +1879,18 @@ window.StudentPageView = (function () {
       trendHtml(l) +
       '</div>' +
       ladderHtml(l.steps, o.level, ladderLabel(l, o.level), false) +
+      '</div>' +
+      nextHtml(l) +
       '</section>'
     );
   }
 
-  function strongestHtml(l) {
-    var s = l.strongest;
-    if (!s || l.mode === 'letter') return '';
-    return (
-      '<button type="button" class="sp-ml-card sp-ml-strongest" data-act="skill" data-skill="' +
-      esc(s.id) +
-      '">' +
-      mlIcon('star', 18) +
-      '<span class="sp-ml-next-text"><span class="sp-ml-strongest-title">Your Strongest</span><span class="sp-ml-strongest-line"><span class="sp-ml-strongest-name">' +
-      esc(s.name) +
-      '</span>' +
-      (s.text ? chipHtml(s.text, s.level) : '') +
-      '</span></span>' +
-      NEXT_ARROW +
-      '</button>'
-    );
-  }
+  // What the grade covers: the year so far (DECISIONS, "Year-to-date grading", 2026-11-03).
+  var PERIOD = '<p class="sp-ml-period">This Year So Far</p>';
 
-  /* Missing work: each piece, oldest first, opening its card. A Letter or
-     Both class counts Missing as 0 in the course %, so it says so; a
-     Proficiency class leaves Missing work out of a level, so it does not. */
-  function missingHtml(l) {
-    var n = l.missing.length;
-    if (!n) return '';
-    var zero = l.mode !== 'proficiency';
-    return (
-      '<section class="sp-ml-card sp-ml-missing"><h2 class="sp-ml-card-title sp-ml-missing-title">' +
-      esc(n + ' Missing') +
-      '</h2>' +
-      (zero
-        ? '<p class="sp-ml-line">' +
-          esc(n === 1 ? 'It counts as 0 until it’s in.' : 'Each counts as 0 until it’s in.') +
-          '</p>'
-        : '') +
-      '<ul class="sp-ml-rows">' +
-      l.missing
-        .map(function (p) {
-          return (
-            '<li><button type="button" class="sp-ml-row" data-act="open-piece" data-piece="' +
-            esc(p.id) +
-            '"><span class="sp-row-text"><span class="sp-row-title">' +
-            esc(p.title) +
-            '</span>' +
-            (p.dueDate ? '<span class="sp-row-sub">' + esc('Due ' + fmtDate(p.dueDate, DAY)) + '</span>' : '') +
-            '</span>' +
-            NEXT_ARROW +
-            '</button></li>'
-          );
-        })
-        .join('') +
-      '</ul></section>'
-    );
-  }
-
-  // What Makes Up Your Grade: each category, what it counts, the student's letter and %.
+  // What Makes Up Your Grade, in a Letter or Both class: each category, what it counts, the student's letter and %.
   function categoriesHtml(l) {
-    if (!l.categories.length) return '';
+    if (l.mode === 'proficiency' || !l.categories.length) return '';
     return (
       '<section class="sp-ml-card"><h2 class="sp-ml-card-title">What Makes Up Your Grade</h2><ul class="sp-ml-rows">' +
       l.categories
@@ -2323,277 +1910,152 @@ window.StudentPageView = (function () {
     );
   }
 
-  function skillRowHtml(s) {
-    return (
-      '<li><button type="button" class="sp-ml-row" data-act="skill" data-skill="' +
-      esc(s.id) +
-      '"><span class="sp-ml-skill-name">' +
-      esc(s.name) +
-      '</span>' +
-      skillLevelHtml(s) +
-      NEXT_ARROW +
-      '</button></li>'
-    );
-  }
-
-  /* Your Skills: in their folders (the first open), under each course's
-     name when there are two. */
-  function skillsHtml(l) {
-    var firstFolder = true;
-    var lastSubject = '';
-    var body = l.groups
-      .map(function (g) {
-        var head = '';
-        if (g.subject && g.subject !== lastSubject) {
-          head = '<h3 class="sp-ml-subject">' + esc(g.subject) + '</h3>';
-          lastSubject = g.subject;
-        }
-        var rows = '<ul class="sp-ml-rows">' + g.skills.map(skillRowHtml).join('') + '</ul>';
-        if (!g.folder) return head + rows;
-        var open = firstFolder;
-        firstFolder = false;
-        var n = g.skills.length;
-        return (
-          head +
-          '<details class="sp-ml-folder"' +
-          (open ? ' open' : '') +
-          '><summary class="sp-ml-folder-head"><span class="sp-ml-folder-name">' +
-          esc(g.folder) +
-          '</span><span class="sp-ml-folder-count">' +
-          esc(n + (n === 1 ? ' skill' : ' skills')) +
-          '</span></summary>' +
-          rows +
-          '</details>'
-        );
+  /* The pieces on My Learning: work sent and waiting first, then the rest
+     newest first (the view's order): missing, excused and back. */
+  function learningPieces(view) {
+    var on = view.work.filter(function (p) {
+      return !segmentOf(p, view) || p.kind === 'missing';
+    });
+    return on
+      .filter(function (p) {
+        return p.kind === 'sent';
       })
-      .join('');
+      .concat(
+        on.filter(function (p) {
+          return p.kind !== 'sent';
+        }),
+      );
+  }
+
+  /* One piece's row: its title, a line on where it stands, and what it got.
+     The line says when it was sent, that Missing counts as 0 in a class
+     with a course % (a Proficiency class leaves Missing work out of a
+     level), and what an updated result was. A blue dot marks a result not
+     opened yet. */
+  function learningRowHtml(p, view) {
+    var zero = view.course && view.course.gradingSystem !== 'proficiency';
+    var sub = '';
+    var chip = '';
+    var act = '';
+    if (p.kind === 'sent') {
+      var sent = (p.send && p.send.sent) || {};
+      var at = sent.at || (p.group && p.group.sentAt) || '';
+      sub = [sentAt(at), 'waiting for feedback'].join(SEP);
+      chip = '<span class="sp-level sp-lv-0">Sent</span>';
+      act = 'open-piece';
+    } else if (p.kind === 'missing') {
+      sub = [p.dueDate ? 'Due ' + fmtDate(p.dueDate, DAY) : '', zero ? 'counts as 0 until it’s in' : '']
+        .filter(Boolean)
+        .join(SEP);
+      chip = '<span class="sp-level sp-lv-missing">Missing</span>';
+      act = 'open-piece';
+    } else if (p.kind === 'excused') {
+      chip = '<span class="sp-level sp-lv-0">Excused</span>';
+    } else {
+      var r = p.result || {};
+      var was = r.was ? 'was ' + r.was : '';
+      sub = (
+        p.updated
+          ? ['Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY), was]
+          : [p.returnedAt ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '']
+      )
+        .concat(p.late ? ['Late'] : [])
+        .filter(Boolean)
+        .join(SEP);
+      chip = r.text ? chipHtml(r.text, r.level) : '';
+      act = hasFeedback(p) ? 'feedback' : '';
+    }
+    var fresh = p.kind === 'back' && p.unseen && p.result && p.result.text;
+    var inner =
+      '<span class="sp-ml-new' +
+      (fresh ? ' sp-ml-new-on' : '') +
+      '" aria-hidden="true"></span><span class="sp-row-text"><span class="sp-row-title">' +
+      esc(p.title) +
+      '</span>' +
+      (sub ? '<span class="sp-row-sub">' + esc(sub) + '</span>' : '') +
+      '</span>' +
+      chip +
+      (fresh ? '<span class="sp-hidden-title">New</span>' : '');
+    /* A result not opened yet carries its id as data-unseen: it counts as
+       opened once its row has been on screen (DECISIONS, "Student page
+       build rulings (2026-11-10, later)" 5), as the Back cards' did. */
     return (
-      '<section class="sp-ml-card sp-ml-skills"><h2 class="sp-ml-card-title">Your Skills</h2>' + body + '</section>'
+      '<li' +
+      (fresh ? ' data-unseen="' + esc(p.id) + '"' : '') +
+      '>' +
+      (act
+        ? '<button type="button" class="sp-ml-row" data-act="' +
+          act +
+          '" data-piece="' +
+          esc(p.id) +
+          '">' +
+          inner +
+          NEXT_ARROW +
+          '</button>'
+        : '<span class="sp-ml-row sp-ml-row-still">' + inner + '</span>') +
+      '</li>'
     );
   }
 
-  /* Your Work: a list of pieces with what each got. A returned piece of the
-     page (a points class: "31 / 40" and its %), or a skill's mark on a
-     piece (One Skill: "Proficient +" and its code). */
-  function workHtml(pieces) {
+  function workListHtml(view) {
+    var pieces = learningPieces(view);
     if (!pieces.length) return '';
     return (
-      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">Your Work</h2><ul class="sp-ml-rows">' +
+      '<section class="sp-ml-card sp-ml-work"><h2 class="sp-ml-card-title">Your Work</h2><ul class="sp-ml-rows">' +
       pieces
         .map(function (p) {
-          var r = p.result;
-          var day = p.date || p.dueDate;
-          var level = r
-            ? r.kind === 'points'
-              ? '<span class="sp-ml-word">' + esc(r.text) + '</span>' + chipHtml(r.percent, r.level)
-              : chipHtml(r.text, r.level)
-            : chipHtml(p.text, p.level);
-          return (
-            '<li class="sp-ml-row sp-ml-row-still"><span class="sp-row-text"><span class="sp-row-title">' +
-            esc(p.title) +
-            '</span>' +
-            (day ? '<span class="sp-row-sub">' + esc(fmtDate(day, DAY)) + '</span>' : '') +
-            '</span><span class="sp-ml-level">' +
-            level +
-            '</span></li>'
-          );
+          return learningRowHtml(p, view);
         })
         .join('') +
       '</ul></section>'
     );
   }
 
-  // Nothing Marked Yet.
+  // Nothing handed in or back yet.
   function nothingYetHtml() {
     return (
-      '<div class="sp-ml-empty"><h1 class="sp-page-title" tabindex="-1">Nothing Marked Yet</h1>' +
-      '<p class="sp-lead">Your learning shows here once your teacher marks your first piece of work.</p>' +
+      '<div class="sp-ml-empty"><h1 class="sp-page-title" tabindex="-1">Nothing Here Yet</h1>' +
+      '<p class="sp-lead">Your work and your feedback show here once you hand something in or your teacher returns it.</p>' +
       '<button type="button" class="sp-btn sp-btn-tint sp-btn-pill" data-act="tab" data-tab="assignments">See Your Assignments</button></div>'
     );
   }
 
-  function skillIn(l, id) {
-    var found = null;
-    l.groups.forEach(function (g) {
-      g.skills.forEach(function (s) {
-        if (!found && s.id === id) found = s;
-      });
-    });
-    return found;
-  }
-
-  /* How It's Going: the last four pieces, oldest on the left, each placed
-     at its mark (a + or − a third of a step), the four steps up the side.
-     Shown from the second piece on. */
-  var CHART = { w: 300, h: 128, left: 70 };
-  function chartY(v) {
-    return Math.round(8 + ((4 - Math.max(1, Math.min(4, Number(v) || 1))) / 3) * (CHART.h - 16));
-  }
-  function chartX(i, n) {
-    return Math.round(CHART.left + 14 + (i * (CHART.w - CHART.left - 28)) / Math.max(1, n - 1));
-  }
-  var HOW_MANY = { 2: 'two', 3: 'three', 4: 'four' };
-  function goingHtml(l, s) {
-    var pts = s.pieces.slice(0, 4).reverse();
-    if (pts.length < 2) return '';
-    var label =
-      'Your last ' +
-      HOW_MANY[pts.length] +
-      ' pieces: ' +
-      pts
-        .map(function (p) {
-          return p.text;
-        })
-        .join(', ');
-    var grid = l.steps
-      .map(function (st) {
-        var y = chartY(st.level);
-        return (
-          '<line x1="' +
-          CHART.left +
-          '" x2="' +
-          CHART.w +
-          '" y1="' +
-          y +
-          '" y2="' +
-          y +
-          '" class="sp-ml-grid"/><text x="0" y="' +
-          (y + 4) +
-          '" class="sp-ml-axis">' +
-          esc(st.name) +
-          '</text>'
-        );
-      })
-      .join('');
-    var path = pts
-      .map(function (p, i) {
-        return (i ? 'L' : 'M') + chartX(i, pts.length) + ' ' + chartY(p.value);
-      })
-      .join(' ');
-    // Each dot in its own level's colour; the latest ringed.
-    var last = pts.length - 1;
-    var dots = pts
-      .map(function (p, i) {
-        var x = chartX(i, pts.length);
-        var y = chartY(p.value);
-        return (
-          (i === last
-            ? '<circle cx="' + x + '" cy="' + y + '" r="8.5" class="sp-ml-ring sp-ml-ring-' + lvClass(p.level) + '"/>'
-            : '') +
-          '<circle cx="' +
-          x +
-          '" cy="' +
-          y +
-          '" r="5" class="sp-ml-dot sp-ml-dot-' +
-          lvClass(p.level) +
-          '"/>'
-        );
-      })
-      .join('');
+  /* The card of a piece sent and waiting, opened from My Learning (Unsend
+     and Replace are on it while they can be used). */
+  function sentCardBody(ui, view, p) {
     return (
-      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">How It’s Going</h2><svg class="sp-ml-chart" viewBox="0 0 ' +
-      CHART.w +
-      ' ' +
-      CHART.h +
-      '" role="img" aria-label="' +
-      esc(label) +
-      '">' +
-      grid +
-      '<path d="' +
-      path +
-      '" class="sp-ml-path sp-ml-path-' +
-      lvClass(s.level) +
-      '"/>' +
-      dots +
-      '</svg><div class="sp-ml-dates" aria-hidden="true">' +
-      pts
-        .map(function (p, i) {
-          return '<span' + (i === last ? ' class="sp-ml-date-last"' : '') + '>' + esc(fmtDate(p.date, DAY)) + '</span>';
-        })
-        .join('') +
-      '</div></section>'
-    );
-  }
-
-  /* One Skill's Next Step (the comment bank's step for the level it shows),
-     or at Extending "You've Reached the Top Step". */
-  function skillNextHtml(l, s) {
-    var n = s.next;
-    if (n && n.top) {
-      // The top step is a step of the ladder, so only where the ladder shows (not a Letter class).
-      if (l.mode === 'letter') return '';
-      return '<p class="sp-ml-card sp-ml-top">' + mlIcon('star', 18) + '<span>You’ve Reached the Top Step</span></p>';
-    }
-    if (!n || !n.text) return '';
-    return (
-      '<section class="sp-ml-card sp-ml-next sp-ml-next-still">' +
-      mlIcon('next', 20) +
-      '<span class="sp-ml-next-text"><h2 class="sp-ml-next-title">Next Step</h2><span class="sp-ml-next-line">' +
-      esc(n.text) +
-      '</span></span></section>'
-    );
-  }
-
-  // One Skill: its I Can lines, the ladder (or its % in a Letter class), How It's Going, Your Work.
-  function skillHtml(l, s) {
-    var levels = l.mode !== 'letter';
-    var where = '';
-    if (levels && s.level) {
-      where =
-        '<section class="sp-ml-card">' + ladderHtml(l.steps, s.level, ladderLabel(l, s.level), true) + '</section>';
-    } else if (s.text) {
-      where = '<section class="sp-ml-card"><ul class="sp-ml-rows">' + skillRowHtml(s) + '</ul></section>';
-    }
-    return (
-      '<div class="sp-ml sp-ml-one"><button type="button" class="sp-fb-back" data-act="skill-close">' +
+      '<div class="sp-split sp-split-feedback">' +
+      sideHtml(learningPieces(view), p, view) +
+      '<section class="sp-feedback sp-ml-card-open">' +
+      '<button type="button" class="sp-fb-back" data-act="card-close">' +
       BACK_ARROW +
-      'My Learning</button><h1 class="sp-page-title" id="sp-ml-skill-title" tabindex="-1">' +
-      esc(s.name) +
-      '</h1>' +
-      (s.iCan.length
-        ? '<ul class="sp-ml-card sp-ml-ican">' +
-          s.iCan
-            .map(function (t) {
-              return '<li>' + mlIcon('target', 18) + '<span>' + esc(t) + '</span></li>';
-            })
-            .join('') +
-          '</ul>'
-        : '') +
-      where +
-      skillNextHtml(l, s) +
-      (levels ? goingHtml(l, s) : '') +
-      (s.pieces.length ? workHtml(s.pieces) : '<p class="sp-lead sp-empty">Nothing marked on this skill yet.</p>') +
-      '</div>'
+      '<span>My Learning</span></button>' +
+      '<div class="sp-deck sp-deck-one">' +
+      cardHtml(p, true, view) +
+      '</div></section></div>'
     );
+  }
+
+  // The sent piece My Learning has open, or null.
+  function cardOpen(view, ui) {
+    if (!view || !ui.card) return null;
+    var p = pieceIn(view.work, ui.card);
+    return p && p.id === ui.card && p.kind === 'sent' ? p : null;
   }
 
   function learningBody(view, ui) {
     var l = view.learning;
-    if (l.empty) return nothingYetHtml();
-    var s = ui.skill ? skillIn(l, ui.skill) : null;
-    if (s) return skillHtml(l, s);
-    var anySkill = l.groups.some(function (g) {
-      return g.skills.some(function (k) {
-        return !!k.text;
-      });
-    });
-    // A Letter class whose work is marked by points alone shows its work, not its skills.
-    var showWork = l.mode === 'letter' && !anySkill;
-    /* The boards' order: the grade, Next Step, Your Strongest (three across
-       on a Chromebook), What Makes Up Your Grade, Missing, the skills. A
-       falling grade puts its Missing work straight under the grade. */
-    var falling = !!(l.trend && l.trend.dir < 0);
+    var grade = l && !l.empty ? overallHtml(l) + categoriesHtml(l) : '';
+    var list = workListHtml(view);
+    if (!grade && !list) return nothingYetHtml();
     return (
-      '<div class="sp-ml"><h1 class="sp-page-title sp-ml-title" tabindex="-1">My Learning</h1><div class="sp-ml-head">' +
-      overallHtml(l) +
-      (falling ? missingHtml(l) : '') +
-      nextHtml(l) +
-      strongestHtml(l) +
-      '</div>' +
-      // A Letter and Skills class leads with its skills, as its board does; a Letter class with its categories.
-      (l.mode === 'letter' ? categoriesHtml(l) : '') +
-      (falling ? '' : missingHtml(l)) +
-      (showWork ? workHtml(l.work) : skillsHtml(l)) +
+      '<div class="sp-ml"><h1 class="sp-page-title sp-ml-title' +
+      (grade ? ' sp-hidden-title' : '') +
+      '" tabindex="-1">My Learning</h1>' +
+      // The results didn't load: say so over the list, with Try Again.
+      noResultsHtml(ui, view) +
+      grade +
+      list +
       '</div>'
     );
   }
@@ -2601,10 +2063,8 @@ window.StudentPageView = (function () {
   function bodyHtml(view, ui) {
     if (ui.waiting || !view) return '<p class="sp-lead sp-empty" role="status">' + esc(WAITING) + '</p>';
     var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
-    if (tab === 'questionnaires' && (view.questionnaires || []).length) return questionnairesBody(view, ui);
-    if (tab === 'reports' && (view.reports || []).length) return reportsBody(view, ui);
-    if (tab === 'learning' && view.learning) return learningBody(view, ui);
-    if (tab !== 'assignments') {
+    if (tab === 'questionnaires') {
+      if ((view.questionnaires || []).length) return questionnairesBody(view, ui);
       return (
         '<h1 class="sp-page-title" tabindex="-1">' +
         esc(TAB_BODIES[tab].title) +
@@ -2613,19 +2073,21 @@ window.StudentPageView = (function () {
         '</p>'
       );
     }
-    if (ui.all) return allBody(ui, view);
     var ho = handoutOpen(view, ui);
     if (ho) return handoutBody(ui, view, ho);
     var fb = feedbackPiece(view, ui);
-    return fb ? feedbackBody(ui, view, fb) : assignmentsBody(ui, view);
+    if (fb) return feedbackBody(ui, view, fb);
+    if (tab === 'learning') {
+      var c = cardOpen(view, ui);
+      return c ? sentCardBody(ui, view, c) : learningBody(view, ui);
+    }
+    return assignmentsBody(ui, view);
   }
 
   /* ── The frame ─────────────────────────────────────────────── */
 
   var CHEVRON =
     '<svg class="sp-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
-  var MENU =
-    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
   var TABS = [
     {
       id: 'assignments',
@@ -2635,23 +2097,34 @@ window.StudentPageView = (function () {
     { id: 'learning', label: 'My Learning', icon: '<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>' },
     {
       id: 'questionnaires',
-      label: 'Questionnaires',
+      label: 'Reflections',
       icon: '<circle cx="12" cy="12" r="8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5v.01"/>',
     },
-    { id: 'reports', label: 'Reports', icon: '<path d="M7 3h7l4 4v14H7z"/><path d="M10 12h5M10 16h5"/>' },
   ];
 
-  /* The four tabs. Drawn twice, once in the header for a Chromebook and
+  /* What is new on each tab since the student last looked (the board's red
+     badge): a revision asked for on Assignments; work back or updated on
+     My Learning. */
+  function newsOf(view, ui) {
+    var n = { assignments: 0, learning: 0, questionnaires: 0 };
+    if (!view || ui.waiting) return n;
+    (view.changes || []).forEach(function (c) {
+      n[c.why === 'revise' ? 'assignments' : 'learning'] += 1;
+    });
+    return n;
+  }
+
+  /* The three tabs. Drawn twice, once in the header for a Chromebook and
      once along the bottom for a phone; page-view.css shows one. */
   function tabBarHtml(ui, where, view) {
     var on = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
-    // What changed since the student last looked, as a count on Assignments (the board's red badge).
-    var news = view && !ui.waiting ? (view.changes || []).length : 0;
+    var news = newsOf(view, ui);
     return (
       '<nav class="sp-tabs sp-tabs-' +
       where +
       '" aria-label="Your Page">' +
       TABS.map(function (t) {
+        var n = news[t.id];
         return (
           '<button type="button" class="sp-tab' +
           (t.id === on ? ' sp-tab-on' : '') +
@@ -2662,11 +2135,11 @@ window.StudentPageView = (function () {
           '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
           t.icon +
           '</svg>' +
-          (t.id === 'assignments' && news ? '<span class="sp-tab-badge" aria-hidden="true">' + news + '</span>' : '') +
+          (n ? '<span class="sp-tab-badge" aria-hidden="true">' + n + '</span>' : '') +
           '<span class="sp-tab-label">' +
           esc(t.label) +
           '</span>' +
-          (t.id === 'assignments' && news ? '<span class="sp-hidden-title">' + esc(news + ' new') + '</span>' : '') +
+          (n ? '<span class="sp-hidden-title">' + esc(n + ' new') + '</span>' : '') +
           '</button>'
         );
       }).join('') +
@@ -2674,21 +2147,39 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* Log Out? (Colin, 2026-11-14: "Done should be Log Out and should also
+     prompt a warning"): asked over the page before the session ends. Log
+     Out ends it as Done did (card-done, s/app.js). */
+  function logoutSheetHtml() {
+    return (
+      '<button type="button" class="sp-sheet-back" data-act="logout-cancel" aria-label="Cancel" tabindex="-1"></button>' +
+      '<div class="sp-sheet sp-logout" role="alertdialog" aria-modal="true" aria-labelledby="sp-logout-title" aria-describedby="sp-logout-line">' +
+      '<span class="sp-sheet-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title" id="sp-logout-title" tabindex="-1">Log Out?</h2>' +
+      '<p class="sp-lead" id="sp-logout-line">You’ll need your card to open your page again.</p>' +
+      '<div class="sp-logout-buttons">' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
+      '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">Log Out</button>' +
+      '</div></div>'
+    );
+  }
+
   /* The whole page: the class's name with its block (it opens Your
-     Classes), the tabs on a Chromebook, Done and the All Assignments
-     button; the tab's body; the tabs along the bottom on a phone. */
+     Classes), the tabs on a Chromebook, Log Out; the tab's body; the tabs
+     along the bottom on a phone. */
   function html(view, ui) {
     ui = ui || {};
     var course = (view && view.course) || ui.course || {};
     var block = String(course.block || '').trim();
-    var onAssignments = (TAB_BODIES[ui.tab] ? ui.tab : 'assignments') === 'assignments';
-    var all = !!ui.all && onAssignments;
-    var fb = onAssignments && !all && !ui.waiting && (handoutOpen(view, ui) || feedbackPiece(view, ui));
+    var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    var ready = !ui.waiting && view;
+    var open =
+      ready && (handoutOpen(view, ui) || feedbackPiece(view, ui) || (tab === 'learning' && cardOpen(view, ui)));
     return (
       '<div class="sp-view' +
-      (fb ? ' sp-on-feedback' : '') +
-      // The cards or Your Feedback, with To Do, Sent and Back: on a Chromebook, a sidebar down the left (page-view.css).
-      (onAssignments && !all && !ui.waiting && view ? ' sp-on-deck' : '') +
+      (open ? ' sp-on-feedback' : '') +
+      // The cards or a piece open, with its list: on a Chromebook, a sidebar down the left (page-view.css).
+      ((tab === 'assignments' || open) && ready ? ' sp-on-deck' : '') +
       '">' +
       '<header class="sp-head">' +
       '<button type="button" class="sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
@@ -2702,18 +2193,14 @@ window.StudentPageView = (function () {
       '<span class="sp-head-gap"></span>' +
       tabBarHtml(ui, 'top', view) +
       '<span class="sp-head-gap"></span>' +
-      '<button type="button" class="sp-done" data-act="card-done">Done</button>' +
-      '<button type="button" class="sp-head-icon" data-act="all-open" aria-label="All assignments"' +
-      (all ? ' aria-pressed="true"' : '') +
-      '>' +
-      MENU +
-      '</button>' +
+      '<button type="button" class="sp-done" data-act="logout-ask" aria-haspopup="dialog">Log Out</button>' +
       '</header>' +
       '<main class="sp-page">' +
       bodyHtml(view, ui) +
       (ui.note ? '<p class="sp-fine">' + esc(ui.note) + '</p>' : '') +
       '</main>' +
       tabBarHtml(ui, 'bottom', view) +
+      (ui.logout ? logoutSheetHtml() : '') +
       '</div>'
     );
   }
@@ -2726,9 +2213,8 @@ window.StudentPageView = (function () {
 
   /* ── What a press changes ──────────────────────────────────── */
 
-  var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
-  var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
-  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1, new: 1, revise: 1 };
+  var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1 };
+  var SEGMENT_IDS = { outstanding: 1, upcoming: 1 };
   var FEEDBACK_ACTS = {
     feedback: 1,
     whole: 1,
@@ -2746,22 +2232,46 @@ window.StudentPageView = (function () {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
   }
 
+  // Where focus goes back to on a piece's list: its row on My Learning, its card on Assignments.
+  function backFocus(p, view) {
+    if (!p) return '.sp-segment-on';
+    return homeOf(p, view).tab === 'learning' ? '.sp-ml-row[data-piece="' + cssId(p.id) + '"]' : '#' + domId(p.id);
+  }
+
+  // Open piece `p` where it lives: its tab, and its segment on Assignments.
+  function goHome(next, p, view) {
+    var home = homeOf(p, view);
+    next.tab = home.tab;
+    if (home.segment) next.segment = home.segment;
+    next.pick = p.id;
+  }
+
   /* A press on one of the page's own buttons, answered with what the
      student now looks at: { ui, focus } (focus: where the keyboard goes
      after the page is drawn again), or null when the press is not one of
-     these (Done, Your Classes, Try Again: the student page's own). Nothing
-     here reaches the network or the session, so the student page and the
-     preview answer the same presses the same way. `el` is the button. */
+     these (Log Out, Your Classes, Try Again: the student page's own).
+     Nothing here reaches the network or the session, so the student page
+     and the preview answer the same presses the same way. `el` is the
+     button. */
   function press(ui, view, act, el) {
     var next = Object.assign({}, ui || {});
     var attr = function (name) {
       return (el && el.getAttribute && el.getAttribute(name)) || '';
     };
+    // Log Out? goes with any press but its own.
+    if (act !== 'logout-ask') next.logout = false;
+    if (act === 'logout-ask') {
+      next.logout = true;
+      return { ui: next, focus: '#sp-logout-title' };
+    }
+    if (act === 'logout-cancel') return { ui: next, focus: '.sp-done' };
     // Any other press leaves Your Feedback and The Whole Rubric.
     if (!has(FEEDBACK_ACTS, act)) {
       next.feedback = '';
       next.whole = false;
     }
+    // A sent piece's card on My Learning goes with any press but the ones inside it.
+    if (!has(FEEDBACK_ACTS, act) && !/^handout/.test(act) && act !== 'open-piece') next.card = '';
     // Before and After goes with any press but its own (S11-F2).
     if (act !== 'compare') next.compare = false;
     // See Your Work goes with any press but its own.
@@ -2784,12 +2294,9 @@ window.StudentPageView = (function () {
         return x && x.kind === 'handout' && x.id === hid;
       })[0];
       if (!hr) return null;
-      next.tab = 'assignments';
-      next.all = false;
       next.feedback = '';
       next.whole = false;
-      next.segment = segmentOf(hp) || next.segment;
-      next.pick = hp.id;
+      goHome(next, hp, view);
       next.handout = hr.id;
       next.handoutPiece = hp.id;
       next.handoutPage = 0;
@@ -2820,12 +2327,9 @@ window.StudentPageView = (function () {
       var wid = attr('data-piece');
       var w = view && pieceIn(view.work, wid);
       if (!w || w.id !== wid || !w.marks || !hasFeedback(w)) return null;
-      next.tab = 'assignments';
-      next.all = false;
+      goHome(next, w, view);
       next.feedback = w.id;
       next.whole = false;
-      next.segment = segmentOf(w);
-      next.pick = w.id;
       next.work = w.id;
       next.workPage = 0;
       next.marksOff = false;
@@ -2852,25 +2356,11 @@ window.StudentPageView = (function () {
       next.workPage = to;
       return { ui: next, focus: '#sp-work-title' };
     }
-    if (act === 'skill') {
-      var l = view && view.learning;
-      var sk = l && skillIn(l, attr('data-skill'));
-      if (!sk) return null;
-      next.tab = 'learning';
-      next.skill = sk.id;
-      return { ui: next, focus: '#sp-ml-skill-title' };
-    }
-    if (act === 'skill-close') {
-      var was = next.skill;
-      next.skill = '';
-      return { ui: next, focus: was ? '[data-act="skill"][data-skill="' + cssId(was) + '"]' : '.sp-ml-title' };
-    }
     if (act === 'tab') {
       if (!has(TAB_IDS, attr('data-tab'))) return null;
       next.tab = attr('data-tab');
-      next.all = false;
       next.form = '';
-      next.skill = '';
+      next.card = '';
       var top = el.closest && el.closest('.sp-tabs-top');
       return { ui: next, focus: (top ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on' };
     }
@@ -2878,31 +2368,17 @@ window.StudentPageView = (function () {
       if (!has(SEGMENT_IDS, attr('data-segment'))) return null;
       next.tab = 'assignments';
       next.segment = attr('data-segment');
-      next.all = false;
       next.pick = '';
       return { ui: next, focus: '.sp-segment-on' };
-    }
-    if (act === 'all-open' || act === 'all-close') {
-      next.tab = 'assignments';
-      next.all = act === 'all-open';
-      return { ui: next, focus: next.all ? '.sp-page-title' : '.sp-segment-on' };
-    }
-    if (act === 'filter') {
-      if (!has(FILTER_IDS, attr('data-filter'))) return null;
-      next.filter = attr('data-filter');
-      return { ui: next, focus: '.sp-filter-on' };
     }
     if (act === 'compare') {
       var bid = attr('data-piece');
       var c = view && pieceIn(view.work, bid);
       if (!c || c.id !== bid || !hasCompare(c)) return null;
-      next.tab = 'assignments';
-      next.all = false;
+      goHome(next, c, view);
       next.feedback = c.id;
       next.whole = false;
       next.compare = true;
-      next.segment = segmentOf(c);
-      next.pick = c.id;
       return { ui: next, focus: '#sp-fb-title' };
     }
     if (act === 'feedback' || act === 'whole') {
@@ -2912,22 +2388,24 @@ window.StudentPageView = (function () {
       next.feedback = f.id;
       next.whole = act === 'whole';
       if (!feedbackPiece(view, next)) return null;
-      next.tab = 'assignments';
-      next.all = false;
-      next.segment = segmentOf(f);
-      next.pick = f.id;
+      goHome(next, f, view);
       return { ui: next, focus: '#sp-fb-title' };
     }
     if (act === 'feedback-close' || act === 'whole-close') {
       var open = view && feedbackPiece(view, next);
       next.whole = false;
-      // From The Whole Rubric back to Your Feedback, when the piece has some; otherwise to its card.
+      // From The Whole Rubric back to Your Feedback, when the piece has some; otherwise to where it was opened.
       if (act === 'whole-close' && open && hasFeedback(open)) return { ui: next, focus: '#sp-fb-title' };
       next.feedback = '';
-      return { ui: next, focus: open ? '#' + domId(open.id) : '.sp-segment-on' };
+      // A sent piece's card stays open under its feedback.
+      return { ui: next, focus: next.card ? '#' + domId(next.card) : backFocus(open, view) };
+    }
+    if (act === 'card-close') {
+      var was = view && pieceIn(view.work, ui.card);
+      return { ui: next, focus: was && was.id === ui.card ? backFocus(was, view) : '.sp-ml-title' };
     }
     if (act === 'form-pick') {
-      var list = view ? (next.tab === 'reports' ? view.reports : view.questionnaires) || [] : [];
+      var list = view ? view.questionnaires || [] : [];
       var fid2 = attr('data-form-id');
       var item = pieceIn(list, fid2);
       if (!item || item.id !== fid2) return null;
@@ -2941,38 +2419,33 @@ window.StudentPageView = (function () {
     if (act === 'pick' || act === 'open-piece') {
       var id = attr('data-piece');
       var p = view && pieceIn(view.work, id);
-      if (!p || p.id !== id || !segmentOf(p)) return null;
-      next.tab = 'assignments';
-      next.all = false;
-      next.segment = segmentOf(p);
-      next.pick = p.id;
-      return { ui: next, focus: '#' + domId(p.id), piece: p.id };
+      if (!p || p.id !== id) return null;
+      if (segmentOf(p, view)) {
+        goHome(next, p, view);
+        next.card = '';
+        return { ui: next, focus: '#' + domId(p.id), piece: p.id };
+      }
+      // Work sent and waiting opens its card on My Learning.
+      if (p.kind !== 'sent') return null;
+      next.tab = 'learning';
+      next.card = p.id;
+      return { ui: next, focus: '#' + domId(p.id) };
     }
     return null;
   }
 
-  /* After the page is drawn into `root`: the phone's cards start at the one
-     picked, and the count under them ("2 of 3") follows the swipe.
-     `onPick(id)` is told each card the student swipes to. */
-  function settle(root, onPick) {
+  /* After the page is drawn into `root`: a card picked from elsewhere (a
+     row on My Learning, a Chromebook's list) is brought into view on the
+     phone, where the cards are one under another. `onPick` is kept for
+     the callers; scrolling picks nothing. */
+  function settle(root) {
     var deck = root && root.querySelector ? root.querySelector('.sp-deck') : null;
-    if (!deck) return;
-    var cards = Array.prototype.slice.call(deck.querySelectorAll('.sp-piece'));
-    var on = deck.querySelector('.sp-picked');
-    if (on && deck.scrollWidth > deck.clientWidth && typeof deck.scrollTo === 'function') {
-      deck.scrollTo({ left: on.offsetLeft - deck.offsetLeft, behavior: 'auto' });
-    }
-    var count = root.querySelector('.sp-deck-count');
-    deck.addEventListener(
-      'scroll',
-      function () {
-        if (!deck.clientWidth || deck.scrollWidth <= deck.clientWidth) return;
-        var at = Math.max(0, Math.min(cards.length - 1, Math.round(deck.scrollLeft / deck.clientWidth)));
-        if (count) count.textContent = at + 1 + ' of ' + cards.length;
-        if (onPick && cards[at]) onPick(cards[at].getAttribute('data-piece'));
-      },
-      { passive: true },
-    );
+    var on = deck && deck.querySelector('.sp-picked');
+    if (!on || deck.children[0] === on || typeof on.scrollIntoView !== 'function') return;
+    // On a Chromebook the list on the left shows (page-view.css) and the card picked is the one drawn.
+    var side = root.querySelector('.sp-side');
+    if (side && side.offsetParent !== null) return;
+    on.scrollIntoView({ block: 'start', behavior: 'auto' });
   }
 
   return {
@@ -2983,8 +2456,8 @@ window.StudentPageView = (function () {
     rowView: rowView,
     counts: counts,
     inSegment: inSegment,
-    matching: matching,
     segmentOf: segmentOf,
+    learningPieces: learningPieces,
     photosWord: photosWord,
     thumbsHtml: thumbsHtml,
     marksLine: marksLine,

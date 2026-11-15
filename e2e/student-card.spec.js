@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { showAll } from './student-card-fake.js';
+import { openLearning } from './student-card-fake.js';
 
 /* A student card on the student page, /s/#demo-card (docs/plans/
    student-page-build-plan.md, S0-F3), against the built site with the live
-   site's CSP: the card's code, Is This You?, then the Assignments list, on
-   a phone and on a Chromebook. Demo Mode builds all of it on the device: no
+   site's CSP: the card's code, Is This You?, then Assignments and My
+   Learning's list of work, on a phone and on a Chromebook. Demo Mode builds all of it on the device: no
    request goes to the student-submit function, and a grade the teacher has
    not returned is nowhere on the page. */
 
@@ -81,21 +81,31 @@ for (const size of SIZES) {
 
       // Assignments: both arrive, once, before the list is drawn.
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-      await showAll(page);
-      const row = title => page.locator('.sp-row', { hasText: title });
-      await expect(row('Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('Extending · 100%');
-      await expect(row('Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
-      await expect(row('Cell Microscope Lab').locator('.sp-row-result')).toHaveText('Proficient − · 67%');
-      await expect(row('Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
-      await expect(row('Lab Safety Contract').locator('.sp-row-result')).toHaveText('Complete');
-      await expect(row('Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Missing · Due /);
-      // A draft never returned: the title and the date, like work not graded.
-      await expect(row('Disease Research Poster').locator('.sp-row-sub')).toHaveText(/^Due \S+ \S+ \d+$/);
-      await expect(row('Disease Research Poster').locator('.sp-row-result')).toHaveCount(0);
-      await expect(row('Science Fair Proposal').locator('.sp-row-result')).toHaveCount(0);
+      // Outstanding: a draft never returned is a card like work not graded, with no result.
+      const card = title => page.locator('.sp-deck .sp-piece', { hasText: title });
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
+      await expect(card('Disease Research Poster').locator('.sp-flag-overdue')).toHaveText(/^Due \S+ \S+ \d+ · /);
+      await expect(card('Disease Research Poster').locator('.sp-level')).toHaveCount(0);
+      await expect(card('Immune System Quick Check').locator('.sp-flag-missing')).toHaveText('Missing');
+      let html = await page.locator('#app').innerHTML();
+      await page.locator('.sp-segment[data-segment="upcoming"]').click();
+      await expect(card('Science Fair Proposal').locator('.sp-level')).toHaveCount(0);
+      // My Learning: what came back, each result as the class's grading style gives it.
+      await openLearning(page);
+      const row = title => page.locator('.sp-ml-work .sp-ml-row', { hasText: title });
+      await expect(row('Energy Transfer Investigation').locator('.sp-level')).toHaveText('Extending · 100%');
+      await expect(row('Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Returned \S+ \d+$/);
+      await expect(row('Cell Microscope Lab').locator('.sp-level')).toHaveText('Proficient − · 67%');
+      await expect(row('Cell Structure Quiz').locator('.sp-level')).toHaveText('8 / 10');
+      await expect(row('Lab Safety Contract').locator('.sp-level')).toHaveText('Complete');
+      await expect(row('Immune System Quick Check').locator('.sp-level')).toHaveText('Missing');
+      await expect(row('Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Due \S+ \d+ · counts as 0/);
+      // Work not handed in or back is not on My Learning.
+      await expect(row('Disease Research Poster')).toHaveCount(0);
+      await expect(row('Science Fair Proposal')).toHaveCount(0);
       // A returned grade with a newer draft over it keeps what was returned.
-      await expect(row('Ecosystem Connections Essay').locator('.sp-row-result')).toHaveText('Developing · 50%');
-      const html = await page.locator('#app').innerHTML();
+      await expect(row('Ecosystem Connections Essay').locator('.sp-level')).toHaveText('Developing · 50%');
+      html += await page.locator('.sp-ml-work').innerHTML();
       expect(html).not.toMatch(/draft/i);
       expect(html).not.toContain('sources are missing');
       expect(html).not.toContain('much clearer');
@@ -190,22 +200,19 @@ test.describe('student card: the card’s password and the lock', () => {
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-    await showAll(page);
+    await openLearning(page);
+    const row = title => page.locator('.sp-ml-work .sp-ml-row', { hasText: title });
+    // My Learning, where the results would be, says they didn't load.
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
-    await expect(page.locator('.sp-row')).toHaveCount(9);
-    await expect(page.locator('.sp-row-result')).toHaveCount(0);
-    await expect(
-      page.locator('.sp-row', { hasText: 'Energy Transfer Investigation' }).locator('.sp-row-sub'),
-    ).toHaveText(/^Back \S+ \d+$/);
-    await expect(page.locator('.sp-row', { hasText: 'Immune System Quick Check' }).locator('.sp-row-sub')).toHaveText(
-      /^Missing · Due /,
-    );
+    await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(7);
+    // Only Missing has a chip: no result shows.
+    await expect(page.locator('.sp-ml-work .sp-level')).toHaveText(['Missing']);
+    await expect(row('Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Returned \S+ \d+$/);
+    await expect(row('Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Due /);
     // The connection comes back.
     await page.unroute('**/shared/calc.js');
     await page.getByRole('button', { name: 'Try Again' }).tap();
-    await expect(
-      page.locator('.sp-row', { hasText: 'Energy Transfer Investigation' }).locator('.sp-row-result'),
-    ).toHaveText('Extending');
+    await expect(row('Energy Transfer Investigation').locator('.sp-level')).toHaveText('Extending');
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(errors).toEqual([]);
   });

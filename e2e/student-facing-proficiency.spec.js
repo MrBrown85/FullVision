@@ -147,15 +147,17 @@ test('every surface a student or family reads names a proficiency and shows no s
   seen.push(
     await screen.locator('[aria-label]').evaluateAll(els => els.map(e => e.getAttribute('aria-label')).join(' ')),
   );
-  await screen.locator('.sp-tabs-bottom').getByRole('button', { name: 'Assignments' }).click();
-  await screen.locator('[data-segment="back"]').click();
-  // On a phone, Back is a deck of cards: the piece, Your Result and each row's level.
-  await expect(screen.getByText('Your Result').first()).toBeVisible();
-  const back = await screen.innerText();
-  expect(back).toMatch(WORD);
-  seen.push(back);
-  await screen.getByRole('button', { name: 'See Your Feedback' }).first().click();
+  // Your Work: each piece back with its result chip, worded by the proficiency.
+  const chips = await screen.locator('.sp-ml-work .sp-ml-row .sp-level').allInnerTexts();
+  expect(chips.some(t => WORD.test(t))).toBe(true);
+  // One piece's feedback, opened from its row.
+  await screen.locator('.sp-ml-work .sp-ml-row[data-act="feedback"]').first().click();
   await expect(screen.locator('.sp-fb-big')).toHaveText(WORD);
+  seen.push(await screen.innerText());
+  // And Assignments' cards, still to do (back to My Learning first: a phone's feedback screen has no tab bar).
+  await screen.locator('.sp-fb-back').click();
+  await screen.locator('.sp-tabs-bottom').getByRole('button', { name: 'Assignments' }).click();
+  await expect(screen.locator('.sp-segments')).toBeVisible();
   seen.push(await screen.innerText());
   seen.forEach(text => expect(noFigure(text)).toBeNull());
   expect(errors).toEqual([]);
@@ -188,13 +190,14 @@ test('the student page and the reports say the same for the same student', async
   // The level the teacher set by hand, Emerging, not the level the scores give.
   expect(now).toBe('Emerging');
 
-  // The student page: You're at, and the same competency in Your Skills.
+  // The student page: You're at, the same as the report's Overall Proficiency. (Its skills are not on it
+  // since Colin's ruling of 2026-11-14; the grade is.)
   await page.goto('/dashboard?manage=student-page');
   await page.getByRole('button', { name: 'Open Preview' }).click();
   const dialog = page.getByRole('dialog', { name: 'Previewing as ' + at.name });
   const screen = dialog.locator('.ps-screen');
   await screen.locator('.sp-tabs-bottom').getByRole('button', { name: 'My Learning' }).click();
   await expect(screen.locator('.sp-ml-at-word')).toHaveText(course);
-  await expect(screen.locator('[data-skill="' + at.sec + '"] .sp-level').first()).toHaveText(now);
+  await expect(screen.locator('[data-skill]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

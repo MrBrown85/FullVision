@@ -35,8 +35,8 @@ test('a real card reflects on returned work through the server', async ({ page }
   await page.goto('/s/#P3R8-WDK4');
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await page.locator('[data-segment="back"]').click();
-  await page.locator('.sp-piece[data-piece="' + WORK.energy + '"] [data-act="feedback"]').click();
+  await page.locator('.sp-tabs-bottom [data-tab="learning"]').click();
+  await page.locator('.sp-ml-row[data-act="feedback"][data-piece="' + WORK.energy + '"]').click();
   await page.locator('[data-act="reflect-open"]').click();
   await page.locator('[data-act="reflect-sense"][data-value="yes"]').click();
   await page.locator('#sp-reflect-plan').fill('Next time I’ll label every part first.');

@@ -59,6 +59,8 @@ test('a real card sends a photo, sees it Sent from its own pages, and unsends it
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   const fair = page.locator('.sp-piece', { hasText: 'Science Fair Proposal' });
+  // Due in four days: on Upcoming.
+  await page.getByRole('button', { name: 'Upcoming 1' }).click();
   await fair.getByRole('button', { name: 'Send My Work' }).click();
   await expect(page.getByRole('heading', { name: 'Check and Send' })).toBeVisible();
   await page.locator('input.sp-send-input:not([capture])').setInputFiles(PHOTO);
@@ -70,7 +72,15 @@ test('a real card sends a photo, sees it Sent from its own pages, and unsends it
   expect([...fn.world.subs.values()].map(s => [s.state, s.files.length])).toEqual([['sent', 1]]);
 
   await page.getByRole('button', { name: 'Back to My Work' }).click();
-  await page.getByRole('button', { name: 'Sent 1' }).click();
+  // Sent: off Assignments, the first row of My Learning's Your Work; its card opens from there.
+  await expect(page.getByRole('button', { name: 'Upcoming 0' })).toBeVisible();
+  await page.getByRole('button', { name: /^My Learning/ }).click();
+  const row = page.locator('.sp-ml-work .sp-ml-row').first();
+  await expect(row).toContainText('Science Fair Proposal');
+  await expect(row.locator('.sp-row-sub')).toHaveText(
+    /^Sent \w{3} \d{1,2}, \d{1,2}:\d\d [ap]\.m\. · waiting for feedback$/,
+  );
+  await row.click();
   await expect(page.getByText('Your teacher hasn’t started grading it. You can still change it.')).toBeVisible();
   const thumb = fair.getByRole('img', { name: 'Your page 1' });
   await expect(thumb).toBeVisible();
@@ -79,8 +89,13 @@ test('a real card sends a photo, sees it Sent from its own pages, and unsends it
 
   await fair.getByRole('button', { name: 'Unsend' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Unsend' }).click();
-  await expect(page.getByRole('button', { name: 'Sent 0' })).toBeVisible();
+  // Unsent: the page goes to its card on Assignments, in Upcoming, its title focused; it is off My Learning.
+  await expect(page.getByRole('button', { name: 'Upcoming 1' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(fair.locator('.sp-piece-title')).toBeFocused();
+  await expect(fair.getByRole('button', { name: 'Send My Work' })).toBeVisible();
   expect(fn.world.subs.size).toBe(0);
+  await page.getByRole('button', { name: /^My Learning/ }).click();
+  await expect(page.locator('.sp-ml-row', { hasText: 'Science Fair Proposal' })).toHaveCount(0);
 
   const token = JSON.parse((await stored(page)).local[KEY]).t;
   expect(posts.map(p => p.body.route).filter(r => r !== 'seen')).toEqual([

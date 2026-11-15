@@ -12,6 +12,7 @@
 import './setup.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seedClass, clearClass } from './helpers/pin-save-paths.js';
+import { parseHTML } from 'linkedom';
 
 const NOW = '2026-11-10T20:00:00.000Z';
 const CID = 'ml-class';
@@ -221,11 +222,6 @@ describe('the parts of My Learning', () => {
     ]);
   });
 
-  it('Your Strongest is the skill with the highest level', () => {
-    seed('proficiency', { show: true });
-    expect(learningOf().strongest.id).toBe('ev');
-  });
-
   it('a piece’s mark names its level with its + or −', () => {
     seed('proficiency', { show: true });
     const ev = skill(learningOf(), 'ev');
@@ -293,93 +289,239 @@ describe('the parts of My Learning', () => {
 });
 
 describe('the My Learning screens (s/page-view.js)', () => {
-  const html = (view, ui) => StudentPageView.html(view, Object.assign({ tab: 'learning' }, ui));
+  const DOC = parseHTML('<!doctype html><html><body></body></html>').document;
+  const drawn = (view, ui) => {
+    const box = DOC.createElement('div');
+    box.innerHTML = StudentPageView.html(view, Object.assign({ tab: 'learning' }, ui));
+    return box;
+  };
+  const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
   const el = attrs => ({ getAttribute: name => (name in attrs ? attrs[name] : null), closest: () => null });
+  // Each row of Your Work: [title, the line under it, the chip, what pressing it does].
+  const rows = box =>
+    [...box.querySelectorAll('.sp-ml-work .sp-ml-row')].map(r => [
+      words(r.querySelector('.sp-row-title')),
+      words(r.querySelector('.sp-row-sub')),
+      words(r.querySelector('.sp-level')),
+      r.getAttribute('data-act'),
+    ]);
+  const viewOf = () => StudentView.fromCache(CID, S1).view;
+  const resultOf = (view, id) => view.work.find(p => p.id === id).result.text;
 
-  it('off: the plain line, and nothing of a grade', () => {
+  it('off: Your Work with nothing of a grade', () => {
     seed('proficiency');
-    const out = html(StudentView.fromCache(CID, S1).view);
-    expect(out).toContain('Your teacher hasn’t turned on My Learning for this class.');
-    expect(out).not.toContain('sp-ml');
+    const view = viewOf();
+    expect(view.learning).toBeNull();
+    const box = drawn(view);
+    expect(words(box.querySelector('.sp-ml-title'))).toBe('My Learning');
+    expect(box.querySelector('.sp-ml-title').classList.contains('sp-hidden-title')).toBe(false);
+    expect(rows(box).map(r => r[0])).toEqual(['A Knight’s Tale', 'The King', 'Magna Carta']);
+    ['.sp-ml-overall', '.sp-ml-period', '.sp-ml-ladder', '.sp-ml-next'].forEach(sel =>
+      expect(box.querySelector(sel), sel).toBeNull(),
+    );
+    ['You’re at', 'What Makes Up Your Grade', 'hasn’t turned on'].forEach(w =>
+      expect(box.textContent).not.toContain(w),
+    );
+  });
+
+  it('Your Work: Missing, then what came back newest first, each opening what it should', () => {
+    seed('proficiency', { show: true });
+    const view = viewOf();
+    // The draft (Medieval Church) was never returned: it is still to do, on Assignments.
+    expect(rows(drawn(view))).toEqual([
+      ['A Knight’s Tale', 'Due Oct 30', 'Missing', 'open-piece'],
+      ['The King', 'Returned Oct 21', resultOf(view, 'a2'), 'feedback'],
+      ['Magna Carta', 'Returned Oct 6', resultOf(view, 'a1'), 'feedback'],
+    ]);
+    // Missing goes to its card on Outstanding; a returned piece opens Your Feedback, which goes back to My Learning.
+    expect(StudentPageView.press({ tab: 'learning' }, view, 'open-piece', el({ 'data-piece': 'a4' }))).toMatchObject({
+      ui: { tab: 'assignments', segment: 'outstanding', pick: 'a4' },
+      focus: '#sp-piece-a4',
+    });
+    const fb = StudentPageView.press({ tab: 'learning' }, view, 'feedback', el({ 'data-piece': 'a2' }));
+    expect(fb.ui).toMatchObject({ tab: 'learning', feedback: 'a2' });
+    expect(words(drawn(view, fb.ui).querySelector('.sp-fb-back'))).toBe('My Learning');
+    expect(StudentPageView.press(fb.ui, view, 'feedback-close', el({}))).toMatchObject({
+      ui: { feedback: '' },
+      focus: '.sp-ml-row[data-piece="a2"]',
+    });
   });
 
   it('Missing counts as 0 only where the course % counts it: Letter and Both, not Proficiency', () => {
     seed('proficiency', { show: true });
-    let out = html(StudentView.fromCache(CID, S1).view);
-    expect(out).toContain('>1 Missing<');
-    expect(out).not.toContain('counts as 0');
+    expect(rows(drawn(viewOf()))[0]).toEqual(['A Knight’s Tale', 'Due Oct 30', 'Missing', 'open-piece']);
+    ['letter', 'both'].forEach(system => {
+      seed(system, { show: true });
+      expect(rows(drawn(viewOf()))[0].slice(0, 3)).toEqual([
+        'A Knight’s Tale',
+        'Due Oct 30 · counts as 0 until it’s in',
+        'Missing',
+      ]);
+    });
+  });
+
+  it('work sent first, waiting for feedback; Excused with nothing to open; Late and Updated on what came back; New until opened', () => {
     seed('letter', { show: true });
-    out = html(StudentView.fromCache(CID, S1).view);
-    expect(out).toContain('It counts as 0 until it’s in.');
-    expect(out).toContain('data-act="open-piece" data-piece="a4"');
+    const view = viewOf();
+    view.work.push(
+      { id: 's1', title: 'Sent Today', kind: 'sent', dueDate: '2026-11-09', send: { sent: { at: '2026-11-09' } } },
+      { id: 'x1', title: 'Field Trip Form', kind: 'excused', dueDate: '2026-10-01' },
+    );
+    // Preview marks every returned piece not opened (ruling 116); here the student opened all but The King.
+    view.work.forEach(p => (p.unseen = false));
+    const a2 = view.work.find(p => p.id === 'a2');
+    Object.assign(a2, { late: true, unseen: true });
+    const a1 = view.work.find(p => p.id === 'a1');
+    Object.assign(a1, {
+      updated: true,
+      updatedAt: '2026-11-02T18:00:00Z',
+      result: Object.assign({}, a1.result, { was: 'C+' }),
+    });
+    const box = drawn(view);
+    expect(rows(box)).toEqual([
+      ['Sent Today', 'Sent Nov 9 · waiting for feedback', 'Sent', 'open-piece'],
+      ['A Knight’s Tale', 'Due Oct 30 · counts as 0 until it’s in', 'Missing', 'open-piece'],
+      ['The King', 'Returned Oct 21 · Late', a2.result.text, 'feedback'],
+      ['Magna Carta', 'Updated Nov 2 · was C+', a1.result.text, 'feedback'],
+      ['Field Trip Form', null, 'Excused', null],
+    ]);
+    // Excused is a still row, not a button.
+    const excused = [...box.querySelectorAll('.sp-ml-row')].pop();
+    expect(excused.tagName).toBe('SPAN');
+    // The blue dot and the word New on the one not opened; its row is watched for "opened".
+    const marked = [...box.querySelectorAll('.sp-ml-work li[data-unseen]')];
+    expect(marked.map(li => li.getAttribute('data-unseen'))).toEqual(['a2']);
+    expect(marked[0].querySelector('.sp-ml-new-on')).not.toBeNull();
+    expect(words(marked[0].querySelector('.sp-hidden-title'))).toBe('New');
+    expect(box.querySelectorAll('.sp-ml-new-on')).toHaveLength(1);
+    // A sent piece's row opens its card on My Learning, with the way back.
+    const open = StudentPageView.press({ tab: 'learning' }, view, 'open-piece', el({ 'data-piece': 's1' }));
+    expect(open.ui).toMatchObject({ tab: 'learning', card: 's1' });
+    const card = drawn(view, open.ui);
+    expect(words(card.querySelector('.sp-piece-title'))).toBe('Sent Today');
+    expect(words(card.querySelector('[data-act="card-close"]'))).toBe('My Learning');
   });
 
-  it('a skill opens One Skill, and My Learning goes back to it', () => {
+  it('a sent row says the time it went in when the server gives one', () => {
     seed('proficiency', { show: true });
-    const view = StudentView.fromCache(CID, S1).view;
-    expect(html(view)).toContain('data-act="skill" data-skill="ev"');
-    const out = StudentPageView.press({ tab: 'learning' }, view, 'skill', el({ 'data-skill': 'ev' }));
-    expect(out.ui.skill).toBe('ev');
-    const one = html(view, out.ui);
-    expect(one).toContain('id="sp-ml-skill-title" tabindex="-1">Evidence</h1>');
-    I_CAN.forEach(line => expect(one).toContain(line));
-    expect(one).toContain('How It’s Going');
-    expect(StudentPageView.press(out.ui, view, 'skill-close', el({})).ui.skill).toBe('');
-    expect(StudentPageView.press(out.ui, view, 'tab', el({ 'data-tab': 'assignments' })).ui.skill).toBe('');
-    // A skill the view does not hold opens nothing.
-    expect(StudentPageView.press({}, view, 'skill', el({ 'data-skill': 'nope' }))).toBeNull();
+    const view = viewOf();
+    view.work.unshift({
+      id: 's1',
+      title: 'Sent Today',
+      kind: 'sent',
+      dueDate: '2026-11-09',
+      send: { sent: { at: '2026-11-09T19:41:00Z', pages: 3 } },
+    });
+    const time = new Date('2026-11-09T19:41:00Z').toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    expect(time).toMatch(/^\d{1,2}:41 [ap]\.m\.$/);
+    expect(rows(drawn(view))[0][1]).toBe('Sent Nov 9, ' + time + ' · waiting for feedback');
   });
 
-  it('the boards’ month line, Next Step and Top Step, from the view', () => {
+  it.each(['proficiency', 'letter', 'both'])('a %s class: the grade card, in the view’s own words', system => {
+    seed(system, { show: true });
+    const view = viewOf();
+    const l = view.learning;
+    let box = drawn(view);
+    const card = box.querySelector('.sp-ml-overall');
+    expect(words(card.querySelector('.sp-ml-period'))).toBe('This Year So Far');
+    // The heading is for a screen reader once the grade is there.
+    expect(box.querySelector('.sp-ml-title').classList.contains('sp-hidden-title')).toBe(true);
+    if (system === 'proficiency') {
+      expect(words(card.querySelector('.sp-ml-at'))).toBe('You’re at' + l.overall.word);
+      expect(card.querySelector('.sp-ml-letter')).toBeNull();
+      expect(box.textContent).not.toContain('What Makes Up Your Grade');
+    } else {
+      expect(words(card.querySelector('.sp-ml-letter'))).toBe(l.overall.letter.grade);
+      expect(words(card.querySelector('.sp-ml-pct'))).toBe(l.overall.letter.pct);
+      expect(card.querySelector('.sp-ml-ladder')).toBeNull();
+      const cats = [...box.querySelectorAll('.sp-ml-card')].find(
+        c => words(c.querySelector('h2')) === 'What Makes Up Your Grade',
+      );
+      expect(
+        [...cats.querySelectorAll('.sp-ml-row')].map(r => [
+          words(r.querySelector('.sp-row-title')),
+          words(r.querySelector('.sp-row-sub')),
+          words(r.querySelector('.sp-level')),
+        ]),
+      ).toEqual(l.categories.map(c => [c.name, 'Counts ' + c.weight + '%', c.text]));
+    }
+    // Every word of it is the view's: change the view's, and the page says that.
+    l.overall.word = 'WORD-FROM-VIEW';
+    if (l.overall.letter) l.overall.letter = { grade: 'Q', pct: 'PCT-FROM-VIEW' };
+    box = drawn(view);
+    expect(box.textContent).toContain(system === 'proficiency' ? 'WORD-FROM-VIEW' : 'PCT-FROM-VIEW');
+    // Your Work is under the grade.
+    const cards = [...box.querySelectorAll('.sp-ml > section')].map(c => c.className);
+    expect(cards[0]).toContain('sp-ml-overall');
+    expect(cards[cards.length - 1]).toContain('sp-ml-work');
+  });
+
+  it('the month line and Work On Next, from the view; Work On Next is a line, not a button', () => {
     seed('proficiency', { show: true });
-    const view = StudentView.fromCache(CID, S1).view;
+    const view = viewOf();
     const l = view.learning;
     l.trend = { dir: 1, from: 'Developing' };
     l.next = { id: 'per', name: 'Perspective', text: 'Explain which beliefs or values shaped that point of view.' };
-    let out = html(view);
-    expect(out).toContain('Up from Developing a month ago</p>');
-    expect(out).toContain('data-act="skill" data-skill="per"');
-    expect(out).toContain('>Next Step: Perspective</span>');
-    expect(out).toContain('Explain which beliefs or values shaped that point of view.');
+    let box = drawn(view);
+    expect(words(box.querySelector('.sp-ml-trend'))).toBe('Up from Developing a month ago');
+    const next = box.querySelector('.sp-ml-next');
+    expect(words(next.querySelector('.sp-ml-next-title'))).toBe('Work On Next: Perspective');
+    expect(words(next.querySelector('.sp-ml-next-line'))).toBe(
+      'Explain which beliefs or values shaped that point of view.',
+    );
+    expect(next.tagName).toBe('DIV');
+    expect(next.querySelector('button, [data-act]')).toBeNull();
     l.trend = { dir: -1, from: 'C' };
-    expect(html(view)).toContain('Down from C a month ago</p>');
-    // Nothing to compare, nothing to step to: neither shows.
+    expect(words(drawn(view).querySelector('.sp-ml-trend'))).toBe('Down from C a month ago');
+    // Nothing to compare, nothing to work on: neither shows.
     l.trend = null;
     l.next = null;
-    out = html(view);
-    expect(out).not.toContain('a month ago');
-    expect(out).not.toContain('Next Step');
-    // One Skill: its own step, or the Top Step at Extending.
-    const ev = skill(l, 'ev');
-    ev.next = { top: false, text: 'Weigh accounts that disagree.' };
-    out = html(view, { skill: 'ev' });
-    expect(out).toContain('>Next Step</h2>');
-    expect(out).toContain('Weigh accounts that disagree.');
-    expect(out).not.toContain('Top Step');
-    ev.next = { top: true, text: '' };
-    out = html(view, { skill: 'ev' });
-    expect(out).toContain('You’ve Reached the Top Step');
-    expect(out).not.toContain('>Next Step<');
+    box = drawn(view);
+    expect(box.textContent).not.toContain('a month ago');
+    expect(box.querySelector('.sp-ml-next')).toBeNull();
   });
 
   it('the ladder: every step reached in the student’s own level’s colour, You on theirs', () => {
     seed('proficiency', { show: true });
-    const view = StudentView.fromCache(CID, S1).view;
-    const out = html(view, { skill: 'ev' });
-    const ev = skill(view.learning, 'ev');
-    const ladder = out.slice(out.indexOf('sp-ml-ladder'), out.indexOf('</div>', out.indexOf('sp-ml-ladder')));
-    expect(ladder).toContain('sp-ml-ladder sp-ml-at-' + ev.level);
-    expect((ladder.match(/sp-ml-bar-on/g) || []).length).toBe(ev.level);
-    expect((ladder.match(/sp-ml-you/g) || []).length).toBe(1);
+    const view = viewOf();
+    const at = view.learning.overall.level;
+    expect(at).toBeGreaterThan(0);
+    const ladder = drawn(view).querySelector('.sp-ml-overall .sp-ml-ladder');
+    expect(ladder.classList.contains('sp-ml-at-' + at)).toBe(true);
+    expect(ladder.querySelectorAll('.sp-ml-bar-on')).toHaveLength(at);
+    expect(ladder.querySelectorAll('.sp-ml-you')).toHaveLength(1);
+    expect(ladder.querySelector('.sp-ml-step-on').classList.contains('sp-ml-step-' + at)).toBe(true);
   });
 
-  it('nothing marked yet', () => {
+  it('One Skill, Your Strongest and Your Skills are gone', () => {
+    seed('proficiency', { show: true });
+    const view = viewOf();
+    const html = StudentPageView.html(view, { tab: 'learning' });
+    ['data-act="skill"', 'Your Strongest', 'Your Skills', 'Next Step', 'How It’s Going'].forEach(w =>
+      expect(html).not.toContain(w),
+    );
+    expect(StudentPageView.press({ tab: 'learning' }, view, 'skill', el({ 'data-skill': 'ev' }))).toBeNull();
+  });
+
+  it('nothing marked yet: no grade, and Your Work still lists what is missing', () => {
     seed('proficiency', { show: true });
     Object.values(_cache.gradeReturns[CID]).forEach(rows => (rows[S1] = { is_draft: true }));
     delete _returnedSets[CID];
     clearProfCache();
-    const out = html(StudentView.fromCache(CID, S1).view);
-    expect(out).toContain('>Nothing Marked Yet</h1>');
-    expect(out).toContain('data-act="tab" data-tab="assignments">See Your Assignments</button>');
+    const view = viewOf();
+    expect(view.learning.empty).toBe(true);
+    const box = drawn(view);
+    expect(box.querySelector('.sp-ml-overall')).toBeNull();
+    expect(rows(box).map(r => r[0])).toEqual(['A Knight’s Tale']);
+  });
+
+  it('nothing handed in, missing or back: Nothing Here Yet, and the way to Assignments', () => {
+    seed('proficiency', { show: true });
+    const view = Object.assign({}, viewOf(), { work: [] });
+    view.learning = Object.assign({}, view.learning, { empty: true });
+    const box = drawn(view);
+    expect(words(box.querySelector('.sp-page-title'))).toBe('Nothing Here Yet');
+    const go = box.querySelector('.sp-ml-empty [data-act="tab"]');
+    expect([words(go), go.getAttribute('data-tab')]).toEqual(['See Your Assignments', 'assignments']);
   });
 });

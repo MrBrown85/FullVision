@@ -34,10 +34,11 @@ async function demo(hash) {
 const viewOf = page => page.T.viewOf(page.T.state());
 const piece = (page, title) => viewOf(page).work.find(p => p.title === title);
 
+// Your Feedback opens from the piece's row in My Learning's Your Work.
 async function openFeedback(page, title) {
-  await page.click('[data-segment="back"]');
+  await page.click('[data-tab="learning"]');
   const p = piece(page, title);
-  await page.click('.sp-piece[data-piece="' + p.id + '"] [data-act="feedback"]');
+  await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + p.id + '"]');
   return p;
 }
 
@@ -238,12 +239,13 @@ describe('answers that arrive late, or wrong', () => {
     expect(q(page, '.sp-work')).toBeNull();
   });
 
-  it('an answer that lands after Done draws nothing', async () => {
+  it('an answer that lands after Log Out draws nothing', async () => {
     const page = await demo();
     const h = held();
     page.T.setFeedbackAnswer(() => h.promise);
     await openWork(page);
-    await page.click('[data-act="card-done"]');
+    await page.click('[data-act="logout-ask"]');
+    await page.click('.sp-logout [data-act="card-done"]');
     h.settle({ ok: true, files: [] });
     await page.settle();
     expect(q(page, '.sp-work')).toBeNull();

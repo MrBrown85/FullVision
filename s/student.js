@@ -120,14 +120,13 @@ var StudentPage = (function () {
       from: '', // 'card' when the code was typed on one of the card's screens
       sheet: false, // a card's page: Your Classes is open over it (app.js)
       reply: null, // a card's page: the server's `page` reply, which student-view.js draws from
-      tab: 'assignments', // a card's page: assignments | learning | questionnaires | reports
-      segment: 'todo', // the Assignments tab: todo | sent | back
-      all: false, // the Assignments tab: All Assignments is showing
-      pick: '', // the Assignments tab: the card showing
-      search: '', // All Assignments: the search words
-      filter: 'all', // All Assignments: all | todo | sent | back
-      feedback: '', // the Assignments tab: the piece Your Feedback is open on
-      whole: false, // the Assignments tab: The Whole Rubric is showing for that piece
+      tab: 'assignments', // a card's page: assignments | learning | questionnaires (Reflections)
+      segment: 'outstanding', // the Assignments tab: outstanding | upcoming
+      pick: '', // the Assignments tab: the card picked
+      card: '', // My Learning: the card of a piece sent, open
+      logout: false, // Log Out? is asking
+      feedback: '', // the piece Your Feedback is open on
+      whole: false, // The Whole Rubric is showing for that piece
       levels: false, // Your Feedback: What the Levels Mean is open
       work: '', // Your Feedback: See Your Work is open on this piece (s/feedback.js, S9-F3)
       workPage: 0, // See Your Work: the page showing, from 0
@@ -137,7 +136,7 @@ var StudentPage = (function () {
       handoutPiece: '', // the piece that handout is on
       handoutPage: 0, // the handout: the page showing, from 0
       handoutPages: null, // the handout: the pages fetched, { id, state, pages, asked } (s/handouts.js)
-      form: '', // Questionnaires and My Reports: the one picked on a Chromebook
+      form: '', // Reflections: the one picked on a Chromebook
       back: '', // a questionnaire or report opened from a card's page: the tab to go back to
       realForms: null, // a real card: { student, questionnaires, reports }, the `forms` reply (app.js)
       cardForm: null, // a questionnaire opened from a real card's page: { student, id } (app.js)

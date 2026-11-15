@@ -15,11 +15,11 @@
 
    The device draws the student page itself: s/page-view.js
    (StudentPageView), the same code the student's phone runs, handed the
-   same kind of view. Its tabs, To Do, Sent and Back, All Assignments with
-   its search and filters, and each piece's card answer presses here as
-   they do on the phone (StudentPageView.press); what the student chose to
-   look at is kept while the preview is open. Nothing that would reach the
-   network (Done, Your Classes) does anything here.
+   same kind of view. Its three tabs, Outstanding and Upcoming, My
+   Learning's list and each piece's card answer presses here as they do on
+   the phone (StudentPageView.press); what the student chose to look at is
+   kept while the preview is open. Nothing that would reach the network
+   (Log Out, Your Classes) does anything here.
 
    Not ready: a signed-in class whose Draft and Returned rows have not
    loaded draws "Loading this class…" in the device. When the rows load the
@@ -54,8 +54,8 @@ window.PreviewStudent = (function () {
 
   /* The page inside the device: the student page's own drawing
      (s/page-view.js), the same HTML the student's device draws for this
-     view and these choices (`ui`: the tab, To Do, Sent or Back, All
-     Assignments, the card showing). */
+     view and these choices (`ui`: the tab, Outstanding or Upcoming, the
+     piece open). */
   function drawPage(view, ui) {
     return StudentPageView.html(view, ui || {});
   }
@@ -118,7 +118,7 @@ window.PreviewStudent = (function () {
         'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
       ) +
       (StudentView.learningOn(cid) || (_open && _open.learning)
-        ? _item('My Learning', 'Their level on each skill and their grade, only from work you’ve returned.')
+        ? _item('My Learning', 'Their grade, only from work you’ve returned.')
         : '') +
       (_commentsSeen(view) ? _item('Your comment and criterion comments', 'Word for word, as you wrote them.') : '') +
       (marks
@@ -151,7 +151,10 @@ window.PreviewStudent = (function () {
       _item('Your private notes', 'Observations marked Private stay with you.') +
       (StudentView.learningOn(cid) || (_open && _open.learning)
         ? ''
-        : _item('My Learning', 'Off for this class. Turn it on in Class Settings › Student Page.')) +
+        : _item(
+            'Their grade',
+            'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.',
+          )) +
       '</ul></section>'
     );
   }
@@ -255,7 +258,7 @@ window.PreviewStudent = (function () {
       device: 'phone',
       trigger: trigger || null,
       returnTo: returnFocusId || null,
-      // What the student looks at, as on the phone: the page opens on Assignments, To Do.
+      // What the student looks at, as on the phone: the page opens on Assignments, Outstanding.
       ui: opts && opts.tab ? { tab: opts.tab } : {},
       learning: !!(opts && opts.learning),
     };
@@ -274,16 +277,6 @@ window.PreviewStudent = (function () {
       if (d) return setDevice(d.dataset.psDevice);
       var a = t.closest('.ps-screen [data-act]');
       if (a) _press(a.getAttribute('data-act'), a);
-    });
-    // All Assignments' search, as on the phone.
-    el.addEventListener('input', function (e) {
-      var t = e.target;
-      if (!_open || !t || t.id !== 'sp-search') return;
-      _open.ui = Object.assign({}, _open.ui, { search: String(t.value || '').slice(0, 100) });
-      var at = typeof t.selectionStart === 'number' ? t.selectionStart : 0;
-      _drawScreen('#sp-search');
-      var box = _overlay() && _overlay().querySelector('#sp-search');
-      if (box && typeof box.setSelectionRange === 'function') box.setSelectionRange(at, at);
     });
     _onKey = function (e) {
       if (!_open) return;
@@ -497,13 +490,10 @@ window.PreviewStudent = (function () {
     if (to && typeof to.focus === 'function') to.focus();
   }
 
-  // The phone's cards start at the one picked, and the count follows the swipe.
+  // On the phone, a card picked from elsewhere is brought into view.
   function _settle(screen) {
     if (!screen || !_open) return;
-    var mine = _open;
-    StudentPageView.settle(screen, function (id) {
-      if (_open === mine) _open.ui = Object.assign({}, _open.ui, { pick: id });
-    });
+    StudentPageView.settle(screen);
   }
 
   function setDevice(device) {

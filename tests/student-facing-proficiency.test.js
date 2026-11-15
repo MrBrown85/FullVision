@@ -185,15 +185,50 @@ function stringsOf(value, out) {
 
 const DRAWN = ['st1', 'st2', 'st3', 'st4', 'st5', 'st6'];
 
+/* The view in the shape it had when the fixture was written: the student
+   page's redesign (Colin, 2026-11-14) added the class's `today` and took
+   out `reports` (phone reports left the student page), neither of them a
+   grade. Put back as they were, the fingerprints still compare every word
+   and figure a student reads. */
+function asBefore(view) {
+  if (!view) return null;
+  const out = {};
+  Object.keys(view).forEach(k => {
+    if (k === 'today') return;
+    out[k] = view[k];
+    if (k === 'questionnaires') out.reports = [];
+  });
+  return out;
+}
+
 /* The student-facing surfaces of the class as it is graded now. */
 function draw(cid) {
   clearProfCache();
   const out = surfaces(cid, ['progress', 'quick'], { students: DRAWN });
   DRAWN.forEach(sid => {
     const v = StudentView.fromCache(cid, sid, { learning: true });
-    out['student page › ' + sid] = JSON.stringify(v.view || null);
+    out['student page › ' + sid] = JSON.stringify(asBefore(v.view));
+    out['student page drawn › ' + sid] = pageScreens(v.view);
   });
   return out;
+}
+
+/* The student page as the student sees it (s/page-view.js): Assignments'
+   two segments, My Learning with its grade and Your Work, and Your
+   Feedback and The Whole Rubric on every returned piece. */
+function pageScreens(view) {
+  if (!view) return '';
+  const uis = [
+    { tab: 'assignments', segment: 'outstanding' },
+    { tab: 'assignments', segment: 'upcoming' },
+    { tab: 'learning' },
+  ];
+  view.work.forEach(p => {
+    if (p.kind !== 'back') return;
+    uis.push({ tab: 'learning', feedback: p.id, levels: true });
+    if (p.rubric) uis.push({ tab: 'learning', feedback: p.id, whole: true });
+  });
+  return uis.map(ui => StudentPageView.html(view, ui)).join('\n');
 }
 
 /* Every points and Complete/Incomplete score a student or family reads in
@@ -215,7 +250,7 @@ function pointsWork(cid, drawn) {
     } else if (/ › progress › grade-table/.test(key)) {
       const rows = v.match(/<div class="report-grades-row">[\s\S]*?<\/div>/g) || [];
       out[key] = JSON.stringify(rows.filter(r => titles.some(t => r.indexOf('>' + t + '<') >= 0)));
-    } else if (/^student page/.test(key)) {
+    } else if (/^student page › /.test(key)) {
       const view = JSON.parse(v);
       out[key] = JSON.stringify(
         ((view && view.work) || [])
@@ -292,6 +327,10 @@ describe('every student-facing surface of the Demo class', { timeout: 120000 }, 
       expect(d[key], part).toMatch(WORD);
     });
     expect(d['student page › st1']).toMatch(WORD);
+    // The page as drawn: My Learning's grade card and Your Work, and each piece's feedback, by the proficiency.
+    expect(shownOf(d['student page drawn › st1'])).toMatch(WORD);
+    expect(d['student page drawn › st1']).toContain('sp-ml-overall');
+    expect(d['student page drawn › st1']).toContain('sp-fb-crits');
     // The Assessments list: a level's Score is its proficiency, Out Of empty.
     const q = JSON.parse(d['year › quick › st1']);
     const levels = q.rows.filter(r => WORD.test(r.score));

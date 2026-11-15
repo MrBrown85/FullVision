@@ -6,8 +6,9 @@ import { fakeStudentSubmit, sampleCard } from '../tests/helpers/fake-student-sub
    with the live site's CSP: the student-submit function's own handler over a
    stand-in database, with `page` answering as my-learning-contract.md writes
    it once Show My Learning is on (Batch E, E9): `show_my_learning` and
-   `learning`. The My Learning tab draws the student's skills from that page
-   alone; with the switch off it says so and nothing else changes. */
+   `learning`. The My Learning tab draws the student's grade from that page
+   alone, above Your Work; with the switch off it lists the work, with no
+   grade. */
 
 test.use(PHONE);
 
@@ -81,17 +82,34 @@ async function open(page, on) {
   return errors;
 }
 
-test('with Show My Learning on, the My Learning tab draws the student’s skills from the page', async ({ page }) => {
+test('with Show My Learning on, the My Learning tab draws the grade from the page, above Your Work', async ({
+  page,
+}) => {
   const errors = await open(page, true);
-  await expect(page.locator('.sp-page')).not.toContainText('hasn’t turned on My Learning');
-  // Each competency of the class's map is a skill on the tab.
-  const tags = sampleCard(TODAY).page.tags;
-  for (const id of Object.keys(tags)) await expect(page.locator('.sp-page')).toContainText(tags[id].label);
+  const overall = page.locator('.sp-ml-overall');
+  await expect(overall).toBeVisible();
+  await expect(overall.locator('.sp-ml-period')).toHaveText('This Year So Far');
+  await expect(overall.locator('.sp-ml-at-word')).toHaveText(/^(Emerging|Developing|Proficient|Extending)$/);
+  await expect(page.locator('.sp-ml-work').getByRole('heading', { name: 'Your Work' })).toBeVisible();
+  // Missing first, then what came back, newest first.
+  await expect(page.locator('.sp-ml-work .sp-row-title')).toHaveText([
+    'Immune System Quick Check',
+    'Energy Transfer Investigation',
+    'Cell Structure Quiz',
+    'Cell Microscope Lab',
+    'Ecosystem Connections Essay',
+    'KMT & States of Matter Lab',
+    'Lab Safety Contract',
+  ]);
   expect(errors).toEqual([]);
 });
 
-test('with it off, the tab says so', async ({ page }) => {
+test('with it off, Your Work alone, and no grade', async ({ page }) => {
   const errors = await open(page, false);
-  await expect(page.locator('.sp-page')).toContainText('Your teacher hasn’t turned on My Learning for this class.');
+  await expect(page.getByRole('heading', { name: 'My Learning' })).toBeVisible();
+  await expect(page.locator('.sp-ml-work .sp-ml-row')).toHaveCount(7);
+  await expect(page.locator('.sp-ml-overall')).toHaveCount(0);
+  await expect(page.locator('.sp-page')).not.toContainText('You’re at');
+  await expect(page.locator('.sp-page')).not.toContainText('hasn’t turned on My Learning');
   expect(errors).toEqual([]);
 });

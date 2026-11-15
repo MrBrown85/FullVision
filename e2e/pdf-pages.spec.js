@@ -155,7 +155,7 @@ test('student page: nothing of the reader loads with the page; fetched the way a
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
   expect(await page.evaluate(() => typeof window.PhotoReaders)).toBe('undefined');
   expect(seen.pdfjs).toEqual([]);
 

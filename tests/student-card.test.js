@@ -1,7 +1,8 @@
 /**
  * A student card on the student page (s/app.js, s/assignments.js,
  * s/student-data.js; docs/plans/student-page-build-plan.md, S0-F3), in Demo
- * Mode: the card's code, Is This You?, then the Assignments list.
+ * Mode: the card's code, Is This You?, then the Assignments tab and My
+ * Learning's list of work.
  *
  * The line this build protects: a grade the teacher has not returned shows
  * nothing at all. The sample class holds a draft that was never returned
@@ -18,15 +19,40 @@ import { asServerSends, openStudentPage, studentPageScripts } from './helpers/st
 const CID = 'demo-science-8';
 const SID = 'demo-cece';
 
-// Every piece, as All Assignments lists it (S4-F1: the tab opens on To Do).
-const rows = page =>
-  (page.showAll(), [...page.root().querySelectorAll('.sp-row')]).map(li => ({
+/* Every piece, as the page lists it (redesign of 2026-11-14): Outstanding,
+   then Upcoming, as the Chromebook's list beside the cards shows them
+   (title, line, dot), then My Learning's Your Work (title, line, the
+   chip's words as `result`, its blue dot as `fresh`). Work Missing is on
+   both. The page is left on My Learning. */
+async function rows(page) {
+  const side = () =>
+    [...page.root().querySelectorAll('.sp-side .sp-side-row')].map(b => ({
+      where: 'assignments',
+      title: b.querySelector('.sp-side-title').textContent,
+      sub: (b.querySelector('.sp-row-sub') || {}).textContent || '',
+      result: '',
+      dot: b.querySelector('.sp-dot').getAttribute('class'),
+    }));
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
+  await page.click('[data-segment="outstanding"]');
+  const outstanding = side();
+  await page.click('[data-segment="upcoming"]');
+  const upcoming = side();
+  await page.click('.sp-tabs-bottom [data-tab="learning"]');
+  const learning = [...page.root().querySelectorAll('.sp-ml-work .sp-ml-row')].map(li => ({
+    where: 'learning',
     title: li.querySelector('.sp-row-title').textContent,
     sub: (li.querySelector('.sp-row-sub') || {}).textContent || '',
-    result: (li.querySelector('.sp-row-result') || {}).textContent || '',
-    dot: li.querySelector('.sp-dot').getAttribute('class'),
+    result: (li.querySelector('.sp-level') || {}).textContent || '',
+    fresh: !!li.querySelector('.sp-ml-new-on'),
   }));
-const row = (page, title) => rows(page).find(r => r.title === title);
+  return outstanding.concat(upcoming, learning);
+}
+// One piece's row: `where` it is listed, or its My Learning row when it has one.
+const row = async (page, title, where) => {
+  const all = (await rows(page)).filter(r => r.title === title);
+  return where ? all.find(r => r.where === where) : all.find(r => r.where === 'learning') || all[0];
+};
 
 /* Card, Is This You? (the sample student's number), Assignments. */
 async function walk(hash) {
@@ -132,7 +158,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     await page.click('[data-act="card-yes"]');
     expect(page.fetched).toEqual(CALC);
     expect(preloads(page)).toBe(CALC.join()); // asked for once
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe('Extending');
   });
 
   it('the card and Is This You? fetch neither; reaching Assignments fetches both, once', async () => {
@@ -146,13 +172,13 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     await page.click('[data-act="card-yes"]');
     expect(page.fetched).toEqual(CALC);
     expect(page.run(GRADES_IN)).toBe('object function function');
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe('Extending');
     // The card opened again on this device: nothing is fetched a second time.
     page.T.openCard('P3R-8WD');
     await page.settle();
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe('Extending');
     expect(page.fetched).toEqual(CALC);
   });
 
@@ -166,15 +192,15 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(page.fetched).toEqual(CALC);
     expect(page.run('typeof assessmentCellValue')).toBe('undefined');
-    expect(page.root().querySelector('.sp-row')).toBeNull();
-    expect(page.root().querySelector('.sp-row-result')).toBeNull();
+    expect(page.root().querySelector('.sp-piece')).toBeNull();
+    expect(page.root().querySelector('.sp-ml-row')).toBeNull();
     const yes = page.root().querySelector('[data-act="card-yes"]');
     expect(yes.textContent).toBe('Checking…');
     expect(yes.hasAttribute('disabled')).toBe(true);
     expect(page.root().querySelector('#sp-ident').getAttribute('value')).toBe(page.T.DEMO.number);
     await page.settle();
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    expect(row(page, 'Cell Microscope Lab').result).toBe('Proficient −');
+    expect((await row(page, 'Cell Microscope Lab')).result).toBe('Proficient −');
   });
 
   it('with calc.js out of reach the list opens without results and says so; Try Again brings them', async () => {
@@ -185,26 +211,41 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    // Every piece is listed, with its date; none that came back has a result or a level.
+    const all = await rows(page);
+    const back = all.filter(r => r.where === 'learning' && r.result !== 'Missing');
+    expect(back.map(r => r.title)).toEqual([
+      'Energy Transfer Investigation',
+      'Cell Structure Quiz',
+      'Cell Microscope Lab',
+      'Ecosystem Connections Essay',
+      'KMT & States of Matter Lab',
+      'Lab Safety Contract',
+    ]);
+    expect(back.map(r => r.result)).toEqual(Array(6).fill(''));
+    expect(all.filter(r => r.where === 'assignments').map(r => r.title)).toEqual([
+      'Immune System Quick Check',
+      'Disease Research Poster',
+      'Science Fair Proposal',
+    ]);
+    expect((await row(page, 'Energy Transfer Investigation')).sub).toMatch(/^Returned \S+ \d+$/);
+    expect((await row(page, 'KMT & States of Matter Lab')).sub).toMatch(/^Returned \S+ \d+ · Late$/);
+    expect((await row(page, 'Immune System Quick Check', 'assignments')).sub).toMatch(/^Missing · Due /);
+    // No raw value stands in for a result.
+    const cells = page.root().querySelector('.sp-ml-work').textContent;
+    expect(cells).not.toMatch(/Extending|Proficient|Developing|%|\d\.\d| \/ |Complete/);
+    // My Learning, where the results would be, says they didn't load.
     expect(page.root().querySelector('.sp-no-results .sp-msg').textContent).toBe(
       'Your results didn’t load. Check your internet and try again.',
     );
     expect(page.root().querySelector('[data-act="grades-retry"]').textContent).toBe('Try Again');
-    // Every piece is listed, with its date; none has a result or a level.
-    expect(rows(page)).toHaveLength(9);
-    expect(rows(page).map(r => r.result)).toEqual(Array(9).fill(''));
-    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
-    expect(row(page, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Late$/);
-    expect(row(page, 'Immune System Quick Check').sub).toMatch(/^Missing · Due /);
-    // No raw value stands in for a result.
-    const cells = page.root().querySelector('.sp-list').textContent;
-    expect(cells).not.toMatch(/Extending|Proficient|Developing|%|\d\.\d| \/ |Complete/);
 
     page.net.fail = () => false;
     await page.click('[data-act="grades-retry"]');
     expect(page.fetched).toEqual([...CALC, '../shared/calc.js']);
     expect(page.root().querySelector('.sp-no-results')).toBeNull();
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending · 100%');
-    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe('Extending · 100%');
+    expect((await row(page, 'Cell Structure Quiz')).result).toBe('8 / 10');
     expect(page.calls).toHaveLength(0);
   });
 
@@ -217,9 +258,11 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     };
     const read = page.run('StudentData.fromServer')(reply);
     page.run('StudentData.use')(read);
-    const html = page.T.render({ screen: 'assignments', page: read, reply, all: true, demo: false });
+    const html = page.T.render({ screen: 'assignments', page: read, reply, demo: false });
     expect(html).toContain('Map Quiz');
     expect(html).not.toContain('sp-no-results');
+    const mine = page.T.render({ screen: 'assignments', page: read, reply, tab: 'learning', demo: false });
+    expect(mine).not.toContain('sp-no-results');
   });
 });
 
@@ -278,9 +321,11 @@ describe('student card: the demo walk', () => {
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
     expect(page.root().querySelector('.sp-pill').textContent).toBe('Block B');
-    expect(rows(page).map(r => r.title)).toEqual([
-      'Science Fair Proposal',
+    // Outstanding, the oldest due date first; then Upcoming; then My Learning's Your Work, newest first.
+    expect((await rows(page)).map(r => r.title)).toEqual([
+      'Immune System Quick Check',
       'Disease Research Poster',
+      'Science Fair Proposal',
       'Immune System Quick Check',
       'Energy Transfer Investigation',
       'Cell Structure Quiz',
@@ -356,7 +401,7 @@ describe('student card: wrong tries', () => {
       'This card is locked after too many wrong tries. Ask your teacher to unlock it.',
     );
     expect(page.root().querySelector('#sp-ident')).toBeNull();
-    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector('.sp-view')).toBeNull();
     expect(page.T.state().page).toBeNull();
     expect(page.calls).toHaveLength(0);
   });
@@ -391,13 +436,13 @@ describe('student card: a returned result follows the class’s grading style', 
     expect(format((3 + 7 / 3) / 2)).toBe(rubric);
     expect(format(2)).toBe(two);
     expect(format(3)).toBe(three);
-    expect(row(page, 'Energy Transfer Investigation').result).toBe(four);
-    expect(row(page, 'Cell Microscope Lab').result).toBe(rubric);
-    expect(row(page, 'Ecosystem Connections Essay').result).toBe(two);
-    expect(row(page, 'KMT & States of Matter Lab').result).toBe(three);
+    expect((await row(page, 'Energy Transfer Investigation')).result).toBe(four);
+    expect((await row(page, 'Cell Microscope Lab')).result).toBe(rubric);
+    expect((await row(page, 'Ecosystem Connections Essay')).result).toBe(two);
+    expect((await row(page, 'KMT & States of Matter Lab')).result).toBe(three);
     // Points and Complete/Incomplete work read the same in every style.
-    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
-    expect(row(page, 'Lab Safety Contract').result).toBe('Complete');
+    expect((await row(page, 'Cell Structure Quiz')).result).toBe('8 / 10');
+    expect((await row(page, 'Lab Safety Contract')).result).toBe('Complete');
   });
 
   it('names the level once, in the result, not again beside the date; a Letter class names none', async () => {
@@ -405,26 +450,33 @@ describe('student card: a returned result follows the class’s grading style', 
     const prof = await walk('#demo-card');
     const back = title => prof.T.state().page.assessments.find(a => a.title === title).returnedAt;
     // The result is the proficiency itself (DECISIONS, "Student-facing levels are proficiencies"), so the date line does not say it again.
-    expect(row(prof, 'Energy Transfer Investigation').sub).toBe(
-      'Back ' + day(prof, back('Energy Transfer Investigation')),
-    );
-    expect(row(prof, 'Energy Transfer Investigation').result).toBe('Extending');
-    expect(row(prof, 'Cell Microscope Lab').sub).toMatch(/^Back \S+ \d+$/);
-    expect(row(prof, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Late$/);
-    expect(row(prof, 'Cell Structure Quiz').sub).toMatch(/^Back \S+ \d+$/);
-    expect(row(prof, 'Energy Transfer Investigation').dot).toContain('sp-dot-back');
+    const energy = await row(prof, 'Energy Transfer Investigation');
+    expect(energy.sub).toBe('Returned ' + day(prof, back('Energy Transfer Investigation')));
+    expect(energy.result).toBe('Extending');
+    // Not opened yet: the blue dot.
+    expect(energy.fresh).toBe(true);
+    expect((await row(prof, 'Cell Microscope Lab')).sub).toMatch(/^Returned \S+ \d+$/);
+    expect((await row(prof, 'KMT & States of Matter Lab')).sub).toMatch(/^Returned \S+ \d+ · Late$/);
+    expect((await row(prof, 'Cell Structure Quiz')).sub).toMatch(/^Returned \S+ \d+$/);
 
     const letter = await walk('#demo-card-letter');
-    expect(row(letter, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
-    expect(letter.root().textContent).not.toMatch(/Extending|Proficient|Developing|Emerging/);
+    expect((await row(letter, 'Energy Transfer Investigation')).sub).toMatch(/^Returned \S+ \d+$/);
+    expect(letter.root().querySelector('.sp-ml-work').textContent).not.toMatch(
+      /Extending|Proficient|Developing|Emerging/,
+    );
   });
 
   it('shows Missing at once, with its due date and no result', async () => {
     const page = await walk();
-    const missing = row(page, 'Immune System Quick Check');
+    const missing = await row(page, 'Immune System Quick Check', 'assignments');
     expect(missing.sub).toMatch(/^Missing · Due \S+ \S+ \d+$/);
     expect(missing.result).toBe('');
     expect(missing.dot).toContain('sp-dot-missing');
+    // On My Learning too: its due date, and Missing where a result would be.
+    const listed = await row(page, 'Immune System Quick Check', 'learning');
+    expect(listed.sub).toMatch(/^Due \S+ \d+$/);
+    expect(listed.result).toBe('Missing');
+    expect(listed.fresh).toBe(false);
   });
 });
 
@@ -495,22 +547,30 @@ describe('student card: a draft is nowhere on the page', () => {
 
   it('a draft’s row is a not-graded row: the title and the date, nothing else', async () => {
     const page = await walk();
-    const drafted = row(page, 'Disease Research Poster');
-    const ungraded = row(page, 'Science Fair Proposal');
+    const drafted = await row(page, 'Disease Research Poster');
+    const ungraded = await row(page, 'Science Fair Proposal');
+    expect(drafted.where).toBe('assignments');
     expect(drafted.sub).toMatch(/^Due \S+ \S+ \d+$/);
     expect(drafted.result).toBe('');
     expect(drafted.dot).toBe(ungraded.dot);
-    const li = title => [...page.root().querySelectorAll('.sp-row')].find(el => el.textContent.includes(title));
+    // Its card is shaped as the card of work never graded (one is past due and one is not, so only the pill's colour differs).
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
+    await page.click('[data-segment="outstanding"]');
     const shape = el =>
       el.outerHTML
         .replace(/>[^<]+</g, '><')
-        .replace(/sp-row-title">.*?<\/span>/, 'sp-row-title"></span>')
-        .replace(/data-piece="[^"]*"/g, 'data-piece=""');
-    expect(shape(li('Disease Research Poster'))).toBe(shape(li('Science Fair Proposal')));
+        .replace(/sp-flag-(overdue|due)/g, 'sp-flag-')
+        .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
+        .replace(/ sp-picked/, '');
+    const poster = page.root().querySelector('.sp-deck .sp-piece[data-piece="demo-poster"]');
+    await page.click('[data-segment="upcoming"]');
+    const fair = page.root().querySelector('.sp-deck .sp-piece[data-piece="demo-fair"]');
+    expect(poster.querySelector('.sp-level')).toBeNull();
+    expect(shape(poster)).toBe(shape(fair));
     // A returned grade with a newer draft over it keeps what was returned.
-    const essay = row(page, 'Ecosystem Connections Essay');
+    const essay = await row(page, 'Ecosystem Connections Essay');
     expect(essay.result).toBe('Developing');
-    expect(essay.sub).toMatch(/^Back \S+ \d+$/);
+    expect(essay.sub).toMatch(/^Returned \S+ \d+$/);
   });
 });
 
@@ -610,7 +670,7 @@ describe('student-data.js: the one adapter', () => {
     const v = page.T.viewOf({ page: read, reply: REPLY });
     const view = id => page.T.rowView(v.work.find(p => p.id === id));
     expect(view('a1')).toMatchObject({ kind: 'back', result: 'Proficient + · 83%' });
-    expect(view('a1').sub).toMatch(/^Back \S+ \d+$/);
+    expect(view('a1').sub).toMatch(/^Returned \S+ \d+$/);
     expect(view('a2')).toMatchObject({ kind: 'due', result: '' });
     expect(view('a3')).toMatchObject({ kind: 'excused', result: '' });
     expect(view('a3').sub).toMatch(/^Excused · Due \S+ \S+ \d+$/);
@@ -619,14 +679,17 @@ describe('student-data.js: the one adapter', () => {
     expect(view('a7')).toMatchObject({ kind: 'due', result: '' });
     expect(view('a7').sub).toMatch(/^Late · Due \S+ \S+ \d+$/);
     const none = Object.assign({}, REPLY, { assessments: [] });
-    expect(
+    const empty = tab =>
       page.T.render({
         screen: 'assignments',
         page: page.run('StudentData.fromServer')(none),
         reply: none,
+        tab,
         demo: false,
-      }),
-    ).toContain('No assignments yet.');
+      });
+    expect(empty('assignments')).toContain('All caught up');
+    expect(empty('assignments')).not.toContain('See What’s Coming Up');
+    expect(empty('learning')).toContain('Nothing Here Yet');
   });
 
   it('answers calc.js for this student and this class only', async () => {
@@ -869,7 +932,7 @@ describe('calc.js on the student page reads only what student-data.js gives it',
     const list = reply => {
       const read = page.run('StudentData.fromServer')(reply);
       page.run('StudentData.use')(read);
-      const html = page.T.render({ screen: 'assignments', page: read, reply, all: true, demo: false });
+      const html = page.T.render({ screen: 'assignments', page: read, reply, tab: 'learning', demo: false });
       const v = page.T.viewOf({ page: read, reply });
       return Object.fromEntries(v.work.map(p => [p.id, page.T.rowView(p)]).concat([['html', html]]));
     };
@@ -887,18 +950,22 @@ describe('calc.js on the student page reads only what student-data.js gives it',
     'a %s class: every kind of piece is listed with no read the page lacks and no reader unused',
     async system => {
       const { page, reached, used, list } = await watched();
-      const demo = list(page.T.demoPage(system));
+      // The sample class with Show My Learning off: My Learning's readers are looked at last, below.
+      const demo = list(Object.assign(page.T.demoPage(system), { show_my_learning: false, learning: null }));
       const own = list(everyKind(system, OWN_SCALE));
       // Last, so the class in use below is the one on the default scale.
       const kinds = list(everyKind(system));
 
-      // One name is reached and not given, on purpose: constants.js asks
+      // Two names are reached and not given, on purpose. constants.js asks
       // (typeof getSectionForTag) whether the class's competency list is
       // here, to leave out a competency removed from the class. The page
       // carries no competency list; `tag_ids` arrives holding only the
-      // competencies still on the class. Anything else here is a reader
-      // s/student-data.js must add (getReturnedScores, when S0-F1 lands).
-      expect([...reached]).toEqual(['getSectionForTag']);
+      // competencies still on the class. And student-view.js asks (typeof
+      // courseToday) for the class's today, to split Outstanding from
+      // Upcoming; without My Learning it takes the date in British Columbia.
+      // Anything else here is a reader s/student-data.js must add
+      // (getReturnedScores, when S0-F1 lands).
+      expect([...reached].sort()).toEqual(['courseToday', 'getSectionForTag']);
       // And student-data.js defines nothing that nothing reads.
       expect(page.run('StudentData.readers')).toEqual([
         'getScores',
@@ -934,6 +1001,14 @@ describe('calc.js on the student page reads only what student-data.js gives it',
         expect(own.unlinked.result).toContain('95%');
         expect(kinds.unlinked.result).toContain('100%');
       }
+      /* With Show My Learning on, the page reaches My Learning's readers
+         too (getGroupedSections, courseToday…). Each is one student-data.js
+         puts on the page while the class shows My Learning (the watch
+         stands in their place here, so they are seen as reached). */
+      const learning = list(page.T.demoPage(system));
+      expect(learning.html).toContain('Your Work');
+      const readers = page.run('StudentData.learningReaders');
+      expect([...reached].filter(name => !readers.includes(name))).toEqual([]);
     },
   );
 });

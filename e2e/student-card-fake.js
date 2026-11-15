@@ -65,7 +65,8 @@ export async function serve(page, fn, opts = {}) {
 
 export const routes = posts => posts.map(p => p.body.route);
 export const school = (card, more) => fakeStudentSubmit({ cards: [sampleCard(TODAY, card)], ...more });
-export const row = (page, title) => page.locator('.sp-row', { hasText: title });
+// A row of My Learning's Your Work (the returned work, each row watched for "opened").
+export const row = (page, title) => page.locator('.sp-ml-work .sp-ml-row', { hasText: title });
 export const stored = page => page.evaluate(() => ({ local: { ...localStorage }, tab: { ...sessionStorage } }));
 
 export async function fits(page) {
@@ -239,14 +240,21 @@ export async function signIn(page) {
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
-  // Every piece in one list, as the tests of the list read it.
-  await showAll(page);
 }
 
-/* All Assignments (the header's list button, S4-F1): every piece in one
-   list, as the page drew it before To Do, Sent and Back. */
-export async function showAll(page) {
-  const b = page.getByRole('button', { name: 'All assignments' });
-  if ((await b.getAttribute('aria-pressed')) !== 'true') await b.click();
-  await expect(page.getByRole('heading', { name: 'All Assignments' })).toBeVisible();
+/* My Learning (the tab, redesign of 2026-11-14): Your Work lists what was
+   sent, is missing or came back, with each result. Opened from whichever
+   tab bar shows (along the bottom on a phone, in the header on a
+   Chromebook). */
+export async function openLearning(page) {
+  const tab = page.locator('.sp-tab[data-tab="learning"]').locator('visible=true');
+  if ((await tab.getAttribute('aria-current')) !== 'page') await tab.click();
+  await expect(page.locator('.sp-tab[data-tab="learning"][aria-current="page"]').locator('visible=true')).toBeVisible();
+}
+
+/* Log Out, then Log Out on the sheet that asks first (the old Done). */
+export async function logOut(page) {
+  await page.locator('.sp-head [data-act="logout-ask"]').click();
+  await expect(page.getByRole('alertdialog', { name: 'Log Out?' })).toBeVisible();
+  await page.locator('.sp-logout [data-act="card-done"]').click();
 }

@@ -11,7 +11,7 @@
  * - Reflecting sends the student's words with their own enrollment and the
  *   session; the screen shows what the route answered.
  * - An answer the teacher sent is marked seen once it is on screen.
- * - Nothing is kept past the session: Done ends it, and the next student
+ * - Nothing is kept past the session: Log Out ends it, and the next student
  *   in the same tab is asked their own `feedback`.
  * The stand-in answers only the routes this change calls; the rest of the
  * function is the real handler over the stand-in database.
@@ -165,9 +165,8 @@ describe('a class that takes work, with Reflect on Feedback on', () => {
     const world = { reflect: true, assessments: [] };
     const dev = school(world, TAKES);
     const page = await signIn(dev);
-    await page.click('[data-segment="back"]');
-    const p = viewOf(page).work.find(x => x.id === WORK.energy);
-    await page.click('.sp-piece[data-piece="' + p.id + '"] [data-act="feedback"]');
+    await page.click('[data-tab="learning"]');
+    await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + WORK.energy + '"]');
     await page.click('[data-act="reflect-open"]');
     await page.click('[data-act="reflect-sense"][data-value="yes"]');
     page.type('#sp-reflect-plan', 'Next time I’ll label every part first.');
@@ -200,8 +199,8 @@ describe('a class that takes work, with Reflect on Feedback on', () => {
     };
     const dev = school(world, TAKES);
     const page = await signIn(dev);
-    await page.click('[data-segment="back"]');
-    await page.click('.sp-piece[data-piece="' + WORK.energy + '"] [data-act="feedback"]');
+    await page.click('[data-tab="learning"]');
+    await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + WORK.energy + '"]');
     await page.click('[data-act="reflect-open"]');
     await page.settle();
     expect(bodies(page, 'answer-seen')).toHaveLength(1);
@@ -216,7 +215,7 @@ describe('a class that takes work, with Reflect on Feedback on', () => {
     expect(bodies(page, 'answer-seen')).toHaveLength(1);
   });
 
-  it('nothing outlasts the session: after Done the next sign-in asks for its own `feedback`', async () => {
+  it('nothing outlasts the session: after Log Out the next sign-in asks for its own `feedback`', async () => {
     const world = {
       reflect: true,
       assessments: [{ id: WORK.energy, marks: null, revision: null, reflection: reflection({}) }],
@@ -224,7 +223,8 @@ describe('a class that takes work, with Reflect on Feedback on', () => {
     const dev = school(world, TAKES);
     const page = await signIn(dev);
     expect(page.T.feedbackOf(page.T.state()).assessments).toHaveLength(1);
-    await page.click('[data-act="card-done"]');
+    await page.click('[data-act="logout-ask"]');
+    await page.click('.sp-logout [data-act="card-done"]');
     expect(page.T.state().realFeedback || null).toBeNull();
     expect(page.T.feedbackOf(page.T.state())).toBeNull();
   });

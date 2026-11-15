@@ -318,8 +318,6 @@ describe('grade-format-guard', () => {
     'teacher-mobile/tab-grade.js round (gradedCount / total) * 100': 'a share graded',
     's/page-view.js round Number(level)': 'a level the student view gives, already whole (calc.js’s)',
     's/page-view.js round v * 10000': 'a share',
-    's/page-view.js round 8 + ((4 - Math.max(1, Math.min(4, Number(v) || 1))) / 3) * (CHART.h - 16)':
-      'a chart point’s y',
     's/student-data.js floor v': 'a whole-number check',
   };
 

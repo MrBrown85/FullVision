@@ -21,25 +21,24 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('button', { name: 'To Do 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Outstanding \d+$/ })).toBeVisible();
   return { posts, errors };
 }
 
-async function showCard(page, title) {
+// A card on Upcoming: picked from the list on a Chromebook; on a phone the cards are one under another.
+async function showUpcoming(page, title) {
+  await page.getByRole('button', { name: /^Upcoming \d+$/ }).click();
   if (await page.locator('.sp-side').isVisible()) {
     await page.locator('.sp-side-row', { hasText: title }).click();
   } else {
-    await page.locator('.sp-deck').evaluate((d, t) => {
-      const card = [...d.querySelectorAll('.sp-piece')].find(c => c.textContent.includes(t));
-      d.scrollTo({ left: card.offsetLeft - d.offsetLeft, behavior: 'auto' });
-    }, title);
+    await page.locator('.sp-piece', { hasText: title }).scrollIntoViewIfNeeded();
   }
 }
 
+// Your Feedback opens from the piece's row in My Learning's Your Work.
 async function openFeedback(page, title) {
-  await page.getByRole('button', { name: /^Back \d+$/ }).click();
-  await showCard(page, title);
-  await page.locator('.sp-piece', { hasText: title }).getByRole('button', { name: 'See Your Feedback' }).click();
+  await page.locator('.sp-tab[data-tab="learning"]:visible').click();
+  await page.locator('.sp-ml-row[data-act="feedback"]', { hasText: title }).click();
   await expect(page.getByRole('heading', { level: 1, name: title })).toBeFocused();
 }
 
@@ -103,7 +102,7 @@ for (const [where, device] of [
 
     test('Check and Send asks Did You Do It? under the plan', async ({ page }) => {
       const { errors } = await demo(page);
-      await showCard(page, 'Science Fair Proposal');
+      await showUpcoming(page, 'Science Fair Proposal');
       const card = page.locator('.sp-piece', { hasText: 'Science Fair Proposal' });
       await expect(card.getByRole('heading', { name: 'Your Plan From Last Time' })).toBeVisible();
       await card.getByRole('button', { name: 'Send My Work' }).click();

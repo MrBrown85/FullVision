@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// S13-F2 and F3: My Learning in Preview as Student, Demo Mode. Off until the
-// class's Show My Learning is on (S13-F1 sets it); on, the tab shows the
-// grade and the skills in each grading style, and One Skill opens from a
-// skill, all from returned grades only. SHOTS=dir saves a picture of each.
+// My Learning in Preview as Student, Demo Mode (S13-F2; redrawn by Colin's
+// ruling of 2026-11-14). The tab always lists Your Work; once the class's
+// Show My Learning is on (S13-F1 sets it), the grade sits above it in the
+// class's grading style, from returned grades only. SHOTS=dir saves a
+// picture of each.
 
 const SHOTS = process.env.SHOTS || '';
 
@@ -44,61 +45,58 @@ async function shot(page, name) {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 }
 
-test('My Learning is off until the class shows it', async ({ page }) => {
-  const { screen, errors } = await openPreview(page, null);
-  await expect(screen.getByText('Your teacher hasn’t turned on My Learning for this class.')).toBeVisible();
-  await expect(screen.locator('.sp-ml')).toHaveCount(0);
+test('with Show My Learning off: Your Work, and no grade', async ({ page }) => {
+  const { dialog, screen, errors } = await openPreview(page, null);
+  await expect(screen.getByRole('heading', { name: 'My Learning' })).toBeVisible();
+  await expect(screen.locator('.sp-ml-work .sp-ml-row').first()).toBeVisible();
+  await expect(screen.locator('.sp-ml-overall')).toHaveCount(0);
+  await expect(screen.getByText('Your teacher hasn’t turned on My Learning for this class.')).toHaveCount(0);
+  await expect(
+    dialog.getByText('Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.'),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('a Proficiency class: You’re at, Your Strongest, Your Skills, and One Skill', async ({ page }) => {
+test('a Proficiency class: You’re at, Work On Next, and Your Work', async ({ page }) => {
   const { at, dialog, screen, errors } = await openPreview(page, 'proficiency');
   const want = await page.evaluate(
     ({ cid, sid }) => {
-      var l = StudentView.fromCache(cid, sid).view.learning;
+      var view = StudentView.fromCache(cid, sid).view;
       var word = withReturnedOnly(function () {
         return levelWord(cid, getOverallProficiency(cid, sid));
       });
-      var best = l.groups
-        .flatMap(function (g) {
-          return g.skills;
-        })
-        .sort(function (a, b) {
-          return b.pieces.length - a.pieces.length;
-        })[0];
-      return { word: word, first: l.groups[0].skills[0], best: best, next: l.next };
+      return {
+        word: word,
+        next: view.learning.next,
+        rows: StudentPageView.learningPieces(view).map(function (p) {
+          return p.title;
+        }),
+      };
     },
     { cid: at.cid, sid: at.sid },
   );
+  await expect(screen.locator('.sp-ml-period')).toHaveText('This Year So Far');
   await expect(screen.locator('.sp-ml-at-word')).toHaveText(want.word);
-  await expect(screen.getByRole('heading', { name: 'Your Skills' })).toBeVisible();
-  await expect(screen.locator('.sp-ml-skills [data-act="skill"][data-skill="' + want.first.id + '"]')).toContainText(
-    want.first.text || 'Not Yet',
-  );
-  // Next Step: the comment bank's step for the skill Generate would name, opening that skill.
+  await expect(screen.locator('.sp-ml-overall .sp-ml-ladder')).toBeVisible();
+  // Work On Next: the comment bank's step for the skill Generate would name; a line, not a button.
   if (want.next) {
-    await expect(screen.locator('.sp-ml-next')).toContainText('Next Step: ' + want.next.name);
+    await expect(screen.locator('.sp-ml-next')).toContainText('Work On Next: ' + want.next.name);
     await expect(screen.locator('.sp-ml-next')).toContainText(want.next.text);
+    await expect(screen.locator('.sp-ml-next button')).toHaveCount(0);
   }
-  await expect(
-    dialog.getByText('Their level on each skill and their grade, only from work you’ve returned.'),
-  ).toBeVisible();
+  await expect(screen.locator('.sp-ml-work .sp-row-title')).toHaveText(want.rows);
+  // Gone with the redesign: Your Strongest, Your Skills and One Skill.
+  await expect(screen.getByRole('heading', { name: 'Your Skills' })).toHaveCount(0);
+  await expect(screen.locator('[data-act="skill"]')).toHaveCount(0);
+  await expect(screen.locator('.sp-ml-strongest')).toHaveCount(0);
+  await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toHaveCount(0);
+  await expect(dialog.getByText('Their grade, only from work you’ve returned.')).toBeVisible();
   await shot(page, 'S13-F2-proficiency-phone');
 
-  // One Skill, from the skill with the most marked work: How It's Going and Your Work.
-  const row = screen.locator('[data-act="skill"][data-skill="' + want.best.id + '"]').last();
-  await row.evaluate(el => {
-    var d = el.closest('details');
-    if (d) d.open = true;
-  });
-  await row.click();
-  await expect(screen.getByRole('heading', { name: want.best.name })).toBeFocused();
-  for (const line of want.best.iCan) await expect(screen.getByText(line, { exact: true })).toBeVisible();
-  await expect(screen.getByRole('heading', { name: 'How It’s Going' })).toBeVisible();
-  await expect(screen.getByRole('heading', { name: 'Your Work' })).toBeVisible();
-  await expect(screen.locator('.sp-ml-one .sp-row-title').first()).toHaveText(want.best.pieces[0].title);
-  await shot(page, 'S13-F3-one-skill-phone');
-  await screen.getByRole('button', { name: 'My Learning' }).first().click();
+  // A returned row opens Your Feedback, and its back button goes to My Learning.
+  await screen.locator('.sp-ml-work .sp-ml-row[data-act="feedback"]').first().click();
+  await expect(screen.locator('.sp-fb-title')).toBeFocused();
+  await screen.locator('.sp-fb-back').click();
   await expect(screen.locator('.sp-ml-at-word')).toBeVisible();
 
   await dialog.getByRole('radio', { name: 'Chromebook' }).click();
@@ -107,7 +105,18 @@ test('a Proficiency class: You’re at, Your Strongest, Your Skills, and One Ski
   expect(errors).toEqual([]);
 });
 
-test('a Letter class: the letter and %, What Makes Up Your Grade, skills as a %', async ({ page }) => {
+test('Class Settings says what Show My Learning shows', async ({ page }) => {
+  await openPreview(page, 'proficiency');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sp-learning-hint')).toHaveText(
+    'Students see their overall grade, from work you’ve returned, at the top of My Learning. Off, they still see each piece’s result.',
+  );
+  await expect(page.locator('#sp-learning-would')).toHaveText(
+    "Students would see their grade in this class’s grading style (Proficiency), only from work you've returned.",
+  );
+});
+
+test('a Letter class: the letter and %, and What Makes Up Your Grade', async ({ page }) => {
   const { at, screen, errors } = await openPreview(page, 'letter');
   const want = await page.evaluate(
     ({ cid, sid }) =>
@@ -121,22 +130,26 @@ test('a Letter class: the letter and %, What Makes Up Your Grade, skills as a %'
   await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toBeVisible();
   await expect(screen.getByText('Counts 40%')).toBeVisible();
   await expect(screen.locator('.sp-ml-at-word')).toHaveCount(0);
+  // Missing work counts as 0 in a class with a course %.
+  const missing = screen.locator('.sp-ml-row', { has: screen.locator('.sp-lv-missing') });
+  if (await missing.count())
+    await expect(missing.first().locator('.sp-row-sub')).toContainText('counts as 0 until it’s in');
   await shot(page, 'S13-F2-letter-phone');
   expect(errors).toEqual([]);
 });
 
-test('a Both class: the letter and %, Your Strongest and the skills by level', async ({ page }) => {
+test('a Both class: the letter and %, and What Makes Up Your Grade', async ({ page }) => {
   const { screen, errors } = await openPreview(page, 'both');
   await expect(screen.locator('.sp-ml-letter')).toBeVisible();
-  await expect(screen.locator('.sp-ml-strongest')).toContainText('Your Strongest');
-  // The Letter and Skills board leads with the skills: no What Makes Up Your Grade.
-  await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toHaveCount(0);
-  await expect(screen.getByRole('heading', { name: 'Your Skills' })).toBeVisible();
+  await expect(screen.locator('.sp-ml-pct')).toHaveText(/%$/);
+  await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toBeVisible();
+  await expect(screen.locator('.sp-ml-strongest')).toHaveCount(0);
+  await expect(screen.getByRole('heading', { name: 'Your Skills' })).toHaveCount(0);
   await shot(page, 'S13-F2-both-phone');
   expect(errors).toEqual([]);
 });
 
-test('nothing returned yet: Nothing Marked Yet, and See Your Assignments goes back', async ({ page }) => {
+test('nothing returned yet: no grade, and Your Work lists only what is still owed', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => typeof getActiveCourse === 'function' && getStudents(getActiveCourse()).length > 0);
@@ -148,19 +161,31 @@ test('nothing returned yet: Nothing Marked Yet, and See Your Assignments goes ba
   await page.goto('/dashboard?manage=student-page');
   await page.getByRole('button', { name: 'Open Preview' }).waitFor();
   // A student with no grade at all, in this page's memory only.
-  const name = await page.evaluate(() => {
+  const at = await page.evaluate(() => {
     var cid = getActiveCourse();
     var st = sortStudents(getStudents(cid), 'lastName')[0];
     _cache.scores[cid][st.id] = [];
     delete _returnedSets[cid];
     clearProfCache();
-    return displayNameWithLast(st);
+    var view = StudentView.fromCache(cid, st.id).view;
+    return {
+      name: displayNameWithLast(st),
+      rows: StudentPageView.learningPieces(view).map(function (p) {
+        return p.title;
+      }),
+    };
   });
   await page.getByRole('button', { name: 'Open Preview' }).click();
-  const screen = page.getByRole('dialog', { name: 'Previewing as ' + name }).locator('.ps-screen');
+  const screen = page.getByRole('dialog', { name: 'Previewing as ' + at.name }).locator('.ps-screen');
   await screen.locator('.sp-tabs-bottom').getByRole('button', { name: 'My Learning' }).click();
-  await expect(screen.getByRole('heading', { name: 'Nothing Marked Yet' })).toBeVisible();
+  await expect(screen.locator('.sp-ml-overall')).toHaveCount(0);
+  if (at.rows.length) {
+    await expect(screen.locator('.sp-ml-work .sp-row-title')).toHaveText(at.rows);
+    await expect(screen.locator('.sp-ml-work .sp-ml-row[data-act="feedback"]')).toHaveCount(0);
+  } else {
+    await expect(screen.getByRole('heading', { name: 'Nothing Here Yet' })).toBeVisible();
+    await screen.getByRole('button', { name: 'See Your Assignments' }).click();
+    await expect(screen.locator('.sp-segments')).toBeVisible();
+  }
   await shot(page, 'S13-F2-nothing-yet-phone');
-  await screen.getByRole('button', { name: 'See Your Assignments' }).click();
-  await expect(screen.locator('.sp-segments')).toBeVisible();
 });

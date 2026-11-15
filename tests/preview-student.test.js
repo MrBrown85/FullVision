@@ -103,11 +103,16 @@ function key(target, k, opts) {
 function click(target) {
   target.dispatchEvent(new doc.defaultView.Event('click', { bubbles: true, cancelable: true }));
 }
-// All Assignments, pressed inside the device: every piece and its result in one list.
-function showAll(el) {
-  const b = el.querySelector('.ps-screen [data-act="all-open"]');
-  if (b && b.getAttribute('aria-pressed') !== 'true') click(b);
+// A tab of the page inside the device, pressed along the bottom as on a phone.
+function tab(el, id) {
+  click(el.querySelector('.ps-screen .sp-tabs-bottom [data-tab="' + id + '"]'));
 }
+// My Learning's Your Work, inside the device: each row's title and result.
+const workRows = el =>
+  [...el.querySelectorAll('.ps-screen .sp-ml-work .sp-ml-row')].map(r => ({
+    title: text(r.querySelector('.sp-row-title')),
+    result: text(r.querySelector('.sp-level')),
+  }));
 // Chooses a student in the list (linkedom's select has no value setter).
 function pick(select, value) {
   [...select.querySelectorAll('option')].forEach(o => {
@@ -208,9 +213,12 @@ describe('Class Settings › Student Page: the board’s two columns', () => {
     const sum = aside.querySelector('.sc-summary');
     expect(text(sum.querySelector('.cm-grade-title'))).toBe('Student Cards');
     expect(text(sum.querySelector('button'))).toBe('Manage Cards');
-    // The last row says where questionnaires and reports are set up.
+    // The last row says where questionnaires are answered and set up.
     const rows = [...doc.querySelectorAll('.sp-card .sp-row-title')].map(text);
-    expect(rows[rows.length - 1]).toBe('Questionnaires and Reports');
+    expect(rows[rows.length - 1]).toBe('Questionnaires');
+    expect(text(doc.querySelector('.sp-card .sp-questionnaires .cm-hint'))).toBe(
+      'Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.',
+    );
   });
 
   it('Manage Cards takes the focus to the full Student Cards list', () => {
@@ -248,17 +256,18 @@ describe('the preview', () => {
   it('draws the page StudentView builds: returned grades only, worded by calc.js', () => {
     const el = openJordan();
     const { view } = StudentView.fromCache(CID, S1);
-    showAll(el);
-    const rows = [...el.querySelectorAll('.sp-row')].map(r => ({
-      title: text(r.querySelector('.sp-row-title')),
-      result: text(r.querySelector('.sp-row-result')),
-    }));
-    // All Assignments groups the rows (work to hand in first, then by unit), so compare them in title order.
-    const byTitle = (a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0);
-    expect(rows.slice().sort(byTitle)).toEqual(
-      view.work.map(p => ({ title: p.title, result: p.result.text })).sort(byTitle),
+    // The draft is work still to hand in, on Outstanding, with no result.
+    const poster = view.work.find(p => p.title === 'Draft Poster');
+    expect([poster.kind, poster.result.text]).toEqual(['due', '']);
+    expect([...el.querySelectorAll('.ps-screen .sp-deck .sp-piece-title')].map(text)).toEqual(['Draft Poster']);
+    expect(el.querySelector('.ps-screen .sp-deck .sp-level')).toBeNull();
+    // My Learning's Your Work lists the returned pieces, newest first, each with its result.
+    tab(el, 'learning');
+    const rows = workRows(el);
+    expect(rows).toEqual(
+      view.work.filter(p => p.kind === 'back').map(p => ({ title: p.title, result: p.result.text })),
     );
-    expect(rows.find(r => r.title === 'Draft Poster').result).toBe('');
+    expect(rows.map(r => r.title)).toEqual(['Quick Check', 'Changed Reflection', 'Returned Essay']);
     // The changed reflection shows the grade returned, not the draft.
     const reflect = getAssessments(CID).find(a => a.id === 'reflect');
     // A Both class: the proficiency and the piece's %, never "3.0 · 75%"
@@ -272,34 +281,42 @@ describe('the preview', () => {
     expect(text(el.querySelector('.sp-pill'))).toBe('Block C');
   });
 
-  it('the page inside the device answers presses as the student’s does: tabs, To Do, Sent and Back, search, a card', () => {
+  it('the page inside the device answers presses as the student’s does: tabs, Outstanding and Upcoming, a row, Log Out', () => {
     const el = openJordan();
     const screen = () => el.querySelector('.ps-screen');
     const { view } = StudentView.fromCache(CID, S1);
-    // It opens as the student's does: Assignments, To Do.
-    expect(screen().querySelector('.sp-segment[aria-pressed="true"]').textContent).toMatch(/^To Do \d+$/);
-    click(screen().querySelector('[data-segment="back"]'));
-    const back = view.work.filter(p => p.kind === 'back').map(p => p.title);
-    expect([...screen().querySelectorAll('.sp-deck .sp-piece-title')].map(t => text(t))).toEqual(back);
+    // It opens as the student's does: Assignments, Outstanding.
+    expect(text(screen().querySelector('.sp-segment[aria-pressed="true"]'))).toMatch(/^Outstanding \d+$/);
+    click(screen().querySelector('[data-segment="upcoming"]'));
+    expect(text(screen().querySelector('.sp-segment[aria-pressed="true"]'))).toBe('Upcoming 0');
+    expect(text(screen().querySelector('.sp-empty'))).toBe('Nothing coming up yet.');
     // The page inside the device is the student page's own drawing for that choice.
     const same = doc.createElement('div');
-    same.innerHTML = StudentPageView.html(view, { tab: 'assignments', segment: 'back', all: false, pick: '' });
+    same.innerHTML = StudentPageView.html(view, { tab: 'assignments', segment: 'upcoming', pick: '' });
     expect(screen().innerHTML === same.innerHTML).toBe(true);
-    click(screen().querySelector('.sp-tabs-bottom [data-tab="reports"]'));
-    expect(text(screen().querySelector('.sp-page-title'))).toBe('My Reports');
-    click(screen().querySelector('[data-act="all-open"]'));
-    const box = screen().querySelector('#sp-search');
-    box.value = 'reflection';
-    box.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
-    expect([...screen().querySelectorAll('.sp-row-title')].map(t => text(t))).toEqual(
-      view.work.filter(p => /reflection/i.test(p.title)).map(p => p.title),
-    );
-    // Done and Your Classes reach for the student's session: here they do nothing.
+    click(screen().querySelector('[data-segment="outstanding"]'));
+    expect([...screen().querySelectorAll('.sp-deck .sp-piece-title')].map(text)).toEqual(['Draft Poster']);
+    // My Learning: a returned piece's row opens Your Feedback, and its way back is My Learning.
+    tab(el, 'learning');
+    click(screen().querySelector('.sp-ml-row[data-act="feedback"][data-piece="essay"]'));
+    expect(text(screen().querySelector('#sp-fb-title'))).toBe('Returned Essay');
+    expect(text(screen().querySelector('[data-act="feedback-close"]'))).toBe('My Learning');
+    click(screen().querySelector('[data-act="feedback-close"]'));
+    expect(screen().querySelector('.sp-ml-row[data-piece="essay"]')).toBeTruthy();
+    // Reflections, with nothing there yet.
+    tab(el, 'questionnaires');
+    expect(text(screen().querySelector('.sp-page-title'))).toBe('Reflections');
+    expect(text(screen().querySelector('.sp-empty'))).toBe('Reflections from your teacher will show here.');
+    // Log Out asks first; its Log Out and Your Classes reach for the student's session: here they do nothing.
+    click(screen().querySelector('[data-act="logout-ask"]'));
+    expect(text(screen().querySelector('#sp-logout-title'))).toBe('Log Out?');
     const before = screen().innerHTML;
-    click(screen().querySelector('[data-act="card-done"]'));
+    click(screen().querySelector('.sp-logout [data-act="card-done"]'));
     click(screen().querySelector('[data-act="classes-open"]'));
     expect(screen().innerHTML).toBe(before);
     expect(overlay()).toBeTruthy();
+    click(screen().querySelector('.sp-logout [data-act="logout-cancel"]'));
+    expect(screen().querySelector('.sp-logout')).toBeNull();
   });
 
   it('lists what Jordan sees and doesn’t see, in the board’s words', () => {
@@ -328,7 +345,7 @@ describe('the preview', () => {
           ],
           ['Other students', 'No class average, no one else’s work.'],
           ['Your private notes', 'Observations marked Private stay with you.'],
-          ['My Learning', 'Off for this class. Turn it on in Class Settings › Student Page.'],
+          ['Their grade', 'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.'],
         ],
       },
     ]);
@@ -346,9 +363,13 @@ describe('the preview', () => {
     expect(el.isConnected).toBe(false);
     PreviewStudent.open(CID, S1, null, null, { learning: true });
     const right = text(overlay().querySelector('.ps-side-right'));
-    const left = text(overlay().querySelector('.ps-side-left'));
+    const sees = [...overlay().querySelectorAll('.ps-side-left .ps-item')].map(li => [
+      text(li.querySelector('.ps-item-title')),
+      text(li.querySelector('.ps-item-line')),
+    ]);
     expect(right).not.toContain('My Learning');
-    expect(left).toContain('My Learning');
+    expect(right).not.toContain('Their grade');
+    expect(sees).toContainEqual(['My Learning', 'Their grade, only from work you’ve returned.']);
   });
 
   it.each([
@@ -370,10 +391,10 @@ describe('the preview', () => {
     expect(el.querySelector('.ps-device-phone')).toBeNull();
     expect(el.querySelector('[data-ps-device="chromebook"]').getAttribute('aria-checked')).toBe('true');
     // The same page in either, and what the student chose to look at is kept.
-    showAll(el);
+    click(el.querySelector('.ps-screen .sp-tabs-top [data-tab="learning"]'));
     click(el.querySelector('[data-ps-device="phone"]'));
-    expect(el.querySelector('.ps-screen [data-act="all-open"]').getAttribute('aria-pressed')).toBe('true');
-    expect(el.querySelectorAll('.sp-row').length).toBe(4);
+    expect(el.querySelector('.ps-screen .sp-tabs-bottom .sp-tab-on').getAttribute('data-tab')).toBe('learning');
+    expect(workRows(el)).toHaveLength(3);
   });
 
   it('Back to Class Settings and Escape close it, and the focus goes back to Open Preview', () => {
@@ -436,14 +457,15 @@ describe('a signed-in class whose Draft and Returned rows have not loaded', () =
     expect(PreviewStudent.open(CID, S1, null)).toBe(true);
     const el = overlay();
     expect(text(el.querySelector('.ps-waiting'))).toBe('Loading this class…');
-    expect(el.querySelectorAll('.sp-row').length).toBe(0);
+    expect(el.querySelectorAll('.sp-piece, .sp-ml-row').length).toBe(0);
     expect(el.innerHTML).not.toMatch(SECRET);
     // No draft count is said while the rows are not known.
     expect(text(el.querySelectorAll('.ps-item-line')[1])).toBe('Drafts never reach the student page.');
     _loadGradeReturns(CID, structuredClone(_cache.gradeReturns[CID] || {}));
     CmStudentPage.render(CID);
-    showAll(overlay());
-    expect(overlay().querySelectorAll('.sp-row').length).toBe(4);
+    expect(overlay().querySelectorAll('.ps-screen .sp-deck .sp-piece').length).toBe(1);
+    tab(overlay(), 'learning');
+    expect(workRows(overlay())).toHaveLength(3);
     expect(overlay().innerHTML).not.toMatch(SECRET);
   });
 });
@@ -498,8 +520,8 @@ describe('S9-F3: See Your Work in the preview, from the marks the student was gi
   const screen = () => overlay().querySelector('.ps-screen');
   function openEssayFeedback() {
     PreviewStudent.open(CID, S1, null);
-    click(screen().querySelector('[data-segment="back"]'));
-    click(screen().querySelector('.sp-piece[data-piece="essay"] [data-act="feedback"]'));
+    tab(overlay(), 'learning');
+    click(screen().querySelector('.sp-ml-row[data-act="feedback"][data-piece="essay"]'));
   }
 
   it('Jordan Sees names the notes; Your Feedback has See Your Work; it opens the page with the marks', async () => {

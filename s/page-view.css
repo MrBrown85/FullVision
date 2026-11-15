@@ -48,7 +48,7 @@
   cursor: pointer;
 }
 
-/* The header: the class and its block, Done, All Assignments. */
+/* The header: the class and its block, the tabs on a Chromebook, Log Out. */
 .sp-view .sp-head {
   position: sticky;
   top: 0;
@@ -201,7 +201,7 @@
   opacity: 0.6;
 }
 
-/* To Do, Sent and Back. */
+/* Outstanding and Upcoming. */
 .sp-view .sp-segments {
   display: flex;
   background: rgba(118, 118, 128, 0.12);
@@ -280,36 +280,22 @@
   line-height: 1.35;
   color: var(--sp-text-2);
 }
-.sp-view .sp-row-result {
-  flex: none;
-  max-width: 45%;
-  font-size: 16px;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
 
-/* The cards (S4-F2): side by side on a phone, swiped between. */
+/* The cards: one under another on a phone, scrolled through (Colin,
+   2026-11-14: "they're used to scroll"). */
 .sp-view .sp-side {
   display: none;
 }
 .sp-view .sp-split {
-  margin: 0 -16px;
+  margin: 0;
 }
 .sp-view .sp-deck {
   display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-}
-.sp-view .sp-deck::-webkit-scrollbar {
-  display: none;
+  flex-direction: column;
+  gap: 14px;
 }
 .sp-view .sp-piece {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  padding: 0 16px;
+  scroll-margin-top: 12px;
 }
 .sp-view .sp-piece-card {
   height: 100%;
@@ -362,24 +348,7 @@
   background: rgba(0, 122, 255, 0.1);
   color: #0058d0;
 }
-.sp-view .sp-piece-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.sp-view .sp-piece-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
-  font-size: 14px;
-}
-.sp-view .sp-piece-row-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
+
 .sp-view .sp-level {
   flex: none;
   font-size: 12px;
@@ -406,61 +375,7 @@
   background: #dbeafe;
   color: #1e40af;
 }
-.sp-view .sp-piece-comment {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #f0f6ff;
-  font-size: 14px;
-  line-height: 1.45;
-}
-.sp-view .sp-deck-count {
-  margin: 4px 0 0;
-  text-align: center;
-  font-size: 13px;
-  color: #58585d;
-}
 
-/* All Assignments (S4-F2): search, filters, rows that open a card. */
-.sp-view .sp-all-head {
-  align-items: center;
-  gap: 4px;
-  margin-left: -10px;
-}
-.sp-view .sp-all-head .sp-page-title {
-  margin: 0;
-  font-size: 20px;
-}
-.sp-view .sp-search {
-  width: 100%;
-  min-height: 40px;
-  margin: 0;
-  padding: 9px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: rgba(118, 118, 128, 0.12);
-  font: inherit;
-  font-size: 16px;
-  color: var(--sp-text);
-}
-.sp-view .sp-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.sp-view .sp-filter {
-  min-height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--sp-line);
-  border-radius: 999px;
-  background: #fff;
-  font-size: 13px;
-}
-.sp-view .sp-filter-on {
-  border-color: var(--sp-text);
-  background: var(--sp-text);
-  color: #fff;
-}
 .sp-view .sp-row-open {
   flex: 1;
   min-width: 0;
@@ -519,28 +434,7 @@
   font-size: 24px;
   font-weight: 700;
 }
-.sp-view .sp-all-head {
-  display: flex;
-}
 
-/* What You're Graded On, on a card not back yet (S4-F3). */
-.sp-view .sp-graded-on {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #eef5ee;
-}
-.sp-view .sp-graded-on-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1b5e20;
-}
-.sp-view .sp-graded-on-name {
-  font-size: 14px;
-}
 .sp-view .sp-link-btn {
   display: inline-flex;
   align-items: center;
@@ -956,9 +850,9 @@
   }
 }
 
-/* Questionnaires and My Reports (S4-F4): on a phone the open one as a
-   card and the rest as a list; on a Chromebook the list on the left and
-   the one picked on the right. */
+/* Reflections (S4-F4): on a phone the open ones as cards and the rest as
+   lists; on a Chromebook the list on the left and the one picked on the
+   right. */
 .sp-view .sp-forms-desk {
   display: none;
 }
@@ -1015,76 +909,11 @@
   background: var(--sp-green-soft);
   color: var(--sp-green);
 }
-.sp-view .sp-report-head {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sp-view .sp-report-head .sp-form-title {
-  flex: 1;
-  font-size: 18px;
-}
-.sp-view .sp-report-result {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--sp-bg);
-  font-size: 15px;
-  font-weight: 600;
-}
-.sp-view .sp-report-result .sp-level {
-  font-size: 14px;
-}
-.sp-view .sp-report-comment {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
+
 .sp-view .sp-dot-new {
   background: var(--sp-blue);
 }
 
-/* What Changed Since You Last Looked (S4-F5). */
-.sp-view .sp-since {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #e8f1ff;
-  color: #0c2d6b;
-}
-.sp-view .sp-since-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-.sp-view .sp-since-line {
-  margin: 0;
-  font-size: 14px;
-}
-.sp-view .sp-row-flags {
-  display: flex;
-  gap: 6px;
-  margin-top: 4px;
-}
-.sp-view .sp-row-flag {
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 11px;
-  background: #0058d0;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-}
 .sp-view .sp-flag-updated {
   background: #dbeafe;
   color: #1e40af;
@@ -1101,22 +930,7 @@
   color: #58585d;
   white-space: nowrap;
 }
-.sp-view .sp-updated-note {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #eef4ff;
-  box-shadow: inset 0 0 0 1px #bcd4ff;
-  font-size: 14px;
-}
-.sp-view .sp-updated-title {
-  margin: 0 0 2px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1e40af;
-}
-.sp-view .sp-updated-line {
-  margin: 0;
-}
+
 .sp-view .sp-tab {
   position: relative;
 }
@@ -1267,9 +1081,6 @@
     font-size: 28px;
     font-weight: 800;
   }
-  .sp-view .sp-deck-count {
-    display: none;
-  }
   .sp-view .sp-page {
     width: 100%;
     max-width: 1040px;
@@ -1323,9 +1134,8 @@
   }
 }
 
-/* My Learning (S13-F2 and F3): the grade, the skills, One Skill. Each
-   level has one colour (--sp-ml-1 to 4); the ladder, the little bars, the
-   chart's line and dots use it. */
+/* My Learning (S13-F2; 2026-11-14): the grade, then the student's work.
+   Each level has one colour (--sp-ml-1 to 4); the ladder uses it. */
 .sp-view .sp-ml {
   --sp-ml-1: #dc2626;
   --sp-ml-2: #d97706;
@@ -1340,12 +1150,7 @@
   margin: 0;
   padding: 0;
 }
-.sp-view .sp-ml-head {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
+
 .sp-view .sp-ml-card {
   display: block;
   margin: 0;
@@ -1382,8 +1187,20 @@
   color: var(--sp-ml-4);
 }
 
-/* The grade: the word (or letter) on the left, the ladder beside it. */
+/* The grade: what it covers, then the word (or letter) on the left and
+   the ladder beside it, then Work On Next. */
 .sp-view .sp-ml-overall {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-view .sp-ml-period {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-overall-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -1423,7 +1240,7 @@
 .sp-view .sp-ml-trend-down {
   color: var(--sp-text-2);
 }
-.sp-view .sp-ml-overall-letter {
+.sp-view .sp-ml-overall-letter .sp-ml-overall-row {
   align-items: center;
   justify-content: flex-start;
   gap: 16px;
@@ -1550,52 +1367,23 @@
   color: var(--sp-ml-at);
 }
 
-/* A level as a skill row shows it: a little four-bar ladder and a chip. */
-.sp-view .sp-ml-mini {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
-}
-.sp-view .sp-ml-mini i {
-  display: block;
-  width: 4px;
-  border-radius: 1px;
-  background: var(--sp-fill);
-}
-.sp-view .sp-ml-mini i:nth-child(1) {
-  height: 5px;
-}
-.sp-view .sp-ml-mini i:nth-child(2) {
-  height: 8px;
-}
-.sp-view .sp-ml-mini i:nth-child(3) {
-  height: 11px;
-}
-.sp-view .sp-ml-mini i:nth-child(4) {
-  height: 14px;
-}
-.sp-view .sp-ml-mini i.sp-ml-mini-on {
-  background: var(--sp-ml-at);
-}
-
-/* Next Step and Your Strongest: an icon, a coloured title, the words. */
-.sp-view .sp-ml-next,
-.sp-view .sp-ml-strongest {
+/* Work On Next: an icon, a coloured title, the words. */
+.sp-view .sp-ml-next {
   display: flex;
   align-items: center;
-  gap: 12px;
-  cursor: pointer;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sp-ml-amber-bg);
 }
-.sp-view .sp-ml-next-still {
-  cursor: default;
-}
+
 .sp-view .sp-ml-next .sp-ml-icon {
   align-self: flex-start;
   margin-top: 1px;
   color: var(--sp-ml-amber-ink);
 }
 .sp-view .sp-ml-next-text {
+  margin: 0;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1610,38 +1398,6 @@
 .sp-view .sp-ml-next-line {
   font-size: 15px;
   line-height: 1.4;
-}
-.sp-view .sp-ml-strongest .sp-ml-icon {
-  color: var(--sp-ml-4);
-}
-.sp-view .sp-ml-strongest-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--sp-ml-4);
-}
-.sp-view .sp-ml-strongest-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 10px;
-}
-.sp-view .sp-ml-strongest-name {
-  min-width: 0;
-  font-size: 17px;
-  font-weight: 700;
-}
-.sp-view .sp-ml-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #e3edff;
-  box-shadow: none;
-  color: #1e3a8a;
-  font-weight: 700;
-}
-.sp-view .sp-ml-top .sp-ml-icon {
-  color: var(--sp-ml-4);
 }
 
 /* Rows. */
@@ -1672,178 +1428,7 @@
   font: inherit;
   text-align: left;
 }
-.sp-view .sp-ml-skill-name {
-  flex: 1;
-  min-width: 0;
-  font-weight: 600;
-}
-.sp-view .sp-ml-level {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-.sp-view .sp-ml-word {
-  font-size: 14px;
-  color: var(--sp-text-2);
-  font-variant-numeric: tabular-nums;
-}
-.sp-view .sp-ml-none {
-  font-size: 14px;
-  color: var(--sp-text-2);
-}
 
-/* Missing: amber, as work that needs the student. */
-.sp-view .sp-ml-missing {
-  background: var(--sp-ml-amber-bg);
-  box-shadow: none;
-}
-.sp-view .sp-ml-missing-title {
-  margin: 0;
-  font-size: 15px;
-  color: var(--sp-ml-amber-ink);
-}
-.sp-view .sp-ml-missing .sp-row-title {
-  font-weight: 700;
-  color: var(--sp-ml-amber-ink);
-}
-.sp-view .sp-ml-missing .sp-ml-rows > li {
-  border-top-color: rgba(124, 74, 3, 0.15);
-}
-.sp-view .sp-ml-line {
-  margin: 0 0 4px;
-  font-size: 13px;
-  color: var(--sp-text-2);
-}
-.sp-view .sp-ml-missing .sp-ml-line {
-  color: var(--sp-ml-amber-ink);
-}
-
-/* Your Skills. */
-.sp-view .sp-ml-subject {
-  margin: 10px 0 4px;
-  font-size: 15px;
-  font-weight: 700;
-}
-.sp-view .sp-ml-folder {
-  margin: 0;
-  border-top: 1px solid var(--sp-fill);
-}
-.sp-view .sp-ml-folder-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  cursor: pointer;
-  font-weight: 700;
-}
-.sp-view .sp-ml-folder-name {
-  flex: 1;
-  min-width: 0;
-}
-.sp-view .sp-ml-folder-count {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--sp-text-2);
-}
-
-/* One Skill: the I Can lines, each with a target. */
-.sp-view .sp-ml-ican {
-  list-style: none;
-  padding: 4px 16px;
-}
-.sp-view .sp-ml-ican > li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 0;
-  padding: 10px 0;
-  border-top: 1px solid var(--sp-fill);
-  font-size: 16px;
-  line-height: 1.4;
-}
-.sp-view .sp-ml-ican > li:first-child {
-  border-top: 0;
-}
-.sp-view .sp-ml-ican .sp-ml-icon {
-  margin-top: 2px;
-  color: var(--sp-ml-4);
-}
-
-/* How It's Going: the line in the skill's level's colour, each dot in its own, the latest ringed. */
-.sp-view .sp-ml-chart {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-.sp-view .sp-ml-grid {
-  stroke: var(--sp-fill);
-  stroke-width: 1;
-}
-.sp-view .sp-ml-axis {
-  font-size: 10px;
-  fill: var(--sp-text-2);
-}
-.sp-view .sp-ml-path {
-  fill: none;
-  stroke: var(--sp-text-2);
-  stroke-width: 2.5;
-}
-.sp-view .sp-ml-path-1 {
-  stroke: var(--sp-ml-1);
-}
-.sp-view .sp-ml-path-2 {
-  stroke: var(--sp-ml-2);
-}
-.sp-view .sp-ml-path-3 {
-  stroke: var(--sp-ml-3);
-}
-.sp-view .sp-ml-path-4 {
-  stroke: var(--sp-ml-4);
-}
-.sp-view .sp-ml-dot {
-  fill: var(--sp-field);
-}
-.sp-view .sp-ml-dot-1 {
-  fill: var(--sp-ml-1);
-}
-.sp-view .sp-ml-dot-2 {
-  fill: var(--sp-ml-2);
-}
-.sp-view .sp-ml-dot-3 {
-  fill: var(--sp-ml-3);
-}
-.sp-view .sp-ml-dot-4 {
-  fill: var(--sp-ml-4);
-}
-.sp-view .sp-ml-ring {
-  fill: var(--sp-card);
-  stroke: var(--sp-field);
-  stroke-width: 2;
-}
-.sp-view .sp-ml-ring-1 {
-  stroke: var(--sp-ml-1);
-}
-.sp-view .sp-ml-ring-2 {
-  stroke: var(--sp-ml-2);
-}
-.sp-view .sp-ml-ring-3 {
-  stroke: var(--sp-ml-3);
-}
-.sp-view .sp-ml-ring-4 {
-  stroke: var(--sp-ml-4);
-}
-.sp-view .sp-ml-dates {
-  display: flex;
-  justify-content: space-between;
-  padding-left: calc(100% * 70 / 300);
-  font-size: 11px;
-  color: var(--sp-text-2);
-}
-.sp-view .sp-ml-date-last {
-  font-weight: 700;
-  color: var(--sp-text);
-}
 .sp-view .sp-ml-empty {
   display: flex;
   flex-direction: column;
@@ -1853,50 +1438,8 @@
   text-align: center;
 }
 
-/* A Chromebook (SDeskLearning): the grade, Next Step and Your Strongest
-   three across; Missing a full-width strip; the skills in two columns. */
-@container sp-view (min-width: 760px) {
-  .sp-view .sp-ml-head {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: 16px;
-  }
-  .sp-view .sp-ml-head > .sp-ml-card {
-    flex: 1 1 0;
-    width: auto;
-    min-width: 0;
-  }
-  .sp-view .sp-ml-head > .sp-ml-overall {
-    flex-grow: 1.4;
-  }
-  .sp-view .sp-ml-head > .sp-ml-next,
-  .sp-view .sp-ml-head > .sp-ml-strongest {
-    align-items: flex-start;
-  }
-  .sp-view .sp-ml-head .sp-row-go {
-    display: none;
-  }
-  .sp-view .sp-ml-head .sp-ml-strongest-line {
-    justify-content: flex-start;
-  }
-  .sp-view .sp-ml-head > .sp-ml-missing {
-    flex-basis: 100%;
-    order: 9;
-  }
-  .sp-view .sp-ml-skills .sp-ml-rows {
-    columns: 2;
-    column-gap: 32px;
-  }
-  .sp-view .sp-ml-skills .sp-ml-rows > li {
-    break-inside: avoid;
-  }
-}
-
-/* What the server also tells (S4-W1): the unit, the category and what it
-   counts, the teacher's Description, I Can lines, Core Competencies, the
-   teacher's name over their words, what a rubric row counts toward. Each
-   shows only when the page is sent it. */
+/* What the server also tells (S4-W1): the unit and the teacher's
+   Description. Each shows only when the page is sent it. */
 .sp-view .sp-piece-unit {
   margin: 0;
   font-size: 12px;
@@ -1906,12 +1449,7 @@
   color: var(--sp-text-2);
   overflow-wrap: anywhere;
 }
-.sp-view .sp-piece-category {
-  margin: -6px 0 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--sp-text-2);
-}
+
 .sp-view .sp-piece-about {
   margin: 0;
   font-size: 15px;
@@ -1919,12 +1457,7 @@
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
-.sp-view .sp-graded-on-ican {
-  margin: -2px 0 4px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: #3a3a3c;
-}
+
 .sp-view .sp-core {
   display: flex;
   flex-direction: column;
@@ -1934,24 +1467,12 @@
   border-radius: 12px;
   background: var(--sp-blue-soft);
 }
-.sp-view .sp-core .sp-graded-on-title {
-  color: var(--sp-blue-text);
-}
+
 .sp-view .sp-core-name {
   font-size: 14px;
 }
 .sp-view .sp-fb-comment-words {
   margin: 0;
-}
-.sp-view .sp-fb-category {
-  margin: 0;
-  font-size: 14px;
-  color: var(--sp-text-2);
-}
-.sp-view .sp-fb-toward {
-  margin: -4px 0 0;
-  font-size: 13px;
-  color: var(--sp-text-2);
 }
 
 /* Sending (S5-F2, S5-F3): Send My Work, a closed piece, a card sent. */
@@ -2353,9 +1874,7 @@
   background: #ffedd5;
   color: #9a3412;
 }
-.sp-view .sp-row-flag-revise {
-  background: #c2410c;
-}
+
 .sp-view .sp-revise {
   display: flex;
   flex-direction: column;
@@ -2527,19 +2046,6 @@
   color: #3a3a3c;
 }
 
-/* The category as a blue pill; the Core Competency as a label and an outlined pill. */
-.sp-view .sp-piece-category {
-  margin: -4px 0 0;
-}
-.sp-view .sp-category-pill {
-  display: inline-flex;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(0, 122, 255, 0.1);
-  color: var(--sp-blue-text);
-  font-size: 13px;
-  font-weight: 700;
-}
 .sp-view .sp-core {
   flex-direction: row;
   flex-wrap: wrap;
@@ -2548,11 +2054,7 @@
   padding: 0;
   background: none;
 }
-.sp-view .sp-core .sp-core-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--sp-text);
-}
+
 .sp-view .sp-core-name {
   display: inline-flex;
   padding: 3px 10px;
@@ -2579,13 +2081,6 @@
 }
 .sp-view .sp-lock-row .sp-pill-icon {
   color: #3a3a3c;
-}
-
-/* A rubric criterion's competency under its name (Returned Work). */
-.sp-view .sp-piece-row-sub {
-  display: block;
-  font-size: 13px;
-  color: var(--sp-text-2);
 }
 
 /* A button with an icon before its words. */
@@ -2641,7 +2136,7 @@
   border-color: rgba(0, 122, 255, 0.25);
 }
 
-/* To Do orange; Missing and Needs Revision brown; Sent blue; Back green (All Assignments). */
+/* The Chromebook list's dots: due orange; Missing and Needs Revision brown; Sent blue; Back green. */
 .sp-view .sp-dot-due {
   background: #e08a00;
 }
@@ -2650,7 +2145,7 @@
   background: #9a4a0a;
 }
 
-/* All Assignments' groups: This Week, then each unit. */
+/* A list's heading: Reflections' Open Now, Done and Coming Up. */
 .sp-view .sp-list-head {
   margin: 14px 4px 6px;
   font-size: 12px;
@@ -2815,18 +2310,14 @@
     padding: 0 24px;
   }
 }
-.sp-view .sp-piece-row-label {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+
 /* The student's pages on a card sit at the left, small (the Sent and Needs Revision boards). */
 .sp-view .sp-piece-card .sp-send-thumbs {
   justify-content: flex-start;
 }
 
-/* The Chromebook frame (Your Feedback on a Chromebook): To Do, Sent and
-   Back and the list in a full-height sidebar flush to the window's left
+/* The Chromebook frame (Your Feedback on a Chromebook): Outstanding and
+   Upcoming and the list in a full-height sidebar flush to the window's left
    edge; the card or Your Feedback fills the rest. The split's two parts
    become the page's grid items, so the sidebar is one white column from
    the header to the bottom, whatever the segment holds. */
@@ -2884,4 +2375,97 @@
     grid-row: auto;
     margin-top: 24px;
   }
+}
+
+/* ── Three tabs (Colin, 2026-11-14) ─────────────────────────── */
+
+/* A due date that has passed. */
+.sp-view .sp-flag-overdue {
+  background: #fde2e1;
+  color: #9b1c1c;
+}
+.sp-view .sp-piece-head {
+  flex-wrap: wrap;
+}
+.sp-view .sp-rubric-link {
+  align-self: flex-start;
+}
+
+/* My Learning's list: a dot for feedback not opened, the title and its
+   line, what it got. */
+.sp-view .sp-ml-work .sp-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.sp-view .sp-ml-work .sp-row-title {
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-ml-new {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.sp-view .sp-ml-new-on {
+  background: #007aff;
+}
+.sp-view .sp-lv-0 {
+  background: var(--sp-fill);
+  color: #3a3a3c;
+}
+.sp-view .sp-lv-missing {
+  background: #fde2e1;
+  color: #9b1c1c;
+}
+.sp-view .sp-ml {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-view .sp-deck-one .sp-piece {
+  display: block;
+}
+
+/* Your Rubric: one card, a row per criterion, its level and the teacher's comment. */
+.sp-view ul.sp-fb-crits {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  list-style: none;
+  margin: 0;
+  padding: 4px 16px;
+  gap: 0;
+  background: var(--sp-card);
+  border-radius: 18px;
+}
+.sp-view li.sp-fb-criterion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view li.sp-fb-criterion:first-child {
+  border-top: 0;
+}
+.sp-view li.sp-fb-criterion .sp-fb-crit-name {
+  font-size: 16px;
+}
+/* Reflections on a phone: Open Now, Done, Coming Up. */
+.sp-view .sp-forms-phone .sp-list-head {
+  margin: 6px 2px -4px;
+}
+
+/* Log Out? */
+.sp-logout .sp-lead {
+  margin: 0 0 16px;
+}
+.sp-logout-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.sp-view .sp-btn-danger {
+  background: #d70015;
+  color: #fff;
 }

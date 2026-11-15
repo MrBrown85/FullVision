@@ -56,11 +56,33 @@ async function demo(hash) {
   return { page, calls };
 }
 
-// Send My Work on a piece, then files chosen.
+const idOf = (page, title) => page.T.state().reply.assessments.find(a => a.title === title).id;
+const viewPiece = (page, title) => page.T.viewOf(page.T.state()).work.find(p => p.title === title);
+// Outstanding or Upcoming: the segment of Assignments a piece is on, or '' (it is on My Learning).
+const segmentOf = (page, title) => StudentPageView.segmentOf(viewPiece(page, title), page.T.viewOf(page.T.state()));
+
+// Send My Work on a piece, from the segment it is in.
 async function openSend(page, title) {
+  await page.click('[data-segment="' + segmentOf(page, title) + '"]');
   await page.click('.sp-piece[data-piece="' + idOf(page, title) + '"] [data-act="send-open"]');
 }
-const idOf = (page, title) => page.T.state().reply.assessments.find(a => a.title === title).id;
+// "Sent Nov 12, 3:41 p.m.": the day and the clock time work went in.
+const SENT_AT = String.raw`Sent \S+ \d+, \d{1,2}:\d\d [ap]\.m\.`;
+// The Your Work row on My Learning for a piece.
+const workRow = (page, title) => page.root().querySelector('.sp-ml-row[data-piece="' + idOf(page, title) + '"]');
+// Work sent is on My Learning: its row there opens its card, where Unsend and Replace are.
+async function openSent(page, title) {
+  await page.click('[data-tab="learning"]');
+  await page.click('.sp-ml-row[data-piece="' + idOf(page, title) + '"]');
+  expect(page.T.state().card).toBe(idOf(page, title));
+  expect(has(page, '.sp-ml-card-open .sp-piece[data-piece="' + idOf(page, title) + '"]')).toBe(true);
+}
+// Log Out, then Log Out again on the sheet that asks.
+async function logOut(page) {
+  await page.click('[data-act="logout-ask"]');
+  expect(text(page, '#sp-logout-title')).toBe('Log Out?');
+  await page.click('.sp-logout [data-act="card-done"]');
+}
 async function choose(page, files) {
   await page.T.sendFiles(files, -1);
   await page.settle();
@@ -71,7 +93,13 @@ describe('Send Work off (every class, and #demo-card): nothing about sending sho
     const { page } = await demo('#demo-card');
     expect(page.T.workOf(page.T.state())).toBeNull();
     expect(page.root().innerHTML).not.toMatch(/sp-send|Send My Work|Hand this one in on paper/);
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 0');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 1');
+    await page.click('[data-segment="upcoming"]');
+    expect(page.root().innerHTML).not.toMatch(/sp-send|Send My Work|Hand this one in on paper/);
+    // Nothing is waiting for feedback on My Learning.
+    await page.click('[data-tab="learning"]');
+    expect(page.root().innerHTML).not.toMatch(/waiting for feedback|sp-send/);
     expect(page.calls).toEqual([]);
   });
 
@@ -111,6 +139,9 @@ describe('Send Work off (every class, and #demo-card): nothing about sending sho
     expect(sent.work[0].kind).toBe('sent');
     expect(sent.work[0].send.sent).toMatchObject({ pages: 0, grading: false, canChange: true, thumbs: [] });
     expect(sent.counts).toMatchObject({ toDo: 0, sent: 1 });
+    // Work sent is not on Assignments: it is on My Learning.
+    expect(StudentPageView.segmentOf(sent.work[0], sent)).toBe('');
+    expect(StudentPageView.learningPieces(sent).map(p => p.id)).toEqual(['a1']);
   });
 });
 
@@ -127,6 +158,7 @@ describe('a PDF becomes pages: the PDF reader is fetched only when a send opens'
     await page.submit('form[data-form="card"]');
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
+    await page.click('[data-segment="upcoming"]');
     await page.click('.sp-piece[data-piece="demo-fair"] [data-act="send-open"]');
     await page.settle();
     expect(page.fetched.filter(src => /photo-|pdfjs/.test(src)).sort()).toEqual([
@@ -142,17 +174,22 @@ describe('a PDF becomes pages: the PDF reader is fetched only when a send opens'
 });
 
 describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () => {
-  it('the To Do cards: Send My Work while open; Closed and "Hand this one in on paper" once the last day has passed', async () => {
+  it('the Outstanding and Upcoming cards: Send My Work while open; Closed and "Hand this one in on paper" once the last day has passed', async () => {
     const { page } = await demo();
-    const fair = card(page, 'Science Fair Proposal');
-    expect(words(fair.querySelector('[data-act="send-open"]'))).toBe('Send My Work');
+    expect(cards(page).map(c => words(c.querySelector('.sp-piece-title')))).toEqual([
+      'Immune System Quick Check',
+      'Disease Research Poster',
+    ]);
     expect(words(card(page, 'Disease Research Poster').querySelector('[data-act="send-open"]'))).toBe('Send My Work');
     const quick = card(page, 'Immune System Quick Check');
     expect(quick.querySelector('[data-act="send-open"]')).toBeNull();
     // The Closed Assignment board: a "Closed Nov 13" pill, then a locked row; no due pill.
     expect(words(quick.querySelector('.sp-flag-closed'))).toMatch(/^Closed \S+ \d+$/);
     expect(words(quick.querySelector('.sp-lock-row.sp-send-closed-line'))).toBe('Hand this one in on paper');
-    expect(quick.querySelector('.sp-flag-due')).toBeNull();
+    expect(quick.querySelector('.sp-flag-due, .sp-flag-overdue')).toBeNull();
+    await page.click('[data-segment="upcoming"]');
+    const fair = card(page, 'Science Fair Proposal');
+    expect(words(fair.querySelector('[data-act="send-open"]'))).toBe('Send My Work');
   });
 
   it('Check and Send opens with the camera and the file chooser; a piece that takes files also takes PDFs', async () => {
@@ -196,12 +233,23 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     expect(rec.late).toBe(false);
     await page.click('[data-act="send-done"]');
     expect(page.T.state().screen).toBe('assignments');
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 1');
-    expect(text(page, '[data-segment="todo"]')).toBe('To Do 2');
-    await page.click('[data-segment="sent"]');
+    // Sent work leaves Assignments.
+    expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 0');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(has(page, '.sp-piece[data-piece="demo-fair"]')).toBe(false);
+    expect(text(page, '.sp-page')).toMatch(/Nothing coming up yet\./);
+    // It is at the top of My Learning's Your Work, waiting for feedback.
+    await page.click('[data-tab="learning"]');
+    const row = workRow(page, 'Science Fair Proposal');
+    expect(page.root().querySelector('.sp-ml-work .sp-ml-row')).toBe(row);
+    expect(row.getAttribute('data-act')).toBe('open-piece');
+    expect(words(row.querySelector('.sp-row-sub'))).toMatch(new RegExp('^' + SENT_AT + ' · waiting for feedback$'));
+    expect(words(row.querySelector('.sp-level'))).toBe('Sent');
+    await openSent(page, 'Science Fair Proposal');
+    expect(text(page, '.sp-ml-card-open .sp-fb-back')).toBe('My Learning');
     const sent = card(page, 'Science Fair Proposal');
-    // "Sent Nov 4 · 3 photos" (the Sent, Being Graded board).
-    expect(words(sent.querySelector('.sp-flag-sent'))).toMatch(/^Sent \S+ \d+ · \d+ photos?$/);
+    // "Sent Nov 12, 3:41 p.m. · 2 photos" (the Sent, Being Graded board).
+    expect(words(sent.querySelector('.sp-flag-sent'))).toMatch(new RegExp('^' + SENT_AT + ' · 2 photos$'));
     expect(words(sent.querySelector('.sp-send-line'))).toBe(
       'Your teacher hasn’t started grading it. You can still change it.',
     );
@@ -225,7 +273,8 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     await page.click('[data-act="send-go"]');
     await page.settle();
     await page.click('[data-act="send-done"]');
-    await page.click('[data-segment="sent"]');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 1');
+    await openSent(page, 'Disease Research Poster');
     const poster = card(page, 'Disease Research Poster');
     expect(words(poster.querySelector('.sp-send-line'))).toBe('Your teacher is grading this');
     expect(poster.querySelector('.sp-send-change')).toBeNull();
@@ -476,26 +525,34 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await d.page.click('[data-act="send-go"]');
     await d.page.settle();
     await d.page.click('[data-act="send-done"]');
-    await d.page.click('[data-segment="sent"]');
+    await openSent(d.page, 'Science Fair Proposal');
     return d;
   }
 
-  it('Unsend: Colin’s words; Keep It Sent changes nothing; Unsend puts the piece back in To Do', async () => {
+  it('Unsend: Colin’s words; Keep It Sent changes nothing; Unsend puts the piece back on its card in Upcoming', async () => {
     const { page } = await sentFair();
     await page.click('[data-act="send-unsend"]');
     expect(text(page, '#sp-send-ask-title')).toBe('Unsend Your Work?');
     expect(text(page, '#sp-send-ask-body')).toBe(
-      'Your 2 photos are deleted and Science Fair Proposal goes back to To Do. Deleted photos can’t come back. After grading starts, ask your teacher instead.',
+      'Your 2 photos are deleted and Science Fair Proposal goes back to your Assignments. Deleted photos can’t come back. After grading starts, ask your teacher instead.',
     );
     expect([...page.root().querySelectorAll('.sp-send-ask .sp-btn')].map(words)).toEqual(['Unsend', 'Keep It Sent']);
     await page.click('.sp-send-ask [data-act="send-ask-no"]');
     expect(has(page, '.sp-send-ask')).toBe(false);
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 1');
+    // Still sent, its card still open on My Learning.
+    expect(Object.keys(page.T.state().demoSent)).toHaveLength(1);
+    expect(has(page, '.sp-ml-card-open [data-act="send-unsend"]')).toBe(true);
     await page.click('[data-act="send-unsend"]');
     await page.click('[data-act="send-ask-yes"]');
     expect(page.T.state().demoSent).toEqual({});
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 0');
-    expect(text(page, '[data-segment="todo"]')).toBe('To Do 3');
+    // The page goes to its card on Assignments, in Upcoming (it is due in four days).
+    expect(page.T.state()).toMatchObject({ tab: 'assignments', segment: 'upcoming', pick: 'demo-fair', card: '' });
+    expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 1');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(words(card(page, 'Science Fair Proposal').querySelector('[data-act="send-open"]'))).toBe('Send My Work');
+    // And it is off My Learning.
+    await page.click('[data-tab="learning"]');
+    expect(workRow(page, 'Science Fair Proposal')).toBeNull();
   });
 
   it('Unsend when the teacher added a page: Colin’s words; that page stays and the work stays in, as the teacher’s', async () => {
@@ -506,8 +563,11 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
       'Your 2 photos are deleted. The page your teacher added stays. Deleted photos can’t come back.',
     );
     await page.click('[data-act="send-ask-yes"]');
-    expect(text(page, '[data-segment="sent"]')).toBe('Sent 1');
+    // Still handed in, so the page stays on its card on My Learning, with nothing left to change.
+    expect(page.T.state()).toMatchObject({ tab: 'learning', card: 'demo-fair' });
+    expect(has(page, '.sp-ml-card-open .sp-piece[data-piece="demo-fair"]')).toBe(true);
     expect(card(page, 'Science Fair Proposal').querySelector('.sp-send-change')).toBeNull();
+    expect(page.T.viewOf(page.T.state()).work.find(p => p.id === 'demo-fair').kind).toBe('sent');
   });
 
   it('Replace: Colin’s words, with the past-due sentence after the due date; the new pages take the old ones’ place', async () => {
@@ -535,6 +595,10 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     const rec = Object.values(page.T.state().demoSent)[0];
     expect(rec.pages).toHaveLength(1);
     expect(rec.late).toBe(true);
+    // Back to My Work: the card it was replaced from, on My Learning, with the one new photo.
+    await page.click('[data-act="send-done"]');
+    expect(has(page, '.sp-ml-card-open .sp-piece[data-piece="demo-fair"]')).toBe(true);
+    expect(words(card(page, 'Science Fair Proposal').querySelector('.sp-flag-sent'))).toMatch(/· 1 photo$/);
   });
 
   it('no Unsend or Replace once grading has started, even from a card drawn before', async () => {
@@ -548,9 +612,9 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     );
   });
 
-  it('Done forgets what the sample sent and lets go of its photos', async () => {
+  it('Log Out forgets what the sample sent and lets go of its photos', async () => {
     const { page } = await sentFair();
-    await page.click('[data-act="card-done"]');
+    await logOut(page);
     expect(page.T.state().demoSent).toEqual({});
     expect(page.T.madeUrls()).toEqual([]);
     expect(page.calls).toEqual([]);
