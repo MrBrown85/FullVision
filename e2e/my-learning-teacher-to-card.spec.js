@@ -252,7 +252,7 @@ test('a teacher turns Show My Learning on for a Letter class; the card shows it,
 
   // The teacher turns it on, and it is kept by the server.
   await page.goto('/dashboard?manage=student-page');
-  const learning = page.getByRole('switch', { name: 'Show My Learning' });
+  const learning = page.getByRole('switch', { name: 'Show Overall Grade' });
   await expect(learning).not.toBeChecked();
   await page.locator('.sp-learning .gpd-switch').click();
   await expect(learning).toBeChecked();
@@ -260,7 +260,7 @@ test('a teacher turns Show My Learning on for a Letter class; the card shows it,
     .poll(() => page.evaluate(() => window.__e2eRpcLog.filter(c => c.name === 'set_course_feedback_options').length))
     .toBe(1);
   await page.reload();
-  await expect(page.getByRole('switch', { name: 'Show My Learning' })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Show Overall Grade' })).toBeChecked();
 
   // Preview as Student for Cece, chosen by her id.
   await page.locator('#sp-preview-student').selectOption(CECE);

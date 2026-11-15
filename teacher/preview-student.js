@@ -153,7 +153,7 @@ window.PreviewStudent = (function () {
         ? ''
         : _item(
             'Their grade',
-            'Show My Learning is off for this class. Turn it on in Class Settings › Student Page.',
+            'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.',
           )) +
       '</ul></section>'
     );

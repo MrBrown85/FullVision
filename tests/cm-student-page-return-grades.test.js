@@ -209,7 +209,7 @@ describe('Class Settings › Student Page: Return Grades', () => {
 
     it('draws no other row of the board yet, but the last one, Questionnaires', () => {
       open();
-      ['Send Work', 'Keep Photos Until', 'Reflect on Feedback', 'Show My Learning'].forEach(label =>
+      ['Send Work', 'Keep Photos Until', 'Reflect on Feedback', 'Show Overall Grade'].forEach(label =>
         expect(html(), label).not.toContain(label),
       );
       expect((html().match(/class="sp-row"/g) || []).length).toBe(1);

@@ -119,7 +119,7 @@ test('Show My Learning turned on in a signed-in Letter class is sent to the serv
   await server(page);
 
   await page.goto('/dashboard?manage=student-page');
-  const learning = page.getByRole('switch', { name: 'Show My Learning' });
+  const learning = page.getByRole('switch', { name: 'Show Overall Grade' });
   await expect(learning).toBeVisible();
   await expect(learning).not.toBeChecked();
   await expect(page.locator('#sp-learning-would')).toContainText('grading style (Letter)');
@@ -137,6 +137,6 @@ test('Show My Learning turned on in a signed-in Letter class is sent to the serv
 
   // The server keeps it: after a reload the switch is still on.
   await page.reload();
-  await expect(page.getByRole('switch', { name: 'Show My Learning' })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Show Overall Grade' })).toBeChecked();
   expect(errors).toEqual([]);
 });

@@ -345,7 +345,7 @@ describe('the preview', () => {
           ],
           ['Other students', 'No class average, no one else’s work.'],
           ['Your private notes', 'Observations marked Private stay with you.'],
-          ['Their grade', 'Show My Learning is off for this class. Turn it on in Class Settings › Student Page.'],
+          ['Their grade', 'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.'],
         ],
       },
     ]);

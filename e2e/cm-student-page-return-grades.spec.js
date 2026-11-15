@@ -86,7 +86,7 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
     // Demo Mode's sample has photos, so Keep Photos Until shows with Send Work off (ruling 108's follow-up).
     'Keep Photos Until',
     'Reflect on Feedback',
-    'Show My Learning',
+    'Show Overall Grade',
     'Questionnaires',
   ]);
   await expect(card.locator('#sp-return-hint')).toHaveText(

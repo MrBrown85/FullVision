@@ -1170,7 +1170,7 @@ describe('cm-student-page-my-learning', () => {
     vi.useRealTimers();
   });
 
-  describe('Show My Learning', () => {
+  describe('Show Overall Grade', () => {
     it('is off at first, in the board’s words', () => {
       openSettings();
       const r = row();
@@ -1181,12 +1181,12 @@ describe('cm-student-page-my-learning', () => {
         'Return Grades',
         'Send Work',
         'Reflect on Feedback',
-        'Show My Learning',
+        'Show Overall Grade',
         'Questionnaires',
       ]);
-      expect(text(r.querySelector('label[for="sp-learning-switch"]'))).toBe('Show My Learning');
+      expect(text(r.querySelector('label[for="sp-learning-switch"]'))).toBe('Show Overall Grade');
       expect(text(r.querySelector('#sp-learning-hint'))).toBe(
-        'Students see their grade, from work you’ve returned, above the list of their work.',
+        'Students see their overall grade, from work you’ve returned, at the top of My Learning. Off, they still see each piece’s result.',
       );
       expect(text(r.querySelector('#sp-learning-would'))).toBe(
         "Students would see their grade in this class’s grading style (Both), only from work you've returned.",
@@ -1319,7 +1319,7 @@ describe('cm-student-page-my-learning', () => {
         expect(getReturnSettings(CID).student_page).toBe(true);
         const drawn = CmStudentPage.render(CID);
         expect(drawn).toContain('Return Grades');
-        expect(drawn).not.toContain('Show My Learning');
+        expect(drawn).not.toContain('Show Overall Grade');
         expect(drawn).not.toContain('See What They');
         expect(session.sent().filter(c => /show_my_learning/.test(JSON.stringify(c)))).toEqual([]);
       } finally {
@@ -1510,7 +1510,7 @@ describe('cm-student-page-reflect', () => {
         // The sample class has photos, so Keep Photos Until shows with Send Work off (ruling 108's follow-up).
         'Keep Photos Until',
         'Reflect on Feedback',
-        'Show My Learning',
+        'Show Overall Grade',
         'Questionnaires',
       ]);
       expect(doc.querySelector('label[for="sp-reflect-switch"]').textContent).toBe('Reflect on Feedback');

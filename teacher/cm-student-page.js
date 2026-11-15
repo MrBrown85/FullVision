@@ -720,9 +720,11 @@ var CmStudentPage = (function () {
       // Drawn as Send Work's row is (assignments.css, .sp-send): Class Settings' own switch row.
       '<div class="sp-row sp-send sp-learning">' +
       '<div class="cm-recent-limit sp-send-row">' +
-      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-learning-switch">Show My Learning</label>' +
+      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-learning-switch">Show Overall Grade</label>' +
       '<span class="cm-hint" id="sp-learning-hint">' +
-      esc('Students see their grade, from work you’ve returned, above the list of their work.') +
+      esc(
+        'Students see their overall grade, from work you’ve returned, at the top of My Learning. Off, they still see each piece’s result.',
+      ) +
       '</span></span>' +
       '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-learning-switch" data-action-change="spShowLearning" aria-describedby="sp-learning-hint"' +
       (l.on ? ' checked' : '') +
