@@ -1882,13 +1882,3 @@ label.sp-btn:focus-within {
     margin: 0 auto;
   }
 }
-
-/* A picture that could not load: a grey box with a small picture icon
-   in place of the broken-picture mark (shared/html.js sets the icon). */
-img.fv-img-broken {
-  object-fit: none;
-  object-position: center;
-  background: #eceef2;
-  min-width: 48px;
-  min-height: 48px;
-}
