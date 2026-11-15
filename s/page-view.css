@@ -2469,3 +2469,10 @@
   background: #d70015;
   color: #fff;
 }
+
+/* Photos sit on a light grey until they arrive, so a frame never shows empty. */
+.sp-view .sp-send-thumb,
+.sp-view .sp-ba-photo,
+.sp-view .sp-work-img {
+  background-color: #eceef2;
+}
