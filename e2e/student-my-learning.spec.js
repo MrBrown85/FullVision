@@ -52,7 +52,7 @@ test('with Show My Learning off: Your Work, and no grade', async ({ page }) => {
   await expect(screen.locator('.sp-ml-overall')).toHaveCount(0);
   await expect(screen.getByText('Your teacher hasn’t turned on My Learning for this class.')).toHaveCount(0);
   await expect(
-    dialog.getByText('Show My Learning is off for this class. Turn it on in Class Settings › Student Page.'),
+    dialog.getByText('Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.'),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -109,7 +109,7 @@ test('Class Settings says what Show My Learning shows', async ({ page }) => {
   await openPreview(page, 'proficiency');
   await page.keyboard.press('Escape');
   await expect(page.locator('#sp-learning-hint')).toHaveText(
-    'Students see their grade, from work you’ve returned, above the list of their work.',
+    'Students see their overall grade, from work you’ve returned, at the top of My Learning. Off, they still see each piece’s result.',
   );
   await expect(page.locator('#sp-learning-would')).toHaveText(
     "Students would see their grade in this class’s grading style (Proficiency), only from work you've returned.",

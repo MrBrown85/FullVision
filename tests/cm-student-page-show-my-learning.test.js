@@ -120,7 +120,7 @@ describe('Show My Learning for a signed-in class', () => {
       'Return Grades',
       'Send Work',
       'Reflect on Feedback',
-      'Show My Learning',
+      'Show Overall Grade',
       'Questionnaires',
     ]);
     expect(sw().hasAttribute('checked')).toBe(false);

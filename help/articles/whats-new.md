@@ -47,7 +47,7 @@ next:
 
 ## Nov 14, 2026: The Student Page, Redesigned
 
-The page students open with their card now has three tabs. Assignments shows what they still have to do, under Outstanding (due today or earlier, Missing, or sent back for revision) and Upcoming, each card with its due date, your instructions, handouts and links, and Send My Work when it's on. My Learning is their report card: their grade for the year so far when Show My Learning is on, then every piece they've sent or got back, with its result. Tapping a piece shows your comment and each rubric row with its level and your comment on it. Reflections holds their questionnaires. Phone reports are no longer on the student page, and Done is now Log Out, which asks before it signs the student out. Preview as Student shows the new page.
+The page students open with their card now has three tabs. Assignments shows what they still have to do, under Outstanding (due today or earlier, Missing, or sent back for revision) and Upcoming, each card with its due date, your instructions, handouts and links, and Send My Work when it's on. My Learning is their report card: their grade for the year so far when Show Overall Grade is on, then every piece they've sent or got back, with its result. Tapping a piece shows your comment and each rubric row with its level and your comment on it. Reflections holds their questionnaires. Phone reports are no longer on the student page, and Done is now Log Out, which asks before it signs the student out. Preview as Student shows the new page.
 
 ## Nov 12, 2026: Students Read Proficiencies
 
