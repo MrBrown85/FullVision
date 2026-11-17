@@ -11477,6 +11477,20 @@ window.PageAssignments = (function () {
           },
         });
       },
+      openAddWorkClass: function () {
+        var aid = el.dataset.aid;
+        if (!window.AddWorkClass || !activeCourse) return;
+        // The page behind is drawn again as it closes, so new work shows.
+        var cid = activeCourse;
+        AddWorkClass.open(cid, aid, {
+          onClose: function () {
+            if (activeCourse !== cid || !document.getElementById('ac-' + aid)) return;
+            render();
+            var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
+            if (more) more.focus({ preventScroll: true });
+          },
+        });
+      },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
       },
@@ -13772,8 +13786,18 @@ window.PageAssignments = (function () {
           )) + _cardPrintItem(cid, a);
     // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
-    if (!a.isDraft && !focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
+    var workShown = !a.isDraft && !focusStudentId && GraderWork.workShown(cid, a);
+    if (workShown && window.WorkWall)
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
+    // Add Work for the Class (teacher/add-work-class.js): where the row's +
+    // (Attach Work) is offered, never while one student is focused.
+    if (workShown && window.AddWorkClass && AddWorkClass.offered(cid, a, true))
+      html += _cardMenuItem(
+        'data-action="openAddWorkClass" ' + aid,
+        LINE_ICONS.plus,
+        'Add Work for the Class',
+        'assess-add-class-btn',
+      );
     var rubric = !a.isDraft && a.rubricId && getRubricById(cid, a.rubricId);
     if (rubric) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
@@ -13988,7 +14012,7 @@ window.PageAssignments = (function () {
     if (!files.length || !window.PhotoShrink || !cid || !aid || !sid || _attachBusy[key]) return;
     _attachBusy[key] = true;
     render();
-    _prepareWorkFiles(files)
+    AddWorkFiles.prepare(files)
       .then(function (got) {
         if (got.said || !got.pages.length) return { result: 'refused', said: got.said };
         return addStudentWorkPages(cid, sid, aid, got.pages, { mode: 'new' });
@@ -13998,7 +14022,7 @@ window.PageAssignments = (function () {
       })
       .then(function (res) {
         delete _attachBusy[key];
-        if (res.result !== 'sent') _attachSay(res.said || _addWorkAnswer(res));
+        if (res.result !== 'sent') _attachSay(res.said || AddWorkFiles.answer(res));
         if (activeCourse !== cid) return;
         render();
         if (!document.activeElement || document.activeElement === document.body) _focusWorkIcon(aid, sid);
@@ -15682,59 +15706,9 @@ window.PageAssignments = (function () {
     });
   }
 
-  /* Add Work's Choose Files: each file shrunk the way a student's are
-     (PhotoShrink.prepare), its pages kept in order, then recorded as the
-     teacher's work (addStudentWorkPages). The refusals say what the
-     phone's Add Work says (teacher-mobile/add-work.js). */
-  function _addWorkRefusal(res) {
-    var R = (window.PhotoShrink && PhotoShrink.REASONS) || {};
-    if (res && res.reason === R.OFFICE) return 'Save it as a PDF first.';
-    // A PDF becomes pages through shared/photo-readers.js (pdf.js, PR 1073).
-    if (res && res.kind === 'pdf' && res.locked)
-      return 'That PDF has a password. Save a copy without one, then add it.';
-    if (res && res.kind === 'pdf' && res.reason === R.NO_DECODER)
-      return "The PDF reader couldn't load. Check the connection and try again.";
-    if (res && (res.reason === R.TOO_MANY_PAGES || res.reason === R.PDF_TOO_LARGE))
-      return 'That PDF is too long to add here.';
-    if (res && res.kind === 'heic' && res.reason === R.NO_DECODER)
-      return 'Save that photo as a JPEG first, then add it.';
-    return "That file couldn't be used. Try another photo.";
-  }
-  function _addWorkAnswer(res) {
-    if (res.result === 'too_many_pages') return 'A piece of work can have 30 pages at most.';
-    if (res.result === 'storage_full') return 'This computer is full. Free some space, then try again.';
-    if (res.result === 'already_sent') return 'Work came in for this student meanwhile. It is shown now.';
-    if (res.result === 'not_available') return 'Adding work is not ready for signed-in classes yet.';
-    if (res.result === 'class_full') return 'This class has no room for more photos.';
-    if (res.result === 'nothing_sent') return 'That work was taken away meanwhile. Add it again as new work.';
-    if (res.result === 'uploading') return "That work is still uploading. Try again when it's in.";
-    if (res.result === 'on_paper') return 'This was handed in on paper. Use Replace Them to add photos.';
-    if (res.result === 'not_found') return 'This student is no longer in this class.';
-    return "The photos couldn't be kept. Try again.";
-  }
-  /* Each file shrunk in turn, its pages kept in order: a Promise of
-     { pages, said }, `said` the first refusal ('' when every file is used).
-     The grader's Add Work and the row's + both use it. */
-  function _prepareWorkFiles(files) {
-    var pages = [];
-    var said = '';
-    return files
-      .reduce(function (p, file) {
-        return p.then(function () {
-          if (said) return;
-          return PhotoShrink.prepare(file, { openPdf: window.PhotoReaders && PhotoReaders.openPdf }).then(
-            function (res) {
-              if (!res || !res.ok) said = _addWorkRefusal(res);
-              else pages = pages.concat(res.pages);
-              if (!said && pages.length > STUDENT_WORK_MAX_PAGES) said = 'A piece of work can have 30 pages at most.';
-            },
-          );
-        });
-      }, Promise.resolve())
-      .then(function () {
-        return { pages: pages, said: said };
-      });
-  }
+  /* Add Work's Choose Files: the files are shrunk and their pages kept in
+     order by AddWorkFiles (shared/add-work-files.js), then recorded as the
+     teacher's work (addStudentWorkPages). */
   function _graderAddWorkFiles(input) {
     if (!_grader || _grader.work.busy) return;
     var files = Array.prototype.slice.call(input.files || []);
@@ -15751,7 +15725,7 @@ window.PageAssignments = (function () {
     g.work.msg = '';
     render();
     var said = '';
-    _prepareWorkFiles(files)
+    AddWorkFiles.prepare(files)
       .then(function (got) {
         said = got.said;
         if (said || !got.pages.length) return { result: 'refused' };
@@ -15765,7 +15739,7 @@ window.PageAssignments = (function () {
         if (_grader !== g) return;
         // A line about this student's files is said only on their screen.
         if (same()) {
-          g.work.msg = res.result === 'sent' ? '' : said || _addWorkAnswer(res);
+          g.work.msg = res.result === 'sent' ? '' : said || AddWorkFiles.answer(res);
           g.work.page = 0;
         }
         render();
