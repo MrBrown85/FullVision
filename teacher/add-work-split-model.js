@@ -115,7 +115,21 @@
       return { no: i + 1, page: g.page, blank: !!g.blank, kept: false, cut: false };
     });
     var list = (students || []).slice();
-    var st = { per: 1, leaveOut: true, order: 'typed', pins: {} };
+    /* stickers (B4): page no → what the sticker read on that page says,
+       { sid, why, code, also } (teacher/add-work-split-stickers.js sets
+       them for the pieces' first pages). Kept against the page, as a typed
+       name is. stickersOn: once stickers are being read, an emptied box is
+       kept as "no one" so the piece's sticker does not name it again. */
+    var st = {
+      per: 1,
+      leaveOut: true,
+      order: 'typed',
+      pins: {},
+      stickers: {},
+      inside: {},
+      read: {},
+      stickersOn: false,
+    };
 
     function out(p) {
       return st.leaveOut && p.blank && !p.kept;
@@ -181,14 +195,69 @@
       return _count() === list.length;
     }
 
+    /* A piece's name: the name typed on it; else its sticker's student,
+       unless that student is typed on another piece (a clash: shown on both,
+       nothing changed); else, in Class List Order, the listed student. A
+       sticker's name counts as typed, so a sticker that disagrees with the
+       list shows as one student on two pieces, and nothing can be matched
+       until the teacher changes one (review rule 3 is unchanged: the list
+       names pieces only when there is one piece for each student). */
     function pieces() {
       if (!_keptAll().length) return [];
       var runs = _runs();
       var byList = st.order === 'list' && runs.length === list.length;
-      return runs.map(function (r, at) {
+      var has = Object.prototype.hasOwnProperty;
+      var typedAt = {};
+      runs.forEach(function (r, at) {
+        var no = pages[r.kept[0]].no;
+        if (has.call(st.pins, no) && st.pins[no]) typedAt[st.pins[no]] = at;
+      });
+      var clashFrom = {};
+      var out2 = runs.map(function (r, at) {
         var first = pages[r.kept[0]];
-        var pin = Object.prototype.hasOwnProperty.call(st.pins, first.no) ? st.pins[first.no] : undefined;
-        var sid = pin !== undefined ? pin : byList ? list[at].id : '';
+        var pin = has.call(st.pins, first.no) ? st.pins[first.no] : undefined;
+        var sticker = has.call(st.stickers, first.no) ? st.stickers[first.no] : null;
+        var bySticker = false;
+        var clash = -1;
+        var sid = pin;
+        /* A wrong cut: a later page of this piece carries a sticker that is
+           not its own student's (`inside`, page no → sid, '?' for one not
+           of the class). The piece is not named by its sticker; a typed
+           name stays, and the warning shows. */
+        var own = pin || (sticker && sticker.sid) || '';
+        /** @type {any} */
+        var wrong = null;
+        for (var w = 1; w < r.kept.length && !wrong; w++) {
+          var later = pages[r.kept[w]].no;
+          var whose = has.call(st.inside, later) ? st.inside[later] : '';
+          if (whose && whose !== own) wrong = { no: later, pos: w + 1, sid: whose };
+        }
+        /* Named by sticker only once every kept page of the piece has been
+           read (a later page may show a wrong cut): until then it is
+           pending, and has no name. A typed name never waits. */
+        var pending = false;
+        if (wrong && pin === undefined && sticker && sticker.sid) sid = '';
+        else if (
+          pin === undefined &&
+          sticker &&
+          sticker.sid &&
+          r.kept.some(function (i) {
+            return !has.call(st.read, pages[i].no);
+          })
+        ) {
+          pending = true;
+          sid = '';
+        } else if (pin === undefined && sticker && sticker.sid) {
+          var there = typedAt[sticker.sid];
+          if (there !== undefined && there !== at) {
+            clash = there;
+            (clashFrom[there] = clashFrom[there] || []).push(at);
+          } else {
+            sid = sticker.sid;
+            bySticker = true;
+          }
+        }
+        if (sid === undefined) sid = byList ? list[at].id : '';
         return {
           at: at,
           from: r.from,
@@ -204,8 +273,18 @@
           sid: sid || '',
           typed: pin !== undefined,
           spans: _spans(r),
+          sticker: sticker,
+          bySticker: bySticker,
+          clash: clash,
+          clashFrom: [],
+          wrong: wrong,
+          pending: pending,
         };
       });
+      Object.keys(clashFrom).forEach(function (at) {
+        out2[Number(at)].clashFrom = clashFrom[at];
+      });
+      return out2;
     }
 
     /* A piece's kept pages as runs that sit together in the scan: [[3, 5]]
@@ -338,8 +417,29 @@
       var p = pieces()[at];
       if (!p) return false;
       sid = String(sid || '');
-      if (!sid && st.order !== 'list') delete st.pins[p.first];
+      if (!sid && st.order !== 'list' && !st.stickersOn) delete st.pins[p.first];
       else st.pins[p.first] = sid;
+      return true;
+    }
+
+    /* Stickers (B4). setStickers(map): page no → { sid, why, code, also }
+       for the pieces' first pages, replacing what was there; inside: page
+       no → whose sticker is on every page read (a listed student's sid,
+       live or retired, or '?'); on a later page, anyone's but the piece's
+       own student's is a wrong cut. read: page no → true for every page
+       whose picture has been read.
+       useSticker(at): the teacher asks for the sticker's name on a piece
+       they had typed or emptied: their name on it is let go. */
+    function setStickers(map, inside, read) {
+      st.stickers = map || {};
+      st.inside = inside || {};
+      st.read = read || {};
+      st.stickersOn = true;
+    }
+    function useSticker(at) {
+      var p = pieces()[at];
+      if (!p || !p.sticker || !p.sticker.sid) return false;
+      delete st.pins[p.first];
       return true;
     }
 
@@ -493,6 +593,8 @@
       setLeaveOut: setLeaveOut,
       setOrder: setOrder,
       name: name,
+      setStickers: setStickers,
+      useSticker: useSticker,
       setPage: setPage,
       twice: twice,
       counts: counts,
