@@ -333,6 +333,48 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION fv_private.scan_label_new(p_enrollment_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+    _alphabet constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    _b    bytea;
+    _code text;
+    _try  int := 0;
+begin
+    loop
+        _try := _try + 1;
+        -- Twelve characters of five random bits each. gen_random_uuid() draws from
+        -- the server's strong random source; its bytes 0 to 5 and 10 to 15 are
+        -- random in every bit (bytes 6 and 8 carry the version and the variant).
+        _b := uuid_send(gen_random_uuid());
+        _code := '';
+        for _i in 0..11 loop
+            _code := _code || substr(_alphabet, (get_byte(_b, case when _i < 6 then _i else _i + 4 end) & 31) + 1, 1);
+        end loop;
+        begin
+            insert into public.scan_label (enrollment_id, code) values (p_enrollment_id, _code);
+            return _code;
+        exception when unique_violation then
+            -- The student already has a live code: that one is the answer.
+            select l.code into _code from public.scan_label l
+             where l.enrollment_id = p_enrollment_id and l.retired_at is null;
+            if found then
+                return _code;
+            end if;
+            -- Otherwise the code itself is taken (sixty random bits: it will not
+            -- happen, and if it does, draw again).
+            if _try >= 5 then
+                raise;
+            end if;
+        end;
+    end loop;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION fv_private.teacher_of(p_kind text, p_id uuid)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -7077,6 +7119,47 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _e      uuid;
+    _out    jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'issue_scan_labels');
+    if _cached is not null then
+        return _cached;
+    end if;
+    -- Another teacher's class, one in the trash, or one that is gone: nothing
+    -- is made and nothing is said about it.
+    if not fv_owns_course(p_course_id) then
+        return jsonb_build_object('labels', '[]'::jsonb);
+    end if;
+    -- One call at a time for a class, so two windows printing at once give
+    -- each student one code, not two.
+    perform pg_advisory_xact_lock(hashtext('fv.scan_label'), hashtext(p_course_id::text));
+    for _e in
+        select e.id from enrollment e
+         where e.course_id = p_course_id and e.withdrawn_at is null
+           and not exists (select 1 from scan_label l where l.enrollment_id = e.id and l.retired_at is null)
+         order by e.roster_position, e.id
+    loop
+        perform fv_private.scan_label_new(_e);
+    end loop;
+    _out := jsonb_build_object('labels', coalesce((
+        select jsonb_agg(jsonb_build_object('enrollment_id', l.enrollment_id, 'code', l.code) order by e.roster_position, e.id)
+          from scan_label l join enrollment e on e.id = l.enrollment_id
+         where e.course_id = p_course_id and e.withdrawn_at is null and l.retired_at is null), '[]'::jsonb));
+    perform fv_idem_store(p_idempotency_key, 'issue_scan_labels', _out);
+    return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_assessment_copies(p_copy_group uuid)
  RETURNS TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
  LANGUAGE sql
@@ -7624,6 +7707,26 @@ AS $function$
      order by c.display_order, c.name;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.list_scan_labels(p_course_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    -- Another teacher's class, one in the trash, or one that is gone: nothing.
+    if not fv_owns_course(p_course_id) then
+        return jsonb_build_object('labels', '[]'::jsonb);
+    end if;
+    return jsonb_build_object('labels', coalesce((
+        select jsonb_agg(jsonb_build_object('enrollment_id', l.enrollment_id, 'code', l.code, 'retired', l.retired_at is not null)
+                         order by e.roster_position, e.id, l.created_at, l.id)
+          from scan_label l join enrollment e on e.id = l.enrollment_id
+         where e.course_id = p_course_id), '[]'::jsonb));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_student_cards(p_course_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7983,6 +8086,42 @@ begin
     _result := jsonb_build_object('enrollment_id', p_enrollment_id);
     perform fv_idem_store(p_idempotency_key, 'reenrol_student', _result);
     return _result;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.reissue_scan_label(p_enrollment_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _course uuid;
+    _code   text;
+    _out    jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'reissue_scan_label');
+    if _cached is not null then
+        return _cached;
+    end if;
+    -- Another teacher's student, a class in the trash, or a student who is
+    -- gone: nothing changes.
+    if not fv_owns_enrollment(p_enrollment_id) then
+        return jsonb_build_object('label', null);
+    end if;
+    -- A withdrawn student gets no new sheet; the code they had is left as it is.
+    select e.course_id into _course from enrollment e where e.id = p_enrollment_id and e.withdrawn_at is null;
+    if _course is null then
+        return jsonb_build_object('label', null);
+    end if;
+    perform pg_advisory_xact_lock(hashtext('fv.scan_label'), hashtext(_course::text));
+    update scan_label set retired_at = now() where enrollment_id = p_enrollment_id and retired_at is null;
+    _code := fv_private.scan_label_new(p_enrollment_id);
+    _out := jsonb_build_object('label', jsonb_build_object('enrollment_id', p_enrollment_id, 'code', _code));
+    perform fv_idem_store(p_idempotency_key, 'reissue_scan_label', _out);
+    return _out;
 end;
 $function$;
 

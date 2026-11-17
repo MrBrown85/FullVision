@@ -175,6 +175,10 @@ begin
     if to_regclass('public.course_opened') is not null then
         execute 'insert into public.course_opened (course_id) values ($1) on conflict do nothing' using c;
     end if;
+    -- A sticker code for the first student, once 2026111710 is applied (until then the table is missing).
+    if to_regclass('public.scan_label') is not null then
+        execute 'select fv_private.scan_label_new($1)' using e1;
+    end if;
     insert into public.submission_file_removal (bucket, path, course_id, reason, link_dies_at)
     values ('student-photos', c || '/' || p_mark || '-gone.jpg', c, 'test', now());
     insert into student_submit.attempt (route, outcome, ip_hash, code_id, course_id) values ('card', 'ok', p_mark, code, c);
