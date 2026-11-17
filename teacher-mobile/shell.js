@@ -733,10 +733,7 @@
     _navStacks[tab].push(tab);
     _addDemoPill(stack.querySelector('.m-screen'));
 
-    // Apply any persisted filters to the freshly-mounted Grade list.
-    // renderPicker loads _filters from LocalStorage into module state, but
-    // the returned HTML renders every cell visible; filterAssessments walks
-    // the DOM and hides cells that don't match.
+    // The saved filters (renderPicker draws every cell; filterAssessments hides those that don't match).
     if (tab === 'grade') MGrade.filterAssessments(_cid);
 
     // Setup scroll → large title collapse
@@ -752,6 +749,29 @@
     }
     // The sync light is drawn fresh with each render; show the current state.
     if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
+  }
+
+  // The Settings sheet's Active Class, or Open Class on a photo warning.
+  function _switchClass(newCid) {
+    if (!newCid || newCid === _cid) return;
+    _cid = newCid;
+    // Screens left open on each tab belong to the old class.
+    _tabState = { students: null, observe: null, grade: null };
+    _gradeReturnSid = null;
+    document.body.setAttribute('aria-busy', 'true');
+    var settle = function (switched) {
+      document.body.removeAttribute('aria-busy');
+      if (switched) MC.dismissSheet(); // failed: the sheet stays
+      _renderTab(_activeTab);
+    };
+    switchActiveCourse(newCid).then(
+      function (current) {
+        if (current) settle(true);
+      },
+      function () {
+        settle(false);
+      },
+    );
   }
 
   /* ── Push/pop screens ───────────────────────────────────────── */
@@ -1036,9 +1056,7 @@
           .sort(function (a, b) {
             return (b.date || '').localeCompare(a.date || '') || samePieceDateOrder(_cid, b.id, a.id);
           })[0];
-    // The Grade tab opens on its list. A grading screen left open there
-    // would come back under this one with the same ids, and the handlers
-    // would bind to the hidden copy.
+    // The Grade tab opens on its list: a grading screen left there would share this one's ids.
     _tabState.grade = null;
     _switchTab('grade');
     if (!newest) return;
@@ -1158,34 +1176,15 @@
             versionBlock +
             '</div>',
         );
-        // Wire course select change
         var courseSelect = document.getElementById('m-course-select');
-        if (courseSelect) {
+        if (courseSelect)
           courseSelect.addEventListener('change', function () {
-            var newCid = this.value;
-            if (newCid && newCid !== _cid) {
-              _cid = newCid;
-              // Screens left open on each tab belong to the old class.
-              _tabState = { students: null, observe: null, grade: null };
-              _gradeReturnSid = null;
-              document.body.setAttribute('aria-busy', 'true');
-              switchActiveCourse(newCid).then(
-                function (current) {
-                  if (!current) return;
-                  document.body.removeAttribute('aria-busy');
-                  MC.dismissSheet();
-                  _renderTab(_activeTab);
-                },
-                function () {
-                  document.body.removeAttribute('aria-busy');
-                  _renderTab(_activeTab);
-                },
-              );
-            }
+            _switchClass(this.value);
           });
-        }
         return;
       }
+      // Open Class on a photo warning (shared/photo-expiry.js): opening it keeps the photos.
+      if (action === 'm-photo-expiry-open') return _switchClass(target.getAttribute('data-cid'));
 
       if (action === 'm-demo-menu') {
         MC.presentSheet(_demoSheetHtml());

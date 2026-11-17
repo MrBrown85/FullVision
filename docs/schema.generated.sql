@@ -271,6 +271,7 @@ table public.course (rls on)
   CREATE INDEX course_deleted_at_idx ON public.course USING btree (deleted_at) WHERE (deleted_at IS NOT NULL)
   CREATE UNIQUE INDEX course_pkey ON public.course USING btree (id)
   CREATE INDEX course_teacher_idx ON public.course USING btree (teacher_id) WHERE (is_archived = false)
+  CREATE TRIGGER course_restored_opened AFTER UPDATE OF deleted_at ON public.course FOR EACH ROW WHEN (((old.deleted_at IS NOT NULL) AND (new.deleted_at IS NULL))) EXECUTE FUNCTION public._course_restored_opened()
   CREATE TRIGGER course_sync_cursor_course_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.course FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   CREATE TRIGGER grade_return_release AFTER UPDATE OF student_page_enabled, return_grades ON public.course FOR EACH ROW WHEN ((old.student_page_enabled AND (NOT (old.return_grades IS DISTINCT FROM 'on_return'::text)) AND (NOT (new.student_page_enabled AND (NOT (new.return_grades IS DISTINCT FROM 'on_return'::text)))))) EXECUTE FUNCTION public._grade_return_release()
   CREATE TRIGGER markup_given_on_release AFTER UPDATE OF student_page_enabled, return_grades ON public.course FOR EACH ROW WHEN ((old.student_page_enabled AND (NOT (old.return_grades IS DISTINCT FROM 'on_return'::text)) AND (NOT (new.student_page_enabled AND (NOT (new.return_grades IS DISTINCT FROM 'on_return'::text)))))) EXECUTE FUNCTION public._markup_on_release()
@@ -1666,6 +1667,7 @@ function public._assessment_resource_same_class() returns trigger security defin
 function public._assessment_resource_truncated() returns trigger security definer
 function public._assessment_work_json(p_assessment_id uuid) returns jsonb security definer
 function public._cards_work_until(p_course_id uuid) returns date security definer
+function public._course_restored_opened() returns trigger security definer
 function public._fv_date(p text) returns date
 function public._fv_release_orphan_teacher_email() returns void security definer
 function public._fv_teacher_sign_in_deleted() returns trigger security definer
@@ -1836,6 +1838,7 @@ function public.list_course_feedback(p_course_id uuid) returns jsonb security de
 function public.list_course_goal_dates(p_course_id uuid) returns jsonb
 function public.list_course_grade_returns(p_course_id uuid) returns jsonb
 function public.list_course_guardians(p_course_id uuid) returns jsonb
+function public.list_course_photo_expiry() returns TABLE(course_id uuid, last_opened_at timestamp with time zone, photos integer) security definer
 function public.list_course_questionnaires(p_course_id uuid) returns jsonb
 function public.list_course_resources(p_course_id uuid) returns jsonb security definer
 function public.list_course_responses(p_course_id uuid) returns jsonb

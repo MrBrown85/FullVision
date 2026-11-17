@@ -118,12 +118,14 @@ window.MStudentsList = (function () {
         '</div>';
     }
 
+    // Photos in a class about to go a year unopened (shared/photo-expiry.js): rarely anything.
     return (
       '<div class="m-screen" id="m-screen-students-list">' +
       nav +
       '<div class="m-screen-content' +
       (students.length ? ' m-cards-mode' : '') +
       '">' +
+      PhotoExpiry.mount('phone') +
       body +
       '</div></div>'
     );

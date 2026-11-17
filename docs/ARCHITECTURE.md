@@ -109,16 +109,17 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 29. `shared/data-overrides.js` (hand-set levels: the teacher's section overrides with their reasons, and the calculated level shown beside one)
 30. `shared/data-profile-summaries.js` (student profile summaries: each student's flags, goals, reflections, hand-set levels and notes as a class loads)
 31. `shared/data-courses-terms.js` (classes and reporting terms: create, rename, archive and delete a class, the grading scale, reporting terms, switching class and blocks)
-32. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
-33. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
-34. `shared/offline-queue.js`
-35. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
-36. `shared/auto-update.js`
-37. `shared/calc.js`
-38. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-39. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-40. `shared/rubric-draft.js`
-41. `shared/rubric-checks.js`
+32. `shared/photo-expiry.js` (the warning before a class's photos are deleted for going a year unopened: one line per class on the Dashboard and the phone's Students screen)
+33. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
+34. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
+35. `shared/offline-queue.js`
+36. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
+37. `shared/auto-update.js`
+38. `shared/calc.js`
+39. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+40. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+41. `shared/rubric-draft.js`
+42. `shared/rubric-checks.js`
 
 The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 
