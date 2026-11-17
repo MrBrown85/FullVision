@@ -23,6 +23,7 @@
   var RUB_WAIT = 250; // ms the pointer rests on a card before the rubric shows
   var RUB_WIDE = 860; // px, the card's widest
   var RUB_NARROW = 560; // px, the narrowest it is drawn beside a card before it goes over it
+  var RUB_SMALLEST = 0.5; // the smallest scale a rubric too tall for the window is drawn at
   /** @type {{ card: Element, el: HTMLElement } | null} */
   var _rub = null;
   /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -244,6 +245,32 @@
     return head + body;
   }
 
+  /* Too tall for the window: the type gets smaller, then the rubric is
+     drawn smaller, as large as still fits. Every level's descriptor and
+     every checkbox stay (Colin, Nov 17 2026: "The rubric should show in
+     this view completely"); emptying the levels not given left blank cells
+     beside the student's. The feedback keeps its size. */
+  function _fit(el) {
+    var body = el.querySelector('.wr-body');
+    var table = /** @type {HTMLElement | null} */ (body && body.querySelector('.wr-table'));
+    if (!body || !table || !(body.scrollHeight > body.clientHeight)) return;
+    el.classList.add('is-tight');
+    if (_fits(body, table)) return;
+    // The largest scale that fits, found in a few halvings.
+    var lo = RUB_SMALLEST;
+    var hi = 1;
+    for (var i = 0; i < 7; i++) {
+      var mid = (lo + hi) / 2;
+      table.style.setProperty('zoom', String(mid));
+      if (_fits(body, table)) lo = mid;
+      else hi = mid;
+    }
+    table.style.setProperty('zoom', String(lo));
+  }
+  function _fits(body, table) {
+    return table.getBoundingClientRect().height <= body.clientHeight + 1;
+  }
+
   function _rubShow(card) {
     hide();
     var cid = card.getAttribute('data-cid');
@@ -275,14 +302,7 @@
     el.innerHTML = html;
     _rub = { card: card, el: el };
     document.body.appendChild(el);
-    // Too tall for the window: the levels not given shorten, then go, then
-    // the type gets smaller. The feedback is never the part cut off.
-    ['is-tight', 'is-tighter', 'is-tightest'].some(function (cls) {
-      var body = el.querySelector('.wr-body');
-      if (!body || !(body.scrollHeight > body.clientHeight)) return true;
-      el.classList.add(cls);
-      return false;
-    });
+    _fit(el);
     var h = el.offsetHeight || 0;
     var x;
     if (right >= w) x = at.right + 10;

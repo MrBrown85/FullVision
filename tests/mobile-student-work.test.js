@@ -223,6 +223,37 @@ describe('with the student page and Send Work on', () => {
     expect(note.textContent).toBe('<b>hi</b>');
   });
 
+  it('Unsubmit on a card with photos: the confirm, then the work goes and Add Work is back', async () => {
+    grading();
+    const card = () => document.querySelector('.m-swiper-card[data-sid="st2"]');
+    const btn = card().querySelector('[data-action="m-work-unsubmit"]');
+    expect(btn.textContent).toBe('Unsubmit');
+    MGradePhotos.askUnsubmit(CID, LAB, 'st2', btn);
+    const sheet = document.querySelector('#m-sheet-container .m-confirm-sheet');
+    expect(sheet.querySelector('#m-confirm-title').textContent).toBe('Unsubmit Noor’s Work?');
+    expect(sheet.querySelector('#m-confirm-text').textContent).toMatch(
+      /^Noor’s 2 photos for Cell Microscope Lab are deleted, .* grade and your comments stay\. Deleted photos can’t come back\.$/,
+    );
+    expect(sheet.querySelector('.m-confirm-ok').textContent).toBe('Unsubmit');
+    expect(sheet.querySelector('.m-group-sheet-cancel').textContent).toBe('Keep It');
+    sheet.querySelector('.m-confirm-ok').onclick();
+    for (let i = 0; i < 5; i++) await new Promise(r => setTimeout(r, 0));
+    expect(getStudentSubmission(CID, 'st2', LAB)).toBeNull();
+    expect(card().querySelector('[data-action="m-work-unsubmit"]')).toBeNull();
+    expect(card().querySelector('[data-action="m-add-work"]')).not.toBeNull();
+  });
+
+  it('Unsubmit on work handed in on paper asks lightly', () => {
+    grading();
+    const card = document.querySelector('.m-swiper-card[data-sid="st6"]');
+    expect(card.querySelector('.m-work-sent').textContent).toBe('Handed in on paper');
+    MGradePhotos.askUnsubmit(CID, LAB, 'st6', card.querySelector('[data-action="m-work-unsubmit"]'));
+    const text = document.querySelector('#m-sheet-container #m-confirm-text').textContent;
+    expect(text).toMatch(
+      /^Ethan’s work on Cell Microscope Lab goes back to not handed in, .* grade and your comments stay\.$/,
+    );
+  });
+
   it('the filter applies as it is tapped and counts what it shows', () => {
     picker();
     MGrade.filterAssessments(CID, 'all');

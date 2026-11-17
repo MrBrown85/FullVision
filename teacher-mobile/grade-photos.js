@@ -270,7 +270,44 @@ window.MGradePhotos = (function () {
           : '');
     }
     if (sub.note) html += '<div class="m-work-note">' + NOTE_SVG + '<span>' + MC.esc(sub.note) + '</span></div>';
+    // Unsubmit, on one student's own work (photos, or handed in on paper); not on a group's.
+    if (!sub.group)
+      html +=
+        '<div class="m-work-foot"><button type="button" class="m-work-unsubmit" data-action="m-work-unsubmit" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        a.id +
+        '">Unsubmit</button></div>';
     return html + '</div>';
+  }
+
+  /* Unsubmit on the card (Nov 17 2026): the desktop grader's confirm, in
+     GraderWork.unsubmitAsk's words, then the work goes (GraderWork.deleteWork)
+     and the card is drawn again with Add Work. The grade and comments stay.
+     A sync failure shows only on the sync dot. */
+  function askUnsubmit(cid, aid, sid, from) {
+    var a = (getAssessments(cid) || []).find(function (x) {
+      return x.id === aid;
+    });
+    var st = (getStudents(cid) || []).find(function (s) {
+      return s.id === sid;
+    });
+    var sub = submission(cid, sid, aid);
+    if (!a || !st || !sub) return;
+    var ask = GraderWork.unsubmitAsk(a, st, sub);
+    MC.confirmSheet(
+      ask.title,
+      ask.message,
+      'Unsubmit',
+      function () {
+        GraderWork.deleteWork(cid, sid, aid).then(function () {
+          if (window.MGrade && MGrade.refreshSwiper) MGrade.refreshSwiper(cid, aid);
+          syncTabBadge(cid);
+        });
+      },
+      from,
+      'Keep It',
+    );
   }
 
   // Days past the due date, by the class's own day; 0 when not late.
@@ -643,5 +680,6 @@ window.MGradePhotos = (function () {
     wire: wire,
     toTop: toTop,
     openFull: openFull,
+    askUnsubmit: askUnsubmit,
   };
 })();

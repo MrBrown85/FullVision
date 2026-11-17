@@ -1258,6 +1258,15 @@ Colin, on the teacher's student page, Overview tab: "'Start With These' list on 
 6. **All Your Work: every piece open to read.** The student's pages as thumbnails on the left, each opening the grader; beside them the overall comment, then each criterion with its level in words and the teacher's comment on it (a Single-Point Rubric's Went Beyond and Work On), or each competency on work scored without a rubric. No click to open a piece or a criterion. The 1–4 bars and "To get a 3" come off, as on the student's own Your Feedback ("The student page from the student's side" 8). A piece with nothing to read (missing, excused, not assessed) is one line. Open in Assignments shows when a piece is pointed at, and always on an iPad.
 7. **The Grades tab's rows still open in place**, and an open row shows the same feedback.
 
+## Teacher's Delete Work is Unsubmit (2026-11-17)
+
+Colin: "the ability to 'unsubmit' for a student or if a teacher accidentally uploads a poor photo or changes their mind. teams already has this feature." The work set "Handed in on paper" had no way back.
+
+1. **Delete Work is renamed Unsubmit** on the desktop grader, and the phone's grading card has it too. It puts the student's piece back to not handed in, and Add Work shows again at once, so a poor photo can be taken again. Grades and comments stay.
+2. **It is offered on any sent work of the student's own**: photos, links, work handed in on paper, and work whose photos are already gone. Not on a group's work, and not on the first version of a revision (Unsubmit removes the newest version; on the revised version it removes the revision and the first version stays in).
+3. **The confirm says what goes.** "Unsubmit Ethan’s Work?", with Unsubmit and Keep It. Photos or links: they are deleted, and "Deleted photos can’t come back" (ruling 102, item 9, unchanged). Handed in on paper, or nothing left: only the handed-in mark goes, so it asks lightly. The words are one function, `GraderWork.unsubmitAsk` in `shared/grader.js`, for both screens.
+4. **No new server rule.** It is the existing `delete_submission` (`deleteStudentWork`). The student's own Unsend is unchanged.
+
 ## Observation follow-ups (2026-11-17)
 
 Colin approved follow-ups on observations on Nov 17 ("Yes, as recommended"). His council's call on the database: the smallest step, one column on `observation`, not a new system. Built in `shared/obs-follow-ups.js` (the pieces on screen), `shared/data-observations.js` (the data) and `migrations/2026111703_observation_follow_ups.sql` (not applied until Colin's OK).

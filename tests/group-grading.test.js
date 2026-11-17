@@ -120,7 +120,7 @@ describe('the grader on a group', () => {
     );
     expect(overlay.querySelector('.grader-work-at').textContent).toBe('Page 1 of 2');
     expect(overlay.querySelector('.grader-work-note-title').textContent).toBe('Priya’s Note, Sent for the Group');
-    expect(overlay.querySelector('.grader-work-delete')).toBeNull();
+    expect(overlay.querySelector('.grader-work-unsubmit')).toBeNull();
     const strip = overlay.querySelector('.grader-work-strip');
     expect(strip.getAttribute('aria-label')).toBe('Groups to grade');
     expect([...strip.querySelectorAll('button')].map(b => b.getAttribute('aria-label'))).toEqual([
