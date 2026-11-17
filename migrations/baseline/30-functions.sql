@@ -10875,11 +10875,9 @@ CREATE OR REPLACE FUNCTION student_submit._card_listed(p_questionnaire_id uuid, 
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'student_submit', 'pg_temp'
 AS $function$
-    select exists (select 1 from student_access_code c
-                    where c.questionnaire_id = p_questionnaire_id and c.enrollment_id = p_enrollment_id
-                      and c.revoked_at is null)
-        or exists (select 1 from response r
-                    where r.questionnaire_id = p_questionnaire_id and r.enrollment_id = p_enrollment_id);
+    select exists (select 1 from questionnaire q
+                     join enrollment e on e.course_id = q.course_id
+                    where q.id = p_questionnaire_id and e.id = p_enrollment_id);
 $function$;
 
 CREATE OR REPLACE FUNCTION student_submit._card_lookup(p_code_hmac text, p_key_id text, p_ip_hash text)
@@ -10973,6 +10971,9 @@ declare
     _levels jsonb := '{}'::jsonb;
     _why    jsonb;
     _whys   jsonb := '{}'::jsonb;
+    _v      numeric;
+    _list   jsonb;
+    _cols   jsonb;
 begin
     if p_value is null or p_value = 'null'::jsonb then return null; end if;
     if p_kind = 'text' then
@@ -11075,6 +11076,65 @@ begin
             raise exception 'invalid';
         end if;
         return jsonb_build_object('text', _t);
+    elsif p_kind = 'rating' then
+        -- A whole number from 1 to the question's levels: 2 to 10, and 5
+        -- when the question names none or names something else.
+        if jsonb_typeof(p_value) <> 'number' then raise exception 'invalid'; end if;
+        _n := 5;
+        if jsonb_typeof(p_options->'levels') = 'number' then
+            _v := (p_options->>'levels')::numeric;
+            if _v = trunc(_v) and _v between 2 and 10 then _n := _v::int; end if;
+        end if;
+        _v := (p_value #>> '{}')::numeric;
+        if _v <> trunc(_v) or _v < 1 or _v > _n then raise exception 'invalid'; end if;
+        return jsonb_build_object('num', _v::int);
+    elsif p_kind = 'date' then
+        -- "YYYY-MM-DD", and a real day: make_date refuses February 30.
+        if jsonb_typeof(p_value) <> 'string' then raise exception 'invalid'; end if;
+        _t := btrim(p_value #>> '{}');
+        if _t = '' then return null; end if;
+        if _t !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then raise exception 'invalid'; end if;
+        perform make_date(substr(_t, 1, 4)::int, substr(_t, 6, 2)::int, substr(_t, 9, 2)::int);
+        return jsonb_build_object('text', _t);
+    elsif p_kind = 'ranking' then
+        -- Every one of the question's choices, once, in the student's order.
+        _list := coalesce(p_options->'choices', '[]'::jsonb);
+        if jsonb_typeof(p_value) <> 'array' or jsonb_typeof(_list) <> 'array' then raise exception 'invalid'; end if;
+        if jsonb_array_length(p_value) = 0 then return null; end if;
+        for _e in select * from jsonb_array_elements(p_value) loop
+            if jsonb_typeof(_e) <> 'string' then raise exception 'invalid'; end if;
+            _t := _e #>> '{}';
+            if _arr ? _t or not (_list ? _t) then raise exception 'invalid'; end if;
+            _arr := _arr || to_jsonb(_t);
+        end loop;
+        if jsonb_array_length(_arr) <> (select count(distinct v) from jsonb_array_elements_text(_list) v) then
+            raise exception 'invalid';
+        end if;
+        _t := (select string_agg(i || '. ' || v, ' · ' order by i)
+                 from jsonb_array_elements_text(_arr) with ordinality x(v, i));
+        -- answer.value_text holds 5,000 characters: longer is refused here, not by the table.
+        if char_length(_t) > 5000 then raise exception 'invalid'; end if;
+        return jsonb_build_object('json', _arr, 'text', _t);
+    elsif p_kind = 'likert' then
+        -- {statement: choice} for the statements answered: each statement
+        -- one of the question's, each choice one of its columns.
+        _list := coalesce(p_options->'statements', '[]'::jsonb);
+        _cols := coalesce(p_options->'choices', '[]'::jsonb);
+        if jsonb_typeof(p_value) <> 'object' or jsonb_typeof(_list) <> 'array' or jsonb_typeof(_cols) <> 'array' then
+            raise exception 'invalid';
+        end if;
+        for _k, _e in select * from jsonb_each(p_value) loop
+            if jsonb_typeof(_e) <> 'string' or not (_list ? _k) or not (_cols ? (_e #>> '{}')) then
+                raise exception 'invalid';
+            end if;
+            _levels := _levels || jsonb_build_object(_k, _e #>> '{}');
+        end loop;
+        if _levels = '{}'::jsonb then return null; end if;
+        _t := (select string_agg(s || ': ' || (_levels->>s), ' · ' order by i)
+                 from (select s, min(i) as i from jsonb_array_elements_text(_list) with ordinality x(s, i)
+                        where _levels ? s group by s) y);
+        if char_length(_t) > 5000 then raise exception 'invalid'; end if;
+        return jsonb_build_object('json', _levels, 'text', _t);
     end if;
     raise exception 'invalid';
 end;

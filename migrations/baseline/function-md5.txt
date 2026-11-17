@@ -286,10 +286,10 @@ public.upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uui
 public.withdraw_student(p_enrollment_id uuid, p_idempotency_key uuid) c4fc1f0e7c9ecee57726e975c0b89847 1153
 student_submit._as_teacher(p_teacher_id uuid) a478e6e00d91742951036fcec250ae0d 624
 student_submit._card_key_seen(p_key_id text) 455da128c868ae4c67f9ef1ee2c0a125 634
-student_submit._card_listed(p_questionnaire_id uuid, p_enrollment_id uuid) a0dc2d9e540be764da89a98e83751260 598
+student_submit._card_listed(p_questionnaire_id uuid, p_enrollment_id uuid) b594802f9fa517b4b5391cab24e31d03 439
 student_submit._card_lookup(p_code_hmac text, p_key_id text, p_ip_hash text) b35a926e60a39330f8851d368acec7e6 2517
 student_submit._card_refusal(p_card_id uuid) cb88af0a6bf62c22ff6c636b291b1a25 719
-student_submit._clean_answer(p_kind text, p_options jsonb, p_core_ids text[], p_value jsonb) 0f8377c8b45d14bc5c1b93c04852e49d 6429
+student_submit._clean_answer(p_kind text, p_options jsonb, p_core_ids text[], p_value jsonb) b944ef1d218b55c811e41973ebe5126f 10116
 student_submit._closed_reason(p_q public.questionnaire, p_tz text) 997a840da057165a80cf3c4ffa9a5c32 600
 student_submit._device_session(p_token text) fa1e510e4ccd3bccbf91e29540a837bb 432
 student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) 586a6a0b5910e6c153b72e73a5b672bc 1324
