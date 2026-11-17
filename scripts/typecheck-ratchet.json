@@ -57,7 +57,10 @@
     "teacher/add-work-split-model.js",
     "teacher/add-work-split.js",
     "teacher/add-work-class.js",
-    "teacher/add-work-tray.js"
+    "teacher/add-work-tray.js",
+    "shared/data-scan-labels.js",
+    "shared/scan-label-read.js",
+    "teacher/scan-labels.js"
   ],
   "notYetChecked": [
     "s/app.js",
