@@ -215,6 +215,7 @@
            another student (`inside`, page no → sid). The piece is not named
            by its sticker; a typed name stays, and the warning shows. */
         var own = pin || (sticker && sticker.sid) || '';
+        /** @type {any} */
         var wrong = null;
         for (var w = 1; w < r.kept.length && !wrong; w++) {
           var later = pages[r.kept[w]].no;
