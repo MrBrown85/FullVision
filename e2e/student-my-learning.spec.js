@@ -57,7 +57,7 @@ test('with Show My Learning off: Your Work, and no grade', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('a Proficiency class: You’re at, Work On Next, and Your Work', async ({ page }) => {
+test('a Proficiency class: You’re at and Your Work, with no Work On Next', async ({ page }) => {
   const { at, dialog, screen, errors } = await openPreview(page, 'proficiency');
   const want = await page.evaluate(
     ({ cid, sid }) => {
@@ -67,7 +67,6 @@ test('a Proficiency class: You’re at, Work On Next, and Your Work', async ({ p
       });
       return {
         word: word,
-        next: view.learning.next,
         rows: StudentPageView.learningPieces(view).map(function (p) {
           return p.title;
         }),
@@ -78,12 +77,9 @@ test('a Proficiency class: You’re at, Work On Next, and Your Work', async ({ p
   await expect(screen.locator('.sp-ml-period')).toHaveText('This Year So Far');
   await expect(screen.locator('.sp-ml-at-word')).toHaveText(want.word);
   await expect(screen.locator('.sp-ml-overall .sp-ml-ladder')).toBeVisible();
-  // Work On Next: the comment bank's step for the skill Generate would name; a line, not a button.
-  if (want.next) {
-    await expect(screen.locator('.sp-ml-next')).toContainText('Work On Next: ' + want.next.name);
-    await expect(screen.locator('.sp-ml-next')).toContainText(want.next.text);
-    await expect(screen.locator('.sp-ml-next button')).toHaveCount(0);
-  }
+  // No Work On Next on the student page (Colin, Nov 17: "It seems like clutter").
+  await expect(screen.locator('.sp-ml-next')).toHaveCount(0);
+  await expect(screen.getByText(/Work On Next/)).toHaveCount(0);
   await expect(screen.locator('.sp-ml-work .sp-row-title')).toHaveText(want.rows);
   // Gone with the redesign: Your Strongest, Your Skills and One Skill.
   await expect(screen.getByRole('heading', { name: 'Your Skills' })).toHaveCount(0);
