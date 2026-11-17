@@ -203,11 +203,13 @@ test('stickers name their pieces, the rest are typed, and every page goes to the
   await aws.getByRole('button', { name: 'One fewer page per student' }).click();
   await expect(aws.locator('.aws-card')).toHaveCount(6);
 
-  // The stickers are read in the background, then both counts are said.
+  // As a teacher sees it: each stickered piece's name comes once all its pages are read, then both counts.
+  await expect(aws.locator('#aws-name-0')).toHaveValue(A.name, { timeout: 60000 });
+  await expect(aws.locator('#aws-name-3')).toHaveValue(C.name, { timeout: 60000 });
   await expect(aws.locator('.aws-stk-line')).toHaveText('3 pieces named by sticker, 3 left to type.', {
     timeout: 60000,
   });
-  await expect(aws.locator('#aws-name-0')).toHaveValue(A.name);
+  await expect(aws.locator('.aws-stk-pending')).toHaveCount(0);
   await expect(aws.locator('#aws-name-1')).toHaveValue(B.name);
   await expect(aws.locator('#aws-name-2')).toHaveValue('');
   await expect(aws.locator('#aws-name-3')).toHaveValue(C.name);

@@ -11,10 +11,13 @@
    the scan opens (for each class, with two classes on). Refused or empty,
    nothing is read, jsQR is never fetched and nothing is said.
 
-   In the background: every piece's first page, then every other kept page
-   (to catch a wrong cut), one after another, each picture once (a page
+   In the background: piece by piece, every kept page (a later page can
+   show a wrong cut), one after another, each picture once (a page
    turned by hand is a new picture and is read again); the reader pauses
-   between looks, so typing stays live. Match the Named Pieces never waits.
+   between looks, so typing stays live. Match the Named Pieces never waits,
+   so a piece is named by its sticker only once every one of its kept pages
+   has been read; until then it says "Reading this piece's pages…" and has
+   no name. A typed name never waits.
 
    A wrong cut: a later page of a piece carries any sticker but the piece's
    own student's (another listed student's, live or retired; another
@@ -152,12 +155,14 @@
       if (l && listed[l.enrollment_id]) whose[l.code] = l.enrollment_id;
     });
     var inside = {};
+    var read = {};
     var order = _order(s);
     order.forEach(function (no) {
       var r = _readOf(s, no);
+      if (r !== undefined) read[no] = true;
       if (r && r.code) inside[no] = whose[r.code] || OTHER;
     });
-    s.m.setStickers(map, inside);
+    s.m.setStickers(map, inside, read);
     stk.total = order.length;
     stk.done = order.filter(function (no) {
       return _readOf(s, no) !== undefined;
@@ -165,18 +170,15 @@
     _next(s, ctx);
   }
 
-  /* The pages to read, in order: every piece's first page (so names come
-     first), then every other kept page, to catch a wrong cut. */
+  /* The pages to read, in order: piece by piece, each piece's kept pages
+     from its first, so names appear steadily from the top (a piece is
+     named by its sticker only once all its pages are read). */
   function _order(s) {
-    var ps = s.m.pieces();
-    var firsts = ps.map(function (p) {
-      return p.first;
+    var out = [];
+    s.m.pieces().forEach(function (p) {
+      out = out.concat(p.nos);
     });
-    var rest = [];
-    ps.forEach(function (p) {
-      rest = rest.concat(p.nos.slice(1));
-    });
-    return firsts.concat(rest);
+    return out;
   }
 
   // The next page not yet read, one at a time.
@@ -290,6 +292,7 @@
     if (!s.stk || !s.stk.labels) return '';
     var words = note(s, p, ctx);
     var use = p.sticker && p.sticker.sid && p.typed && p.sticker.sid !== p.sid && p.clash < 0 && !p.wrong;
+    if (p.pending) return '<div class="aws-stk"><span class="aws-stk-pending">Reading this piece’s pages…</span></div>';
     if (!p.bySticker && !words) return '';
     return (
       '<div class="aws-stk">' +

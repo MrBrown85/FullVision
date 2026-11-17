@@ -887,3 +887,7 @@
     transition: none;
   }
 }
+.aws-stk-pending {
+  color: var(--text-3);
+  font-weight: 600;
+}

@@ -120,7 +120,16 @@
        them for the pieces' first pages). Kept against the page, as a typed
        name is. stickersOn: once stickers are being read, an emptied box is
        kept as "no one" so the piece's sticker does not name it again. */
-    var st = { per: 1, leaveOut: true, order: 'typed', pins: {}, stickers: {}, inside: {}, stickersOn: false };
+    var st = {
+      per: 1,
+      leaveOut: true,
+      order: 'typed',
+      pins: {},
+      stickers: {},
+      inside: {},
+      read: {},
+      stickersOn: false,
+    };
 
     function out(p) {
       return st.leaveOut && p.blank && !p.kept;
@@ -223,8 +232,22 @@
           var whose = has.call(st.inside, later) ? st.inside[later] : '';
           if (whose && whose !== own) wrong = { no: later, pos: w + 1, sid: whose };
         }
+        /* Named by sticker only once every kept page of the piece has been
+           read (a later page may show a wrong cut): until then it is
+           pending, and has no name. A typed name never waits. */
+        var pending = false;
         if (wrong && pin === undefined && sticker && sticker.sid) sid = '';
-        else if (pin === undefined && sticker && sticker.sid) {
+        else if (
+          pin === undefined &&
+          sticker &&
+          sticker.sid &&
+          r.kept.some(function (i) {
+            return !has.call(st.read, pages[i].no);
+          })
+        ) {
+          pending = true;
+          sid = '';
+        } else if (pin === undefined && sticker && sticker.sid) {
           var there = typedAt[sticker.sid];
           if (there !== undefined && there !== at) {
             clash = there;
@@ -255,6 +278,7 @@
           clash: clash,
           clashFrom: [],
           wrong: wrong,
+          pending: pending,
         };
       });
       Object.keys(clashFrom).forEach(function (at) {
@@ -402,12 +426,14 @@
        for the pieces' first pages, replacing what was there; inside: page
        no → whose sticker is on every page read (a listed student's sid,
        live or retired, or '?'); on a later page, anyone's but the piece's
-       own student's is a wrong cut.
+       own student's is a wrong cut. read: page no → true for every page
+       whose picture has been read.
        useSticker(at): the teacher asks for the sticker's name on a piece
        they had typed or emptied: their name on it is let go. */
-    function setStickers(map, inside) {
+    function setStickers(map, inside, read) {
       st.stickers = map || {};
       st.inside = inside || {};
+      st.read = read || {};
       st.stickersOn = true;
     }
     function useSticker(at) {

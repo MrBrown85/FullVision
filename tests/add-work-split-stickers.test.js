@@ -109,13 +109,13 @@ async function settled(s) {
 const who = m => m.pieces().map(p => p.sid);
 
 describe('stickers name the pieces of a scan', () => {
-  it('reads first pages first, then the rest, names the stickered pieces, and says both counts', async () => {
+  it('reads piece by piece, every page, names the stickered pieces, and says both counts', async () => {
     answers = { 1: sticker(CODE.s2), 5: sticker(CODE.s4), 2: sticker(CODE.s2) };
     const { s, m, ctx } = opened(8, 2);
     expect(await Stk.start(s, ctx)).toBe(true);
     await settled(s);
-    // First pages first, then the rest. Page 2 is s2's own second sticker: fine.
-    expect(reads).toEqual([1, 3, 5, 7, 2, 4, 6, 8]);
+    // Piece by piece, every page. Page 2 is s2's own second sticker: fine.
+    expect(reads).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(who(m)).toEqual(['s2', '', 's4', '']);
     expect(m.pieces().map(p => p.bySticker)).toEqual([true, false, true, false]);
     expect(Stk.line(s)).toBe('2 pieces named by sticker, 2 left to type.');
@@ -465,7 +465,7 @@ describe('a wrong cut, caught by the stickers on later pages', () => {
     await Stk.start(s, ctx);
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 50 && reads.indexOf(2) < 0; i++) await new Promise(r => setTimeout(r, 0));
-    expect(Stk.line(s)).toBe('Reading stickers: 3 of 6');
+    expect(Stk.line(s)).toBe('Reading stickers: 1 of 6');
     let2(null);
     await settled(s);
     expect(Stk.line(s)).toBe('3 pieces named by sticker, 0 left to type.');
@@ -494,6 +494,75 @@ describe('a wrong cut, caught by the stickers on later pages', () => {
     await settled(s);
     expect(who(m)).toEqual(named);
     expect(reads.indexOf(6)).toBe(-1);
+  });
+});
+
+describe('a piece is named by its sticker only once all its pages are read', () => {
+  // Wait until page `no` has been asked for.
+  async function asked(no) {
+    for (let i = 0; i < 100 && reads.indexOf(no) < 0; i++) await new Promise(r => setTimeout(r, 0));
+  }
+
+  it('is not named or matched while a later page is unread, and is named when the last one comes back', async () => {
+    let let2;
+    answers = { 1: sticker(CODE.s1) };
+    held[2] = new Promise(r => (let2 = r));
+    const { s, m, ctx } = opened(4, 2);
+    await Stk.start(s, ctx);
+    await asked(2);
+    const p = m.pieces()[0];
+    expect([p.sid, p.pending, p.bySticker]).toEqual(['', true, false]);
+    expect(m.counts().named).toBe(0);
+    expect(m.canMatch()).toBe(false);
+    expect(m.take()).toEqual([]);
+    expect(Stk.cardHtml(s, p, ctx)).toContain('Reading this piece’s pages…');
+    let2(null);
+    await settled(s);
+    expect(who(m)).toEqual(['s1', '']);
+    expect(m.pieces()[0].pending).toBe(false);
+    expect(m.take().map(q => [q.sid, q.pages.map(pg => pg.n)])).toEqual([['s1', [1, 2]]]);
+  });
+
+  it('a wrong-cut sticker on that last page means the piece is never named', async () => {
+    let let2;
+    answers = { 1: sticker(CODE.s1) };
+    held[2] = new Promise(r => (let2 = r));
+    const { s, m, ctx } = opened(4, 2);
+    await Stk.start(s, ctx);
+    await asked(2);
+    expect(who(m)[0]).toBe('');
+    let2(sticker(CODE.s2));
+    await settled(s);
+    expect(who(m)[0]).toBe('');
+    expect(Stk.note(s, m.pieces()[0], ctx)).toBe(
+      'Page 2 of this piece has Ben’s sticker. Check where this piece ends.',
+    );
+    expect(m.take()).toEqual([]);
+  });
+
+  it('a typed name is matched without waiting for the reading', async () => {
+    answers = { 1: sticker(CODE.s1) };
+    held[2] = new Promise(() => {}); // never comes back
+    const { s, m, ctx } = opened(4, 2);
+    await Stk.start(s, ctx);
+    await asked(2);
+    m.name(0, 's3');
+    expect(m.canMatch()).toBe(true);
+    expect(m.take().map(q => [q.sid, q.pages.map(pg => pg.n)])).toEqual([['s3', [1, 2]]]);
+  });
+
+  it('a moved cut keeps what was read: a piece whose pages are all read is named at once', async () => {
+    answers = { 1: sticker(CODE.s1), 4: sticker(CODE.s2) };
+    const { s, m, ctx } = opened(6, 3); // pieces 1–3 and 4–6
+    await Stk.start(s, ctx);
+    await settled(s);
+    m.setPer(2); // pieces 1–2, 3–4, 5–6: piece 1's pages were read, piece 2's sticker is on page 4
+    expect(m.pieces()[0].pending).toBe(false);
+    const before = reads.length;
+    ctx.draw();
+    expect(who(m)[0]).toBe('s1');
+    await settled(s);
+    expect(reads.length).toBe(before); // nothing read twice
   });
 });
 
