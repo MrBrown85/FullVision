@@ -40,7 +40,7 @@ test('Create saves the held rubric, then the assessment with it', async ({ page 
   await page.selectOption('#af-category', 'sci8-cat-labs');
   await page.fill('#af-ge-name', 'Brand New Rubric');
   await page.locator('[data-action="geSave"]').click();
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -71,7 +71,7 @@ test('Edit Rubric on a shared rubric asks; Edit a Copy is the default and leaves
   await copyBtn.click();
   await expect(page.locator('#re-name')).toHaveValue(lab.name + ' · Density Lab');
   await page.locator('[data-action="saveRubricEdit"]').click();
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
       page.evaluate(src => {

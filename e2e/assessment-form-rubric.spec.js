@@ -108,7 +108,7 @@ test('Use This Rubric makes the Competency Rubric this assessment’s rubric, sa
   await expect(chosen.locator('.rb-grid tbody tr')).toHaveCount(2);
   // Held, not saved, until the assessment is created.
   expect(await page.evaluate(() => getRubrics('sci8').length)).toBe(n);
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
       page.evaluate(() => {

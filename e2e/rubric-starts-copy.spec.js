@@ -53,7 +53,7 @@ test('opens in place; from the same curriculum the copy keeps its competencies',
   await expect(page.locator('#af-rubric-view .af-rubric-card-name')).toContainText(src.name);
   // Held, not saved, until Create.
   expect(await page.evaluate(() => getRubrics('sci8').length)).toBe(n);
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -76,7 +76,7 @@ test('from a different curriculum: no codes, and the copy brings criteria and wo
   const words = await page.evaluate(() => getRubricById('sci7', 'sci7-r0').criteria[0].levels[3]);
   await expect(card.locator('.af-start-preview')).toContainText(words);
   await card.locator('.af-start-row').first().press('Enter');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
       page.evaluate(() => {
