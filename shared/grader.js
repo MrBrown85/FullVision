@@ -411,7 +411,8 @@ window.Grader = (function () {
   /* ...and the piece takes work (Students Send is not Nothing). A DIBELS
      benchmark never does. */
   function workOn(cid, a) {
-    if (!a || isDibelsScored(a) || !workOnInClass(cid)) return false;
+    // A Draft takes no work until it's assigned: it is in no To Grade or Not In.
+    if (!a || a.isDraft || isDibelsScored(a) || !workOnInClass(cid)) return false;
     return getAssessmentStudentWork(cid, a.id).students_send !== 'nothing';
   }
 

@@ -58,7 +58,7 @@
   var _on = _readView();
   /** @type {string | null} */
   var _cid = null;
-  var _filters = { module: '', term: '', scoring: '', noDue: false };
+  var _filters = { module: '', term: '', scoring: '', noDue: false, drafts: false };
   /** @type {string | null} */
   var _sort = null;
   var _dir = 1;
@@ -116,7 +116,7 @@
   function _forClass(cid) {
     if (cid === _cid) return;
     _cid = cid;
-    _filters = { module: '', term: '', scoring: '', noDue: false };
+    _filters = { module: '', term: '', scoring: '', noDue: false, drafts: false };
     _sort = null;
     _dir = 1;
     _sel = new Set();
@@ -200,6 +200,7 @@
       if (_filters.module === '-' ? a.moduleId : _filters.module && a.moduleId !== _filters.module) return false;
       if (_filters.scoring && scoringOf(cid, a) !== _filters.scoring) return false;
       if (_filters.noDue && dueOf(a)) return false;
+      if (_filters.drafts && !a.isDraft) return false;
       if (term) {
         var d = dateOf(a);
         if (!d || d < term.starts_on || d > term.ends_on) return false;
@@ -445,6 +446,14 @@
       '"><input type="checkbox" data-alv-filter="noDue" data-alv-f="f:noDue"' +
       (_filters.noDue ? ' checked' : '') +
       '><span>No Due Date</span></label>';
+    // Drafts (assign-draft.js): only while the class has one, or the filter is on.
+    if (_filters.drafts || _all.some(G.isDraftAssessment))
+      html +=
+        '<label class="alv-fchip alv-fchip-check' +
+        (_filters.drafts ? ' is-on' : '') +
+        '"><input type="checkbox" data-alv-filter="drafts" data-alv-f="f:drafts"' +
+        (_filters.drafts ? ' checked' : '') +
+        '><span>Drafts</span></label>';
     html += '<span class="alv-count">' + shown + ' of ' + total + '</span>';
     return html + '</div>';
   }
@@ -478,6 +487,9 @@
       '<strong class="alv-bar-n">' +
       _sel.size +
       ' Selected</strong>' +
+      (_tickedDrafts(cid).length
+        ? '<button type="button" class="btn btn-primary alv-assign" data-alv-act="assign" data-alv-f="bulk:assign">Assign</button>'
+        : '') +
       (cats.length
         ? pick(
             'category',
@@ -659,7 +671,9 @@
         G.esc(title || 'Untitled') +
         '"></td>';
       out +=
-        '<td class="alv-title-col"><input class="alv-title" data-alv-k="title"' +
+        '<td class="alv-title-col">' +
+        (a.isDraft ? '<span class="draft-badge">Draft</span>' : '') +
+        '<input class="alv-title" data-alv-k="title"' +
         f('title') +
         ' value="' +
         G.esc(title) +
@@ -852,6 +866,42 @@
 
   /* A change kept for Undo: `before` is what each piece held, `field` the
      field changed ('send' for Students Send). */
+  /* The ticked pieces that are Drafts. */
+  /** @param {string} cid */
+  function _tickedDrafts(cid) {
+    return (G.getAssessments(cid) || [])
+      .filter(function (/** @type {any} */ a) {
+        return a && a.isDraft && _sel.has(a.id);
+      })
+      .map(function (/** @type {any} */ a) {
+        return a.id;
+      });
+  }
+
+  /* Assign on the bar: the ticked Drafts, with Undo while nothing has come in. */
+  /** @param {string} cid */
+  function _assignTicked(cid) {
+    var ids = _tickedDrafts(cid);
+    /** @type {Record<string, string>} */
+    var dates = {};
+    (G.getAssessments(cid) || []).forEach(function (/** @type {any} */ a) {
+      if (a && ids.indexOf(a.id) >= 0) dates[a.id] = dateOf(a);
+    });
+    var n = G.AssignDraft.assign(cid, ids);
+    if (!n) return;
+    _undo = {
+      text: 'Assigned ' + _plural(n) + '.',
+      undo: function () {
+        _write(cid, ids, function (a) {
+          if (G.AssignDraft.hasWork(cid, a.id)) return;
+          a.isDraft = true;
+          a.date = dates[a.id];
+          a.dateAssigned = dates[a.id];
+        });
+      },
+    };
+  }
+
   /** @param {string} cid @param {string} text @param {Record<string, any>} before @param {string} field */
   function _keepUndo(cid, text, before, field) {
     var ids = Object.keys(before);
@@ -912,7 +962,7 @@
     var cid = _cid;
     var d = el.dataset;
     if (d.alvFilter) {
-      if (d.alvFilter === 'noDue') _filters.noDue = el.checked;
+      if (d.alvFilter === 'noDue' || d.alvFilter === 'drafts') _filters[d.alvFilter] = el.checked;
       else _filters[/** @type {'module'} */ (d.alvFilter)] = el.value;
       _redraw();
       return;
@@ -1004,7 +1054,9 @@
       _redraw(true);
       return;
     } else if (act === 'clearFilters') {
-      _filters = { module: '', term: '', scoring: '', noDue: false };
+      _filters = { module: '', term: '', scoring: '', noDue: false, drafts: false };
+    } else if (act === 'assign') {
+      _assignTicked(cid);
     } else return;
     _redraw();
   }

@@ -148,7 +148,7 @@ window.ObsCapture = (function () {
   }
 
   function assessmentList(cid) {
-    var list = ((typeof getAssessments === 'function' && getAssessments(cid)) || []).slice();
+    var list = ((typeof getAssignedAssessments === 'function' && getAssignedAssessments(cid)) || []).slice();
     function when(a) {
       return a.dueDate || a.due_date || a.date || a.dateAssigned || a.date_assigned || '';
     }
@@ -161,7 +161,7 @@ window.ObsCapture = (function () {
   }
 
   function _assessmentTitle(cid, aid) {
-    var a = ((typeof getAssessments === 'function' && getAssessments(cid)) || []).find(function (x) {
+    var a = ((typeof getAssignedAssessments === 'function' && getAssignedAssessments(cid)) || []).find(function (x) {
       return x.id === aid;
     });
     return a ? a.title || '' : '';

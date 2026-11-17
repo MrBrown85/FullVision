@@ -2425,7 +2425,7 @@ window.CommentBank = (function () {
   function compsOf(cid, student) {
     var sid = student.id;
     var byId = {};
-    (getAssessments(cid) || []).forEach(function (a) {
+    (getAssignedAssessments(cid) || []).forEach(function (a) {
       byId[a.id] = a;
     });
     var inYtd = function (a) {
@@ -2529,7 +2529,7 @@ window.CommentBank = (function () {
     loadSets();
     var sid = student.id;
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
-    var assessments = getAssessments(cid) || [];
+    var assessments = getAssignedAssessments(cid) || [];
     var inYtd = function (a) {
       return _inYtd(cid, a);
     };
@@ -7932,7 +7932,7 @@ window.CommentBank = (function () {
   function marksOf(f) {
     var out = {};
     var titles = {};
-    ((typeof getAssessments === 'function' && f && getAssessments(f.cid)) || []).forEach(function (a) {
+    ((typeof getAssignedAssessments === 'function' && f && getAssignedAssessments(f.cid)) || []).forEach(function (a) {
       titles[a.id] = a.title || '';
     });
     ((f && f.work) || []).forEach(function (w) {
@@ -8077,8 +8077,8 @@ window.CommentBank = (function () {
     was = was || {};
     now = now || {};
     var byId = {};
-    if (cid != null && typeof getAssessments === 'function') {
-      (getAssessments(cid) || []).forEach(function (a) {
+    if (cid != null && typeof getAssignedAssessments === 'function') {
+      (getAssignedAssessments(cid) || []).forEach(function (a) {
         byId[a.id] = a;
       });
     }
