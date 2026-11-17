@@ -204,7 +204,7 @@ describe('in Demo Mode', () => {
     expect(getAssessmentResources(CID, AID)).toEqual([]);
   });
 
-  it('Preview as Student’s view has them, and the card shows For This Assignment under the Description', async () => {
+  it('Preview as Student’s view has them: the handout’s pages to swipe through, then the Description, then the links', async () => {
     await addAssessmentHandout(CID, AID, 'Density Lab Instructions', shrunk(3));
     await addAssessmentLink(CID, AID, 'https://www.britannica.com/science/density', 'Density');
     await addAssessmentLink(CID, AID, 'https://www.youtube.com/watch?v=abc', 'Measuring Density');
@@ -226,21 +226,38 @@ describe('in Demo Mode', () => {
       '<main>' + StudentPageView.html(built.view, { segment: 'upcoming', pick: AID }) + '</main>',
     );
     const card = document.querySelector('.sp-piece[data-piece="' + AID + '"]');
+    // Still to do: the handout's pages are on the card, each opening full size (s/page-carousel.js).
+    const car = card.querySelector('.sp-car');
+    expect(car.nextElementSibling.className).toBe('sp-piece-about');
+    const slides = [...car.querySelectorAll('.sp-car-slide')];
+    expect(slides.map(b => [b.tagName, b.getAttribute('data-act'), b.getAttribute('data-page')])).toEqual([
+      ['BUTTON', 'handout', '0'],
+      ['BUTTON', 'handout', '1'],
+      ['BUTTON', 'handout', '2'],
+    ]);
+    expect(slides[1].getAttribute('aria-label')).toBe('Density Lab Instructions, page 2 of 3. Open full size');
+    expect(car.querySelector('.sp-car-count').textContent).toBe('1 / 3');
+    expect(car.querySelector('.sp-car-caption').textContent).toBe('Density Lab Instructions');
+    // The links stay under the Description; the handout is not listed twice.
     const block = card.querySelector('.sp-res');
     expect(block.previousElementSibling.className).toBe('sp-piece-about');
     expect(block.querySelector('.sp-res-head').textContent).toBe('For This Assignment');
     const rows = [...block.querySelectorAll('.sp-res-row')];
     expect(rows.map(r => r.textContent.replace(/\s+/g, ' ').trim())).toEqual([
-      'Density Lab Instructions Handout · 3 pages',
       'Density britannica.com (opens in a new tab)',
       'Measuring Density youtube.com (opens in a new tab)',
     ]);
-    expect(rows[0].tagName).toBe('BUTTON');
-    expect(rows[0].getAttribute('data-act')).toBe('handout');
-    expect(rows[1].getAttribute('href')).toBe('https://www.britannica.com/science/density');
-    expect(rows[1].getAttribute('target')).toBe('_blank');
-    expect(rows[1].getAttribute('rel')).toBe('noopener noreferrer');
-    expect(rows[2].querySelector('.sp-res-icon-video')).toBeTruthy();
+    expect(rows[0].getAttribute('href')).toBe('https://www.britannica.com/science/density');
+    expect(rows[0].getAttribute('target')).toBe('_blank');
+    expect(rows[0].getAttribute('rel')).toBe('noopener noreferrer');
+    expect(rows[1].querySelector('.sp-res-icon-video')).toBeTruthy();
+    // Handed in for revision, the card lists the handout as it did, with no pages on it.
+    const revise = Object.assign({}, p, { kind: 'revise' });
+    const old = parseHTML(
+      '<main>' + StudentPageView.html(Object.assign({}, built.view, { work: [revise] }), {}) + '</main>',
+    ).document;
+    expect(old.querySelector('.sp-car')).toBeNull();
+    expect(old.querySelector('.sp-res-row[data-act="handout"]').textContent).toContain('Handout · 3 pages');
   });
 
   it('a handout still uploading, or one with no pages, is not shown to the student', async () => {
@@ -274,8 +291,12 @@ describe('in Demo Mode', () => {
     const { document } = parseHTML(
       '<main>' + StudentPageView.html(view, { segment: 'upcoming', pick: AID }) + '</main>',
     );
-    const row = document.querySelector('.sp-piece[data-piece="' + AID + '"] [data-act="handout"]');
-    const opened = StudentPageView.press({ segment: 'upcoming', pick: AID }, view, 'handout', row);
+    // A tap on the card's second page opens the handout at that page.
+    const row = document.querySelector('.sp-piece[data-piece="' + AID + '"] .sp-car-slide[data-page="1"]');
+    const atTwo = StudentPageView.press({ segment: 'upcoming', pick: AID }, view, 'handout', row);
+    expect(atTwo.ui.handoutPage).toBe(1);
+    const first = document.querySelector('.sp-piece[data-piece="' + AID + '"] .sp-car-slide[data-page="0"]');
+    const opened = StudentPageView.press({ segment: 'upcoming', pick: AID }, view, 'handout', first);
     expect(opened.handout).toEqual({ piece: AID, resource: h.resource.id });
     expect(opened.focus).toBe('#sp-handout-title');
     // It opens where its card lives: Assignments, on Upcoming.
@@ -301,9 +322,10 @@ describe('in Demo Mode', () => {
     expect(html).toContain('src="blob:two"');
     const back = StudentPageView.press(ui, view, 'handout-close', null);
     expect(back.ui.handout).toBe('');
-    expect(back.focus).toBe('[data-act="handout"][data-resource="' + h.resource.id + '"]');
+    // Back on the card, at the page the student was on.
+    expect(back.focus).toBe('.sp-car-slide[data-resource="' + h.resource.id + '"][data-page="1"]');
     const card = parseHTML('<main>' + StudentPageView.html(view, back.ui) + '</main>').document;
-    expect(card.querySelector('.sp-piece.sp-picked[data-piece="' + AID + '"] [data-act="handout"]')).toBeTruthy();
+    expect(card.querySelector('.sp-piece.sp-picked[data-piece="' + AID + '"] ' + back.focus)).toBeTruthy();
     // Any other press leaves it too.
     const tab = parseHTML('<main>' + html + '</main>').document.querySelector('[data-act="segment"]');
     expect(StudentPageView.press(ui, view, 'segment', tab).ui.handout).toBe('');

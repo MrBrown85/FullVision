@@ -75,6 +75,7 @@ const PRECACHE_URLS = [
   '/shared/core-self.js',
   '/shared/student-view.js',
   '/s/page-view.js',
+  '/s/page-carousel.js',
   '/s/send.js',
   '/s/feedback.js',
   '/s/handouts.js',
