@@ -4,8 +4,9 @@ import { pagesPdf } from '../tests/fixtures/pdf-fixtures.mjs';
 /* Handouts and Links (boards 3a and 3b of the Assessment Form canvas), in
    Demo Mode: on the assessment form, under the Description, a teacher adds
    a two-page PDF and a link, takes one off, and saves; Preview as Student
-   then shows them on the card under For This Assignment, the link opening
-   in a new tab, the handout's pages opening in the page one at a time.
+   then shows the handout's pages on the card to swipe through (the card is
+   still to do; s/page-carousel.js), a tap opening them in the page one at
+   a time, and the link under For This Assignment, opening in a new tab.
    The pages are made from the PDF on this computer (shared/photo-shrink.js,
    pdf.js) and kept in the photo queue. Nothing is sent. */
 
@@ -129,10 +130,23 @@ test('a teacher adds a handout and a link, and the student sees them on the card
   await dialog.getByRole('button', { name: segmentName }).click();
   await dialog.locator('.sp-side-row[data-piece="' + aid + '"]').click();
   const card = dialog.locator('.sp-piece.sp-picked');
+  // The handout's pages on the card, each a real picture as the preview opens it.
+  const car = card.locator('.sp-car');
+  await expect(car.locator('.sp-car-slide')).toHaveCount(2);
+  await expect(car.locator('.sp-car-count')).toHaveText('1 / 2');
+  await expect(car.locator('.sp-car-caption')).toHaveText('Density Lab Instructions');
+  await expect
+    .poll(() =>
+      car
+        .locator('.sp-car-slide img')
+        .first()
+        .evaluate(img => img.complete && img.naturalWidth > 0),
+    )
+    .toBe(true);
+  const handout = car.getByRole('button', { name: 'Density Lab Instructions, page 1 of 2. Open full size' });
   const block = card.locator('.sp-res');
   await expect(block.getByRole('heading', { name: 'For This Assignment' })).toBeVisible();
-  const handout = block.getByRole('button', { name: /Density Lab Instructions/ });
-  await expect(handout).toContainText('Handout · 2 pages');
+  await expect(block.getByRole('button')).toHaveCount(0);
   const link = block.getByRole('link', { name: /Density/ });
   await expect(link).toHaveAttribute('href', 'https://www.britannica.com/science/density');
   await expect(link).toHaveAttribute('target', '_blank');
@@ -155,11 +169,12 @@ test('a teacher adds a handout and a link, and the student sees them on the card
   if (SHOTS) await dialog.screenshot({ path: SHOTS + '/handouts-links-handout-chromebook.png' });
   await pane.getByRole('button', { name: 'Back' }).click();
   await expect(dialog.locator('.sp-handout')).toHaveCount(0);
-  await expect(dialog.locator('.sp-piece.sp-picked .sp-res')).toBeVisible();
+  await expect(dialog.locator('.sp-piece.sp-picked .sp-car')).toBeVisible();
 
   // On a phone too.
   await dialog.getByRole('radio', { name: 'Phone' }).click();
-  await expect(dialog.locator('.sp-piece[data-piece="' + aid + '"] .sp-res-row')).toHaveCount(2);
+  await expect(dialog.locator('.sp-piece[data-piece="' + aid + '"] .sp-car-slide')).toHaveCount(2);
+  await expect(dialog.locator('.sp-piece[data-piece="' + aid + '"] .sp-res-row')).toHaveCount(1);
 
   expect(posts).toEqual([]);
   expect(errors).toEqual([]);

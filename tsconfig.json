@@ -61,6 +61,7 @@
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
     "s/question-kinds.js",
+    "s/page-carousel.js",
     "teacher/cm-reflect-answers.js",
     "teacher/cm-reflect-builder.js",
     "shared/add-work-files.js",

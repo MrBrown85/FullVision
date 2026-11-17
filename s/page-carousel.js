@@ -1,3 +1,4 @@
+// @ts-check
 /* The handout's pages on a card still to do, to swipe through like a post
    (Colin, 2026-11-17: "As students scroll the missing assignments on their
    app, it should look like Instagram — the assignment images they can
@@ -29,7 +30,7 @@
    that has not come shows a plain grey box, the same size. Nothing here
    reaches the network itself, and nothing is said when a page does not
    come. */
-window.StudentPageCarousel = (function () {
+var StudentPageCarousel = (function () {
   'use strict';
 
   var SEP = ' · ';
@@ -51,7 +52,7 @@ window.StudentPageCarousel = (function () {
   function handoutsOf(p) {
     return (p && Array.isArray(p.resources) ? p.resources : []).filter(function (r) {
       var n = r && Number(r.pages);
-      return r && r.kind === 'handout' && typeof r.id === 'string' && r.id && n >= 1 && n <= 20;
+      return !!r && r.kind === 'handout' && typeof r.id === 'string' && !!r.id && n >= 1 && n <= 20 && n % 1 === 0;
     });
   }
 
@@ -61,7 +62,7 @@ window.StudentPageCarousel = (function () {
   function slidesOf(p) {
     var out = [];
     handoutsOf(p).forEach(function (r) {
-      var n = Math.floor(Number(r.pages));
+      var n = Number(r.pages);
       for (var k = 0; k < n; k++) {
         out.push({ rid: r.id, title: r.title || 'Handout', page: k, of: n, at: out.length });
       }
@@ -98,13 +99,14 @@ window.StudentPageCarousel = (function () {
     return looking && at + 1 < n ? [at, at + 1] : [at];
   }
 
-  // A page's shape as CSS aspect-ratio, kept between very wide and very tall; '' when unknown.
+  // A page's shape as CSS aspect-ratio (its width / its height), kept between 1 / 2 and 2 / 1; '' when unknown.
   function ratioOf(w, h) {
     var x = Number(w);
     var y = Number(h);
     if (!(x > 0) || !(y > 0)) return '';
-    var r = Math.max(0.5, Math.min(2, x / y));
-    return Math.round(r * 1000) / 1000 + ' / 1';
+    if (x > 2 * y) return '2 / 1';
+    if (y > 2 * x) return '1 / 2';
+    return x + ' / ' + y;
   }
 
   // What the slide's button is called: which page of what, and that it opens full size.
@@ -180,6 +182,8 @@ window.StudentPageCarousel = (function () {
 
   var at = {}; // piece id → the page its carousel shows, kept across a redraw
   var ratios = {}; // piece id → its first page's shape, so a redraw keeps it
+  var wired = new WeakMap(); // a carousel on the page → { near, look }: what to fetch as it comes near, or into view
+  var watching = new WeakMap(); // a page drawn → its two observers
 
   function reduceMotion() {
     try {
@@ -274,8 +278,7 @@ window.StudentPageCarousel = (function () {
 
   function wire(el, source) {
     var track = el.querySelector('.sp-car-track');
-    if (!track || el.getAttribute('data-car-on')) return;
-    el.setAttribute('data-car-on', '1');
+    if (!track || wired.has(el)) return;
     var pid = el.getAttribute('data-car') || '';
     var n = slidesIn(el).length;
     var cur = clamp(at[pid], n);
@@ -283,7 +286,7 @@ window.StudentPageCarousel = (function () {
     // A redraw keeps the page the student was on.
     if (cur && track.clientWidth) track.scrollLeft = cur * track.clientWidth;
     mark(el, cur);
-    el._spCar = {
+    var me = {
       near: function () {
         wanted(cur, n, false).forEach(function (i) {
           fetchPage(el, i, source);
@@ -295,6 +298,7 @@ window.StudentPageCarousel = (function () {
         });
       },
     };
+    wired.set(el, me);
     var queued = false;
     track.addEventListener(
       'scroll',
@@ -309,7 +313,7 @@ window.StudentPageCarousel = (function () {
             at[pid] = i;
             mark(el, i);
           }
-          el._spCar.look();
+          me.look();
         });
       },
       { passive: true },
@@ -339,16 +343,20 @@ window.StudentPageCarousel = (function () {
   function attach(root, source, opts) {
     if (!root || !root.querySelectorAll || !source) return;
     var els = Array.prototype.slice.call(root.querySelectorAll('.sp-car'));
-    if (root._spCarNear) root._spCarNear.disconnect();
-    if (root._spCarSeen) root._spCarSeen.disconnect();
-    root._spCarNear = root._spCarSeen = null;
+    var was = watching.get(root);
+    if (was)
+      was.forEach(function (o) {
+        o.disconnect();
+      });
+    watching.delete(root);
     if (!els.length) return;
     els.forEach(function (el) {
       wire(el, source);
     });
     if (typeof IntersectionObserver !== 'function') {
       els.forEach(function (el) {
-        if (el._spCar) el._spCar.near();
+        var w = wired.get(el);
+        if (w) w.near();
       });
       return;
     }
@@ -356,7 +364,8 @@ window.StudentPageCarousel = (function () {
     var near = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (e) {
-          if (e.isIntersecting && e.target._spCar) e.target._spCar.near();
+          var w = e.isIntersecting && wired.get(e.target);
+          if (w) w.near();
         });
       },
       { root: box, rootMargin: NEAR },
@@ -364,7 +373,8 @@ window.StudentPageCarousel = (function () {
     var seen = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (e) {
-          if (e.isIntersecting && e.target._spCar) e.target._spCar.look();
+          var w = e.isIntersecting && wired.get(e.target);
+          if (w) w.look();
         });
       },
       { root: box, threshold: 0.5 },
@@ -373,8 +383,7 @@ window.StudentPageCarousel = (function () {
       near.observe(el);
       seen.observe(el);
     });
-    root._spCarNear = near;
-    root._spCarSeen = seen;
+    watching.set(root, [near, seen]);
   }
 
   return {

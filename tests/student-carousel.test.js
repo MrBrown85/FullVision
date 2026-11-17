@@ -80,8 +80,8 @@ describe('the pure parts', () => {
   });
 
   it('a page’s shape, kept between very wide and very tall', () => {
-    expect(C.ratioOf(1275, 1650)).toBe('0.773 / 1');
-    expect(C.ratioOf(100, 1000)).toBe('0.5 / 1');
+    expect(C.ratioOf(1275, 1650)).toBe('1275 / 1650');
+    expect(C.ratioOf(100, 1000)).toBe('1 / 2');
     expect(C.ratioOf(3000, 100)).toBe('2 / 1');
     expect(C.ratioOf(0, 100)).toBe('');
   });
