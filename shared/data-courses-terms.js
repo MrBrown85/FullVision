@@ -460,7 +460,10 @@ function noteClassOpened(cid) {
   } catch (e) {
     /* storage blocked: this visit remembers it */
   }
-  _rpcOrNoop('note_course_opened', { p_course_id: cid });
+  // _writeRpc, not the typed _rpcOrNoop: types/database.d.ts has the function once 2026111704 is applied.
+  _writeRpc('note_course_opened', { p_course_id: cid }).then(function (res) {
+    if (res && res.error && !res.error.handledSessionExpired) console.warn('note_course_opened failed:', res.error);
+  });
   return true;
 }
 
