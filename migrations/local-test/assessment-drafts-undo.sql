@@ -20,6 +20,16 @@
 -- database where the file was never applied, or a second time.
 --
 -- Read-only check first: assessment-drafts-live-postcheck.sql (drafts row).
+--
+-- ── PART 1, the fast stop: one statement, on its own ─────────────────────────
+-- If Unassign's check itself misbehaves (it refuses what it should not, or a
+-- save waits on it), run only this. Unassign is then no longer checked;
+-- everything else, Drafts and what students see included, stays as the
+-- file made it. Run the file again to put the check back.
+--
+--     drop trigger if exists assessment_draft_guard on public.assessment;
+--
+-- ── PART 2, the full removal: the rest of this file ──────────────────────────
 begin;
 
 set local lock_timeout = '5s';

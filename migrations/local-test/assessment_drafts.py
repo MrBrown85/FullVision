@@ -26,12 +26,15 @@ dropped here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
   rls       Teacher B cannot read, change, Unassign, Assign or copy Teacher A's piece; nobody signed in
             and anon can run nothing; the trigger function is the owner's alone.
   race      On connections of their own: Unassign against a grade being saved and a send being started,
-            each order. No deadlock; the Draft never ends up with a student's work it did not see.
+            each order, and a send that holds the class's lock when Unassign arrives. No deadlock; the
+            Draft never ends up with a student's work; twenty sends and Unassigns started at once, no
+            deadlock. A mutant: the trigger without its class lock lets the first race through.
   apply     The guards (each wrong definition, a second overload, a wrong column, a taken trigger name)
             stop with the catalog unchanged; a second run; every replaced function differs from live
             only by is_draft lines and keeps its attributes and grants; the md5s the header records;
             the pre-check and post-check.
-  undo      Refuses while a Draft exists; otherwise the catalog and every row are as before the file
+  undo      PART 1, the fast stop (drop the trigger): only the trigger goes, Unassign is unchecked,
+            Drafts stay hidden, the file puts it back. PART 2 refuses while a Draft exists; otherwise the catalog and every row are as before the file
             (but one dropped-column slot on assessment); a second run; on a database without the file
             it changes nothing; page answers as before the file.
 """
@@ -544,11 +547,59 @@ def scen_race():
             ok('race %d: Unassign, then a grade saved: the save waits, then is saved on the Draft, no deadlock' % rnd,
                blocked and 'e' not in box and state(d, a)[0] is True and d.one('select count(*) from score where assessment_id = :a', a=a) == 1, (blocked, box))
             s1.close(); s2.close()
-        # The same first race with the trigger's two locks taken out: the Draft goes through with the grade
-        # (so the locks are what makes it hold)
+        # 5. a send that holds the class's lock when Unassign arrives, then reads the piece's row: no deadlock,
+        # Unassign waits and is refused. (As _send_begin: the class's lock first, then the rest of the send.)
+        def send_vs_unassign(tag):
+            a = T(d, "create_assessment(:c, :t)", c=w.c, t=tag); d.run("update assessment set students_send = 'photos' where id = :a", a=a)
+            s1, s2 = Side(d), Side(d)
+            s1.c.run('begin'); s1.run('select public._grade_return_lock(:c)', c=w.c)
+            s2.begin('authenticated', A)
+            t, box = in_thread(lambda: s2.run("""select update_assessment(:a, '{"is_draft": true}'::jsonb)""", a=a))
+            blocked = waiting(d)
+            res = {}
+            try:
+                s1.c.run('set local role service_role')
+                res['r'] = s1.run("""select student_submit.send_start(:t, :e, :a, '[{"width":1500,"height":2000}]'::jsonb, null, null,
+                                      gen_random_uuid(), 'ip')""", t=w.t1, e=w.e1, a=a)[0][0]
+                s1.run('commit')
+            except Exception as e:
+                res['e'] = (message(e), sqlstate(e)); s1.run('rollback')
+            t.join(30); s2.run('commit' if 'e' not in box else 'rollback')
+            s1.close(); s2.close()
+            return a, blocked, res, box
+        for rnd in range(3):
+            a, blocked, res, box = send_vs_unassign('R5-%d' % rnd)
+            ok('race %d: a send holding the class\'s lock, then Unassign: no deadlock; the send goes in, Unassign waits and is refused' % rnd,
+               blocked and res.get('r', {}).get('ok') is True and box.get('e', ('',)) == ('draft_has_work', 'P0001') and state(d, a)[0] is False,
+               (blocked, res, box))
+        # 6. a send and an Unassign started at the same instant, twenty times: never a deadlock
+        seen = {}
+        for i in range(20):
+            a = T(d, "create_assessment(:c, :t)", c=w.c, t='R6-%d' % i); d.run("update assessment set students_send = 'photos' where id = :a", a=a)
+            c1, c2 = connect(d.name), connect(d.name); bar = threading.Barrier(2); res = {}
+            def send():
+                c1.run('set role service_role'); bar.wait()
+                try: res['send'] = c1.run("""select student_submit.send_start(:t, :e, :a, '[{"width":1500,"height":2000}]'::jsonb, null, null,
+                                              gen_random_uuid(), 'ip')""", t=w.t1, e=w.e1, a=a)[0][0].get('error') or 'ok'
+                except Exception as e: res['send'] = sqlstate(e)
+            def un():
+                c2.run("select set_config('request.jwt.claim.sub', :u, false)", u=A); c2.run('set role authenticated'); bar.wait()
+                try: c2.run("""select update_assessment(:a, '{"is_draft": true}'::jsonb)""", a=a); res['unassign'] = 'ok'
+                except Exception as e: res['unassign'] = message(e) if sqlstate(e) == 'P0001' else sqlstate(e)
+            th = [threading.Thread(target=send), threading.Thread(target=un)]; [x.start() for x in th]; [x.join(30) for x in th]
+            c1.close(); c2.close()
+            drafted = state(d, a)[0]; work = d.one('select count(*) from submission where assessment_id = :a', a=a)
+            k = '%s/%s' % (res.get('send'), res.get('unassign')); seen[k] = seen.get(k, 0) + 1
+            seen.setdefault('bad', 0)
+            if '40P01' in k or (drafted and work) or (res.get('send') == 'ok') == (res.get('unassign') == 'ok' and res.get('send') == 'not_found'):
+                seen['bad'] += 1
+        ok('race: a send and an Unassign at the same instant, 20 rounds: no deadlock, and either the send went in and the '
+           'piece stayed assigned, or the Draft came first and the send found no piece', seen['bad'] == 0, seen)
+        # The first race with the trigger's class lock taken out: the Draft goes through with the grade
+        # (so the lock is what makes it hold)
         body = defn(d, GUARD)
-        cut = body.replace('    perform 1 from assessment where id = new.id for update;\n', '').replace('    perform _grade_return_lock(new.course_id);\n', '')
-        assert cut != body and 'for update' not in cut
+        cut = body.replace('    perform _grade_return_lock(new.course_id);\n', '')
+        assert cut != body
         d.run(cut)
         a = T(d, "create_assessment(:c, 'R-mutant')", c=w.c)
         s1, s2 = Side(d), Side(d)
@@ -556,7 +607,7 @@ def scen_race():
         s2.begin('authenticated', A)
         t, box = in_thread(lambda: s2.run("""select update_assessment(:a, '{"is_draft": true}'::jsonb)""", a=a))
         t.join(5); blocked = t.is_alive(); s1.run('commit'); t.join(30); s2.run('commit' if 'e' not in box else 'rollback')
-        ok('race: (mutant without the locks) the first race lets the Draft through with a grade on it, as it must without them',
+        ok('race: (mutant without the class lock) the first race lets the Draft through with a grade on it, as it must without it',
            'e' not in box and state(d, a)[0] is True and d.one('select count(*) from score where assessment_id = :a', a=a) == 1, (blocked, box))
         s1.close(); s2.close()
         d.run(body)
@@ -672,6 +723,22 @@ def scen_undo():
         ok('undo: on a database without the file it succeeds and changes nothing',
            d.file(UNDO) == 'ok' and differences(cat0, catalog(d.c)) == ([], []) and row_checksums(d.c) == rows0)
         ok('undo: (setup) the file applies', d.file(FILE) == 'ok')
+        # PART 1, the fast stop: the one statement the undo's header gives
+        stop = re.search(r'^--\s+(drop trigger if exists assessment_draft_guard on public\.assessment;)$', text_of(UNDO), re.M).group(1)
+        cat_a = catalog(d.c)
+        d.run(stop)
+        gone, new = differences(cat_a, catalog(d.c))
+        ok('undo: the fast stop takes out the trigger and nothing else (pg_depend counts apart)',
+           [l for l in gone if not l.startswith('depends ')] == [l for l in gone if 'trigger assessment | assessment_draft_guard' in l] != []
+           and [l for l in new if not l.startswith('depends ')] == [], (gone, new))
+        y = T(d, "create_assessment(:c, 'Graded')", c=w.c); T(d, "upsert_score(:e, :a, 7, null)", e=w.e1, a=y)
+        ok('undo: after the fast stop Unassign is no longer checked', unassign(d, y) is None and state(d, y)[0] is True)
+        pg = S(d, "student_submit.page(:t, :e, 'ip')", t=w.t1, e=w.e1)
+        ok('undo: ... and a Draft is still kept off the student page', y not in json.dumps(pg))
+        T(d, """update_assessment(:a, '{"is_draft": false}'::jsonb)""", a=y)
+        ok('undo: running the file again puts the check back', d.file(FILE) == 'ok' and differences(cat_a, catalog(d.c)) == ([], [])
+           and unassign(d, y) == ('draft_has_work', 'P0001'))
+        d.run('delete from score where assessment_id = :a', a=y); d.run('delete from assessment where id = :a', a=y)
         x = T(d, "create_assessment(:c, 'Kept Draft', p_is_draft => true)", c=w.c)
         cat1 = catalog(d.c)
         r = d.file(UNDO)

@@ -26,8 +26,10 @@
 --    false). The old signature is dropped in the same transaction, so there
 --    is still exactly one. The app sends p_is_draft only when it is true.
 -- 3. update_assessment takes is_draft in p_patch (a JSON true or false;
---    anything else: 22023). The app sends it in every patch, so only a
---    change from false to true is checked, by the trigger
+--    anything else: 22023). The app sends only the keys that changed when
+--    it holds the server's copy of the row, and the whole row, is_draft
+--    included, when it holds none; so is_draft can arrive unchanged, and
+--    only a change from false to true is checked, by the trigger
 --    assessment_draft_guard (BEFORE UPDATE OF is_draft, only when it turns
 --    true). It refuses with
 --        raise exception 'draft_has_work' using errcode = 'P0001'
@@ -46,6 +48,13 @@
 --    The server has no fan-out to linked copies (copy_group): each class's
 --    row is changed by its own update_assessment call, so a Draft never
 --    spreads by itself; the app must not send is_draft to the copies.
+--    The check takes the class's lock first, so a send, Add Work, return,
+--    Mark Up, revision or score/rubric/competency save in progress makes
+--    Unassign wait and then be refused. Known gap: upsert_dibels_score
+--    takes no class lock, so a DIBELS reading saved at the same instant as
+--    an Unassign can leave a Draft with a reading score, hidden from the
+--    student. It needs two devices acting on the same piece at once (the
+--    app keeps a Draft out of grading); upsert_dibels_score is not changed.
 -- 4. get_class_bundle and get_gradebook send 'is_draft' on each assessment.
 -- 5. duplicate_assessment copies is_draft. import_json_restore and
 --    import_teams_class take it from the row when it is a JSON boolean,
@@ -92,7 +101,7 @@
 --   public.update_assessment                                     523f9491dc3b689dc3d6473e411e4876  c48044d5e0d902e3e5a6fef63cb74049
 --   public.create_assessment (old signature, dropped)             b3f6055028ea0ea1bdcb2f481959d9cf
 --   public.create_assessment (with p_is_draft)                                                      2852ea5862f02785711a2d8125b5fadf
---   public._assessment_draft_guard (new)                                                            8c891dea862dc2ab1353dbad1a8df26a
+--   public._assessment_draft_guard (new)                                                            c18fcd8b805c83a2b75e8ca051792658
 --
 -- ── What live holds (read-only, Nov 16) ────────────────────────────────────
 -- migrations/local-test/assessment-drafts-live-precheck.sql:
@@ -165,7 +174,7 @@ begin
          where n.nspname = 'public' and p.proname = 'create_assessment') <> 1 then
         raise exception 'there is more than one create_assessment. Nothing was changed.';
     end if;
-    if _g is not null and _g <> '8c891dea862dc2ab1353dbad1a8df26a' then
+    if _g is not null and _g <> 'c18fcd8b805c83a2b75e8ca051792658' then
         raise exception 'public._assessment_draft_guard exists and is not this file''s (found %). Nothing was changed.', _g;
     end if;
     if exists (select 1 from pg_trigger t where t.tgrelid = 'public.assessment'::regclass and t.tgname = 'assessment_draft_guard'
@@ -202,11 +211,13 @@ begin
     if coalesce(current_setting('fv.restoring', true), '') = 'on' then
         return new;
     end if;
-    -- First wait for anyone saving a grade on this piece: a score row being written holds a
-    -- key-share lock on the assessment's row until it commits. Then the class's lock, which
-    -- every send, Add Work, Mark Up, revision and return takes before it writes. Same order
-    -- as every save already takes them (the piece's row, then the class's): no new deadlock.
-    perform 1 from assessment where id = new.id for update;
+    -- The class's lock, then the check. Every send, Add Work, Mark Up, revision and return takes
+    -- it before it writes, and a score, rubric, competency or rubric-box save takes it through
+    -- its sync trigger before its transaction ends: a save in progress makes this wait, and the
+    -- check then sees what it saved. No lock is taken on the piece's row beyond this update's
+    -- own: a writer holding the class's lock that then needed the row would deadlock against
+    -- it (review of PR 1484).
+    -- Known gap: upsert_dibels_score takes no class lock (see the file's header).
     perform _grade_return_lock(new.course_id);
     if exists (select 1 from score x where x.assessment_id = new.id
                   and (x.value is not null or nullif(btrim(x.status), '') is not null

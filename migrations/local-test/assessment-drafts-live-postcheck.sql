@@ -21,7 +21,7 @@ with want(sig, before_md5, after_md5) as (values
     ('public.update_assessment(uuid,jsonb,uuid[])', '523f9491dc3b689dc3d6473e411e4876', 'c48044d5e0d902e3e5a6fef63cb74049'),
     ('public.create_assessment(uuid,text,uuid,text,date,date,text,numeric,numeric,text,uuid,uuid,uuid[],uuid,text[],uuid)', 'b3f6055028ea0ea1bdcb2f481959d9cf', 'absent'),
     ('public.create_assessment(uuid,text,uuid,text,date,date,text,numeric,numeric,text,uuid,uuid,uuid[],uuid,text[],uuid,boolean)', 'absent', '2852ea5862f02785711a2d8125b5fadf'),
-    ('public._assessment_draft_guard()', 'absent', '8c891dea862dc2ab1353dbad1a8df26a')),
+    ('public._assessment_draft_guard()', 'absent', 'c18fcd8b805c83a2b75e8ca051792658')),
 found as (select w.*, coalesce(md5(pg_get_functiondef(to_regprocedure(w.sig))), 'absent') as md5 from want w)
 select 'fingerprint ' || sig as check, case when md5 = after_md5 then 'ok' else 'NOT AS EXPECTED: ' || md5 end as value from found
 union all select 'is_draft is boolean not null default false',
