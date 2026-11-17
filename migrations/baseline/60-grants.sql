@@ -198,6 +198,7 @@ revoke all on routine public._assessment_resource_truncated() from public;
 revoke all on routine public._assessment_work_json(p_assessment_id uuid) from public;
 revoke all on routine public._cards_work_until(p_course_id uuid) from public;
 grant execute on routine public._cards_work_until(p_course_id uuid) to service_role;
+revoke all on routine public._course_restored_opened() from public;
 revoke all on routine public._fv_date(p text) from public;
 grant execute on routine public._fv_date(p text) to service_role;
 revoke all on routine public._fv_release_orphan_teacher_email() from public;
@@ -586,6 +587,9 @@ grant execute on routine public.list_course_grade_returns(p_course_id uuid) to s
 revoke all on routine public.list_course_guardians(p_course_id uuid) from public;
 grant execute on routine public.list_course_guardians(p_course_id uuid) to authenticated;
 grant execute on routine public.list_course_guardians(p_course_id uuid) to service_role;
+revoke all on routine public.list_course_photo_expiry() from public;
+grant execute on routine public.list_course_photo_expiry() to authenticated;
+grant execute on routine public.list_course_photo_expiry() to service_role;
 revoke all on routine public.list_course_questionnaires(p_course_id uuid) from public;
 grant execute on routine public.list_course_questionnaires(p_course_id uuid) to authenticated;
 grant execute on routine public.list_course_questionnaires(p_course_id uuid) to service_role;
