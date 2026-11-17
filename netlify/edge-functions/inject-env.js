@@ -13,19 +13,23 @@
 // 17 2026). Its scripts must run, so it gets a policy of its own, and
 // `sandbox` without allow-same-origin gives it an origin of its own even if
 // the address is opened alone: nothing in it reaches a page's storage,
-// cookies or sign-in. Only FullVision may frame it (this overrides
+// cookies or sign-in. Nothing in it loads from the internet: no script,
+// style, font, picture, media, fetch or frame from any other address, so no
+// third party sees a student's address or what they type (Colin's privacy
+// call, Nov 17 2026); inline content and data: still work. Only FullVision
+// may frame it (this overrides
 // X-Frame-Options: DENY from _headers, which browsers ignore when
 // frame-ancestors is set; it is dropped here as well).
 const HANDOUT_FRAME_PATH = '/shared/handout-frame.html';
 const HANDOUT_FRAME_CSP = [
   "default-src 'none'",
-  "script-src 'unsafe-inline' 'unsafe-eval' https: data: blob:",
-  "style-src 'unsafe-inline' https: data: blob:",
-  'img-src https: data: blob:',
-  'font-src https: data: blob:',
-  'media-src https: data: blob:',
-  'connect-src https:',
-  'frame-src https:',
+  "script-src 'unsafe-inline' 'unsafe-eval' data: blob:",
+  "style-src 'unsafe-inline' data: blob:",
+  'img-src data: blob:',
+  'font-src data: blob:',
+  'media-src data: blob:',
+  "connect-src 'none'",
+  "frame-src 'none'",
   "form-action 'none'",
   "frame-ancestors 'self'",
   'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',

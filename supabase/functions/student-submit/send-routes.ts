@@ -463,15 +463,20 @@ export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'no
             files.push({ id, path: x.path as string });
           } else skipped++;
         }
-        if (items.length) await store.remove(items.map(i => i.path));
-        if (files.length)
-          await store.remove(
-            files.map(i => i.path),
-            FILE_BUCKET,
-          );
-        const both = items.concat(files);
-        if (both.length) {
-          const done = await db.call(SQL.removalDone, ['{' + both.map(i => i.id).join(',') + '}']);
+        // Each bucket's files deleted, then reported done, before the next bucket is
+        // touched: a failure in handout-files never strands photos already deleted.
+        for (const [batch, bucket] of [
+          [items, null],
+          [files, FILE_BUCKET],
+        ] as const) {
+          if (!batch.length) continue;
+          if (bucket)
+            await store.remove(
+              batch.map(i => i.path),
+              bucket,
+            );
+          else await store.remove(batch.map(i => i.path));
+          const done = await db.call(SQL.removalDone, ['{' + batch.map(i => i.id).join(',') + '}']);
           if (!good(done)) throw new TypeError('reply');
           if (whole(done.gone, 0, Number.MAX_SAFE_INTEGER)) removed += done.gone;
         }

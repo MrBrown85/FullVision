@@ -10,17 +10,21 @@
       so whatever runs here has an origin of its own ("null"): it cannot
       read the student page's storage, cookies, sign-in or page, cannot
       move the page, and is sealed even if this address is opened alone;
-    script-src 'unsafe-inline' 'unsafe-eval' https: (the handout's own
-      scripts run: most of Colin's worksheets are interactive), images,
-      fonts, styles and media from https:, data: and blob:, nothing from
-      http:, forms submit nowhere, and only FullVision may frame it.
+    script-src 'unsafe-inline' 'unsafe-eval' data: blob: (the handout's own
+      scripts run: most of Colin's worksheets are interactive), and nothing
+      at all from the internet: no script, style, font, picture or media
+      from any other address, no fetch (connect-src 'none') and no frame
+      (frame-src 'none'), so no third party sees a student's address or what
+      they type (Colin's privacy call, Nov 17 2026). Forms submit nowhere,
+      and only FullVision may frame it.
   The viewer adds sandbox="allow-scripts …" (no allow-same-origin) as well.
 
   It does one thing and waits for nothing else: it says it is ready to the
   page that framed it, and takes one message from that page.
     { fv: 'handout-show', mode: 'page', html }  the handout's whole page,
-        written over this one (its scripts run); links to the web open in a
-        new tab, links to files that were beside it do nothing.
+        written over this one (its scripts run), with localStorage and
+        sessionStorage held in memory (storageStandIn); links to the web
+        open in a new tab, links to files that were beside it do nothing.
     { fv: 'handout-show', mode: 'book', chapters: [ { path, html, css } ] }
         an EPUB, read by the viewer: each chapter in turn, in pages one
         screen wide. Then it takes { fv: 'handout-turn', by: 1 | -1 }, and
@@ -72,12 +76,85 @@
           'if(!/^(mailto|tel):/i.test(h))e.preventDefault();},true);<' +
           '/script>';
 
+        /* Written first of all ahead of the handout's own page: localStorage and
+           sessionStorage held in memory for as long as the page is open. In this
+           sealed frame the browser's own throw a SecurityError, and many
+           worksheets save answers or scores there without a try. This stand-in
+           is the frame's own: it reads nothing of the page around it, and what
+           a worksheet keeps in it is gone when the handout closes. It is put in
+           only where the real one cannot be reached. */
+        function storageStandIn() {
+          function store() {
+            var m = new Map();
+            var own = Object.prototype.hasOwnProperty;
+            var api = {
+              getItem: function (k) {
+                k = String(k);
+                return m.has(k) ? m.get(k) : null;
+              },
+              setItem: function (k, v) {
+                m.set(String(k), String(v));
+              },
+              removeItem: function (k) {
+                m.delete(String(k));
+              },
+              clear: function () {
+                m.clear();
+              },
+              key: function (i) {
+                var keys = Array.from(m.keys());
+                i = Number(i);
+                return i >= 0 && i < keys.length ? keys[i] : null;
+              },
+            };
+            // localStorage.score = 5 and localStorage.score, as a browser's storage allows.
+            return new Proxy(api, {
+              get: function (t, p) {
+                if (p === 'length') return m.size;
+                if (typeof p !== 'string' || own.call(t, p)) return t[p];
+                return m.has(p) ? m.get(p) : undefined;
+              },
+              set: function (t, p, v) {
+                if (typeof p === 'string') m.set(p, String(v));
+                return true;
+              },
+              deleteProperty: function (t, p) {
+                m.delete(String(p));
+                return true;
+              },
+              has: function (t, p) {
+                return own.call(t, p) || m.has(String(p));
+              },
+              ownKeys: function () {
+                return Array.from(m.keys());
+              },
+              getOwnPropertyDescriptor: function (t, p) {
+                var k = String(p);
+                return m.has(k) ? { value: m.get(k), writable: true, enumerable: true, configurable: true } : undefined;
+              },
+            });
+          }
+          ['localStorage', 'sessionStorage'].forEach(function (name) {
+            try {
+              if (window[name]) return;
+            } catch (e) {
+              /* sealed: the stand-in below */
+            }
+            try {
+              Object.defineProperty(window, name, { value: store(), configurable: true });
+            } catch (e) {
+              /* left as it is */
+            }
+          });
+        }
+        var STORAGE = '<script>(' + storageStandIn.toString() + ')();<' + '/script>';
+
         function writePage(html) {
           var s = String(html || '');
           // After <head>, else <html>, else the doctype (a script before it would put the page in quirks mode).
           var m = /<head(\s[^>]*)?>/i.exec(s) || /<html(\s[^>]*)?>/i.exec(s) || /<!doctype[^>]*>/i.exec(s);
           var end = m ? m.index + m[0].length : 0;
-          s = s.slice(0, end) + LINKS + s.slice(end);
+          s = s.slice(0, end) + STORAGE + LINKS + s.slice(end);
           document.open();
           document.write(s);
           document.close();
@@ -136,6 +213,28 @@
           }
           book.box.scrollLeft = book.page * width();
           say();
+          settleLater();
+        }
+
+        /* The page count again once layout has settled: the frame's own size
+           can still change as the viewer lays out, and fonts and pictures
+           land after the first measure. Said only when it changed. */
+        function remeasure() {
+          if (!book || !book.flow) return;
+          var was = book.pages;
+          measure();
+          if (book.pages !== was) say();
+        }
+        function settleLater() {
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(function () {
+              requestAnimationFrame(remeasure);
+            });
+          }
+          if (document.fonts && document.fonts.ready) document.fonts.ready.then(remeasure);
+          Array.prototype.forEach.call(book.flow.querySelectorAll('img'), function (img) {
+            if (!img.complete) img.addEventListener('load', remeasure, { once: true });
+          });
         }
 
         function turn(by) {
@@ -220,6 +319,7 @@
               say();
             }
           });
+          if (typeof ResizeObserver === 'function') new ResizeObserver(remeasure).observe(box);
           showChapter(0);
         }
 

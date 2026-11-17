@@ -204,6 +204,44 @@
     return { html: out, used: Object.keys(used), missing: missing };
   }
 
+  /* The sites a web page loads pictures, fonts, styles, scripts or frames
+     from (Colin's privacy call, Nov 17 2026: a handout loads nothing from the
+     internet, so no third party sees a student's address or what they type).
+     → [ host ], each once, in the order the page names them. A link the
+     student clicks is not one of them: it opens in a new tab. */
+  function webSites(html) {
+    /** @type {string[]} */
+    var hosts = [];
+    /** @param {string} ref */
+    function note(ref) {
+      var m = /^(?:https?:)?\/\/([^/\s"'<>?#]+)/i.exec(String(ref || '').trim());
+      if (!m) return;
+      var host = m[1].toLowerCase().replace(/^www\./, '');
+      if (hosts.indexOf(host) < 0) hosts.push(host);
+    }
+    var s = String(html || '');
+    // Tags that load what they name (an <a>'s href does not).
+    var TAG = /<(script|img|link|iframe|frame|video|audio|source|track|embed|object|input|image|use)\b[^>]*>/gi;
+    var NOT_LOADED = /\brel\s*=\s*["']?(canonical|alternate|author|license|help|next|prev)\b/i;
+    (s.match(TAG) || []).forEach(function (tag) {
+      if (/^<link\b/i.test(tag) && NOT_LOADED.test(tag)) return;
+      var attr = /\s(?:src|href|xlink:href|poster|data)\s*=\s*(["']?)([^"'\s>]+)\1/gi;
+      var m;
+      while ((m = attr.exec(tag))) note(m[2]);
+      var set = /\ssrcset\s*=\s*(["'])([\s\S]*?)\1/i.exec(tag);
+      if (set) {
+        set[2].split(',').forEach(function (part) {
+          note(part.trim().split(/\s+/)[0]);
+        });
+      }
+    });
+    // Styles: url(...) and @import "...".
+    var css = /url\(\s*(["']?)([^"')]+?)\1\s*\)|@import\s+(["'])([^"']+)\3/gi;
+    var c;
+    while ((c = css.exec(s))) note(c[2] || c[4]);
+    return hosts;
+  }
+
   function readBuffer(file) {
     if (file && typeof file.arrayBuffer === 'function') return file.arrayBuffer();
     return new Promise(function (resolve, reject) {
@@ -237,7 +275,9 @@
   /* The files a teacher picked, made ready to attach.
      → Promise of {
          ready:   [ { kind: 'html' | 'txt' | 'epub', title, name, blob, bytes,
-                      missing: [picture names] } ], in the order picked
+                      missing: [picture names], web: [sites it would load
+                      from, which students' screens will not] } ], in the
+                  order picked
          pdfs:    [ File ], for photo-shrink.js
          refused: [ { name, why: 'kind' | 'too_large' | 'empty' | 'not_epub' |
                       'unreadable' } ]
@@ -297,6 +337,8 @@
                   var blob;
                   /** @type {string[]} */
                   var missing = [];
+                  /** @type {string[]} */
+                  var web = [];
                   if (item.kind === 'epub') {
                     // A ZIP file: it starts PK\x03\x04.
                     if (!(bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04)) {
@@ -306,6 +348,7 @@
                   } else {
                     var text = decodeText(bytes);
                     if (item.kind === 'html') {
+                      web = webSites(text);
                       var done = inlinePictures(text, pictures);
                       done.used.forEach(function (n) {
                         used[n] = true;
@@ -323,6 +366,7 @@
                     blob: blob,
                     bytes: blob.size,
                     missing: missing,
+                    web: web,
                   });
                 },
                 function () {
@@ -362,6 +406,16 @@
             ', remove the page and add it again with its pictures.',
         );
       }
+      if (r.web && r.web.length) {
+        var shown = r.web.slice(0, 3).join(', ') + (r.web.length > 3 ? ' and ' + (r.web.length - 3) + ' more' : '');
+        words.push(
+          'On students’ screens, ' +
+            r.title +
+            ' won’t show its pictures, fonts or scripts from the web (' +
+            shown +
+            '). Handouts load nothing from the internet, to keep students’ information private.',
+        );
+      }
     });
     (out.refused || []).forEach(function (r) {
       var n = r.name || 'That file';
@@ -393,6 +447,7 @@
     sizeWord: sizeWord,
     decodeText: decodeText,
     inlinePictures: inlinePictures,
+    webSites: webSites,
     prepare: prepare,
     sayAbout: sayAbout,
   };

@@ -143,6 +143,40 @@ describe('a web page’s pictures', () => {
   });
 });
 
+describe('a web page’s parts from the web', () => {
+  it('are named by site, each once; a link the student clicks is not one', () => {
+    const page = [
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora">',
+      '<link rel="canonical" href="https://example.org/lesson">',
+      '<script src="//cdn.jsdelivr.net/npm/x.js"></script>',
+      '<img src="https://www.example.org/map.png"><img src="http://example.org/b.png" srcset="https://img.example.net/c.png 2x">',
+      '<style>@import "https://fonts.googleapis.com/x"; body { background: url(https://bg.example.com/a.jpg) }</style>',
+      '<a href="https://britannica.com">Read</a><img src="local.png"><img src="data:image/png;base64,AA">',
+    ].join('\n');
+    expect(HandoutFiles.webSites(page)).toEqual([
+      'fonts.googleapis.com',
+      'cdn.jsdelivr.net',
+      'example.org',
+      'img.example.net',
+      'bg.example.com',
+    ]);
+  });
+
+  it('are said plainly when the page is added', async () => {
+    const out = await HandoutFiles.prepare([
+      file(
+        'Lesson 2.html',
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora"><p>Hi</p>',
+        'text/html',
+      ),
+    ]);
+    expect(out.ready[0].web).toEqual(['fonts.googleapis.com']);
+    expect(HandoutFiles.sayAbout(out)).toBe(
+      'On students’ screens, Lesson 2 won’t show its pictures, fonts or scripts from the web (fonts.googleapis.com). Handouts load nothing from the internet, to keep students’ information private.',
+    );
+  });
+});
+
 describe('prepare: the files a teacher picked', () => {
   it('a web page with its pictures, a text file and an EPUB, ready; the rest said plainly', async () => {
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -671,6 +705,29 @@ describe('the viewer', () => {
     await tick();
     await tick();
     expect(doc.querySelector('.hv-text').textContent).toBe('now');
+  });
+
+  it('reads a book’s size from its zip directory, and will not open one that would unzip past 100 MB', async () => {
+    const enc = s => new TextEncoder().encode(s);
+    const zip = fflate.zipSync({ 'a.txt': enc('hello'), 'b.txt': enc('world!') });
+    expect(HandoutViewer.unzippedSize(zip)).toBe(11);
+    // The directory says one entry is 200 MB: refused before anything is inflated.
+    const big = zip.slice();
+    const dv = new DataView(big.buffer);
+    let at = -1;
+    for (let i = 0; i < big.length - 4; i++) if (dv.getUint32(i, true) === 0x02014b50) at = at < 0 ? i : at;
+    dv.setUint32(at + 24, 200 * 1024 * 1024, true);
+    expect(() => HandoutViewer.unzippedSize(big)).toThrow('too_large');
+    expect(() => HandoutViewer.readBook(big, fflate)).toThrow('too_large');
+    expect(() => HandoutViewer.unzippedSize(enc('not a zip at all, no directory here'))).toThrow('not a zip');
+    // Opened, it says so plainly; Save to Phone still works.
+    HandoutViewer.open({ title: 'Huge', kind: 'epub', load: async () => new Blob([big]) });
+    await tick();
+    await tick();
+    await tick();
+    expect(doc.querySelector('.hv-msg').textContent).toBe('This book is too large to open here; use Save to Phone.');
+    expect(doc.querySelector('.hv-save').disabled).toBe(false);
+    expect(doc.querySelector('.hv-layer iframe')).toBeNull();
   });
 
   it('reads an EPUB’s chapters in reading order, its pictures and styles inside them, its scripts left out', () => {

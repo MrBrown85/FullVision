@@ -7,8 +7,10 @@ import { test, expect } from '@playwright/test';
    Assignment, and each opens over the device as the student page opens it
    (shared/handout-viewer.js):
      the web page in the sealed frame, its scripts running, its picture
-     inside it, and nothing of the page around it within reach: not its
-     storage, its cookies, its page or its address;
+     inside it, its saved answers kept by the in-memory storage stand-in,
+     nothing of the page around it within reach (not its storage, its
+     cookies, its page or its address), and nothing from the internet (no
+     web picture, no fetch: no request leaves for another site);
      the text file as text;
      the EPUB in pages, Previous Page and Next Page, and Save to Phone.
    Nothing is sent. */
@@ -32,7 +34,10 @@ const LESSON = `<!doctype html>
 <img id="chart" src="chart.png" alt="Chart">
 <button id="check" onclick="document.getElementById('said').textContent = 'Checked'">Check</button>
 <p id="said"></p>
+<img id="web" src="https://example.org/map.png" alt="From the web">
 <p id="probe"></p>
+<p id="kept"></p>
+<p id="fetch"></p>
 <script>
   var out = [];
   function t(name, f) {
@@ -45,6 +50,19 @@ const LESSON = `<!doctype html>
   t('top', function () { return top.location.href; });
   out.push('origin:' + window.origin);
   document.getElementById('probe').textContent = out.join('|');
+  // A worksheet that saves its answers, with no try: the stand-in keeps them while it is open.
+  localStorage.setItem('answer', '42');
+  localStorage.score = 7;
+  sessionStorage.setItem('step', '3');
+  document.getElementById('kept').textContent = [
+    localStorage.getItem('answer'), localStorage.score, localStorage.length, Object.keys(localStorage).join('+'),
+    sessionStorage.getItem('step'), localStorage.key(0),
+  ].join(',');
+  // Nothing from the internet: a fetch is refused.
+  fetch('https://example.org/answers?typed=hello').then(
+    function () { document.getElementById('fetch').textContent = 'fetch:sent'; },
+    function () { document.getElementById('fetch').textContent = 'fetch:blocked'; }
+  );
 </script>
 </body></html>`;
 
@@ -79,8 +97,16 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   const posts = [];
+  const remote = [];
   page.on('request', r => {
     if (r.method() === 'POST' && /supabase/.test(r.url())) posts.push(r.url());
+  });
+  // A request the frame's policy stops never leaves: the browser fails it as blocked. Anything else did go.
+  page.on('requestfailed', r => {
+    if (/example\.org/.test(r.url())) remote.push(r.url() + ' ' + (r.failure() || {}).errorText);
+  });
+  page.on('response', r => {
+    if (/example\.org/.test(r.url())) remote.push(r.url() + ' answered');
   });
   await page.setViewportSize({ width: 1366, height: 900 });
   await page.goto('/login.html?demo=1');
@@ -126,7 +152,8 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   await expect(field.locator('.af-res-item').nth(2)).toContainText('The Novel · EPUB ·');
   if (SHOTS) await page.locator('.af-card-what').screenshot({ path: SHOTS + '/handout-files-form-1366.png' });
   await expect(field.locator('#af-res-msg')).toHaveText(
-    'Lesson 1.1 Practice was added, but this picture it shows was not chosen, so it won’t appear: chart.png. To include it, remove the page and add it again with its pictures.',
+    'Lesson 1.1 Practice was added, but this picture it shows was not chosen, so it won’t appear: chart.png. To include it, remove the page and add it again with its pictures. ' +
+      'On students’ screens, Lesson 1.1 Practice won’t show its pictures, fonts or scripts from the web (example.org). Handouts load nothing from the internet, to keep students’ information private.',
   );
   await page.locator('[data-action="saveEditAssess"]').click();
   await page.waitForFunction(
@@ -164,9 +191,14 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   );
   const frame = page.frameLocator('.ps-device > .hv-layer iframe.hv-frame');
   await expect(frame.locator('h1')).toHaveText('Lesson 1.1 Practice');
+  // The stand-in storage starts empty (nothing of the page's own), and keeps what the worksheet saves.
   await expect(frame.locator('#probe')).toHaveText(
-    'storage:blocked|session:blocked|cookie:blocked|parent:blocked|top:blocked|origin:null',
+    'storage:read:null|session:read:0|cookie:blocked|parent:blocked|top:blocked|origin:null',
   );
+  await expect(frame.locator('#kept')).toHaveText('42,7,2,answer+score,3,answer');
+  // Nothing from the internet: no fetch, no picture.
+  await expect(frame.locator('#fetch')).toHaveText('fetch:blocked');
+  expect(await frame.locator('#web').evaluate(img => img.naturalWidth)).toBe(0);
   await frame.locator('#check').click();
   await expect(frame.locator('#said')).toHaveText('Checked');
   await expect(frame.locator('#map')).toHaveAttribute('src', /^data:image\/png;base64,/);
@@ -178,6 +210,10 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   expect(await sealed.evaluate(() => String(window.origin))).toBe('null');
   // The page around it is as it was.
   expect(await page.evaluate(() => localStorage.getItem('fv-secret'))).toBe('teacher-only');
+  expect(await page.evaluate(() => [localStorage.getItem('answer'), localStorage.getItem('score')])).toEqual([
+    null,
+    null,
+  ]);
   await viewer.getByRole('button', { name: 'Back' }).click();
   await expect(page.locator('.hv-layer')).toHaveCount(0);
 
@@ -199,6 +235,16 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   await expect.poll(() => book.locator('#fv-book').evaluate(el => el.shadowRoot.textContent)).toContain('Chapter One');
   // A long first chapter runs to several pages, one screen wide each.
   await expect(viewer.locator('.hv-count')).toHaveText(/^Part 1 of 2 · Page 1 of \d+$/);
+  // Once the layout has settled, the count holds.
+  let last = '';
+  await expect
+    .poll(async () => {
+      const now = await viewer.locator('.hv-count').textContent();
+      const same = now === last;
+      last = now;
+      return same;
+    })
+    .toBe(true);
   const pages = Number((await viewer.locator('.hv-count').textContent()).match(/of (\d+)$/)[1]);
   expect(pages).toBeGreaterThan(1);
   await expect(viewer.getByRole('button', { name: 'Previous Page' })).toBeDisabled();
@@ -229,5 +275,7 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   await alone.close();
 
   expect(posts).toEqual([]);
+  // The page's web picture was tried, and the policy stopped it; nothing answered from example.org.
+  expect(remote).toEqual(['https://example.org/map.png csp']);
   expect(errors).toEqual([]);
 });

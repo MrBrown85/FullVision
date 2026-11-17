@@ -160,11 +160,47 @@
     return btoa(out);
   }
 
+  // The most an EPUB may unzip to here (a book of 20 MB that unzips past it is a bomb, or too big to read).
+  var BOOK_MAX_BYTES = 100 * 1024 * 1024;
+  var BOOK_MAX_FILES = 10000;
+
+  /* What the book unzips to, read from the zip's own directory before
+     anything is inflated: each entry's stated size, summed. Throws
+     Error('too_large') past BOOK_MAX_BYTES or BOOK_MAX_FILES, or for a
+     ZIP64 entry (its sizes are not in the plain fields), and Error('not a
+     zip') when there is no directory. fflate inflates each entry into a
+     buffer of its stated size, so the stated sizes bound what is made. */
+  function unzippedSize(bytes) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    var end = -1;
+    for (var i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65535); i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) {
+        end = i;
+        break;
+      }
+    }
+    if (end < 0) throw new Error('not a zip');
+    var count = dv.getUint16(end + 10, true);
+    var at = dv.getUint32(end + 16, true);
+    if (count === 0xffff || at === 0xffffffff || count > BOOK_MAX_FILES) throw new Error('too_large');
+    var total = 0;
+    for (var n = 0; n < count; n++) {
+      if (at + 46 > bytes.length || dv.getUint32(at, true) !== 0x02014b50) throw new Error('not a zip');
+      var size = dv.getUint32(at + 24, true);
+      if (size === 0xffffffff) throw new Error('too_large');
+      total += size;
+      if (total > BOOK_MAX_BYTES) throw new Error('too_large');
+      at += 46 + dv.getUint16(at + 28, true) + dv.getUint16(at + 30, true) + dv.getUint16(at + 32, true);
+    }
+    return total;
+  }
+
   /* Read an EPUB: { chapters: [ { path, html, css } ] }, in reading order.
      Each picture, font and stylesheet a chapter names is put inside it as
      a data: address; scripts are left out. Throws when it is not a book. */
   function readBook(bytes, zip) {
     var lib = zip || w.fflate;
+    unzippedSize(bytes);
     var files = lib.unzipSync(bytes);
     var types = {};
     var dataOf = function (path) {
@@ -400,6 +436,9 @@
                   try {
                     book = readBook(bytes, lib);
                   } catch (e) {
+                    if (e instanceof Error && e.message === 'too_large') {
+                      return say('This book is too large to open here; use Save to Phone.');
+                    }
                     return say('This book couldn’t be opened here. Save it to your phone to read it in a book app.');
                   }
                   sealed({ fv: 'handout-show', mode: 'book', chapters: book.chapters });
@@ -492,6 +531,8 @@
       return !!open_;
     },
     readBook: readBook,
+    unzippedSize: unzippedSize,
+    BOOK_MAX_BYTES: BOOK_MAX_BYTES,
     FRAME_URL: FRAME_URL,
     SANDBOX: SANDBOX,
   };

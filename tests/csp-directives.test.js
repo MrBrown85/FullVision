@@ -55,9 +55,15 @@ describe('Content-Security-Policy', () => {
     expect(d['frame-ancestors']).toBe("'self'");
     expect(d['default-src']).toBe("'none'");
     expect(d['form-action']).toBe("'none'");
-    expect(d['script-src']).not.toMatch(/'self'|nonce|http:(?!\/)/);
-    expect(d['img-src']).toBe('https: data: blob:');
-    expect(d['connect-src']).toBe('https:');
+    expect(d['script-src']).toBe("'unsafe-inline' 'unsafe-eval' data: blob:");
+    // Nothing from the internet (Colin's privacy call, Nov 17 2026): inline and data: only.
+    expect(d['img-src']).toBe('data: blob:');
+    expect(d['style-src']).toBe("'unsafe-inline' data: blob:");
+    expect(d['font-src']).toBe('data: blob:');
+    expect(d['media-src']).toBe('data: blob:');
+    expect(d['connect-src']).toBe("'none'");
+    expect(d['frame-src']).toBe("'none'");
+    expect(res.headers.get('Content-Security-Policy')).not.toMatch(/https?:|\*/);
     expect(res.headers.get('x-frame-options')).toBeNull();
     expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     // Any other page keeps the nonce policy, and cannot be framed.
