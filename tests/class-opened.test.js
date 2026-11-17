@@ -204,3 +204,58 @@ describe('when the stamp fails', () => {
     expect(_ECHO_SAFE_RPCS.note_course_opened).toBe(true);
   });
 });
+
+/* An archived class is never the class on screen (getActiveCourse skips it),
+   so Class Settings notes the class the teacher picks or opens there. */
+describe('Class Settings', () => {
+  let mounts;
+  let saved;
+  beforeEach(() => {
+    mounts = {
+      main: { innerHTML: '' },
+      'sidebar-mount': { innerHTML: '', style: {}, removeAttribute() {} },
+      'page-toolbar-mount': { innerHTML: '' },
+    };
+    saved = { getElementById: document.getElementById, setUrl: Router.setUrl };
+    document.getElementById = id => mounts[id] || saved.getElementById(id);
+    Router.setUrl = () => {};
+  });
+  afterEach(() => {
+    DashClassManager.resetState();
+    document.getElementById = saved.getElementById;
+    Router.setUrl = saved.setUrl;
+  });
+  const open = cid => {
+    DashClassManager.resetState();
+    DashClassManager.configure({ activeCourse: A, onRender() {}, onCourseChange() {} });
+    DashClassManager.openClassManager('details', cid);
+  };
+  const pick = cid => DashClassManager.handleAction('cmSelectClass', { tagName: 'BUTTON', dataset: { cid } });
+
+  it('an archived class picked in Class Settings is noted, once a day', async () => {
+    saveCourses({ [A]: { id: A, name: 'History 12' }, [B]: { id: B, name: 'Science 9', archived: true } });
+    expect(getActiveCourse()).toBe(A);
+    open();
+    await quiet();
+    pick(B);
+    await quiet();
+    pick(A);
+    pick(B);
+    await quiet();
+    expect(stamps().map(p => p.p_course_id)).toEqual([A, B]);
+  });
+
+  it('a class only ever opened there (from its address) is noted', async () => {
+    open(B);
+    await quiet();
+    expect(stamps().map(p => p.p_course_id)).toEqual([B]);
+  });
+
+  it('the classes it loads in the background are not', async () => {
+    open();
+    await quiet();
+    await preloadClasses();
+    await quiet();
+    expect(stamps().map(p => p.p_course_id)).toEqual([A]);
+  });
+});
