@@ -13785,11 +13785,12 @@ window.PageAssignments = (function () {
           )) + _cardPrintItem(cid, a);
     // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
-    if (!a.isDraft && !focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
+    var workShown = !a.isDraft && !focusStudentId && GraderWork.workShown(cid, a);
+    if (workShown && window.WorkWall)
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
     // Add Work for the Class (teacher/add-work-class.js): where the row's +
     // (Attach Work) is offered, never while one student is focused.
-    if (!a.isDraft && !focusStudentId && window.AddWorkClass && AddWorkClass.offered(cid, a))
+    if (workShown && window.AddWorkClass && AddWorkClass.offered(cid, a, true))
       html += _cardMenuItem(
         'data-action="openAddWorkClass" ' + aid,
         LINE_ICONS.plus,

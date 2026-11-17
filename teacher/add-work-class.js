@@ -446,8 +446,12 @@ window.AddWorkClass = (function () {
     });
   }
 
-  function offered(cid, a) {
-    if (!cid || !a || a.isDraft || !window.GraderWork || !GraderWork.workShown(cid, a)) return false;
+  // shown: true when the caller has asked GraderWork.workShown already (a card's menu).
+  function offered(cid, a, shown) {
+    if (!cid || !a || a.isDraft || !window.GraderWork) return false;
+    if (shown !== true && !GraderWork.workShown(cid, a)) return false;
+    // Only a pair or group piece can leave nobody to list; a card's menu draws this for every piece.
+    if (a.collaboration !== 'pair' && a.collaboration !== 'group') return true;
     return students(cid, a).length > 0;
   }
 
@@ -1389,7 +1393,7 @@ window.AddWorkClass = (function () {
     overlay.addEventListener('dragstart', _dragStart);
     overlay.addEventListener('dragend', _dragEnd);
     document.addEventListener('keydown', _keydown, true);
-    window.addEventListener('beforeunload', _beforeUnload);
+    if (window.addEventListener) window.addEventListener('beforeunload', _beforeUnload);
     _draw();
     var back = overlay.querySelector('.awc-back');
     if (back) back.focus();
@@ -1401,7 +1405,7 @@ window.AddWorkClass = (function () {
     if (!s) return;
     _s = null;
     document.removeEventListener('keydown', _keydown, true);
-    window.removeEventListener('beforeunload', _beforeUnload);
+    if (window.removeEventListener) window.removeEventListener('beforeunload', _beforeUnload);
     s.stage.rows().forEach(function (r) {
       _release(s, r.pieces);
     });
