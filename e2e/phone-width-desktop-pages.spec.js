@@ -246,8 +246,15 @@ test('the photos sentence fits a phone, and the Dashboard has no photo line', as
   await page.waitForSelector('#main .dash-glance', { timeout: 10000 });
   await expect(page.locator('.photo-reminder')).toHaveCount(0);
   await page.goto('/dashboard?manage=student-page&course=sci8');
-  const line = page.locator('#sp-photos-stay');
-  await expect(line).toBeVisible();
-  const box = await line.boundingBox();
-  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  await expect(page.locator('#sp-photos-stay')).toBeVisible();
+  // Read in one step: Student Cards draws Class Settings again when its list
+  // is read (teacher/student-cards.js), which can replace the sentence between
+  // a locator's two calls. The sentence's right edge, once it is laid out.
+  const right = () =>
+    page.evaluate(() => {
+      const el = document.getElementById('sp-photos-stay');
+      const r = el && el.getBoundingClientRect();
+      return r && r.width > 0 ? r.right : null;
+    });
+  await expect.poll(right).toBeLessThanOrEqual(375);
 });
