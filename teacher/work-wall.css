@@ -656,6 +656,12 @@
   font-size: 13px;
   line-height: 1.4;
 }
+/* Nothing in it moves: fitting it measures each size at once, and the
+   reduced-motion rule would otherwise turn every change into a transition. */
+.wr-card,
+.wr-card * {
+  transition-property: none;
+}
 .wr-head {
   flex: none;
   display: flex;
@@ -831,22 +837,13 @@
   font-size: 13px;
   color: var(--text-3);
 }
-/* Too tall for the window: the levels not given shorten, then go. */
-.wr-card.is-tight .wr-cell:not(.is-on) .wr-desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.wr-card.is-tighter .wr-cell:not(.is-on) .wr-desc,
-.wr-card.is-tighter .wr-cell:not(.is-on) .wr-check:not(.is-on) {
-  display: none;
-}
-.wr-card.is-tightest .wr-table th,
-.wr-card.is-tightest .wr-table td {
+/* Too tall for the window: smaller type, then work-rubric-card.js draws
+   the whole table smaller. Every level stays. */
+.wr-card.is-tight .wr-table th,
+.wr-card.is-tight .wr-table td {
   padding: 4px 6px;
   font-size: 10.5px;
 }
-.wr-card.is-tightest .wr-mark {
+.wr-card.is-tight .wr-mark {
   font-size: 10.5px;
 }
