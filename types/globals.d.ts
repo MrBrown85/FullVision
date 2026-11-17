@@ -106,6 +106,7 @@ interface Window {
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
   CmTerms: unknown;
+  CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
   ReportPrintPaper: unknown;

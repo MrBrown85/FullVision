@@ -2,6 +2,15 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Grading tab: each preset says what it does, and the Course Percentage bar drags (2026-11-17)
+
+Colin: "In Points and Proficiency slider, there should be a better explanation of what BC Letter Bands and Match Columns means. And let users grab the edges of the course percentage visualizer so they can adjust them graphically, too." (Colin, 2026-11-17.) The Points and Proficiency % tabs and markers already dragged and took the arrow keys; nothing on screen said so. The bar under the Course Percentage heading, the categories' weights, did not drag. Colin saw the mockup (https://claude.ai/artifact/5CadFs5nBM3FzNEFzwdwUP) and answered "Yes, build it" to its recommendation: the Course Percentage bar is the one that drags, and Points and Proficiency gets a line saying its own bar drags.
+
+- **Each preset button has a sentence beside it** with the numbers it would save for this class: BC Letter Bands (Extending 100% (A), Proficient 80% (B), Proficient + 86% (A), Developing 63% (C), Emerging 45% (F); the bands don't move), Match Columns (each marker where its band starts, from the class's own bands; Extending halfway to 100%), and Reset to Defaults. A line under the label says the markers are what a score counts as in the course % and the bands are the proficiency a points score shows as. Letters come from `percentageToLetter`.
+- **A line between two categories drags** (mouse, pen or touch) or moves by the arrow keys (Shift: 5%), in whole percents from 0, moving weight between those two categories only, so the total stays. A drag types both numbers into their boxes through `cmCatWeightLive`: nothing saves until Save Categories, which saves what typing them would (`tests/grading-bars.test.js`). Typing a weight moves the bar.
+- **No grade math changes.** Match Columns' formula moved unchanged to `teacher/cm-grading-bars.js`; what each preset and band produces is as before.
+- Smaller choices made by the recommendation, not ruled by Colin (Handoff review rulings 4; easy to reverse): the sentences' wording; the button keeps the name Match Columns; the bar is 32px tall with each category's name and % on it; its shades changed so the text on each passes 4.5:1; a drag can take a category to 0%.
+
 ## Start-up draws the saved class list first (2026-11-13)
 
 Before anything drew on a repeat visit, three requests ran one after another: the sign-in re-check (`sb.auth.getUser()`, which stops a forged or revoked session), `bootstrap_teacher`, then `list_teacher_courses`. Decision 23 of the handoff review plan (`plans/handoff-review-plan.md`) asked whether the re-check may run beside the class load instead of before it. Colin consulted the council (OWASP and the privacy commissioner's office are the members for this one).
