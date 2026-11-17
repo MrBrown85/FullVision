@@ -691,8 +691,11 @@ window.StudentPageView = (function () {
     );
   }
 
-  function resourcesHtml(p) {
-    var list = Array.isArray(p.resources) ? p.resources : [];
+  // The handouts and links, or (`linksOnly`: the handouts are in the card's carousel) the links alone.
+  function resourcesHtml(p, linksOnly) {
+    var list = (Array.isArray(p.resources) ? p.resources : []).filter(function (r) {
+      return !linksOnly || (r && r.kind !== 'handout');
+    });
     if (!list.length) return '';
     var id = domId(p.id) + '-res';
     return (
@@ -840,6 +843,8 @@ window.StudentPageView = (function () {
   function cardHtml(p, picked, view) {
     var todo = p.kind === 'due' || p.kind === 'missing';
     var tags = pills(p);
+    // A card still to do shows its handout's pages to swipe through (s/page-carousel.js), above the Description.
+    var car = todo && typeof StudentPageCarousel !== 'undefined' ? StudentPageCarousel.html(p) : '';
     return (
       '<article class="sp-piece sp-piece-' +
       kindOf(p) +
@@ -856,10 +861,11 @@ window.StudentPageView = (function () {
       esc(p.title) +
       '</h2>' +
       (tags ? '<div class="sp-piece-tags">' + tags + '</div>' : '') +
+      car +
       ((todo || p.kind === 'sent' || p.kind === 'revise') && p.description
         ? '<p class="sp-piece-about">' + esc(p.description) + '</p>'
         : '') +
-      (todo || p.kind === 'revise' ? resourcesHtml(p) : '') +
+      (todo || p.kind === 'revise' ? resourcesHtml(p, !!car) : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) : '') +
       (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
@@ -2297,19 +2303,32 @@ window.StudentPageView = (function () {
       goHome(next, hp, view);
       next.handout = hr.id;
       next.handoutPiece = hp.id;
-      next.handoutPage = 0;
+      // A page tapped in the card's carousel opens at that page.
+      var hpage = Number(attr('data-page'));
+      next.handoutPage = hpage >= 0 && hpage < hr.pages && Math.floor(hpage) === hpage ? hpage : 0;
       // Pages fetched for another handout are not this one's.
       if (next.handoutPages && next.handoutPages.id !== hr.id) next.handoutPages = null;
       return { ui: next, focus: '#sp-handout-title', handout: { piece: hp.id, resource: hr.id } };
     }
     if (act === 'handout-close') {
-      var was2 = { piece: next.handoutPiece, resource: next.handout };
+      var was2 = { piece: next.handoutPiece, resource: next.handout, page: Number(next.handoutPage) || 0 };
+      var wasP = view && was2.piece ? pieceIn(view.work, was2.piece) : null;
+      var inCar =
+        !!wasP &&
+        wasP.id === was2.piece &&
+        typeof StudentPageCarousel !== 'undefined' &&
+        StudentPageCarousel.shows(wasP);
       next.handout = '';
       next.handoutPiece = '';
       next.handoutPage = 0;
       return {
         ui: next,
-        focus: was2.resource ? '[data-act="handout"][data-resource="' + cssId(was2.resource) + '"]' : '.sp-segment-on',
+        // Back on the card: its carousel at the page the student was on, or the handout's row.
+        focus: !was2.resource
+          ? '.sp-segment-on'
+          : inCar
+            ? '.sp-car-slide[data-resource="' + cssId(was2.resource) + '"][data-page="' + was2.page + '"]'
+            : '[data-act="handout"][data-resource="' + cssId(was2.resource) + '"]',
       };
     }
     if (act === 'handout-page') {

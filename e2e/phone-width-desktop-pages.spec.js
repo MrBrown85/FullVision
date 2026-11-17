@@ -229,9 +229,10 @@ test('Progress Reports fits a phone', async ({ page }) => {
   await expect(page.locator('#studio-palette [data-action="oneSwitch"]').first()).toBeVisible();
 });
 
-// The one-week photo reminder (S8-F1) on the Dashboard fits a phone, with Send
-// Work and the build switch on a week before June 30.
-test('the photo reminder line fits a phone', async ({ page }) => {
+// Class Settings › Student Page's sentence on how long photos stay fits a
+// phone, with Send Work and the build switch on. The Dashboard has no photo
+// line any more (Keep Photos Until and its reminder went on Nov 17 2026).
+test('the photos sentence fits a phone, and the Dashboard has no photo line', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2027-06-25T10:00:00'));
   await openDesktop(page, '/dashboard');
   await page.waitForFunction(cid => getCourseSubmissions(cid).submissions.length === 16, 'sci8', { timeout: 15000 });
@@ -243,8 +244,17 @@ test('the photo reminder line fits a phone', async ({ page }) => {
   }, 'sci8');
   await page.goto('/dashboard');
   await page.waitForSelector('#main .dash-glance', { timeout: 10000 });
-  const line = page.locator('#dash-photo-reminder');
-  await expect(line).toBeVisible();
-  const box = await line.boundingBox();
-  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  await expect(page.locator('.photo-reminder')).toHaveCount(0);
+  await page.goto('/dashboard?manage=student-page&course=sci8');
+  await expect(page.locator('#sp-photos-stay')).toBeVisible();
+  // Read in one step: Student Cards draws Class Settings again when its list
+  // is read (teacher/student-cards.js), which can replace the sentence between
+  // a locator's two calls. The sentence's right edge, once it is laid out.
+  const right = () =>
+    page.evaluate(() => {
+      const el = document.getElementById('sp-photos-stay');
+      const r = el && el.getBoundingClientRect();
+      return r && r.width > 0 ? r.right : null;
+    });
+  await expect.poll(right).toBeLessThanOrEqual(375);
 });

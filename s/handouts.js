@@ -1,21 +1,21 @@
 /* A teacher's handout, opened on the student's page (Handouts and Links;
    the board "What the Student Sees (Phone)").
 
-   The card's For This Assignment (s/page-view.js) lists the piece's
-   handout and links. A link opens in a new tab and needs nothing here. The
-   handout opens in the page, one page at a time, as See Your Work does
-   (s/feedback.js): app.js has already opened it (StudentPageView.press);
-   this file fetches its pages.
+   On a card still to do, the handout's pages show in the card to swipe
+   through (s/page-carousel.js); on a Needs Revision card, For This
+   Assignment (s/page-view.js) lists the handout. Either way a tap opens it
+   in the page, one page at a time, as See Your Work does (s/feedback.js):
+   app.js has already opened it (StudentPageView.press); this file fetches
+   its pages, for the open handout and for the carousels.
 
    A real card asks `handout-links` (supabase/functions/student-submit/
    handout-routes.ts, student_submit.handout_links) through
    StudentPage.askClass, which adds the device's session: { ok, pages: [ {
-   page, url } ] }, each url a link signed for 60 seconds. Each page is
-   fetched at once and shown from a blob: address (the Content Security
+   page, url } ] }, each url a link signed for 60 seconds. A page is fetched
+   when it is wanted and shown from a blob: address (the Content Security
    Policy allows blob: and not the storage host); the addresses are let go
-   on Log Out, another class or another card. Demo Mode's sample handout
-   (Disease Research Poster's Poster Checklist) is the site's own pictures,
-   so it asks nothing.
+   on Log Out, another class or another card. Demo Mode's sample handouts
+   are the site's own pictures, so they ask nothing.
 
    Every answer is checked against the screen that asked before it draws:
    the handout must still be open, for the same student, from the same ask. */
@@ -75,21 +75,65 @@
 
   /* Fast (Colin, 2026-11-16: "it should be extremely fast and snappy").
      A handout's pages are kept for the session once fetched, so opening it
-     again is instant; its first page shows as soon as it lands, the rest
-     filling in behind it; and once the page is up, the handouts on the
-     student's Outstanding and Upcoming cards are fetched ahead (up to
-     WARM_MAX), so a tap usually finds them here. kept: resource id →
-     { student, state: 'loading' | 'ready' | 'failed', pages: [ { url } ],
-     done }. */
+     again is instant, and each page shows as soon as it lands. kept:
+     resource id → { student, piece, links (the route's addresses, by page),
+     linksAt (when they were signed), asking (the route's answer on its
+     way), getting (page → its picture on its way), pages: [ { url } ],
+     missed (pages that did not come), count, failed }.
+
+     The pages on a card still to do come from here too, one at a time
+     (s/page-carousel.js asks for the page a card shows as it comes near the
+     screen, and the next once the student is looking): `handout-links` is
+     asked once per handout, and again only when its links have run out.
+     Each link is signed for 60 seconds (send-routes.ts LINK_SECONDS), so a
+     page wanted after LINK_FRESH ms asks for new links first, and a page
+     whose link fails is asked for again once, with new links, quietly. The
+     route has no rate limit of its own (student_submit.handout_links reads
+     and counts nothing), so a student scrolling a long list cannot run into
+     one. */
   var kept = {};
   var WARM_MAX = 4;
+  var LINK_FRESH = 45000;
+  var RETRY_AFTER = 15000;
 
-  // Demo Mode's sample handout: its pages are the site's own pictures.
+  // Demo Mode's sample handouts: their pages are the site's own pictures.
   var DEMO_PAGES = {
     'demo-res-checklist': [
       '../assets/sample-handouts/poster-checklist-1.jpg',
       '../assets/sample-handouts/poster-checklist-2.jpg',
     ],
+    'demo-res-study': ['../assets/sample-handouts/study-guide-1.svg', '../assets/sample-handouts/study-guide-2.svg'],
+    'demo-res-planner': [
+      '../assets/sample-handouts/proposal-planner-1.svg',
+      '../assets/sample-handouts/proposal-planner-2.svg',
+    ],
+    'demo-res-safety': ['../assets/sample-handouts/safety-checklist-1.svg'],
+  };
+
+  /* #demo-card-feed (s/app.js): a long list still to do, so the cards'
+     carousels can be seen fetching their pages only as they come near the
+     screen: five more pieces Missing after the Quick Check, then one due
+     today with the Proposal Planner. isoDay: app.js's day `n` from today. */
+  StudentPage.demoFeed = function (isoDay) {
+    var names = [
+      'Body Systems Vocabulary',
+      'Digestion Diagram',
+      'Heart Rate Lab',
+      'Lung Capacity Data',
+      'Nerve Signal Quiz',
+    ];
+    return names
+      .map(function (title, i) {
+        return { id: 'demo-feed-' + (i + 1), title: title, date: isoDay(-6), due_date: isoDay(-4), status: 'NS' };
+      })
+      .concat({
+        id: 'demo-feed-review',
+        title: 'Body Systems Review',
+        date: isoDay(-3),
+        due_date: isoDay(0),
+        about: 'Plan a short review of one body system for the class.',
+        resources: [{ id: 'demo-res-planner', kind: 'pdf', title: 'Proposal Planner', url: null, page_count: 2 }],
+      });
   };
 
   // Is the handout still open on resource `id`, for this student?
@@ -97,44 +141,66 @@
     return !!S && S.screen === 'assignments' && S.handout === id && !!S.page && S.page.student.id === student;
   }
 
+  // What the open handout shows: loading until a page is here, failed when none can come.
+  function stateOf(k) {
+    if (k.failed) return 'failed';
+    var got = k.pages.some(function (pg) {
+      return pg && pg.url;
+    });
+    if (got) return 'ready';
+    if (k.count && Object.keys(k.missed).length >= k.count) return 'failed';
+    return 'loading';
+  }
+
   // The open handout drawn from what is kept: a page that landed shows at once.
   function show(id, student) {
     var k = kept[id];
     if (!k || !showing(id, student)) return;
-    var first = k.pages[0] && k.pages[0].url;
-    var state = k.state === 'failed' ? 'failed' : first || k.done ? 'ready' : 'loading';
+    var state = stateOf(k);
     var had = S.handoutPages;
     S.handoutPages = { id: id, state: state, pages: k.pages.slice(), asked: asked };
     // Drawn again only when what shows changes, so the keyboard stays where it is.
     if (!had || had.id !== id || had.state !== state || state === 'ready') StudentPage.paint('#sp-handout-title');
   }
 
-  /* Fetch handout `id` into kept (or reuse it). `open`: the student is
-     looking at it, so each page that lands is drawn. */
-  function fetchHandout(id, piece, student, open) {
+  // What is kept of handout `id` for this student, started if need be.
+  function entry(id, piece, student) {
     var k = kept[id];
-    if (k && k.student === student && k.state !== 'failed') {
-      if (open) show(id, student);
-      return;
-    }
-    if (S.demo) {
+    if (k && k.student === student) return k;
+    k = kept[id] = {
+      student: student,
+      piece: piece,
+      links: null,
+      linksAt: 0,
+      asking: null,
+      getting: {},
+      pages: [],
+      missed: {},
+      count: 0,
+      failed: false,
+      failedAt: 0,
+    };
+    if (S && S.demo) {
       var demoPages = DEMO_PAGES[id] || [];
-      kept[id] = {
-        student: student,
-        state: demoPages.length ? 'ready' : 'failed',
-        pages: demoPages.map(function (u) {
-          return { url: u };
-        }),
-        done: true,
-      };
-      if (open) show(id, student);
-      return;
+      k.count = demoPages.length;
+      k.failed = !demoPages.length;
+      k.pages = demoPages.map(function (u) {
+        return { url: u };
+      });
     }
-    k = kept[id] = { student: student, state: 'loading', pages: [], done: false };
-    if (open) show(id, student);
-    var body = { enrollment_id: student, assessment_id: piece, resource_id: id };
-    StudentPage.whileCurrent(answerOf(body)).then(function (res) {
-      if (kept[id] !== k) return;
+    return k;
+  }
+
+  /* The handout's links, by page (null when the route refused or failed):
+     the ones kept while they are fresh, or asked for (`again`: asked for
+     anew whatever is kept). One ask at a time. */
+  function linksOf(k, id, again) {
+    if (!again && k.links && Date.now() - k.linksAt < LINK_FRESH) return Promise.resolve(k.links);
+    if (k.asking) return k.asking;
+    var body = { enrollment_id: k.student, assessment_id: k.piece, resource_id: id };
+    k.asking = StudentPage.whileCurrent(answerOf(body)).then(function (res) {
+      k.asking = null;
+      if (kept[id] !== k) return null;
       var list =
         res && res.ok === true && Array.isArray(res.pages)
           ? res.pages
@@ -147,49 +213,114 @@
               })
           : null;
       if (!list || !list.length) {
-        k.state = 'failed';
-        k.done = true;
+        // Links that came once still stand for the pages already here.
+        if (!k.links) {
+          k.failed = true;
+          k.failedAt = Date.now();
+        }
+        return null;
+      }
+      k.links = list.map(function (pg) {
+        return pg.url;
+      });
+      k.linksAt = Date.now();
+      k.count = list.length;
+      for (var n = k.pages.length; n < k.count; n++) k.pages.push({ url: '' });
+      return k.links;
+    });
+    return k.asking;
+  }
+
+  // Page i kept as this device's own copy, or marked as one that did not come.
+  function keep(k, id, i, blob) {
+    var u = blob ? objectUrl(new Blob([blob], { type: 'image/jpeg' })) : '';
+    if (u) {
+      for (var n = k.pages.length; n <= i; n++) k.pages.push({ url: '' });
+      k.pages[i] = { url: u };
+      delete k.missed[i];
+    } else {
+      k.missed[i] = true;
+    }
+    if (showing(id, k.student)) show(id, k.student);
+    return u;
+  }
+
+  /* Page i of handout `id` (from 0): its address on this device, or ''
+     when it did not come. A link that fails is asked for again once. */
+  function pageOf(k, id, i) {
+    if (k.pages[i] && k.pages[i].url) return Promise.resolve(k.pages[i].url);
+    if (S && S.demo) return Promise.resolve('');
+    if (k.getting[i]) return k.getting[i];
+    var mine = linksOf(k, id, false)
+      .then(function (links) {
+        if (!links || !links[i]) return null;
+        return picture(links[i]).then(function (blob) {
+          if (blob || kept[id] !== k) return blob;
+          return linksOf(k, id, true).then(function (again) {
+            return again && again[i] ? picture(again[i]) : null;
+          });
+        });
+      })
+      .then(function (blob) {
+        if (k.getting[i] === mine) delete k.getting[i];
+        return kept[id] === k ? keep(k, id, i, blob) : '';
+      });
+    k.getting[i] = mine;
+    return mine;
+  }
+
+  /* Fetch every page of handout `id` into kept (or reuse it). `open`: the
+     student is looking at it, so each page that lands is drawn. */
+  function fetchHandout(id, piece, student, open) {
+    var k = entry(id, piece, student);
+    if (open) show(id, student);
+    if (S.demo) return;
+    linksOf(k, id, false).then(function (links) {
+      if (kept[id] !== k) return;
+      if (!links) {
         if (showing(id, student)) show(id, student);
         return;
       }
-      k.pages = list.map(function () {
-        return { url: '' };
-      });
-      var left = list.length;
-      var got = 0;
-      list.forEach(function (pg, i) {
-        picture(pg.url).then(function (blob) {
-          if (kept[id] !== k) return;
-          var u = blob ? objectUrl(new Blob([blob], { type: 'image/jpeg' })) : '';
-          if (u) {
-            k.pages[i] = { url: u };
-            got += 1;
-          }
-          left -= 1;
-          if (!left) {
-            k.done = true;
-            k.state = got ? 'ready' : 'failed';
-          } else if (got) {
-            k.state = 'ready';
-          }
-          if (showing(id, student)) show(id, student);
-        });
+      links.forEach(function (u, i) {
+        pageOf(k, id, i);
       });
     });
   }
+
+  /* The pages a card's carousel shows (s/page-carousel.js): known gives
+     what is already here, load fetches one page. Quiet: a page that does
+     not come is ''. */
+  var source = {
+    known: function (id, i) {
+      var k = S && S.page ? kept[id] : null;
+      return k && k.student === S.page.student.id && k.pages[i] && k.pages[i].url ? k.pages[i].url : '';
+    },
+    load: function (piece, id, i) {
+      if (!S || !S.page || !id) return Promise.resolve('');
+      var k = entry(id, piece, S.page.student.id);
+      if (k.failed && !k.links) {
+        // The route did not answer: tried again when the card comes back, at most every RETRY_AFTER ms.
+        if (S.demo || Date.now() - k.failedAt < RETRY_AFTER) return Promise.resolve('');
+        k.failed = false;
+      }
+      return pageOf(k, id, Number(i) || 0);
+    },
+  };
 
   function load(id, piece) {
     if (!S || !S.page || !id) return;
     asked += 1;
     var student = S.page.student.id;
     // Try Again starts over.
-    if (kept[id] && kept[id].state === 'failed') delete kept[id];
+    if (kept[id] && stateOf(kept[id]) === 'failed') delete kept[id];
     S.handoutPages = { id: id, state: 'loading', pages: [], asked: asked };
     fetchHandout(id, piece, student, true);
     if (S.handoutPages && S.handoutPages.state === 'loading') StudentPage.paint('#sp-handout-title');
   }
 
-  // The handouts on the student's cards still to do, fetched ahead (a real card; Demo Mode's are on the device).
+  /* The handouts on Needs Revision cards, fetched ahead (a real card; Demo
+     Mode's are on the device). A card still to do shows its pages in its
+     carousel, which fetches them as the card comes near the screen. */
   function warm() {
     if (!S || !S.page || S.demo || typeof StudentPage.viewOf !== 'function') return;
     var view = StudentPage.viewOf(S);
@@ -197,7 +328,7 @@
     var student = S.page.student.id;
     var n = 0;
     view.work.forEach(function (p) {
-      if (!/^(due|missing|revise)$/.test(p.kind)) return;
+      if (p.kind !== 'revise') return;
       (p.resources || []).forEach(function (r) {
         if (r.kind !== 'handout' || n >= WARM_MAX || kept[r.id]) return;
         n += 1;
@@ -233,6 +364,11 @@
     file: 'handouts',
     render: {},
     click: onClick,
+    // Once the page is drawn: the cards' carousels are watched, and fetch their pages as they come near.
+    drawn: function (root, state) {
+      if (state.screen !== 'assignments' || typeof StudentPageCarousel === 'undefined') return;
+      StudentPageCarousel.attach(root, source);
+    },
     share: function (state) {
       // A new state is a sign-out: the last student's pictures go with it.
       if (state !== S) forgetAll();
@@ -240,6 +376,7 @@
     },
     test: {
       // Tests answer `handout-links` themselves (to hold one, or fail it); null puts the real route back.
+      handoutSource: source,
       setHandoutAnswer: function (fn) {
         answerFn = fn;
       },

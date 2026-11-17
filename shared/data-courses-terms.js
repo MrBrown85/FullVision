@@ -416,6 +416,76 @@ async function switchActiveCourse(cid) {
   return gen === _switchGeneration;
 }
 
+/* ── A class opened (migrations/2026111704) ────────────────────
+   The nightly job deletes a class's photos once it has gone a year without
+   being opened (DECISIONS, "Photos stay with the class", Nov 17 2026), so
+   the class on screen tells the server it was opened: note_course_opened,
+   through the outbox (a failure shows only on the sync dot), at most once a
+   day per class on this device (gb-class-opened, cleared at sign-out).
+   initData calls noteClassOpenedSoon for every load, the class on screen's
+   among them; it sends only for the class on screen, after the load's
+   check has answered, so the load never waits on it. A class loaded in the
+   background (preloadClasses, a copy between classes) is not the class on
+   screen and is never noted. A class picked or opened in Class Settings is
+   noted too, archived or not: an archived class is never the class on
+   screen, and would otherwise lose its photos a year after it was archived
+   however often the teacher looked at it there. Nothing in Demo Mode, and nothing for a class
+   with no server id yet: a new class counts from when it was made. */
+var _CLASS_OPENED_KEY = 'gb-class-opened';
+var _classOpenedHere = { day: '', ids: {} }; // this visit's, kept too in case storage is blocked
+// The class load does not carry the stamp, so its echo needs no reload.
+_ECHO_SAFE_RPCS.note_course_opened = true;
+
+function _classOpenedToday() {
+  var d = new Date();
+  var day =
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  var seen = _classOpenedHere.day === day ? _classOpenedHere : { day: day, ids: {} };
+  try {
+    var saved = JSON.parse(localStorage.getItem(_CLASS_OPENED_KEY) || 'null');
+    if (saved && saved.day === day && saved.ids && typeof saved.ids === 'object')
+      seen = { day: day, ids: Object.assign({}, saved.ids, seen.ids) };
+  } catch (e) {
+    /* storage blocked or unreadable: this visit's list */
+  }
+  return seen;
+}
+
+// Sends the stamp for `cid` unless this device sent it today. True when sent.
+function noteClassOpened(cid) {
+  if (!_useSupabase || _isDemoSession() || !_isUuid(cid)) return false;
+  var seen = _classOpenedToday();
+  if (seen.ids[cid]) return false;
+  seen.ids[cid] = true;
+  _classOpenedHere = seen;
+  try {
+    localStorage.setItem(_CLASS_OPENED_KEY, JSON.stringify(seen));
+  } catch (e) {
+    /* storage blocked: this visit remembers it */
+  }
+  // _writeRpc, not the typed _rpcOrNoop: types/database.d.ts has the function once 2026111704 is applied.
+  _writeRpc('note_course_opened', { p_course_id: cid }).then(function (res) {
+    if (res && res.error && !res.error.handledSessionExpired) console.warn('note_course_opened failed:', res.error);
+  });
+  return true;
+}
+
+/* Noted once the class's check has answered. From initData only for the
+   class on screen; `picked` is a class the teacher picked or opened in Class
+   Settings (dash-class-manager.js), which may be archived and so never the
+   class on screen. */
+function noteClassOpenedSoon(cid, picked) {
+  if (!cid || (!picked && cid !== getActiveCourse())) return;
+  var check = _refreshState[cid] && _refreshState[cid].running;
+  Promise.resolve(check)
+    .catch(function () {
+      /* a failed check still opened the class */
+    })
+    .then(function () {
+      noteClassOpened(cid);
+    });
+}
+
 /* Class load timings, kept so changes to the load path can be measured on a
    real device. window.__fvPerf holds the last 50; set localStorage
    'fv-perf' to '1' to also log each one. */

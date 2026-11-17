@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /* S5-F1: the assessment form's Student Work card and Class Settings ›
-   Student Page's Send Work and Keep Photos Until, in Demo Mode, behind the
+   Student Page's Send Work and how long photos stay, in Demo Mode, behind the
    build switch and Send Work (docs/plans/student-page-build-plan.md S5).
    Board "Teacher: Student Work Settings on an Assessment" and "Teacher:
    Class Settings, Student Page". */
@@ -37,11 +37,13 @@ test('with Send Work off the form has no Student Work card; on, it does, and its
   await page.goto('/dashboard?manage=student-page&course=sci8');
   const sw = page.locator('#sp-send-switch');
   await expect(sw).not.toBeChecked();
-  // The sample has photos kept, so Keep Photos Until shows with Send Work off too (ruling 108's follow-up).
-  await expect(page.locator('#sp-keep-hint')).toContainText('Photos of student work in this class are deleted on');
+  // The sample has photos kept, so the sentence shows with Send Work off too; there is no choice to make.
+  await expect(page.locator('#sp-photos-stay')).toHaveText(
+    "Photos stay as long as this class exists. They're deleted when the class is deleted, or after a year without being opened.",
+  );
   await sw.check();
-  await expect(page.locator('#sp-keep-hint')).toContainText('Photos of student work in this class are deleted on');
-  await expect(page.locator('#sp-keep-end_of_year')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#sp-photos-stay')).toBeVisible();
+  await expect(page.locator('.sp-card')).not.toContainText('Keep Photos Until');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/S5-F1-class-settings-1366.png', fullPage: true });
 
   await editForm(page, aid);

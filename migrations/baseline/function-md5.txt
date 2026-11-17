@@ -54,7 +54,7 @@ public._markup_on_release() a7e8838702d000c42621d72bf8621dfb 742
 public._markup_on_return() ce8ceaa830617aa9caf935b161d7e379 703
 public._phone_report_json(p_id uuid) 9a4bdd3d2f08780ec90919777ada3089 798
 public._phone_report_put(p_report_id uuid, p_course_id uuid, p_students jsonb) 7f16fa3a62f1b0f6899b1731bf7de022 1031
-public._photo_keep_class(p_course_id uuid, p_now timestamp with time zone) fb78dde9520f84f0f58faa1bebf98c23 3422
+public._photo_keep_class(p_course_id uuid, p_now timestamp with time zone) 67d1ae88eeacd34543cc0a80f1055991 3729
 public._photo_keep_cutoff(p_course_id uuid, p_now timestamp with time zone) 57f0aac3911eb4657447a951232bed4a 1365
 public._photo_log(p_course_id uuid, p_kind text, p_n integer, p_detail jsonb) 53859922b32f0e4f2da95052edc130e2 322
 public._photo_missing(p_course_id uuid) d099b00a7d1a2997ee287dfdbb528c43 713
@@ -210,6 +210,7 @@ public.list_teacher_courses() f1580735b9f6001018e6f4b5596cfe54 904
 public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) 6a3caf6c0bfad3398bbb33a8ac1aa79a 2246
 public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) 2ee4ab4fe90971e69d1ee8083c3a9aa3 895
 public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) eb9e161daa032f3b272435ec52a0bc7a 4442
+public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) 0c9431bb6ff130f8de2715f8315838f1 1125
 public.photo_lifecycle_nightly() 7e3dc52c80eb21f50848d67011385a26 2609
 public.photo_removal_call() 08b22d449cc3312b31b975ee057fbc08 2010
 public.photo_removal_due() 3faf3499da0753407687386407c8b01f 481

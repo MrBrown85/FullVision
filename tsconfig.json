@@ -61,10 +61,15 @@
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
     "s/question-kinds.js",
+    "s/page-carousel.js",
     "teacher/cm-reflect-answers.js",
     "teacher/cm-reflect-builder.js",
     "shared/add-work-files.js",
+    "shared/name-match.js",
     "teacher/add-work-stage.js",
-    "teacher/add-work-class.js"
+    "teacher/add-work-split-model.js",
+    "teacher/add-work-split.js",
+    "teacher/add-work-class.js",
+    "teacher/add-work-tray.js"
   ]
 }

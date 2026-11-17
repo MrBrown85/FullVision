@@ -1842,6 +1842,7 @@ describe('data-idempotency-keys', () => {
         'import_roster_csv',
         'import_teams_class',
         'move_rubric_scores',
+        'note_course_opened',
         'reenrol_student',
         'remove_section',
         'restore_section',

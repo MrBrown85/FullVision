@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="/teacher/student.css" />
     <link rel="stylesheet" href="/teacher/work-wall.css" />
     <link rel="stylesheet" href="/teacher/add-work-class.css" />
+    <link rel="stylesheet" href="/teacher/add-work-split.css" />
     <link rel="stylesheet" href="/teacher/gradebook.css" />
     <link rel="stylesheet" href="/teacher/class-results.css" />
     <link rel="stylesheet" href="/teacher/observations.css" />
@@ -127,11 +128,13 @@
     <script src="/shared/photo-readers.js"></script>
     <!-- A teacher's files made into pages of work (Add Work, the row's +, Add Work for the Class) -->
     <script src="/shared/add-work-files.js"></script>
+    <script src="/shared/name-match.js"></script>
     <!-- Pictures of student work on the Work Wall and the Work tab -->
     <script src="/shared/work-thumbs.js"></script>
     <!-- Mark Up: drawing over a page of student work (S9) -->
     <script src="/shared/markup-draw.js"></script>
     <script src="/s/page-view.js"></script>
+    <script src="/s/page-carousel.js"></script>
     <script src="/teacher/ui.js"></script>
     <!-- seed-data.js (113KB) lazy-loaded by loadSeedIfNeeded() — only fetched for new accounts -->
     <!-- Submodules (loaded before their parent page modules) -->
@@ -185,7 +188,10 @@
     <script src="/teacher/work-rubric-card.js"></script>
     <!-- Add Work for the Class: paper work for every student of one piece (after add-work-files.js) -->
     <script src="/teacher/add-work-stage.js"></script>
+    <script src="/teacher/add-work-split-model.js"></script>
+    <script src="/teacher/add-work-split.js"></script>
     <script src="/teacher/add-work-class.js"></script>
+    <script src="/teacher/add-work-tray.js"></script>
     <script src="/shared/competency-wording.js"></script>
     <!-- grades-print.js and grading-setup-copy.js load the first time Print Grades
          or Copy Grading Setup is pressed, rubric-library.js and rubric-bank.js

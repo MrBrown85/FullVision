@@ -489,6 +489,8 @@
        is Proficient and Proficient (s/feedback.js keeps the request and the
        first version's grade). The Cell Microscope Lab is returned for
        revision there too. */
+    // #demo-card-feed: a long list still to do, the last with a handout (s/handouts.js demoFeed).
+    if (demo && demo.feed && StudentPage.demoFeed) cls.work = cls.work.concat(StudentPage.demoFeed(isoDay));
     if (demo && demo.revise) {
       cls.work.unshift({
         id: 'demo-vaccine',
@@ -575,8 +577,12 @@
           about:
             'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
           core: ['CT', 'CRT'],
-          // Handouts and Links: none on the sample card (its files name no other host).
-          resources: [],
+          // Two handouts, so the card's carousel shows one after the other (s/page-carousel.js);
+          // their pages are the site's own pictures (s/handouts.js). No link: the sample names no other host.
+          resources: [
+            { id: 'demo-res-planner', kind: 'pdf', title: 'Proposal Planner', url: null, page_count: 2 },
+            { id: 'demo-res-safety', kind: 'pdf', title: 'Lab Safety Checklist', url: null, page_count: 1 },
+          ],
         },
         {
           // A draft, never returned: the student sees the piece and its date only.
@@ -607,6 +613,8 @@
           score_mode: 'points',
           max_points: 12,
           status: 'NS',
+          // Missing, with the teacher's handout: its pages show on the card to swipe through.
+          resources: [{ id: 'demo-res-study', kind: 'pdf', title: 'Study Guide', url: null, page_count: 2 }],
         },
         {
           id: 'demo-energy',
@@ -2432,7 +2440,8 @@
     // #demo-card-revise: Send Work on, a piece returned for revision and a revision returned (S11-F2),
     // in a class graded by both, so Before and After shows the board's "2.7 · 67%" and "3.0 · 75%".
     // #demo-card-no-learning: Show My Learning off, so My Learning lists the work without the grade.
-    var m = /^demo-card(?:-(password|letter|both|send|reflect|group|revise|no-learning))?$/i.exec(hash || '');
+    // #demo-card-feed: a long list still to do, the last card with a handout (s/page-carousel.js).
+    var m = /^demo-card(?:-(password|letter|both|send|reflect|group|revise|no-learning|feed))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
@@ -2445,6 +2454,7 @@
       group: kind === 'group',
       revise: kind === 'revise',
       noLearning: kind === 'no-learning',
+      feed: kind === 'feed',
     };
     adding = null;
     S.demo = true;

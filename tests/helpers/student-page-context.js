@@ -226,6 +226,8 @@ export function openStudentPage(opts = {}) {
   if (opts.objectUrls) {
     let made = 0;
     sandbox.URL = { createObjectURL: () => 'blob:page/' + ++made, revokeObjectURL() {} };
+    // A page's picture, as the browser holds it (s/handouts.js makes a JPEG of each).
+    sandbox.Blob = Blob;
   }
   sandbox.window = sandbox;
   const ctx = vm.createContext(sandbox);

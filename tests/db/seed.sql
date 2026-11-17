@@ -171,6 +171,10 @@ begin
     insert into public.grade_return_repair_log (course_id, sqlstate, message) values (c, '00000', p_mark || ' Log');
     insert into public.photo_check_log (course_id, kind, n, detail) values (c, 'expired', 1, jsonb_build_object('m', p_mark));
     insert into public.photo_keep_check (course_id, checked_through, judged_choice) values (c, current_date, 'end_of_year');
+    -- When the class was last opened, once 2026111704 is applied (until then the table is missing).
+    if to_regclass('public.course_opened') is not null then
+        execute 'insert into public.course_opened (course_id) values ($1) on conflict do nothing' using c;
+    end if;
     insert into public.submission_file_removal (bucket, path, course_id, reason, link_dies_at)
     values ('student-photos', c || '/' || p_mark || '-gone.jpg', c, 'test', now());
     insert into student_submit.attempt (route, outcome, ip_hash, code_id, course_id) values ('card', 'ok', p_mark, code, c);

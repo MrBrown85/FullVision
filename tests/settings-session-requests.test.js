@@ -39,6 +39,11 @@ describe('one computer, one sitting in Class Settings', () => {
   it.skipIf(recordTo)('sends what it sent before the fix, but for the three things the fix changed', async () => {
     const main = JSON.parse(readFileSync(resolve(root, 'tests/fixtures/settings-session-main.json'), 'utf-8'));
     const run = await runSession();
+    // Opening the class notes it as opened, once a day on this device
+    // (migrations/2026111704). That request is new and is not a setting.
+    const opened = run.log.filter(e => e.name === 'note_course_opened');
+    expect(opened.length).toBe(1);
+    run.log = run.log.filter(e => e.name !== 'note_course_opened');
     const diff = compareLogs(main.log, run.log, main.start);
 
     expect(diff.notAllowed).toEqual([]);

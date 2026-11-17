@@ -300,10 +300,19 @@ declare var AddWorkFiles: {
   refusal(res: unknown): string;
   answer(res: { result?: string }): string;
 };
+// shared/name-match.js and teacher/add-work-tray.js (B3).
+declare var NameMatch: {
+  match(fileName: string, students: unknown[]): any;
+  compare(a: string, b: string): number;
+  plain(text: string): string;
+  FILLER: string[];
+};
+declare var AddWorkTray: { create(host: any): any; MAX_FILES: number };
 declare var AddWorkStage: {
   stage(list: { id: string; had?: string }[]): any;
   run(s: any, api: any, opts?: any): Promise<any>;
 };
+declare var AddWorkSplitModel: any; // teacher/add-work-split-model.js, for teacher/add-work-split.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
 declare var GraderWork: { workShown(cid: string, a: unknown): boolean };

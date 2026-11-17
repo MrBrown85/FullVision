@@ -1,0 +1,713 @@
+/**
+ * Add Work for the Class, B3 (docs/plans/add-work-for-class-plan.md):
+ * files dropped off a student or chosen from the tray, matched to students
+ * by name (shared/name-match.js), and the Waiting for a Student tray
+ * (teacher/add-work-tray.js). In Demo Mode, with PhotoShrink stubbed.
+ *
+ * A pile routed to students and the tray, natural order for one student's
+ * files, each tray action, a refused file, the counts and the leave
+ * question, placePieces, a single unnamed PDF opening a stubbed Split the
+ * Scan, Escape standing aside while it is open, folders, and that no file
+ * name reaches the data layer or the photo queue.
+ */
+import './setup.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseHTML } from 'linkedom';
+import { readFileSync } from 'fs';
+import { runInThisContext } from 'vm';
+import { U, seedClass, clearClass } from './helpers/pin-save-paths.js';
+
+const page = n => ({
+  blob: new Blob(['b' + n], { type: 'image/jpeg' }),
+  thumb: new Blob(['t' + n], { type: 'image/jpeg' }),
+  hash: String(n).padStart(64, 'a'),
+  width: 1500,
+  height: 2000,
+  name: 'page-' + n + '.jpg',
+});
+const pages = n => Array.from({ length: n }, (_, i) => page(i + 1));
+
+const CID = U(1);
+const PIECE = U(31);
+const GROUP = U(33);
+const Q = U(41);
+const NAMES = [
+  ['Avery', 'Chen'],
+  ['Liam', 'Chen'],
+  ['Mateo', 'Cruz'],
+  ['Priya', 'Kaur'],
+  ['Sam', 'Blackwood'],
+  ['Jordan', 'Reyes'],
+];
+const IDS = NAMES.map((_, i) => U(100 + i));
+const [AVERY, LIAM, MATEO, PRIYA, SAM, JORDAN] = IDS;
+
+let doc;
+let stubDocument;
+let wasDemo;
+let realPrepare;
+let realConfirm;
+
+const text = el => el.textContent.replace(/\s+/g, ' ').trim();
+const $ = sel => doc.querySelector(sel);
+const $$ = sel => [...doc.querySelectorAll(sel)];
+const click = el => el.dispatchEvent(new doc.defaultView.Event('click', { bubbles: true }));
+const rowOf = sid => $('.awc-row[data-awc-target="' + sid + '"]');
+const chipsOf = sid => [...rowOf(sid).querySelectorAll('.awc-file-name')].map(text);
+const items = () => $$('.awt-item');
+const itemNamed = name => items().find(el => text(el.querySelector('.awt-file-name')) === name);
+const tick = async (n = 5) => {
+  for (let i = 0; i < n; i++) await new Promise(r => setTimeout(r, 0));
+};
+// The photo queue, kept in memory: what it holds is what would upload.
+function memoryQueue() {
+  const kept = [];
+  const store = {
+    list: async () => kept.map(k => k.meta),
+    putAll: async list => list.forEach(i => kept.push(JSON.parse(JSON.stringify(i)))),
+    update: async () => {},
+    blobs: async () => null,
+    remove: async () => {},
+    clear: async () => {},
+  };
+  runInThisContext(readFileSync('shared/photo-queue.js', 'utf-8'), { filename: 'shared/photo-queue.js' });
+  window.PhotoQueue.configure({ store, isDemo: () => true, upload: async () => ({ error: null }) });
+  return kept;
+}
+const file = (name, extra) =>
+  Object.assign({ name, type: /\.pdf$/i.test(name) ? 'application/pdf' : 'image/jpeg' }, extra);
+
+function seed() {
+  seedClass(CID, {
+    students: NAMES.map(([firstName, lastName], i) => ({ id: IDS[i], firstName, lastName })),
+    learningMaps: {
+      subjects: [],
+      sections: [{ id: U(51), name: 'Question', tags: [{ id: Q, label: 'Question', text: 'Ask questions' }] }],
+      _customized: true,
+      _version: 1,
+      _flatVersion: 2,
+    },
+    assessments: [
+      { id: PIECE, title: 'Conscription', tagIds: [Q], date: '2026-10-20', dueDate: '2026-10-30' },
+      { id: GROUP, title: 'Group Poster', tagIds: [Q], collaboration: 'group', groups: [[LIAM, SAM]] },
+    ],
+    courseConfigs: { student_page_enabled: true, return_grades: 'on_save' },
+  });
+  COURSES[CID].name = 'Socials 10';
+  saveDemoStudentWork(CID, {
+    course: { send_work: true },
+    assessments: [
+      { id: PIECE, students_send: 'photos' },
+      { id: GROUP, students_send: 'photos' },
+    ],
+    submissions: [],
+  });
+  clearProfCache();
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  wasDemo = window.isDemoMode;
+  window.isDemoMode = () => true;
+  stubDocument = globalThis.document;
+  doc = parseHTML('<!DOCTYPE html><html><body><div id="main"></div></body></html>').document;
+  globalThis.document = doc;
+  realPrepare = PhotoShrink.prepare;
+  realConfirm = globalThis.showConfirm;
+  PhotoShrink.prepare = vi.fn(f =>
+    Promise.resolve(
+      f.refuse
+        ? { ok: false, reason: PhotoShrink.REASONS.OFFICE }
+        : {
+            ok: true,
+            pages: Array.from({ length: f.n || 1 }, (_, i) =>
+              Object.assign(page(i + 1), { name: f.name.replace(/\.\w+$/, '') + '-' + (i + 1) + '.jpg' }),
+            ),
+          },
+    ),
+  );
+  globalThis.showConfirm = vi.fn();
+  delete window.AddWorkSplit;
+  seed();
+});
+afterEach(() => {
+  AddWorkClass.close(true);
+  delete window.AddWorkSplit;
+  PhotoShrink.prepare = realPrepare;
+  globalThis.showConfirm = realConfirm;
+  globalThis.document = stubDocument;
+  clearClass(CID);
+  localStorage.clear();
+  window.isDemoMode = wasDemo;
+  vi.restoreAllMocks();
+});
+
+describe('a pile of files', () => {
+  it('certain names go on their students; the rest wait in the tray, each saying why', async () => {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([
+      file('Avery Chen.pdf', { n: 2 }),
+      file('Chen.pdf'),
+      file('Matteo C.jpg'),
+      file('SCAN0017.pdf'),
+      file('Priya K.jpg'),
+      file('Blackwood_Sam.pdf'),
+    ]);
+    expect(chipsOf(AVERY)).toEqual(['Avery Chen.pdf']);
+    expect(chipsOf(PRIYA)).toEqual(['Priya K.jpg']);
+    expect(chipsOf(SAM)).toEqual(['Blackwood_Sam.pdf']);
+    expect(chipsOf(LIAM)).toEqual([]);
+    expect(chipsOf(MATEO)).toEqual([]);
+    // In the order of their names.
+    expect(items().map(el => text(el.querySelector('.awt-file')))).toEqual([
+      'Chen.pdf · 1 page',
+      'Matteo C.jpg · 1 page',
+      'SCAN0017.pdf · 1 page',
+    ]);
+    expect(items().map(el => text(el.querySelector('.awt-why')))).toEqual([
+      'Two students are named Chen.',
+      'The spelling is close, not the same.',
+      'No name in the file name.',
+    ]);
+    expect(text($('.awt-count'))).toBe('3 files');
+    expect(text($('.awc-count'))).toBe('3 ready to add · 3 files waiting · 3 students with nothing to add stay Not In');
+    expect(text($('.awc-primary'))).toBe('Add Work for 3 Students');
+    // Each waiting file shows its first page.
+    expect(itemNamed('Chen.pdf').querySelector('.awt-pic img').getAttribute('alt')).toBe('First page of Chen.pdf');
+  });
+
+  it("one student's files go on in the natural order of their names", async () => {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Avery Chen 10.jpg'), file('Avery Chen 2.jpg'), file('avery chen 1.jpg')]);
+    expect(chipsOf(AVERY)).toEqual(['avery chen 1.jpg', 'Avery Chen 2.jpg', 'Avery Chen 10.jpg']);
+  });
+
+  it('a file dropped on a student still goes to that student, whatever it is called', async () => {
+    AddWorkClass.open(CID, PIECE);
+    const ev = new doc.defaultView.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'dataTransfer', {
+      value: { types: ['Files'], files: [file('Liam Chen.pdf')], items: [] },
+    });
+    rowOf(AVERY).dispatchEvent(ev);
+    await tick();
+    expect(chipsOf(AVERY)).toEqual(['Liam Chen.pdf']);
+    expect(chipsOf(LIAM)).toEqual([]);
+  });
+
+  it('a file dropped off a student is matched by name', async () => {
+    AddWorkClass.open(CID, PIECE);
+    const drop = $('[data-awt-drop]');
+    const over = new doc.defaultView.Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', { value: { types: ['Files'], files: [], dropEffect: '' } });
+    drop.dispatchEvent(over);
+    expect(drop.classList.contains('is-over')).toBe(true);
+    const ev = new doc.defaultView.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'dataTransfer', {
+      value: { types: ['Files'], files: [file('Liam Chen.pdf'), file('IMG_4471.jpg')], items: [] },
+    });
+    drop.dispatchEvent(ev);
+    await tick(10);
+    expect(chipsOf(LIAM)).toEqual(['Liam Chen.pdf']);
+    expect(items().map(el => text(el.querySelector('.awt-file-name')))).toEqual(['IMG_4471.jpg']);
+  });
+
+  it('says how far along it is while reading, and Add Work waits', async () => {
+    AddWorkClass.open(CID, PIECE);
+    const waits = [];
+    PhotoShrink.prepare = vi.fn(() => new Promise(r => waits.push(r)));
+    // Each file takes a second to read, as a real photo might.
+    let clock = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1000));
+    const going = AddWorkClass.takeFiles([file('Avery Chen.pdf'), file('Priya Kaur.pdf')]);
+    await tick();
+    expect(text($('.awc-primary'))).toBe('Reading 1 of 2…');
+    expect($('.awc-primary').disabled).toBe(true);
+    expect(text($('.awt-status'))).toBe('Reading 1 of 2…');
+    waits[0]({ ok: true, pages: pages(1) });
+    await tick();
+    expect(text($('.awc-primary'))).toBe('Reading 2 of 2…');
+    expect($('.awc-primary').disabled).toBe(true);
+    // One file at a time.
+    expect(PhotoShrink.prepare).toHaveBeenCalledTimes(2);
+    waits[1]({ ok: true, pages: pages(1) });
+    await going;
+    expect(text($('.awc-primary'))).toBe('Add Work for 2 Students');
+    expect($('.awc-primary').disabled).toBe(false);
+  });
+
+  it('passes over files that are not photos or PDFs, and hidden ones, and says so in one line', async () => {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([
+      file('Avery Chen.pdf'),
+      { name: 'notes.txt', type: 'text/plain' },
+      { name: 'class list.csv', type: 'text/csv' },
+      { name: '.DS_Store', type: '' },
+      { name: 'Thumbs', type: '', webkitRelativePath: 'Period 2/.hidden/Thumbs' },
+    ]);
+    expect(chipsOf(AVERY)).toEqual(['Avery Chen.pdf']);
+    expect(text($('.awt-status'))).toBe('2 files that aren’t photos or PDFs were passed over.');
+    expect(PhotoShrink.prepare).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads at most 300 files, with a plain line', async () => {
+    AddWorkClass.open(CID, PIECE);
+    const many = Array.from({ length: 305 }, (_, i) => file('SCAN' + String(i).padStart(4, '0') + '.jpg'));
+    await AddWorkClass.takeFiles(many);
+    expect(PhotoShrink.prepare).toHaveBeenCalledTimes(300);
+    expect(text($('.awt-status'))).toBe('Only the first 300 files were read. Add the rest after these.');
+  });
+
+  it('a refused file is listed with its reason and can be dismissed; it is not waiting', async () => {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Avery Chen essay.docx', { refuse: true, type: '' })]);
+    const it = items()[0];
+    expect(it.classList.contains('is-refused')).toBe(true);
+    expect(text(it.querySelector('.awt-why'))).toBe('Save it as a PDF first.');
+    expect(chipsOf(AVERY)).toEqual([]);
+    expect(text($('.awt-count'))).toBe('');
+    expect(text($('.awc-count'))).not.toMatch(/waiting/);
+    click(it.querySelector('[data-awt="off"]'));
+    expect(items().length).toBe(0);
+  });
+
+  it('a student graded with a group on this assessment is never matched to a classmate', async () => {
+    AddWorkClass.open(CID, GROUP);
+    // Liam and Sam are graded together: not listed. "Chen" now fits Avery only on the page,
+    // but the class has two Chens, so it still waits.
+    await AddWorkClass.takeFiles([file('Chen.pdf'), file('Liam Chen.pdf')]);
+    expect(chipsOf(AVERY)).toEqual([]);
+    const why = items().map(el => text(el.querySelector('.awt-why')));
+    expect(why).toEqual(['Two students are named Chen.', 'That student is graded with a group on this assessment.']);
+    // Only the listed student is offered.
+    expect([...itemNamed('Chen.pdf').querySelectorAll('[data-awt="to"]')].map(text)).toEqual(['Avery Chen']);
+  });
+});
+
+describe('the tray', () => {
+  async function pile() {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Chen.pdf'), file('Matteo C.jpg'), file('SCAN0017.pdf', { n: 2 })]);
+  }
+
+  it('two students who fit: a button for each', async () => {
+    await pile();
+    const it = itemNamed('Chen.pdf');
+    expect([...it.querySelectorAll('[data-awt="to"]')].map(text)).toEqual(['Avery Chen', 'Liam Chen']);
+    click(it.querySelector('[data-awt="to"][data-sid="' + LIAM + '"]'));
+    expect(chipsOf(LIAM)).toEqual(['Chen.pdf']);
+    expect(itemNamed('Chen.pdf')).toBeUndefined();
+    expect(text($('.awt-count'))).toBe('2 files');
+  });
+
+  it('a close spelling: Is this Mateo? Yes, Mateo places it', async () => {
+    await pile();
+    const it = itemNamed('Matteo C.jpg');
+    expect(text(it.querySelector('.awt-ask'))).toBe('Is this Mateo?');
+    expect([...it.querySelectorAll('.awt-act')].map(text)).toEqual(['Yes, Mateo', 'Someone Else']);
+    click(it.querySelector('.awt-act.is-main'));
+    expect(chipsOf(MATEO)).toEqual(['Matteo C.jpg']);
+  });
+
+  it('Someone Else, and no name: Choose a Student, with type-to-find', async () => {
+    await pile();
+    click(itemNamed('Matteo C.jpg').querySelector('[data-awt="else"]'));
+    let it = itemNamed('Matteo C.jpg');
+    const find = it.querySelector('.awt-find');
+    expect(find.getAttribute('placeholder')).toBe('Type a name');
+    expect([...it.querySelectorAll('.awt-option')].map(text)).toEqual(
+      NAMES.map(n => n.join(' ')).sort((a, b) => {
+        const la = a.split(' ')[1];
+        const lb = b.split(' ')[1];
+        return la === lb ? a.localeCompare(b) : la.localeCompare(lb);
+      }),
+    );
+    find.value = 'pri';
+    find.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    expect([...itemNamed('Matteo C.jpg').querySelectorAll('.awt-option')].map(text)).toEqual(['Priya Kaur']);
+    // Return takes the first student found.
+    Object.defineProperty(doc, 'activeElement', { configurable: true, get: () => find });
+    const key = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+    key.key = 'Enter';
+    doc.dispatchEvent(key);
+    delete doc.activeElement;
+    expect(chipsOf(PRIYA)).toEqual(['Matteo C.jpg']);
+    expect(chipsOf(MATEO)).toEqual([]);
+    // No name: Choose a Student opens the same list.
+    it = itemNamed('SCAN0017.pdf');
+    expect(text(it.querySelector('.awt-choose'))).toBe('Choose a Student');
+    click(it.querySelector('.awt-choose'));
+    const opt = [...itemNamed('SCAN0017.pdf').querySelectorAll('.awt-option')].find(b => text(b) === 'Jordan Reyes');
+    click(opt);
+    expect(chipsOf(JORDAN)).toEqual(['SCAN0017.pdf']);
+    expect(text(rowOf(JORDAN).querySelector('.awc-pages'))).toBe('2 pages');
+  });
+
+  it('Return in an empty Choose a Student places nothing; the file still waits', async () => {
+    await pile();
+    click(itemNamed('SCAN0017.pdf').querySelector('.awt-choose'));
+    const find = itemNamed('SCAN0017.pdf').querySelector('.awt-find');
+    expect(find.value).toBe('');
+    Object.defineProperty(doc, 'activeElement', { configurable: true, get: () => find });
+    const enter = () => {
+      const key = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+      key.key = 'Enter';
+      doc.dispatchEvent(key);
+    };
+    enter();
+    // Spaces alone are still an empty box.
+    find.value = '  ';
+    find.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    enter();
+    delete doc.activeElement;
+    expect($$('.awc-chip').length).toBe(0);
+    expect(itemNamed('SCAN0017.pdf')).toBeDefined();
+    expect(text($('.awt-count'))).toBe('3 files');
+  });
+
+  it('a file named for a student with no room left waits, saying why', async () => {
+    AddWorkClass.open(CID, PIECE);
+    AddWorkClass.placePieces([{ sid: AVERY, from: 'Scan', pages: pages(29) }]);
+    await AddWorkClass.takeFiles([file('Avery Chen.pdf', { n: 2 })]);
+    expect(chipsOf(AVERY)).toEqual(['Scan']);
+    const it = itemNamed('Avery Chen.pdf');
+    expect(text(it.querySelector('.is-note'))).toBe('A piece of work can have 30 pages at most.');
+    expect(text(it.querySelector('.awt-why'))).toBe('Choose where it goes.');
+  });
+
+  it('Escape closes Choose a Student, not the page', async () => {
+    await pile();
+    click(itemNamed('SCAN0017.pdf').querySelector('.awt-choose'));
+    const find = itemNamed('SCAN0017.pdf').querySelector('.awt-find');
+    Object.defineProperty(doc, 'activeElement', { configurable: true, get: () => find });
+    const key = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+    key.key = 'Escape';
+    doc.dispatchEvent(key);
+    delete doc.activeElement;
+    expect(itemNamed('SCAN0017.pdf').querySelector('.awt-find')).toBeNull();
+    expect(AddWorkClass.isOpen()).toBe(true);
+    expect(showConfirm).not.toHaveBeenCalled();
+  });
+
+  it('a waiting file can be dragged onto a student', async () => {
+    await pile();
+    const it = itemNamed('SCAN0017.pdf');
+    expect(it.getAttribute('draggable')).toBe('true');
+    const start = new doc.defaultView.Event('dragstart', { bubbles: true });
+    Object.defineProperty(start, 'dataTransfer', { value: { types: [], setData() {} } });
+    it.dispatchEvent(start);
+    const over = new doc.defaultView.Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', { value: { types: [], dropEffect: '' } });
+    rowOf(SAM).dispatchEvent(over);
+    expect(text(rowOf(SAM).querySelector('.awc-drop'))).toBe('Drop to Add for Sam');
+    const drop = new doc.defaultView.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: { types: [], files: [] } });
+    rowOf(SAM).dispatchEvent(drop);
+    expect(chipsOf(SAM)).toEqual(['SCAN0017.pdf']);
+    expect(itemNamed('SCAN0017.pdf')).toBeUndefined();
+  });
+
+  it('a waiting file can be taken off, and its picture let go', async () => {
+    const gone = [];
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:x' + gone.length);
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(u => gone.push(u));
+    await pile();
+    click(itemNamed('Chen.pdf').querySelector('.awt-off'));
+    expect(itemNamed('Chen.pdf')).toBeUndefined();
+    expect(gone.length).toBe(1);
+    // The pictures of what still waits go when the page closes.
+    AddWorkClass.close(true);
+    expect(gone.length).toBe(3);
+  });
+
+  it('a picture placed from the tray is the same one, not made again', async () => {
+    let n = 0;
+    const made = vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:' + n++);
+    await pile();
+    const before = made.mock.calls.length;
+    click(itemNamed('Chen.pdf').querySelector('[data-awt="to"]'));
+    expect(made.mock.calls.length).toBe(before);
+    expect(rowOf(AVERY).querySelector('.awc-thumb img').getAttribute('src')).toBe('blob:0');
+  });
+
+  it('waiting files count in the leave question', async () => {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('SCAN0017.pdf')]);
+    click($('.awc-cancel'));
+    expect(showConfirm).toHaveBeenCalledWith(
+      'Leave without adding?',
+      '1 file is waiting.',
+      'Leave',
+      'danger',
+      expect.any(Function),
+      'Keep Adding',
+    );
+    await AddWorkClass.takeFiles([file('Avery Chen.pdf')]);
+    click($('.awc-cancel'));
+    expect(showConfirm.mock.calls[1][1]).toBe('2 files are waiting.');
+  });
+
+  it('waiting files never block Add Work, and are still there after it', async () => {
+    memoryQueue();
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Avery Chen.pdf'), file('Chen.pdf')]);
+    expect($('.awc-primary').disabled).toBe(false);
+    click($('.awc-primary'));
+    for (let i = 0; i < 40 && !text($('.awc-note')); i++) await tick(1);
+    expect($('.awc-done')).toBeNull();
+    expect(text($('.awc-note'))).toBe('Added Work for 1 Student.');
+    expect(items().map(el => text(el.querySelector('.awt-file-name')))).toEqual(['Chen.pdf']);
+    expect(getStudentSubmission(CID, AVERY, PIECE).files.length).toBe(1);
+    // Placed now, it is added on its own.
+    click(itemNamed('Chen.pdf').querySelector('[data-sid="' + LIAM + '"]'));
+    click($('.awc-primary'));
+    for (let i = 0; i < 40 && !$('.awc-done'); i++) await tick(1);
+    window.PhotoQueue.release();
+    expect(text($('.awc-done-title'))).toBe('Added Work for 2 Students');
+  });
+
+  it('Grid draws the tray as a strip above the cards', async () => {
+    AddWorkClass.open(CID, PIECE);
+    click($('.awc-seg-btn[data-layout="grid"]'));
+    await AddWorkClass.takeFiles([file('Chen.pdf')]);
+    const strip = $('.awt-tray.is-strip');
+    expect(strip).not.toBeNull();
+    expect(strip.nextElementSibling.classList.contains('awc-grid')).toBe(true);
+    expect([...itemNamed('Chen.pdf').querySelectorAll('[data-awt="to"]')].map(text)).toEqual([
+      'Avery Chen',
+      'Liam Chen',
+    ]);
+    click(itemNamed('Chen.pdf').querySelector('[data-awt="to"]'));
+    expect($('.awc-card[data-awc-target="' + AVERY + '"] .awc-file-name')).not.toBeNull();
+  });
+
+  it('Column draws the tray beside the students, with its buttons and the privacy line', () => {
+    AddWorkClass.open(CID, PIECE);
+    const tray = $('.awc-body > .awt-tray');
+    expect(tray).not.toBeNull();
+    expect(text(tray.querySelector('.awt-drop-title'))).toBe('Drop the Scan, a Folder or Files');
+    expect($$('.awt-pick-btn').map(text)).toEqual(['Choose Files…', 'Choose a Folder…']);
+    expect($('.awt-input[data-awt-input="folder"]').hasAttribute('webkitdirectory')).toBe(true);
+    expect(text(tray.querySelector('.awt-note'))).toBe(
+      'File names are read on this computer to find each student. Only the pages upload, made smaller; the names are not kept.',
+    );
+    expect(text($('.awc-hint'))).toBe('Nothing is added until you press Add Work.');
+  });
+});
+
+describe('folders', () => {
+  const fileEntry = f => ({ isFile: true, isDirectory: false, name: f.name, file: ok => ok(f) });
+  const dirEntry = (name, children) => {
+    let given = false;
+    return {
+      isFile: false,
+      isDirectory: true,
+      name,
+      createReader: () => ({
+        readEntries: ok => {
+          // A batch, then an empty one.
+          ok(given ? [] : children);
+          given = true;
+        },
+      }),
+    };
+  };
+
+  it('a folder dropped anywhere is read into its sub-folders, hidden files left out', async () => {
+    AddWorkClass.open(CID, PIECE);
+    const root = dirEntry('Period 2', [
+      fileEntry(file('Avery Chen.pdf')),
+      fileEntry({ name: '.DS_Store', type: '' }),
+      dirEntry('more', [fileEntry(file('Priya Kaur.jpg')), fileEntry({ name: 'readme.txt', type: 'text/plain' })]),
+      dirEntry('__MACOSX', [fileEntry(file('._Avery Chen.pdf'))]),
+    ]);
+    const ev = new doc.defaultView.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'dataTransfer', {
+      value: {
+        types: ['Files'],
+        files: [{ name: 'Period 2', type: '' }],
+        items: [{ kind: 'file', webkitGetAsEntry: () => root }],
+      },
+    });
+    // Dropped on a student, a folder is still matched by name.
+    rowOf(SAM).dispatchEvent(ev);
+    await tick(20);
+    expect(chipsOf(AVERY)).toEqual(['Avery Chen.pdf']);
+    expect(chipsOf(PRIYA)).toEqual(['Priya Kaur.jpg']);
+    expect(chipsOf(SAM)).toEqual([]);
+    expect(text($('.awt-status'))).toBe('1 file that isn’t a photo or PDF was passed over.');
+  });
+
+  it('Choose a Folder… hands its files to the same matching', async () => {
+    AddWorkClass.open(CID, PIECE);
+    const input = $('.awt-input[data-awt-input="folder"]');
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [
+        Object.assign(file('Mateo Cruz.jpg'), { webkitRelativePath: 'Scans/Mateo Cruz.jpg' }),
+        Object.assign({ name: '.DS_Store', type: '' }, { webkitRelativePath: 'Scans/.DS_Store' }),
+      ],
+    });
+    input.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    await tick(10);
+    expect(chipsOf(MATEO)).toEqual(['Mateo Cruz.jpg']);
+    expect($('.awt-status').textContent).toBe('');
+  });
+});
+
+describe('placePieces and Split the Scan', () => {
+  it('places pieces on their students with one draw; one that cannot be placed waits', () => {
+    AddWorkClass.open(CID, PIECE);
+    const out = AddWorkClass.placePieces([
+      { sid: AVERY, from: 'Scan, pages 1–2', pages: pages(2) },
+      { sid: LIAM, from: 'Scan, pages 3–4', pages: pages(2) },
+      { sid: 'not-here', from: 'Scan, page 5', pages: pages(1) },
+      { sid: MATEO, from: 'Scan, pages 6–36', pages: pages(31) },
+    ]);
+    expect(out).toEqual({ placed: 2, waiting: 2 });
+    expect(chipsOf(AVERY)).toEqual(['Scan, pages 1–2']);
+    expect(chipsOf(LIAM)).toEqual(['Scan, pages 3–4']);
+    expect(items().map(el => text(el.querySelector('.awt-file-name')))).toEqual(['Scan, page 5', 'Scan, pages 6–36']);
+    expect(text(itemNamed('Scan, pages 6–36').querySelector('.is-note'))).toBe(
+      'A piece of work can have 30 pages at most.',
+    );
+  });
+
+  function stubSplit() {
+    const split = { opened: [], open: false };
+    window.AddWorkSplit = {
+      takes: files => files.length === 1 && /\.pdf$/i.test(files[0].name),
+      open: vi.fn((cid, aid, f, opts) => {
+        split.opened.push({ cid, aid, name: f.name, opts });
+        split.open = true;
+        return true;
+      }),
+      isOpen: () => split.open,
+      close: vi.fn(() => {
+        split.open = false;
+      }),
+    };
+    return split;
+  }
+
+  it('one PDF that matches no student for certain opens Split the Scan, and its pieces land', async () => {
+    const split = stubSplit();
+    AddWorkClass.open(CID, PIECE);
+    expect($$('.awt-pick-btn').map(text)).toEqual(['Choose Files…', 'Choose a Folder…', 'Split a Scan…']);
+    await AddWorkClass.takeFiles([file('SCAN0017.pdf')]);
+    expect(split.opened.map(o => [o.cid, o.aid, o.name])).toEqual([[CID, PIECE, 'SCAN0017.pdf']]);
+    // The scan itself is never read here.
+    expect(PhotoShrink.prepare).not.toHaveBeenCalled();
+    split.opened[0].opts.onPieces([
+      { sid: PRIYA, from: 'Scan, pages 1–2', pages: pages(2) },
+      { sid: MATEO, from: 'Scan, pages 3–4', pages: pages(2) },
+    ]);
+    split.open = false;
+    split.opened[0].opts.onClose();
+    expect(chipsOf(PRIYA)).toEqual(['Scan, pages 1–2']);
+    expect(chipsOf(MATEO)).toEqual(['Scan, pages 3–4']);
+    expect(text($('.awc-primary'))).toBe('Add Work for 2 Students');
+  });
+
+  it('a PDF named for one student, or two PDFs, are matched by name instead', async () => {
+    const split = stubSplit();
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Priya Kaur.pdf')]);
+    await AddWorkClass.takeFiles([file('SCAN0017.pdf'), file('SCAN0018.pdf')]);
+    expect(split.opened).toEqual([]);
+    expect(chipsOf(PRIYA)).toEqual(['Priya Kaur.pdf']);
+    expect(items().length).toBe(2);
+  });
+
+  it('Split a Scan… opens it with the chosen PDF, whatever it is called', () => {
+    const split = stubSplit();
+    AddWorkClass.open(CID, PIECE);
+    const input = $('.awt-input[data-awt-input="scan"]');
+    Object.defineProperty(input, 'files', { configurable: true, value: [file('Priya Kaur.pdf')] });
+    input.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    expect(split.opened.map(o => o.name)).toEqual(['Priya Kaur.pdf']);
+  });
+
+  it("the page's Escape and arrow keys stand aside while Split the Scan is open", async () => {
+    const split = stubSplit();
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('SCAN0017.pdf')]);
+    expect(split.open).toBe(true);
+    const esc = () => {
+      const key = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+      key.key = 'Escape';
+      doc.dispatchEvent(key);
+      return key;
+    };
+    const k = esc();
+    expect(k.defaultPrevented).toBe(false);
+    expect(AddWorkClass.isOpen()).toBe(true);
+    split.open = false;
+    esc();
+    expect(AddWorkClass.isOpen()).toBe(false);
+  });
+
+  it('closing the page closes Split the Scan too', () => {
+    const split = stubSplit();
+    AddWorkClass.open(CID, PIECE);
+    split.open = true;
+    AddWorkClass.close(true);
+    expect(window.AddWorkSplit.close).toHaveBeenCalled();
+  });
+});
+
+describe('no file name leaves the page', () => {
+  it('from a pile, the tray and Split the Scan, none reaches the data layer', async () => {
+    const split = (() => {
+      const s = { opts: null, open: false };
+      window.AddWorkSplit = {
+        takes: f => f.length === 1 && /\.pdf$/i.test(f[0].name),
+        open: (cid, aid, f, opts) => ((s.opts = opts), (s.open = true), true),
+        isOpen: () => s.open,
+        close: () => (s.open = false),
+      };
+      return s;
+    })();
+    const handed = [];
+    const real = globalThis.addStudentWorkPages;
+    globalThis.addStudentWorkPages = vi.fn((cid, sid, aid, pg) => {
+      handed.push(...pg);
+      return Promise.resolve({ result: 'sent' });
+    });
+    try {
+      AddWorkClass.open(CID, PIECE);
+      await AddWorkClass.takeFiles([file('Avery Chen essay.pdf', { n: 2 }), file('Chen_final.pdf')]);
+      click(itemNamed('Chen_final.pdf').querySelector('[data-sid="' + LIAM + '"]'));
+      await AddWorkClass.takeFiles([file('SCAN0017.pdf')]);
+      split.opts.onPieces([
+        {
+          sid: PRIYA,
+          from: 'Scan, pages 1–2',
+          pages: pages(2).map(p => Object.assign(p, { name: 'Priya Kaur scan-1.jpg' })),
+        },
+      ]);
+      split.open = false;
+      click($('.awc-primary'));
+      await tick(20);
+    } finally {
+      globalThis.addStudentWorkPages = real;
+    }
+    expect(handed.length).toBe(5);
+    handed.forEach(p => expect(p.name).toMatch(/^page-\d+\.jpg$/));
+    const said = JSON.stringify(handed, (k, v) => (v instanceof Blob ? '' : v)).toLowerCase();
+    ['avery', 'chen', 'essay', 'final', 'priya', 'kaur', 'scan'].forEach(bit => expect(said).not.toContain(bit));
+  });
+
+  it('none reaches the photo queue in Demo Mode', async () => {
+    const kept = memoryQueue();
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Mateo Cruz.pdf', { n: 2 }), file('Matteo C.jpg')]);
+    click(itemNamed('Matteo C.jpg').querySelector('[data-sid="' + MATEO + '"]'));
+    click($('.awc-primary'));
+    for (let i = 0; i < 40 && !$('.awc-done'); i++) await tick(1);
+    window.PhotoQueue.release();
+    expect(text($('.awc-done-title'))).toBe('Added Work for 1 Student');
+    expect(kept.length).toBe(3);
+    expect(JSON.stringify(kept).toLowerCase()).not.toMatch(/mateo|matteo|cruz/);
+    expect(getStudentSubmission(CID, MATEO, PIECE).files.length).toBe(3);
+  });
+});

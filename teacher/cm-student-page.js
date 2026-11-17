@@ -19,9 +19,8 @@
    What later PRs add, none of which needs to change dash-class-manager.js:
 
    - S3-F1: the rest of Student Cards (filters, Cards Work Until).
-   - S5-F1: Send Work and Keep Photos Until, in Demo Mode (below).
-   - S8-F1: the "photos go for good" line on Keep Photos Until, and the
-     one-week reminder (below), here and on the Dashboard.
+   - S5-F1: Send Work, in Demo Mode (below), and the sentence on how long
+     photos stay (Nov 17 2026: Keep Photos Until and its reminder are gone).
    - S13-F1: Show My Learning and See What They'd See (below), in Demo
      Mode and, since S13-W2, for a signed-in class.
    - S10 follow-up: the Reflect on Feedback switch, in Demo Mode (below).
@@ -311,26 +310,20 @@ var CmStudentPage = (function () {
     else _askThenMake(cid, 'return', change, 'sp-return-' + value);
   }
 
-  /* ── Send Work and Keep Photos Until (S5-F1) ───────────────────
+  /* ── Send Work (S5-F1) ─────────────────────────────────────────
      Send Work is the class's switch for students sending photos or files
-     (course.send_work, off), and Keep Photos Until when they are deleted
-     (course.keep_photos_until: End of Year, the default, or End of Term;
-     DECISIONS, Grades, photos and sign-in 5). Keep Photos Until shows while
-     Send Work is on, and whenever the class has photos kept (classHasPhotos):
-     photos sent before Send Work was turned off are still deleted on that
-     date (ruling 108's follow-up).
+     (course.send_work, off). Under it, while Send Work is on or the class
+     has photos kept (classHasPhotos), one sentence says how long photos stay
+     (DECISIONS, "Photos stay with the class", Nov 17 2026): there is no
+     choice to make.
 
      Drawn in Demo Mode and for a signed-in class whose student page the
      server has on (studentWorkLive, S5-W1). Read through workSettings
      (getCourseSendWork) and saved through setCourseSendWork in
-     shared/data.js: Demo Mode keeps them with its sample work, a signed-in
-     class sends set_course_send_work. The line under Keep Photos Until and the
-     Delete Photos Now? question are Colin's (ruling 102); the reminder it
-     promises and the deleting itself come with S8. */
-  var KEEP_CHOICES = [
-    { value: 'end_of_term', label: 'End of Term' },
-    { value: 'end_of_year', label: 'End of Year' },
-  ];
+     shared/data.js: Demo Mode keeps it with its sample work, a signed-in
+     class sends set_course_send_work. */
+  var PHOTOS_STAY =
+    "Photos stay as long as this class exists. They're deleted when the class is deleted, or after a year without being opened.";
 
   function _demo() {
     return typeof isDemoMode === 'function' && isDemoMode();
@@ -340,104 +333,31 @@ var CmStudentPage = (function () {
     return _demo() || (typeof studentWorkLive === 'function' && studentWorkLive(cid));
   }
 
-  /* The class's Send Work and Keep Photos Until, as the screens read them:
-     { offered, send_work, keep_photos_until }, from getCourseSendWork
-     (shared/data.js, S5-F5). `offered` is false where the rows are not
-     drawn (a signed-in teacher, or the student page off), and then
-     send_work is false too: nothing about student work shows anywhere. */
+  /* The class's Send Work, as the screens read it: { offered, send_work },
+     from getCourseSendWork (shared/data.js, S5-F5). `offered` is false where
+     the rows are not drawn (a signed-in teacher, or the student page off),
+     and then send_work is false too: nothing about student work shows
+     anywhere. */
   function workSettings(cid) {
     var s = _settings(cid);
     var offered = !!s && s.student_page === true && _workHere(cid) && typeof getCourseSendWork === 'function';
-    var w = offered ? getCourseSendWork(cid) : { send_work: false, keep_photos_until: 'end_of_year' };
-    return {
-      offered: offered,
-      send_work: offered && w.send_work === true,
-      keep_photos_until: w.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
-    };
+    var w = offered ? getCourseSendWork(cid) : { send_work: false };
+    return { offered: offered, send_work: offered && w.send_work === true };
   }
 
-  /* The day photos are deleted for a choice, 'YYYY-MM-DD'. End of Year is
-     June 30 of the school year the class is in today. End of Term is the
-     last day of the reporting term the class is in today, else the next
-     to end; with no term end ahead (every term past, or none), June 30, as
-     End of Year. The server's nightly job (migrations/2026111140,
-     public._keep_photos_day) uses this same rule. */
-  function _today(cid) {
-    return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
-  }
-  function keepPhotosDate(cid, choice, onDay) {
-    var today = onDay || _today(cid);
-    var y = parseInt(today.slice(0, 4), 10);
-    var june = (parseInt(today.slice(5, 7), 10) >= 8 ? y + 1 : y) + '-06-30';
-    if (choice !== 'end_of_term') return june;
-    var ends = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
-      .map(function (t) {
-        return t.ends_on;
-      })
-      .filter(function (d) {
-        return /^\d{4}-\d{2}-\d{2}$/.test(d);
-      })
-      .sort();
-    if (!ends.length) return june;
-    var ahead = ends.filter(function (d) {
-      return d >= today;
-    });
-    return ahead.length ? ahead[0] : june;
-  }
-  function _day(iso, month) {
-    var d = new Date(iso + 'T12:00:00Z');
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: month, day: 'numeric', timeZone: 'UTC' });
-  }
-  function _longDay(iso) {
-    return _day(iso, 'long');
-  }
-
-  // The one writer of the class's two settings (setCourseSendWork).
+  // The one writer of the class's Send Work (setCourseSendWork).
   function _saveWork(cid, change) {
     setCourseSendWork(cid, change);
     _rerender();
   }
 
-  /* Whether Keep Photos Until is drawn and can be changed: Send Work on, or
-     photos kept for the class. Inside the build switch and Demo Mode (offered). */
-  function _keepShown(cid, w) {
-    w = w || workSettings(cid);
-    return w.offered && (w.send_work || classHasPhotos(cid));
-  }
-
   function _sendWorkRows(cid) {
     var w = workSettings(cid);
     if (!w.offered) return '';
-    var keep = _keepShown(cid, w)
-      ? '<div class="sp-row-head">' +
-        '<div class="sp-row-title sp-keep-title" id="sp-keep-label">Keep Photos Until</div>' +
-        '</div>' +
-        '<div class="seg cm-seg" role="radiogroup" aria-labelledby="sp-keep-label" aria-describedby="sp-keep-hint">' +
-        KEEP_CHOICES.map(function (c) {
-          var on = c.value === w.keep_photos_until;
-          return (
-            '<button type="button" class="seg-btn cm-seg-btn' +
-            (on ? ' active' : '') +
-            '" id="sp-keep-' +
-            c.value +
-            '" role="radio" aria-checked="' +
-            on +
-            '" data-action="spKeepPhotos" data-value="' +
-            c.value +
-            '">' +
-            esc(c.label) +
-            '</button>'
-          );
-        }).join('') +
-        '</div>' +
-        '<div class="cm-hint" id="sp-keep-hint">' +
-        esc(
-          'Photos of student work in this class are deleted on ' +
-            _longDay(keepPhotosDate(cid, w.keep_photos_until)) +
-            ". Grades, comments and Mark Up stay. Deleted photos can't come back. You'll get a reminder a week before.",
-        ) +
-        '</div>'
-      : '';
+    var stay =
+      w.send_work || classHasPhotos(cid)
+        ? '<div class="cm-hint sp-photos-stay" id="sp-photos-stay">' + esc(PHOTOS_STAY) + '</div>'
+        : '';
     return (
       '<div class="sp-row sp-send">' +
       '<div class="cm-recent-limit sp-send-row">' +
@@ -449,7 +369,7 @@ var CmStudentPage = (function () {
       (w.send_work ? ' checked' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
       '</div>' +
-      keep +
+      stay +
       '</div>'
     );
   }
@@ -462,61 +382,13 @@ var CmStudentPage = (function () {
     _focus('sp-send-switch');
   }
 
-  function _chooseKeepPhotos(cid, value) {
-    var w = cid ? workSettings(cid) : null;
-    if (!w || !_keepShown(cid, w)) return;
-    var known = KEEP_CHOICES.some(function (c) {
-      return c.value === value;
-    });
-    if (!known || w.keep_photos_until === value) return;
-    var choose = function () {
-      _saveWork(cid, { keep_photos_until: value });
-      _focus('sp-keep-' + value);
-    };
-    var on = keepPhotosDate(cid, value);
-    // A day already gone deletes the photos tonight: ask first (ruling 102).
-    if (on >= _today(cid)) return choose();
-    var name = typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name ? COURSES[cid].name : 'this class';
-    showConfirm(
-      'Delete Photos Now?',
-      'End of Term was ' +
-        _day(on, 'short') +
-        ', so this deletes the photos of student work in ' +
-        name +
-        " tonight. Deleted photos can't come back.",
-      'Delete Photos',
-      'danger',
-      choose,
-    );
-  }
-
-  /* ── The one-week reminder (S8-F1) ─────────────────────────────
-     Colin's words (ruling 102, s8-f1-wording-draft.md item 2), in the app
-     only: a line at the top of the class's Dashboard and of this tab, from
-     one week before the class's Keep Photos Until date until that date, or
-     until the teacher presses Dismiss. Change the Date opens this tab at
-     Keep Photos Until.
-
-     Shown only where it is true: the class's build switch on, and photos
-     of student work kept for the class (classHasPhotos), whether or not Send
-     Work is still on (Keep Photos Until, which Change the Date opens, shows
-     then too; ruling 108's follow-up). The job
-     that deletes them (S8-M1) is not built, so until it is no signed-in
-     class has photos here and the line never shows for one.
-
-     Dismiss is kept on this device, for the class and the date: a new date
-     brings the line back. It sends nothing; DashOverview keeps it (this tab
-     writes only through saveReturnSettings and Demo Mode's student work). `today` is an argument (tests pass it); the screens
-     pass nothing and get the class's own day (courseToday). */
-  var REMIND_DAYS = 7;
-
   /* Who in class `cid` has photos of their work kept, { enrollment_id: true },
      from the read side in shared/data.js (getCourseSubmissions): a submission
      with at least one page, whoever sent it; for one assessment when `aid` is
      given. Empty while the class's build switch is off. Send Work is not
-     asked: photos sent before it was turned off are still kept, and still
-     deleted. The one question the delete warnings (dash-class-manager.js,
-     page-gradebook.js), Keep Photos Until and the reminder ask. */
+     asked: photos sent before it was turned off are still kept. The one
+     question the delete warnings (dash-class-manager.js, page-gradebook.js)
+     and the sentence above ask. */
   function studentsWithPhotos(cid, aid) {
     var who = {};
     if (!cid || typeof getCourseSubmissions !== 'function') return who;
@@ -530,92 +402,9 @@ var CmStudentPage = (function () {
     return who;
   }
 
-  // True when the class has photos of student work that would be deleted.
+  // True when the class has photos of student work kept.
   function classHasPhotos(cid) {
     return Object.keys(studentsWithPhotos(cid)).length > 0;
-  }
-
-  function _dismissedOn(cid) {
-    return typeof DashOverview !== 'undefined' && DashOverview.photoReminderDismissed
-      ? DashOverview.photoReminderDismissed(cid)
-      : null;
-  }
-
-  function _daysBetween(fromIso, toIso) {
-    var a = Date.parse(fromIso + 'T12:00:00Z');
-    var b = Date.parse(toIso + 'T12:00:00Z');
-    return isNaN(a) || isNaN(b) ? NaN : Math.round((b - a) / 86400000);
-  }
-
-  /* The reminder for class `cid` on `today` ('YYYY-MM-DD'), or null:
-     { date, text }. */
-  function photoReminder(cid, today) {
-    if (!classHasPhotos(cid)) return null;
-    var day = today || _today(cid);
-    var w = workSettings(cid);
-    if (!_keepShown(cid, w)) return null;
-    var date = keepPhotosDate(cid, w.keep_photos_until, day);
-    var left = _daysBetween(day, date);
-    if (!(left >= 0 && left <= REMIND_DAYS)) return null;
-    if (_dismissedOn(cid) === date) return null;
-    var name = typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name ? COURSES[cid].name : 'this class';
-    return {
-      date: date,
-      text:
-        'Photos of student work in ' +
-        name +
-        ' are deleted on ' +
-        _longDay(date) +
-        ". Grades, comments and Mark Up stay. Deleted photos can't come back.",
-    };
-  }
-
-  // Dismiss: remembered for the class and that date only.
-  function dismissPhotoReminder(cid, date) {
-    if (!cid || !date || typeof DashOverview === 'undefined' || !DashOverview.dismissPhotoReminder) return;
-    DashOverview.dismissPhotoReminder(cid, date);
-  }
-
-  /* The line and its two buttons. `where` is 'dash' (the Dashboard, whose
-     actions page-dashboard.js handles) or 'sp' (this tab). */
-  function photoReminderHtml(cid, where, today) {
-    var r = photoReminder(cid, today);
-    if (!r) return '';
-    var pre = where === 'sp' ? 'sp' : 'dash';
-    return (
-      '<div class="photo-reminder" id="' +
-      pre +
-      '-photo-reminder" data-cid="' +
-      esc(cid) +
-      '">' +
-      '<p class="photo-reminder-text">' +
-      esc(r.text) +
-      '</p>' +
-      '<div class="photo-reminder-actions">' +
-      '<button type="button" class="btn btn-secondary" data-action="' +
-      pre +
-      'PhotoReminderChange" data-cid="' +
-      esc(cid) +
-      '">Change the Date</button>' +
-      '<button type="button" class="btn btn-ghost" data-action="' +
-      pre +
-      'PhotoReminderDismiss" data-cid="' +
-      esc(cid) +
-      '" data-date="' +
-      esc(r.date) +
-      '">Dismiss</button>' +
-      '</div>' +
-      '</div>'
-    );
-  }
-
-  // Change the Date: Keep Photos Until's chosen button, in view and focused.
-  function focusKeepPhotos(cid) {
-    var w = workSettings(cid);
-    var el = typeof document !== 'undefined' ? document.getElementById('sp-keep-' + w.keep_photos_until) : null;
-    if (!el) return;
-    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
-    if (typeof el.focus === 'function') el.focus({ preventScroll: true });
   }
 
   /* ── Reflect on Feedback (S10 follow-up) ───────────────────────
@@ -937,7 +726,6 @@ var CmStudentPage = (function () {
           '<div class="cm-hint sp-intro">' +
           esc('What students can do when they open their page with their card. Each one is off until you turn it on.') +
           '</div>' +
-          photoReminderHtml(cid, 'sp') +
           _returnGradesRow(cid) +
           _sendWorkRows(cid) +
           _reflectRow(cid) +
@@ -969,21 +757,6 @@ var CmStudentPage = (function () {
     }
     if (action === 'spSeeLearning') {
       _seeLearning(_cid(el), el);
-      return true;
-    }
-    if (action === 'spPhotoReminderChange') {
-      focusKeepPhotos(_cid(el));
-      return true;
-    }
-    if (action === 'spPhotoReminderDismiss') {
-      var on = _cid(el);
-      dismissPhotoReminder(on, el && el.dataset ? el.dataset.date : null);
-      _rerender();
-      if (_stillHere(on)) _focus('sp-keep-' + workSettings(on).keep_photos_until);
-      return true;
-    }
-    if (action === 'spKeepPhotos') {
-      _chooseKeepPhotos(_cid(el), el && el.dataset ? el.dataset.value : null);
       return true;
     }
     if (action !== 'spReturnGrades') return false;
@@ -1036,13 +809,8 @@ var CmStudentPage = (function () {
     workSettings: workSettings,
     learningSettings: learningSettings,
     reflectSettings: reflectSettings,
-    keepPhotosDate: keepPhotosDate,
     classHasPhotos: classHasPhotos,
     studentsWithPhotos: studentsWithPhotos,
-    photoReminder: photoReminder,
-    photoReminderHtml: photoReminderHtml,
-    dismissPhotoReminder: dismissPhotoReminder,
-    focusKeepPhotos: focusKeepPhotos,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,

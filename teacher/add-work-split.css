@@ -1,0 +1,649 @@
+/* ── add-work-split.css — Split the Scan (teacher/add-work-split.js) ── */
+
+/* Over Add Work for the Class (3850), under the grader (3900). */
+.aws-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3860;
+  background: var(--bg);
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+}
+.aws-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--divider-subtle),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.aws-gap {
+  flex: 1;
+}
+.aws-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── The bar ── */
+.aws-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.aws-back {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 16px;
+  border: 0;
+  background: var(--seg-track);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.aws-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.aws-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.aws-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.aws-note {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  min-width: 0;
+}
+.aws-note:empty {
+  display: none;
+}
+.aws-cancel,
+.aws-primary {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 17px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.aws-cancel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.aws-primary {
+  border: 0;
+  background: var(--active);
+  color: #fff;
+}
+.aws-overlay button:disabled,
+.aws-overlay button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.aws-overlay button:focus-visible,
+.aws-name:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* ── Reading ── */
+.aws-wait {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+.aws-wait-line {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.aws-track {
+  width: min(360px, 80%);
+  height: 6px;
+  border-radius: 3px;
+  background: var(--seg-track);
+  overflow: hidden;
+}
+.aws-fill {
+  display: block;
+  height: 100%;
+  background: var(--active);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 150ms linear;
+}
+.aws-refused {
+  margin: 0;
+  max-width: 520px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.aws-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.aws-hint.is-bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ── The side and the grid ── */
+.aws-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.aws-side {
+  width: 280px;
+  flex: none;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+  box-shadow: inset -0.5px 0 0 var(--divider-heavy);
+}
+.aws-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aws-h {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.aws-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.aws-step {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+.aws-per {
+  min-width: 34px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+}
+.aws-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.aws-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.aws-switch-track {
+  width: 36px;
+  height: 22px;
+  flex: none;
+  border-radius: 11px;
+  background: var(--seg-track);
+  position: relative;
+  transition: background-color 150ms var(--ease-out);
+}
+.aws-switch-knob {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--seg-thumb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 150ms var(--ease-out);
+}
+.aws-switch[aria-checked='true'] .aws-switch-track {
+  background: var(--active);
+}
+.aws-switch[aria-checked='true'] .aws-switch-knob {
+  transform: translateX(14px);
+}
+.aws-order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aws-order-btn {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.aws-order-btn.is-on {
+  border-color: var(--active);
+  box-shadow: inset 0 0 0 1px var(--active);
+  background: var(--active-light);
+  color: var(--link);
+  font-weight: 600;
+}
+.aws-tally {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+}
+.aws-tally .is-bad {
+  color: var(--danger);
+}
+.aws-tally .is-quiet,
+.aws-tally-hint {
+  color: var(--text-3);
+}
+.aws-tally-hint {
+  font-size: 12px;
+}
+.aws-privacy {
+  margin: auto 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.aws-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.aws-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 14px;
+  padding: 16px;
+  align-items: start;
+}
+
+/* ── A piece ── */
+.aws-card {
+  position: relative;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--divider-strong);
+  display: flex;
+  flex-direction: column;
+}
+.aws-card.is-named {
+  box-shadow: 0 0 0 1px var(--divider-strong);
+}
+.aws-card.is-twice {
+  box-shadow: 0 0 0 2px var(--danger);
+}
+.aws-card:focus-within {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.aws-card.is-loose {
+  grid-column: 1 / -1;
+  padding: 12px;
+  gap: 10px;
+}
+.aws-crop {
+  position: relative;
+  height: 128px;
+  overflow: hidden;
+  border-radius: 12px 12px 0 0;
+  background: #fff;
+  box-shadow: inset 0 -1px 0 var(--divider-medium);
+}
+.aws-crop-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: left top;
+}
+/* The thumbnail stands in until the sharp top is drawn: the same crop. */
+.aws-crop-img.is-thumb {
+  width: 160%;
+  height: auto;
+  margin-left: -4%;
+  object-fit: fill;
+}
+.aws-range {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.aws-who {
+  position: relative;
+  padding: 8px 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aws-name {
+  height: 34px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  width: 100%;
+}
+.aws-name.is-listed {
+  font-weight: 400;
+}
+.aws-name.is-twice {
+  border: 2px solid var(--danger);
+  background: var(--priority-light);
+}
+.aws-name::placeholder {
+  color: var(--text-3);
+  font-weight: 400;
+}
+.aws-card-note {
+  margin: 0;
+  min-height: 15px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.aws-card-note.is-bad {
+  color: var(--danger);
+}
+.aws-list {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 46px;
+  z-index: 3;
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.22),
+    0 0 0 1px var(--divider-medium);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aws-list[hidden] {
+  display: none;
+}
+.aws-option {
+  min-height: 30px;
+  border-radius: 7px;
+  padding: 4px 10px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  cursor: pointer;
+}
+.aws-option.is-on {
+  background: var(--active-light);
+  color: var(--link);
+  font-weight: 600;
+}
+.aws-option-on,
+.aws-option.is-used {
+  color: var(--text-3);
+}
+.aws-option-on {
+  margin-left: 0.35em;
+  font-weight: 400;
+}
+
+/* ── A piece's pages ── */
+.aws-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+.aws-tile {
+  position: relative;
+  width: 60px;
+  height: 78px;
+  flex: none;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border);
+  padding: 0;
+  border: 0;
+  font: inherit;
+}
+.aws-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.aws-tile.is-kept {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.aws-tile.is-out {
+  cursor: pointer;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--divider-medium);
+}
+.aws-tile.is-out img {
+  opacity: 0.4;
+}
+.aws-out-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-2);
+}
+.aws-tile-no {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+.aws-turn,
+.aws-leave {
+  position: absolute;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+.aws-turn {
+  right: 3px;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.aws-leave {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 20px;
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+.aws-size {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 8px;
+}
+.aws-arrow {
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.aws-count {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* ── The foot: the keys ── */
+.aws-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 10px 16px;
+  background: var(--bg);
+  box-shadow: inset 0 0.5px 0 var(--divider-heavy);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.aws-foot-title {
+  font-weight: 700;
+  color: var(--text);
+}
+.aws-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.aws-key kbd {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow:
+    inset 0 -1px 0 var(--divider-heavy),
+    0 0 0 1px var(--border);
+  font: 600 11px var(--font-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── A narrow window: the side stacks above the pieces. ── */
+@media (max-width: 860px) {
+  .aws-overlay {
+    padding: 0;
+  }
+  .aws-page {
+    border-radius: 0;
+  }
+  .aws-body {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .aws-side {
+    width: auto;
+    overflow: visible;
+    box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+  }
+  .aws-scroll {
+    overflow: visible;
+  }
+  .aws-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+  .aws-foot {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aws-fill,
+  .aws-switch-track,
+  .aws-switch-knob {
+    transition: none;
+  }
+}
