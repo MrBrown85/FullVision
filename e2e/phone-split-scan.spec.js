@@ -237,3 +237,43 @@ test('A scan shared while signed out is not kept', async ({ page }) => {
   await expect(page.locator('#m-splitscan')).toHaveCount(0);
   expect(await page.evaluate(() => MSharedScan.held())).toBe(false);
 });
+
+test('While another class loads, Start, an assessment and a file do nothing', async ({ page }) => {
+  await openPhone(page);
+  // Two classes in the picker, and a class load that waits until told.
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    window.getPickerCourses = () => [
+      { id: cid, name: 'Science 8' },
+      { id: 'other', name: 'Other Class' },
+    ];
+    window.switchActiveCourse = () => new Promise(r => (window.__finishSwitch = r));
+    window.__scan = new File(['%PDF-1.4'], 'scan.pdf', { type: 'application/pdf' });
+    MSplitScan.open(cid, 'sci8a1', { file: window.__scan });
+  });
+  const ss = page.locator('#m-splitscan');
+  const start = ss.getByRole('button', { name: 'Split the Scan' });
+  await expect(start).toBeEnabled();
+  await ss.locator('[data-ss="class"][data-cid="other"]').click();
+  await expect(start).toBeDisabled();
+  const during = await page.evaluate(() => {
+    // Pressed anyway (a tap that lands as the button turns off), another
+    // assessment chosen, and a file chosen: none begins reading.
+    const btn = document.querySelector('#m-splitscan [data-ss="start"]');
+    btn.removeAttribute('disabled');
+    btn.click();
+    const other = [...document.querySelectorAll('#m-splitscan [data-ss="piece"]')].find(
+      b => b.getAttribute('aria-pressed') !== 'true',
+    );
+    if (other) other.click();
+    const chose = MSplitScan.choose(window.__scan);
+    const s = MSplitScan._state();
+    return { phase: s.phase, aid: s.aid, chose };
+  });
+  expect(during).toEqual({ phase: 'pick', aid: 'sci8a1', chose: false });
+  // The load is overtaken by another: the screen answers again, on its own class.
+  await page.evaluate(() => window.__finishSwitch(false));
+  await expect(start).toBeEnabled();
+  expect(await page.evaluate(() => MSplitScan._state().phase)).toBe('pick');
+  await page.evaluate(() => MSplitScan.close());
+});

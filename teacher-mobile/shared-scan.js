@@ -78,6 +78,7 @@
   function held() {
     var w = _worker();
     if (!w || typeof MessageChannel === 'undefined') return Promise.resolve(false);
+    var worker = w;
     return new Promise(function (resolve) {
       var ch = new MessageChannel();
       var done = false;
@@ -85,7 +86,7 @@
         done = true;
         resolve(!!(e.data && e.data.held));
       };
-      w.postMessage({ type: 'FV_SHARED_SCAN_HELD' }, [ch.port2]);
+      worker.postMessage({ type: 'FV_SHARED_SCAN_HELD' }, [ch.port2]);
       setTimeout(function () {
         if (!done) resolve(false);
       }, 2000);

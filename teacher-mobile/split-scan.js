@@ -59,7 +59,9 @@
     missing: 'The shared scan did not arrive. Share it again.',
   };
 
+  /** @type {any} */
   var _cfg = { onClass: null, onClose: null, nameFirst: null, read: null };
+  /** @type {any} */
   var _s = null; // the open screen's state
 
   var TURN_ICON =
@@ -162,7 +164,7 @@
     document.addEventListener('keydown', _onKey);
     window.addEventListener('beforeunload', _beforeUnload);
     _draw();
-    var first = root.querySelector('.m-ss-cancel');
+    var first = /** @type {any} */ (root).querySelector('.m-ss-cancel');
     if (first) first.focus();
     return true;
   }
@@ -209,7 +211,8 @@
 
   function choose(file) {
     var s = _s;
-    if (!s || s.phase !== 'pick' || !file) return false;
+    // While another class loads, the class on screen is not the one asked for.
+    if (!s || s.phase !== 'pick' || !file || s.switching) return false;
     if (!AddWorkSplit.takes([file])) {
       s.said = 'Only a PDF can be split. Choose the scan’s PDF.';
       _draw();
@@ -221,6 +224,7 @@
   }
 
   function _start(s) {
+    if (s.switching) return false;
     var a = _assessment(s.cid, s.aid);
     if (!a || !s.file) return false;
     var list = AddWorkClass.students(s.cid, a) || [];
@@ -245,9 +249,9 @@
         s.step = p.step;
         s.total = p.pages;
         if (p.step === 'read') s.read = p.page;
-        var line = s.root.querySelector('.m-ss-wait-line');
+        var line = /** @type {any} */ (s.root).querySelector('.m-ss-wait-line');
         if (line) line.textContent = _readingWords(s);
-        var fill = s.root.querySelector('.m-ss-fill');
+        var fill = /** @type {any} */ (s.root).querySelector('.m-ss-fill');
         if (fill) fill.style.transform = 'scaleX(' + (s.total ? (s.step === 'blank' ? 1 : s.read / s.total) : 0) + ')';
       },
     }).then(function (res) {
@@ -355,7 +359,7 @@
         if (!now || now.page !== page) return _crops(s);
         if (s.crops[no]) _revoke(s.crops[no].url);
         s.crops[no] = blob ? { page: page, url: _url(blob) } : { page: null, failed: page, url: '' };
-        var img = s.root.querySelector('img[data-crop="' + no + '"]');
+        var img = /** @type {any} */ (s.root).querySelector('img[data-crop="' + no + '"]');
         if (img && blob) {
           img.setAttribute('src', s.crops[no].url);
           img.classList.remove('is-thumb');
@@ -457,11 +461,11 @@
     else if (s.phase === 'reading') body = _readingHtml(s);
     else if (s.phase === 'split') body = _splitHtml(s);
     else body = _checkHtml(s);
-    var scroller = s.root.querySelector('.m-ss-body');
+    var scroller = /** @type {any} */ (s.root).querySelector('.m-ss-body');
     var keep = scroller ? scroller.scrollTop : 0;
     // html-safe: every part escapes its own text
     s.root.innerHTML = _topHtml(s) + body + (s.asking ? _askHtml(s) : '');
-    var again = s.root.querySelector('.m-ss-body');
+    var again = /** @type {any} */ (s.root).querySelector('.m-ss-body');
     if (again && s.drawnPhase === s.phase) again.scrollTop = keep;
     s.drawnPhase = s.phase;
   }
@@ -521,7 +525,7 @@
         '</div><p class="m-ss-hint">The one with the most students Not In comes first.</p>';
     }
     html += '<p class="m-ss-privacy">The scan is split on this phone. Only each student’s own pages upload.</p></div>';
-    var can = !!s.aid && offered.length > 0;
+    var can = !!s.aid && offered.length > 0 && !s.switching;
     var foot = '<div class="m-ss-foot">';
     if (s.file) {
       foot +=
@@ -916,7 +920,7 @@
   /* ── Names ──────────────────────────────────────────────────── */
 
   function _nameInput(s, at) {
-    return s.root.querySelector('#m-ss-name-' + at);
+    return /** @type {any} */ (s.root).querySelector('#m-ss-name-' + at);
   }
 
   function _used(s, exceptAt) {
@@ -931,7 +935,7 @@
   // html-safe: names go through esc; ids are ours (esc too)
   function _drawFits(s, input) {
     var at = Number(input.getAttribute('data-at'));
-    var box = s.root.querySelector('#m-ss-fits-' + at);
+    var box = /** @type {any} */ (s.root).querySelector('#m-ss-fits-' + at);
     if (!box) return;
     var p = s.m.pieces()[at];
     var shown = p && p.sid ? _full(s.byId[p.sid]) : '';
@@ -973,7 +977,7 @@
     var next = order.find(function (p) {
       return !p.sid;
     });
-    var el = next ? _nameInput(s, next.at) : s.root.querySelector('.m-ss-primary:not(:disabled)');
+    var el = next ? _nameInput(s, next.at) : /** @type {any} */ (s.root).querySelector('.m-ss-primary:not(:disabled)');
     if (el) {
       el.focus({ preventScroll: true });
       if (el.scrollIntoView) el.scrollIntoView({ block: 'center' });
@@ -1022,7 +1026,7 @@
     s.phase = 'check';
     s.note = built.refused.length ? 'A piece of work can have 30 pages at most. Some pieces were not checked.' : '';
     _draw();
-    var b = s.root.querySelector('.m-ss-primary');
+    var b = /** @type {any} */ (s.root).querySelector('.m-ss-primary');
     if (b) b.focus({ preventScroll: true });
   }
 
@@ -1076,7 +1080,7 @@
         progress: function (done, total) {
           if (_s !== s) return;
           s.run.line = 'Adding ' + done + ' of ' + total + '…';
-          var line = s.root.querySelector('.m-ss-foot .m-ss-wait-line');
+          var line = /** @type {any} */ (s.root).querySelector('.m-ss-foot .m-ss-wait-line');
           if (line) line.textContent = s.run.line;
         },
       },
@@ -1105,7 +1109,7 @@
     if (waiting && !s.asking) {
       s.asking = true;
       _draw();
-      var stay = s.root.querySelector('[data-ss="stay"]');
+      var stay = /** @type {any} */ (s.root).querySelector('[data-ss="stay"]');
       if (stay) stay.focus();
       return;
     }
@@ -1128,6 +1132,8 @@
       return;
     }
     if (what === 'cancel') return _cancel(s);
+    // A class still loading: nothing on the pick screen answers until it is in.
+    if (s.phase === 'pick' && s.switching) return;
     if (what === 'class' && s.phase === 'pick') return _switchClass(s, btn.getAttribute('data-cid'));
     if (what === 'piece' && s.phase === 'pick') {
       s.aid = btn.getAttribute('data-aid');
@@ -1183,11 +1189,12 @@
   function _switchClass(s, cid) {
     if (!cid || cid === s.cid || s.switching) return;
     s.switching = true;
+    _draw();
     switchActiveCourse(cid).then(
       function (current) {
         if (_s !== s) return;
         s.switching = false;
-        if (!current) return;
+        if (!current) return _draw();
         s.cid = cid;
         s.aid = '';
         s.choices = {};
