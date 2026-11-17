@@ -589,6 +589,8 @@
           category: 'Projects',
           about: 'Make a poster about one disease: what causes it, how it spreads, and how the body fights it.',
           core: ['COM', 'CRT'],
+          // A handout the teacher attached (Handouts and Links): its pages are the site's own pictures (s/handouts.js).
+          resources: [{ id: 'demo-res-checklist', kind: 'pdf', title: 'Poster Checklist', url: null, page_count: 2 }],
           working: {
             score: { value: null, comment: 'Draft: two of your sources are missing.' },
             tag_scores: [level('demo-pa', 1), level('demo-com', 1)],
@@ -2315,6 +2317,8 @@
       watchRows();
       // What the class takes, asked once the page is up (s/send.js): a class that takes no work stays as drawn.
       if (!S.demo && typeof StudentPage.pageOpened === 'function') StudentPage.pageOpened();
+      // The handouts on the student's cards, fetched ahead so a tap opens them at once (s/handouts.js).
+      if (!S.demo && typeof StudentPage.warmHandouts === 'function') StudentPage.warmHandouts();
       // Its questionnaires (S4-F4): a function without the route leaves Reflections as drawn.
       if (!S.demo) loadForms();
     });

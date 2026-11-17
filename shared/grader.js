@@ -545,6 +545,35 @@ window.Grader = (function () {
     };
   }
 
+  /* Submitted (the Assignments page's Show bar): those of `studentIds`
+     whose work is in on `aid`, in the order given: their own (sent, added
+     by the teacher or handed in on paper), or on a One per Group piece a
+     group-mate's, less a member marked Missing or Excused, as To Grade
+     leaves them. In any grade state: work graded or returned is still in.
+     None on a DIBELS benchmark. The page asks for every card it draws, so
+     this reads the class's index of work and copies none of it. */
+  function workInIds(cid, aid, studentIds) {
+    var a = _piece(cid, aid);
+    if (!a || isDibelsScored(a)) return [];
+    var sent = {};
+    _workSentIn(cid, 'piece', aid).forEach(function (s) {
+      sent[s.enrollment_id] = true;
+    });
+    if (!Object.keys(sent).length) return [];
+    return studentIds.filter(function (sid) {
+      if (sent[sid]) return true;
+      var group = getStudentWorkGroup(cid, sid, aid);
+      var mateSent = group
+        ? group.members.some(function (m) {
+            return sent[m];
+          })
+        : false;
+      if (!mateSent) return false;
+      var status = getAssignmentStatus(cid, sid, aid);
+      return status !== 'NS' && status !== 'EXC';
+    });
+  }
+
   /* The class's totals over every piece (or the pieces in `aids`):
      { tograde, toreturn, notin, groups, oldest, pieces: [{ aid, tograde,
      toreturn, notin }] } (only pieces with one of them), for the
@@ -769,6 +798,7 @@ window.Grader = (function () {
     workShownInClass: workShownInClass,
     workStateOf: workStateOf,
     workCounts: workCounts,
+    workInIds: workInIds,
     classWorkCounts: classWorkCounts,
     returnedThisWeek: returnedThisWeek,
     samePhotoAs: samePhotoAs,

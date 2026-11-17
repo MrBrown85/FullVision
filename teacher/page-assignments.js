@@ -20,9 +20,6 @@ window.PageAssignments = (function () {
   var showUngraded = false;
   // "N to return" pressed: only the assessments with a draft (S1-F2).
   var _toReturnOnly = false;
-  // Show: To Grade (S6-F4): only the assessments with work waiting to grade.
-  var _toGradeOnly = false;
-  var _toGradeTotal = 0;
   // The drafts on screen, summed over the listed assessments at the last
   // render or refresh.
   var _toReturnTotal = 0;
@@ -41,6 +38,18 @@ window.PageAssignments = (function () {
   // While a search or filter is on, every module with matches shows open;
   // a module the teacher closes during it is kept here, not saved.
   var _filterClosedModules = {};
+  // Show: Submitted (assign-show.js) opens and closes cards through these.
+  AssignShow.bind({
+    get: function () {
+      return { open: openAssessIds, allExpanded: _allExpanded, collapsed: _collapsedIds, closed: _filterClosedModules };
+    },
+    set: function (v) {
+      openAssessIds = v.open;
+      _allExpanded = v.allExpanded;
+      _collapsedIds = v.collapsed;
+      _filterClosedModules = v.closed;
+    },
+  });
   // Closed modules stay closed per class, saved with the teacher's
   // preferences so they survive signing out. This key is the old
   // browser-only copy, read once when a class has nothing saved yet.
@@ -198,6 +207,7 @@ window.PageAssignments = (function () {
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;
+    AssignShow.reset();
     _filterMenuOpen = false;
     focusStudentId = null;
     collapsedModules = _loadClosedModules(cid);
@@ -572,15 +582,19 @@ window.PageAssignments = (function () {
       '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
       (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
-      _toGradeSegHtml(cid) +
-      '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
-      '<button class="seg-btn assess-seg-btn"' +
-      segAttr(seg[0]) +
-      ' data-action="expandAllAssess">Expand</button>' +
-      '<button class="seg-btn assess-seg-btn"' +
-      segAttr(seg[1]) +
-      ' data-action="collapseAllAssess">Collapse</button>' +
-      '</div>' +
+      AssignShow.barHtml(cid) +
+      AssignList.switchHtml() +
+      // The List has no cards to open (assign-list.js).
+      (AssignList.on()
+        ? ''
+        : '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
+          '<button class="seg-btn assess-seg-btn"' +
+          segAttr(seg[0]) +
+          ' data-action="expandAllAssess">Expand</button>' +
+          '<button class="seg-btn assess-seg-btn"' +
+          segAttr(seg[1]) +
+          ' data-action="collapseAllAssess">Collapse</button>' +
+          '</div>') +
       (focusStudentId
         ? '<button class="tb-action-btn tb-show-all-btn" data-action="clearFocusStudent">Show All Students</button>'
         : '') +
@@ -1318,9 +1332,15 @@ window.PageAssignments = (function () {
       })
       .join('');
     var course = COURSES[cid] || {};
+    // The saved PDF's name: "DIBELS 8 Benchmark – Science 8 Block B – Beginning of Year".
+    var fileName = printFileName([
+      a.title || 'DIBELS 8 Benchmark',
+      printClassName(course),
+      DIBELS_PERIOD_NAMES[period],
+    ]);
     var html =
       '<!doctype html><html><head><meta charset="utf-8"><title>' +
-      esc(a.title || 'DIBELS 8 Benchmark') +
+      esc(fileName) +
       '</title><style>' +
       'body{font-family:-apple-system,system-ui,sans-serif;color:#000;margin:0.4in;font-size:10pt}' +
       'h1{font-size:15pt;margin:0 0 2pt}p{margin:0 0 8pt}' +
@@ -1345,9 +1365,12 @@ window.PageAssignments = (function () {
     frame.contentDocument.write(html);
     frame.contentDocument.close();
     setTimeout(function () {
+      // The frame's title names the file; the page's too, for a browser that names it from the page.
+      var restoreTitle = setPrintTitle([fileName]);
       frame.contentWindow.focus();
       frame.contentWindow.print();
       setTimeout(function () {
+        restoreTitle();
         frame.remove();
       }, 1000);
     }, 50);
@@ -1595,6 +1618,7 @@ window.PageAssignments = (function () {
   // An open card's body: its description and its grading controls.
   // html-safe: the description goes through esc; the grading builders are reviewed
   function _cardBodyHtml(cid, a, focusSt, students, scores) {
+    students = AssignShow.students(cid, a, students);
     var tagObjs = _scoreTagObjs(cid, a);
     return (
       (a.description
@@ -1627,7 +1651,7 @@ window.PageAssignments = (function () {
           _WARNING_ICON +
           missingCount +
           ' missing</span>'
-        : '') + _toGradeChipHtml(cid, a, shownIds, tograde);
+        : '') + AssignShow.toGradeChipHtml(cid, a, shownIds, tograde);
     var out = { meta: meta, button: _gradeSubmissionsHtml(cid, a, shownIds, tograde) };
     _drawnReturn('n' + a.id, meta + '|' + out.button);
     return out;
@@ -1652,20 +1676,13 @@ window.PageAssignments = (function () {
       // html-safe: built by _gradeSubmissionsHtml
       head.querySelector('.assess-header-actions').insertAdjacentHTML('afterbegin', c.button);
     });
-    if (!classOn || total === _toGradeTotal) return;
-    _toGradeTotal = total;
-    var n = document.querySelector('.assess-tograde-n');
-    if (n) n.textContent = String(total);
+    if (classOn) AssignShow.toGradeTotal(total);
   }
 
-  // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
-  function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds) {
-    var html =
-      '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
-    html += '<div>';
-
-    // New assessment form
-    html +=
+  // The new or edit form's place, above the cards or the List.
+  // html-safe: the form escapes its own text
+  function _newFormHtml(cid) {
+    return (
       '<div id="new-assess-form" data-cid="' +
       esc(cid) +
       '" style="display:' +
@@ -1682,7 +1699,17 @@ window.PageAssignments = (function () {
               : null,
           )
         : '') +
-      '</div>';
+      '</div>'
+    );
+  }
+
+  // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
+  function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds) {
+    var html =
+      '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
+    html += '<div>';
+
+    html += _newFormHtml(cid);
 
     // Assessment cards grouped by module folders
     var focusSt = focusStudentId
@@ -1809,7 +1836,6 @@ window.PageAssignments = (function () {
             _drawnReturn('s' + a.id, _returnDraftsButtonHtml(cid, a, shownIds)) +
             '</span>'
           : '') +
-        _setEveryoneMenuHtml(cid, a) +
         _cardMoreMenuHtml(cid, a) +
         '</div>' +
         '<span class="assess-chevron" aria-hidden="true">' +
@@ -1837,7 +1863,8 @@ window.PageAssignments = (function () {
       grouped[key].push(a);
     });
 
-    var filtersActive = filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly;
+    var filtersActive =
+      filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly || AssignShow.on();
     if (!filtersActive) _filterClosedModules = {};
 
     // Nothing to show: say so first, above any modules.
@@ -2563,20 +2590,11 @@ window.PageAssignments = (function () {
         });
     } else _toReturnOnly = false;
 
-    // Work to grade (S6-F4): the same count as the gradebook's bar and the
-    // dashboard's To Grade cell (GraderWork.workCounts), over the students
-    // on screen. With To Grade on, only the assessments with work waiting.
-    _toGradeTotal = 0;
-    if (GraderWork.workOnInClass(cid)) {
-      assessments.forEach(function (a) {
-        nums[a.id].tograde = GraderWork.workCounts(cid, a.id, shownIds).tograde;
-        _toGradeTotal += nums[a.id].tograde;
-      });
-      if (_toGradeOnly)
-        assessments = assessments.filter(function (a) {
-          return nums[a.id].tograde > 0;
-        });
-    } else _toGradeOnly = false;
+    // The Show bar (assign-show.js): each card's To Grade, Not In and
+    // Submitted, the same counts as the gradebook's bar and the dashboard's
+    // To Grade cell (GraderWork), over the students on screen; with
+    // Submitted, To Grade or Not In on, only the assessments it counts.
+    assessments = AssignShow.listed(cid, assessments, nums, shownIds);
 
     // Render toolbar
     var result = renderAssessToolbar(cid, assessments);
@@ -2589,16 +2607,10 @@ window.PageAssignments = (function () {
     _keepingForm = !!keptForm;
     _drawnReturns = {};
     try {
-      document.getElementById('main').innerHTML = renderAssessmentList(
-        cid,
-        assessments,
-        allAssessments,
-        students,
-        scores,
-        modules,
-        nums,
-        shownIds,
-      );
+      // html-safe: AssignList.html escapes every title and name (assign-list.js); renderAssessmentList is reviewed
+      document.getElementById('main').innerHTML = AssignList.on()
+        ? AssignList.html(cid, assessments, allAssessments, _newFormHtml(cid))
+        : renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds);
     } finally {
       _keepingForm = false;
     }
@@ -2608,7 +2620,8 @@ window.PageAssignments = (function () {
       if (keptFocus && keptFocus.isConnected) keptFocus.focus({ preventScroll: true });
     }
     _afterCardsDrawn(document.getElementById('main'));
-    _syncDescriptorBar(cid, assessments);
+    AssignList.afterDraw(document.getElementById('main'));
+    _syncDescriptorBar(cid, AssignList.on() ? [] : assessments);
   }
 
   /* After a draw of the list or of cards: the ledgers' counts, the Class
@@ -7047,6 +7060,13 @@ window.PageAssignments = (function () {
       var assessWeight = _formAssessWeight();
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
+    // A change that moves grades asks first (grade-change.js).
+    if (
+      GradeChange.askFirst(activeCourse, before, next, function () {
+        saveEditAssess(aid);
+      })
+    )
+      return;
     var edited = JSON.stringify(next) !== JSON.stringify(before);
     if (edited) next.successCriteria = undefined;
     // Read before hideNewForm()/render() replace the form.
@@ -7080,6 +7100,7 @@ window.PageAssignments = (function () {
     openAssessIds.add(aid);
     hideNewForm();
     render();
+    GradeChange.offerUndo(activeCourse, before, after, render);
     if (carried) refreshSidebarGrades();
     if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
       // One dialog at a time: the edit offer first, then any new copies.
@@ -7239,9 +7260,9 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var main = document.getElementById('main');
     if (_grader || !main || !COURSES[cid]) return false;
-    // A filter on grades (Ungraded, To Return, To Grade) can drop a card graded since the draw.
-    if (showUngraded || _toReturnOnly || _toGradeOnly) return false;
-    var filtersActive = filterCategories.length > 0 || !!assessSearch;
+    // A filter on grades (Ungraded, To Return) can drop a card graded since the draw.
+    if (showUngraded || _toReturnOnly) return false;
+    var filtersActive = filterCategories.length > 0 || !!assessSearch || AssignShow.on();
     var all = getAssessments(cid);
     var byId = {};
     all.forEach(function (a) {
@@ -7469,6 +7490,12 @@ window.PageAssignments = (function () {
     // Draft or Returned beside the name (S1-F2); '' in a class that holds
     // no grades, where the row is as it was.
     var mark = _returnMarkHtml(activeCourse, aid, st.id);
+    var group = _groupRowFor(aid, st.id);
+    // The work icon, as on a rubric's or competencies' rows (Colin, Nov 16:
+    // every kind of work takes Add Work and See the Work). A group's row
+    // has none, as there.
+    var work = group && group.view ? '' : _workIconHtml(activeCourse, aid, st);
+    var wrap = mark || work;
     return (
       '<div class="score-row ldg-row ldg-' +
       kind +
@@ -7482,15 +7509,12 @@ window.PageAssignments = (function () {
       aid +
       '">' +
       '<span class="ldg-name' +
-      (mark ? ' ldg-name-ret' : '') +
+      (wrap ? ' ldg-name-ret' : '') +
+      (work ? ' ldg-name-work' : '') +
       '">' +
-      (mark ? '<span class="ldg-name-text">' : '') +
-      esc(
-        _groupRowFor(aid, st.id) && _groupRowFor(aid, st.id).view
-          ? _groupRowFor(aid, st.id).view.label
-          : displayNameWithLast(st),
-      ) +
-      (mark ? '</span>' + mark : '') +
+      (wrap ? '<span class="ldg-name-text">' : '') +
+      esc(group && group.view ? group.view.label : displayNameWithLast(st)) +
+      (wrap ? '</span>' + mark + work : '') +
       '</span>'
     );
   }
@@ -11233,7 +11257,7 @@ window.PageAssignments = (function () {
       _closeGroupMenus();
     // A card's menu closes on any click but its own button's (an item's
     // action still runs).
-    if (!e.target.closest('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]')) _closeCardMenus();
+    if (!e.target.closest(CardMenu.TOGGLES + ', [data-action="openCardSubmenu"]')) CardMenu.close();
     // The row's Attach a Link form closes on a click anywhere else.
     if (!e.target.closest('.rsg-attach-link, [data-action="attachWorkLink"]')) _closeAttachLink(false);
     // KB focus on score cells
@@ -11317,7 +11341,10 @@ window.PageAssignments = (function () {
         editAssess(el.dataset.aid);
       },
       toggleCardMenu: function () {
-        _toggleCardMenu(el);
+        CardMenu.toggle(el);
+      },
+      openCardSubmenu: function () {
+        CardMenu.openSub(el, true);
       },
       attachWorkMenu: function () {
         _attachMenuOpen(el);
@@ -11460,13 +11487,12 @@ window.PageAssignments = (function () {
       toggleToReturn: function () {
         _toggleToReturn();
       },
-      // Work to grade (S6-F4).
+      // The Show bar (assign-show.js).
       setToGradeShow: function () {
-        _toGradeOnly = el.dataset.show === 'tograde';
+        var show = AssignShow.choose(el.dataset.show);
         render();
-        var again = document.querySelector(
-          '.assess-tograde-seg [data-show="' + (_toGradeOnly ? 'tograde' : 'all') + '"]',
-        );
+        AssignShow.afterDraw();
+        var again = document.querySelector('.assess-tograde-seg [data-show="' + show + '"]');
         if (again) again.focus({ preventScroll: true });
       },
       gradeSubmissions: function () {
@@ -11542,7 +11568,9 @@ window.PageAssignments = (function () {
         filterCategories = [];
         assessSearch = '';
         showUngraded = false;
+        AssignShow.choose('all');
         render();
+        AssignShow.afterDraw();
       },
       selectTagLevel: function () {
         selectTagLevel(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.tagid);
@@ -12015,7 +12043,7 @@ window.PageAssignments = (function () {
       closeMenus();
       return;
     }
-    if (_cardMenuKeydown(e)) return;
+    if (CardMenu.keydown(e)) return;
     if (_attachLinkKeydown(e)) return;
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
@@ -12096,8 +12124,15 @@ window.PageAssignments = (function () {
       return;
     }
     var ldgRow = document.activeElement.closest && document.activeElement.closest('.ldg-row.ldg-cmp');
-    // Typing in the row's Overall Comment is not a c / i answer.
-    if (ldgRow && document.activeElement.tagName !== 'TEXTAREA' && handleLedgerKey(e, ldgRow)) return;
+    // Typing in the row's Overall Comment, or in its + menu and Link…
+    // form, is not a c / i answer.
+    if (
+      ldgRow &&
+      document.activeElement.tagName !== 'TEXTAREA' &&
+      !document.activeElement.closest('.rsg-attach') &&
+      handleLedgerKey(e, ldgRow)
+    )
+      return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
       // Shift+Enter is a new line.
@@ -13647,35 +13682,11 @@ window.PageAssignments = (function () {
   }
 
   /* ── Work to grade on the Assignments page (S6-F4) ───────────
-     In a class whose student page and Send Work are on: Show All | To
-     Grade 9 on the toolbar, "6 to grade" on a card, Grade Submissions,
+     In a class whose student page and Send Work are on: the Show bar
+     (All | Submitted | To Grade 9 | Not In, assign-show.js) on the toolbar, "6 to grade" on a card, Grade Submissions,
      which opens the grader dialog on the work waiting (Show on To Grade),
      and on one student's grader, what came in and Add Work. Every number is
      GraderWork.workCounts', as the gradebook's and the dashboard's are. */
-  // html-safe: fixed words and a number
-  function _toGradeSegHtml(cid) {
-    if (!GraderWork.workOnInClass(cid)) return '';
-    return (
-      '<div class="seg seg-sm assess-tograde-seg" role="group" aria-label="Show">' +
-      '<button type="button" class="seg-btn"' +
-      segAttr(!_toGradeOnly) +
-      ' data-action="setToGradeShow" data-show="all">All</button>' +
-      '<button type="button" class="seg-btn"' +
-      segAttr(_toGradeOnly) +
-      ' data-action="setToGradeShow" data-show="tograde">To Grade <span class="assess-tograde-n">' +
-      _toGradeTotal +
-      '</span></button></div>'
-    );
-  }
-
-  // `tograde`, when given, is the card's To Grade count as render() worked it out.
-  // html-safe: a number and fixed words
-  function _toGradeChipHtml(cid, a, shownIds, tograde) {
-    if (!GraderWork.workOn(cid, a)) return '';
-    var n = tograde != null ? tograde : GraderWork.workCounts(cid, a.id, shownIds).tograde;
-    return n ? '<span class="assess-to-grade">' + n + ' to grade</span>' : '';
-  }
-
   // html-safe: ids are ours; fixed words
   function _gradeSubmissionsHtml(cid, a, shownIds, tograde) {
     if (focusStudentId || !GraderWork.workOn(cid, a)) return '';
@@ -13687,19 +13698,20 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* The open card's header (AssignmentsPage board): Grade Submissions,
-     Set Everyone To ▾ and a ⋯ menu, so the title keeps its room. Every
-     action the old row of buttons had is in the ⋯ menu: Class Results,
-     Print, the Work Wall (while the piece takes work), Grade by
-     Competencies or Rubric, Show or Hide Checklists, Edit Assessment,
-     Duplicate, Copy to Another Class… and Delete…. One menu is open at a
-     time; a click elsewhere or Esc closes it. */
+  /* The open card's header (AssignmentsPage board): Grade Submissions
+     and a ⋯ menu, so the title keeps its room. Every action the old row
+     of buttons had is in the ⋯ menu: Class Results, Print, the Work Wall
+     (while the piece takes work), Grade by Competencies or Rubric, Show or
+     Hide Checklists, Set Everyone To (Colin, Nov 16: in the menu, not a
+     button of its own on the bar), Edit Assessment, Duplicate, Copy to
+     Another Class… and Delete…. One menu is open at a time; a click
+     elsewhere or Esc closes it. */
   var _ARROW_RIGHT_ICON =
     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8h11M9 3.5L13.5 8 9 12.5"/></svg>';
+  var _SUB_CARET =
+    '<svg class="assess-sub-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
   var _WALL_ICON =
     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2" width="5.5" height="5" rx="1"/><rect x="9" y="2" width="5.5" height="5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5" rx="1"/><rect x="9" y="9" width="5.5" height="5" rx="1"/></svg>';
-  var _MENU_CARET =
-    '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
   // html-safe: attrs are built from our ids and fixed words; label and icon are fixed
   function _cardMenuItem(attrs, icon, label, cls) {
@@ -13716,9 +13728,11 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* Set Everyone To ▾ while the class's levels grid shows (the competency
-     or rubric grid, not one student's grader, points, a mark or DIBELS):
-     the four levels in the class's order, each as the grid's row was. */
+  /* The ⋯ menu's Set Everyone To › while the class's levels grid shows
+     (the competency or rubric grid, not one student's grader, points, a
+     mark or DIBELS): a submenu of the four levels in the class's order
+     (teacher/card-menu.js). Points and Complete/Incomplete keep their Set
+     Unmarked To buttons above their grid. */
   // html-safe: ids are ours; level names are fixed
   function _setEveryoneMenuHtml(cid, a) {
     if (focusStudentId || isDibelsScored(a) || isCompletionScored(a) || a.scoreMode === 'points') return '';
@@ -13743,11 +13757,13 @@ window.PageAssignments = (function () {
       })
       .join('');
     return (
-      '<div class="assess-menu-wrap assess-setto">' +
-      '<button type="button" class="assess-setto-btn" data-action="toggleCardMenu" aria-haspopup="menu" aria-expanded="false">Set Everyone To' +
-      _MENU_CARET +
+      '<div class="assess-setto">' +
+      '<span class="assess-menu-sep" role="separator"></span>' +
+      '<button type="button" role="menuitem" class="assess-menu-item assess-sub-btn" data-action="openCardSubmenu" aria-haspopup="menu" aria-expanded="false">' +
+      '<span class="assess-menu-icon" aria-hidden="true"></span><span>Set Everyone To</span>' +
+      _SUB_CARET +
       '</button>' +
-      '<div class="assess-menu" role="menu" aria-label="Set Everyone To" hidden>' +
+      '<div class="assess-menu assess-submenu" role="menu" aria-label="Set Everyone To" hidden>' +
       items +
       '</div></div>'
     );
@@ -13825,6 +13841,7 @@ window.PageAssignments = (function () {
       }
     }
     html +=
+      _setEveryoneMenuHtml(cid, a) +
       '<span class="assess-menu-sep" role="separator"></span>' +
       _cardMenuItem('data-action="editAssess" ' + aid, LINE_ICONS.edit, 'Edit Assessment') +
       _cardMenuItem('data-action="dupeAssess" ' + aid, LINE_ICONS.copy, 'Duplicate');
@@ -13845,44 +13862,6 @@ window.PageAssignments = (function () {
       html +
       '</div></div>'
     );
-  }
-
-  function _closeCardMenus(except) {
-    document.querySelectorAll('.assess-menu-wrap .assess-menu').forEach(function (menu) {
-      if (menu === except || menu.hidden) return;
-      menu.hidden = true;
-      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
-      if (btn) btn.setAttribute('aria-expanded', 'false');
-    });
-  }
-  function _toggleCardMenu(btn) {
-    var menu = btn.parentNode.querySelector('.assess-menu');
-    if (!menu) return;
-    _closeCardMenus(menu);
-    menu.hidden = !menu.hidden;
-    btn.setAttribute('aria-expanded', String(!menu.hidden));
-    if (!menu.hidden) {
-      var first = menu.querySelector('button');
-      if (first) first.focus({ preventScroll: true });
-    }
-  }
-  // ↑ ↓ move through an open menu; Esc closes it and goes back to its button.
-  function _cardMenuKeydown(e) {
-    var menu = e.target.closest && e.target.closest('.assess-menu-wrap .assess-menu:not([hidden])');
-    if (!menu) return false;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      _closeCardMenus();
-      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
-      if (btn) btn.focus({ preventScroll: true });
-      return true;
-    }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return false;
-    e.preventDefault();
-    var items = Array.prototype.slice.call(menu.querySelectorAll('button'));
-    var i = items.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : -1);
-    items[(i + items.length) % items.length].focus();
-    return true;
   }
 
   /* Copy to Another Class…: the edit form, at its Classes row (the copy is
@@ -14019,7 +13998,7 @@ window.PageAssignments = (function () {
       // html-safe: _attachMenuHtml escapes its ids and label; the rest is fixed
       wrap.insertAdjacentHTML('beforeend', _attachMenuHtml(cid, aid, sid, btn.getAttribute('aria-label') || ''));
     }
-    _toggleCardMenu(btn);
+    CardMenu.toggle(btn);
   }
 
   // The row's work icon for `sid`, once the page is drawn again.
@@ -14098,7 +14077,7 @@ window.PageAssignments = (function () {
     var wrap = el && el.closest('.rsg-attach');
     if (!wrap) return;
     _closeAttachLink(false);
-    _closeCardMenus();
+    CardMenu.close();
     // html-safe: built by _attachLinkHtml, which escapes the name and the ids
     wrap.insertAdjacentHTML('beforeend', _attachLinkHtml(activeCourse, el.dataset.aid, el.dataset.sid));
     var btn = wrap.querySelector('.rsg-attach-btn');
@@ -16960,7 +16939,8 @@ window.PageAssignments = (function () {
     showUngraded = false;
     _toReturnOnly = false;
     // The dashboard's To Grade cell opens the page with To Grade on.
-    _toGradeOnly = !!(params && params.show === 'tograde');
+    AssignShow.reset(params && params.show);
+    AssignList.reset();
     _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;
@@ -17030,6 +17010,7 @@ window.PageAssignments = (function () {
     _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
+    AssignList.listen(_addDocListener);
     ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
       _addDocListener(type, _queuePrintMarks);
     });

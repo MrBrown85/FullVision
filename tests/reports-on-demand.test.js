@@ -69,7 +69,7 @@ describe('scripts loaded on demand', () => {
     );
     // Every sheet of slips or cards prints through printSheet, the only caller of qrSvg's QR maker.
     expect(read('teacher/qr-slips.js')).toMatch(
-      /function printSheet\(items, renderCell\) \{[\s\S]{0,200}Router\.withScripts\('qrcode', function \(\) \{/,
+      /function printSheet\(items, renderCell, titleParts\) \{[\s\S]{0,200}Router\.withScripts\('qrcode', function \(\) \{/,
     );
   });
 

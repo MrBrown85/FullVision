@@ -6603,6 +6603,22 @@ button.grader-member-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ...and the work icon at its end (_workIconHtml), its + menu let out of
+   the cell. */
+.ldg-name.ldg-name-work {
+  overflow: visible;
+}
+.ldg-name-work .rsg-work-btn,
+.ldg-name-work .rsg-attach {
+  margin-left: auto;
+}
+/* The + is near the card's left edge here: its menu and Link… open to the
+   right of it, not off the card. */
+.ldg-name-work .rsg-attach .assess-menu,
+.ldg-name-work .rsg-attach-link {
+  left: 0;
+  right: auto;
+}
 /* One student on the page: the dialog's row, under their grader in the
    open card. */
 .grader-return.grader-return-inline {
@@ -9746,30 +9762,10 @@ button.grader-member-name {
   font-size: 13px;
   white-space: nowrap;
 }
-/* The open card's Set Everyone To ▾ and ⋯ menus (AssignmentsPage). */
+/* The open card's ⋯ menu (AssignmentsPage). */
 .assess-menu-wrap {
   position: relative;
   display: inline-flex;
-}
-.assess-setto-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px 0 12px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(118, 118, 128, 0.12);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.assess-setto-btn:hover,
-.assess-setto-btn[aria-expanded='true'] {
-  background: rgba(118, 118, 128, 0.22);
 }
 .assess-more-btn {
   width: 30px;
@@ -9805,10 +9801,38 @@ button.grader-member-name {
     0 10px 28px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   cursor: default;
 }
-.assess-setto .assess-menu {
+/* Opened upward, or from the button's left edge, when there's no room
+   below or to the left (_placeCardMenu). */
+.assess-menu.is-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.assess-menu.is-left {
+  right: auto;
+  left: 0;
+}
+.assess-setto {
+  display: flex;
+  flex-direction: column;
+}
+/* Set Everyone To's levels: beside the ⋯ menu, placed against the window
+   by teacher/card-menu.js. */
+.assess-menu.assess-submenu {
+  position: fixed;
+  top: 0;
+  right: auto;
   min-width: 180px;
+  z-index: 31;
+}
+.assess-sub-caret {
+  margin-left: auto;
+  color: var(--text-3);
+}
+.assess-sub-btn[aria-expanded='true'] {
+  background: var(--active-light);
 }
 .assess-menu[hidden] {
   display: none;
@@ -9867,7 +9891,7 @@ button.grader-member-name {
 .assess-menu-dot.l4 {
   background: var(--score-4);
 }
-/* Set Everyone To changes the open grid only: a closed card leaves it out. */
+/* Set Everyone To changes the open grid only: a closed card's menu leaves it out. */
 .assess-card:not(.open) .assess-header-actions .assess-setto {
   display: none;
 }
@@ -10833,4 +10857,315 @@ button.grader-member-name {
   .af-res-in {
     animation: none;
   }
+}
+
+/* ── List view (teacher/assign-list.js) ─────────────────────────────
+   One row per assessment, its settings along the row. Mockup approved
+   Nov 16 (https://claude.ai/artifact/QewmqUbXPfuuQcfAzSsRqJ). */
+.assess-view-seg {
+  margin-left: 4px;
+}
+.alv-page {
+  padding: 12px 12px 24px;
+}
+.alv-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.alv-fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.78125rem;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.alv-fchip-check {
+  padding-right: 10px;
+}
+.alv-fchip.is-on {
+  border-color: var(--active);
+  color: var(--active);
+}
+.alv-fchip select {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+  max-width: 180px;
+  cursor: pointer;
+}
+.alv-fchip input {
+  margin: 0;
+}
+.alv-count {
+  font-size: 0.78125rem;
+  color: var(--text-2);
+  margin-left: 4px;
+}
+.alv {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px var(--divider-medium);
+  overflow: hidden;
+}
+.alv-scroll {
+  overflow-x: auto;
+}
+.alv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.alv-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-2);
+  padding: 8px 4px 7px;
+  border-bottom: 1px solid var(--divider-medium);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.alv-sort {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.alv-sort:hover {
+  color: var(--text);
+}
+.alv-arrow {
+  color: var(--active);
+  margin-left: 3px;
+}
+.alv-hint {
+  display: block;
+  font-weight: 400;
+  font-size: 0.6875rem;
+  color: var(--text-3);
+}
+.alv-table td {
+  padding: 4px 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--divider-subtle);
+}
+.alv-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.alv-table tbody tr.is-ticked td {
+  background: var(--active-light);
+}
+.alv-table tbody tr.is-moving {
+  opacity: 0.4;
+}
+.alv-table tbody tr.drop-before td {
+  box-shadow: inset 0 2px 0 var(--active);
+}
+.alv-table tbody tr.drop-after td {
+  box-shadow: inset 0 -2px 0 var(--active);
+}
+.alv-grip-col {
+  width: 22px;
+  padding-left: 8px !important;
+}
+.alv-tick-col {
+  width: 26px;
+}
+.alv-tick-col input {
+  margin: 0;
+}
+.alv-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-3);
+  cursor: grab;
+  padding: 0;
+}
+.alv-grip:hover,
+.alv-grip:focus-visible {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.alv-title-col {
+  width: 40%;
+}
+.alv-title,
+.alv-cell,
+.alv-factor-in {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+}
+.alv-title {
+  width: 100%;
+  min-width: 210px;
+  padding: 4px 6px;
+  font-weight: 600;
+  font-size: 0.84375rem;
+}
+.alv-cell {
+  padding: 4px 2px;
+  max-width: 136px;
+  cursor: pointer;
+}
+.alv-date {
+  width: 114px;
+}
+.alv-cell.is-empty {
+  color: var(--text-3);
+}
+.alv-title:hover,
+.alv-cell:hover,
+.alv-factor-in:hover {
+  border-color: var(--divider-strong);
+}
+.alv-title:focus,
+.alv-cell:focus,
+.alv-factor-in:focus {
+  outline: none;
+  border-color: var(--active);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--active-light);
+}
+.alv-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.alv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.alv-factor {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.alv-step {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.alv-step:hover {
+  background: var(--overlay-pressed);
+}
+.alv-factor-in {
+  width: 38px;
+  padding: 3px 0;
+  text-align: center;
+}
+.alv-sub {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-3);
+  margin: 1px 0 0 4px;
+}
+.alv-share.is-changed,
+.alv-warn {
+  color: var(--notice-text);
+}
+.alv-scoring {
+  display: inline-block;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  font-size: 0.71875rem;
+  color: var(--text-2);
+  border: 1px solid var(--divider-strong);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.alv-open-col {
+  text-align: right;
+  padding-right: 10px !important;
+}
+.alv-link {
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  font: inherit;
+  color: var(--link);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.alv-link:hover {
+  background: var(--active-light);
+}
+.alv-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  background: var(--active-light);
+  border-bottom: 1px solid var(--divider-medium);
+}
+.alv-bar-n {
+  color: var(--active);
+}
+.alv-bar select,
+.alv-bar input[type='date'] {
+  font: inherit;
+  font-size: 0.78125rem;
+  padding: 3px 6px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+}
+.alv-bar-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.alv-bar-done {
+  color: var(--text-2);
+  margin-left: 6px;
+}
+.alv-sort-bar {
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
+.alv-spacer {
+  flex: 1;
+}
+.alv-none {
+  padding: 28px 12px !important;
+  text-align: center;
+  color: var(--text-2);
+  white-space: normal !important;
 }

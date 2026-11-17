@@ -482,12 +482,17 @@ test.describe('A Page Studio form, read as parts', () => {
       window.print = () => {
         const sids = [...document.querySelectorAll('#rb-preview .sheet-student')].map(el => el.dataset.sid);
         window.__printed.push(sids);
+        window.__title = document.title;
       };
     });
+    const before = await page.title();
     await page.getByRole('button', { name: 'Print This Copy' }).click();
     const printed = await page.evaluate(() => window.__printed);
     expect(printed).toHaveLength(1);
     expect(new Set(printed[0]).size).toBe(STUDENTS);
+    // Save as PDF names the file after the reports, the class and the term; the page's title comes back.
+    expect(await page.evaluate(() => window.__title)).toMatch(/^Progress Reports \u2013 Science 8\b.* \u2013 \S/);
+    await expect(page).toHaveTitle(before);
     // The canvas goes back to the one student afterwards.
     await expect(page.locator('.report-sheet')).toHaveCount(2);
   });

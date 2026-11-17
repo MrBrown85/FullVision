@@ -725,9 +725,15 @@ window.StudentPageView = (function () {
   function handoutPages(ui, r) {
     var got = ui.handoutPages && r && ui.handoutPages.id === r.id ? ui.handoutPages : null;
     if (!got || got.state !== 'ready') return null;
-    return (Array.isArray(got.pages) ? got.pages : []).filter(function (pg) {
-      return pg && typeof pg.url === 'string' && PAGE_URL.test(pg.url);
-    });
+    // Pages come in one by one: one still on its way keeps its place, with no address yet.
+    // An address this page would not show is left out.
+    return (Array.isArray(got.pages) ? got.pages : [])
+      .filter(function (pg) {
+        return pg && typeof pg.url === 'string' && (pg.url === '' || PAGE_URL.test(pg.url));
+      })
+      .map(function (pg) {
+        return { url: pg.url };
+      });
   }
 
   /* A handout open in the page: the way back to the card, its name, which
@@ -754,11 +760,13 @@ window.StudentPageView = (function () {
       var dots = '';
       for (var k = 0; k < n; k++) dots += '<span class="sp-work-dot' + (k === i ? ' sp-work-dot-on' : '') + '"></span>';
       body =
-        '<figure class="sp-work-page sp-handout-page"><img class="sp-work-img" src="' +
-        esc(pages[i].url) +
-        '" alt="' +
-        esc(r.title + ', page ' + (i + 1)) +
-        '"></figure>' +
+        (pages[i].url
+          ? '<figure class="sp-work-page sp-handout-page"><img class="sp-work-img" src="' +
+            esc(pages[i].url) +
+            '" alt="' +
+            esc(r.title + ', page ' + (i + 1)) +
+            '"></figure>'
+          : '<figure class="sp-work-page sp-handout-page sp-handout-wait"><p class="sp-lead sp-msg-calm" role="status">Getting this page…</p></figure>') +
         (n > 1
           ? '<div class="sp-work-bar"><button type="button" class="sp-head-icon" data-act="handout-page" data-page="' +
             (i - 1) +
@@ -1348,7 +1356,7 @@ window.StudentPageView = (function () {
   }
 
   // Only a picture this page made or ships: a blob: address, or a drawn sample page.
-  var PAGE_URL = /^(blob:|\/assets\/sample-work\/|\.\.\/assets\/sample-work\/)[^"'<>\s]*$/;
+  var PAGE_URL = /^(blob:|(\.\.)?\/assets\/sample-(work|handouts)\/)[^"'<>\s]*$/;
 
   // The pages fetched for piece `p`, when they are in: [ { url, marks } ], or null.
   function readyPages(ui, p) {

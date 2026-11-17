@@ -149,6 +149,52 @@ test('the + on a row with nothing in: attach a link, and it becomes See the Work
   expect(errors).toEqual([]);
 });
 
+test('every kind of work has the +: a points quiz and Complete/Incomplete, not only rubrics', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const at = await openDemo(page);
+  // Cell Structure Quiz (points) and Lab Safety Contract (Complete/Incomplete) take work.
+  await page.evaluate(cid => {
+    ['sci8q1', 'sci8q4'].forEach(id =>
+      saveAssessmentStudentWork(cid, id, { students_send: 'photos_files', after_due: 'keep', group_work: 'each' }),
+    );
+  }, at.cid);
+  await page.goto('/assignments?open=sci8q4');
+  await page.waitForSelector('#dock-mount nav');
+  const contract = page.locator('#ac-sci8q4');
+  await contract.getByRole('button', { name: 'Attach Work for Ines' }).click();
+  await contract.getByRole('menuitem', { name: 'Link…' }).click();
+  // Typing in the form is not a C or I answer for the row.
+  const before = await page.evaluate(cid => getCompletionMark(cid, 'st11', 'sci8q4'), at.cid);
+  await contract.getByRole('textbox', { name: 'Web Address' }).fill('ic');
+  expect(await page.evaluate(cid => getCompletionMark(cid, 'st11', 'sci8q4'), at.cid)).toBe(before);
+  await contract.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.goto('/assignments?open=sci8q1');
+  await page.waitForSelector('#dock-mount nav');
+  const quiz = page.locator('#ac-sci8q1');
+  await quiz.getByRole('button', { name: 'Attach Work for Ines' }).click();
+  await expect(quiz.getByRole('menuitem', { name: 'Image or PDF…' })).toBeVisible();
+  await quiz.getByRole('menuitem', { name: 'Link…' }).click();
+  const form = quiz.getByRole('dialog', { name: 'Attach a Link for Ines' });
+  // The form opens over the card, not off its left edge.
+  const box = await form.boundingBox();
+  const card = await quiz.boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(card.x);
+  await form.getByRole('textbox', { name: 'Web Address' }).fill('docs.google.com/document/d/quiz');
+  await page.keyboard.press('Enter');
+  const see = quiz.getByRole('button', { name: 'See the Work' }).and(quiz.locator('[data-sid="st11"]'));
+  await expect(see).toBeFocused();
+  await see.click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog.locator('.grader-work-what')).toContainText('1 link');
+  await expect(dialog.getByRole('link', { name: /docs\.google\.com/ })).toHaveAttribute(
+    'href',
+    'https://docs.google.com/document/d/quiz',
+  );
+  expect(errors).toEqual([]);
+});
+
 test('the wall: thumbnails only, sorting, the level filters, a card, the grader', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));

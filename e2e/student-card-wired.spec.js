@@ -170,7 +170,8 @@ for (const size of [
       expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8|Assignments|Extending|Quiz/);
       expect((await stored(page)).local).toEqual({});
       await expect.poll(() => routes(posts)).toEqual(['page', 'work', 'forms', 'done']);
-      expect(fn.state.sessions).toEqual({});
+      // Logged when it arrives; the session goes when the fake server answers.
+      await expect.poll(() => fn.state.sessions).toEqual({});
       await fits(page);
       await named(page);
       await contrast(page);
@@ -394,6 +395,9 @@ test.describe('a real card: what stops it, and what each one says', () => {
       const fn = school();
       const posts = await serve(page, fn);
       await signIn(page);
+      // The signed-in page asks for its questionnaires once it's up: let that
+      // land before the log is cleared, or it counts against the reload.
+      await expect.poll(() => routes(posts), error).toContain('forms');
       Object.assign(fn.state.cards.P3R8WDK4, change);
       posts.length = 0;
       await page.reload();
