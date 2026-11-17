@@ -583,14 +583,18 @@ window.PageAssignments = (function () {
       '</div>' +
       (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
       AssignShow.barHtml(cid) +
-      '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
-      '<button class="seg-btn assess-seg-btn"' +
-      segAttr(seg[0]) +
-      ' data-action="expandAllAssess">Expand</button>' +
-      '<button class="seg-btn assess-seg-btn"' +
-      segAttr(seg[1]) +
-      ' data-action="collapseAllAssess">Collapse</button>' +
-      '</div>' +
+      AssignList.switchHtml() +
+      // The List has no cards to open (assign-list.js).
+      (AssignList.on()
+        ? ''
+        : '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
+          '<button class="seg-btn assess-seg-btn"' +
+          segAttr(seg[0]) +
+          ' data-action="expandAllAssess">Expand</button>' +
+          '<button class="seg-btn assess-seg-btn"' +
+          segAttr(seg[1]) +
+          ' data-action="collapseAllAssess">Collapse</button>' +
+          '</div>') +
       (focusStudentId
         ? '<button class="tb-action-btn tb-show-all-btn" data-action="clearFocusStudent">Show All Students</button>'
         : '') +
@@ -1675,14 +1679,10 @@ window.PageAssignments = (function () {
     if (classOn) AssignShow.toGradeTotal(total);
   }
 
-  // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
-  function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds) {
-    var html =
-      '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
-    html += '<div>';
-
-    // New assessment form
-    html +=
+  // The new or edit form's place, above the cards or the List.
+  // html-safe: the form escapes its own text
+  function _newFormHtml(cid) {
+    return (
       '<div id="new-assess-form" data-cid="' +
       esc(cid) +
       '" style="display:' +
@@ -1699,7 +1699,17 @@ window.PageAssignments = (function () {
               : null,
           )
         : '') +
-      '</div>';
+      '</div>'
+    );
+  }
+
+  // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
+  function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds) {
+    var html =
+      '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
+    html += '<div>';
+
+    html += _newFormHtml(cid);
 
     // Assessment cards grouped by module folders
     var focusSt = focusStudentId
@@ -2597,16 +2607,10 @@ window.PageAssignments = (function () {
     _keepingForm = !!keptForm;
     _drawnReturns = {};
     try {
-      document.getElementById('main').innerHTML = renderAssessmentList(
-        cid,
-        assessments,
-        allAssessments,
-        students,
-        scores,
-        modules,
-        nums,
-        shownIds,
-      );
+      // html-safe: AssignList.html escapes every title and name (assign-list.js); renderAssessmentList is reviewed
+      document.getElementById('main').innerHTML = AssignList.on()
+        ? AssignList.html(cid, assessments, allAssessments, _newFormHtml(cid))
+        : renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds);
     } finally {
       _keepingForm = false;
     }
@@ -2616,7 +2620,8 @@ window.PageAssignments = (function () {
       if (keptFocus && keptFocus.isConnected) keptFocus.focus({ preventScroll: true });
     }
     _afterCardsDrawn(document.getElementById('main'));
-    _syncDescriptorBar(cid, assessments);
+    AssignList.afterDraw(document.getElementById('main'));
+    _syncDescriptorBar(cid, AssignList.on() ? [] : assessments);
   }
 
   /* After a draw of the list or of cards: the ledgers' counts, the Class
@@ -7055,6 +7060,13 @@ window.PageAssignments = (function () {
       var assessWeight = _formAssessWeight();
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
+    // A change that moves grades asks first (grade-change.js).
+    if (
+      GradeChange.askFirst(activeCourse, before, next, function () {
+        saveEditAssess(aid);
+      })
+    )
+      return;
     var edited = JSON.stringify(next) !== JSON.stringify(before);
     if (edited) next.successCriteria = undefined;
     // Read before hideNewForm()/render() replace the form.
@@ -7088,6 +7100,7 @@ window.PageAssignments = (function () {
     openAssessIds.add(aid);
     hideNewForm();
     render();
+    GradeChange.offerUndo(activeCourse, before, after, render);
     if (carried) refreshSidebarGrades();
     if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
       // One dialog at a time: the edit offer first, then any new copies.
@@ -16927,6 +16940,7 @@ window.PageAssignments = (function () {
     _toReturnOnly = false;
     // The dashboard's To Grade cell opens the page with To Grade on.
     AssignShow.reset(params && params.show);
+    AssignList.reset();
     _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;
@@ -16996,6 +17010,7 @@ window.PageAssignments = (function () {
     _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
+    AssignList.listen(_addDocListener);
     ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
       _addDocListener(type, _queuePrintMarks);
     });
