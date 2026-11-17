@@ -46,7 +46,7 @@ window.DraftsBeforePrint = (function () {
      grades or nothing in the print is a draft. */
   function find(cid, aids, sids) {
     if (!cid || !holds(cid)) return null;
-    var assessments = getAssessments(cid) || [];
+    var assessments = getAssignedAssessments(cid) || [];
     var pieces = [];
     var total = 0;
     (aids || []).forEach(function (aid) {

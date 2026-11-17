@@ -329,7 +329,7 @@ window.DashOverview = (function () {
         students[s.id] = s;
       });
       var pieces = {};
-      (getAssessments(cid) || []).forEach(function (a) {
+      (getAssignedAssessments(cid) || []).forEach(function (a) {
         if (a && a.id) pieces[a.id] = a;
       });
       questionsIn(cid).forEach(function (r) {

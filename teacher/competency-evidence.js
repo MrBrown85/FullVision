@@ -214,7 +214,7 @@ window.CompetencyEvidence = (function () {
 
   function assessMapFor(cid) {
     var map = {};
-    (getAssessments(cid) || []).forEach(function (a) {
+    (getAssignedAssessments(cid) || []).forEach(function (a) {
       map[a.id] = a;
     });
     return map;

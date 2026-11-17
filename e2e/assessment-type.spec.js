@@ -41,7 +41,7 @@ test('a teacher adds a type, it saves, and the next assessment offers it under T
   await expect(page.locator('#af-evidence')).toHaveValue('Debate');
   await expect(page.locator('#af-title')).toBeVisible();
 
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Debate on Ecosystems'));
   expect(saved.evidenceType).toBe('Debate');
 

@@ -2,10 +2,10 @@
  * The Show bar on the Assignments page (teacher/assign-show.js; Colin,
  * Nov 16). Demo Mode, Science 8 with its Student Page and Send Work on, at
  * 1366 x 900. One click on Submitted lists only the assessments with work
- * sent in, each open, each showing only the students who sent it; a second
- * click puts the page back: the same card open, the same scroll. To Grade
- * and Not In open their cards the same way, with only the students they
- * count.
+ * sent in, and a card the teacher opens shows only the students who sent
+ * it; a second click lets go and puts back the scroll. To Grade and Not In
+ * filter the same way. None of them opens or closes a card (Colin, Nov 17):
+ * each keeps what the teacher gave it.
  */
 import { test, expect } from '@playwright/test';
 
@@ -59,6 +59,21 @@ async function openDemo(page) {
 
 // The students an open card shows, by id.
 const shownOn = card => card.evaluate(c => [...new Set([...c.querySelectorAll('[data-sid]')].map(e => e.dataset.sid))]);
+// The ids of the cards drawn open.
+const openIds = page =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('#main .assess-card')]
+      .filter(c => c.querySelector('.assess-body > *'))
+      .map(c => c.id),
+  );
+// Opens a card by its header, as the teacher does, and checks its students.
+async function openAndCheck(page, aid, want) {
+  const card = page.locator('#ac-' + aid);
+  if (!(await openIds(page)).includes('ac-' + aid)) await card.locator('.assess-header').click();
+  await expect(card.locator('.assess-body > *').first()).toBeVisible();
+  // A long card draws its last rows a moment later.
+  await expect.poll(async () => (await shownOn(card)).sort()).toEqual(want);
+}
 
 test('Submitted shows only the work sent in, and a second click puts the page back', async ({ page }) => {
   const errors = [];
@@ -72,9 +87,12 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
   await expect(submitted).toHaveText('Submitted ' + total);
   await expect(submitted).toHaveAttribute('aria-pressed', 'false');
 
-  // Before: one card open, the list scrolled.
-  const quiz = page.locator('.assess-card').filter({ hasNotText: 'Microscope Lab' }).first();
-  const quizId = await quiz.getAttribute('id');
+  // Before: one card with no work in open, the list scrolled.
+  const quizId = await page.evaluate(
+    sent => [...document.querySelectorAll('#main .assess-card')].map(c => c.id).find(id => !sent.includes(id.slice(3))),
+    sentIds,
+  );
+  const quiz = page.locator('#' + quizId);
   await quiz.locator('.assess-header').click();
   await expect(quiz.locator('.assess-body > *').first()).toBeVisible();
   await scrollTop(page, 400);
@@ -83,32 +101,25 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
   const top = await scrollTop(page);
   expect(top).toBeGreaterThan(0);
 
-  // On: only the work sent in, every card open, only the students who sent it.
+  // On: only the work sent in, nothing opened; a card opened shows only the students who sent it.
   await submitted.click();
   await expect(submitted).toHaveAttribute('aria-pressed', 'true');
-  const cards = page.locator('#main .assess-card');
-  await expect(cards).toHaveCount(sentIds.length);
-  for (const aid of sentIds) {
-    const card = page.locator('#ac-' + aid);
-    await expect(card.locator('.assess-body > *').first()).toBeVisible();
-    await expect.poll(async () => (await shownOn(card)).sort()).toEqual(want[aid]);
-  }
+  await expect(page.locator('#main .assess-card')).toHaveCount(sentIds.length);
+  expect(await openIds(page)).toEqual([]);
+  for (const aid of sentIds) await openAndCheck(page, aid, want[aid]);
   await shot(page, 'assignments-submitted-on-1366');
 
-  // Off: the page as it was.
+  // Off: every card as the teacher left it, the scroll as it was.
   await submitted.click();
   await expect(submitted).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.assess-tograde-seg [data-show="all"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#' + quizId + ' .assess-body > *').first()).toBeVisible();
-  const openNow = await page.evaluate(
-    () => [...document.querySelectorAll('#main .assess-card')].filter(c => c.querySelector('.assess-body > *')).length,
-  );
-  expect(openNow).toBe(1);
+  expect((await openIds(page)).sort()).toEqual([quizId, ...sentIds.map(aid => 'ac-' + aid)].sort());
   expect(await scrollTop(page)).toBe(top);
   expect(errors).toEqual([]);
 });
 
-test('To Grade and Not In open their cards with only the students they count', async ({ page }) => {
+test('To Grade and Not In list their cards, opened cards show only the students they count', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   const want = await openDemo(page);
@@ -119,12 +130,10 @@ test('To Grade and Not In open their cards with only the students they count', a
     const aids = Object.keys(want[show]);
     expect(aids.length).toBeGreaterThan(0);
     await expect(page.locator('#main .assess-card')).toHaveCount(aids.length);
-    for (const aid of aids) {
-      const card = page.locator('#ac-' + aid);
-      await expect(card.locator('.assess-body > *').first()).toBeVisible();
-      // A long card draws its last rows a moment later.
-      await expect.poll(async () => (await shownOn(card)).sort()).toEqual(want[show][aid]);
-    }
+    // A card opened under To Grade is still open under Not In; nothing else opens.
+    const opened = (await openIds(page)).map(id => id.slice(3));
+    expect(opened.every(aid => aids.includes(aid))).toBe(true);
+    for (const aid of aids) await openAndCheck(page, aid, want[show][aid]);
     await shot(page, 'assignments-' + show + '-on-1366');
   }
   await page.locator('.assess-tograde-seg [data-show="notin"]').click();

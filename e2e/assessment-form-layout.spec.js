@@ -81,7 +81,7 @@ test('a new assessment saves its fields from the cards as before', async ({ page
   await closeCompPicker(page);
   await page.fill('#af-desc', 'A short description.');
   await page.selectOption('#af-evidence', 'oral');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Card Layout Check'));
   expect(saved).toBeTruthy();
   expect(saved.categoryId).toBe('sci8-cat-labs');
@@ -96,7 +96,7 @@ test('editing shows the description under the title', async ({ page }) => {
   await page.fill('#af-title', 'Has a Description');
   await page.selectOption('#af-category', 'sci8-cat-labs');
   await page.fill('#af-desc', 'Read me.');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const aid = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Has a Description').id);
   await page.evaluate(id => document.querySelector('[data-action="editAssess"][data-aid="' + id + '"]').click(), aid);
   await expect(page.locator('.af-heading-title')).toHaveText('Edit Assessment');

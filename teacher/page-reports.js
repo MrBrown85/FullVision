@@ -1250,7 +1250,7 @@ window.PageReports = (function () {
   function _draftsInPrint(ids) {
     var cid = activeCourse;
     if (!DraftsBeforePrint.holds(cid)) return null;
-    var aids = (getAssessments(cid) || [])
+    var aids = (getAssignedAssessments(cid) || [])
       .filter(function (a) {
         return assessmentInYearToDate(cid, a);
       })

@@ -1690,7 +1690,7 @@ function renderStudentHeader(cid, sid, opts) {
 
   // The header's work counts cover the work its grade counts (the year so far, or a report's year to date).
   const inTerm = typeof assessmentInYearToDate === 'function';
-  const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInYearToDate(cid, a));
+  const assessments = getAssignedAssessments(cid).filter(a => !inTerm || assessmentInYearToDate(cid, a));
   const overall = getOverallProficiency(cid, sid);
   const overallRounded = roundLevel(overall);
   const profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];

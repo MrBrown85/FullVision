@@ -85,7 +85,7 @@ window.ObsCard = (function () {
     if (!ac) return '';
     if (ac.assessmentTitle) return ac.assessmentTitle;
     if (!ac.assessmentId) return '';
-    var a = (getAssessments(cid) || []).find(function (x) {
+    var a = (getAssignedAssessments(cid) || []).find(function (x) {
       return x.id === ac.assessmentId;
     });
     return a ? a.title || '' : '';

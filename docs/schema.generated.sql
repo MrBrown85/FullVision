@@ -48,6 +48,7 @@ table public.assessment (rls on)
   accept_until date
   group_work text not null default 'each'::text
   students_see_markup boolean not null default true
+  is_draft boolean not null default false
   constraint assessment_accept_until_check CHECK (((after_due = 'until'::text) = (accept_until IS NOT NULL)))
   constraint assessment_after_due_check CHECK ((after_due = ANY (ARRAY['keep'::text, 'until'::text, 'stop'::text])))
   constraint assessment_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.category(id) ON DELETE SET NULL
@@ -69,6 +70,7 @@ table public.assessment (rls on)
   CREATE INDEX assessment_module_idx ON public.assessment USING btree (module_id)
   CREATE UNIQUE INDEX assessment_pkey ON public.assessment USING btree (id)
   CREATE INDEX assessment_rubric_idx ON public.assessment USING btree (rubric_id)
+  CREATE TRIGGER assessment_draft_guard BEFORE UPDATE OF is_draft ON public.assessment FOR EACH ROW WHEN ((new.is_draft AND (NOT old.is_draft))) EXECUTE FUNCTION public._assessment_draft_guard()
   CREATE TRIGGER assessment_resource_gone AFTER DELETE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._assessment_resource_gone()
   CREATE TRIGGER assessment_resource_truncate AFTER TRUNCATE ON public.assessment FOR EACH STATEMENT EXECUTE FUNCTION public._assessment_resource_truncated()
   CREATE TRIGGER course_sync_cursor_assessment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
@@ -788,7 +790,7 @@ table public.question (rls on)
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
   constraint question_core_ids_check CHECK ((core_ids <@ ARRAY['COM'::text, 'COL'::text, 'CT'::text, 'CRT'::text, 'PPI'::text, 'PAR'::text, 'SAR'::text]))
-  constraint question_kind_check CHECK ((kind = ANY (ARRAY['text'::text, 'short_set'::text, 'scale4'::text, 'choice'::text, 'goal_status'::text, 'core_pick'::text])))
+  constraint question_kind_check CHECK ((kind = ANY (ARRAY['text'::text, 'short_set'::text, 'scale4'::text, 'choice'::text, 'goal_status'::text, 'core_pick'::text, 'rating'::text, 'date'::text, 'ranking'::text, 'likert'::text, 'section'::text])))
   constraint question_options_check CHECK ((jsonb_typeof(options) = 'object'::text))
   constraint question_pkey PRIMARY KEY (id)
   constraint question_prompt_check CHECK (((char_length(btrim(prompt)) >= 1) AND (char_length(btrim(prompt)) <= 1000)))
@@ -818,7 +820,7 @@ table public.questionnaire (rls on)
   updated_at timestamp with time zone not null default now()
   constraint questionnaire_check CHECK (((opens_on IS NULL) OR (closes_on IS NULL) OR (opens_on <= closes_on)))
   constraint questionnaire_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
-  constraint questionnaire_kind_check CHECK ((kind = ANY (ARRAY['about_me'::text, 'core_reflection'::text, 'goal_checkin'::text, 'curricular_self_assessment'::text])))
+  constraint questionnaire_kind_check CHECK ((kind = ANY (ARRAY['about_me'::text, 'core_reflection'::text, 'goal_checkin'::text, 'curricular_self_assessment'::text, 'custom'::text])))
   constraint questionnaire_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.questionnaire(id) ON DELETE SET NULL
   constraint questionnaire_pkey PRIMARY KEY (id)
   constraint questionnaire_report_period_check CHECK (((report_period IS NULL) OR ((report_period >= 1) AND (report_period <= 6))))
@@ -1643,6 +1645,7 @@ table student_submit.write_log (rls on)
   CREATE INDEX write_log_card_kind_at ON student_submit.write_log USING btree (card_id, kind, at)
   CREATE UNIQUE INDEX write_log_pkey ON student_submit.write_log USING btree (id)
 function public._access_code_hash(p_code text, p_salt text) returns text
+function public._assessment_draft_guard() returns trigger security definer
 function public._assessment_resource_gone() returns trigger security definer
 function public._assessment_resource_json(p_id uuid) returns jsonb security definer
 function public._assessment_resource_removed() returns trigger security definer
@@ -1741,7 +1744,7 @@ function public.clear_score(p_enrollment_id uuid, p_assessment_id uuid) returns 
 function public.clear_section_override(p_enrollment_id uuid, p_section_id uuid) returns void
 function public.close_phone_report(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.course_draft_count(p_course_id uuid) returns integer
-function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid) returns uuid
+function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) returns uuid
 function public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) returns uuid
 function public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) returns uuid
 function public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) returns uuid

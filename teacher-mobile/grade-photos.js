@@ -152,7 +152,7 @@ window.MGradePhotos = (function () {
   function studentList(cid, sid) {
     if (!on(cid)) return [];
     var rows = [];
-    (getAssessments(cid) || []).forEach(function (a) {
+    (getAssignedAssessments(cid) || []).forEach(function (a) {
       if (!takes(cid, a)) return;
       var state = GraderWork.workStateOf(cid, a.id, sid);
       if (state === 'tograde') rows.push({ a: a, kind: 'grade', sub: work(cid, sid, a.id) });

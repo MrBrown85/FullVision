@@ -1304,7 +1304,7 @@ window.ReportQuestionnaire = (function () {
      the one rule everywhere (Decision 4; facts().notHandedIn counts the
      same work). */
   function notHandedIn(cid, sid) {
-    return (getAssessments(cid) || [])
+    return (getAssignedAssessments(cid) || [])
       .filter(function (a) {
         return assessmentInYearToDate(cid, a) && assessmentCellValue(cid, sid, a).status === 'NS';
       })
@@ -1450,7 +1450,7 @@ window.ReportQuestionnaire = (function () {
      piece with status LATE), oldest first. */
   function missingAndLate(cid, sid) {
     var out = [];
-    (getAssessments(cid) || []).forEach(function (a) {
+    (getAssignedAssessments(cid) || []).forEach(function (a) {
       if (!assessmentInYearToDate(cid, a)) return;
       var cell = assessmentCellValue(cid, sid, a);
       if (cell.status === 'NS') out.push({ id: a.id, title: a.title || '', d: _dateOf(a), missing: true });

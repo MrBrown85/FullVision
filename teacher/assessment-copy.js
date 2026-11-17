@@ -293,6 +293,8 @@ window.AssessmentCopy = (function () {
     if (a.scoreMode && a.scoreMode !== 'proficiency') copy.scoreMode = a.scoreMode;
     if (a.maxPoints != null && a.scoreMode && a.scoreMode !== 'proficiency') copy.maxPoints = a.maxPoints;
     if (a.weight != null && a.weight !== 1) copy.weight = a.weight;
+    // A Draft's copy is a Draft too; each class assigns its own.
+    if (a.isDraft) copy.isDraft = true;
     return { assessment: copy, rubric: rubricToAdd };
   }
 

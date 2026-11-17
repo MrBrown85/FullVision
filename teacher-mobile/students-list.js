@@ -136,7 +136,14 @@ window.MStudentsList = (function () {
       '<div class="m-sheet-title">All Students</div>' +
       '<div class="m-search-wrap m-search-wrap-sheet"><input class="m-search-input" type="search" placeholder="Search students..." data-action="m-student-search" autocomplete="off"></div>' +
       '<div class="m-list m-list-sheet" id="m-student-list">' +
-      buildCells(students, cid, getAssignmentStatuses(cid), getAssessments(cid), opts.renderBadges, 'm-jump-student') +
+      buildCells(
+        students,
+        cid,
+        getAssignmentStatuses(cid),
+        getAssignedAssessments(cid),
+        opts.renderBadges,
+        'm-jump-student',
+      ) +
       '</div>'
     );
   }
