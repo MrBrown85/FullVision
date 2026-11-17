@@ -1391,14 +1391,10 @@
       if (action === 'm-obs-delete') {
         var obId = target.getAttribute('data-obid');
         var obSid = target.getAttribute('data-sid');
-        // One with follow-ups asks in the sheet itself (holdDelete).
-        if (target.closest('.m-sheet') && obId && getObservationFollowUps(_cid, obId).length) {
-          MObserve.resetSheetState();
-          MObserve.holdDelete(_cid, obSid, obId);
-          return;
-        }
+        // One with follow-ups asks first, in the sheet itself (holdDelete).
+        var asks = obId && getObservationFollowUps(_cid, obId).length;
         if (target.closest('.m-sheet')) {
-          MC.dismissSheet();
+          if (!asks) MC.dismissSheet();
           MObserve.resetSheetState();
         }
         if (obId && obSid) MObserve.holdDelete(_cid, obSid, obId);
