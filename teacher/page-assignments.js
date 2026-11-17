@@ -7478,6 +7478,12 @@ window.PageAssignments = (function () {
     // Draft or Returned beside the name (S1-F2); '' in a class that holds
     // no grades, where the row is as it was.
     var mark = _returnMarkHtml(activeCourse, aid, st.id);
+    var group = _groupRowFor(aid, st.id);
+    // The work icon, as on a rubric's or competencies' rows (Colin, Nov 16:
+    // every kind of work takes Add Work and See the Work). A group's row
+    // has none, as there.
+    var work = group && group.view ? '' : _workIconHtml(activeCourse, aid, st);
+    var wrap = mark || work;
     return (
       '<div class="score-row ldg-row ldg-' +
       kind +
@@ -7491,15 +7497,12 @@ window.PageAssignments = (function () {
       aid +
       '">' +
       '<span class="ldg-name' +
-      (mark ? ' ldg-name-ret' : '') +
+      (wrap ? ' ldg-name-ret' : '') +
+      (work ? ' ldg-name-work' : '') +
       '">' +
-      (mark ? '<span class="ldg-name-text">' : '') +
-      esc(
-        _groupRowFor(aid, st.id) && _groupRowFor(aid, st.id).view
-          ? _groupRowFor(aid, st.id).view.label
-          : displayNameWithLast(st),
-      ) +
-      (mark ? '</span>' + mark : '') +
+      (wrap ? '<span class="ldg-name-text">' : '') +
+      esc(group && group.view ? group.view.label : displayNameWithLast(st)) +
+      (wrap ? '</span>' + mark + work : '') +
       '</span>'
     );
   }
@@ -12105,8 +12108,15 @@ window.PageAssignments = (function () {
       return;
     }
     var ldgRow = document.activeElement.closest && document.activeElement.closest('.ldg-row.ldg-cmp');
-    // Typing in the row's Overall Comment is not a c / i answer.
-    if (ldgRow && document.activeElement.tagName !== 'TEXTAREA' && handleLedgerKey(e, ldgRow)) return;
+    // Typing in the row's Overall Comment, or in its + menu and Link…
+    // form, is not a c / i answer.
+    if (
+      ldgRow &&
+      document.activeElement.tagName !== 'TEXTAREA' &&
+      !document.activeElement.closest('.rsg-attach') &&
+      handleLedgerKey(e, ldgRow)
+    )
+      return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
       // Shift+Enter is a new line.

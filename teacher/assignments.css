@@ -6603,6 +6603,22 @@ button.grader-member-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ...and the work icon at its end (_workIconHtml), its + menu let out of
+   the cell. */
+.ldg-name.ldg-name-work {
+  overflow: visible;
+}
+.ldg-name-work .rsg-work-btn,
+.ldg-name-work .rsg-attach {
+  margin-left: auto;
+}
+/* The + is near the card's left edge here: its menu and Link… open to the
+   right of it, not off the card. */
+.ldg-name-work .rsg-attach .assess-menu,
+.ldg-name-work .rsg-attach-link {
+  left: 0;
+  right: auto;
+}
 /* One student on the page: the dialog's row, under their grader in the
    open card. */
 .grader-return.grader-return-inline {
