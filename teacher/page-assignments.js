@@ -20,9 +20,6 @@ window.PageAssignments = (function () {
   var showUngraded = false;
   // "N to return" pressed: only the assessments with a draft (S1-F2).
   var _toReturnOnly = false;
-  // Show: To Grade (S6-F4): only the assessments with work waiting to grade.
-  var _toGradeOnly = false;
-  var _toGradeTotal = 0;
   // The drafts on screen, summed over the listed assessments at the last
   // render or refresh.
   var _toReturnTotal = 0;
@@ -585,7 +582,7 @@ window.PageAssignments = (function () {
       '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
       (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
-      AssignShow.barHtml(cid, _toGradeOnly, _toGradeTotal) +
+      AssignShow.barHtml(cid) +
       '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
       '<button class="seg-btn assess-seg-btn"' +
       segAttr(seg[0]) +
@@ -1675,10 +1672,7 @@ window.PageAssignments = (function () {
       // html-safe: built by _gradeSubmissionsHtml
       head.querySelector('.assess-header-actions').insertAdjacentHTML('afterbegin', c.button);
     });
-    if (!classOn || total === _toGradeTotal) return;
-    _toGradeTotal = total;
-    var n = document.querySelector('.assess-tograde-n');
-    if (n) n.textContent = String(total);
+    if (classOn) AssignShow.toGradeTotal(total);
   }
 
   // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
@@ -2587,21 +2581,11 @@ window.PageAssignments = (function () {
         });
     } else _toReturnOnly = false;
 
+    // The Show bar (assign-show.js): each card's To Grade, Not In and
+    // Submitted, the same counts as the gradebook's bar and the dashboard's
+    // To Grade cell (GraderWork), over the students on screen; with
+    // Submitted, To Grade or Not In on, only the assessments it counts.
     assessments = AssignShow.listed(cid, assessments, nums, shownIds);
-    // Work to grade (S6-F4): the same count as the gradebook's bar and the
-    // dashboard's To Grade cell (GraderWork.workCounts), over the students
-    // on screen. With To Grade on, only the assessments with work waiting.
-    _toGradeTotal = 0;
-    if (GraderWork.workOnInClass(cid)) {
-      assessments.forEach(function (a) {
-        nums[a.id].tograde = GraderWork.workCounts(cid, a.id, shownIds).tograde;
-        _toGradeTotal += nums[a.id].tograde;
-      });
-      if (_toGradeOnly)
-        assessments = assessments.filter(function (a) {
-          return nums[a.id].tograde > 0;
-        });
-    } else _toGradeOnly = false;
 
     // Render toolbar
     var result = renderAssessToolbar(cid, assessments);
@@ -7264,8 +7248,8 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var main = document.getElementById('main');
     if (_grader || !main || !COURSES[cid]) return false;
-    // A filter on grades (Ungraded, To Return, To Grade) can drop a card graded since the draw.
-    if (showUngraded || _toReturnOnly || _toGradeOnly) return false;
+    // A filter on grades (Ungraded, To Return) can drop a card graded since the draw.
+    if (showUngraded || _toReturnOnly) return false;
     var filtersActive = filterCategories.length > 0 || !!assessSearch || AssignShow.on();
     var all = getAssessments(cid);
     var byId = {};
@@ -11488,10 +11472,9 @@ window.PageAssignments = (function () {
       toggleToReturn: function () {
         _toggleToReturn();
       },
-      // Work to grade (S6-F4).
+      // The Show bar (assign-show.js).
       setToGradeShow: function () {
-        var show = AssignShow.choose(el.dataset.show, _toGradeOnly);
-        _toGradeOnly = show === 'tograde';
+        var show = AssignShow.choose(el.dataset.show);
         render();
         AssignShow.afterDraw();
         var again = document.querySelector('.assess-tograde-seg [data-show="' + show + '"]');
@@ -11570,7 +11553,7 @@ window.PageAssignments = (function () {
         filterCategories = [];
         assessSearch = '';
         showUngraded = false;
-        AssignShow.choose('all', false);
+        AssignShow.choose('all');
         render();
         AssignShow.afterDraw();
       },
@@ -13685,7 +13668,7 @@ window.PageAssignments = (function () {
 
   /* ── Work to grade on the Assignments page (S6-F4) ───────────
      In a class whose student page and Send Work are on: the Show bar
-     (All | Submitted | To Grade 9, assign-show.js) on the toolbar, "6 to grade" on a card, Grade Submissions,
+     (All | Submitted | To Grade 9 | Not In, assign-show.js) on the toolbar, "6 to grade" on a card, Grade Submissions,
      which opens the grader dialog on the work waiting (Show on To Grade),
      and on one student's grader, what came in and Add Work. Every number is
      GraderWork.workCounts', as the gradebook's and the dashboard's are. */
@@ -16973,8 +16956,7 @@ window.PageAssignments = (function () {
     showUngraded = false;
     _toReturnOnly = false;
     // The dashboard's To Grade cell opens the page with To Grade on.
-    _toGradeOnly = !!(params && params.show === 'tograde');
-    AssignShow.reset();
+    AssignShow.reset(params && params.show);
     _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;

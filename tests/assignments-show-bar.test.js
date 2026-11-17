@@ -1,10 +1,10 @@
 /**
- * Show: Submitted on the Assignments page (teacher/assign-show.js; Colin,
+ * The Show bar on the Assignments page (teacher/assign-show.js; Colin,
  * Nov 16): "submitted assignments should open and show only students who
- * have submitted. Easy to click and unselect." With it on, only the
- * assessments with work in are listed, each open, each showing only the
- * students whose work is in (GraderWork.workInIds). A second click puts the
- * page back as it was: the same cards open, the same scroll.
+ * have submitted. Easy to click and unselect." Submitted, To Grade and Not
+ * In each list only the assessments they count, each open, each showing
+ * only the students they count. A second click puts the page back as it
+ * was: the same cards open, the same scroll.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -137,22 +137,75 @@ describe('Show: Submitted', () => {
     expect(studentsOn(QUIZ).length).toBe(IDS.length);
   });
 
-  it('All or To Grade turn it off; To Grade pressed again is All', () => {
+  it('One to another keeps the view to come back to; the pressed one clicked again is All', () => {
     openAssignments(() => seed(), CID, {});
+    click(document.querySelector('#ac-' + QUIZ + ' .assess-header'));
     click(bar('submitted'));
     click(bar('tograde'));
     expect(pressed()).toEqual(['tograde']);
-    expect(openCards()).toEqual([]);
-    click(bar('tograde'));
-    expect(pressed()).toEqual(['all']);
-    click(bar('submitted'));
-    click(bar('all'));
+    click(bar('notin'));
+    expect(pressed()).toEqual(['notin']);
+    click(bar('notin'));
     expect(pressed()).toEqual(['all']);
     expect(cards().length).toBe(3);
+    expect(openCards()).toEqual([QUIZ]);
+    click(bar('tograde'));
+    click(bar('all'));
+    expect(pressed()).toEqual(['all']);
+    expect(openCards()).toEqual([QUIZ]);
   });
 
   it('there is no bar while Send Work is off', () => {
     openAssignments(() => seed({ sendWork: false }), CID, {});
     expect(document.querySelector('.assess-tograde-seg')).toBeNull();
+  });
+});
+
+describe('Show: To Grade', () => {
+  it('lists the work waiting, open, with only the students it is from; a group counts once', () => {
+    openAssignments(() => seed(), CID, {});
+    // Lab: 0-2 wait (3 is a draft, 4 returned). Talk: the group (0-2) once, and 5.
+    expect(bar('tograde').textContent).toBe('To Grade 5');
+    click(bar('tograde'));
+    expect(cards().sort()).toEqual([LAB, TALK].sort());
+    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    expect(studentsOn(LAB).sort()).toEqual(IDS.slice(0, 3).sort());
+    expect(studentsOn(TALK).sort()).toEqual([IDS[0], IDS[1], IDS[2], IDS[5]].sort());
+  });
+
+  it("the dashboard's To Grade cell opens the page with it on, and a click lets it go", () => {
+    openAssignments(() => seed(), CID, { show: 'tograde' });
+    expect(pressed()).toEqual(['tograde']);
+    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    click(bar('tograde'));
+    expect(pressed()).toEqual(['all']);
+    expect(cards().length).toBe(3);
+    expect(openCards()).toEqual([]);
+  });
+});
+
+describe('Show: Not In', () => {
+  it('lists the pieces that take work, open, with only the students who sent nothing', () => {
+    openAssignments(() => seed(), CID, {});
+    // Lab: 5-7. Talk: 3, 4, 6, 7 (the group is in through 0's work, 5 sent). Quiz takes none.
+    expect(bar('notin').textContent).toBe('Not In 7');
+    click(bar('notin'));
+    expect(cards().sort()).toEqual([LAB, TALK].sort());
+    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    expect(studentsOn(LAB).sort()).toEqual(IDS.slice(5).sort());
+    expect(studentsOn(TALK).sort()).toEqual([IDS[3], IDS[4], IDS[6], IDS[7]].sort());
+  });
+
+  it('an Excused student is left out', () => {
+    openAssignments(
+      () => {
+        seed();
+        setAssignmentStatus(CID, IDS[7], LAB, 'EXC');
+      },
+      CID,
+      {},
+    );
+    click(bar('notin'));
+    expect(studentsOn(LAB).sort()).toEqual([IDS[5], IDS[6]].sort());
   });
 });
