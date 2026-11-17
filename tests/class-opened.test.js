@@ -137,16 +137,18 @@ describe('the class on screen is noted as opened', () => {
   });
 
   it('with storage blocked, this visit still sends it only once', async () => {
-    const set = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (k, v) {
+    // tests/setup.js's localStorage is a plain object: block the one key on it.
+    const set = localStorage.setItem;
+    localStorage.setItem = function (k, v) {
       if (k === 'gb-class-opened') throw new Error('blocked');
       return set.call(this, k, v);
     };
     try {
       expect(noteClassOpened(A)).toBe(true);
+      expect(localStorage.getItem('gb-class-opened')).toBe(null);
       expect(noteClassOpened(A)).toBe(false);
     } finally {
-      Storage.prototype.setItem = set;
+      localStorage.setItem = set;
     }
     await quiet();
     expect(stamps()).toHaveLength(1);
