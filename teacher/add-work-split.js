@@ -480,9 +480,11 @@
       '<section class="aws-sec">' +
       '<h3 class="aws-h" id="aws-order-label">The Pile Is in</h3>' +
       '<div class="aws-order" role="group" aria-labelledby="aws-order-label">' +
-      orderBtn('list', 'Class List Order') +
+      // Two classes (B6): one pile can't be in two lists' order.
+      (s.noListOrder ? '' : orderBtn('list', 'Class List Order')) +
       orderBtn('typed', 'No Order: I’ll Type Names') +
       '</div>' +
+      (s.noListOrder ? '<p class="aws-hint">With two classes, every name is typed.</p>' : '') +
       '<p class="aws-hint' +
       (order === 'list' && !m.listFits() ? ' is-bad' : '') +
       '">' +
@@ -894,7 +896,7 @@
           '" data-sid="' +
           esc(o.sid) +
           '">' +
-          esc(_fullOf(s, o.sid)) +
+          esc(_fullOf(s, o.sid) + (s.label ? s.label(o.sid) : '')) +
           (o.on !== undefined ? '<span class="aws-option-on">' + esc('· on piece ' + (o.on + 1)) + '</span>' : '') +
           '</div>'
         );
@@ -903,6 +905,14 @@
     listEl.hidden = false;
     input.setAttribute('aria-expanded', 'true');
     input.setAttribute('aria-activedescendant', 'aws-opt-' + at + '-' + s.combo.active);
+  }
+
+  // Whether another option has the same full name as option `i`.
+  function _sameName(s, opts, i) {
+    var name = fold(_fullOf(s, opts[i].sid));
+    return opts.some(function (o, j) {
+      return j !== i && fold(_fullOf(s, o.sid)) === name;
+    });
   }
 
   function _closeCombo(s, input, revert) {
@@ -1072,6 +1082,7 @@
       return _draw({ glide: true });
     }
     if (what === 'order') {
+      if (s.noListOrder) return;
       s.m.setOrder(btn.getAttribute('data-order'));
       return _draw();
     }
@@ -1134,6 +1145,7 @@
       e.preventDefault();
       if (opts.length) {
         combo.active = (combo.active + (key === 'ArrowDown' ? 1 : opts.length - 1)) % opts.length;
+        combo.picked = true;
         _drawCombo(s, input);
       } else if (key === 'ArrowDown') {
         var btns = _cardButtons(input);
@@ -1143,6 +1155,15 @@
     }
     if (key === 'Enter') {
       e.preventDefault();
+      // Two students with this very name (one in each class, or twins): the
+      // teacher picks one with the arrows; Return alone takes neither (rule 6).
+      if (opts.length && !combo.picked && _sameName(s, opts, combo.active)) {
+        var note = s.overlay.querySelector('.aws-note');
+        if (note)
+          note.textContent =
+            'Two students are named ' + _fullOf(s, opts[combo.active].sid) + '. Choose one with the arrow keys.';
+        return;
+      }
       if (opts.length) return _commit(s, at, opts[combo.active].sid, 'next');
       var p = s.m.pieces()[at];
       var shown = p && p.sid ? _fullOf(s, p.sid) : '';
@@ -1288,12 +1309,18 @@
     if (!a || !takes([file]) || !window.PhotoShrink) return false;
     close(true);
     opts = opts || {};
-    var list = _students(cid, a) || [];
+    // opts.list (two classes, B6): both classes' students; opts.had(sid)
+    // says who has work in their own class; opts.label(sid) their class.
+    var list = (Array.isArray(opts.list) && opts.list) || _students(cid, a) || [];
     var byId = {};
     var subs = {};
     list.forEach(function (st) {
       byId[st.id] = st;
-      if (typeof getStudentSubmission === 'function' && getStudentSubmission(cid, st.id, aid)) subs[st.id] = true;
+      var had =
+        typeof opts.had === 'function'
+          ? opts.had(st.id)
+          : typeof getStudentSubmission === 'function' && getStudentSubmission(cid, st.id, aid);
+      if (had) subs[st.id] = true;
     });
     var overlay = document.createElement('div');
     overlay.id = 'add-work-split-overlay';
@@ -1324,6 +1351,8 @@
       opener: document.activeElement,
       onPieces: typeof opts.onPieces === 'function' ? opts.onPieces : null,
       onClose: typeof opts.onClose === 'function' ? opts.onClose : null,
+      label: typeof opts.label === 'function' ? opts.label : null,
+      noListOrder: !!opts.noListOrder,
     };
     _s = s;
     overlay.addEventListener('click', _click);

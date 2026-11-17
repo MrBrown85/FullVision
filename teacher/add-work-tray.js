@@ -210,7 +210,12 @@
         return 'Another student’s name is in it too.';
       }
       if (m.why === 'not_listed') return 'That student is graded with a group on this assessment.';
-      if (m.why === 'unknown') return 'No student here has that name.';
+      if (m.why === 'unknown') {
+        var names = host.classes ? host.classes() : [];
+        return names.length > 1
+          ? 'No student in ' + names.join(' or ') + ' has that name.'
+          : 'No student here has that name.';
+      }
       return 'No name in the file name.';
     }
 
@@ -392,7 +397,13 @@
     function split(file) {
       var s = /** @type {any} */ (window).AddWorkSplit;
       if (!s || !host.alive()) return false;
+      // Two classes on (B6): both lists, each name with its class.
+      var more = (host.split && host.split()) || {};
       return !!s.open(host.cid, host.aid, file, {
+        list: more.list,
+        label: more.label,
+        had: more.had,
+        noListOrder: more.noListOrder,
         onPieces: function (pieces) {
           // Marked as off the scan, for Grade in Scan Order (B5).
           if (host.alive())

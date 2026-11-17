@@ -318,6 +318,8 @@ declare var AddWorkSplitSetup: any; // teacher/add-work-split-setup.js
 declare var AddWorkSplitMove: any; // teacher/add-work-split-move.js
 declare var AddWorkSplitTurn: any; // teacher/add-work-split-turn.js
 declare var AddWorkPageView: any; // teacher/add-work-page-view.js
+declare var AddWorkTargets: any; // teacher/add-work-targets.js (B6)
+declare var AddWorkTwoClasses: any; // teacher/add-work-two-classes.js (B6)
 declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses-terms.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
