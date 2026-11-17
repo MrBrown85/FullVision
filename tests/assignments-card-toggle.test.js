@@ -309,7 +309,10 @@ describe('Assignments: a card opened or closed brings its header counts up to da
     sameHeadsAsRedraw();
   });
 
-  it('with To Grade on, the page is drawn again, so a card with nothing left to grade leaves', async () => {
+  // To Grade opens its cards with only the students waiting (assign-show.js). A card
+  // or row graded while it is on stays until To Grade is let go, so nothing moves
+  // under the pointer; the count on the bar follows.
+  it('with To Grade on, a card graded in place stays listed, and the page is what a redraw draws', async () => {
     openAssignments(withWork, CID, { open: ESSAY });
     await settled();
     click(document.querySelector('[data-action="setToGradeShow"][data-show="tograde"]'));
@@ -319,7 +322,8 @@ describe('Assignments: a card opened or closed brings its header counts up to da
     click(row.querySelector('.rsg-level.l3'));
     await settled();
     click(header(ESSAY));
-    expect(document.querySelectorAll('#main .assess-card').length).toBe(0);
+    expect(Array.from(document.querySelectorAll('#main .assess-card')).map(c => c.id)).toEqual(['ac-' + ESSAY]);
+    expect(document.querySelector('.assess-tograde-n').textContent).toBe('0');
     sameAsRedraw();
   });
 });
