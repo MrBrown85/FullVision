@@ -339,3 +339,11 @@ interface Window {
   PhotoReaders?: typeof PhotoReaders;
   GraderWork?: typeof GraderWork;
 }
+// The phone's Split a Scan (teacher-mobile/split-scan.js, B7) and the
+// modules it calls, which are not typed.
+declare var AddWorkClass: any;
+declare var AddWorkSplit: any;
+declare var MSplitScanModel: any;
+declare var MComponents: any;
+declare var MGrade: any;
+declare var MGradePhotos: any;

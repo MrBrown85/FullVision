@@ -20,13 +20,15 @@ async function demo(page) {
   return posts;
 }
 
-// Every button and box on screen is at least 44px tall.
+// Every button and box on screen is at least 44px tall. A 44px box can
+// measure 43.99998 once the page is scaled, so the height is rounded to a
+// hundredth first.
 async function touchSized(page) {
   const small = await page.$$eval('.sp-main button, .sp-main input, .sp-main select', els =>
     els
       .filter(el => el.offsetParent !== null)
       .map(el => [el.getAttribute('aria-label') || el.textContent.trim() || el.id, el.getBoundingClientRect().height])
-      .filter(([, h]) => h < 44),
+      .filter(([, h]) => Math.round(h * 100) / 100 < 44),
   );
   expect(small).toEqual([]);
 }

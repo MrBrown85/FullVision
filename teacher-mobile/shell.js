@@ -81,6 +81,18 @@
         },
       });
     }
+    // Split a Scan (B7): a class switched there is the app's class too.
+    if (window.MSplitScan)
+      MSplitScan.configure({
+        onClass: function (cid) {
+          _cid = cid;
+          _tabState = { students: null, observe: null, grade: null };
+          _gradeReturnSid = null;
+        },
+        onClose: function () {
+          _renderTab(_activeTab);
+        },
+      });
     _bindEdgeSwipe();
 
     _hideLoader();
@@ -1118,6 +1130,12 @@
         MAddWork.open(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'), {
           then: target.getAttribute('data-then') === 'grade' ? 'grade' : 'next',
         });
+        return;
+      }
+
+      if (action === 'm-split-scan') {
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        MSplitScan.open(_cid, target.getAttribute('data-aid'));
         return;
       }
 
