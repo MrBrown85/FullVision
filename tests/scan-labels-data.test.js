@@ -126,6 +126,37 @@ describe('sticker codes signed in', () => {
     expect(JSON.parse(localStorage.getItem('fv-sync-queue-v1') || '{"entries":[]}').entries).toEqual([]);
   });
 
+  it('each press sends a key of its own, and a sign-in retry of one press sends the same key', async () => {
+    const keys = [];
+    session.fake.on('reissue_scan_label', p => {
+      keys.push(p.p_idempotency_key);
+      return { data: { label: { enrollment_id: S1, code: 'GGGGHHHHJJJJ' } }, error: null };
+    });
+    await reissueScanLabel(CID, S1);
+    await reissueScanLabel(CID, S1);
+    expect(keys).toHaveLength(2);
+    keys.forEach(k => expect(k).toMatch(/^[0-9a-f-]{36}$/));
+    expect(keys[0]).not.toBe(keys[1]);
+
+    // The session ran out: the data layer refreshes the sign-in and sends the press again with its key.
+    const sent = [];
+    session.fake.on('issue_scan_labels', (p, n) => {
+      sent.push(p.p_idempotency_key);
+      return n === 1
+        ? { data: null, error: { message: 'JWT expired', code: 'PGRST301', status: 401 } }
+        : { data: { labels: [] }, error: null };
+    });
+    const was = globalThis.refreshSupabaseSession;
+    globalThis.refreshSupabaseSession = async () => ({ session: {} });
+    try {
+      await issueScanLabels(CID);
+    } finally {
+      globalThis.refreshSupabaseSession = was;
+    }
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
+  });
+
   it('says when the student is not this teacher’s', async () => {
     session.fake.on('reissue_scan_label', () => ({ data: { label: null }, error: null }));
     expect((await reissueScanLabel(CID, S1)).data).toEqual({ label: null });

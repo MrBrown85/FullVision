@@ -21,15 +21,23 @@
      reissueScanLabel(cid, sid) { label: { enrollment_id, code } | null }
                                 the student's live code retired and a new
                                 one made; null when the student is not in
-                                this teacher's class.
+                                this teacher's class, or is withdrawn.
+
+   The server's list also holds a withdrawn student's codes, with no flag:
+   who is in the class is the app's own class list (ScanLabelRead.resolve
+   names only students on the page's list).
 
    `refused` is a plain sentence the screen shows when the call could not be
-   asked (offline, a class or student still saving); data and error are
-   then null. Nothing here is ever queued: a sheet needs the code the server
-   holds, so a call with no connection says so instead of waiting.
+   made or was refused (offline, permission denied, a class or student still
+   saving); data is then null. Nothing here goes through the outbox and
+   nothing shows on the sync dot: a sheet needs the code the server holds,
+   so a call that cannot be made says so on the screen instead of waiting.
 
    Signed in, they call list_scan_labels, issue_scan_labels and
-   reissue_scan_label (each write with its own p_idempotency_key). A class
+   reissue_scan_label. Each write always sends a p_idempotency_key: a new
+   one for each press, and the same one when _callRpcWithAuthGuard sends
+   that press again after refreshing the sign-in (it reuses the params), so
+   a retried New Code never retires the code it just made. A class
    or student whose id is still local-shaped (CLAUDE.md rule 6) is never
    sent. In Demo Mode the same answers are made on this device and kept in
    gb-scan-labels-<cid>, which Demo Mode's reset and sign-out wipe with
@@ -38,9 +46,9 @@ var SCAN_LABEL_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 var SCAN_LABEL_LENGTH = 12;
 var _SCAN_LABEL_RE = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12}$/;
 var SCAN_LABEL_REFUSED = {
-  offline: 'Sticker sheets need a connection. Try again when you are back online.',
-  saving: 'This class is still saving. Try again in a moment.',
-  failed: 'Could not reach FullVision. Check the connection and try again.',
+  offline: 'Sticker sheets are not available right now. Check the connection and try again.',
+  saving: 'Sticker sheets are not available right now. This class is still saving; try again in a moment.',
+  failed: 'Sticker sheets are not available right now. Try again in a moment.',
 };
 
 /** @param {any} data @param {any} [error] @param {string} [refused] */

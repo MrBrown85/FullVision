@@ -12,10 +12,11 @@
  *     picture: a page from PhotoShrink.prepare ({ blob, width, height }), a
  *     Blob, raw pixels { width, height, data } (RGBA), or anything a canvas
  *     can draw. jsQR finds one code at a time, and none at all when two
- *     codes confuse it, so the page is looked at whole and then in nine
- *     overlapping parts. A code that is not a sticker (a handout's own QR,
- *     say) is blanked out and that part looked at again, MAX_LOOKS times at
- *     most. A page with two different stickers names no one (null). Only a read of exactly FVS + 12
+ *     codes confuse it, so the page is looked at whole, then in nine
+ *     overlapping parts, then in sixteen smaller parts drawn twice as big.
+ *     A code that is not a sticker (a handout's own QR, say) is blanked out
+ *     and that part looked at again, MAX_LOOKS times at most. A page with
+ *     two different stickers names no one (null). Only a read of exactly FVS + 12
  *     characters of the sticker alphabet is a sticker; anything else is
  *     null, never a guess. `turn` is how far the code is turned (0, 90, 180
  *     or 270 degrees, clockwise) worked out from where jsQR says its corners
@@ -46,6 +47,7 @@
   var STICKER_RE = /^FVS([23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12})$/;
   var MAX_LOOKS = 4; // pictures looked at per page: the first, and after each code that was not a sticker
   var TILES = 3; // the page is looked at whole, then in TILES × TILES overlapping parts
+  var SMALL = 4; // then in SMALL × SMALL smaller parts, drawn twice as big
   var BLANK_GROW = 0.25; // a code that is not a sticker is blanked this much beyond its corners
 
   var WHY = { NONE: 'none', TWICE: 'twice', RETIRED: 'retired', OTHER: 'other', GONE: 'gone' };
@@ -198,30 +200,75 @@
     return m ? m[1] : '';
   }
 
-  /* The parts of the picture looked at, in order: the whole page, then
-     TILES × TILES overlapping parts each half its width and height. jsQR
-     finds one code per look and can find none when a page holds two (a
-     handout's QR and a sticker), so a part with only one in it is looked at
-     too. */
+  /* The parts of the picture looked at, in order: the whole page; then
+     TILES × TILES overlapping parts each half its width and height; then
+     SMALL × SMALL overlapping parts each a third of its width and height,
+     drawn twice as big. jsQR finds one code per look and can find none when
+     a page holds two (a handout's QR and a sticker), so a part with only one
+     in it is looked at too. A sticker's squares are only three or four
+     pixels wide on a page of about 2000 pixels, and jsQR misses some at
+     that size; drawn twice as big it finds more of them (the read trial,
+     scripts/sticker-read-trial.mjs). */
   /** @param {number} w @param {number} h */
   function _regions(w, h) {
-    var out = [{ x: 0, y: 0, w: w, h: h }];
-    var tw = Math.ceil(w / 2);
-    var th = Math.ceil(h / 2);
-    for (var j = 0; j < TILES; j++) {
-      for (var i = 0; i < TILES; i++) {
-        out.push({
-          x: Math.round((i * (w - tw)) / (TILES - 1)),
-          y: Math.round((j * (h - th)) / (TILES - 1)),
-          w: tw,
-          h: th,
-        });
+    var out = [{ x: 0, y: 0, w: w, h: h, s: 1 }];
+    /** @param {number} n @param {number} part @param {number} scale */
+    function grid(n, part, scale) {
+      var tw = Math.ceil(w / part);
+      var th = Math.ceil(h / part);
+      for (var j = 0; j < n; j++) {
+        for (var i = 0; i < n; i++) {
+          out.push({
+            x: Math.round((i * (w - tw)) / (n - 1)),
+            y: Math.round((j * (h - th)) / (n - 1)),
+            w: tw,
+            h: th,
+            s: scale,
+          });
+        }
       }
     }
+    grid(TILES, 2, 1);
+    grid(SMALL, 3, 2);
     return out;
   }
-  /** @param {{ width: number, height: number, data: Uint8ClampedArray }} px @param {{ x: number, y: number, w: number, h: number }} r */
+  /* A part of the picture drawn r.s times as big, smoothly (in grey, which is all jsQR reads). */
+  /** @param {{ width: number, height: number, data: Uint8ClampedArray }} px @param {{ x: number, y: number, w: number, h: number, s: number }} r */
+  function _enlarged(px, r) {
+    var W = r.w * r.s;
+    var H = r.h * r.s;
+    var src = px.data;
+    var pw = px.width;
+    var grey = new Float32Array(r.w * r.h);
+    for (var y = 0; y < r.h; y++) {
+      for (var x = 0; x < r.w; x++) {
+        var i = ((r.y + y) * pw + r.x + x) * 4;
+        grey[y * r.w + x] = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+      }
+    }
+    var out = new Uint8ClampedArray(W * H * 4);
+    for (var Y = 0; Y < H; Y++) {
+      var sy = Math.min(r.h - 1, Math.max(0, (Y + 0.5) / r.s - 0.5));
+      var y0 = Math.floor(sy);
+      var y1 = Math.min(r.h - 1, y0 + 1);
+      var fy = sy - y0;
+      for (var X = 0; X < W; X++) {
+        var sx = Math.min(r.w - 1, Math.max(0, (X + 0.5) / r.s - 0.5));
+        var x0 = Math.floor(sx);
+        var x1 = Math.min(r.w - 1, x0 + 1);
+        var fx = sx - x0;
+        var top = grey[y0 * r.w + x0] * (1 - fx) + grey[y0 * r.w + x1] * fx;
+        var bottom = grey[y1 * r.w + x0] * (1 - fx) + grey[y1 * r.w + x1] * fx;
+        var o = (Y * W + X) * 4;
+        out[o] = out[o + 1] = out[o + 2] = top * (1 - fy) + bottom * fy;
+        out[o + 3] = 255;
+      }
+    }
+    return { width: W, height: H, data: out };
+  }
+  /** @param {{ width: number, height: number, data: Uint8ClampedArray }} px @param {{ x: number, y: number, w: number, h: number, s: number }} r */
   function _crop(px, r) {
+    if (r.s !== 1) return _enlarged(px, r);
     if (r.x === 0 && r.y === 0 && r.w === px.width && r.h === px.height) return px;
     var data = new Uint8ClampedArray(r.w * r.h * 4);
     for (var y = 0; y < r.h; y++) {
@@ -230,12 +277,25 @@
     }
     return { width: r.w, height: r.h, data: data };
   }
-  /** @param {any} loc @param {number} dx @param {number} dy */
-  function _moved(loc, dx, dy) {
+  /* A found code no wider than a third of the part it was found in: a real
+     code on a page, not one made of two codes' corner squares. */
+  /** @param {any} loc @param {{ width: number, height: number }} part */
+  function _plausible(loc, part) {
+    var most = Math.min(part.width, part.height) / 3;
+    var a = loc.topLeftCorner;
+    var b = loc.topRightCorner;
+    var c = loc.bottomLeftCorner;
+    var top = Math.hypot(b.x - a.x, b.y - a.y);
+    var left = Math.hypot(c.x - a.x, c.y - a.y);
+    return top <= most && left <= most && top >= left / 2 && left >= top / 2;
+  }
+  /* A code's corners in a part, as places on the whole picture. */
+  /** @param {any} loc @param {{ x: number, y: number, s: number }} r */
+  function _moved(loc, r) {
     /** @type {any} */
     var out = {};
     ['topLeftCorner', 'topRightCorner', 'bottomRightCorner', 'bottomLeftCorner'].forEach(function (k) {
-      out[k] = { x: loc[k].x + dx, y: loc[k].y + dy };
+      out[k] = { x: loc[k].x / r.s + r.x, y: loc[k].y / r.s + r.y };
     });
     return out;
   }
@@ -267,12 +327,16 @@
         var part = _crop(px, r);
         var got = jsQR(part.data, part.width, part.height, { inversionAttempts: 'dontInvert' });
         if (!got || !got.location) break;
-        var loc = _moved(got.location, r.x, r.y);
+        var loc = _moved(got.location, r);
         var code = stickerCode(got.data);
         if (code) {
           found = { code: code, location: loc };
           break;
         }
+        // jsQR can make one "code" out of the corner squares of two (a handout's and a
+        // sticker's), and answers it with no text. Blanking that would paint over the
+        // sticker: the next part is looked at instead.
+        if (!got.data || !_plausible(got.location, part)) break;
         own();
         _blank(px, loc);
       }
@@ -365,6 +429,6 @@
     WHY: WHY,
     MAX_LOOKS: MAX_LOOKS,
     // The most times jsQR looks at one page.
-    MAX_JSQR_CALLS: MAX_LOOKS * (1 + TILES * TILES) + 1,
+    MAX_JSQR_CALLS: MAX_LOOKS * (1 + TILES * TILES + SMALL * SMALL) + 1,
   };
 })();

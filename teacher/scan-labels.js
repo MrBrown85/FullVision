@@ -213,7 +213,7 @@ var ScanLabels = (function () {
       return (
         bar +
         '<div class="sl-body"><div class="sl-note" role="status">' +
-        esc(s.refused || 'Could not get the sticker codes.') +
+        esc(s.refused || 'Sticker sheets are not available right now. Try again in a moment.') +
         '</div><button type="button" class="btn btn-secondary" data-sl="retry">Try Again</button></div>'
       );
     }
@@ -370,7 +370,7 @@ var ScanLabels = (function () {
       if (_s !== s) return; // the screen closed, or another class's opened
       s.busy = false;
       if (!res || res.refused || !res.data) {
-        s.refused = (res && res.refused) || 'Could not get the sticker codes.';
+        s.refused = (res && res.refused) || 'Sticker sheets are not available right now. Try again in a moment.';
         _draw();
         return;
       }
@@ -407,7 +407,9 @@ var ScanLabels = (function () {
           s.busy = false;
           var label = res && res.data && res.data.label;
           if (!label) {
-            s.msg = (res && res.refused) || 'Could not make a new code for ' + first + '. Nothing changed.';
+            s.msg =
+              (res && res.refused) ||
+              'Sticker sheets are not available right now. ' + first + '’s code did not change.';
             _draw();
             return;
           }
