@@ -1188,7 +1188,7 @@
 }
 
 /* The grade: what it covers, then the word (or letter) on the left and
-   the ladder beside it, then Work On Next. */
+   the ladder beside it. */
 .sp-view .sp-ml-overall {
   display: flex;
   flex-direction: column;
@@ -1365,39 +1365,6 @@
 .sp-view .sp-ml-step-on .sp-ml-step-name {
   font-weight: 800;
   color: var(--sp-ml-at);
-}
-
-/* Work On Next: an icon, a coloured title, the words. */
-.sp-view .sp-ml-next {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--sp-ml-amber-bg);
-}
-
-.sp-view .sp-ml-next .sp-ml-icon {
-  align-self: flex-start;
-  margin-top: 1px;
-  color: var(--sp-ml-amber-ink);
-}
-.sp-view .sp-ml-next-text {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-.sp-view .sp-ml-next-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--sp-ml-amber-ink);
-}
-.sp-view .sp-ml-next-line {
-  font-size: 15px;
-  line-height: 1.4;
 }
 
 /* Rows. */
