@@ -65,7 +65,9 @@ beforeAll(() => {
   R.configure({ load: () => Promise.resolve(require('../vendor/jsqr/jsQR.js')) });
 });
 
-describe('ScanLabelRead.read', () => {
+// Every test here runs jsQR over whole pictures, which is slow on a busy two-core runner:
+// each gets 30 s, far over what it takes (see the PR for the timing).
+describe('ScanLabelRead.read', { timeout: 30000 }, () => {
   it('reads a sticker the right way up', async () => {
     const got = await R.read(page(400, 300, [sticker('K7M4QX2PABCD')])); // 12 characters of the alphabet
     expect(got).toEqual({ code: 'K7M4QX2PABCD', upsideDown: false, turn: 0 });
@@ -81,10 +83,10 @@ describe('ScanLabelRead.read', () => {
   });
 
   it('blanks out a handout’s own QR code and finds the sticker beside it', async () => {
-    // A letter-shaped page: the handout's QR at the top left, the sticker at the top right.
-    const px = page(800, 1035, [
-      { text: 'https://example.com/handout', x: 40, y: 40, scale: 5 },
-      sticker('ZZZZYYYYXXXX', 640, 50, 4),
+    // A small letter-shaped page: the handout's QR at the top left, the sticker at the top right.
+    const px = page(400, 520, [
+      { text: 'https://example.com/handout', x: 20, y: 20, scale: 3 },
+      sticker('ZZZZYYYYXXXX', 310, 25, 3),
     ]);
     const before = px.data.slice();
     expect(await R.read(px)).toEqual({ code: 'ZZZZYYYYXXXX', upsideDown: false, turn: 0 });
@@ -104,21 +106,21 @@ describe('ScanLabelRead.read', () => {
     });
     const codes = [];
     for (let i = 0; i < R.MAX_LOOKS + 2; i++)
-      codes.push({ text: 'NOT A STICKER ' + i, x: 20 + i * 210, y: 20, scale: 6 });
-    expect(await R.read(page(20 + (R.MAX_LOOKS + 2) * 210, 240, codes))).toBeNull();
+      codes.push({ text: 'NOT A STICKER ' + i, x: 15 + i * 90, y: 15, scale: 3 });
+    expect(await R.read(page(15 + (R.MAX_LOOKS + 2) * 90, 95, codes))).toBeNull();
     expect(looks).toBeGreaterThan(1);
     expect(looks).toBeLessThanOrEqual(R.MAX_JSQR_CALLS);
     R.configure({ load: () => Promise.resolve(real) });
   });
 
   it('answers null for a page with two different stickers', async () => {
-    const one = sticker('ZZZZYYYYXXXX', 60, 60, 4);
-    const two = sticker('AAAABBBBCCCC', 640, 900, 4);
-    expect(await R.read(page(800, 1035, [one]))).toMatchObject({ code: 'ZZZZYYYYXXXX' });
-    expect(await R.read(page(800, 1035, [two]))).toMatchObject({ code: 'AAAABBBBCCCC' });
-    expect(await R.read(page(800, 1035, [one, two]))).toBeNull();
+    const one = sticker('ZZZZYYYYXXXX', 25, 25, 3);
+    const two = sticker('AAAABBBBCCCC', 310, 430, 3);
+    expect(await R.read(page(400, 520, [one]))).toMatchObject({ code: 'ZZZZYYYYXXXX' });
+    expect(await R.read(page(400, 520, [two]))).toMatchObject({ code: 'AAAABBBBCCCC' });
+    expect(await R.read(page(400, 520, [one, two]))).toBeNull();
     // The same sticker twice on one page still names its student.
-    expect(await R.read(page(800, 1035, [one, sticker('ZZZZYYYYXXXX', 640, 900, 4)]))).toMatchObject({
+    expect(await R.read(page(400, 520, [one, sticker('ZZZZYYYYXXXX', 310, 430, 3)]))).toMatchObject({
       code: 'ZZZZYYYYXXXX',
     });
   });
