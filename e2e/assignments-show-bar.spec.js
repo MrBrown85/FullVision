@@ -1,9 +1,11 @@
 /**
- * Show: Submitted on the Assignments page (teacher/assign-show.js; Colin,
+ * The Show bar on the Assignments page (teacher/assign-show.js; Colin,
  * Nov 16). Demo Mode, Science 8 with its Student Page and Send Work on, at
- * 1366 x 900. One click lists only the assessments with work sent in, each
- * open, each showing only the students who sent it; a second click puts the
- * page back: the same card open, the same scroll.
+ * 1366 x 900. One click on Submitted lists only the assessments with work
+ * sent in, each open, each showing only the students who sent it; a second
+ * click puts the page back: the same card open, the same scroll. To Grade
+ * and Not In open their cards the same way, with only the students they
+ * count.
  */
 import { test, expect } from '@playwright/test';
 
@@ -22,9 +24,7 @@ const scrollTop = (page, to) =>
     return el.scrollTop;
   }, to);
 
-test('Submitted shows only the work sent in, and a second click puts the page back', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
+async function openDemo(page) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -32,26 +32,42 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
     var cid = typeof getActiveCourse === 'function' && getActiveCourse();
     return !!cid && getAssessments(cid).some(a => a.id === 'sci8a1');
   });
-  // The students with work in, per assessment, as GraderWork counts them.
-  const want = await page.evaluate(() => {
+  await page.evaluate(() => {
     const cid = getActiveCourse();
     setStudentPageSwitch(cid, true, 'on_return');
     const work = getCourseSubmissions(cid);
     work.course.send_work = true;
     saveDemoStudentWork(cid, work);
+  });
+  await page.goto('/assignments');
+  await expect(page.locator('.assess-tograde-seg')).toBeVisible();
+  // Per assessment, the students each mode counts, as GraderWork counts them on this page.
+  return page.evaluate(() => {
+    const cid = getActiveCourse();
     const ids = getStudents(cid).map(s => s.id);
-    const out = {};
+    const out = { submitted: {}, tograde: {}, notin: {} };
     getAssessments(cid).forEach(a => {
+      const lists = GraderWork.workCounts(cid, a.id, ids).ids;
       const sent = GraderWork.workInIds(cid, a.id, ids);
-      if (sent.length) out[a.id] = sent.sort();
+      if (sent.length) out.submitted[a.id] = sent.sort();
+      if (lists.tograde.length) out.tograde[a.id] = lists.tograde.slice().sort();
+      if (lists.notin.length) out.notin[a.id] = lists.notin.slice().sort();
     });
     return out;
   });
+}
+
+// The students an open card shows, by id.
+const shownOn = card => card.evaluate(c => [...new Set([...c.querySelectorAll('[data-sid]')].map(e => e.dataset.sid))]);
+
+test('Submitted shows only the work sent in, and a second click puts the page back', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const want = (await openDemo(page)).submitted;
   const sentIds = Object.keys(want);
   expect(sentIds.length).toBeGreaterThan(0);
   const total = sentIds.reduce((n, aid) => n + want[aid].length, 0);
 
-  await page.goto('/assignments');
   const submitted = page.locator('.assess-tograde-seg [data-show="submitted"]');
   await expect(submitted).toHaveText('Submitted ' + total);
   await expect(submitted).toHaveAttribute('aria-pressed', 'false');
@@ -75,8 +91,7 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
   for (const aid of sentIds) {
     const card = page.locator('#ac-' + aid);
     await expect(card.locator('.assess-body > *').first()).toBeVisible();
-    const shown = await card.evaluate(c => [...new Set([...c.querySelectorAll('[data-sid]')].map(e => e.dataset.sid))]);
-    expect(shown.sort()).toEqual(want[aid]);
+    await expect.poll(async () => (await shownOn(card)).sort()).toEqual(want[aid]);
   }
   await shot(page, 'assignments-submitted-on-1366');
 
@@ -90,5 +105,29 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
   );
   expect(openNow).toBe(1);
   expect(await scrollTop(page)).toBe(top);
+  expect(errors).toEqual([]);
+});
+
+test('To Grade and Not In open their cards with only the students they count', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const want = await openDemo(page);
+  for (const show of ['tograde', 'notin']) {
+    const btn = page.locator('.assess-tograde-seg [data-show="' + show + '"]');
+    await btn.click();
+    await expect(btn).toHaveAttribute('aria-pressed', 'true');
+    const aids = Object.keys(want[show]);
+    expect(aids.length).toBeGreaterThan(0);
+    await expect(page.locator('#main .assess-card')).toHaveCount(aids.length);
+    for (const aid of aids) {
+      const card = page.locator('#ac-' + aid);
+      await expect(card.locator('.assess-body > *').first()).toBeVisible();
+      // A long card draws its last rows a moment later.
+      await expect.poll(async () => (await shownOn(card)).sort()).toEqual(want[show][aid]);
+    }
+    await shot(page, 'assignments-' + show + '-on-1366');
+  }
+  await page.locator('.assess-tograde-seg [data-show="notin"]').click();
+  await expect(page.locator('.assess-tograde-seg [data-show="all"]')).toHaveAttribute('aria-pressed', 'true');
   expect(errors).toEqual([]);
 });
