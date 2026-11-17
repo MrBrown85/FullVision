@@ -265,8 +265,8 @@ window.CmGradingBars = (function () {
     if (!bar || !bar.querySelectorAll) return;
     var rows = _rows(cid);
     var total = _sum(rows);
-    var segs = bar.querySelectorAll('.cm-weight-seg');
-    var grips = bar.querySelectorAll('.cm-weight-grip');
+    var segs = /** @type {NodeListOf<HTMLElement>} */ (bar.querySelectorAll('.cm-weight-seg'));
+    var grips = /** @type {NodeListOf<HTMLElement>} */ (bar.querySelectorAll('.cm-weight-grip'));
     if (segs.length !== rows.length || total <= 0) return;
     rows.forEach(function (r, i) {
       var seg = segs[i];
@@ -303,13 +303,16 @@ window.CmGradingBars = (function () {
     var cid = _host && _host.selectedCourse();
     if (!cid) return false;
     var two = splitAt(_rows(cid), i, v);
-    if (!two) return false;
-    _host.setWeight(i, String(two[0]));
-    _host.setWeight(i + 1, String(two[1]));
+    if (!two || !_host) return false;
+    var set = two;
+    _host.setWeight(i, String(set[0]));
+    _host.setWeight(i + 1, String(set[1]));
     if (typeof document !== 'undefined' && document.querySelector) {
       [i, i + 1].forEach(function (k, j) {
-        var box = document.querySelector('.cm-cat-weight[data-idx="' + k + '"]');
-        if (box) box.value = String(two[j]);
+        var box = /** @type {HTMLInputElement | null} */ (
+          document.querySelector('.cm-cat-weight[data-idx="' + k + '"]')
+        );
+        if (box) box.value = String(set[j]);
       });
     }
     syncWeightBar(cid);
@@ -332,6 +335,7 @@ window.CmGradingBars = (function () {
 
   /* A line follows the pointer (mouse, pen or touch) and snaps to whole
      percents. */
+  /** @type {{ pointer: number, i: number, before: number, total: number, rect: DOMRect } | null} */
   var _drag = null;
   function initDrag(addDocListener) {
     addDocListener('pointerdown', function (e) {
