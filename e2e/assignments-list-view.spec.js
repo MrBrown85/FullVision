@@ -59,6 +59,28 @@ test('List: change many rows at once, sort and keep the order, drag a row, open 
   await page.locator('[data-alv-act="clearSel"]').click();
   await expect(page.locator('.alv-bar')).toHaveCount(0);
 
+  // A Factor moves grades: it asks first, and Undo puts it back.
+  const first = ids[0];
+  const weight = () =>
+    page.evaluate(id => getAssessmentWeight(getAssessments(getActiveCourse()).find(a => a.id === id)), first);
+  const was = await weight();
+  await page.locator('[data-alv-f="' + first + ':up"]').click();
+  const dialog = page.locator('.confirm-card');
+  await expect(dialog.locator('.confirm-title')).toHaveText('Change the Factor?');
+  await expect(dialog.locator('.confirm-message')).toContainText(
+    'This changes students\u2019 grades. You can undo it.',
+  );
+  await shot(page, 'factor-question');
+  await page.locator('#confirm-cancel-btn').click();
+  expect(await weight()).toBe(was);
+  await page.locator('[data-alv-f="' + first + ':up"]').click();
+  await page.locator('#confirm-ok-btn').click();
+  expect(await weight()).toBe(was + 0.5);
+  await expect(page.locator('.alv-undo-bar')).toContainText('Changed the Factor of');
+  await page.locator('.alv-undo-bar [data-alv-act="undo"]').click();
+  expect(await weight()).toBe(was);
+  await expect(page.locator('.alv-bar')).toHaveCount(0);
+
   // Sorting by Title changes nothing until Keep This Order.
   const sortedTitles = (await titles(page)).slice().sort((a, b) => a.localeCompare(b));
   await page.locator('[data-alv-sort="title"]').click();

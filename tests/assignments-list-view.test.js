@@ -22,6 +22,7 @@ import {
   key,
   tick,
   settle,
+  confirmOk,
   openAssignments,
   closePages,
 } from './helpers/pin-save-paths.js';
@@ -224,10 +225,12 @@ describe('a change along a row', () => {
     session.since();
     const before = AssignList.shareText(CID, piece(QUIZ));
     click(ctl(QUIZ, 'up'));
+    confirmOk();
     await settle();
     expect(updates()).toEqual([[QUIZ, { weight: '1.5' }]]);
     expect(ctl(QUIZ, 'factor').value).toBe('1.5');
     enter(ctl(QUIZ, 'factor'), '1');
+    confirmOk();
     await settle();
     expect(updates()).toEqual([[QUIZ, { weight: '1' }]]);
     expect(piece(QUIZ).weight).toBeUndefined();
@@ -259,6 +262,7 @@ describe('the ticked rows', () => {
     box.dispatchEvent(e);
     expect(main().querySelector('.alv-bar-n').textContent).toBe('3 Selected');
     choose(main().querySelector('[data-alv-bulk="category"]'), PRACTICE);
+    confirmOk();
     await settle();
     expect(updates()).toEqual([
       [LAB, { category_id: PRACTICE }],
@@ -289,12 +293,146 @@ describe('the ticked rows', () => {
     ]);
     choose(main().querySelector('[data-alv-bulk="module"]'), '-');
     choose(main().querySelector('[data-alv-bulk="factor"]'), '2');
+    confirmOk();
     await settle();
     // Two changes before either is sent go out together.
     expect(updates()).toEqual([
       [LAB, { weight: '2', module_id: null }],
       [HUNT, { weight: '2' }],
     ]);
+  });
+});
+
+describe('a change that moves grades asks first, and can be undone', () => {
+  const question = () => {
+    const card = document.querySelector('.confirm-card');
+    return card
+      ? [card.querySelector('.confirm-title').textContent, card.querySelector('.confirm-message').textContent]
+      : null;
+  };
+  const cancel = () => document.getElementById('confirm-cancel-btn').onclick();
+
+  it('a Factor asks; Cancel sends nothing and the row keeps what was saved', async () => {
+    openList();
+    await settle();
+    session.since();
+    click(ctl(QUIZ, 'up'));
+    expect(question()).toEqual([
+      'Change the Factor?',
+      '“Cell Quiz” will count 1.5× as much as work at Factor 1×. This changes students’ grades. You can undo it.',
+    ]);
+    expect(ctl(QUIZ, 'factor').value).toBe('1');
+    cancel();
+    await settle();
+    expect(question()).toBeNull();
+    expect(updates()).toEqual([]);
+    expect(piece(QUIZ).weight).toBeUndefined();
+  });
+
+  it('OK saves it, and Undo puts it back without asking', async () => {
+    openList();
+    await settle();
+    session.since();
+    enter(ctl(TEST, 'factor'), '3');
+    confirmOk();
+    await settle();
+    expect(updates()).toEqual([[TEST, { weight: '3' }]]);
+    expect(main().querySelector('.alv-undo-bar').textContent).toContain('Changed the Factor of “Atoms Test”.');
+    click(main().querySelector('[data-alv-act="undo"]'));
+    expect(question()).toBeNull();
+    await settle();
+    expect(updates()).toEqual([[TEST, { weight: '2' }]]);
+    expect(main().querySelector('.alv-undo-bar')).toBeNull();
+  });
+
+  it('in a Letter class the question says how the share moves', () => {
+    COURSES[CID] = { ...COURSES[CID] };
+    openList();
+    COURSES[CID].gradingSystem = 'letter';
+    COURSES[CID].gradeLevel = '11';
+    click(ctl(QUIZ, 'up'));
+    expect(question()[1]).toBe(
+      '“Cell Quiz” will count 1.5× as much as work at Factor 1×. Its share of its category goes from ≈ 9% to ≈ 13%. This changes students’ grades. You can undo it.',
+    );
+    cancel();
+  });
+
+  it('a Category asks when it moves grades: into or out of 0%, or any move in a Letter class', async () => {
+    openList();
+    await settle();
+    session.since();
+    // Proficiency, between two categories that count: no grade moves.
+    choose(ctl(LAB, 'category'), QUIZZES);
+    expect(question()).toBeNull();
+    await settle();
+    expect(updates()).toEqual([[LAB, { category_id: QUIZZES }]]);
+    choose(ctl(LAB, 'category'), PRACTICE);
+    expect(question()).toEqual([
+      'Change the Category?',
+      '“Cell Lab” moves from Quizzes to Practice. Practice counts 0%, so it will count toward no grade. This changes students’ grades. You can undo it.',
+    ]);
+    cancel();
+    choose(ctl(HUNT, 'category'), LABS);
+    expect(question()[1]).toBe(
+      '“Element Hunt” moves from Practice to Labs. It will start counting toward grades. This changes students’ grades. You can undo it.',
+    );
+    cancel();
+    COURSES[CID].gradingSystem = 'letter';
+    choose(ctl(QUIZ, 'category'), LABS);
+    expect(question()[0]).toBe('Change the Category?');
+    cancel();
+    await settle();
+    expect(updates()).toEqual([]);
+  });
+
+  it('a Date Assigned asks only when it crosses the end of a term', async () => {
+    openList();
+    await settle();
+    session.since();
+    enter(ctl(LAB, 'date'), '2026-09-12');
+    expect(question()).toBeNull();
+    await settle();
+    enter(ctl(LAB, 'date'), '2026-10-02');
+    expect(question()).toEqual([
+      'Change the Date Assigned?',
+      '“Cell Lab” moves out of Term 1’s grades. This changes students’ grades. You can undo it.',
+    ]);
+    confirmOk();
+    enter(ctl(TEST, 'date'), '2026-09-29');
+    expect(question()[1]).toBe(
+      '“Atoms Test” moves into Term 1’s grades. This changes students’ grades. You can undo it.',
+    );
+    cancel();
+    await settle();
+    expect(updates()).toEqual([
+      [LAB, { date_assigned: '2026-09-12' }],
+      [LAB, { date_assigned: '2026-10-02' }],
+    ]);
+  });
+
+  it('ticked rows: one question for all, naming how many move', () => {
+    openList();
+    tick(ctl(LAB, 'tick'), true);
+    tick(ctl(QUIZ, 'tick'), true);
+    choose(main().querySelector('[data-alv-bulk="factor"]'), '1');
+    // Neither moves: Factor 1 already.
+    expect(question()).toBeNull();
+    choose(main().querySelector('[data-alv-bulk="category"]'), PRACTICE);
+    expect(question()).toEqual([
+      'Change the Category?',
+      '2 assessments move to Practice. Practice counts 0%, so they will count toward no grade. This changes students’ grades. You can undo it.',
+    ]);
+    expect(document.getElementById('confirm-ok-btn').textContent).toBe('Set Category');
+    cancel();
+  });
+
+  it('Title, Module, Due Date and Students Send never ask', () => {
+    openList();
+    enter(ctl(LAB, 'title'), 'Cell Lab 2');
+    choose(ctl(LAB, 'module'), CHEM);
+    enter(ctl(LAB, 'due'), '2026-12-24');
+    expect(question()).toBeNull();
+    expect(['factor', 'category', 'date'].every(f => AssignList.changesGrades(CID, piece(LAB), f, piece(LAB)[f])));
   });
 });
 

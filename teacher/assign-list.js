@@ -811,10 +811,10 @@
   }
 
   /* ── Events ──────────────────────────────────────────────── */
-  /** @param {boolean} [glide] */
-  function _redraw(glide) {
+  /** @param {boolean} [glide] @param {string | null} [focus] the control to focus after, when not the one focused now */
+  function _redraw(glide, focus) {
     var active = /** @type {HTMLElement | null} */ (document.activeElement);
-    _focusKey = active && active.dataset ? active.dataset.alvF || null : null;
+    _focusKey = focus || (active && active.dataset ? active.dataset.alvF || null : null);
     if (glide) {
       /** @type {Record<string, DOMRect>} */
       var rects = {};
@@ -837,13 +837,108 @@
     return n === 1 ? '1 assessment' : n + ' assessments';
   }
 
-  /* A change to the ticked rows, kept for Undo: `before` is what each
-     held, `field` the field changed ('send' for Students Send). */
+  /* ── A change that moves grades asks first, and can be undone ─────
+     Colin, Nov 16: "when doing things that change grade math, give
+     teachers a warning prompt before making changes, provide undo as
+     well." A Factor always counts (the course % and the factored mean of
+     levels). A Category moves the course % in a Letter or Both class, and
+     in any class when it takes work into or out of a 0% category. A Date
+     Assigned moves grades when it crosses the end of a reporting term:
+     each term's grade counts the work dated up to its end. DIBELS counts
+     toward no grade. */
+  /** @param {string} cid @param {any} a @param {string} field @param {any} value */
+  function changesGrades(cid, a, field, value) {
+    if (!a || G.isDibelsScored(a)) return false;
+    if (field === 'factor') return Number(value) !== G.getAssessmentWeight(a);
+    if (field === 'category') {
+      if ((value || '') === categoryOf(a)) return false;
+      if (G.courseGradeMode(cid) !== 'proficiency') return true;
+      return G.countsTowardGrades(cid, a) !== G.countsTowardGrades(cid, { categoryId: value || '' });
+    }
+    if (field === 'date') return !!_termCrossed(cid, dateOf(a), value);
+    return false;
+  }
+
+  /* The first reporting term whose end lies between two dates, and
+     whether the move takes work out of it (later) or into it (earlier). */
+  /** @param {string} cid @param {string} from @param {string} to */
+  function _termCrossed(cid, from, to) {
+    if (!from || !to || from === to) return null;
+    var terms = typeof G.getReportingTerms === 'function' ? G.getReportingTerms(cid) || [] : [];
+    for (var i = 0; i < terms.length; i++) {
+      var end = terms[i].ends_on;
+      if (end && from <= end !== to <= end) return { label: terms[i].label || 'the term', out: to > end };
+    }
+    return null;
+  }
+
+  /** @param {string} cid @param {string} id */
+  function _catName(cid, id) {
+    var c = id ? G.getCategoryById(cid, id) : null;
+    return c ? c.name || 'Untitled' : 'No Category';
+  }
+
+  /** @param {string} cid @param {any} a */
+  function _sharePct(cid, a) {
+    var info = G.assessmentCategoryShare(cid, a);
+    return info && info.kind === 'share' ? G.formatShare(info.share, true) : '';
+  }
+
+  /* The question asked before a change that moves grades, or null. */
+  /** @param {string} cid @param {any[]} pieces @param {string} field @param {any} value @param {boolean} bulk */
+  function gradeQuestion(cid, pieces, field, value, bulk) {
+    var hit = pieces.filter(function (a) {
+      return changesGrades(cid, a, field, value);
+    });
+    if (!hit.length) return null;
+    var one = hit.length === 1 && !bulk ? hit[0] : null;
+    var name = one ? '“' + (one.title || 'Untitled') + '”' : _plural(hit.length);
+    var tail = ' This changes students’ grades. You can undo it.';
+    if (field === 'factor') {
+      var msg = name + ' will count ' + G.formatFactor(value) + ' as much as work at Factor 1×.';
+      if (one) {
+        var was = _sharePct(cid, one);
+        var now = _sharePct(cid, Object.assign({}, one, { weight: Number(value) }));
+        if (was && now && was !== now) msg += ' Its share of its category goes from ' + was + ' to ' + now + '.';
+      }
+      return { title: 'Change the Factor?', message: msg + tail, ok: bulk ? 'Set Factor' : 'Change Factor' };
+    }
+    if (field === 'category') {
+      var to = _catName(cid, value);
+      var msg2 = one
+        ? name + ' moves from ' + _catName(cid, categoryOf(one)) + ' to ' + to + '.'
+        : name + ' move to ' + to + '.';
+      if (!G.countsTowardGrades(cid, { categoryId: value || '' }))
+        msg2 += ' ' + to + ' counts 0%, so ' + (one ? 'it' : 'they') + ' will count toward no grade.';
+      else if (one && !G.countsTowardGrades(cid, one)) msg2 += ' It will start counting toward grades.';
+      return { title: 'Change the Category?', message: msg2 + tail, ok: bulk ? 'Set Category' : 'Change Category' };
+    }
+    var crossed = _termCrossed(cid, dateOf(hit[0]), value);
+    var msg3 =
+      name +
+      (crossed && crossed.out ? ' moves out of ' : ' moves into ') +
+      (crossed ? crossed.label : 'the term') +
+      '’s grades.';
+    return { title: 'Change the Date Assigned?', message: msg3 + tail, ok: 'Change Date' };
+  }
+
+  var FIELD_NAMES = {
+    title: 'Title',
+    module: 'Module',
+    category: 'Category',
+    date: 'Date Assigned',
+    due: 'Due Date',
+    factor: 'Factor',
+    send: 'Students Send',
+  };
+
+  /* A change kept for Undo: `before` is what each piece held, `field` the
+     field changed ('send' for Students Send). */
   /** @param {string} cid @param {string} text @param {Record<string, any>} before @param {string} field */
   function _keepUndo(cid, text, before, field) {
     var ids = Object.keys(before);
     _undo = {
-      text: text + ' for ' + _plural(ids.length) + '.',
+      text: text,
       undo: function () {
         if (field === 'send')
           ids.forEach(function (id) {
@@ -855,6 +950,41 @@
           });
       },
     };
+  }
+
+  /* Saves one field on `ids`. A change that moves grades asks first; it and
+     every change to ticked rows (bulk) can be undone. */
+  /** @param {string} cid @param {string[]} ids @param {string} field @param {any} value @param {boolean} bulk */
+  function apply(cid, ids, field, value, bulk) {
+    var list = G.getAssessments(cid);
+    var pieces = ids
+      .map(function (id) {
+        return list.find(function (/** @type {any} */ x) {
+          return x && x.id === id;
+        });
+      })
+      .filter(Boolean);
+    if (!pieces.length) return;
+    var ask = field === 'send' ? null : gradeQuestion(cid, pieces, field, value, bulk);
+    var active = /** @type {HTMLElement | null} */ (document.activeElement);
+    var focus = active && active.dataset ? active.dataset.alvF || null : null;
+    function go() {
+      var before = field === 'send' ? setSend(cid, ids, value) : setField(cid, ids, field, value);
+      if (bulk) _keepUndo(cid, 'Set ' + FIELD_NAMES[field] + ' for ' + _plural(ids.length) + '.', before, field);
+      else if (ask)
+        _keepUndo(
+          cid,
+          'Changed the ' + FIELD_NAMES[field] + ' of “' + (pieces[0].title || 'Untitled') + '”.',
+          before,
+          field,
+        );
+      else _undo = null;
+      _redraw(false, focus);
+    }
+    if (!ask || typeof G.showConfirm !== 'function') return go();
+    // The row shows what is saved until the teacher says yes.
+    _redraw(false, focus);
+    G.showConfirm(ask.title, ask.message, ask.ok, 'primary', go);
   }
 
   /** @param {Event} e */
@@ -871,33 +1001,19 @@
     }
     if (d.alvBulk) {
       var ids = Array.from(_sel);
-      var field = d.alvBulk;
-      var v = field === 'module' && el.value === '-' ? '' : el.value;
       if (!ids.length || !el.value) return;
-      var text = { category: 'Set Category', module: 'Set Module', due: 'Set Due Date', factor: 'Set Factor' }[
-        /** @type {'category'} */ (field)
-      ];
-      if (field === 'send') _keepUndo(cid, 'Set Students Send', setSend(cid, ids, v), 'send');
-      else _keepUndo(cid, text, setField(cid, ids, field, v), field);
-      _redraw();
+      apply(cid, ids, d.alvBulk, d.alvBulk === 'module' && el.value === '-' ? '' : el.value, true);
       return;
     }
     var k = d.alvK;
     if (!k) return;
     var id = _rowId(el);
     if (!id) return;
-    _undo = null;
-    if (k === 'send') setSend(cid, [id], el.value);
-    else if (k === 'title') {
-      var title = el.value.trim();
-      if (title) setField(cid, [id], 'title', title);
-    } else if (k === 'date') {
-      if (el.value) setField(cid, [id], 'date', el.value);
-    } else if (k === 'factor') {
-      var factor = G.FactorField.parse(el.value);
-      if (factor != null) setField(cid, [id], 'factor', factor);
-    } else setField(cid, [id], k, el.value);
-    _redraw();
+    var value = k === 'title' ? el.value.trim() : k === 'factor' ? G.FactorField.parse(el.value) : el.value;
+    // A blank Title or Date Assigned, or a Factor that isn't one, is not saved.
+    if ((k === 'title' || k === 'date') && !value) return _redraw();
+    if (k === 'factor' && value == null) return _redraw();
+    apply(cid, [id], k, value, false);
   }
 
   /** @param {MouseEvent} e */
@@ -930,9 +1046,7 @@
         return x.id === sid;
       });
       if (!a) return;
-      _undo = null;
-      setField(cid, [sid], 'factor', G.FactorField.step(G.getAssessmentWeight(a), Number(step.dataset.alvStep)));
-      _redraw();
+      apply(cid, [sid], 'factor', G.FactorField.step(G.getAssessmentWeight(a), Number(step.dataset.alvStep)), false);
       return;
     }
     var actEl = /** @type {HTMLInputElement | null} */ (t.closest('[data-alv-act]'));
@@ -1102,6 +1216,8 @@
     scoringOf: scoringOf,
     setField: setField,
     setSend: setSend,
+    changesGrades: changesGrades,
+    gradeQuestion: gradeQuestion,
     move: move,
   };
 })();
