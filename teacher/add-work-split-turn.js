@@ -27,7 +27,7 @@
 /** @type {any} */ (window).AddWorkSplitTurn = (function () {
   'use strict';
 
-  /** @type {Array<function(any): Promise<boolean|null>>} */
+  /** @type {Array<(page: any) => Promise<boolean | null>>} */
   var finders = [];
 
   /* A page turned half a turn, redrawn on a canvas and shrunk again

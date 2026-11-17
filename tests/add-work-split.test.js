@@ -730,9 +730,17 @@ describe('Set Up Like Last Time (B5)', () => {
   const Setup = window.AddWorkSplitSetup;
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
-  const fresh = { per: 1, order: 'typed', leaveOut: true };
+  const keep = o => localStorage.setItem(Setup.KEY, JSON.stringify(o));
+  // A new scan as Split the Scan opens it: the usual start, then last time's.
+  const opened = (n, blank, list = CLASS) => {
+    const m = M.model(scan(n, blank), list);
+    m.setPer(M.startPer(m.counts().kept, list.length));
+    const fresh = { per: m.per(), order: m.order(), leaveOut: m.leaveOut() };
+    const s = { m, list };
+    return { s, fresh, applied: Setup.apply(s, fresh) };
+  };
 
-  it('keeps only the class, the assessment and the three choices, under a key signing out wipes', () => {
+  it('keeps only the class, the assessment, Pages per Student and blank pages, under a key signing out wipes', () => {
     const m = M.model(scan(12, [2]), CLASS);
     m.setLeaveOut(false);
     m.setPer(2);
@@ -740,8 +748,9 @@ describe('Set Up Like Last Time (B5)', () => {
     m.name(0, 's3');
     Setup.save('c1', 'a1', m);
     const raw = localStorage.getItem(Setup.KEY);
-    expect(JSON.parse(raw)).toEqual({ cid: 'c1', aid: 'a1', per: 2, order: 'list', leaveOut: false });
-    // No student, no name, no file name, no page.
+    expect(JSON.parse(raw)).toEqual({ cid: 'c1', aid: 'a1', per: 2, leaveOut: false });
+    // No order, no student, no name, no file name, no page.
+    expect(raw).not.toContain('order');
     for (const st of CLASS) {
       expect(raw).not.toContain('"' + st.id + '"');
       expect(raw).not.toContain(st.lastName);
@@ -752,28 +761,181 @@ describe('Set Up Like Last Time (B5)', () => {
     expect(Setup.KEY.startsWith('fv-')).toBe(true);
   });
 
-  it('sets the last choices on a new scan, and says so; Start Fresh puts the usual start back', () => {
-    localStorage.setItem(Setup.KEY, JSON.stringify({ cid: 'c1', aid: 'a1', per: 2, order: 'list', leaveOut: false }));
-    const s = { m: M.model(scan(12, [2]), CLASS), list: CLASS };
-    expect(Setup.apply(s, fresh)).toBe(true);
-    expect([s.m.per(), s.m.order(), s.m.leaveOut()]).toEqual([2, 'list', false]);
-    expect(Setup.words(s.setup.last)).toBe('2 pages per student, Class List Order, blank pages kept');
+  it('uses last time’s Pages per Student when the scan shows none, and says exactly that; Start Fresh puts the start back', () => {
+    keep({ cid: 'c1', aid: 'a1', per: 2, leaveOut: true });
+    const { s, fresh, applied } = opened(14, []); // 14 pages, 6 students: no even split
+    expect(fresh.per).toBe(1);
+    expect(applied).toBe(true);
+    expect([s.m.per(), s.m.order(), s.m.leaveOut()]).toEqual([2, 'typed', true]);
+    expect(Setup.words(s.setup.set)).toBe('2 pages per student');
     let drawn = null;
     expect(Setup.click(s, 'fresh', null, { draw: o => (drawn = o) })).toBe(true);
-    expect([s.m.per(), s.m.order(), s.m.leaveOut()]).toEqual([1, 'typed', true]);
+    expect([s.m.per(), s.m.leaveOut()]).toEqual([1, true]);
     expect(s.setup).toBe(null);
     expect(drawn).toBeTruthy();
   });
 
-  it('says nothing when the last choices are the usual start, or when what is kept is not choices', () => {
-    localStorage.setItem(Setup.KEY, JSON.stringify({ per: 1, order: 'typed', leaveOut: true }));
-    const s = { m: M.model(scan(4), CLASS), list: CLASS };
-    expect(Setup.apply(s, fresh)).toBe(false);
+  it('keeps the scan’s own Pages per Student when its pages divide evenly, and then says nothing', () => {
+    keep({ cid: 'c1', aid: 'a1', per: 3, leaveOut: true });
+    const { s, applied } = opened(12, []); // 12 pages, 6 students: 2 each
+    expect(applied).toBe(false);
     expect(s.setup).toBe(null);
-    for (const bad of ['{', '{"per":40,"order":"typed","leaveOut":true}', '{"per":2,"order":"x","leaveOut":true}']) {
+    expect(s.m.per()).toBe(2);
+  });
+
+  it('blank pages kept as last time, then the scan’s own number for the pages now kept', () => {
+    keep({ cid: 'c1', aid: 'a1', per: 5, leaveOut: false });
+    // 12 pages, 6 blank: left out, 6 pages make 1 each; kept, 12 pages make 2 each.
+    const { s, fresh, applied } = opened(12, [2, 4, 6, 8, 10, 12]);
+    expect(fresh.per).toBe(1);
+    expect(applied).toBe(true);
+    expect([s.m.per(), s.m.leaveOut()]).toEqual([2, false]);
+    expect(Setup.words(s.setup.set)).toBe('2 pages per student, blank pages kept');
+  });
+
+  it('never carries Class List Order: an order kept by an earlier version is ignored', () => {
+    keep({ cid: 'c1', aid: 'a1', per: 2, order: 'list', leaveOut: true });
+    expect(Setup.load()).toEqual({ cid: 'c1', aid: 'a1', per: 2, leaveOut: true });
+    const { s, applied } = opened(14, []);
+    expect(applied).toBe(true);
+    expect(s.m.order()).toBe('typed');
+    expect(s.m.pieces().every(p => !p.sid)).toBe(true);
+  });
+
+  it('says nothing when the last choices are the usual start, or when what is kept is not choices', () => {
+    keep({ per: 1, leaveOut: true });
+    const { s, applied } = opened(4, []);
+    expect(applied).toBe(false);
+    expect(s.setup).toBe(null);
+    for (const bad of ['{', '{"per":40,"leaveOut":true}', '{"per":2,"leaveOut":"yes"}']) {
       localStorage.setItem(Setup.KEY, bad);
       expect(Setup.load()).toBe(null);
     }
+  });
+});
+
+describe('a page dragged onto another piece (B5)', () => {
+  const Move = window.AddWorkSplitMove;
+  const TYPE = 'application/x-fv-scan-page';
+  let on;
+  let docOn;
+  let realAdd;
+  let realRemove;
+  let busy;
+  beforeEach(() => {
+    on = {};
+    docOn = {};
+    busy = false;
+    realAdd = document.addEventListener;
+    realRemove = document.removeEventListener;
+    document.addEventListener = (type, fn) => (docOn[type] = fn);
+    document.removeEventListener = type => delete docOn[type];
+  });
+  afterEach(() => {
+    Move.unlisten();
+    document.addEventListener = realAdd;
+    document.removeEventListener = realRemove;
+  });
+
+  // Split the Scan's state, the page's listeners on a stand-in overlay.
+  function setUp() {
+    const m = M.model(scan(6), CLASS);
+    m.setPer(2); // [1,2] [3,4] [5,6]
+    ['s1', 's2', 's3'].forEach((sid, at) => m.name(at, sid));
+    const s = { m, phase: 'split', drag: null, over: null, overlay: { querySelector: () => null } };
+    const overlay = { addEventListener: (type, fn) => (on[type] = fn) };
+    const ctx = {
+      state: () => s,
+      draw: () => {},
+      busy: () => busy,
+      full: (st, sid) => sid,
+      call: (st, sid) => sid,
+    };
+    Move.listen(overlay, ctx);
+    return s;
+  }
+  const tile = no => ({
+    closest: sel =>
+      sel.indexOf('aws-tile') >= 0 ? { getAttribute: () => String(no), classList: { contains: () => false } } : null,
+  });
+  const card = at => ({
+    closest: sel =>
+      sel.indexOf('aws-card') >= 0
+        ? { getAttribute: () => String(at), classList: { add() {}, remove() {} }, querySelector: () => null }
+        : null,
+  });
+  // A drag event carrying `data` (type → value).
+  const ev = (target, data) => {
+    const store = { ...data };
+    return {
+      target,
+      defaultPrevented: false,
+      preventDefault() {
+        this.defaultPrevented = true;
+      },
+      stopImmediatePropagation() {},
+      dataTransfer: {
+        types: Object.keys(store),
+        getData: t => store[t] || '',
+        setData: (t, v) => (store[t] = v),
+        dropEffect: '',
+        effectAllowed: '',
+      },
+    };
+  };
+  const handed = s => {
+    const out = {};
+    s.m.take().forEach(p => (out[p.sid] = p.pages.map(pg => Number(pg.hash.replace(/^a+/, '')))));
+    return out;
+  };
+
+  it('a page dragged onto a piece with its own mark moves there', () => {
+    const s = setUp();
+    on.dragstart(ev(tile(3), {}));
+    expect(s.drag).toEqual({ no: 3 });
+    on.drop(ev(card(0), { [TYPE]: '3' }));
+    expect(handed(s)).toEqual({ s1: [1, 2, 3], s3: [5, 6] });
+  });
+
+  it('after a drag whose end never came, a drop with no page mark moves nothing', () => {
+    const s = setUp();
+    on.dragstart(ev(tile(3), {})); // its tile drawn away: no dragend
+    const drop = ev(card(0), { 'text/plain': 'some words' });
+    on.dragover(drop);
+    expect(drop.defaultPrevented).toBe(false);
+    on.drop(drop);
+    expect(s.drag).toBe(null);
+    expect(handed(s)).toEqual({ s1: [1, 2], s2: [3, 4], s3: [5, 6] });
+  });
+
+  it('a drop carrying the mark of another page than this drag’s moves nothing', () => {
+    const s = setUp();
+    on.dragstart(ev(tile(3), {}));
+    on.drop(ev(card(0), { [TYPE]: '5' }));
+    on.dragstart(ev(tile(4), {}));
+    on.drop(ev(card(0), { [TYPE]: 'x' }));
+    expect(handed(s)).toEqual({ s1: [1, 2], s2: [3, 4], s3: [5, 6] });
+  });
+
+  it('a drag ends on the document, and a new drag starts with nothing left from the last', () => {
+    const s = setUp();
+    on.dragstart(ev(tile(3), {}));
+    docOn.dragend();
+    expect(s.drag).toBe(null);
+    on.dragstart(ev(tile(3), {}));
+    on.dragstart(ev({ closest: () => null }, {})); // not a page
+    expect(s.drag).toBe(null);
+    Move.unlisten();
+    expect(docOn.dragend).toBeUndefined();
+  });
+
+  it('while every page is turning, nothing moves, by drop or by menu', () => {
+    const s = setUp();
+    on.dragstart(ev(tile(3), {}));
+    busy = true;
+    on.drop(ev(card(0), { [TYPE]: '3' }));
+    expect(Move.move(s, 3, 0, { busy: () => true, draw: () => {} })).toMatchObject({ ok: false, reason: 'busy' });
+    expect(handed(s)).toEqual({ s1: [1, 2], s2: [3, 4], s3: [5, 6] });
   });
 });
 

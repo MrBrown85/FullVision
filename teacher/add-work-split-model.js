@@ -213,6 +213,7 @@
        [21, 21]] once page 21 was moved onto it. */
     function _spans(r) {
       var spans = [];
+      /** @type {any} */
       var prev = null;
       for (var i = r.from; i < r.to; i++) {
         var p = pages[i];

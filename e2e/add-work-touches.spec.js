@@ -6,8 +6,9 @@
  * little shorter than the one before, so a page can be told by its shape),
  * split from Add Work for the Class's Split a Scan…:
  * - Set Up Like Last Time: 2 pages per student from the last scan, said
- *   in one line with the assessment it came from; the choices kept after
- *   Match hold no student data.
+ *   in one line with the assessment it came from (the scan shows no even
+ *   split of its own); an old Class List Order is not carried; the choices
+ *   kept after Match hold no order and no student data.
  * - Turn Every Page turns the whole scan, and pressed again turns it back.
  * - Space on a piece shows its pages full size.
  * - A page moved: page 5 onto the first piece with its menu, page 6 onto
@@ -55,7 +56,8 @@ test('Set Up Like Last Time, a moved page under the right student, and Grade in 
     const other = getAssessments(cid).find(x => x.id !== LAB && x.title);
     localStorage.setItem(
       'fv-add-work-split-setup',
-      JSON.stringify({ cid, aid: other.id, per: 2, order: 'typed', leaveOut: true }),
+      // An order kept by an earlier version of the key: never carried over.
+      JSON.stringify({ cid, aid: other.id, per: 2, order: 'list', leaveOut: true }),
     );
     return { pick, other: other.title };
   }, LAB);
@@ -163,9 +165,12 @@ test('Set Up Like Last Time, a moved page under the right student, and Grade in 
   const setup = aws.locator('.aws-setup');
   await expect(setup.locator('.aws-h')).toHaveText('Set Up Like Last Time');
   await expect(setup.locator('.aws-hint')).toHaveText(
-    'From ' + set.other + ': 2 pages per student, names typed, blank pages left out. Change anything below.',
+    'From ' + set.other + ': 2 pages per student. Change anything below.',
   );
   await expect(aws.locator('.aws-per')).toHaveText('2');
+  // The pile's order is never carried: names are typed until the teacher says otherwise.
+  await expect(aws.getByRole('button', { name: 'No Order: I’ll Type Names' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(aws.locator('.aws-name').first()).toHaveValue('');
   await expect(setup.getByRole('button', { name: 'Start Fresh' })).toBeVisible();
 
   // Turn Every Page, and back again: a toggle.
@@ -221,7 +226,7 @@ test('Set Up Like Last Time, a moved page under the right student, and Grade in 
   await expect(aws.locator('.aws-card')).toHaveCount(3);
   // What was kept for next time: the choices and the assessment, no student.
   const kept = await page.evaluate(() => localStorage.getItem('fv-add-work-split-setup'));
-  expect(JSON.parse(kept)).toMatchObject({ aid: LAB, per: 2, order: 'typed', leaveOut: true });
+  expect(JSON.parse(kept)).toEqual({ cid: expect.any(String), aid: LAB, per: 2, leaveOut: true });
   for (const st of set.pick) {
     expect(kept).not.toContain(st.id);
     expect(kept).not.toContain(st.first);

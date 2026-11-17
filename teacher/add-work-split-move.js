@@ -21,6 +21,7 @@
    AddWorkSplitMove.escape(s, ctx)    → true when a menu closed.
    AddWorkSplitMove.listen(overlay, ctx)  drag and drop, before the page's
                                       own "nothing dropped here" listeners.
+   AddWorkSplitMove.unlisten()         when the page closes.
    AddWorkSplitMove.view(s, at, no, ctx)  piece `at` full size from page no.
    AddWorkSplitMove.move(s, no, to, ctx)  the move, its note, and a draw. */
 /** @type {any} */ (window).AddWorkSplitMove = (function () {
@@ -79,6 +80,8 @@
       return q.at !== p.at;
     });
     if (others.length) items += '<span class="aws-pmenu-h" role="presentation">Move to</span>';
+    // While Turn Every Page runs, nothing moves.
+    var busy = !!(ctx.busy && ctx.busy());
     others.forEach(function (q) {
       var full = q.nos.length >= max;
       items +=
@@ -87,7 +90,11 @@
         '" data-to="' +
         esc(String(q.at)) +
         '"' +
-        (full ? ' disabled title="A piece of work can have 30 pages at most."' : '') +
+        (full
+          ? ' disabled title="A piece of work can have 30 pages at most."'
+          : busy
+            ? ' disabled title="Wait for every page to turn."'
+            : '') +
         '>' +
         esc('Make It ' + _target(s, q, ctx)) +
         '</button>';
@@ -101,6 +108,7 @@
 
   /* ── The move ── */
   function move(s, no, to, ctx) {
+    if (ctx.busy && ctx.busy()) return { ok: false, reason: 'busy' };
     var dst = s.m.pieces()[to];
     var label = dst ? _target(s, dst, ctx) : '';
     var res = s.m.move(no, to);
@@ -127,7 +135,7 @@
 
   function view(s, at, no, ctx) {
     var p = s.m.pieces()[at];
-    if (!p || !window.AddWorkPageView) return false;
+    if (!p || !(/** @type {any} */ (window).AddWorkPageView)) return false;
     var start = Math.max(0, p.nos.indexOf(no));
     var back = s.overlay.querySelector('#aws-name-' + at);
     var key = back ? back.getAttribute('data-key') : null;
@@ -196,6 +204,11 @@
     return !!types && Array.prototype.indexOf.call(types, 'Files') >= 0;
   }
 
+  function _hasPage(e) {
+    var types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, TYPE) >= 0;
+  }
+
   function _off(s) {
     if (!s.over) return;
     s.over.classList.remove('is-drop');
@@ -204,9 +217,20 @@
     s.over = null;
   }
 
+  /* A page is moved only by a drop that carries this page's own mark
+     (TYPE, with its number) for the page this drag started on. A drag
+     whose end was never heard (its tile drawn away mid-drag) leaves
+     s.drag set; a later drop of text, a link or a picture carries no
+     mark and moves nothing. dragend is heard on the document, so a tile
+     drawn away still ends its drag. */
+  /** @type {any} */
+  var _docEnd = null;
+
   function listen(overlay, ctx) {
+    unlisten();
     overlay.addEventListener('dragstart', function (e) {
       var s = ctx.state();
+      if (s) s.drag = null;
       var tile = e.target && e.target.closest ? e.target.closest('.aws-tile[data-no]') : null;
       if (!s || !tile || tile.classList.contains('is-out') || s.phase !== 'split' || ctx.busy()) return;
       s.drag = { no: Number(tile.getAttribute('data-no')) };
@@ -223,14 +247,14 @@
         s.drag = null;
         return _off(s);
       }
-      if (!s.drag) return;
+      if (!s.drag || !_hasPage(e)) return _off(s);
       var card = e.target && e.target.closest ? e.target.closest('.aws-card[data-at]') : null;
       var to = card ? Number(card.getAttribute('data-at')) : -1;
       var p = to >= 0 ? s.m.pieces()[to] : null;
       var max = window.AddWorkSplitModel ? AddWorkSplitModel.maxPiece() : 30;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (!p || p.nos.indexOf(s.drag.no) >= 0 || p.nos.length >= max) {
+      if (!p || p.nos.indexOf(s.drag.no) >= 0 || p.nos.length >= max || ctx.busy()) {
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
         return _off(s);
       }
@@ -248,19 +272,31 @@
       var drag = s.drag;
       s.drag = null;
       _off(s);
-      if (_hasFiles(e) || !drag) return;
+      if (_hasFiles(e) || !drag || !e.dataTransfer) return;
+      var mark = String(e.dataTransfer.getData(TYPE) || '');
+      if (!/^\d+$/.test(mark)) return;
+      var no = Number(mark);
+      // The mark is this drag's page, and that page is in a piece.
+      if (no !== drag.no || !_pieceOf(s, no)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       var card = e.target && e.target.closest ? e.target.closest('.aws-card[data-at]') : null;
       if (!card || ctx.busy()) return;
-      move(s, drag.no, Number(card.getAttribute('data-at')), ctx);
+      move(s, no, Number(card.getAttribute('data-at')), ctx);
     });
-    overlay.addEventListener('dragend', function () {
+    _docEnd = function () {
       var s = ctx.state();
       if (!s) return;
       s.drag = null;
       _off(s);
-    });
+    };
+    document.addEventListener('dragend', _docEnd, true);
+  }
+
+  // Split the Scan closing: the document's dragend listener goes.
+  function unlisten() {
+    if (_docEnd) document.removeEventListener('dragend', _docEnd, true);
+    _docEnd = null;
   }
 
   return {
@@ -271,6 +307,7 @@
     escape: escape,
     key: key,
     listen: listen,
+    unlisten: unlisten,
     view: view,
     move: move,
     pieceOf: _pieceOf,

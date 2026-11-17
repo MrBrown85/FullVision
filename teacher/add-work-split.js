@@ -1385,6 +1385,7 @@
     document.removeEventListener('keydown', _keydown, true);
     if (window.removeEventListener) window.removeEventListener('beforeunload', _beforeUnload);
     if (_t('AddWorkPageView')) AddWorkPageView.close();
+    if (_t('AddWorkSplitMove')) AddWorkSplitMove.unlisten();
     // The scan and its pages are let go.
     Object.keys(s.thumbs).forEach(function (no) {
       _revoke(s.thumbs[no].url);
