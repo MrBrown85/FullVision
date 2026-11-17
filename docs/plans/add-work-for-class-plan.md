@@ -1,6 +1,6 @@
 # Add Work for the Class build plan (2026-11-17)
 
-**Status.** Plan only. Nothing is built. Colin chose Option B on Nov 17 ("go with option b"): a page of its own, opened from the assessment card's menu and from a button on the Work Wall. Option A (dropping straight onto the Work Wall) is not being built.
+**Status (Nov 17, evening).** B0 to B3 are built and on `main`; B4 to B7 are not built. See "Built so far" below for what was and was not checked. Colin chose Option B on Nov 17 ("go with option b"): a page of its own, opened from the assessment card's menu and from a button on the Work Wall. Option A (dropping straight onto the Work Wall) is not being built.
 
 **What it is for.** A teacher scans a pile of paper work on the school photocopier, which emails one big PDF. From one page, on a computer, the teacher adds each student's pages for one assessment in a few minutes. Nothing is saved until the teacher presses Add Work.
 
@@ -35,18 +35,41 @@ Traced in the code on Nov 17.
 
 One PR per slice. Each slice ends usable on its own.
 
-| Slice | What                                                                                                                                | Database change  | Waits for                           |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------- |
-| B0    | This plan, the DECISIONS entry, the ROADMAP line                                                                                    | No               | Nothing                             |
-| B1    | The page: one file per student, Column and Grid, Add as More Pages / Replace Them / Skip, On Paper, the list of who is still Not In | No               | B0                                  |
-| B2    | Split the Scan: drop the emailed PDF, pages per student, type names, blank backs left out, turn a page                              | No               | B1 (the page limit is settled: 150) |
-| B3    | A folder matched by name: the Waiting tray, close spellings, two students with one last name                                        | No               | B1                                  |
-| B4    | Sticker sheets: print one sheet per student, the scan sorts itself                                                                  | Yes (decision 3) | B2, and decisions 3 and 4           |
-| B5    | Small touches: Set Up Like Last Time, a page dragged between pieces, the answer key, grade in the order of the scan                 | No               | B2                                  |
-| B6    | One pile, two classes; a late paper's own assessment                                                                                | No               | B2 and B3                           |
-| B7    | The scan shared from the phone's mail                                                                                               | No               | B2, and a check on a real iPhone    |
+| Slice | What                                                                                                                                | Database change  | Waits for                           | Status                |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------- | --------------------- |
+| B0    | This plan, the DECISIONS entry, the ROADMAP line                                                                                    | No               | Nothing                             | Done (PRs 1509, 1512) |
+| B1    | The page: one file per student, Column and Grid, Add as More Pages / Replace Them / Skip, On Paper, the list of who is still Not In | No               | B0                                  | Done (PR 1513)        |
+| B2    | Split the Scan: drop the emailed PDF, pages per student, type names, blank backs left out, turn a page                              | No               | B1 (the page limit is settled: 150) | Done (PRs 1521, 1522) |
+| B3    | A folder matched by name: the Waiting tray, close spellings, two students with one last name                                        | No               | B1                                  | Done (PR 1518)        |
+| B4    | Sticker sheets: print one sheet per student, the scan sorts itself                                                                  | Yes (decision 3) | B2, and decisions 3 and 4           | Not built             |
+| B5    | Small touches: Set Up Like Last Time, a page dragged between pieces, the answer key, grade in the order of the scan                 | No               | B2                                  | Not built             |
+| B6    | One pile, two classes; a late paper's own assessment                                                                                | No               | B2 and B3                           | Not built             |
+| B7    | The scan shared from the phone's mail                                                                                               | No               | B2, and a check on a real iPhone    | Not built             |
 
 B2 and B3 can be built at the same time by two builders once B1 is merged: they share only the staging model, which B1 fixes.
+
+## Built so far (Nov 17)
+
+On `main` at `4cbe486a`. A release carries it when Colin says.
+
+- **B1, the page** (PR 1513). `teacher/add-work-stage.js` (`AddWorkStage`: the staging model and the run, no DOM), `teacher/add-work-class.js` and `.css` (`AddWorkClass`, the screen), `shared/add-work-files.js` (`AddWorkFiles`, moved out of `teacher/page-assignments.js`). Opens from the assessment card's menu and from Add Work on the Work Wall, on the pieces where the row's + shows.
+- **B2, Split the Scan** (PRs 1521 and 1522). `teacher/add-work-split-model.js` (`AddWorkSplitModel`, no DOM), `teacher/add-work-split.js` and `.css` (`AddWorkSplit`). A page is blank when its sharpness is under 2.6, set from made-up scans and from the school copier's scans read as numbers only. A made-up 92-page scan split in 3.2 seconds on Colin's Mac, 8.9 with the browser slowed four times as a stand-in for a Chromebook.
+- **B3, files matched by name** (PR 1518). `shared/name-match.js` (`NameMatch`), `teacher/add-work-tray.js` (`AddWorkTray`: files dropped off a student, folders, the Waiting tray, and the hook that opens Split the Scan).
+
+Rules the reviews added, each after a fault that could have put a page under the wrong student:
+
+1. Add Work is not possible while any file is still being read, and a write takes off only the pieces that were in it.
+2. A drag that carries files is always files from the computer, never a page still marked as moving.
+3. Class List Order names pieces only when there is exactly one piece for each student listed. Otherwise it names none and says so with both numbers.
+4. Return in an empty name box takes no one, in Split the Scan and in the tray's Choose a Student.
+5. A name in Split the Scan belongs to the page it was read from; when a line moves, a piece that starts on another page has no name.
+6. A match by file name is taken only when it is certain. A close spelling, two students who fit, or a second name-like word in the file name is offered, never taken.
+
+Checked: each slice's unit tests and browser spec; the whole flow by hand in Demo Mode on `main` (files by name, the tray, a made-up scan split and named, Add Work, the stored pages, no file name kept on the device).
+
+Not checked: a signed-in class; a real drag from Finder; a real PDF from the copier through the page; Safari and Firefox; a real Chromebook; a screen reader.
+
+Left as built, for Colin to change if he wants: the Replace Them warning ("Deleted photos can't come back.") shows on the student's row, not in a dialog; two comment blocks in `shared/work-wall.js` were rewrapped wider so the Add Work button fit under that file's line limit.
 
 ### B0. Record the choice
 
