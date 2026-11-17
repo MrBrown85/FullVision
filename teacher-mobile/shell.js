@@ -1522,6 +1522,10 @@
         MGradePhotos.openFull(_cid, target);
         return;
       }
+      if (action === 'm-work-unsubmit') {
+        MGradePhotos.askUnsubmit(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'), target);
+        return;
+      }
       // Grade From Paper on a not-in card: Set Logan To, then a level.
       if (action === 'm-work-setto-menu') {
         MGrade.openSetTo(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'));

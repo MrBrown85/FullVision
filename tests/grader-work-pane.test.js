@@ -2,7 +2,7 @@
  * The grader dialog's work pane (S6-F1 to F3, Demo Mode): the pages beside
  * the scoring, Whole Page and Fit Width, the student's note, Focus on
  * Work's short level names, Add Work and Grade From Paper for a student
- * with nothing in, "Same photo as", and Delete Work with Colin's approved
+ * with nothing in, "Same photo as", and Unsubmit (was Delete Work) with Colin's approved
  * confirm (ruling 102, item 9 of the photo-warning wording).
  *
  * With Send Work off the dialog is as it was: no pane. Every answer that
@@ -399,9 +399,9 @@ describe('Nothing in: Add Work and Grade From Paper', () => {
   });
 });
 
-describe('Delete Work (ruling 102, item 9)', () => {
+describe('Unsubmit (was Delete Work; ruling 102, item 9)', () => {
   const ask = overlay => {
-    $(overlay, '[data-grader="work-delete"]').click();
+    $(overlay, '[data-grader="work-unsubmit"]').click();
     const c = document.querySelector('.confirm-overlay');
     return {
       title: text(c.querySelector('.confirm-title')),
@@ -411,15 +411,17 @@ describe('Delete Work (ruling 102, item 9)', () => {
     };
   };
 
-  it('asks in the approved words, and deletes only on Delete Work', async () => {
+  it('asks in the approved words, and deletes only on Unsubmit', async () => {
     const overlay = openGrader(seed, CID, PIECE, ANA);
     Grader.setLevel(CID, ANA, PIECE, Q, 3, 0);
+    expect(text($(overlay, '[data-grader="work-unsubmit"]'))).toBe('Unsubmit');
     const c = ask(overlay);
-    expect(c.title).toBe('Delete Ana’s Work?');
+    expect(c.title).toBe('Unsubmit Ana’s Work?');
     expect(c.message).toBe(
       'Ana’s 2 photos for Conscription are deleted, and she can send it again. Her grade and your comments stay. Deleted photos can’t come back.',
     );
-    expect(c.ok.textContent).toBe('Delete Work');
+    expect(c.ok.textContent).toBe('Unsubmit');
+    expect(c.cancel.textContent).toBe('Keep It');
     expect(c.ok.className).toContain('danger');
     c.cancel.onclick();
     expect(getStudentSubmission(CID, ANA, PIECE)).not.toBeNull();
@@ -457,6 +459,36 @@ describe('Delete Work (ruling 102, item 9)', () => {
     expect(ask(overlay).message).toBe(
       'The 2 pages you added for Dee on Conscription are deleted, and Dee can send it again. Dee’s grade and your comments stay. Deleted photos can’t come back.',
     );
+  });
+
+  it('work handed in on paper: Unsubmit asks lightly, and Add Work is back', async () => {
+    const overlay = openGrader(
+      () => {
+        seed();
+        const work = getCourseSubmissions(CID);
+        work.submissions.push(sub(DEE, [], { sent_by: 'teacher', on_paper: true }));
+        saveDemoStudentWork(CID, work);
+      },
+      CID,
+      PIECE,
+      DEE,
+    );
+    expect(text($(overlay, '.grader-work-empty'))).toBe('Handed in on paper. Grade it from the paper.');
+    Grader.setLevel(CID, DEE, PIECE, Q, 2, 0);
+    const c = ask(overlay);
+    expect(c.title).toBe('Unsubmit Dee’s Work?');
+    expect(c.message).toBe(
+      'Dee’s work on Conscription goes back to not handed in, and Dee can send it again. Dee’s grade and your comments stay.',
+    );
+    expect(c.ok.className).not.toContain('danger');
+    c.ok.onclick();
+    await settle();
+    expect(getStudentSubmission(CID, DEE, PIECE)).toBeNull();
+    expect((getScores(CID)[DEE] || []).some(e => e.assessmentId === PIECE && e.tagId === Q && e.score === 2)).toBe(
+      true,
+    );
+    expect($(overlay, '.grader-addwork')).not.toBeNull();
+    expect(text($(overlay, '.grader-work-what'))).toMatch(/^Not In/);
   });
 
   it('a Yes that comes after the dialog moved to another student deletes nothing', async () => {

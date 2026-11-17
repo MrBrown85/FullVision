@@ -14845,7 +14845,7 @@ window.PageAssignments = (function () {
      - every page the student sent, one under the other, each with its
        own bar (its number, Rotate, the view only, and Mark Up); over them
        Whole Page and Fit Width and Focus on Work; under them the
-       student's note and Delete Work;
+       student's note and Unsubmit;
      - with nothing in: Add Work (Choose Files, shrunk as a student's are,
        shared/photo-shrink.js) and Grade From Paper's Set Logan To.
      Focus on Work gives the page the room and narrows the scoring to a
@@ -14918,17 +14918,6 @@ window.PageAssignments = (function () {
         return x.id === sid;
       }) || null
     );
-  }
-
-  // "she", "he", "they" from the student's pronouns, or null.
-  function _workPronoun(st) {
-    var p = String((st && st.pronouns) || '')
-      .toLowerCase()
-      .trim();
-    if (/^she\b/.test(p)) return { subj: 'she', poss: 'Her' };
-    if (/^he\b/.test(p)) return { subj: 'he', poss: 'His' };
-    if (/^they\b/.test(p)) return { subj: 'they', poss: 'Their' };
-    return null;
   }
 
   // "Oct 30, 8:41 pm"
@@ -15252,14 +15241,19 @@ window.PageAssignments = (function () {
   // html-safe: names and the note go through esc; ids are ours; labels are fixed words
   function _workPaneHtml(cid, a, st, view, sub, versions) {
     var w = _grader.work;
-    // The first version is for looking at: Mark Up and Delete Work are the new one's.
+    // The first version is for looking at: Mark Up and Unsubmit are the new one's.
     var onFirst = !!versions && w.version === 'first';
     var first = view ? view.label : displayNameFirst(st);
     var files = (sub && sub.files) || [];
     if (!sub) return _addWorkHtml(cid, a, st, first);
+    // Unsubmit puts one student's own piece back to not handed in; a group's is not offered here.
+    var foot =
+      sub.group || onFirst
+        ? ''
+        : '<div class="grader-work-foot"><button type="button" class="grader-work-unsubmit" data-grader="work-unsubmit">Unsubmit</button></div>';
     var links = _workLinksHtml(sub);
     if (!files.length && !links)
-      return '<div class="grader-work-empty"><p>Handed in on paper. Grade it from the paper.</p></div>';
+      return '<div class="grader-work-empty"><p>Handed in on paper. Grade it from the paper.</p></div>' + foot;
     var fit = _workFit(w, files.length);
     var grid = _workGrid(files.length);
     var markUp = !!(window.MarkUp && !onFirst && _markUpHere(cid));
@@ -15335,12 +15329,7 @@ window.PageAssignments = (function () {
         esc(sub.note) +
         '</p></div>';
     }
-    // Delete Work deletes one student's own work; a group's is not offered here.
-    if (sub.group || onFirst) return html;
-    return (
-      html +
-      '<div class="grader-work-foot"><button type="button" class="grader-work-delete" data-grader="work-delete">Delete Work</button></div>'
-    );
+    return html + foot;
   }
 
   /* The links on a submission, each opening in a new tab. Only http(s)
@@ -15612,8 +15601,8 @@ window.PageAssignments = (function () {
     } else if (what === 'work-setto') {
       w.setTo = null;
       _graderSetTo(cid, a, sid, parseInt(btn.dataset.score, 10), btn.textContent.replace(/^\s*\d\s*/, '').trim());
-    } else if (what === 'work-delete') {
-      return _graderAskDeleteWork(cid, a, sid, btn);
+    } else if (what === 'work-unsubmit') {
+      return _graderAskUnsubmit(cid, a, sid, btn);
     } else if (what === 'work-markup') {
       return _graderOpenMarkUp(cid, a, sid);
     } else return;
@@ -15777,61 +15766,21 @@ window.PageAssignments = (function () {
       });
   }
 
-  /* Delete Work (Colin's ruling 87; the confirm is ruling 102's, item 9 of
-     the photo-warning wording). The grade and comments stay. */
-  function _deleteWorkMessage(cid, a, st, sub) {
-    var files = (sub && sub.files) || [];
-    var theirs = files.filter(function (f) {
-      return f.added_by !== 'teacher';
-    }).length;
-    var yours = files.length - theirs;
-    var first = displayNameFirst(st);
-    var p = _workPronoun(st);
-    // Only links (the row's Link…): no photos to lose.
-    var links = ((sub && sub.links) || []).length;
-    if (!files.length && links)
-      return (
-        (links === 1 ? 'The link' : 'The ' + links + ' links') +
-        ' you added for ' +
-        first +
-        ' on ' +
-        (a.title || 'this work') +
-        (links === 1 ? ' is' : ' are') +
-        ' deleted, and ' +
-        (p ? p.subj : first) +
-        ' can send work again. ' +
-        (p ? p.poss : first + '’s') +
-        ' grade and your comments stay.'
-      );
-    var what = theirs
-      ? first +
-        '’s ' +
-        _workPhotos(theirs) +
-        (yours ? (yours === 1 ? ' and the page you added' : ' and the ' + yours + ' pages you added') : '')
-      : 'The ' + (yours === 1 ? 'page' : yours + ' pages') + ' you added for ' + first;
-    return (
-      what +
-      (theirs ? ' for ' : ' on ') +
-      (a.title || 'this work') +
-      (files.length === 1 ? ' is' : ' are') +
-      ' deleted, and ' +
-      (p ? p.subj : first) +
-      ' can send it again. ' +
-      (p ? p.poss : first + '’s') +
-      ' grade and your comments stay. Deleted photos can’t come back.'
-    );
-  }
-  function _graderAskDeleteWork(cid, a, sid, button) {
+  /* Unsubmit (was Delete Work, Colin's ruling 87; Nov 17 2026): the work
+     goes, the piece is back to not handed in, the grade and comments stay.
+     The words are GraderWork.unsubmitAsk's, the phone's too. */
+  function _graderAskUnsubmit(cid, a, sid, button) {
     var st = _workStudent(cid, sid);
     var sub = getStudentSubmission(cid, sid, a.id);
     if (!st || !sub) return;
     var g = _grader;
+    var ask = GraderWork.unsubmitAsk(a, st, sub);
     if (button && button.focus) button.focus({ preventScroll: true });
     showConfirm(
-      'Delete ' + displayNameFirst(st) + '’s Work?',
-      _deleteWorkMessage(cid, a, st, sub),
-      'Delete Work',
-      'danger',
+      ask.title,
+      ask.message,
+      'Unsubmit',
+      ask.danger ? 'danger' : 'primary',
       function () {
         if (_grader !== g || activeCourse !== cid || focusStudentId !== sid) return;
         GraderWork.deleteWork(cid, sid, a.id).then(function () {
@@ -15840,6 +15789,7 @@ window.PageAssignments = (function () {
           render();
         });
       },
+      'Keep It',
     );
   }
 

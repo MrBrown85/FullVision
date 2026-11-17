@@ -217,9 +217,10 @@ window.MComponents = (function () {
      screen reader, the focus starts on Cancel and Tab stays inside. Escape,
      the handle and a tap outside cancel (shell.js and presentSheet), and
      Cancel gives the focus back to `from`, the control that asked. `onOk`
-     runs when the action is pressed. (S1-F3) */
-  // html-safe: title, message and okLabel go through _esc.
-  function confirmSheet(title, message, okLabel, onOk, from) {
+     runs when the action is pressed. (S1-F3) `cancelLabel` names Cancel
+     otherwise (Unsubmit's Keep It). */
+  // html-safe: title, message, okLabel and cancelLabel go through _esc.
+  function confirmSheet(title, message, okLabel, onOk, from, cancelLabel) {
     var done = false;
     presentSheet(
       '<div class="m-group-sheet m-confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="m-confirm-title" aria-describedby="m-confirm-text">' +
@@ -232,7 +233,9 @@ window.MComponents = (function () {
         '<button type="button" class="m-group-sheet-btn m-confirm-ok">' +
         _esc(okLabel) +
         '</button>' +
-        '<button type="button" class="m-group-sheet-btn m-group-sheet-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+        '<button type="button" class="m-group-sheet-btn m-group-sheet-cancel" data-action="m-sheet-cancel">' +
+        _esc(cancelLabel || 'Cancel') +
+        '</button>' +
         '</div>',
       {
         half: true,

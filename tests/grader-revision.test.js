@@ -361,10 +361,10 @@ describe('the grader: grading both versions', () => {
     expect(letter.querySelector('.grader-was-hint').textContent).toBe('Pick the level for the new version.');
     // Return is greyed out until the new version is graded.
     expect(overlay.querySelector('[data-grader="return"]').disabled).toBe(true);
-    // First shows the first version's page; Mark Up and Delete Work are the new one's.
+    // First shows the first version's page; Mark Up and Unsubmit are the new one's.
     click(overlay.querySelector('[data-grader="work-version"][data-version="first"]'));
     expect(overlay.querySelector('.grader-work-surface').dataset.fileId).toBe('f1');
-    expect(overlay.querySelector('[data-grader="work-delete"]')).toBeNull();
+    expect(overlay.querySelector('[data-grader="work-unsubmit"]')).toBeNull();
   });
 
   it('Before and After: 2.7 · 67% before, 3.0 · 75% after, a draft until it is returned', () => {

@@ -659,11 +659,88 @@ window.Grader = (function () {
     });
   }
 
-  /* Delete Work: one student's work on `aid` and its photos go for good
-     (Colin's ruling 87). Grades and comments stay. A Promise of
+  /* Unsubmit (was Delete Work, Colin's ruling 87; renamed Nov 17 2026):
+     one student's work on `aid` and its photos go for good, and the piece
+     is back to not handed in. Grades and comments stay. A Promise of
      data.js deleteStudentWork's answer. */
   function deleteWork(cid, sid, aid) {
     return deleteStudentWork(cid, sid, aid);
+  }
+
+  // "she", "he", "they" from the student's pronouns, or null.
+  function _pronoun(st) {
+    var p = String((st && st.pronouns) || '')
+      .toLowerCase()
+      .trim();
+    if (/^she\b/.test(p)) return { subj: 'she', poss: 'Her' };
+    if (/^he\b/.test(p)) return { subj: 'he', poss: 'His' };
+    if (/^they\b/.test(p)) return { subj: 'they', poss: 'Their' };
+    return null;
+  }
+
+  /* What Unsubmit asks, on the desktop grader and the phone's card alike:
+     { title, message, danger }. Photos or links go for good, and it says
+     so (ruling 102, item 9). Work handed in on paper, or with no pages
+     left, loses only the handed-in mark, so it asks lightly. */
+  function unsubmitAsk(a, st, sub) {
+    var files = (sub && sub.files) || [];
+    var links = ((sub && sub.links) || []).length;
+    var first = displayNameFirst(st);
+    var piece = (a && a.title) || 'this work';
+    var p = _pronoun(st);
+    var who = p ? p.subj : first;
+    var stays = (p ? p.poss : first + '’s') + ' grade and your comments stay.';
+    var title = 'Unsubmit ' + first + '’s Work?';
+    if (!files.length && !links)
+      return {
+        title: title,
+        message:
+          first + '’s work on ' + piece + ' goes back to not handed in, and ' + who + ' can send it again. ' + stays,
+        danger: false,
+      };
+    if (!files.length)
+      return {
+        title: title,
+        message:
+          (links === 1 ? 'The link' : 'The ' + links + ' links') +
+          ' you added for ' +
+          first +
+          ' on ' +
+          piece +
+          (links === 1 ? ' is' : ' are') +
+          ' deleted, and ' +
+          who +
+          ' can send work again. ' +
+          stays,
+        danger: true,
+      };
+    var theirs = files.filter(function (f) {
+      return f.added_by !== 'teacher';
+    }).length;
+    var yours = files.length - theirs;
+    var photos = function (n) {
+      return n + (n === 1 ? ' photo' : ' photos');
+    };
+    var what = theirs
+      ? first +
+        '’s ' +
+        photos(theirs) +
+        (yours ? (yours === 1 ? ' and the page you added' : ' and the ' + yours + ' pages you added') : '')
+      : 'The ' + (yours === 1 ? 'page' : yours + ' pages') + ' you added for ' + first;
+    return {
+      title: title,
+      message:
+        what +
+        (theirs ? ' for ' : ' on ') +
+        piece +
+        (files.length === 1 ? ' is' : ' are') +
+        ' deleted, and ' +
+        who +
+        ' can send it again. ' +
+        stays +
+        ' Deleted photos can’t come back.',
+      danger: true,
+    };
   }
 
   /* Grade From Paper's Set Logan To (S6-F2), for the desktop grader and the
@@ -784,7 +861,7 @@ window.Grader = (function () {
     return { kind: 'draft', given: given ? { returnedAt: given.returned_at || null } : null };
   }
 
-  /* Reads, and Delete Work, which writes no grade, so they sit apart from
+  /* Reads, and Unsubmit, which writes no grade, so they sit apart from
      the grade actions (tests/grader.test.js holds Grader to those). */
   window.GraderWork = {
     returnArea: returnArea,
@@ -805,6 +882,7 @@ window.Grader = (function () {
     samePhotoAs: samePhotoAs,
     setToFromPaper: setToFromPaper,
     deleteWork: deleteWork,
+    unsubmitAsk: unsubmitAsk,
   };
 
   return {
