@@ -425,7 +425,8 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
     var opened = [];
     window.open = url => (opened.push(url), {});
     click('[data-action="sqBPreview"]');
-    expect(opened).toEqual(['/s/#preview-reflection']);
+    expect(opened).toHaveLength(1);
+    expect(opened[0]).toMatch(/^\/s\/\?preview=\d+#preview-reflection$/);
     var preview = JSON.parse(localStorage.getItem('fv-reflect-preview'));
     expect(preview.title).toBe('Exit Ticket 2');
     expect(preview.course).toEqual({ name: 'Science 8' });
@@ -436,6 +437,97 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
     var saved = Questionnaires.find(CID, x => x.id === q.id);
     expect(saved.title).toBe('Exit Ticket 2');
     expect(saved.questions.map(x => x.id)).toEqual([ids[1], ids[0]]);
+  });
+
+  it('a second Preview opens a new address, so a window already open reads the new draft', async () => {
+    var q = await Questionnaires.saveCustom(CID, {
+      title: 'Exit Ticket',
+      is_on: false,
+      questions: [{ prompt: 'One thing', kind: 'text', options: {} }],
+    });
+    mount();
+    click('[data-card="custom-' + q.id + '"] [data-action="sqEdit"]');
+    var opened = [];
+    window.open = url => (opened.push(url), {});
+    var now = Date.now;
+    try {
+      Date.now = () => 1000;
+      click('[data-action="sqBPreview"]');
+      Date.now = () => 2000;
+      click('[data-action="sqBPreview"]');
+    } finally {
+      Date.now = now;
+    }
+    expect(opened).toEqual(['/s/?preview=1000#preview-reflection', '/s/?preview=2000#preview-reflection']);
+  });
+
+  it('a reflection on but past its closing date is Off in the builder: Keep Off leaves the date, Turn On clears it', async () => {
+    var q = await Questionnaires.saveCustom(CID, {
+      title: 'Exit Ticket',
+      is_on: true,
+      opens_on: '2000-01-01',
+      closes_on: '2000-02-01',
+      questions: [{ prompt: 'One thing', kind: 'text', options: {} }],
+    });
+    mount();
+    click('[data-card="custom-' + q.id + '"] [data-action="sqEdit"]');
+    expect([...root.querySelectorAll('.rb-buttons [data-action="sqBSave"]')].map(b => b.textContent)).toEqual([
+      'Save, Keep Off',
+      'Save and Turn On',
+    ]);
+    // The past date it already has is not refused, and stays.
+    type('#rb-name', 'Exit Ticket 2');
+    click('[data-action="sqBSave"][data-on="0"]');
+    await tick();
+    expect(root.querySelector('.rb-build')).toBeNull();
+    var saved = Questionnaires.find(CID, x => x.id === q.id);
+    expect(saved.title).toBe('Exit Ticket 2');
+    expect(saved.is_on).toBe(false);
+    expect(saved.closes_on).toBe('2000-02-01');
+
+    // A past date the teacher picks is refused.
+    click('[data-card="custom-' + q.id + '"] [data-action="sqEdit"]');
+    type('#rb-closes', '2000-03-01');
+    click('[data-action="sqBSave"][data-on="0"]');
+    await tick();
+    expect(root.querySelector('.rb-closes .rb-err').textContent).toBe('Pick today or a later day, or leave it empty.');
+    type('#rb-closes', '2000-02-01');
+
+    // Turned On with the past date untouched: on, and the date goes.
+    click('[data-action="sqBSave"][data-on="1"]');
+    await tick();
+    saved = Questionnaires.find(CID, x => x.id === q.id);
+    expect(saved.is_on).toBe(true);
+    expect(saved.closes_on).toBe(null);
+    expect(Questionnaires.status(saved).state).toBe('open');
+  });
+
+  it('a saved question changed to another kind loses its id; changed back, it has it again', async () => {
+    var q = await Questionnaires.saveCustom(CID, {
+      title: 'Exit Ticket',
+      is_on: false,
+      questions: [
+        { prompt: 'One thing', kind: 'text', options: {} },
+        { prompt: 'Rate it', kind: 'rating', options: { levels: 5 } },
+      ],
+    });
+    var ids = q.questions.map(x => x.id);
+    mount();
+    click('[data-card="custom-' + q.id + '"] [data-action="sqEdit"]');
+    click('[data-action="sqBEdit"][data-i="0"]');
+    change('.rb-q-on [data-action-change="sqBType"]', 'choice');
+    expect(B()._state().questions[0].id).toBeUndefined();
+    expect(B().toContract(B()._state().questions[0])).not.toHaveProperty('id');
+    change('.rb-q-on [data-action-change="sqBType"]', 'text');
+    expect(B()._state().questions[0].id).toBe(ids[0]);
+    change('.rb-q-on [data-action-change="sqBType"]', 'date');
+    click('[data-action="sqBSave"][data-on="0"]');
+    await tick();
+    var saved = Questionnaires.find(CID, x => x.id === q.id);
+    var live = saved.questions.filter(x => !x.archived);
+    expect(live.map(x => x.kind)).toEqual(['date', 'rating']);
+    expect(live[0].id).not.toBe(ids[0]);
+    expect(live[1].id).toBe(ids[1]);
   });
 
   it('Copy to Another Class saves the same reflection there, Off, with no question ids', async () => {

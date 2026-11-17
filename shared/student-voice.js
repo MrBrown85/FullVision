@@ -130,6 +130,10 @@ var StudentVoice = (function () {
           var v = answers[x.id];
           items.push({ q: x, v: _has(v) ? v : null });
         });
+        /* An answer to a question taken out since. For a signed-in class
+           `gone[id]` is never found: the server's _questionnaire_json leaves
+           archived questions out, so it shows as "A question since removed",
+           read as text. */
         Object.keys(answers).forEach(function (id) {
           if (seen[id] || !_has(answers[id])) return;
           items.push({

@@ -444,7 +444,10 @@ var CmReflectAnswers = (function () {
         items.push({ q: x, num: x.kind === 'section' ? null : ++num, rows: rows, sum: summarise(x, rows) });
       });
       // Answers to questions taken out since: by the question's words when
-      // the list still has it, otherwise as plain answers.
+      // the list still has it, otherwise as plain answers. For a signed-in
+      // class the list never has it: the server's _questionnaire_json leaves
+      // archived questions out, so `archived[id]` is never found and such an
+      // answer shows as "A question since removed", read as text.
       var goneIds = [];
       Object.keys(mine).forEach(function (sid) {
         Object.keys(mine[sid].answers || {}).forEach(function (id) {

@@ -120,7 +120,8 @@ test.describe('a teacher-built reflection on a phone', () => {
         }),
       ),
     );
-    await page.reload();
+    // The builder's address: a query that changes each time, which the page ignores.
+    await page.goto('/s/?preview=' + Date.now() + '#preview-reflection');
     await expect(page.getByText('This is a preview. Nothing is sent.')).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'Lab Check-In' })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('fv-reflect-preview'))).toBeNull();

@@ -302,6 +302,55 @@ describe('each new kind and option', () => {
     expect(page.T.collect(page.T.state())).toEqual({ m: ['Notes', 'Labs'], d: ['Green'] });
   });
 
+  it('choice: a kept answer the teacher has since renamed or removed is not shown, counted or sent', async () => {
+    const page = await opened([
+      Q('a', 'choice', 'One answer', { choices: ['Labs', 'Notes'], multiple: false }),
+      Q('b', 'choice', 'Many answers', { choices: ['Labs', 'Notes'], other: true }),
+    ]);
+    const S = page.T.state();
+    // A draft from before the teacher renamed "Old" and "Older": only one typed Other is kept, with Other on.
+    S.answers = { a: ['Old'], b: ['Older', 'Notes', 'Videos'] };
+    page.run('StudentPage.paint')();
+    expect(qa(page, '[data-qbox="a"] [aria-checked="true"]')).toEqual([]);
+    expect(qa(page, '[data-qbox="b"] [aria-checked="true"]').map(words)).toEqual(['Notes', 'Other']);
+    expect(q(page, '#q-b-other').value).toBe('Videos');
+    expect(words(q(page, '#sp-count'))).toBe('1 of 2 answered');
+    expect(page.T.collect(S)).toEqual({ b: ['Notes', 'Videos'] });
+    // Without Other, a text not among the choices is never sent.
+    S.answers = { a: ['Labs', 'Gone'] };
+    expect(page.T.collect(S)).toEqual({ a: ['Labs'] });
+  });
+
+  it('choice: an Other typed the same as a listed choice is that choice, and Other goes off', async () => {
+    const page = await opened([
+      Q('o', 'choice', 'Which?', { choices: ['Labs', 'Notes'], multiple: false, other: true }),
+    ]);
+    await page.click('[data-act="kc-other"][data-q="o"]');
+    page.type('#q-o-other', ' labs ');
+    expect(page.T.state().answers.o).toEqual(['Labs']);
+    page.run('StudentPage.paint')();
+    expect(qa(page, '[data-qbox="o"] [aria-checked="true"]').map(words)).toEqual(['Labs']);
+    expect(q(page, '#q-o-other')).toBeNull();
+    expect(page.T.collect(page.T.state())).toEqual({ o: ['Labs'] });
+  });
+
+  it('a teacher’s own prompt keeps "this class"; a ready-made one reads the class’s name', async () => {
+    const page = await opened([Q('c', 'text', 'What did you like about this class?')]);
+    expect(words(q(page, '#q-c-p'))).toBe('What did you like about this class?');
+    const S = page.T.state();
+    S.data.parts.push({
+      id: 'r',
+      kind: 'about_me',
+      title: 'About Me',
+      questions: [
+        { id: 'r1', kind: 'text', prompt: 'How can these help you in this class?', options: {}, core_ids: [] },
+      ],
+    });
+    S.part = 1;
+    page.run('StudentPage.paint')();
+    expect(words(page.root())).toContain('How can these help you in Science 8?');
+  });
+
   it('choice with shuffle: one order for the page load, the same each time it is drawn', async () => {
     const choices = 'ABCDEFGHIJKLMNOP'.split('');
     const page = await opened([Q('s', 'choice', 'Shuffled', { choices, multiple: false, shuffle: true })]);
@@ -380,6 +429,7 @@ describe('Preview as a Student', () => {
     questions: [
       { prompt: 'How did the lab go?', kind: 'text', options: { required: true } },
       { id: 'q2', prompt: 'How sure are you?', kind: 'rating', options: { levels: 4 } },
+      { id: 'q3', prompt: 'Anything else about this class?', kind: 'text', options: { long: false } },
     ],
   };
 
@@ -394,6 +444,8 @@ describe('Preview as a Student', () => {
     expect(words(page.root())).toContain('Chemistry 11');
     expect(words(q(page, '.sp-main h1'))).toBe('Lab Check-In');
     expect(words(page.root())).toContain('Two quick questions.');
+    // A teacher's own words: "this class" is not rewritten in the preview either.
+    expect(words(q(page, '#q-q3-p'))).toBe('Anything else about this class?');
     // A question with no id yet gets one of its own.
     expect(q(page, '#q-preview-1')).toBeTruthy();
     expect(qa(page, '[data-act="rate"][data-q="q2"]')).toHaveLength(4);

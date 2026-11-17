@@ -42,7 +42,7 @@ var CmReflectBuilder = (function () {
   var PREVIEW_KEY = 'fv-reflect-preview';
 
   /** @type {any} */
-  var _b = null; // the open draft: { cid, qid, title, description, closes, questions, active, menu, showErrors, msg, saving, base, wasOn, answered }
+  var _b = null; // the open draft: { cid, qid, title, description, closes, savedCloses, questions, active, menu, showErrors, msg, saving, base, wasOn, answered }
   var _seq = 0;
 
   /* The page's other modules (DashClassManager, Questionnaires,
@@ -183,7 +183,10 @@ var CmReflectBuilder = (function () {
   }
 
   /* What stops a save, in plain words beside the problem:
-     { title, none, closes, q: { <card key>: message } }, or null. */
+     { title, none, closes, q: { <card key>: message } }, or null. A past
+     closing date is refused only when the teacher picked it: one already
+     saved (a reflection that has closed) stays as it is on Save, Keep Off,
+     and Save and Turn On clears it (_save). */
   function validate(draft, today) {
     /** @type {any} */
     var e = { q: {} };
@@ -199,7 +202,7 @@ var CmReflectBuilder = (function () {
       e.none = 'Add at least one question.';
       bad = true;
     }
-    if (draft.closes && draft.closes < (today || _today())) {
+    if (draft.closes && draft.closes !== (draft.savedCloses || '') && draft.closes < (today || _today())) {
       e.closes = 'Pick today or a later day, or leave it empty.';
       bad = true;
     }
@@ -238,6 +241,16 @@ var CmReflectBuilder = (function () {
     return !!_b && _b.cid === cid;
   }
 
+  /* On in the students' Reflect tab: on and not past its closing date. One
+     on but closed shows as Off on its card ("Closed Feb 1"), so the builder
+     offers Save, Keep Off and Save and Turn On for it, as for one that is
+     off (cm-questionnaires.js _isOn). */
+  function _isOn(q) {
+    if (!q || !q.is_on) return false;
+    var Q = _g().Questionnaires;
+    return !(Q && Q.status && Q.status(q, _today()).state === 'closed');
+  }
+
   /* Opens the builder for a new reflection (q null) or a teacher-built one. */
   function open(cid, q) {
     _b = {
@@ -246,6 +259,7 @@ var CmReflectBuilder = (function () {
       title: q ? q.title || '' : '',
       description: q ? q.theme || '' : '',
       closes: q ? q.closes_on || '' : '',
+      savedCloses: q ? q.closes_on || '' : '',
       questions: q
         ? (q.questions || [])
             .filter(function (x) {
@@ -258,7 +272,7 @@ var CmReflectBuilder = (function () {
       showErrors: false,
       msg: '',
       saving: false,
-      wasOn: !!(q && q.is_on),
+      wasOn: _isOn(q),
       answered: !!(q && (q.answered || []).length),
     };
     if (!q) {
@@ -830,7 +844,13 @@ var CmReflectBuilder = (function () {
     } catch (e) {
       /* a full device: the preview opens with nothing to show */
     }
-    var w = window.open('/s/#preview-reflection', 'fv-reflect-preview', 'popup=yes,width=400,height=820');
+    /* The query changes each time: the same address in a window already on
+       it is only a move within the page, which would not read the new draft. */
+    var w = window.open(
+      '/s/?preview=' + Date.now() + '#preview-reflection',
+      'fv-reflect-preview',
+      'popup=yes,width=400,height=820',
+    );
     _b.msg = w ? '' : 'The preview window was blocked. Allow pop-ups for this site, then try again.';
     if (!w) _rerender();
   }
@@ -859,6 +879,9 @@ var CmReflectBuilder = (function () {
     var p = _payload();
     var opens = prev ? prev.opens_on || null : null;
     if (isOn && !(opens && opens <= today)) opens = today;
+    // Turned On with a past closing date it already had: the date goes, as the tab's switch does.
+    var closes = _b.closes || null;
+    if (isOn && closes && closes < today) closes = null;
     var draft = _b;
     draft.saving = true;
     draft.msg = '';
@@ -867,7 +890,7 @@ var CmReflectBuilder = (function () {
       title: p.title,
       theme: p.description,
       opens_on: opens,
-      closes_on: draft.closes || null,
+      closes_on: closes,
       is_on: isOn,
       questions: p.questions,
     });
@@ -922,6 +945,7 @@ var CmReflectBuilder = (function () {
         if (!d) return true;
         var c = JSON.parse(JSON.stringify(d));
         delete c.id;
+        delete c.savedId;
         c.k = 'k' + ++_seq;
         _b.questions.splice(i + 1, 0, c);
         _b.active = i + 1;
@@ -1023,6 +1047,17 @@ var CmReflectBuilder = (function () {
     var d = _b.questions[Number(el.dataset.i)];
     if (!d) return true;
     if (a === 'sqBType') {
+      /* A saved question changing kind loses its id: the server keeps the
+         old one, with its answers, as removed, and makes a new one, so no
+         answer of the old kind is read as the new. Back to its first kind
+         before saving, it is that question again. */
+      if (d.id && el.value !== d.kind) {
+        d.savedId = d.id;
+        d.savedKind = d.kind;
+        delete d.id;
+      } else if (!d.id && d.savedId && el.value === d.savedKind) {
+        d.id = d.savedId;
+      }
       d.kind = el.value;
       if (d.kind === 'section' && d.subtitle === null) d.subtitle = '';
     } else {

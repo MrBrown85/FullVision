@@ -152,6 +152,44 @@ var StudentQuestionKinds = (function () {
     return typed.length ? typed[typed.length - 1] : '';
   }
 
+  // The listed choice a text stands for (trimmed, any case), or ''.
+  function listedChoice(q, text) {
+    var t = String(text == null ? '' : text)
+      .trim()
+      .toLowerCase();
+    if (!t) return '';
+    var hit = choicesOf(q).filter(function (c) {
+      return c.trim().toLowerCase() === t;
+    });
+    return hit.length ? hit[0] : '';
+  }
+
+  /* A choice answer with only what the question has now: its current
+     choices, in the student's order, and at most one typed Other, only
+     while Other is on (the last one typed, up to 60). One answer keeps one.
+     A draft kept before the teacher renamed or removed a choice loses the
+     old text here, so what is shown, counted and sent agree. */
+  function choiceKept(q, v) {
+    var other = opts(q).other === true;
+    var arr = (Array.isArray(v) ? v : []).filter(function (x) {
+      return typeof x === 'string' && x.trim() !== '';
+    });
+    var last = -1;
+    arr.forEach(function (x, i) {
+      if (other && !listedChoice(q, x)) last = i;
+    });
+    var out = [];
+    arr.forEach(function (x, i) {
+      var hit = listedChoice(q, x);
+      if (hit) {
+        if (out.indexOf(hit) < 0) out.push(hit);
+      } else if (i === last) {
+        out.push(x.trim().slice(0, 60));
+      }
+    });
+    return opts(q).multiple === false ? out.slice(0, 1) : out;
+  }
+
   /* ── Drawing ───────────────────────────────────────────────── */
 
   var STAR = '<span class="sp-req" aria-hidden="true">*</span><span class="sp-vh"> (required)</span>';
@@ -505,6 +543,8 @@ var StudentQuestionKinds = (function () {
     rankOrder: rankOrder,
     statementsOf: statementsOf,
     otherText: otherText,
+    listedChoice: listedChoice,
+    choiceKept: choiceKept,
     isAnswered: isAnswered,
     isComplete: isComplete,
     value: value,

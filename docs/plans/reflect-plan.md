@@ -55,7 +55,7 @@ The Reflect tab calls See Answers through `window.CmReflectAnswers`: `render(cid
 
 ## Preview as a Student
 
-The builder writes the draft to `localStorage['fv-reflect-preview']` as `{ title, description, course: { name }, questions: [question…] }` (questions as in the contract, each with any `id`) and opens `/s/#preview-reflection` in a small window. The student page draws that reflection on its own answering screens with a line saying it is a preview; Send sends nothing and says so. The key is read once and removed.
+The builder writes the draft to `localStorage['fv-reflect-preview']` as `{ title, description, course: { name }, questions: [question…] }` (questions as in the contract, each with any `id`) and opens `/s/#preview-reflection`, with a query that changes each time, in a small window. The student page draws that reflection on its own answering screens with a line saying it is a preview; Send sends nothing and says so. The key is read once and removed.
 
 ## Shared wiring already in place
 

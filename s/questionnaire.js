@@ -113,9 +113,12 @@
     return out;
   }
 
-  /* "this class" in a template prompt reads as the class's name. */
-  function promptText(q, course) {
+  /* "this class" in a ready-made prompt reads as the class's name. A
+     teacher's own words (a `custom` part, and the preview, which is one)
+     stay as they wrote them. */
+  function promptText(q, course, part) {
     var p = q.prompt || '';
+    if (part && part.kind === 'custom') return p;
     return course ? p.replace(/\bthis class\b/g, course) : p;
   }
 
@@ -159,7 +162,25 @@
     });
   }
 
+  /* A teacher-built reflection's choice answers as the questions are now
+     (s/question-kinds.js choiceKept): a draft kept before a choice was
+     renamed or removed loses the old text, so what is shown, counted and
+     sent agree. The ready-made reflections' choices are left as they are. */
+  function tidyChoices(state) {
+    if (!Kinds || !state || !state.answers) return;
+    ((state.data && state.data.parts) || []).forEach(function (p) {
+      if (p.kind !== 'custom') return;
+      (p.questions || []).forEach(function (q) {
+        if (q.kind !== 'choice' || !Object.prototype.hasOwnProperty.call(state.answers, q.id)) return;
+        var v = state.answers[q.id];
+        var kept = Kinds.choiceKept(q, v);
+        if (JSON.stringify(kept) !== JSON.stringify(v)) state.answers[q.id] = kept;
+      });
+    });
+  }
+
   function answeredCount(state) {
+    tidyChoices(state);
     return countedQuestions(state.data).filter(function (q) {
       return isComplete(q, state.answers[q.id]);
     }).length;
@@ -168,6 +189,7 @@
   /* The first question marked with a star that is not answered in full,
      with the part it is on, or null. */
   function firstMissing(state) {
+    tidyChoices(state);
     var skip = noGoalQuestions(state.data);
     var parts = (state.data && state.data.parts) || [];
     for (var i = 0; i < parts.length; i++) {
@@ -184,6 +206,7 @@
   /* The answers as submit takes them: only the answered ones. */
   function collect(state) {
     var out = {};
+    tidyChoices(state);
     allQuestions(state.data).forEach(function (q) {
       var v = state.answers[q.id];
       if (isNewKind(q)) {
@@ -546,7 +569,7 @@
 
   function questionCard(q, v, part, course) {
     if (Kinds && Kinds.owns(q, part)) {
-      return Kinds.card(q, v, { prompt: promptText(q, course), other: otherOn(S, q, v) });
+      return Kinds.card(q, v, { prompt: promptText(q, course, part), other: otherOn(S, q, v) });
     }
     if (q.teacher_only) {
       return (
@@ -634,6 +657,7 @@
     var part = d.parts[state.part];
     var course = d.course.name;
     var body = '';
+    tidyChoices(state);
     if (state.preview) body += '<p class="sp-preview-note" role="note">This is a preview. Nothing is sent.</p>';
     if (part.kind === 'core_reflection') body += reflectionIntro(part);
     if (part.kind === 'custom' && Kinds) body += Kinds.intro(part);
@@ -786,7 +810,9 @@
     return on;
   }
 
-  // The typed Other, up to 60, in place of any typed before; nothing typed, nothing kept.
+  /* The typed Other, up to 60, in place of any typed before; nothing typed,
+     nothing kept. Typed the same as a listed choice (any case), it is that
+     choice picked and Other goes off. */
   function setOther(state, q, text) {
     var list = Kinds.choicesOf(q);
     var single = (q.options || {}).multiple === false;
@@ -796,8 +822,15 @@
     var t = String(text || '')
       .trim()
       .slice(0, 60);
-    if (t) cur.push(t);
-    (state.otherOn || (state.otherOn = {}))[q.id] = true;
+    var hit = Kinds.listedChoice(q, t);
+    var ons = state.otherOn || (state.otherOn = {});
+    if (hit) {
+      if (cur.indexOf(hit) < 0) cur.push(hit);
+      ons[q.id] = false;
+    } else {
+      if (t) cur.push(t);
+      ons[q.id] = true;
+    }
     state.answers[q.id] = cur;
   }
 
