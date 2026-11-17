@@ -56,6 +56,7 @@ const PRECACHE_URLS = [
   '/shared/photo-shrink.js',
   '/shared/photo-queue.js',
   '/shared/photo-readers.js',
+  '/shared/add-work-files.js',
   // The PDF reader's library and worker (vendor/pdfjs/README.md), so a PDF
   // chosen offline still becomes pages. Fetched only when a PDF is opened,
   // but cached here at install like the other vendor files. The scan
@@ -89,6 +90,7 @@ const PRECACHE_URLS = [
   '/teacher/tablet.css',
   '/teacher/student.css',
   '/teacher/work-wall.css',
+  '/teacher/add-work-class.css',
   '/teacher/gradebook.css',
   '/teacher/class-results.css',
   '/teacher/observations.css',
@@ -171,6 +173,8 @@ const PRECACHE_URLS = [
   '/teacher/student-overrides.js',
   '/teacher/rubric-print.js',
   '/teacher/work-rubric-card.js',
+  '/teacher/add-work-stage.js',
+  '/teacher/add-work-class.js',
   '/shared/competency-wording.js',
   '/teacher/report-feedback.js',
   '/teacher/report-feedback-cards.js',

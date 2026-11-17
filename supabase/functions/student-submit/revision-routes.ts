@@ -75,8 +75,8 @@ export const REVISION_ROUTES: Record<string, true> = {
 // finish sent again work and file_links, with send-routes.ts's own statements.
 export const SQL = {
   revisionStart:
-    'select student_submit.revision_start($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::uuid, $7::text) as r',
-  revisionFinish: 'select student_submit.revision_finish($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
+    'select student_submit.revision_start($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text, $6::uuid, $7::text) as r',
+  revisionFinish: 'select student_submit.revision_finish($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text) as r',
   revisionUnsend: 'select student_submit.revision_unsend($1::text, $2::uuid, $3::uuid, $4::text) as r',
   groupFileLinks: 'select student_submit.group_file_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
 };
