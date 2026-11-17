@@ -95,9 +95,10 @@ table public.assessment_resource (rls on)
   position integer not null
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
-  constraint assessment_resource_kind_check CHECK ((kind = ANY (ARRAY['pdf'::text, 'link'::text])))
+  bytes bigint
+  constraint assessment_resource_kind_check CHECK ((kind = ANY (ARRAY['pdf'::text, 'link'::text, 'html'::text, 'txt'::text, 'epub'::text])))
   constraint assessment_resource_pkey PRIMARY KEY (id)
-  constraint assessment_resource_shape_check CHECK ((((kind = 'link'::text) AND (url IS NOT NULL) AND (char_length(url) <= 2000) AND (url ~* '^https?://'::text) AND (page_count IS NULL) AND (status = 'ready'::text)) OR ((kind = 'pdf'::text) AND (url IS NULL) AND (page_count IS NOT NULL) AND ((page_count >= 1) AND (page_count <= 20)))))
+  constraint assessment_resource_shape_check CHECK ((((kind = 'link'::text) AND (url IS NOT NULL) AND (char_length(url) <= 2000) AND (url ~* '^https?://'::text) AND (page_count IS NULL) AND (status = 'ready'::text) AND (bytes IS NULL)) OR ((kind = 'pdf'::text) AND (url IS NULL) AND (page_count IS NOT NULL) AND ((page_count >= 1) AND (page_count <= 20)) AND (bytes IS NULL)) OR ((kind = ANY (ARRAY['html'::text, 'txt'::text, 'epub'::text])) AND (url IS NULL) AND (page_count IS NULL) AND (bytes IS NOT NULL) AND ((bytes >= 1) AND (bytes <= 20971520)))))
   constraint assessment_resource_status_check CHECK ((status = ANY (ARRAY['uploading'::text, 'ready'::text])))
   constraint assessment_resource_title_check CHECK (((char_length(title) >= 1) AND (char_length(title) <= 200)))
   CREATE INDEX assessment_resource_assessment_idx ON public.assessment_resource USING btree (assessment_id, "position")
@@ -1706,6 +1707,11 @@ function public._grade_return_repoint() returns trigger security definer
 function public._grade_return_settle(p_enrollment_id uuid, p_assessment_id uuid) returns integer security definer
 function public._grade_return_truncated() returns trigger security definer
 function public._handout_drop_expired(p_course_id uuid) returns integer security definer
+function public._handout_file_bucket() returns text
+function public._handout_file_max_bytes() returns bigint
+function public._handout_file_mime(p_kind text) returns text
+function public._handout_file_object(p_path text) returns TABLE(bytes bigint, mimetype text) security definer
+function public._handout_file_path(p_course_id uuid, p_resource_id uuid, p_kind text) returns text
 function public._handout_path(p_course_id uuid, p_resource_id uuid, p_page integer) returns text
 function public._keep_photos_day(p_choice text, p_terms jsonb, p_on date) returns date
 function public._markup_check(p_marks jsonb) returns void
@@ -1805,6 +1811,7 @@ function public.delete_withdrawn_student(p_enrollment_id uuid, p_idempotency_key
 function public.duplicate_assessment(p_src_id uuid, p_idempotency_key uuid) returns uuid
 function public.duplicate_course(p_src_id uuid, p_idempotency_key uuid) returns uuid
 function public.fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer, p_modifier smallint) returns integer
+function public.finish_handout_file(p_resource_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.finish_handout_upload(p_resource_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.finish_work_upload(p_submission_id uuid, p_files jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.fv_assessment_overall(p_enrollment_id uuid, p_assessment_id uuid) returns public.score_result
@@ -1919,6 +1926,7 @@ function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_c
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
 function public.soft_delete_teacher() returns void
+function public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid) returns jsonb security definer
 function public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) returns jsonb security definer
 function public.start_work_upload(p_assessment_id uuid, p_enrollment_id uuid, p_pages jsonb, p_mode text, p_idempotency_key uuid) returns jsonb security definer
 function public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) returns uuid security definer
@@ -1988,6 +1996,7 @@ function student_submit.form(p_session_token text, p_enrollment_id uuid, p_quest
 function student_submit.forms(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.group_file_links(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.group_work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.handout_file(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.handout_links(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
