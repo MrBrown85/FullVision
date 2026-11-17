@@ -109,13 +109,13 @@ async function settled(s) {
 const who = m => m.pieces().map(p => p.sid);
 
 describe('stickers name the pieces of a scan', () => {
-  it('reads each piece’s first page, names the stickered pieces, and says both counts', async () => {
-    answers = { 1: sticker(CODE.s2), 5: sticker(CODE.s4), 2: sticker(CODE.s3) };
+  it('reads first pages first, then the rest, names the stickered pieces, and says both counts', async () => {
+    answers = { 1: sticker(CODE.s2), 5: sticker(CODE.s4), 2: sticker(CODE.s2) };
     const { s, m, ctx } = opened(8, 2);
     expect(await Stk.start(s, ctx)).toBe(true);
     await settled(s);
-    // First pages only: 1, 3, 5, 7. Page 2's sticker names no one.
-    expect(reads).toEqual([1, 3, 5, 7]);
+    // First pages first, then the rest. Page 2 is s2's own second sticker: fine.
+    expect(reads).toEqual([1, 3, 5, 7, 2, 4, 6, 8]);
     expect(who(m)).toEqual(['s2', '', 's4', '']);
     expect(m.pieces().map(p => p.bySticker)).toEqual([true, false, true, false]);
     expect(Stk.line(s)).toBe('2 pieces named by sticker, 2 left to type.');
@@ -137,7 +137,7 @@ describe('stickers name the pieces of a scan', () => {
     const { s, ctx } = opened(4, 2);
     await Stk.start(s, ctx);
     await new Promise(r => setTimeout(r, 0));
-    expect(Stk.line(s)).toBe('Reading stickers: 0 of 2');
+    expect(Stk.line(s)).toBe('Reading stickers: 0 of 4');
     let1(sticker(CODE.s1));
     await settled(s);
     expect(Stk.line(s)).toBe('1 piece named by sticker, 1 left to type.');
@@ -347,6 +347,122 @@ describe('stickers name the pieces of a scan', () => {
   });
 });
 
+describe('a wrong cut, caught by the stickers on later pages', () => {
+  // Three two-page papers, each with its student's sticker on its first page.
+  const papers = () => ({ 1: sticker(CODE.s1), 3: sticker(CODE.s2), 5: sticker(CODE.s3) });
+
+  it('cut one page too long: no piece holding another student’s sticker is named, and it says which page', async () => {
+    answers = papers();
+    const { s, m, ctx } = opened(6, 3); // three pages per student, where the papers are two
+    await Stk.start(s, ctx);
+    await settled(s);
+    expect(m.pieces().map(p => p.nos)).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+    expect(who(m)).toEqual(['', '']);
+    expect(m.pieces().map(p => Stk.note(s, p, ctx))).toEqual([
+      'Page 3 of this piece has Ben’s sticker. Check where this piece ends.',
+      'Page 2 of this piece has Cam’s sticker. Check where this piece ends.',
+    ]);
+    expect(m.canMatch()).toBe(false);
+    expect(m.take()).toEqual([]);
+  });
+
+  it('the same scan cut right names them all, with nothing to say', async () => {
+    answers = papers();
+    const { s, m, ctx } = opened(6, 3);
+    await Stk.start(s, ctx);
+    await settled(s);
+    m.setPer(2);
+    ctx.draw();
+    await settled(s);
+    expect(who(m)).toEqual(['s1', 's2', 's3']);
+    expect(m.pieces().map(p => Stk.note(s, p, ctx))).toEqual(['', '', '']);
+    expect(m.take().map(p => [p.sid, p.pages.map(pg => pg.n)])).toEqual([
+      ['s1', [1, 2]],
+      ['s2', [3, 4]],
+      ['s3', [5, 6]],
+    ]);
+  });
+
+  it('a student with a sticker on both of their pages is named once, with no warning and not twice', async () => {
+    answers = { 1: sticker(CODE.s1), 2: sticker(CODE.s1), 3: sticker(CODE.s2) };
+    const { s, m, ctx } = opened(4, 2);
+    await Stk.start(s, ctx);
+    await settled(s);
+    expect(who(m)).toEqual(['s1', 's2']);
+    expect(m.twice()).toEqual({});
+    expect(m.pieces().map(p => [p.wrong, Stk.note(s, p, ctx)])).toEqual([
+      [null, ''],
+      [null, ''],
+    ]);
+  });
+
+  it('a typed name on a piece with another student’s sticker inside stays, and the line shows', async () => {
+    answers = papers();
+    const { s, m, ctx } = opened(6, 3);
+    m.name(0, 's1');
+    await Stk.start(s, ctx);
+    await settled(s);
+    expect(who(m)).toEqual(['s1', '']);
+    expect(Stk.note(s, m.pieces()[0], ctx)).toBe(
+      'Page 3 of this piece has Ben’s sticker. Check where this piece ends.',
+    );
+    // Typed names are the teacher's: matched as typed.
+    expect(m.canMatch()).toBe(true);
+    expect(m.take().map(p => [p.sid, p.pages.map(pg => pg.n)])).toEqual([['s1', [1, 2, 3]]]);
+  });
+
+  it('a retired or another class’s sticker on a later page says nothing', async () => {
+    answers = { 1: sticker(CODE.s1), 2: sticker(OLD_S2), 3: sticker(CODE.s2), 4: sticker('ZZZZZZZZZZZZ') };
+    const { s, m, ctx } = opened(4, 2);
+    await Stk.start(s, ctx);
+    await settled(s);
+    expect(who(m)).toEqual(['s1', 's2']);
+    expect(m.pieces().map(p => Stk.note(s, p, ctx))).toEqual(['', '']);
+  });
+
+  it('counts pages while it reads', async () => {
+    let let2;
+    answers = papers();
+    held[2] = new Promise(r => (let2 = r));
+    const { s, ctx } = opened(6, 2);
+    await Stk.start(s, ctx);
+    await new Promise(r => setTimeout(r, 0));
+    for (let i = 0; i < 50 && reads.indexOf(2) < 0; i++) await new Promise(r => setTimeout(r, 0));
+    expect(Stk.line(s)).toBe('Reading stickers: 3 of 6');
+    let2(null);
+    await settled(s);
+    expect(Stk.line(s)).toBe('3 pieces named by sticker, 0 left to type.');
+  });
+
+  it('a later page read upside down is marked too, on its own', async () => {
+    answers = { 1: sticker(CODE.s1), 2: sticker(CODE.s1, 180) };
+    const { s, m, ctx } = opened(4, 2);
+    await Stk.start(s, ctx);
+    await settled(s);
+    await T.find(s, ctx);
+    expect([1, 2, 3, 4].map(no => T.marked(s, no))).toEqual([false, true, false, false]);
+    expect(who(m)).toEqual(['s1', '']);
+  });
+
+  it('closing mid-read names nothing afterwards, a later page’s read included', async () => {
+    let let4;
+    answers = papers();
+    held[4] = new Promise(r => (let4 = r));
+    const { s, m, ctx, close } = opened(6, 2);
+    await Stk.start(s, ctx);
+    for (let i = 0; i < 50 && reads.indexOf(4) < 0; i++) await new Promise(r => setTimeout(r, 0));
+    const named = who(m);
+    close();
+    let4(sticker(CODE.s3));
+    await settled(s);
+    expect(who(m)).toEqual(named);
+    expect(reads.indexOf(6)).toBe(-1);
+  });
+});
+
 describe('real stickers through jsQR', { timeout: 30000 }, () => {
   // A small white page with a sticker's QR (version 1, Q, FVS + code) drawn on it.
   function page(code, x, y, scale) {
@@ -380,7 +496,7 @@ describe('real stickers through jsQR', { timeout: 30000 }, () => {
       page('', 0, 0, 0),
       page('', 0, 0, 0),
       page(CODE.s1, 200, 20, 3),
-      page(CODE.s4, 200, 300, 3), // on a second page: names no one
+      page(CODE.s1, 200, 300, 3), // s1's own sticker on their second page: fine
     ];
     const m = M.model(
       pics.map(p => ({ page: p, blank: false })),

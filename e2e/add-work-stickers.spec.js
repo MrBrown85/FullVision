@@ -7,9 +7,12 @@
  * sheet is replaced, so their old code is retired. A made-up 12-page scan
  * is drawn in the browser, each page a little shorter than the one before
  * so a page can be told by its shape, with stickers (vendor/qrcode.js, as
- * printed) on some pages:
+ * printed) on some pages. The papers are two pages each.
+ * First the scan is cut three pages per student (a wrong cut): piece 1
+ * (pages 1–3) holds B's sticker on its page 3, so it is not named and says
+ * so. Then two pages per student:
  *   page 1  A's sticker            → piece 1 is A's, By Sticker
- *   page 2  D's sticker            → a second page: names no one
+ *   page 2  A's sticker again      → A's own: fine, no warning
  *   page 3  B's sticker            → piece 2 is B's
  *   page 5  none                   → piece 3 is typed: D
  *   page 7  C's sticker, upside down → piece 4 is C's; page 7 "Upside down?"
@@ -72,7 +75,7 @@ test('stickers name their pieces, the rest are typed, and every page goes to the
     };
     await new Promise(r => Router.withScripts('qrcode', r));
     // Which sticker on which page: [code, upside down].
-    const on = { 1: [set.codes[0]], 2: [set.codes[3]], 3: [set.codes[1]], 7: [set.codes[2], true], 9: [set.retired] };
+    const on = { 1: [set.codes[0]], 2: [set.codes[0]], 3: [set.codes[1]], 7: [set.codes[2], true], 9: [set.retired] };
     const jpegs = [];
     for (let n = 1; n <= 12; n++) {
       // A letter page at 150 dots per inch, a little shorter each time.
@@ -178,9 +181,20 @@ test('stickers name their pieces, the rest are typed, and every page goes to the
   });
   const aws = page.locator('#add-work-split-overlay');
   await expect(aws.locator('.aws-card').first()).toBeVisible({ timeout: 30000 });
-  // Two pages per student: six pieces.
-  while ((await aws.locator('.aws-per').textContent()) !== '2')
+  // A wrong cut first: three pages per student, four pieces. Piece 1 holds B's sticker on its page 3.
+  while ((await aws.locator('.aws-per').textContent()) !== '3')
     await aws.getByRole('button', { name: 'One more page per student' }).click();
+  await expect(aws.locator('.aws-card')).toHaveCount(4);
+  await expect(aws.locator('.aws-card[data-at="0"] .aws-stk-note')).toHaveText(
+    /^Page 3 of this piece has .+’s sticker\. Check where this piece ends\.$/,
+    { timeout: 60000 },
+  );
+  await expect(aws.locator('#aws-name-0')).toHaveValue('');
+  await expect(aws.locator('.aws-stk-line')).toHaveText(/ named by sticker, /, { timeout: 60000 });
+  await shot(page, 'add-work-stickers-wrong-cut');
+
+  // Cut right: two pages per student, six pieces.
+  await aws.getByRole('button', { name: 'One fewer page per student' }).click();
   await expect(aws.locator('.aws-card')).toHaveCount(6);
 
   // The stickers are read in the background, then both counts are said.
@@ -203,7 +217,7 @@ test('stickers name their pieces, the rest are typed, and every page goes to the
 
   await shot(page, 'add-work-stickers-read');
 
-  // D is typed on piece 3 (D's sticker on page 2 named no one).
+  // D is typed on piece 3.
   await aws.locator('#aws-name-2').focus();
   await page.keyboard.type(D.name.slice(0, -1));
   await page.keyboard.press('Enter');

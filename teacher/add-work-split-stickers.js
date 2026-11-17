@@ -11,10 +11,16 @@
    the scan opens (for each class, with two classes on). Refused or empty,
    nothing is read, jsQR is never fetched and nothing is said.
 
-   In the background: first pages are read one after another, each picture
-   once (a page turned by hand is a new picture and is read again); the
-   reader pauses between looks, so typing stays live. Match the Named
-   Pieces never waits for it.
+   In the background: every piece's first page, then every other kept page
+   (to catch a wrong cut), one after another, each picture once (a page
+   turned by hand is a new picture and is read again); the reader pauses
+   between looks, so typing stays live. Match the Named Pieces never waits.
+
+   A wrong cut: a later page of a piece carries a live sticker of another
+   student than the piece's sticker or typed name. The piece is not named
+   by its sticker (a typed name stays) and says which page. A student's own
+   sticker on more of their pages is fine, and is not "twice": only the
+   same code on two pieces' first pages is.
 
    What a read does (ScanLabelRead.resolve over the pieces' first pages,
    worked out again at every draw, so it follows the cuts):
@@ -130,24 +136,53 @@
         });
       map[ps[i].first] = { sid: r.sid || '', why: r.why || '', code: r.code, also: also };
     });
-    s.m.setStickers(map);
-    stk.total = ps.length;
-    stk.done = ps.filter(function (p) {
-      return _readOf(s, p.first) !== undefined;
+    // Every page read with a live sticker of a listed student: a later page's is a wrong cut.
+    var listed = {};
+    (s.list || []).forEach(function (st) {
+      if (st && st.id) listed[st.id] = true;
+    });
+    var live = {};
+    stk.labels.forEach(function (l) {
+      if (l && !l.retired && listed[l.enrollment_id]) live[l.code] = l.enrollment_id;
+    });
+    var inside = {};
+    var order = _order(s);
+    order.forEach(function (no) {
+      var r = _readOf(s, no);
+      if (r && live[r.code]) inside[no] = live[r.code];
+    });
+    s.m.setStickers(map, inside);
+    stk.total = order.length;
+    stk.done = order.filter(function (no) {
+      return _readOf(s, no) !== undefined;
     }).length;
     _next(s, ctx);
   }
 
-  // The next first page not yet read, one at a time.
+  /* The pages to read, in order: every piece's first page (so names come
+     first), then every other kept page, to catch a wrong cut. */
+  function _order(s) {
+    var ps = s.m.pieces();
+    var firsts = ps.map(function (p) {
+      return p.first;
+    });
+    var rest = [];
+    ps.forEach(function (p) {
+      rest = rest.concat(p.nos.slice(1));
+    });
+    return firsts.concat(rest);
+  }
+
+  // The next page not yet read, one at a time.
   function _next(s, ctx) {
     var stk = s.stk;
     var m = s.m;
     if (!stk || stk.busy || !m) return;
-    var todo = m.pieces().find(function (p) {
-      return _readOf(s, p.first) === undefined;
+    var no = _order(s).find(function (n) {
+      return _readOf(s, n) === undefined;
     });
-    if (!todo) return;
-    var pic = m.page(todo.first).page;
+    if (no === undefined) return;
+    var pic = m.page(no).page;
     stk.busy = true;
     Promise.resolve()
       .then(function () {
@@ -216,6 +251,10 @@
     var call = function (sid) {
       return (ctx && ctx.call ? ctx.call(s, sid) : '') || 'a student';
     };
+    if (p.wrong)
+      return (
+        'Page ' + p.wrong.pos + ' of this piece has ' + call(p.wrong.sid) + '’s sticker. Check where this piece ends.'
+      );
     if (p.clash >= 0) return 'The sticker says ' + call(k.sid) + ', who is typed on piece ' + (p.clash + 1) + '.';
     if (p.clashFrom && p.clashFrom.length)
       return 'The sticker on ' + _nums(p.clashFrom) + ' says ' + call(p.sid) + ' too.';
@@ -235,7 +274,7 @@
   function cardHtml(s, p, ctx) {
     if (!s.stk || !s.stk.labels) return '';
     var words = note(s, p, ctx);
-    var use = p.sticker && p.sticker.sid && p.typed && p.sticker.sid !== p.sid && p.clash < 0;
+    var use = p.sticker && p.sticker.sid && p.typed && p.sticker.sid !== p.sid && p.clash < 0 && !p.wrong;
     if (!p.bySticker && !words) return '';
     return (
       '<div class="aws-stk">' +

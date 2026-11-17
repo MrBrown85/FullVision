@@ -120,7 +120,7 @@
        them for the pieces' first pages). Kept against the page, as a typed
        name is. stickersOn: once stickers are being read, an emptied box is
        kept as "no one" so the piece's sticker does not name it again. */
-    var st = { per: 1, leaveOut: true, order: 'typed', pins: {}, stickers: {}, stickersOn: false };
+    var st = { per: 1, leaveOut: true, order: 'typed', pins: {}, stickers: {}, inside: {}, stickersOn: false };
 
     function out(p) {
       return st.leaveOut && p.blank && !p.kept;
@@ -211,7 +211,18 @@
         var bySticker = false;
         var clash = -1;
         var sid = pin;
-        if (pin === undefined && sticker && sticker.sid) {
+        /* A wrong cut: a later page of this piece carries a live sticker of
+           another student (`inside`, page no → sid). The piece is not named
+           by its sticker; a typed name stays, and the warning shows. */
+        var own = pin || (sticker && sticker.sid) || '';
+        var wrong = null;
+        for (var w = 1; w < r.kept.length && !wrong; w++) {
+          var later = pages[r.kept[w]].no;
+          var whose = has.call(st.inside, later) ? st.inside[later] : '';
+          if (whose && whose !== own) wrong = { no: later, pos: w + 1, sid: whose };
+        }
+        if (wrong && pin === undefined && sticker && sticker.sid) sid = '';
+        else if (pin === undefined && sticker && sticker.sid) {
           var there = typedAt[sticker.sid];
           if (there !== undefined && there !== at) {
             clash = there;
@@ -241,6 +252,7 @@
           bySticker: bySticker,
           clash: clash,
           clashFrom: [],
+          wrong: wrong,
         };
       });
       Object.keys(clashFrom).forEach(function (at) {
@@ -385,11 +397,14 @@
     }
 
     /* Stickers (B4). setStickers(map): page no → { sid, why, code, also }
-       for the pieces' first pages, replacing what was there. useSticker(at):
-       the teacher asks for the sticker's name on a piece they had typed or
-       emptied: their name on it is let go. */
-    function setStickers(map) {
+       for the pieces' first pages, replacing what was there; inside: page
+       no → sid for every page read with a live sticker of a listed student
+       (a later page's is a wrong cut when it is another student's).
+       useSticker(at): the teacher asks for the sticker's name on a piece
+       they had typed or emptied: their name on it is let go. */
+    function setStickers(map, inside) {
       st.stickers = map || {};
+      st.inside = inside || {};
       st.stickersOn = true;
     }
     function useSticker(at) {
