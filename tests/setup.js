@@ -334,6 +334,8 @@ load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/work-rubric-card.js');
 load('teacher/add-work-stage.js');
+load('teacher/add-work-split-model.js');
+load('teacher/add-work-split.js');
 load('teacher/add-work-class.js');
 load('shared/competency-wording.js');
 load('teacher/report-feedback.js');
