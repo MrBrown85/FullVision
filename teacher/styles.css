@@ -3442,3 +3442,13 @@ img.fv-img-broken {
   color: transparent;
   font-size: 0;
 }
+
+/* A picture still on its way (shared/work-thumbs.js sets its source once
+   the file arrives): a plain grey box in its own size, not the browser's
+   broken-picture mark and alt text (Colin, Nov 16). */
+img[data-work-pic]:not([src]) {
+  content: url('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+  background: #eceef2;
+  color: transparent;
+  font-size: 0;
+}
