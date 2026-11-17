@@ -3531,6 +3531,19 @@ function gradeMonthChange(cid, sid, today) {
   };
 }
 
+/** The overall grade on each day, year to date, on every score: [{ day, value (% or level), level, text, word }]. */
+function gradeOverYear(cid, sid, days) {
+  var byLetter = courseGradeMode(cid) !== 'proficiency';
+  return (days || []).map(function (day) {
+    return _readAsOfDate(cid, day, function () {
+      var v = getOverallProficiency(cid, sid);
+      var lg = byLetter ? getCourseLetterData(cid, sid) || {} : { R: v > 0 ? v : null };
+      var text = lg.R == null ? '' : byLetter ? (lg.S ? lg.S + ' ' : '') + lg.R + '%' : formatLevel(cid, v);
+      return { day: day, value: lg.R == null ? null : lg.R, level: v, text: text, word: levelWord(cid, v) };
+    });
+  });
+}
+
 /** Which level's Next Step applies to one skill, from returned work only:
  * the level the skill shows now (its word's level, as the comment bank's
  * Generate reads it), so the step is the comment bank's sentence for that
