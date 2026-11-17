@@ -3167,12 +3167,77 @@ a.dash-ins-name:hover {
   line-height: 1.5;
   color: var(--text);
 }
+/* The categories' weights as one bar (teacher/cm-grading-bars.js): each
+   line between two categories drags, by mouse, pen or touch, or moves by
+   the arrow keys once focused. */
 .cm-weight-bar {
+  position: relative;
   display: flex;
-  gap: 2px;
-  height: 10px;
-  border-radius: 5px;
+  height: 32px;
+  margin-top: 4px;
+  user-select: none;
+}
+.cm-weight-seg {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cm-weight-seg:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.cm-weight-seg:nth-last-child(1 of .cm-weight-seg) {
+  border-radius: 0 6px 6px 0;
+}
+.cm-weight-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 6px;
+}
+.cm-weight-pct {
+  padding-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.cm-weight-grip {
+  position: absolute;
+  top: -4px;
+  z-index: 1;
+  width: 24px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  transform: translateX(-50%);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.cm-weight-grip::before {
+  content: '';
+  width: 6px;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--text-2);
+  border-radius: 3px;
+  background: var(--surface);
+  transition: border-color 150ms;
+}
+.cm-weight-grip:hover::before,
+.cm-weight-grip.is-dragging::before {
+  border-color: var(--text);
+}
+.cm-weight-grip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 .cm-check {
   width: 340px;
@@ -6985,10 +7050,29 @@ label.cm-cr-row {
   color: var(--score-1-text);
   font-size: var(--text-sm);
 }
+/* Each preset with the sentence that says what it does beside it. */
 .cm-pts-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  gap: 10px 14px;
+}
+.cm-pts-preset-text {
+  margin-top: 0;
+  padding-top: 6px;
+  max-width: 62ch;
+}
+@media (max-width: 560px) {
+  .cm-pts-actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .cm-pts-actions .cm-action-btn {
+    justify-self: start;
+  }
+  .cm-pts-preset-text {
+    padding: 0 0 8px;
+  }
 }
 
 /* ── Student Page tab (teacher/cm-student-page.js; board "Teacher: Class

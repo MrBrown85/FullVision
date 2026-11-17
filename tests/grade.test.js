@@ -288,6 +288,8 @@ describe('grade-format-guard', () => {
     'teacher/class-results.js round pct': 'a bar’s width',
     'teacher/class-results.js round (38 - ((p.pct - lo) / (hi - lo)) * 32) * 10': 'a chart point’s y',
     'teacher/class-results.js round v.value * 10': 'stacks dots that share a points value',
+    'teacher/cm-grading-bars.js round Number(v) * 10': 'a Counts As % in a preset’s sentence, as the ruler shows it',
+    'teacher/cm-grading-bars.js round Number(v)': 'a category weight being set by a drag, a whole percent',
     'teacher/comment-bank.js floor Number(v)': 'a saved limit, a whole number',
     'teacher/comment-bank.js round (nx.min - Number(g.pct)) * 10': 'the gap to the next letter from the shown course %',
     'teacher/comment-personal.js floor Number(v[k])': 'a count',
