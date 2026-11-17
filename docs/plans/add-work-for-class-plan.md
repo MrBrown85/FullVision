@@ -1,6 +1,6 @@
 # Add Work for the Class build plan (2026-11-17)
 
-**Status (Nov 17, evening).** B0 to B3 are built and on `main`; B4 to B7 are not built. See "Built so far" below for what was and was not checked. Colin chose Option B on Nov 17 ("go with option b"): a page of its own, opened from the assessment card's menu and from a button on the Work Wall. Option A (dropping straight onto the Work Wall) is not being built.
+**Status (Nov 17, night).** B0 to B7 are built and on `main`, not released. See "Built so far" below for what was and was not checked, and "Not built" for the three pieces left out. Colin chose Option B on Nov 17 ("go with option b"): a page of its own, opened from the assessment card's menu and from a button on the Work Wall. Option A (dropping straight onto the Work Wall) is not being built.
 
 **What it is for.** A teacher scans a pile of paper work on the school photocopier, which emails one big PDF. From one page, on a computer, the teacher adds each student's pages for one assessment in a few minutes. Nothing is saved until the teacher presses Add Work.
 
@@ -35,26 +35,31 @@ Traced in the code on Nov 17.
 
 One PR per slice. Each slice ends usable on its own.
 
-| Slice | What                                                                                                                                | Database change  | Waits for                           | Status                |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------- | --------------------- |
-| B0    | This plan, the DECISIONS entry, the ROADMAP line                                                                                    | No               | Nothing                             | Done (PRs 1509, 1512) |
-| B1    | The page: one file per student, Column and Grid, Add as More Pages / Replace Them / Skip, On Paper, the list of who is still Not In | No               | B0                                  | Done (PR 1513)        |
-| B2    | Split the Scan: drop the emailed PDF, pages per student, type names, blank backs left out, turn a page                              | No               | B1 (the page limit is settled: 150) | Done (PRs 1521, 1522) |
-| B3    | A folder matched by name: the Waiting tray, close spellings, two students with one last name                                        | No               | B1                                  | Done (PR 1518)        |
-| B4    | Sticker sheets: print one sheet per student, the scan sorts itself                                                                  | Yes (decision 3) | B2, and decisions 3 and 4           | Not built             |
-| B5    | Small touches: Set Up Like Last Time, a page dragged between pieces, the answer key, grade in the order of the scan                 | No               | B2                                  | Not built             |
-| B6    | One pile, two classes; a late paper's own assessment                                                                                | No               | B2 and B3                           | Not built             |
-| B7    | The scan shared from the phone's mail                                                                                               | No               | B2, and a check on a real iPhone    | Not built             |
+| Slice | What                                                                                                                                | Database change  | Waits for                           | Status                            |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------- | --------------------------------- |
+| B0    | This plan, the DECISIONS entry, the ROADMAP line                                                                                    | No               | Nothing                             | Done (PRs 1509, 1512)             |
+| B1    | The page: one file per student, Column and Grid, Add as More Pages / Replace Them / Skip, On Paper, the list of who is still Not In | No               | B0                                  | Done (PR 1513)                    |
+| B2    | Split the Scan: drop the emailed PDF, pages per student, type names, blank backs left out, turn a page                              | No               | B1 (the page limit is settled: 150) | Done (PRs 1521, 1522)             |
+| B3    | A folder matched by name: the Waiting tray, close spellings, two students with one last name                                        | No               | B1                                  | Done (PR 1518)                    |
+| B4    | Sticker sheets: print one sheet per student, the scan sorts itself                                                                  | Yes (decision 3) | B2, and decisions 3 and 4           | Done (PRs 1531, 1538, 1541)       |
+| B5    | Small touches: Set Up Like Last Time, a page dragged between pieces, the answer key, grade in the order of the scan                 | No               | B2                                  | Done but the answer key (PR 1533) |
+| B6    | One pile, two classes; a late paper's own assessment                                                                                | No               | B2 and B3                           | Done (PR 1539)                    |
+| B7    | The scan shared from the phone's mail                                                                                               | No               | B2, and a check on a real iPhone    | Done as Choose a File (PR 1534)   |
 
 B2 and B3 can be built at the same time by two builders once B1 is merged: they share only the staging model, which B1 fixes.
 
 ## Built so far (Nov 17)
 
-On `main` at `4cbe486a`. A release carries it when Colin says.
+B1 to B3 were on `main` at `4cbe486a`; B4 to B7 followed the same night. A release carries it when Colin says.
 
 - **B1, the page** (PR 1513). `teacher/add-work-stage.js` (`AddWorkStage`: the staging model and the run, no DOM), `teacher/add-work-class.js` and `.css` (`AddWorkClass`, the screen), `shared/add-work-files.js` (`AddWorkFiles`, moved out of `teacher/page-assignments.js`). Opens from the assessment card's menu and from Add Work on the Work Wall, on the pieces where the row's + shows.
 - **B2, Split the Scan** (PRs 1521 and 1522). `teacher/add-work-split-model.js` (`AddWorkSplitModel`, no DOM), `teacher/add-work-split.js` and `.css` (`AddWorkSplit`). A page is blank when its sharpness is under 2.6, set from made-up scans and from the school copier's scans read as numbers only. A made-up 92-page scan split in 3.2 seconds on Colin's Mac, 8.9 with the browser slowed four times as a stand-in for a Chromebook.
 - **B3, files matched by name** (PR 1518). `shared/name-match.js` (`NameMatch`), `teacher/add-work-tray.js` (`AddWorkTray`: files dropped off a student, folders, the Waiting tray, and the hook that opens Split the Scan).
+
+- **B4, sticker sheets** (PRs 1531, 1538 and 1541). The database: migration `2026111710_scan_labels.sql` (table `scan_label`; `list_scan_labels`, `issue_scan_labels`, `reissue_scan_label`), applied to `gradebook-prod` on Colin's "Apply it"; 204 of 204 on a local PostgreSQL 17 and one independent review. The app: `shared/data-scan-labels.js`, `shared/scan-label-read.js` (`ScanLabelRead`), `vendor/jsqr/` (jsQR 1.4.0, the npm package's own file), `teacher/scan-labels.js` and `.css` (`ScanLabels`: Class Settings, Student Page tab, Print Sticker Sheets). On made-up scans at 200 and 300 dots per inch, blurred, noisy, skewed and upside down, every sticker at the printed size (0.44 inch) read, and none read wrongly; the smallest that always read was 0.35 inch. Reading (`teacher/add-work-split-stickers.js`): when the class has sticker codes, every kept page of a scan is read in the background, piece by piece. A sticker on a piece's first page names the piece once all of that piece's pages are read, and the piece says By Sticker. A made-up 56-page scan was read in 19 seconds on Colin's Mac, 70 with the browser slowed four times.
+- **B5, small touches** (PR 1533). `teacher/add-work-split-setup.js`, `-move.js`, `-turn.js`, `teacher/add-work-page-view.js`. Set Up Like Last Time; a page moved onto another piece by drag or from a menu; Space to see a page full size; Turn Every Page; Grade in Scan Order.
+- **B6, two classes and a late paper** (PR 1539). `teacher/add-work-targets.js` (`AddWorkTargets`: one staging model for each class and assessment, no DOM) and `teacher/add-work-two-classes.js`. This Pile Has Two Classes is offered when another class has an assessment of the same title; each student's pages go to their own class. Each placed file has a For choice for another assessment of its student's class; it never sets Late.
+- **B7, Split a Scan on the phone** (PR 1534). `teacher-mobile/split-scan.js`, `split-scan-model.js`, `split-scan.css`, opened from the Grade tab's row menu with Choose a File, on the desktop's own model and staging modules.
 
 Rules the reviews added, each after a fault that could have put a page under the wrong student:
 
@@ -64,10 +69,22 @@ Rules the reviews added, each after a fault that could have put a page under the
 4. Return in an empty name box takes no one, in Split the Scan and in the tray's Choose a Student.
 5. A name in Split the Scan belongs to the page it was read from; when a line moves, a piece that starts on another page has no name.
 6. A match by file name is taken only when it is certain. A close spelling, two students who fit, or a second name-like word in the file name is offered, never taken.
+7. A page moves between pieces only when the drop carries that page's own mark. A drag whose end was never heard moves nothing later.
+8. Set Up Like Last Time never carries Class List Order to a new pile.
+9. Return never takes a name two students share (one in each class, or two in one): the teacher picks.
+10. A second class is added to the page only while files are still being placed; Add Work waits while that class is being read.
+11. A sticker names a piece only when every page of the piece has been read and none of its later pages carries anyone else's sticker. A piece with another student's sticker inside it was cut wrong: it gets no name from its sticker and says which page.
+12. A sticker never replaces a name the teacher typed or a box the teacher emptied; Use Sticker is how the teacher asks for it. The same sticker on two pieces, a replaced sheet's sticker, another class's and a student's no longer listed are shown and never taken.
 
-Checked: each slice's unit tests and browser spec; the whole flow by hand in Demo Mode on `main` (files by name, the tray, a made-up scan split and named, Add Work, the stored pages, no file name kept on the device).
+Checked: each slice's unit tests and browser spec; for B1 to B3 the whole flow by hand in Demo Mode on `main` (files by name, the tray, a made-up scan split and named, Add Work, the stored pages, no file name kept on the device); for B4 to B7 each slice's tests and browser spec re-run by the reviewer, its diff read, and its screens looked at in Demo Mode.
 
-Not checked: a signed-in class; a real drag from Finder; a real PDF from the copier through the page; Safari and Firefox; a real Chromebook; a screen reader.
+Not checked: a signed-in class (the sticker calls have not been made against the live database from the app); a real drag from Finder; a real PDF from the copier through the page; a sticker sheet printed on real Avery 5167 stock and scanned on the school copier; a real phone; Safari and Firefox; a real Chromebook; a screen reader.
+
+### Not built
+
+- **The answer key** (B5). Decided Nov 17: kept in the database in a table of its own (DECISIONS, "Add Work for the Class" 14). To be designed and built; its SQL goes to Colin first.
+- **Finding upside-down pages from the picture** (B5). The trial (90 made-up pages, each both ways up) made wrong calls: tall letters against hanging ones was wrong on 1 page, more ink at the top on 9. A sticker read upside down points its page out instead; nothing turns by itself.
+- **A scan shared from an Android phone's mail** (B7). Built, then taken out before merging: when the service worker with the handler is not the active one, the phone sends the whole PDF to the web host. Kept on the branch `claude/add-work-share-target-kept`.
 
 Left as built, for Colin to change if he wants: the Replace Them warning ("Deleted photos can't come back.") shows on the student's row, not in a dialog; two comment blocks in `shared/work-wall.js` were rewrapped wider so the Add Work button fit under that file's line limit.
 
@@ -186,12 +203,13 @@ On Android the installed app can receive a shared PDF. On an iPhone a web app ca
 ## Decisions that are Colin's
 
 1. **The page limit for a class scan.** Settled Nov 17: 150 pages on this page only ("Yes, 150 pages"); the 20 MB limit and every other upload's 20 pages are unchanged. DECISIONS, "Add Work for the Class" 7.
-2. **Whether the page is offered in classes without the student page.** Recommended: yes. Paper is where it helps most.
-3. **How a sticker's code is kept** (B4): a table of its own, or the enrolment's id. Recommended: the table.
-4. **Reading stickers outside Chrome** (B4): add a small reader to `vendor/`, or fall back to typing names.
-5. **The sticker privacy check** (B4): that the code says nothing about the student and cannot sign anyone in. This needs the district privacy officer's view, not mine.
-6. **The sticker's design and the cost of label stock**: about 28 sheets per class per term.
-7. **Whether a sticker names the student only** (B4). Colin asked on Nov 17 whether it should also say the assignment. Recommended: the student only, so one sheet lasts the term; the assessment is chosen when the scan is dropped.
+2. **Whether the page is offered in classes without the student page.** Recommended: yes. Paper is where it helps most. Taken as recommended, Nov 17 (DECISIONS 16).
+3. **How a sticker's code is kept** (B4): a table of its own, or the enrolment's id. Recommended: the table. Taken as recommended, Nov 17 (DECISIONS, "Add Work for the Class" 8).
+4. **Reading stickers outside Chrome** (B4): add a small reader to `vendor/`, or fall back to typing names. Settled in the build, Nov 17: one reader, jsQR, in every browser, Chrome included (DECISIONS 8).
+5. **The sticker privacy check** (B4): that the code says nothing about the student and cannot sign anyone in. This needs the district privacy officer's view, not mine. Colin chose on Nov 17 to go ahead in real classes without waiting for it (DECISIONS 13); the officer has not been asked.
+6. **The sticker's design and the cost of label stock**: about 28 sheets per class per term. Taken as Avery 5167 plus plain paper (DECISIONS 8).
+7. **Whether a sticker names the student only** (B4). Colin asked on Nov 17 whether it should also say the assignment. Recommended: the student only, so one sheet lasts the term; the assessment is chosen when the scan is dropped. Taken as recommended (DECISIONS 8).
+8. **The answer key** (B5): kept in the database in a table of its own (DECISIONS 14); to be designed and built. **The Android share** (B7): stays out (DECISIONS 15).
 
 ## Risks
 
