@@ -67,6 +67,7 @@ export const OWNERS = {
   'public.rubric_print': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.rubric_score': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.rubric_tag': 'rls_test.of_rubric(t.rubric_id)',
+  'public.scan_label': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.score': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.score_audit': 'rls_test.of_score(t.score_id)',
   'public.section': 'rls_test.of_course(t.course_id)',
@@ -112,4 +113,4 @@ export const NO_TEACHER = {
 /* Tables that a file in migrations/ adds and live does not have yet. Each is tested only when it is
    there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
    out once the file is applied and migrations/baseline/ is refreshed. */
-export const NOT_YET_APPLIED = {};
+export const NOT_YET_APPLIED = { 'public.scan_label': 'migrations/2026111710_scan_labels.sql' };

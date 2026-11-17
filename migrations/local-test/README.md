@@ -2697,3 +2697,22 @@ Result on 2026-11-17, PostgreSQL 17.12 (Postgres.app), from an empty database: *
 The pre-check (`photo-expiry-live-precheck.sql`, catalog facts only, returns only the rows that differ) is to be run read-only on gradebook-prod before the apply. After it, the post-check (`photo-expiry-live-postcheck.sql`) says ok on every row.
 
 Not verified here: gradebook-prod itself; pg_cron itself.
+
+## Sticker codes (2026111710, 2026-11-17)
+
+One file, `../2026111710_scan_labels.sql`, 19 KB, NOT APPLIED (needs Colin's OK). Add Work for the Class, slice B4: a random code on each student's sticker sheet, so a scanned paper names its student. It adds `public.scan_label` (one row per code: `enrollment_id` on delete cascade, `code` unique and checked against the alphabet, `created_at`, `retired_at`; one live code per student; row security on, no policy, no grants), `fv_private.scan_label_new` (draws and stores a code; no role may call it), and three functions a teacher may run: `list_scan_labels`, `issue_scan_labels` and `reissue_scan_label` (the two that write are idempotent). It changes no existing row, table or function, and the table starts empty. `scan_labels.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same function md5s as gradebook-prod:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54620/sl_base node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54620 PGDATABASE=sl_base python3 scan_labels.py                                            # every scenario
+DATABASE_URL=postgresql://postgres@127.0.0.1:54620/postgres npm run test:db                     # the rule tests, without the file
+FV_DB_TEST_APPLY=migrations/2026111710_scan_labels.sql DATABASE_URL=postgresql://postgres@127.0.0.1:54620/postgres npm run test:db   # and with it
+```
+
+Scenarios (the script's docstring says what each checks): `issue`, `reissue`, `list`, `others` (Teacher B's class and student, a class in the trash, ids that do not exist and null ids answer empty and change nothing; signed out is PT401; a visitor runs none; no role reads or writes the table or calls the code-drawing function; no function of the student page names the table), `cascade` (a withdrawn student deleted for good and a class purged from the trash take their codes), `taken` (a code already taken is drawn again; five in a row fail and add nothing; the table itself refuses a code outside the alphabet, a second live code for a student and a repeated code; 401 draws all differ and use every character), `race` (two issues for one class and two reissues for one student on connections of their own, three rounds each; one key from two windows), `apply` (eight guards, each named by the pre-check; a held lock gives up after five seconds; only the header's changes; no existing row; the header's md5s; pre-check, post-check, a second run, size), `undo` (PART 1 alone takes the functions from teachers and keeps every code; the full undo leaves the catalog and every row as before; a changed function stops it; a second run; the file applies again).
+
+Result on 2026-11-17, PostgreSQL 17.12 (Postgres.app), from an empty database: **184 of 184**. `npm run test:db` with the file loaded: every rule test passed (355 functions, 82 tables with an owner, `scan_label` among them); without it, as before (351 functions).
+
+The pre-check (`scan-labels-live-precheck.sql`, catalog facts only, returns only the rows that differ) was run read-only on gradebook-prod on Nov 17 and returned no rows.
+
+Not verified here: gradebook-prod itself; the app that calls the functions (its own tests are in the B4 app PR).
