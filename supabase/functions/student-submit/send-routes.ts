@@ -143,12 +143,12 @@ const AT_ONCE = 4;
 export const SQL = {
   work: 'select student_submit.work($1::text, $2::uuid, $3::text) as r',
   sendStart:
-    'select student_submit.send_start($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
+    'select student_submit.send_start($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
   replace:
-    'select student_submit.replace($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
+    'select student_submit.replace($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
   // PR 1095, section 4: read-only, the paths of this student's own unfinished send, by its id.
   sendPaths: 'select student_submit.send_paths($1::text, $2::uuid, $3::uuid, $4::text) as r',
-  sendFinish: 'select student_submit.send_finish($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
+  sendFinish: 'select student_submit.send_finish($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text) as r',
   unsend: 'select student_submit.unsend($1::text, $2::uuid, $3::uuid, $4::text) as r',
   fileLinks: 'select student_submit.file_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
   removalBatch: 'select student_submit.removal_batch($1::int) as r',
