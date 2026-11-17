@@ -2,7 +2,7 @@
  * The desktop grader with the student's work (S6-F1 to F3): the page
  * beside the scoring, Focus on Work, the Show bar with To Grade and Not
  * In, Add Work for a student with nothing in (a real photo, shrunk in the
- * browser and kept on the device), and Delete Work. Demo Mode, Science 8,
+ * browser and kept on the device), and Unsubmit. Demo Mode, Science 8,
  * on the sample work of Cell Microscope Lab (shared/seed-data.js), at
  * 1366 x 900.
  *
@@ -95,7 +95,7 @@ test('the work beside the scoring, Focus on Work, and To Grade', async ({ page }
   expect(errors).toEqual([]);
 });
 
-test('Add Work for a student with nothing in, then Delete Work', async ({ page }) => {
+test('Add Work for a student with nothing in, then Unsubmit', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   // A student who sent nothing, their sample grade cleared: Not In.
@@ -128,11 +128,11 @@ test('Add Work for a student with nothing in, then Delete Work', async ({ page }
   // The photo was made smaller in the browser before it was kept.
   const size = await img.evaluate(el => Math.max(el.naturalWidth, el.naturalHeight));
   expect(size).toBeLessThanOrEqual(2000);
-  await dialog.locator('[data-grader="work-delete"]').click();
+  await dialog.locator('[data-grader="work-unsubmit"]').click();
   const confirm = page.locator('.confirm-overlay');
-  await expect(confirm.locator('.confirm-title')).toHaveText(/^Delete .*’s Work\?$/);
+  await expect(confirm.locator('.confirm-title')).toHaveText(/^Unsubmit .*’s Work\?$/);
   await expect(confirm.locator('.confirm-message')).toContainText('Deleted photos can’t come back.');
-  await shot(page, 'S6-F3-delete-work-1366');
+  await shot(page, 'S6-F3-unsubmit-1366');
   await page.locator('#confirm-ok-btn').click();
   await expect(dialog.locator('.grader-addwork')).toBeVisible();
   expect(errors).toEqual([]);

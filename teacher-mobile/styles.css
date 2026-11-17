@@ -5301,6 +5301,21 @@ body.fv-switching-course::after {
   margin-top: 3px;
   color: #7a5900;
 }
+/* Unsubmit under the work: quiet, as on the desktop grader. */
+.m-work-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+.m-work-unsubmit {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
 /* Pinned at the top of the card once the pages have scrolled past. */
 .m-work-pin {
   position: sticky;

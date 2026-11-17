@@ -8685,6 +8685,12 @@ button.grader-member-name {
   top: auto;
   bottom: calc(100% + 4px);
 }
+/* The card is a layer under the open start (z-index 2 under 3), so a
+   picker or menu inside it could be drawn over by that start when it opens
+   upward. While one is open the card lifts above the starts. */
+.af-start-card.af-rubric-card:has(.af-ge-picker, .af-ge-menu) {
+  z-index: 4;
+}
 /* On a phone the editor fits the card: the grid scrolls sideways inside
    it (contain keeps its width out of the form's), and the name and the
    Style switch take the head's width. */
@@ -9323,7 +9329,7 @@ button.grader-member-name {
   display: flex;
   justify-content: flex-end;
 }
-.grader-work-delete {
+.grader-work-unsubmit {
   background: none;
   border: none;
   color: var(--score-1, #c0392b);
@@ -9753,13 +9759,13 @@ button.grader-member-name {
 .grader-work-pages.fit-all .grader-work-page {
   cursor: zoom-in;
 }
-/* Delete Work: there when wanted, not red under the student's note. */
-.grader-dialog.has-work .grader-work-delete {
+/* Unsubmit: there when wanted, not red under the student's note. */
+.grader-dialog.has-work .grader-work-unsubmit {
   color: var(--text-3);
   font-weight: 500;
 }
-.grader-dialog.has-work .grader-work-delete:hover,
-.grader-dialog.has-work .grader-work-delete:focus-visible {
+.grader-dialog.has-work .grader-work-unsubmit:hover,
+.grader-dialog.has-work .grader-work-unsubmit:focus-visible {
   color: var(--score-1-text);
 }
 @media (min-width: 901px) {
