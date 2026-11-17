@@ -617,8 +617,8 @@
         rows: reports,
       },
       {
-        name: 'Questionnaires',
-        about: 'Each answer a student gave on a questionnaire, one row per question.',
+        name: 'Reflections',
+        about: 'Each answer a student gave on a reflection, one row per question.',
         columns: [
           COL.classCol,
           COL.student,

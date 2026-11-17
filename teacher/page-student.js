@@ -2252,7 +2252,7 @@ window.PageStudent = (function () {
           : 'About Me isn’t turned on for this class. Turn it on in ' +
             '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
             esc(encodeURIComponent(o.cid)) +
-            '&amp;manage=questionnaires">Class Settings › Questionnaires</a>.') +
+            '&amp;manage=questionnaires">Class Settings › Reflect</a>.') +
         '</p></section>'
       );
     html += '<p class="lp2-lede">From the About Me questionnaire, ' + esc(LearnerProfile.day(a.at)) + '.</p>';

@@ -1892,32 +1892,16 @@
     paint(out.focus);
     if (!out.piece && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     watchRows();
+    // Reflect opened: its list asked again (at most every 20 s), so one turned on mid-class shows.
+    if (act === 'tab' && S.tab === 'questionnaires' && Date.now() - formsAt >= 20000) loadForms();
   }
 
   /* ── Reflections (S4-F4; the Questionnaires tab until 2026-11-14) ── */
 
   /* Demo Mode's samples, in the shape the server's page is to send them
-     (shared/student-view.js, questionnairesOf). Kept out of the page reply
-     itself, which is the server's shape today. Phone reports are not on
-     the student page (Colin, 2026-11-14). */
+     (s/questionnaire.js, demoFormList; shared/student-view.js reads them). */
   function demoForms() {
-    function at(offset) {
-      return isoDay(offset) + 'T20:15:00Z';
-    }
-    return {
-      questionnaires: [
-        {
-          id: 'demo-q-reflection',
-          title: 'November Reflection',
-          description: 'Core Competencies and your goal check-in',
-          minutes: 10,
-          state: 'open',
-          closes_on: isoDay(9),
-        },
-        { id: 'demo-q-about', title: 'About Me', state: 'sent', sent_at: at(-58) },
-        { id: 'demo-q-march', title: 'March Reflection', state: 'not_open_yet', opens_on: isoDay(112) },
-      ],
-    };
+    return StudentPage.demoFormList(isoDay);
   }
 
   /* Start, from the card's page. It opens on the slip's own screens, with
@@ -1941,7 +1925,7 @@
     var mine = S;
     StudentPage.loadDemoTemplates(function () {
       if (S !== mine || S.screen !== 'loading' || !S.back) return;
-      S.data = StudentPage.demoData('reflection');
+      S.data = StudentPage.demoData(StudentPage.demoFormKind(id));
       S.part = 0;
       S.answers = {};
       S.screen = 'part';
@@ -1960,6 +1944,7 @@
      page as it was drawn: Reflections says its empty line. */
   var formsAsked = 0; // each `forms` ask, so an older answer never replaces a newer one
   var formAsked = 0; // each `form` ask, so only the last one opens
+  var formsAt = 0; // when `forms` was last asked (Reflect asks again 20 s after)
 
   function listOf(v) {
     return Array.isArray(v) ? v : [];
@@ -1996,6 +1981,7 @@
     if (!state || state.demo || !state.page) return Promise.resolve();
     var student = state.page.student.id;
     var mine = ++formsAsked;
+    formsAt = Date.now();
     return askClass('forms', {}, student).then(function (res) {
       if (S !== state || mine !== formsAsked || !state.page || state.page.student.id !== student) return;
       if (!(res && res.ok === true && Array.isArray(res.questionnaires))) return;

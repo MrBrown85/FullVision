@@ -55,6 +55,9 @@
     "teacher/expand-motion.js",
     "teacher/report-print-paper.js",
     "teacher/card-menu.js",
-    "teacher-mobile/tab-bar.js"
+    "teacher-mobile/tab-bar.js",
+    "s/question-kinds.js",
+    "teacher/cm-reflect-answers.js",
+    "teacher/cm-reflect-builder.js"
   ]
 }

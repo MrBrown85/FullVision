@@ -4,7 +4,7 @@ import { PHONE, CHROMEBOOK, fits, named, contrast, shot } from './student-card-f
 /* The student page's shell (S4-F1; redesigned 2026-11-14), in Demo Mode,
    against the built site with the live site's CSP: the three tabs (along
    the bottom on a phone, in the header on a Chromebook), Outstanding and
-   Upcoming with their counts, My Learning's list of work, Reflections, and
+   Upcoming with their counts, My Learning's list of work, Reflect, and
    Log Out with the sheet that asks first. Nothing is sent anywhere. */
 
 async function demo(page) {
@@ -27,10 +27,10 @@ for (const size of [
   test.describe('the shell on a ' + size.tag, () => {
     test.use(size.use);
 
-    test('the tabs, Outstanding and Upcoming, My Learning, Reflections and Log Out', async ({ page }) => {
+    test('the tabs, Outstanding and Upcoming, My Learning, Reflect and Log Out', async ({ page }) => {
       const posts = await demo(page);
       const nav = page.getByRole('navigation', { name: 'Your Page' }).locator('visible=true');
-      await expect(nav.locator('.sp-tab-label')).toHaveText(['Assignments', 'My Learning', 'Reflections']);
+      await expect(nav.locator('.sp-tab-label')).toHaveText(['Assignments', 'My Learning', 'Reflect']);
       await expect(nav.getByRole('button', { name: 'Assignments' })).toHaveAttribute('aria-current', 'page');
       // What came back is new on My Learning: its badge says how many.
       await expect(nav.locator('[data-tab="learning"] .sp-tab-badge')).toHaveText('6');
@@ -91,10 +91,11 @@ for (const size of [
       await contrast(page);
       await shot(page, size.tag + '-s4f1-my-learning');
 
-      // Reflections: Demo Mode's sample questionnaires (S4-F4).
-      await nav.getByRole('button', { name: 'Reflections' }).click();
-      await expect(nav.getByRole('button', { name: 'Reflections' })).toHaveAttribute('aria-current', 'page');
-      await expect(page.getByRole('heading', { level: 1, name: 'Reflections', exact: true })).toBeVisible();
+      // Reflect: Demo Mode's sample reflections (S4-F4), two of them open and not yet answered.
+      await expect(nav.locator('[data-tab="questionnaires"] .sp-tab-badge')).toHaveText('2');
+      await nav.getByRole('button', { name: 'Reflect' }).click();
+      await expect(nav.getByRole('button', { name: 'Reflect' })).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('heading', { level: 1, name: 'Reflect', exact: true })).toBeVisible();
       await expect(
         page.getByText('November Reflection', { exact: true }).locator('visible=true').first(),
       ).toBeVisible();
@@ -113,7 +114,7 @@ for (const size of [
       await shot(page, size.tag + '-s4f1-log-out');
       await sheet.getByRole('button', { name: 'Cancel' }).click();
       await expect(sheet).toHaveCount(0);
-      await expect(page.getByRole('heading', { level: 1, name: 'Reflections', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: 'Reflect', exact: true })).toBeVisible();
       expect(posts).toEqual([]);
     });
   });

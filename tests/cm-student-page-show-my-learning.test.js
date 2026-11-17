@@ -121,7 +121,7 @@ describe('Show My Learning for a signed-in class', () => {
       'Send Work',
       'Reflect on Feedback',
       'Show Overall Grade',
-      'Questionnaires',
+      'Reflections',
     ]);
     expect(sw().hasAttribute('checked')).toBe(false);
     expect(text(row().querySelector('#sp-learning-would'))).toBe(
