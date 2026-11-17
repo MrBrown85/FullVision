@@ -228,9 +228,9 @@ window.CmTerms = (function () {
   function _cmDayNum(iso) {
     return Math.round(Date.parse(iso + 'T12:00:00Z') / 86400000);
   }
-  // A position on the strip as CSS percent text, to two places. Not a grade.
+  // A position on the strip as CSS percent text (CSS takes any decimals). Not a grade.
   function _cmStripPos(x) {
-    return String(Math.round(x * 100) / 100);
+    return String(x);
   }
   // html-safe: labels go through esc; positions and month names are computed numbers and fixed text.
   function _cmTermStripHtml(rows) {
