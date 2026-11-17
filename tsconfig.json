@@ -72,7 +72,6 @@
     "teacher/add-work-split.js",
     "teacher/add-work-class.js",
     "teacher/add-work-tray.js",
-    "teacher-mobile/shared-scan.js",
     "teacher-mobile/split-scan-model.js",
     "teacher-mobile/split-scan.js"
   ]

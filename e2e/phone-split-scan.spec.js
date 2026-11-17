@@ -3,16 +3,11 @@
  * Science 8, Cell Microscope Lab, 375 x 812.
  *
  * A made-up six-page PDF (tests/fixtures/pdf-fixtures.mjs: a black box and
- * "Page n" on each page, so every page's picture differs) goes in two ways:
- * - Choose a File, from the Grade tab's row menu (the iPhone's path: Mail,
- *   Save to Files, then Choose a File);
- * - shared to the installed app (Android): a multipart POST to the share
- *   target, answered by the service worker, which opens the phone app on
- *   the screen with the scan.
- * Each run cuts the scan into pieces of 2, names pieces, adds, and checks
- * which student got which pages (by each page's fingerprint), that no file
- * name was kept, and that the shared scan no longer waits in the worker.
- * A share while signed out keeps nothing and says so.
+ * "Page n" on each page, so every page's picture differs) is chosen with
+ * Choose a File, from the Grade tab's row menu. It is cut into pieces of 2,
+ * pieces are named and added, and the test checks which student got which
+ * pages (by each page's fingerprint) and that no file name was kept. While
+ * another class loads on the screen, choosing does nothing.
  */
 import { test, expect } from '@playwright/test';
 import { pagesPdf } from '../tests/fixtures/pdf-fixtures.mjs';
@@ -158,31 +153,6 @@ async function splitNameAndAdd(page, who) {
   await expect(ss).toHaveCount(0);
 }
 
-// The service worker in charge of this page (the share target needs it).
-async function withWorker(page) {
-  await page.evaluate(() => navigator.serviceWorker.ready);
-  if (!(await page.evaluate(() => !!navigator.serviceWorker.controller))) await page.reload();
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
-}
-
-// What Android's share sheet sends: a multipart POST of the file to the share target.
-async function share(page) {
-  await page.evaluate(() => {
-    const form = document.createElement('form');
-    form.id = 'fake-share';
-    form.method = 'POST';
-    form.enctype = 'multipart/form-data';
-    form.action = '/teacher-mobile/share-scan';
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.name = 'scan';
-    form.appendChild(input);
-    document.body.appendChild(form);
-  });
-  await page.locator('#fake-share input').setInputFiles(SCAN);
-  await page.evaluate(() => document.getElementById('fake-share').submit());
-}
-
 test('Choose a File: a six-page scan is split, two pieces named and added to the right students', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -197,7 +167,7 @@ test('Choose a File: a six-page scan is split, two pieces named and added to the
   await expect(ss.locator('.m-ss-title')).toHaveText('Split the Scan');
   await expect(ss.locator('[data-ss="piece"][aria-pressed="true"]')).toHaveAttribute('data-aid', LAB);
   await expect(ss.locator('.m-ss-foot .m-ss-hint')).toHaveText(
-    'On an iPhone, open the scan in Mail, choose Save to Files, then choose it here.',
+    'Save the scan from Mail to this phone (to Files on an iPhone, to Downloads on Android), then choose it here.',
   );
   await shot(page, 'B7-phone-split-pick');
   await ss.locator('.m-ss-input').setInputFiles(SCAN);
@@ -205,40 +175,7 @@ test('Choose a File: a six-page scan is split, two pieces named and added to the
   expect(errors).toEqual([]);
 });
 
-test('A scan shared to the app opens Split the Scan with it, and nothing waits afterwards', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  await openPhone(page);
-  await withWorker(page);
-  const who = await twoStudents(page);
-  const first = await page.evaluate(() => MSplitScanModel.assessments(getActiveCourse())[0].a.id);
-
-  await share(page);
-  await page.waitForURL(/\/teacher-mobile\/$/);
-  const ss = page.locator('#m-splitscan');
-  await expect(ss.locator('.m-ss-foot .m-ss-hint')).toHaveText('The shared scan is ready.');
-  // The assessment with the most students Not In is picked first.
-  await expect(ss.locator('[data-ss="piece"][aria-pressed="true"]')).toHaveAttribute('data-aid', first);
-  // Taken: the worker holds it no longer.
-  expect(await page.evaluate(() => MSharedScan.held())).toBe(false);
-  await ss.locator('[data-ss="piece"][data-aid="' + LAB + '"]').click();
-  await ss.getByRole('button', { name: 'Split the Scan' }).click();
-  await splitNameAndAdd(page, who);
-  expect(await page.evaluate(() => MSharedScan.held())).toBe(false);
-  expect(errors).toEqual([]);
-});
-
-test('A scan shared while signed out is not kept', async ({ page }) => {
-  await page.goto('/login.html');
-  await withWorker(page);
-  await share(page);
-  await page.waitForURL(/\/teacher-mobile\//);
-  await expect(page.locator('#m-auth-error')).toHaveText('Sign in, then share the scan again.');
-  await expect(page.locator('#m-splitscan')).toHaveCount(0);
-  expect(await page.evaluate(() => MSharedScan.held())).toBe(false);
-});
-
-test('While another class loads, Start, an assessment and a file do nothing', async ({ page }) => {
+test('While another class loads, choosing an assessment or a file does nothing', async ({ page }) => {
   await openPhone(page);
   // Two classes in the picker, and a class load that waits until told.
   await page.evaluate(() => {
@@ -248,32 +185,34 @@ test('While another class loads, Start, an assessment and a file do nothing', as
       { id: 'other', name: 'Other Class' },
     ];
     window.switchActiveCourse = () => new Promise(r => (window.__finishSwitch = r));
-    window.__scan = new File(['%PDF-1.4'], 'scan.pdf', { type: 'application/pdf' });
-    MSplitScan.open(cid, 'sci8a1', { file: window.__scan });
+    MSplitScan.open(cid, 'sci8a1');
   });
   const ss = page.locator('#m-splitscan');
-  const start = ss.getByRole('button', { name: 'Split the Scan' });
-  await expect(start).toBeEnabled();
+  const input = ss.locator('.m-ss-input');
+  await expect(input).toBeEnabled();
   await ss.locator('[data-ss="class"][data-cid="other"]').click();
-  await expect(start).toBeDisabled();
+  await expect(input).toBeDisabled();
   const during = await page.evaluate(() => {
-    // Pressed anyway (a tap that lands as the button turns off), another
-    // assessment chosen, and a file chosen: none begins reading.
-    const btn = document.querySelector('#m-splitscan [data-ss="start"]');
-    btn.removeAttribute('disabled');
-    btn.click();
+    // A file that lands anyway (a tap as the button turns off), another
+    // assessment chosen, and a file handed straight in: none begins reading.
+    const box = document.querySelector('#m-splitscan .m-ss-input');
+    box.removeAttribute('disabled');
+    const dt = new DataTransfer();
+    dt.items.add(new File(['%PDF-1.4'], 'scan.pdf', { type: 'application/pdf' }));
+    box.files = dt.files;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
     const other = [...document.querySelectorAll('#m-splitscan [data-ss="piece"]')].find(
       b => b.getAttribute('aria-pressed') !== 'true',
     );
     if (other) other.click();
-    const chose = MSplitScan.choose(window.__scan);
+    const chose = MSplitScan.choose(new File(['%PDF-1.4'], 'scan.pdf', { type: 'application/pdf' }));
     const s = MSplitScan._state();
     return { phase: s.phase, aid: s.aid, chose };
   });
   expect(during).toEqual({ phase: 'pick', aid: 'sci8a1', chose: false });
   // The load is overtaken by another: the screen answers again, on its own class.
   await page.evaluate(() => window.__finishSwitch(false));
-  await expect(start).toBeEnabled();
+  await expect(input).toBeEnabled();
   expect(await page.evaluate(() => MSplitScan._state().phase)).toBe('pick');
   await page.evaluate(() => MSplitScan.close());
 });

@@ -2,9 +2,8 @@
 /* split-scan.js — Split a Scan on the phone (Add Work for the Class, B7).
 
    The photocopier emails one PDF of the whole pile. On the phone the teacher
-   chooses it (iPhone: Mail, Save to Files, then Choose a File here) or, on
-   Android with the app installed, shares it from Mail straight to
-   FullVision (teacher-mobile/shared-scan.js). This screen does what the
+   saves it from Mail to the phone, then chooses it here (Choose a File,
+   opened from the Grade tab's row menu). This screen does what the
    desktop's Split the Scan and Add Work for the Class do, sized for a
    phone: the class and the assessment, Pages per Student, each piece with
    the top of its first page and a name box, blank pages left out and shown
@@ -35,8 +34,7 @@
                     the teacher sees them (name labels, B4): called once
                     after the scan is read and cut; nothing uses it yet.
      read           tests' own AddWorkSplit.read.
-   MSplitScan.open(cid, aid, opts)  opts.file (a PDF), opts.said (a share
-                    that kept nothing: why). → true when it opened.
+   MSplitScan.open(cid, aid)        → true when it opened.
    MSplitScan.choose(file)          a file chosen on the screen.
    MSplitScan.close() / isOpen() */
 
@@ -50,14 +48,6 @@
   var CROP_ASPECT = 1.8;
   var TOO_BIG =
     'This scan is too big to split here: 150 pages or 20 MB at most. Scan the pile in two halves and split each one.';
-  var SHARE_SAID = {
-    none: 'No PDF came with the share. Share the scan again.',
-    many: 'Share one PDF at a time.',
-    not_pdf: 'Only a PDF can be split. Share the scan as a PDF.',
-    too_big: TOO_BIG,
-    unreadable: 'The shared scan could not be read. Share it again.',
-    missing: 'The shared scan did not arrive. Share it again.',
-  };
 
   /** @type {any} */
   var _cfg = { onClass: null, onClose: null, nameFirst: null, read: null };
@@ -119,8 +109,7 @@
     return MSplitScanModel.assessments(cid).length > 0;
   }
 
-  function open(cid, aid, opts) {
-    opts = opts || {};
+  function open(cid, aid) {
     close(true);
     var root = document.createElement('div');
     root.id = 'm-splitscan';
@@ -133,9 +122,8 @@
       cid: cid,
       aid: aid || '',
       phase: 'pick',
-      file: opts.file || null,
-      said: opts.said ? SHARE_SAID[opts.said] || SHARE_SAID.unreadable : '',
-      shared: !!opts.file,
+      file: null,
+      said: '',
       read: 0,
       total: 0,
       step: 'read',
@@ -198,8 +186,6 @@
     document.removeEventListener('keydown', _onKey);
     window.removeEventListener('beforeunload', _beforeUnload);
     s.root.remove();
-    // A shared scan still waiting in the worker is let go too.
-    if (window.MSharedScan) MSharedScan.drop();
     if (!quiet && _cfg.onClose) _cfg.onClose();
   }
 
@@ -261,7 +247,6 @@
       if (!res || !res.ok) {
         s.phase = 'pick';
         s.said = (res && res.said) || "That file couldn't be used. Try another.";
-        s.shared = false;
         return _draw();
       }
       var m = AddWorkSplitModel.model(res.pages, s.list);
@@ -527,21 +512,13 @@
     html += '<p class="m-ss-privacy">The scan is split on this phone. Only each student’s own pages upload.</p></div>';
     var can = !!s.aid && offered.length > 0 && !s.switching;
     var foot = '<div class="m-ss-foot">';
-    if (s.file) {
-      foot +=
-        '<p class="m-ss-hint">The shared scan is ready.</p>' +
-        '<button type="button" class="m-ss-primary" data-ss="start"' +
-        (can ? '' : ' disabled') +
-        '>Split the Scan</button>';
-    } else {
-      foot +=
-        '<label class="m-ss-primary m-ss-choose' +
-        (can ? '' : ' is-off') +
-        '">Choose a File<input type="file" class="m-ss-input" accept="application/pdf,.pdf"' +
-        (can ? '' : ' disabled') +
-        '></label>' +
-        '<p class="m-ss-hint">On an iPhone, open the scan in Mail, choose Save to Files, then choose it here.</p>';
-    }
+    foot +=
+      '<label class="m-ss-primary m-ss-choose' +
+      (can ? '' : ' is-off') +
+      '">Choose a File<input type="file" class="m-ss-input" accept="application/pdf,.pdf"' +
+      (can ? '' : ' disabled') +
+      '></label>' +
+      '<p class="m-ss-hint">Save the scan from Mail to this phone (to Files on an iPhone, to Downloads on Android), then choose it here.</p>';
     return html + foot + '</div>';
   }
 
@@ -1139,7 +1116,6 @@
       s.aid = btn.getAttribute('data-aid');
       return _draw();
     }
-    if (what === 'start' && s.phase === 'pick') return _start(s);
     if (s.phase === 'split') {
       var at = Number(btn.getAttribute('data-at'));
       var no = Number(btn.getAttribute('data-no'));

@@ -372,18 +372,6 @@
      outbox. */
   let _authChannel = null;
 
-  /* A scan shared from the phone's mail waits in the service worker's
-     memory only (sw.js, "A scan shared from the phone's mail"); it is let
-     go whenever the device signs out. */
-  function _dropSharedScan() {
-    try {
-      const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-      if (sw) sw.postMessage({ type: 'FV_SHARED_SCAN_DROP' });
-    } catch (e) {
-      /* no worker: nothing waits */
-    }
-  }
-
   /* The sign-in re-check says the session is gone (expired or revoked), or
      that it is not the user this device's saved session names (`forged`).
      Saved class data is removed, so it isn't left on a shared computer, and
@@ -395,7 +383,6 @@
      Never resolves: the browser is leaving. */
   function _leaveSignedOut(forged) {
     _dropHeldWrites();
-    _dropSharedScan();
     const wipe = function () {
       _removeSavedClassData(forged === true);
     };
@@ -430,7 +417,6 @@
 
   function _onSignedOutElsewhere() {
     if (/\/login\.html$/.test(window.location.pathname || '')) return;
-    _dropSharedScan();
     _clearDeviceData();
     window.addEventListener('pagehide', _clearDeviceData);
     window.location.href = '/login.html';
@@ -503,7 +489,6 @@
       console.warn('Sign-out exception (proceeding anyway):', err);
     }
     _clearDeviceData();
-    _dropSharedScan();
     // The other open tabs leave too, so they do not save the class back.
     _postSignedOut();
     // Clear service worker caches

@@ -337,7 +337,6 @@ interface Window {
 declare var AddWorkClass: any;
 declare var AddWorkSplit: any;
 declare var MSplitScanModel: any;
-declare var MSharedScan: any;
 declare var MComponents: any;
 declare var MGrade: any;
 declare var MGradePhotos: any;

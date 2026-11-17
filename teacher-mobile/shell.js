@@ -23,8 +23,6 @@
 
   /* ── Boot ───────────────────────────────────────────────────── */
   async function boot() {
-    // A scan shared from the phone's mail (B7), read before _resetHistory tidies the address.
-    var shared = window.MSharedScan ? MSharedScan.arrived() : null;
     // Check auth: show login screen or proceed to app
     var hasSession = false;
     try {
@@ -54,15 +52,12 @@
 
     if (!hasSession) {
       _showAuth();
-      if (shared) _authError(MSharedScan.refuse());
       return; // Don't boot app — wait for sign-in
     }
 
-    var fromShare = window.MSharedScan ? await MSharedScan.receive(shared) : null;
     _hideAuth();
     _resetHistory();
     await _bootApp();
-    if (fromShare) MSplitScan.open(_cid, null, fromShare);
   }
 
   async function _bootApp() {
