@@ -61,7 +61,9 @@
     "teacher/add-work-split-move.js",
     "teacher/add-work-split-turn.js",
     "teacher/add-work-class.js",
-    "teacher/add-work-tray.js"
+    "teacher/add-work-tray.js",
+    "teacher-mobile/split-scan-model.js",
+    "teacher-mobile/split-scan.js"
   ],
   "notYetChecked": [
     "s/app.js",
