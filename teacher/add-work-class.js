@@ -47,9 +47,32 @@
   // The grader's Add Work takes these (_attachMenuHtml, grader.js).
   var ACCEPT = 'image/*,.heic,.heif,application/pdf';
 
-  // The staging model and the run, with no DOM (teacher/add-work-stage.js).
-  var stage = AddWorkStage.stage;
-  var run = AddWorkStage.run;
+  /* Where each piece goes: one target per class and assessment, each with
+     its own staging model (teacher/add-work-targets.js, B6). s.stage is the
+     set of targets, answering the staging model's own calls. One pile, two
+     classes and a late paper's assessment are drawn by
+     teacher/add-work-two-classes.js (AddWorkTwoClasses) when it is there. */
+  function _two() {
+    return /** @type {any} */ (window).AddWorkTwoClasses || null;
+  }
+  // What the two-classes screen may use of this page.
+  var _ctx = {
+    state: function () {
+      return _s;
+    },
+    draw: function (o) {
+      if (_s) _draw(o);
+    },
+    release: function (pieces) {
+      if (_s) _release(_s, pieces);
+    },
+    read: _read,
+    students: students,
+    offered: offered,
+    full: function (s, sid) {
+      return _full(s, sid);
+    },
+  };
 
   function _say(res) {
     return window.AddWorkFiles ? AddWorkFiles.answer(res) : "The photos couldn't be kept. Try again.";
@@ -175,7 +198,18 @@
     var reading = _readingAny(s);
     var off = busy ? ' disabled' : '';
     var done = s.view === 'done';
-    var sub = [s.a.title || '', course.name || '', _plural(s.list.length, 'student', 'students')]
+    var classes = s.stage.classes();
+    var sub = [
+      s.a.title || '',
+      classes.length > 1
+        ? classes
+            .map(function (t) {
+              return t.name;
+            })
+            .join(' and ')
+        : course.name || '',
+      _plural(s.stage.rows().length, 'student', 'students'),
+    ]
       .filter(Boolean)
       .join(' · ');
     var html =
@@ -196,9 +230,7 @@
       '<span class="awc-gap"></span>';
     if (done) {
       html +=
-        (_canGradeInOrder(s)
-          ? '<button type="button" class="awc-cancel" data-awc="scanOrder" data-key="scanOrder">Grade in Scan Order</button>'
-          : '') +
+        _gradeButtons(s) +
         '<button type="button" class="awc-primary" data-awc="done" data-key="done">Done</button></div>' +
         _doneHtml(s) +
         '</div>';
@@ -220,7 +252,9 @@
         busy
           ? s.progress || 'Adding…'
           : reading
-            ? (s.tray && s.tray.progress()) || 'Reading Files…'
+            ? (s.twoState && s.twoState.reading ? 'Reading ' + s.twoState.reading + '…' : '') ||
+              (s.tray && s.tray.progress()) ||
+              'Reading Files…'
             : s.stage.buttonLabel(),
       ) +
       '</button>' +
@@ -230,6 +264,7 @@
       '" data-keep-scroll="awc-body">' +
       (s.layout === 'grid' ? '' : s.tray.html()) +
       '<div class="awc-scroll" data-keep-scroll="awc-scroll">' +
+      (_two() ? AddWorkTwoClasses.barHtml(s, _ctx) : '') +
       (s.layout === 'grid' ? s.tray.html() + _gridHtml(s) : _columnHtml(s)) +
       '</div></div>' +
       '<div class="awc-foot">' +
@@ -244,6 +279,8 @@
   // Whether any file is still being read (shrunk) for any student.
   function _readingAny(s) {
     if (s.tray && s.tray.reading()) return true;
+    // The other class being read (B6): Add Work waits for it too.
+    if (s.twoState && s.twoState.reading) return true;
     return Object.keys(s.reading).some(function (sid) {
       return s.reading[sid] > 0;
     });
@@ -283,6 +320,7 @@
         .rows()
         .map(function (r) {
           return (
+            (_two() ? AddWorkTwoClasses.heading(s, r.sid, 'row') : '') +
             '<div class="awc-row' +
             (r.pieces.length ? ' has-work' : '') +
             '" role="row" data-awc-target="' +
@@ -314,6 +352,7 @@
           var first = r.pieces[0];
           var url = first && s.urls[first.id];
           return (
+            (_two() ? AddWorkTwoClasses.heading(s, r.sid, 'card') : '') +
             '<div class="awc-card' +
             (r.pieces.length ? ' has-work' : '') +
             '" role="listitem" data-awc-target="' +
@@ -376,6 +415,7 @@
         '<span class="awc-pages">' +
         esc(_plural(piece.pages.length, 'page', 'pages')) +
         '</span>' +
+        (_two() ? AddWorkTwoClasses.forHtml(s, sid, piece, _ctx) : '') +
         '<span class="awc-move-wrap">' +
         '<button type="button" class="awc-move" data-awc="moveMenu" data-sid="' +
         esc(sid) +
@@ -402,6 +442,8 @@
         X_ICON +
         '</button></div>';
     });
+    // A late paper's pieces: on this row, each for its own assessment.
+    if (_two()) html += AddWorkTwoClasses.lateHtml(s, sid, _ctx);
     if (reading) html += '<span class="awc-reading" role="status">Reading…</span>';
     var empty = !r.pieces.length && !reading;
     if (r.onPaper && empty) {
@@ -464,7 +506,7 @@
             '" data-to="' +
             esc(r.sid) +
             '">' +
-            esc(_full(s, r.sid)) +
+            esc(_full(s, r.sid) + (_two() ? AddWorkTwoClasses.label(s, r.sid) : '')) +
             '</button>'
           );
         })
@@ -557,6 +599,7 @@
               '<li class="awc-done-row"><span class="awc-name">' +
               esc(_full(s, sid)) +
               '</span>' +
+              (_two() ? AddWorkTwoClasses.classTag(s, sid) : '') +
               (paper
                 ? '<span class="awc-had">' + esc(paper === true ? 'Handed in on paper' : paper) + '</span>'
                 : '<button type="button" class="awc-paper" data-awc="paperNow" data-sid="' +
@@ -767,11 +810,27 @@
     };
   }
 
-  function _readSubs(s) {
-    s.subs = {};
-    s.list.forEach(function (st) {
-      s.subs[st.id] = getStudentSubmission(s.cid, st.id, s.aid);
+  // Each target's students' work in its own class and assessment.
+  function _subsOf(cid, aid, list) {
+    var subs = {};
+    list.forEach(function (st) {
+      subs[st.id] = getStudentSubmission(cid, st.id, aid);
     });
+    return subs;
+  }
+  function _readSubs(s) {
+    s.stage.targets().forEach(function (t) {
+      t.subs = _subsOf(t.cid, t.aid, t.list);
+    });
+    s.subs = s.stage.subs();
+  }
+  // A class and assessment as a target takes them, or null.
+  function _read(cid, aid) {
+    var a = _piece(cid, aid);
+    if (!a || !offered(cid, a)) return null;
+    var list = students(cid, a);
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    return { cid: cid, aid: aid, a: a, list: list, subs: _subsOf(cid, aid, list), name: course.name || '' };
   }
 
   function _run() {
@@ -783,24 +842,28 @@
     s.moveMenu = null;
     s.progress = '';
     _draw({ focus: 'run' });
-    var api = _api(s.cid, s.aid);
-    // Who was added, for Grade in Scan Order.
-    var sent = function (sid) {
+    // Who was added to the page's assessment, for Grade in Scan Order.
+    var sent = function (t, sid) {
       return function (res) {
-        if (res && res.result === 'sent' && s.addedSids.indexOf(sid) < 0) s.addedSids.push(sid);
+        if (res && res.result === 'sent') s.addedAny[sid] = true;
+        if (t.home && res && res.result === 'sent' && s.addedSids.indexOf(sid) < 0) s.addedSids.push(sid);
         return res;
       };
     };
-    return run(
+    // Each target through its own class and assessment's calls.
+    return AddWorkTargets.run(
       s.stage,
-      {
-        add: function (sid, pages, mode) {
-          return Promise.resolve(api.add(sid, pages, mode)).then(sent(sid));
-        },
-        replace: function (sid, pages) {
-          return Promise.resolve(api.replace(sid, pages)).then(sent(sid));
-        },
-        paper: api.paper,
+      function (t) {
+        var api = _api(t.cid, t.aid);
+        return {
+          add: function (sid, pages, mode) {
+            return Promise.resolve(api.add(sid, pages, mode)).then(sent(t, sid));
+          },
+          replace: function (sid, pages) {
+            return Promise.resolve(api.replace(sid, pages)).then(sent(t, sid));
+          },
+          paper: api.paper,
+        };
       },
       {
         alive: function () {
@@ -818,7 +881,8 @@
     ).then(function (out) {
       if (_s !== s || out.closed) return;
       s.busy = false;
-      s.added += out.added;
+      // Each student once, across targets and runs.
+      s.added = Object.keys(s.addedAny).length;
       s.paperSet += out.paper;
       _readSubs(s);
       var waiting = s.stage.counts();
@@ -861,7 +925,8 @@
     var focus = _nextKey(s, sid);
     s.paperDone[sid] = 'Saving…';
     _draw({ focus: focus });
-    markStudentWorkOnPaper(s.cid, s.aid, [sid])
+    var t = s.stage.home(sid) || s.stage.main();
+    markStudentWorkOnPaper(t.cid, t.aid, [sid])
       .then(null, function () {
         return { result: 'store_failed' };
       })
@@ -880,38 +945,75 @@
      The students added, in the order their pieces came off the scan; the
      ones added from files, not the scan, after them in the list's order.
      Kept in memory only. */
-  function scanOrder(s) {
-    var scanned = s.scanOrder.filter(function (sid) {
-      return s.addedSids.indexOf(sid) >= 0;
-    });
+  // For one class (`t`, the page's own when left out), its own students only.
+  function scanOrder(s, t) {
+    t = t || s.stage.main();
+    var mine = function (sid) {
+      return s.addedSids.indexOf(sid) >= 0 && !!t.stage.row(sid);
+    };
+    var scanned = s.scanOrder.filter(mine);
     if (!scanned.length) return [];
     return scanned.concat(
-      s.list
+      t.list
         .map(function (st) {
           return st.id;
         })
         .filter(function (sid) {
-          return s.addedSids.indexOf(sid) >= 0 && scanned.indexOf(sid) < 0;
+          return mine(sid) && scanned.indexOf(sid) < 0;
         }),
     );
   }
 
-  function _canGradeInOrder(s) {
+  // One button per class with students off the scan: "Grade Block A in Scan Order".
+  // html-safe: class names go through esc; ids are ours (esc too)
+  function _gradeButtons(s) {
     var pa = /** @type {any} */ (window).PageAssignments;
-    return !!(pa && pa.openGrader) && scanOrder(s).length > 0;
+    if (!pa || !pa.openGrader) return '';
+    var classes = s.stage.classes();
+    return classes
+      .map(function (t, i) {
+        if (!scanOrder(s, t).length) return '';
+        // Another class's grader opens there: the Assignments page switches class.
+        if (i > 0 && !pa.switchCourse) return '';
+        return (
+          '<button type="button" class="awc-cancel" data-awc="scanOrder" data-cid="' +
+          esc(t.cid) +
+          '" data-key="scanOrder:' +
+          esc(t.cid) +
+          '">' +
+          esc(classes.length > 1 ? 'Grade ' + (t.name || 'This Class') + ' in Scan Order' : 'Grade in Scan Order') +
+          '</button>'
+        );
+      })
+      .join('');
   }
 
   // The grader (PageAssignments.openGrader, unchanged) on those students, from
-  // the first. The page behind is drawn again when the grader closes.
-  function _gradeInOrder() {
+  // the first. The page behind is drawn again when the grader closes. For the
+  // second class the Assignments page switches to it first, as it does to
+  // open a copy in another class (switchCourse).
+  function _gradeInOrder(cid) {
     var s = _s;
-    var ids = s ? scanOrder(s) : [];
+    var t =
+      s &&
+      (s.stage.classes().find(function (x) {
+        return x.cid === cid;
+      }) ||
+        s.stage.main());
+    var ids = s ? scanOrder(s, t) : [];
     var pa = /** @type {any} */ (window).PageAssignments;
     if (!s || !ids.length || !pa || !pa.openGrader) return;
     var router = /** @type {any} */ (window).Router;
     var over = !!(router && router.getCurrentPage && router.getCurrentPage() === pa);
     var after = s.onClose;
     close(true);
+    if (t !== s.stage.main()) {
+      var wall = /** @type {any} */ (window).WorkWall;
+      if (wall && wall.isOpen && wall.isOpen()) wall.close();
+      return Promise.resolve(pa.switchCourse(t.cid)).then(function () {
+        pa.openGrader(t.cid, t.aid, ids[0], { studentIds: ids, overPage: over });
+      });
+    }
     pa.openGrader(s.cid, s.aid, ids[0], {
       studentIds: ids,
       overPage: over,
@@ -963,7 +1065,7 @@
     var pid = btn.getAttribute('data-piece');
     if (what === 'leave') return _leave();
     if (what === 'done') return close();
-    if (what === 'scanOrder') return _gradeInOrder();
+    if (what === 'scanOrder') return _gradeInOrder(btn.getAttribute('data-cid'));
     if (what === 'layout') {
       s.layout = btn.getAttribute('data-layout') === 'grid' ? 'grid' : 'column';
       _keepLayout(s.layout);
@@ -971,6 +1073,7 @@
     }
     if (what === 'run') return _run();
     if (s.busy) return;
+    if (_two() && AddWorkTwoClasses.click(s, what, btn, _ctx)) return;
     if (what === 'choose') {
       var input = btn.parentNode && btn.parentNode.querySelector('.awc-file');
       if (input) input.click();
@@ -1012,6 +1115,7 @@
     var input = e.target;
     if (!_s || !input || !input.classList) return;
     if (_s.tray.change(input)) return;
+    if (_two() && AddWorkTwoClasses.change(_s, input, _ctx)) return;
     if (!input.classList.contains('awc-file')) return;
     var files = Array.prototype.slice.call(input.files || []);
     input.value = '';
@@ -1204,16 +1308,17 @@
       paperDone: {},
       scanOrder: [],
       addedSids: [],
+      addedAny: {},
       overlay: overlay,
       opener: document.activeElement,
       onClose: typeof opts.onClose === 'function' ? opts.onClose : null,
     };
-    _readSubs(s);
-    s.stage = stage(
-      list.map(function (st) {
-        return { id: st.id, had: _had(s.subs[st.id]) };
-      }),
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    s.stage = AddWorkTargets.create(
+      { cid: cid, aid: aid, a: a, list: list, subs: _subsOf(cid, aid, list), name: course.name || '' },
+      _read,
     );
+    s.subs = s.stage.subs();
     s.tray = AddWorkTray.create({
       cid: cid,
       aid: aid,
@@ -1223,8 +1328,11 @@
       busy: function () {
         return s.busy || s.view !== 'stage';
       },
+      // Every class on the page: a name in both is offered, never taken.
       roster: function () {
-        return getStudents(cid) || [];
+        return s.stage.classes().reduce(function (all, t) {
+          return all.concat(getStudents(t.cid) || []);
+        }, []);
       },
       rows: function () {
         return s.stage.rows().map(function (r) {
@@ -1232,7 +1340,16 @@
         });
       },
       full: function (sid) {
-        return _full(s, sid);
+        return _full(s, sid) + (_two() ? AddWorkTwoClasses.label(s, sid) : '');
+      },
+      // Split the Scan with two classes: both lists, each name with its class.
+      split: function () {
+        return _two() ? AddWorkTwoClasses.splitOpts(s, _ctx) : null;
+      },
+      classes: function () {
+        return s.stage.classes().map(function (t) {
+          return t.name;
+        });
       },
       first: function (sid) {
         return _first(s, sid);
