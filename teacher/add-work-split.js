@@ -43,6 +43,16 @@
   var startPer = M.startPer;
   var isBlank = M.isBlank;
   var _maxPiece = M.maxPiece;
+  /* B5's touches, each in a file of its own and used when it is there:
+     Set Up Like Last Time (add-work-split-setup.js), a page moved onto
+     another piece (add-work-split-move.js), Turn Every Page
+     (add-work-split-turn.js), a page full size (add-work-page-view.js). */
+  function _t(name) {
+    return /** @type {any} */ (window)[name] || null;
+  }
+  function _turningAll(s) {
+    return !!(_t('AddWorkSplitTurn') && AddWorkSplitTurn.busy(s));
+  }
   /* ── Reading the scan ───────────────────────────────────────── */
 
   var TOO_BIG =
@@ -294,10 +304,6 @@
     return shared > 1 ? _full(st) : _first(st);
   }
 
-  function _pagesWord(a, b) {
-    return a === b ? 'Page ' + a : 'Pages ' + a + '–' + b;
-  }
-
   // "Avery is on pieces 5 and 9"
   function _twiceLine(s, sid, ats) {
     var nums = ats.map(function (at) {
@@ -348,7 +354,7 @@
     if (split)
       html +=
         '<button type="button" class="aws-primary" data-aws="match" data-key="match"' +
-        (s.m.canMatch() ? '' : ' disabled') +
+        (s.m.canMatch() && !_turningAll(s) ? '' : ' disabled') +
         '>Match the Named Pieces</button>';
     html += '</div>';
     if (s.phase === 'reading') html += _readingHtml(s);
@@ -442,6 +448,7 @@
       '</span></div>';
     return (
       '<aside class="aws-side" aria-label="How to Split">' +
+      (_t('AddWorkSplitSetup') ? AddWorkSplitSetup.html(s) : '') +
       '<section class="aws-sec">' +
       '<h3 class="aws-h" id="aws-per-label">Pages per Student</h3>' +
       '<div class="aws-stepper" role="group" aria-labelledby="aws-per-label">' +
@@ -469,6 +476,7 @@
       esc(blankLine) +
       '</p>' +
       '</section>' +
+      (_t('AddWorkSplitTurn') ? AddWorkSplitTurn.html(s) : '') +
       '<section class="aws-sec">' +
       '<h3 class="aws-h" id="aws-order-label">The Pile Is in</h3>' +
       '<div class="aws-order" role="group" aria-labelledby="aws-order-label">' +
@@ -562,7 +570,7 @@
           '">'
         : '') +
       '<span class="aws-range">' +
-      esc('Piece ' + n + ' · ' + _pagesWord(p.first, p.last)) +
+      esc('Piece ' + n + ' · ' + M.pagesText(p.spans)) +
       '</span></div>' +
       '<div class="aws-who">' +
       '<label class="aws-sr" for="aws-name-' +
@@ -596,6 +604,7 @@
       '">' +
       esc(note) +
       '</p></div>' +
+      (_t('AddWorkSplitMove') ? AddWorkSplitMove.dropHtml() : '') +
       '<div class="aws-strip" role="group" aria-label="' +
       esc('Pages of piece ' + n) +
       '">' +
@@ -605,6 +614,7 @@
         })
         .join('') +
       '</div>' +
+      (_t('AddWorkSplitMove') ? AddWorkSplitMove.menuHtml(s, p, _ctx) : '') +
       '<div class="aws-size">' +
       '<button type="button" class="aws-arrow" data-aws="fewer" data-at="' +
       esc(String(p.at)) +
@@ -638,7 +648,7 @@
   function _tileHtml(s, no) {
     var p = s.m.page(no);
     var url = _thumbOf(s, no);
-    var img = url ? '<img src="' + esc(url) + '" alt="">' : '';
+    var img = url ? '<img src="' + esc(url) + '" alt="" draggable="false">' : '';
     var num = esc(String(no));
     if (s.m.out(p))
       return (
@@ -653,12 +663,17 @@
         '<span class="aws-out-label">Blank · Left Out</span></button>'
       );
     var busy = !!s.turning[no];
+    var move = _t('AddWorkSplitMove');
+    var upside = _t('AddWorkSplitTurn') && AddWorkSplitTurn.marked(s, no);
     return (
       '<div class="aws-tile' +
       (p.blank ? ' is-kept' : '') +
+      (upside ? ' is-upside' : '') +
       '" data-no="' +
       num +
-      '">' +
+      '"' +
+      (move ? ' draggable="true"' : '') +
+      '>' +
       img +
       '<span class="aws-tile-no" aria-hidden="true">' +
       num +
@@ -674,6 +689,8 @@
       '>' +
       TURN_ICON +
       '</button>' +
+      (move ? AddWorkSplitMove.tileHtml(s, no) : '') +
+      (upside ? '<span class="aws-upside">Upside down?</span>' : '') +
       (p.blank && s.m.leaveOut()
         ? '<button type="button" class="aws-leave" data-aws="leaveOne" data-no="' +
           num +
@@ -695,8 +712,10 @@
       '<div class="aws-foot">' +
       '<span class="aws-foot-title">No Mouse Needed</span>' +
       key('Tab', 'Next piece') +
+      key('li', 'Type a few letters') +
       key('Return', 'Name it, go to the next') +
       key('[</kbd><kbd>]', 'One page fewer or more') +
+      (_t('AddWorkPageView') ? key('Space', 'See the page full size') : '') +
       key('↓', 'This piece’s pages') +
       '</div>'
     );
@@ -938,7 +957,7 @@
   /* ── Actions ── */
   function _turn(no) {
     var s = _s;
-    if (!s || s.phase !== 'split' || s.turning[no]) return;
+    if (!s || s.phase !== 'split' || s.turning[no] || _turningAll(s)) return;
     var p = s.m.page(no);
     if (!p) return;
     var was = p.page;
@@ -964,7 +983,9 @@
 
   function _match() {
     var s = _s;
-    if (!s || s.phase !== 'split' || !s.m.canMatch()) return;
+    if (!s || s.phase !== 'split' || !s.m.canMatch() || _turningAll(s)) return;
+    // The choices used, for Set Up Like Last Time: no student data.
+    if (_t('AddWorkSplitSetup')) AddWorkSplitSetup.save(s.cid, s.aid, s.m);
     var before = {};
     s.m.pages().forEach(function (p) {
       before[p.no] = true;
@@ -1036,6 +1057,10 @@
     if (what === 'leave') return _leave();
     if (what === 'close') return close();
     if (s.phase !== 'split') return;
+    var touched = ['AddWorkSplitMove', 'AddWorkSplitSetup', 'AddWorkSplitTurn'].some(function (name) {
+      return _t(name) && _t(name).click(s, what, btn, _ctx);
+    });
+    if (touched) return;
     if (what === 'match') return _match();
     if (what === 'option') return _commit(s, at, btn.getAttribute('data-sid'), 'next');
     if (what === 'per') {
@@ -1149,6 +1174,15 @@
       }
       return;
     }
+    // Space, while no name is being typed: the piece's pages full size.
+    if (key === ' ' && _t('AddWorkSplitMove')) {
+      var p3 = s.m.pieces()[at];
+      if (p3 && (!input.value.trim() || input.value === (p3.sid ? _fullOf(s, p3.sid) : ''))) {
+        e.preventDefault();
+        _closeCombo(s, input, true);
+        return AddWorkSplitMove.view(s, at, p3.first, _ctx);
+      }
+    }
     if (key === '[' || key === ']') {
       e.preventDefault();
       if (key === '[') s.m.fewer(at);
@@ -1181,6 +1215,7 @@
     if (!s || e.defaultPrevented || s.phase !== 'split') return;
     var t = e.target;
     if (t && t.classList && t.classList.contains('aws-name')) return _nameKey(s, e, t);
+    if (_t('AddWorkSplitMove') && AddWorkSplitMove.key(s, e)) return;
     if (t && t.closest && t.closest('.aws-card') && t.tagName === 'BUTTON') return _cardKey(s, e, t);
   }
 
@@ -1202,6 +1237,7 @@
       s.combo.opts.length
     )
       return _closeCombo(s, active, false);
+    if (_t('AddWorkSplitMove') && AddWorkSplitMove.escape(s, _ctx)) return;
     _leave();
   }
 
@@ -1231,6 +1267,21 @@
     if (awc && typeof awc.students === 'function') return awc.students(cid, a);
     return sortStudents(getStudents(cid) || [], 'lastName');
   }
+
+  // What the touches' files may use of this page.
+  var _ctx = {
+    state: function () {
+      return _s;
+    },
+    draw: function (o) {
+      _draw(o);
+    },
+    busy: function () {
+      return !_s || _turningAll(_s);
+    },
+    full: _fullOf,
+    call: _callOf,
+  };
 
   function open(cid, aid, file, opts) {
     var a = _assessment(cid, aid);
@@ -1281,6 +1332,8 @@
     overlay.addEventListener('focusin', _focusIn);
     overlay.addEventListener('focusout', _focusOut);
     overlay.addEventListener('keydown', _keyIn);
+    // A page dragged onto another piece, before "nothing dropped here".
+    if (_t('AddWorkSplitMove')) AddWorkSplitMove.listen(overlay, _ctx);
     overlay.addEventListener('dragover', _noDrop);
     overlay.addEventListener('drop', _noDrop);
     document.addEventListener('keydown', _keydown, true);
@@ -1311,6 +1364,9 @@
       m.setPer(startPer(m.counts().kept, list.length));
       s.m = m;
       s.phase = 'split';
+      var fresh = { per: m.per(), order: m.order(), leaveOut: m.leaveOut() };
+      if (_t('AddWorkSplitSetup')) AddWorkSplitSetup.apply(s, fresh);
+      if (_t('AddWorkSplitTurn')) AddWorkSplitTurn.find(s, _ctx);
       _draw({ focus: '__none' });
       var first = _nameInput(s, 0);
       if (first) first.focus();
@@ -1328,6 +1384,7 @@
     _s = null;
     document.removeEventListener('keydown', _keydown, true);
     if (window.removeEventListener) window.removeEventListener('beforeunload', _beforeUnload);
+    if (_t('AddWorkPageView')) AddWorkPageView.close();
     // The scan and its pages are let go.
     Object.keys(s.thumbs).forEach(function (no) {
       _revoke(s.thumbs[no].url);

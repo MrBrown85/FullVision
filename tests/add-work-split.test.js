@@ -466,9 +466,17 @@ describe('a page moved to another piece', () => {
     m.name(2, 's3');
     m.name(3, 's4');
     expect(m.move(9, 1)).toEqual({ ok: true, reason: '', gone: { at: 4, sid: '' }, unnamed: '' });
-    expect(cut(m)).toEqual([[1, 2], [3, 4, 9], [5, 6], [7, 8]]);
+    expect(cut(m)).toEqual([
+      [1, 2],
+      [3, 4, 9],
+      [5, 6],
+      [7, 8],
+    ]);
     expect(sids(m)).toEqual(['s1', 's5', 's3', 's4']);
-    expect(m.pieces()[1].spans).toEqual([[3, 4], [9, 9]]);
+    expect(m.pieces()[1].spans).toEqual([
+      [3, 4],
+      [9, 9],
+    ]);
     const out = m.take();
     expect(out.map(p => p.from)).toEqual([
       'Scan, pages 1–2',
@@ -488,7 +496,10 @@ describe('a page moved to another piece', () => {
     m.name(1, 's6');
     m.move(6, 0, 1); // between pages 1 and 2
     m.move(5, 0, 0); // asked for first: it goes second
-    expect(cut(m)).toEqual([[1, 5, 6, 2], [3, 4]]);
+    expect(cut(m)).toEqual([
+      [1, 5, 6, 2],
+      [3, 4],
+    ]);
     expect(handed(m)).toEqual({ s2: [1, 5, 6, 2], s6: [3, 4] });
   });
 
@@ -574,7 +585,11 @@ describe('a page moved to another piece', () => {
     ['s1', 's2', 's3'].forEach((sid, at) => m.name(at, sid));
     m.move(4, 2); // [1,2] [3] [5,6,4]
     m.move(4, 1); // [1,2] [3,4] [5,6]
-    expect(cut(m)).toEqual([[1, 2], [3, 4], [5, 6]]);
+    expect(cut(m)).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ]);
     expect(handed(m)).toEqual({ s1: [1, 2], s2: [3, 4], s3: [5, 6] });
   });
 });
