@@ -386,7 +386,7 @@ describe('reading the scan', () => {
         o.onProgress({ page: 1, pages: 3 });
         return { ok: true, kind: 'pdf', pages: [1, 2, 3].map(fakePage) };
       },
-      measure: async p => (p.hash === fakePage(2).hash ? 3 : 400),
+      measure: async p => (p.hash === fakePage(2).hash ? 1 : 400),
       onProgress: p => progress.push(p.step + p.page),
     });
     expect(asked.maxPages).toBe(150);
