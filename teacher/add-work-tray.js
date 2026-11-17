@@ -211,7 +211,7 @@
       return 'No name in the file name.';
     }
 
-    function _find(id) {
+    function _waitingItem(id) {
       for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
       return null;
     }
@@ -430,8 +430,8 @@
       return next && next.id !== id ? 'awt-lead:' + next.id : 'awt-files';
     }
 
-    function place(id, sid) {
-      var item = _find(id);
+    function placeItem(id, sid) {
+      var item = _waitingItem(id);
       if (!item || item.refused || host.busy()) return false;
       var focus = _nextKey(id);
       var before = _rect(id);
@@ -450,7 +450,7 @@
     }
 
     function remove(id) {
-      var item = _find(id);
+      var item = _waitingItem(id);
       if (!item) return;
       var focus = _nextKey(id);
       _revoke(item.url);
@@ -748,9 +748,9 @@
         if (input) input.click();
         return true;
       }
-      var item = _find(btn.getAttribute('data-item'));
+      var item = _waitingItem(btn.getAttribute('data-item'));
       if (!item) return true;
-      if (what === 'to') place(item.id, btn.getAttribute('data-sid'));
+      if (what === 'to') placeItem(item.id, btn.getAttribute('data-sid'));
       else if (what === 'off') remove(item.id);
       else if (what === 'else' || what === 'pick') _openPicker(item);
       return true;
@@ -774,7 +774,7 @@
     // Typing in Choose a Student: only the list is drawn again.
     function input(el) {
       var id = el && el.getAttribute && el.getAttribute('data-awt-find');
-      var item = id && _find(id);
+      var item = id && _waitingItem(id);
       if (!item) return false;
       item.query = String(el.value || '');
       var list = document.querySelector('.awt-options[data-awt-options="' + id + '"]');
@@ -791,7 +791,7 @@
       var picker = el && el.closest ? el.closest('.awt-picker') : null;
       if (!picker) return false;
       var host_ = picker.closest('.awt-item');
-      var item = host_ && _find(host_.getAttribute('data-awt-item'));
+      var item = host_ && _waitingItem(host_.getAttribute('data-awt-item'));
       if (!item) return false;
       var options = Array.prototype.slice.call(picker.querySelectorAll('.awt-option'));
       var at = options.indexOf(el);
@@ -812,7 +812,7 @@
       }
       if (e.key === 'Enter' && at < 0 && el.classList.contains('awt-find')) {
         e.preventDefault();
-        if (options.length) place(item.id, options[0].getAttribute('data-sid'));
+        if (options.length) placeItem(item.id, options[0].getAttribute('data-sid'));
         return true;
       }
       return false;
@@ -824,7 +824,7 @@
       takeDrop: takeDrop,
       hasFolder: hasFolder,
       placeOrHold: placeOrHold,
-      place: place,
+      placeItem: placeItem,
       remove: remove,
       release: release,
       count: count,

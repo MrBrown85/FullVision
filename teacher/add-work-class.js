@@ -1019,7 +1019,7 @@
     var sid = target && target.getAttribute('data-awc-target');
     if (drag) {
       if (drag.tray) {
-        if (sid) s.tray.place(drag.tray, sid);
+        if (sid) s.tray.placeItem(drag.tray, sid);
       } else if (sid && sid !== drag.sid) _move(s, drag.sid, sid, drag.pid);
       return;
     }
