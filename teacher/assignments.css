@@ -8685,6 +8685,12 @@ button.grader-member-name {
   top: auto;
   bottom: calc(100% + 4px);
 }
+/* The card is a layer under the open start (z-index 2 under 3), so a
+   picker or menu inside it could be drawn over by that start when it opens
+   upward. While one is open the card lifts above the starts. */
+.af-start-card.af-rubric-card:has(.af-ge-picker, .af-ge-menu) {
+  z-index: 4;
+}
 /* On a phone the editor fits the card: the grid scrolls sideways inside
    it (contain keeps its width out of the form's), and the name and the
    Style switch take the head's width. */
