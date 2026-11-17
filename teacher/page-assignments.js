@@ -11477,6 +11477,19 @@ window.PageAssignments = (function () {
           },
         });
       },
+      openAddWorkClass: function () {
+        var aid = el.dataset.aid;
+        if (!window.AddWorkClass || !activeCourse) return;
+        // The page behind is drawn again as it closes, so new work shows.
+        AddWorkClass.open(activeCourse, aid, {
+          onClose: function () {
+            if (!_pageBehind) return;
+            render();
+            var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
+            if (more) more.focus({ preventScroll: true });
+          },
+        });
+      },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
       },
@@ -13774,6 +13787,15 @@ window.PageAssignments = (function () {
     // side, only while the piece takes work.
     if (!a.isDraft && !focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
+    // Add Work for the Class (teacher/add-work-class.js): where the row's +
+    // (Attach Work) is offered, never while one student is focused.
+    if (!a.isDraft && !focusStudentId && window.AddWorkClass && AddWorkClass.offered(cid, a))
+      html += _cardMenuItem(
+        'data-action="openAddWorkClass" ' + aid,
+        LINE_ICONS.plus,
+        'Add Work for the Class',
+        'assess-add-class-btn',
+      );
     var rubric = !a.isDraft && a.rubricId && getRubricById(cid, a.rubricId);
     if (rubric) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;

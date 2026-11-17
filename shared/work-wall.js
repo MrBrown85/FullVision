@@ -1,34 +1,28 @@
 /* ── work-wall.js — seeing everyone's work (S14-F1 to F2) ──────────────
-   The Work Wall: one assessment's work side by side, a card per student
-   with the first page's thumbnail, sorted by Name, To Grade First or Level,
-   filtered by level, To Grade or Not In. A card, like Grade in This Order,
-   opens the grader (PageAssignments.openGrader) on the students shown, in
-   the order shown, from that card (Colin, Nov 14: no page view first).
+   The Work Wall: one assessment's work side by side, a card per student with the first page's thumbnail, sorted
+   by Name, To Grade First or Level, filtered by level, To Grade or Not In. A card, like Grade in This Order,
+   opens the grader (PageAssignments.openGrader) on the students shown, in the order shown, from that card
+   (Colin, Nov 14: no page view first).
 
-   The Work tab: one student's work in one place on the teacher's student
-   page (teacher/page-student.js draws the tab and calls tabHtml / mountTab
-   here), filtered by competency, by where it stands (To Grade, To Return,
-   Returned) and by category, newest or oldest first, each piece with its
-   level. A filter redraws only the cards, which slide to their new places.
+   The Work tab: one student's work in one place on the teacher's student page (teacher/page-student.js draws
+   the tab and calls tabHtml / mountTab here), filtered by competency, by where it stands (To Grade, To Return,
+   Returned) and by category, newest or oldest first, each piece with its level. A filter redraws only the
+   cards, which slide to their new places.
 
-   Both are teacher views, so they read all work, drafts included (Colin,
-   "Keep all grades", DECISIONS 2026-11-10 night 3); a draft is marked.
-   Every level and grade is shown through calc.js (assessmentCellValue,
-   formatLevel, rubricCriterionLevel, nearestScoreLevel, tagMarksByAssessment)
-   in the class's grading style. Every count of To Grade and Not In comes
-   from GraderWork (shared/grader.js). Every picture comes through
-   WorkThumbs (shared/work-thumbs.js): the wall and the tab ask for
-   thumbnails only; a whole page is asked for only once it is opened.
+   Both are teacher views, so they read all work, drafts included (Colin, "Keep all grades", DECISIONS
+   2026-11-10 night 3); a draft is marked. Every level and grade is shown through calc.js (assessmentCellValue,
+   formatLevel, rubricCriterionLevel, nearestScoreLevel, tagMarksByAssessment) in the class's grading style.
+   Every count of To Grade and Not In comes from GraderWork (shared/grader.js). Every picture comes through
+   WorkThumbs (shared/work-thumbs.js): the wall and the tab ask for thumbnails only; a whole page is asked for
+   only once it is opened.
 
-   Only in a class whose student page (the build switch) and Send Work are
-   on, on a piece whose Students Send is not Nothing (GraderWork.workOn).
-   Demo Mode only for now: nothing here calls the server.
+   Only in a class whose student page (the build switch) and Send Work are on, on a piece whose Students Send is
+   not Nothing (GraderWork.workOn). Demo Mode only for now: nothing here calls the server.
 
-   WorkWall.open(cid, aid, opts)  the wall over the page; false when work is
-                                  off for that piece. opts.onClose(); and
-                                  opts.onGrade(sid, studentIds) for a screen
-                                  with its own grader (the phone), in place
-                                  of PageAssignments.openGrader.
+   WorkWall.open(cid, aid, opts)  the wall over the page; false when work is off for that piece. opts.onClose();
+                                  and opts.onGrade(sid, studentIds) for a screen with its own grader (the phone),
+                                  in place of PageAssignments.openGrader. The wall's Add Work opens Add Work for
+                                  the Class (teacher/add-work-class.js) where that is loaded (the computer).
    WorkWall.close(), WorkWall.isOpen()
    WorkWall.tabOn(cid)            whether the student page shows a Work tab.
    WorkWall.tabSummary(cid, sid)  { stat } or { badge, tone } for the tab.
@@ -514,6 +508,10 @@ window.WorkWall = (function () {
         );
       }).join('') +
       '</div>' +
+      // Add Work for the Class (teacher/add-work-class.js), on the computer only.
+      (window.AddWorkClass && !w.onGrade && AddWorkClass.offered(w.cid, m.a)
+        ? '<button type="button" class="ww-add-work" data-ww="addWork">Add Work</button>'
+        : '') +
       (canGrade
         ? '<button type="button" class="ww-grade" data-ww="grade"' +
           (rows.length ? '' : ' disabled') +
@@ -637,6 +635,12 @@ window.WorkWall = (function () {
       return _drawWall();
     }
     if (what === 'grade') return _gradeInOrder(w, w.shown[0]);
+    if (what === 'addWork')
+      return AddWorkClass.open(w.cid, w.aid, {
+        onClose: function () {
+          if (_wall === w) _drawWall();
+        },
+      });
     if (what === 'open') {
       var sid = btn.getAttribute('data-sid');
       // With no grader at all, the pages open full size.
@@ -1273,22 +1277,19 @@ window.WorkWall = (function () {
   }
 
   /* ── Work on the teacher's other screens ──────────────────────
-     seeWorkHtml: See the Work on a student's row in the Assignments page's
-     whole-class grid, when work is in for them; it opens the grader on
-     their pages (the page's gradeSubmissions action). Pointing at it, or
-     tabbing to it, shows the first pages in a card beside the button, for
-     a look without opening anything (the glance, below).
+     seeWorkHtml: See the Work on a student's row in the Assignments page's whole-class grid, when work is in for
+     them; it opens the grader on their pages (the page's gradeSubmissions action). Pointing at it, or tabbing to
+     it, shows the first pages in a card beside the button, for a look without opening anything (the glance,
+     below).
 
-     pieceHtml and mountPiece: the student's pages for one piece, whole,
-     beside the rubric in an open row of All Your Work on the teacher's
-     student page, to sit with a student and talk it through. A page opens
-     the grader on the piece. unmountTab(true) lets these pictures go too. */
+     pieceHtml and mountPiece: the student's pages for one piece, whole, beside the rubric in an open row of All
+     Your Work on the teacher's student page, to sit with a student and talk it through. A page opens the grader
+     on the piece. unmountTab(true) lets these pictures go too. */
   // html-safe: ids are ours; fixed words
-  // icon: the Assignments page's row draws the button as that icon (fixed
-  // markup, LINE_ICONS), named See the Work; it then answers null, not '',
-  // when the piece shows work but none is in, so the row can offer its +
-  // without asking again. known: true or false when the caller has already
-  // looked for the student's work, so it is not looked up again.
+  // icon: the Assignments page's row draws the button as that icon (fixed markup, LINE_ICONS), named See the
+  // Work; it then answers null, not '', when the piece shows work but none is in, so the row can offer its +
+  // without asking again. known: true or false when the caller has already looked for the student's work, so it
+  // is not looked up again.
   function seeWorkHtml(cid, aid, sid, icon, known) {
     var a = _piece(cid, aid);
     if (!a || !GraderWork.workShown(cid, a)) return '';
