@@ -196,6 +196,9 @@
       '<span class="awc-gap"></span>';
     if (done) {
       html +=
+        (_canGradeInOrder(s)
+          ? '<button type="button" class="awc-cancel" data-awc="scanOrder" data-key="scanOrder">Grade in Scan Order</button>'
+          : '') +
         '<button type="button" class="awc-primary" data-awc="done" data-key="done">Done</button></div>' +
         _doneHtml(s) +
         '</div>';
@@ -734,6 +737,8 @@
       if (!given || s.busy || s.view !== 'stage') return { ok: false, reason: 'busy' };
       var placed = s.stage.place(given.sid, { from: given.from, pages: given.pages });
       if (!placed.ok) return placed;
+      // Off a scan: its place in the pile, for Grade in Scan Order.
+      if (given.scan && s.scanOrder.indexOf(given.sid) < 0) s.scanOrder.push(given.sid);
       var url = given.url || _thumbUrl(placed.piece.pages[0]);
       if (url) s.urls[placed.piece.id] = url;
       s.headNote = '';
@@ -778,19 +783,39 @@
     s.moveMenu = null;
     s.progress = '';
     _draw({ focus: 'run' });
-    return run(s.stage, _api(s.cid, s.aid), {
-      alive: function () {
-        return _s === s;
+    var api = _api(s.cid, s.aid);
+    // Who was added, for Grade in Scan Order.
+    var sent = function (sid) {
+      return function (res) {
+        if (res && res.result === 'sent' && s.addedSids.indexOf(sid) < 0) s.addedSids.push(sid);
+        return res;
+      };
+    };
+    return run(
+      s.stage,
+      {
+        add: function (sid, pages, mode) {
+          return Promise.resolve(api.add(sid, pages, mode)).then(sent(sid));
+        },
+        replace: function (sid, pages) {
+          return Promise.resolve(api.replace(sid, pages)).then(sent(sid));
+        },
+        paper: api.paper,
       },
-      progress: function (n, total) {
-        s.progress = 'Adding ' + n + ' of ' + total + '…';
-        var btn = s.overlay.querySelector('.awc-primary');
-        if (btn) btn.textContent = s.progress;
+      {
+        alive: function () {
+          return _s === s;
+        },
+        progress: function (n, total) {
+          s.progress = 'Adding ' + n + ' of ' + total + '…';
+          var btn = s.overlay.querySelector('.awc-primary');
+          if (btn) btn.textContent = s.progress;
+        },
+        release: function (pieces) {
+          _release(s, pieces);
+        },
       },
-      release: function (pieces) {
-        _release(s, pieces);
-      },
-    }).then(function (out) {
+    ).then(function (out) {
       if (_s !== s || out.closed) return;
       s.busy = false;
       s.added += out.added;
@@ -851,6 +876,51 @@
       });
   }
 
+  /* ── Grade in Scan Order ──
+     The students added, in the order their pieces came off the scan; the
+     ones added from files, not the scan, after them in the list's order.
+     Kept in memory only. */
+  function scanOrder(s) {
+    var scanned = s.scanOrder.filter(function (sid) {
+      return s.addedSids.indexOf(sid) >= 0;
+    });
+    if (!scanned.length) return [];
+    return scanned.concat(
+      s.list
+        .map(function (st) {
+          return st.id;
+        })
+        .filter(function (sid) {
+          return s.addedSids.indexOf(sid) >= 0 && scanned.indexOf(sid) < 0;
+        }),
+    );
+  }
+
+  function _canGradeInOrder(s) {
+    var pa = /** @type {any} */ (window).PageAssignments;
+    return !!(pa && pa.openGrader) && scanOrder(s).length > 0;
+  }
+
+  // The grader (PageAssignments.openGrader, unchanged) on those students, from
+  // the first. The page behind is drawn again when the grader closes.
+  function _gradeInOrder() {
+    var s = _s;
+    var ids = s ? scanOrder(s) : [];
+    var pa = /** @type {any} */ (window).PageAssignments;
+    if (!s || !ids.length || !pa || !pa.openGrader) return;
+    var router = /** @type {any} */ (window).Router;
+    var over = !!(router && router.getCurrentPage && router.getCurrentPage() === pa);
+    var after = s.onClose;
+    close(true);
+    pa.openGrader(s.cid, s.aid, ids[0], {
+      studentIds: ids,
+      overPage: over,
+      onClose: function () {
+        if (after) after();
+      },
+    });
+  }
+
   /* ── Leaving ── */
   function _leave() {
     var s = _s;
@@ -893,6 +963,7 @@
     var pid = btn.getAttribute('data-piece');
     if (what === 'leave') return _leave();
     if (what === 'done') return close();
+    if (what === 'scanOrder') return _gradeInOrder();
     if (what === 'layout') {
       s.layout = btn.getAttribute('data-layout') === 'grid' ? 'grid' : 'column';
       _keepLayout(s.layout);
@@ -1131,6 +1202,8 @@
       stillNotIn: [],
       leftAlone: {},
       paperDone: {},
+      scanOrder: [],
+      addedSids: [],
       overlay: overlay,
       opener: document.activeElement,
       onClose: typeof opts.onClose === 'function' ? opts.onClose : null,
@@ -1228,6 +1301,10 @@
     },
     waiting: function () {
       return _s ? _s.tray.items() : [];
+    },
+    // For tests: Grade in Scan Order's students, as the button would open them.
+    scanOrder: function () {
+      return _s ? scanOrder(_s) : [];
     },
   };
 })();

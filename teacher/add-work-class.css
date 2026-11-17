@@ -297,6 +297,10 @@
   border: 1px solid var(--border);
   background: #fff;
 }
+button.awt-pic {
+  padding: 0;
+  cursor: zoom-in;
+}
 .awt-pic img {
   width: 100%;
   height: 100%;

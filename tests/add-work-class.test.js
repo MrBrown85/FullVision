@@ -609,6 +609,62 @@ describe('the page', () => {
     expect(getStudentSubmission(CID, IDS[4], PIECE)).toBeNull();
   });
 
+  it('Grade in Scan Order opens the grader on the added students in the order of the scan, then the rest in list order', async () => {
+    seedScreen();
+    const store = {
+      list: async () => [],
+      putAll: async () => {},
+      update: async () => {},
+      blobs: async () => null,
+      remove: async () => {},
+      clear: async () => {},
+    };
+    runInThisContext(readFileSync('shared/photo-queue.js', 'utf-8'), { filename: 'shared/photo-queue.js' });
+    window.PhotoQueue.configure({ store, isDemo: () => true, upload: async () => ({ error: null }) });
+    const realPA = window.PageAssignments;
+    const openGrader = vi.fn();
+    window.PageAssignments = { openGrader };
+    try {
+      AddWorkClass.open(CID, PIECE);
+      // Off the scan: Ravi's piece came first, then Avery's. Wren's came as a file.
+      AddWorkClass.placePieces([
+        { sid: IDS[3], from: 'Scan, pages 1–2', pages: pages(2), scan: true },
+        { sid: IDS[0], from: 'Scan, pages 3–4', pages: pages(2, 3), scan: true },
+      ]);
+      await AddWorkClass.addFiles(IDS[4], [{ name: 'Wren Evans.pdf', n: 1 }]);
+      click($('.awc-primary'));
+      for (let i = 0; i < 40 && !$('.awc-done'); i++) await new Promise(r => setTimeout(r, 0));
+      window.PhotoQueue.release();
+      expect(AddWorkClass.scanOrder()).toEqual([IDS[3], IDS[0], IDS[4]]);
+      const btn = $('[data-awc="scanOrder"]');
+      expect(text(btn)).toBe('Grade in Scan Order');
+      click(btn);
+      expect(AddWorkClass.isOpen()).toBe(false);
+      expect(openGrader).toHaveBeenCalledTimes(1);
+      const [cid, aid, sid, opts] = openGrader.mock.calls[0];
+      expect([cid, aid, sid]).toEqual([CID, PIECE, IDS[3]]);
+      expect(opts.studentIds).toEqual([IDS[3], IDS[0], IDS[4]]);
+    } finally {
+      window.PageAssignments = realPA;
+    }
+  });
+
+  it('offers no Grade in Scan Order when nothing came off a scan', async () => {
+    seedScreen();
+    const realPA = window.PageAssignments;
+    window.PageAssignments = { openGrader: vi.fn() };
+    try {
+      AddWorkClass.open(CID, PIECE);
+      click(rowOf(IDS[3]).querySelector('.awc-paper'));
+      click($('.awc-primary'));
+      for (let i = 0; i < 40 && !$('.awc-done'); i++) await new Promise(r => setTimeout(r, 0));
+      expect($('.awc-done')).not.toBeNull();
+      expect($('[data-awc="scanOrder"]')).toBeNull();
+    } finally {
+      window.PageAssignments = realPA;
+    }
+  });
+
   it('asks before leaving with files waiting; leaves at once with none', async () => {
     seedScreen();
     const onClose = vi.fn();
