@@ -228,6 +228,10 @@ window.CmTerms = (function () {
   function _cmDayNum(iso) {
     return Math.round(Date.parse(iso + 'T12:00:00Z') / 86400000);
   }
+  // A position on the strip as CSS percent text, to two places. Not a grade.
+  function _cmStripPos(x) {
+    return String(Math.round(x * 100) / 100);
+  }
   // html-safe: labels go through esc; positions and month names are computed numbers and fixed text.
   function _cmTermStripHtml(rows) {
     var good = (rows || []).filter(function (r) {
@@ -264,9 +268,9 @@ window.CmTerms = (function () {
       var w = pct(_cmDayNum(r.ends_on) + 1) - l;
       html +=
         '<span class="cm-term-strip-term" style="left:' +
-        l.toFixed(2) +
+        _cmStripPos(l) +
         '%;width:' +
-        w.toFixed(2) +
+        _cmStripPos(w) +
         '%" title="' +
         esc(r.label + ': ' + _cmTermDay(r.starts_on) + ' – ' + _cmTermDay(r.ends_on)) +
         '">' +
@@ -284,9 +288,9 @@ window.CmTerms = (function () {
           var oe = pct(_cmDayNum(sorted[k].ends_on < sorted[i].ends_on ? sorted[k].ends_on : sorted[i].ends_on) + 1);
           html +=
             '<span class="cm-term-strip-overlap" style="left:' +
-            ol.toFixed(2) +
+            _cmStripPos(ol) +
             '%;width:' +
-            Math.max(0.6, oe - ol).toFixed(2) +
+            _cmStripPos(Math.max(0.6, oe - ol)) +
             '%"></span>';
         }
       }
@@ -298,7 +302,7 @@ window.CmTerms = (function () {
       var yy = mm >= 9 ? y : y + 1;
       var d = _cmDayNum(yy + '-' + (mm < 10 ? '0' : '') + mm + '-01');
       if (d < from || d > to) return;
-      html += '<span style="left:' + pct(d).toFixed(2) + '%">' + m + '</span>';
+      html += '<span style="left:' + _cmStripPos(pct(d)) + '%">' + m + '</span>';
     });
     return html + '</div>';
   }
