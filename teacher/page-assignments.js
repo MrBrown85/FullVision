@@ -11481,9 +11481,10 @@ window.PageAssignments = (function () {
         var aid = el.dataset.aid;
         if (!window.AddWorkClass || !activeCourse) return;
         // The page behind is drawn again as it closes, so new work shows.
-        AddWorkClass.open(activeCourse, aid, {
+        var cid = activeCourse;
+        AddWorkClass.open(cid, aid, {
           onClose: function () {
-            if (!_pageBehind) return;
+            if (activeCourse !== cid || !document.getElementById('ac-' + aid)) return;
             render();
             var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
             if (more) more.focus({ preventScroll: true });
