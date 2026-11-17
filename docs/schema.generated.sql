@@ -1926,6 +1926,7 @@ function student_submit._closed_reason(p_q public.questionnaire, p_tz text) retu
 function student_submit._device_session(p_token text) returns student_submit.device_session security definer
 function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean security definer
 function student_submit._group_members(p_assessment_id uuid, p_enrollment_id uuid) returns uuid[] security definer
+function student_submit._listed(p_assessment public.assessment, p_today date) returns boolean
 function student_submit._log(p_route text, p_outcome text, p_ip_hash text, p_code_id uuid, p_course_id uuid) returns void security definer
 function student_submit._midnight(p_tz text) returns timestamp with time zone
 function student_submit._norm(p text) returns text

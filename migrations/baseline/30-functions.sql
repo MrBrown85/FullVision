@@ -11210,6 +11210,16 @@ AS $function$
      where a.id = p_assessment_id and a.group_work = 'group' and a.collab_mode in ('pairs', 'groups');
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit._listed(p_assessment public.assessment, p_today date)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+ SET search_path TO ''
+AS $function$
+    select not p_assessment.is_draft
+       and (p_assessment.date_assigned is null or p_assessment.date_assigned <= p_today)
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit._log(p_route text, p_outcome text, p_ip_hash text, p_code_id uuid DEFAULT NULL::uuid, p_course_id uuid DEFAULT NULL::uuid)
  RETURNS void
  LANGUAGE sql
@@ -11586,9 +11596,7 @@ AS $function$
                            from assessment a
                           cross join lateral _returned_grade(e.id, a.id) as g(r)
                           where a.course_id = c.id
-                            and (a.date_assigned is null
-                                 or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
-                            and not a.is_draft  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
+                            and student_submit._listed(a, (now() at time zone public._fv_timezone(c.timezone))::date)
                             and a.score_mode <> 'dibels'
                             and (coalesce(g.r->>'status', '') = 'NS'
                                  or (coalesce(g.r->>'status', '') <> 'EXC' and g.r->>'returned_at' is null)))
@@ -11616,8 +11624,7 @@ CREATE OR REPLACE FUNCTION student_submit._work_window(p_assessment_id uuid)
  SET search_path TO 'public', 'student_submit', 'pg_temp'
 AS $function$
     select jsonb_build_object(
-               -- 2026111701: a Draft is not on the student's page until the teacher assigns it
-               'listed', not a.is_draft and (a.date_assigned is null or a.date_assigned <= d.today),
+               'listed', student_submit._listed(a, d.today),
                'closes_on', case a.after_due when 'until' then a.accept_until when 'stop' then a.due_date end,
                'open', case a.after_due when 'until' then d.today <= a.accept_until
                                         when 'stop' then a.due_date is null or d.today <= a.due_date
@@ -12028,7 +12035,7 @@ begin
                            where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id
                              and _course.reflect_on_feedback) rf on true
                      where a.course_id = _course.id
-                       and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft
+                       and student_submit._listed(a, _today)
                        and (mk.j is not null or rv.j is not null or rf.j is not null)) x), '[]'::jsonb),
         'last_plan', (select jsonb_build_object('assessment_id', f.assessment_id, 'plan', f.plan, 'sent_at', f.plan_at)
                         from feedback_reflection f
@@ -12062,12 +12069,10 @@ begin
               join submission_file f on f.submission_id = s.id
              where s.assessment_id = p_assessment_id and s.enrollment_id = p_enrollment_id
                and s.course_id = (_in->>'course_id')::uuid and s.state = 'sent'
-               -- E4: a piece dated in the future is not on the student's page: no link for its pages
+               -- E4: a piece not on the student's page (student_submit._listed): no link for its pages
                and exists (select 1 from assessment a join course c on c.id = a.course_id
                              where a.id = p_assessment_id
-                               and (a.date_assigned is null
-                                    or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
-                               and not a.is_draft)), '[]'::jsonb));
+                               and student_submit._listed(a, (now() at time zone public._fv_timezone(c.timezone))::date))), '[]'::jsonb));
 end;
 $function$;
 
@@ -12208,12 +12213,10 @@ begin
               join submission_file f on f.submission_id = s.id
              where s.assessment_id = p_assessment_id and s.course_id = (_in->>'course_id')::uuid and s.state = 'sent'
                and s.enrollment_id = any (coalesce(_group_members(p_assessment_id, p_enrollment_id), array[p_enrollment_id]))
-               -- E4: a piece dated in the future is not on the student's page: no link for its pages
+               -- E4: a piece not on the student's page (student_submit._listed): no link for its pages
                and exists (select 1 from assessment a join course c on c.id = a.course_id
                              where a.id = p_assessment_id
-                               and (a.date_assigned is null
-                                    or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
-                               and not a.is_draft)), '[]'::jsonb));
+                               and student_submit._listed(a, (now() at time zone public._fv_timezone(c.timezone))::date))), '[]'::jsonb));
 end;
 $function$;
 
@@ -12251,7 +12254,7 @@ begin
                from submission s left join submission_file f on f.submission_id = s.id
               where s.assessment_id = a.id and s.state = 'sent' and s.enrollment_id = any (m.ids)) w
          where a.course_id = _course.id and m.ids is not null
-           and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft), '[]'::jsonb));
+           and student_submit._listed(a, _today)), '[]'::jsonb));
 end;
 $function$;
 
@@ -12274,9 +12277,7 @@ begin
       join course c on c.id = a.course_id
      where r.id = p_resource_id and r.kind = 'pdf' and r.status = 'ready'
        and r.course_id = (_in->>'course_id')::uuid and a.course_id = r.course_id
-       and (a.date_assigned is null
-            or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
-       and not a.is_draft;  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
+       and student_submit._listed(a, (now() at time zone public._fv_timezone(c.timezone))::date);
     if not found then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
@@ -12634,11 +12635,10 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
-    -- E4: a piece dated in the future is not on the student's page: nothing of it is served
+    -- E4: a piece not on the student's page (student_submit._listed): nothing of it is served
     select * into _a from assessment
      where id = p_assessment_id and course_id = _course.id
-       and (date_assigned is null or date_assigned <= (now() at time zone public._fv_timezone(_course.timezone))::date)
-       and not is_draft;  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
+       and student_submit._listed(assessment, (now() at time zone public._fv_timezone(_course.timezone))::date);
     if _a.id is null then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
@@ -12943,7 +12943,7 @@ begin
               from rubric r
              where r.course_id = _course.id
                and exists (select 1 from assessment a where a.rubric_id = r.id
-                              and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft)), '[]'::jsonb),
+                              and student_submit._listed(a, _today))), '[]'::jsonb),
         'assessments', coalesce((
             select jsonb_agg(
                        jsonb_build_object(
@@ -12990,7 +12990,7 @@ begin
               from assessment a
               left join category k on k.id = a.category_id and k.course_id = _course.id
              where a.course_id = _course.id
-               and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft), '[]'::jsonb))
+               and student_submit._listed(a, _today)), '[]'::jsonb))
         -- E9: Show My Learning on: the class's own settings, categories, folders and learning map
         -- (get_class_bundle's shapes; no tag source_text). Off: nothing is added.
         || case when _course.show_my_learning then jsonb_build_object(
@@ -13019,7 +13019,7 @@ begin
                                  join section s on s.id = t.section_id
                                 where s.course_id = _course.id and s.removed_at is null
                                   and exists (select 1 from assessment a where a.rubric_id = r.id
-                                                 and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft)
+                                                 and student_submit._listed(a, _today))
                                 group by rt.rubric_id) w), '{}'::jsonb),
                    -- E9: every category of the class, as the bundle sends them
                    'categories', coalesce((
@@ -13132,8 +13132,7 @@ begin
     end if;
     select * into _a from assessment
      where id = p_assessment_id and course_id = _course.id
-       and (date_assigned is null or date_assigned <= (now() at time zone public._fv_timezone(_course.timezone))::date)
-       and not is_draft;  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
+       and student_submit._listed(assessment, (now() at time zone public._fv_timezone(_course.timezone))::date);
     if _a.id is null then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;

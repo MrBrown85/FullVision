@@ -2622,7 +2622,7 @@ Not verified here: the edge function (not changed: it passes a question's `optio
 
 ## One student page rule (2026111702, 2026-11-17)
 
-One file, `../2026111702_student_listed_rule.sql`, **not applied**, 16.7 KB. It adds `student_submit._listed(assessment, today)` (not a Draft, and Date Assigned empty or on or before today) and patches the 10 `student_submit` functions that spelled that rule out, in place: each swap of the rule for a call is checked against the md5 before and after. It changes no row and no answer. `student_listed.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same 344 function md5s as gradebook-prod:
+One file, `../2026111702_student_listed_rule.sql`, applied to gradebook-prod on 2026-11-17 (post-check: all 15 rows ok), 16.7 KB. It adds `student_submit._listed(assessment, today)` (not a Draft, and Date Assigned empty or on or before today) and patches the 10 `student_submit` functions that spelled that rule out, in place: each swap of the rule for a call is checked against the md5 before and after. It changes no row and no answer. `student_listed.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same 344 function md5s as gradebook-prod:
 
 ```bash
 DATABASE_URL=postgresql://postgres@127.0.0.1:54471/listed_main node scripts/db-rebuild.mjs --check   # an empty database
