@@ -7,8 +7,11 @@
    half a turn again. The Turn button on each page stays as it was.
 
    Finding upside-down pages on their own. The plan allows it only if a
-   trial shows it can be trusted. The trial (Nov 17, made-up pages, see
-   the PR) made wrong calls, so nothing here guesses from the picture.
+   trial shows it can be trusted. The trial (Nov 17, 90 made-up pages,
+   each right way up and upside down, printed, handwriting-like and harder
+   ones) made wrong calls: tall letters against hanging ones was wrong on
+   1 handwriting-like page, more ink at the top was wrong on 9 pages with
+   a diagram at the top. So nothing here guesses from the picture.
    `finders` is the place for a way that is certain: B4's sticker is read
    with its direction, and a sticker read upside down says its page is.
    A finder is function (page) → Promise of true (upside down), false, or

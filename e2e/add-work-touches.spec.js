@@ -190,6 +190,7 @@ test('Set Up Like Last Time, a moved page under the right student, and Grade in 
 
   // Page 5 (piece 3's first) onto Mia's piece, from its menu.
   await aws.locator('.aws-tile[data-no="5"] .aws-pmenu').click();
+  await shot(page, 'add-work-touches-menu');
   await aws.getByRole('menuitem', { name: 'Make It ' + mia.first + '’s Page 3' }).click();
   await expect(aws.locator('.aws-note')).toHaveText('Page 5 is now ' + mia.first + '’s Page 3.');
   await expect(aws.locator('.aws-range').nth(0)).toHaveText('Piece 1 · Pages 1–2, 5');
