@@ -159,11 +159,7 @@ describe('the class list', () => {
   });
 
   it('a student with no last name, or blank names, is read safely', () => {
-    const odd = [
-      { id: 'x', firstName: 'Kai', lastName: '' },
-      { id: 'y', firstName: '', lastName: '' },
-      null,
-    ];
+    const odd = [{ id: 'x', firstName: 'Kai', lastName: '' }, { id: 'y', firstName: '', lastName: '' }, null];
     expect(NameMatch.match('Kai.pdf', odd)).toEqual({ kind: 'one', sid: 'x' });
   });
 });

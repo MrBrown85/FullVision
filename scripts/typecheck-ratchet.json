@@ -51,8 +51,10 @@
     "teacher/cm-reflect-answers.js",
     "teacher/cm-reflect-builder.js",
     "shared/add-work-files.js",
+    "shared/name-match.js",
     "teacher/add-work-stage.js",
-    "teacher/add-work-class.js"
+    "teacher/add-work-class.js",
+    "teacher/add-work-tray.js"
   ],
   "notYetChecked": [
     "s/app.js",

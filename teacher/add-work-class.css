@@ -157,6 +157,343 @@
   color: var(--text-3);
 }
 
+/* ── The body: the tray beside the students (Column) or above them (Grid) ── */
+.awc-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.awc-body > .awc-scroll {
+  min-width: 0;
+}
+
+/* ── The tray (teacher/add-work-tray.js) ── */
+.awt-tray {
+  width: 340px;
+  flex: none;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: inset -0.5px 0 0 var(--divider-heavy);
+}
+.awt-drop {
+  box-sizing: border-box;
+  border: 2px dashed var(--border-2);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 12px;
+  text-align: center;
+}
+.awt-drop.is-over {
+  border-color: var(--active);
+  background: var(--active-light);
+  color: var(--link);
+}
+.awt-drop-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.awt-drop-hint {
+  font-size: 12px;
+}
+.awt-pick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.awt-pick-btn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--link);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awt-status {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.awt-status:empty {
+  display: none;
+}
+.awt-wait {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.awt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.awt-title {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.awt-count,
+.awt-hint,
+.awt-empty {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.awt-hint,
+.awt-empty {
+  margin: -4px 0 0;
+}
+.awt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.awt-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--divider-medium);
+  cursor: grab;
+  min-width: 0;
+}
+.awt-item.is-refused {
+  cursor: default;
+  background: var(--bg);
+}
+.awt-item.is-dragging {
+  opacity: 0.5;
+}
+.awt-pic {
+  width: 56px;
+  height: 74px;
+  flex: none;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.awt-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+.awt-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.awt-file {
+  font-size: 13px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.awt-file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.awt-why {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.awt-why.is-note {
+  color: var(--danger);
+  font-weight: 600;
+}
+.awt-ask {
+  font-size: 13px;
+  font-weight: 700;
+}
+.awt-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.awt-act {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.awt-act.is-main {
+  border-color: var(--active);
+  background: var(--active);
+  color: #fff;
+}
+.awt-act.is-quiet {
+  border-color: transparent;
+  color: var(--link);
+}
+.awt-choose {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.awt-off {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.awt-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.awt-find {
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.awt-find:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.awt-options {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  max-height: 180px;
+  overflow: auto;
+  border-radius: 7px;
+  box-shadow: 0 0 0 1px var(--divider-medium);
+}
+.awt-option {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awt-option:hover,
+.awt-option:focus-visible {
+  background: var(--active-light);
+}
+.awt-none {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.awt-note {
+  margin-top: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--text-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.awt-note strong {
+  color: var(--text);
+}
+
+/* Grid: the tray is a strip above the cards. */
+.awt-tray.is-strip {
+  width: auto;
+  overflow: visible;
+  margin: 16px 16px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 0 0 1px var(--divider-medium);
+}
+.awt-tray.is-strip .awt-drop {
+  width: 260px;
+  flex: none;
+  padding: 10px;
+  gap: 4px;
+}
+.awt-tray.is-strip .awt-drop svg {
+  display: none;
+}
+.awt-tray.is-strip .awt-drop-title {
+  font-size: 13px;
+}
+.awt-tray.is-strip .awt-status {
+  flex-basis: 100%;
+  order: 3;
+}
+.awt-tray.is-strip .awt-wait {
+  flex: 1;
+  min-width: 240px;
+}
+.awt-tray.is-strip .awt-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.awt-tray.is-strip .awt-item {
+  width: 300px;
+  box-sizing: border-box;
+}
+
 /* ── Column ── */
 .awc-head,
 .awc-row {
@@ -558,5 +895,26 @@
     flex-wrap: wrap;
     height: auto;
     padding: 4px;
+  }
+  /* The tray goes above the students, and the two scroll as one. */
+  .awc-body.is-column {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .awc-body.is-column > .awc-scroll {
+    flex: none;
+    overflow: visible;
+  }
+  .awt-tray {
+    width: auto;
+    overflow: visible;
+    box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+  }
+  .awt-note {
+    margin-top: 0;
+  }
+  .awt-tray.is-strip .awt-drop,
+  .awt-tray.is-strip .awt-item {
+    width: 100%;
   }
 }

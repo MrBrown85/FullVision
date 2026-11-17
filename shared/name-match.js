@@ -50,7 +50,10 @@
    Two or more students fit ('many'): two who share the name ("Chen" with
    Avery Chen and Liam Chen), two students' full names in one file name,
    or a close spelling of two students. Nothing else is 'none'
-   ("SCAN0017.pdf", "IMG_4471.jpg"). A doubtful match is never certain. */
+   ("SCAN0017.pdf", "IMG_4471.jpg"). A doubtful match is never certain.
+
+   NameMatch.compare(a, b)  file names in natural order ("2" before "10").
+   NameMatch.plain(text)    text without accents, for type-to-find. */
 /** @type {any} */ (window).NameMatch = (function () {
   'use strict';
 
@@ -111,7 +114,10 @@
   /* The file name's words: [{ w, shown }], `shown` as written (for the
      screen). Numbers and filler go. */
   function _read(fileName) {
-    var base = String(fileName || '').split(/[\\/]/).pop() || '';
+    var base =
+      String(fileName || '')
+        .split(/[\\/]/)
+        .pop() || '';
     base = base.replace(/\.[A-Za-z0-9]{1,5}$/, '');
     var out = [];
     _plain(base)
@@ -338,9 +344,12 @@
       if (!left.length) return { kind: 'one', sid: sid };
       // Another student fits a word that is left: two students could be meant.
       var others = fits.filter(function (o) {
-        return o !== f && o.fit.runs.some(function (r) {
-          return !_used(f.fit.runs)[r.from];
-        });
+        return (
+          o !== f &&
+          o.fit.runs.some(function (r) {
+            return !_used(f.fit.runs)[r.from];
+          })
+        );
       });
       if (others.length)
         return {
@@ -377,6 +386,7 @@
 
   /* File names in their natural order: "Avery Chen 2" before "Avery Chen
      10". Capitals and accents don't matter. */
+  /** @type {Intl.Collator | null} */
   var _collator = null;
   function compare(a, b) {
     var x = String(a || '');
@@ -386,5 +396,10 @@
     return _collator ? _collator.compare(x, y) : x.localeCompare(y);
   }
 
-  return { match: match, compare: compare, FILLER: FILLER.slice() };
+  // Text with its accents and apostrophes gone, for type-to-find.
+  function plain(text) {
+    return _plain(text);
+  }
+
+  return { match: match, compare: compare, plain: plain, FILLER: FILLER.slice() };
 })();

@@ -1,21 +1,23 @@
 // @ts-check
-/* ── add-work-class.js — Add Work for the Class (B1) ─────────────────────
+/* ── add-work-class.js — Add Work for the Class (B1, B3) ─────────────────
    One page, on a computer, where a teacher puts paper work (photos or
    PDFs) on every student of one assessment, then adds it all with one
    button. Nothing is saved until Add Work is pressed
    (docs/plans/add-work-for-class-plan.md, DECISIONS "Add Work for the
    Class (2026-11-17)").
 
-   Two parts:
-   - The staging model (AddWorkClass.stage, AddWorkClass.run): for each
-     student, the pages waiting, in pieces (a piece is one file's pages, in
-     order), where each piece came from (for the screen only), the choice
-     for a student who already has work, and On Paper. No HTML and no DOM:
-     it is handed pages, however they arrived, and answers the writes to
-     run. Later slices (Split the Scan, a folder matched by name) hand it
-     pieces too.
-   - The screen: a page over the Assignments page (or the Work Wall), like
-     the Work Wall, in Column or Grid.
+   This file is the screen: a page over the Assignments page (or the Work
+   Wall), like the Work Wall, in Column or Grid. Beside it:
+   - teacher/add-work-stage.js (AddWorkStage.stage, AddWorkStage.run): the
+     staging model and the run, with no DOM. For each student, the pages
+     waiting, in pieces (a piece is one file's pages, in order), where each
+     came from (for the screen only), the choice for a student who already
+     has work, and On Paper.
+   - teacher/add-work-tray.js (AddWorkTray): files dropped off a student,
+     or chosen from the tray, matched to students by name
+     (shared/name-match.js), and the Waiting for a Student tray (B3).
+   - teacher/add-work-split.js (AddWorkSplit, B2, when it is there): Split
+     the Scan, over this page; its pieces come back through placePieces.
 
    File names never leave this computer: every page is renamed page-1.jpg,
    page-2.jpg and so on before the model keeps it, so no file name reaches
@@ -33,7 +35,10 @@
    AddWorkClass.isOpen()
    AddWorkClass.offered(cid, a)       whether the piece offers it: where the
                                       row's + (Attach Work) is offered.
-   AddWorkClass.students(cid, a)      the students it lists, in roster order. */
+   AddWorkClass.students(cid, a)      the students it lists, in roster order.
+   AddWorkClass.placePieces(pieces)   [{ sid, from, pages }] onto their
+                                      students, drawn once; any that can't be
+                                      placed wait in the tray. → { placed, waiting }. */
 /** @type {any} */ (window).AddWorkClass = (function () {
   'use strict';
 
@@ -208,15 +213,25 @@
       '<button type="button" class="awc-primary" data-awc="run" data-key="run"' +
       (busy || reading || !c.ready ? ' disabled' : '') +
       '>' +
-      esc(busy ? s.progress || 'Adding…' : reading ? 'Reading Files…' : s.stage.buttonLabel()) +
+      esc(
+        busy
+          ? s.progress || 'Adding…'
+          : reading
+            ? (s.tray && s.tray.progress()) || 'Reading Files…'
+            : s.stage.buttonLabel(),
+      ) +
       '</button>' +
       '</div>' +
-      '<div class="awc-scroll">' +
-      (s.layout === 'grid' ? _gridHtml(s) : _columnHtml(s)) +
-      '</div>' +
+      '<div class="awc-body is-' +
+      esc(s.layout) +
+      '" data-keep-scroll="awc-body">' +
+      (s.layout === 'grid' ? '' : s.tray.html()) +
+      '<div class="awc-scroll" data-keep-scroll="awc-scroll">' +
+      (s.layout === 'grid' ? s.tray.html() + _gridHtml(s) : _columnHtml(s)) +
+      '</div></div>' +
       '<div class="awc-foot">' +
       '<span class="awc-count">' +
-      esc(s.stage.footerText()) +
+      esc(_footer(s)) +
       '</span>' +
       '<span class="awc-hint">Nothing is added until you press Add Work.</span>' +
       '</div></div>';
@@ -225,9 +240,18 @@
 
   // Whether any file is still being read (shrunk) for any student.
   function _readingAny(s) {
+    if (s.tray && s.tray.reading()) return true;
     return Object.keys(s.reading).some(function (sid) {
       return s.reading[sid] > 0;
     });
+  }
+
+  // "N ready to add · 3 files waiting · …": the tray's count after the ready students.
+  function _footer(s) {
+    var parts = s.stage.footerText() ? s.stage.footerText().split(' · ') : [];
+    var waiting = s.tray ? s.tray.count() : 0;
+    if (waiting) parts.splice(s.stage.counts().ready ? 1 : 0, 0, _plural(waiting, 'file', 'files') + ' waiting');
+    return parts.join(' · ');
   }
 
   function _segBtn(id, label, icon, on) {
@@ -557,11 +581,14 @@
     var s = _s;
     if (!s) return;
     opts = opts || {};
-    var scroll = s.overlay.querySelector('.awc-scroll');
-    var top = scroll ? scroll.scrollTop : 0;
+    // Every scroll on the page (the students, the tray) stays where it was.
+    var tops = {};
+    Array.prototype.forEach.call(s.overlay.querySelectorAll('[data-keep-scroll]'), function (el) {
+      tops[el.getAttribute('data-keep-scroll')] = el.scrollTop;
+    });
     var active = document.activeElement;
     var key = opts.focus || (active && s.overlay.contains(active) ? active.getAttribute('data-key') : null);
-    var before = {};
+    var before = Object.assign({}, opts.glideFrom || {});
     (opts.glide || []).forEach(function (pid) {
       var el = s.overlay.querySelector('.awc-chip[data-piece="' + pid + '"]');
       if (el && el.getBoundingClientRect) before[pid] = el.getBoundingClientRect();
@@ -570,14 +597,16 @@
     s.overlay.innerHTML = _pageHtml(s);
     // The chip being dragged is gone: its drag can no longer end, so it is let go.
     if (s.drag && !(s.drag.el && s.drag.el.isConnected)) s.drag = null;
-    var again = s.overlay.querySelector('.awc-scroll');
-    if (again) again.scrollTop = top;
+    Array.prototype.forEach.call(s.overlay.querySelectorAll('[data-keep-scroll]'), function (el) {
+      var top = tops[el.getAttribute('data-keep-scroll')];
+      if (top) el.scrollTop = top;
+    });
     if (key) {
       var el = s.overlay.querySelector('[data-key="' + key + '"]');
       if (!el || el.disabled) el = opts.fallback ? s.overlay.querySelector('[data-key="' + opts.fallback + '"]') : null;
       if (el && !el.disabled) el.focus({ preventScroll: !opts.focus });
     }
-    if (opts.glide) _glide(s, before);
+    if (Object.keys(before).length) _glide(s, before);
   }
 
   function _reducedMotion() {
@@ -698,6 +727,26 @@
     });
   }
 
+  /* Pieces with their pages already read (Split the Scan, the tray) onto
+     their students, with no draw. → [{ ok, piece, reason }], one each. */
+  function _placeAll(s, pieces) {
+    return (pieces || []).map(function (given) {
+      if (!given || s.busy || s.view !== 'stage') return { ok: false, reason: 'busy' };
+      var placed = s.stage.place(given.sid, { from: given.from, pages: given.pages });
+      if (!placed.ok) return placed;
+      var url = given.url || _thumbUrl(placed.piece.pages[0]);
+      if (url) s.urls[placed.piece.id] = url;
+      s.headNote = '';
+      return placed;
+    });
+  }
+
+  function placePieces(pieces) {
+    var s = _s;
+    if (!s || s.busy || s.view !== 'stage') return { placed: 0, waiting: 0 };
+    return s.tray.placeOrHold(pieces);
+  }
+
   /* ── The run ── */
   function _api(cid, aid) {
     return {
@@ -748,7 +797,7 @@
       s.paperSet += out.paper;
       _readSubs(s);
       var waiting = s.stage.counts();
-      if (!out.stopped && !waiting.files && !waiting.paper) {
+      if (!out.stopped && !waiting.files && !waiting.paper && !s.tray.count()) {
         s.view = 'done';
         s.stillNotIn = s.stage
           .rows()
@@ -806,7 +855,7 @@
   function _leave() {
     var s = _s;
     if (!s || s.busy) return;
-    var files = s.view === 'stage' ? s.stage.counts().files : 0;
+    var files = s.view === 'stage' ? s.stage.counts().files + s.tray.count() : 0;
     if (!files) return close();
     if (typeof showConfirm !== 'function') return close();
     showConfirm(
@@ -824,7 +873,7 @@
   /* ── Events ── */
   function _click(e) {
     var s = _s;
-    var btn = e.target && e.target.closest ? e.target.closest('[data-awc]') : null;
+    var btn = e.target && e.target.closest ? e.target.closest('[data-awc], [data-awt]') : null;
     if (!s) return;
     if (
       s.moveMenu &&
@@ -835,6 +884,10 @@
       if (!btn) return;
     }
     if (!btn || btn.disabled) return;
+    if (!btn.hasAttribute('data-awc')) {
+      if (!s.busy) s.tray.click(btn);
+      return;
+    }
     var what = btn.getAttribute('data-awc');
     var sid = btn.getAttribute('data-sid');
     var pid = btn.getAttribute('data-piece');
@@ -886,10 +939,17 @@
 
   function _change(e) {
     var input = e.target;
-    if (!_s || !input || !input.classList || !input.classList.contains('awc-file')) return;
+    if (!_s || !input || !input.classList) return;
+    if (_s.tray.change(input)) return;
+    if (!input.classList.contains('awc-file')) return;
     var files = Array.prototype.slice.call(input.files || []);
     input.value = '';
     addFiles(input.getAttribute('data-sid'), files);
+  }
+
+  // Typing in the tray's Choose a Student.
+  function _input(e) {
+    if (_s) _s.tray.input(e.target);
   }
 
   function _hasFiles(e) {
@@ -924,6 +984,8 @@
     }
     var target = _targetOf(e);
     var sid = target && target.getAttribute('data-awc-target');
+    // Files off a student go to the tray, matched by name: its drop space lights.
+    if (files && !target) target = s.overlay.querySelector('[data-awt-drop]');
     if (!target || (s.drag && s.drag.sid === sid)) {
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
       return _overOff(s);
@@ -934,7 +996,8 @@
     s.over = target;
     target.classList.add('is-over');
     var drop = target.querySelector('.awc-drop');
-    if (drop) drop.textContent = drop.getAttribute(files ? 'data-over' : 'data-move');
+    // A file from the tray is added, as a file from the computer is.
+    if (drop) drop.textContent = drop.getAttribute(files || (s.drag && s.drag.tray) ? 'data-over' : 'data-move');
   }
 
   function _dragLeave(e) {
@@ -955,24 +1018,26 @@
     var target = _targetOf(e);
     var sid = target && target.getAttribute('data-awc-target');
     if (drag) {
-      if (sid && sid !== drag.sid) _move(s, drag.sid, sid, drag.pid);
+      if (drag.tray) {
+        if (sid) s.tray.place(drag.tray, sid);
+      } else if (sid && sid !== drag.sid) _move(s, drag.sid, sid, drag.pid);
       return;
     }
     var files = e.dataTransfer && e.dataTransfer.files;
     if (!files || !files.length) return;
-    if (!sid) {
-      // The Waiting tray is a later slice: a file dropped off a student is not taken.
-      s.headNote = 'Drop it on a student.';
-      return _draw();
-    }
+    // Off a student, or a folder anywhere: each file is matched by its name.
+    if (!sid || s.tray.hasFolder(e.dataTransfer)) return s.tray.takeDrop(e.dataTransfer);
+    // On a student: that student's, whatever it is called.
     addFiles(sid, files);
   }
 
   function _dragStart(e) {
     var s = _s;
-    var chip = e.target && e.target.closest ? e.target.closest('.awc-chip') : null;
+    var chip = e.target && e.target.closest ? e.target.closest('.awc-chip, .awt-item') : null;
     if (!s || !chip || s.busy) return;
-    s.drag = { sid: chip.getAttribute('data-sid'), pid: chip.getAttribute('data-piece'), el: chip };
+    s.drag = chip.hasAttribute('data-awt-item')
+      ? { tray: chip.getAttribute('data-awt-item'), el: chip }
+      : { sid: chip.getAttribute('data-sid'), pid: chip.getAttribute('data-piece'), el: chip };
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       try {
@@ -988,7 +1053,7 @@
     if (!s) return;
     s.drag = null;
     _overOff(s);
-    var chip = s.overlay.querySelector('.awc-chip.is-dragging');
+    var chip = s.overlay.querySelector('.is-dragging');
     if (chip) chip.classList.remove('is-dragging');
   }
 
@@ -997,6 +1062,10 @@
   function _keydown(e) {
     var s = _s;
     if (!s || e.defaultPrevented) return;
+    // Split the Scan, over this page, has the keys while it is open.
+    var split = /** @type {any} */ (window).AddWorkSplit;
+    if (split && typeof split.isOpen === 'function' && split.isOpen()) return;
+    if (s.tray.keydown(e)) return;
     if (s.moveMenu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       var items = Array.prototype.slice.call(s.overlay.querySelectorAll('.awc-move-menu .awc-move-item'));
       var at = items.indexOf(document.activeElement);
@@ -1021,7 +1090,7 @@
 
   function _beforeUnload(e) {
     var s = _s;
-    if (!s || (!s.busy && !(s.view === 'stage' && s.stage.counts().files))) return;
+    if (!s || (!s.busy && !(s.view === 'stage' && s.stage.counts().files + s.tray.count()))) return;
     e.preventDefault();
     e.returnValue = '';
   }
@@ -1072,9 +1141,43 @@
         return { id: st.id, had: _had(s.subs[st.id]) };
       }),
     );
+    s.tray = AddWorkTray.create({
+      cid: cid,
+      aid: aid,
+      alive: function () {
+        return _s === s;
+      },
+      busy: function () {
+        return s.busy || s.view !== 'stage';
+      },
+      roster: function () {
+        return getStudents(cid) || [];
+      },
+      rows: function () {
+        return s.stage.rows().map(function (r) {
+          return r.sid;
+        });
+      },
+      full: function (sid) {
+        return _full(s, sid);
+      },
+      first: function (sid) {
+        return _first(s, sid);
+      },
+      place: function (pieces) {
+        return _placeAll(s, pieces);
+      },
+      draw: function (o) {
+        if (_s === s) _draw(o);
+      },
+      layout: function () {
+        return s.layout;
+      },
+    });
     _s = s;
     overlay.addEventListener('click', _click);
     overlay.addEventListener('change', _change);
+    overlay.addEventListener('input', _input);
     overlay.addEventListener('dragover', _dragOver);
     overlay.addEventListener('dragleave', _dragLeave);
     overlay.addEventListener('drop', _drop);
@@ -1099,6 +1202,9 @@
     s.stage.rows().forEach(function (r) {
       _release(s, r.pieces);
     });
+    s.tray.release();
+    var split = /** @type {any} */ (window).AddWorkSplit;
+    if (split && typeof split.isOpen === 'function' && split.isOpen()) split.close();
     s.overlay.remove();
     if (quiet) return;
     if (s.opener && s.opener.isConnected && typeof s.opener.focus === 'function') s.opener.focus();
@@ -1113,7 +1219,15 @@
     },
     offered: offered,
     students: students,
+    placePieces: placePieces,
     // For tests: the files for one student, as a drop or the chooser gives them.
     addFiles: addFiles,
+    // For tests: files dropped off a student or chosen from the tray, and what waits.
+    takeFiles: function (files) {
+      return _s ? _s.tray.take(files) : Promise.resolve();
+    },
+    waiting: function () {
+      return _s ? _s.tray.items() : [];
+    },
   };
 })();
