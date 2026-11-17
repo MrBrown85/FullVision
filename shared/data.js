@@ -4657,7 +4657,7 @@ function _applyBundleCourseRow(cid, courseRow) {
 function _applyBundleCourseConfig(cid, row, courseRow) {
   // Cards Work Until is the student cards' own (getCardsWorkUntil), never a setting this device sends up.
   _noteCardsWorkUntil(cid, courseRow);
-  // Send Work and Keep Photos Until, the server's (S5-W1): read from here, never sent from here.
+  // Send Work, the server's (S5-W1): read from here, never sent from here.
   _noteCourseSendWork(cid, courseRow);
   // Reflect on Feedback and Show My Learning, the same (S10-W1).
   _noteCourseFeedbackOptions(cid, courseRow);

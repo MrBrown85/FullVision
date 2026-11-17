@@ -8969,10 +8969,6 @@ button.grader-member-name {
   padding: 0;
   border: 0;
 }
-.sp-send .sp-keep-title {
-  font-size: var(--text-sm);
-  margin-top: 4px;
-}
 
 /* Assessment form: the Student Work card (S5-F1), redrawn Nov 11 (board
    "Assessment Form" 2a to 2d). Drawn only while the class's Send Work is

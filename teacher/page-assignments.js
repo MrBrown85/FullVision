@@ -3460,14 +3460,6 @@ window.PageAssignments = (function () {
     var excluded = typeof AC !== 'undefined' && AC.excluded ? AC.excluded.size : 0;
     if (excluded > 0 && students.length)
       facts.push('Only the ' + (students.length - excluded) + ' students chosen see it.');
-    if (sending) {
-      var keep = typeof CmStudentPage !== 'undefined' ? CmStudentPage.workSettings(cid).keep_photos_until : '';
-      facts.push(
-        keep === 'end_of_term'
-          ? 'Photos are kept until the end of the term (Class Settings).'
-          : 'Photos are kept until after June report cards (Class Settings).',
-      );
-    }
     return (
       '<div class="af-peek-label">' +
       esc(who) +

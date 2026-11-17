@@ -12,7 +12,7 @@
    PR (S5-W1) fills them from the server:
 
    getCourseSubmissions(cid)   list_course_submissions(p_course_id):
-     { bucket, course: { send_work, keep_photos_until },
+     { bucket, course: { send_work },
        assessments: [{ id, students_send, after_due, accept_until,
                        group_work, students_see_markup }],   every assessment
        submissions: [{ id, assessment_id, enrollment_id, version, state,
@@ -106,7 +106,7 @@ function saveDemoStudentWork(cid, work) {
   });
   if (tooMany) return false;
   var stored = {
-    course: Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _studentWorkCopy(work.course) || {}),
+    course: Object.assign({ send_work: false }, _studentWorkCopy(work.course) || {}),
     assessments: _studentWorkCopy(Array.isArray(work.assessments) ? work.assessments : []),
     submissions: _studentWorkCopy(subs),
   };
@@ -119,10 +119,7 @@ function saveDemoStudentWork(cid, work) {
 function getCourseSendWork(cid) {
   var stored = _studentWorkStored(cid);
   var course = stored && stored.course;
-  return {
-    send_work: !!(course && course.send_work === true),
-    keep_photos_until: course && course.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
-  };
+  return { send_work: !!(course && course.send_work === true) };
 }
 
 function getAssessmentStudentWork(cid, aid) {
@@ -507,7 +504,7 @@ function _studentWorkDraft(cid) {
   var stored = _studentWorkCopy(_studentWorkStored(cid));
   if (!_plainObject(stored)) stored = {};
   return {
-    course: Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, stored.course || {}),
+    course: Object.assign({ send_work: false }, stored.course || {}),
     assessments: Array.isArray(stored.assessments) ? stored.assessments : [],
     submissions: Array.isArray(stored.submissions) ? stored.submissions : [],
   };
@@ -884,8 +881,7 @@ function openStudentWorkPage(cid, file, which) {
    Work on (or its Send Work is not known yet this session), when the
    grader or the Assignments page opens (refreshStudentWork, at most every
    30 seconds unless asked), and after this device's own writes land.
-   Send Work and Keep Photos Until also come on the course row with the
-   class. Kept in memory only (_workServer).
+   Send Work also comes on the course row with the class. Kept in memory only (_workServer).
 
    What is shown is that answer with this device's writes not yet answered
    laid over it (_workServerView), so a change shows at once and a reload
@@ -925,8 +921,8 @@ var _WORK_DROPPED_MS = 24 * 60 * 60 * 1000; // how long the sync dot says so, un
 var _workAwaited = {}; // start key → true while Add Work's screen still waits for the answer
 var _workServer = {}; // cid → list_course_submissions' answer, as last read
 var _workVersion = {}; // cid → that answer's version, until something here changes the copy
-var _workCourseRow = {}; // cid → { send_work, keep_photos_until }, as the server last said
-var _workCourseHere = {}; // cid → a change of the two on its way: { patch, at }
+var _workCourseRow = {}; // cid → { send_work }, as the server last said
+var _workCourseHere = {}; // cid → a change of Send Work on its way: { patch, at }
 var _workAssessHere = {}; // aid → a change of an assessment's settings on its way
 var _workRead = {}; // cid → { running, at, writes }
 var _workWrites = {}; // cid → how many of this device's work writes have landed
@@ -1040,7 +1036,7 @@ function _workServerView(cid) {
     'delete_submission',
     'mark_handed_in_paper',
   ]);
-  var course = Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _workCourseRow[cid] || {});
+  var course = Object.assign({ send_work: false }, _workCourseRow[cid] || {});
   queuedTo('set_course_send_work', function (p) {
     return p.p_course_id === cid;
   }).forEach(function (e) {
@@ -1187,13 +1183,11 @@ function _workServerView(cid) {
 
 /* ── Reading ── */
 
-// The course row's two settings, when the class loads (_applyBundleCourseConfig).
+// The course row's Send Work, when the class loads (_applyBundleCourseConfig).
+// The server still sends keep_photos_until; nothing reads it (Nov 17 2026).
 function _noteCourseSendWork(cid, courseRow) {
   if (!cid || !_plainObject(courseRow) || !('send_work' in courseRow)) return;
-  _workCourseRow[cid] = {
-    send_work: courseRow.send_work === true,
-    keep_photos_until: courseRow.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
-  };
+  _workCourseRow[cid] = { send_work: courseRow.send_work === true };
   _workChanged(cid);
 }
 
@@ -1338,18 +1332,15 @@ function _workWriteLanded(cid) {
   }, 0);
 }
 
-/* ── The two class settings and an assessment's ── */
+/* ── The class's Send Work and an assessment's settings ── */
 
-/* Send Work and Keep Photos Until: `patch` names what changes, any of
-   { send_work: boolean, keep_photos_until: 'end_of_year' | 'end_of_term' }.
-   Answers { ok } at once. Demo Mode keeps it with its sample work; a live
-   class sends set_course_send_work through the outbox. */
+/* Send Work: `patch` is { send_work: boolean }. Answers { ok } at once.
+   Demo Mode keeps it with its sample work; a live class sends
+   set_course_send_work through the outbox. Keep Photos Until is gone
+   (Nov 17 2026): photos stay with the class, so nothing sends it. */
 function setCourseSendWork(cid, patch) {
   var clean = {};
   if (patch && (patch.send_work === true || patch.send_work === false)) clean.send_work = patch.send_work;
-  if (patch && (patch.keep_photos_until === 'end_of_year' || patch.keep_photos_until === 'end_of_term')) {
-    clean.keep_photos_until = patch.keep_photos_until;
-  }
   if (!cid || !Object.keys(clean).length) return { ok: false };
   if (_isDemoSession()) {
     var work = getCourseSubmissions(cid);
