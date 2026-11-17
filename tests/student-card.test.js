@@ -82,6 +82,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/student-data.js',
       'shared/student-view.js',
       's/page-view.js',
+      // A handout's pages on a card still to do, to swipe through (Nov 17).
+      's/page-carousel.js',
       's/student.js',
       // A teacher-built reflection's questions (docs/plans/reflect-plan.md).
       's/question-kinds.js',
@@ -564,8 +566,8 @@ describe('student card: a draft is nowhere on the page', () => {
         .replace(/sp-flag-(overdue|due)/g, 'sp-flag-')
         .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
         .replace(/ sp-picked/, '')
-        // The poster carries the teacher's handout (Demo Mode's Poster Checklist); that is not a grade.
-        .replace(/<section class="sp-res"[\s\S]*?<\/section>/, '');
+        // The poster and the proposal carry the teacher's handouts (their pages, to swipe through); that is not a grade.
+        .replace(/<section [^>]*class="sp-(res|car)"[\s\S]*?<\/section>/, '');
     const poster = page.root().querySelector('.sp-deck .sp-piece[data-piece="demo-poster"]');
     await page.click('[data-segment="upcoming"]');
     const fair = page.root().querySelector('.sp-deck .sp-piece[data-piece="demo-fair"]');

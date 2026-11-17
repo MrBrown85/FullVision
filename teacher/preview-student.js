@@ -320,7 +320,16 @@ window.PreviewStudent = (function () {
     var el = _overlay();
     var was = _open;
     _open = null;
-    if (was) _letGo(was);
+    if (was) {
+      _letGo(was);
+      (was.carReleases || []).forEach(function (release) {
+        try {
+          release();
+        } catch (e) {
+          /* already gone */
+        }
+      });
+    }
     if (_onKey) document.removeEventListener('keydown', _onKey, true);
     if (_onLeave && typeof window.removeEventListener === 'function') window.removeEventListener('popstate', _onLeave);
     _onKey = _onLeave = null;
@@ -490,11 +499,53 @@ window.PreviewStudent = (function () {
     if (to && typeof to.focus === 'function') to.focus();
   }
 
-  // On the phone, a card picked from elsewhere is brought into view.
+  // On the phone, a card picked from elsewhere is brought into view; the cards' carousels fetch their pages.
   function _settle(screen) {
     if (!screen || !_open) return;
     StudentPageView.settle(screen);
+    if (typeof StudentPageCarousel !== 'undefined') {
+      StudentPageCarousel.attach(screen, _carSource, { scrollRoot: screen });
+    }
   }
+
+  /* The pages a card's carousel shows (s/page-carousel.js), as the student
+     sees them: openAssessmentHandoutPage, as the open handout uses. Kept
+     while the preview is open on this student, let go when it closes. */
+  var _carSource = {
+    known: function (rid, i) {
+      var got = _open && _open.car && _open.car[rid + ':' + i];
+      return got && typeof got === 'string' ? got : '';
+    },
+    load: function (piece, rid, i) {
+      var mine = _open;
+      if (!mine || typeof openAssessmentHandoutPage !== 'function') return Promise.resolve('');
+      var key = rid + ':' + i;
+      mine.car = mine.car || {};
+      if (mine.car[key]) return Promise.resolve(mine.car[key]);
+      var asking = Promise.resolve(openAssessmentHandoutPage(mine.cid, rid, Number(i) || 0)).then(
+        function (o) {
+          if (!o || !o.url) {
+            delete mine.car[key];
+            return '';
+          }
+          if (_open !== mine) {
+            if (typeof o.release === 'function') o.release();
+            return '';
+          }
+          mine.carReleases = mine.carReleases || [];
+          if (typeof o.release === 'function') mine.carReleases.push(o.release);
+          mine.car[key] = o.url;
+          return o.url;
+        },
+        function () {
+          delete mine.car[key];
+          return '';
+        },
+      );
+      mine.car[key] = asking;
+      return asking;
+    },
+  };
 
   function setDevice(device) {
     if (!_open || (device !== 'phone' && device !== 'chromebook') || _open.device === device) return;

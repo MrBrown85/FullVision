@@ -2443,3 +2443,146 @@
 .sp-view .sp-work-img {
   background-color: #eceef2;
 }
+
+/* A handout's pages on a card still to do, to swipe through (s/page-carousel.js;
+   Colin, 2026-11-17: "it should look like Instagram"). One page wide at the
+   page's own shape (letter until the first page arrives), never taller than
+   70% of the screen, the whole page showing. Sideways is the browser's own
+   scroll-snap; up and down still scrolls the list. A page not here yet is the
+   pictures' waiting grey. */
+.sp-view .sp-car {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 -18px;
+}
+.sp-view .sp-car-frame {
+  position: relative;
+}
+.sp-view .sp-car-track {
+  display: flex;
+  width: 100%;
+  aspect-ratio: var(--sp-car-ratio, 8.5 / 11);
+  max-height: 70vh;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  background: #eceef2;
+  border-top: 1px solid var(--sp-fill);
+  border-bottom: 1px solid var(--sp-fill);
+}
+.sp-view .sp-car-track::-webkit-scrollbar {
+  display: none;
+}
+.sp-view .sp-car-track:focus-visible {
+  outline: 3px solid var(--sp-blue);
+  outline-offset: -3px;
+}
+.sp-view .sp-car-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #eceef2;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  cursor: zoom-in;
+}
+.sp-view .sp-car-slide.sp-car-in {
+  background: var(--sp-bg);
+}
+.sp-view .sp-car-slide:focus-visible {
+  outline: 3px solid var(--sp-blue);
+  outline-offset: -3px;
+}
+.sp-view .sp-car-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.sp-view .sp-car-count {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(29, 29, 31, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  pointer-events: none;
+}
+/* Previous Page and Next Page: with a mouse or a trackpad only; a phone swipes. */
+.sp-view .sp-car-arrow {
+  display: none;
+  position: absolute;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  margin-top: -16px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--sp-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.sp-view .sp-car-prev {
+  left: 10px;
+}
+.sp-view .sp-car-next {
+  right: 10px;
+}
+.sp-view .sp-car-next svg {
+  transform: scaleX(-1);
+}
+.sp-view .sp-car-arrow:focus-visible {
+  outline: 3px solid var(--sp-blue);
+  outline-offset: 2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sp-view .sp-car-arrow {
+    display: flex;
+  }
+}
+.sp-view .sp-car-arrow[hidden] {
+  display: none;
+}
+.sp-view .sp-car-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+.sp-view .sp-car-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sp-field);
+}
+.sp-view .sp-car-dot-on {
+  background: var(--sp-blue);
+}
+.sp-view .sp-car-caption {
+  margin: 0;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text-2);
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-view .sp-car-track {
+    scroll-behavior: auto;
+  }
+}
