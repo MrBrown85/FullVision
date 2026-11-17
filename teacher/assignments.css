@@ -9329,7 +9329,7 @@ button.grader-member-name {
   display: flex;
   justify-content: flex-end;
 }
-.grader-work-delete {
+.grader-work-unsubmit {
   background: none;
   border: none;
   color: var(--score-1, #c0392b);
@@ -9759,13 +9759,13 @@ button.grader-member-name {
 .grader-work-pages.fit-all .grader-work-page {
   cursor: zoom-in;
 }
-/* Delete Work: there when wanted, not red under the student's note. */
-.grader-dialog.has-work .grader-work-delete {
+/* Unsubmit: there when wanted, not red under the student's note. */
+.grader-dialog.has-work .grader-work-unsubmit {
   color: var(--text-3);
   font-weight: 500;
 }
-.grader-dialog.has-work .grader-work-delete:hover,
-.grader-dialog.has-work .grader-work-delete:focus-visible {
+.grader-dialog.has-work .grader-work-unsubmit:hover,
+.grader-dialog.has-work .grader-work-unsubmit:focus-visible {
   color: var(--score-1-text);
 }
 @media (min-width: 901px) {

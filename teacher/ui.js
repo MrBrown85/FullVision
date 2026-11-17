@@ -2529,7 +2529,7 @@ function scoreStatusMarker(status, cid, assessment) {
 }
 
 /* ── Confirm Modal ────────────────────────────────────────── */
-function showConfirm(title, message, okLabel, okStyle, onConfirm) {
+function showConfirm(title, message, okLabel, okStyle, onConfirm, cancelLabel) {
   var triggerEl = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
@@ -2540,7 +2540,7 @@ function showConfirm(title, message, okLabel, okStyle, onConfirm) {
     <div class="confirm-title" id="confirm-title">${esc(title)}</div>
     <div class="confirm-message">${esc(message)}</div>
     <div class="confirm-actions">
-      <button class="confirm-cancel" id="confirm-cancel-btn">Cancel</button>
+      <button class="confirm-cancel" id="confirm-cancel-btn">${esc(cancelLabel || 'Cancel')}</button>
       <button class="confirm-ok ${esc(okStyle || 'primary')}" id="confirm-ok-btn">${esc(okLabel || 'OK')}</button>
     </div>
   </div>`;
