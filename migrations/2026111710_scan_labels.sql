@@ -1,4 +1,5 @@
--- Sticker codes for scanned paper (2026-11-17). NOT APPLIED: needs Colin's OK (rule 1).
+-- Sticker codes for scanned paper (2026-11-17). Applied to gradebook-prod on
+-- 2026-11-17 on Colin's word ("Apply it"): pre-check no rows, post-check all ok.
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE OR FUNCTION. It adds one empty
 -- table and four functions. Until a teacher prints sticker sheets the table
