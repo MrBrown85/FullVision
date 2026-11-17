@@ -1157,8 +1157,7 @@ window.StudentView = (function () {
   }
 
   /* Today where the class is: calc.js's courseToday when it is on the
-     page, otherwise the date in British Columbia (every class's zone
-     unless the class says otherwise). */
+     page, otherwise this device's date. */
   function todayIn(cid) {
     if (typeof courseToday === 'function' && cid) {
       try {
@@ -1168,11 +1167,12 @@ window.StudentView = (function () {
         // Fall through to the date in Vancouver.
       }
     }
-    try {
-      return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
-    } catch (e) {
-      return new Date().toISOString().slice(0, 10);
-    }
+    // This device's date: a student's phone in BC is on the class's day, and Demo Mode dates its samples from it.
+    var d = new Date();
+    var pad = function (n) {
+      return (n < 10 ? '0' : '') + n;
+    };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
   /* The Reflections tab (S4-F4; called Questionnaires until Colin's

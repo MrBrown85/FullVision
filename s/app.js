@@ -946,6 +946,14 @@
     },
   };
 
+  function deviceZone() {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver';
+    } catch (e) {
+      return 'America/Vancouver';
+    }
+  }
+
   /* What My Learning needs for a sample class (Batch E E9,
      my-learning-contract.md): the class's calculation settings, its
      categories, and its learning map, in get_class_bundle's own shapes,
@@ -972,7 +980,9 @@
         round_percent: true,
         level_order: 'desc',
         reporting_terms: [],
-        timezone: 'America/Vancouver',
+        // The device's own zone: the samples are dated from this device's today (isoDay), so the
+        // page's today is the same day wherever the device is (a test runner on UTC included).
+        timezone: deviceZone(),
         folders_count_as_one: false,
         courses_count_equally: false,
         grade_level: '8',
