@@ -8,6 +8,8 @@
  * - Set Up Like Last Time: 2 pages per student from the last scan, said
  *   in one line with the assessment it came from; the choices kept after
  *   Match hold no student data.
+ * - Turn Every Page turns the whole scan, and pressed again turns it back.
+ * - Space on a piece shows its pages full size.
  * - A page moved: page 5 onto the first piece with its menu, page 6 onto
  *   the second piece by dragging; the third piece, left with no pages,
  *   goes. Each student's pages are the right ones, in order, and the Work
@@ -165,6 +167,14 @@ test('Set Up Like Last Time, a moved page under the right student, and Grade in 
   );
   await expect(aws.locator('.aws-per')).toHaveText('2');
   await expect(setup.getByRole('button', { name: 'Start Fresh' })).toBeVisible();
+
+  // Turn Every Page, and back again: a toggle.
+  const turnAll = aws.getByRole('button', { name: 'Turn Every Page' });
+  await turnAll.click();
+  await expect(turnAll).toHaveAttribute('aria-pressed', 'true', { timeout: 20000 });
+  await expect(aws.locator('.aws-turn-line')).toHaveText('Every page is turned. Press it again to turn them back.');
+  await turnAll.click();
+  await expect(turnAll).toHaveAttribute('aria-pressed', 'false', { timeout: 20000 });
 
   // Name the first two pieces with the keyboard.
   await aws.locator('#aws-name-0').focus();
