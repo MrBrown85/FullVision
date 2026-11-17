@@ -1,3 +1,4 @@
+// @ts-check
 /* ── add-work-files.js — a teacher's files, made into pages of work ──────
    Add Work's Choose Files on the teacher's computer: each file shrunk the
    way a student's are (PhotoShrink.prepare), its pages kept in order, then
@@ -13,7 +14,7 @@
    AddWorkFiles.refusal(res)    the words for a file PhotoShrink refused.
    AddWorkFiles.answer(res)     the words for a data-layer answer that
                                 isn't "added". */
-window.AddWorkFiles = (function () {
+/** @type {any} */ (window).AddWorkFiles = (function () {
   'use strict';
 
   function refusal(res) {

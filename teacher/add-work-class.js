@@ -1,3 +1,4 @@
+// @ts-check
 /* ── add-work-class.js — Add Work for the Class (B1) ─────────────────────
    One page, on a computer, where a teacher puts paper work (photos or
    PDFs) on every student of one assessment, then adds it all with one
@@ -33,7 +34,7 @@
    AddWorkClass.offered(cid, a)       whether the piece offers it: where the
                                       row's + (Attach Work) is offered.
    AddWorkClass.students(cid, a)      the students it lists, in roster order. */
-window.AddWorkClass = (function () {
+/** @type {any} */ (window).AddWorkClass = (function () {
   'use strict';
 
   var LAYOUT_KEY = 'fv-add-work-class-layout';
@@ -463,7 +464,7 @@ window.AddWorkClass = (function () {
   function _day(iso) {
     if (!iso) return '';
     var d = new Date(String(iso).length <= 10 ? iso + 'T00:00:00' : iso);
-    return isNaN(d) ? '' : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
   }
 
   // "Nothing in", "2 photos, Oct 30", "Handed in on paper".
@@ -482,6 +483,7 @@ window.AddWorkClass = (function () {
   }
 
   /* ── The screen ──────────────────────────────────────────────── */
+  /** @type {any} */
   var _s = null; // the open page's state
 
   function _layout() {
@@ -1418,7 +1420,7 @@ window.AddWorkClass = (function () {
     document.addEventListener('keydown', _keydown, true);
     if (window.addEventListener) window.addEventListener('beforeunload', _beforeUnload);
     _draw();
-    var back = overlay.querySelector('.awc-back');
+    var back = /** @type {HTMLElement | null} */ (overlay.querySelector('.awc-back'));
     if (back) back.focus();
     return true;
   }

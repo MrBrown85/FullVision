@@ -293,3 +293,27 @@ interface Window {
   leaveDemoMode(href: string, opts?: { force?: boolean }): Promise<unknown>;
   leaveDemoUnsentText(n: number): string;
 }
+// shared/add-work-files.js, and what it and teacher/add-work-class.js call
+// from files outside this check. Only the members they use are typed.
+declare var AddWorkFiles: {
+  prepare(files: unknown[]): Promise<{ pages: any[]; said: string }>;
+  refusal(res: unknown): string;
+  answer(res: { result?: string }): string;
+};
+declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
+declare var PhotoReaders: { openPdf: unknown };
+declare var GraderWork: { workShown(cid: string, a: unknown): boolean };
+declare function showConfirm(
+  title: string,
+  message: string,
+  okLabel?: string,
+  okStyle?: string,
+  onConfirm?: () => void,
+  cancelLabel?: string,
+): void;
+interface Window {
+  AddWorkFiles?: typeof AddWorkFiles;
+  PhotoShrink?: typeof PhotoShrink;
+  PhotoReaders?: typeof PhotoReaders;
+  GraderWork?: typeof GraderWork;
+}
