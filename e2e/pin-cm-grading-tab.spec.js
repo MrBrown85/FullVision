@@ -150,10 +150,10 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
   }) => {
     const ASC = ['Emerging', 'Developing', 'Proficient', 'Extending'];
     const DESC = ['Extending', 'Proficient', 'Developing', 'Emerging'];
-    // Cell Microscope Lab is a rubric card; Set Everyone To lists its levels.
+    // Cell Microscope Lab is a rubric card; its ⋯ menu's Set Everyone To lists its levels.
     const cardLevels = async () => {
       await gotoApp(page, '/assignments?course=sci8');
-      const items = page.locator('#ac-sci8a1 .assess-setto .assess-menu-item');
+      const items = page.locator('#ac-sci8a1 .assess-submenu .assess-menu-item');
       await expect(items).toHaveCount(4);
       return items.allTextContents();
     };
@@ -174,7 +174,7 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
     expect(await cardLevels()).toEqual(DESC);
 
     await page.reload();
-    await expect(page.locator('#ac-sci8a1 .assess-setto .assess-menu-item')).toHaveText(DESC);
+    await expect(page.locator('#ac-sci8a1 .assess-submenu .assess-menu-item')).toHaveText(DESC);
     await openGrading(page);
     await expect(levelOrder(page, 'desc')).toHaveAttribute('aria-checked', 'true');
   });

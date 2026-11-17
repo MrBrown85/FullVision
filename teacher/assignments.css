@@ -9762,30 +9762,10 @@ button.grader-member-name {
   font-size: 13px;
   white-space: nowrap;
 }
-/* The open card's Set Everyone To ▾ and ⋯ menus (AssignmentsPage). */
+/* The open card's ⋯ menu (AssignmentsPage). */
 .assess-menu-wrap {
   position: relative;
   display: inline-flex;
-}
-.assess-setto-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px 0 12px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(118, 118, 128, 0.12);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.assess-setto-btn:hover,
-.assess-setto-btn[aria-expanded='true'] {
-  background: rgba(118, 118, 128, 0.22);
 }
 .assess-more-btn {
   width: 30px;
@@ -9821,10 +9801,38 @@ button.grader-member-name {
     0 10px 28px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   cursor: default;
 }
-.assess-setto .assess-menu {
+/* Opened upward, or from the button's left edge, when there's no room
+   below or to the left (_placeCardMenu). */
+.assess-menu.is-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.assess-menu.is-left {
+  right: auto;
+  left: 0;
+}
+.assess-setto {
+  display: flex;
+  flex-direction: column;
+}
+/* Set Everyone To's levels: beside the ⋯ menu, placed against the window
+   by teacher/card-menu.js. */
+.assess-menu.assess-submenu {
+  position: fixed;
+  top: 0;
+  right: auto;
   min-width: 180px;
+  z-index: 31;
+}
+.assess-sub-caret {
+  margin-left: auto;
+  color: var(--text-3);
+}
+.assess-sub-btn[aria-expanded='true'] {
+  background: var(--active-light);
 }
 .assess-menu[hidden] {
   display: none;
@@ -9883,7 +9891,7 @@ button.grader-member-name {
 .assess-menu-dot.l4 {
   background: var(--score-4);
 }
-/* Set Everyone To changes the open grid only: a closed card leaves it out. */
+/* Set Everyone To changes the open grid only: a closed card's menu leaves it out. */
 .assess-card:not(.open) .assess-header-actions .assess-setto {
   display: none;
 }

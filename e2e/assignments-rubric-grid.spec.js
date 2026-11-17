@@ -42,9 +42,9 @@ test('the whole-class rubric grid scores, fine-tunes and sets a status', async (
   const card = page.locator('#ac-assess-grid');
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
 
-  // Set Everyone To ▾ in the card's header, the four levels in its menu.
-  await expect(card.locator('.assess-setto-btn')).toHaveText('Set Everyone To');
-  await expect(card.locator('.assess-setto .assess-menu-item')).toHaveCount(4);
+  // Set Everyone To in the card's ⋯ menu, the four levels in its submenu.
+  await expect(card.locator('.assess-more .assess-sub-btn')).toHaveText('Set Everyone To');
+  await expect(card.locator('.assess-submenu .assess-menu-item')).toHaveCount(4);
 
   const alice = card.locator('.rsg-student[data-status-student="stu-001"]');
   await expect(alice.locator('.rsg-student-name')).toContainText('Alice');

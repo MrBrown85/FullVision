@@ -55,12 +55,12 @@ async function openCard(page) {
   // The card's grid is in the page while collapsed; expand it when hidden.
   if (!(await page.locator('.rsg-criterion-row').first().isVisible())) await title.click();
   await expect(page.locator('.rsg-criterion-row').first()).toBeVisible();
-  // Set Everyone To ▾ lists the four levels in the card's header.
-  await expect(page.locator('.assess-setto .assess-menu-item')).toHaveCount(4);
+  // The ⋯ menu's Set Everyone To lists the four levels in its submenu.
+  await expect(page.locator('.assess-submenu .assess-menu-item')).toHaveCount(4);
 }
 
 async function cardOrder(page) {
-  const header = await page.locator('.assess-setto .assess-menu-item').allTextContents();
+  const header = await page.locator('.assess-submenu .assess-menu-item').allTextContents();
   const row = await page.locator('.rsg-criterion-row').first().locator('.rsg-level').allTextContents();
   return { header, row };
 }
