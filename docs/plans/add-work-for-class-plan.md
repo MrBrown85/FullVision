@@ -35,16 +35,16 @@ Traced in the code on Nov 17.
 
 One PR per slice. Each slice ends usable on its own.
 
-| Slice | What                                                                                                                                | Database change  | Waits for                               |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------- |
-| B0    | This plan, the DECISIONS entry, the ROADMAP line                                                                                    | No               | Nothing                                 |
-| B1    | The page: one file per student, Column and Grid, Add as More Pages / Replace Them / Skip, On Paper, the list of who is still Not In | No               | B0                                      |
-| B2    | Split the Scan: drop the emailed PDF, pages per student, type names, blank backs left out, turn a page                              | No               | B1, and Colin's page limit (decision 1) |
-| B3    | A folder matched by name: the Waiting tray, close spellings, two students with one last name                                        | No               | B1                                      |
-| B4    | Sticker sheets: print one sheet per student, the scan sorts itself                                                                  | Yes (decision 3) | B2, and decisions 3 and 4               |
-| B5    | Small touches: Set Up Like Last Time, a page dragged between pieces, the answer key, grade in the order of the scan                 | No               | B2                                      |
-| B6    | One pile, two classes; a late paper's own assessment                                                                                | No               | B2 and B3                               |
-| B7    | The scan shared from the phone's mail                                                                                               | No               | B2, and a check on a real iPhone        |
+| Slice | What                                                                                                                                | Database change  | Waits for                           |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------- |
+| B0    | This plan, the DECISIONS entry, the ROADMAP line                                                                                    | No               | Nothing                             |
+| B1    | The page: one file per student, Column and Grid, Add as More Pages / Replace Them / Skip, On Paper, the list of who is still Not In | No               | B0                                  |
+| B2    | Split the Scan: drop the emailed PDF, pages per student, type names, blank backs left out, turn a page                              | No               | B1 (the page limit is settled: 150) |
+| B3    | A folder matched by name: the Waiting tray, close spellings, two students with one last name                                        | No               | B1                                  |
+| B4    | Sticker sheets: print one sheet per student, the scan sorts itself                                                                  | Yes (decision 3) | B2, and decisions 3 and 4           |
+| B5    | Small touches: Set Up Like Last Time, a page dragged between pieces, the answer key, grade in the order of the scan                 | No               | B2                                  |
+| B6    | One pile, two classes; a late paper's own assessment                                                                                | No               | B2 and B3                           |
+| B7    | The scan shared from the phone's mail                                                                                               | No               | B2, and a check on a real iPhone    |
 
 B2 and B3 can be built at the same time by two builders once B1 is merged: they share only the staging model, which B1 fixes.
 
@@ -85,11 +85,11 @@ B2 and B3 can be built at the same time by two builders once B1 is merged: they 
 
 **Boards.** Option B: Split the Scan (Beyond the Ask); Surprise: Blank Backs, Upside Down, Set Up Like Last Time (the blank backs and the Turn button only).
 
-**First, measure.** Before any limit is written down: take three real scans from the school copier (one-sided, two-sided, the longest class set) and record pages, megabytes, and how long the split takes on Colin's Mac and on a Chromebook. Decision 1 is made from those numbers.
+**Measured (Nov 17).** Five scans from the school's copiers (Konica Minolta bizhub 650i and C651i) already on Colin's Mac, read for page count and size only: 22 pages at 2 MB, 56 at 8 MB, 62 at 9 MB, 88 at 13 MB, 92 at 13 MB. About 0.15 MB a page, so the 20 MB limit that exists holds about 138 pages and only the 20-page rule was in the way. Colin: "Yes, 150 pages" (decision 1). **Still to measure, before B2 ships:** how long a 92-page split takes on Colin's Mac and on a Chromebook, with a made-up PDF of the same size and page count, not a real scan.
 
 **Build.**
 
-- `PhotoShrink.prepare` gains `opts.maxPdfBytes`, used the way `opts.maxPages` already is. Only this page passes larger limits. Every other upload keeps 20 pages and 20 MB, and each student's piece keeps the 30-page limit.
+- Split the Scan calls `PhotoShrink.prepare` with `maxPages: 150`, the option that already exists. `shared/photo-shrink.js` does not change: the 20 MB limit stays for every PDF, this page included, and every other upload keeps 20 pages. Each student's piece keeps the 30-page limit. A scan over 150 pages or 20 MB is refused with a plain line that says to scan the pile in two halves.
 - Pages are read one at a time (the loop that exists), with a count as they come. The PDF is never queued or uploaded.
 - Pages per Student, with one page fewer or more on any piece. Class List Order, or No Order with a name box on each piece that takes two or three letters and Return. Each piece shows the top of its first page.
 - A student named twice is flagged and cannot go on until one is changed. A piece with no name stays behind.
@@ -97,9 +97,9 @@ B2 and B3 can be built at the same time by two builders once B1 is merged: they 
 - Turn on any page redraws it upright before it is shrunk. Finding upside-down pages automatically is B5, after a short trial shows it can be trusted.
 - Match the Named Pieces hands the pieces to B1's staging model. From there everything is B1.
 
-**Files.** `teacher/add-work-split.js`, `teacher/add-work-class.css`, `shared/photo-shrink.js` (the one option), `teacher/add-work-class.js`.
+**Files.** `teacher/add-work-split.js`, `teacher/add-work-class.css`, `teacher/add-work-class.js`.
 
-**Tests.** Unit: the piece maths (pages per student, a moved line, a left-out blank, a kept blank), the name box (unique letters, two students, a student used twice), the larger limit refused everywhere else. Browser: a 12-page sample PDF becomes six pieces in Demo Mode and is added.
+**Tests.** Unit: the piece maths (pages per student, a moved line, a left-out blank, a kept blank), the name box (unique letters, two students, a student used twice), a 151-page scan refused here, and a 21-page PDF still refused by the grader's Add Work. Browser: a 12-page sample PDF becomes six pieces in Demo Mode and is added.
 
 **Done when.** One of Colin's real class scans goes from the email to every student's work in under five minutes, and no page is under the wrong student.
 
@@ -157,12 +157,12 @@ On Android the installed app can receive a shared PDF. On an iPhone a web app ca
 ## Hot files
 
 - **This track's:** `teacher/add-work-class.js`, `teacher/add-work-split.js`, `teacher/add-work-class.css`, `shared/add-work-files.js`, `shared/name-match.js`.
-- **Shared and risky, a few lines each, one builder at a time:** `teacher/page-assignments.js`, `shared/work-wall.js`, `shared/photo-shrink.js`, `teacher/app.html`, `sw.js`.
-- **Not touched:** `shared/data-student-work.js`, `shared/grader.js`, `shared/calc.js`, the edge functions, and every migration until B4.
+- **Shared and risky, a few lines each, one builder at a time:** `teacher/page-assignments.js`, `shared/work-wall.js`, `teacher/app.html`, `sw.js`.
+- **Not touched:** `shared/photo-shrink.js`, `shared/data-student-work.js`, `shared/grader.js`, `shared/calc.js`, the edge functions, and every migration until B4.
 
 ## Decisions that are Colin's
 
-1. **The page limit for a class scan** (B2 waits on it). Ruling 18 caps a PDF at 20 pages, and a PDF over 20 MB is refused. A class scan is 50 to 60 pages, 112 when two-sided. Proposed after the measuring step: a larger limit for this page only, with every other upload unchanged.
+1. **The page limit for a class scan.** Settled Nov 17: 150 pages on this page only ("Yes, 150 pages"); the 20 MB limit and every other upload's 20 pages are unchanged. DECISIONS, "Add Work for the Class" 7.
 2. **Whether the page is offered in classes without the student page.** Recommended: yes. Paper is where it helps most.
 3. **How a sticker's code is kept** (B4): a table of its own, or the enrolment's id. Recommended: the table.
 4. **Reading stickers outside Chrome** (B4): add a small reader to `vendor/`, or fall back to typing names.
