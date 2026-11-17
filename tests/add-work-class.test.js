@@ -26,7 +26,7 @@ const page = n => ({
 const pages = (n, from = 1) => Array.from({ length: n }, (_, i) => page(from + i));
 
 function three() {
-  return AddWorkClass.stage([
+  return AddWorkStage.stage([
     { id: 'a', had: 'none' },
     { id: 'b', had: 'work' },
     { id: 'c', had: 'paper' },
@@ -179,7 +179,7 @@ describe('the run', () => {
   }
 
   function placed() {
-    const s = AddWorkClass.stage([
+    const s = AddWorkStage.stage([
       { id: 'a', had: 'none' },
       { id: 'b', had: 'work' },
       { id: 'c', had: 'paper' },
@@ -212,14 +212,14 @@ describe('the run', () => {
     });
     const seen = [];
     const released = [];
-    const out = await AddWorkClass.run(s, api, {
+    const out = await AddWorkStage.run(s, api, {
       progress: (n, total) => seen.push(n + '/' + total),
       release: p => released.push(...p.map(x => x.from)),
     });
     expect(calls).toEqual(['add:a:new', 'add:b:add', 'replace:c', 'add:d:new', 'paper:e']);
     expect(most).toBe(1);
     expect(seen).toEqual(['1/5', '2/5', '3/5', '4/5', '5/5']);
-    expect(out).toMatchObject({ added: 5, stopped: null, closed: false });
+    expect(out).toMatchObject({ added: 4, paper: 1, stopped: null, closed: false });
     expect(released).toEqual(['a.pdf', 'b.pdf', 'c.pdf', 'd.pdf']);
     expect(s.counts()).toMatchObject({ files: 0, paper: 0, ready: 0 });
     expect(s.row('e').had).toBe('paper');
@@ -229,7 +229,7 @@ describe('the run', () => {
   it('already_sent keeps the pages and shows the three choices', async () => {
     const s = placed();
     const { api } = stubs({ a: { result: 'already_sent', submission: { on_paper: false, files: [{}] } } });
-    await AddWorkClass.run(s, api);
+    await AddWorkStage.run(s, api);
     const r = s.row('a');
     expect(r.pieces.length).toBe(1);
     expect(r.had).toBe('work');
@@ -242,7 +242,7 @@ describe('the run', () => {
   it('on_paper keeps the pages and offers Replace Them or Skip', async () => {
     const s = placed();
     const { api } = stubs({ b: { result: 'on_paper' } });
-    await AddWorkClass.run(s, api);
+    await AddWorkStage.run(s, api);
     expect(s.row('b').pieces.length).toBe(1);
     expect(s.choices('b')).toEqual(['replace', 'skip']);
     expect(s.row('b').choice).toBe(null);
@@ -252,7 +252,7 @@ describe('the run', () => {
   it('too_many_pages and uploading say the words and keep the pages', async () => {
     const s = placed();
     const { api } = stubs({ a: { result: 'too_many_pages' }, d: { result: 'uploading' } });
-    await AddWorkClass.run(s, api);
+    await AddWorkStage.run(s, api);
     expect(s.row('a').pieces.length).toBe(1);
     expect(s.row('a').note).toBe('A piece of work can have 30 pages at most.');
     expect(s.row('d').pieces.length).toBe(1);
@@ -262,7 +262,7 @@ describe('the run', () => {
   it('class_full stops the run once and leaves the students not yet run as they are', async () => {
     const s = placed();
     const { api, calls } = stubs({ b: { result: 'class_full' } });
-    const out = await AddWorkClass.run(s, api);
+    const out = await AddWorkStage.run(s, api);
     expect(calls).toEqual(['add:a:new', 'add:b:add']);
     expect(out.stopped).toBe('class_full');
     expect(out.said).toBe('This class has no room for more photos.');
@@ -276,7 +276,7 @@ describe('the run', () => {
   it('storage_full stops the run too', async () => {
     const s = placed();
     const { api, calls } = stubs({ a: { result: 'storage_full' } });
-    const out = await AddWorkClass.run(s, api);
+    const out = await AddWorkStage.run(s, api);
     expect(calls).toEqual(['add:a:new']);
     expect(out.said).toBe('This computer is full. Free some space, then try again.');
   });
@@ -286,7 +286,7 @@ describe('the run', () => {
     const { api } = stubs({ a: { result: 'not_found' } });
     api.replace = () => Promise.reject(new Error('boom'));
     const released = [];
-    await AddWorkClass.run(s, api, { release: p => released.push(...p.map(x => x.from)) });
+    await AddWorkStage.run(s, api, { release: p => released.push(...p.map(x => x.from)) });
     expect(s.row('a')).toBe(null);
     expect(released).toContain('a.pdf');
     expect(s.row('c').note).toBe("The photos couldn't be kept. Try again.");
@@ -296,7 +296,7 @@ describe('the run', () => {
   it('nothing_sent: the work went meanwhile, so the student is new work again', async () => {
     const s = placed();
     const { api } = stubs({ b: { result: 'nothing_sent' } });
-    await AddWorkClass.run(s, api);
+    await AddWorkStage.run(s, api);
     expect(s.row('b').had).toBe('none');
     expect(s.writes()[0]).toMatchObject({ sid: 'b', mode: 'new' });
   });
@@ -304,10 +304,29 @@ describe('the run', () => {
   it('a student on the On Paper write who had work in by then is not counted', async () => {
     const s = placed();
     const { api } = stubs({ paper: { result: 'sent', marked: 0, submissions: [] } });
-    const out = await AddWorkClass.run(s, api);
-    expect(out.added).toBe(4);
+    const out = await AddWorkStage.run(s, api);
+    expect(out).toMatchObject({ added: 4, paper: 0 });
     expect(s.row('e').had).toBe('work');
     expect(s.row('e').onPaper).toBe(false);
+  });
+
+  it('a piece placed after the writes were taken stays when its student is added', async () => {
+    const s = placed();
+    const { api } = stubs({});
+    const was = api.add;
+    let late = null;
+    api.add = (sid, pg, mode) => {
+      // A file finishes reading for a while its write is out.
+      if (sid === 'a') late = s.place('a', { from: 'late.pdf', pages: pages(2) }).piece;
+      return was(sid, pg, mode);
+    };
+    const released = [];
+    await AddWorkStage.run(s, api, { release: p => released.push(...p.map(x => x.from)) });
+    expect(released).not.toContain('late.pdf');
+    expect(s.row('a').pieces.map(p => p.id)).toEqual([late.id]);
+    // It waits as more pages for a student whose work is now in.
+    expect(s.row('a')).toMatchObject({ had: 'work', choice: 'add' });
+    expect(s.counts().ready).toBe(1);
   });
 
   it('a page closed in the middle stops after the write that is running, and changes nothing more', async () => {
@@ -320,7 +339,7 @@ describe('the run', () => {
         if (args[0] === 'b') open = false;
         return r;
       });
-    const out = await AddWorkClass.run(s, api, { alive: () => open });
+    const out = await AddWorkStage.run(s, api, { alive: () => open });
     expect(calls).toEqual(['add:a:new', 'add:b:add']);
     expect(out.closed).toBe(true);
     // b's answer came after the close: b is left as it was.
@@ -574,7 +593,9 @@ describe('the page', () => {
     // No file name reached the queue either.
     expect(kept.length).toBe(2);
     expect(JSON.stringify(kept).toLowerCase()).not.toMatch(/avery|abbott|essay/);
-    expect(text($('.awc-done-title'))).toBe('Added Work for 2 Students');
+    // Only pages count as Added Work; On Paper is said on its own line.
+    expect(text($('.awc-done-title'))).toBe('Added Work for 1 Student');
+    expect(text($('.awc-done-paper'))).toBe('1 set to Handed in on paper');
     expect($$('.awc-done-row .awc-name').map(text)).toEqual(['Wren Evans']);
     expect($$('.awc-done-row button').map(text)).toEqual(['On Paper', 'Leave Not In']);
     expect(getStudentSubmission(CID, IDS[0], PIECE).files.length).toBe(2);
@@ -629,6 +650,78 @@ describe('the page', () => {
     expect(gone).toEqual(['blob:0']);
     AddWorkClass.close(true);
     expect(gone).toEqual(['blob:0', 'blob:1']);
+  });
+
+  it('Add Work waits while a file is being read', async () => {
+    seedScreen();
+    const add = vi.spyOn(globalThis, 'addStudentWorkPages');
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.addFiles(IDS[0], [{ name: 'a.pdf' }]);
+    expect(text($('.awc-primary'))).toBe('Add Work for 1 Student');
+    let finish;
+    const realPrep = PhotoShrink.prepare;
+    PhotoShrink.prepare = vi.fn(() => new Promise(r => (finish = r)));
+    const going = AddWorkClass.addFiles(IDS[3], [{ name: 'b.pdf' }]);
+    expect(text($('.awc-primary'))).toBe('Reading Files…');
+    expect($('.awc-primary').disabled).toBe(true);
+    // Even pressed, it does nothing.
+    $('.awc-primary').disabled = false;
+    click($('.awc-primary'));
+    await new Promise(r => setTimeout(r, 0));
+    expect(add).not.toHaveBeenCalled();
+    finish({ ok: true, pages: pages(1) });
+    await going;
+    PhotoShrink.prepare = realPrep;
+    expect(text($('.awc-primary'))).toBe('Add Work for 2 Students');
+    expect($('.awc-primary').disabled).toBe(false);
+  });
+
+  const dragEvent = (type, dataTransfer) => {
+    const ev = new doc.defaultView.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'dataTransfer', { value: dataTransfer });
+    return ev;
+  };
+  const filesFrom = list => ({ types: ['Files'], files: list, dropEffect: '' });
+
+  it('after a chip drag that never ended, a file dropped on another student goes there and nothing moves', async () => {
+    seedScreen();
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.addFiles(IDS[0], [{ name: 'avery.pdf' }]);
+    // A chip starts to move; its dragend never reaches the page.
+    rowOf(IDS[0])
+      .querySelector('.awc-chip')
+      .dispatchEvent(dragEvent('dragstart', { types: [], setData() {} }));
+    const drop = dragEvent('drop', filesFrom([{ name: 'ravi.jpg' }]));
+    rowOf(IDS[3]).dispatchEvent(dragEvent('dragover', filesFrom([])));
+    rowOf(IDS[3]).dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+    for (let i = 0; i < 5; i++) await new Promise(r => setTimeout(r, 0));
+    expect([...rowOf(IDS[3]).querySelectorAll('.awc-file-name')].map(text)).toEqual(['ravi.jpg']);
+    expect([...rowOf(IDS[0]).querySelectorAll('.awc-file-name')].map(text)).toEqual(['avery.pdf']);
+  });
+
+  it('a chip drag is let go when the page is drawn again without it', async () => {
+    seedScreen();
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.addFiles(IDS[0], [{ name: 'avery.pdf' }]);
+    rowOf(IDS[0])
+      .querySelector('.awc-chip')
+      .dispatchEvent(dragEvent('dragstart', { types: [], setData() {} }));
+    // The page is drawn again mid-drag (a file finished reading, a layout change).
+    click($('.awc-seg-btn[data-layout="column"]'));
+    rowOf(IDS[3]).dispatchEvent(dragEvent('drop', { types: [], files: [] }));
+    expect(rowOf(IDS[3]).querySelector('.awc-chip')).toBeNull();
+    expect([...rowOf(IDS[0]).querySelectorAll('.awc-file-name')].map(text)).toEqual(['avery.pdf']);
+  });
+
+  it('with only On Paper set, the summary says so', async () => {
+    seedScreen();
+    AddWorkClass.open(CID, PIECE);
+    click(rowOf(IDS[4]).querySelector('.awc-paper'));
+    click($('.awc-primary'));
+    for (let i = 0; i < 20 && !$('.awc-done'); i++) await new Promise(r => setTimeout(r, 0));
+    expect(text($('.awc-done-title'))).toBe('Set 1 Student to Handed In on Paper');
+    expect($('.awc-done-paper')).toBeNull();
   });
 
   it('moves a file to another student with Move to…', async () => {

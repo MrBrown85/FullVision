@@ -42,379 +42,12 @@
   // The grader's Add Work takes these (_attachMenuHtml, grader.js).
   var ACCEPT = 'image/*,.heic,.heif,application/pdf';
 
-  function _maxPages() {
-    return typeof STUDENT_WORK_MAX_PAGES === 'number' ? STUDENT_WORK_MAX_PAGES : 30;
-  }
-
-  /* ── The staging model ─────────────────────────────────────────
-     stage(list): list is [{ id, had }] in roster order, had 'none' (nothing
-     in), 'work' (photos or links in) or 'paper' (handed in on paper).
-
-     A row: { sid, had, pieces: [{ id, from, pages }], choice, onPaper, note }.
-     choice: for had 'work', 'add' (the default), 'replace' or 'skip'; for
-     had 'paper', 'replace' (the default) or 'skip'; null for had 'none',
-     or when the student must be decided again (work came in meanwhile). */
-  var _pieceSeq = 0;
-
-  function _defaultChoice(had) {
-    return had === 'work' ? 'add' : had === 'paper' ? 'replace' : null;
-  }
-
-  function _choices(had) {
-    return had === 'work' ? ['add', 'replace', 'skip'] : had === 'paper' ? ['replace', 'skip'] : [];
-  }
-
-  // Each page a copy, named by where it sits: no file name is kept.
-  function _renamed(pages, from) {
-    return (pages || []).map(function (p, i) {
-      var copy = Object.assign({}, p);
-      copy.name = 'page-' + (from + i + 1) + '.jpg';
-      return copy;
-    });
-  }
-
-  function _pageCount(row) {
-    return row.pieces.reduce(function (n, piece) {
-      return n + piece.pages.length;
-    }, 0);
-  }
-
-  function stage(list) {
-    var rows = [];
-    var byId = {};
-    (list || []).forEach(function (st) {
-      if (!st || !st.id || byId[st.id]) return;
-      var had = st.had === 'work' || st.had === 'paper' ? st.had : 'none';
-      var row = { sid: st.id, had: had, pieces: [], choice: _defaultChoice(had), onPaper: false, note: '' };
-      rows.push(row);
-      byId[st.id] = row;
-    });
-
-    function row(sid) {
-      return byId[sid] || null;
-    }
-
-    function _settle(r) {
-      if (!r.pieces.length) r.choice = _defaultChoice(r.had);
-    }
-
-    /* A piece ({ from, pages }) placed on a student, after what waits there.
-       → { ok: true, piece } or { ok: false, reason: 'not_found' | 'empty'
-       | 'too_many_pages' }. */
-    function place(sid, given) {
-      var r = row(sid);
-      if (!r) return { ok: false, reason: 'not_found' };
-      var pages = (given && given.pages) || [];
-      if (!pages.length) return { ok: false, reason: 'empty' };
-      if (_pageCount(r) + pages.length > _maxPages()) return { ok: false, reason: 'too_many_pages' };
-      var piece = { id: 'p' + ++_pieceSeq, from: String((given && given.from) || ''), pages: _renamed(pages, 0) };
-      if (!r.pieces.length) r.choice = _defaultChoice(r.had);
-      r.pieces.push(piece);
-      r.onPaper = false;
-      r.note = '';
-      return { ok: true, piece: piece };
-    }
-
-    function _find(sid, pid) {
-      var r = row(sid);
-      if (!r) return -1;
-      for (var i = 0; i < r.pieces.length; i++) if (r.pieces[i].id === pid) return i;
-      return -1;
-    }
-
-    /* One piece (pid), or every piece, from one student to another, after
-       what waits there. → { ok, moved: [pieces] } or { ok: false, reason }. */
-    function move(fromSid, toSid, pid) {
-      var from = row(fromSid);
-      var to = row(toSid);
-      if (!from || !to) return { ok: false, reason: 'not_found' };
-      if (from === to) return { ok: false, reason: 'same' };
-      var moving = pid
-        ? from.pieces.filter(function (p) {
-            return p.id === pid;
-          })
-        : from.pieces.slice();
-      if (!moving.length) return { ok: false, reason: 'empty' };
-      var n = moving.reduce(function (k, p) {
-        return k + p.pages.length;
-      }, 0);
-      if (_pageCount(to) + n > _maxPages()) return { ok: false, reason: 'too_many_pages' };
-      from.pieces = from.pieces.filter(function (p) {
-        return moving.indexOf(p) < 0;
-      });
-      if (!to.pieces.length) to.choice = _defaultChoice(to.had);
-      to.pieces = to.pieces.concat(moving);
-      to.onPaper = false;
-      from.note = '';
-      to.note = '';
-      _settle(from);
-      return { ok: true, moved: moving };
-    }
-
-    /* One piece, or all of a student's, taken off. → the pieces taken. */
-    function takeOff(sid, pid) {
-      var r = row(sid);
-      if (!r) return [];
-      var at = pid ? _find(sid, pid) : -1;
-      var gone = pid ? (at < 0 ? [] : r.pieces.splice(at, 1)) : r.pieces.splice(0, r.pieces.length);
-      if (gone.length) r.note = '';
-      _settle(r);
-      return gone;
-    }
-
-    function choose(sid, choice) {
-      var r = row(sid);
-      if (!r) return false;
-      if (choice !== null && _choices(r.had).indexOf(choice) < 0) return false;
-      r.choice = choice;
-      r.note = '';
-      return true;
-    }
-
-    // On Paper: only a student with nothing in and nothing placed.
-    function setOnPaper(sid, on) {
-      var r = row(sid);
-      if (!r) return false;
-      if (on && (r.had !== 'none' || r.pieces.length)) return false;
-      r.onPaper = !!on;
-      return true;
-    }
-
-    // What is in for the student now (an answer from the data layer).
-    function setHad(sid, had, choice) {
-      var r = row(sid);
-      if (!r) return;
-      r.had = had === 'work' || had === 'paper' ? had : 'none';
-      r.choice = choice === undefined ? _defaultChoice(r.had) : choice;
-      if (r.had !== 'none') r.onPaper = false;
-    }
-
-    function note(sid, text) {
-      var r = row(sid);
-      if (r) r.note = String(text || '');
-    }
-
-    // The student leaves the page (no longer in the class). → their pieces.
-    function drop(sid) {
-      var r = row(sid);
-      if (!r) return [];
-      rows.splice(rows.indexOf(r), 1);
-      delete byId[sid];
-      return r.pieces;
-    }
-
-    function _ready(r) {
-      if (r.onPaper) return true;
-      if (!r.pieces.length) return false;
-      return r.had === 'none' || r.choice === 'add' || r.choice === 'replace';
-    }
-    function _decide(r) {
-      return r.pieces.length > 0 && r.had !== 'none' && !r.choice;
-    }
-
-    function counts() {
-      var out = { ready: 0, decide: 0, notIn: 0, files: 0, pages: 0, paper: 0, replace: 0 };
-      rows.forEach(function (r) {
-        out.files += r.pieces.length;
-        out.pages += _pageCount(r);
-        if (_ready(r)) out.ready++;
-        if (r.onPaper) out.paper++;
-        if (_decide(r)) out.decide++;
-        if (r.pieces.length && r.had !== 'none' && r.choice === 'replace') out.replace++;
-        if (r.had === 'none' && !r.pieces.length && !r.onPaper) out.notIn++;
-      });
-      return out;
-    }
-
-    function buttonLabel() {
-      var n = counts().ready;
-      return 'Add Work for ' + n + (n === 1 ? ' Student' : ' Students');
-    }
-
-    // "N ready to add · M to decide · K students with nothing to add stay Not In"
-    function footerText() {
-      var c = counts();
-      var parts = [];
-      if (c.ready) parts.push(c.ready + ' ready to add');
-      if (c.decide) parts.push(c.decide + ' to decide');
-      if (c.notIn)
-        parts.push(
-          c.notIn === 1
-            ? '1 student with nothing to add stays Not In'
-            : c.notIn + ' students with nothing to add stay Not In',
-        );
-      return parts.join(' · ');
-    }
-
-    /* The writes, in roster order: one per student with pages, then one
-       for the On Paper students. Each student's pages are numbered in
-       order across their pieces. */
-    function writes() {
-      var out = [];
-      var paper = [];
-      rows.forEach(function (r) {
-        if (r.onPaper) paper.push(r.sid);
-        if (!_ready(r) || !r.pieces.length) return;
-        var pages = [];
-        r.pieces.forEach(function (piece) {
-          pages = pages.concat(_renamed(piece.pages, pages.length));
-        });
-        if (r.had === 'none') out.push({ kind: 'add', sid: r.sid, mode: 'new', pages: pages });
-        else if (r.choice === 'add') out.push({ kind: 'add', sid: r.sid, mode: 'add', pages: pages });
-        else out.push({ kind: 'replace', sid: r.sid, pages: pages });
-      });
-      if (paper.length) out.push({ kind: 'paper', sids: paper });
-      return out;
-    }
-
-    return {
-      rows: function () {
-        return rows.slice();
-      },
-      row: row,
-      choices: function (sid) {
-        var r = row(sid);
-        return r ? _choices(r.had) : [];
-      },
-      place: place,
-      move: move,
-      takeOff: takeOff,
-      choose: choose,
-      setOnPaper: setOnPaper,
-      setHad: setHad,
-      note: note,
-      drop: drop,
-      counts: counts,
-      buttonLabel: buttonLabel,
-      footerText: footerText,
-      writes: writes,
-    };
-  }
+  // The staging model and the run, with no DOM (teacher/add-work-stage.js).
+  var stage = AddWorkStage.stage;
+  var run = AddWorkStage.run;
 
   function _say(res) {
     return window.AddWorkFiles ? AddWorkFiles.answer(res) : "The photos couldn't be kept. Try again.";
-  }
-
-  /* The run: each write awaited in turn. api: { add(sid, pages, mode),
-     replace(sid, pages), paper(sids) }, each a Promise of the data layer's
-     answer. opts.alive() is asked before each write and each answer is
-     used (false: the page closed, stop and change nothing more);
-     opts.progress(done, total) before each student; opts.release(pieces)
-     for pieces that leave the page. → Promise of { added, stopped, said,
-     closed }: `stopped` is 'class_full' or 'storage_full' when the run
-     stopped there, `said` its words (once). */
-  function run(s, api, opts) {
-    opts = opts || {};
-    var alive =
-      opts.alive ||
-      function () {
-        return true;
-      };
-    var release = opts.release || function () {};
-    var list = s.writes();
-    var total = list.reduce(function (n, w) {
-      return n + (w.kind === 'paper' ? w.sids.length : 1);
-    }, 0);
-    var out = { added: 0, stopped: null, said: '', closed: false, total: total };
-    var done = 0;
-    var at = 0;
-
-    function answerOf(p) {
-      return Promise.resolve()
-        .then(p)
-        .then(null, function () {
-          return { result: 'store_failed' };
-        })
-        .then(function (res) {
-          return res || { result: 'store_failed' };
-        });
-    }
-
-    function student(w, res) {
-      var r = res.result;
-      var sub = res.submission || null;
-      if (r === 'sent') {
-        release(s.takeOff(w.sid));
-        s.setHad(w.sid, 'work');
-        out.added++;
-        return;
-      }
-      if (r === 'already_sent' || r === 'on_paper') {
-        s.setHad(w.sid, r === 'on_paper' || (sub && sub.on_paper) ? 'paper' : 'work', null);
-        s.note(w.sid, _say(res));
-        return;
-      }
-      if (r === 'nothing_sent') {
-        s.setHad(w.sid, 'none');
-        s.note(w.sid, _say(res));
-        return;
-      }
-      if (r === 'not_found') {
-        release(s.drop(w.sid));
-        return;
-      }
-      if (r === 'class_full' || r === 'storage_full') {
-        out.stopped = r;
-        out.said = _say(res);
-        return;
-      }
-      s.note(w.sid, _say(res));
-    }
-
-    function paper(w, res) {
-      if (res.result !== 'sent') {
-        if (res.result === 'class_full' || res.result === 'storage_full') out.stopped = res.result;
-        out.said = _say(res);
-        return;
-      }
-      var made = {};
-      (res.submissions || []).forEach(function (sub) {
-        if (sub && sub.enrollment_id) made[sub.enrollment_id] = true;
-      });
-      w.sids.forEach(function (sid) {
-        s.setOnPaper(sid, false);
-        // A student not marked had work in by then.
-        s.setHad(sid, made[sid] ? 'paper' : 'work');
-      });
-      out.added += typeof res.marked === 'number' ? res.marked : Object.keys(made).length;
-    }
-
-    function next() {
-      if (!alive()) {
-        out.closed = true;
-        return Promise.resolve(out);
-      }
-      if (out.stopped || at >= list.length) return Promise.resolve(out);
-      var w = list[at++];
-      if (opts.progress) opts.progress(Math.min(done + 1, total), total);
-      var call =
-        w.kind === 'paper'
-          ? function () {
-              return api.paper(w.sids);
-            }
-          : w.kind === 'replace'
-            ? function () {
-                return api.replace(w.sid, w.pages);
-              }
-            : function () {
-                return api.add(w.sid, w.pages, w.mode);
-              };
-      return answerOf(call).then(function (res) {
-        if (!alive()) {
-          out.closed = true;
-          return out;
-        }
-        if (w.kind === 'paper') {
-          done += w.sids.length;
-          paper(w, res);
-        } else {
-          done++;
-          student(w, res);
-        }
-        return next();
-      });
-    }
-    return next();
   }
 
   /* ── Who is listed ─────────────────────────────────────────── */
@@ -534,6 +167,7 @@
     var c = s.stage.counts();
     var course = (typeof COURSES !== 'undefined' && COURSES[s.cid]) || {};
     var busy = !!s.busy;
+    var reading = _readingAny(s);
     var off = busy ? ' disabled' : '';
     var done = s.view === 'done';
     var sub = [s.a.title || '', course.name || '', _plural(s.list.length, 'student', 'students')]
@@ -572,9 +206,9 @@
       off +
       '>Cancel</button>' +
       '<button type="button" class="awc-primary" data-awc="run" data-key="run"' +
-      (busy || !c.ready ? ' disabled' : '') +
+      (busy || reading || !c.ready ? ' disabled' : '') +
       '>' +
-      esc(busy ? s.progress || 'Adding…' : s.stage.buttonLabel()) +
+      esc(busy ? s.progress || 'Adding…' : reading ? 'Reading Files…' : s.stage.buttonLabel()) +
       '</button>' +
       '</div>' +
       '<div class="awc-scroll">' +
@@ -587,6 +221,13 @@
       '<span class="awc-hint">Nothing is added until you press Add Work.</span>' +
       '</div></div>';
     return html;
+  }
+
+  // Whether any file is still being read (shrunk) for any student.
+  function _readingAny(s) {
+    return Object.keys(s.reading).some(function (sid) {
+      return s.reading[sid] > 0;
+    });
   }
 
   function _segBtn(id, label, icon, on) {
@@ -853,14 +494,27 @@
     return html;
   }
 
+  // "1 set to Handed in on paper"
+  function _paperLine(n) {
+    return n + ' set to Handed in on paper';
+  }
+
   // html-safe: names go through esc; ids are ours (esc too); words are fixed
   function _doneHtml(s) {
     var added = s.added;
+    var paper = s.paperSet;
+    var students = function (n) {
+      return n + (n === 1 ? ' Student' : ' Students');
+    };
+    // Only students whose pages went in count as Added Work; On Paper says so on its own.
+    var title =
+      added || !paper ? 'Added Work for ' + students(added) : 'Set ' + students(paper) + ' to Handed In on Paper';
     var html =
       '<div class="awc-scroll awc-done">' +
       '<h3 class="awc-done-title">' +
-      esc('Added Work for ' + added + (added === 1 ? ' Student' : ' Students')) +
-      '</h3>';
+      esc(title) +
+      '</h3>' +
+      (added && paper ? '<p class="awc-done-paper">' + esc(_paperLine(paper)) + '</p>' : '');
     var still = s.stillNotIn.filter(function (sid) {
       return !s.leftAlone[sid];
     });
@@ -914,6 +568,8 @@
     });
     // html-safe: _pageHtml escapes every name, file name and word; the rest is fixed markup
     s.overlay.innerHTML = _pageHtml(s);
+    // The chip being dragged is gone: its drag can no longer end, so it is let go.
+    if (s.drag && !(s.drag.el && s.drag.el.isConnected)) s.drag = null;
     var again = s.overlay.querySelector('.awc-scroll');
     if (again) again.scrollTop = top;
     if (key) {
@@ -1066,7 +722,8 @@
 
   function _run() {
     var s = _s;
-    if (!s || s.busy || !s.stage.counts().ready) return;
+    // A file still being read would land during the run: Add Work waits for it.
+    if (!s || s.busy || _readingAny(s) || !s.stage.counts().ready) return;
     s.busy = true;
     s.headNote = '';
     s.moveMenu = null;
@@ -1088,6 +745,7 @@
       if (_s !== s || out.closed) return;
       s.busy = false;
       s.added += out.added;
+      s.paperSet += out.paper;
       _readSubs(s);
       var waiting = s.stage.counts();
       if (!out.stopped && !waiting.files && !waiting.paper) {
@@ -1105,6 +763,7 @@
       }
       var parts = [];
       if (s.added) parts.push('Added Work for ' + s.added + (s.added === 1 ? ' Student.' : ' Students.'));
+      if (s.paperSet) parts.push(_paperLine(s.paperSet) + '.');
       if (out.said) parts.push(out.said);
       s.headNote = parts.join(' ');
       _draw({ focus: 'run', fallback: 'cancel' });
@@ -1256,6 +915,9 @@
     // Nothing dropped here opens in the browser.
     e.preventDefault();
     var files = _hasFiles(e);
+    // A drag that carries files is always files from the computer, never a
+    // chip still marked as moving (its dragend may never have come).
+    if (files) s.drag = null;
     if (s.busy || s.view !== 'stage' || (!files && !s.drag)) {
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
       return _overOff(s);
@@ -1287,7 +949,7 @@
     if (!s) return;
     e.preventDefault();
     _overOff(s);
-    var drag = s.drag;
+    var drag = _hasFiles(e) ? null : s.drag;
     s.drag = null;
     if (s.busy || s.view !== 'stage') return;
     var target = _targetOf(e);
@@ -1310,7 +972,7 @@
     var s = _s;
     var chip = e.target && e.target.closest ? e.target.closest('.awc-chip') : null;
     if (!s || !chip || s.busy) return;
-    s.drag = { sid: chip.getAttribute('data-sid'), pid: chip.getAttribute('data-piece') };
+    s.drag = { sid: chip.getAttribute('data-sid'), pid: chip.getAttribute('data-piece'), el: chip };
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       try {
@@ -1396,6 +1058,7 @@
       over: null,
       headNote: '',
       added: 0,
+      paperSet: 0,
       stillNotIn: [],
       leftAlone: {},
       paperDone: {},
@@ -1416,7 +1079,8 @@
     overlay.addEventListener('dragleave', _dragLeave);
     overlay.addEventListener('drop', _drop);
     overlay.addEventListener('dragstart', _dragStart);
-    overlay.addEventListener('dragend', _dragEnd);
+    // On the document: a chip drawn away mid-drag still ends its drag.
+    document.addEventListener('dragend', _dragEnd, true);
     document.addEventListener('keydown', _keydown, true);
     if (window.addEventListener) window.addEventListener('beforeunload', _beforeUnload);
     _draw();
@@ -1430,6 +1094,7 @@
     if (!s) return;
     _s = null;
     document.removeEventListener('keydown', _keydown, true);
+    document.removeEventListener('dragend', _dragEnd, true);
     if (window.removeEventListener) window.removeEventListener('beforeunload', _beforeUnload);
     s.stage.rows().forEach(function (r) {
       _release(s, r.pieces);
@@ -1448,8 +1113,6 @@
     },
     offered: offered,
     students: students,
-    stage: stage,
-    run: run,
     // For tests: the files for one student, as a drop or the chooser gives them.
     addFiles: addFiles,
   };
