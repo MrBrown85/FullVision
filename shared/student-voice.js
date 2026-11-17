@@ -89,9 +89,27 @@ var StudentVoice = (function () {
     return !!(j && typeof j === 'object' && Object.keys(j).length);
   }
 
+  /* A class's answers to one questionnaire: {enrollment id: the student's
+     newest submission}, as list_course_responses gives them (Demo Mode:
+     this device). See Answers counts these. */
+  function responses(cid, qid) {
+    if (_demo()) Questionnaires.load(cid);
+    var byQ = _demo() ? _readLocal(cid) : _resp[cid] || {};
+    var mine = byQ[qid] || {};
+    var out = {};
+    Object.keys(mine).forEach(function (eid) {
+      var subs = (Array.isArray(mine[eid]) ? mine[eid] : []).slice().sort(function (a, b) {
+        return String(b.submitted_at || '').localeCompare(String(a.submitted_at || ''));
+      });
+      if (subs[0]) out[eid] = subs[0];
+    });
+    return out;
+  }
+
   /* One student's submissions, newest first: {qid, kind, title, theme,
      report_period, at, items: [{q, v}]} with every live question in order
-     (v null when skipped), then any answer to a question since removed. */
+     (v null when skipped), then any answer to a question since removed
+     (with its words when the list still carries it, archived). */
   function entries(cid, enrollmentId) {
     if (_demo()) Questionnaires.load(cid);
     var byQ = _demo() ? _readLocal(cid) : _resp[cid] || {};
@@ -101,15 +119,21 @@ var StudentVoice = (function () {
       mine.forEach(function (r) {
         var answers = r.answers || {};
         var seen = {};
-        var items = (q.questions || []).map(function (x) {
+        var gone = {};
+        var items = [];
+        (q.questions || []).forEach(function (x) {
+          if (x.archived) {
+            gone[x.id] = x;
+            return;
+          }
           seen[x.id] = true;
           var v = answers[x.id];
-          return { q: x, v: _has(v) ? v : null };
+          items.push({ q: x, v: _has(v) ? v : null });
         });
         Object.keys(answers).forEach(function (id) {
           if (seen[id] || !_has(answers[id])) return;
           items.push({
-            q: { id: id, prompt: 'A question since removed', kind: 'text', options: {}, core_ids: [] },
+            q: gone[id] || { id: id, prompt: 'A question since removed', kind: 'text', options: {}, core_ids: [] },
             v: answers[id],
           });
         });
@@ -262,11 +286,129 @@ var StudentVoice = (function () {
     return {
       about: a,
       checkin: _checkin(checkins[0]),
+      // The Core Competency reflections and the ones a teacher built.
       reflections: list.filter(function (e) {
-        return e.kind === 'core_reflection';
+        return e.kind === 'core_reflection' || e.kind === 'custom';
       }),
       last: list[0] ? list[0].at : null,
     };
+  }
+
+  /* ── An answer in words (docs/plans/reflect-plan.md, the data contract) ──
+     The reflection a teacher builds asks in kinds the ready-made ones don't:
+     a rating, a date, a ranking, a grid of statements. answerText says any
+     answer as plain text, one line per part: "4 of 5 (Could Teach It)",
+     "November 20, 2026", "1. Labs" on its own line, "statement: choice" per
+     statement. A kind it doesn't know says whatever was stored. These are
+     the student's own words and self-ratings, never a grade. */
+
+  function dateWords(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+    if (!m) return String(iso || '');
+    var t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+    return isNaN(t) ? String(iso) : t.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function _str(x) {
+    return x == null ? '' : String(x).trim();
+  }
+
+  // The levels a rating has: a whole number 2 to 10, 5 when absent.
+  function ratingLevels(q) {
+    var n = Number(((q && q.options) || {}).levels);
+    return Number.isInteger(n) && n >= 2 && n <= 10 ? n : 5;
+  }
+
+  // A rating's number: value_num, or the stored text when it is one.
+  function ratingOf(v) {
+    if (!v) return null;
+    var n = v.num != null ? Number(v.num) : Number(_str(v.text));
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }
+
+  // A ranking's order: value_json, or "1. A · 2. B" read back.
+  function rankingOf(v) {
+    if (!v) return [];
+    if (Array.isArray(v.json)) return v.json.map(_str).filter(Boolean);
+    return _str(v.text)
+      .split(/\s*·\s*/)
+      .map(function (p) {
+        return p.replace(/^\d+\.\s*/, '').trim();
+      })
+      .filter(Boolean);
+  }
+
+  // A grid's answers, {statement: choice}: value_json, or "s: c · …" read back.
+  function likertOf(v) {
+    if (!v) return {};
+    var j = v.json;
+    if (j && typeof j === 'object' && !Array.isArray(j)) return j;
+    var out = {};
+    _str(v.text)
+      .split(/\s*·\s*/)
+      .forEach(function (p) {
+        var at = p.lastIndexOf(':');
+        if (at > 0) out[p.slice(0, at).trim()] = p.slice(at + 1).trim();
+      });
+    return out;
+  }
+
+  function _anyText(v) {
+    if (!v) return '';
+    if (v.text != null && _str(v.text)) return String(v.text);
+    var j = v.json;
+    if (Array.isArray(j)) return j.map(_str).filter(Boolean).join(', ');
+    if (j && typeof j === 'object')
+      return Object.keys(j)
+        .map(function (k) {
+          var x = j[k];
+          return k + ': ' + (x && typeof x === 'object' ? JSON.stringify(x) : _str(x));
+        })
+        .join('\n');
+    return v.num != null ? String(v.num) : '';
+  }
+
+  function answerText(q, v) {
+    if (!v || !q) return '';
+    var o = q.options || {};
+    switch (q.kind) {
+      case 'section':
+        return '';
+      case 'rating': {
+        var n = ratingOf(v);
+        if (n == null) return _anyText(v);
+        var levels = ratingLevels(q);
+        var end = n === levels ? _str(o.high) : n === 1 ? _str(o.low) : '';
+        return n + ' of ' + levels + (end ? ' (' + end + ')' : '');
+      }
+      case 'date':
+        return dateWords(_str(v.text));
+      case 'ranking':
+        return rankingOf(v)
+          .map(function (c, i) {
+            return i + 1 + '. ' + c;
+          })
+          .join('\n');
+      case 'likert': {
+        var got = likertOf(v);
+        var order = (Array.isArray(o.statements) ? o.statements : []).filter(function (s) {
+          return Object.prototype.hasOwnProperty.call(got, s);
+        });
+        Object.keys(got).forEach(function (s) {
+          if (order.indexOf(s) < 0) order.push(s);
+        });
+        return order
+          .map(function (s) {
+            return s + ': ' + _str(got[s]);
+          })
+          .join('\n');
+      }
+      case 'choice':
+        if (Array.isArray(v.json)) return v.json.map(_str).filter(Boolean).join(', ');
+        return _anyText(v);
+      default:
+        return _anyText(v);
+    }
   }
 
   function _reset() {
@@ -280,6 +422,14 @@ var StudentVoice = (function () {
     loaded: loaded,
     refreshIfStale: refreshIfStale,
     entries: entries,
+    responses: responses,
+    hasAnswer: _has,
+    answerText: answerText,
+    dateWords: dateWords,
+    ratingLevels: ratingLevels,
+    ratingOf: ratingOf,
+    rankingOf: rankingOf,
+    likertOf: likertOf,
     profile: profile,
     coreSelf: coreSelf,
     _reset: _reset,

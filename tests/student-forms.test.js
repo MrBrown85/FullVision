@@ -1,5 +1,5 @@
 /**
- * Reflections on the student's page (S4-F4; the artboard's "Questionnaires
+ * Reflect on the student's page (S4-F4; the artboard's "Questionnaires
  * Tab" and "Questions on a Chromebook"; the tab called Questionnaires until
  * Colin's ruling of 2026-11-14). Phone reports are not on the student page
  * any more (Colin, 2026-11-14): no Reports tab, and the reply's `reports`
@@ -86,12 +86,12 @@ describe('the view reads the lists the server’s page will send', () => {
     expect(viewOf(page)).not.toHaveProperty('reports');
   });
 
-  it('a real card shows the plain line on Reflections, has no Reports tab, and Start or See Your Report pressed anyway opens nothing', async () => {
+  it('a real card shows the plain line on Reflect, has no Reports tab, and Start or See Your Report pressed anyway opens nothing', async () => {
     const page = await real();
-    expect(qa(page, '.sp-tabs-bottom .sp-tab-label').map(words)).toEqual(['Assignments', 'My Learning', 'Reflections']);
+    expect(qa(page, '.sp-tabs-bottom .sp-tab-label').map(words)).toEqual(['Assignments', 'My Learning', 'Reflect']);
     expect(q(page, '[data-tab="reports"]')).toBeNull();
     await page.click('[data-tab="questionnaires"]');
-    expect(words(q(page, '.sp-page-title'))).toBe('Reflections');
+    expect(words(q(page, '.sp-page-title'))).toBe('Reflect');
     expect(words(q(page, '.sp-empty'))).toBe('Reflections from your teacher will show here.');
     // A sample's id, pressed on a real card's page: nothing opens and nothing is asked.
     const asked = page.calls.length;
@@ -110,19 +110,22 @@ describe('the view reads the lists the server’s page will send', () => {
   });
 });
 
-describe('Reflections in Demo Mode', () => {
+describe('Reflect in Demo Mode', () => {
   it('Open Now as a card with Start, then Done and Coming Up as lists; on a Chromebook the list and the one picked', async () => {
     const page = await demo();
     await page.click('[data-tab="questionnaires"]');
-    expect(words(q(page, '.sp-page-title'))).toBe('Reflections');
+    expect(words(q(page, '.sp-page-title'))).toBe('Reflect');
     expect(qa(page, '.sp-forms-phone .sp-list-head').map(words)).toEqual(['Open Now', 'Done', 'Coming Up']);
     // Each part holds its own: the open one under Open Now, About Me under Done, March under Coming Up.
     const under = head => {
       const h = qa(page, '.sp-forms-phone .sp-list-head').find(x => words(x) === head);
-      const next = h.nextElementSibling;
-      return [...next.querySelectorAll('.sp-form-title, .sp-row-title')].map(words);
+      const out = [];
+      for (let el = h.nextElementSibling; el && !el.matches('.sp-list-head'); el = el.nextElementSibling) {
+        out.push(...[...el.querySelectorAll('.sp-form-title, .sp-row-title')].map(words));
+      }
+      return out;
     };
-    expect(under('Open Now')).toEqual(['November Reflection']);
+    expect(under('Open Now')).toEqual(['November Reflection', 'Unit 2 Exit Reflection']);
     expect(under('Done')).toEqual(['About Me']);
     expect(under('Coming Up')).toEqual(['March Reflection']);
     const card = q(page, '.sp-forms-phone .sp-form-card');
@@ -142,7 +145,12 @@ describe('Reflections in Demo Mode', () => {
       ['March Reflection', expect.stringMatching(/^Opens \S+ \d+$/)],
     ]);
     // The Chromebook's list: the first is picked; another picked shows its card, with no Start.
-    expect(qa(page, '.sp-side-row').map(b => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
+    expect(qa(page, '.sp-side-row').map(b => b.getAttribute('aria-pressed'))).toEqual([
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
     await page.click('.sp-side-row[data-form-id="demo-q-about"]');
     expect(words(q(page, '.sp-forms-desk .sp-form-title'))).toBe('About Me');
     expect(q(page, '.sp-forms-desk [data-act="q-start"]')).toBeNull();
@@ -195,7 +203,7 @@ describe('no phone reports in Demo Mode', () => {
 });
 
 describe('Preview as Student draws the same tab', () => {
-  it('Reflections: the same HTML, character for character', async () => {
+  it('Reflect: the same HTML, character for character', async () => {
     const page = await demo();
     await page.click('[data-tab="questionnaires"]');
     const view = JSON.parse(JSON.stringify(viewOf(page)));

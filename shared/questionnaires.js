@@ -4,7 +4,7 @@
    A signed-in class reads and writes the questionnaire tables through the
    v2 wrappers (migrations/20261025_questionnaires_tables_and_functions.sql).
    Demo Mode keeps the same shapes in localStorage under
-   gb-questionnaires-<cid>, so the Questionnaires tab works there too; a
+   gb-questionnaires-<cid>, so the Reflect tab works there too; a
    signed-in class never falls back to a device copy, so no local id ever
    reaches the database. The templates come from the server, or from
    shared/questionnaire-templates.js when it can't be read. */
@@ -233,18 +233,65 @@ var Questionnaires = (function () {
       });
   }
 
-  /* Turns a questionnaire on, creating it from its template the first time. */
-  function turnOn(cid, spec) {
+  /* A teacher-built reflection (docs/plans/reflect-plan.md, "The data
+     contract"): kind custom, no template, report period or parent; its
+     description is the theme. spec: { id?, title, theme, opens_on,
+     closes_on, is_on, questions }. */
+  function saveCustom(cid, spec) {
+    return save(cid, {
+      id: spec.id || null,
+      kind: 'custom',
+      title: spec.title,
+      template_id: null,
+      theme: spec.theme || null,
+      report_period: null,
+      parent_id: null,
+      opens_on: spec.opens_on || null,
+      closes_on: spec.closes_on || null,
+      is_on: !!spec.is_on,
+      myed_comment: null,
+      questions: spec.questions || [],
+    });
+  }
+
+  function _todayIso() {
+    var d = new Date();
+    return (
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    );
+  }
+
+  /* Turns a questionnaire on, creating it from its template the first time.
+     The switch is the gate (reflect plan, "What changes" 2): nothing sets a
+     closing date, and turning on one that is past its closing date (or not
+     open yet) opens it today with no closing date. */
+  function turnOn(cid, spec, today) {
+    var d = today || _todayIso();
     var existing = spec.id ? find(cid, x => x.id === spec.id) : null;
-    if (existing) return setOn(cid, existing.id, true);
+    if (existing) {
+      var closed = existing.closes_on && existing.closes_on < d;
+      var later = existing.opens_on && existing.opens_on > d;
+      if (!closed && !later) return setOn(cid, existing.id, true);
+      return save(
+        cid,
+        Object.assign({}, existing, {
+          questions: (existing.questions || []).filter(function (x) {
+            return !x.archived;
+          }),
+          is_on: true,
+          opens_on: later ? d : existing.opens_on,
+          closes_on: closed ? null : existing.closes_on,
+        }),
+      );
+    }
     var tpl = template(spec.template_id);
     return save(cid, {
       kind: spec.kind || (tpl && tpl.kind),
-      title: spec.title || (tpl && tpl.title) || 'Questionnaire',
+      title: spec.title || (tpl && tpl.title) || 'Reflection',
       template_id: spec.template_id,
       report_period: spec.report_period || null,
       parent_id: spec.parent_id || null,
-      opens_on: spec.opens_on || null,
+      opens_on: spec.opens_on || d,
       closes_on: spec.closes_on || null,
       is_on: true,
       questions: null,
@@ -262,46 +309,98 @@ var Questionnaires = (function () {
     });
   }
 
-  /* Codes for the printed slips: [{ enrollment_id, code }]. Demo Mode makes
-     them up; nothing checks them there. */
-  var CODE_ABC = 'ABCDEFGHJKMNPQRTUVWXYZ2346789';
-  function _demoCode() {
-    var s = '';
-    for (var i = 0; i < 6; i++) s += CODE_ABC.charAt(Math.floor(Math.random() * CODE_ABC.length));
-    return s.slice(0, 3) + '-' + s.slice(3);
-  }
-
-  function issueCodes(cid, qid, enrollmentIds) {
-    if (_demo()) {
-      var ids =
-        enrollmentIds && enrollmentIds.length
-          ? enrollmentIds
-          : getStudents(cid).map(function (s) {
-              return s.id;
-            });
-      return Promise.resolve({
-        data: ids.map(function (id) {
-          return { enrollment_id: id, code: _demoCode() };
-        }),
-        error: null,
+  /* Deletes a questionnaire nobody has answered (delete_questionnaire
+     refuses once anyone has, error 23503: it would delete their answers).
+     Resolves { deleted } or { refused } (someone has answered) or { error };
+     only a delete the server took leaves the list. Demo Mode follows the
+     same rule. */
+  function remove(cid, id) {
+    var q = find(cid, x => x.id === id);
+    if (!q) return Promise.resolve({ error: 'missing' });
+    var drop = function () {
+      _byCourse[cid] = list(cid).filter(function (x) {
+        return x.id !== id && x.parent_id !== id;
       });
-    }
+      if (_demo()) _writeLocal(cid, _byCourse[cid]);
+      return { deleted: true };
+    };
+    if ((q.answered || []).length) return Promise.resolve({ refused: true });
+    if (_demo()) return Promise.resolve(drop());
     var v2 = window.v2 || {};
-    if (!v2.issueAccessCodes) return Promise.resolve({ data: null, error: { message: 'unavailable' } });
-    return v2.issueAccessCodes(qid, enrollmentIds);
+    if (!v2.deleteQuestionnaire) return Promise.resolve({ error: 'unavailable' });
+    return v2.deleteQuestionnaire(id).then(function (res) {
+      var err = res && res.error;
+      if (!err) return drop();
+      if (String(err.code) === '23503' || /answer/i.test(String(err.message || ''))) return { refused: true };
+      return { error: err };
+    });
   }
 
-  /* Open, opens, closed or off, as a short status and its state. */
+  /* Copies a questionnaire into another class: the same title, description
+     and questions (no question ids), saved there Off. */
+  function copyTo(fromCid, id, toCid) {
+    var src = find(fromCid, x => x.id === id);
+    if (!src || !toCid || toCid === fromCid) return Promise.resolve(null);
+    var wasLoaded = loaded(toCid);
+    if (_demo()) _byCourse[toCid] = _readLocal(toCid);
+    var questions = (src.questions || [])
+      .filter(function (x) {
+        return !x.archived;
+      })
+      .map(function (x) {
+        return {
+          prompt: x.prompt,
+          kind: x.kind,
+          options: JSON.parse(JSON.stringify(x.options || {})),
+          core_ids: (x.core_ids || []).slice(),
+          repeated_key: x.repeated_key || null,
+          teacher_only: !!x.teacher_only,
+          prompt_translations: x.prompt_translations || {},
+        };
+      });
+    return save(toCid, {
+      kind: src.kind,
+      title: src.title,
+      template_id: src.template_id || null,
+      theme: src.theme || null,
+      report_period: null,
+      parent_id: null,
+      opens_on: null,
+      closes_on: null,
+      is_on: false,
+      myed_comment: src.myed_comment || null,
+      questions: questions,
+    }).then(function (row) {
+      // A class not read yet is read whole when it is opened, not from this one row.
+      if (!_demo() && !wasLoaded) {
+        delete _byCourse[toCid];
+        delete _at[toCid];
+      }
+      return row;
+    });
+  }
+
+  /* Off; on but not open yet; on but past its closing date (shown as Off);
+     or in the students' Reflect tab, with until when. */
   function status(q, today) {
-    var d = today || new Date().toISOString().slice(0, 10);
+    var d = today || _todayIso();
     var fmt = function (iso) {
       var t = new Date(iso + 'T12:00:00');
       return isNaN(t) ? iso : t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
     };
     if (!q || !q.is_on) return { state: 'off', text: 'Off' };
-    if (q.opens_on && q.opens_on > d) return { state: 'upcoming', text: 'Opens ' + fmt(q.opens_on) };
     if (q.closes_on && q.closes_on < d) return { state: 'closed', text: 'Closed ' + fmt(q.closes_on) };
-    return { state: 'open', text: q.closes_on ? 'Open until ' + fmt(q.closes_on) : 'Open' };
+    if (q.opens_on && q.opens_on > d) return { state: 'upcoming', text: 'Opens ' + fmt(q.opens_on) };
+    return {
+      state: 'open',
+      text: 'In Students’ Reflect Tab',
+      until: q.closes_on ? 'Until ' + fmt(q.closes_on) : 'Until you turn it off',
+    };
+  }
+
+  /* Whether students see it in their Reflect tab today. */
+  function visible(q, today) {
+    return status(q, today).state === 'open';
   }
 
   function _reset() {
@@ -322,10 +421,13 @@ var Questionnaires = (function () {
     find: find,
     refreshIfStale: refreshIfStale,
     save: save,
+    saveCustom: saveCustom,
     turnOn: turnOn,
     setOn: setOn,
-    issueCodes: issueCodes,
+    remove: remove,
+    copyTo: copyTo,
     status: status,
+    visible: visible,
     _reset: _reset,
   };
 })();

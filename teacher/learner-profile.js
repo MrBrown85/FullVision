@@ -81,6 +81,37 @@ var LearnerProfile = (function () {
     );
   }
 
+  /* The kinds a teacher-built reflection adds (docs/plans/reflect-plan.md),
+     and any kind this page doesn't know: said in words by
+     StudentVoice.answerText, one line per part. The ready-made kinds keep
+     text() exactly. */
+  var OLD_KINDS = { text: 1, choice: 1, short_set: 1, scale4: 1, goal_status: 1, core_pick: 1 };
+  var NEW_KINDS = {
+    rating: 1,
+    date: 1,
+    ranking: 1,
+    likert: 1,
+    section: 1,
+  };
+  function isNewKind(kind) {
+    return !!NEW_KINDS[kind] || !OLD_KINDS[kind];
+  }
+  function words(q, v) {
+    if (!v) return '';
+    if (!isNewKind(q && q.kind)) return text(v);
+    return typeof StudentVoice !== 'undefined' && StudentVoice.answerText ? StudentVoice.answerText(q, v) : text(v);
+  }
+  function qaWords(q, v) {
+    var t = words(q, v);
+    return (
+      '<figure class="qw"><figcaption class="qw-q">' +
+      esc(q.prompt || '') +
+      '</figcaption>' +
+      (t ? bubble(t) : noAnswer()) +
+      '</figure>'
+    );
+  }
+
   function src(who, first) {
     return who === 'you'
       ? '<span class="src src-you">Set by you</span>'
@@ -380,16 +411,42 @@ var LearnerProfile = (function () {
       }
     });
     if (plain.length) {
-      var pl = '';
+      // A section heading in a reflection a teacher built starts a group of its own.
+      var groups = [{ head: null, html: '' }];
       plain.forEach(function (it) {
-        pl += qa(it.q.prompt, it.v);
+        if (it.q.kind === 'section') {
+          groups.push({ head: it.q, html: '' });
+          return;
+        }
+        groups[groups.length - 1].html += isNewKind(it.q.kind) ? qaWords(it.q, it.v) : qa(it.q.prompt, it.v);
       });
       // Written answers sit with the shield they follow, before the self-assessment.
       var at = html.indexOf('<div class="qw-group"><h3>Self-Assessment');
-      var block = '<div class="qw-group">' + pl + '</div>';
+      var block = groups
+        .filter(function (g) {
+          return g.head || g.html;
+        })
+        .map(function (g) {
+          var sub = g.head && g.head.options && g.head.options.subtitle;
+          return (
+            '<div class="qw-group">' +
+            (g.head
+              ? '<h3>' + esc(g.head.prompt || '') + '</h3>' + (sub ? '<div class="qw-q">' + esc(sub) + '</div>' : '')
+              : '') +
+            g.html +
+            '</div>'
+          );
+        })
+        .join('');
       html = at >= 0 ? html.slice(0, at) + block + html.slice(at) : html + block;
     }
     return html;
+  }
+
+  // A ready-made reflection's theme beside its date; a teacher's own
+  // reflection keeps its description (the theme column) off the line.
+  function themeOf(e) {
+    return e.theme && e.kind !== 'custom' ? ' · ' + e.theme : '';
   }
 
   function reflectionsHtml(o) {
@@ -400,7 +457,7 @@ var LearnerProfile = (function () {
       (list.length > 1
         ? '<span>Newest first</span>'
         : latest
-          ? '<span>' + esc(day(latest.at) + (latest.theme ? ' · ' + latest.theme : '')) + '</span>'
+          ? '<span>' + esc(day(latest.at) + themeOf(latest)) + '</span>'
           : '') +
       '</div>';
     if (!list.length) {
@@ -427,7 +484,7 @@ var LearnerProfile = (function () {
           '<div class="lp-older"><h3>' +
           esc(e.title) +
           ' <span class="gl-meta">' +
-          esc(day(e.at) + (e.theme ? ' · ' + e.theme : '')) +
+          esc(day(e.at) + themeOf(e)) +
           '</span></h3></div>';
       }
       html += reflectionHtml(o, e, o.first);
@@ -704,6 +761,9 @@ var LearnerProfile = (function () {
     studentGoals: studentGoals,
     statusHtml: statusHtml,
     text: text,
+    words: words,
+    coreName: coreName,
+    STEPS: STEPS,
     sayHtml: sayHtml,
     day: day,
     src: src,

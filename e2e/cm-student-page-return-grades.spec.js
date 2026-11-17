@@ -62,13 +62,13 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
   // The hidden build switch, from the console.
   expect(await page.evaluate(cid => setStudentPageSwitch(cid, true), at.cid)).toBe(true);
 
-  // The tab is there now, between Questionnaires and Grading, with the row
+  // The tab is there now, between Reflect and Grading, with the row
   // as the board words it.
   let group = await openStudentPageTab(page);
   await expect(page.locator('.cm-tabs [role="tab"]')).toHaveText([
     /^Details/,
     /^Students/,
-    /^Questionnaires/,
+    /^Reflect/,
     'Student Page',
     /^Grading/,
     /^Reporting Terms/,
@@ -87,7 +87,7 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
     'Keep Photos Until',
     'Reflect on Feedback',
     'Show Overall Grade',
-    'Questionnaires',
+    'Reflections',
   ]);
   await expect(card.locator('#sp-return-hint')).toHaveText(
     "When a grade shows on a student's page. Until then it's a draft only you can see.",

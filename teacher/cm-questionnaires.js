@@ -1,14 +1,19 @@
-/* Class Settings → Questionnaires tab (docs/STUDENT-VOICE-PLAN.md, PR 5;
-   canvas screen 6b).
+/* Class Settings → Reflect tab (docs/STUDENT-VOICE-PLAN.md, PR 5;
+   docs/plans/reflect-plan.md, board 1). Code names keep "questionnaire".
 
-   One card per questionnaire: About Me at the start of the course, and the
-   reporting period's Core Competency reflection with its Goal Check-In on
-   the same slip. Each card says whether it is open, who has answered, and
-   prints the QR slips. Show Questions opens the class's copy for editing;
-   every change saves the whole questionnaire (shared/questionnaires.js).
+   One card per reflection: About Me at the start of the course, the
+   reporting period's Core Competency reflection with its Goal Check-In,
+   and the reflections a teacher builds (kind custom). The switch is the
+   gate: On puts a reflection in every student's Reflect tab until it is
+   turned off or reaches its closing date, if it has one. Each card says
+   who has answered and opens See Answers (teacher/cm-reflect-answers.js).
+   Show Questions opens a ready-made one's questions for editing, where
+   every change saves the whole questionnaire (shared/questionnaires.js);
+   New Reflection and a teacher-built one open the builder
+   (teacher/cm-reflect-builder.js).
 
    DashClassManager renders the panel and hands over every sq* action,
-   change and blur. */
+   change and blur; sqAns… go on to See Answers and sqB… to the builder. */
 var CmQuestionnaires = (function () {
   'use strict';
 
@@ -21,6 +26,7 @@ var CmQuestionnaires = (function () {
   var _saving = {}; // qid -> the save in flight, so saves go one at a time
   var _draft = {}; // qid -> a new question shown but not saved until it has words
   var _turning = {}; // card key -> true while a first turn-on saves, so the switch shows On at once
+  var _answers = {}; // cid -> the reflection whose answers are shown in place of the list
 
   function _rerender() {
     if (typeof DashClassManager !== 'undefined' && DashClassManager.renderClassManager) {
@@ -40,17 +46,13 @@ var CmQuestionnaires = (function () {
     );
   }
 
-  function _addDays(iso, n) {
-    var t = new Date(iso + 'T12:00:00');
-    t.setDate(t.getDate() + n);
-    return (
-      t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0')
-    );
+  function _builder() {
+    return typeof CmReflectBuilder !== 'undefined' ? CmReflectBuilder : null;
   }
 
-  function _fmt(iso) {
-    var t = new Date(iso + 'T12:00:00');
-    return isNaN(t) ? iso : t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  function _answersView() {
+    var a = typeof window !== 'undefined' ? window.CmReflectAnswers : null;
+    return a && typeof a.render === 'function' ? a : null;
   }
 
   function _shortName(st) {
@@ -72,12 +74,18 @@ var CmQuestionnaires = (function () {
     });
   }
 
-  /* How many questionnaires are on, for the tab's count (null until read). */
+  /* How many reflections students can see now, for the tab's count (null until read). */
   function countOn(cid) {
     if (!Questionnaires.loaded(cid)) return null;
+    var today = _today();
     return Questionnaires.list(cid).filter(function (q) {
-      return q.is_on && !q.parent_id;
+      return !q.parent_id && Questionnaires.visible(q, today);
     }).length;
+  }
+
+  /* On, as the switch shows it: on and not past its closing date. */
+  function _isOn(q) {
+    return !!q && !!q.is_on && Questionnaires.status(q, _today()).state !== 'closed';
   }
 
   /* ── Rendering ─────────────────────────────────────────────── */
@@ -113,14 +121,18 @@ var CmQuestionnaires = (function () {
     var color = { open: 'var(--score-3)', upcoming: 'var(--score-2)', closed: 'var(--text-3)', off: 'var(--text-3)' }[
       s.state
     ];
-    return { state: s.state, html: '<span class="sq-dot" style="background:' + color + '"></span>' + esc(s.text) };
+    return {
+      state: s.state,
+      html: '<span class="sq-dot" style="background:' + color + '"></span>' + esc(s.text),
+      until: s.until || '',
+    };
   }
 
   function _fact(label, valueHtml, extra) {
     return '<div><span>' + esc(label) + '</span><strong>' + valueHtml + '</strong>' + (extra || '') + '</div>';
   }
 
-  function _facts(cid, q, child) {
+  function _facts(cid, q) {
     var st = _status(q);
     var students = getStudents(cid);
     var done = {};
@@ -130,103 +142,99 @@ var CmQuestionnaires = (function () {
     var answered = students.filter(function (s) {
       return done[s.id];
     }).length;
-    var facts = [_fact('Status', st.html)];
-    if (st.state === 'open' || st.state === 'closed') {
-      var pct = students.length ? Math.round((answered / students.length) * 100) : 0;
-      facts.push(
-        _fact(
-          'Answered',
-          esc(answered + ' of ' + students.length),
-          '<span class="sq-bar" aria-hidden="true"><span style="width:' + pct + '%"></span></span>',
-        ),
-      );
-      var missing = students
-        .filter(function (s) {
-          return !done[s.id];
-        })
-        .map(_shortName);
-      // A few names to chase; past six, the count.
-      var who = !missing.length
-        ? 'No one'
-        : !answered
-          ? 'All ' + missing.length + ' students'
-          : missing.length > 6
-            ? missing.slice(0, 6).join(', ') + ' and ' + (missing.length - 6) + ' more'
-            : missing.join(', ');
-      facts.push(_fact('Not Answered', esc(who)));
-    } else {
-      if (q.opens_on || q.closes_on) {
-        facts.push(
-          _fact(
-            'Open',
-            esc(
-              q.opens_on && q.closes_on
-                ? _fmt(q.opens_on) + ' to ' + _fmt(q.closes_on)
-                : q.closes_on
-                  ? 'Until ' + _fmt(q.closes_on)
-                  : 'From ' + _fmt(q.opens_on),
-            ),
-          ),
-        );
-      }
-      if (child && child.is_on) facts.push(_fact('On the Same Slip', esc(child.title || 'Goal Check-In')));
-    }
+    var facts = [_fact('Status', st.html, st.until ? '<span class="sq-until">' + esc(st.until) + '</span>' : '')];
+    var pct = students.length ? Math.round((answered / students.length) * 100) : 0;
+    facts.push(
+      _fact(
+        'Answered',
+        esc(answered + ' of ' + students.length),
+        '<span class="sq-bar" aria-hidden="true"><span style="width:' + pct + '%"></span></span>',
+      ),
+    );
+    var missing = students
+      .filter(function (s) {
+        return !done[s.id];
+      })
+      .map(_shortName);
+    // A few names to chase; past six, the count.
+    var who = !missing.length
+      ? 'No one'
+      : !answered
+        ? 'All ' + missing.length + ' students'
+        : missing.length > 6
+          ? missing.slice(0, 6).join(', ') + ' and ' + (missing.length - 6) + ' more'
+          : missing.join(', ');
+    facts.push(_fact('Not Answered', esc(who)));
     return '<div class="sq-facts">' + facts.join('') + '</div>';
   }
 
-  function _notAnswered(cid, q) {
-    var done = {};
-    (q.answered || []).forEach(function (id) {
-      done[id] = true;
-    });
-    return getStudents(cid).filter(function (s) {
-      return !done[s.id];
-    });
+  /* The teacher's other classes, for Copy to Another Class. */
+  function _otherClasses(cid) {
+    if (typeof COURSES === 'undefined') return [];
+    return Object.keys(COURSES)
+      .filter(function (id) {
+        return id !== cid && COURSES[id] && !COURSES[id].archived;
+      })
+      .map(function (id) {
+        return COURSES[id];
+      })
+      .sort(function (a, b) {
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
   }
 
-  /* One student's slip, for a lost or locked one: only that student's old
-     slip stops working. Not Answered students come first. */
-  // html-safe: names are escaped; ids are the class's student ids.
-  function _printOneHtml(cid, q) {
-    var left = _notAnswered(cid, q);
-    var leftIds = {};
-    left.forEach(function (s) {
-      leftIds[s.id] = true;
-    });
-    var rest = getStudents(cid).filter(function (s) {
-      return !leftIds[s.id];
-    });
-    var opt = function (s) {
-      return '<option value="' + esc(s.id) + '">' + esc(fullName(s)) + '</option>';
-    };
+  // html-safe: class names are escaped; ids are the teacher's class ids, escaped too
+  function _copyHtml(cid, q) {
+    var others = _otherClasses(cid);
+    if (!others.length) return '';
     return (
-      '<select class="cm-input sq-print-one" data-action-change="sqPrintOne" data-qid="' +
+      '<select class="cm-input sq-copy" data-action-change="sqCopyTo" data-qid="' +
       q.id +
-      '" aria-label="Print one student’s slip">' +
-      '<option value="">Print One Slip…</option>' +
-      (left.length ? '<optgroup label="Not Answered">' + left.map(opt).join('') + '</optgroup>' : '') +
-      (rest.length ? '<optgroup label="Answered">' + rest.map(opt).join('') + '</optgroup>' : '') +
+      '" aria-label="Copy to Another Class">' +
+      '<option value="">Copy to Another Class…</option>' +
+      others
+        .map(function (c) {
+          return '<option value="' + esc(c.id) + '">' + esc(c.name || 'Class') + '</option>';
+        })
+        .join('') +
       '</select>'
     );
   }
 
+  var ANSWERED_NO_DELETE =
+    'Students have answered this, so it can\u2019t be deleted. Turn it off to take it out of their Reflect tab.';
+
+  /* A teacher-built reflection's own buttons: edit, copy and Delete. Delete
+     on one students have answered says why it can't be (the server keeps
+     answers: it refuses). */
+  function _customButtons(cid, q, withEdit) {
+    return (
+      (withEdit
+        ? '<button type="button" class="cm-action-btn" data-action="sqEdit" data-qid="' +
+          q.id +
+          '">Edit Questions</button>'
+        : '') +
+      _copyHtml(cid, q) +
+      '<button type="button" class="cm-action-btn" data-action="sqDelete" data-qid="' +
+      q.id +
+      '">Delete</button>'
+    );
+  }
+
+  // See Answers, on any reflection the answers view can show.
+  function _seeAnswersBtn(q) {
+    return _answersView()
+      ? '<button type="button" class="btn btn-primary" data-action="sqSeeAnswers" data-qid="' +
+          q.id +
+          '">See Answers</button>'
+      : '';
+  }
+
   function _actions(cid, q) {
     var shown = !!_open[q.id];
-    var left = _notAnswered(cid, q).length;
-    var some = (q.answered || []).length > 0;
     var html =
       '<div class="sq-actions">' +
-      '<button type="button" class="btn btn-primary" data-action="sqPrint" data-qid="' +
-      q.id +
-      '">Print QR Slips</button>' +
-      (some && left
-        ? '<button type="button" class="cm-action-btn" data-action="sqPrint" data-qid="' +
-          q.id +
-          '" data-missing="1">Print Slips for ' +
-          left +
-          ' Not Answered</button>'
-        : '') +
-      _printOneHtml(cid, q) +
+      _seeAnswersBtn(q) +
       '<button type="button" class="cm-action-btn" data-action="sqToggleQuestions" data-qid="' +
       q.id +
       '" aria-expanded="' +
@@ -238,18 +246,15 @@ var CmQuestionnaires = (function () {
       q.id +
       '" aria-expanded="' +
       !!_dates[q.id] +
-      '">Change Dates</button>' +
-      '</div>' +
-      '<div class="cm-hint sq-print-hint">A new slip replaces the one that student already has; the old code stops working.</div>';
+      '">' +
+      (q.closes_on ? 'Change Closing Date' : 'Set a Closing Date') +
+      '</button>' +
+      (q.kind === 'custom' ? _customButtons(cid, q, false) : '') +
+      '</div>';
     var d = _dates[q.id];
     if (d) {
       html +=
         '<div class="sq-dates">' +
-        '<label class="cm-field"><span class="cm-label">Opens</span><input type="date" class="cm-input" id="sq-opens-' +
-        q.id +
-        '" value="' +
-        esc(d.opens || '') +
-        '"></label>' +
         '<label class="cm-field"><span class="cm-label">Closes</span><input type="date" class="cm-input" id="sq-closes-' +
         q.id +
         '" value="' +
@@ -257,7 +262,12 @@ var CmQuestionnaires = (function () {
         '"></label>' +
         '<button type="button" class="btn btn-primary" data-action="sqSaveDates" data-qid="' +
         q.id +
-        '">Save Dates</button>' +
+        '">Save Closing Date</button>' +
+        (q.closes_on
+          ? '<button type="button" class="cm-action-btn" data-action="sqClearDates" data-qid="' +
+            q.id +
+            '">No Closing Date</button>'
+          : '') +
         '<button type="button" class="btn btn-ghost" data-action="sqToggleDates" data-qid="' +
         q.id +
         '">Cancel</button>' +
@@ -375,7 +385,7 @@ var CmQuestionnaires = (function () {
       '<li class="sq-q sq-q-slip">' +
       '<div class="sq-q-head"><span class="sq-num">' +
       n +
-      '</span><span class="sq-type">Goal Check-In · on the same slip</span>' +
+      '</span><span class="sq-type">Goal Check-In · asked with this reflection</span>' +
       '<span class="sq-slip-seg">' +
       _seg('Goal Check-In', on, 'sqGoalOn', ' data-qid="' + q.id + '"') +
       '</span></div>' +
@@ -450,7 +460,9 @@ var CmQuestionnaires = (function () {
 
   function _card(opts) {
     var q = opts.q;
-    var on = !!(q && q.is_on) || (!q && !!_turning[opts.key]);
+    var on = _isOn(q) || (!q && !!_turning[opts.key]);
+    var st = q ? Questionnaires.status(q, _today()) : null;
+    var closed = st && st.state === 'closed';
     var html =
       '<article class="sq-card' +
       (on ? '' : ' sq-off') +
@@ -461,16 +473,52 @@ var CmQuestionnaires = (function () {
       esc(opts.title) +
       '</h3><div class="sq-desc">' +
       opts.descHtml +
-      '</div></div>' +
+      (on ? '' : '<span class="sq-offnote"> · Students do not see this while it is off</span>') +
+      '</div>' +
+      (closed ? '<div class="sq-closed">' + esc(st.text) + '</div>' : '') +
+      '</div>' +
       _seg(opts.title, on, 'sqTurn', opts.segAttrs) +
       '</div>';
     if (q && on) {
-      html += _facts(opts.cid, q, opts.child) + _actions(opts.cid, q);
-      if (_open[q.id]) html += _editorHtml(opts.cid, q, opts.withSlip);
-    } else if (_msg[opts.key]) {
-      html += '<div class="sq-msg" role="status">' + esc(_msg[opts.key]) + '</div>';
+      html += _facts(opts.cid, q) + _actions(opts.cid, q);
+      if (_open[q.id]) html += q.kind === 'custom' ? _customQuestionsHtml(q) : _editorHtml(opts.cid, q, opts.withSlip);
+    } else {
+      // Off or closed, what students wrote can still be read; a teacher's own can still be changed.
+      var seen = q && (q.answered || []).length ? _seeAnswersBtn(q) : '';
+      var own = q && q.kind === 'custom' ? _customButtons(opts.cid, q, true) : '';
+      if (seen || own) html += '<div class="sq-actions">' + seen + own + '</div>';
+      var m = _msg[opts.key] || (q && _msg[q.id]);
+      if (m) html += '<div class="sq-msg" role="status">' + esc(m) + '</div>';
     }
     return html + '</article>';
+  }
+
+  /* A teacher-built reflection's questions as students see them; they
+     change in the builder. */
+  function _customQuestionsHtml(q) {
+    var b = _builder();
+    if (!b) return '';
+    return (
+      '<div class="sq-qs">' +
+      b.previewHtml(q.questions) +
+      '<div><button type="button" class="cm-action-btn" data-action="sqEdit" data-qid="' +
+      q.id +
+      '">Edit Questions</button></div></div>'
+    );
+  }
+
+  function _customCard(cid, q) {
+    var n = _questions(q).filter(function (x) {
+      return x.kind !== 'section';
+    }).length;
+    return _card({
+      cid: cid,
+      key: 'custom-' + q.id,
+      q: q,
+      title: q.title || 'Reflection',
+      descHtml: esc((q.theme ? q.theme + ' · ' : 'Your own · ') + n + ' question' + (n === 1 ? '' : 's')),
+      segAttrs: ' data-kind="custom" data-qid="' + q.id + '"',
+    });
   }
 
   function _aboutMeCard(cid) {
@@ -520,7 +568,15 @@ var CmQuestionnaires = (function () {
           .join('') +
         '</select></label>';
     } else {
-      desc = esc('Grade ' + grade + (theme ? ' theme: ' + theme : '') + ' · for Report ' + period);
+      var child = _child(cid, q);
+      desc = esc(
+        'Grade ' +
+          grade +
+          (theme ? ' theme: ' + theme : '') +
+          ' · for Report ' +
+          period +
+          (child && child.is_on ? ' · with Goal Check-In' : ''),
+      );
     }
     var title = (q && q.title) || PERIOD_NAMES[period] + ' Reflection';
     return _card({
@@ -567,15 +623,29 @@ var CmQuestionnaires = (function () {
     return true;
   }
 
+  function _section(cid, inner) {
+    return '<div class="cm-section sq-section" data-cid="' + esc(cid) + '">' + inner + '</div>';
+  }
+
   function render(cid) {
-    if (!prepare(cid)) return '<div class="cm-section"><div class="cm-hint">Loading questionnaires…</div></div>';
+    if (!prepare(cid)) return '<div class="cm-section"><div class="cm-hint">Loading reflections…</div></div>';
+    var b = _builder();
+    if (b && b.isOpen(cid)) return _section(cid, b.render(cid));
+    var ans = _answersView();
+    var shown = _answers[cid] ? _find(cid, _answers[cid]) : null;
+    if (ans && shown) {
+      return _section(
+        cid,
+        // The view's own "‹ Reflections" (sqAnsBack) is the way back.
+        '<div class="sq-answers">' + ans.render(cid, shown.id) + '</div>',
+      );
+    }
+    delete _answers[cid];
     var current = Questionnaires.periodFor(new Date());
-    var reflections = Questionnaires.list(cid).filter(function (x) {
-      return x.kind === 'core_reflection';
-    });
+    var all = Questionnaires.list(cid);
     var periods = {};
-    reflections.forEach(function (x) {
-      if (x.report_period) periods[x.report_period] = x;
+    all.forEach(function (x) {
+      if (x.kind === 'core_reflection' && x.report_period) periods[x.report_period] = x;
     });
     periods[current] = periods[current] || null;
     var cards = Object.keys(periods)
@@ -584,15 +654,25 @@ var CmQuestionnaires = (function () {
       .map(function (p) {
         return _reflectionCard(cid, p, periods[p]);
       });
-    return (
-      '<div class="cm-section sq-section" data-cid="' +
-      esc(cid) +
-      '">' +
-      '<div class="sq-section-head"><div class="cm-section-title">Student Questionnaires</div>' +
-      '<div class="cm-hint">Students scan their own QR slip and answer on their phone.</div></div>' +
-      _aboutMeCard(cid) +
-      cards.join('') +
-      '</div>'
+    var custom = all
+      .filter(function (x) {
+        return x.kind === 'custom';
+      })
+      .sort(function (a, b) {
+        return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+      })
+      .map(function (q) {
+        return _customCard(cid, q);
+      });
+    return _section(
+      cid,
+      '<div class="sq-section-head"><div class="sq-section-titles"><div class="cm-section-title">Reflections</div>' +
+        '<div class="cm-hint">Students open these from the Reflect tab after they sign in with their card. Turn one on to show it.</div></div>' +
+        (b ? '<button type="button" class="btn btn-primary sq-new" data-action="sqNew">New Reflection</button>' : '') +
+        '</div>' +
+        _aboutMeCard(cid) +
+        cards.join('') +
+        custom.join(''),
     );
   }
 
@@ -619,6 +699,9 @@ var CmQuestionnaires = (function () {
     });
   }
 
+  /* On: today, with no closing date; one past its closing date opens
+     again with none (Questionnaires.turnOn). A reflection's Goal Check-In
+     keeps its dates. */
   function _turnOn(cid, el) {
     var key = el.closest('[data-card]') ? el.closest('[data-card]').dataset.card : '';
     var today = _today();
@@ -630,13 +713,14 @@ var CmQuestionnaires = (function () {
       template_id: el.dataset.template,
       report_period: period,
       opens_on: today,
-      closes_on: _addDays(today, kind === 'about_me' ? 7 : 13),
+      closes_on: null,
     };
     if (!spec.template_id && !spec.id) return;
     delete _msg[key];
+    if (spec.id) delete _msg[spec.id];
     // The switch shows On while it saves (the sync dot shows the save).
     _turning[key] = true;
-    var saving = Questionnaires.turnOn(cid, spec);
+    var saving = Questionnaires.turnOn(cid, spec, today);
     _rerender();
     return saving.then(function (q) {
       delete _turning[key];
@@ -645,8 +729,9 @@ var CmQuestionnaires = (function () {
         _rerender();
         return;
       }
-      // A new reflection brings its Goal Check-In, on the same slip.
-      if (kind === 'core_reflection' && !spec.id) {
+      var child = _child(cid, q);
+      // A new reflection brings its Goal Check-In.
+      if (kind === 'core_reflection' && !child) {
         return Questionnaires.turnOn(cid, {
           kind: 'goal_checkin',
           template_id: 'goal-checkin',
@@ -656,39 +741,64 @@ var CmQuestionnaires = (function () {
           closes_on: q.closes_on,
         }).then(_rerender);
       }
+      if (child && (child.closes_on || null) !== (q.closes_on || null)) {
+        return _save(cid, child, { opens_on: q.opens_on, closes_on: q.closes_on || null }).then(_rerender);
+      }
       _rerender();
     });
   }
 
-  function _print(cid, qid, missingOnly, onlyIds) {
-    var q = _find(cid, qid);
-    if (!q) return;
-    var ids = onlyIds
-      ? onlyIds
-      : missingOnly
-        ? _notAnswered(cid, q).map(function (s) {
-            return s.id;
-          })
-        : null;
-    _msg[qid] = 'Making slips…';
+  function _saveCloses(cid, q, closes) {
+    delete _msg[q.id];
+    delete _dates[q.id];
+    var dates = { closes_on: closes || null };
+    _save(cid, q, dates)
+      .then(function () {
+        var child = _child(cid, q);
+        return child ? _save(cid, child, dates) : null;
+      })
+      .then(_rerender);
     _rerender();
-    return Questionnaires.issueCodes(cid, qid, ids).then(function (res) {
-      var codes = (res && res.data) || [];
-      if (!codes.length) {
-        _msg[qid] =
-          res && res.error
-            ? 'Could not make the slips. Check the connection and try again.'
-            : 'No students to make slips for.';
-        _rerender();
-        return;
-      }
-      delete _msg[qid];
+  }
+
+  function _delete(cid, q) {
+    if ((q.answered || []).length) {
+      _msg[q.id] = ANSWERED_NO_DELETE;
       _rerender();
-      QrSlips.print(cid, q, codes);
-    });
+      return;
+    }
+    var go = function () {
+      delete _msg[q.id];
+      Questionnaires.remove(cid, q.id).then(function (res) {
+        if (res && res.deleted) delete _open[q.id];
+        else if (res && res.refused) _msg[q.id] = ANSWERED_NO_DELETE;
+        else _msg[q.id] = 'Could not delete this. Check the connection and try again.';
+        _rerender();
+      });
+    };
+    if (typeof showConfirm !== 'function') return go();
+    showConfirm(
+      'Delete This Reflection?',
+      '\u201c' + (q.title || 'Reflection') + '\u201d is deleted from this class. This cannot be undone.',
+      'Delete',
+      'danger',
+      go,
+    );
   }
 
   function handleAction(action, el) {
+    if (action === 'sqAnsBack') {
+      var back = _cid(el);
+      if (back) delete _answers[back];
+      _rerender();
+      return true;
+    }
+    if (/^sqAns/.test(action)) {
+      var ans = _answersView();
+      return ans && ans.handleAction ? ans.handleAction(action, el) !== false : false;
+    }
+    var b = _builder();
+    if (/^sqB[A-Z]/.test(action)) return b ? b.handleAction(action, el) : false;
     var cid = _cid(el);
     if (!cid) return false;
     var qid = el.dataset.qid;
@@ -697,8 +807,8 @@ var CmQuestionnaires = (function () {
     switch (action) {
       case 'sqTurn':
         if (el.dataset.on === '1') {
-          if (!q || !q.is_on) _turnOn(cid, el);
-        } else if (q && q.is_on) {
+          if (!_isOn(q)) _turnOn(cid, el);
+        } else if (_isOn(q)) {
           // setOn changes the copy at once; draw it now, not after the save.
           Questionnaires.setOn(cid, q.id, false).then(_rerender);
           _rerender();
@@ -721,8 +831,23 @@ var CmQuestionnaires = (function () {
         }
         return true;
       }
-      case 'sqPrint':
-        _print(cid, qid, el.dataset.missing === '1');
+      case 'sqNew':
+        if (!b) return true;
+        b.open(cid, null);
+        _rerender();
+        return true;
+      case 'sqEdit':
+        if (!b || !q) return true;
+        b.open(cid, q);
+        _rerender();
+        return true;
+      case 'sqSeeAnswers':
+        if (!q) return true;
+        _answers[cid] = q.id;
+        _rerender();
+        return true;
+      case 'sqDelete':
+        if (q) _delete(cid, q);
         return true;
       case 'sqToggleQuestions':
         _open[qid] = !_open[qid];
@@ -730,33 +855,26 @@ var CmQuestionnaires = (function () {
         return true;
       case 'sqToggleDates':
         if (_dates[qid] || !q) delete _dates[qid];
-        else _dates[qid] = { opens: q.opens_on || '', closes: q.closes_on || '' };
+        else _dates[qid] = { closes: q.closes_on || '' };
         delete _msg[qid];
         _rerender();
         return true;
       case 'sqSaveDates': {
         if (!q) return true;
-        var opens = (document.getElementById('sq-opens-' + qid) || {}).value || null;
         var closes = (document.getElementById('sq-closes-' + qid) || {}).value || null;
-        // Kept as typed, so a refusal doesn't wipe them.
-        _dates[qid] = { opens: opens || '', closes: closes || '' };
-        if (opens && closes && closes < opens) {
-          _msg[qid] = 'The closing date comes before the opening date.';
+        // Kept as typed, so a refusal doesn't wipe it.
+        _dates[qid] = { closes: closes || '' };
+        if (closes && closes < _today()) {
+          _msg[qid] = 'That day has passed. Pick today or a later day.';
           _rerender();
           return true;
         }
-        delete _msg[qid];
-        delete _dates[qid];
-        var dates = { opens_on: opens, closes_on: closes };
-        _save(cid, q, dates)
-          .then(function () {
-            var child = _child(cid, q);
-            return child ? _save(cid, child, dates) : null;
-          })
-          .then(_rerender);
-        _rerender();
+        _saveCloses(cid, q, closes);
         return true;
       }
+      case 'sqClearDates':
+        if (q) _saveCloses(cid, q, null);
+        return true;
       case 'sqAddQuestion': {
         if (!q) return true;
         _open[qid] = true;
@@ -809,6 +927,17 @@ var CmQuestionnaires = (function () {
   }
 
   function handleChange(el) {
+    var ans = _answersView();
+    var a = (el.dataset && el.dataset.actionChange) || '';
+    if (
+      ans &&
+      ans.handleChange &&
+      (/^sqAns/.test(a) || (el.closest && el.closest('.sq-answers'))) &&
+      ans.handleChange(el)
+    )
+      return true;
+    var b = _builder();
+    if (b && /^sqB[A-Z]/.test(a)) return b.handleChange(el);
     var cid = _cid(el);
     if (!cid) return false;
     if (el.dataset.actionChange === 'sqGrade') {
@@ -816,10 +945,18 @@ var CmQuestionnaires = (function () {
       _rerender();
       return true;
     }
-    if (el.dataset.actionChange === 'sqPrintOne') {
-      var sid = el.value;
+    if (el.dataset.actionChange === 'sqCopyTo') {
+      var to = el.value;
       el.selectedIndex = 0;
-      if (sid) _print(cid, el.dataset.qid, false, [sid]);
+      var src = _find(cid, el.dataset.qid);
+      if (!to || !src) return true;
+      var name = (COURSES[to] && COURSES[to].name) || 'the other class';
+      Questionnaires.copyTo(cid, src.id, to).then(function (row) {
+        _msg[src.id] = row
+          ? 'Copied to ' + name + '. It is off there until you turn it on.'
+          : 'Could not copy this. Check the connection and try again.';
+        _rerender();
+      });
       return true;
     }
     if (el.dataset.actionChange === 'sqCoreAdd') {
@@ -841,6 +978,10 @@ var CmQuestionnaires = (function () {
      back to what it was; Remove takes a question out. */
   function handleBlur(el) {
     var kind = el.dataset.actionBlur;
+    var b = _builder();
+    if (b && kind === 'sqBField') return b.handleBlur(el);
+    var ans = _answersView();
+    if (ans && ans.handleBlur && /^sqAns/.test(kind || '')) return ans.handleBlur(el) !== false;
     if (kind !== 'sqPrompt' && kind !== 'sqMyed' && kind !== 'sqDraft') return false;
     var cid = _cid(el);
     var q = cid ? _find(cid, el.dataset.qid) : null;
@@ -882,6 +1023,8 @@ var CmQuestionnaires = (function () {
     _saving = {};
     _draft = {};
     _turning = {};
+    _answers = {};
+    if (_builder()) _builder()._reset();
   }
 
   return {

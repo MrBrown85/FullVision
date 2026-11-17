@@ -21,7 +21,7 @@
    the view, so it cannot be drawn.
 
    ui: { tab: 'assignments' | 'learning' | 'questionnaires' (the tab
-         called Reflections), segment: 'outstanding' | 'upcoming', pick:
+         called Reflect), segment: 'outstanding' | 'upcoming', pick:
          the id of the card picked on a Chromebook,
          feedback: the id of the piece Your Feedback is open on, whole:
          true for its The Whole Rubric (also for work not back yet, from
@@ -38,8 +38,8 @@
    The three tabs (Colin, 2026-11-14): Assignments is what the student
    still has to do, Outstanding and Upcoming, the cards one under another
    to scroll; My Learning is their report card, the grade and every piece
-   handed in or returned, each opening its feedback; Reflections is the
-   questionnaires. */
+   handed in or returned, each opening its feedback; Reflect is the
+   questionnaires, each called a reflection. */
 window.StudentPageView = (function () {
   'use strict';
 
@@ -1574,13 +1574,14 @@ window.StudentPageView = (function () {
   var NEXT_ARROW =
     '<svg class="sp-row-go" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>';
 
-  /* The tabs besides Assignments. Reflections (the student's
-     questionnaires: Core Competency self-reflections and the rest; Colin,
-     2026-11-14, "change questionnaires to reflections") lists what the
-     view holds; with nothing there it says so plainly. */
+  /* The tabs besides Assignments. Reflect (the student's questionnaires:
+     Core Competency self-reflections, the teacher's own and the rest; each
+     one is a reflection. Colin, 2026-11-16: "Reflect 'Questionnaires' into
+     Reflect altogether") lists what the view holds; with nothing there it
+     says so plainly. */
   var TAB_BODIES = {
     learning: { title: 'My Learning', line: '' },
-    questionnaires: { title: 'Reflections', line: 'Reflections from your teacher will show here.' },
+    questionnaires: { title: 'Reflect', line: 'Reflections from your teacher will show here.' },
   };
 
   /* ── Reflections (the artboard's "Questionnaires Tab" and "Questions on
@@ -1714,7 +1715,7 @@ window.StudentPageView = (function () {
     };
     var picked = pieceIn(items, ui.form);
     return (
-      '<h1 class="sp-page-title" tabindex="-1">Reflections</h1>' +
+      '<h1 class="sp-page-title" tabindex="-1">Reflect</h1>' +
       '<div class="sp-split sp-forms">' +
       formSide(items, picked, formWhen, function (q) {
         return q.state === 'open' ? 'missing' : q.state === 'sent' ? 'back' : 'due';
@@ -2105,21 +2106,29 @@ window.StudentPageView = (function () {
     { id: 'learning', label: 'My Learning', icon: '<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>' },
     {
       id: 'questionnaires',
-      label: 'Reflections',
+      label: 'Reflect',
       icon: '<circle cx="12" cy="12" r="8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5v.01"/>',
     },
   ];
 
   /* What is new on each tab since the student last looked (the board's red
      badge): a revision asked for on Assignments; work back or updated on
-     My Learning. */
+     My Learning. Reflect counts the reflections open and not yet answered
+     (docs/plans/reflect-plan.md, "What changes" 6). */
   function newsOf(view, ui) {
     var n = { assignments: 0, learning: 0, questionnaires: 0 };
     if (!view || ui.waiting) return n;
     (view.changes || []).forEach(function (c) {
       n[c.why === 'revise' ? 'assignments' : 'learning'] += 1;
     });
+    n.questionnaires = (view.questionnaires || []).filter(function (q) {
+      return q && q.state === 'open';
+    }).length;
     return n;
+  }
+  // The badge in words: "2 new", or on Reflect "2 to answer".
+  function badgeWords(id, n) {
+    return n + (id === 'questionnaires' ? ' to answer' : ' new');
   }
 
   /* The three tabs. Drawn twice, once in the header for a Chromebook and
@@ -2147,7 +2156,7 @@ window.StudentPageView = (function () {
           '<span class="sp-tab-label">' +
           esc(t.label) +
           '</span>' +
-          (n ? '<span class="sp-hidden-title">' + esc(n + ' new') + '</span>' : '') +
+          (n ? '<span class="sp-hidden-title">' + esc(badgeWords(t.id, n)) + '</span>' : '') +
           '</button>'
         );
       }).join('') +

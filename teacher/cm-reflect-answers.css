@@ -1,0 +1,444 @@
+/* See Answers on the Reflect tab (teacher/cm-reflect-answers.js), as board 3
+   of the Reflect mockup draws it. One blue for bars (#0a6ad6 on #f2f2f7);
+   every bar and cell carries its number, so nothing rests on colour. */
+
+.ra {
+  --ra-blue: #0a6ad6;
+  --ra-track: #f2f2f7;
+  --ra-t1: #f5f9ff;
+  --ra-t2: #eaf3ff;
+  --ra-t3: #dbeaff;
+  --ra-t4: #c5deff;
+  --ra-t5: #9cc7ff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text);
+  font-size: var(--text-base);
+}
+
+.ra button {
+  font: inherit;
+}
+
+/* ── Head ── */
+.ra-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ra-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ra-title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.ra-back,
+.ra-more,
+.ra-name {
+  align-self: flex-start;
+  padding: 2px 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--link);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.ra-name {
+  font-size: inherit;
+  font-weight: 600;
+  padding: 0;
+}
+.ra-back:hover,
+.ra-more:hover,
+.ra-name:hover {
+  text-decoration: underline;
+}
+.ra-sub {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.ra-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ra-missing {
+  font-size: var(--text-sm);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px 12px;
+  line-height: 1.6;
+}
+.ra-missing strong {
+  font-weight: 600;
+}
+
+/* ── Question cards ── */
+.ra-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.ra-card {
+  border: 0.5px solid var(--divider-strong);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.ra-wide,
+.ra-section {
+  grid-column: 1 / -1;
+}
+.ra-section h3,
+.ra-form {
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.ra-q-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.ra-q {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.ra-q-count {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.ra-q-sub,
+.ra-hint,
+.ra-when {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.ra-private {
+  align-self: flex-start;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--notice-text);
+  background: var(--notice-bg);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.ra-none {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+
+/* Answers by student: name, then their words. */
+.ra-list {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  row-gap: 6px;
+  column-gap: 12px;
+  font-size: var(--text-base);
+}
+.ra-list .ra-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ra-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Bars: label, track, count. A bar is a button that lists who chose it. */
+.ra-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ra-bar {
+  display: grid;
+  grid-template-columns: minmax(80px, 128px) minmax(0, 1fr) 24px;
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 3px 4px;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+button.ra-bar {
+  cursor: pointer;
+}
+button.ra-bar:hover,
+.ra-bar.is-picked {
+  background: var(--overlay-hover);
+}
+.ra-bar-label {
+  overflow-wrap: anywhere;
+}
+.ra-bar-track {
+  display: block;
+  height: 14px;
+  background: var(--ra-track);
+  border-radius: 3px;
+}
+.ra-bar-fill {
+  display: block;
+  height: 14px;
+  background: var(--ra-blue);
+  border-radius: 3px;
+}
+.ra-bar-n {
+  font-weight: 600;
+  text-align: right;
+}
+.ra-who {
+  font-size: var(--text-sm);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.6;
+}
+.ra-other {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The grid: statements by columns, darker meaning more. */
+.ra-grid-t {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  font-size: var(--text-sm);
+  table-layout: fixed;
+}
+.ra-grid-t thead th {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+.ra-grid-t tbody th {
+  font-weight: 400;
+  text-align: left;
+  width: 40%;
+}
+.ra-cell {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--surface-2);
+  border-radius: 4px;
+}
+button.ra-cell {
+  cursor: pointer;
+}
+.ra-cell.is-picked,
+button.ra-cell:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+.ra-t1 {
+  background: var(--ra-t1);
+  border-color: var(--ra-t1);
+}
+.ra-t2 {
+  background: var(--ra-t2);
+  border-color: var(--ra-t2);
+}
+.ra-t3 {
+  background: var(--ra-t3);
+  border-color: var(--ra-t3);
+}
+.ra-t4 {
+  background: var(--ra-t4);
+  border-color: var(--ra-t4);
+}
+.ra-t5 {
+  background: var(--ra-t5);
+  border-color: var(--ra-t5);
+}
+.ra-t6 {
+  color: #fff;
+  background: var(--ra-blue);
+  border-color: var(--ra-blue);
+}
+
+/* Ranking: the class's order. */
+.ra-rank {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ra-rank li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--surface-2);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.ra-rank strong {
+  font-weight: 700;
+  margin-right: 6px;
+}
+.ra-rank-first {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.ra-rank .ra-more {
+  align-self: center;
+  color: var(--link);
+}
+
+/* Core Competencies: one block per competency. */
+.ra-core {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.ra-core-one {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ra-core-one h5 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+/* ── By Student ── */
+.ra-stu-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ra-stu-pick {
+  font: inherit;
+  font-size: var(--text-base);
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  max-width: 260px;
+}
+.ra-stu-count {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.ra-stu-bar .ra-more {
+  align-self: center;
+  margin-left: auto;
+}
+.ra-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+}
+.ra-one {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 0.5px solid var(--divider-medium);
+}
+.ra-ans {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+.ra-ans-set {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+.ra-ans-set dt {
+  color: var(--text-2);
+}
+.ra-ans-set dd {
+  margin: 0;
+  font-weight: 600;
+}
+.ra-ans-rank {
+  margin: 0;
+  padding-left: 22px;
+}
+.ra-ans-core + .ra-ans-core {
+  margin-top: 6px;
+}
+
+/* ── Print: only the sheet ── */
+.ra-print {
+  display: none;
+}
+.ra-p-head h1 {
+  margin: 0;
+  font-size: 18pt;
+}
+.ra-p-who {
+  font-size: 13pt;
+  font-weight: 600;
+}
+
+@media print {
+  body.ra-print-active {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body.ra-print-active > :not(#ra-print-root) {
+    display: none !important;
+  }
+  body.ra-print-active #ra-print-root {
+    display: flex;
+    font-size: 10.5pt;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #ra-print-root .ra-cards {
+    display: block;
+  }
+  #ra-print-root .ra-card,
+  #ra-print-root .ra-one {
+    break-inside: avoid;
+    margin-bottom: 10px;
+  }
+  #ra-print-root .ra-name {
+    color: #000;
+  }
+}

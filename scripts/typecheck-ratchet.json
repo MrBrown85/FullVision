@@ -39,7 +39,10 @@
     "teacher/assign-list.js",
     "teacher/grade-change.js",
     "teacher/expand-motion.js",
-    "teacher/card-menu.js"
+    "teacher/card-menu.js",
+    "s/question-kinds.js",
+    "teacher/cm-reflect-answers.js",
+    "teacher/cm-reflect-builder.js"
   ],
   "notYetChecked": [
     "s/app.js",

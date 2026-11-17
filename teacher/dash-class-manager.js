@@ -4195,7 +4195,7 @@ window.DashClassManager = (function () {
   var CM_TABS = [
     { id: 'details', label: 'Details' },
     { id: 'students', label: 'Students' },
-    { id: 'questionnaires', label: 'Questionnaires' },
+    { id: 'questionnaires', label: 'Reflect' },
     {
       id: 'student-page',
       label: 'Student Page',

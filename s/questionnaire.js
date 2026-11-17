@@ -23,6 +23,11 @@
   var clearDraft = StudentPage.clearDraft;
   var paint = StudentPage.paint;
   var grow = StudentPage.grow;
+  // A teacher-built reflection's questions and the new kinds (s/question-kinds.js); a copy of
+  // index.html from before it draws the ready-made reflections as it always did.
+  var Kinds = typeof StudentQuestionKinds !== 'undefined' ? StudentQuestionKinds : null;
+  var STARRED = 'Answer the questions marked with a star first.';
+  var PREVIEW_KEY = 'fv-reflect-preview';
 
   // The page's state and its #app: student.js's own, handed over by share.
   var S = null;
@@ -114,7 +119,12 @@
     return course ? p.replace(/\bthis class\b/g, course) : p;
   }
 
+  function isNewKind(q) {
+    return !!Kinds && Kinds.isNew(q.kind);
+  }
+
   function isAnswered(q, v) {
+    if (isNewKind(q)) return Kinds.isAnswered(q, v);
     if (v == null) return false;
     if (typeof v === 'string') return v.trim() !== '';
     if (Array.isArray(v))
@@ -136,18 +146,39 @@
     return false;
   }
 
+  // Answered in full: a likert needs every statement (s/question-kinds.js); the rest as isAnswered.
+  function isComplete(q, v) {
+    return isNewKind(q) ? Kinds.isComplete(q, v) : isAnswered(q, v);
+  }
+
   /* The progress counts the questions every student answers; the private
-     note to the teacher is extra. */
+     note to the teacher is extra, and a section heading takes no answer. */
   function countedQuestions(data) {
     return allQuestions(data).filter(function (q) {
-      return !q.teacher_only;
+      return !q.teacher_only && q.kind !== 'section';
     });
   }
 
   function answeredCount(state) {
     return countedQuestions(state.data).filter(function (q) {
-      return isAnswered(q, state.answers[q.id]);
+      return isComplete(q, state.answers[q.id]);
     }).length;
+  }
+
+  /* The first question marked with a star that is not answered in full,
+     with the part it is on, or null. */
+  function firstMissing(state) {
+    var skip = noGoalQuestions(state.data);
+    var parts = (state.data && state.data.parts) || [];
+    for (var i = 0; i < parts.length; i++) {
+      var qs = parts[i].questions || [];
+      for (var j = 0; j < qs.length; j++) {
+        var q = qs[j];
+        if (skip[q.id] || q.kind === 'section' || !Kinds || !Kinds.required(q)) continue;
+        if (!isComplete(q, state.answers[q.id])) return { part: i, q: q };
+      }
+    }
+    return null;
   }
 
   /* The answers as submit takes them: only the answered ones. */
@@ -155,6 +186,11 @@
     var out = {};
     allQuestions(state.data).forEach(function (q) {
       var v = state.answers[q.id];
+      if (isNewKind(q)) {
+        var nv = Kinds.value(q, v);
+        if (nv !== undefined) out[q.id] = nv;
+        return;
+      }
       if (!isAnswered(q, v)) return;
       if (q.kind === 'short_set') {
         out[q.id] = v.map(function (x) {
@@ -502,7 +538,16 @@
     return html;
   }
 
+  // A choice's Other is chosen: pressed, or a typed answer kept (a draft brought back).
+  function otherOn(state, q, v) {
+    if (state.otherOn && Object.prototype.hasOwnProperty.call(state.otherOn, q.id)) return !!state.otherOn[q.id];
+    return !!(Kinds && Kinds.otherText(q, v));
+  }
+
   function questionCard(q, v, part, course) {
+    if (Kinds && Kinds.owns(q, part)) {
+      return Kinds.card(q, v, { prompt: promptText(q, course), other: otherOn(S, q, v) });
+    }
     if (q.teacher_only) {
       return (
         '<section class="sp-card sp-card-private"><div class="sp-private-tag">' +
@@ -589,7 +634,9 @@
     var part = d.parts[state.part];
     var course = d.course.name;
     var body = '';
+    if (state.preview) body += '<p class="sp-preview-note" role="note">This is a preview. Nothing is sent.</p>';
     if (part.kind === 'core_reflection') body += reflectionIntro(part);
+    if (part.kind === 'custom' && Kinds) body += Kinds.intro(part);
     if (part.kind === 'goal_checkin') {
       body += goalSections(state, part);
     } else {
@@ -608,8 +655,13 @@
       '</main>' +
       '<footer class="sp-foot">' +
       (state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '') +
-      '<div class="sp-foot-row">' +
-      '<button type="button" class="sp-btn sp-btn-quiet" data-act="back">Back</button>' +
+      '<div class="sp-foot-row' +
+      (state.preview && state.part === 0 ? ' sp-foot-one' : '') +
+      '">' +
+      // A preview's first part has nowhere to go back to.
+      (state.preview && state.part === 0
+        ? ''
+        : '<button type="button" class="sp-btn sp-btn-quiet" data-act="back">Back</button>') +
       (last
         ? '<button type="button" class="sp-btn sp-btn-primary" data-act="send"' +
           (state.sending ? ' disabled' : '') +
@@ -639,7 +691,11 @@
       (reflection
         ? '<p class="sp-note">Talk with your family about what you wrote. It will be part of your report.</p>'
         : '') +
-      (state.demo ? '<p class="sp-note">This was Demo Mode. Nothing was sent.</p>' : '') +
+      (state.preview
+        ? '<p class="sp-note">This is a preview. Nothing was sent.</p>'
+        : state.demo
+          ? '<p class="sp-note">This was Demo Mode. Nothing was sent.</p>'
+          : '') +
       (state.back
         ? '<button type="button" class="sp-btn sp-btn-primary" data-act="page-back">Back to Your Page</button>'
         : '') +
@@ -660,6 +716,20 @@
       while (arr.length < n) arr.push('');
       arr[Number(el.dataset.i)] = el.value;
       state.answers[id] = arr;
+    } else if (kind === 'date') {
+      state.answers[id] = el.value;
+    } else if (kind === 'other') {
+      setOther(state, q, el.value);
+    } else if (kind === 'select') {
+      var v = el.value;
+      var ons = state.otherOn || (state.otherOn = {});
+      if (v === Kinds.OTHER) {
+        ons[id] = true;
+        state.answers[id] = [];
+      } else {
+        ons[id] = false;
+        state.answers[id] = v ? [v] : [];
+      }
     } else if (kind === 'why') {
       var cur = Object.assign({}, state.answers[id] || {});
       if (el.dataset.core === '_') cur.why = el.value;
@@ -681,6 +751,87 @@
     state.answers[q.id] = cur;
   }
 
+  /* A teacher-built reflection's choice pressed. One answer: that one, or
+     none when pressed again (Other goes). Many: it joins or leaves, the
+     typed Other kept. */
+  function pickChoice(state, q, value) {
+    var single = (q.options || {}).multiple === false;
+    var list = Kinds.choicesOf(q);
+    var cur = Array.isArray(state.answers[q.id]) ? state.answers[q.id].slice() : [];
+    if (single) {
+      (state.otherOn || (state.otherOn = {}))[q.id] = false;
+      state.answers[q.id] = cur.indexOf(value) >= 0 ? [] : [value];
+      return;
+    }
+    var at = cur.indexOf(value);
+    if (at >= 0) cur.splice(at, 1);
+    else if (list.indexOf(value) >= 0) cur.push(value);
+    state.answers[q.id] = cur;
+  }
+
+  // Other pressed: chosen (one answer: the choices go) or not (the typed answer goes).
+  function toggleOther(state, q) {
+    var ons = state.otherOn || (state.otherOn = {});
+    var on = !otherOn(state, q, state.answers[q.id]);
+    ons[q.id] = on;
+    var single = (q.options || {}).multiple === false;
+    var list = Kinds.choicesOf(q);
+    var cur = Array.isArray(state.answers[q.id]) ? state.answers[q.id] : [];
+    state.answers[q.id] =
+      on && single
+        ? []
+        : cur.filter(function (x) {
+            return list.indexOf(x) >= 0;
+          });
+    return on;
+  }
+
+  // The typed Other, up to 60, in place of any typed before; nothing typed, nothing kept.
+  function setOther(state, q, text) {
+    var list = Kinds.choicesOf(q);
+    var single = (q.options || {}).multiple === false;
+    var cur = (Array.isArray(state.answers[q.id]) ? state.answers[q.id] : []).filter(function (x) {
+      return !single && list.indexOf(x) >= 0;
+    });
+    var t = String(text || '')
+      .trim()
+      .slice(0, 60);
+    if (t) cur.push(t);
+    (state.otherOn || (state.otherOn = {}))[q.id] = true;
+    state.answers[q.id] = cur;
+  }
+
+  // A rating pressed: that number, or none when pressed again.
+  function setRating(state, q, n) {
+    if (state.answers[q.id] === n) delete state.answers[q.id];
+    else state.answers[q.id] = n;
+  }
+
+  // A likert statement's column pressed: that one, or none when pressed again.
+  function setLikert(state, q, si, choice) {
+    var s = Kinds.statementsOf(q)[si];
+    if (s == null) return;
+    var cur = Object.assign(
+      {},
+      state.answers[q.id] && typeof state.answers[q.id] === 'object' ? state.answers[q.id] : {},
+    );
+    if (cur[s] === choice) delete cur[s];
+    else cur[s] = choice;
+    state.answers[q.id] = cur;
+  }
+
+  // A ranking's row moved one place up (-1) or down (+1); from then on it is the student's order.
+  function moveRank(state, q, i, dir) {
+    var order = Kinds.rankOrder(q, state.answers[q.id]);
+    var j = i + dir;
+    if (i < 0 || i >= order.length || j < 0 || j >= order.length) return -1;
+    var t = order[i];
+    order[i] = order[j];
+    order[j] = t;
+    state.answers[q.id] = order;
+    return j;
+  }
+
   function setStep(state, q, core, step) {
     var cur = Object.assign({}, state.answers[q.id] || {});
     if (core === '_') cur.level = cur.level === step ? undefined : step;
@@ -697,6 +848,15 @@
 
   function send() {
     if (S.sending) return Promise.resolve();
+    // A question marked with a star and not answered: say so, and go to it.
+    var miss = firstMissing(S);
+    if (miss) {
+      S.message = STARRED;
+      S.part = miss.part;
+      paint();
+      focusQuestion(miss.q);
+      return Promise.resolve();
+    }
     var answers = collect(S);
     if (!Object.keys(answers).length) {
       S.message = MESSAGES.empty;
@@ -790,7 +950,22 @@
     );
   }
 
+  /* Every starred question answered now: "Answer the questions marked
+     with a star first." has done its job and goes. */
+  function starsDone() {
+    if (!S || S.message !== STARRED || firstMissing(S)) return;
+    S.message = '';
+    var m = root && root.querySelector('.sp-foot .sp-msg');
+    if (m) m.remove();
+  }
+  // An answer changed by a press: the star message checked, the draft kept.
+  function kept() {
+    starsDone();
+    saveDraft();
+  }
+
   function updateCount() {
+    starsDone();
     var box = root && root.querySelector('.sp-progress');
     if (!box) return;
     var tmp = document.createElement('div');
@@ -816,9 +991,11 @@
     } else if (act === 'back') {
       S.message = '';
       if (S.part > 0) S.part -= 1;
-      // Opened from a card's page (S4-F4): the first part's Back goes back to that page.
-      else if (S.back && StudentPage.pageBack) return StudentPage.pageBack();
-      else S.screen = 'confirm';
+      // Opened from a card's page (S4-F4): the first part's Back goes back to that page, the draft kept first.
+      else if (S.back && StudentPage.pageBack) {
+        saveDraft();
+        return StudentPage.pageBack();
+      } else S.screen = 'confirm';
       saveDraft();
       paint();
       window.scrollTo(0, 0);
@@ -873,7 +1050,97 @@
         saveDraft();
         paint('[data-act="other-open"][data-q="' + q.id + '"]');
       }
+    } else if (act === 'kc-pick' && q && Kinds) {
+      pickChoice(S, q, el.dataset.value);
+      kept();
+      paint('[data-act="kc-pick"][data-q="' + cssEsc(q.id) + '"][data-value="' + cssEsc(el.dataset.value) + '"]');
+    } else if (act === 'kc-other' && q && Kinds) {
+      var on = toggleOther(S, q);
+      kept();
+      paint(on ? '#q-' + cssId(q.id) + '-other' : '[data-act="kc-other"][data-q="' + cssEsc(q.id) + '"]');
+    } else if (act === 'rate' && q && Kinds) {
+      setRating(S, q, Number(el.dataset.value));
+      kept();
+      paint('[data-act="rate"][data-q="' + cssEsc(q.id) + '"][data-value="' + Number(el.dataset.value) + '"]');
+    } else if (act === 'likert' && q && Kinds) {
+      setLikert(S, q, Number(el.dataset.s), el.dataset.value);
+      kept();
+      paint(
+        '[data-act="likert"][data-q="' +
+          cssEsc(q.id) +
+          '"][data-s="' +
+          Number(el.dataset.s) +
+          '"][data-value="' +
+          cssEsc(el.dataset.value) +
+          '"]',
+      );
+    } else if ((act === 'rank-up' || act === 'rank-down') && q && Kinds) {
+      var dir = act === 'rank-up' ? -1 : 1;
+      var before = rankTops(q);
+      var to = moveRank(S, q, Number(el.dataset.i), dir);
+      if (to < 0) return;
+      kept();
+      paint();
+      glide(q, before);
+      // The focus stays on the row moved: the same arrow, or the other one at either end.
+      var sel = '[data-q="' + cssEsc(q.id) + '"][data-i="' + to + '"]';
+      var btn = root.querySelector('[data-act="' + act + '"]' + sel) || root.querySelector('.sp-rq-move' + sel);
+      if (btn) btn.focus({ preventScroll: true });
     }
+  }
+
+  // An id as a CSS selector part (ids are uuids, or the builder's own: letters, digits, - and _).
+  function cssId(id) {
+    return String(id).replace(/[^\w-]/g, '\\$&');
+  }
+
+  /* Each row of a ranking glides from where it was to its new place
+     (about 200 ms); nothing fades. Read before the page is drawn again. */
+  function rankTops(q) {
+    var out = {};
+    var list = root && root.querySelector('[data-rank-q="' + cssEsc(q.id) + '"]');
+    if (!list || typeof list.querySelectorAll !== 'function') return out;
+    list.querySelectorAll('li[data-rank]').forEach(function (li) {
+      if (typeof li.getBoundingClientRect === 'function')
+        out[li.getAttribute('data-rank')] = li.getBoundingClientRect().top;
+    });
+    return out;
+  }
+  function glide(q, before) {
+    var still =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var list = root && root.querySelector('[data-rank-q="' + cssEsc(q.id) + '"]');
+    if (still || !list) return;
+    var moved = [];
+    list.querySelectorAll('li[data-rank]').forEach(function (li) {
+      var was = before[li.getAttribute('data-rank')];
+      if (was == null || typeof li.getBoundingClientRect !== 'function') return;
+      var dy = was - li.getBoundingClientRect().top;
+      if (!dy) return;
+      li.style.transition = 'none';
+      li.style.transform = 'translateY(' + dy + 'px)';
+      moved.push(li);
+    });
+    if (!moved.length) return;
+    void list.offsetHeight; // the old places drawn first
+    moved.forEach(function (li) {
+      li.style.transition = 'transform 200ms ease-out';
+      li.style.transform = '';
+    });
+  }
+
+  /* The focus on a question: its first box, the chosen choice or the
+     first, or its first button. */
+  function focusQuestion(q) {
+    var box = root && root.querySelector('[data-qbox="' + cssEsc(q.id) + '"]');
+    if (!box) return;
+    var el =
+      box.querySelector('input, textarea, select') ||
+      box.querySelector('[role="radio"][tabindex="0"]') ||
+      box.querySelector('button');
+    if (el && el.focus) el.focus({ preventScroll: false });
   }
 
   function cssEsc(s) {
@@ -884,6 +1151,8 @@
     if (!el.dataset || !el.dataset.q) return;
     var q = questionById(el.dataset.q);
     if (!q) return;
+    // A menu is read when its choice is made (onChange): choosing Other opens its box.
+    if (el.dataset.kind === 'select') return;
     setAnswer(S, q, el);
     if (el.tagName === 'TEXTAREA') grow(el);
     // Kept once the student pauses (student.js): not every key turns every answer into text.
@@ -891,11 +1160,200 @@
     updateCount();
   }
 
+  // A menu chosen, or a date picked (a date also says so as it is typed: onInput).
+  function onChange(el) {
+    if (!el.dataset || !el.dataset.q || !S || S.screen !== 'part') return;
+    var q = questionById(el.dataset.q);
+    if (!q || !Kinds) return;
+    if (el.dataset.kind === 'date') return onInput(el);
+    if (el.dataset.kind !== 'select') return;
+    var was = otherOn(S, q, S.answers[q.id]);
+    setAnswer(S, q, el);
+    kept();
+    var now = otherOn(S, q, S.answers[q.id]);
+    if (was !== now) paint(now ? '#q-' + cssId(q.id) + '-other' : '#q-' + cssId(q.id));
+    else updateCount();
+  }
+
+  /* ── Preview as a Student (docs/plans/reflect-plan.md) ─────── */
+
+  function str(v) {
+    return typeof v === 'string' ? v : '';
+  }
+
+  /* The teacher's builder leaves its draft under PREVIEW_KEY and opens
+     #preview-reflection. It is read once and removed. A reflection in the
+     shape the `form` route gives, or null for nothing to preview. */
+  function readPreview() {
+    var d = null;
+    try {
+      var raw = localStorage.getItem(PREVIEW_KEY);
+      localStorage.removeItem(PREVIEW_KEY);
+      d = JSON.parse(raw || 'null');
+    } catch (e) {
+      d = null;
+    }
+    if (!d || typeof d !== 'object' || !Array.isArray(d.questions)) return null;
+    var seen = {};
+    var questions = d.questions
+      .filter(function (q) {
+        return q && typeof q === 'object' && str(q.kind) && str(q.prompt).trim();
+      })
+      .map(function (q, i) {
+        var id = String(q.id == null ? '' : q.id).replace(/[^\w-]/g, '');
+        if (!id || seen[id]) id = 'preview-' + (i + 1);
+        seen[id] = true;
+        return {
+          id: id,
+          kind: q.kind,
+          prompt: q.prompt,
+          options: q.options && typeof q.options === 'object' ? q.options : {},
+          core_ids: [],
+          teacher_only: false,
+        };
+      });
+    return {
+      ok: true,
+      token: 'preview',
+      student: { first_name: '' },
+      course: { name: str(d.course && d.course.name) || 'Your Class' },
+      parts: [
+        {
+          id: 'preview',
+          kind: 'custom',
+          title: str(d.title).trim() || 'Untitled Reflection',
+          theme: str(d.description),
+          questions: questions,
+        },
+      ],
+      context: {},
+    };
+  }
+
+  function renderPreviewNone() {
+    return (
+      header('Preview', 'FullVision') +
+      '<main class="sp-main sp-main-center"><section class="sp-card sp-hello">' +
+      '<h1 class="sp-big">Nothing to Preview</h1>' +
+      '<p class="sp-lead" role="alert">There is nothing to preview. Open Preview as a Student from the reflection you are building.</p>' +
+      '</section></main>'
+    );
+  }
+
+  // #preview-reflection: the draft on the answering screens, nothing asked and nothing sent.
+  function startPreview(hash) {
+    if (!/^preview-reflection$/i.test(hash || '')) return false;
+    S.demo = true;
+    S.preview = true;
+    S.data = readPreview();
+    S.part = 0;
+    S.answers = {};
+    S.otherOn = {};
+    S.screen = S.data ? 'part' : 'previewnone';
+    if (typeof document !== 'undefined') document.title = 'Preview — FullVision';
+    paint(S.data ? 'h1' : null);
+    return true;
+  }
+
+  /* ── Demo Mode's reflections ───────────────────────────────── */
+
+  var DEMO_CUSTOM_ID = 'demo-q-unit2';
+  var UNIT2 = {
+    title: 'Unit 2 Exit Reflection',
+    description: 'A few questions about how the unit went. About 5 minutes.',
+  };
+
+  /* Reflect's list (app.js's demoForms): the ready-made November
+     Reflection, the teacher-built Unit 2 Exit Reflection, About Me sent,
+     March coming up. `isoDay(offset)` is the device's day, offset. */
+  function demoFormList(isoDay) {
+    return {
+      questionnaires: [
+        {
+          id: 'demo-q-reflection',
+          title: 'November Reflection',
+          description: 'Core Competencies and your goal check-in',
+          minutes: 10,
+          state: 'open',
+          closes_on: isoDay(9),
+        },
+        { id: DEMO_CUSTOM_ID, title: UNIT2.title, description: UNIT2.description, state: 'open' },
+        { id: 'demo-q-about', title: 'About Me', state: 'sent', sent_at: isoDay(-58) + 'T20:15:00Z' },
+        { id: 'demo-q-march', title: 'March Reflection', state: 'not_open_yet', opens_on: isoDay(112) },
+      ],
+    };
+  }
+
+  // Which sample Start opens (student.js's demoData).
+  function demoFormKind(id) {
+    return id === DEMO_CUSTOM_ID ? 'custom' : 'reflection';
+  }
+
+  /* The teacher-built sample, as the `form` route gives it: board 5's five
+     questions, then a Section Heading and a Date, so every new kind can be
+     tried. */
+  function demoCustom() {
+    var q = function (n, kind, prompt, options) {
+      return { id: 'demo-unit2-' + n, kind: kind, prompt: prompt, options: options, core_ids: [], teacher_only: false };
+    };
+    return {
+      ok: true,
+      token: 'demo',
+      student: { first_name: 'Cece' },
+      course: { name: 'Science 8', block: 'B' },
+      parts: [
+        {
+          id: 'demo-unit2',
+          kind: 'custom',
+          title: UNIT2.title,
+          theme: UNIT2.description,
+          closes_on: null,
+          grade: null,
+          questions: [
+            q(1, 'text', 'What is one thing you understand better after this unit?', { required: true }),
+            q(2, 'rating', 'How confident are you balancing chemical equations?', {
+              required: true,
+              levels: 5,
+              low: 'Not Yet',
+              high: 'Could Teach It',
+            }),
+            q(3, 'choice', 'Which helped you learn the most?', {
+              required: true,
+              choices: ['Labs', 'Notes', 'Practice Questions', 'Group Work'],
+              multiple: false,
+              other: true,
+            }),
+            q(4, 'likert', 'How often did you do each of these?', {
+              statements: [
+                'I asked questions when I was stuck',
+                'I checked my work before handing it in',
+                'I helped someone in my group',
+              ],
+              choices: ['Never', 'Sometimes', 'Usually', 'Always'],
+            }),
+            q(5, 'ranking', 'Put these in order, from most to least helpful.', {
+              choices: ['Labs', 'Notes', 'Practice Questions'],
+            }),
+            q(6, 'section', 'Before You Go', { subtitle: 'One last question about your lab report.' }),
+            q(7, 'date', 'When will you finish your lab report?', { subtitle: 'Pick the day you plan to hand it in.' }),
+          ],
+        },
+      ],
+      context: {},
+    };
+  }
+
+  StudentPage.demoFormList = demoFormList;
+  StudentPage.demoFormKind = demoFormKind;
+  StudentPage.demoCustom = demoCustom;
+
   StudentPage.addScreens({
     file: 'questionnaire',
-    render: { confirm: renderConfirm, part: renderPart, sent: renderSent },
+    render: { confirm: renderConfirm, part: renderPart, sent: renderSent, previewnone: renderPreviewNone },
     click: onClick,
     input: onInput,
+    change: onChange,
+    start: startPreview,
     share: function (state, el) {
       S = state;
       root = el;
@@ -907,6 +1365,17 @@
       setAnswer: setAnswer,
       toggleChoice: toggleChoice,
       setStep: setStep,
+      isComplete: isComplete,
+      firstMissing: firstMissing,
+      pickChoice: pickChoice,
+      toggleOther: toggleOther,
+      setOther: setOther,
+      setRating: setRating,
+      setLikert: setLikert,
+      moveRank: moveRank,
+      readPreview: readPreview,
+      demoCustom: demoCustom,
+      PREVIEW_KEY: PREVIEW_KEY,
     },
   });
 })();
