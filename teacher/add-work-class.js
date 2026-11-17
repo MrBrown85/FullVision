@@ -33,8 +33,9 @@
                                       opts.onClose() once it has closed.
    AddWorkClass.close()               closes at once (no asking).
    AddWorkClass.isOpen()
-   AddWorkClass.offered(cid, a)       whether the piece offers it: where the
-                                      row's + (Attach Work) is offered.
+   AddWorkClass.offered(cid, a)       whether the piece offers it: in every
+                                      class, on a piece not a draft and not
+                                      DIBELS-scored.
    AddWorkClass.students(cid, a)      the students it lists, in roster order.
    AddWorkClass.placePieces(pieces)   [{ sid, from, pages }] onto their
                                       students, drawn once; any that can't be
@@ -108,10 +109,12 @@
     });
   }
 
-  // shown: true when the caller has asked GraderWork.workShown already (a card's menu).
-  function offered(cid, a, shown) {
-    if (!cid || !a || a.isDraft || !window.GraderWork) return false;
-    if (shown !== true && !GraderWork.workShown(cid, a)) return false;
+  /* Offered in every class (plan decision 2, Colin, Nov 17 2026): on every
+     piece that is not a draft and not DIBELS-scored, student page and Send
+     Work on or off. The third argument (once "shown") is no longer read. */
+  function offered(cid, a) {
+    if (!cid || !a || a.isDraft) return false;
+    if (typeof isDibelsScored === 'function' && isDibelsScored(a)) return false;
     // Only a pair or group piece can leave nobody to list; a card's menu draws this for every piece.
     if (a.collaboration !== 'pair' && a.collaboration !== 'group') return true;
     return students(cid, a).length > 0;

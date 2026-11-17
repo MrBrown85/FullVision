@@ -645,6 +645,9 @@ function _teacherWork(cid, sid, aid, pages, mode) {
         }, 0);
         now.files = (now.files || []).concat(_teacherWorkFiles(kept.ids, pages, last + 1));
         now.updated_at = stamp;
+        // Added by the teacher in Demo Mode: shown with the student page off
+        // (GraderWork, _piecesWithWork), unlike the sample class's own work.
+        now.demo_added = true;
       } else {
         // Replace Them: every page of what is in goes, the student's among them.
         if (now) {
@@ -667,6 +670,7 @@ function _teacherWork(cid, sid, aid, pages, mode) {
           created_at: stamp,
           sent_at: stamp,
           files: _teacherWorkFiles(kept.ids, pages, 1),
+          demo_added: true, // see Add as More Pages above
         });
       }
       _studentWorkWrite(cid, draft);
@@ -780,6 +784,7 @@ function markStudentWorkOnPaper(cid, aid, sids) {
         created_at: stamp,
         sent_at: stamp,
         files: [],
+        demo_added: true, // the teacher's own, in Demo Mode (see _teacherWork)
       };
       draft.submissions.push(sub);
       made.push(sid);

@@ -13844,9 +13844,9 @@ window.PageAssignments = (function () {
     var workShown = !a.isDraft && !focusStudentId && GraderWork.workShown(cid, a);
     if (workShown && window.WorkWall)
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
-    // Add Work for the Class (teacher/add-work-class.js): where the row's +
-    // (Attach Work) is offered, never while one student is focused.
-    if (workShown && window.AddWorkClass && AddWorkClass.offered(cid, a, true))
+    // Add Work for the Class (teacher/add-work-class.js): in every class, on
+    // every piece it is offered on, never while one student is focused.
+    if (!a.isDraft && !focusStudentId && window.AddWorkClass && AddWorkClass.offered(cid, a))
       html += _cardMenuItem(
         'data-action="openAddWorkClass" ' + aid,
         LINE_ICONS.plus,

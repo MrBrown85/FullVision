@@ -1140,6 +1140,19 @@ var StudentCards = (function () {
     return st.waiting !== null && !!_watch && _watch.cid === cid && _watch.gen === st.waiting;
   }
 
+  /* Print Sticker Sheets, the row with its line: under the cards' buttons
+     with the student page on, and on its own in Class Settings with it off
+     (teacher/cm-student-page.js), since Add Work for the Class is in every
+     class. '' with no students, or no sticker sheets on this page. */
+  // html-safe: fixed words only
+  function stickersHtml(cid) {
+    if (!_roster(cid).length || typeof ScanLabels === 'undefined') return '';
+    return (
+      '<div class="sc-stickers"><span class="cm-hint">Sticker sheets name scanned paper work. They don’t open the student page.</span>' +
+      '<button type="button" class="cm-action-btn" data-action="spCardsStickers">Print Sticker Sheets</button></div>'
+    );
+  }
+
   // The Student Cards card for a class whose student page is on.
   function render(cid) {
     var st = _st(cid);
@@ -1220,10 +1233,7 @@ var StudentCards = (function () {
       _untilHtml(cid, off) +
       // Sticker Sheets for Scanning (teacher/scan-labels.js): a row of its own
       // under the cards' own buttons, since a sticker is not a card.
-      (students.length && typeof ScanLabels !== 'undefined'
-        ? '<div class="sc-stickers"><span class="cm-hint">Sticker sheets name scanned paper work. They don’t open the student page.</span>' +
-          '<button type="button" class="cm-action-btn" data-action="spCardsStickers">Print Sticker Sheets</button></div>'
-        : '') +
+      stickersHtml(cid) +
       (known && students.length ? _filterHtml(st, students, byStudent) : '') +
       (known && students.length && !shown.length
         ? '<div class="cm-hint sc-empty" role="status">' + esc(filter.empty) + '</div>'
@@ -1388,6 +1398,7 @@ var StudentCards = (function () {
 
   return {
     render: render,
+    stickersHtml: stickersHtml,
     summaryHtml: summaryHtml,
     handleAction: handleAction,
     handleChange: handleChange,
