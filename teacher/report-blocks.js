@@ -492,7 +492,7 @@ window.ReportBlocks = (function () {
     const showEvidence = options.evidence !== false;
     const hideEmpty = options.noEvidence === 'hide';
     const titles = {};
-    if (options.assignments) getAssessments(cid).forEach(a => (titles[a.id] = a.title));
+    if (options.assignments) getAssignedAssessments(cid).forEach(a => (titles[a.id] = a.title));
     const cols = showEvidence ? 3 : 2;
     const grouped = getGroupedSections(cid);
     const row = sec => {
@@ -570,7 +570,7 @@ window.ReportBlocks = (function () {
 
   function renderBlockSectionOutcomes(cid, student) {
     const sections = getSections(cid);
-    const assessments = getAssessments(cid);
+    const assessments = getAssignedAssessments(cid);
     const allScores = ReportScores.entries(cid, student.id);
     let html = `<div class="report-block-box">
     <div class="report-block-title">Learning Outcomes</div>
@@ -718,7 +718,7 @@ window.ReportBlocks = (function () {
      later), so "Latest" here is the piece the grade treats as latest. */
   function _sectionWork(cid, sid, sec) {
     const byId = {};
-    getAssessments(cid).forEach(a => (byId[a.id] = a));
+    getAssignedAssessments(cid).forEach(a => (byId[a.id] = a));
     const best = {};
     (sec.tags || []).forEach(tag => {
       // One mark per piece of work on each competency (tagMarksByAssessment).
@@ -970,7 +970,7 @@ window.ReportBlocks = (function () {
      the best and lowest of them with their dates. */
   function _sectionEvidence(cid, sid, sec) {
     const titles = {};
-    getAssessments(cid).forEach(a => (titles[a.id] = a));
+    getAssignedAssessments(cid).forEach(a => (titles[a.id] = a));
     const byId = {};
     (sec.tags || []).forEach(tag => {
       // The competency's mark on each piece, as the gradebook shows it.
@@ -1016,7 +1016,7 @@ window.ReportBlocks = (function () {
     // The start is measured inside the report's own term (the scores read
     // are the year to date as of its end; Colin, 2026-11-03).
     const dates = {};
-    getAssessments(cid).forEach(a => {
+    getAssignedAssessments(cid).forEach(a => {
       const d = typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || a.dueDate || null;
       if (d && assessmentInTermWindow(cid, a)) dates[a.id] = d;
     });
@@ -1637,7 +1637,7 @@ window.ReportBlocks = (function () {
   /* ── Section Proficiency Bar Chart (horizontal bars) ── */
   function renderBlockSectionChart(cid, student) {
     const sections = getSections(cid);
-    const assessments = getAssessments(cid);
+    const assessments = getAssignedAssessments(cid);
     const levelScores = _levelScores(cid, student.id);
     let html = `<div class="report-block-box report-section-chart">
     <div class="report-block-title">Section Proficiency Breakdown</div>`;
@@ -1775,7 +1775,7 @@ window.ReportBlocks = (function () {
   /* ── Score Distribution & Assignment Highlights ── */
   function renderBlockScoreDistribution(cid, student) {
     const allScores = ReportScores.entries(cid, student.id);
-    const assessments = getAssessments(cid);
+    const assessments = getAssignedAssessments(cid);
     const scored = _levelScores(cid, student.id).filter(s => s.score > 0);
     if (scored.length === 0) return '';
 
@@ -2004,7 +2004,7 @@ window.ReportBlocks = (function () {
   /* ── Core Competencies ── */
   function renderBlockCoreCompetencies(cid, student, options) {
     options = options || {};
-    const assessments = getAssessments(cid);
+    const assessments = getAssignedAssessments(cid);
     // Count competency exposure: how many assessments touched each competency, and avg score
     const compData = {};
     CORE_COMPETENCIES.forEach(c => {
@@ -2077,7 +2077,7 @@ window.ReportBlocks = (function () {
   /* The assessments dated in the report's term (all when no term is
      active), each with its cell as the Scores view shows it. */
   function _termCells(cid, student) {
-    return getAssessments(cid)
+    return getAssignedAssessments(cid)
       .filter(a => assessmentInTermWindow(cid, a))
       .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }));
   }
@@ -2085,7 +2085,7 @@ window.ReportBlocks = (function () {
      assigned in, undated work included (Colin, 2026-11-03): the year to
      date the grade counts. */
   function _missingCells(cid, student) {
-    return getAssessments(cid)
+    return getAssignedAssessments(cid)
       .filter(a => assessmentInYearToDate(cid, a))
       .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }))
       .filter(c => c.cell.status === 'NS');

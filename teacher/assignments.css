@@ -11169,3 +11169,76 @@ button.grader-member-name {
   color: var(--text-2);
   white-space: normal !important;
 }
+
+/* ── Drafts (teacher/assign-draft.js) ────────────────────────────────
+   A Draft is seen only here until it's assigned: a dashed outline, the
+   Draft chip, and Assign where a card's grading would be. */
+.assess-card.is-draft {
+  background: transparent;
+  box-shadow: none;
+  outline: 1.5px dashed var(--divider-medium);
+  outline-offset: -1.5px;
+}
+.assess-card.is-draft .assess-title {
+  color: var(--text-2);
+}
+/* Assign is what a Draft is for: shown without a hover. */
+.assess-card.is-draft .assess-header-actions {
+  opacity: 1;
+  background: none;
+}
+.assess-card.is-draft .assess-header-actions > * {
+  pointer-events: auto;
+}
+.draft-badge,
+.draft-sees-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: var(--radius-xl);
+  white-space: nowrap;
+}
+.draft-badge {
+  color: var(--text-2);
+  border: 1.5px dashed var(--divider-medium);
+}
+.draft-sees-badge {
+  font-weight: 600;
+  color: var(--active);
+  background: var(--active-light);
+}
+.draft-assign-btn {
+  padding: 5px 14px;
+  font-size: 13px;
+}
+.draft-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 16px 30px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.draft-body p {
+  flex: 1 1 280px;
+  margin: 0;
+}
+.assess-menu-item.draft-unassign-off {
+  opacity: 0.45;
+  cursor: default;
+}
+.alv-title-col .draft-badge {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.alv-title-col .draft-badge + .alv-title {
+  width: calc(100% - 60px);
+}
+.alv-assign {
+  padding: 4px 14px;
+  font-size: 13px;
+}

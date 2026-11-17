@@ -290,7 +290,7 @@ window.PageGradebook = (function () {
     // The gradebook always shows the year so far (Colin, 2026-11-03): no
     // report's term is in view here.
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
-    var everyAssessment = getAssessments(cid);
+    var everyAssessment = getAssignedAssessments(cid);
     var allAssessments = everyAssessment
       .filter(function (a) {
         return !_pendingDeleteAids[a.id];

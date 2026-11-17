@@ -12,6 +12,34 @@ function getAssessments(cid) {
   }
 }
 
+/* Drafts (Colin, Nov 16 2026): a piece saved as a Draft is seen only on
+   the Assignments page until the teacher assigns it. It takes no grades, so
+   nothing counts it, and every other screen lists getAssignedAssessments:
+   the gradebook, the phone, reports, Preview as Student. Students never get
+   it (the student page's functions leave out is_draft rows). */
+function isDraftAssessment(a) {
+  return !!(a && a.isDraft);
+}
+
+/* The class's work without its Drafts. The class's own list when it has no
+   Draft (so nothing kept against that list is lost), and the same filtered
+   list while its Drafts stay the same. Read only: never save what this
+   returns, since saveAssessments deletes what a list leaves out. */
+var _assignedLists = new WeakMap();
+function getAssignedAssessments(cid) {
+  var all = getAssessments(cid) || [];
+  var sig = '';
+  for (var i = 0; i < all.length; i++) if (all[i] && all[i].isDraft) sig += all[i].id + ',';
+  if (!sig) return all;
+  var held = _assignedLists.get(all);
+  if (held && held.sig === sig && held.len === all.length) return held.out;
+  var out = all.filter(function (a) {
+    return !(a && a.isDraft);
+  });
+  _assignedLists.set(all, { sig: sig, len: all.length, out: out });
+  return out;
+}
+
 /* Lookups on the class's list of work, asked for each cell of a draw. Each
    is kept with the list it was made from, the one this page holds
    (_cache.assessments), and checked against it on every ask: the list and
@@ -259,6 +287,7 @@ function _assessmentChanged(a, b) {
     (a.rubricId || '') !== (b.rubricId || '') ||
     (a.moduleId || '') !== (b.moduleId || '') ||
     (a.copyGroup || '') !== (b.copyGroup || '') ||
+    !!a.isDraft !== !!b.isDraft ||
     _coreCompetencyIdsOf(a.coreCompetencyIds).join() !== _coreCompetencyIdsOf(b.coreCompetencyIds).join() ||
     Number(a.display_order || 0) !== Number(b.display_order || 0) ||
     JSON.stringify(a.tagIds || []) !== JSON.stringify(b.tagIds || [])
@@ -333,6 +362,8 @@ function _canonicalCreateAssessment(sb, cid, a) {
   // Likewise only when ticked (migration 20261027).
   var coreIds = _coreCompetencyIdsOf(a.coreCompetencyIds);
   if (coreIds.length) params.p_core_competency_ids = coreIds;
+  // Likewise only for a Draft (migration 2026111701).
+  if (a.isDraft) params.p_is_draft = true;
   var rec = _registerPendingCreate(cid, 'assessment', localId, 'create_assessment');
   var created = _writeRpc('create_assessment', params, { entryId: rec ? rec.entryId : undefined }).then(function (res) {
     if (res.error) {
@@ -420,6 +451,8 @@ function _assessmentFieldsPatchOf(a) {
     module_id: _isUuid(a.moduleId) ? a.moduleId : null,
     display_order: Number(a.display_order || 0),
     core_competency_ids: _coreCompetencyIdsOf(a.coreCompetencyIds),
+    // Each class's own: linked copies never take it (the server keeps it per piece).
+    is_draft: !!a.isDraft,
   };
 }
 

@@ -208,7 +208,7 @@ window.PageDashboard = (function () {
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
     var flags = getFlags(cid);
-    var assessments = getAssessments(cid);
+    var assessments = getAssignedAssessments(cid);
     var allScores = getScores(cid);
     var list = _shownStudents(cid, flags);
     var allStudents = getStudents(cid);
@@ -427,7 +427,7 @@ window.PageDashboard = (function () {
       getStudents(cid),
       flags,
       getSections(cid),
-      getAssessments(cid),
+      getAssignedAssessments(cid),
       getScores(cid),
     );
     if (before) StudentCards.slideFrom(before);
@@ -463,7 +463,7 @@ window.PageDashboard = (function () {
         [st],
         allStudents,
         getSections(cid),
-        getAssessments(cid),
+        getAssignedAssessments(cid),
         getScores(cid),
         flags,
         { focusKey: naComp, rule: helpRule },
