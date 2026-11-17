@@ -168,6 +168,7 @@ export type Database = {
       assessment_resource: {
         Row: {
           assessment_id: string
+          bytes: number | null
           course_id: string
           created_at: string
           id: string
@@ -182,6 +183,7 @@ export type Database = {
         ComputedFields: never
         Insert: {
           assessment_id: string
+          bytes?: number | null
           course_id: string
           created_at?: string
           id?: string
@@ -195,6 +197,7 @@ export type Database = {
         }
         Update: {
           assessment_id?: string
+          bytes?: number | null
           course_id?: string
           created_at?: string
           id?: string
@@ -3520,6 +3523,26 @@ export type Database = {
         Returns: number
       }
       _handout_drop_expired: { Args: { p_course_id: string }; Returns: number }
+      _handout_file_bucket: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      _handout_file_max_bytes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      _handout_file_mime: { Args: { p_kind: string }; Returns: string }
+      _handout_file_object: {
+        Args: { p_path: string }
+        Returns: {
+          bytes: number
+          mimetype: string
+        }[]
+      }
+      _handout_file_path: {
+        Args: { p_course_id: string; p_kind: string; p_resource_id: string }
+        Returns: string
+      }
       _handout_path: {
         Args: { p_course_id: string; p_page: number; p_resource_id: string }
         Returns: string
@@ -3909,6 +3932,10 @@ export type Database = {
           p_value: number
         }
         Returns: number
+      }
+      finish_handout_file: {
+        Args: { p_idempotency_key?: string; p_resource_id: string }
+        Returns: Json
       }
       finish_handout_upload: {
         Args: { p_idempotency_key?: string; p_resource_id: string }
@@ -4382,6 +4409,16 @@ export type Database = {
       soft_delete_teacher: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      start_handout_file: {
+        Args: {
+          p_assessment_id: string
+          p_bytes: number
+          p_idempotency_key?: string
+          p_kind: string
+          p_title: string
+        }
+        Returns: Json
       }
       start_handout_upload: {
         Args: {

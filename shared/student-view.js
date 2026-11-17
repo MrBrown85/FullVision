@@ -577,7 +577,6 @@ window.StudentView = (function () {
 
   // A handout file's kinds (2026111706): a web page, a text file, an EPUB.
   var FILE_KINDS = { html: true, txt: true, epub: true };
-
   // A link a student may open: http:// or https:// only, as text.
   var WEB = /^https?:\/\/[^\s"'<>]+$/i;
   function hostOf(url) {

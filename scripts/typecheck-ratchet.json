@@ -57,7 +57,10 @@
     "teacher/add-work-split-model.js",
     "teacher/add-work-split.js",
     "teacher/add-work-class.js",
-    "teacher/add-work-tray.js"
+    "teacher/add-work-tray.js",
+    "shared/data-handout-files.js",
+    "shared/handout-files.js",
+    "shared/handout-viewer.js"
   ],
   "notYetChecked": [
     "s/app.js",

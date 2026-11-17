@@ -1,3 +1,4 @@
+// @ts-check
 /* shared/handout-files.js — a teacher's files, made ready to attach as handouts
 
    Colin, Nov 17 2026: "+ Add a PDF" becomes "+ Add a File". A PDF still
@@ -20,7 +21,7 @@
    answers what to attach (shared/data.js addAssessmentHandoutFile keeps
    it) and what to say. Every window.HandoutFiles.* is its public surface.
 */
-window.HandoutFiles = (function () {
+/** @type {any} */ (window).HandoutFiles = (function () {
   'use strict';
 
   var MAX_BYTES = 20971520; // 20 MB: the bucket's limit
@@ -137,8 +138,11 @@ window.HandoutFiles = (function () {
      in src, poster, srcset or url(...) that were not picked. */
   function inlinePictures(html, pictures) {
     pictures = pictures || {};
+    /** @type {Record<string, boolean>} */
     var used = {};
+    /** @type {string[]} */
     var missing = [];
+    /** @type {Record<string, boolean>} */
     var seenMissing = {};
     function swap(ref) {
       if (!isLocal(ref)) return null;
@@ -241,8 +245,11 @@ window.HandoutFiles = (function () {
          noPage:  true when pictures were picked with no web page } */
   function prepare(files) {
     var list = Array.prototype.slice.call(files || []);
+    /** @type {{ ready: any[], pdfs: any[], refused: { name: string, why: string }[], unused: string[], noPage: boolean }} */
     var out = { ready: [], pdfs: [], refused: [], unused: [], noPage: false };
+    /** @type {{ kind: string, file: any }[]} */
     var pages = [];
+    /** @type {any[]} */
     var pictureFiles = [];
     list.forEach(function (f) {
       var k = kindOf(f);
@@ -258,6 +265,7 @@ window.HandoutFiles = (function () {
       out.noPage = true;
       pictureFiles = [];
     }
+    /** @type {Record<string, string>} */
     var pictures = {};
     return Promise.all(
       pictureFiles.map(function (f) {
@@ -273,6 +281,7 @@ window.HandoutFiles = (function () {
       }),
     )
       .then(function () {
+        /** @type {Record<string, boolean>} */
         var used = {};
         return pages
           .reduce(function (p, item) {
@@ -286,6 +295,7 @@ window.HandoutFiles = (function () {
                 function (buf) {
                   var bytes = new Uint8Array(buf);
                   var blob;
+                  /** @type {string[]} */
                   var missing = [];
                   if (item.kind === 'epub') {
                     // A ZIP file: it starts PK\x03\x04.

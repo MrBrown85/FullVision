@@ -40,6 +40,7 @@ const PRECACHE_URLS = [
   '/shared/data-student-records.js',
   '/shared/data-student-cards.js',
   '/shared/data-student-work.js',
+  '/shared/data-handout-files.js',
   '/shared/data-feedback-live.js',
   '/shared/data-markup.js',
   '/shared/data-reflect.js',

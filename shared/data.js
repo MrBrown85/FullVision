@@ -8952,14 +8952,7 @@ window.submitSupportReport = function (report) {
    student_submit.page's assessments[].resources and student_submit.
    handout_links through the student-submit edge function.
 
-   A handout file (Colin, Nov 17: "+ Add a File"; migrations/
-   2026111706_handout_files.sql) is a web page, a text file or an EPUB
-   kept as the teacher chose it, 20 MB at most: kind 'html' | 'txt' |
-   'epub', one file in the bucket handout-files at <class>/<resource>.
-   <kind>, through start_handout_file and finish_handout_file, waiting in
-   the photo queue as a one-page handout with its own type. The student
-   page opens it through the edge function's handout-file route; a web
-   page or a book only in the sealed frame (shared/handout-viewer.js).
+   Handout files (a web page, a text file, an EPUB): shared/data-handout-files.js.
 
    Kept on this device as gb-assessment-resources-<cid>:
      { rows: [ { id, assessment_id, kind: 'pdf' | 'link' | 'html' | 'txt' |
@@ -8987,12 +8980,6 @@ window.submitSupportReport = function (report) {
 var RESOURCE_MAX_PAGES = 20;
 var RESOURCE_TITLE_MAX = 200;
 var RESOURCE_URL_MAX = 2000;
-// A handout file's kinds, each with the one type it is kept and sent as, and its limit (the bucket's).
-var RESOURCE_FILE_KINDS = { html: 'text/html', txt: 'text/plain', epub: 'application/epub+zip' };
-var RESOURCE_FILE_MAX_BYTES = 20971520;
-function _resIsFileKind(kind) {
-  return Object.prototype.hasOwnProperty.call(RESOURCE_FILE_KINDS, kind);
-}
 var _RES_KEY_PREFIX = 'gb-assessment-resources-';
 var _HANDOUT_UPLOADS_KEY = 'gb-handout-uploads';
 var _RES_REFRESH_MS = 30000;
@@ -9298,54 +9285,6 @@ function addAssessmentHandout(cid, aid, title, pages) {
     });
 }
 
-/* Add a handout file to assessment `aid`: a web page, a text file or an
-   EPUB (`kind` 'html' | 'txt' | 'epub'), `blob` its bytes as they are to be
-   kept (a web page's pictures already inside it), 20 MB at most. `title`
-   is the name students see. → Promise of { ok: true, resource } or { ok:
-   false, reason: 'not_a_file_kind' | 'empty' | 'too_large' |
-   'storage_full' | 'store_failed' | 'no_photo_store' | 'not_available' }. */
-function addAssessmentHandoutFile(cid, aid, title, kind, blob) {
-  if (!_resIsFileKind(kind)) return Promise.resolve({ ok: false, reason: 'not_a_file_kind' });
-  if (!blob || !(blob.size > 0)) return Promise.resolve({ ok: false, reason: 'empty' });
-  if (blob.size > RESOURCE_FILE_MAX_BYTES) return Promise.resolve({ ok: false, reason: 'too_large' });
-  if (!assessmentResourcesOffered(cid) || !aid) return Promise.resolve({ ok: false, reason: 'not_available' });
-  var live = _resLive(cid);
-  var q = live ? _wireWorkQueue() : window.PhotoQueue;
-  if (!q || typeof q.addHandout !== 'function') return Promise.resolve({ ok: false, reason: 'no_photo_store' });
-  var rid = _resLocalId();
-  var name = _resTitle(title, 'Handout');
-  var mime = RESOURCE_FILE_KINDS[kind];
-  var typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
-  return Promise.resolve(q.addHandout({ course: cid, assessment: aid, resource: rid }, [{ blob: typed, mime: mime }]))
-    .then(function (res) {
-      if (!res || !res.ok)
-        return { ok: false, reason: res && res.reason === 'storage_full' ? 'storage_full' : 'store_failed' };
-      var draft = _resDraft(cid);
-      var row = {
-        id: rid,
-        assessment_id: aid,
-        kind: kind,
-        title: name,
-        url: null,
-        page_count: null,
-        bytes: typed.size,
-        status: live ? 'uploading' : 'ready',
-        position: _resNextPosition(draft.rows, aid),
-        created_at: new Date().toISOString(),
-        pages: null,
-        file: 'photo-queue:' + res.ids[0],
-      };
-      draft.rows.push(row);
-      _resWrite(cid, draft);
-      if (live) _handoutStart(cid, aid, rid, name, res, { kind: kind, bytes: typed.size });
-      _resChanged(cid);
-      return { ok: true, resource: _resRowOut(row) };
-    })
-    .then(null, function () {
-      return { ok: false, reason: 'store_failed' };
-    });
-}
-
 function _resQueueIds(row) {
   return ((row && row.pages) || [])
     .concat(row && typeof row.file === 'string' ? [row.file] : [])
@@ -9511,13 +9450,8 @@ function _handoutStart(cid, aid, rid, title, queued, file) {
   _handoutUploadsSave(all);
   var endpoint = file ? 'start_handout_file' : 'start_handout_upload';
   _registerPendingCreate(cid, 'resource', rid, endpoint, { entryId: key });
-  // Each call named as written, so scripts/check-db-drift.mjs sees both.
   (file
-    ? _rpcOrNoop(
-        'start_handout_file',
-        { p_assessment_id: aid, p_title: title, p_kind: file.kind, p_bytes: file.bytes, p_idempotency_key: key },
-        { entryId: key },
-      )
+    ? _handoutFileStartCall(aid, title, file, key)
     : _rpcOrNoop(
         'start_handout_upload',
         { p_assessment_id: aid, p_title: title, p_page_count: queued.ids.length, p_idempotency_key: key },
@@ -9538,12 +9472,8 @@ function _handoutStarted(key, data) {
   if (!rec || rec.placed) return Promise.resolve(null);
   var res = _rpcObject(data) || {};
   var id = _isUuid(res.id) ? String(res.id).toLowerCase() : null;
-  // A handout file has one path, <class>/<resource>.<kind>, of the kind it was started as.
-  var expected = id ? String(rec.cid).toLowerCase() + '/' + id + '.' + rec.kind : '';
   var paths = _resIsFileKind(rec.kind)
-    ? res.path === expected && id
-      ? [expected]
-      : []
+    ? _handoutFilePaths(rec, res, id)
     : Array.isArray(res.paths)
       ? res.paths.map(String)
       : [];
@@ -9621,12 +9551,11 @@ async function _handoutCommit(batch) {
   var rid = batch && batch.ids && batch.ids.resource;
   if (!_isUuid(rid)) return { error: { message: 'no resource id', status: 422 } };
   var rec = _handoutUploadByBatch(batch.key);
-  // A handout file's one path is <class>/<resource>.<kind>; a PDF's pages are .jpg.
-  var fileKind = (/\.(html|txt|epub)$/.exec(String(((batch.files || [])[0] || {}).path || '')) || [])[1] || '';
+  var fileKind = _handoutFileKindOf(batch);
   var finish = { p_resource_id: rid, p_idempotency_key: batch.key };
   var quiet = { suppressSessionExpiredModal: true };
   var res = fileKind
-    ? await _callRpcWithAuthGuard('finish_handout_file', finish, quiet)
+    ? await _handoutFileFinishCall(finish, quiet)
     : await _callRpcWithAuthGuard('finish_handout_upload', finish, quiet);
   if (!res || res.error) return { error: (res && res.error) || { message: 'no answer', status: 503 } };
   var row = _rpcObject(res.data) || {};
@@ -9636,11 +9565,7 @@ async function _handoutCommit(batch) {
     draft.rows.forEach(function (r) {
       if (r.id !== rid) return;
       r.status = 'ready';
-      if (fileKind) {
-        r.file = String(batch.files[0].path);
-        if (Number(row.bytes) > 0) r.bytes = Number(row.bytes);
-        return;
-      }
+      if (fileKind) return _handoutFileReady(r, batch, row);
       r.pages = (batch.files || [])
         .slice()
         .sort(function (x, y) {
@@ -9844,139 +9769,4 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('load', function () {
     setTimeout(_resumeHandoutUploads, 0);
   });
-}
-
-/* ── Showing a handout's page ── */
-
-var _HANDOUT_STORAGE_PATH =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handouts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/([1-9]|1[0-9]|20)\.jpg$/;
-
-/* Page `i` (from 0) of handout `rid` in class `cid`: { url, release } or
-   null. A page still on this device comes from the photo queue; one on
-   the server through a link signed for 300 seconds, fetched, and shown
-   from a blob: address. Only a path in this class's own handouts folder,
-   under this handout. */
-function openAssessmentHandoutPage(cid, rid, i) {
-  var row = _resFind(cid, rid);
-  var n = Number(i);
-  if (!row || row.kind !== 'pdf' || !(n >= 0) || Math.floor(n) !== n) return Promise.resolve(null);
-  var name = row.pages && row.pages[n];
-  // The contract's layout, <course>/handouts/<resource>/<n>.jpg, when the server sent no paths.
-  if (!name && _isUuid(rid) && n < (Number(row.page_count) || 0)) {
-    name = String(cid).toLowerCase() + '/handouts/' + String(rid).toLowerCase() + '/' + (n + 1) + '.jpg';
-  }
-  if (!name) return Promise.resolve(null);
-  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return Promise.resolve(null);
-  var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
-  if (m) {
-    var q = window.PhotoQueue;
-    if (m[2] || !q || typeof q.blobs !== 'function') return Promise.resolve(null);
-    return Promise.resolve()
-      .then(function () {
-        return q.blobs(m[1]);
-      })
-      .then(
-        function (found) {
-          return found && found.photo ? _resPicture(found.photo) : null;
-        },
-        function () {
-          return null;
-        },
-      );
-  }
-  var prefix = String(cid).toLowerCase() + '/handouts/' + String(rid).toLowerCase() + '/';
-  if (_isDemoSession() || !_HANDOUT_STORAGE_PATH.test(name) || name.indexOf(prefix) !== 0) return Promise.resolve(null);
-  var sb = getSupabase();
-  if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
-  return Promise.resolve(_signInWait) // not signed before start-up's re-check has passed
-    .then(function () {
-      return sb.storage.from('student-photos').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
-    })
-    .then(function (res) {
-      var link = res && !res.error && res.data && res.data.signedUrl;
-      if (!link) return null;
-      return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
-        return r && r.ok ? r.blob() : null;
-      });
-    })
-    .then(function (blob) {
-      return blob ? _resPicture(blob) : null;
-    })
-    .then(null, function () {
-      return null;
-    });
-}
-
-/* ── Opening a handout file ── */
-
-var _HANDOUT_FILE_STORAGE_PATH =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(html|txt|epub)$/;
-
-/* Handout file `rid` of class `cid` (a web page, a text file or an EPUB),
-   as the student page opens it: Promise of { kind, title, blob } or null.
-   One still on this device comes from the photo queue; one on the server
-   through a link signed for 300 seconds in the bucket handout-files, only
-   at this class's and this handout's own name. The blob always carries its
-   kind's type. What is inside is the teacher's: show it only through
-   HandoutViewer (shared/handout-viewer.js). */
-function openAssessmentHandoutFile(cid, rid) {
-  var row = _resFind(cid, rid);
-  if (!row || !_resIsFileKind(row.kind)) return Promise.resolve(null);
-  var mime = RESOURCE_FILE_KINDS[row.kind];
-  var done = function (blob) {
-    return blob ? { kind: row.kind, title: String(row.title || ''), blob: new Blob([blob], { type: mime }) } : null;
-  };
-  var name = typeof row.file === 'string' ? row.file : '';
-  if (!name && _isUuid(rid)) name = String(cid).toLowerCase() + '/' + String(rid).toLowerCase() + '.' + row.kind;
-  var m = name ? _STUDENT_WORK_QUEUE_PATH.exec(name) : null;
-  if (m) {
-    var q = window.PhotoQueue;
-    if (m[2] || !q || typeof q.blobs !== 'function') return Promise.resolve(null);
-    return Promise.resolve()
-      .then(function () {
-        return q.blobs(m[1]);
-      })
-      .then(
-        function (found) {
-          return done(found && found.photo);
-        },
-        function () {
-          return null;
-        },
-      );
-  }
-  var own = String(cid).toLowerCase() + '/' + String(rid).toLowerCase() + '.' + row.kind;
-  if (_isDemoSession() || name !== own || !_HANDOUT_FILE_STORAGE_PATH.test(name)) return Promise.resolve(null);
-  var sb = getSupabase();
-  if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
-  return Promise.resolve(_signInWait)
-    .then(function () {
-      return sb.storage.from('handout-files').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
-    })
-    .then(function (res) {
-      var link = res && !res.error && res.data && res.data.signedUrl;
-      if (!link) return null;
-      return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
-        return r && r.ok ? r.blob() : null;
-      });
-    })
-    .then(done)
-    .then(null, function () {
-      return null;
-    });
-}
-
-// A picture shown from a blob: address, with the way to let it go.
-function _resPicture(blob) {
-  // Always a picture: what is handed back is shown in an <img> and nothing else.
-  var url = URL.createObjectURL(new Blob([blob], { type: 'image/jpeg' }));
-  var released = false;
-  return {
-    url: url,
-    release: function () {
-      if (released) return;
-      released = true;
-      URL.revokeObjectURL(url);
-    },
-  };
 }

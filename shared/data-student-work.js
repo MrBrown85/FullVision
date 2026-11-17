@@ -1556,25 +1556,14 @@ function _wireWorkQueue() {
   return q;
 }
 
-/* One file up. A handout file (a web page, a text file or an EPUB,
-   2026111706) goes to the bucket handout-files with its own type; every
-   other path is a JPEG page in student-photos. Never upsert: a name that
-   holds a file is refused. */
-var _HANDOUT_FILE_UPLOAD_PATH =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(html|txt|epub)$/;
-var _HANDOUT_FILE_UPLOAD_TYPES = { html: 'text/html', txt: 'text/plain', epub: 'application/epub+zip' };
 function _workUploadFile(path, blob) {
   var sb = getSupabase();
   if (!sb || !sb.storage) return Promise.resolve({ error: { message: 'offline: no client', status: 503 } });
-  var file = _HANDOUT_FILE_UPLOAD_PATH.exec(String(path || ''));
+  // A handout file goes to its own bucket (shared/data-handout-files.js).
+  var file = typeof _handoutFileUpload === 'function' ? _handoutFileUpload(sb, path, blob) : null;
+  if (file) return file;
   return Promise.resolve(_signInWait)
     .then(function () {
-      if (file) {
-        // The type the bucket allows for this kind, on the bytes as kept (storage reads a Blob's own type).
-        var type = _HANDOUT_FILE_UPLOAD_TYPES[file[1]];
-        var typed = blob && blob.type === type ? blob : new Blob([blob], { type: type });
-        return sb.storage.from('handout-files').upload(path, typed, { contentType: type, upsert: false });
-      }
       return sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
     })
     .then(function (res) {

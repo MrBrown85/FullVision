@@ -29,6 +29,7 @@
     "shared/data-student-records.js",
     "shared/data-student-cards.js",
     "shared/data-student-work.js",
+    "shared/data-handout-files.js",
     "shared/data-feedback-live.js",
     "shared/data-markup.js",
     "shared/data-reflect.js",
@@ -71,6 +72,8 @@
     "teacher/add-work-split-model.js",
     "teacher/add-work-split.js",
     "teacher/add-work-class.js",
-    "teacher/add-work-tray.js"
+    "teacher/add-work-tray.js",
+    "shared/handout-files.js",
+    "shared/handout-viewer.js"
   ]
 }

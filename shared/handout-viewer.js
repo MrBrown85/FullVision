@@ -1,3 +1,4 @@
+// @ts-check
 /* shared/handout-viewer.js — a teacher's handout file, open on the student's screen
 
    Colin, Nov 17 2026: a teacher can attach a web page (HTML), a text file
@@ -32,16 +33,22 @@
             keeps the .epub on the device, for a book app.
    A message from the frame is read only when it comes from that frame,
    and only for its page numbers. Nothing here is sent anywhere. */
-window.HandoutViewer = (function () {
+/** @type {any} */ (window).HandoutViewer = (function () {
   'use strict';
+
+  /** @type {any} */
+  var w = window;
 
   var FRAME_URL = '/shared/handout-frame.html';
   var FFLATE_URL = '/vendor/fflate/fflate.min.js';
   var SANDBOX = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals';
   var KIND_WORDS = { html: 'Web Page', txt: 'Text File', epub: 'Book' };
-  var open_ = null; // the viewer on screen: { layer, close }
+  /** @type {{ layer: HTMLElement, close: () => void } | null} */
+  var open_ = null; // the viewer on screen
+  /** @type {Promise<any> | null} */
   var fflateLoading = null;
 
+  /** @returns {any} an element (a button's type and disabled are set on it) */
   function el(tag, cls, text) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -70,7 +77,7 @@ window.HandoutViewer = (function () {
 
   // Text from bytes: UTF-8, or Windows-1252 when it is not (shared/handout-files.js stores UTF-8).
   function decode(bytes) {
-    if (window.HandoutFiles && typeof HandoutFiles.decodeText === 'function') return HandoutFiles.decodeText(bytes);
+    if (w.HandoutFiles && typeof w.HandoutFiles.decodeText === 'function') return w.HandoutFiles.decodeText(bytes);
     try {
       return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^﻿/, '');
     } catch (e) {
@@ -87,7 +94,7 @@ window.HandoutViewer = (function () {
     return new Promise(function (resolve, reject) {
       var r = new FileReader();
       r.onload = function () {
-        resolve(new Uint8Array(r.result));
+        resolve(new Uint8Array(/** @type {ArrayBuffer} */ (r.result)));
       };
       r.onerror = function () {
         reject(r.error);
@@ -99,14 +106,14 @@ window.HandoutViewer = (function () {
   /* ── An EPUB's chapters ── */
 
   function loadFflate() {
-    if (window.fflate && typeof fflate.unzipSync === 'function') return Promise.resolve(window.fflate);
+    if (w.fflate && typeof w.fflate.unzipSync === 'function') return Promise.resolve(w.fflate);
     if (fflateLoading) return fflateLoading;
-    fflateLoading = new Promise(function (resolve, reject) {
+    var loading = new Promise(function (resolve, reject) {
       var s = document.createElement('script');
       s.src = FFLATE_URL;
       s.async = true;
       s.onload = function () {
-        if (window.fflate && typeof fflate.unzipSync === 'function') resolve(window.fflate);
+        if (w.fflate && typeof w.fflate.unzipSync === 'function') resolve(w.fflate);
         else reject(new Error('fflate did not load'));
       };
       s.onerror = function () {
@@ -114,10 +121,11 @@ window.HandoutViewer = (function () {
       };
       document.head.appendChild(s);
     });
-    fflateLoading.then(null, function () {
+    fflateLoading = loading;
+    loading.then(null, function () {
       fflateLoading = null;
     });
-    return fflateLoading;
+    return loading;
   }
 
   var MEDIA = {
@@ -156,7 +164,7 @@ window.HandoutViewer = (function () {
      Each picture, font and stylesheet a chapter names is put inside it as
      a data: address; scripts are left out. Throws when it is not a book. */
   function readBook(bytes, zip) {
-    var lib = zip || window.fflate;
+    var lib = zip || w.fflate;
     var files = lib.unzipSync(bytes);
     var types = {};
     var dataOf = function (path) {
@@ -253,8 +261,10 @@ window.HandoutViewer = (function () {
     var host = opts.host || document.body;
     var title = String(opts.title || 'Handout');
     var urls = [];
+    /** @type {any} */
     var frame = null;
     var where = { page: 0, pages: 0, chapter: 0, chapters: 0 };
+    /** @type {Blob | null} */
     var savedBlob = null;
     var closed = false;
 
@@ -277,36 +287,28 @@ window.HandoutViewer = (function () {
     words.appendChild(sub);
     head.appendChild(back);
     head.appendChild(words);
-    var save = null;
-    if (kind === 'epub') {
-      save = el('button', 'hv-save', 'Save to Phone');
-      save.type = 'button';
-      save.disabled = true;
-      head.appendChild(save);
-    }
+    // A book's own controls; drawn for an EPUB only.
+    var save = el('button', 'hv-save', 'Save to Phone');
+    save.type = 'button';
+    save.disabled = true;
+    if (kind === 'epub') head.appendChild(save);
     var body = el('div', 'hv-body');
     var msg = el('p', 'hv-msg', 'Getting the handout…');
     msg.setAttribute('role', 'status');
     body.appendChild(msg);
     layer.appendChild(head);
     layer.appendChild(body);
-    var bar = null;
-    var prev = null;
-    var next = null;
-    var count = null;
-    if (kind === 'epub') {
-      bar = el('div', 'hv-bar');
-      prev = el('button', 'hv-turn hv-prev', 'Previous Page');
-      next = el('button', 'hv-turn hv-next', 'Next Page');
-      prev.type = next.type = 'button';
-      count = el('span', 'hv-count', '');
-      count.setAttribute('aria-live', 'polite');
-      bar.appendChild(prev);
-      bar.appendChild(count);
-      bar.appendChild(next);
-      bar.hidden = true;
-      layer.appendChild(bar);
-    }
+    var bar = el('div', 'hv-bar');
+    var prev = el('button', 'hv-turn hv-prev', 'Previous Page');
+    var next = el('button', 'hv-turn hv-next', 'Next Page');
+    prev.type = next.type = 'button';
+    var count = el('span', 'hv-count', '');
+    count.setAttribute('aria-live', 'polite');
+    bar.appendChild(prev);
+    bar.appendChild(count);
+    bar.appendChild(next);
+    bar.hidden = true;
+    if (kind === 'epub') layer.appendChild(bar);
     host.appendChild(layer);
 
     function say(text, retry) {
@@ -323,7 +325,7 @@ window.HandoutViewer = (function () {
     }
 
     function showWhere() {
-      if (!bar) return;
+      if (kind !== 'epub') return;
       bar.hidden = false;
       var book = where.chapters > 1 ? 'Part ' + (where.chapter + 1) + ' of ' + where.chapters + ' · ' : '';
       count.textContent = book + 'Page ' + (where.page + 1) + ' of ' + Math.max(1, where.pages);
@@ -390,7 +392,7 @@ window.HandoutViewer = (function () {
             if (kind === 'html') return sealed({ fv: 'handout-show', mode: 'page', html: decode(bytes) });
             if (kind === 'epub') {
               savedBlob = new Blob([bytes], { type: 'application/epub+zip' });
-              if (save) save.disabled = false;
+              save.disabled = false;
               return loadFflate().then(
                 function (lib) {
                   if (closed) return;
@@ -467,15 +469,13 @@ window.HandoutViewer = (function () {
     }
 
     back.addEventListener('click', finish);
-    if (save) save.addEventListener('click', saveToPhone);
-    if (prev)
-      prev.addEventListener('click', function () {
-        turn(-1);
-      });
-    if (next)
-      next.addEventListener('click', function () {
-        turn(1);
-      });
+    save.addEventListener('click', saveToPhone);
+    prev.addEventListener('click', function () {
+      turn(-1);
+    });
+    next.addEventListener('click', function () {
+      turn(1);
+    });
     window.addEventListener('message', onMessage);
     document.addEventListener('keydown', onKey, true);
     open_ = { layer: layer, close: finish };
