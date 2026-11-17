@@ -62,6 +62,9 @@
     "teacher/add-work-split-turn.js",
     "teacher/add-work-class.js",
     "teacher/add-work-tray.js",
+    "shared/data-scan-labels.js",
+    "shared/scan-label-read.js",
+    "teacher/scan-labels.js",
     "teacher-mobile/split-scan-model.js",
     "teacher-mobile/split-scan.js"
   ],
