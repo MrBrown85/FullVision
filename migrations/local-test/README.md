@@ -2679,3 +2679,21 @@ Since the apply, `migrations/baseline/` has the file, so a rebuilt database is t
 Result after the review (2026-11-17, PostgreSQL 17.12, a database rebuilt from the refreshed baseline): **133 of 133**, `levers` included. `npm run test:db` on the same baseline: every rule test passed, `course_opened` now one of live's own tables.
 
 Not verified here: pg_cron itself, the Storage service and the removal worker (the queue rows are checked, not the files), gradebook-prod itself.
+
+## A warning before the year runs out (2026111705, 2026-11-17)
+
+One file, `../2026111705_photo_expiry_warning.sql`, not applied (needs Colin's OK), 10 KB. It adds `list_course_photo_expiry()` (stable, runs as its owner, fixed search_path; the signed-in teacher's own classes not in the trash, with pages of sent work, unopened for 300 days or more: `course_id`, `last_opened_at` as `_photo_keep_class` judges it, `photos`; a visitor may not run it) and a trigger on `course`, `course_restored_opened`, with its function `_course_restored_opened()`: when `deleted_at` goes from a time to null, the class is stamped in `course_opened` as opened now, never moving a stamp back. There is no restore function: the operator restores with one UPDATE (20261012), and the `course_owner` policy lets a teacher's own update do the same, so a trigger covers both. It changes no existing row. `photo_expiry.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has 2026111704 as live does:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54491/pe_base node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54491 PGDATABASE=pe_base python3 photo_expiry.py                                            # every scenario
+DATABASE_URL=postgresql://postgres@127.0.0.1:54491/postgres FV_DB_TEST_APPLY=migrations/2026111705_photo_expiry_warning.sql npm run test:db
+```
+
+Scenarios (the script's docstring says what each checks): `list` (eleven classes: who is listed and who is not, the date it answers, the page count, Teacher B, signed out, a visitor; a class opened leaves the list; at 364 days 23 hours the nightly step keeps the photos and the class is listed, past 365 it takes them), `restore` (the operator's UPDATE and a teacher's own update stamp the class; the nightly job then keeps its photos, and without the file the same restore loses them; a stamp in the future, a class with no stamp, a rename, a move to the trash, the purge), `apply` (each guard stops with the catalog unchanged and the pre-check names it; only the header's changes; no existing row; the md5s; a second run; pre-check and post-check; lock timeout; size), `undo` (PART 0 alone, the stop that deletes nothing; the full undo leaves the catalog and every row as before; a changed function stops it; a second run; the file applies again).
+
+Result on 2026-11-17, PostgreSQL 17.12 (Postgres.app), from an empty database: **66 of 66**. `npm run test:db` with the file loaded: every rule test passed (351 functions; a visitor may run none).
+
+The pre-check (`photo-expiry-live-precheck.sql`, catalog facts only, returns only the rows that differ) is to be run read-only on gradebook-prod before the apply. After it, the post-check (`photo-expiry-live-postcheck.sql`) says ok on every row.
+
+Not verified here: gradebook-prod itself; pg_cron itself.
