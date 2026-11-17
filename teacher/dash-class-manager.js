@@ -436,6 +436,18 @@ window.DashClassManager = (function () {
     currentId: _currentId,
   });
   var cmShowStdHelp = CmStdHelp.cmShowStdHelp;
+  /* ── Points and Proficiency presets, Course Percentage bar: teacher/cm-grading-bars.js ── */
+  CmGradingBars.configure({
+    selectedCourse: function () {
+      return cmSelectedCourse;
+    },
+    catRows: function (cid) {
+      return _cmCatState(cid).rows;
+    },
+    setWeight: function (idx, value) {
+      cmCatWeightLive(idx, value);
+    },
+  });
 
   function _cmStdCardOpen(secId) {
     return (
@@ -4195,7 +4207,7 @@ window.DashClassManager = (function () {
   var CM_TABS = [
     { id: 'details', label: 'Details' },
     { id: 'students', label: 'Students' },
-    { id: 'questionnaires', label: 'Questionnaires' },
+    { id: 'questionnaires', label: 'Reflect' },
     {
       id: 'student-page',
       label: 'Student Page',
@@ -4821,6 +4833,7 @@ window.DashClassManager = (function () {
     return (
       '<div class="cm-pts-scale">' +
       '<span class="cm-label" id="cm-pts-label">Points and Proficiency</span>' +
+      CmGradingBars.renderScaleHint() +
       '<div class="cm-pts-scroll"><div class="cm-pts-ruler' +
       (rows.indexOf(1) >= 0 ? ' is-two-rows' : '') +
       '" id="cm-pts-ruler" role="group" aria-labelledby="cm-pts-label">' +
@@ -4837,31 +4850,12 @@ window.DashClassManager = (function () {
       edit +
       '</div>' +
       (_cmPtsError ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(_cmPtsError) + '</div>' : '') +
-      '<div class="cm-pts-actions">' +
-      '<button type="button" class="cm-action-btn" data-action="cmPointsScaleBc">BC Letter Bands</button>' +
-      '<button type="button" class="cm-action-btn" data-action="cmPointsScaleMatch">Match Columns</button>' +
-      '<button type="button" class="cm-action-btn cm-pts-reset" data-action="cmPointsScaleReset">Reset to Defaults</button>' +
-      '</div>' +
+      CmGradingBars.renderPresets(scale) +
       '</div>'
     );
   }
 
-  /* Counts As from the Points to Proficiency column: Extending halfway from
-     its start to 100, Proficient and Developing at their own starts, and
-     Emerging at 50, the C- floor, so a Developing student with one Emerging
-     still passes (half of Developing's start when that is 50 or lower). */
-  function _cmMatchedPercents(boundaries) {
-    var at = {};
-    boundaries.forEach(function (row) {
-      at[row.proficiency] = row.min;
-    });
-    return {
-      4: Math.round(at[4] + (100 - at[4]) / 2),
-      3: at[3],
-      2: at[2],
-      1: at[2] > 50 ? 50 : Math.round(at[2] / 2),
-    };
-  }
+  var _cmMatchedPercents = CmGradingBars.matchedPercents;
 
   // The first reporting term that has already ended, or null.
   function _cmEndedTerm(cid) {
@@ -5155,23 +5149,7 @@ window.DashClassManager = (function () {
     _cmApplyPointsScale(cmSelectedCourse, structuredClone(DEFAULT_GRADING_SCALE));
   }
 
-  /* The categories' weights as one bar, so a teacher sees the split. */
-  function _cmRenderWeightBar(cid) {
-    var rows = (_cmCatState(cid).rows || []).filter(function (r) {
-      return Number(r.weight) > 0;
-    });
-    if (!rows.length) return '';
-    var shades = ['var(--active)', '#5a9be6', '#a9c9f2', '#2f6fb8', '#7fb0ec', '#cfe0f7'];
-    return (
-      '<div class="cm-weight-bar" aria-hidden="true">' +
-      rows
-        .map(function (r, i) {
-          return '<span style="flex:' + Number(r.weight) + ';background:' + shades[i % shades.length] + '"></span>';
-        })
-        .join('') +
-      '</div>'
-    );
-  }
+  var _cmRenderWeightBar = CmGradingBars.renderWeightBar;
 
   /* One student's grade with the settings on the left, from the class's own
      scores: the year so far, as the gradebook shows it, even when Class
@@ -7094,6 +7072,7 @@ window.DashClassManager = (function () {
     row.weight = isNaN(v) ? 0 : Math.max(0, v);
     _cmCatEdited(cmSelectedCourse);
     _cmCatRefreshFooter(cmSelectedCourse);
+    CmGradingBars.syncWeightBar(cmSelectedCourse);
   }
 
   function _cmAssessmentCategoryId(a) {
@@ -7608,16 +7587,8 @@ window.DashClassManager = (function () {
   var _cmTermDay = CmTerms._cmTermDay;
   var _cmDefaultReportingTerms = CmTerms._cmDefaultReportingTerms;
   var _cmRenderReportingTermsField = CmTerms._cmRenderReportingTermsField;
-  var cmTermEdit = CmTerms.cmTermEdit;
-  var cmTermCancel = CmTerms.cmTermCancel;
-  var cmTermSpan = CmTerms.cmTermSpan;
-  var cmTermPreset = CmTerms.cmTermPreset;
   var cmTermSchool = CmTerms.cmTermSchool;
-  var cmTermSchoolPreset = CmTerms.cmTermSchoolPreset;
-  var cmTermAdd = CmTerms.cmTermAdd;
-  var cmTermDelete = CmTerms.cmTermDelete;
   var cmTermLive = CmTerms.cmTermLive;
-  var cmTermSave = CmTerms.cmTermSave;
 
   // A new method moves grades that already exist, so the change says how
   // many students it moves before it is made.
@@ -10635,6 +10606,7 @@ window.DashClassManager = (function () {
       return CmQuestionnaires.handleAction(action, el);
     if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', cmSelectedCourse))
       return CmStudentPage.handleAction(action, el);
+    if (/^cmTerm[A-Z]/.test(action) && CmTerms.handleAction(action, el)) return true;
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -10741,30 +10713,6 @@ window.DashClassManager = (function () {
       },
       cmSetLevelOrder: function () {
         cmSetLevelOrder(el.dataset.value);
-      },
-      cmTermSpan: function () {
-        cmTermSpan(el.dataset.value);
-      },
-      cmTermPreset: function () {
-        cmTermPreset(el.dataset.value);
-      },
-      cmTermSchoolPreset: function () {
-        cmTermSchoolPreset();
-      },
-      cmTermAdd: function () {
-        cmTermAdd();
-      },
-      cmTermDelete: function () {
-        cmTermDelete(parseInt(el.dataset.idx, 10));
-      },
-      cmTermEdit: function () {
-        cmTermEdit();
-      },
-      cmTermCancel: function () {
-        cmTermCancel();
-      },
-      cmTermSave: function () {
-        cmTermSave();
       },
       cmCatAdd: function () {
         cmCatAdd();
@@ -11214,7 +11162,7 @@ window.DashClassManager = (function () {
       return true;
     }
     if (_cmRosterKeydown(e)) return true;
-    if (_cmPtsKeydown(e)) return true;
+    if (_cmPtsKeydown(e) || CmGradingBars.keydown(e)) return true;
     // A course row in New Class or Re-link ticks with Space or Enter, and
     // keeps the focus through the redraw so the next row is one Tab away.
     if (
@@ -11402,6 +11350,7 @@ window.DashClassManager = (function () {
       _initCmStdDrag();
       _initCmCatDrag();
       _initCmPtsDrag();
+      CmGradingBars.initDrag(_addDocListener);
     },
     destroy: _removeAllListeners,
     resetState: function () {

@@ -99,15 +99,16 @@ test('the student page on and Send Work off: work that is in still shows', async
   expect(await page.evaluate(({ cid, LAB }) => WorkWall.open(cid, LAB), { cid: at.cid, LAB })).toBe(true);
   await expect(page.locator('#work-wall-overlay .ww-title')).toHaveText('Work Wall');
   await page.evaluate(() => WorkWall.close());
-  // The student page: the Work tab, and the pages whole beside the rubric in an open row.
+  // The student page: the Work tab, and the pages beside the feedback in All Your Work, no click needed.
   await page.goto('/student?id=st2&course=' + at.cid + '&tab=overview');
   await expect(page.locator('#stu-tab-work')).toHaveCount(1);
-  await page.locator('.stu-ov-row-btn', { hasText: 'Cell Microscope Lab' }).first().click();
-  const pages = page.locator('.stu-ov-work .ovw-img');
+  const piece = page.locator('.stu-ov-item', { hasText: 'Cell Microscope Lab' }).first();
+  await piece.scrollIntoViewIfNeeded();
+  const pages = piece.locator('.stu-ov-work .ovw-img');
   await expect(pages).toHaveCount(2);
   await expect.poll(() => pages.first().evaluate(el => el.complete && el.naturalWidth)).toBeGreaterThan(0);
   // A page opens the grader on the piece, with no page view first.
-  await page.locator('.stu-ov-work .ovw-page').nth(1).click();
+  await piece.locator('.stu-ov-work .ovw-page').nth(1).click();
   await expect(page.locator('#grader-overlay .grader-dialog')).toHaveClass(/has-work/);
   await expect(page.locator('#work-viewer-overlay')).toHaveCount(0);
   await page.keyboard.press('Escape');

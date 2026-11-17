@@ -341,6 +341,9 @@ window.MStudentDetail = (function () {
         .join('\n');
     }
     if (q.kind === 'core_pick' && v.text) return _coreLabel(String(v.text).trim());
+    // A teacher-built reflection's kinds read as the Learner Profile reads them ("4 of 5", a date in words).
+    if (/^(rating|date|ranking|likert|section)$/.test(q.kind) && StudentVoice.answerText)
+      return StudentVoice.answerText(q, v);
     if (Array.isArray(v.json))
       return v.json
         .filter(function (x) {

@@ -1182,7 +1182,7 @@ describe('cm-student-page-my-learning', () => {
         'Send Work',
         'Reflect on Feedback',
         'Show Overall Grade',
-        'Questionnaires',
+        'Reflections',
       ]);
       expect(text(r.querySelector('label[for="sp-learning-switch"]'))).toBe('Show Overall Grade');
       expect(text(r.querySelector('#sp-learning-hint'))).toBe(
@@ -1511,7 +1511,7 @@ describe('cm-student-page-reflect', () => {
         'Keep Photos Until',
         'Reflect on Feedback',
         'Show Overall Grade',
-        'Questionnaires',
+        'Reflections',
       ]);
       expect(doc.querySelector('label[for="sp-reflect-switch"]').textContent).toBe('Reflect on Feedback');
       expect(doc.getElementById('sp-reflect-hint').textContent).toBe(HINT);

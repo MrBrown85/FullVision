@@ -269,9 +269,17 @@ async function expectCopySetup(page, button) {
   await expect(dialog).toHaveCount(0);
 }
 
+/* Student Cards print a sheet of QR codes (the questionnaire slips that
+   did until Nov 16 are gone: reflect plan, "What changes" 3). The first
+   press makes and prints the cards; later ones print them again. */
+const CARDS = '/dashboard?manage=student-page';
+const PRINT_CARDS = /^(Make and Print \d+ Cards?|Print Again)$/;
+async function cardsOn(page) {
+  await page.evaluate(() => setStudentPageSwitch('sci8', true));
+}
 async function expectSlips(page, students) {
   await catchSheet(page);
-  await page.getByRole('button', { name: 'Print QR Slips' }).first().click();
+  await page.locator('.sc-card').getByRole('button', { name: PRINT_CARDS }).first().click();
   await expect.poll(() => page.evaluate(() => window.__sheet)).toEqual({ cells: students, qrs: students });
 }
 
@@ -384,14 +392,15 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     expect(errors).toEqual([]);
   });
 
-  test('a sheet of QR slips asks for the QR maker when printed, and every slip has its code', async ({ page }) => {
+  test('a sheet of student cards asks for the QR maker when printed, and every card has its code', async ({ page }) => {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     const asked = watchScripts(page);
     await demoClass(page);
     const students = await page.evaluate(() => getStudents('sci8').length);
-    await page.goto('/dashboard?manage=questionnaires&class=sci8');
-    await expect(page.getByRole('button', { name: 'Print QR Slips' }).first()).toBeVisible();
+    await cardsOn(page);
+    await page.goto(CARDS + '&class=sci8');
+    await expect(page.locator('.sc-card').getByRole('button', { name: PRINT_CARDS }).first()).toBeVisible();
     await page.waitForLoadState('networkidle');
     expect(printAsked(asked)).toEqual([]);
     await expectSlips(page, students);
@@ -421,11 +430,12 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     await expect(page.getByRole('dialog', { name: 'Print Grades' })).toBeVisible();
     await page.keyboard.press('Escape');
 
-    // QR slips.
+    // QR codes: Student Cards.
     const students = await page.evaluate(() => getStudents('sci8').length);
-    await page.evaluate(r => window.Router.navigate(r), '/dashboard?manage=questionnaires');
+    await cardsOn(page);
+    await page.evaluate(r => window.Router.navigate(r), CARDS);
     await catchSheet(page);
-    await page.getByRole('button', { name: 'Print QR Slips' }).first().click();
+    await page.locator('.sc-card').getByRole('button', { name: PRINT_CARDS }).first().click();
     ask = page.getByRole('dialog', { name: 'QR Codes Could Not Open' });
     await expect(ask).toContainText('Check your internet connection');
     expect(await page.evaluate(() => window.__sheet)).toBe(null);
@@ -516,7 +526,8 @@ test('offline after a first visit that never used them, print, QR and the Rubric
   await page.evaluate(r => window.Router.navigate(r), '/dashboard?manage=grading');
   await expectCopySetup(page, 'Copy Grading Setup…');
   const students = await page.evaluate(() => getStudents('sci8').length);
-  await page.evaluate(r => window.Router.navigate(r), '/dashboard?manage=questionnaires');
+  await cardsOn(page);
+  await page.evaluate(r => window.Router.navigate(r), CARDS);
   await expectSlips(page, students);
   // A reload of Assignments itself, still offline.
   await page.goto('/assignments?course=sci8');

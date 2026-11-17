@@ -52,7 +52,7 @@ test('Create saves the whole rubric’s competencies; the gradebook shows one le
   await page.fill('#af-ge-pick-search', 'pa4');
   await ed.locator('[data-action="gePick"][data-tag="PA4"]').click();
   await ed.locator('[data-action="geSave"]').click();
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const ids = await page.evaluate(async () => {
     for (let i = 0; i < 50; i++) {
       const a = getAssessments('sci8').find(x => x.title === 'Density Lab');

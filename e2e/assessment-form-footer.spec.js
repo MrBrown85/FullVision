@@ -22,7 +22,7 @@ async function openForm(page) {
 
 test('Create Assessment stays in view at the top of a long form', async ({ page }) => {
   await openForm(page);
-  const create = page.locator('[data-action="saveNewAssess"]');
+  const create = page.locator('[data-action="saveNewAssess"]:not([data-draft])');
   await expect(create).toBeInViewport();
 });
 

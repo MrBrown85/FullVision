@@ -891,17 +891,17 @@ var CmStudentPage = (function () {
     PreviewStudent.open(cid, sid, el, 'sp-preview-open');
   }
 
-  /* ── Questionnaires ─────────────────────────────────────────── */
+  /* ── Reflections ────────────────────────────────────────────── */
 
   // Nothing to choose here: the row says where they are set up (the board's last row).
   function _questionnairesRow() {
     return (
       '<div class="sp-row sp-questionnaires">' +
       '<div class="sp-row-head">' +
-      '<div class="sp-row-title">Questionnaires</div>' +
+      '<div class="sp-row-title">Reflections</div>' +
       '<div class="cm-hint">' +
       esc(
-        'Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.',
+        'Students answer them on their page’s Reflect tab, with the same card. Turn them on under Reflect, here in Class Settings.',
       ) +
       '</div>' +
       '</div>' +

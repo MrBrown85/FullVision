@@ -6,9 +6,13 @@
  *    student's Missing work read as Excused. It moves only that student,
  *    only the pieces named, shares no cached number with the real grade,
  *    and puts everything back after.
- * 2. The tab: opens by default, shows both grades in a Letter class, sorts
- *    the missing work by what handing it in adds, hides the projection when
- *    too little is marked, and never shows it in a Proficiency class.
+ * 2. The tab: opens by default, shows both grades in a Letter class, says
+ *    on each missing piece what handing it in adds, hides the projection
+ *    when too little is marked, and never shows it in a Proficiency class.
+ * 3. The picture of the grade (teacher/student-overview.js, DECISIONS "The
+ *    student Overview pictures the grade"): calc.js gradeOverYear gives the
+ *    grade on each day; the line has one point a day work counted, then
+ *    today; All Your Work shows each piece's feedback without a click.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -96,6 +100,27 @@ describe('withMissingLeftOut', () => {
 
 /* ── 2. The tab ──────────────────────────────────────────────── */
 
+describe('gradeOverYear', () => {
+  beforeEach(() => seed('letter'));
+  it('reads the grade as it stood on each day, in the class’s grading style', () => {
+    const [d1, d2, none] = gradeOverYear(CID, 's1', ['2026-10-01', '2026-10-05', '2026-09-01']);
+    expect(d1).toMatchObject({ day: '2026-10-01', value: 90 });
+    expect(d1.text).toContain('90%');
+    expect(d2.value).toBe(80);
+    expect(none.value).toBeNull();
+  });
+
+  it('on today, gives the grade the page shows now, in either grading style', () => {
+    const today = courseToday(CID);
+    expect(gradeOverYear(CID, 's1', [today])[0].value).toBe(getCourseLetterData(CID, 's1').R);
+    seed('proficiency');
+    const v = getOverallProficiency(CID, 's1');
+    const [p] = gradeOverYear(CID, 's1', [today]);
+    expect(p.value).toBe(v > 0 ? v : null);
+    if (v > 0) expect(p.text).toBe(formatLevel(CID, v));
+  });
+});
+
 describe('the Overview tab', () => {
   let stubDocument;
   let doc;
@@ -113,6 +138,7 @@ describe('the Overview tab', () => {
     ).document;
     globalThis.document = doc;
     globalThis.requestAnimationFrame = fn => fn();
+    runInThisContext(readFileSync('teacher/student-overview.js', 'utf-8'), { filename: 'teacher/student-overview.js' });
     runInThisContext(readFileSync('teacher/page-student.js', 'utf-8'), { filename: 'teacher/page-student.js' });
     seed('letter');
   });
@@ -188,16 +214,50 @@ describe('the Overview tab', () => {
     expect(main.querySelector('.stu-ov-miss').textContent).toContain('Each counts as 0 until it’s in.');
   });
 
-  it('lists the missing work by what handing it in adds', () => {
+  it('says on each missing piece what handing it in adds', () => {
     const main = open();
-    const titles = Array.from(main.querySelectorAll('.stu-ov-todo-title')).map(n => n.textContent);
     // The essay (20 points) adds more than the short response (10).
-    expect(titles).toEqual(['Source Essay', 'Short Response']);
-    expect(main.querySelector('.stu-ov-start').closest('li').textContent).toContain('Source Essay');
+    const essay = Number(main.querySelector('#stu-ov-row-m2 .stu-ov-gain').textContent.match(/\+(\d+)%/)[1]);
+    const short = Number(main.querySelector('#stu-ov-row-m1 .stu-ov-gain').textContent.match(/\+(\d+)%/)[1]);
+    expect(essay).toBeGreaterThan(short);
+    expect(main.querySelector('#stu-ov-row-m2').textContent).toContain('when it’s in');
+    // Start With These and Next to Work On are gone (Colin, 2026-11-17).
+    expect(main.querySelector('.stu-ov-todo, .stu-ov-better')).toBeNull();
   });
 
-  it('opens a piece of work in place', () => {
+  it('the Missing tile shows the missing work in All Your Work', () => {
     let main = open();
+    main.querySelector('button.stu-ov-miss').click();
+    main = doc.getElementById('main');
+    const rows = Array.from(main.querySelectorAll('.stu-ov-all .stu-ov-row')).map(r => r.id);
+    expect(rows.sort()).toEqual(['stu-ov-row-m1', 'stu-ov-row-m2']);
+  });
+
+  it('shows each piece’s comment without a click', () => {
+    seed('letter', undefined, {
+      s1: [Object.assign(entry('q1', 9), { note: 'Clear steps; check units.' }), entry('q2', 7)],
+      s2: [],
+    });
+    const main = open();
+    expect(main.querySelector('#stu-ov-row-q1 .stu-ov-fb-note').textContent).toBe('Clear steps; check units.');
+    expect(main.querySelector('.stu-ov-row-btn')).toBeNull();
+  });
+
+  it('pictures the grade over the year: a point a day work counted, then today', () => {
+    const main = open();
+    const points = Array.from(main.querySelectorAll('.stu-gp-pt'));
+    // Oct 1, Oct 5, Oct 10 and Oct 20 (the last two missing, counted as 0), then today.
+    expect(points).toHaveLength(5);
+    expect(points[0].getAttribute('aria-label')).toContain('Quiz One');
+    expect(points[0].getAttribute('aria-label')).toContain('90%');
+    expect(points[0].dataset.aids).toBe('q1');
+    expect(points[4].getAttribute('aria-label')).toMatch(/^Today: .*32%/);
+    // Handing in the missing work: a forecast point, dashed.
+    expect(main.querySelector('.stu-gp-projpt').getAttribute('title')).toContain('80%');
+  });
+
+  it('opens a piece of work in place on the Grades tab', () => {
+    let main = open({ tab: 'grades' });
     main.querySelector('.stu-ov-row-btn[data-aid="m2"]').click();
     main = doc.getElementById('main');
     const row = main.querySelector('#stu-ov-row-m2');

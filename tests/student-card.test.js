@@ -83,6 +83,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       'shared/student-view.js',
       's/page-view.js',
       's/student.js',
+      // A teacher-built reflection's questions (docs/plans/reflect-plan.md).
+      's/question-kinds.js',
       's/questionnaire.js',
       's/report.js',
       's/app.js',

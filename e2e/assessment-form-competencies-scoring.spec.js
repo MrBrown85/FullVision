@@ -32,7 +32,7 @@ async function createOne(page, title) {
   await page.locator('.af-tag-cb[value="QP1"]').check();
   await page.locator('.af-tag-cb[value="QP2"]').check();
   await closeCompPicker(page);
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   return page.evaluate(t => getAssessments('sci8').find(a => a.title === t), title);
 }
 
@@ -92,7 +92,7 @@ test('it needs a tagged competency, says so, and saves no rubric', async ({ page
   await expect(page.locator('#af-comp-hint')).toHaveText(
     'Tag at least one competency above. Each one you tag is what students are scored on.',
   );
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   expect(await page.evaluate(() => getAssessments('sci8').some(a => a.title === 'Direct Check'))).toBe(false);
   // The save stops at Choose Competencies.
   await expect(page.locator('#af-comp-choose')).toBeFocused();
@@ -100,7 +100,7 @@ test('it needs a tagged competency, says so, and saves no rubric', async ({ page
   await page.locator('.af-tag-cb[value="QP1"]').check();
   await closeCompPicker(page);
   await expect(page.locator('#af-comp-hint')).toBeHidden();
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Direct Check'));
   expect(saved.tagIds).toEqual(['QP1']);
   expect(saved.rubricId).toBeFalsy();

@@ -56,7 +56,7 @@ test('Start From a Past Assessment in this class brings Category, Module and Des
   await expect(page.locator('#af-category-hint')).toBeHidden();
   const n = await page.evaluate(() => getAssessments('sci8').length);
   await page.fill('#af-title', src.title + ' (Again)');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect.poll(() => page.evaluate(() => getAssessments('sci8').length)).toBe(n + 1);
 });
 

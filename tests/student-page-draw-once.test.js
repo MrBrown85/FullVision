@@ -110,7 +110,9 @@ describe('the student page draws each figure once', () => {
     // The grade now, the grade with both missing pieces in, and each one alone: 4. It was 8.
     const n = draw('overview');
     expect(n.withMissingLeftOut).toBe(3);
-    expect(n.getCourseLetterData).toBe(4 + 1); // and once for the header's grade pill
+    // And once for the header's grade pill, and once for each of the 5 days on Over the Year
+    // (calc.js gradeOverYear: the grade as it stood that day).
+    expect(n.getCourseLetterData).toBe(4 + 1 + 5);
     expect(doc.querySelector('#stu-tab-overview .stu-tab-badge').textContent).toBe('2 Missing');
   });
 

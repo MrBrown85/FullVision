@@ -4,9 +4,10 @@ window.StudentGroups = (function () {
   'use strict';
 
   /* ── Groups of assessments (the Grades tab's Group By) ── */
-  var TYPE_ORDER = ['written', 'observation', 'audio', 'video', 'photo', 'conversation'];
+  // Types in the form's order (ASSESSMENT_TYPES, shared/constants.js); Audio reads as Oral.
+  var TYPE_ORDER = ASSESSMENT_TYPES.concat(ASSESSMENT_TYPES_RETIRED);
   function _typeLabel(t) {
-    return t ? String(t).charAt(0).toUpperCase() + String(t).slice(1) : 'No Type';
+    return assessmentTypeLabel(t);
   }
 
   function _rubricIdOf(a) {
@@ -44,7 +45,7 @@ window.StudentGroups = (function () {
     } else if (by === 'type') {
       var seen = [];
       assessments.forEach(function (a) {
-        var t = a.evidenceType || '';
+        var t = assessmentTypeOf(a);
         if (t && seen.indexOf(t) < 0) seen.push(t);
       });
       seen.sort(function (x, y) {
@@ -85,7 +86,7 @@ window.StudentGroups = (function () {
         ? mid
         : '';
     }
-    if (by === 'type') return a.evidenceType || '';
+    if (by === 'type') return assessmentTypeOf(a);
     if (by === 'rubric') return _rubricIdOf(a);
     return '';
   }
