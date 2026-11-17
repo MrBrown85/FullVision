@@ -46,7 +46,8 @@
   /* B5's touches, each in a file of its own and used when it is there:
      Set Up Like Last Time (add-work-split-setup.js), a page moved onto
      another piece (add-work-split-move.js), Turn Every Page
-     (add-work-split-turn.js), a page full size (add-work-page-view.js). */
+     (add-work-split-turn.js), a page full size (add-work-page-view.js).
+     B4's stickers name pieces (add-work-split-stickers.js). */
   function _t(name) {
     return /** @type {any} */ (window)[name] || null;
   }
@@ -495,6 +496,7 @@
         : '') +
       '</section>' +
       tally +
+      (_t('AddWorkSplitStickers') ? AddWorkSplitStickers.html(s) : '') +
       '<p class="aws-privacy">FullVision does not read the handwriting. The scan is split on this computer and is not uploaded whole; each student’s pages upload on their own.</p>' +
       '</aside>'
     );
@@ -549,7 +551,7 @@
     if (bad) note = _twiceLine(s, p.sid, bad);
     else if (p.sid && s.subs[p.sid]) note = 'Already has work in';
     var name = p.sid ? _fullOf(s, p.sid) : '';
-    var listed = p.sid && !p.typed;
+    var listed = p.sid && !p.typed && !p.bySticker;
     var size = p.nos.length;
     var last = p.at === s.m.pieces().length - 1;
     return (
@@ -605,7 +607,9 @@
       esc(String(p.at)) +
       '">' +
       esc(note) +
-      '</p></div>' +
+      '</p>' +
+      (_t('AddWorkSplitStickers') ? AddWorkSplitStickers.cardHtml(s, p, _ctx) : '') +
+      '</div>' +
       (_t('AddWorkSplitMove') ? AddWorkSplitMove.dropHtml() : '') +
       '<div class="aws-strip" role="group" aria-label="' +
       esc('Pages of piece ' + n) +
@@ -729,6 +733,7 @@
     var s = _s;
     if (!s) return;
     opts = opts || {};
+    if (s.m && _t('AddWorkSplitStickers')) AddWorkSplitStickers.sync(s, _ctx);
     // The pieces scroll; in a narrow window the whole body does.
     var tops = ['.aws-scroll', '.aws-body'].map(function (sel) {
       var el = s.overlay.querySelector(sel);
@@ -1067,9 +1072,11 @@
     if (what === 'leave') return _leave();
     if (what === 'close') return close();
     if (s.phase !== 'split') return;
-    var touched = ['AddWorkSplitMove', 'AddWorkSplitSetup', 'AddWorkSplitTurn'].some(function (name) {
-      return _t(name) && _t(name).click(s, what, btn, _ctx);
-    });
+    var touched = ['AddWorkSplitMove', 'AddWorkSplitSetup', 'AddWorkSplitTurn', 'AddWorkSplitStickers'].some(
+      function (name) {
+        return _t(name) && _t(name).click(s, what, btn, _ctx);
+      },
+    );
     if (touched) return;
     if (what === 'match') return _match();
     if (what === 'option') return _commit(s, at, btn.getAttribute('data-sid'), 'next');
@@ -1353,6 +1360,7 @@
       onClose: typeof opts.onClose === 'function' ? opts.onClose : null,
       label: typeof opts.label === 'function' ? opts.label : null,
       noListOrder: !!opts.noListOrder,
+      cids: Array.isArray(opts.cids) ? opts.cids : null, // two classes (B6): both, for their sticker codes
     };
     _s = s;
     overlay.addEventListener('click', _click);
@@ -1396,6 +1404,7 @@
       var fresh = { per: m.per(), order: m.order(), leaveOut: m.leaveOut() };
       if (_t('AddWorkSplitSetup')) AddWorkSplitSetup.apply(s, fresh);
       if (_t('AddWorkSplitTurn')) AddWorkSplitTurn.find(s, _ctx);
+      if (_t('AddWorkSplitStickers')) AddWorkSplitStickers.start(s, _ctx);
       _draw({ focus: '__none' });
       var first = _nameInput(s, 0);
       if (first) first.focus();

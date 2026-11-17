@@ -317,6 +317,7 @@ declare var AddWorkSplitModel: any; // teacher/add-work-split-model.js, for teac
 declare var AddWorkSplitSetup: any; // teacher/add-work-split-setup.js
 declare var AddWorkSplitMove: any; // teacher/add-work-split-move.js
 declare var AddWorkSplitTurn: any; // teacher/add-work-split-turn.js
+declare var AddWorkSplitStickers: any; // teacher/add-work-split-stickers.js (B4)
 declare var AddWorkPageView: any; // teacher/add-work-page-view.js
 declare var AddWorkTargets: any; // teacher/add-work-targets.js (B6)
 declare var AddWorkTwoClasses: any; // teacher/add-work-two-classes.js (B6)

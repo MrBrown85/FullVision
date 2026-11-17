@@ -259,6 +259,10 @@
         return !!s.subs[sid];
       },
       noListOrder: true,
+      // Both classes, for their sticker codes (B4).
+      cids: s.stage.classes().map(function (t) {
+        return t.cid;
+      }),
     };
   }
 
