@@ -7076,6 +7076,13 @@ window.PageAssignments = (function () {
       var assessWeight = _formAssessWeight();
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
+    // A change that moves grades asks first (grade-change.js).
+    if (
+      GradeChange.askFirst(activeCourse, before, next, function () {
+        saveEditAssess(aid);
+      })
+    )
+      return;
     var edited = JSON.stringify(next) !== JSON.stringify(before);
     if (edited) next.successCriteria = undefined;
     // Read before hideNewForm()/render() replace the form.
@@ -7109,6 +7116,7 @@ window.PageAssignments = (function () {
     openAssessIds.add(aid);
     hideNewForm();
     render();
+    GradeChange.offerUndo(activeCourse, before, after, render);
     if (carried) refreshSidebarGrades();
     if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
       // One dialog at a time: the edit offer first, then any new copies.

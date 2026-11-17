@@ -18,7 +18,9 @@ const pieces = (page, ids) =>
     return ids.map(id => getAssessments(cid).find(a => a.id === id));
   }, ids);
 
-test('List: change many rows at once, sort and keep the order, drag a row, open one', async ({ page }) => {
+test('List: change many rows at once, sort and keep the order, drag a row, open one; grade changes ask first', async ({
+  page,
+}) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -108,6 +110,22 @@ test('List: change many rows at once, sort and keep the order, drag a row, open 
   await rows.nth(0).locator('[data-action="editAssess"]').click();
   await expect(page.locator('#af-title')).toHaveValue(sortedTitles[1]);
   await shot(page, 'open');
+
+  // The form's Save Changes asks before a Factor change too, and offers Undo.
+  const openId = await rows.nth(0).getAttribute('data-alv-row');
+  const formWeight = () =>
+    page.evaluate(id => getAssessmentWeight(getAssessments(getActiveCourse()).find(a => a.id === id)), openId);
+  const formWas = await formWeight();
+  await page.locator('#af-weight').fill(String(formWas + 1));
+  await page.locator('[data-action="saveEditAssess"]').click();
+  await expect(page.locator('.confirm-card .confirm-title')).toHaveText('Change the Factor?');
+  await shot(page, 'form-question');
+  await page.locator('#confirm-ok-btn').click();
+  expect(await formWeight()).toBe(formWas + 1);
+  await expect(page.locator('#undo-toast')).toContainText('Changed the Factor of');
+  await page.locator('#undo-toast .undo-toast-btn').click();
+  expect(await formWeight()).toBe(formWas);
+  await expect(page.locator('tr[data-alv-row]')).toHaveCount(total);
 
   // The view is kept: back on the page, the List.
   await page.goto('/dashboard');

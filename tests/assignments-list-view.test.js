@@ -432,7 +432,7 @@ describe('a change that moves grades asks first, and can be undone', () => {
     choose(ctl(LAB, 'module'), CHEM);
     enter(ctl(LAB, 'due'), '2026-12-24');
     expect(question()).toBeNull();
-    expect(['factor', 'category', 'date'].every(f => AssignList.changesGrades(CID, piece(LAB), f, piece(LAB)[f])));
+    expect(['factor', 'category', 'date'].every(f => !GradeChange.moves(CID, piece(LAB), f, piece(LAB)[f])));
   });
 });
 

@@ -838,91 +838,8 @@
     return n === 1 ? '1 assessment' : n + ' assessments';
   }
 
-  /* ── A change that moves grades asks first, and can be undone ─────
-     Colin, Nov 16: "when doing things that change grade math, give
-     teachers a warning prompt before making changes, provide undo as
-     well." A Factor always counts (the course % and the factored mean of
-     levels). A Category moves the course % in a Letter or Both class, and
-     in any class when it takes work into or out of a 0% category. A Date
-     Assigned moves grades when it crosses the end of a reporting term:
-     each term's grade counts the work dated up to its end. DIBELS counts
-     toward no grade. */
-  /** @param {string} cid @param {any} a @param {string} field @param {any} value */
-  function changesGrades(cid, a, field, value) {
-    if (!a || G.isDibelsScored(a)) return false;
-    if (field === 'factor') return Number(value) !== G.getAssessmentWeight(a);
-    if (field === 'category') {
-      if ((value || '') === categoryOf(a)) return false;
-      if (G.courseGradeMode(cid) !== 'proficiency') return true;
-      return G.countsTowardGrades(cid, a) !== G.countsTowardGrades(cid, { categoryId: value || '' });
-    }
-    if (field === 'date') return !!_termCrossed(cid, dateOf(a), value);
-    return false;
-  }
-
-  /* The first reporting term whose end lies between two dates, and
-     whether the move takes work out of it (later) or into it (earlier). */
-  /** @param {string} cid @param {string} from @param {string} to */
-  function _termCrossed(cid, from, to) {
-    if (!from || !to || from === to) return null;
-    var terms = typeof G.getReportingTerms === 'function' ? G.getReportingTerms(cid) || [] : [];
-    for (var i = 0; i < terms.length; i++) {
-      var end = terms[i].ends_on;
-      if (end && from <= end !== to <= end) return { label: terms[i].label || 'the term', out: to > end };
-    }
-    return null;
-  }
-
-  /** @param {string} cid @param {string} id */
-  function _catName(cid, id) {
-    var c = id ? G.getCategoryById(cid, id) : null;
-    return c ? c.name || 'Untitled' : 'No Category';
-  }
-
-  /** @param {string} cid @param {any} a */
-  function _sharePct(cid, a) {
-    var info = G.assessmentCategoryShare(cid, a);
-    return info && info.kind === 'share' ? G.formatShare(info.share, true) : '';
-  }
-
-  /* The question asked before a change that moves grades, or null. */
-  /** @param {string} cid @param {any[]} pieces @param {string} field @param {any} value @param {boolean} bulk */
-  function gradeQuestion(cid, pieces, field, value, bulk) {
-    var hit = pieces.filter(function (a) {
-      return changesGrades(cid, a, field, value);
-    });
-    if (!hit.length) return null;
-    var one = hit.length === 1 && !bulk ? hit[0] : null;
-    var name = one ? '“' + (one.title || 'Untitled') + '”' : _plural(hit.length);
-    var tail = ' This changes students’ grades. You can undo it.';
-    if (field === 'factor') {
-      var msg = name + ' will count ' + G.formatFactor(value) + ' as much as work at Factor 1×.';
-      if (one) {
-        var was = _sharePct(cid, one);
-        var now = _sharePct(cid, Object.assign({}, one, { weight: Number(value) }));
-        if (was && now && was !== now) msg += ' Its share of its category goes from ' + was + ' to ' + now + '.';
-      }
-      return { title: 'Change the Factor?', message: msg + tail, ok: bulk ? 'Set Factor' : 'Change Factor' };
-    }
-    if (field === 'category') {
-      var to = _catName(cid, value);
-      var msg2 = one
-        ? name + ' moves from ' + _catName(cid, categoryOf(one)) + ' to ' + to + '.'
-        : name + ' move to ' + to + '.';
-      if (!G.countsTowardGrades(cid, { categoryId: value || '' }))
-        msg2 += ' ' + to + ' counts 0%, so ' + (one ? 'it' : 'they') + ' will count toward no grade.';
-      else if (one && !G.countsTowardGrades(cid, one)) msg2 += ' It will start counting toward grades.';
-      return { title: 'Change the Category?', message: msg2 + tail, ok: bulk ? 'Set Category' : 'Change Category' };
-    }
-    var crossed = _termCrossed(cid, dateOf(hit[0]), value);
-    var msg3 =
-      name +
-      (crossed && crossed.out ? ' moves out of ' : ' moves into ') +
-      (crossed ? crossed.label : 'the term') +
-      '’s grades.';
-    return { title: 'Change the Date Assigned?', message: msg3 + tail, ok: 'Change Date' };
-  }
-
+  /* A change that moves grades asks first and can be undone (Colin,
+     Nov 16): which changes, and the question, are teacher/grade-change.js's. */
   var FIELD_NAMES = {
     title: 'Title',
     module: 'Module',
@@ -966,7 +883,7 @@
       })
       .filter(Boolean);
     if (!pieces.length) return;
-    var ask = field === 'send' ? null : gradeQuestion(cid, pieces, field, value, bulk);
+    var ask = field === 'send' ? null : G.GradeChange.question(cid, pieces, field, value, bulk);
     var active = /** @type {HTMLElement | null} */ (document.activeElement);
     var focus = active && active.dataset ? active.dataset.alvF || null : null;
     function go() {
@@ -1217,8 +1134,6 @@
     scoringOf: scoringOf,
     setField: setField,
     setSend: setSend,
-    changesGrades: changesGrades,
-    gradeQuestion: gradeQuestion,
     move: move,
   };
 })();
