@@ -474,6 +474,7 @@ window.MGrade = (function () {
       camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
       grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
       pencil: '<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
+      scan: '<path d="M7 3h7l4 4v14H7z"/><path d="M4 12h16"/>',
     };
 
     function openRowMenu(cid, aid, from) {
@@ -538,6 +539,10 @@ window.MGrade = (function () {
                 'm-add-work',
                 'camera',
               )
+            : '') +
+          // Split a Scan (B7): where the desktop offers Add Work for the Class.
+          (window.MSplitScan && window.AddWorkClass && AddWorkClass.offered(cid, a)
+            ? item('', 'Split a Scan', 'One PDF of everyone’s pages', 'm-split-scan', 'scan')
             : '') +
           (wall ? item('', 'Work Wall', 'Everyone’s work side by side', 'm-work-wall', 'grid') : '') +
           item('', 'Grade Everyone', 'All ' + students.length + ', in roster order', null, 'pencil') +
