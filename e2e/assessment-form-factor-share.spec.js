@@ -70,7 +70,7 @@ test('a Factor of 2.3 moves the share bar, and is saved as 2.3', async ({ page }
   await expect(page.locator('#af-weight')).toHaveValue('2.3');
 
   await page.fill('#af-title', 'Factor Share Lab');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Factor Share Lab'));
   expect(saved.weight).toBe(2.3);
 });

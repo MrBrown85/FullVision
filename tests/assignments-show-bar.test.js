@@ -1,10 +1,11 @@
 /**
  * The Show bar on the Assignments page (teacher/assign-show.js; Colin,
- * Nov 16): "submitted assignments should open and show only students who
- * have submitted. Easy to click and unselect." Submitted, To Grade and Not
- * In each list only the assessments they count, each open, each showing
- * only the students they count. A second click puts the page back as it
- * was: the same cards open, the same scroll.
+ * Nov 16): Submitted, To Grade and Not In each list only the assessments
+ * they count, and inside each card only the students they count. They only
+ * filter (Colin, Nov 17): "shouldn't open or close tabs or assignment tabs,
+ * just filter out and in what's available". Every card keeps the open or
+ * closed the teacher gave it, through every change and back to All. A
+ * second click lets go and puts back the scroll.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,6 +16,7 @@ const LAB = U(31); // Students Send Photos: 0-4 sent (3 graded, 4 returned)
 const TALK = U(32); // group work, one per group: 0-2 are a group; 0 and 5 sent
 const QUIZ = U(33); // takes no work, nothing in
 const Q = U(41);
+const UNIT = U(61);
 const IDS = Array.from({ length: 8 }, (_, i) => U(100 + i));
 let wasDemo;
 let wasStyle;
@@ -38,7 +40,7 @@ function sub(sid, aid) {
   };
 }
 
-function seed({ sendWork = true } = {}) {
+function seed({ sendWork = true, unit = false } = {}) {
   seedClass(CID, {
     students: IDS.map((id, i) => ({ id, firstName: 'S' + i, lastName: 'L' + i })),
     learningMaps: {
@@ -48,8 +50,9 @@ function seed({ sendWork = true } = {}) {
       _version: 1,
       _flatVersion: 2,
     },
+    modules: unit ? [{ id: UNIT, name: 'Unit 1', color: '#6366f1' }] : [],
     assessments: [
-      { id: LAB, title: 'Lab', tagIds: [Q], date: '2026-10-20' },
+      { id: LAB, title: 'Lab', tagIds: [Q], date: '2026-10-20', moduleId: unit ? UNIT : undefined },
       { id: TALK, title: 'Talk', tagIds: [Q], date: '2026-10-21', collaboration: 'group', groups: [IDS.slice(0, 3)] },
       { id: QUIZ, title: 'Quiz', tagIds: [Q], date: '2026-10-22' },
     ],
@@ -78,6 +81,10 @@ const openCards = () => cards().filter(aid => document.getElementById('ac-' + ai
 const studentsOn = aid =>
   Array.from(new Set(Array.from(document.querySelectorAll('#ac-' + aid + ' [data-sid]')).map(el => el.dataset.sid)));
 const main = () => document.getElementById('main');
+// Opens a closed card by its header, as the teacher does.
+const openCard = aid => {
+  if (!openCards().includes(aid)) click(document.querySelector('#ac-' + aid + ' .assess-header'));
+};
 
 beforeEach(() => {
   wasDemo = window.isDemoMode;
@@ -106,41 +113,49 @@ describe('GraderWork.workInIds', () => {
 });
 
 describe('Show: Submitted', () => {
-  it('lists only the work sent in, open, with only the students who sent it', () => {
+  it('lists only the work sent in, and a card opened shows only the students who sent it', () => {
     openAssignments(() => seed(), CID, {});
     expect(pressed()).toEqual(['all']);
     expect(bar('submitted').textContent).toBe('Submitted 9');
     click(bar('submitted'));
     expect(pressed()).toEqual(['submitted']);
     expect(cards().sort()).toEqual([LAB, TALK].sort());
-    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    // It opens nothing: the teacher opens the card they want.
+    expect(openCards()).toEqual([]);
+    openCard(LAB);
+    openCard(TALK);
     expect(studentsOn(LAB).sort()).toEqual(IDS.slice(0, 5).sort());
     expect(studentsOn(TALK).sort()).toEqual([IDS[0], IDS[1], IDS[2], IDS[5]].sort());
   });
 
-  it('a second click puts the page back: the same cards open, the same scroll', () => {
+  it('cards keep what the teacher gave them, through Submitted and back, and the scroll comes back', () => {
     openAssignments(() => seed(), CID, {});
     globalThis.getComputedStyle = () => ({ overflowY: 'auto' });
-    click(document.querySelector('#ac-' + QUIZ + ' .assess-header'));
-    expect(openCards()).toEqual([QUIZ]);
+    openCard(QUIZ);
+    openCard(TALK);
+    expect(openCards().sort()).toEqual([QUIZ, TALK].sort());
     main().scrollTop = 420;
     click(bar('submitted'));
     expect(main().scrollTop).toBe(0);
-    // A card closed while Submitted is on stays closed.
-    click(document.querySelector('#ac-' + LAB + ' .assess-header'));
+    // Talk stays open and Lab stays closed; the teacher opens Lab and closes Talk.
     expect(openCards()).toEqual([TALK]);
+    openCard(LAB);
+    click(document.querySelector('#ac-' + TALK + ' .assess-header'));
+    expect(openCards()).toEqual([LAB]);
     click(bar('submitted'));
     expect(pressed()).toEqual(['all']);
     expect(cards().length).toBe(3);
-    expect(openCards()).toEqual([QUIZ]);
+    expect(openCards().sort()).toEqual([LAB, QUIZ].sort());
     expect(main().scrollTop).toBe(420);
     expect(studentsOn(QUIZ).length).toBe(IDS.length);
+    expect(studentsOn(LAB).length).toBe(IDS.length);
   });
 
-  it('One to another keeps the view to come back to; the pressed one clicked again is All', () => {
+  it('one to another opens and closes nothing; the pressed one clicked again is All', () => {
     openAssignments(() => seed(), CID, {});
-    click(document.querySelector('#ac-' + QUIZ + ' .assess-header'));
+    openCard(QUIZ);
     click(bar('submitted'));
+    expect(openCards()).toEqual([]);
     click(bar('tograde'));
     expect(pressed()).toEqual(['tograde']);
     click(bar('notin'));
@@ -155,6 +170,22 @@ describe('Show: Submitted', () => {
     expect(openCards()).toEqual([QUIZ]);
   });
 
+  it('a folder keeps the open or closed the teacher gave it, and opens and closes while it is on', () => {
+    openAssignments(() => seed({ unit: true }), CID, {});
+    const folder = () => document.querySelector('.mod-folder[data-module-id="' + UNIT + '"]');
+    const header = () => document.querySelector('.mod-folder-header[data-uid="' + UNIT + '"]');
+    click(header());
+    expect(folder().classList.contains('open')).toBe(false);
+    click(bar('submitted'));
+    expect(folder().classList.contains('open')).toBe(false);
+    click(header());
+    expect(folder().classList.contains('open')).toBe(true);
+    click(bar('notin'));
+    expect(folder().classList.contains('open')).toBe(true);
+    click(bar('notin'));
+    expect(folder().classList.contains('open')).toBe(true);
+  });
+
   it('there is no bar while Send Work is off', () => {
     openAssignments(() => seed({ sendWork: false }), CID, {});
     expect(document.querySelector('.assess-tograde-seg')).toBeNull();
@@ -162,13 +193,15 @@ describe('Show: Submitted', () => {
 });
 
 describe('Show: To Grade', () => {
-  it('lists the work waiting, open, with only the students it is from; a group counts once', () => {
+  it('lists the work waiting, and a card opened shows only the students it is from; a group counts once', () => {
     openAssignments(() => seed(), CID, {});
     // Lab: 0-2 wait (3 is a draft, 4 returned). Talk: the group (0-2) once, and 5.
     expect(bar('tograde').textContent).toBe('To Grade 5');
     click(bar('tograde'));
     expect(cards().sort()).toEqual([LAB, TALK].sort());
-    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    expect(openCards()).toEqual([]);
+    openCard(LAB);
+    openCard(TALK);
     expect(studentsOn(LAB).sort()).toEqual(IDS.slice(0, 3).sort());
     expect(studentsOn(TALK).sort()).toEqual([IDS[0], IDS[1], IDS[2], IDS[5]].sort());
   });
@@ -176,7 +209,8 @@ describe('Show: To Grade', () => {
   it("the dashboard's To Grade cell opens the page with it on, and a click lets it go", () => {
     openAssignments(() => seed(), CID, { show: 'tograde' });
     expect(pressed()).toEqual(['tograde']);
-    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    expect(cards().sort()).toEqual([LAB, TALK].sort());
+    expect(openCards()).toEqual([]);
     click(bar('tograde'));
     expect(pressed()).toEqual(['all']);
     expect(cards().length).toBe(3);
@@ -185,13 +219,15 @@ describe('Show: To Grade', () => {
 });
 
 describe('Show: Not In', () => {
-  it('lists the pieces that take work, open, with only the students who sent nothing', () => {
+  it('lists the pieces that take work, and a card opened shows only the students who sent nothing', () => {
     openAssignments(() => seed(), CID, {});
     // Lab: 5-7. Talk: 3, 4, 6, 7 (the group is in through 0's work, 5 sent). Quiz takes none.
     expect(bar('notin').textContent).toBe('Not In 7');
     click(bar('notin'));
     expect(cards().sort()).toEqual([LAB, TALK].sort());
-    expect(openCards().sort()).toEqual([LAB, TALK].sort());
+    expect(openCards()).toEqual([]);
+    openCard(LAB);
+    openCard(TALK);
     expect(studentsOn(LAB).sort()).toEqual(IDS.slice(5).sort());
     expect(studentsOn(TALK).sort()).toEqual([IDS[3], IDS[4], IDS[6], IDS[7]].sort());
   });
@@ -206,6 +242,7 @@ describe('Show: Not In', () => {
       {},
     );
     click(bar('notin'));
+    openCard(LAB);
     expect(studentsOn(LAB).sort()).toEqual([IDS[5], IDS[6]].sort());
   });
 });

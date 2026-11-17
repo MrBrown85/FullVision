@@ -26,7 +26,7 @@ window.MStudentDetail = (function () {
     // scores: a whole sparkline fits the header at phone width.
     var growthData = getSectionGrowthData(cid, sid, sec.id);
     var sparkline = renderGrowthSparkline((growthData || []).slice(-5));
-    var allAssessments = getAssessments(cid);
+    var allAssessments = getAssignedAssessments(cid);
     var allEvidenceScores = [];
     sec.tags.forEach(function (tag) {
       getTagScores(cid, sid, tag.id).forEach(function (s) {
@@ -341,6 +341,9 @@ window.MStudentDetail = (function () {
         .join('\n');
     }
     if (q.kind === 'core_pick' && v.text) return _coreLabel(String(v.text).trim());
+    // A teacher-built reflection's kinds read as the Learner Profile reads them ("4 of 5", a date in words).
+    if (/^(rating|date|ranking|likert|section)$/.test(q.kind) && StudentVoice.answerText)
+      return StudentVoice.answerText(q, v);
     if (Array.isArray(v.json))
       return v.json
         .filter(function (x) {
@@ -611,7 +614,7 @@ window.MStudentDetail = (function () {
     };
     var sections = getSections(cid);
     var statuses = getAssignmentStatuses(cid);
-    var termAssess = getAssessments(cid)
+    var termAssess = getAssignedAssessments(cid)
       .filter(inTerm)
       .slice()
       .sort(function (a, b) {
@@ -819,12 +822,12 @@ window.MStudentDetail = (function () {
       (window.MGradePhotos ? MGradePhotos.studentListHtml(cid, st) : '') +
       tabsBlock +
       '<div class="m-scard-actions" style="padding:16px">' +
-      (getAssessments(cid).length
+      (getAssignedAssessments(cid).length
         ? '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
           sid +
           '">Grade Newest: ' +
           MC.esc(
-            getAssessments(cid)
+            getAssignedAssessments(cid)
               .slice()
               .sort(function (a, b) {
                 return (b.date || '').localeCompare(a.date || '') || samePieceDateOrder(cid, b.id, a.id);

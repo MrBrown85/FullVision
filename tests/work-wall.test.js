@@ -545,7 +545,7 @@ describe("work on the teacher's other screens", () => {
     expect(asked).toHaveLength(want.length);
   });
 
-  it('an open row of All Your Work: the pages whole, each opening the grader on the piece', async () => {
+  it('a piece in All Your Work: its pages as thumbnails, each opening the grader on the piece', async () => {
     seed({ sendWork: false });
     expect(WorkWall.pieceHtml(CID, last, PIECE)).toBe('');
     const main = doc.getElementById('main');
@@ -556,7 +556,8 @@ describe("work on the teacher's other screens", () => {
     ]);
     WorkWall.mountPiece(main, CID, IDS[3]);
     await settle();
-    expect(asked).toEqual(['page:' + file(IDS[3], 1).path, 'page:' + file(IDS[3], 2).path]);
+    // Thumbnails, so a list of many pieces stays light.
+    expect(asked).toEqual(['thumb:' + file(IDS[3], 1).thumb_path, 'thumb:' + file(IDS[3], 2).thumb_path]);
     expect($$('.ovw-img').every(img => !!img.getAttribute('src'))).toBe(true);
     // Drawn again: nothing new is asked for.
     WorkWall.mountPiece(main, CID, IDS[3]);

@@ -1028,10 +1028,10 @@
 
   function _openGraderAt(gradeSid, wantAid, oneStudent) {
     var newest = wantAid
-      ? getAssessments(_cid).find(function (a) {
+      ? getAssignedAssessments(_cid).find(function (a) {
           return a.id === wantAid;
         })
-      : getAssessments(_cid)
+      : getAssignedAssessments(_cid)
           .slice()
           .sort(function (a, b) {
             return (b.date || '').localeCompare(a.date || '') || samePieceDateOrder(_cid, b.id, a.id);

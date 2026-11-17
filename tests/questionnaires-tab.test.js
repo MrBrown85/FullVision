@@ -1,16 +1,29 @@
 /**
- * The Questionnaires tab in Class Settings (docs/STUDENT-VOICE-PLAN.md,
- * PR 5): shared/questionnaires.js, teacher/cm-questionnaires.js and
- * teacher/qr-slips.js.
+ * The Reflect tab in Class Settings (docs/STUDENT-VOICE-PLAN.md, PR 5;
+ * docs/plans/reflect-plan.md): shared/questionnaires.js,
+ * teacher/cm-questionnaires.js and teacher/qr-slips.js (which student
+ * cards print with).
  *
- * In Demo Mode a questionnaire turns on from its template and saves on this
- * device; a reflection brings its Goal Check-In on the same slip; status,
- * answered counts and the question editor follow what is saved; and the
- * slips print eight to a page with each student's own code in the QR.
+ * In Demo Mode a reflection turns on from its template and saves on this
+ * device; the switch is the gate (no closing date set by itself; one past
+ * its closing date shows Off and turning it On clears the date); a
+ * Core Competency reflection brings its Goal Check-In; status, answered
+ * counts and the question editor follow what is saved. No slips print here.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseHTML } from 'linkedom';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { runInThisContext } from 'vm';
+
+// The builder, which tests/setup.js does not load.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+if (typeof CmReflectBuilder === 'undefined')
+  runInThisContext(readFileSync(resolve(ROOT, 'teacher/cm-reflect-builder.js'), 'utf-8'), {
+    filename: 'teacher/cm-reflect-builder.js',
+  });
 
 const CID = 'course-sq';
 const tick = () => new Promise(r => setTimeout(r, 10));
@@ -62,12 +75,57 @@ describe('Questionnaires module', () => {
     expect(Questionnaires.list(CID)[0].is_on).toBe(false);
   });
 
-  it('says whether a questionnaire is off, opens later, is open or has closed', () => {
+  it('says whether a reflection is off, opens later, is in the Reflect tab or has closed', () => {
     var q = { is_on: true, opens_on: '2026-11-03', closes_on: '2026-11-14' };
     expect(Questionnaires.status(q, '2026-10-24')).toEqual({ state: 'upcoming', text: 'Opens Nov 3' });
-    expect(Questionnaires.status(q, '2026-11-05').state).toBe('open');
-    expect(Questionnaires.status(q, '2026-11-20').state).toBe('closed');
+    expect(Questionnaires.status(q, '2026-11-05')).toEqual({
+      state: 'open',
+      text: 'In Students’ Reflect Tab',
+      until: 'Until Nov 14',
+    });
+    expect(Questionnaires.status(q, '2026-11-14').state).toBe('open');
+    expect(Questionnaires.status(q, '2026-11-20')).toEqual({ state: 'closed', text: 'Closed Nov 14' });
     expect(Questionnaires.status(Object.assign({}, q, { is_on: false })).state).toBe('off');
+    expect(Questionnaires.status({ is_on: true, opens_on: '2026-11-03', closes_on: null }, '2026-11-05').until).toBe(
+      'Until you turn it off',
+    );
+    expect(Questionnaires.visible(q, '2026-11-05')).toBe(true);
+    expect(Questionnaires.visible(q, '2026-11-20')).toBe(false);
+  });
+
+  it('the switch is the gate: On opens today with no closing date', async () => {
+    await Questionnaires.load(CID);
+    var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' }, '2026-11-16');
+    expect(q).toMatchObject({ is_on: true, opens_on: '2026-11-16', closes_on: null });
+    expect(Questionnaires.status(q, '2026-12-25').state).toBe('open');
+    await Questionnaires.setOn(CID, q.id, false);
+    expect(
+      Questionnaires.status(
+        Questionnaires.find(CID, x => x.id === q.id),
+        '2026-11-16',
+      ).state,
+    ).toBe('off');
+  });
+
+  it('turning On one past its closing date clears the date; a later date is kept', async () => {
+    await Questionnaires.load(CID);
+    var q = await Questionnaires.save(CID, {
+      kind: 'about_me',
+      template_id: 'about-me',
+      title: 'About Me',
+      opens_on: '2026-10-01',
+      closes_on: '2026-11-01',
+      is_on: true,
+      questions: null,
+    });
+    expect(Questionnaires.status(q, '2026-11-16')).toEqual({ state: 'closed', text: 'Closed Nov 1' });
+    var back = await Questionnaires.turnOn(CID, { id: q.id }, '2026-11-16');
+    expect(back).toMatchObject({ id: q.id, is_on: true, opens_on: '2026-10-01', closes_on: null });
+    expect(back.questions).toHaveLength(8);
+    // Off with a closing date still ahead: On keeps it.
+    await Questionnaires.save(CID, Object.assign({}, back, { is_on: false, closes_on: '2026-12-01' }));
+    var again = await Questionnaires.turnOn(CID, { id: q.id }, '2026-11-16');
+    expect(again).toMatchObject({ is_on: true, closes_on: '2026-12-01' });
   });
 });
 
@@ -174,20 +232,55 @@ describe('Questionnaires tab', () => {
     DashClassManager.renderClassManager = originals.rerender;
   });
 
-  it('shows About Me and this period’s reflection, both off', () => {
+  it('shows About Me and this period’s reflection, both off, under Reflections', () => {
     mount();
+    expect(root.querySelector('.cm-section-title').textContent).toBe('Reflections');
+    expect(root.querySelector('.sq-section-head .cm-hint').textContent).toBe(
+      'Students open these from the Reflect tab after they sign in with their card. Turn one on to show it.',
+    );
+    expect(root.querySelector('[data-action="sqNew"]').textContent).toBe('New Reflection');
+    expect(root.textContent).not.toMatch(/questionnaire|slip/i);
     var cards = root.querySelectorAll('.sq-card');
     expect(cards.length).toBe(2);
     expect(cards[0].querySelector('.sq-name').textContent).toBe('About Me');
     expect(cards[0].querySelector('.sq-desc').textContent).toBe(
-      'Start of course · 7 questions and a private note to you',
+      'Start of course · 7 questions and a private note to you · Students do not see this while it is off',
     );
     expect(cards[0].classList.contains('sq-off')).toBe(true);
-    expect(cards[1].querySelector('.sq-desc').textContent).toMatch(/^Grade 8 theme: .+ · for Report \d$/);
+    expect(cards[0].querySelector('.sq-facts')).toBeNull();
+    expect(cards[1].querySelector('.sq-desc').textContent).toMatch(
+      /^Grade 8 theme: .+ · for Report \d · Students do not see this while it is off$/,
+    );
     expect(CmQuestionnaires.countOn(CID)).toBe(0);
   });
 
-  it('turning on a reflection brings its Goal Check-In on the same slip', async () => {
+  it('a reflection on but past its closing date shows Off with Closed under it, and On clears the date', async () => {
+    var q = await Questionnaires.save(CID, {
+      kind: 'about_me',
+      template_id: 'about-me',
+      title: 'About Me',
+      opens_on: '2026-01-05',
+      closes_on: '2026-01-10',
+      is_on: true,
+      questions: null,
+    });
+    expect(CmQuestionnaires.countOn(CID)).toBe(0);
+    mount();
+    var card = root.querySelector('[data-card="about-me"]');
+    expect(card.classList.contains('sq-off')).toBe(true);
+    expect(card.querySelector('.seg-btn[data-on="0"]').getAttribute('aria-checked')).toBe('true');
+    expect(card.querySelector('.sq-closed').textContent).toBe('Closed Jan 10');
+    click('[data-card="about-me"] .seg-btn[data-on="1"]');
+    await tick();
+    expect(Questionnaires.find(CID, x => x.id === q.id)).toMatchObject({ is_on: true, closes_on: null });
+    expect(CmQuestionnaires.countOn(CID)).toBe(1);
+    mount();
+    card = root.querySelector('[data-card="about-me"]');
+    expect(card.querySelector('.sq-closed')).toBeNull();
+    expect(card.querySelector('.sq-facts').textContent).toContain('In Students’ Reflect TabUntil you turn it off');
+  });
+
+  it('turning on a reflection brings its Goal Check-In, with no closing date', async () => {
     mount();
     click('[data-card^="core-"] .seg-btn[data-on="1"]');
     await tick();
@@ -196,22 +289,64 @@ describe('Questionnaires tab', () => {
     var goal = list.find(q => q.kind === 'goal_checkin');
     expect(refl.is_on).toBe(true);
     expect(goal.parent_id).toBe(refl.id);
-    expect(goal.closes_on).toBe(refl.closes_on);
+    expect(refl.closes_on).toBeNull();
+    expect(goal.closes_on).toBeNull();
     expect(CmQuestionnaires.countOn(CID)).toBe(1);
     mount();
     var card = root.querySelector('[data-card^="core-"]');
+    expect(card.querySelector('.sq-desc').textContent).toMatch(/ · with Goal Check-In$/);
+    expect(card.querySelector('.sq-q-slip')).toBeNull();
+    expect([...card.querySelectorAll('.sq-actions button')].map(b => b.textContent)).toEqual([
+      'Show Questions',
+      'Set a Closing Date',
+    ]);
     expect(card.querySelector('.sq-facts').textContent).toContain('Answered0 of 3');
     expect(card.querySelector('.sq-facts').textContent).toContain('Not AnsweredAll 3 students');
   });
 
-  it('counts who has answered and offers slips for the rest', async () => {
+  it('counts who has answered; no slips; See Answers shows the answers in place of the list', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     q.answered = ['e1', 'e3'];
-    mount();
-    var card = root.querySelector('[data-card="about-me"]');
-    expect(card.querySelector('.sq-facts').textContent).toContain('2 of 3');
-    expect(card.querySelector('.sq-facts').textContent).toContain('Jay L.');
-    expect(card.querySelector('[data-missing="1"]').textContent).toBe('Print Slips for 1 Not Answered');
+    var seen = [];
+    window.CmReflectAnswers = {
+      render: (cid, qid) => '<div class="ans-view">' + qid + '</div>',
+      handleAction: action => (seen.push(action), true),
+      handleChange: el => (seen.push('change:' + el.dataset.actionChange), true),
+    };
+    try {
+      mount();
+      var card = root.querySelector('[data-card="about-me"]');
+      expect(card.querySelector('.sq-facts').textContent).toContain('2 of 3');
+      expect(card.querySelector('.sq-facts').textContent).toContain('Jay L.');
+      expect(card.textContent).not.toMatch(/slip/i);
+      expect([...card.querySelectorAll('.sq-actions button')].map(b => b.textContent)).toEqual([
+        'See Answers',
+        'Show Questions',
+        'Set a Closing Date',
+      ]);
+      click('[data-card="about-me"] [data-action="sqSeeAnswers"]');
+      mount();
+      expect(root.querySelector('.ans-view').textContent).toBe(q.id);
+      expect(root.querySelector('.sq-card')).toBeNull();
+      var btn = document.createElement('button');
+      btn.dataset.action = 'sqAnsTab';
+      root.querySelector('.sq-answers').appendChild(btn);
+      expect(DashClassManager.handleAction('sqAnsTab', btn)).toBe(true);
+      var pick = document.createElement('select');
+      pick.dataset.actionChange = 'sqAnsSort';
+      root.querySelector('.sq-answers').appendChild(pick);
+      expect(DashClassManager.handleChange(pick)).toBe(true);
+      expect(seen).toEqual(['sqAnsTab', 'change:sqAnsSort']);
+      // The view's own way back is the tab's to take.
+      var back = document.createElement('button');
+      back.dataset.action = 'sqAnsBack';
+      root.querySelector('.sq-answers').appendChild(back);
+      expect(DashClassManager.handleAction('sqAnsBack', back)).toBe(true);
+      mount();
+      expect(root.querySelectorAll('.sq-card').length).toBe(2);
+    } finally {
+      delete window.CmReflectAnswers;
+    }
   });
 
   it('edits questions: a prompt saves on blur, an empty one goes back, a new one waits for words', async () => {
@@ -355,56 +490,31 @@ describe('Questionnaires tab', () => {
     }
   });
 
-  it('prints one student’s slip alone, Not Answered first, and says a new slip replaces the old one', async () => {
-    var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
-    q.answered = ['e1'];
-    var asked = [];
-    var stubIssue = Questionnaires.issueCodes;
-    var stubPrint = QrSlips.print;
-    Questionnaires.issueCodes = (cid, qid, ids) => {
-      asked.push(ids);
-      return Promise.resolve({ data: ids.map(id => ({ enrollment_id: id, code: 'ABC-DEF' })) });
-    };
-    var printed = [];
-    QrSlips.print = (cid, qq, codes) => printed.push(codes);
-    try {
-      mount();
-      var card = root.querySelector('[data-card="about-me"]');
-      var pick = card.querySelector('select[data-action-change="sqPrintOne"]');
-      expect(Array.from(pick.querySelectorAll('optgroup')).map(g => g.getAttribute('label'))).toEqual([
-        'Not Answered',
-        'Answered',
-      ]);
-      expect(card.textContent).toContain('A new slip replaces the one that student already has');
-      pick.querySelector('option[value="e3"]').selected = true;
-      DashClassManager.handleChange(pick);
-      await tick();
-      expect(asked).toEqual([['e3']]);
-      expect(printed[0]).toEqual([{ enrollment_id: 'e3', code: 'ABC-DEF' }]);
-    } finally {
-      Questionnaires.issueCodes = stubIssue;
-      QrSlips.print = stubPrint;
-    }
-  });
-
-  it('refuses dates that close before they open', async () => {
+  it('one optional closing date: set, refused when past, cleared', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();
     click('[data-action="sqToggleDates"]');
     mount();
-    root.querySelector('#sq-opens-' + q.id).value = '2026-11-10';
-    root.querySelector('#sq-closes-' + q.id).value = '2026-11-01';
+    expect(root.querySelector('#sq-opens-' + q.id)).toBeNull();
+    root.querySelector('#sq-closes-' + q.id).value = '2020-01-01';
     click('[data-action="sqSaveDates"]');
     mount();
-    expect(root.querySelector('.sq-msg').textContent).toBe('The closing date comes before the opening date.');
-    expect(root.querySelector('#sq-opens-' + q.id).value).toBe('2026-11-10');
-    root.querySelector('#sq-closes-' + q.id).value = '2026-11-20';
+    expect(root.querySelector('.sq-msg').textContent).toBe('That day has passed. Pick today or a later day.');
+    expect(root.querySelector('#sq-closes-' + q.id).value).toBe('2020-01-01');
+    root.querySelector('#sq-closes-' + q.id).value = '2999-11-30';
     click('[data-action="sqSaveDates"]');
     await tick();
-    expect(Questionnaires.find(CID, x => x.id === q.id)).toMatchObject({
-      opens_on: '2026-11-10',
-      closes_on: '2026-11-20',
-    });
+    expect(Questionnaires.find(CID, x => x.id === q.id).closes_on).toBe('2999-11-30');
+    mount();
+    expect(root.querySelector('.sq-facts').textContent).toContain('Until Nov 30');
+    expect(root.querySelector('[data-action="sqToggleDates"]').textContent).toBe('Change Closing Date');
+    click('[data-action="sqToggleDates"]');
+    mount();
+    click('[data-action="sqClearDates"]');
+    await tick();
+    expect(Questionnaires.find(CID, x => x.id === q.id).closes_on).toBeNull();
+    mount();
+    expect(root.querySelector('[data-action="sqToggleDates"]').textContent).toBe('Set a Closing Date');
   });
 
   it('a class with no single grade picks one before the reflection can turn on', () => {

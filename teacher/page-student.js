@@ -15,8 +15,7 @@ window.PageStudent = (function () {
   var _tab = 'overview'; // the open tab: overview, comps, grades, work, evidence, profile
   var _ovOpen = ''; // Overview: the assessment open in All Your Work ('' = none)
   var _ovFilter = 'all'; // Overview, All Your Work: all, marked, missing
-  var _ovShowAll = false; // Overview: every missing piece, not the first three
-  var _ovCrit = ''; // Overview: '<assessment id>:<criterion index>' whose next step shows
+  var _ovComp = ''; // Overview, All Your Work: only the work on this competency (section id)
   var _coreTerm = null; // Learner Profile: the term ordinal whose self-assessments show
   var _coreEditing = ''; // Learner Profile: the Core Competency being self-assessed
   var _openTags = new Set(); // competency cards whose evidence drawer is open
@@ -457,44 +456,6 @@ window.PageStudent = (function () {
       return (gains[y.id] || 0) - (gains[x.id] || 0) || dueOf(x).localeCompare(dueOf(y));
     });
 
-    // To Get Better: the lowest competency, and the teacher's latest words
-    // on work that scored it.
-    // Next to Work On: the same pick as the Competencies tab's summary, so
-    // the two never name different competencies, and never one that rests
-    // on too few scores.
-    var cands = [];
-    ctx.sections.forEach(function (sec) {
-      var v = getSectionProficiency(cid, studentId, sec.id);
-      if (!(v > 0)) return;
-      var es = _compEntries(cid, sec);
-      cands.push({ sec: sec, v: v, n: es.length, enough: _cpTrend(cid, es).dir !== 'none' });
-    });
-    var picked = _cpPick(cands);
-    var better = picked.lo || picked.hi;
-    if (better) better = { sec: better.sec, v: better.v };
-    if (better) {
-      var tag = better.sec.tags[0];
-      better.name = (tag && tag.label) || better.sec.name;
-      better.what = (tag && (tag.ican || tag.text)) || '';
-      var ids = _compEntries(cid, better.sec).map(function (e) {
-        return e.assessmentId;
-      });
-      var noted = ctx.allScores
-        .filter(function (s) {
-          return s.note && ids.indexOf(s.assessmentId) >= 0;
-        })
-        .map(function (s) {
-          return { s: s, a: ctx.assessMap[s.assessmentId] };
-        })
-        .filter(function (x) {
-          return x.a;
-        })
-        .sort(function (x, y) {
-          return (y.a.date || '').localeCompare(x.a.date || '');
-        })[0];
-      if (noted) better.comment = { text: String(noted.s.note), a: noted.a };
-    }
-
     return (ctx.ov = {
       cid: cid,
       course: course,
@@ -506,64 +467,13 @@ window.PageStudent = (function () {
       assigned: assigned,
       marked: marked,
       handedIn: assigned.length - missing.length,
-      better: better,
       cellOf: cellOf,
       statusOf: statusOf,
       dueOf: dueOf,
     });
   }
 
-  /* The letter bands from C− to A as a strip, with where the student is
-     now and, when it shows, where handing everything in would put them.
-     Zoomed to 50–100%: below 50 is one band. */
-  function _ovStripHtml(ov) {
-    var bands = BC_LETTER_BANDS.filter(function (b) {
-      return b.min >= 50;
-    }).sort(function (x, y) {
-      return x.min - y.min;
-    });
-    var at = function (p) {
-      return Math.max(0, Math.min(100, (p - 50) * 2));
-    };
-    var nowP = ov.now.lg.R;
-    var projP = ov.proj ? ov.proj.lg.R : null;
-    var track = '';
-    var names = '';
-    bands.forEach(function (b, i) {
-      var top = i < bands.length - 1 ? bands[i + 1].min : 100;
-      var w = top - b.min;
-      var isNow = nowP >= b.min && nowP < (i < bands.length - 1 ? top : 101);
-      var isProj = projP != null && projP >= b.min && projP < (i < bands.length - 1 ? top : 101);
-      track +=
-        '<span class="stu-ov-band' +
-        (isNow ? ' now' + (ov.now.level > 0 ? ' stu-ov-lv-' + roundLevel(ov.now.level) : '') : '') +
-        '" style="flex:' +
-        w +
-        ' 1 0"></span>';
-      names +=
-        '<span class="stu-ov-band-name' +
-        (isNow ? ' now' : isProj ? ' proj' : '') +
-        '" style="flex:' +
-        w +
-        ' 1 0">' +
-        esc(b.label) +
-        '</span>';
-    });
-    var html = '<div class="stu-ov-strip" aria-hidden="true"><div class="stu-ov-track">' + track + '</div>';
-    if (projP != null)
-      html +=
-        '<span class="stu-ov-gap" style="left:' +
-        at(nowP) +
-        '%;width:' +
-        Math.max(0, at(projP) - at(nowP)) +
-        '%"></span><span class="stu-ov-pin proj" style="left:' +
-        at(projP) +
-        '%"></span>';
-    html += '<span class="stu-ov-pin" style="left:' + at(nowP) + '%"></span>';
-    return html + '<div class="stu-ov-names">' + names + '</div></div>';
-  }
-
-  function _ovGradeHtml(ov) {
+  function _ovGradeHtml(ov, chart) {
     var cid = ov.cid;
     var now = ov.now;
     var big = now.hasPct
@@ -613,15 +523,18 @@ window.PageStudent = (function () {
         ' pieces are assessed so far.</div></div>';
     }
     html += '</div>';
-    if (now.hasPct) html += _ovStripHtml(ov);
+    if (chart) html += '<div class="stu-ov-grade-chart">' + chart + '</div>';
     return html + '</div>';
   }
 
   function _ovMissingTileHtml(ov) {
+    var n = ov.missing.length;
+    // With work missing, the tile shows it in All Your Work.
     return (
-      '<div class="stu-ov-card stu-ov-miss' +
-      (ov.missing.length ? '' : ' none') +
-      '"><div class="stu-ov-label">Missing</div>' +
+      (n
+        ? '<button type="button" class="stu-ov-card stu-ov-miss" data-action="stuOvFilter" data-filter="missing" data-reveal="1">'
+        : '<div class="stu-ov-card stu-ov-miss none">') +
+      '<div class="stu-ov-label">Missing</div>' +
       '<div class="stu-ov-miss-n">' +
       ov.missing.length +
       '</div>' +
@@ -636,63 +549,188 @@ window.PageStudent = (function () {
       ov.handedIn +
       ' of ' +
       ov.assigned.length +
-      ' handed in</div></div>'
+      ' handed in</div>' +
+      (n ? '<div class="stu-ov-miss-go">Show Missing Work</div></button>' : '</div>')
     );
   }
 
-  function _ovTodoHtml(ov) {
-    var n = ov.missing.length;
-    // Nothing missing: the Missing tile above already says so.
-    if (!n) return '';
-    var shown = _ovShowAll ? ov.missing : ov.missing.slice(0, 3);
-    var html =
-      '<div class="stu-ov-todo"><h3 class="stu-ov-h3">' +
-      (n > 3 && !_ovShowAll ? 'Start With These Three' : 'Missing Work') +
-      '</h3><ul class="stu-ov-list">';
-    shown.forEach(function (a, i) {
-      var gain = ov.gains[a.id];
-      html +=
-        '<li class="stu-ov-todo-item">' +
-        '<div class="stu-ov-todo-main"><div class="stu-ov-todo-head"><span class="stu-ov-todo-title">' +
-        esc(a.title) +
-        '</span>' +
-        (i === 0 ? '<span class="stu-ov-start">Start Here</span>' : '') +
-        '</div><div class="stu-ov-todo-meta"><span>Was due ' +
-        esc(_shortDay(ov.dueOf(a))) +
-        '</span><button type="button" class="stu-ov-tc" data-action="stuOvShow" data-aid="' +
-        esc(a.id) +
-        '">Details</button></div></div>' +
-        (ov.proj && gain > 0 ? '<span class="stu-ov-gain">+' + gain + '%</span>' : '') +
-        '</li>';
-    });
-    html += '</ul>';
-    if (n > 3)
-      html +=
-        '<button type="button" class="stu-ov-btn stu-ov-more" data-action="stuOvShowAll">' +
-        (_ovShowAll ? 'Show Fewer' : 'Show All ' + n + ' Missing') +
-        '</button>';
-    return html + '</div>';
+  // The feedback on one piece, to read at a glance (teacher/student-overview.js).
+  function _ovFbHtml(ov, a) {
+    return window.StudentOverview ? StudentOverview.feedbackHtml(ov.cid, studentId, a, ov.statusOf(a)) : '';
   }
 
-  function _ovBetterHtml(ov) {
-    var b = ov.better;
-    if (!b) return '';
+  /* The model for the picture of the grade (teacher/student-overview.js):
+     the grade on each day work was assessed (calc.js gradeOverYear), each
+     competency's level in its folder, and the work behind both. */
+  function _ovPicture(ov, ctx) {
+    var cid = ov.cid;
+    var mode = courseGradeMode(cid);
+    var today = courseToday(cid);
+    var secsOf = {}; // assessment id -> the competencies it was scored on
+    var counts = {};
+    var scored = 0;
+    var total = 0;
+    var items = function (sections) {
+      return sections.map(function (sec) {
+        var tag = sec.tags[0];
+        var v = getSectionProficiency(cid, studentId, sec.id);
+        var es = _compEntries(cid, sec);
+        var aids = [];
+        es.forEach(function (e) {
+          if (aids.indexOf(e.assessmentId) >= 0) return;
+          aids.push(e.assessmentId);
+          (secsOf[e.assessmentId] = secsOf[e.assessmentId] || []).push(sec.id);
+        });
+        var tr = es.length ? _cpTrend(cid, es) : null;
+        var lv = v > 0 ? roundLevel(v) : 0;
+        total++;
+        if (lv) {
+          scored++;
+          counts[lv] = (counts[lv] || 0) + 1;
+        }
+        return {
+          id: sec.id,
+          name: (tag && tag.label) || sec.name || '',
+          v: v,
+          lv: lv,
+          text: v > 0 ? formatLevel(cid, v) : '',
+          word: levelWord(cid, v),
+          tile: !(v > 0) ? '–' : mode === 'letter' ? formatLevel(cid, v) : levelCode(v),
+          trend: tr && tr.dir !== 'none' ? tr.text : '',
+          dir: tr ? tr.dir : 'none',
+          aids: aids,
+          n: aids.length,
+        };
+      });
+    };
+    var grouped = getGroupedSections(cid) || { groups: [], ungrouped: [] };
+    var groups = (grouped.groups || [])
+      .filter(function (g) {
+        return g.sections && g.sections.length;
+      })
+      .map(function (g) {
+        return { name: (g.group && g.group.name) || '', items: items(g.sections) };
+      });
+    if ((grouped.ungrouped || []).length)
+      groups.push({ name: groups.length ? 'Other' : '', items: items(grouped.ungrouped) });
+    var split = [];
+    if (mode !== 'letter')
+      [4, 3, 2, 1].forEach(function (l) {
+        if (counts[l]) split.push({ lv: l, n: counts[l], name: levelWord(cid, l) });
+      });
+    if (split.length && total > scored) split.push({ lv: 0, n: total - scored, name: 'Not Yet' });
+
+    // Each day work counted toward the grade (missing work too), then today.
+    var byDay = {};
+    ctx.assessments.forEach(function (a) {
+      var st = ov.statusOf(a);
+      var c = ov.cellOf[a.id];
+      var day = String(a.date || '').slice(0, 10);
+      if (!countsTowardGrades(cid, a) || st === 'EXC' || !day || day > today) return;
+      if (st !== 'NS' && !(c && (c.kind === 'points' || c.kind === 'level' || c.kind === 'complete'))) return;
+      (byDay[day] = byDay[day] || []).push(a);
+    });
+    var days = Object.keys(byDay).sort();
+    if (days.length && days[days.length - 1] < today) days.push(today);
+    var points = gradeOverYear(cid, studentId, days)
+      .filter(function (h) {
+        return h.value != null;
+      })
+      .map(function (h) {
+        return {
+          day: h.day,
+          value: h.value,
+          text: h.text,
+          word: h.word,
+          lv: h.level > 0 ? roundLevel(h.level) : 0,
+          label: h.day === today ? 'Today' : _shortDay(h.day),
+          pieces: (byDay[h.day] || []).map(function (a) {
+            return { id: a.id, title: a.title || '', text: _ovScore(ov, a).main, secs: secsOf[a.id] || [] };
+          }),
+        };
+      });
+    var last = points[points.length - 1];
+    return {
+      mode: mode,
+      today: today,
+      points: points,
+      now: last ? { text: last.text, word: last.word } : null,
+      proj: ov.proj ? { value: ov.proj.lg.R, label: 'If missing work is in: ' + ov.proj.text } : null,
+      levelNames: { 1: levelWord(cid, 1), 2: levelWord(cid, 2), 3: levelWord(cid, 3), 4: levelWord(cid, 4) },
+      bands: BC_LETTER_BANDS,
+      comps: { groups: groups, counts: split, scored: scored, total: total },
+      compFilter: _ovComp,
+    };
+  }
+
+  function _ovPill(st) {
+    return st === 'NS'
+      ? '<span class="stu-ov-pill miss">Missing</span>'
+      : st === 'LATE'
+        ? '<span class="stu-ov-pill late">Late</span>'
+        : st === 'EXC'
+          ? '<span class="stu-ov-pill exc">Excused</span>'
+          : '';
+  }
+
+  /* One piece in All Your Work, open to read (Colin, 2026-11-17: "just show
+     the rubric/comments/assessment ... not needing more clicks"): the
+     student's pages, and beside them the comment and the rubric. Work with
+     nothing to read (missing, excused, not assessed) is one line. */
+  function _ovItemHtml(ov, a) {
+    var cid = ov.cid;
+    var st = ov.statusOf(a);
+    var sc = _ovScore(ov, a);
+    var fb = _ovFbHtml(ov, a);
+    var work = st !== 'NS' && window.WorkWall ? WorkWall.pieceHtml(cid, studentId, a.id) : '';
+    var gain = st === 'NS' && ov.proj && ov.gains[a.id] > 0 ? ov.gains[a.id] : 0;
+    var task = st === 'NS' && a.description ? '<p class="stu-ov-task">' + esc(a.description) + '</p>' : '';
+    var cat = showsCategoryBadge(cid, a) ? _assessmentCategoryLabel(cid, a) : '';
+    var when = st === 'NS' ? 'Was due ' + _shortDay(ov.dueOf(a)) : _shortDay(a.date);
+    var body =
+      work || fb || task
+        ? '<div class="stu-ov-item-body' +
+          (work ? ' with-work' : '') +
+          '">' +
+          work +
+          (fb || task ? '<div class="stu-ov-fb">' + fb + task + '</div>' : '') +
+          '</div>'
+        : '';
     return (
-      '<div class="stu-ov-card stu-ov-better"><div class="stu-ov-label">Next to Work On</div>' +
-      '<div class="stu-ov-better-name">' +
-      esc(b.name) +
-      ' ' +
-      _levelPill(ov.cid, b.v) +
-      '</div>' +
-      (b.what ? '<div class="stu-ov-read">' + esc(b.what) + '</div>' : '') +
-      (b.comment
-        ? '<div class="stu-ov-better-note"><div class="stu-ov-label">From your teacher · ' +
-          esc(_shortDay(b.comment.a.date)) +
-          '</div><div class="stu-ov-read stu-ov-pre">' +
-          esc(b.comment.text) +
-          '</div></div>'
-        : '') +
-      '</div>'
+      '<article class="stu-ov-row stu-ov-item' +
+      (body ? '' : ' quiet') +
+      '" id="stu-ov-row-' +
+      esc(a.id) +
+      '"><div class="stu-ov-item-head"><span class="stu-ov-row-main"><span class="stu-ov-row-title">' +
+      esc(a.title) +
+      _ovPill(st) +
+      '</span><span class="stu-ov-row-date">' +
+      esc(when + (cat ? ' · ' + cat : '')) +
+      '</span></span>' +
+      // What only the teacher acts on: shown when pointed at.
+      '<a class="stu-link stu-ov-item-open" role="link" tabindex="0" data-href="/assignments?course=' +
+      cid +
+      '&open=' +
+      a.id +
+      '&student=' +
+      studentId +
+      '">' +
+      (st === 'NS' ? 'Enter a Score' : 'Open in Assignments') +
+      '</a><span class="stu-ov-row-score' +
+      (sc.cls ? ' ' + sc.cls : '') +
+      '"><span class="stu-ov-row-main-score' +
+      (sc.lv ? ' stu-ov-chip-lv stu-level-' + sc.lv : '') +
+      '">' +
+      esc(sc.main) +
+      '</span>' +
+      (gain
+        ? '<span class="stu-ov-row-sub stu-ov-gain">+' + gain + '% when it’s in</span>'
+        : sc.sub
+          ? '<span class="stu-ov-row-sub">' + esc(sc.sub) + '</span>'
+          : '') +
+      '</span></div>' +
+      body +
+      '</article>'
     );
   }
 
@@ -716,85 +754,10 @@ window.PageStudent = (function () {
     return { main: cell.text, sub: '', lv: lv };
   }
 
-  /* An open piece's rubric: one 1–4 scale per criterion, and one next
-     step, for the lowest criterion unless the teacher picks another. */
-  function _ovRubricHtml(ov, a) {
-    if (isPointsScored(a)) return '';
-    var rid = a.rubricId || a.rubric_id;
-    var rubric = rid ? getRubricById(ov.cid, rid) : null;
-    if (!rubric || !(rubric.criteria || []).length) return '';
-    var rows = [];
-    rubric.criteria.forEach(function (crit, k) {
-      var v = rubricCriterionLevel(ov.cid, studentId, a, crit);
-      if (v == null) return;
-      rows.push({ crit: crit, k: k, near: nearestScoreLevel(v) });
-    });
-    if (!rows.length) return '';
-    var lowest = rows.reduce(function (m, r) {
-      return r.near.level < m.near.level ? r : m;
-    }, rows[0]);
-    var sel =
-      rows.find(function (r) {
-        return _ovCrit === a.id + ':' + r.k;
-      }) || lowest;
-    var html =
-      '<div class="stu-ov-rubric"><div class="stu-ov-rub-row stu-ov-rub-head" aria-hidden="true"><span>Rubric</span>' +
-      '<span class="stu-ov-cells"><span>1</span><span>2</span><span>3</span><span>4</span></span><span></span></div>';
-    rows.forEach(function (r) {
-      var on = r === sel;
-      var cells = '';
-      // Filled in the level's colour, as every 1–4 scale (design rule 5).
-      var fill = PROF_COLORS[r.near.level] || PROF_COLORS[0];
-      for (var n = 1; n <= 4; n++)
-        cells += '<span class="stu-ov-cell' + (n <= r.near.level ? ' on" style="background:' + fill : '') + '"></span>';
-      html +=
-        '<button type="button" class="stu-ov-rub-row' +
-        (on ? ' sel' : '') +
-        '" data-action="stuOvCrit" data-key="' +
-        esc(a.id + ':' + r.k) +
-        '" aria-pressed="' +
-        on +
-        '"><span class="stu-ov-rub-name">' +
-        esc(r.crit.name || '') +
-        '</span><span class="stu-ov-cells" aria-hidden="true">' +
-        cells +
-        '</span><span class="stu-ov-rub-lv">' +
-        esc(r.near.text || String(r.near.level)) +
-        '</span></button>';
-    });
-    html += '</div>';
-    var nextLv = sel.near.level + 1;
-    var nextText = sel.near.level >= 4 ? '' : (sel.crit.levels && sel.crit.levels[nextLv]) || '';
-    if (sel.near.level >= 4)
-      html +=
-        '<div class="stu-ov-next"><div class="stu-ov-label">Next Step · ' +
-        esc(sel.crit.name || '') +
-        '</div><div class="stu-ov-next-text"><strong>Top level.</strong> Keep doing what you did here.</div></div>';
-    else if (nextText)
-      html +=
-        '<div class="stu-ov-next"><div class="stu-ov-label">Next Step · ' +
-        esc(sel.crit.name || '') +
-        '</div><div class="stu-ov-next-text"><strong>To get a ' +
-        nextLv +
-        ':</strong> ' +
-        esc(nextText) +
-        '</div></div>';
-    return html;
-  }
-
   function _ovOpenHtml(ov, ctx, a) {
     var cid = ov.cid;
     var st = ov.statusOf(a);
-    var withNote = ctx.allScores.find(function (s) {
-      return s.assessmentId === a.id && s.note;
-    });
-    var left = '';
-    if (withNote && st !== 'NS' && st !== 'EXC')
-      left +=
-        '<div><div class="stu-ov-label">From your teacher</div><div class="stu-ov-read stu-ov-pre">' +
-        esc(String(withNote.note)) +
-        '</div></div>';
-    if (st !== 'NS' && st !== 'EXC') left += _ovRubricHtml(ov, a);
+    var left = _ovFbHtml(ov, a);
     if (st === 'NS' && a.description)
       left +=
         '<div><div class="stu-ov-label">The Task</div><div class="stu-ov-read stu-ov-pre">' +
@@ -854,14 +817,7 @@ window.PageStudent = (function () {
     var st = ov.statusOf(a);
     var open = _ovOpen === a.id;
     var sc = _ovScore(ov, a);
-    var pill =
-      st === 'NS'
-        ? '<span class="stu-ov-pill miss">Missing</span>'
-        : st === 'LATE'
-          ? '<span class="stu-ov-pill late">Late</span>'
-          : st === 'EXC'
-            ? '<span class="stu-ov-pill exc">Excused</span>'
-            : '';
+    var pill = _ovPill(st);
     return (
       '<div class="stu-ov-row' +
       (open ? ' open' : '') +
@@ -890,7 +846,14 @@ window.PageStudent = (function () {
     );
   }
 
-  function _ovAllHtml(ov, ctx) {
+  function _ovAllHtml(ov, ctx, pic) {
+    // A competency picked on Your Competencies narrows the list to its work.
+    var comp = null;
+    pic.comps.groups.forEach(function (g) {
+      g.items.forEach(function (it) {
+        if (it.id === _ovComp) comp = it;
+      });
+    });
     var list = ctx.assessments
       .slice()
       .sort(function (x, y) {
@@ -898,6 +861,7 @@ window.PageStudent = (function () {
       })
       .filter(function (a) {
         var st = ov.statusOf(a);
+        if (comp && comp.aids.indexOf(a.id) < 0) return false;
         if (_ovFilter === 'missing') return st === 'NS';
         if (_ovFilter === 'marked') {
           var c = ov.cellOf[a.id];
@@ -926,34 +890,42 @@ window.PageStudent = (function () {
           );
         })
         .join('') +
+      (comp
+        ? '<button type="button" class="stu-ov-chip stu-ov-comp-chip" data-action="stuOvComp" aria-pressed="true" aria-label="' +
+          esc('Only ' + comp.name + ': show all work') +
+          '">' +
+          esc(comp.name) +
+          ' <span aria-hidden="true">✕</span></button>'
+        : '') +
       '</div>';
     var html =
       '<div class="stu-ov-all"><div class="stu-ov-all-head"><h3 class="stu-ov-h3">All Your Work</h3>' + seg + '</div>';
     if (!list.length) return html + '<div class="stu-ov-card stu-ov-none">Nothing here.</div></div>';
     html += '<div class="stu-ov-rows">';
     list.forEach(function (a) {
-      html += _ovRowHtml(ov, ctx, a);
+      html += _ovItemHtml(ov, a);
     });
     return html + '</div></div>';
   }
 
   function _overviewTabHtml(ctx) {
     var ov = _overviewModel(ctx);
+    var pic = _ovPicture(ov, ctx);
     var first = displayNameFirst(ctx.student);
     return (
       '<div class="stu-ov">' +
       '<div class="stu-ov-head"><div><h2 class="stu-ov-title">' +
       esc(first + '’s Overview') +
       '</h2></div><button type="button" class="stu-ov-btn" data-action="stuOvFull">Full Screen</button></div>' +
-      '<div class="stu-ov-top">' +
-      _ovGradeHtml(ov) +
+      // The grade, its line over the year and the competencies under it, pointing at each other.
+      '<div class="stu-gp"><div class="stu-ov-top">' +
+      _ovGradeHtml(ov, window.StudentOverview ? StudentOverview.lineHtml(pic) : '') +
       _ovMissingTileHtml(ov) +
-      '</div><div class="stu-ov-mid">' +
-      _ovTodoHtml(ov) +
-      _ovBetterHtml(ov) +
       '</div>' +
-      _ovAllHtml(ov, ctx) +
-      '<p class="stu-ov-foot">Shows grades and missing work only: no notes, observations, designations or other students.</p>' +
+      (window.StudentOverview ? StudentOverview.compsHtml(pic) : '') +
+      '</div>' +
+      _ovAllHtml(ov, ctx, pic) +
+      '<p class="stu-ov-foot">Shows grades, feedback and missing work only: no notes, observations, designations or other students.</p>' +
       '</div>'
     );
   }
@@ -1206,7 +1178,7 @@ window.PageStudent = (function () {
     var byType = {};
     entries.forEach(function (e) {
       var a = ctx.assessMap[e.assessmentId];
-      var t = (a && a.evidenceType) || '';
+      var t = assessmentTypeOf(a);
       (byType[t] = byType[t] || []).push(e);
     });
     var rows = Object.keys(byType)
@@ -2252,7 +2224,7 @@ window.PageStudent = (function () {
           : 'About Me isn’t turned on for this class. Turn it on in ' +
             '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
             esc(encodeURIComponent(o.cid)) +
-            '&amp;manage=questionnaires">Class Settings › Questionnaires</a>.') +
+            '&amp;manage=questionnaires">Class Settings › Reflect</a>.') +
         '</p></section>'
       );
     html += '<p class="lp2-lede">From the About Me questionnaire, ' + esc(LearnerProfile.day(a.at)) + '.</p>';
@@ -2763,7 +2735,7 @@ window.PageStudent = (function () {
     // Every grade on this page is the year so far (Colin, 2026-11-03).
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
-    var assessments = getAssessments(cid);
+    var assessments = getAssignedAssessments(cid);
     var assessMap = {};
     assessments.forEach(function (a) {
       assessMap[a.id] = a;
@@ -2848,6 +2820,7 @@ window.PageStudent = (function () {
     if (_tab === 'work') WorkWall.mountTab(document.getElementById('stu-panel'), cid, studentId, { onChange: render });
     else if (window.WorkWall) WorkWall.unmountTab();
     if (window.WorkWall) WorkWall.mountPiece(document.getElementById('main'), cid, studentId);
+    if (_tab === 'overview' && window.StudentOverview) StudentOverview.mount(main);
     CompetencyEvidence.mount(activeCourse, studentId, main, {
       onAdd: function () {
         Evidence.refresh();
@@ -2886,6 +2859,13 @@ window.PageStudent = (function () {
     if (match) match.focus({ preventScroll: true });
   }
 
+  // Bring a part of the page into view only when it is off the screen.
+  function _ovReveal(node, block) {
+    if (!node || !node.scrollIntoView) return;
+    var r = node.getBoundingClientRect();
+    if (r.top < 60 || r.top > window.innerHeight - 120) node.scrollIntoView({ block: block });
+  }
+
   /* ── Delegated click handler ──────────────────────────────── */
   function _handleClick(e) {
     var el = e.target.closest('[data-action]');
@@ -2914,24 +2894,42 @@ window.PageStudent = (function () {
       stuOvOpen: function () {
         var aid = el.dataset.aid || '';
         _ovOpen = _ovOpen === aid ? '' : aid;
-        _ovCrit = '';
         render();
       },
-      // Overview: a missing piece's Details opens its row in All Your Work.
-      stuOvShow: function () {
-        _ovOpen = el.dataset.aid || '';
-        _ovFilter = 'all';
-        _ovCrit = '';
-        render();
-        var row = document.getElementById('stu-ov-row-' + _ovOpen);
-        if (row) {
-          row.scrollIntoView({ block: 'center' });
-          var btn = row.querySelector('.stu-ov-row-btn');
-          if (btn) btn.focus({ preventScroll: true });
-        }
-      },
+      // Overview: All, Assessed or Missing; the Missing tile shows the missing work.
       stuOvFilter: function () {
         _ovFilter = el.dataset.filter || 'all';
+        render();
+        if (el.dataset.reveal) _ovReveal(document.querySelector('.stu-ov-all'), 'start');
+      },
+      // Overview: a day on Your Grade Over the Year shows its work in All Your Work.
+      stuGpPoint: function () {
+        if (StudentOverview.armFirst(el)) return;
+        var aid = (el.dataset.aids || '').split(' ')[0];
+        if (!aid) return;
+        if (!document.getElementById('stu-ov-row-' + aid)) {
+          _ovFilter = 'all';
+          _ovComp = '';
+          render();
+        }
+        var row = document.getElementById('stu-ov-row-' + aid);
+        _ovReveal(row, 'center');
+        if (row) {
+          row.classList.add('flash');
+          setTimeout(function () {
+            row.classList.remove('flash');
+          }, 1200);
+        }
+      },
+      // Overview: a competency on Your Competencies shows only its work; again, all of it.
+      stuGpComp: function () {
+        if (StudentOverview.armFirst(el)) return;
+        _ovComp = _ovComp === el.dataset.sec ? '' : el.dataset.sec || '';
+        render();
+        if (_ovComp) _ovReveal(document.querySelector('.stu-ov-all'), 'start');
+      },
+      stuOvComp: function () {
+        _ovComp = '';
         render();
       },
       stuCompSort: function () {
@@ -2962,14 +2960,6 @@ window.PageStudent = (function () {
         render();
         var btn = document.querySelector('[data-action="stuGrFilter"][data-filter="' + _grFilter + '"]');
         if (btn) btn.focus({ preventScroll: true });
-      },
-      stuOvShowAll: function () {
-        _ovShowAll = !_ovShowAll;
-        render();
-      },
-      stuOvCrit: function () {
-        _ovCrit = el.dataset.key || '';
-        render();
       },
       // Full Screen: the Overview alone, for turning the screen to the student.
       stuOvFull: function () {
@@ -3130,8 +3120,7 @@ window.PageStudent = (function () {
     _tab = _isTab(asked) ? asked : params.ob ? 'evidence' : _savedTab() || 'overview';
     _ovOpen = '';
     _ovFilter = 'all';
-    _ovShowAll = false;
-    _ovCrit = '';
+    _ovComp = '';
     _overrideSelectedLevel = 0;
 
     // Show sidebar with student roster

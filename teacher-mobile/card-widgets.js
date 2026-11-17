@@ -278,7 +278,7 @@ window.MCardWidgets = (function () {
   /* ── missingWork (alert metric tile) ─────────────────────────── */
   _renderers.missingWork = function (st, cid, data) {
     var statuses = data.statuses || getAssignmentStatuses(cid);
-    var assessments = data.assessments || getAssessments(cid);
+    var assessments = data.assessments || getAssignedAssessments(cid);
     var count = assessments.filter(function (a) {
       return statuses[st.id + ':' + a.id] === 'NS';
     }).length;

@@ -3888,6 +3888,309 @@ function seedIfNeeded() {
     localStorage.setItem('gb-responses-sci8', JSON.stringify(responses));
   })();
 
+  // ── A reflection the teacher built (Demo Mode) ──
+  // "Unit 2 Exit Reflection" (docs/plans/reflect-plan.md): kind 'custom',
+  // on, no closing date, its questions shaped as the plan's data contract
+  // says, answered by 19 of the 27 students. Added once per device, after
+  // the questionnaires above, so a demo seeded before it existed gets it
+  // too and a demo teacher who deletes it doesn't get it back.
+  (function seedUnit2Reflection() {
+    var MARK = 'gb-demo-unit2-reflection';
+    // After the questionnaires above, never in place of them.
+    if (!COURSES.sci8 || localStorage.getItem(MARK) != null) return;
+    if (localStorage.getItem('gb-questionnaires-sci8') == null) return;
+    var list;
+    var responses;
+    try {
+      list = JSON.parse(localStorage.getItem('gb-questionnaires-sci8') || '[]');
+      responses = JSON.parse(localStorage.getItem('gb-responses-sci8') || '{}');
+    } catch (e) {
+      return;
+    }
+    if (!Array.isArray(list)) list = [];
+    if (!responses || typeof responses !== 'object') responses = {};
+    var QID = 'q-demo-unit2';
+    if (
+      list.some(function (q) {
+        return q.id === QID;
+      })
+    ) {
+      localStorage.setItem(MARK, '1');
+      return;
+    }
+    var STATEMENTS = [
+      'I asked questions when I was stuck',
+      'I checked my work before handing it in',
+      'I helped someone in my group',
+    ];
+    var COLUMNS = ['Never', 'Sometimes', 'Usually', 'Always'];
+    var questions = [
+      { prompt: 'What is one thing you understand better after this unit?', kind: 'text', options: { required: true } },
+      {
+        prompt: 'How confident are you balancing chemical equations?',
+        kind: 'rating',
+        options: { required: true, levels: 5, low: 'Not Yet', high: 'Could Teach It' },
+      },
+      {
+        prompt: 'Which helped you learn the most?',
+        kind: 'choice',
+        options: {
+          required: true,
+          choices: ['Labs', 'Notes', 'Practice Questions', 'Group Work'],
+          multiple: false,
+          other: true,
+        },
+      },
+      {
+        prompt: 'How often did you do each of these?',
+        kind: 'likert',
+        options: { statements: STATEMENTS, choices: COLUMNS },
+      },
+      {
+        prompt: 'Put these in order, from most to least helpful.',
+        kind: 'ranking',
+        options: { choices: ['Labs', 'Notes', 'Practice Questions'] },
+      },
+    ].map(function (x, i) {
+      return Object.assign(
+        {
+          id: QID + '-' + (i + 1),
+          display_order: i + 1,
+          core_ids: [],
+          repeated_key: null,
+          teacher_only: false,
+          prompt_translations: {},
+        },
+        x,
+      );
+    });
+    var unit2 = {
+      id: QID,
+      course_id: 'sci8',
+      kind: 'custom',
+      title: 'Unit 2 Exit Reflection',
+      template_id: null,
+      theme: 'A few questions about how the unit went. About 5 minutes.',
+      report_period: null,
+      parent_id: null,
+      opens_on: null,
+      closes_on: null,
+      is_on: true,
+      myed_comment: null,
+      created_at: current('2026-03-09T16:00:00Z'),
+      updated_at: current('2026-03-09T16:00:00Z'),
+      questions: questions,
+    };
+    // One row a student: [id, when, what they understand better, rating,
+    // what helped most, the three statements' columns (N S U A), ranking
+    // (L Labs, N Notes, P Practice Questions)]. Eight students haven't
+    // answered: Noor, Liam, Mateo, Ethan, Jas, Fatima, Priya and Darius.
+    var COL = { N: 'Never', S: 'Sometimes', U: 'Usually', A: 'Always' };
+    var RANK = { L: 'Labs', N: 'Notes', P: 'Practice Questions' };
+    var ROWS = [
+      [
+        'st1',
+        '2026-03-13T18:42:00Z',
+        'Why the numbers in front change but the small numbers never do.',
+        4,
+        'Labs',
+        'SUU',
+        'LPN',
+      ],
+      [
+        'st3',
+        '2026-03-10T19:05:00Z',
+        'how to count atoms on both sides. i used to just guess',
+        2,
+        'Group Work',
+        'NSN',
+        'LNP',
+      ],
+      [
+        'st10',
+        '2026-03-11T17:20:00Z',
+        "That atoms don't disappear in a reaction, they just get rearranged.",
+        5,
+        'Labs',
+        'UAS',
+        'LPN',
+      ],
+      [
+        'st11',
+        '2026-03-12T20:10:00Z',
+        'How to count atoms on both sides before I start changing anything.',
+        4,
+        'Practice Questions',
+        'SUS',
+        'PLN',
+      ],
+      [
+        'st12',
+        '2026-03-10T18:31:00Z',
+        'Balancing equations. At first it made no sense but the lab with the baking soda helped.',
+        3,
+        'Labs',
+        'SSA',
+        'LPN',
+      ],
+      [
+        'st13',
+        '2026-03-13T16:55:00Z',
+        'That mass stays the same before and after a reaction. We weighed the bag and it was the same!',
+        4,
+        'Labs',
+        'UUS',
+        'LPN',
+      ],
+      [
+        'st14',
+        '2026-03-11T21:02:00Z',
+        'The difference between a physical change and a chemical change.',
+        3,
+        'Practice Questions',
+        'AUU',
+        'PLN',
+      ],
+      [
+        'st15',
+        '2026-03-12T15:48:00Z',
+        'honestly not much, the equations still confuse me',
+        1,
+        'Group Work',
+        'NNN',
+        'LNP',
+      ],
+      [
+        'st16',
+        '2026-03-10T20:15:00Z',
+        'Signs of a chemical reaction like bubbles, colour change and heat.',
+        3,
+        'Labs',
+        'SUS',
+        'LPN',
+      ],
+      [
+        'st17',
+        '2026-03-11T16:40:00Z',
+        'What the subscripts mean. The 2 in H2O means there are two hydrogen atoms.',
+        4,
+        'Practice Questions',
+        'UAA',
+        'PNL',
+      ],
+      [
+        'st18',
+        '2026-03-12T18:25:00Z',
+        'How to write a word equation and then turn it into symbols.',
+        5,
+        'Labs',
+        'SSU',
+        'LPN',
+      ],
+      [
+        'st19',
+        '2026-03-13T17:30:00Z',
+        "Why we can't change the little numbers, because that makes it a different substance.",
+        4,
+        'Labs',
+        'SUS',
+        'LPN',
+      ],
+      [
+        'st20',
+        '2026-03-11T19:12:00Z',
+        'Using a table to keep track of the atoms on each side. It makes it way easier.',
+        3,
+        'Practice Questions',
+        'UUS',
+        'PLN',
+      ],
+      [
+        'st21',
+        '2026-03-10T17:58:00Z',
+        'Reactants go on the left and products go on the right.',
+        2,
+        'Group Work',
+        'NSN',
+        'NLP',
+      ],
+      [
+        'st23',
+        '2026-03-12T16:20:00Z',
+        'Conservation of mass. Atoms just move around, nothing gets made or lost.',
+        4,
+        'Labs',
+        'UAU',
+        'LPN',
+      ],
+      [
+        'st24',
+        '2026-03-11T15:35:00Z',
+        'I get coefficients now. You multiply the whole molecule, not just one atom.',
+        3,
+        'Notes',
+        'SUS',
+        'NPL',
+      ],
+      [
+        'st25',
+        '2026-03-13T19:48:00Z',
+        'How to check my answer by counting every atom again at the end.',
+        4,
+        'Practice Questions',
+        'AAA',
+        'PLN',
+      ],
+      ['st26', '2026-03-10T21:20:00Z', 'That a reaction is when new substances get made.', 2, 'Labs', 'SSN', 'LPN'],
+      [
+        'st27',
+        '2026-03-12T17:05:00Z',
+        'How to balance equations step by step instead of changing random numbers.',
+        3,
+        'the video about moles',
+        'UUU',
+        'PLN',
+      ],
+    ];
+    var mine = {};
+    ROWS.forEach(function (row, n) {
+      var grid = {};
+      STATEMENTS.forEach(function (st, i) {
+        grid[st] = COL[row[5].charAt(i)];
+      });
+      var order = row[6].split('').map(function (k) {
+        return RANK[k];
+      });
+      var answers = {};
+      answers[QID + '-1'] = { num: null, text: row[2], json: null };
+      answers[QID + '-2'] = { num: row[3], text: null, json: null };
+      answers[QID + '-3'] = { num: null, text: row[4], json: [row[4]] };
+      answers[QID + '-4'] = {
+        num: null,
+        text: STATEMENTS.map(function (st) {
+          return st + ': ' + grid[st];
+        }).join(' · '),
+        json: grid,
+      };
+      answers[QID + '-5'] = {
+        num: null,
+        text: order
+          .map(function (c, i) {
+            return i + 1 + '. ' + c;
+          })
+          .join(' · '),
+        json: order,
+      };
+      mine[row[0]] = [{ id: 'r-demo-unit2-' + (n + 1), submitted_at: current(row[1]), via: 'link', answers: answers }];
+    });
+    responses[QID] = mine;
+    unit2.answered = Object.keys(mine);
+    list.push(unit2);
+    localStorage.setItem('gb-questionnaires-sci8', JSON.stringify(list));
+    localStorage.setItem('gb-responses-sci8', JSON.stringify(responses));
+    localStorage.setItem(MARK, '1');
+  })();
+
   // ── Core Competency self-assessments this term (Demo Mode) ──
   // The steps Science 8 gave on their Term 2 reflection sheets, as the demo
   // teacher entered them: most of the class on Communicating, Collaborating

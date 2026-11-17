@@ -293,6 +293,8 @@ window.AssessmentCopy = (function () {
     if (a.scoreMode && a.scoreMode !== 'proficiency') copy.scoreMode = a.scoreMode;
     if (a.maxPoints != null && a.scoreMode && a.scoreMode !== 'proficiency') copy.maxPoints = a.maxPoints;
     if (a.weight != null && a.weight !== 1) copy.weight = a.weight;
+    // A Draft's copy is a Draft too; each class assigns its own.
+    if (a.isDraft) copy.isDraft = true;
     return { assessment: copy, rubric: rubricToAdd };
   }
 
@@ -385,7 +387,7 @@ window.AssessmentCopy = (function () {
     scoreMode: 'scoring mode',
     maxPoints: 'max points',
     weight: 'proficiency weight',
-    evidenceType: 'evidence type',
+    evidenceType: 'type',
     category: 'category',
     rubric: 'rubric',
     module: 'module',
@@ -826,7 +828,7 @@ window.AssessmentCopy = (function () {
       );
     }
     if ('weight' in patch) out.push('Factor → ' + formatFactor(patch.weight));
-    if ('evidenceType' in patch) out.push('Evidence type → ' + (patch.evidenceType || 'none'));
+    if ('evidenceType' in patch) out.push('Type → ' + assessmentTypeLabel(patch.evidenceType));
     if ('categoryId' in patch) {
       var cat = (getCategories(dstCid) || []).find(function (c) {
         return c.id === patch.categoryId;
@@ -1172,99 +1174,12 @@ window.AssessmentCopy = (function () {
     );
   }
 
-  /* ── Add from another class ────────────────────────────────── */
-  /* Pick assessments in another class and copy them into cid. Links each
-     source to its copy, giving the source a copyGroup if it has none. */
-  function openAddFromClass(cid, onDone) {
-    var targets = copyTargets(cid);
-    var classes = targets.sameCourse.concat(targets.other);
-    if (!classes.length) {
-      _toast('You have no other classes to copy from.');
-      return;
-    }
-    var html =
-      '<label class="copy-review-field">From <select class="af-input" id="copy-from-class">' +
-      classes
-        .map(function (c) {
-          return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
-        })
-        .join('') +
-      '</select></label>' +
-      '<div id="copy-from-list" class="copy-from-list">Loading…</div>';
-
-    function fillList(root, srcCid) {
-      var list = root.querySelector('#copy-from-list');
-      list.textContent = 'Loading…';
-      loadClass(srcCid).then(function () {
-        var mine = getAssessments(cid) || [];
-        var have = {};
-        mine.forEach(function (x) {
-          if (x.copyGroup) have[x.copyGroup] = true;
-        });
-        var rows = (getAssessments(srcCid) || []).slice().sort(function (x, y) {
-          return String(_dateOf(y)).localeCompare(String(_dateOf(x)));
-        });
-        if (!rows.length) {
-          list.textContent = 'That class has no assessments yet.';
-          return;
-        }
-        list.innerHTML = rows
-          .map(function (x) {
-            var already = x.copyGroup && have[x.copyGroup];
-            var refused = !already && !offersScoreMode(cid, x);
-            var cat = _categoryOf(srcCid, x);
-            return (
-              '<label class="copy-review-check' +
-              (already || refused ? ' af-copy-has' : '') +
-              '"><input type="checkbox" data-copy-src="' +
-              esc(x.id) +
-              '"' +
-              (already || refused ? ' disabled' : '') +
-              '> <span>' +
-              esc(x.title) +
-              '</span><span class="copy-review-muted"> ' +
-              esc(
-                [
-                  _dateOf(x),
-                  cat ? cat.name : '',
-                  already ? 'already here' : '',
-                  refused ? 'DIBELS is only for ELA and Social Studies 8' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · '),
-              ) +
-              '</span></label>'
-            );
-          })
-          .join('');
-      });
-    }
-
-    _dialog({
-      title: 'Add from another class',
-      html: html,
-      okLabel: 'Add',
-      onOpen: function (root) {
-        var sel = root.querySelector('#copy-from-class');
-        fillList(root, sel.value);
-        sel.addEventListener('change', function () {
-          fillList(root, sel.value);
-        });
-      },
-      onOk: function (root) {
-        var srcCid = root.querySelector('#copy-from-class').value;
-        var ids = Array.from(root.querySelectorAll('[data-copy-src]:checked')).map(function (cb) {
-          return cb.dataset.copySrc;
-        });
-        if (!ids.length) return true;
-        _addFrom(srcCid, ids, cid).then(function (added) {
-          if (onDone && added) onDone();
-        });
-        return true;
-      },
-    });
-  }
-
+  /* ── Add From Another Class ────────────────────────────────── */
+  /* The dialog that picks the assessments is teacher/add-from-class.js.
+     This copies the picked ones from srcCid into dstCid: each source is
+     linked to its copy, getting a copyGroup if it has none. Resolves true
+     when they were added, false when the teacher backed out of Check
+     Before Adding. */
   function _addFrom(srcCid, ids, dstCid) {
     return Promise.all([loadClass(srcCid), loadClass(dstCid)]).then(function () {
       var srcList = (getAssessments(srcCid) || []).slice();
@@ -1329,7 +1244,10 @@ window.AssessmentCopy = (function () {
     renderCardCopies: renderCardCopies,
     renderSiblingToggle: renderSiblingToggle,
     deleteNote: deleteNote,
-    openAddFromClass: openAddFromClass,
+    addFrom: _addFrom,
+    className: _className,
+    loadClass: loadClass,
+    offersScoreMode: offersScoreMode,
     dialog: _dialog,
     _courseKey: _courseKey,
   };

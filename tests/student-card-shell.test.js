@@ -46,7 +46,7 @@ async function real(card) {
 }
 
 describe('the three tabs', () => {
-  it('Assignments, My Learning and Reflections, the first one current', async () => {
+  it('Assignments, My Learning and Reflect, the first one current', async () => {
     const page = await demo();
     // Drawn twice: in the header for a Chromebook, along the bottom for a phone; page-view.css shows one.
     expect(page.root().querySelector('.sp-tabs-top').tagName).toBe('NAV');
@@ -57,7 +57,7 @@ describe('the three tabs', () => {
     expect(tabs.map(t => t.querySelector('.sp-tab-label').textContent)).toEqual([
       'Assignments',
       'My Learning',
-      'Reflections',
+      'Reflect',
     ]);
     expect(tabs.map(t => t.getAttribute('data-tab'))).toEqual(['assignments', 'learning', 'questionnaires']);
     expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual(['page', null, null]);
@@ -71,7 +71,7 @@ describe('the three tabs', () => {
     await page.click('[data-tab="questionnaires"]');
     expect(page.root().querySelector('.sp-tab[aria-current="page"]').getAttribute('data-tab')).toBe('questionnaires');
     expect(page.root().querySelector('.sp-segments')).toBeNull();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Reflections');
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Reflect');
     expect(page.root().querySelector('.sp-empty').textContent).toBe('Reflections from your teacher will show here.');
     // My Learning lists the work even with Show My Learning off, and shows no grade above it.
     await page.click('[data-tab="learning"]');

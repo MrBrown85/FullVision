@@ -314,3 +314,120 @@ describe('LearnerProfile', () => {
     expect(cards[1].querySelector('.qw-b').textContent).toBe('Family is everything');
   });
 });
+
+/* A reflection the teacher built (docs/plans/reflect-plan.md): its answers
+   read as words in Reflections, the ready-made one beside it as before. */
+describe('LearnerProfile: a reflection the teacher built', () => {
+  let originals;
+  let doc;
+  const CQ = {
+    id: 'qc',
+    course_id: CID,
+    kind: 'custom',
+    title: 'Unit 2 Exit Reflection',
+    theme: 'A few questions about how the unit went.',
+    template_id: null,
+    is_on: true,
+    questions: [
+      {
+        id: 'c1',
+        kind: 'rating',
+        prompt: 'How confident?',
+        options: { levels: 5, low: 'Not Yet', high: 'Could Teach It' },
+      },
+      { id: 'c2', kind: 'rating', prompt: 'How ready?', options: {} },
+      { id: 'c3', kind: 'section', prompt: 'Looking Ahead', options: { subtitle: 'Two more.' } },
+      { id: 'c4', kind: 'date', prompt: 'When is your test?', options: {} },
+      { id: 'c5', kind: 'ranking', prompt: 'Most to least helpful', options: { choices: ['Labs', 'Notes'] } },
+      {
+        id: 'c6',
+        kind: 'likert',
+        prompt: 'How often?',
+        options: { statements: ['I asked', 'I checked'], choices: ['Never', 'Always'] },
+      },
+      { id: 'c7', kind: 'mystery', prompt: 'A new kind', options: {} },
+      { id: 'c8', kind: 'text', prompt: 'Anything else?', options: {} },
+    ],
+  };
+  beforeEach(() => {
+    localStorage.clear();
+    originals = { isDemoMode: globalThis.isDemoMode };
+    globalThis.isDemoMode = () => true;
+    Questionnaires._reset();
+    StudentVoice._reset();
+    seed();
+    const qs = JSON.parse(localStorage.getItem('gb-questionnaires-' + CID));
+    localStorage.setItem('gb-questionnaires-' + CID, JSON.stringify(qs.concat([CQ])));
+    const resp = JSON.parse(localStorage.getItem('gb-responses-' + CID));
+    resp.qc = {
+      e1: [
+        {
+          id: 'rc',
+          submitted_at: '2025-11-20T18:00:00Z',
+          answers: {
+            c1: { num: 5, text: null, json: null },
+            c2: { num: 3, text: null, json: null },
+            c4: { num: null, text: '2025-11-28', json: null },
+            c5: { num: null, text: '1. Notes · 2. Labs', json: ['Notes', 'Labs'] },
+            c6: {
+              num: null,
+              text: 'I checked: Always · I asked: Never',
+              json: { 'I checked': 'Always', 'I asked': 'Never' },
+            },
+            c7: { num: null, text: null, json: { a: 'b' } },
+          },
+        },
+      ],
+    };
+    localStorage.setItem('gb-responses-' + CID, JSON.stringify(resp));
+    doc = parseHTML('<!doctype html><html><body></body></html>').document;
+  });
+  afterEach(() => {
+    globalThis.isDemoMode = originals.isDemoMode;
+  });
+
+  it('answerText: a rating as "n of N" with its end word, a date in words, a ranking numbered, a grid one line per statement', () => {
+    const q = id => CQ.questions.find(x => x.id === id);
+    expect(StudentVoice.answerText(q('c1'), { num: 5 })).toBe('5 of 5 (Could Teach It)');
+    expect(StudentVoice.answerText(q('c1'), { num: 1 })).toBe('1 of 5 (Not Yet)');
+    expect(StudentVoice.answerText(q('c2'), { num: 3 })).toBe('3 of 5');
+    expect(StudentVoice.answerText(q('c4'), { text: '2025-11-28' })).toBe('November 28, 2025');
+    expect(StudentVoice.answerText(q('c5'), { json: ['Notes', 'Labs'] })).toBe('1. Notes\n2. Labs');
+    expect(StudentVoice.answerText(q('c6'), { json: { 'I checked': 'Always', 'I asked': 'Never' } })).toBe(
+      'I asked: Never\nI checked: Always',
+    );
+    expect(StudentVoice.answerText(q('c3'), { text: 'x' })).toBe('');
+    expect(StudentVoice.answerText(q('c7'), { json: { a: 'b' } })).toBe('a: b');
+    expect(StudentVoice.answerText({ kind: 'choice' }, { json: ['Labs', 'Other thing'] })).toBe('Labs, Other thing');
+  });
+
+  it('counts among Reflections, newest first, with each answer in words and the section as a heading', () => {
+    const model = StudentVoice.profile(StudentVoice.entries(CID, 'e1'));
+    expect(model.reflections.map(e => e.kind)).toEqual(['custom', 'core_reflection']);
+    const box = doc.createElement('div');
+    box.innerHTML = LearnerProfile.reflectionsHtml({ model, first: 'Harjot' });
+    const older = [...box.querySelectorAll('.lp-older h3')].map(h => h.textContent);
+    // The teacher's description stays off the date line; the ready-made theme stays on it.
+    expect(older[0]).toBe('Unit 2 Exit Reflection Nov 20');
+    expect(older[1]).toBe('November Reflection Nov 7 · Self-Awareness and Goal Setting');
+    const groups = [...box.querySelectorAll('.qw-group')];
+    const words = [...groups[0].querySelectorAll('.qw-b')].map(b => b.textContent);
+    expect(words).toEqual(['5 of 5 (Could Teach It)', '3 of 5']);
+    expect(groups[1].querySelector('h3').textContent).toBe('Looking Ahead');
+    expect(groups[1].querySelector('.qw-q').textContent).toBe('Two more.');
+    const rest = [...groups[1].querySelectorAll('.qw')].map(f => [
+      f.querySelector('figcaption').textContent,
+      (f.querySelector('.qw-b') || f.querySelector('.gl-none')).textContent,
+    ]);
+    expect(rest).toEqual([
+      ['When is your test?', 'November 28, 2025'],
+      ['Most to least helpful', '1. Notes\n2. Labs'],
+      ['How often?', 'I asked: Never\nI checked: Always'],
+      ['A new kind', 'a: b'],
+      ['Anything else?', 'No answer'],
+    ]);
+    // The ready-made reflection draws as it always has.
+    expect(box.querySelectorAll('.sh-grid .qw')).toHaveLength(4);
+    expect([...box.querySelectorAll('.stu-core-step.on')].map(s => s.textContent)).toEqual(['Beginning', 'Confident']);
+  });
+});

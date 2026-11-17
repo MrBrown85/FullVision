@@ -75,7 +75,7 @@ window.PreviewStudent = (function () {
   // How many of this student's grades wait as drafts: the cells a screen shows as Draft (GradeState.stateOf).
   function _draftsFor(cid, sid) {
     if (typeof GradeState === 'undefined') return 0;
-    return (getAssessments(cid) || []).filter(function (a) {
+    return (getAssignedAssessments(cid) || []).filter(function (a) {
       return a && GradeState.stateOf(cid, sid, a.id) === GradeState.DRAFT;
     }).length;
   }

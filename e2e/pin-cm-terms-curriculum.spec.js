@@ -169,12 +169,12 @@ test.describe('Reporting Terms', () => {
   test('a preset fills the terms, a span keeps one semester, and the print dialog follows', async ({ page }) => {
     await openTerms(page);
     await clickAction(page, 'cmTermEdit');
-    // With every row removed the presets come back.
     await termRows(page).nth(1).getByRole('button', { name: 'Remove term' }).click();
     await termRows(page).nth(0).getByRole('button', { name: 'Remove term' }).click();
     await expect(termRows(page)).toHaveCount(0);
     await expect(page.locator('#cm-term-foot-sci8')).toHaveText('No terms: every page shows the whole year.');
-    await page.getByRole('button', { name: 'Quarters (4)' }).click();
+    // The class's own dates: Start With offers the generic layouts.
+    await page.getByRole('button', { name: '4 Terms' }).click();
     await expect(termLabels(page)).toHaveCount(4);
     expect(await termLabels(page).evaluateAll(els => els.map(e => e.value))).toEqual([
       'Term 1',

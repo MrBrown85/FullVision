@@ -60,7 +60,7 @@ test('a rubric survives a trip through Points, and Points saves none', async ({ 
   await expect(page.locator('#af-maxpoints')).toHaveValue('25');
   await page.fill('#af-title', 'Points Keep No Rubric');
   await page.selectOption('#af-category', 'sci8-cat-checks');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Points Keep No Rubric'));
   expect(saved.scoreMode).toBe('points');
   expect(saved.maxPoints).toBe(25);

@@ -59,6 +59,8 @@ test('a card opens to a ⋯ menu that holds its actions, Set Everyone To in a su
     'Set Everyone To',
     'Edit Assessment',
     'Duplicate',
+    // A piece no student has a grade or work on can go back to a Draft (#1484).
+    'Unassign',
     'Delete…',
   ]);
   // Set Everyone To › opens its levels beside the menu: on hover, and by

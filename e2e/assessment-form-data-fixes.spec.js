@@ -46,7 +46,7 @@ test('Save Rubric on a Blank rubric keeps the ticked competencies', async ({ pag
   expect(await ticked(page)).toEqual(before);
   await expect(page.locator('.af-card-competencies')).not.toHaveClass(/is-rubric/);
   expect(await page.evaluate(() => document.querySelector('.af-tag-cb').disabled)).toBe(false);
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Blank Keeps Ticks'));
   expect(saved.tagIds.sort()).toEqual(before.sort());
   expect(saved.rubricId).toBeTruthy();
@@ -59,7 +59,7 @@ test('Create with a written Blank rubric keeps the ticked competencies', async (
   await tick(page, 1);
   const before = await ticked(page);
   await page.locator('[data-ge="level"][data-i="0"][data-level="2"]').fill('Some words');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
       page.evaluate(() => (getAssessments('sci8').find(a => a.title === 'Blank Ticks On Create') || {}).tagIds),
@@ -139,7 +139,7 @@ test('Max Points keeps a decimal and the quick picks follow the box', async ({ p
   await expect(page.locator('#af-maxpoints')).toHaveValue('50');
   await expect(pick(50)).toHaveAttribute('aria-pressed', 'true');
   await page.fill('#af-maxpoints', '12.5');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() => page.evaluate(() => (getAssessments('sci8').find(a => a.title === 'Decimal Points') || {}).maxPoints))
     .toBe(12.5);

@@ -44,7 +44,7 @@ window.MGrade = (function () {
 
   function _assessmentById(cid, aid) {
     return (
-      (getAssessments(cid) || []).find(function (a) {
+      (getAssignedAssessments(cid) || []).find(function (a) {
         return a.id === aid;
       }) || null
     );
@@ -199,7 +199,7 @@ window.MGrade = (function () {
     // The assessments with a draft, newest first, each with who is waiting.
     function _toReturnRows(cid) {
       var ids = _rosterIds(cid);
-      return getAssessments(cid)
+      return getAssignedAssessments(cid)
         .slice()
         .sort(function (a, b) {
           return (b.date || '').localeCompare(a.date || '');
@@ -335,7 +335,7 @@ window.MGrade = (function () {
        class that holds no grades. */
     function studentDrafts(cid, sid) {
       if (!_holdsGrades(cid)) return [];
-      return getAssessments(cid)
+      return getAssignedAssessments(cid)
         .filter(function (a) {
           return GraderWork.draftsIn(cid, a.id, [sid]).length > 0;
         })
@@ -563,7 +563,7 @@ window.MGrade = (function () {
           '</button>',
       });
 
-      var assessments = getAssessments(cid);
+      var assessments = getAssignedAssessments(cid);
       var students = getStudents(cid);
       var allScores = getScores(cid);
 
@@ -847,7 +847,7 @@ window.MGrade = (function () {
         _saveFilters(cid);
       }
 
-      var assessments = getAssessments(cid);
+      var assessments = getAssignedAssessments(cid);
       var ctx = _filterCtx(cid);
 
       // Update segmented control active state
@@ -936,7 +936,7 @@ window.MGrade = (function () {
           '</div></div>'
         );
       };
-      var assessments = getAssessments(cid);
+      var assessments = getAssignedAssessments(cid);
       var ctx = _filterCtx(cid);
       var shown = assessments.filter(function (a) {
         return _matchesAllFilters(a, ctx);
@@ -1184,7 +1184,7 @@ window.MGrade = (function () {
 
     // Which card a student is graded on: their own, or their group's.
     function studentCardIndex(cid, aid, sid) {
-      var a = (getAssessments(cid) || []).find(function (x) {
+      var a = (getAssignedAssessments(cid) || []).find(function (x) {
         return x.id === aid;
       });
       if (!a) return -1;
@@ -1327,7 +1327,7 @@ window.MGrade = (function () {
     }
     // Back to Group Grade asks first: it replaces the member's own grade.
     function confirmBackToGroup(cid, aid, sid) {
-      var a = getAssessments(cid).find(function (x) {
+      var a = getAssignedAssessments(cid).find(function (x) {
         return x.id === aid;
       });
       var st = getStudents(cid).find(function (x) {
@@ -1369,7 +1369,7 @@ window.MGrade = (function () {
     function renderSwiper(cid, aid, opts) {
       _swiperCid = cid;
       _swiperAid = aid;
-      var assessments = getAssessments(cid);
+      var assessments = getAssignedAssessments(cid);
       var assessment = assessments.find(function (a) {
         return a.id === aid;
       });
@@ -2670,7 +2670,7 @@ window.MGrade = (function () {
 
     // html-safe: the name and title go through MC.esc; ids are ours; levels are numbers
     function openSetTo(cid, aid, sid) {
-      var a = getAssessments(cid).find(function (x) {
+      var a = getAssignedAssessments(cid).find(function (x) {
         return x.id === aid;
       });
       var st = getStudents(cid).find(function (s) {
@@ -2839,7 +2839,7 @@ window.MGrade = (function () {
         hint.textContent =
           view === 'tags' ? 'One score for each competency the work assesses.' : 'One score for each rubric criterion.';
       });
-      var assessment = getAssessments(cid).find(function (a) {
+      var assessment = getAssignedAssessments(cid).find(function (a) {
         return a.id === aid;
       });
       var swiper = document.getElementById('m-swiper');
@@ -3020,7 +3020,7 @@ window.MGrade = (function () {
         _updateThumbGraded(cid, aid);
       }
       // Group work: a member's status can change whose grade the card shows.
-      var a = getAssessments(cid).find(function (x) {
+      var a = getAssignedAssessments(cid).find(function (x) {
         return x.id === aid;
       });
       if (groupGradingUnits(cid, a, [])) _redrawSwiper(cid, aid);
@@ -3031,7 +3031,7 @@ window.MGrade = (function () {
        (isScoreLocked), so none with a level or points goes back under it. */
     function _undoEntries(entry, prev) {
       if (!isScoreLocked(entry.cid, entry.sid, entry.aid)) return prev;
-      var a = getAssessments(entry.cid).find(function (x) {
+      var a = getAssignedAssessments(entry.cid).find(function (x) {
         return x.id === entry.aid;
       });
       return prev.filter(function (p) {
@@ -3090,7 +3090,7 @@ window.MGrade = (function () {
       var swiper = document.getElementById('m-swiper');
       if (!swiper) return;
       // A bank competency's wording, ready for the level sheet.
-      var assess = (getAssessments(cid) || []).find(function (a) {
+      var assess = (getAssignedAssessments(cid) || []).find(function (a) {
         return a.id === aid;
       });
       var hasBank = ((assess && assess.tagIds) || []).some(function (t) {

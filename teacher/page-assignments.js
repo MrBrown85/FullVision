@@ -38,18 +38,6 @@ window.PageAssignments = (function () {
   // While a search or filter is on, every module with matches shows open;
   // a module the teacher closes during it is kept here, not saved.
   var _filterClosedModules = {};
-  // Show: Submitted (assign-show.js) opens and closes cards through these.
-  AssignShow.bind({
-    get: function () {
-      return { open: openAssessIds, allExpanded: _allExpanded, collapsed: _collapsedIds, closed: _filterClosedModules };
-    },
-    set: function (v) {
-      openAssessIds = v.open;
-      _allExpanded = v.allExpanded;
-      _collapsedIds = v.collapsed;
-      _filterClosedModules = v.closed;
-    },
-  });
   // Closed modules stay closed per class, saved with the teacher's
   // preferences so they survive signing out. This key is the old
   // browser-only copy, read once when a class has nothing saved yet.
@@ -602,7 +590,7 @@ window.PageAssignments = (function () {
       '<button class="tb-action-btn tb-action-secondary" data-action="openRubricBank">Rubrics</button>' +
       (window.AssessmentCopy &&
       (AssessmentCopy.copyTargets(cid).sameCourse.length || AssessmentCopy.copyTargets(cid).other.length)
-        ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add from another class</button>'
+        ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add From Another Class</button>'
         : '') +
       '<button class="tb-action-btn" data-action="showNewForm">+ New Assessment</button>' +
       '</div>' +
@@ -1728,6 +1716,7 @@ window.PageAssignments = (function () {
       var c =
         '<div class="assess-card' +
         (isOpen ? ' open active' : '') +
+        (a.isDraft ? ' is-draft' : '') +
         '" id="ac-' +
         a.id +
         '" draggable="true"' +
@@ -1811,6 +1800,7 @@ window.PageAssignments = (function () {
           ? '<span class="collab-badge">' + esc(a.collaboration[0].toUpperCase() + a.collaboration.slice(1)) + '</span>'
           : '') +
         (window.AssessmentCopy ? AssessmentCopy.renderCardCopies(cid, a) : '') +
+        AssignDraft.chipHtml(cid, a) +
         '<span class="assess-date">' +
         // Assigned \u2192 due. `date` is the assigned date (date_assigned on the
         // server); the due date is its own field.
@@ -1836,6 +1826,7 @@ window.PageAssignments = (function () {
             _drawnReturn('s' + a.id, _returnDraftsButtonHtml(cid, a, shownIds)) +
             '</span>'
           : '') +
+        AssignDraft.assignButtonHtml(cid, a) +
         _cardMoreMenuHtml(cid, a) +
         '</div>' +
         '<span class="assess-chevron" aria-hidden="true">' +
@@ -1846,7 +1837,7 @@ window.PageAssignments = (function () {
         // card's whole-class grid used to be built and kept out of sight:
         // 80,000 elements on a class of 30 with 36 pieces.)
         '<div class="assess-body">' +
-        (isOpen ? _cardBodyHtml(cid, a, focusSt, students, scores) : '') +
+        (isOpen ? (a.isDraft ? AssignDraft.bodyHtml(cid, a) : _cardBodyHtml(cid, a, focusSt, students, scores)) : '') +
         '</div>' +
         '</div>';
       return c;
@@ -1863,9 +1854,11 @@ window.PageAssignments = (function () {
       grouped[key].push(a);
     });
 
-    var filtersActive =
-      filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly || AssignShow.on();
-    if (!filtersActive) _filterClosedModules = {};
+    // A search or filter opens every module with matches; the Show bar only
+    // lists, and leaves folders and cards as the teacher has them.
+    var opensFolders = filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly;
+    var filtersActive = opensFolders || AssignShow.on();
+    if (!opensFolders) _filterClosedModules = {};
 
     // Nothing to show: say so first, above any modules.
     if (assessments.length === 0 && allAssessments.length > 0) {
@@ -1894,7 +1887,7 @@ window.PageAssignments = (function () {
           return openAssessIds.has(a.id);
         });
       // Searching or filtering shows every module with matches open.
-      var folderOpen = filtersActive ? !_filterClosedModules[u.id] : isOpen || containsOpen;
+      var folderOpen = opensFolders ? !_filterClosedModules[u.id] : isOpen || containsOpen;
       html += '<div class="mod-drop-zone" data-drop-index="' + idx + '" data-mod-drop-zone="true"></div>';
       html +=
         '<div class="mod-folder' +
@@ -1976,7 +1969,7 @@ window.PageAssignments = (function () {
         ungrouped.some(function (a) {
           return openAssessIds.has(a.id);
         });
-      var folderOpen = filtersActive
+      var folderOpen = opensFolders
         ? !_filterClosedModules['__none__']
         : (ungrouped.length > 0 && noModOpen) || containsOpenNoMod;
       html +=
@@ -2746,7 +2739,6 @@ window.PageAssignments = (function () {
     var dueDate = assess ? assess.dueDate || '' : '';
     var categoryId = _getAssessmentCategoryId(assess);
     var selTags = assess ? assess.tagIds || [] : [];
-    var evidence = assess ? assess.evidenceType : 'written';
     var description = assess ? assess.description || '' : '';
     var moduleId = assess ? assess.moduleId || '' : '';
     var collaboration = assess ? assess.collaboration || 'individual' : 'individual';
@@ -2872,33 +2864,8 @@ window.PageAssignments = (function () {
           // save stopped for one (grey text audit, Colin, Nov 11).
           '<p class="af-category-hint" id="af-category-hint" hidden>' + esc(CATEGORY_REQUIRED_HINT) + '</p>') +
       '</div>' +
-      // Evidence Type beside Category, where it was before More Options
-      // (Colin, Nov 4).
-      '<div class="af-field">' +
-      '<label class="af-label" for="af-evidence">Evidence Type</label>' +
-      '<select class="af-input" id="af-evidence">' +
-      // An evidence type from elsewhere (a quiz, lab or project) keeps its
-      // own option, so editing never changes it.
-      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
-        .concat(
-          evidence && ['written', 'observation', 'audio', 'video', 'photo', 'conversation'].indexOf(evidence) < 0
-            ? [evidence]
-            : [],
-        )
-        .map(function (t) {
-          return (
-            '<option value="' +
-            esc(t) +
-            '"' +
-            (t === evidence ? ' selected' : '') +
-            '>' +
-            esc(t[0].toUpperCase() + t.slice(1)) +
-            '</option>'
-          );
-        })
-        .join('') +
-      '</select>' +
-      '</div>' +
+      // Type beside Category, where Evidence Type was (Colin, Nov 4 and 17).
+      AssessmentTypeField.fieldHtml(cid, assess ? assess.evidenceType : undefined) +
       '<div class="af-field">' +
       '<label class="af-label">Module</label>' +
       '<select class="af-input" id="af-module">' +
@@ -2930,13 +2897,6 @@ window.PageAssignments = (function () {
       '</p>' +
       '</div>' +
       '</div>';
-    // Evidence Type: Photo is not students sending photos (a teacher's
-    // question, Nov 11). Only where Student Work is offered.
-    if (_formWorkOffered(cid))
-      html +=
-        '<p class="af-category-hint af-evidence-hint" id="af-evidence-hint"' +
-        (_evidenceNeedsHint(evidence) ? '' : ' hidden') +
-        '>Evidence Type is for your records. Students send photos under Student Work.</p>';
     // Who does it, in the top box with what it is (Colin, Nov 11; board
     // "Assessment Form" 2a to 2d).
     html += _studentsRowHtml(collaboration);
@@ -3199,26 +3159,11 @@ window.PageAssignments = (function () {
       // Create and Add Another says what it saved, until the next edit.
       '<p class="af-saved-note" id="af-saved-note" role="status" hidden></p>' +
       '<p class="af-counts-toward" id="af-counts-toward" aria-live="polite"></p>' +
-      '<button class="btn btn-ghost" data-action="cancelAssessForm">Cancel</button>' +
-      // Create and Add Another (redesign PR 11): saves, then a fresh form
-      // keeping the settings a run of similar work shares.
-      (isEdit
-        ? ''
-        : '<button class="btn btn-ghost" data-action="saveAndAddAnother" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter" title="Ctrl/⌘+Shift+Enter">Create and Add Another</button>') +
-      '<button class="btn btn-primary" data-action="' +
-      (isEdit ? 'saveEditAssess' : 'saveNewAssess') +
-      '" data-aid="' +
-      (isEdit ? assess.id : '') +
-      '">' +
-      (isEdit ? 'Save Changes' : 'Create Assessment') +
-      '</button>' +
+      // Cancel, Save as Draft, Create and Add Another, Create Assessment; a Draft's edit form ends with Assign.
+      AssignDraft.footerHtml(isEdit, assess) +
       '</div>';
 
     return html;
-  }
-
-  function _evidenceNeedsHint(v) {
-    return v === 'photo' || v === 'video' || v === 'audio';
   }
 
   /* The Students row in the top box: a button naming who it's for, which
@@ -4399,10 +4344,6 @@ window.PageAssignments = (function () {
     }
     if (!t.id) return;
     if (t.id === 'af-due' || t.id === 'af-date-assigned') _refreshDueHint();
-    if (t.id === 'af-evidence') {
-      var evHint = document.getElementById('af-evidence-hint');
-      if (evHint) evHint.hidden = !_evidenceNeedsHint(t.value);
-    }
     // Student Work's late question names the due date; Cece Sees follows the form.
     if (t.id === 'af-due' && e.type === 'change') _refreshFormWorkCard();
     else if (t.id === 'af-title' || t.id === 'af-category' || t.id === 'af-module' || t.id === 'af-due')
@@ -4467,7 +4408,7 @@ window.PageAssignments = (function () {
     // Shift adds another (new assessments only).
     var save = e.shiftKey
       ? form.querySelector('[data-action="saveAndAddAnother"]')
-      : form.querySelector('[data-action="saveNewAssess"], [data-action="saveEditAssess"]');
+      : form.querySelector('[data-action="saveNewAssess"]:not([data-draft]), [data-action="saveEditAssess"]');
     if (!save) return;
     e.preventDefault();
     save.click();
@@ -6533,8 +6474,8 @@ window.PageAssignments = (function () {
     }
   }
 
-  function saveNewAssess(addAnother) {
-    addAnother = addAnother === true;
+  function saveNewAssess(how) {
+    var addAnother = how === true;
     if (_formResBusy()) return;
     var titleEl = document.getElementById('af-title');
     var title = (titleEl ? titleEl.value : '').trim();
@@ -6551,7 +6492,7 @@ window.PageAssignments = (function () {
     if (!_formCompetencyTagged()) return;
     if (
       _commitOpenBlank(function () {
-        saveNewAssess(addAnother);
+        saveNewAssess(how);
       })
     )
       return;
@@ -6559,7 +6500,7 @@ window.PageAssignments = (function () {
     // with the rubric's saved id (redesign PR 8).
     if (
       _persistPendingFormRubric(function () {
-        saveNewAssess(addAnother);
+        saveNewAssess(how);
       })
     )
       return;
@@ -6591,6 +6532,7 @@ window.PageAssignments = (function () {
       notes: '',
       created: new Date().toISOString(),
     };
+    if (how === 'draft') newAssess.isDraft = true;
     if (categoryId) {
       newAssess.categoryId = categoryId;
       newAssess.category_id = categoryId;
@@ -7060,6 +7002,7 @@ window.PageAssignments = (function () {
       var assessWeight = _formAssessWeight();
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
+    if (AssignDraft.assigning === aid && next.isDraft) AssignDraft.assignInto(activeCourse, next);
     // A change that moves grades asks first (grade-change.js).
     if (
       GradeChange.askFirst(activeCourse, before, next, function () {
@@ -7262,7 +7205,7 @@ window.PageAssignments = (function () {
     if (_grader || !main || !COURSES[cid]) return false;
     // A filter on grades (Ungraded, To Return) can drop a card graded since the draw.
     if (showUngraded || _toReturnOnly) return false;
-    var filtersActive = filterCategories.length > 0 || !!assessSearch || AssignShow.on();
+    var opensFolders = filterCategories.length > 0 || !!assessSearch;
     var all = getAssessments(cid);
     var byId = {};
     all.forEach(function (a) {
@@ -7278,7 +7221,7 @@ window.PageAssignments = (function () {
     // A folder the teacher closed is drawn open only while a card in it is
     // held open (renderAssessmentList): every folder is checked, since Expand
     // lets go of cards that stay open.
-    var folders = filtersActive ? [] : main.querySelectorAll('.mod-folder');
+    var folders = opensFolders ? [] : main.querySelectorAll('.mod-folder');
     for (var f = 0; f < folders.length; f++) {
       if (!collapsedModules[folders[f].dataset.moduleId]) continue;
       var holds = Array.prototype.some.call(folders[f].querySelectorAll('.assess-card'), function (el) {
@@ -11290,7 +11233,7 @@ window.PageAssignments = (function () {
         showNewForm();
       },
       addFromClass: function () {
-        if (window.AssessmentCopy) AssessmentCopy.openAddFromClass(activeCourse, render);
+        if (window.AddFromClass) AddFromClass.open(activeCourse, render);
       },
       copyTargetToggle: function () {
         if (window.AssessmentCopy) AssessmentCopy.toggleTarget(el);
@@ -11412,9 +11355,10 @@ window.PageAssignments = (function () {
         saveNewAssess(true);
       },
       saveNewAssess: function () {
-        saveNewAssess();
+        saveNewAssess(el.dataset.draft ? 'draft' : false);
       },
       saveEditAssess: function () {
+        AssignDraft.assigning = el.dataset.assign ? el.dataset.aid : null;
         saveEditAssess(el.dataset.aid);
       },
       toggleModuleFolder: function () {
@@ -13811,17 +13755,20 @@ window.PageAssignments = (function () {
   // html-safe: ids are ours; labels and icons are fixed
   function _cardMoreMenuHtml(cid, a) {
     var aid = 'data-aid="' + a.id + '"';
+    // A Draft has no grading: Assign, Print, then what any piece has (assign-draft.js).
     var html =
-      _cardMenuItem(
-        'data-action="classResults" data-cid="' + esc(cid) + '" ' + aid,
-        _CLASS_RESULTS_ICON,
-        'Class Results',
-      ) + _cardPrintItem(cid, a);
+      (a.isDraft
+        ? AssignDraft.menuItemsHtml(cid, a, _cardMenuItem)
+        : _cardMenuItem(
+            'data-action="classResults" data-cid="' + esc(cid) + '" ' + aid,
+            _CLASS_RESULTS_ICON,
+            'Class Results',
+          )) + _cardPrintItem(cid, a);
     // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
-    if (!focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
+    if (!a.isDraft && !focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
-    var rubric = a.rubricId && getRubricById(cid, a.rubricId);
+    var rubric = !a.isDraft && a.rubricId && getRubricById(cid, a.rubricId);
     if (rubric) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       html +=
@@ -13841,7 +13788,7 @@ window.PageAssignments = (function () {
       }
     }
     html +=
-      _setEveryoneMenuHtml(cid, a) +
+      (a.isDraft ? '' : _setEveryoneMenuHtml(cid, a)) +
       '<span class="assess-menu-sep" role="separator"></span>' +
       _cardMenuItem('data-action="editAssess" ' + aid, LINE_ICONS.edit, 'Edit Assessment') +
       _cardMenuItem('data-action="dupeAssess" ' + aid, LINE_ICONS.copy, 'Duplicate');
@@ -13849,6 +13796,7 @@ window.PageAssignments = (function () {
     if (targets && (targets.sameCourse.length || targets.other.length))
       html += _cardMenuItem('data-action="copyAssessToClass" ' + aid, _ARROW_RIGHT_ICON, 'Copy to Another Class…');
     html +=
+      (a.isDraft ? '' : AssignDraft.menuItemsHtml(cid, a, _cardMenuItem)) +
       '<span class="assess-menu-sep" role="separator"></span>' +
       _cardMenuItem('data-action="deleteAssess" ' + aid, LINE_ICONS.trash, 'Delete…', 'is-delete');
     return (
@@ -17011,6 +16959,7 @@ window.PageAssignments = (function () {
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
     AssignList.listen(_addDocListener);
+    AssignDraft.listen(_addDocListener);
     ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
       _addDocListener(type, _queuePrintMarks);
     });

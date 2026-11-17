@@ -339,13 +339,13 @@ describe('Observations, Reports, Questionnaires, Goals and Overrides', () => {
             },
           ]
         : [];
-    const s = sheet(rows({ entries }), 'Questionnaires');
+    const s = sheet(rows({ entries }), 'Reflections');
     expect(s.rows).toEqual([
       ['Science 9', 'Noor Ahmed', 'About Me', '2026-09-15', 'What should I call you?', 'Noor'],
       ['Science 9', 'Noor Ahmed', 'About Me', '2026-09-15', 'Pick any', 'Reading, Art'],
       ['Science 9', 'Noor Ahmed', 'About Me', '2026-09-15', 'Where are you?', 'Communicating: 3 (I speak up.)'],
     ]);
-    expect(sheet(rows(), 'Questionnaires')).toBeUndefined();
+    expect(sheet(rows(), 'Reflections')).toBeUndefined();
   });
 
   it('lists goals, reflections and grade overrides by competency area', () => {
@@ -382,6 +382,7 @@ describe('the export stays complete', () => {
   // added here with its reason, so nothing a teacher wrote goes missing.
   const LEFT_OUT = {
     getAllTags: 'the learning map, not student data',
+    getAssignedAssessments: 'getAssessments without its Drafts; the export reads getAssessments, Drafts included',
     getAssignmentStatus: 'read through getAssignmentStatuses',
     getAssignmentObs: 'a subset of getAllQuickObs',
     getCategories: 'read through getAssessmentCategoryName',
