@@ -866,6 +866,26 @@ window.PageReports = (function () {
     _renderFitLine(); // the copy's paper, said where Print This Copy is pressed
   }
 
+  /* The saved PDF's name: "Progress Reports – Science 8 Block B – Term 1",
+     or one student's "Progress Report – Cece Ahn – Science 8 Block B –
+     Term 1". `names` are the students printed. */
+  function reportPrintTitle(cid, names, termLabel) {
+    var one = names.length === 1;
+    return [one ? 'Progress Report' : 'Progress Reports', one ? names[0] : '', printClassName(COURSES[cid]), termLabel];
+  }
+
+  // The live reports' file name: the selected students, the term picked.
+  function _liveReportTitle() {
+    var all = getStudents(activeCourse);
+    var chosen =
+      selectedStudentIds === null
+        ? all
+        : all.filter(function (st) {
+            return selectedStudentIds.includes(st.id);
+          });
+    return reportPrintTitle(activeCourse, chosen.map(fullName), ReportBlocks.reportContext().termLabel);
+  }
+
   /* Print This Copy prints the whole copy, every student in it, whatever
      the canvas shows: like _printNow, the canvas shows Everyone for the
      print and goes back afterwards. */
@@ -878,8 +898,24 @@ window.PageReports = (function () {
       studioView = 'all';
       _paintIssue(rec, preview);
     }
+    var restoreTitle = setPrintTitle(
+      reportPrintTitle(
+        rec.cid || activeCourse,
+        (rec.students || []).map(function (st) {
+          // A copy read back from the server keeps no names: the roster's.
+          var r = st.name
+            ? null
+            : getStudents(rec.cid || activeCourse).find(function (x) {
+                return x.id === st.sid;
+              });
+          return st.name || (r ? fullName(r) : '');
+        }),
+        rec.termLabel,
+      ),
+    );
     var restore = function () {
       window.removeEventListener('afterprint', restore);
+      restoreTitle();
       if (!wasOne) return;
       wasOne = false;
       studioView = 'one';
@@ -908,8 +944,10 @@ window.PageReports = (function () {
         studioView = 'all';
         renderReports();
       }
+      var restoreTitle = setPrintTitle(_liveReportTitle());
       var restore = function () {
         window.removeEventListener('afterprint', restore);
+        restoreTitle();
         if (wasOne) {
           studioView = 'one';
           renderReports();
@@ -2124,6 +2162,7 @@ window.PageReports = (function () {
       if (document.getElementById('report-output')) renderReports();
     },
     _helpers: {
+      reportPrintTitle: reportPrintTitle,
       tabs: TABS,
       unknownTab: UNKNOWN_TAB,
       tabFor: _tabFor,

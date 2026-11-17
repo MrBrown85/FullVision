@@ -1115,15 +1115,41 @@
     clearPrintMode(STYLE_ID, 'rubric-print-active');
   }
 
+  /* The saved PDF's name. Blank copies: "Rubric – Lab Report – Science 8".
+     Graded handouts: "Rubrics – Lab Report – Science 8", or one student's
+     "Rubric – Cece Ahn – Lab Report – Science 8"; a points assessment
+     prints Score Sheets. */
+  function printTitle(cid, aid, opts) {
+    var assessment = aid ? _assessment(cid, aid) : null;
+    var course = typeof COURSES !== 'undefined' ? COURSES[cid] : null;
+    var cls = printClassName(course);
+    if (opts.mode === 'blank') {
+      var rubric = _jobRubric(cid, aid, opts);
+      return ['Rubric', (assessment && assessment.title) || (rubric && rubric.name), cls];
+    }
+    var students = selectStudents(cid, aid, opts);
+    var one = students.length === 1;
+    var noun = assessment && isPointsScored(assessment) ? 'Score Sheet' : 'Rubric';
+    return [
+      one ? noun : noun + 's',
+      one ? printName(students[0], opts.nameStyle) : '',
+      assessment && assessment.title,
+      cls,
+    ];
+  }
+
   function print(cid, aid, opts) {
     var out = stage(cid, aid, opts);
     if (!out.sheets) return out;
     _activatePrintMode(opts.layout);
-    printThen(function () {
-      _deactivatePrintMode();
-      var root = document.getElementById(ROOT_ID);
-      if (root) root.innerHTML = '';
-    });
+    printThen(
+      function () {
+        _deactivatePrintMode();
+        var root = document.getElementById(ROOT_ID);
+        if (root) root.innerHTML = '';
+      },
+      printTitle(cid, aid, opts),
+    );
     return out;
   }
 
@@ -1959,6 +1985,7 @@
     pageCount: pageCount,
     layoutForCount: layoutForCount,
     printName: printName,
+    printTitle: printTitle,
     renderSheet: renderSheet,
     shrinkSteps: shrinkSteps,
     renderPages: renderPages,

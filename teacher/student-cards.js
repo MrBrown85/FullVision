@@ -403,9 +403,14 @@ var StudentCards = (function () {
 
   function _print(cid, items) {
     var className = _className(cid);
-    QrSlips.printSheet(items, function (item) {
-      return cardHtml(item, className, QrSlips.qrSvg(item.url));
-    });
+    var course = typeof COURSES !== 'undefined' ? COURSES[cid] : null;
+    QrSlips.printSheet(
+      items,
+      function (item) {
+        return cardHtml(item, className, QrSlips.qrSvg(item.url));
+      },
+      QrSlips.sheetTitle('Student Card', items, '', printClassName(course)),
+    );
   }
 
   /* ── Making cards: one path for every button ───────────────── */

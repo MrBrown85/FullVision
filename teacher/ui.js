@@ -229,14 +229,59 @@ function clearPrintMode(styleId, bodyClass) {
   if (style) style.remove();
 }
 
+/* The name Save as PDF suggests for a print. The browser names the file
+   from document.title as print() runs, so every print in the app names
+   itself here: what was printed, then the student, class and term where
+   they apply, e.g. "Progress Report – Cece Ahn – Science 8 Block B – Term 1".
+   Blank parts drop out; characters a file name can't hold become spaces. */
+var PRINT_NAME_BAD = /[\\/:*?"<>|\u0000-\u001f\u007f]/g;
+var PRINT_NAME_MAX = 150;
+function printFileName(parts) {
+  var name = (parts || [])
+    .map(function (p) {
+      return String(p == null ? '' : p)
+        .replace(PRINT_NAME_BAD, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/^[\s.]+|[\s.]+$/g, '');
+    })
+    .filter(Boolean)
+    .join(' – ');
+  if (name.length > PRINT_NAME_MAX) name = name.slice(0, PRINT_NAME_MAX).replace(/[\s.–]+$/, '');
+  return name;
+}
+
+/* A class as a file name shows it: "Science 8 Block B", the name alone when
+   it already says its block. */
+function printClassName(course) {
+  if (!course) return '';
+  var name = course.name || '';
+  var block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
+  if (!block || name.toLowerCase().indexOf(block.toLowerCase()) >= 0) return name;
+  return (name + ' ' + block).trim();
+}
+
+/* Sets the page title to `parts`' file name for a print and returns the
+   function that puts the old title back. No name leaves the title as it is. */
+function setPrintTitle(parts) {
+  var name = printFileName(parts);
+  var before = document.title;
+  if (name) document.title = name;
+  return function () {
+    if (name && document.title === name) document.title = before;
+  };
+}
+
 /* window.print(), then `cleanup` once. Chrome returns from print() when its
-   dialog closes; a browser that returns at once fires afterprint later. */
-function printThen(cleanup) {
+   dialog closes; a browser that returns at once fires afterprint later.
+   `titleParts` names the saved PDF (printFileName) until then. */
+function printThen(cleanup, titleParts) {
   var finished = false;
+  var restoreTitle = setPrintTitle(titleParts);
   function done() {
     if (finished) return;
     finished = true;
     window.removeEventListener('afterprint', done);
+    restoreTitle();
     cleanup();
   }
   window.addEventListener('afterprint', done);

@@ -561,3 +561,17 @@ describe('renderPages', () => {
     expect(html).toMatch(/3\.3<div class="gp-sub">83%<\/div>/);
   });
 });
+
+describe('the saved PDF’s name', () => {
+  const name = opts => printFileName(GP.printTitle(GP.buildModel(CID, opts)));
+
+  it('names the sheet, the class and its block, and the term', () => {
+    expect(name({ term: '1' })).toBe('Grades – Science 8 Block A – Term 1 Year to Date');
+    expect(name({ term: 'all' })).toBe('Grades – Science 8 Block A');
+  });
+
+  it('names a blank gradebook and an attendance sheet for what they are', () => {
+    expect(name({ term: 'all', blank: true })).toBe('Blank Gradebook – Science 8 Block A');
+    expect(name({ term: 'all', attendance: true })).toMatch(/^Attendance – Science 8 Block A – \S/);
+  });
+});

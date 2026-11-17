@@ -59,8 +59,9 @@ var QrSlips = (function () {
 
   /* Prints `items` eight to a letter page, each cell drawn by
      renderCell(item), and takes the sheet off the page when the print dialog
-     closes. The caller checks there is something to print. */
-  function printSheet(items, renderCell) {
+     closes. `titleParts` names the saved PDF (ui.js printFileName). The
+     caller checks there is something to print. */
+  function printSheet(items, renderCell, titleParts) {
     // The QR maker (vendor/qrcode.js) loads the first time a sheet is printed (router.js _onDemand).
     window.Router.withScripts('qrcode', function () {
       var root = document.getElementById(ROOT_ID);
@@ -76,8 +77,15 @@ var QrSlips = (function () {
         clearPrintMode(STYLE_ID, 'qr-slips-active');
         var r = document.getElementById(ROOT_ID);
         if (r) r.innerHTML = '';
-      });
+      }, titleParts);
     });
+  }
+
+  /* A sheet's file name: the plural for many ("Student Cards – Science 8"),
+     the student's name with the singular for one. `extra` follows the noun. */
+  function sheetTitle(noun, items, extra, className) {
+    var one = items.length === 1;
+    return [one ? noun : noun + 's', one ? items[0].name : '', extra, className];
   }
 
   /* ── The slips ────────────────────────────────────────────── */
@@ -192,7 +200,12 @@ var QrSlips = (function () {
   function print(cid, q, codes) {
     var slips = buildSlips(getStudents(cid), codes);
     if (!slips.length) return 0;
-    printSheet(slips, _slipCell(q, _className(cid)));
+    var course = typeof COURSES !== 'undefined' ? COURSES[cid] : null;
+    printSheet(
+      slips,
+      _slipCell(q, _className(cid)),
+      sheetTitle('Questionnaire Slip', slips, q.title || 'Questionnaire', printClassName(course)),
+    );
     return slips.length;
   }
 
@@ -200,6 +213,7 @@ var QrSlips = (function () {
     qrSvg: qrSvg,
     sheetPages: sheetPages,
     printSheet: printSheet,
+    sheetTitle: sheetTitle,
     slipUrl: slipUrl,
     buildSlips: buildSlips,
     buildPages: buildPages,

@@ -170,3 +170,28 @@ describe('Escape and the Parts panel on a narrow screen', () => {
     }
   });
 });
+
+describe('the saved PDF’s name', () => {
+  const { reportPrintTitle } = PageReports._helpers;
+  const D = ' – ';
+  it('names one student’s report, or the class’s reports, with the class and term', () => {
+    COURSES['prt-c'] = { id: 'prt-c', name: 'Science 8', block: 'B' };
+    expect(printFileName(reportPrintTitle('prt-c', ['Cece Ahn'], 'Term 1'))).toBe(
+      ['Progress Report', 'Cece Ahn', 'Science 8 Block B', 'Term 1'].join(D),
+    );
+    expect(printFileName(reportPrintTitle('prt-c', ['Cece Ahn', 'Dev Bains'], 'Term 1'))).toBe(
+      ['Progress Reports', 'Science 8 Block B', 'Term 1'].join(D),
+    );
+    delete COURSES['prt-c'];
+  });
+
+  it('both print buttons set the name before print() and put the title back after', () => {
+    const src = readFileSync('teacher/page-reports.js', 'utf-8');
+    ['function _printIssue(', 'function _printNow('].forEach(fn => {
+      const body = src.slice(src.indexOf(fn), src.indexOf('setTimeout(restore, 0)', src.indexOf(fn)));
+      expect(body.indexOf('setPrintTitle(')).toBeGreaterThan(-1);
+      expect(body.indexOf('setPrintTitle(')).toBeLessThan(body.indexOf('window.print()'));
+      expect(body).toContain('restoreTitle();');
+    });
+  });
+});

@@ -1318,9 +1318,15 @@ window.PageAssignments = (function () {
       })
       .join('');
     var course = COURSES[cid] || {};
+    // The saved PDF's name: "DIBELS 8 Benchmark – Science 8 Block B – Beginning of Year".
+    var fileName = printFileName([
+      a.title || 'DIBELS 8 Benchmark',
+      printClassName(course),
+      DIBELS_PERIOD_NAMES[period],
+    ]);
     var html =
       '<!doctype html><html><head><meta charset="utf-8"><title>' +
-      esc(a.title || 'DIBELS 8 Benchmark') +
+      esc(fileName) +
       '</title><style>' +
       'body{font-family:-apple-system,system-ui,sans-serif;color:#000;margin:0.4in;font-size:10pt}' +
       'h1{font-size:15pt;margin:0 0 2pt}p{margin:0 0 8pt}' +
@@ -1345,9 +1351,12 @@ window.PageAssignments = (function () {
     frame.contentDocument.write(html);
     frame.contentDocument.close();
     setTimeout(function () {
+      // The frame's title names the file; the page's too, for a browser that names it from the page.
+      var restoreTitle = setPrintTitle([fileName]);
       frame.contentWindow.focus();
       frame.contentWindow.print();
       setTimeout(function () {
+        restoreTitle();
         frame.remove();
       }, 1000);
     }, 50);
