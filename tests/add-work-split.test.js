@@ -448,6 +448,137 @@ describe('the named pieces handed over', () => {
   });
 });
 
+describe('a page moved to another piece', () => {
+  // Who ends up with which pages after Match the Named Pieces: sid → page numbers.
+  const handed = m => {
+    const out = {};
+    m.take().forEach(p => {
+      out[p.sid] = p.pages.map(pg => Number(pg.hash.replace(/^a+/, '')));
+    });
+    return out;
+  };
+
+  it('a page from the end of the pile becomes a named piece’s last page, and the empty piece goes', () => {
+    const m = M.model(scan(9), CLASS);
+    m.setPer(2); // [1,2] [3,4] [5,6] [7,8] [9]
+    m.name(0, 's1');
+    m.name(1, 's5');
+    m.name(2, 's3');
+    m.name(3, 's4');
+    expect(m.move(9, 1)).toEqual({ ok: true, reason: '', gone: { at: 4, sid: '' }, unnamed: '' });
+    expect(cut(m)).toEqual([[1, 2], [3, 4, 9], [5, 6], [7, 8]]);
+    expect(sids(m)).toEqual(['s1', 's5', 's3', 's4']);
+    expect(m.pieces()[1].spans).toEqual([[3, 4], [9, 9]]);
+    const out = m.take();
+    expect(out.map(p => p.from)).toEqual([
+      'Scan, pages 1–2',
+      'Scan, pages 3–4, 9',
+      'Scan, pages 5–6',
+      'Scan, pages 7–8',
+    ]);
+    expect(out[1].pages.map(pg => pg.hash)).toEqual([fakePage(3).hash, fakePage(4).hash, fakePage(9).hash]);
+    expect(out[1].pages.map(pg => pg.name)).toEqual(['page-1.jpg', 'page-2.jpg', 'page-3.jpg']);
+    expect(m.pages()).toEqual([]);
+  });
+
+  it('goes where it is put inside the piece, never first, so the piece keeps its name', () => {
+    const m = M.model(scan(6), CLASS);
+    m.setPer(2);
+    m.name(0, 's2');
+    m.name(1, 's6');
+    m.move(6, 0, 1); // between pages 1 and 2
+    m.move(5, 0, 0); // asked for first: it goes second
+    expect(cut(m)).toEqual([[1, 5, 6, 2], [3, 4]]);
+    expect(handed(m)).toEqual({ s2: [1, 5, 6, 2], s6: [3, 4] });
+  });
+
+  it('a named piece’s first page moved away leaves that piece with no name', () => {
+    const m = M.model(scan(8), CLASS);
+    m.setPer(2);
+    ['s1', 's5', 's3', 's4'].forEach((sid, at) => m.name(at, sid));
+    expect(m.move(3, 0)).toEqual({ ok: true, reason: '', gone: null, unnamed: 's5' });
+    expect(cut(m)).toEqual([[1, 2, 3], [4], [5, 6], [7, 8]]);
+    expect(sids(m)).toEqual(['s1', '', 's3', 's4']);
+    expect(handed(m)).toEqual({ s1: [1, 2, 3], s3: [5, 6], s4: [7, 8] });
+    // Page 4 stays, with no name, until the teacher names it.
+    expect(cut(m)).toEqual([[4]]);
+    expect(sids(m)).toEqual(['']);
+  });
+
+  it('a piece whose only page moves goes away, and its name goes with it', () => {
+    const m = M.model(scan(4), CLASS);
+    m.setPer(1);
+    ['s1', 's2', 's3', 's4'].forEach((sid, at) => m.name(at, sid));
+    expect(m.move(2, 0)).toEqual({ ok: true, reason: '', gone: { at: 1, sid: 's2' }, unnamed: '' });
+    expect(sids(m)).toEqual(['s1', 's3', 's4']);
+    expect(m.counts()).toMatchObject({ pieces: 3, named: 3 });
+    expect(handed(m)).toEqual({ s1: [1, 2], s3: [3], s4: [4] });
+  });
+
+  it('the name read from a moved page never comes back with it', () => {
+    const m = M.model(scan(4), CLASS);
+    m.setPer(1);
+    ['s1', 's2', 's3', 's4'].forEach((sid, at) => m.name(at, sid));
+    m.move(3, 0); // [1,3] [2] [4]
+    expect(sids(m)).toEqual(['s1', 's2', 's4']);
+    // One page fewer on the first piece: page 3 starts a piece again, with
+    // no name; pages 2 and 4 still start theirs, with the names read from them.
+    m.fewer(0);
+    expect(cut(m)).toEqual([[1], [3], [2], [4]]);
+    expect(sids(m)).toEqual(['s1', '', 's2', 's4']);
+    expect(handed(m)).toEqual({ s1: [1], s2: [2], s4: [4] });
+    expect(cut(m)).toEqual([[3]]);
+  });
+
+  it('with blank backs left out, only the page of work moves, and the backs stay out', () => {
+    const m = M.model(scan(8, [2, 4, 6, 8]), CLASS);
+    m.setPer(1); // [1] [3] [5] [7]
+    ['s1', 's2', 's3', 's4'].forEach((sid, at) => m.name(at, sid));
+    expect(m.move(2, 0).reason).toBe('not_found'); // a page left out does not move
+    expect(m.move(5, 0)).toMatchObject({ ok: true, gone: { at: 2, sid: 's3' } });
+    expect(cut(m)).toEqual([[1, 5], [3], [7]]);
+    const out = m.take();
+    expect(out.map(p => p.sid)).toEqual(['s1', 's2', 's4']);
+    expect(out[0].from).toBe('Scan, pages 1, 5');
+    expect(out.map(p => p.pages.map(pg => pg.hash))).toEqual([
+      [fakePage(1).hash, fakePage(5).hash],
+      [fakePage(3).hash],
+      [fakePage(7).hash],
+    ]);
+  });
+
+  it('in Class List Order, the piece that lost its first page has no name, and the rest keep theirs', () => {
+    const m = M.model(scan(12), CLASS);
+    m.setPer(2);
+    m.setOrder('list');
+    m.move(3, 0); // [1,2,3] [4] [5,6] …
+    expect(m.listFits()).toBe(true);
+    expect(sids(m)).toEqual(['s1', '', 's3', 's4', 's5', 's6']);
+    expect(handed(m)).toEqual({ s1: [1, 2, 3], s3: [5, 6], s4: [7, 8], s5: [9, 10], s6: [11, 12] });
+  });
+
+  it('a piece of 30 pages takes no more, and nothing changes', () => {
+    const m = M.model(scan(31), CLASS);
+    m.setPer(30); // [1..30] [31]
+    m.name(1, 's2');
+    expect(m.move(31, 0)).toEqual({ ok: false, reason: 'too_many_pages' });
+    expect(cut(m).map(p => p.length)).toEqual([30, 1]);
+    expect(sids(m)).toEqual(['', 's2']);
+    expect(m.move(31, 1).reason).toBe('same');
+    expect(m.move(99, 0).reason).toBe('not_found');
+  });
+
+  it('a page moved, then moved back, ends under the right student', () => {
+    const m = M.model(scan(6), CLASS);
+    m.setPer(2);
+    ['s1', 's2', 's3'].forEach((sid, at) => m.name(at, sid));
+    m.move(4, 2); // [1,2] [3] [5,6,4]
+    m.move(4, 1); // [1,2] [3,4] [5,6]
+    expect(cut(m)).toEqual([[1, 2], [3, 4], [5, 6]]);
+    expect(handed(m)).toEqual({ s1: [1, 2], s2: [3, 4], s3: [5, 6] });
+  });
+});
+
 describe('reading the scan', () => {
   const pdf = (name = FILE_NAME, size = 64) =>
     new File([new TextEncoder().encode('%PDF-1.7\n'), new Uint8Array(size)], name, { type: 'application/pdf' });

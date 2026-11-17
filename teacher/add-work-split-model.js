@@ -9,7 +9,8 @@
    AddWorkSplitModel.model(pages, students)   the model (see below).
    AddWorkSplitModel.matches(list, text, used) the name box's students.
    AddWorkSplitModel.startPer(kept, students)  Pages per Student to start.
-   AddWorkSplitModel.isBlank(sharpness)        under BLANK_BELOW. */
+   AddWorkSplitModel.isBlank(sharpness)        under BLANK_BELOW.
+   AddWorkSplitModel.pagesText(spans, cap)     "Pages 3–5" or "pages 7–8, 21". */
 /** @type {any} */ (window).AddWorkSplitModel = (function () {
   'use strict';
 
@@ -202,8 +203,33 @@
           }),
           sid: sid || '',
           typed: pin !== undefined,
+          spans: _spans(r),
         };
       });
+    }
+
+    /* A piece's kept pages as runs that sit together in the scan: [[3, 5]]
+       for pages 3 to 5 (a blank page 4 left out between them), [[7, 8],
+       [21, 21]] once page 21 was moved onto it. */
+    function _spans(r) {
+      var spans = [];
+      var prev = null;
+      for (var i = r.from; i < r.to; i++) {
+        var p = pages[i];
+        if (!prev || p.no !== prev.no + 1) spans.push({ a: 0, b: 0 });
+        prev = p;
+        if (out(p)) continue;
+        var sp = spans[spans.length - 1];
+        if (!sp.a) sp.a = p.no;
+        sp.b = p.no;
+      }
+      return spans
+        .filter(function (sp) {
+          return sp.a;
+        })
+        .map(function (sp) {
+          return [sp.a, sp.b];
+        });
     }
 
     function _index(no) {
@@ -235,6 +261,57 @@
       var k = _keptAll();
       _recut(p.from, k.indexOf(_index(p.nos[p.nos.length - 1])));
       return true;
+    }
+
+    /* Page `no` moved onto piece `toAt`, to be its page `pos` + 1 (`pos`
+       from 1, after the piece's first page, to its count, the end; the end
+       when left out), for a pile that came out of order. → { ok, reason,
+       gone, unnamed }.
+
+       What it does to names (review rule 5: a name belongs to the page it
+       was read from):
+       - The piece it lands on keeps its first page, so it keeps its name.
+         A moved page is never a piece's first page.
+       - A name read from the moved page goes nowhere with it.
+       - The piece it left keeps its name while it starts on the same page.
+         When the moved page was its first, it now starts on another page
+         and has no name (`unnamed`: the sid it had), even in Class List
+         Order, until the teacher names it.
+       - A piece left with no pages goes away, and its name with it
+         (`gone`: { at, sid }).
+       A piece holds 30 pages at most: a full piece takes none
+       ('too_many_pages'). Only a page in a piece moves (not one left out). */
+    function move(no, toAt, pos) {
+      var ps = pieces();
+      var src = ps.find(function (p) {
+        return p.nos.indexOf(no) >= 0;
+      });
+      var dst = ps[toAt];
+      if (!src || !dst) return { ok: false, reason: 'not_found' };
+      if (src.at === dst.at) return { ok: false, reason: 'same' };
+      if (dst.nos.length >= _maxPiece()) return { ok: false, reason: 'too_many_pages' };
+      var n = dst.nos.length;
+      pos = pos === undefined || pos === null ? NaN : Math.round(Number(pos));
+      pos = isFinite(pos) ? Math.max(1, Math.min(n, pos)) : n;
+      var wasFirst = src.nos[0] === no;
+      var gone = src.nos.length === 1;
+      var i = _index(no);
+      var p = pages[i];
+      delete st.pins[no];
+      pages.splice(i, 1);
+      // The piece it left still starts where it did (a cut moves to its next page).
+      if (p.cut && i < src.to - 1) pages[i].cut = true;
+      if (wasFirst && !gone) st.pins[src.nos[1]] = '';
+      p.cut = false;
+      var at = pos < n ? _index(dst.nos[pos]) : _index(dst.nos[n - 1]) + 1;
+      pages.splice(at, 0, p);
+      _tidy();
+      return {
+        ok: true,
+        reason: '',
+        gone: gone ? { at: src.at, sid: src.sid } : null,
+        unnamed: wasFirst && !gone ? src.sid : '',
+      };
     }
 
     // A blank page kept, or left out again. Only a blank page is ever left out.
@@ -328,7 +405,7 @@
         if (!p.sid) return;
         handed.push({
           sid: p.sid,
-          from: 'Scan, ' + (p.first === p.last ? 'page ' + p.first : 'pages ' + p.first + '–' + p.last),
+          from: 'Scan, ' + pagesText(p.spans, false),
           pages: p.nos.map(function (no, i) {
             var copy = Object.assign({}, page(no).page);
             copy.name = 'page-' + (i + 1) + '.jpg';
@@ -410,6 +487,7 @@
       setPer: setPer,
       more: more,
       fewer: fewer,
+      move: move,
       keep: keep,
       setLeaveOut: setLeaveOut,
       setOrder: setOrder,
@@ -423,8 +501,25 @@
     };
   }
 
+  /* "Pages 3–5", "Page 12", "Pages 7–8, 21" from a piece's spans; small
+     letters when `cap` is false. */
+  function pagesText(spans, cap) {
+    var list = spans || [];
+    var one = list.length === 1 && list[0][0] === list[0][1];
+    var word = (cap === false ? 'p' : 'P') + (one ? 'age ' : 'ages ');
+    return (
+      word +
+      list
+        .map(function (sp) {
+          return sp[0] === sp[1] ? String(sp[0]) : sp[0] + '–' + sp[1];
+        })
+        .join(', ')
+    );
+  }
+
   return {
     model: model,
+    pagesText: pagesText,
     matches: matches,
     fold: fold,
     first: _first,
