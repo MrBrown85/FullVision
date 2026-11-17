@@ -237,6 +237,8 @@ window.PreviewStudent = (function () {
           ? '[data-ps-device="' + had.dataset.psDevice + '"]'
           : null
       : null;
+    // A handout file open over the device goes with it: the device is drawn again.
+    if (typeof HandoutViewer !== 'undefined') HandoutViewer.close();
     el.innerHTML = _previewHtml();
     _settle(el.querySelector('.ps-screen'));
     if (focusKey) {
@@ -281,6 +283,8 @@ window.PreviewStudent = (function () {
     _onKey = function (e) {
       if (!_open) return;
       if (e.key === 'Escape') {
+        // Escape over a handout file closes the file (shared/handout-viewer.js), not the preview.
+        if (typeof HandoutViewer !== 'undefined' && HandoutViewer.isOpen()) return;
         e.preventDefault();
         e.stopPropagation();
         close();
@@ -320,6 +324,7 @@ window.PreviewStudent = (function () {
     var el = _overlay();
     var was = _open;
     _open = null;
+    if (typeof HandoutViewer !== 'undefined') HandoutViewer.close();
     if (was) {
       _letGo(was);
       (was.carReleases || []).forEach(function (release) {
@@ -354,6 +359,7 @@ window.PreviewStudent = (function () {
       if (_open.ui.handout) _loadHandout(_open.ui.handout);
       return;
     }
+    if (act === 'handout-file') return _openFile(el);
     var out = StudentPageView.press(_open.ui, built.view, act, el);
     if (!out) return;
     _open.ui = out.ui;
@@ -364,6 +370,39 @@ window.PreviewStudent = (function () {
       return _loadHandout(out.handout.resource);
     }
     _drawScreen(out.focus);
+  }
+
+  /* ── A handout file (a web page, a text file or an EPUB) ───── */
+
+  /* Opened over the device's screen by the viewer the student page uses
+     (shared/handout-viewer.js), from the class's store
+     (openAssessmentHandoutFile: this device's photo queue in Demo Mode, a
+     signed link otherwise). A web page or a book runs sealed, as it does
+     for the student. */
+  function _openFile(el) {
+    var mine = _open;
+    if (!mine || typeof HandoutViewer === 'undefined') return;
+    var rid = (el && el.getAttribute('data-resource')) || '';
+    var piece = (el && el.getAttribute('data-piece')) || '';
+    var row = (
+      typeof getAssessmentResources === 'function' ? getAssessmentResources(mine.cid, piece, { ready: true }) : []
+    ).filter(function (r) {
+      return r.id === rid;
+    })[0];
+    var device = _overlay() && _overlay().querySelector('.ps-device');
+    if (!row || !device) return;
+    HandoutViewer.open({
+      host: device,
+      title: row.title,
+      kind: row.kind,
+      returnTo: el,
+      load: function () {
+        if (typeof openAssessmentHandoutFile !== 'function') return Promise.resolve(null);
+        return Promise.resolve(openAssessmentHandoutFile(mine.cid, rid)).then(function (got) {
+          return got && _open === mine ? got.blob : null;
+        });
+      },
+    });
   }
 
   /* ── A handout (Handouts and Links) ────────────────────────── */

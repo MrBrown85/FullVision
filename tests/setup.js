@@ -245,6 +245,7 @@ load('shared/data-term-ratings.js');
 load('shared/data-student-records.js');
 load('shared/data-student-cards.js');
 load('shared/data-student-work.js');
+load('shared/data-handout-files.js');
 load('shared/data-feedback-live.js');
 load('shared/data-markup.js');
 load('shared/data-reflect.js');

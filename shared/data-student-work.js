@@ -1559,6 +1559,9 @@ function _wireWorkQueue() {
 function _workUploadFile(path, blob) {
   var sb = getSupabase();
   if (!sb || !sb.storage) return Promise.resolve({ error: { message: 'offline: no client', status: 503 } });
+  // A handout file goes to its own bucket (shared/data-handout-files.js).
+  var file = typeof _handoutFileUpload === 'function' ? _handoutFileUpload(sb, path, blob) : null;
+  if (file) return file;
   return Promise.resolve(_signInWait)
     .then(function () {
       return sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });

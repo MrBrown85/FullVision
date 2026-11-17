@@ -3566,7 +3566,11 @@ window.PageAssignments = (function () {
      (assessmentResourcesOffered, shared/data.js). What is added or
      removed here is saved with the assessment: for a new one, after it
      exists, as Student Work's choices are (_saveFormRes). Kept by the
-     assessment's id, so a copy starts with none. */
+     assessment's id, so a copy starts with none.
+     + Add a File (Colin, Nov 17 2026) takes a PDF, which becomes pages as
+     before, or a web page, a text file or an EPUB, kept as it is, 20 MB at
+     most (shared/handout-files.js). A web page is chosen together with its
+     pictures; the field says which pictures it names were not chosen. */
   var _formRes = null; // { cid, aid, items, linkOpen, busy, msg, next } while the field is drawn
   var RES_MAX_PAGES = 20;
   var RES_ICON_DOC =
@@ -3618,18 +3622,30 @@ window.PageAssignments = (function () {
     return n === 1 ? '1 page' : n + ' pages';
   }
 
+  var RES_FILE_WORDS = { html: 'Web Page', txt: 'Text File', epub: 'EPUB' };
+  function _sizeWord(bytes) {
+    return window.HandoutFiles ? HandoutFiles.sizeWord(bytes) : Math.max(1, Math.round((bytes || 0) / 1024)) + ' KB';
+  }
+
   function _formResItemHtml(it) {
     var pdf = it.kind === 'pdf';
+    var file = !!RES_FILE_WORDS[it.kind];
     var meta = pdf
       ? ' · PDF · ' + _pagesWord(it.pageCount) + (it.status === 'uploading' ? ' · Uploading' : '')
-      : ' · ' + (it.host || '');
+      : file
+        ? ' · ' +
+          RES_FILE_WORDS[it.kind] +
+          ' · ' +
+          _sizeWord(it.bytes) +
+          (it.status === 'uploading' ? ' · Uploading' : '')
+        : ' · ' + (it.host || '');
     return (
       '<li class="af-res-item' +
       (_formRes && _formRes.fresh === it.key ? ' af-res-in' : '') +
       '" data-key="' +
       esc(it.key) +
       '">' +
-      (pdf ? RES_ICON_DOC : RES_VIDEO_HOSTS.test(it.host || '') ? RES_ICON_VIDEO : RES_ICON_LINK) +
+      (pdf || file ? RES_ICON_DOC : RES_VIDEO_HOSTS.test(it.host || '') ? RES_ICON_VIDEO : RES_ICON_LINK) +
       '<span class="af-res-name"' +
       (it.kind === 'link' ? ' title="' + esc(it.url || '') + '"' : '') +
       '>' +
@@ -3667,14 +3683,14 @@ window.PageAssignments = (function () {
           '</div>'
         : '') +
       '<div class="af-res-adds">' +
-      '<button type="button" class="af-res-add" data-action="afResAddPdf"' +
+      '<button type="button" class="af-res-add" data-action="afResAddFile"' +
       (res.busy ? ' disabled aria-disabled="true"' : '') +
-      '>+ Add a PDF</button>' +
+      '>+ Add a File</button>' +
       '<button type="button" class="af-res-add" data-action="afResAddLink"' +
       (res.linkOpen ? ' aria-expanded="true"' : ' aria-expanded="false"') +
       '>+ Add a Link</button>' +
-      '<span class="af-res-hint">A PDF can have up to 20 pages.</span>' +
-      '<input type="file" class="af-res-file" accept="application/pdf,.pdf" hidden tabindex="-1" aria-hidden="true" data-action-change="afResPdf">' +
+      '<span class="af-res-hint">A PDF can have up to 20 pages. A web page, text file or EPUB can be up to 20 MB; choose a web page together with its pictures.</span>' +
+      '<input type="file" class="af-res-file" multiple accept="application/pdf,.pdf,text/html,.html,.htm,text/plain,.txt,application/epub+zip,.epub,image/*" hidden tabindex="-1" aria-hidden="true" data-action-change="afResFiles">' +
       '</div>' +
       '<p class="af-res-msg" id="af-res-msg" role="status"' +
       (res.msg ? '' : ' hidden') +
@@ -3793,12 +3809,14 @@ window.PageAssignments = (function () {
     if (it.saved) it.removed = true;
     else res.items.splice(at, 1);
     res.msg = '';
-    // The keyboard goes to the next item's Remove, else the one before, else + Add a PDF.
+    // The keyboard goes to the next item's Remove, else the one before, else + Add a File.
     var shown = function (x) {
       return x && !x.removed;
     };
     var after = res.items.slice(at + (it.saved ? 1 : 0)).filter(shown)[0] || res.items.slice(0, at).filter(shown).pop();
-    _refreshFormRes(after ? '.af-res-remove[data-key="' + CSS.escape(after.key) + '"]' : '[data-action="afResAddPdf"]');
+    _refreshFormRes(
+      after ? '.af-res-remove[data-key="' + CSS.escape(after.key) + '"]' : '[data-action="afResAddFile"]',
+    );
   }
 
   function _formResRefusal(out) {
@@ -3822,20 +3840,12 @@ window.PageAssignments = (function () {
     return (t || 'Handout').slice(0, 200);
   }
 
-  function _formResPdf(input) {
-    var res = _formRes;
-    var file = input && input.files && input.files[0];
-    if (input) input.value = '';
-    if (!res || res.busy || !file || !window.PhotoShrink) return;
-    var named = typeof PhotoShrink.classify === 'function' ? PhotoShrink.classify(file) : null;
-    if (named && named.ok && named.kind !== 'pdf') {
-      _formResSay('Choose a PDF. A photo can be added to a student’s work instead.');
-      return;
-    }
-    res.busy = true;
-    res.msg = 'Reading the PDF…';
-    _refreshFormRes();
-    PhotoShrink.prepare(file, {
+  /* One PDF made into pages (shared/photo-shrink.js): its item in the
+     list, or the sentence saying why not. → Promise of '' or a sentence. */
+  function _formResReadPdf(res, file) {
+    if (!window.PhotoShrink)
+      return Promise.resolve("The PDF reader couldn't load. Check the connection and try again.");
+    return PhotoShrink.prepare(file, {
       openPdf: window.PhotoReaders && PhotoReaders.openPdf,
       maxPages: RES_MAX_PAGES,
     })
@@ -3843,27 +3853,76 @@ window.PageAssignments = (function () {
         return { ok: false };
       })
       .then(function (out) {
+        if (!out || !out.ok) return _formResRefusal(out);
+        if (out.kind !== 'pdf') return 'Choose a PDF. A photo can be added to a student’s work instead.';
+        if (out.pages.length > RES_MAX_PAGES) return _formResRefusal({ reason: PhotoShrink.REASONS.TOO_MANY_PAGES });
+        res.next += 1;
+        res.items.push({
+          key: 'n' + res.next,
+          saved: false,
+          removed: false,
+          kind: 'pdf',
+          title: _formResPdfTitle(file.name),
+          pageCount: out.pages.length,
+          pages: out.pages,
+        });
+        res.fresh = 'n' + res.next;
+        return '';
+      });
+  }
+
+  /* + Add a File: what the teacher picked. Each PDF becomes pages; each
+     web page (with the pictures picked beside it), text file and EPUB is
+     kept as it is (HandoutFiles.prepare). What could not be added, and
+     any picture a page names that was not picked, is said in the field. */
+  function _formResFiles(input) {
+    var res = _formRes;
+    var picked = input && input.files ? Array.prototype.slice.call(input.files) : [];
+    if (input) input.value = '';
+    if (!res || res.busy || !picked.length) return;
+    if (!window.HandoutFiles) {
+      _formResSay("The file reader couldn't load. Check the connection and try again.");
+      return;
+    }
+    res.busy = true;
+    res.msg = 'Reading the file' + (picked.length > 1 ? 's' : '') + '…';
+    _refreshFormRes();
+    var words = [];
+    HandoutFiles.prepare(picked)
+      .then(function (out) {
         if (_formRes !== res) return;
-        res.busy = false;
-        if (!out || !out.ok) res.msg = _formResRefusal(out);
-        else if (out.kind !== 'pdf') res.msg = 'Choose a PDF. A photo can be added to a student’s work instead.';
-        else if (out.pages.length > RES_MAX_PAGES)
-          res.msg = _formResRefusal({ reason: PhotoShrink.REASONS.TOO_MANY_PAGES });
-        else {
+        out.ready.forEach(function (f) {
           res.next += 1;
           res.items.push({
             key: 'n' + res.next,
             saved: false,
             removed: false,
-            kind: 'pdf',
-            title: _formResPdfTitle(file.name),
-            pageCount: out.pages.length,
-            pages: out.pages,
+            kind: f.kind,
+            title: f.title,
+            bytes: f.bytes,
+            blob: f.blob,
           });
           res.fresh = 'n' + res.next;
-          res.msg = '';
-        }
-        _refreshFormRes('[data-action="afResAddPdf"]');
+        });
+        var said = HandoutFiles.sayAbout(out);
+        if (said) words.push(said);
+        return out.pdfs.reduce(function (p, file) {
+          return p.then(function () {
+            if (_formRes !== res) return;
+            return _formResReadPdf(res, file).then(function (why) {
+              if (why) words.push(out.pdfs.length > 1 || out.ready.length ? file.name + ': ' + why : why);
+            });
+          });
+        }, Promise.resolve());
+      })
+      .then(null, function () {
+        words.push("That file couldn't be read. Try another copy of it.");
+      })
+      .then(function () {
+        if (_formRes !== res) return;
+        res.busy = false;
+        res.msg = words.join(' ');
+        _refreshFormRes('[data-action="afResAddFile"]');
       });
   }
 
@@ -3886,6 +3945,10 @@ window.PageAssignments = (function () {
         steps.push(function () {
           return addAssessmentHandout(cid, aid, it.title, it.pages);
         });
+      } else if (!it.saved && RES_FILE_WORDS[it.kind] && typeof addAssessmentHandoutFile === 'function') {
+        steps.push(function () {
+          return addAssessmentHandoutFile(cid, aid, it.title, it.kind, it.blob);
+        });
       }
     });
     return steps
@@ -3906,7 +3969,7 @@ window.PageAssignments = (function () {
   function _formResBusy() {
     if (!_formRes) return false;
     if (_formRes.busy) {
-      _formResSay('The PDF is still being read. Save once it is in the list.');
+      _formResSay('The file is still being read. Save once it is in the list.');
       return true;
     }
     var url = document.getElementById('af-res-url');
@@ -11253,7 +11316,7 @@ window.PageAssignments = (function () {
       },
       // A class with no categories: Class Settings' Grading tab.
       // Handouts and Links (board 3a).
-      afResAddPdf: function () {
+      afResAddFile: function () {
         var f = document.querySelector('#af-res .af-res-file');
         if (f && _formRes && !_formRes.busy) f.click();
       },
@@ -11830,8 +11893,8 @@ window.PageAssignments = (function () {
       onRubricSelect(el.value);
       return;
     }
-    if (el.dataset.actionChange === 'afResPdf') {
-      _formResPdf(el);
+    if (el.dataset.actionChange === 'afResFiles') {
+      _formResFiles(el);
       return;
     }
     if (el.dataset.actionChange === 'attachWorkFile') {

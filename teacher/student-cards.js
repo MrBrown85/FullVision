@@ -1200,10 +1200,6 @@ var StudentCards = (function () {
           dis +
           '>New Codes for This Class</button>'
         : '') +
-      // Sticker Sheets for Scanning (teacher/scan-labels.js), beside the cards.
-      (students.length && typeof ScanLabels !== 'undefined'
-        ? '<button type="button" class="cm-action-btn" data-action="spCardsStickers">Print Sticker Sheets</button>'
-        : '') +
       (known && n
         ? '<button type="button" class="btn btn-primary" data-action="spCardsMake"' +
           dis +
@@ -1222,6 +1218,12 @@ var StudentCards = (function () {
           '</div>'
         : '') +
       _untilHtml(cid, off) +
+      // Sticker Sheets for Scanning (teacher/scan-labels.js): a row of its own
+      // under the cards' own buttons, since a sticker is not a card.
+      (students.length && typeof ScanLabels !== 'undefined'
+        ? '<div class="sc-stickers"><span class="cm-hint">Sticker sheets name scanned paper work. They don’t open the student page.</span>' +
+          '<button type="button" class="cm-action-btn" data-action="spCardsStickers">Print Sticker Sheets</button></div>'
+        : '') +
       (known && students.length ? _filterHtml(st, students, byStudent) : '') +
       (known && students.length && !shown.length
         ? '<div class="cm-hint sc-empty" role="status">' + esc(filter.empty) + '</div>'

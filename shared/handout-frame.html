@@ -1,0 +1,359 @@
+<!doctype html>
+<!--
+  The sealed frame a teacher's web page or EPUB opens in (Handout files,
+  Colin's call of Nov 17 2026; shared/handout-viewer.js opens it).
+
+  The edge function (netlify/edge-functions/inject-env.js, FRAME_CSP) serves
+  this one address with a policy of its own:
+    sandbox allow-scripts allow-forms allow-modals
+      so whatever runs here has an origin of its own ("null"): it cannot
+      read the student page's storage, cookies, sign-in or page, cannot
+      move the page, and is sealed even if this address is opened alone.
+      With no allow-popups it can open no window at all: not by
+      window.open, a link's target or a form's target, scripted or clicked
+      (Colin's privacy call, Nov 17 2026: what a student typed must not
+      leave in an address);
+    script-src 'unsafe-inline' 'unsafe-eval' data: blob: (the handout's own
+      scripts run: most of Colin's worksheets are interactive), and nothing
+      at all from the internet: no script, style, font, picture or media
+      from any other address, no fetch (connect-src 'none') and no frame
+      (frame-src 'none'), so no third party sees a student's address or what
+      they type (Colin's privacy call, Nov 17 2026). Forms submit nowhere,
+      and only FullVision may frame it.
+  The viewer adds sandbox="allow-scripts …" (no allow-same-origin) as well.
+
+  It does one thing and waits for nothing else: it says it is ready to the
+  page that framed it, and takes one message from that page.
+    { fv: 'handout-show', mode: 'page', html }  the handout's whole page,
+        written over this one (its scripts run), with localStorage and
+        sessionStorage held in memory (storageStandIn). A student's own
+        click on a web link (a trusted click, never a script's) is passed up
+        as { fv: 'handout-link', url }, and the viewer opens it only when the
+        student presses Open Website there; links to files that were beside
+        it do nothing.
+    { fv: 'handout-show', mode: 'book', chapters: [ { path, html, css } ] }
+        an EPUB, read by the viewer: each chapter in turn, in pages one
+        screen wide; a web link in it is passed up as above. Then it takes { fv: 'handout-turn', by: 1 | -1 }, and
+        says where it is: { fv: 'handout-frame', page, pages, chapter,
+        chapters }.
+  A message from anyone but its parent is never read.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Handout</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #fff;
+        color: #1b1b1f;
+        font:
+          17px/1.55 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      #fv-book {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      (function () {
+        'use strict';
+        // Only inside a page, and only sealed (an origin of its own): otherwise nothing happens.
+        if (window.parent === window || String(window.origin) !== 'null') return;
+        var up = window.parent;
+        var shown = false;
+        var book = null;
+
+        /* Written ahead of the handout's own page: a link in the page goes
+           nowhere by itself (this frame may open no window), an anchor in the
+           page still scrolls, and a student's own click on a web link
+           (isTrusted: never a script's click) is passed up to the viewer,
+           which asks the student before it opens anything. */
+        function linkClicks() {
+          document.addEventListener(
+            'click',
+            function (e) {
+              var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+              if (!a) return;
+              var h = a.getAttribute('href') || '';
+              if (h.charAt(0) === '#') return;
+              e.preventDefault();
+              if (e.isTrusted && /^https?:/i.test(a.href)) parent.postMessage({ fv: 'handout-link', url: a.href }, '*');
+            },
+            true,
+          );
+        }
+        var LINKS = '<script>(' + linkClicks.toString() + ')();<' + '/script>';
+
+        /* Written first of all ahead of the handout's own page: localStorage and
+           sessionStorage held in memory for as long as the page is open. In this
+           sealed frame the browser's own throw a SecurityError, and many
+           worksheets save answers or scores there without a try. This stand-in
+           is the frame's own: it reads nothing of the page around it, and what
+           a worksheet keeps in it is gone when the handout closes. It is put in
+           only where the real one cannot be reached. */
+        function storageStandIn() {
+          function store() {
+            var m = new Map();
+            var own = Object.prototype.hasOwnProperty;
+            var api = {
+              getItem: function (k) {
+                k = String(k);
+                return m.has(k) ? m.get(k) : null;
+              },
+              setItem: function (k, v) {
+                m.set(String(k), String(v));
+              },
+              removeItem: function (k) {
+                m.delete(String(k));
+              },
+              clear: function () {
+                m.clear();
+              },
+              key: function (i) {
+                var keys = Array.from(m.keys());
+                i = Number(i);
+                return i >= 0 && i < keys.length ? keys[i] : null;
+              },
+            };
+            // localStorage.score = 5 and localStorage.score, as a browser's storage allows.
+            return new Proxy(api, {
+              get: function (t, p) {
+                if (p === 'length') return m.size;
+                if (typeof p !== 'string' || own.call(t, p)) return t[p];
+                return m.has(p) ? m.get(p) : undefined;
+              },
+              set: function (t, p, v) {
+                if (typeof p === 'string') m.set(p, String(v));
+                return true;
+              },
+              deleteProperty: function (t, p) {
+                m.delete(String(p));
+                return true;
+              },
+              has: function (t, p) {
+                return own.call(t, p) || m.has(String(p));
+              },
+              ownKeys: function () {
+                return Array.from(m.keys());
+              },
+              getOwnPropertyDescriptor: function (t, p) {
+                var k = String(p);
+                return m.has(k) ? { value: m.get(k), writable: true, enumerable: true, configurable: true } : undefined;
+              },
+            });
+          }
+          ['localStorage', 'sessionStorage'].forEach(function (name) {
+            try {
+              if (window[name]) return;
+            } catch (e) {
+              /* sealed: the stand-in below */
+            }
+            try {
+              Object.defineProperty(window, name, { value: store(), configurable: true });
+            } catch (e) {
+              /* left as it is */
+            }
+          });
+        }
+        var STORAGE = '<script>(' + storageStandIn.toString() + ')();<' + '/script>';
+
+        function writePage(html) {
+          var s = String(html || '');
+          // After <head>, else <html>, else the doctype (a script before it would put the page in quirks mode).
+          var m = /<head(\s[^>]*)?>/i.exec(s) || /<html(\s[^>]*)?>/i.exec(s) || /<!doctype[^>]*>/i.exec(s);
+          var end = m ? m.index + m[0].length : 0;
+          s = s.slice(0, end) + STORAGE + LINKS + s.slice(end);
+          document.open();
+          document.write(s);
+          document.close();
+        }
+
+        /* ── A book ── */
+        var READER_CSS =
+          ':host{all:initial;display:block;height:100%;}' +
+          '.fv-flow{box-sizing:border-box;height:100%;padding:24px;column-fill:auto;' +
+          'font:17px/1.6 Georgia,"Times New Roman",serif;color:#1b1b1f;overflow-wrap:break-word;}' +
+          '.fv-flow img,.fv-flow svg,.fv-flow video{max-width:100%;max-height:calc(100vh - 48px);height:auto;object-fit:contain;break-inside:avoid;}' +
+          '.fv-flow table{max-width:100%;}' +
+          '.fv-flow pre{white-space:pre-wrap;}';
+
+        function width() {
+          return Math.max(1, document.documentElement.clientWidth || window.innerWidth || 1);
+        }
+
+        function say() {
+          if (!book) return;
+          up.postMessage(
+            {
+              fv: 'handout-frame',
+              page: book.page,
+              pages: book.pages,
+              chapter: book.at,
+              chapters: book.chapters.length,
+            },
+            '*',
+          );
+        }
+
+        function measure() {
+          var w = width();
+          book.flow.style.columnWidth = w - 48 + 'px';
+          book.flow.style.columnGap = '48px';
+          book.pages = Math.max(1, Math.round(book.flow.scrollWidth / w));
+          if (book.page > book.pages - 1) book.page = book.pages - 1;
+          book.box.scrollLeft = book.page * w;
+        }
+
+        function showChapter(n, where) {
+          var ch = book.chapters[n];
+          if (!ch) return;
+          book.at = n;
+          // Sealed already (this frame's own origin); the book's markup is drawn here and nowhere else.
+          book.root.innerHTML = '<style>' + READER_CSS + String(ch.css || '') + '</style><div class="fv-flow"></div>';
+          book.flow = book.root.querySelector('.fv-flow');
+          book.flow.innerHTML = String(ch.html || '');
+          book.page = 0;
+          measure();
+          if (where === 'end') book.page = book.pages - 1;
+          else if (where && where.id) {
+            var el = book.root.getElementById ? book.root.getElementById(where.id) : null;
+            if (el) book.page = Math.max(0, Math.floor(el.offsetLeft / width()));
+          }
+          book.box.scrollLeft = book.page * width();
+          say();
+          settleLater();
+        }
+
+        /* The page count again once layout has settled: the frame's own size
+           can still change as the viewer lays out, and fonts and pictures
+           land after the first measure. Said only when it changed. */
+        function remeasure() {
+          if (!book || !book.flow) return;
+          var was = book.pages;
+          measure();
+          if (book.pages !== was) say();
+        }
+        function settleLater() {
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(function () {
+              requestAnimationFrame(remeasure);
+            });
+          }
+          if (document.fonts && document.fonts.ready) document.fonts.ready.then(remeasure);
+          Array.prototype.forEach.call(book.flow.querySelectorAll('img'), function (img) {
+            if (!img.complete) img.addEventListener('load', remeasure, { once: true });
+          });
+        }
+
+        function turn(by) {
+          if (!book) return;
+          var next = book.page + by;
+          if (next < 0) {
+            if (book.at > 0) showChapter(book.at - 1, 'end');
+            return;
+          }
+          if (next > book.pages - 1) {
+            if (book.at < book.chapters.length - 1) showChapter(book.at + 1);
+            return;
+          }
+          book.page = next;
+          book.box.scrollLeft = next * width();
+          say();
+        }
+
+        // A link inside the book: another chapter (and its place), the web in a new tab, anything else stays.
+        function follow(e) {
+          var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+          if (!a) return;
+          e.preventDefault();
+          var href = a.getAttribute('href') || '';
+          if (/^https?:/i.test(href)) {
+            // The student's own click only; the viewer asks before it opens anything.
+            if (e.isTrusted) up.postMessage({ fv: 'handout-link', url: href }, '*');
+            return;
+          }
+          var here = book.chapters[book.at].path || '';
+          var to;
+          try {
+            to = new URL(href, 'https://book.invalid/' + here);
+          } catch (err) {
+            return;
+          }
+          if (to.origin !== 'https://book.invalid') return;
+          var path = decodeURIComponent(to.pathname.slice(1));
+          var id = to.hash ? decodeURIComponent(to.hash.slice(1)) : '';
+          var n = path === here ? book.at : -1;
+          for (var i = 0; n < 0 && i < book.chapters.length; i++) if (book.chapters[i].path === path) n = i;
+          if (n < 0) return;
+          showChapter(n, id ? { id: id } : null);
+        }
+
+        function openBook(chapters) {
+          var box = document.createElement('div');
+          box.id = 'fv-book';
+          document.body.appendChild(box);
+          book = {
+            box: box,
+            root: box.attachShadow({ mode: 'open' }),
+            chapters: Array.isArray(chapters) ? chapters : [],
+            at: 0,
+            page: 0,
+            pages: 1,
+          };
+          book.root.addEventListener('click', follow);
+          document.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) turn(1);
+            else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) turn(-1);
+            else return;
+            e.preventDefault();
+          });
+          var x0 = null;
+          box.addEventListener(
+            'touchstart',
+            function (e) {
+              x0 = e.touches && e.touches[0] ? e.touches[0].clientX : null;
+            },
+            { passive: true },
+          );
+          box.addEventListener('touchend', function (e) {
+            var t = e.changedTouches && e.changedTouches[0];
+            if (x0 === null || !t) return;
+            var dx = t.clientX - x0;
+            x0 = null;
+            if (Math.abs(dx) > 40) turn(dx < 0 ? 1 : -1);
+          });
+          window.addEventListener('resize', function () {
+            if (book.flow) {
+              measure();
+              say();
+            }
+          });
+          if (typeof ResizeObserver === 'function') new ResizeObserver(remeasure).observe(box);
+          showChapter(0);
+        }
+
+        window.addEventListener('message', function (e) {
+          if (e.source !== up || !e.data || typeof e.data !== 'object') return;
+          var d = e.data;
+          if (d.fv === 'handout-turn') return turn(d.by === -1 ? -1 : 1);
+          if (d.fv !== 'handout-show' || shown) return;
+          shown = true;
+          if (d.mode === 'book') openBook(d.chapters);
+          else writePage(d.html);
+        });
+        up.postMessage({ fv: 'handout-frame', ready: true }, '*');
+      })();
+    </script>
+  </body>
+</html>
