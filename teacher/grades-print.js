@@ -1104,11 +1104,22 @@
     if (root) root.innerHTML = '';
   }
 
+  /* The saved PDF's name: "Grades – Science 8 Block B – Term 1". A blank
+     sheet is a Blank Gradebook; an attendance sheet names its days. */
+  function printTitle(model) {
+    var o = model.opts;
+    var p = model.period;
+    var kind = o.attendance ? 'Attendance' : o.blank ? 'Blank Gradebook' : 'Grades';
+    var when = o.attendance ? model.header.period : p.kind === 'term' ? p.label : p.kind === 'custom' ? p.dates : '';
+    var course = typeof COURSES !== 'undefined' ? COURSES[model.cid] : null;
+    return [kind, printClassName(course), when];
+  }
+
   function print(cid, opts) {
     var model = stage(cid, opts);
     if (!model.pages.length) return model;
     activatePrintMode(model.opts.paper);
-    printThen(deactivatePrintMode);
+    printThen(deactivatePrintMode, printTitle(model));
     return model;
   }
 
@@ -1770,6 +1781,7 @@
     activatePrintMode: activatePrintMode,
     deactivatePrintMode: deactivatePrintMode,
     print: print,
+    printTitle: printTitle,
     open: open,
     close: close,
   };

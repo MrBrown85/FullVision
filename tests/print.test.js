@@ -291,3 +291,169 @@ describe('print-sheet', () => {
     });
   });
 });
+
+describe('print-file-names', () => {
+  /**
+   * Save as PDF names the file from document.title as print() runs, so each
+   * print names itself (teacher/ui.js printFileName, setPrintTitle,
+   * printThen): what was printed, then the student, class and term.
+   */
+  const DASH = ' – ';
+
+  describe('the name', () => {
+    it('joins the parts with dashes and drops blank ones', () => {
+      expect(printFileName(['Progress Report', 'Cece Ahn', '', null, 'Science 8', 'Term 1'])).toBe(
+        ['Progress Report', 'Cece Ahn', 'Science 8', 'Term 1'].join(DASH),
+      );
+    });
+
+    it('takes out characters a file name can’t hold', () => {
+      expect(printFileName(['Rubric', 'Lab: Part 1/2 "Cells"?', 'Sci*8 <B>|'])).toBe(
+        ['Rubric', 'Lab Part 1 2 Cells', 'Sci 8 B'].join(DASH),
+      );
+      expect(printFileName(['..Notes.', '\u0007Tab\there'])).toBe('Notes' + DASH + 'Tab here');
+    });
+
+    it('keeps a long name to 150 characters, with no dash at its end', () => {
+      const n = printFileName(['Rubrics', 'x'.repeat(146), 'Science 8']);
+      expect(n.length).toBeLessThanOrEqual(150);
+      expect(n).not.toMatch(/[\s–]$/);
+    });
+
+    it('gives nothing for nothing', () => {
+      expect(printFileName([])).toBe('');
+      expect(printFileName(null)).toBe('');
+    });
+
+    it('names a class with its block once', () => {
+      expect(printClassName({ name: 'Science 8', block: 'B' })).toBe('Science 8 Block B');
+      expect(printClassName({ name: 'Science 8 Block B', block: 'B' })).toBe('Science 8 Block B');
+      expect(printClassName({ name: 'Science 8' })).toBe('Science 8');
+      expect(printClassName(null)).toBe('');
+    });
+  });
+
+  describe('the title while printing', () => {
+    let orig;
+    beforeEach(() => {
+      orig = { print: window.print, add: window.addEventListener, remove: window.removeEventListener };
+      document.title = 'FullVision — Reports';
+    });
+    afterEach(() => {
+      window.print = orig.print;
+      window.addEventListener = orig.add;
+      window.removeEventListener = orig.remove;
+      vi.useRealTimers();
+    });
+
+    it('is the file name during print() and the page’s own title after', () => {
+      vi.useFakeTimers();
+      const listeners = {};
+      window.addEventListener = (type, fn) => (listeners[type] = fn);
+      window.removeEventListener = type => delete listeners[type];
+      let during = null;
+      window.print = () => (during = document.title);
+      printThen(() => {}, ['Student Cards', 'Science 8']);
+      expect(during).toBe('Student Cards' + DASH + 'Science 8');
+      listeners.afterprint();
+      vi.runAllTimers();
+      expect(document.title).toBe('FullVision — Reports');
+    });
+
+    it('leaves the title alone with no name, and when the page moved on meanwhile', () => {
+      window.print = vi.fn();
+      setPrintTitle([])();
+      expect(document.title).toBe('FullVision — Reports');
+      const restore = setPrintTitle(['Rubric', 'Lab Report']);
+      document.title = 'FullVision — Dashboard';
+      restore();
+      expect(document.title).toBe('FullVision — Dashboard');
+    });
+  });
+
+  describe('each print’s name', () => {
+    const CID = 'pfn-c';
+    const roster = [
+      { id: 'p1', firstName: 'Cece', lastName: 'Ahn', enrollmentStatus: 'active' },
+      { id: 'p2', firstName: 'Dev', lastName: 'Bains', enrollmentStatus: 'active' },
+    ];
+    let saved;
+    beforeEach(() => {
+      saved = {
+        course: COURSES[CID],
+        students: _cache.students[CID],
+        assessments: _cache.assessments[CID],
+        rubrics: _cache.rubrics[CID],
+      };
+      COURSES[CID] = { id: CID, name: 'Science 8', block: 'B', gradingSystem: 'proficiency' };
+      _cache.students[CID] = roster;
+      _cache.assessments[CID] = [
+        { id: 'lab', title: 'Lab Report', scoreMode: 'proficiency', rubricId: 'rb', tagIds: [] },
+        { id: 'quiz', title: 'Unit Quiz', scoreMode: 'points', maxPoints: 10, tagIds: [] },
+      ];
+      _cache.rubrics[CID] = [{ id: 'rb', name: 'Lab Rubric', criteria: [] }];
+    });
+    afterEach(() => {
+      COURSES[CID] = saved.course;
+      _cache.students[CID] = saved.students;
+      _cache.assessments[CID] = saved.assessments;
+      _cache.rubrics[CID] = saved.rubrics;
+    });
+
+    const rubric = (aid, opts) => printFileName(RubricPrint.printTitle(CID, aid, opts));
+
+    it('a blank rubric: the assessment, else the rubric, and the class', () => {
+      expect(rubric('lab', { mode: 'blank' })).toBe(['Rubric', 'Lab Report', 'Science 8 Block B'].join(DASH));
+      expect(rubric(null, { mode: 'blank', rubricId: 'rb' })).toBe(
+        ['Rubric', 'Lab Rubric', 'Science 8 Block B'].join(DASH),
+      );
+    });
+
+    it('graded rubrics: plural for the class, the student’s name for one', () => {
+      expect(rubric('lab', { mode: 'completed', students: 'all' })).toBe(
+        ['Rubrics', 'Lab Report', 'Science 8 Block B'].join(DASH),
+      );
+      expect(rubric('lab', { mode: 'completed', students: 'pick', picked: ['p1'] })).toBe(
+        ['Rubric', 'Cece Ahn', 'Lab Report', 'Science 8 Block B'].join(DASH),
+      );
+      expect(rubric('quiz', { mode: 'completed', students: 'all' })).toBe(
+        ['Score Sheets', 'Unit Quiz', 'Science 8 Block B'].join(DASH),
+      );
+    });
+
+    it('questionnaire slips and student cards', () => {
+      const items = [{ name: 'Cece Ahn' }, { name: 'Dev Bains' }];
+      expect(
+        printFileName(QrSlips.sheetTitle('Questionnaire Slip', items, 'Term 1 Check-In', 'Science 8 Block B')),
+      ).toBe(['Questionnaire Slips', 'Term 1 Check-In', 'Science 8 Block B'].join(DASH));
+      expect(printFileName(QrSlips.sheetTitle('Student Card', items, '', 'Science 8 Block B'))).toBe(
+        ['Student Cards', 'Science 8 Block B'].join(DASH),
+      );
+      expect(printFileName(QrSlips.sheetTitle('Student Card', items.slice(0, 1), '', 'Science 8 Block B'))).toBe(
+        ['Student Card', 'Cece Ahn', 'Science 8 Block B'].join(DASH),
+      );
+    });
+
+    it('questionnaire slips and student cards pass their names to the print', () => {
+      const slips = readFileSync('teacher/qr-slips.js', 'utf-8');
+      expect(slips).toMatch(
+        /sheetTitle\('Questionnaire Slip', slips, q\.title \|\| 'Questionnaire', printClassName\(course\)\)/,
+      );
+      expect(slips).toMatch(/\}, titleParts\);/);
+      expect(readFileSync('teacher/student-cards.js', 'utf-8')).toMatch(
+        /QrSlips\.sheetTitle\('Student Card', items, '', printClassName\(course\)\)/,
+      );
+    });
+
+    it('the DIBELS sheet names its frame and the page while it prints', () => {
+      const src = readFileSync('teacher/page-assignments.js', 'utf-8');
+      const body = src.slice(src.indexOf('function printDibels('), src.indexOf('frame.remove();'));
+      expect(body.replace(/\s+/g, ' ')).toContain(
+        "printFileName([ a.title || 'DIBELS 8 Benchmark', printClassName(course), DIBELS_PERIOD_NAMES[period], ])",
+      );
+      expect(body).toContain('esc(fileName)');
+      expect(body.indexOf('setPrintTitle([fileName])')).toBeLessThan(body.indexOf('contentWindow.print()'));
+      expect(body).toContain('restoreTitle();');
+    });
+  });
+});
