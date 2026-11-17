@@ -61,7 +61,7 @@ test.describe('A category on every assessment', () => {
     await expect(hint).toBeHidden();
 
     await page.locator('#af-title').fill('Chapter 3 Quiz');
-    await page.locator('[data-action="saveNewAssess"]').click();
+    await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
     await expect(hint).toBeVisible();
     await expect(hint).toHaveText(HINT);
     // Not saved: the form stays open on the Category field.
@@ -73,7 +73,7 @@ test.describe('A category on every assessment', () => {
     await category.selectOption('k-hw');
     await expect(hint).toBeHidden();
     await expect(category).not.toHaveAttribute('aria-invalid', 'true');
-    await page.locator('[data-action="saveNewAssess"]').click();
+    await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
     await expect(page.locator('#af-title')).toBeHidden();
     expect(await savedAssessments(page)).toEqual([{ title: 'Chapter 3 Quiz', categoryId: 'k-hw' }]);
     await expect(page.locator('.assess-card .type-badge').first()).toHaveText('Homework');
@@ -92,7 +92,7 @@ test.describe('A category on every assessment', () => {
     await page.locator('[data-action="setScoreMode"][data-mode="dibels"]').click();
     await expect(page.locator('#af-category-hint')).toBeHidden();
     await page.locator('#af-title').fill('Fall DIBELS');
-    await page.locator('[data-action="saveNewAssess"]').click();
+    await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
     await expect(page.locator('#af-title')).toBeHidden();
     expect(await savedAssessments(page)).toEqual([{ title: 'Fall DIBELS', categoryId: null }]);
   });
@@ -156,7 +156,7 @@ test.describe('A category on every assessment', () => {
     await expect(page.locator('#af-category option')).toHaveText(['No Category']);
     await expect(page.locator('#af-category-hint')).toHaveCount(0);
     await page.locator('#af-title').fill('Exit Ticket');
-    await page.locator('[data-action="saveNewAssess"]').click();
+    await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
     await expect(page.locator('#af-title')).toBeHidden();
     expect(await savedAssessments(page)).toEqual([{ title: 'Exit Ticket', categoryId: null }]);
     await expect(page.locator('.type-badge-needs')).toHaveCount(0);

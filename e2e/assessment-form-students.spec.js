@@ -45,7 +45,7 @@ test('Choose Students opens the list; three chosen are counted and saved', async
   await expect(page.locator('#af-students-names')).toBeVisible();
   await page.fill('#af-title', 'Three Students Only');
   await page.selectOption('#af-category', 'sci8-cat-labs');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Three Students Only'));
   expect(saved.excludedStudents.length).toBe(n - 3);
 });

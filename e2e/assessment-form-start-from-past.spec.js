@@ -126,7 +126,7 @@ test('from another class: competencies matched by name, the rubric a copy held u
   );
   expect(ticked.length).toBe(src.tags.length);
   await page.selectOption('#af-category', 'sci8-cat-labs');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect.poll(() => page.evaluate(() => getRubrics('sci8').length)).toBe(src.n + 1);
   const made = await page.evaluate(() => {
     const a = getAssessments('sci8').find(x => x.title === 'Old Pendulum Lab');

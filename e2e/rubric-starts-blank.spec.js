@@ -33,7 +33,7 @@ test('open on a new assessment; an untouched blank is never saved', async ({ pag
   // The title keeps focus; the editor doesn't take it.
   await expect(page.locator('#af-title')).toBeFocused();
   const n = await page.evaluate(() => getRubrics('sci8').length);
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect.poll(() => savedRubric(page)).toBe('none');
   expect(await page.evaluate(() => getRubrics('sci8').length)).toBe(n);
 });
@@ -59,7 +59,7 @@ test('write a rubric in the grid; Save Rubric holds it; Create saves it', async 
   await ed.locator('[data-action="geSave"]').click();
   await expect(editor(page)).toHaveCount(0);
   await expect(page.locator('#af-rubric-view .af-rubric-card-name')).toHaveText('Density Lab Report');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(async () => {
       const r = await savedRubric(page);
@@ -76,7 +76,7 @@ test('write a rubric in the grid; Save Rubric holds it; Create saves it', async 
 test('Create keeps a touched blank without Save Rubric, named after the assessment', async ({ page }) => {
   await openForm(page);
   await editor(page).locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect.poll(async () => ((await savedRubric(page)) || {}).name).toBe('Density Lab Rubric');
 });
 
@@ -85,7 +85,7 @@ test('Create keeps a written blank folded away by its tab', async ({ page }) => 
   await editor(page).locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');
   await page.locator('.af-rubric-start[data-start="blank"]').click();
   await expect(editor(page)).toHaveCount(0);
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(async () => {
       const r = await savedRubric(page);
@@ -98,7 +98,7 @@ test('signed in, Create keeps the rubric on the new assessment', async ({ page }
   await openForm(page);
   await page.evaluate(serverRekeysRubrics);
   await editor(page).locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');
-  await page.locator('[data-action="saveNewAssess"]').click();
+  await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect.poll(async () => ((await savedRubric(page)) || {}).name).toBe('Density Lab Rubric');
 });
 
