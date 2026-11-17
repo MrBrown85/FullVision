@@ -1200,6 +1200,10 @@ var StudentCards = (function () {
           dis +
           '>New Codes for This Class</button>'
         : '') +
+      // Sticker Sheets for Scanning (teacher/scan-labels.js), beside the cards.
+      (students.length && typeof ScanLabels !== 'undefined'
+        ? '<button type="button" class="cm-action-btn" data-action="spCardsStickers">Print Sticker Sheets</button>'
+        : '') +
       (known && n
         ? '<button type="button" class="btn btn-primary" data-action="spCardsMake"' +
           dis +
@@ -1302,6 +1306,10 @@ var StudentCards = (function () {
     var data = (el && el.dataset) || {};
     if (action === 'spCardsManage') {
       _manage();
+      return true;
+    }
+    if (action === 'spCardsStickers') {
+      if (cid && typeof ScanLabels !== 'undefined') ScanLabels.open(cid);
       return true;
     }
     if (action === 'spCardsMake') {
