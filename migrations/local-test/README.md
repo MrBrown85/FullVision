@@ -2619,3 +2619,18 @@ PGDATABASE=rc python3 reflect_from_card.py fingerprints check
 Result on 2026-11-16, PostgreSQL 17.11, embedded-postgres, from an empty database: **174 of 174**; `fingerprints check` every list current. The pre-check, run read-only on gradebook-prod the same day, returned no row that would stop the file.
 
 Not verified here: the edge function (not changed: it passes a question's `options` and an answer through as they are), gradebook-prod.
+
+## One student page rule (2026111702, 2026-11-17)
+
+One file, `../2026111702_student_listed_rule.sql`, **not applied**, 16.7 KB. It adds `student_submit._listed(assessment, today)` (not a Draft, and Date Assigned empty or on or before today) and patches the 10 `student_submit` functions that spelled that rule out, in place: each swap of the rule for a call is checked against the md5 before and after. It changes no row and no answer. `student_listed.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same 344 function md5s as gradebook-prod:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54471/listed_main node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54471 PGDATABASE=listed_main python3 student_listed.py                                        # every scenario
+```
+
+Scenarios (the script's docstring says what each checks): `rule` (16 cases against the spelled-out rule, null included; attributes; only the owner may run it), `same` (14 routes, 8 states, 3 time zones: 336 answers, byte for byte the same before and after; two mutants of `_listed` are caught), `apply` (four guards, the catalog changes only in the 10 functions and `_listed`, no row, attributes and grants kept, only the rule's lines change, the header's md5s, pre-check, post-check, a second run, lock timeout, size), `undo` (catalog, rows and answers exactly as before; a second run; a changed function stops it; 2026111701's undo stops while this file is applied and runs after this undo).
+
+Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres): **64 of 64**: rule 7, same 22, apply 24, undo 11. The pre-check, run read-only on gradebook-prod (17.6) the same day: all 11 rows ok.
+
+Not verified here: the edge functions and gradebook-prod itself. `tests/db/run.mjs` covers this file only after the baseline is refreshed following the apply.
