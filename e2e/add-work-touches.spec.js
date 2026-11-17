@@ -27,6 +27,8 @@ const SHOTS = process.env.FV_SHOTS || '';
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: SHOTS + '/' + name + '.png' }) : null);
 
 test('Set Up Like Last Time, a moved page under the right student, and Grade in Scan Order', async ({ page }) => {
+  // Two scans are read and their pages turned: about 22 s on CI's two cores.
+  test.setTimeout(90_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.emulateMedia({ reducedMotion: 'reduce' });
