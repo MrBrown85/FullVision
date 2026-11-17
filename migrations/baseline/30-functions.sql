@@ -428,6 +428,52 @@ AS $function$
   select encode(sha256(convert_to(p_salt || ':' || upper(replace(btrim(p_code), '-', '')), 'UTF8')), 'hex');
 $function$;
 
+CREATE OR REPLACE FUNCTION public._assessment_draft_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    -- A restore writes the backup's own state (import_json_restore sets fv.restoring).
+    if coalesce(current_setting('fv.restoring', true), '') = 'on' then
+        return new;
+    end if;
+    -- The class's lock, then the check. Every send, Add Work, Mark Up, revision and return takes
+    -- it before it writes, and a score, rubric, competency or rubric-box save takes it through
+    -- its sync trigger before its transaction ends: a save in progress makes this wait, and the
+    -- check then sees what it saved. No lock is taken on the piece's row beyond this update's
+    -- own: a writer holding the class's lock that then needed the row would deadlock against
+    -- it (review of PR 1484).
+    -- Known gap: upsert_dibels_score takes no class lock (see the file's header).
+    perform _grade_return_lock(new.course_id);
+    if exists (select 1 from score x where x.assessment_id = new.id
+                  and (x.value is not null or nullif(btrim(x.status), '') is not null
+                       or nullif(btrim(x.comment), '') is not null or nullif(btrim(x.report_note), '') is not null))
+       or exists (select 1 from rubric_score x where x.assessment_id = new.id
+                     and (x.value is not null or nullif(btrim(x.comment), '') is not null or nullif(btrim(x.beyond), '') is not null))
+       or exists (select 1 from tag_score x where x.assessment_id = new.id
+                     and (x.value is not null or nullif(btrim(x.comment), '') is not null))
+       or exists (select 1 from rubric_check_score x where x.assessment_id = new.id)
+       or exists (select 1 from dibels_score x where x.assessment_id = new.id
+                     and (x.orf_wrc is not null or x.orf_errors is not null or x.maze_correct is not null or x.maze_incorrect is not null))
+       -- a grade returned or held as a Draft grade; a row with only seen_at (the student opened the list) is not
+       or exists (select 1 from grade_return x where x.assessment_id = new.id
+                     and (x.returned_at is not null or x.is_draft or x.returned_copy is not null or x.previous_copy is not null
+                          or x.working_copy is not null or x.held_note is not null))
+       -- work sent or being sent, by the student or by the teacher (Add Work, Handed In on Paper)
+       or exists (select 1 from submission x where x.assessment_id = new.id)
+       or exists (select 1 from markup x where x.assessment_id = new.id)
+       or exists (select 1 from markup_kept x where x.assessment_id = new.id)
+       or exists (select 1 from revision_request x where x.assessment_id = new.id)
+       or exists (select 1 from feedback_reflection x where x.assessment_id = new.id) then
+        raise exception 'draft_has_work' using errcode = 'P0001',
+            detail = 'A student has a grade, a status or work on this assessment, so it cannot go back to a Draft.';
+    end if;
+    return new;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public._assessment_resource_gone()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2795,7 +2841,7 @@ AS $function$
        and a.score_mode <> 'dibels';
 $function$;
 
-CREATE OR REPLACE FUNCTION public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid DEFAULT NULL::uuid, p_description text DEFAULT NULL::text, p_date_assigned date DEFAULT NULL::date, p_due_date date DEFAULT NULL::date, p_score_mode text DEFAULT 'proficiency'::text, p_max_points numeric DEFAULT NULL::numeric, p_weight numeric DEFAULT 1.0, p_evidence_type text DEFAULT NULL::text, p_rubric_id uuid DEFAULT NULL::uuid, p_module_id uuid DEFAULT NULL::uuid, p_tag_ids uuid[] DEFAULT '{}'::uuid[], p_copy_group uuid DEFAULT NULL::uuid, p_core_competency_ids text[] DEFAULT '{}'::text[], p_idempotency_key uuid DEFAULT NULL::uuid)
+CREATE OR REPLACE FUNCTION public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid DEFAULT NULL::uuid, p_description text DEFAULT NULL::text, p_date_assigned date DEFAULT NULL::date, p_due_date date DEFAULT NULL::date, p_score_mode text DEFAULT 'proficiency'::text, p_max_points numeric DEFAULT NULL::numeric, p_weight numeric DEFAULT 1.0, p_evidence_type text DEFAULT NULL::text, p_rubric_id uuid DEFAULT NULL::uuid, p_module_id uuid DEFAULT NULL::uuid, p_tag_ids uuid[] DEFAULT '{}'::uuid[], p_copy_group uuid DEFAULT NULL::uuid, p_core_competency_ids text[] DEFAULT '{}'::text[], p_idempotency_key uuid DEFAULT NULL::uuid, p_is_draft boolean DEFAULT false)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -2820,11 +2866,12 @@ begin
 
     insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
                             score_mode, max_points, weight, evidence_type,
-                            rubric_id, module_id, display_order, copy_group, core_competency_ids)
+                            rubric_id, module_id, display_order, copy_group, core_competency_ids, is_draft)
     values (p_course_id, p_category_id, p_title, p_description, p_date_assigned, p_due_date,
             p_score_mode, p_max_points, p_weight, p_evidence_type,
             p_rubric_id, p_module_id, _next_pos, p_copy_group,
-            array(select distinct c from unnest(coalesce(p_core_competency_ids, '{}')) c order by c))
+            array(select distinct c from unnest(coalesce(p_core_competency_ids, '{}')) c order by c),
+            coalesce(p_is_draft, false))
     returning id into _id;
 
     if p_tag_ids is not null then
@@ -3585,11 +3632,11 @@ begin
     insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
                             score_mode, max_points, weight, evidence_type,
                             rubric_id, module_id, collab_mode, collab_config, display_order,
-                            core_competency_ids)
+                            core_competency_ids, is_draft)
     select course_id, category_id, title || ' (copy)', description, date_assigned, due_date,
            score_mode, max_points, weight, evidence_type,
            rubric_id, module_id, collab_mode, collab_config, _next_pos,
-           core_competency_ids
+           core_competency_ids, is_draft
       from assessment
      where id = p_src_id
     returning id into _new_id;
@@ -4499,7 +4546,8 @@ begin
                        'tag_ids', coalesce(asm_tags.tag_ids, '[]'::jsonb),
                        'copy_group', asm.copy_group,
                        'core_competency_ids', to_jsonb(asm.core_competency_ids),
-                       'created_at', asm.created_at
+                       'created_at', asm.created_at,
+                       'is_draft', asm.is_draft
                    ) order by asm.ix)
               from asm left join asm_tags on asm_tags.assessment_id = asm.id), '[]'::jsonb),
         'categories', coalesce((
@@ -5082,6 +5130,7 @@ begin
                'display_order', a.display_order,
                'core_competency_ids', to_jsonb(a.core_competency_ids),
                'created_at', a.created_at,
+               'is_draft', a.is_draft,
                'tag_ids', coalesce((
                    select jsonb_agg(at.tag_id order by t.display_order, t.label)
                      from assessment_tag at
@@ -6404,7 +6453,7 @@ begin
         insert into assessment (id, course_id, category_id, title, description,
                                 date_assigned, due_date, score_mode, max_points, weight,
                                 evidence_type, rubric_id, module_id, display_order,
-                                collab_mode, collab_config, core_competency_ids)
+                                collab_mode, collab_config, core_competency_ids, is_draft)
         values ((_row->>'id')::uuid, (_row->>'course_id')::uuid,
                 nullif(_row->>'category_id','')::uuid,
                 coalesce(_row->>'title',''), _row->>'description',
@@ -6421,7 +6470,9 @@ begin
                 case when jsonb_typeof(_row->'collab_config') = 'object' then _row->'collab_config' end,
                 coalesce(array(select jsonb_array_elements_text(
                     case when jsonb_typeof(_row->'core_competency_ids') = 'array'
-                         then _row->'core_competency_ids' else '[]'::jsonb end)), '{}'))
+                         then _row->'core_competency_ids' else '[]'::jsonb end)), '{}'),
+                -- 2026111701: a Draft in the backup comes back a Draft; a backup from before Drafts, assigned
+                coalesce(case when jsonb_typeof(_row->'is_draft') = 'boolean' then (_row->>'is_draft')::boolean end, false))
         on conflict (id) do update set
           category_id=excluded.category_id, title=excluded.title, description=excluded.description,
           date_assigned=excluded.date_assigned, due_date=excluded.due_date,
@@ -6429,7 +6480,7 @@ begin
           evidence_type=excluded.evidence_type, rubric_id=excluded.rubric_id,
           module_id=excluded.module_id, display_order=excluded.display_order,
           collab_mode=excluded.collab_mode, collab_config=excluded.collab_config,
-          core_competency_ids=excluded.core_competency_ids, updated_at=now();
+          core_competency_ids=excluded.core_competency_ids, is_draft=excluded.is_draft, updated_at=now();
         _n_asm := _n_asm + 1;
       end loop;
     end if;
@@ -6880,7 +6931,7 @@ begin
     if p_payload ? 'assignments' and jsonb_typeof(p_payload->'assignments') = 'array' then
         for _row in select * from jsonb_array_elements(p_payload->'assignments') loop
             insert into assessment (course_id, title, description, date_assigned, due_date,
-                                    score_mode, max_points, weight, display_order)
+                                    score_mode, max_points, weight, display_order, is_draft)
             values (_course_id,
                     coalesce(_row->>'title', 'Untitled'),
                     _row->>'description',
@@ -6889,7 +6940,9 @@ begin
                     coalesce(_row->>'score_mode', 'proficiency'),
                     nullif(_row->>'max_points','')::numeric,
                     coalesce((_row->>'weight')::numeric, 1.0),
-                    _asm_created);
+                    _asm_created,
+                    -- 2026111701: a Draft only when the row says so
+                    coalesce(case when jsonb_typeof(_row->'is_draft') = 'boolean' then (_row->>'is_draft')::boolean end, false));
             _asm_created := _asm_created + 1;
         end loop;
     end if;
@@ -9687,6 +9740,11 @@ AS $function$
 declare _tag uuid;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    -- 2026111701: is_draft is true or false. Only false -> true (Unassign) is checked, by the
+    -- trigger assessment_draft_guard: refused with draft_has_work while a student has a result or work.
+    if p_patch ? 'is_draft' and jsonb_typeof(p_patch->'is_draft') is distinct from 'boolean' then
+        raise exception 'is_draft must be true or false' using errcode = '22023';
+    end if;
 
     update assessment set
         title         = coalesce(p_patch->>'title', title),
@@ -9717,6 +9775,8 @@ begin
                                           from jsonb_array_elements_text(p_patch->'core_competency_ids') c
                                          order by c)
                              else '{}' end,
+        is_draft      = case when p_patch ? 'is_draft'
+                             then (p_patch->>'is_draft')::boolean else is_draft end,
         updated_at    = now()
     where id = p_id;
 
@@ -11468,6 +11528,7 @@ AS $function$
                           where a.course_id = c.id
                             and (a.date_assigned is null
                                  or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
+                            and not a.is_draft  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
                             and a.score_mode <> 'dibels'
                             and (coalesce(g.r->>'status', '') = 'NS'
                                  or (coalesce(g.r->>'status', '') <> 'EXC' and g.r->>'returned_at' is null)))
@@ -11495,7 +11556,8 @@ CREATE OR REPLACE FUNCTION student_submit._work_window(p_assessment_id uuid)
  SET search_path TO 'public', 'student_submit', 'pg_temp'
 AS $function$
     select jsonb_build_object(
-               'listed', a.date_assigned is null or a.date_assigned <= d.today,
+               -- 2026111701: a Draft is not on the student's page until the teacher assigns it
+               'listed', not a.is_draft and (a.date_assigned is null or a.date_assigned <= d.today),
                'closes_on', case a.after_due when 'until' then a.accept_until when 'stop' then a.due_date end,
                'open', case a.after_due when 'until' then d.today <= a.accept_until
                                         when 'stop' then a.due_date is null or d.today <= a.due_date
@@ -11906,7 +11968,7 @@ begin
                            where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id
                              and _course.reflect_on_feedback) rf on true
                      where a.course_id = _course.id
-                       and (a.date_assigned is null or a.date_assigned <= _today)
+                       and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft
                        and (mk.j is not null or rv.j is not null or rf.j is not null)) x), '[]'::jsonb),
         'last_plan', (select jsonb_build_object('assessment_id', f.assessment_id, 'plan', f.plan, 'sent_at', f.plan_at)
                         from feedback_reflection f
@@ -11944,7 +12006,8 @@ begin
                and exists (select 1 from assessment a join course c on c.id = a.course_id
                              where a.id = p_assessment_id
                                and (a.date_assigned is null
-                                    or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date))), '[]'::jsonb));
+                                    or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
+                               and not a.is_draft)), '[]'::jsonb));
 end;
 $function$;
 
@@ -12089,7 +12152,8 @@ begin
                and exists (select 1 from assessment a join course c on c.id = a.course_id
                              where a.id = p_assessment_id
                                and (a.date_assigned is null
-                                    or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date))), '[]'::jsonb));
+                                    or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
+                               and not a.is_draft)), '[]'::jsonb));
 end;
 $function$;
 
@@ -12127,7 +12191,7 @@ begin
                from submission s left join submission_file f on f.submission_id = s.id
               where s.assessment_id = a.id and s.state = 'sent' and s.enrollment_id = any (m.ids)) w
          where a.course_id = _course.id and m.ids is not null
-           and (a.date_assigned is null or a.date_assigned <= _today)), '[]'::jsonb));
+           and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft), '[]'::jsonb));
 end;
 $function$;
 
@@ -12151,7 +12215,8 @@ begin
      where r.id = p_resource_id and r.kind = 'pdf' and r.status = 'ready'
        and r.course_id = (_in->>'course_id')::uuid and a.course_id = r.course_id
        and (a.date_assigned is null
-            or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date);
+            or a.date_assigned <= (now() at time zone public._fv_timezone(c.timezone))::date)
+       and not a.is_draft;  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
     if not found then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
@@ -12512,7 +12577,8 @@ begin
     -- E4: a piece dated in the future is not on the student's page: nothing of it is served
     select * into _a from assessment
      where id = p_assessment_id and course_id = _course.id
-       and (date_assigned is null or date_assigned <= (now() at time zone public._fv_timezone(_course.timezone))::date);
+       and (date_assigned is null or date_assigned <= (now() at time zone public._fv_timezone(_course.timezone))::date)
+       and not is_draft;  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
     if _a.id is null then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
@@ -12817,7 +12883,7 @@ begin
               from rubric r
              where r.course_id = _course.id
                and exists (select 1 from assessment a where a.rubric_id = r.id
-                              and (a.date_assigned is null or a.date_assigned <= _today))), '[]'::jsonb),
+                              and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft)), '[]'::jsonb),
         'assessments', coalesce((
             select jsonb_agg(
                        jsonb_build_object(
@@ -12864,7 +12930,7 @@ begin
               from assessment a
               left join category k on k.id = a.category_id and k.course_id = _course.id
              where a.course_id = _course.id
-               and (a.date_assigned is null or a.date_assigned <= _today)), '[]'::jsonb))
+               and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft), '[]'::jsonb))
         -- E9: Show My Learning on: the class's own settings, categories, folders and learning map
         -- (get_class_bundle's shapes; no tag source_text). Off: nothing is added.
         || case when _course.show_my_learning then jsonb_build_object(
@@ -12893,7 +12959,7 @@ begin
                                  join section s on s.id = t.section_id
                                 where s.course_id = _course.id and s.removed_at is null
                                   and exists (select 1 from assessment a where a.rubric_id = r.id
-                                                 and (a.date_assigned is null or a.date_assigned <= _today))
+                                                 and (a.date_assigned is null or a.date_assigned <= _today) and not a.is_draft)
                                 group by rt.rubric_id) w), '{}'::jsonb),
                    -- E9: every category of the class, as the bundle sends them
                    'categories', coalesce((
@@ -13006,7 +13072,8 @@ begin
     end if;
     select * into _a from assessment
      where id = p_assessment_id and course_id = _course.id
-       and (date_assigned is null or date_assigned <= (now() at time zone public._fv_timezone(_course.timezone))::date);
+       and (date_assigned is null or date_assigned <= (now() at time zone public._fv_timezone(_course.timezone))::date)
+       and not is_draft;  -- 2026111701: a Draft is not on the student's page until the teacher assigns it
     if _a.id is null then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;

@@ -70,6 +70,7 @@ export type Database = {
           evidence_type: string | null
           group_work: string
           id: string
+          is_draft: boolean
           max_points: number | null
           module_id: string | null
           rubric_id: string | null
@@ -98,6 +99,7 @@ export type Database = {
           evidence_type?: string | null
           group_work?: string
           id?: string
+          is_draft?: boolean
           max_points?: number | null
           module_id?: string | null
           rubric_id?: string | null
@@ -125,6 +127,7 @@ export type Database = {
           evidence_type?: string | null
           group_work?: string
           id?: string
+          is_draft?: boolean
           max_points?: number | null
           module_id?: string | null
           rubric_id?: string | null
@@ -3750,6 +3753,7 @@ export type Database = {
           p_due_date?: string
           p_evidence_type?: string
           p_idempotency_key?: string
+          p_is_draft?: boolean
           p_max_points?: number
           p_module_id?: string
           p_rubric_id?: string
@@ -4094,6 +4098,10 @@ export type Database = {
         }[]
       }
       list_course_submissions: { Args: { p_course_id: string }; Returns: Json }
+      list_course_submissions_since: {
+        Args: { p_course_id: string; p_version?: string }
+        Returns: Json
+      }
       list_course_term_attendance: {
         Args: { p_course_id: string }
         Returns: Json
