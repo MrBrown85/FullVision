@@ -1187,6 +1187,15 @@ Colin: "When teachers create assignments, they might want to keep them as Drafts
 5. **Unassign is in the card's ⋯ menu** while no student has a grade, a status or sent work on the piece; then it is greyed ("Students have work or grades on this."). The server refuses it too.
 6. **The List view** shows a Draft chip before the title, a Drafts filter beside No Due Date (while the class has one), and Assign on the bar for ticked Drafts, with Undo. No new column.
 
+## Assessment types (2026-11-17)
+
+Colin: "when teachers are creating assessments, there should be other options on the type. There's no oral or presentation, but there are media types. That doesn't make sense for the user. maybe the teacher can just add more?" He approved the mockup's three recommendations ("Build all three"; https://claude.ai/artifact/KUUNY4mHPuxc9igNJPzL75).
+
+1. **The form's Type is the kind of task**: Written, Test, Quiz, Project, Lab, Presentation, Oral, Performance, Observation, Conversation, in that order (`ASSESSMENT_TYPES`, `shared/constants.js`). The label is Type, the word the Student page's Group By uses. Audio, Video and Photo leave the list, and with them the line saying Photo is not students sending photos.
+2. **Teachers add their own, in the form, per class.** Add a Type… ends the list; the word is saved only on the assessment (`assessment.evidence_type`), so there is no new setting and no migration. A class's added types show under This Class while an assessment in that class uses one, and go with an assessment copied to another class. A typed word already there, whatever its case, is chosen instead of added. One list across all a teacher's classes would need a new setting; not built.
+3. **Old values are read, not rewritten.** Audio reads as Oral. Video and Photo keep their own word on an assessment that has one and are not offered for new ones. On Nov 17 live data had 139 assessments: Written 134, Observation 2, Conversation 2, Audio 1.
+4. **Only the teacher sees a type**: the Student page's Group By Type and Where It Shows. No grade reads it, and students and reports never show it.
+
 ## Reflect: one sign-in, a teacher's switch, and reflections a teacher builds (2026-11-16)
 
 Colin's Philosophy 12 and History 12 classes signed in with their cards for the first time on Nov 16 and the Reflect tab was empty. A card listed a questionnaire only for a student who had a printed slip for it (`student_submit._card_listed`), so turning one On in Class Settings did not put it on the student page. No real student had ever answered through a slip. Colin: "No more QR code slips specifically for the questionnaires. Students can access them through their regular sign-in. Extra codes complicates things. Allow teachers to turn them on. … i should also be able to create custom questionnaires that go into their reflect section." He approved a mockup (https://claude.ai/artifact/Fbfhx4hfgkxHsaBedA3DXz) with "Build as shown". The plan and the data contract are in `docs/plans/reflect-plan.md`; the database change is `migrations/2026111620_reflect_from_the_card.sql`.

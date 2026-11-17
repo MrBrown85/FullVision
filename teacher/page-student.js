@@ -1206,7 +1206,7 @@ window.PageStudent = (function () {
     var byType = {};
     entries.forEach(function (e) {
       var a = ctx.assessMap[e.assessmentId];
-      var t = (a && a.evidenceType) || '';
+      var t = assessmentTypeOf(a);
       (byType[t] = byType[t] || []).push(e);
     });
     var rows = Object.keys(byType)

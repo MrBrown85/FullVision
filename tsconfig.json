@@ -50,6 +50,7 @@
     "teacher/assign-show.js",
     "teacher/assign-list.js",
     "teacher/assign-draft.js",
+    "teacher/assessment-type-field.js",
     "teacher/grade-change.js",
     "teacher/expand-motion.js",
     "teacher/report-print-paper.js",
