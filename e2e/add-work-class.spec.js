@@ -102,5 +102,6 @@ test('a photo for each of two students, added with one button, shows on the Work
   await page.keyboard.press('Escape');
   await expect(awc).toHaveCount(0);
   await expect(wall).toHaveCount(1);
+  await expect(wall.locator('.ww-add-work')).toBeFocused();
   expect(errors).toEqual([]);
 });
