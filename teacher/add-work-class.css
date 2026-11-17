@@ -457,9 +457,27 @@
 }
 .awc-card .awc-chip {
   width: 100%;
+  height: auto;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 6px 4px 4px 8px;
 }
 .awc-card .awc-file-name {
+  flex: 1 1 100%;
+  font-weight: 600;
+}
+.awc-card .awc-pages {
   flex: 1;
+}
+.awc-card .awc-choices {
+  flex-direction: column;
+  width: 100%;
+}
+.awc-card .awc-choice {
+  text-align: left;
+}
+.awc-drop {
+  padding: 0 10px;
 }
 
 /* ── After the run ── */

@@ -1109,12 +1109,23 @@ window.AddWorkClass = (function () {
     });
   }
 
+  // After the run, the next student's On Paper (or Done) takes the focus
+  // when a student's buttons go.
+  function _nextKey(s, sid) {
+    var still = s.stillNotIn.filter(function (id) {
+      return !s.leftAlone[id] && (!s.paperDone[id] || id === sid);
+    });
+    var next = still[still.indexOf(sid) + 1];
+    return next ? 'paperNow:' + next : 'done';
+  }
+
   // On Paper after the run: the teacher's click, one student.
   function _paperNow(sid) {
     var s = _s;
     if (!s || s.paperDone[sid]) return;
+    var focus = _nextKey(s, sid);
     s.paperDone[sid] = 'Saving…';
-    _draw({ focus: 'done' });
+    _draw({ focus: focus });
     markStudentWorkOnPaper(s.cid, s.aid, [sid])
       .then(null, function () {
         return { result: 'store_failed' };
@@ -1126,7 +1137,7 @@ window.AddWorkClass = (function () {
           delete s.paperDone[sid];
           s.headNote = _say(res || {});
         }
-        _draw({ focus: 'done' });
+        _draw();
       });
   }
 
@@ -1206,8 +1217,9 @@ window.AddWorkClass = (function () {
     }
     if (what === 'paperNow') return _paperNow(sid);
     if (what === 'leaveNotIn') {
+      var focus = _nextKey(s, sid);
       s.leftAlone[sid] = true;
-      return _draw({ focus: 'done' });
+      return _draw({ focus: focus, fallback: 'done' });
     }
   }
 
@@ -1320,7 +1332,18 @@ window.AddWorkClass = (function () {
   // Ahead of the Work Wall's own Escape, which would close the wall too.
   function _keydown(e) {
     var s = _s;
-    if (!s || e.key !== 'Escape' || e.defaultPrevented) return;
+    if (!s || e.defaultPrevented) return;
+    if (s.moveMenu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      var items = Array.prototype.slice.call(s.overlay.querySelectorAll('.awc-move-menu .awc-move-item'));
+      var at = items.indexOf(document.activeElement);
+      var next = items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+      if (next) {
+        e.preventDefault();
+        next.focus();
+      }
+      return;
+    }
+    if (e.key !== 'Escape') return;
     if (document.querySelector('.confirm-overlay')) return;
     e.preventDefault();
     e.stopPropagation();
