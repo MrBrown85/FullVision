@@ -38,18 +38,6 @@ window.PageAssignments = (function () {
   // While a search or filter is on, every module with matches shows open;
   // a module the teacher closes during it is kept here, not saved.
   var _filterClosedModules = {};
-  // Show: Submitted (assign-show.js) opens and closes cards through these.
-  AssignShow.bind({
-    get: function () {
-      return { open: openAssessIds, allExpanded: _allExpanded, collapsed: _collapsedIds, closed: _filterClosedModules };
-    },
-    set: function (v) {
-      openAssessIds = v.open;
-      _allExpanded = v.allExpanded;
-      _collapsedIds = v.collapsed;
-      _filterClosedModules = v.closed;
-    },
-  });
   // Closed modules stay closed per class, saved with the teacher's
   // preferences so they survive signing out. This key is the old
   // browser-only copy, read once when a class has nothing saved yet.
@@ -1863,9 +1851,11 @@ window.PageAssignments = (function () {
       grouped[key].push(a);
     });
 
-    var filtersActive =
-      filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly || AssignShow.on();
-    if (!filtersActive) _filterClosedModules = {};
+    // A search or filter opens every module with matches; the Show bar only
+    // lists, and leaves folders and cards as the teacher has them.
+    var opensFolders = filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly;
+    var filtersActive = opensFolders || AssignShow.on();
+    if (!opensFolders) _filterClosedModules = {};
 
     // Nothing to show: say so first, above any modules.
     if (assessments.length === 0 && allAssessments.length > 0) {
@@ -1894,7 +1884,7 @@ window.PageAssignments = (function () {
           return openAssessIds.has(a.id);
         });
       // Searching or filtering shows every module with matches open.
-      var folderOpen = filtersActive ? !_filterClosedModules[u.id] : isOpen || containsOpen;
+      var folderOpen = opensFolders ? !_filterClosedModules[u.id] : isOpen || containsOpen;
       html += '<div class="mod-drop-zone" data-drop-index="' + idx + '" data-mod-drop-zone="true"></div>';
       html +=
         '<div class="mod-folder' +
@@ -1976,7 +1966,7 @@ window.PageAssignments = (function () {
         ungrouped.some(function (a) {
           return openAssessIds.has(a.id);
         });
-      var folderOpen = filtersActive
+      var folderOpen = opensFolders
         ? !_filterClosedModules['__none__']
         : (ungrouped.length > 0 && noModOpen) || containsOpenNoMod;
       html +=
@@ -7262,7 +7252,7 @@ window.PageAssignments = (function () {
     if (_grader || !main || !COURSES[cid]) return false;
     // A filter on grades (Ungraded, To Return) can drop a card graded since the draw.
     if (showUngraded || _toReturnOnly) return false;
-    var filtersActive = filterCategories.length > 0 || !!assessSearch || AssignShow.on();
+    var opensFolders = filterCategories.length > 0 || !!assessSearch;
     var all = getAssessments(cid);
     var byId = {};
     all.forEach(function (a) {
@@ -7278,7 +7268,7 @@ window.PageAssignments = (function () {
     // A folder the teacher closed is drawn open only while a card in it is
     // held open (renderAssessmentList): every folder is checked, since Expand
     // lets go of cards that stay open.
-    var folders = filtersActive ? [] : main.querySelectorAll('.mod-folder');
+    var folders = opensFolders ? [] : main.querySelectorAll('.mod-folder');
     for (var f = 0; f < folders.length; f++) {
       if (!collapsedModules[folders[f].dataset.moduleId]) continue;
       var holds = Array.prototype.some.call(folders[f].querySelectorAll('.assess-card'), function (el) {
