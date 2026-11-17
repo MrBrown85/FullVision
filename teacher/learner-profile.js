@@ -515,7 +515,7 @@ var LearnerProfile = (function () {
 
   // This student's reflections on the class's pieces (feedbackOf and feedbackCounts).
   function _reflectionsOf(cid, sid, pieces) {
-    (getAssessments(cid) || []).forEach(function (a) {
+    (getAssignedAssessments(cid) || []).forEach(function (a) {
       if (a && a.id) pieces[a.id] = a;
     });
     return getStudentReflections(cid, sid).filter(function (r) {

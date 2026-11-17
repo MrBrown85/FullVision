@@ -71,7 +71,7 @@ window.MStudents = (function () {
 
     var sections = getSections(cid);
     var allStatuses = getAssignmentStatuses(cid);
-    var allAssessments = getAssessments(cid);
+    var allAssessments = getAssignedAssessments(cid);
     var data = {
       sections: sections,
       statuses: allStatuses,
