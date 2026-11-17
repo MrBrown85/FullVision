@@ -590,7 +590,7 @@ window.PageAssignments = (function () {
       '<button class="tb-action-btn tb-action-secondary" data-action="openRubricBank">Rubrics</button>' +
       (window.AssessmentCopy &&
       (AssessmentCopy.copyTargets(cid).sameCourse.length || AssessmentCopy.copyTargets(cid).other.length)
-        ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add from another class</button>'
+        ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add From Another Class</button>'
         : '') +
       '<button class="tb-action-btn" data-action="showNewForm">+ New Assessment</button>' +
       '</div>' +
@@ -11233,7 +11233,7 @@ window.PageAssignments = (function () {
         showNewForm();
       },
       addFromClass: function () {
-        if (window.AssessmentCopy) AssessmentCopy.openAddFromClass(activeCourse, render);
+        if (window.AddFromClass) AddFromClass.open(activeCourse, render);
       },
       copyTargetToggle: function () {
         if (window.AssessmentCopy) AssessmentCopy.toggleTarget(el);

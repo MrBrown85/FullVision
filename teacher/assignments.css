@@ -5349,6 +5349,289 @@ body.af-comp-open #gb-tooltip {
   gap: 6px;
 }
 
+/* ── Add From Another Class (teacher/add-from-class.js) ──────────────
+   The top (title, class chips, search) and the buttons stay put; only the
+   list scrolls. Rows are a grid, so titles, categories, scoring and dates
+   line up however long a title is. */
+.afc-overlay {
+  padding: 24px 16px;
+  box-sizing: border-box;
+  /* Opens at once: the list is what the teacher came for. */
+  animation: none;
+}
+.afc-card {
+  --afc-cols: 18px minmax(0, 1fr) 180px 132px 92px;
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  max-height: min(760px, 100%);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-base);
+  color: var(--text);
+  overflow: hidden;
+}
+.afc-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px 14px;
+}
+.afc-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.afc-what {
+  margin: -8px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.afc-what strong {
+  font-weight: 600;
+  color: var(--text);
+}
+.afc-from {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.afc-label {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.afc-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.afc-class {
+  max-width: 100%;
+  height: var(--control-h);
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--divider-subtle);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.afc-class:hover {
+  background: var(--overlay-pressed);
+  color: var(--text);
+}
+.afc-class[aria-checked='true'] {
+  border-color: var(--active);
+  background: var(--active);
+  color: #fff;
+}
+.afc-class:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.afc-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.afc-search {
+  flex: 1 1 220px;
+}
+.afc-select {
+  flex: 0 1 190px;
+  min-width: 0;
+  height: var(--control-h);
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.afc-cols,
+.afc-row {
+  display: grid;
+  grid-template-columns: var(--afc-cols);
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 24px;
+}
+.afc-cols {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top: 1px solid var(--divider-medium);
+  border-bottom: 1px solid var(--divider-medium);
+  background: var(--bg);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.afc-col-all {
+  cursor: pointer;
+}
+.afc-box {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--active);
+  cursor: pointer;
+}
+.afc-box:disabled {
+  cursor: default;
+}
+.afc-list {
+  flex: 1 1 auto;
+  min-height: 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.afc-list.afc-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  font-size: var(--text-base);
+  color: var(--text-2);
+  text-align: center;
+}
+.afc-row {
+  min-height: 38px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--divider-subtle);
+  font-size: var(--text-base);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.afc-row:last-child {
+  border-bottom: 0;
+}
+.afc-row:hover {
+  background: var(--divider-subtle);
+}
+.afc-row.is-on,
+.afc-row.is-on:hover {
+  background: var(--active-light);
+}
+.afc-row:has(.afc-box:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--active);
+}
+.afc-row.is-off {
+  color: var(--text-3);
+  cursor: default;
+}
+.afc-row.is-off:hover {
+  background: none;
+}
+.afc-title-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.afc-name {
+  min-width: 0;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.afc-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.afc-row.is-off .afc-cell {
+  color: var(--text-3);
+}
+.afc-date {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.afc-chip {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: var(--radius-xl);
+  background: var(--divider-subtle);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.afc-chip-warn {
+  background: var(--score-2-bg);
+  color: var(--text);
+}
+.afc-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider-medium);
+}
+.afc-status {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.afc-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.afc-link:hover {
+  text-decoration: underline;
+}
+.afc-foot .confirm-ok {
+  min-width: 76px;
+}
+.afc-foot .confirm-ok:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* A narrow window: Scoring gives its room to the titles. */
+@media (max-width: 700px) {
+  .afc-card {
+    --afc-cols: 18px minmax(0, 1fr) 120px 84px;
+  }
+  .afc-scoring {
+    display: none;
+  }
+  .afc-head,
+  .afc-foot {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .afc-cols,
+  .afc-row {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
 /* Rubric editor: note about scored criteria whose top value changed. */
 .rubric-guard-note {
   margin: 0 0 10px;
@@ -7264,6 +7547,12 @@ button.grader-member-name {
 .assess-toolbar .tb-action-btn {
   padding: 0 12px;
   font-size: var(--text-sm);
+}
+/* Rubrics, Add From Another Class, New Assessment: 2px less at each side,
+   so the row is no wider with the middle button in Title Case (in a class
+   with a section toggle, a 1366-wide window has no room to spare). */
+.assess-toolbar .assess-toolbar-actions .tb-action-btn {
+  padding: 0 10px;
 }
 .assess-toolbar .tb-action-btn.tb-action-secondary {
   border: none;

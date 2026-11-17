@@ -264,4 +264,28 @@
   html.fv-tablet .cm-comp-list .mod-folder-meta {
     margin-left: auto;
   }
+
+  /* ── Add From Another Class ─────────────────────────────────────── */
+
+  /* Rows and controls a finger can hit, and Scoring gives its room to the
+     titles (teacher/add-from-class.js). */
+  html.fv-tablet .afc-card {
+    --afc-cols: 20px minmax(0, 1fr) 150px 92px;
+    max-height: 100%;
+  }
+  html.fv-tablet .afc-scoring {
+    display: none;
+  }
+  html.fv-tablet .afc-row {
+    min-height: 44px;
+  }
+  html.fv-tablet .afc-box {
+    width: 20px;
+    height: 20px;
+  }
+  html.fv-tablet .afc-class,
+  html.fv-tablet .afc-select,
+  html.fv-tablet .afc-search .assess-search-input {
+    height: 40px;
+  }
 }
