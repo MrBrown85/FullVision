@@ -2597,3 +2597,25 @@ Scenarios (the script's docstring says what each checks): `student` (each of 13 
 Result on 2026-11-16, PostgreSQL 17.11 (embedded-postgres): **166 of 166** after the review of PR 1484 (the trigger no longer takes the piece's row for update; the 40P01 the review reported did not reproduce on this build, with either trigger): student 35, create 7, update 40, copies 8, rls 27, race 17, apply 18, undo 14. The pre-check, run read-only on gradebook-prod (17.6) the same day: every fingerprint ok; 149 assessments, 0 dated in the future, 146 with a result or work, 73 empty score rows and 2 seen-only grade_return rows (neither blocks).
 
 Not verified here: PostgREST's schema cache and the app's calls through it, the edge functions, gradebook-prod itself. `tests/db/run.mjs` rebuilds from `migrations/baseline/`, so it covers this file only after the baseline is refreshed following the apply.
+
+## Reflect from the card (2026111620)
+
+`reflect_from_card.py` exercises `../2026111620_reflect_from_the_card.sql` on live as it is after Slips Keyed (`slips_keyed.py`'s template with `2026111160` applied). The later files (`2026111170` to `2026111310`) touch none of the functions it patches or relies on.
+
+```bash
+PGDATABASE=rc python3 batch_c_common.py build
+PGDATABASE=rc python3 reflect_from_card.py                    # every scenario
+PGDATABASE=rc python3 reflect_from_card.py fingerprints check
+```
+
+- `live`: the six functions it patches or relies on have, on this build, the md5 read from gradebook-prod on Nov 16.
+- `listed`: before the file (the fault), a questionnaire that is on with no slip is not on a card. After: it is, for every student of the class; off, closed, not open yet and answered; `form` and `answer` with no slip; another class, another student's session, a withdrawn student; a Goal Check-In still rides on its reflection; a printed slip still opens and sends, and a card answer still uses one up.
+- `custom`: a teacher saves a reflection with every kind of question (refused before the file); another teacher cannot; a student answers it from the card and each answer is kept as `docs/plans/reflect-plan.md` says; an answered one cannot be deleted.
+- `answers`: `_clean_answer` for rating, date, ranking and likert: what each takes, refuses and keeps.
+- `same`: every old kind's answers come out of `_clean_answer` exactly as before the file, refusals included.
+- `apply`: six guards (a relied-on function changed stops it too); a database in use; only the two functions and two checks change; no row changes; a second run; anon and authenticated cannot run either function; the pre-check and post-check.
+- `undo`: the catalog comes back line for line; with a teacher's reflection in place both functions go back, the checks stay wide and nothing is deleted; the fast stop.
+
+Result on 2026-11-16, PostgreSQL 17.11, embedded-postgres, from an empty database: **174 of 174**; `fingerprints check` every list current. The pre-check, run read-only on gradebook-prod the same day, returned no row that would stop the file.
+
+Not verified here: the edge function (not changed: it passes a question's `options` and an answer through as they are), gradebook-prod.
