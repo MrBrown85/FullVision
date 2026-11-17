@@ -2913,6 +2913,52 @@ body.fv-switching-course::after {
   max-height: none;
   margin: 4px 0 0;
 }
+/* A warning before the year runs out (shared/photo-expiry.js): one quiet
+   line per class whose photos go within 30 days, above the cards. */
+.photo-expiry[data-where='phone'] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.photo-expiry[data-where='phone']:empty {
+  display: none;
+}
+.photo-expiry[data-where='phone'] .photo-expiry-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-left: 4px solid var(--late);
+  border-radius: 12px;
+}
+.photo-expiry[data-where='phone'] .photo-expiry-text {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.m-photo-expiry-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 22px;
+  background: var(--bg);
+  color: var(--link);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.photo-expiry[data-where='phone'] .photo-expiry-more {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  color: var(--text-3);
+}
 /* Under the stack: "N of M" and All Students, which opens the list sheet. */
 .m-card-foot {
   display: flex;

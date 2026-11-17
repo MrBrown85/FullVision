@@ -8435,6 +8435,45 @@ button.rb-v-prompt {
   white-space: nowrap;
 }
 
+/* ── A warning before the year runs out (shared/photo-expiry.js) ── */
+/* One quiet line per class whose photos go within 30 days because it has
+   not been opened for a year, at the top of the Dashboard. Empty: nothing. */
+.page-dashboard .photo-expiry {
+  order: -2;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.page-dashboard .photo-expiry:empty {
+  display: none;
+}
+.photo-expiry-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-left: 4px solid var(--late);
+  border-radius: 12px;
+}
+.photo-expiry-text {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: 1.4;
+}
+.photo-expiry-more {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
 /* "3 open concerns" (dash-observations.js, openConcernsHtml): a flag that
    opens to a short list, each row a link to its card and follow-ups. */
 .dash-ob2-open {

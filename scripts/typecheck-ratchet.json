@@ -19,6 +19,7 @@
     "shared/data-utilities.js",
     "shared/data-reflect.js",
     "shared/data-courses-terms.js",
+    "shared/photo-expiry.js",
     "shared/data-markup.js",
     "shared/data-categories.js",
     "shared/data-profile-summaries.js",

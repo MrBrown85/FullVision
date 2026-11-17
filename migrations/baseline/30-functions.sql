@@ -628,6 +628,22 @@ AS $function$
      where c.id = p_course_id;
 $function$;
 
+CREATE OR REPLACE FUNCTION public._course_restored_opened()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    -- Restored from the trash (deleted_at from a time to null): opened now,
+    -- or a class last opened long before it was deleted loses its photos the
+    -- first night after. Never moves a stamp back.
+    insert into course_opened (course_id, last_opened_at) values (new.id, now())
+    on conflict (course_id) do update set last_opened_at = greatest(course_opened.last_opened_at, excluded.last_opened_at);
+    return null;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public._fv_date(p text)
  RETURNS date
  LANGUAGE plpgsql
@@ -7278,6 +7294,26 @@ begin
            and e.withdrawn_at is null
     ), '[]'::jsonb);
 end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.list_course_photo_expiry()
+ RETURNS TABLE(course_id uuid, last_opened_at timestamp with time zone, photos integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    -- The signed-in teacher's own classes only, not in the trash, with pages
+    -- of sent work, unopened for 300 days or more (the nightly job takes the
+    -- photos at 365: _photo_keep_class, 2026111704). Signed out: no rows.
+    select c.id, greatest(o.last_opened_at, c.created_at), count(f.id)::int
+      from course c
+      left join course_opened o on o.course_id = c.id
+      join submission s on s.course_id = c.id and s.state = 'sent'
+      join submission_file f on f.submission_id = s.id
+     where c.teacher_id = (select auth.uid())
+       and c.deleted_at is null
+       and greatest(o.last_opened_at, c.created_at) < now() - interval '300 days'
+     group by c.id, o.last_opened_at, c.created_at;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.list_course_questionnaires(p_course_id uuid)

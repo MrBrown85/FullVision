@@ -22,6 +22,7 @@ public._assessment_resource_same_class() 1d661e6e1a34b6c2a82735f439fdc064 448
 public._assessment_resource_truncated() 5d4a8ca2dd10909f2d669927b2a5bba6 332
 public._assessment_work_json(p_assessment_id uuid) e281660216f4186fe3f374eeacaf2fe6 524
 public._cards_work_until(p_course_id uuid) 258317511f7b190e41f62a9570c9b7b7 983
+public._course_restored_opened() a345459a8b66ded92f8aad90e01b4f63 618
 public._fv_date(p text) 0dcf865b5254cf0f9535df0fac1cb8a4 308
 public._fv_release_orphan_teacher_email() d1786f4b0205b700167758f4bb61e32e 762
 public._fv_teacher_sign_in_deleted() f81c14dec41dcf6d95377905e08ed58d 304
@@ -192,6 +193,7 @@ public.list_course_feedback(p_course_id uuid) 7fbe6b367a0c28fd4dd2b894f0dc7711 1
 public.list_course_goal_dates(p_course_id uuid) c79450f6c6f57ba2464fc883b4c3cf38 513
 public.list_course_grade_returns(p_course_id uuid) 0779f1e345fb278fd8702592163784c1 1783
 public.list_course_guardians(p_course_id uuid) a7b52972fd4ddc0bef237f12f1ca3656 795
+public.list_course_photo_expiry() 09fea36f5f757a3de2508a25f9460376 968
 public.list_course_questionnaires(p_course_id uuid) fed47ab4f9bc83baa8f6d9f76b00a22a 567
 public.list_course_resources(p_course_id uuid) aedc2494e8d6236cc287a0c1afc9b412 756
 public.list_course_responses(p_course_id uuid) 42393243ca177fda5aac1239a33d9bb5 1157
