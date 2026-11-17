@@ -1,17 +1,17 @@
 {
   "Assignments: open": {
-    "copied": 1810684,
+    "copied": 1841834,
     "saved": 110,
-    "drawn": 931258,
-    "elements": 3309,
-    "lookups": 18406,
+    "drawn": 961951,
+    "elements": 3676,
+    "lookups": 18680,
     "class": 0
   },
   "Assignments: open one card": {
     "copied": 83036,
     "saved": 0,
     "drawn": 305132,
-    "elements": 5679,
+    "elements": 6046,
     "lookups": 2627,
     "class": 0
   },
@@ -19,7 +19,7 @@
     "copied": 466124,
     "saved": 464696,
     "drawn": 690,
-    "elements": 5680,
+    "elements": 6047,
     "lookups": 12,
     "class": 0
   },
@@ -27,7 +27,7 @@
     "copied": 0,
     "saved": 0,
     "drawn": 539,
-    "elements": 5683,
+    "elements": 6050,
     "lookups": 216,
     "class": 0
   },
@@ -35,7 +35,7 @@
     "copied": 0,
     "saved": 0,
     "drawn": 0,
-    "elements": 5683,
+    "elements": 6050,
     "lookups": 0,
     "class": 0
   },
@@ -43,7 +43,7 @@
     "copied": 12816,
     "saved": 0,
     "drawn": 0,
-    "elements": 3318,
+    "elements": 3685,
     "lookups": 2162,
     "class": 0
   },
@@ -82,16 +82,16 @@
   "Grader: open on a student": {
     "copied": 1864531,
     "saved": 55,
-    "drawn": 665844,
-    "elements": 5514,
+    "drawn": 665941,
+    "elements": 5513,
     "lookups": 10391,
     "class": 0
   },
   "Grader: next student": {
     "copied": 73128,
     "saved": 0,
-    "drawn": 9689,
-    "elements": 5514,
+    "drawn": 9690,
+    "elements": 5513,
     "lookups": 630,
     "class": 0
   },

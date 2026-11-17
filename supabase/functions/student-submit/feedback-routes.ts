@@ -69,8 +69,8 @@ export const FEEDBACK_ROUTES: Record<string, true> = {
 export const SQL = {
   feedback: 'select student_submit.feedback($1::text, $2::uuid, $3::text) as r',
   markup: 'select student_submit.markup($1::text, $2::uuid, $3::uuid, $4::text) as r',
-  reflect: 'select student_submit.reflect($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
-  reply: 'select student_submit.reply($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
+  reflect: 'select student_submit.reflect($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text) as r',
+  reply: 'select student_submit.reply($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text) as r',
   answerSeen: 'select student_submit.answer_seen($1::text, $2::uuid, $3::uuid[], $4::text) as r',
   groupWork: 'select student_submit.group_work($1::text, $2::uuid, $3::text) as r',
 };
@@ -123,7 +123,7 @@ function fields(v: unknown, allowed: string[]): Json | null {
 /* p_reflection, as student_submit.reflect checks it: makes_sense 'yes' or
    'not_sure'; question, plan and went_well each text or null; not_sure
    needs a question, yes a plan; no other field. Rebuilt from those fields
-   only, as JSON text for $4::jsonb. Null when it is wrong. */
+   only, as JSON text for $4::text::jsonb (see index.ts: a jsonb parameter would be stringified again). Null when it is wrong. */
 function reflection(v: unknown): string | null {
   const r = fields(v, ['makes_sense', 'question', 'plan', 'went_well']);
   if (!r || (r.makes_sense !== 'yes' && r.makes_sense !== 'not_sure')) return null;
