@@ -132,6 +132,8 @@ declare var ObsCard: {
   obDay(ob: unknown): string;
   context(cid: string, opts?: unknown): unknown;
   html(ob: unknown, ctx: unknown, opts?: unknown): string;
+  cardWhen(ob: unknown, dayOnly?: boolean): string;
+  TRASH_SVG: string;
 };
 // The offline queue (shared/offline-queue.js sets window.v2Queue). Only the
 // member the checked data files call is typed.

@@ -832,6 +832,15 @@ const OBS_CONTEXTS = {
   discussion: { label: 'Discussion' },
 };
 
+/* A follow-up's quick choices, in the order the chips show (Colin, Nov 17).
+   Resolved closes a Concern. The keys are observation.follow_up_kind. */
+const OBS_FOLLOW_UP_KINDS = {
+  called_home: { label: 'Called Home' },
+  spoke_with_student: { label: 'Spoke With Student' },
+  still_happening: { label: 'Still Happening' },
+  resolved: { label: 'Resolved' },
+};
+
 /* The six sentence starters offered to a class that has none, and Demo
    Mode's Science 8 bank. They reach a teacher's class only when the teacher
    presses "Add these to this class" (docs/DECISIONS.md, "Observations
@@ -1017,6 +1026,7 @@ const FV_IDEMPOTENT_RPCS = {
   create_course: true,
   create_custom_tag: true,
   create_observation: true,
+  create_observation_follow_up: true,
   create_phone_report: true,
   create_report_issue: true,
   create_student_and_enroll: true,
@@ -1040,6 +1050,7 @@ const FV_IDEMPOTENT_RPCS = {
   set_questionnaire_on: true,
   set_rubric_printed: true,
   submit_support_report: true,
+  update_observation_follow_up: true,
   update_phone_report: true,
   upsert_category: true,
   upsert_competency_group: true,

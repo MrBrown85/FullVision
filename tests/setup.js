@@ -324,6 +324,7 @@ load('teacher/factor-field.js');
 load('teacher/rubric-guard.js');
 load('shared/obs-capture.js');
 load('shared/obs-card.js');
+load('shared/obs-follow-ups.js');
 load('teacher/student-evidence.js');
 load('teacher/competency-evidence.js');
 load('shared/work-wall.js');

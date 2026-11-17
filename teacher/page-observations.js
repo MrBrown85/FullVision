@@ -709,7 +709,7 @@ window.PageObservations = (function () {
               : Card.dateFormat({ weekday: 'long', month: 'short', day: 'numeric' }).format(new Date(ds + 'T12:00:00'));
         out += '<div class="obs-feed-date-group">' + Card.dayHeaderHtml(lbl, groups[ds].length);
         shown[ds].forEach(function (ob) {
-          out += Card.html(ob, ctx);
+          out += Card.html(ob, ctx, { followUps: true });
         });
         out += '</div>';
       });
@@ -875,16 +875,11 @@ window.PageObservations = (function () {
      ══════════════════════════════════════════════════════════ */
 
   function _focusFindOb(sid, obId) {
-    var byStudent = getQuickObs(activeCourse) || {};
-    var arr = byStudent[sid] || [];
-    for (var i = 0; i < arr.length; i++) {
-      if (arr[i].id === obId) {
-        // Raw entries in the by-student map don't carry studentId — only the
-        // map key does. Attach it so the focus card can resolve the student.
-        return Object.assign({ studentId: sid }, arr[i]);
-      }
-    }
-    return null;
+    var ob = ((getQuickObs(activeCourse) || {})[sid] || []).find(function (o) {
+      return o.id === obId;
+    });
+    // Raw entries carry no studentId (the map key does): attach it for the card.
+    return ob ? Object.assign({ studentId: sid }, ob) : null;
   }
 
   /* The editor keeps a draft; nothing is written until Save (or Enter).
@@ -923,10 +918,14 @@ window.PageObservations = (function () {
     var sid = _focusSid;
     var obId = _focusObId;
     var host = _focusHost;
+    var cid = activeCourse;
     closeFocus();
-    // Another page's card deletes the way that page does (with its Undo).
-    if (host && host.onDelete) host.onDelete(obId);
-    else deleteOb(sid, obId);
+    // One with follow-ups asks first. Another page's card deletes the way
+    // that page does (with its Undo).
+    ObsFollowUps.confirmDelete(cid, obId, function () {
+      if (host && host.onDelete) host.onDelete(obId);
+      else deleteOb(sid, obId);
+    });
   }
 
   // html-safe: tag labels and keys are escaped; colours come from obsTagColor.
@@ -1030,6 +1029,7 @@ window.PageObservations = (function () {
       '<div class="obs-row obs-focus-row">' +
       _focusRowHtml() +
       '</div>' +
+      ObsFollowUps.panelHtml(activeCourse, ob) +
       '<div class="obs-focus-foot">' +
       '<button type="button" class="obs-focus-delete" data-action="focusDelete">' +
       Card.TRASH_SVG +
@@ -1281,7 +1281,6 @@ window.PageObservations = (function () {
   }
 
   function _handleInput(e) {
-    // Popover search inputs
     if (e.target.matches('[data-action-input="popoverSearch"]')) {
       filterPopoverItems(e.target.dataset.popoverId, e.target.value);
     }
@@ -1303,7 +1302,6 @@ window.PageObservations = (function () {
     var action = el.dataset.action;
     if (el.dataset.stopProp === 'true') e.stopPropagation();
 
-    // Map toggle function names to actual functions
     var toggleFns = {
       toggleFilterStudent: toggleFilterStudent,
       toggleFilterTag: toggleFilterTag,
@@ -1320,7 +1318,9 @@ window.PageObservations = (function () {
       clearAllFilters: clearAllFilters,
       obsShowMore: showMore,
       deleteOb: function () {
-        deleteOb(el.dataset.sid, el.dataset.obid);
+        ObsFollowUps.confirmDelete(activeCourse, el.dataset.obid, function () {
+          deleteOb(el.dataset.sid, el.dataset.obid);
+        });
       },
       popoverToggle: function () {
         var fn = toggleFns[el.dataset.toggleFn];
@@ -1406,7 +1406,6 @@ window.PageObservations = (function () {
     } catch (e) {}
     _alive = true;
 
-    // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
     if (typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
@@ -1424,6 +1423,8 @@ window.PageObservations = (function () {
       filterStudents = [params.student];
     }
     makeCapture(preset);
+    // The dashboard's open concerns open one card with its follow-ups.
+    if (params.ob) ObsFollowUps.reveal(params.ob);
 
     _addDocListener('click', _handleClick);
     _addDocListener('mousedown', _handleMousedown);

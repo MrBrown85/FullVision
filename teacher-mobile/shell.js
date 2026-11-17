@@ -1391,6 +1391,12 @@
       if (action === 'm-obs-delete') {
         var obId = target.getAttribute('data-obid');
         var obSid = target.getAttribute('data-sid');
+        // One with follow-ups asks in the sheet itself (holdDelete).
+        if (target.closest('.m-sheet') && obId && getObservationFollowUps(_cid, obId).length) {
+          MObserve.resetSheetState();
+          MObserve.holdDelete(_cid, obSid, obId);
+          return;
+        }
         if (target.closest('.m-sheet')) {
           MC.dismissSheet();
           MObserve.resetSheetState();

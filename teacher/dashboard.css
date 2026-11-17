@@ -8469,3 +8469,62 @@ button.rb-v-prompt {
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* "3 open concerns" (dash-observations.js, openConcernsHtml): a flag that
+   opens to a short list, each row a link to its card and follow-ups. */
+.dash-ob2-open {
+  position: relative;
+}
+.dash-ob2-open-sum {
+  list-style: none;
+}
+.dash-ob2-open-sum::-webkit-details-marker {
+  display: none;
+}
+.dash-ob2-open[open] .dash-ob2-open-sum {
+  border-color: var(--active);
+  color: var(--link);
+}
+.dash-ob2-open-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 360px;
+  max-width: 80vw;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+.dash-ob2-open-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.dash-ob2-open-item:hover {
+  background: var(--overlay-hover);
+}
+.dash-ob2-open-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.dash-ob2-open-when {
+  grid-column: 1 / -1;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.dash-ob2-open-more {
+  padding: 4px 8px 6px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}

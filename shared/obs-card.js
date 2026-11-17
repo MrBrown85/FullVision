@@ -347,7 +347,9 @@ window.ObsCard = (function () {
        title         the card's tooltip
        veiled        the note's words stay off the screen behind a Show
                      button (a private note on the student page, where the
-                     student may be looking) */
+                     student may be looking)
+       followUps     the follow-ups strip at the foot (the Observations
+                     page's log: shared/obs-follow-ups.js) */
   function html(ob, ctx, opts) {
     opts = opts || {};
     var showStudent = opts.showStudent !== false;
@@ -384,6 +386,7 @@ window.ObsCard = (function () {
           '" data-stop-prop="true">Show</button></div>'
         : '<div class="obs-card-text">' + esc(ob.text) + '</div>') +
       metaHtml(ob, ctx, p) +
+      (opts.followUps && window.ObsFollowUps ? ObsFollowUps.cardHtml(ctx.cid, ob) : '') +
       '</div>' +
       (opts.readOnly
         ? ''

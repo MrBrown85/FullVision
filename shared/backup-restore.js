@@ -22,6 +22,7 @@
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var HEX_COLOR_RE = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
   var SENTIMENTS = ['strength', 'growth', 'concern', 'note'];
+  var FOLLOW_UP_KINDS = ['called_home', 'spoke_with_student', 'still_happening', 'resolved'];
   var REPORTING_BASES = ['grade', 'ie', 'language_goals', 'iep_goals'];
   var CORE_IDS = ['COM', 'COL', 'CT', 'CRT', 'PPI', 'PAR', 'SAR'];
   var HABIT_KEYS = ['completes', 'ready', 'others', 'part', 'feedback', 'devices'];
@@ -127,6 +128,9 @@
     Object.keys(obj(backup.observations)).forEach(function (sid) {
       arr(backup.observations[sid]).forEach(function (ob) {
         add(ob && ob.id);
+        arr(ob && ob.followUps).forEach(function (f) {
+          add(f && f.id);
+        });
       });
     });
     return ids;
@@ -682,6 +686,31 @@
     });
     observationOrder.forEach(function (id) {
       p.observations.push(observations[id]);
+    });
+    // Follow-ups after every observation, each under one sent above: no
+    // students of their own (docs/DECISIONS.md, "Observation follow-ups").
+    var followUpsSent = {};
+    Object.keys(obj(backup.observations)).forEach(function (sid) {
+      arr(backup.observations[sid]).forEach(function (ob) {
+        if (!ob || !observations[ob.id]) return;
+        arr(ob.followUps).forEach(function (f) {
+          if (!f || !UUID_RE.test(str(f.id)) || followUpsSent[f.id]) return;
+          var kind = FOLLOW_UP_KINDS.indexOf(f.kind) >= 0 ? f.kind : null;
+          if (!kind && !str(f.text).trim()) return;
+          followUpsSent[f.id] = true;
+          p.observations.push({
+            id: f.id,
+            course_id: cid,
+            body: str(f.text),
+            created_at: orNull(f.created),
+            dims: [],
+            enrollment_ids: [],
+            tag_ids: [],
+            follow_up_of: ob.id,
+            follow_up_kind: kind,
+          });
+        });
+      });
     });
 
     // Term ratings: { sid: { 'term-N': {…} } }.
