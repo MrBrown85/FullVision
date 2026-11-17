@@ -38,6 +38,7 @@
     "shared/data-overrides.js",
     "shared/data-profile-summaries.js",
     "shared/data-courses-terms.js",
+    "shared/photo-expiry.js",
     "shared/data-demo.js",
     "shared/data-curriculum-index.js",
     "shared/overwrite-count.js",

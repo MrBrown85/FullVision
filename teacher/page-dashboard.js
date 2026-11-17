@@ -266,7 +266,9 @@ window.PageDashboard = (function () {
     _toolbar(list.students);
 
     /* -- Overview Panel -- */
-    var html = Overview.renderOverviewPanel({
+    // Photos in a class about to go a year unopened (shared/photo-expiry.js): rarely anything.
+    var html = PhotoExpiry.mount('dash');
+    html += Overview.renderOverviewPanel({
       cid: cid,
       sections: sections,
       allStudents: allStudents,
@@ -1036,6 +1038,13 @@ window.PageDashboard = (function () {
 
     // Dashboard-only actions
     var handlers = {
+      // Open Class on a photo warning: an archived class opens in Class Settings.
+      photoExpiryOpen: function () {
+        var on = el.dataset.cid;
+        if (!on || !COURSES[on]) return;
+        if (isCourseArchived(on)) openClassManager(null, on);
+        else switchCourse(on);
+      },
       // Questions From Students (S10-F4): the grader on that student's piece.
       dashAnswerQuestion: function () {
         _answerInGrader(el.dataset.cid, el.dataset.aid, el.dataset.sid);

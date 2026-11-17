@@ -476,6 +476,8 @@ function noteClassOpened(cid) {
    class on screen. */
 function noteClassOpenedSoon(cid, picked) {
   if (!cid || (!picked && cid !== getActiveCourse())) return;
+  // Opening is what keeps the photos: its warning line goes (shared/photo-expiry.js).
+  if (typeof PhotoExpiry !== 'undefined') PhotoExpiry.opened(cid);
   var check = _refreshState[cid] && _refreshState[cid].running;
   Promise.resolve(check)
     .catch(function () {

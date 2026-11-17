@@ -254,6 +254,7 @@ load('shared/data-withdrawn.js');
 load('shared/data-overrides.js');
 load('shared/data-profile-summaries.js');
 load('shared/data-courses-terms.js');
+load('shared/photo-expiry.js');
 load('shared/data-demo.js');
 load('shared/data-curriculum-index.js');
 // Counts waiting scores that meet newer ones; attaches only to a loaded outbox.
