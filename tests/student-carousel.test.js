@@ -132,6 +132,47 @@ describe('the markup', () => {
   });
 });
 
+/* The count and dots follow the strip on every scroll, at once: nothing
+   waits for an animation frame, the end of the scroll or a snap landing
+   exactly on a page (a CI browser, a slow phone and Reduce Motion all left
+   the count on "1 / 2" while the strip showed page 2, Nov 17). */
+describe('the count follows the strip', () => {
+  async function demoPage() {
+    const page = openStudentPage();
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    await page.settle();
+    return page;
+  }
+  const { window } = parseHTML('<!doctype html><html><body></body></html>');
+  // The strip scrolled to `left`, one page `width` wide, as the browser reports it; then one scroll event.
+  function scrollTo(track, left, width, name) {
+    Object.defineProperty(track, 'clientWidth', { configurable: true, value: width });
+    Object.defineProperty(track, 'scrollLeft', { configurable: true, writable: true, value: left });
+    track.dispatchEvent(new window.Event(name || 'scroll'));
+  }
+
+  it('on the scroll event itself, part way, at the end, and back', async () => {
+    const page = await demoPage();
+    const car = page.root().querySelector('.sp-car[data-car="demo-quick"]');
+    const track = car.querySelector('.sp-car-track');
+    const count = () => car.querySelector('.sp-car-count').textContent;
+    const dot = () => [...car.querySelectorAll('.sp-car-dot')].findIndex(d => d.classList.contains('sp-car-dot-on'));
+    expect(count()).toBe('1 / 2');
+    // More than half of page 2 in view, the snap not landed yet: page 2 already.
+    scrollTo(track, 200, 343);
+    expect([count(), dot()]).toEqual(['2 / 2', 1]);
+    // Landed a fraction off a whole page (a phone's pixels): still page 2.
+    scrollTo(track, 342.6, 343);
+    expect([count(), dot()]).toEqual(['2 / 2', 1]);
+    // Back, by a scroll that only says it ended.
+    scrollTo(track, 0, 343, 'scrollend');
+    expect([count(), dot()]).toEqual(['1 / 2', 0]);
+  });
+});
+
 /* ── A real card: the pages come from `handout-links`, only as they are wanted ── */
 
 const RES = '00000099-0000-4000-8000-000000000000';

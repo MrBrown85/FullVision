@@ -26,6 +26,31 @@ async function demo(page, hash) {
 const card = (page, id) => page.locator('.sp-piece[data-piece="' + id + '"]');
 const loaded = img => img.evaluate(el => el.complete && el.naturalWidth > 0);
 
+/* A finger on the screen: down, a dozen moves a frame apart, up (CDP touch
+   events, as a phone's touchscreen sends them). From inside `box`, by dx, dy. */
+async function swipe(page, box, dx, dy) {
+  const cdp = await page.context().newCDPSession(page);
+  const x0 = Math.round(box.x + box.width * (dx < 0 ? 0.85 : 0.5));
+  const y0 = Math.round(box.y + box.height * (dy < 0 ? 0.8 : 0.5));
+  const touch = (type, x, y) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  await touch('touchStart', x0, y0);
+  for (let i = 1; i <= 12; i++) {
+    await touch('touchMove', Math.round(x0 + (dx * i) / 12), Math.round(y0 + (dy * i) / 12));
+    await page.waitForTimeout(16);
+  }
+  await touch('touchEnd');
+  await cdp.detach();
+}
+
+// How far page `i` of the strip is from sitting exactly in it: 0 when it is the page in view.
+const offBy = (track, i) =>
+  track.evaluate(
+    (t, k) =>
+      Math.abs(t.querySelectorAll('.sp-car-slide')[k].getBoundingClientRect().left - t.getBoundingClientRect().left),
+    i,
+  );
+
 test.describe('on a phone', () => {
   test.use(PHONE);
 
@@ -50,21 +75,12 @@ test.describe('on a phone', () => {
     await expect(car.locator('.sp-car-next')).toBeHidden();
     if (SHOTS) await page.screenshot({ path: SHOTS + '/carousel-phone-page-1.png' });
 
-    // A sideways swipe moves the pages.
+    // A finger swipes sideways: the strip snaps to the whole of page 2, and the count and dots follow it.
     const at = await track.boundingBox();
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Input.synthesizeScrollGesture', {
-      x: Math.round(at.x + at.width * 0.8),
-      y: Math.round(at.y + at.height / 2),
-      xDistance: -Math.round(at.width * 0.7),
-      yDistance: 0,
-      gestureSourceType: 'touch',
-      speed: 1200,
-    });
+    await swipe(page, at, -Math.round(at.width * 0.6), 0);
+    await expect.poll(() => offBy(track, 1), { message: 'page 2 sits in the strip' }).toBeLessThan(2);
     await expect(car.locator('.sp-car-count')).toHaveText('2 / 2');
     await expect(car.locator('.sp-car-dot').nth(1)).toHaveClass(/sp-car-dot-on/);
-    // It snaps to the whole of page 2.
-    await expect.poll(() => track.evaluate(t => Math.abs(t.scrollLeft - t.clientWidth))).toBeLessThan(2);
     await expect.poll(() => loaded(car.locator('.sp-car-slide').nth(1).locator('img'))).toBe(true);
     // The list did not move up or down.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
@@ -82,16 +98,10 @@ test.describe('on a phone', () => {
 
     // A vertical swipe over the pictures scrolls the list, and leaves the pages where they were.
     await page.evaluate(() => window.scrollTo(0, 0));
-    const again = await card(page, 'demo-quick').locator('.sp-car-track').boundingBox();
-    await cdp.send('Input.synthesizeScrollGesture', {
-      x: Math.round(again.x + again.width / 2),
-      y: Math.round(again.y + again.height * 0.8),
-      xDistance: 0,
-      yDistance: -300,
-      gestureSourceType: 'touch',
-      speed: 1200,
-    });
+    const back = card(page, 'demo-quick').locator('.sp-car-track');
+    await swipe(page, await back.boundingBox(), 0, -300);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+    expect(await offBy(back, 1)).toBeLessThan(2);
     await expect(card(page, 'demo-quick').locator('.sp-car-count')).toHaveText('2 / 2');
 
     expect(pictures.filter(p => /^poster-checklist/.test(p)).length).toBeLessThanOrEqual(2);
@@ -151,6 +161,7 @@ test.describe('on a Chromebook', () => {
     expect(box.height).toBeLessThanOrEqual(768 * 0.7 + 1);
     if (SHOTS) await page.screenshot({ path: SHOTS + '/carousel-chromebook-arrows.png' });
     await next.click();
+    await expect.poll(() => offBy(car.locator('.sp-car-track'), 1)).toBeLessThan(2);
     await expect(car.locator('.sp-car-count')).toHaveText('2 / 2');
     await expect(car.locator('.sp-car-dot').nth(1)).toHaveClass(/sp-car-dot-on/);
     await expect(next).toBeHidden();
@@ -158,8 +169,10 @@ test.describe('on a Chromebook', () => {
     // The keys, with the pages focused.
     await car.locator('.sp-car-track').focus();
     await page.keyboard.press('ArrowLeft');
+    await expect.poll(() => offBy(car.locator('.sp-car-track'), 0)).toBeLessThan(2);
     await expect(car.locator('.sp-car-count')).toHaveText('1 / 2');
     await page.keyboard.press('ArrowRight');
+    await expect.poll(() => offBy(car.locator('.sp-car-track'), 1)).toBeLessThan(2);
     await expect(car.locator('.sp-car-count')).toHaveText('2 / 2');
     // Two handouts on one card: their pages follow one another, the name following the page.
     await page.getByRole('button', { name: /^Upcoming/ }).click();
@@ -167,8 +180,10 @@ test.describe('on a Chromebook', () => {
     await expect(fair.locator('.sp-car-slide')).toHaveCount(3);
     await expect(fair.locator('.sp-car-caption')).toHaveText('Proposal Planner');
     await fair.getByRole('button', { name: 'Next Page' }).click();
+    await expect.poll(() => offBy(fair.locator('.sp-car-track'), 1)).toBeLessThan(2);
     await expect(fair.locator('.sp-car-count')).toHaveText('2 / 3');
     await fair.getByRole('button', { name: 'Next Page' }).click();
+    await expect.poll(() => offBy(fair.locator('.sp-car-track'), 2)).toBeLessThan(2);
     await expect(fair.locator('.sp-car-count')).toHaveText('3 / 3');
     await expect(fair.locator('.sp-car-caption')).toHaveText('Lab Safety Checklist');
     // A click on the page opens it full size.

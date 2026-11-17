@@ -299,25 +299,22 @@ var StudentPageCarousel = (function () {
       },
     };
     wired.set(el, me);
-    var queued = false;
-    track.addEventListener(
-      'scroll',
-      function () {
-        if (queued) return;
-        queued = true;
-        (window.requestAnimationFrame || setTimeout)(function () {
-          queued = false;
-          var i = indexAt(track.scrollLeft, track.clientWidth, n);
-          if (i !== cur) {
-            cur = i;
-            at[pid] = i;
-            mark(el, i);
-          }
-          me.look();
-        });
-      },
-      { passive: true },
-    );
+    /* The count, dots and name follow the strip on every scroll, as it
+       moves: a swipe, a fling, the arrows, the keys, scroll-snap settling,
+       Reduce Motion's jump. Nothing waits for an animation frame or for the
+       scroll to end, and a page between two (snap not landed yet) counts as
+       the one more than half in view. */
+    function follow() {
+      var i = indexAt(track.scrollLeft, track.clientWidth, n);
+      if (i !== cur) {
+        cur = i;
+        at[pid] = i;
+        mark(el, i);
+      }
+      me.look();
+    }
+    track.addEventListener('scroll', follow, { passive: true });
+    track.addEventListener('scrollend', follow, { passive: true });
     function go(d) {
       var to = clamp(cur + d, n);
       if (to === cur) return;
