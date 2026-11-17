@@ -1,3 +1,4 @@
+// @ts-check
 /* split-scan-model.js — Split a Scan on the phone: the parts with no DOM (B7).
 
    The phone's Split a Scan (teacher-mobile/split-scan.js) does what the
@@ -20,7 +21,7 @@
    MSplitScanModel.stageFor(cid, aid, m, list, choices)  the named pieces staged.
    MSplitScanModel.settle(m, sent)           the added students' pieces leave the scan. */
 
-window.MSplitScanModel = (function () {
+/** @type {any} */ (window).MSplitScanModel = (function () {
   'use strict';
 
   function _offered(cid, a) {

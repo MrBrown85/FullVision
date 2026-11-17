@@ -173,3 +173,27 @@ describe('the address a shared scan opens the app with', () => {
     expect(window.MSharedScan.arrived('?demo=1')).toBe(null);
   });
 });
+
+describe('a shared scan at start-up', () => {
+  it('not signed in: let go, and the teacher is told to share it again', () => {
+    expect(window.MSharedScan.refuse()).toBe('Sign in, then share the scan again.');
+  });
+  it('signed in: no share opens nothing; a share that kept nothing says why; one the worker lost says so', async () => {
+    expect(await window.MSharedScan.receive(null)).toBe(null);
+    expect(await window.MSharedScan.receive({ said: 'many' })).toEqual({ said: 'many' });
+    swap('fetch', async () => new Response('', { status: 404 }));
+    expect(await window.MSharedScan.receive({ id: '0123456789abcdef01234567' })).toEqual({ said: 'missing' });
+  });
+  it('signed in: the scan taken from the worker, under a plain name', async () => {
+    const asked = [];
+    swap('fetch', async url => {
+      asked.push(url);
+      return new Response('%PDF-1.4', { status: 200, headers: { 'Content-Type': 'application/pdf' } });
+    });
+    const got = await window.MSharedScan.receive({ id: '0123456789abcdef01234567' });
+    expect(asked).toEqual(['/teacher-mobile/shared-scan?take=0123456789abcdef01234567']);
+    expect(got.file.name).toBe('scan.pdf');
+    expect(got.file.type).toBe('application/pdf');
+    expect(await got.file.text()).toBe('%PDF-1.4');
+  });
+});

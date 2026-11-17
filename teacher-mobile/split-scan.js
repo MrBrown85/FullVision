@@ -1,3 +1,4 @@
+// @ts-check
 /* split-scan.js — Split a Scan on the phone (Add Work for the Class, B7).
 
    The photocopier emails one PDF of the whole pile. On the phone the teacher
@@ -39,7 +40,7 @@
    MSplitScan.choose(file)          a file chosen on the screen.
    MSplitScan.close() / isOpen() */
 
-window.MSplitScan = (function () {
+/** @type {any} */ (window).MSplitScan = (function () {
   'use strict';
 
   var MC = window.MComponents;

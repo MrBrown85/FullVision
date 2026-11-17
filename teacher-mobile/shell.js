@@ -23,8 +23,7 @@
 
   /* ── Boot ───────────────────────────────────────────────────── */
   async function boot() {
-    // A scan shared from the phone's mail (B7) names itself in the address,
-    // which _resetHistory tidies away: it is read first.
+    // A scan shared from the phone's mail (B7), read before _resetHistory tidies the address.
     var shared = window.MSharedScan ? MSharedScan.arrived() : null;
     // Check auth: show login screen or proceed to app
     var hasSession = false;
@@ -55,26 +54,15 @@
 
     if (!hasSession) {
       _showAuth();
-      // Student work is not kept for someone not signed in: the worker lets it go.
-      if (shared) {
-        MSharedScan.drop();
-        _authError('Sign in, then share the scan again.');
-      }
+      if (shared) _authError(MSharedScan.refuse());
       return; // Don't boot app — wait for sign-in
     }
 
-    // The shared scan is taken before the class loads, so it waits in the
-    // worker as briefly as it can; a start-up without one lets go of any left.
-    var sharedFile = null;
-    if (shared && shared.id) sharedFile = await MSharedScan.take(shared.id);
-    else if (!shared && window.MSharedScan) MSharedScan.drop();
-
+    var fromShare = window.MSharedScan ? await MSharedScan.receive(shared) : null;
     _hideAuth();
     _resetHistory();
     await _bootApp();
-    if (shared && window.MSplitScan) {
-      MSplitScan.open(_cid, null, sharedFile ? { file: sharedFile } : { said: shared.said || 'missing' });
-    }
+    if (fromShare) MSplitScan.open(_cid, null, fromShare);
   }
 
   async function _bootApp() {
@@ -98,11 +86,10 @@
         },
       });
     }
-    // Split a Scan (B7): a class switched on its screen is the app's class too.
-    if (window.MSplitScan) {
+    // Split a Scan (B7): a class switched there is the app's class too.
+    if (window.MSplitScan)
       MSplitScan.configure({
         onClass: function (cid) {
-          if (!cid || cid === _cid) return;
           _cid = cid;
           _tabState = { students: null, observe: null, grade: null };
           _gradeReturnSid = null;
@@ -111,7 +98,6 @@
           _renderTab(_activeTab);
         },
       });
-    }
     _bindEdgeSwipe();
 
     _hideLoader();
@@ -1152,7 +1138,6 @@
         return;
       }
 
-      // Split a Scan (B7): one PDF of the class's pages, from the row menu.
       if (action === 'm-split-scan') {
         if (target.closest('#m-sheet-container')) MC.dismissSheet();
         MSplitScan.open(_cid, target.getAttribute('data-aid'));

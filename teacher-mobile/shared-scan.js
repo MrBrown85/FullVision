@@ -1,3 +1,4 @@
+// @ts-check
 /* shared-scan.js — a scan shared from the phone's mail arrives (B7).
 
    On Android, the installed app is in the share sheet for a PDF
@@ -17,9 +18,16 @@
                           the worker no longer has it. The worker lets it
                           go either way.
    MSharedScan.drop()     the worker lets any waiting scan go.
-   MSharedScan.held()     Promise of true while a scan waits (for tests). */
+   MSharedScan.held()     Promise of true while a scan waits (for tests).
+   MSharedScan.refuse()   not signed in: the worker lets the scan go, and
+                          the words to show.
+   MSharedScan.receive(arrived)  signed in, at start-up: Promise of what
+                          Split a Scan opens with ({ file } or { said }),
+                          or null with no share (any scan left waiting is
+                          let go). Taken before the class loads, so it
+                          waits in the worker as briefly as it can. */
 
-window.MSharedScan = (function () {
+/** @type {any} */ (window).MSharedScan = (function () {
   'use strict';
 
   var ADDRESS = '/teacher-mobile/shared-scan';
@@ -84,5 +92,22 @@ window.MSharedScan = (function () {
     });
   }
 
-  return { arrived: arrived, take: take, drop: drop, held: held };
+  // Student work is not kept for someone not signed in.
+  function refuse() {
+    drop();
+    return 'Sign in, then share the scan again.';
+  }
+
+  function receive(shared) {
+    if (!shared) {
+      drop();
+      return Promise.resolve(null);
+    }
+    if (!shared.id) return Promise.resolve({ said: shared.said || 'unreadable' });
+    return take(shared.id).then(function (file) {
+      return file ? { file: file } : { said: 'missing' };
+    });
+  }
+
+  return { arrived: arrived, take: take, drop: drop, held: held, refuse: refuse, receive: receive };
 })();
