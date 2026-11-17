@@ -62,6 +62,9 @@
     "teacher-mobile/tab-bar.js",
     "s/question-kinds.js",
     "teacher/cm-reflect-answers.js",
-    "teacher/cm-reflect-builder.js"
+    "teacher/cm-reflect-builder.js",
+    "shared/add-work-files.js",
+    "teacher/add-work-stage.js",
+    "teacher/add-work-class.js"
   ]
 }

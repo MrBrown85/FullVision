@@ -270,6 +270,8 @@ load('shared/photo-shrink.js');
 load('shared/photo-queue.js');
 // The PDF reader (pdf.js is fetched only when a PDF is opened).
 load('shared/photo-readers.js');
+// A teacher's files made into pages of work (Add Work, the row's +).
+load('shared/add-work-files.js');
 // Pictures of student work through one helper (S14-T1).
 load('shared/work-thumbs.js');
 // Mark Up: drawing over a page of student work (S9).
@@ -331,6 +333,8 @@ load('shared/work-wall.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/work-rubric-card.js');
+load('teacher/add-work-stage.js');
+load('teacher/add-work-class.js');
 load('shared/competency-wording.js');
 load('teacher/report-feedback.js');
 load('teacher/report-feedback-cards.js');
