@@ -1,13 +1,33 @@
 -- Undo for migrations/2026111704_photos_stay_with_class.sql (2026-11-17).
 --
--- ── PART 1, the fast stop ────────────────────────────────────────────────────
+-- ── Which lever: PART 0 first ────────────────────────────────────────────────
+-- PART 0 deletes nothing. PART 1 brings Keep Photos Until's deleting back, on
+-- a setting teachers can no longer see. Reach for PART 0 first; run PART 1
+-- only when Keep Photos Until's deleting is wanted again.
+--
+-- ── PART 0, the stop that deletes nothing (recommended) ──────────────────────
+-- Stamps every class as opened now. The year rule then deletes nothing for
+-- 365 days from the moment it runs, and Keep Photos Until stays off: no
+-- photo goes by date at all. Nothing else changes; the app's stamps still
+-- land. Run it again within the year to keep it so. Run PART 0 alone (from
+-- "PART 0 begins" to "PART 0 ends").
+--
+-- ── PART 1, put the old nightly step back (DELETES PHOTOS) ───────────────────
 -- Puts public._photo_keep_class back word for word as live had it before the
--- file: the nightly job stops deleting the photos of a class not opened for
--- a year and judges Keep Photos Until again, exactly as before (the file kept
--- photo_keep_check current, so it judges from yesterday and catches up on no
--- night it skipped). note_course_opened keeps stamping, so the app's calls
--- still land and nothing shows on the sync dot. Run PART 1 alone (from
--- "PART 1 begins" to "PART 1 ends") to stop only the deleting.
+-- file. The year rule stops, and KEEP PHOTOS UNTIL DELETES AGAIN, by the
+-- setting each class still holds in course.keep_photos_until, which the app
+-- no longer shows and teachers can no longer change, with no reminder:
+--   - End of Year (the default): the night after June 30 (10:27 UTC), every
+--     page handed in by then, in every class with photos, archived or not.
+--   - End of Term (any class whose teacher chose it before Nov 17): the
+--     night after the last day of the term the class is in (or the next to
+--     end), so a class can lose its photos within days, sooner than the year
+--     rule would ever take them.
+-- Grades, comments and Mark Up stay; the photos cannot come back. The step
+-- picks up from the last night it ran (photo_keep_check is kept current), so
+-- it does not catch up on nights before PART 1. note_course_opened keeps
+-- stamping, so nothing shows on the sync dot. Run PART 1 alone (from "PART 1
+-- begins" to "PART 1 ends").
 --
 -- ── PART 2, the full removal: the rest of this file ──────────────────────────
 -- Drops note_course_opened and the course_opened table (when each class was
@@ -16,14 +36,28 @@
 -- that release each call would fail and show on the sync dot until the file
 -- is applied again.
 --
--- Each part stops with nothing changed if a function is neither the file's
--- definition nor the one before it (a later change would be lost). On a
--- database where the file was never applied it changes nothing; a second run
--- changes nothing.
+-- PART 1 and PART 2 each stop with nothing changed if a function is neither
+-- the file's definition nor the one before it (a later change would be
+-- lost). Run whole, the file is PART 0, 1 and 2 in turn: the full removal.
+-- On a database where the file was never applied it changes nothing; a
+-- second run changes nothing.
 --
 -- md5 of pg_get_functiondef (function, before the file, as the file leaves it):
 --   public._photo_keep_class(uuid,timestamptz)  fb78dde9520f84f0f58faa1bebf98c23  67d1ae88eeacd34543cc0a80f1055991
 --   public.note_course_opened(uuid,uuid)        (none)                            0c9431bb6ff130f8de2715f8315838f1
+
+-- PART 0 begins
+do $stop_all$
+begin
+    if to_regclass('public.course_opened') is null then
+        return;   -- the file was never applied: nothing to stop
+    end if;
+    insert into public.course_opened (course_id, last_opened_at)
+    select c.id, now() from public.course c
+    on conflict (course_id) do update set last_opened_at = now();
+end
+$stop_all$;
+-- PART 0 ends
 
 -- PART 1 begins
 begin;

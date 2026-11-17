@@ -84,7 +84,7 @@ create table course (
                    check (return_grades is null or return_grades in ('on_return', 'on_save')), -- classes from before 2026-11-09 are null (2026110902_grade_return)
   cards_work_until date,                                           -- last day the class's student cards work; null: the last reporting date (2026110903_student_card)
   send_work        boolean not null default false,                 -- Send Work: off, no student of the class can send work (2026111101_student_work_submissions; not applied when this was written)
-  keep_photos_until text not null default 'end_of_year'            -- Keep Photos Until: 'end_of_year' | 'end_of_term'. Stored only; the job that acts on it is Batch D (2026111101)
+  keep_photos_until text not null default 'end_of_year'            -- Unused since 2026111704 (photos stay with the class): nothing deletes by it; kept so the app from before can still send it
                    check (keep_photos_until in ('end_of_year', 'end_of_term')),
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
@@ -635,6 +635,15 @@ create table report_config (
   preset         text        not null default 'standard',               -- brief | standard | detailed | custom
   blocks_config  jsonb,
   updated_at     timestamptz not null default now()
+);
+
+-- When a teacher last opened each class (note_course_opened, once a day per
+-- device; 2026111704_photos_stay_with_class). The nightly photo job deletes the
+-- photos of a class not opened for 365 days; a class with no row counts from
+-- course.created_at. Row security on, no grants: only the two functions reach it.
+create table course_opened (
+  course_id       uuid        not null primary key references course(id) on delete cascade,
+  last_opened_at  timestamptz not null default now()
 );
 
 create table course_sync_cursor (
