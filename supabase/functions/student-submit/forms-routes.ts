@@ -60,7 +60,7 @@ export const FORM_ROUTES: Record<string, true> = {
 export const SQL = {
   forms: 'select student_submit.forms($1::text, $2::uuid, $3::text) as r',
   form: 'select student_submit.form($1::text, $2::uuid, $3::uuid, $4::text) as r',
-  answer: 'select student_submit.answer($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
+  answer: 'select student_submit.answer($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text) as r',
   report: 'select student_submit.report($1::text, $2::uuid, $3::uuid, $4::text) as r',
 };
 
