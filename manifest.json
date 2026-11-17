@@ -34,6 +34,14 @@
       "purpose": "maskable"
     }
   ],
+  "share_target": {
+    "action": "/teacher-mobile/share-scan",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [{ "name": "scan", "accept": ["application/pdf", ".pdf"] }]
+    }
+  },
   "shortcuts": [
     {
       "name": "Mobile View",

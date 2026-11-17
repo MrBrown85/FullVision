@@ -236,6 +236,10 @@ const PRECACHE_URLS = [
   '/teacher-mobile/sweep.js',
   '/teacher-mobile/grade-photos.js',
   '/teacher-mobile/add-work.js',
+  '/teacher-mobile/split-scan.css',
+  '/teacher-mobile/shared-scan.js',
+  '/teacher-mobile/split-scan-model.js',
+  '/teacher-mobile/split-scan.js',
   '/teacher-mobile/markup.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/tab-bar.js',
@@ -710,7 +714,83 @@ async function answerFile(event, url) {
   }
 }
 
+// ── A scan shared from the phone's mail (Add Work for the Class, B7) ──
+//
+// On Android, the installed app is offered in the share sheet for a PDF
+// (manifest.json share_target). The share arrives here as a POST to
+// SHARE_SCAN_ACTION. It is student work, so where it waits is kept to one
+// place: this worker's memory, never a cache, IndexedDB or the network.
+// Nothing about it is written to the device. Only the PDF's bytes are kept:
+// its file name is dropped here. The worker then opens the phone app with
+// ?scan=<id>. The phone app (teacher-mobile/shared-scan.js) takes the file
+// once with GET SHARED_SCAN_ADDRESS?take=<id>, and it is let go here as it
+// is handed over. Not signed in, the phone app tells the worker to let it
+// go at once (the FV_SHARED_SCAN_DROP message), and so does Sign Out
+// (shared/supabase.js). A newer share replaces an older one; a scan not
+// taken within SHARED_SCAN_MAX_AGE_MS is never handed over; the worker
+// stopping by the browser loses it, and the teacher shares it again.
+const SHARE_SCAN_ACTION = '/teacher-mobile/share-scan';
+const SHARED_SCAN_ADDRESS = '/teacher-mobile/shared-scan';
+// PhotoShrink's MAX_PDF_BYTES: a bigger PDF is refused on the screen too.
+const SHARED_SCAN_MAX_BYTES = 20 * 1024 * 1024;
+const SHARED_SCAN_MAX_AGE_MS = 10 * 60 * 1000;
+let sharedScan = null; // { id, blob, at }
+
+function dropSharedScan() {
+  sharedScan = null;
+}
+
+function isPdfFile(file) {
+  const type = String(file.type || '').toLowerCase();
+  return type === 'application/pdf' || type === 'application/x-pdf' || /\.pdf$/i.test(String(file.name || ''));
+}
+
+function sharedScanId() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// The share's POST: one PDF kept in memory, then the phone app. Anything
+// else keeps nothing and opens the phone app with why (none, many, not_pdf,
+// too_big, unreadable), so the screen can say it.
+async function takeSharedScan(request) {
+  dropSharedScan();
+  let said = '';
+  try {
+    const form = await request.formData();
+    const files = form.getAll('scan').filter(f => f && typeof f === 'object' && typeof f.size === 'number');
+    if (files.length !== 1) said = files.length ? 'many' : 'none';
+    else if (!isPdfFile(files[0])) said = 'not_pdf';
+    else if (files[0].size > SHARED_SCAN_MAX_BYTES) said = 'too_big';
+    else {
+      // A new Blob of the same bytes: the file's name is not carried over.
+      sharedScan = { id: sharedScanId(), blob: new Blob([files[0]], { type: 'application/pdf' }), at: Date.now() };
+      said = sharedScan.id;
+    }
+  } catch {
+    said = 'unreadable';
+  }
+  return Response.redirect(new URL('/teacher-mobile/?scan=' + said, self.location.origin).href, 303);
+}
+
+// The phone app takes the waiting scan, once. It is let go here either way.
+function handOverSharedScan(url) {
+  const held = sharedScan;
+  dropSharedScan();
+  const id = url.searchParams.get('take') || '';
+  const fresh = held && Date.now() - held.at <= SHARED_SCAN_MAX_AGE_MS;
+  if (!held || !fresh || !id || held.id !== id) {
+    return new Response('', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+  return new Response(held.blob, {
+    status: 200,
+    headers: { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store' },
+  });
+}
+
 // Fetch strategy:
+// - A shared scan (above): its POST, and the phone app taking it
 // - Supabase API calls, and anything but a GET: left to the browser, never
 //   cached
 // - HTML pages: network first, fall back to the saved page
@@ -719,6 +799,15 @@ async function answerFile(event, url) {
 // - Everything else: network first, fall back to the saved copy
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  if (url.origin === self.location.origin && url.pathname === SHARE_SCAN_ACTION && event.request.method === 'POST') {
+    event.respondWith(takeSharedScan(event.request));
+    return;
+  }
+  if (url.origin === self.location.origin && url.pathname === SHARED_SCAN_ADDRESS) {
+    event.respondWith(handOverSharedScan(url));
+    return;
+  }
 
   // Never cache Supabase API calls — these are live data
   if (url.hostname.includes('supabase.co')) {
@@ -745,5 +834,11 @@ self.addEventListener('fetch', event => {
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  // A shared scan let go (not signed in, Cancel, Sign Out), or whether one
+  // waits (the tests ask, through a port).
+  if (event.data && event.data.type === 'FV_SHARED_SCAN_DROP') dropSharedScan();
+  if (event.data && event.data.type === 'FV_SHARED_SCAN_HELD' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ held: !!sharedScan });
   }
 });
