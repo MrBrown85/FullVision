@@ -5,11 +5,14 @@
 
   The edge function (netlify/edge-functions/inject-env.js, FRAME_CSP) serves
   this one address with a policy of its own:
-    sandbox allow-scripts allow-forms allow-popups
-            allow-popups-to-escape-sandbox allow-modals
+    sandbox allow-scripts allow-forms allow-modals
       so whatever runs here has an origin of its own ("null"): it cannot
       read the student page's storage, cookies, sign-in or page, cannot
-      move the page, and is sealed even if this address is opened alone;
+      move the page, and is sealed even if this address is opened alone.
+      With no allow-popups it can open no window at all: not by
+      window.open, a link's target or a form's target, scripted or clicked
+      (Colin's privacy call, Nov 17 2026: what a student typed must not
+      leave in an address);
     script-src 'unsafe-inline' 'unsafe-eval' data: blob: (the handout's own
       scripts run: most of Colin's worksheets are interactive), and nothing
       at all from the internet: no script, style, font, picture or media
@@ -23,11 +26,14 @@
   page that framed it, and takes one message from that page.
     { fv: 'handout-show', mode: 'page', html }  the handout's whole page,
         written over this one (its scripts run), with localStorage and
-        sessionStorage held in memory (storageStandIn); links to the web
-        open in a new tab, links to files that were beside it do nothing.
+        sessionStorage held in memory (storageStandIn). A student's own
+        click on a web link (a trusted click, never a script's) is passed up
+        as { fv: 'handout-link', url }, and the viewer opens it only when the
+        student presses Open Website there; links to files that were beside
+        it do nothing.
     { fv: 'handout-show', mode: 'book', chapters: [ { path, html, css } ] }
         an EPUB, read by the viewer: each chapter in turn, in pages one
-        screen wide. Then it takes { fv: 'handout-turn', by: 1 | -1 }, and
+        screen wide; a web link in it is passed up as above. Then it takes { fv: 'handout-turn', by: 1 | -1 }, and
         says where it is: { fv: 'handout-frame', page, pages, chapter,
         chapters }.
   A message from anyone but its parent is never read.
@@ -68,13 +74,26 @@
         var shown = false;
         var book = null;
 
-        // Written ahead of the handout's own page: web links open in a new tab, a file's link stays put.
-        var LINKS =
-          '<script>document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");' +
-          'if(!a)return;var h=a.getAttribute("href")||"";if(h.charAt(0)==="#")return;' +
-          'if(/^https?:/i.test(a.href)){a.target="_blank";a.rel="noopener noreferrer";return;}' +
-          'if(!/^(mailto|tel):/i.test(h))e.preventDefault();},true);<' +
-          '/script>';
+        /* Written ahead of the handout's own page: a link in the page goes
+           nowhere by itself (this frame may open no window), an anchor in the
+           page still scrolls, and a student's own click on a web link
+           (isTrusted: never a script's click) is passed up to the viewer,
+           which asks the student before it opens anything. */
+        function linkClicks() {
+          document.addEventListener(
+            'click',
+            function (e) {
+              var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+              if (!a) return;
+              var h = a.getAttribute('href') || '';
+              if (h.charAt(0) === '#') return;
+              e.preventDefault();
+              if (e.isTrusted && /^https?:/i.test(a.href)) parent.postMessage({ fv: 'handout-link', url: a.href }, '*');
+            },
+            true,
+          );
+        }
+        var LINKS = '<script>(' + linkClicks.toString() + ')();<' + '/script>';
 
         /* Written first of all ahead of the handout's own page: localStorage and
            sessionStorage held in memory for as long as the page is open. In this
@@ -260,7 +279,8 @@
           e.preventDefault();
           var href = a.getAttribute('href') || '';
           if (/^https?:/i.test(href)) {
-            window.open(href, '_blank', 'noopener');
+            // The student's own click only; the viewer asks before it opens anything.
+            if (e.isTrusted) up.postMessage({ fv: 'handout-link', url: href }, '*');
             return;
           }
           var here = book.chapters[book.at].path || '';

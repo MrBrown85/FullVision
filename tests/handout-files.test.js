@@ -653,10 +653,8 @@ describe('the viewer', () => {
     await tick();
     await tick();
     const frame = doc.querySelector('.hv-layer iframe.hv-frame');
-    expect(frame.getAttribute('sandbox')).toBe(
-      'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',
-    );
-    expect(frame.getAttribute('sandbox')).not.toMatch(/same-origin|top-navigation/);
+    expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-modals');
+    expect(frame.getAttribute('sandbox')).not.toMatch(/same-origin|top-navigation|popups/);
     expect(frame.getAttribute('src')).toBe('/shared/handout-frame.html');
     expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
     const sent = [];
@@ -672,6 +670,40 @@ describe('the viewer', () => {
     expect(sent).toHaveLength(1);
     // The page is never drawn here.
     expect(doc.querySelector('.hv-layer p:not(.hv-sub):not(.hv-msg)')).toBeNull();
+  });
+
+  it('opens a web link only when the student presses Open Website, and only one the frame names', async () => {
+    HandoutViewer.open({ title: 'Practice Page', kind: 'html', load: async () => new Blob(['<p>Hi</p>']) });
+    await tick();
+    await tick();
+    const frame = doc.querySelector('.hv-layer iframe.hv-frame');
+    const win = { postMessage: () => {} };
+    Object.defineProperty(frame, 'contentWindow', { value: win });
+    const opened = [];
+    const wasOpen = window.open;
+    window.open = (...a) => opened.push(a);
+    try {
+      const say = (source, data) => listeners.forEach(fn => fn({ source, data }));
+      // From anyone but the frame, or not a web address: nothing.
+      say({}, { fv: 'handout-link', url: 'https://example.org/a' });
+      say(win, { fv: 'handout-link', url: 'javascript:alert(1)' });
+      say(win, { fv: 'handout-link', url: 'data:text/html,hi' });
+      expect(doc.querySelector('.hv-ask')).toBeNull();
+      // From the frame: the student is asked, with the address in front of them; nothing opens yet.
+      say(win, { fv: 'handout-link', url: 'https://example.org/read?x=1' });
+      expect(doc.querySelector('.hv-ask-words').textContent).toBe('Open this website in a new tab?');
+      expect(doc.querySelector('.hv-ask-url').textContent).toBe('https://example.org/read?x=1');
+      expect(opened).toEqual([]);
+      doc.querySelector('.hv-ask-no').click();
+      expect(doc.querySelector('.hv-ask')).toBeNull();
+      expect(opened).toEqual([]);
+      say(win, { fv: 'handout-link', url: 'https://example.org/read?x=1' });
+      doc.querySelector('.hv-ask-go').click();
+      expect(opened).toEqual([['https://example.org/read?x=1', '_blank', 'noopener,noreferrer']]);
+      expect(doc.querySelector('.hv-ask')).toBeNull();
+    } finally {
+      window.open = wasOpen;
+    }
   });
 
   it('Back closes it and gives the keyboard back; a sign-out closes it too', async () => {
@@ -822,9 +854,7 @@ describe('on a real card', () => {
     expect(page.storageCalls.map(c => c.url)).toEqual(['https://x.supabase.co/sign/file?t=1']);
     const doc = page.run('document');
     const frame = doc.querySelector('.hv-layer iframe.hv-frame');
-    expect(frame.getAttribute('sandbox')).toBe(
-      'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',
-    );
+    expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-modals');
     expect(frame.getAttribute('src')).toBe('/shared/handout-frame.html');
     // Opened again in the session: what was fetched is kept.
     doc.querySelector('.hv-back').click();

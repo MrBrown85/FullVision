@@ -16,7 +16,9 @@
 // cookies or sign-in. Nothing in it loads from the internet: no script,
 // style, font, picture, media, fetch or frame from any other address, so no
 // third party sees a student's address or what they type (Colin's privacy
-// call, Nov 17 2026); inline content and data: still work. Only FullVision
+// call, Nov 17 2026); inline content and data: still work. With no
+// allow-popups it opens no window: a web link a student clicks is opened by
+// the viewer, after the student confirms. Only FullVision
 // may frame it (this overrides
 // X-Frame-Options: DENY from _headers, which browsers ignore when
 // frame-ancestors is set; it is dropped here as well).
@@ -32,7 +34,7 @@ const HANDOUT_FRAME_CSP = [
   "frame-src 'none'",
   "form-action 'none'",
   "frame-ancestors 'self'",
-  'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',
+  'sandbox allow-scripts allow-forms allow-modals',
 ].join('; ');
 
 export default async function handler(request, context) {

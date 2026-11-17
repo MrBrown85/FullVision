@@ -140,7 +140,7 @@ const server = createServer(async (req, res) => {
           "frame-src 'none'",
           "form-action 'none'",
           "frame-ancestors 'self'",
-          'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',
+          'sandbox allow-scripts allow-forms allow-modals',
         ].join('; '),
       });
       res.end(body);

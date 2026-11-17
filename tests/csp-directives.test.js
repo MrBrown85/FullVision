@@ -49,8 +49,10 @@ describe('Content-Security-Policy', () => {
       'x-frame-options': 'DENY',
     });
     const d = directivesOf(res.headers.get('Content-Security-Policy'));
-    expect(d.sandbox).toBe('allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals');
+    expect(d.sandbox).toBe('allow-scripts allow-forms allow-modals');
     expect(d.sandbox).not.toContain('allow-same-origin');
+    // No window of any kind: a web link is opened by the viewer, after the student confirms.
+    expect(d.sandbox).not.toContain('allow-popups');
     expect(d.sandbox).not.toContain('allow-top-navigation');
     expect(d['frame-ancestors']).toBe("'self'");
     expect(d['default-src']).toBe("'none'");

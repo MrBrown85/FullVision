@@ -34,6 +34,11 @@ const LESSON = `<!doctype html>
 <img id="chart" src="chart.png" alt="Chart">
 <button id="check" onclick="document.getElementById('said').textContent = 'Checked'">Check</button>
 <p id="said"></p>
+<a id="go" href="https://example.org/read">Read More</a>
+<a id="blank" href="https://example.org/blank?typed=hello" target="_blank">Blank</a>
+<form id="form" action="https://example.org/form" method="get" target="_blank"><input name="typed" value="hello"></form>
+<button id="tries" onclick="tryAll('click')">Try</button>
+<p id="opened"></p>
 <img id="web" src="https://example.org/map.png" alt="From the web">
 <p id="probe"></p>
 <p id="kept"></p>
@@ -50,6 +55,15 @@ const LESSON = `<!doctype html>
   t('top', function () { return top.location.href; });
   out.push('origin:' + window.origin);
   document.getElementById('probe').textContent = out.join('|');
+  // A script may open no window: by window.open, a link's click or a form's submit, with or without a click.
+  function tryAll(when) {
+    var w = null;
+    try { w = window.open('https://example.org/open?typed=hello', '_blank'); } catch (e) {}
+    document.getElementById('blank').click();
+    try { document.getElementById('form').submit(); } catch (e) {}
+    document.getElementById('opened').textContent += when + ':' + (w ? 'window' : 'none') + ' ';
+  }
+  tryAll('load');
   // A worksheet that saves its answers, with no try: the stand-in keeps them while it is open.
   localStorage.setItem('answer', '42');
   localStorage.score = 7;
@@ -185,10 +199,7 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
   const viewer = page.locator('.ps-device > .hv-layer');
   await expect(viewer.getByRole('heading', { name: 'Lesson 1.1 Practice' })).toBeVisible();
   const iframe = viewer.locator('iframe.hv-frame');
-  await expect(iframe).toHaveAttribute(
-    'sandbox',
-    'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',
-  );
+  await expect(iframe).toHaveAttribute('sandbox', 'allow-scripts allow-forms allow-modals');
   const frame = page.frameLocator('.ps-device > .hv-layer iframe.hv-frame');
   await expect(frame.locator('h1')).toHaveText('Lesson 1.1 Practice');
   // The stand-in storage starts empty (nothing of the page's own), and keeps what the worksheet saves.
@@ -196,6 +207,30 @@ test('a teacher adds a web page, a text file and an EPUB, and each opens as the 
     'storage:read:null|session:read:0|cookie:blocked|parent:blocked|top:blocked|origin:null',
   );
   await expect(frame.locator('#kept')).toHaveText('42,7,2,answer+score,3,answer');
+  // No window opens from a script, at load or inside the student's own click; no question either.
+  const popups = [];
+  page.context().on('page', p => popups.push(p.url()));
+  await frame.locator('#tries').click();
+  await expect(frame.locator('#opened')).toHaveText('load:none click:none');
+  await page.waitForTimeout(300);
+  expect(popups).toEqual([]);
+  await expect(viewer.locator('.hv-ask')).toHaveCount(0);
+  // The student's own click on a web link: asked first, in FullVision's page, then opened in a new tab.
+  await page.context().route('https://example.org/**', route => route.fulfill({ status: 200, body: 'ok' }));
+  await frame.locator('#go').click();
+  await expect(viewer.getByRole('alertdialog', { name: 'Open a Website' })).toContainText('https://example.org/read');
+  expect(popups).toEqual([]);
+  await viewer.getByRole('button', { name: 'Cancel' }).click();
+  await expect(viewer.locator('.hv-ask')).toHaveCount(0);
+  await frame.locator('#go').click();
+  const opening = page.context().waitForEvent('page');
+  await viewer.getByRole('button', { name: 'Open Website' }).click();
+  const tab = await opening;
+  await tab.waitForLoadState();
+  expect(tab.url()).toBe('https://example.org/read');
+  expect(popups).toEqual(['https://example.org/read']);
+  await tab.close();
+  await page.context().unroute('https://example.org/**');
   // Nothing from the internet: no fetch, no picture.
   await expect(frame.locator('#fetch')).toHaveText('fetch:blocked');
   expect(await frame.locator('#web').evaluate(img => img.naturalWidth)).toBe(0);
