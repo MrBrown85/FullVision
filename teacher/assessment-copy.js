@@ -385,7 +385,7 @@ window.AssessmentCopy = (function () {
     scoreMode: 'scoring mode',
     maxPoints: 'max points',
     weight: 'proficiency weight',
-    evidenceType: 'evidence type',
+    evidenceType: 'type',
     category: 'category',
     rubric: 'rubric',
     module: 'module',
@@ -826,7 +826,7 @@ window.AssessmentCopy = (function () {
       );
     }
     if ('weight' in patch) out.push('Factor → ' + formatFactor(patch.weight));
-    if ('evidenceType' in patch) out.push('Evidence type → ' + (patch.evidenceType || 'none'));
+    if ('evidenceType' in patch) out.push('Type → ' + assessmentTypeLabel(patch.evidenceType));
     if ('categoryId' in patch) {
       var cat = (getCategories(dstCid) || []).find(function (c) {
         return c.id === patch.categoryId;

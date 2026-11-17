@@ -339,6 +339,7 @@ load('teacher/grading-setup-copy.js');
 load('teacher/assign-show.js');
 load('teacher/grade-change.js');
 load('teacher/assign-list.js');
+load('teacher/assessment-type-field.js');
 load('teacher/assign-descriptor-bar.js');
 load('teacher/card-menu.js');
 load('teacher/assign-competency-picker.js');

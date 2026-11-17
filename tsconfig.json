@@ -49,6 +49,7 @@
     "teacher/work-rubric-card.js",
     "teacher/assign-show.js",
     "teacher/assign-list.js",
+    "teacher/assessment-type-field.js",
     "teacher/grade-change.js",
     "teacher/expand-motion.js",
     "teacher/report-print-paper.js",

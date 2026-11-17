@@ -2746,7 +2746,6 @@ window.PageAssignments = (function () {
     var dueDate = assess ? assess.dueDate || '' : '';
     var categoryId = _getAssessmentCategoryId(assess);
     var selTags = assess ? assess.tagIds || [] : [];
-    var evidence = assess ? assess.evidenceType : 'written';
     var description = assess ? assess.description || '' : '';
     var moduleId = assess ? assess.moduleId || '' : '';
     var collaboration = assess ? assess.collaboration || 'individual' : 'individual';
@@ -2872,33 +2871,8 @@ window.PageAssignments = (function () {
           // save stopped for one (grey text audit, Colin, Nov 11).
           '<p class="af-category-hint" id="af-category-hint" hidden>' + esc(CATEGORY_REQUIRED_HINT) + '</p>') +
       '</div>' +
-      // Evidence Type beside Category, where it was before More Options
-      // (Colin, Nov 4).
-      '<div class="af-field">' +
-      '<label class="af-label" for="af-evidence">Evidence Type</label>' +
-      '<select class="af-input" id="af-evidence">' +
-      // An evidence type from elsewhere (a quiz, lab or project) keeps its
-      // own option, so editing never changes it.
-      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
-        .concat(
-          evidence && ['written', 'observation', 'audio', 'video', 'photo', 'conversation'].indexOf(evidence) < 0
-            ? [evidence]
-            : [],
-        )
-        .map(function (t) {
-          return (
-            '<option value="' +
-            esc(t) +
-            '"' +
-            (t === evidence ? ' selected' : '') +
-            '>' +
-            esc(t[0].toUpperCase() + t.slice(1)) +
-            '</option>'
-          );
-        })
-        .join('') +
-      '</select>' +
-      '</div>' +
+      // Type beside Category, where Evidence Type was (Colin, Nov 4 and 17).
+      AssessmentTypeField.fieldHtml(cid, assess ? assess.evidenceType : undefined) +
       '<div class="af-field">' +
       '<label class="af-label">Module</label>' +
       '<select class="af-input" id="af-module">' +
@@ -2930,13 +2904,6 @@ window.PageAssignments = (function () {
       '</p>' +
       '</div>' +
       '</div>';
-    // Evidence Type: Photo is not students sending photos (a teacher's
-    // question, Nov 11). Only where Student Work is offered.
-    if (_formWorkOffered(cid))
-      html +=
-        '<p class="af-category-hint af-evidence-hint" id="af-evidence-hint"' +
-        (_evidenceNeedsHint(evidence) ? '' : ' hidden') +
-        '>Evidence Type is for your records. Students send photos under Student Work.</p>';
     // Who does it, in the top box with what it is (Colin, Nov 11; board
     // "Assessment Form" 2a to 2d).
     html += _studentsRowHtml(collaboration);
@@ -3215,10 +3182,6 @@ window.PageAssignments = (function () {
       '</div>';
 
     return html;
-  }
-
-  function _evidenceNeedsHint(v) {
-    return v === 'photo' || v === 'video' || v === 'audio';
   }
 
   /* The Students row in the top box: a button naming who it's for, which
@@ -4399,10 +4362,6 @@ window.PageAssignments = (function () {
     }
     if (!t.id) return;
     if (t.id === 'af-due' || t.id === 'af-date-assigned') _refreshDueHint();
-    if (t.id === 'af-evidence') {
-      var evHint = document.getElementById('af-evidence-hint');
-      if (evHint) evHint.hidden = !_evidenceNeedsHint(t.value);
-    }
     // Student Work's late question names the due date; Cece Sees follows the form.
     if (t.id === 'af-due' && e.type === 'change') _refreshFormWorkCard();
     else if (t.id === 'af-title' || t.id === 'af-category' || t.id === 'af-module' || t.id === 'af-due')
