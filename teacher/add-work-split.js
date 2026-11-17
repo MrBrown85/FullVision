@@ -72,7 +72,11 @@
       if (!ctx) return null;
       ctx.drawImage(bmp, 0, 0);
       if (bmp.close) bmp.close();
-      var v = /** @type {any} */ (PhotoShrink).sharpness(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      var v = /** @type {any} */ (PhotoShrink).sharpness(
+        ctx.getImageData(0, 0, c.width, c.height).data,
+        c.width,
+        c.height,
+      );
       c.width = 0;
       c.height = 0;
       return v;

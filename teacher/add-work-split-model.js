@@ -15,10 +15,15 @@
 
   var MAX_SCAN_PAGES = 150; // DECISIONS, "Add Work for the Class" 7
   var MAX_PIECE_PAGES = 30; // STUDENT_WORK_MAX_PAGES
-  // Sharpness (PhotoShrink.sharpness, measured on the page's thumbnail)
-  // under this is a blank page. Chosen against made-up scans: see the PR
-  // for "Add Work for the Class: Split the Scan (B2)".
-  var BLANK_BELOW = 12;
+  // A page is blank when PhotoShrink.sharpness, measured on the page's
+  // thumbnail (400 px, JPEG: the JPEG takes the scanner's noise out), is
+  // under this. Made-up scans (Nov 17): blank paper with scanner noise, a
+  // grey cast or a dark scan edge measured 0.4 to 2.3; one faint pencil line
+  // (grey 200 on paper at 245) 2.9 to 5.3; a worksheet about 4,500. Real
+  // copier scans, read for these numbers only: near-blank pages 0 to 2.4,
+  // pages of work in the thousands. A faint mark can still be left out; it
+  // stays on screen, dimmed, one click from kept.
+  var BLANK_BELOW = 2.6;
 
   function _maxPiece() {
     return typeof STUDENT_WORK_MAX_PAGES === 'number' ? STUDENT_WORK_MAX_PAGES : MAX_PIECE_PAGES;

@@ -201,7 +201,12 @@ describe('a name belongs to the page it was read from', () => {
     expect(named(m)).toEqual({ 1: 's1', 5: 's3', 7: 's5' });
     // Piece 2 takes page 5: piece 3 now starts on page 6, piece 4 on page 8.
     m.more(1);
-    expect(cut(m).slice(0, 4)).toEqual([[1, 2], [3, 4, 5], [6, 7], [8, 9]]);
+    expect(cut(m).slice(0, 4)).toEqual([
+      [1, 2],
+      [3, 4, 5],
+      [6, 7],
+      [8, 9],
+    ]);
     expect(named(m)).toEqual({ 1: 's1' });
     // Back again: the pieces start on 5 and 7 once more, and their names return.
     m.fewer(1);
