@@ -31,6 +31,7 @@ revoke all on table public.core_self_assessment from public;
 grant delete, insert, select, update on table public.core_self_assessment to authenticated;
 revoke all on table public.course from public;
 grant delete, insert, select, update on table public.course to authenticated;
+revoke all on table public.course_opened from public;
 revoke all on table public.course_sync_cursor from public;
 grant delete, insert, select, update on table public.course_sync_cursor to authenticated;
 revoke all on table public.criterion from public;
@@ -638,6 +639,9 @@ grant execute on routine public.mark_student_cards_printed(p_card_ids uuid[], p_
 revoke all on routine public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) from public;
 grant execute on routine public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) to service_role;
+revoke all on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) from public;
+grant execute on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) to authenticated;
+grant execute on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) to service_role;
 revoke all on routine public.photo_lifecycle_nightly() from public;
 revoke all on routine public.photo_removal_call() from public;
 revoke all on routine public.photo_removal_due() from public;

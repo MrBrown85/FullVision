@@ -296,7 +296,7 @@ describe('reading a signed-in class’s work', () => {
   it('reads it when the class loads with Send Work on, and every reader answers from it', async () => {
     await openClass();
     expect(callsTo('list_course_submissions_since')).toEqual([{ p_course_id: CID, p_version: null }]);
-    expect(getCourseSendWork(CID)).toEqual({ send_work: true, keep_photos_until: 'end_of_year' });
+    expect(getCourseSendWork(CID)).toEqual({ send_work: true });
     expect(getAssessmentStudentWork(CID, CAUSES).students_send).toBe('photos');
     expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
     expect(GraderWork.workOnInClass(CID)).toBe(true);
@@ -502,8 +502,8 @@ describe('the class’s and an assessment’s settings', () => {
   it('Send Work goes up with a key and only what changed, and shows at once', async () => {
     await openClass();
     setOnline(false);
-    expect(setCourseSendWork(CID, { keep_photos_until: 'end_of_term' })).toEqual({ ok: true });
-    expect(getCourseSendWork(CID)).toEqual({ send_work: true, keep_photos_until: 'end_of_term' });
+    expect(setCourseSendWork(CID, { send_work: false })).toEqual({ ok: true });
+    expect(getCourseSendWork(CID)).toEqual({ send_work: false });
     fake.on('set_course_send_work', p => {
       Object.assign(srv.course, p.p_patch);
       return { data: Object.assign({}, srv.course), error: null };
@@ -512,9 +512,18 @@ describe('the class’s and an assessment’s settings', () => {
     await quiet();
     const [call] = callsTo('set_course_send_work');
     expect(call.p_course_id).toBe(CID);
-    expect(call.p_patch).toEqual({ keep_photos_until: 'end_of_term' });
+    expect(call.p_patch).toEqual({ send_work: false });
     expect(call.p_idempotency_key).toMatch(UUID);
-    expect(getCourseSendWork(CID).keep_photos_until).toBe('end_of_term');
+    // The server still answers with keep_photos_until; nothing reads it.
+    expect(getCourseSendWork(CID)).toEqual({ send_work: false });
+  });
+
+  it('Keep Photos Until is gone: nothing sends it (Nov 17 2026)', async () => {
+    await openClass();
+    expect(setCourseSendWork(CID, { keep_photos_until: 'end_of_term' })).toEqual({ ok: false });
+    expect(setCourseSendWork(CID, { send_work: true, keep_photos_until: 'end_of_term' })).toEqual({ ok: true });
+    await quiet();
+    expect(callsTo('set_course_send_work').map(c => c.p_patch)).toEqual([{ send_work: true }]);
   });
 
   it('the Student Work card sends only the choices that differ, and Until with its date', async () => {

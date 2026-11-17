@@ -4420,7 +4420,7 @@ function seedDemoStudentWork() {
     });
   }
   return saveDemoStudentWork('sci8', {
-    course: { send_work: false, keep_photos_until: 'end_of_year' },
+    course: { send_work: false },
     assessments: assessments,
     submissions: submissions,
   });

@@ -26,6 +26,7 @@ export const OWNERS = {
   'public.competency_group': 'rls_test.of_course(t.course_id)',
   'public.core_self_assessment': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.course': 't.teacher_id',
+  'public.course_opened': 'rls_test.of_course(t.course_id)',
   'public.course_sync_cursor': 'rls_test.of_course(t.course_id)',
   'public.criterion': 'rls_test.of_rubric(t.rubric_id)',
   'public.criterion_check': 'rls_test.of_criterion(t.criterion_id)',
@@ -106,4 +107,11 @@ export const NO_TEACHER = {
     read: 'none',
     reason: 'One row: the id of the key the student cards are signed with. Only the student page server uses it.',
   },
+};
+
+/* Tables that a file in migrations/ adds and live does not have yet. Each is tested only when it is
+   there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
+   out once the file is applied and migrations/baseline/ is refreshed. */
+export const NOT_YET_APPLIED = {
+  'public.course_opened': '2026111704_photos_stay_with_class.sql',
 };
