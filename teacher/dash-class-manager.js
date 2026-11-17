@@ -7587,16 +7587,8 @@ window.DashClassManager = (function () {
   var _cmTermDay = CmTerms._cmTermDay;
   var _cmDefaultReportingTerms = CmTerms._cmDefaultReportingTerms;
   var _cmRenderReportingTermsField = CmTerms._cmRenderReportingTermsField;
-  var cmTermEdit = CmTerms.cmTermEdit;
-  var cmTermCancel = CmTerms.cmTermCancel;
-  var cmTermSpan = CmTerms.cmTermSpan;
-  var cmTermPreset = CmTerms.cmTermPreset;
   var cmTermSchool = CmTerms.cmTermSchool;
-  var cmTermSchoolPreset = CmTerms.cmTermSchoolPreset;
-  var cmTermAdd = CmTerms.cmTermAdd;
-  var cmTermDelete = CmTerms.cmTermDelete;
   var cmTermLive = CmTerms.cmTermLive;
-  var cmTermSave = CmTerms.cmTermSave;
 
   // A new method moves grades that already exist, so the change says how
   // many students it moves before it is made.
@@ -10614,6 +10606,7 @@ window.DashClassManager = (function () {
       return CmQuestionnaires.handleAction(action, el);
     if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', cmSelectedCourse))
       return CmStudentPage.handleAction(action, el);
+    if (/^cmTerm[A-Z]/.test(action) && CmTerms.handleAction(action, el)) return true;
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -10720,30 +10713,6 @@ window.DashClassManager = (function () {
       },
       cmSetLevelOrder: function () {
         cmSetLevelOrder(el.dataset.value);
-      },
-      cmTermSpan: function () {
-        cmTermSpan(el.dataset.value);
-      },
-      cmTermPreset: function () {
-        cmTermPreset(el.dataset.value);
-      },
-      cmTermSchoolPreset: function () {
-        cmTermSchoolPreset();
-      },
-      cmTermAdd: function () {
-        cmTermAdd();
-      },
-      cmTermDelete: function () {
-        cmTermDelete(parseInt(el.dataset.idx, 10));
-      },
-      cmTermEdit: function () {
-        cmTermEdit();
-      },
-      cmTermCancel: function () {
-        cmTermCancel();
-      },
-      cmTermSave: function () {
-        cmTermSave();
       },
       cmCatAdd: function () {
         cmCatAdd();
