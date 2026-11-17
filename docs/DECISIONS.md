@@ -1186,3 +1186,12 @@ Colin: "When teachers create assignments, they might want to keep them as Drafts
 4. **A Draft is on the Assignments page only.** It is in no gradebook, phone grading, report, Term Questionnaire, Preview as Student or student page, and no handout, Send Work or feedback reaches a student. It takes no grades, so nothing counts it and `calc.js` is unchanged. A Draft copied to another class is a Draft there; each class assigns its own.
 5. **Unassign is in the card's ⋯ menu** while no student has a grade, a status or sent work on the piece; then it is greyed ("Students have work or grades on this."). The server refuses it too.
 6. **The List view** shows a Draft chip before the title, a Drafts filter beside No Due Date (while the class has one), and Assign on the bar for ticked Drafts, with Undo. No new column.
+
+## Assessment types (2026-11-17)
+
+Colin: "when teachers are creating assessments, there should be other options on the type. There's no oral or presentation, but there are media types. That doesn't make sense for the user. maybe the teacher can just add more?" He approved the mockup's three recommendations ("Build all three"; https://claude.ai/artifact/KUUNY4mHPuxc9igNJPzL75).
+
+1. **The form's Type is the kind of task**: Written, Test, Quiz, Project, Lab, Presentation, Oral, Performance, Observation, Conversation, in that order (`ASSESSMENT_TYPES`, `shared/constants.js`). The label is Type, the word the Student page's Group By uses. Audio, Video and Photo leave the list, and with them the line saying Photo is not students sending photos.
+2. **Teachers add their own, in the form, per class.** Add a Type… ends the list; the word is saved only on the assessment (`assessment.evidence_type`), so there is no new setting and no migration. A class's added types show under This Class while an assessment in that class uses one, and go with an assessment copied to another class. A typed word already there, whatever its case, is chosen instead of added. One list across all a teacher's classes would need a new setting; not built.
+3. **Old values are read, not rewritten.** Audio reads as Oral. Video and Photo keep their own word on an assessment that has one and are not offered for new ones. On Nov 17 live data had 139 assessments: Written 134, Observation 2, Conversation 2, Audio 1.
+4. **Only the teacher sees a type**: the Student page's Group By Type and Where It Shows. No grade reads it, and students and reports never show it.

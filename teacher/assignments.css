@@ -7947,6 +7947,16 @@ button.grader-member-name {
 .af-link-btn:hover {
   text-decoration: underline;
 }
+/* Type: Add a Type… puts a box where the select was (assessment-type-field.js). */
+.af-type-add:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.af-type-add-btns {
+  display: flex;
+  gap: 14px;
+}
 .af-past-card {
   max-width: 560px;
   display: flex;
