@@ -638,8 +638,12 @@ table public.observation (rls on)
   dims text[] not null default '{}'::text[]
   level smallint
   template_id uuid
+  follow_up_of uuid
+  follow_up_kind text
   constraint observation_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE SET NULL
   constraint observation_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint observation_follow_up_kind_check CHECK (((follow_up_kind IS NULL) OR ((follow_up_of IS NOT NULL) AND (follow_up_kind = ANY (ARRAY['called_home'::text, 'spoke_with_student'::text, 'still_happening'::text, 'resolved'::text])))))
+  constraint observation_follow_up_of_fkey FOREIGN KEY (follow_up_of) REFERENCES public.observation(id) ON DELETE CASCADE
   constraint observation_level_check CHECK (((level >= 1) AND (level <= 4)))
   constraint observation_pkey PRIMARY KEY (id)
   constraint observation_sentiment_check CHECK (((sentiment IS NULL) OR (sentiment = ANY (ARRAY['strength'::text, 'growth'::text, 'concern'::text, 'note'::text]))))
@@ -647,9 +651,11 @@ table public.observation (rls on)
   CREATE INDEX observation_assessment_idx ON public.observation USING btree (assessment_id)
   CREATE INDEX observation_course_idx ON public.observation USING btree (course_id)
   CREATE INDEX observation_created_idx ON public.observation USING btree (course_id, created_at DESC)
+  CREATE INDEX observation_follow_up_of_idx ON public.observation USING btree (follow_up_of) WHERE (follow_up_of IS NOT NULL)
   CREATE UNIQUE INDEX observation_pkey ON public.observation USING btree (id)
   CREATE INDEX observation_template_id_idx ON public.observation USING btree (template_id) WHERE (template_id IS NOT NULL)
   CREATE TRIGGER course_sync_cursor_observation_student_records AFTER INSERT OR DELETE OR UPDATE ON public.observation FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'course')
+  CREATE TRIGGER observation_follow_up_rule BEFORE INSERT OR UPDATE OF follow_up_of, course_id ON public.observation FOR EACH ROW EXECUTE FUNCTION fv_private.observation_follow_up_rule()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF course_id, assessment_id, template_id ON public.observation FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('course_id:course', 'assessment_id:assessment', 'template_id:observation_template')
   policy observation_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.observation_custom_tag (rls on)
@@ -676,6 +682,7 @@ table public.observation_student (rls on)
   CREATE INDEX observation_student_enrollment_idx ON public.observation_student USING btree (enrollment_id)
   CREATE UNIQUE INDEX observation_student_pkey ON public.observation_student USING btree (observation_id, enrollment_id)
   CREATE TRIGGER course_sync_cursor_observation_student_student_records AFTER INSERT OR DELETE OR UPDATE ON public.observation_student FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'observation')
+  CREATE TRIGGER observation_follow_up_rule BEFORE INSERT OR UPDATE OF observation_id ON public.observation_student FOR EACH ROW EXECUTE FUNCTION fv_private.observation_follow_up_rule()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF observation_id, enrollment_id ON public.observation_student FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('observation_id:observation', 'enrollment_id:enrollment')
   policy observation_student_via_obs for all to public using ((EXISTS ( SELECT 1
    FROM public.observation o
@@ -1748,6 +1755,7 @@ function public.create_assessment(p_course_id uuid, p_title text, p_category_id 
 function public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) returns uuid
 function public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) returns uuid
 function public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) returns uuid
+function public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text, p_idempotency_key uuid, p_created_at timestamp with time zone) returns uuid
 function public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid) returns jsonb
 function public.create_report_issue(p_course_id uuid, p_term integer, p_term_label text, p_paper text, p_form jsonb, p_students jsonb, p_idempotency_key uuid) returns jsonb
 function public.create_student_and_enroll(p_course_id uuid, p_first_name text, p_last_name text, p_preferred_name text, p_pronouns text, p_student_number text, p_email text, p_date_of_birth date, p_designations text[], p_existing_student_id uuid, p_idempotency_key uuid) returns jsonb
@@ -1894,6 +1902,7 @@ function public.update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[]) re
 function public.update_course(p_course_id uuid, p_patch jsonb) returns void
 function public.update_enrollment(p_id uuid, p_patch jsonb) returns void
 function public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[]) returns void
+function public.update_observation_follow_up(p_id uuid, p_body text, p_kind text, p_idempotency_key uuid) returns void
 function public.update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid) returns jsonb
 function public.update_student(p_id uuid, p_patch jsonb) returns void
 function public.upsert_category(p_id uuid, p_course_id uuid, p_name text, p_weight numeric, p_display_order integer, p_idempotency_key uuid) returns uuid

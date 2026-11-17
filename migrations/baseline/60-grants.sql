@@ -167,6 +167,7 @@ revoke all on routine fv_private.handout_read_allowed(p_name text) from public;
 grant execute on routine fv_private.handout_read_allowed(p_name text) to authenticated;
 revoke all on routine fv_private.handout_upload_allowed(p_name text) from public;
 grant execute on routine fv_private.handout_upload_allowed(p_name text) to authenticated;
+revoke all on routine fv_private.observation_follow_up_rule() from public;
 revoke all on routine fv_private.report_note_hold(p_enrollment_id uuid, p_assessment_id uuid) from public;
 grant execute on routine fv_private.report_note_hold(p_enrollment_id uuid, p_assessment_id uuid) to authenticated;
 grant execute on routine fv_private.report_note_hold(p_enrollment_id uuid, p_assessment_id uuid) to service_role;
@@ -363,6 +364,9 @@ grant execute on routine public.create_custom_tag(p_course_id uuid, p_label text
 revoke all on routine public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) from public;
 grant execute on routine public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) to authenticated;
 grant execute on routine public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) to service_role;
+revoke all on routine public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text, p_idempotency_key uuid, p_created_at timestamp with time zone) from public;
+grant execute on routine public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text, p_idempotency_key uuid, p_created_at timestamp with time zone) to authenticated;
+grant execute on routine public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text, p_idempotency_key uuid, p_created_at timestamp with time zone) to service_role;
 revoke all on routine public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid) from public;
 grant execute on routine public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid) to service_role;
@@ -788,6 +792,9 @@ grant execute on routine public.update_enrollment(p_id uuid, p_patch jsonb) to s
 revoke all on routine public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[]) from public;
 grant execute on routine public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[]) to authenticated;
 grant execute on routine public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[]) to service_role;
+revoke all on routine public.update_observation_follow_up(p_id uuid, p_body text, p_kind text, p_idempotency_key uuid) from public;
+grant execute on routine public.update_observation_follow_up(p_id uuid, p_body text, p_kind text, p_idempotency_key uuid) to authenticated;
+grant execute on routine public.update_observation_follow_up(p_id uuid, p_body text, p_kind text, p_idempotency_key uuid) to service_role;
 revoke all on routine public.update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid) from public;
 grant execute on routine public.update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid) to service_role;
