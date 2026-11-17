@@ -1818,7 +1818,6 @@ window.PageAssignments = (function () {
             _drawnReturn('s' + a.id, _returnDraftsButtonHtml(cid, a, shownIds)) +
             '</span>'
           : '') +
-        _setEveryoneMenuHtml(cid, a) +
         _cardMoreMenuHtml(cid, a) +
         '</div>' +
         '<span class="assess-chevron" aria-hidden="true">' +
@@ -11242,7 +11241,7 @@ window.PageAssignments = (function () {
       _closeGroupMenus();
     // A card's menu closes on any click but its own button's (an item's
     // action still runs).
-    if (!e.target.closest('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]')) _closeCardMenus();
+    if (!e.target.closest(CardMenu.TOGGLES + ', [data-action="openCardSubmenu"]')) CardMenu.close();
     // The row's Attach a Link form closes on a click anywhere else.
     if (!e.target.closest('.rsg-attach-link, [data-action="attachWorkLink"]')) _closeAttachLink(false);
     // KB focus on score cells
@@ -11326,7 +11325,10 @@ window.PageAssignments = (function () {
         editAssess(el.dataset.aid);
       },
       toggleCardMenu: function () {
-        _toggleCardMenu(el);
+        CardMenu.toggle(el);
+      },
+      openCardSubmenu: function () {
+        CardMenu.openSub(el, true);
       },
       attachWorkMenu: function () {
         _attachMenuOpen(el);
@@ -12024,7 +12026,7 @@ window.PageAssignments = (function () {
       closeMenus();
       return;
     }
-    if (_cardMenuKeydown(e)) return;
+    if (CardMenu.keydown(e)) return;
     if (_attachLinkKeydown(e)) return;
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
@@ -13696,19 +13698,20 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* The open card's header (AssignmentsPage board): Grade Submissions,
-     Set Everyone To ▾ and a ⋯ menu, so the title keeps its room. Every
-     action the old row of buttons had is in the ⋯ menu: Class Results,
-     Print, the Work Wall (while the piece takes work), Grade by
-     Competencies or Rubric, Show or Hide Checklists, Edit Assessment,
-     Duplicate, Copy to Another Class… and Delete…. One menu is open at a
-     time; a click elsewhere or Esc closes it. */
+  /* The open card's header (AssignmentsPage board): Grade Submissions
+     and a ⋯ menu, so the title keeps its room. Every action the old row
+     of buttons had is in the ⋯ menu: Class Results, Print, the Work Wall
+     (while the piece takes work), Grade by Competencies or Rubric, Show or
+     Hide Checklists, Set Everyone To (Colin, Nov 16: in the menu, not a
+     button of its own on the bar), Edit Assessment, Duplicate, Copy to
+     Another Class… and Delete…. One menu is open at a time; a click
+     elsewhere or Esc closes it. */
   var _ARROW_RIGHT_ICON =
     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8h11M9 3.5L13.5 8 9 12.5"/></svg>';
+  var _SUB_CARET =
+    '<svg class="assess-sub-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
   var _WALL_ICON =
     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2" width="5.5" height="5" rx="1"/><rect x="9" y="2" width="5.5" height="5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5" rx="1"/><rect x="9" y="9" width="5.5" height="5" rx="1"/></svg>';
-  var _MENU_CARET =
-    '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
   // html-safe: attrs are built from our ids and fixed words; label and icon are fixed
   function _cardMenuItem(attrs, icon, label, cls) {
@@ -13725,9 +13728,11 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* Set Everyone To ▾ while the class's levels grid shows (the competency
-     or rubric grid, not one student's grader, points, a mark or DIBELS):
-     the four levels in the class's order, each as the grid's row was. */
+  /* The ⋯ menu's Set Everyone To › while the class's levels grid shows
+     (the competency or rubric grid, not one student's grader, points, a
+     mark or DIBELS): a submenu of the four levels in the class's order
+     (teacher/card-menu.js). Points and Complete/Incomplete keep their Set
+     Unmarked To buttons above their grid. */
   // html-safe: ids are ours; level names are fixed
   function _setEveryoneMenuHtml(cid, a) {
     if (focusStudentId || isDibelsScored(a) || isCompletionScored(a) || a.scoreMode === 'points') return '';
@@ -13752,11 +13757,13 @@ window.PageAssignments = (function () {
       })
       .join('');
     return (
-      '<div class="assess-menu-wrap assess-setto">' +
-      '<button type="button" class="assess-setto-btn" data-action="toggleCardMenu" aria-haspopup="menu" aria-expanded="false">Set Everyone To' +
-      _MENU_CARET +
+      '<div class="assess-setto">' +
+      '<span class="assess-menu-sep" role="separator"></span>' +
+      '<button type="button" role="menuitem" class="assess-menu-item assess-sub-btn" data-action="openCardSubmenu" aria-haspopup="menu" aria-expanded="false">' +
+      '<span class="assess-menu-icon" aria-hidden="true"></span><span>Set Everyone To</span>' +
+      _SUB_CARET +
       '</button>' +
-      '<div class="assess-menu" role="menu" aria-label="Set Everyone To" hidden>' +
+      '<div class="assess-menu assess-submenu" role="menu" aria-label="Set Everyone To" hidden>' +
       items +
       '</div></div>'
     );
@@ -13834,6 +13841,7 @@ window.PageAssignments = (function () {
       }
     }
     html +=
+      _setEveryoneMenuHtml(cid, a) +
       '<span class="assess-menu-sep" role="separator"></span>' +
       _cardMenuItem('data-action="editAssess" ' + aid, LINE_ICONS.edit, 'Edit Assessment') +
       _cardMenuItem('data-action="dupeAssess" ' + aid, LINE_ICONS.copy, 'Duplicate');
@@ -13854,44 +13862,6 @@ window.PageAssignments = (function () {
       html +
       '</div></div>'
     );
-  }
-
-  function _closeCardMenus(except) {
-    document.querySelectorAll('.assess-menu-wrap .assess-menu').forEach(function (menu) {
-      if (menu === except || menu.hidden) return;
-      menu.hidden = true;
-      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
-      if (btn) btn.setAttribute('aria-expanded', 'false');
-    });
-  }
-  function _toggleCardMenu(btn) {
-    var menu = btn.parentNode.querySelector('.assess-menu');
-    if (!menu) return;
-    _closeCardMenus(menu);
-    menu.hidden = !menu.hidden;
-    btn.setAttribute('aria-expanded', String(!menu.hidden));
-    if (!menu.hidden) {
-      var first = menu.querySelector('button');
-      if (first) first.focus({ preventScroll: true });
-    }
-  }
-  // ↑ ↓ move through an open menu; Esc closes it and goes back to its button.
-  function _cardMenuKeydown(e) {
-    var menu = e.target.closest && e.target.closest('.assess-menu-wrap .assess-menu:not([hidden])');
-    if (!menu) return false;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      _closeCardMenus();
-      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]');
-      if (btn) btn.focus({ preventScroll: true });
-      return true;
-    }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return false;
-    e.preventDefault();
-    var items = Array.prototype.slice.call(menu.querySelectorAll('button'));
-    var i = items.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : -1);
-    items[(i + items.length) % items.length].focus();
-    return true;
   }
 
   /* Copy to Another Class…: the edit form, at its Classes row (the copy is
@@ -14028,7 +13998,7 @@ window.PageAssignments = (function () {
       // html-safe: _attachMenuHtml escapes its ids and label; the rest is fixed
       wrap.insertAdjacentHTML('beforeend', _attachMenuHtml(cid, aid, sid, btn.getAttribute('aria-label') || ''));
     }
-    _toggleCardMenu(btn);
+    CardMenu.toggle(btn);
   }
 
   // The row's work icon for `sid`, once the page is drawn again.
@@ -14107,7 +14077,7 @@ window.PageAssignments = (function () {
     var wrap = el && el.closest('.rsg-attach');
     if (!wrap) return;
     _closeAttachLink(false);
-    _closeCardMenus();
+    CardMenu.close();
     // html-safe: built by _attachLinkHtml, which escapes the name and the ids
     wrap.insertAdjacentHTML('beforeend', _attachLinkHtml(activeCourse, el.dataset.aid, el.dataset.sid));
     var btn = wrap.querySelector('.rsg-attach-btn');

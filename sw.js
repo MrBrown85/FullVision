@@ -187,6 +187,7 @@ const PRECACHE_URLS = [
   '/teacher/expand-motion.js',
   '/teacher/page-assignments.js',
   '/teacher/assign-descriptor-bar.js',
+  '/teacher/card-menu.js',
   '/teacher/assign-competency-picker.js',
   '/teacher/page-student.js',
   '/teacher/student-edit-dialog.js',

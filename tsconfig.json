@@ -49,6 +49,7 @@
     "teacher/work-rubric-card.js",
     "teacher/expand-motion.js",
     "teacher/report-print-paper.js",
+    "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js"
   ]
 }

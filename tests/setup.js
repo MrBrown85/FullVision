@@ -337,6 +337,7 @@ load('teacher/rubric-library.js');
 load('teacher/rubric-bank.js');
 load('teacher/grading-setup-copy.js');
 load('teacher/assign-descriptor-bar.js');
+load('teacher/card-menu.js');
 load('teacher/assign-competency-picker.js');
 load('teacher/student-edit-dialog.js');
 load('teacher/student-groups.js');

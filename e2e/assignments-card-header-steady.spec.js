@@ -124,7 +124,7 @@ test('hidden buttons take no clicks: a click there opens the card', async ({ pag
       return !!el.closest('.assess-header-actions');
     });
     expect(hit).toBe(false);
-    // Hovered, a closed card shows its ⋯, not the open grid's Set Everyone To.
+    // Hovered, a closed card shows its ⋯; its menu leaves out the open grid's Set Everyone To.
     await lab.locator('.assess-grip').hover();
     await expect(lab.locator('.assess-more-btn')).toBeVisible();
     await expect(lab.locator('.assess-setto')).toBeHidden();
