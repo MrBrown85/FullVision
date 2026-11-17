@@ -342,6 +342,38 @@ describe('the tray', () => {
     expect(text(rowOf(JORDAN).querySelector('.awc-pages'))).toBe('2 pages');
   });
 
+  it('Return in an empty Choose a Student places nothing; the file still waits', async () => {
+    await pile();
+    click(itemNamed('SCAN0017.pdf').querySelector('.awt-choose'));
+    const find = itemNamed('SCAN0017.pdf').querySelector('.awt-find');
+    expect(find.value).toBe('');
+    Object.defineProperty(doc, 'activeElement', { configurable: true, get: () => find });
+    const enter = () => {
+      const key = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+      key.key = 'Enter';
+      doc.dispatchEvent(key);
+    };
+    enter();
+    // Spaces alone are still an empty box.
+    find.value = '  ';
+    find.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    enter();
+    delete doc.activeElement;
+    expect($$('.awc-chip').length).toBe(0);
+    expect(itemNamed('SCAN0017.pdf')).toBeDefined();
+    expect(text($('.awt-count'))).toBe('3 files');
+  });
+
+  it('a file named for a student with no room left waits, saying why', async () => {
+    AddWorkClass.open(CID, PIECE);
+    AddWorkClass.placePieces([{ sid: AVERY, from: 'Scan', pages: pages(29) }]);
+    await AddWorkClass.takeFiles([file('Avery Chen.pdf', { n: 2 })]);
+    expect(chipsOf(AVERY)).toEqual(['Scan']);
+    const it = itemNamed('Avery Chen.pdf');
+    expect(text(it.querySelector('.is-note'))).toBe('A piece of work can have 30 pages at most.');
+    expect(text(it.querySelector('.awt-why'))).toBe('Choose where it goes.');
+  });
+
   it('Escape closes Choose a Student, not the page', async () => {
     await pile();
     click(itemNamed('SCAN0017.pdf').querySelector('.awt-choose'));

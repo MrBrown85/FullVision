@@ -197,6 +197,8 @@
 
     function _why(m) {
       if (!m) return '';
+      // Certain, but it couldn't be placed (the note says why when there is one).
+      if (m.kind === 'one') return 'Choose where it goes.';
       if (m.kind === 'many') {
         var n = m.count || m.sids.length;
         if (!m.word) return 'More than one student could fit.';
@@ -274,7 +276,12 @@
           if (m.kind === 'one') {
             var res = host.place([{ sid: m.sid, from: name, pages: got.pages }])[0];
             if (res && res.ok) return;
-            hold(name, got.pages, m, 'A piece of work can have 30 pages at most.');
+            hold(
+              name,
+              got.pages,
+              m,
+              res && res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '',
+            );
             return;
           }
           hold(name, got.pages, m);
@@ -819,7 +826,8 @@
       }
       if (e.key === 'Enter' && at < 0 && el.classList.contains('awt-find')) {
         e.preventDefault();
-        if (options.length) placeItem(item.id, options[0].getAttribute('data-sid'));
+        // An empty box lists the whole class: Return takes no one until a name is typed.
+        if (String(el.value || '').trim() && options.length) placeItem(item.id, options[0].getAttribute('data-sid'));
         return true;
       }
       return false;
