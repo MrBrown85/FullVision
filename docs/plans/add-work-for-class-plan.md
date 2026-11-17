@@ -136,8 +136,9 @@ B2 and B3 can be built at the same time by two builders once B1 is merged: they 
 **Build, after decision 3.**
 
 - Print: one sheet per student, 80 stickers (Avery 5167 size), from Class Settings beside Print Student Cards, through `vendor/qrcode.js`. A plain-paper version of the same page.
-- Read: in Split the Scan, each page is checked for a code; a code starts that student's piece. Chrome's own reader is used where the browser has one. For Safari and Firefox on a computer, either a small reader added to `vendor/` (loaded only on this page, licence checked) or the name boxes from B2: decision 4.
+- Read: in Split the Scan, each piece's first page is checked for a code, and a code names that piece. Pieces are still cut by Pages per Student, never by where the stickers are, so a paper whose sticker fell off is not swallowed by the student before it. Chrome's own reader is used where the browser has one. For Safari and Firefox on a computer, either a small reader added to `vendor/` (loaded only on this page, licence checked) or the name boxes from B2: decision 4.
 - A sticker names the student only. The assessment is chosen when the scan is dropped.
+- **Stickers fall off and smudge** (Colin, Nov 17: "some stickers will become unstuck. that's the reality. some will be too hard to read."). A piece with no sticker, or one that does not read cleanly, goes to the name box exactly as in B2; a doubtful read is never taken. A code read twice in one pile, a code from another class, or a retired code is shown, not guessed at. The page says how many pieces were named by sticker and how many are left to type, so the teacher sees at once how well the stickers did.
 
 **Before building.** One sheet printed and scanned on the school copier at its usual setting, to prove a sticker this small reads. The privacy check in decision 5.
 
@@ -173,6 +174,7 @@ On Android the installed app can receive a shared PDF. On an iPhone a web app ca
 
 - **A page under the wrong student.** If the work is returned through the student page, another student sees it. Rule 1, the first-page picture on every row, the close-spelling check and the twice-named check exist for this. Each slice's browser test asserts on who got which page.
 - **A long scan on a slow computer.** Reading 112 pages takes time and memory. The measuring step sets the limit; pages are read one at a time and the count shows progress.
+- **Stickers that fall off or will not read.** Expected, not an error: those pieces go to the name box, and pieces are cut by page count so a missing sticker cannot join two students' papers.
 - **Blank pages.** Faint pencil could read as blank. Left-out pages stay on screen, dimmed, and the threshold is set from real scans.
 - **Two sessions.** Work that arrives from a student while the page is open is caught by the `already_sent` answer and turned back into the three choices.
 - **`teacher/page-assignments.js` is 17,000 lines and busy.** B1 moves three functions out and adds one menu item. Nothing else there changes.
