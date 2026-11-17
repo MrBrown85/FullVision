@@ -1,0 +1,198 @@
+/* shared/handout-viewer.css — a handout file open over the page (shared/handout-viewer.js).
+   Over the whole screen on the student page; over the device's screen in Preview as Student. */
+.hv-layer {
+  --hv-bg: #ffffff;
+  --hv-ink: #1b1b1f;
+  --hv-soft: #5f6368;
+  --hv-line: rgba(0, 0, 0, 0.12);
+  --hv-tint: #eef2fb;
+  --hv-accent: #2f5fd0;
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--hv-bg);
+  color: var(--hv-ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+.hv-layer.hv-whole {
+  position: fixed;
+  z-index: 2000;
+}
+@media (prefers-color-scheme: dark) {
+  .hv-layer {
+    --hv-bg: #17181c;
+    --hv-ink: #ececf1;
+    --hv-soft: #a7a9b2;
+    --hv-line: rgba(255, 255, 255, 0.14);
+    --hv-tint: #262a36;
+    --hv-accent: #8fb0ff;
+  }
+}
+.hv-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hv-line);
+  flex: 0 0 auto;
+}
+.hv-back,
+.hv-save,
+.hv-turn,
+.hv-retry {
+  font: inherit;
+  color: inherit;
+  background: var(--hv-tint);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.hv-back {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.hv-words {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hv-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-title:focus {
+  outline: none;
+}
+.hv-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--hv-soft);
+}
+.hv-save {
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hv-accent);
+  flex: 0 0 auto;
+}
+.hv-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.hv-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+.hv-text {
+  margin: 0;
+  padding: 18px 18px 40px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    15px/1.6 ui-monospace,
+    'SF Mono',
+    Menlo,
+    Consolas,
+    monospace;
+}
+.hv-msg {
+  margin: 28px 18px 12px;
+  color: var(--hv-soft);
+}
+.hv-retry {
+  margin: 0 18px;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+.hv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px calc(8px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--hv-line);
+  flex: 0 0 auto;
+}
+.hv-bar[hidden] {
+  display: none;
+}
+.hv-turn {
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.hv-turn:disabled,
+.hv-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hv-count {
+  font-size: 13px;
+  color: var(--hv-soft);
+  text-align: center;
+}
+.hv-ask {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 12px 14px;
+  background: var(--hv-bg);
+  border: 1px solid var(--hv-line);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+.hv-ask-words {
+  margin: 0;
+  flex: 1 1 100%;
+  font-weight: 600;
+}
+.hv-ask-url {
+  margin: 0;
+  flex: 1 1 100%;
+  font-size: 13px;
+  color: var(--hv-soft);
+  overflow-wrap: anywhere;
+}
+.hv-ask-go,
+.hv-ask-no {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--hv-tint);
+  color: inherit;
+}
+.hv-ask-go {
+  background: var(--hv-accent);
+  color: #fff;
+}

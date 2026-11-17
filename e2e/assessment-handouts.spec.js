@@ -68,7 +68,7 @@ test('a teacher adds a handout and a link, and the student sees them on the card
 
   // + Add a PDF: two pages, named from the file.
   const chooser = page.waitForEvent('filechooser');
-  await field.getByRole('button', { name: '+ Add a PDF' }).click();
+  await field.getByRole('button', { name: '+ Add a File' }).click();
   await (
     await chooser
   ).setFiles({

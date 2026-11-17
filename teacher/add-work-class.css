@@ -297,6 +297,10 @@
   border: 1px solid var(--border);
   background: #fff;
 }
+button.awt-pic {
+  padding: 0;
+  cursor: zoom-in;
+}
 .awt-pic img {
   width: 100%;
   height: 100%;
@@ -921,5 +925,127 @@
   .awt-tray.is-strip .awt-drop,
   .awt-tray.is-strip .awt-item {
     width: 100%;
+  }
+}
+
+/* ── B6: one pile, two classes (teacher/add-work-two-classes.js) ── */
+.awc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.awc-two {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 10px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+  font-size: 13px;
+}
+.awc-two-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.awc-two-track {
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--seg-track);
+  position: relative;
+  flex: none;
+}
+.awc-two-knob {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+.awc-two-switch[aria-checked='true'] .awc-two-track {
+  background: var(--active);
+}
+.awc-two-switch[aria-checked='true'] .awc-two-knob {
+  transform: translateX(14px);
+}
+.awc-two-name {
+  font-weight: 600;
+}
+.awc-two-pick select,
+.awc-for select {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 2px 4px;
+  max-width: 180px;
+}
+.awc-two-line {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-3);
+}
+.awc-class-head {
+  padding: 12px 16px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.awc-class-head.is-card {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 4px 0;
+}
+.awc-class-tag {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ── B6: a late paper's assessment ── */
+.awc-for {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.awc-chip.is-late {
+  background: var(--bg);
+}
+.awc-late-in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.awc-late-hint {
+  margin: 0;
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .awc-two-knob {
+    transition: none;
   }
 }

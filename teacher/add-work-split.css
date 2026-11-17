@@ -415,6 +415,35 @@
 .aws-card-note.is-bad {
   color: var(--danger);
 }
+/* ── B4: what a piece's sticker says (teacher/add-work-split-stickers.js) ── */
+.aws-stk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 11px;
+}
+.aws-by-sticker {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--active-light);
+  color: var(--active);
+  font-weight: 700;
+}
+.aws-stk-note {
+  color: var(--late);
+  font-weight: 600;
+}
+.aws-stk-use {
+  border: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .aws-list {
   position: absolute;
   left: 8px;
@@ -612,6 +641,217 @@
   justify-content: center;
 }
 
+/* ── B5: Set Up Like Last Time, Turn Every Page ── */
+.aws-setup {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--active-light);
+}
+.aws-fresh,
+.aws-turn-all {
+  align-self: flex-start;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.aws-turn-all.is-on {
+  border-color: var(--active);
+  box-shadow: inset 0 0 0 1px var(--active);
+  background: var(--active-light);
+  color: var(--link);
+}
+
+/* ── B5: a page's menu, and a page dragged onto another piece ── */
+.aws-tile[draggable='true'] {
+  cursor: grab;
+}
+.aws-pmenu {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 22px;
+  height: 18px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.aws-tile.is-kept .aws-pmenu {
+  bottom: 23px;
+}
+.aws-pmenu-list {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 40px;
+  z-index: 4;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.22),
+    0 0 0 1px var(--divider-medium);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aws-pmenu-item {
+  min-height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.aws-pmenu-item:hover,
+.aws-pmenu-item:focus-visible {
+  background: var(--active-light);
+  color: var(--link);
+}
+.aws-pmenu-h {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.aws-drop-line {
+  display: none;
+}
+.aws-card.is-drop {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.aws-card.is-drop .aws-drop-line {
+  display: block;
+  margin: 6px 8px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--active);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.aws-tile.is-upside {
+  box-shadow: 0 0 0 2px var(--late);
+}
+.aws-upside {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 2px;
+  background: rgba(146, 64, 14, 0.85);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ── B5: a page full size (teacher/add-work-page-view.js), over every
+   Add Work page, under a confirm. ── */
+.awv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3880;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.awv-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.awv-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+.awv-title {
+  font-weight: 700;
+}
+.awv-where {
+  font-size: 13px;
+  opacity: 0.85;
+}
+.awv-gap {
+  flex: 1;
+}
+.awv-btn,
+.awv-close {
+  height: 32px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.awv-btn {
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.awv-close {
+  padding: 0 16px;
+}
+.awv-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.awv-btn:focus-visible,
+.awv-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.awv-pic {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.awv-pic img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 4px;
+}
+.awv-hint {
+  margin: 0;
+  color: #fff;
+  opacity: 0.75;
+  font-size: 12px;
+  text-align: center;
+}
+
 /* ── A narrow window: the side stacks above the pieces. ── */
 @media (max-width: 860px) {
   .aws-overlay {
@@ -646,4 +886,8 @@
   .aws-switch-knob {
     transition: none;
   }
+}
+.aws-stk-pending {
+  color: var(--text-3);
+  font-weight: 600;
 }

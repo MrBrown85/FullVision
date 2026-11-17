@@ -8952,10 +8952,13 @@ window.submitSupportReport = function (report) {
    student_submit.page's assessments[].resources and student_submit.
    handout_links through the student-submit edge function.
 
+   Handout files (a web page, a text file, an EPUB): shared/data-handout-files.js.
+
    Kept on this device as gb-assessment-resources-<cid>:
-     { rows: [ { id, assessment_id, kind: 'pdf' | 'link', title, url,
-                 page_count, status: 'uploading' | 'ready', position,
-                 created_at, pages: [ path ] | null } ],
+     { rows: [ { id, assessment_id, kind: 'pdf' | 'link' | 'html' | 'txt' |
+                 'epub', title, url, page_count, bytes, status: 'uploading'
+                 | 'ready', position, created_at, pages: [ path ] | null,
+                 file: path | null } ],
        gone: [ id ] }  removed here, the removal not yet landed
    A page still on this device has the path "photo-queue:<id>" (the photo
    queue, IndexedDB), which openAssessmentHandoutPage turns into an
@@ -8987,6 +8990,7 @@ var _resMissing = false; // the server has no list_course_resources yet: nothing
 var _RES_ENDPOINTS = {
   add_assessment_link: true,
   start_handout_upload: true,
+  start_handout_file: true,
   remove_assessment_resource: true,
 };
 
@@ -9110,7 +9114,7 @@ function assessmentResourcesOffered(cid) {
 }
 
 function _resRowOut(r) {
-  var kind = r.kind === 'pdf' ? 'pdf' : 'link';
+  var kind = r.kind === 'pdf' || _resIsFileKind(r.kind) ? r.kind : 'link';
   var pages = Array.isArray(r.pages) ? r.pages : null;
   return {
     id: String(r.id),
@@ -9120,6 +9124,7 @@ function _resRowOut(r) {
     url: kind === 'link' ? String(r.url || '') : null,
     host: kind === 'link' ? resourceHost(r.url) : '',
     pageCount: kind === 'pdf' ? Math.max(0, Number(r.page_count) || (pages ? pages.length : 0)) : 0,
+    bytes: _resIsFileKind(kind) ? Math.max(0, Number(r.bytes) || 0) : 0,
     status: r.status === 'uploading' ? 'uploading' : 'ready',
     position: Number(r.position) || 0,
   };
@@ -9175,7 +9180,7 @@ function _resChanged(cid) {
 // A row the server sent, as it is kept here, or null.
 function _resFromServer(row) {
   if (!_plainObject(row) || !_isUuid(row.id) || !_isUuid(row.assessment_id)) return null;
-  var kind = row.kind === 'pdf' ? 'pdf' : row.kind === 'link' ? 'link' : null;
+  var kind = row.kind === 'pdf' || row.kind === 'link' || _resIsFileKind(row.kind) ? row.kind : null;
   if (!kind) return null;
   var out = {
     id: String(row.id).toLowerCase(),
@@ -9184,10 +9189,12 @@ function _resFromServer(row) {
     title: String(row.title || ''),
     url: kind === 'link' ? String(row.url || '') : null,
     page_count: kind === 'pdf' ? Number(row.page_count) || 0 : null,
+    bytes: _resIsFileKind(kind) ? Number(row.bytes) || 0 : null,
     status: row.status === 'uploading' ? 'uploading' : 'ready',
     position: Number(row.position) || 0,
     created_at: row.created_at || null,
     pages: null,
+    file: _resIsFileKind(kind) && typeof row.path === 'string' ? row.path : null,
   };
   if (kind === 'pdf' && Array.isArray(row.paths)) {
     out.pages = row.paths.filter(function (p) {
@@ -9280,6 +9287,7 @@ function addAssessmentHandout(cid, aid, title, pages) {
 
 function _resQueueIds(row) {
   return ((row && row.pages) || [])
+    .concat(row && typeof row.file === 'string' ? [row.file] : [])
     .map(function (p) {
       var m = typeof p === 'string' ? _STUDENT_WORK_QUEUE_PATH.exec(p) : null;
       return m && !m[2] ? m[1] : null;
@@ -9421,8 +9429,10 @@ function _handoutUploadsSave(all) {
   _safeLSSet(_HANDOUT_UPLOADS_KEY, JSON.stringify(all));
 }
 
-// start_handout_upload through the outbox, keyed so a retry is the same start.
-function _handoutStart(cid, aid, rid, title, queued) {
+/* start_handout_upload (a PDF's pages) or, for a handout file (`file`: {
+   kind, bytes }), start_handout_file, through the outbox, keyed so a retry
+   is the same start. */
+function _handoutStart(cid, aid, rid, title, queued, file) {
   var key = _newEntryId();
   var all = _handoutUploads();
   all[key] = {
@@ -9435,13 +9445,18 @@ function _handoutStart(cid, aid, rid, title, queued) {
     n: queued.ids.length,
     ids: queued.ids,
     batch: queued.batch,
+    kind: file ? file.kind : 'pdf',
   };
   _handoutUploadsSave(all);
-  _registerPendingCreate(cid, 'resource', rid, 'start_handout_upload', { entryId: key });
-  _rpcOrNoop(
-    'start_handout_upload',
-    { p_assessment_id: aid, p_title: title, p_page_count: queued.ids.length, p_idempotency_key: key },
-    { entryId: key },
+  var endpoint = file ? 'start_handout_file' : 'start_handout_upload';
+  _registerPendingCreate(cid, 'resource', rid, endpoint, { entryId: key });
+  (file
+    ? _handoutFileStartCall(aid, title, file, key)
+    : _rpcOrNoop(
+        'start_handout_upload',
+        { p_assessment_id: aid, p_title: title, p_page_count: queued.ids.length, p_idempotency_key: key },
+        { entryId: key },
+      )
   ).then(function (res) {
     if (res && !res.error && res.data != null) _handoutStarted(key, res.data);
   });
@@ -9457,7 +9472,11 @@ function _handoutStarted(key, data) {
   if (!rec || rec.placed) return Promise.resolve(null);
   var res = _rpcObject(data) || {};
   var id = _isUuid(res.id) ? String(res.id).toLowerCase() : null;
-  var paths = Array.isArray(res.paths) ? res.paths.map(String) : [];
+  var paths = _resIsFileKind(rec.kind)
+    ? _handoutFilePaths(rec, res, id)
+    : Array.isArray(res.paths)
+      ? res.paths.map(String)
+      : [];
   var q = _wireWorkQueue();
   if (!id || !q || typeof q.placeHandout !== 'function' || paths.length !== rec.ids.length) {
     return _handoutGiveUp(rec, true);
@@ -9532,11 +9551,12 @@ async function _handoutCommit(batch) {
   var rid = batch && batch.ids && batch.ids.resource;
   if (!_isUuid(rid)) return { error: { message: 'no resource id', status: 422 } };
   var rec = _handoutUploadByBatch(batch.key);
-  var res = await _callRpcWithAuthGuard(
-    'finish_handout_upload',
-    { p_resource_id: rid, p_idempotency_key: batch.key },
-    { suppressSessionExpiredModal: true },
-  );
+  var fileKind = _handoutFileKindOf(batch);
+  var finish = { p_resource_id: rid, p_idempotency_key: batch.key };
+  var quiet = { suppressSessionExpiredModal: true };
+  var res = fileKind
+    ? await _handoutFileFinishCall(finish, quiet)
+    : await _callRpcWithAuthGuard('finish_handout_upload', finish, quiet);
   if (!res || res.error) return { error: (res && res.error) || { message: 'no answer', status: 503 } };
   var row = _rpcObject(res.data) || {};
   var cid = (rec && rec.cid) || batch.ids.course;
@@ -9545,6 +9565,7 @@ async function _handoutCommit(batch) {
     draft.rows.forEach(function (r) {
       if (r.id !== rid) return;
       r.status = 'ready';
+      if (fileKind) return _handoutFileReady(r, batch, row);
       r.pages = (batch.files || [])
         .slice()
         .sort(function (x, y) {
@@ -9568,7 +9589,7 @@ async function _handoutCommit(batch) {
      may replace a file in storage. The handout is removed here and on the
      server, and the sync dot says pages were dropped (independent review,
      Nov 11). */
-  if (row.status === 'uploading' && Array.isArray(row.bad) && row.bad.length) {
+  if (row.status === 'uploading' && ((Array.isArray(row.bad) && row.bad.length) || row.bad === true)) {
     if (cid) removeAssessmentResource(cid, rid);
     if (rec) await _handoutGiveUp(rec, true);
     return { error: null };
@@ -9576,7 +9597,8 @@ async function _handoutCommit(batch) {
   if (row.status === 'uploading') {
     // Still missing a page (row.missing names them by number): those go again.
     var q = window.PhotoQueue;
-    var missing = Array.isArray(row.missing) ? row.missing.map(Number) : null;
+    // A handout file says missing: true: its one page goes again.
+    var missing = Array.isArray(row.missing) ? row.missing.map(Number) : row.missing === true ? [1] : null;
     var pages = q && typeof q.pages === 'function' ? q.pages() : [];
     await Promise.all(
       pages
@@ -9605,7 +9627,7 @@ function _onResourceWriteEvent(kind, endpoint, payload, data) {
   if (kind === 'flush:success') _resReadAfterWrite(payload);
   try {
     var key = payload && payload.p_idempotency_key;
-    if (endpoint === 'start_handout_upload' && key) {
+    if ((endpoint === 'start_handout_upload' || endpoint === 'start_handout_file') && key) {
       if (kind === 'flush:success') _handoutStarted(key, data);
       else {
         var rec = _handoutUploads()[key];
@@ -9747,80 +9769,4 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('load', function () {
     setTimeout(_resumeHandoutUploads, 0);
   });
-}
-
-/* ── Showing a handout's page ── */
-
-var _HANDOUT_STORAGE_PATH =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handouts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/([1-9]|1[0-9]|20)\.jpg$/;
-
-/* Page `i` (from 0) of handout `rid` in class `cid`: { url, release } or
-   null. A page still on this device comes from the photo queue; one on
-   the server through a link signed for 300 seconds, fetched, and shown
-   from a blob: address. Only a path in this class's own handouts folder,
-   under this handout. */
-function openAssessmentHandoutPage(cid, rid, i) {
-  var row = _resFind(cid, rid);
-  var n = Number(i);
-  if (!row || row.kind !== 'pdf' || !(n >= 0) || Math.floor(n) !== n) return Promise.resolve(null);
-  var name = row.pages && row.pages[n];
-  // The contract's layout, <course>/handouts/<resource>/<n>.jpg, when the server sent no paths.
-  if (!name && _isUuid(rid) && n < (Number(row.page_count) || 0)) {
-    name = String(cid).toLowerCase() + '/handouts/' + String(rid).toLowerCase() + '/' + (n + 1) + '.jpg';
-  }
-  if (!name) return Promise.resolve(null);
-  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return Promise.resolve(null);
-  var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
-  if (m) {
-    var q = window.PhotoQueue;
-    if (m[2] || !q || typeof q.blobs !== 'function') return Promise.resolve(null);
-    return Promise.resolve()
-      .then(function () {
-        return q.blobs(m[1]);
-      })
-      .then(
-        function (found) {
-          return found && found.photo ? _resPicture(found.photo) : null;
-        },
-        function () {
-          return null;
-        },
-      );
-  }
-  var prefix = String(cid).toLowerCase() + '/handouts/' + String(rid).toLowerCase() + '/';
-  if (_isDemoSession() || !_HANDOUT_STORAGE_PATH.test(name) || name.indexOf(prefix) !== 0) return Promise.resolve(null);
-  var sb = getSupabase();
-  if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
-  return Promise.resolve(_signInWait) // not signed before start-up's re-check has passed
-    .then(function () {
-      return sb.storage.from('student-photos').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
-    })
-    .then(function (res) {
-      var link = res && !res.error && res.data && res.data.signedUrl;
-      if (!link) return null;
-      return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
-        return r && r.ok ? r.blob() : null;
-      });
-    })
-    .then(function (blob) {
-      return blob ? _resPicture(blob) : null;
-    })
-    .then(null, function () {
-      return null;
-    });
-}
-
-// A picture shown from a blob: address, with the way to let it go.
-function _resPicture(blob) {
-  // Always a picture: what is handed back is shown in an <img> and nothing else.
-  var url = URL.createObjectURL(new Blob([blob], { type: 'image/jpeg' }));
-  var released = false;
-  return {
-    url: url,
-    release: function () {
-      if (released) return;
-      released = true;
-      URL.revokeObjectURL(url);
-    },
-  };
 }

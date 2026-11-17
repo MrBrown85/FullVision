@@ -18,7 +18,16 @@
    are the site's own pictures, so they ask nothing.
 
    Every answer is checked against the screen that asked before it draws:
-   the handout must still be open, for the same student, from the same ask. */
+   the handout must still be open, for the same student, from the same ask.
+
+   A handout file (a web page, a text file or an EPUB; Colin's call of Nov
+   17 2026) is a row in For This Assignment (data-act="handout-file"). A
+   tap asks `handout-file` (student_submit.handout_file): { ok, kind,
+   bytes, title, url }, one link signed for 60 seconds; the file is fetched
+   and opened over the page by shared/handout-viewer.js, a web page or a
+   book only in its sealed frame. A file fetched is kept for the session,
+   like a handout's pages, and let go on Log Out, another class or another
+   card. */
 (function () {
   'use strict';
 
@@ -63,13 +72,61 @@
     );
   }
 
-  function answerOf(body) {
-    if (answerFn) return Promise.resolve(answerFn('handout-links', body));
+  function answerOf(body, route) {
+    var r = route || 'handout-links';
+    if (answerFn) return Promise.resolve(answerFn(r, body));
     if (!S || S.demo || typeof StudentPage.askClass !== 'function') {
       return Promise.resolve({ ok: false, error: 'not_found' });
     }
-    return Promise.resolve(StudentPage.askClass('handout-links', body, body.enrollment_id)).then(null, function () {
+    return Promise.resolve(StudentPage.askClass(r, body, body.enrollment_id)).then(null, function () {
       return { ok: false, error: 'network' };
+    });
+  }
+
+  /* ── A handout file ── */
+  var files = {}; // resource id → { student, blob } once fetched, for the session
+
+  // The file's bytes, from what is kept or through `handout-file`; null when it did not come.
+  function fileBlob(rid, piece, student) {
+    var k = files[rid];
+    if (k && k.student === student) return Promise.resolve(k.blob);
+    if (!S || S.demo) return Promise.resolve(null);
+    var body = { enrollment_id: student, assessment_id: piece, resource_id: rid };
+    return StudentPage.whileCurrent(answerOf(body, 'handout-file')).then(function (res) {
+      if (!res || res.ok !== true || !/^https:\/\//.test(String(res.url || ''))) return null;
+      return picture(res.url).then(function (blob) {
+        if (!blob || !S || !S.page || S.page.student.id !== student) return null;
+        files[rid] = { student: student, blob: blob };
+        return blob;
+      });
+    });
+  }
+
+  // A tap on a handout file's row: it opens over the page.
+  function openFile(el) {
+    if (!S || !S.page || typeof HandoutViewer === 'undefined' || typeof StudentPage.viewOf !== 'function') return;
+    var rid = (el && el.getAttribute('data-resource')) || '';
+    var piece = (el && el.getAttribute('data-piece')) || '';
+    var view = StudentPage.viewOf(S);
+    var p =
+      view &&
+      (view.work || []).filter(function (x) {
+        return x && x.id === piece;
+      })[0];
+    var r =
+      p &&
+      (p.resources || []).filter(function (x) {
+        return x && x.kind === 'file' && x.id === rid;
+      })[0];
+    if (!r) return;
+    var student = S.page.student.id;
+    HandoutViewer.open({
+      title: r.title,
+      kind: r.type,
+      returnTo: el,
+      load: function () {
+        return fileBlob(r.id, piece, student);
+      },
     });
   }
 
@@ -341,7 +398,9 @@
   // Everything kept goes: a sign-out, another class or another card.
   function forgetAll() {
     kept = {};
+    files = {};
     letGo();
+    if (typeof HandoutViewer !== 'undefined') HandoutViewer.close();
   }
 
   function onClick(act, el) {
@@ -353,6 +412,7 @@
       forgetAll();
       return;
     }
+    if (act === 'handout-file') return openFile(el);
     // app.js has opened the handout (StudentPageView.press); its pages come from what is kept, or are fetched.
     if (act === 'handout' && S.handout) return load(S.handout, S.handoutPiece);
     if (act === 'handout-retry' && S.handout && S.handout === ((el && el.getAttribute('data-resource')) || '')) {

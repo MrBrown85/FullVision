@@ -43,6 +43,17 @@
   var startPer = M.startPer;
   var isBlank = M.isBlank;
   var _maxPiece = M.maxPiece;
+  /* B5's touches, each in a file of its own and used when it is there:
+     Set Up Like Last Time (add-work-split-setup.js), a page moved onto
+     another piece (add-work-split-move.js), Turn Every Page
+     (add-work-split-turn.js), a page full size (add-work-page-view.js).
+     B4's stickers name pieces (add-work-split-stickers.js). */
+  function _t(name) {
+    return /** @type {any} */ (window)[name] || null;
+  }
+  function _turningAll(s) {
+    return !!(_t('AddWorkSplitTurn') && AddWorkSplitTurn.busy(s));
+  }
   /* ── Reading the scan ───────────────────────────────────────── */
 
   var TOO_BIG =
@@ -294,10 +305,6 @@
     return shared > 1 ? _full(st) : _first(st);
   }
 
-  function _pagesWord(a, b) {
-    return a === b ? 'Page ' + a : 'Pages ' + a + '–' + b;
-  }
-
   // "Avery is on pieces 5 and 9"
   function _twiceLine(s, sid, ats) {
     var nums = ats.map(function (at) {
@@ -348,7 +355,7 @@
     if (split)
       html +=
         '<button type="button" class="aws-primary" data-aws="match" data-key="match"' +
-        (s.m.canMatch() ? '' : ' disabled') +
+        (s.m.canMatch() && !_turningAll(s) ? '' : ' disabled') +
         '>Match the Named Pieces</button>';
     html += '</div>';
     if (s.phase === 'reading') html += _readingHtml(s);
@@ -442,6 +449,7 @@
       '</span></div>';
     return (
       '<aside class="aws-side" aria-label="How to Split">' +
+      (_t('AddWorkSplitSetup') ? AddWorkSplitSetup.html(s) : '') +
       '<section class="aws-sec">' +
       '<h3 class="aws-h" id="aws-per-label">Pages per Student</h3>' +
       '<div class="aws-stepper" role="group" aria-labelledby="aws-per-label">' +
@@ -469,12 +477,15 @@
       esc(blankLine) +
       '</p>' +
       '</section>' +
+      (_t('AddWorkSplitTurn') ? AddWorkSplitTurn.html(s) : '') +
       '<section class="aws-sec">' +
       '<h3 class="aws-h" id="aws-order-label">The Pile Is in</h3>' +
       '<div class="aws-order" role="group" aria-labelledby="aws-order-label">' +
-      orderBtn('list', 'Class List Order') +
+      // Two classes (B6): one pile can't be in two lists' order.
+      (s.noListOrder ? '' : orderBtn('list', 'Class List Order')) +
       orderBtn('typed', 'No Order: I’ll Type Names') +
       '</div>' +
+      (s.noListOrder ? '<p class="aws-hint">With two classes, every name is typed.</p>' : '') +
       '<p class="aws-hint' +
       (order === 'list' && !m.listFits() ? ' is-bad' : '') +
       '">' +
@@ -485,6 +496,7 @@
         : '') +
       '</section>' +
       tally +
+      (_t('AddWorkSplitStickers') ? AddWorkSplitStickers.html(s) : '') +
       '<p class="aws-privacy">FullVision does not read the handwriting. The scan is split on this computer and is not uploaded whole; each student’s pages upload on their own.</p>' +
       '</aside>'
     );
@@ -539,7 +551,7 @@
     if (bad) note = _twiceLine(s, p.sid, bad);
     else if (p.sid && s.subs[p.sid]) note = 'Already has work in';
     var name = p.sid ? _fullOf(s, p.sid) : '';
-    var listed = p.sid && !p.typed;
+    var listed = p.sid && !p.typed && !p.bySticker;
     var size = p.nos.length;
     var last = p.at === s.m.pieces().length - 1;
     return (
@@ -562,7 +574,7 @@
           '">'
         : '') +
       '<span class="aws-range">' +
-      esc('Piece ' + n + ' · ' + _pagesWord(p.first, p.last)) +
+      esc('Piece ' + n + ' · ' + M.pagesText(p.spans)) +
       '</span></div>' +
       '<div class="aws-who">' +
       '<label class="aws-sr" for="aws-name-' +
@@ -595,7 +607,10 @@
       esc(String(p.at)) +
       '">' +
       esc(note) +
-      '</p></div>' +
+      '</p>' +
+      (_t('AddWorkSplitStickers') ? AddWorkSplitStickers.cardHtml(s, p, _ctx) : '') +
+      '</div>' +
+      (_t('AddWorkSplitMove') ? AddWorkSplitMove.dropHtml() : '') +
       '<div class="aws-strip" role="group" aria-label="' +
       esc('Pages of piece ' + n) +
       '">' +
@@ -605,6 +620,7 @@
         })
         .join('') +
       '</div>' +
+      (_t('AddWorkSplitMove') ? AddWorkSplitMove.menuHtml(s, p, _ctx) : '') +
       '<div class="aws-size">' +
       '<button type="button" class="aws-arrow" data-aws="fewer" data-at="' +
       esc(String(p.at)) +
@@ -638,7 +654,7 @@
   function _tileHtml(s, no) {
     var p = s.m.page(no);
     var url = _thumbOf(s, no);
-    var img = url ? '<img src="' + esc(url) + '" alt="">' : '';
+    var img = url ? '<img src="' + esc(url) + '" alt="" draggable="false">' : '';
     var num = esc(String(no));
     if (s.m.out(p))
       return (
@@ -653,12 +669,17 @@
         '<span class="aws-out-label">Blank · Left Out</span></button>'
       );
     var busy = !!s.turning[no];
+    var move = _t('AddWorkSplitMove');
+    var upside = _t('AddWorkSplitTurn') && AddWorkSplitTurn.marked(s, no);
     return (
       '<div class="aws-tile' +
       (p.blank ? ' is-kept' : '') +
+      (upside ? ' is-upside' : '') +
       '" data-no="' +
       num +
-      '">' +
+      '"' +
+      (move ? ' draggable="true"' : '') +
+      '>' +
       img +
       '<span class="aws-tile-no" aria-hidden="true">' +
       num +
@@ -674,6 +695,8 @@
       '>' +
       TURN_ICON +
       '</button>' +
+      (move ? AddWorkSplitMove.tileHtml(s, no) : '') +
+      (upside ? '<span class="aws-upside">Upside down?</span>' : '') +
       (p.blank && s.m.leaveOut()
         ? '<button type="button" class="aws-leave" data-aws="leaveOne" data-no="' +
           num +
@@ -695,8 +718,10 @@
       '<div class="aws-foot">' +
       '<span class="aws-foot-title">No Mouse Needed</span>' +
       key('Tab', 'Next piece') +
+      key('li', 'Type a few letters') +
       key('Return', 'Name it, go to the next') +
       key('[</kbd><kbd>]', 'One page fewer or more') +
+      (_t('AddWorkPageView') ? key('Space', 'See the page full size') : '') +
       key('↓', 'This piece’s pages') +
       '</div>'
     );
@@ -708,6 +733,7 @@
     var s = _s;
     if (!s) return;
     opts = opts || {};
+    if (s.m && _t('AddWorkSplitStickers')) AddWorkSplitStickers.sync(s, _ctx);
     // The pieces scroll; in a narrow window the whole body does.
     var tops = ['.aws-scroll', '.aws-body'].map(function (sel) {
       var el = s.overlay.querySelector(sel);
@@ -875,7 +901,7 @@
           '" data-sid="' +
           esc(o.sid) +
           '">' +
-          esc(_fullOf(s, o.sid)) +
+          esc(_fullOf(s, o.sid) + (s.label ? s.label(o.sid) : '')) +
           (o.on !== undefined ? '<span class="aws-option-on">' + esc('· on piece ' + (o.on + 1)) + '</span>' : '') +
           '</div>'
         );
@@ -884,6 +910,14 @@
     listEl.hidden = false;
     input.setAttribute('aria-expanded', 'true');
     input.setAttribute('aria-activedescendant', 'aws-opt-' + at + '-' + s.combo.active);
+  }
+
+  // Whether another option has the same full name as option `i`.
+  function _sameName(s, opts, i) {
+    var name = fold(_fullOf(s, opts[i].sid));
+    return opts.some(function (o, j) {
+      return j !== i && fold(_fullOf(s, o.sid)) === name;
+    });
   }
 
   function _closeCombo(s, input, revert) {
@@ -938,7 +972,7 @@
   /* ── Actions ── */
   function _turn(no) {
     var s = _s;
-    if (!s || s.phase !== 'split' || s.turning[no]) return;
+    if (!s || s.phase !== 'split' || s.turning[no] || _turningAll(s)) return;
     var p = s.m.page(no);
     if (!p) return;
     var was = p.page;
@@ -964,7 +998,9 @@
 
   function _match() {
     var s = _s;
-    if (!s || s.phase !== 'split' || !s.m.canMatch()) return;
+    if (!s || s.phase !== 'split' || !s.m.canMatch() || _turningAll(s)) return;
+    // The choices used, for Set Up Like Last Time: no student data.
+    if (_t('AddWorkSplitSetup')) AddWorkSplitSetup.save(s.cid, s.aid, s.m);
     var before = {};
     s.m.pages().forEach(function (p) {
       before[p.no] = true;
@@ -1036,6 +1072,12 @@
     if (what === 'leave') return _leave();
     if (what === 'close') return close();
     if (s.phase !== 'split') return;
+    var touched = ['AddWorkSplitMove', 'AddWorkSplitSetup', 'AddWorkSplitTurn', 'AddWorkSplitStickers'].some(
+      function (name) {
+        return _t(name) && _t(name).click(s, what, btn, _ctx);
+      },
+    );
+    if (touched) return;
     if (what === 'match') return _match();
     if (what === 'option') return _commit(s, at, btn.getAttribute('data-sid'), 'next');
     if (what === 'per') {
@@ -1047,6 +1089,7 @@
       return _draw({ glide: true });
     }
     if (what === 'order') {
+      if (s.noListOrder) return;
       s.m.setOrder(btn.getAttribute('data-order'));
       return _draw();
     }
@@ -1109,6 +1152,7 @@
       e.preventDefault();
       if (opts.length) {
         combo.active = (combo.active + (key === 'ArrowDown' ? 1 : opts.length - 1)) % opts.length;
+        combo.picked = true;
         _drawCombo(s, input);
       } else if (key === 'ArrowDown') {
         var btns = _cardButtons(input);
@@ -1118,6 +1162,15 @@
     }
     if (key === 'Enter') {
       e.preventDefault();
+      // Two students with this very name (one in each class, or twins): the
+      // teacher picks one with the arrows; Return alone takes neither (rule 6).
+      if (opts.length && !combo.picked && _sameName(s, opts, combo.active)) {
+        var note = s.overlay.querySelector('.aws-note');
+        if (note)
+          note.textContent =
+            'Two students are named ' + _fullOf(s, opts[combo.active].sid) + '. Choose one with the arrow keys.';
+        return;
+      }
       if (opts.length) return _commit(s, at, opts[combo.active].sid, 'next');
       var p = s.m.pieces()[at];
       var shown = p && p.sid ? _fullOf(s, p.sid) : '';
@@ -1148,6 +1201,15 @@
         if (target.scrollIntoView) target.scrollIntoView({ block: 'nearest' });
       }
       return;
+    }
+    // Space, while no name is being typed: the piece's pages full size.
+    if (key === ' ' && _t('AddWorkSplitMove')) {
+      var p3 = s.m.pieces()[at];
+      if (p3 && (!input.value.trim() || input.value === (p3.sid ? _fullOf(s, p3.sid) : ''))) {
+        e.preventDefault();
+        _closeCombo(s, input, true);
+        return AddWorkSplitMove.view(s, at, p3.first, _ctx);
+      }
     }
     if (key === '[' || key === ']') {
       e.preventDefault();
@@ -1181,6 +1243,7 @@
     if (!s || e.defaultPrevented || s.phase !== 'split') return;
     var t = e.target;
     if (t && t.classList && t.classList.contains('aws-name')) return _nameKey(s, e, t);
+    if (_t('AddWorkSplitMove') && AddWorkSplitMove.key(s, e)) return;
     if (t && t.closest && t.closest('.aws-card') && t.tagName === 'BUTTON') return _cardKey(s, e, t);
   }
 
@@ -1202,6 +1265,7 @@
       s.combo.opts.length
     )
       return _closeCombo(s, active, false);
+    if (_t('AddWorkSplitMove') && AddWorkSplitMove.escape(s, _ctx)) return;
     _leave();
   }
 
@@ -1232,17 +1296,38 @@
     return sortStudents(getStudents(cid) || [], 'lastName');
   }
 
+  // What the touches' files may use of this page.
+  var _ctx = {
+    state: function () {
+      return _s;
+    },
+    draw: function (o) {
+      _draw(o);
+    },
+    busy: function () {
+      return !_s || _turningAll(_s);
+    },
+    full: _fullOf,
+    call: _callOf,
+  };
+
   function open(cid, aid, file, opts) {
     var a = _assessment(cid, aid);
     if (!a || !takes([file]) || !window.PhotoShrink) return false;
     close(true);
     opts = opts || {};
-    var list = _students(cid, a) || [];
+    // opts.list (two classes, B6): both classes' students; opts.had(sid)
+    // says who has work in their own class; opts.label(sid) their class.
+    var list = (Array.isArray(opts.list) && opts.list) || _students(cid, a) || [];
     var byId = {};
     var subs = {};
     list.forEach(function (st) {
       byId[st.id] = st;
-      if (typeof getStudentSubmission === 'function' && getStudentSubmission(cid, st.id, aid)) subs[st.id] = true;
+      var had =
+        typeof opts.had === 'function'
+          ? opts.had(st.id)
+          : typeof getStudentSubmission === 'function' && getStudentSubmission(cid, st.id, aid);
+      if (had) subs[st.id] = true;
     });
     var overlay = document.createElement('div');
     overlay.id = 'add-work-split-overlay';
@@ -1273,6 +1358,9 @@
       opener: document.activeElement,
       onPieces: typeof opts.onPieces === 'function' ? opts.onPieces : null,
       onClose: typeof opts.onClose === 'function' ? opts.onClose : null,
+      label: typeof opts.label === 'function' ? opts.label : null,
+      noListOrder: !!opts.noListOrder,
+      cids: Array.isArray(opts.cids) ? opts.cids : null, // two classes (B6): both, for their sticker codes
     };
     _s = s;
     overlay.addEventListener('click', _click);
@@ -1281,6 +1369,8 @@
     overlay.addEventListener('focusin', _focusIn);
     overlay.addEventListener('focusout', _focusOut);
     overlay.addEventListener('keydown', _keyIn);
+    // A page dragged onto another piece, before "nothing dropped here".
+    if (_t('AddWorkSplitMove')) AddWorkSplitMove.listen(overlay, _ctx);
     overlay.addEventListener('dragover', _noDrop);
     overlay.addEventListener('drop', _noDrop);
     document.addEventListener('keydown', _keydown, true);
@@ -1311,6 +1401,10 @@
       m.setPer(startPer(m.counts().kept, list.length));
       s.m = m;
       s.phase = 'split';
+      var fresh = { per: m.per(), order: m.order(), leaveOut: m.leaveOut() };
+      if (_t('AddWorkSplitSetup')) AddWorkSplitSetup.apply(s, fresh);
+      if (_t('AddWorkSplitTurn')) AddWorkSplitTurn.find(s, _ctx);
+      if (_t('AddWorkSplitStickers')) AddWorkSplitStickers.start(s, _ctx);
       _draw({ focus: '__none' });
       var first = _nameInput(s, 0);
       if (first) first.focus();
@@ -1328,6 +1422,8 @@
     _s = null;
     document.removeEventListener('keydown', _keydown, true);
     if (window.removeEventListener) window.removeEventListener('beforeunload', _beforeUnload);
+    if (_t('AddWorkPageView')) AddWorkPageView.close();
+    if (_t('AddWorkSplitMove')) AddWorkSplitMove.unlisten();
     // The scan and its pages are let go.
     Object.keys(s.thumbs).forEach(function (no) {
       _revoke(s.thumbs[no].url);

@@ -1517,6 +1517,50 @@ describe('the removal worker and sweep', () => {
     expect(t.logs).toContainEqual({ route: 'sweep', worker: 'ran', removed: 0, skipped: 3, left: 0 });
   });
 
+  it('a handout file is removed from handout-files, beside the photos, and both are reported done', async () => {
+    const t = setup();
+    const FILE = `${C1}/${REQ2}.epub`;
+    t.world.override.removal_batch = () => ({
+      ok: true,
+      items: [
+        { id: 11, bucket: 'student-photos', path: `${C1}/${LAB}/${CECE}/${REQ}/${REQ2}.jpg` },
+        { id: 12, bucket: 'handout-files', path: FILE },
+        // A file's name in the photos' bucket, or a photo's in the files', is neither deleted nor reported.
+        { id: 13, bucket: 'student-photos', path: FILE },
+        { id: 14, bucket: 'handout-files', path: `${C1}/${LAB}/${CECE}/${REQ}/${REQ2}.jpg` },
+        { id: 15, bucket: 'handout-files', path: `${C1}/${REQ2}.exe` },
+      ],
+      left: 0,
+    });
+    await t.send({ route: 'sweep', access_token: TEACHER_TOKEN });
+    expect(t.world.storeCalls.filter(c => c[0] === 'remove')).toEqual([
+      ['remove', [`${C1}/${LAB}/${CECE}/${REQ}/${REQ2}.jpg`]],
+      ['remove', [FILE], 'handout-files'],
+    ]);
+    expect(t.world.calls.filter(c => c[0] === 'removal_done').map(c => c[1])).toEqual([['{11}'], ['{12}']]);
+    expect(t.logs).toContainEqual(expect.objectContaining({ route: 'sweep', worker: 'ran', skipped: 3 }));
+  });
+
+  it('the photos are reported done before handout-files is touched, so a failure there strands none of them', async () => {
+    const t = setup();
+    t.world.override.removal_batch = () => ({
+      ok: true,
+      items: [
+        { id: 21, bucket: 'student-photos', path: `${C1}/${LAB}/${CECE}/${REQ}/${REQ2}.jpg` },
+        { id: 22, bucket: 'handout-files', path: `${C1}/${REQ2}.html` },
+      ],
+      left: 0,
+    });
+    const remove = t.world.store.remove;
+    t.world.store.remove = async (paths, bucket) => {
+      if (bucket === 'handout-files') throw Object.assign(new Error('storage remove 503'), { name: 'StorageError' });
+      return remove(paths, bucket);
+    };
+    await t.send({ route: 'sweep', access_token: TEACHER_TOKEN });
+    expect(t.world.calls.filter(c => c[0] === 'removal_done').map(c => c[1])).toEqual([['{21}']]);
+    expect(t.logs).toContainEqual(expect.objectContaining({ route: 'sweep', worker: 'error', kind: 'StorageError' }));
+  });
+
   it('a failed removal is logged, never reaches the answer, and nothing is reported done', async () => {
     const t = setup();
     const s = await started(t, {}, []);

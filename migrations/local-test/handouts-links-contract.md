@@ -88,3 +88,63 @@ So the function needs: the handout shape accepted in `remove` and `signDownloads
 - Backups and Download All My Data leave them out.
 - A handout's pages do not count against the class's limit for students' photos.
 - Keep Photos Until never deletes a handout. It goes when it is removed, when its assessment is deleted, or when its class is purged.
+
+## Handout files (2026-11-17, `migrations/2026111706_handout_files.sql`)
+
+Colin's call of Nov 17: "+ Add a PDF" becomes "+ Add a File". A PDF works as above. A web page, a text file or an EPUB is kept as the teacher chose it (DECISIONS, Handouts and Links 6 to 11).
+
+### The row
+
+`kind` may also be `html`, `txt` or `epub`. Such a row has `url` and `page_count` null and two more keys:
+
+```json
+{ "kind": "html", "bytes": 52000, "path": "<class>/<id>.html", "finish_by": "timestamptz while uploading" }
+```
+
+`bytes` is the size declared at the start, and the stored size once `ready`. A PDF's and a link's row answer exactly as before (no `bytes`, no `path`).
+
+### Teacher functions
+
+| Function                                                                           | Answers                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start_handout_file(p_assessment_id, p_title, p_kind, p_bytes, p_idempotency_key)` | The row, `uploading`, plus `bucket` (`handout-files`). `p_kind` `html`, `txt` or `epub`, and `p_bytes` 1 to 20971520, or `22023`. With no `p_title` the title is `Handout`. Counts toward the 50.                                                                                                                                                         |
+| `finish_handout_file(p_resource_id, p_idempotency_key)`                            | The row, `ready` (with the stored `bytes`) when the file is in storage typed as its kind and within 20 MB. Otherwise still `uploading` with `missing: true` (send it again) or `bad: true` (the stored file is another type or size: it cannot be replaced, so remove the handout); nothing is remembered. `{ id, status: 'gone' }` when it is not there. |
+
+`remove_assessment_resource` and `list_course_resources` take files as they take PDFs.
+
+### Uploading and reading a file (the teacher's browser)
+
+- Bucket `handout-files`: private, 20 MB a file, and only `text/html`, `text/plain` and `application/epub+zip`. Upload with the kind's type as the file's own type (storage reads a Blob's type), never `upsert`.
+- Upload, signed in, to exactly the `path` `start_handout_file` gave, within two hours of the start. Storage refuses any other name, a second upload to the same name, and any upload once the file is `ready`. Nothing can be changed or deleted from the browser.
+- Read a file of your own class with a signed link made signed in (`createSignedUrl` on `handout-files`).
+- A web page's pictures are put inside it before upload (`shared/handout-files.js`); text is stored as UTF-8.
+
+### The student page
+
+- `page`: `resources[].kind` is `html`, `txt` or `epub` for a file; `url` and `page_count` are null. The edge function copies such an item with no address.
+- `handout_file(p_session_token, p_enrollment_id, p_resource_id, p_ip_hash)`:
+
+  ```json
+  {
+    "ok": true,
+    "bucket": "handout-files",
+    "resource_id": "uuid",
+    "assessment_id": "uuid",
+    "title": "Lesson 1.1 Practice",
+    "kind": "html",
+    "bytes": 52000,
+    "path": "<class>/<id>.html"
+  }
+  ```
+
+  or `{ ok: false, error }` under the same checks as `handout_links` (a PDF, a link, a file still uploading, another class, a Draft or a piece dated into the future: `not_found`).
+
+- The edge function's route `handout-file` (`supabase/functions/student-submit/handout-routes.ts`) checks the bucket, that the path is this resource's of the kind named, and the size, then answers `{ ok, kind, bytes, title, url }` with one link signed for 60 seconds in `handout-files`. The page fetches it and shows it with `shared/handout-viewer.js`: text through `textContent`; a web page or an EPUB only in the sealed frame `shared/handout-frame.html` (sandbox without `allow-same-origin`, and its own policy from `netlify/edge-functions/inject-env.js`, which loads nothing from any other address: no `https:` picture, font, style or script, `connect-src 'none'`, `frame-src 'none'`). A page's `localStorage` and `sessionStorage` there are an in-memory stand-in. The frame may open no window (no `allow-popups`); a student's own click on a web link is passed to the viewer, which opens it only after the student presses Open Website. An EPUB that would unzip past 100 MB, by its zip directory, is not opened (Save to Phone still works).
+- The removal worker deletes a queued file from `handout-files` (`storageRest(...).remove(paths, 'handout-files')`), and `removal_done` asks that bucket whether it is gone.
+
+### What is not done
+
+- Copies of an assessment do not carry files. Backups and Download All My Data leave them out.
+- A web page's own stylesheets and scripts that sit beside it on disk are not put inside it (pictures only).
+- The EPUB reader has no table of contents; links between chapters work.
+- `handout-files` has no nightly stray sweep (`_photo_strays` looks only in `student-photos`), and none is added: a stray there would be a file with no row, and none can arise from the app. A teacher can write a name only while its row is `uploading` (the policy is checked again when Storage records the file), removing the row queues the name, and the worker looks again after ten minutes (`link_dies_at`), so a file recorded in that moment is deleted too. An upload never finished is dropped by the nightly job and its name queued. Only a file put there by hand (the dashboard, the service key) would stay; catching that would need a SQL sweep like `_photo_strays` for this bucket.

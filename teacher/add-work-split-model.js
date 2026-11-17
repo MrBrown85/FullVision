@@ -9,7 +9,8 @@
    AddWorkSplitModel.model(pages, students)   the model (see below).
    AddWorkSplitModel.matches(list, text, used) the name box's students.
    AddWorkSplitModel.startPer(kept, students)  Pages per Student to start.
-   AddWorkSplitModel.isBlank(sharpness)        under BLANK_BELOW. */
+   AddWorkSplitModel.isBlank(sharpness)        under BLANK_BELOW.
+   AddWorkSplitModel.pagesText(spans, cap)     "Pages 3–5" or "pages 7–8, 21". */
 /** @type {any} */ (window).AddWorkSplitModel = (function () {
   'use strict';
 
@@ -114,7 +115,21 @@
       return { no: i + 1, page: g.page, blank: !!g.blank, kept: false, cut: false };
     });
     var list = (students || []).slice();
-    var st = { per: 1, leaveOut: true, order: 'typed', pins: {} };
+    /* stickers (B4): page no → what the sticker read on that page says,
+       { sid, why, code, also } (teacher/add-work-split-stickers.js sets
+       them for the pieces' first pages). Kept against the page, as a typed
+       name is. stickersOn: once stickers are being read, an emptied box is
+       kept as "no one" so the piece's sticker does not name it again. */
+    var st = {
+      per: 1,
+      leaveOut: true,
+      order: 'typed',
+      pins: {},
+      stickers: {},
+      inside: {},
+      read: {},
+      stickersOn: false,
+    };
 
     function out(p) {
       return st.leaveOut && p.blank && !p.kept;
@@ -180,14 +195,69 @@
       return _count() === list.length;
     }
 
+    /* A piece's name: the name typed on it; else its sticker's student,
+       unless that student is typed on another piece (a clash: shown on both,
+       nothing changed); else, in Class List Order, the listed student. A
+       sticker's name counts as typed, so a sticker that disagrees with the
+       list shows as one student on two pieces, and nothing can be matched
+       until the teacher changes one (review rule 3 is unchanged: the list
+       names pieces only when there is one piece for each student). */
     function pieces() {
       if (!_keptAll().length) return [];
       var runs = _runs();
       var byList = st.order === 'list' && runs.length === list.length;
-      return runs.map(function (r, at) {
+      var has = Object.prototype.hasOwnProperty;
+      var typedAt = {};
+      runs.forEach(function (r, at) {
+        var no = pages[r.kept[0]].no;
+        if (has.call(st.pins, no) && st.pins[no]) typedAt[st.pins[no]] = at;
+      });
+      var clashFrom = {};
+      var out2 = runs.map(function (r, at) {
         var first = pages[r.kept[0]];
-        var pin = Object.prototype.hasOwnProperty.call(st.pins, first.no) ? st.pins[first.no] : undefined;
-        var sid = pin !== undefined ? pin : byList ? list[at].id : '';
+        var pin = has.call(st.pins, first.no) ? st.pins[first.no] : undefined;
+        var sticker = has.call(st.stickers, first.no) ? st.stickers[first.no] : null;
+        var bySticker = false;
+        var clash = -1;
+        var sid = pin;
+        /* A wrong cut: a later page of this piece carries a sticker that is
+           not its own student's (`inside`, page no → sid, '?' for one not
+           of the class). The piece is not named by its sticker; a typed
+           name stays, and the warning shows. */
+        var own = pin || (sticker && sticker.sid) || '';
+        /** @type {any} */
+        var wrong = null;
+        for (var w = 1; w < r.kept.length && !wrong; w++) {
+          var later = pages[r.kept[w]].no;
+          var whose = has.call(st.inside, later) ? st.inside[later] : '';
+          if (whose && whose !== own) wrong = { no: later, pos: w + 1, sid: whose };
+        }
+        /* Named by sticker only once every kept page of the piece has been
+           read (a later page may show a wrong cut): until then it is
+           pending, and has no name. A typed name never waits. */
+        var pending = false;
+        if (wrong && pin === undefined && sticker && sticker.sid) sid = '';
+        else if (
+          pin === undefined &&
+          sticker &&
+          sticker.sid &&
+          r.kept.some(function (i) {
+            return !has.call(st.read, pages[i].no);
+          })
+        ) {
+          pending = true;
+          sid = '';
+        } else if (pin === undefined && sticker && sticker.sid) {
+          var there = typedAt[sticker.sid];
+          if (there !== undefined && there !== at) {
+            clash = there;
+            (clashFrom[there] = clashFrom[there] || []).push(at);
+          } else {
+            sid = sticker.sid;
+            bySticker = true;
+          }
+        }
+        if (sid === undefined) sid = byList ? list[at].id : '';
         return {
           at: at,
           from: r.from,
@@ -202,8 +272,44 @@
           }),
           sid: sid || '',
           typed: pin !== undefined,
+          spans: _spans(r),
+          sticker: sticker,
+          bySticker: bySticker,
+          clash: clash,
+          clashFrom: [],
+          wrong: wrong,
+          pending: pending,
         };
       });
+      Object.keys(clashFrom).forEach(function (at) {
+        out2[Number(at)].clashFrom = clashFrom[at];
+      });
+      return out2;
+    }
+
+    /* A piece's kept pages as runs that sit together in the scan: [[3, 5]]
+       for pages 3 to 5 (a blank page 4 left out between them), [[7, 8],
+       [21, 21]] once page 21 was moved onto it. */
+    function _spans(r) {
+      var spans = [];
+      /** @type {any} */
+      var prev = null;
+      for (var i = r.from; i < r.to; i++) {
+        var p = pages[i];
+        if (!prev || p.no !== prev.no + 1) spans.push({ a: 0, b: 0 });
+        prev = p;
+        if (out(p)) continue;
+        var sp = spans[spans.length - 1];
+        if (!sp.a) sp.a = p.no;
+        sp.b = p.no;
+      }
+      return spans
+        .filter(function (sp) {
+          return sp.a;
+        })
+        .map(function (sp) {
+          return [sp.a, sp.b];
+        });
     }
 
     function _index(no) {
@@ -237,6 +343,57 @@
       return true;
     }
 
+    /* Page `no` moved onto piece `toAt`, to be its page `pos` + 1 (`pos`
+       from 1, after the piece's first page, to its count, the end; the end
+       when left out), for a pile that came out of order. → { ok, reason,
+       gone, unnamed }.
+
+       What it does to names (review rule 5: a name belongs to the page it
+       was read from):
+       - The piece it lands on keeps its first page, so it keeps its name.
+         A moved page is never a piece's first page.
+       - A name read from the moved page goes nowhere with it.
+       - The piece it left keeps its name while it starts on the same page.
+         When the moved page was its first, it now starts on another page
+         and has no name (`unnamed`: the sid it had), even in Class List
+         Order, until the teacher names it.
+       - A piece left with no pages goes away, and its name with it
+         (`gone`: { at, sid }).
+       A piece holds 30 pages at most: a full piece takes none
+       ('too_many_pages'). Only a page in a piece moves (not one left out). */
+    function move(no, toAt, pos) {
+      var ps = pieces();
+      var src = ps.find(function (p) {
+        return p.nos.indexOf(no) >= 0;
+      });
+      var dst = ps[toAt];
+      if (!src || !dst) return { ok: false, reason: 'not_found' };
+      if (src.at === dst.at) return { ok: false, reason: 'same' };
+      if (dst.nos.length >= _maxPiece()) return { ok: false, reason: 'too_many_pages' };
+      var n = dst.nos.length;
+      pos = pos === undefined || pos === null ? NaN : Math.round(Number(pos));
+      pos = isFinite(pos) ? Math.max(1, Math.min(n, pos)) : n;
+      var wasFirst = src.nos[0] === no;
+      var gone = src.nos.length === 1;
+      var i = _index(no);
+      var p = pages[i];
+      delete st.pins[no];
+      pages.splice(i, 1);
+      // The piece it left still starts where it did (a cut moves to its next page).
+      if (p.cut && i < src.to - 1) pages[i].cut = true;
+      if (wasFirst && !gone) st.pins[src.nos[1]] = '';
+      p.cut = false;
+      var at = pos < n ? _index(dst.nos[pos]) : _index(dst.nos[n - 1]) + 1;
+      pages.splice(at, 0, p);
+      _tidy();
+      return {
+        ok: true,
+        reason: '',
+        gone: gone ? { at: src.at, sid: src.sid } : null,
+        unnamed: wasFirst && !gone ? src.sid : '',
+      };
+    }
+
     // A blank page kept, or left out again. Only a blank page is ever left out.
     function keep(no, on) {
       var i = _index(no);
@@ -260,8 +417,29 @@
       var p = pieces()[at];
       if (!p) return false;
       sid = String(sid || '');
-      if (!sid && st.order !== 'list') delete st.pins[p.first];
+      if (!sid && st.order !== 'list' && !st.stickersOn) delete st.pins[p.first];
       else st.pins[p.first] = sid;
+      return true;
+    }
+
+    /* Stickers (B4). setStickers(map): page no → { sid, why, code, also }
+       for the pieces' first pages, replacing what was there; inside: page
+       no → whose sticker is on every page read (a listed student's sid,
+       live or retired, or '?'); on a later page, anyone's but the piece's
+       own student's is a wrong cut. read: page no → true for every page
+       whose picture has been read.
+       useSticker(at): the teacher asks for the sticker's name on a piece
+       they had typed or emptied: their name on it is let go. */
+    function setStickers(map, inside, read) {
+      st.stickers = map || {};
+      st.inside = inside || {};
+      st.read = read || {};
+      st.stickersOn = true;
+    }
+    function useSticker(at) {
+      var p = pieces()[at];
+      if (!p || !p.sticker || !p.sticker.sid) return false;
+      delete st.pins[p.first];
       return true;
     }
 
@@ -328,7 +506,7 @@
         if (!p.sid) return;
         handed.push({
           sid: p.sid,
-          from: 'Scan, ' + (p.first === p.last ? 'page ' + p.first : 'pages ' + p.first + '–' + p.last),
+          from: 'Scan, ' + pagesText(p.spans, false),
           pages: p.nos.map(function (no, i) {
             var copy = Object.assign({}, page(no).page);
             copy.name = 'page-' + (i + 1) + '.jpg';
@@ -410,10 +588,13 @@
       setPer: setPer,
       more: more,
       fewer: fewer,
+      move: move,
       keep: keep,
       setLeaveOut: setLeaveOut,
       setOrder: setOrder,
       name: name,
+      setStickers: setStickers,
+      useSticker: useSticker,
       setPage: setPage,
       twice: twice,
       counts: counts,
@@ -423,8 +604,25 @@
     };
   }
 
+  /* "Pages 3–5", "Page 12", "Pages 7–8, 21" from a piece's spans; small
+     letters when `cap` is false. */
+  function pagesText(spans, cap) {
+    var list = spans || [];
+    var one = list.length === 1 && list[0][0] === list[0][1];
+    var word = (cap === false ? 'p' : 'P') + (one ? 'age ' : 'ages ');
+    return (
+      word +
+      list
+        .map(function (sp) {
+          return sp[0] === sp[1] ? String(sp[0]) : sp[0] + '–' + sp[1];
+        })
+        .join(', ')
+    );
+  }
+
   return {
     model: model,
+    pagesText: pagesText,
     matches: matches,
     fold: fold,
     first: _first,

@@ -7288,6 +7288,18 @@ label.cm-cr-row {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Print Sticker Sheets, on a row of its own under the cards' buttons. */
+.sc-stickers {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 2px;
+}
+.sc-stickers .cm-hint {
+  margin: 0;
+}
 .sc-table {
   width: 100%;
   border-collapse: collapse;

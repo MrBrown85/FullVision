@@ -468,8 +468,8 @@ export function fakeWorld(opts = {}) {
       // storage-rest.ts sends Cache-Control: private, no-store with every overwrite (its own test proves it).
       objects.set(path, { bytes, type: 'image/jpeg', cache: 'private, no-store' });
     },
-    async remove(paths) {
-      storeCalls.push(['remove', paths]);
+    async remove(paths, bucket) {
+      storeCalls.push(['remove', paths, ...(bucket ? [bucket] : [])]);
       for (const p of paths) objects.delete(p);
     },
   };

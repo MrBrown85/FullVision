@@ -25,6 +25,47 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION fv_private.handout_file_path_parts(p_name text)
+ RETURNS TABLE(course_id uuid, resource_id uuid, kind text)
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select m[1]::uuid, m[2]::uuid, m[3]
+      from regexp_match(p_name, '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(html|txt|epub)$') m
+     where m is not null;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.handout_file_read_allowed(p_name text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select (select auth.uid()) is not null
+       and exists (select 1
+                     from fv_private.handout_file_path_parts(p_name) h
+                     join assessment_resource r on r.id = h.resource_id
+                    where r.course_id = h.course_id and r.kind = h.kind
+                      and fv_owns_assessment(r.assessment_id));
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.handout_file_upload_allowed(p_name text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select (select auth.uid()) is not null
+       and exists (select 1
+                     from fv_private.handout_file_path_parts(p_name) h
+                     join assessment_resource r on r.id = h.resource_id
+                    where r.course_id = h.course_id and r.kind = h.kind
+                      and r.status = 'uploading'
+                      and r.created_at >= now() - _work_hold()
+                      and fv_owns_assessment(r.assessment_id));
+$function$;
+
 CREATE OR REPLACE FUNCTION fv_private.handout_path_parts(p_name text)
  RETURNS TABLE(course_id uuid, resource_id uuid, page integer)
  LANGUAGE sql
@@ -333,6 +374,48 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION fv_private.scan_label_new(p_enrollment_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+    _alphabet constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    _b    bytea;
+    _code text;
+    _try  int := 0;
+begin
+    loop
+        _try := _try + 1;
+        -- Twelve characters of five random bits each. gen_random_uuid() draws from
+        -- the server's strong random source; its bytes 0 to 5 and 10 to 15 are
+        -- random in every bit (bytes 6 and 8 carry the version and the variant).
+        _b := uuid_send(gen_random_uuid());
+        _code := '';
+        for _i in 0..11 loop
+            _code := _code || substr(_alphabet, (get_byte(_b, case when _i < 6 then _i else _i + 4 end) & 31) + 1, 1);
+        end loop;
+        begin
+            insert into public.scan_label (enrollment_id, code) values (p_enrollment_id, _code);
+            return _code;
+        exception when unique_violation then
+            -- The student already has a live code: that one is the answer.
+            select l.code into _code from public.scan_label l
+             where l.enrollment_id = p_enrollment_id and l.retired_at is null;
+            if found then
+                return _code;
+            end if;
+            -- Otherwise the code itself is taken (sixty random bits: it will not
+            -- happen, and if it does, draw again).
+            if _try >= 5 then
+                raise;
+            end if;
+        end;
+    end loop;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION fv_private.teacher_of(p_kind text, p_id uuid)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -542,7 +625,10 @@ AS $function$
                    then jsonb_build_object('paths', (select jsonb_agg(_handout_path(r.course_id, r.id, n) order by n)
                                                        from generate_series(1, r.page_count) n))
                    else '{}'::jsonb end
-           || case when r.kind = 'pdf' and r.status = 'uploading'
+           || case when r.kind in ('html', 'txt', 'epub')
+                   then jsonb_build_object('bytes', r.bytes, 'path', _handout_file_path(r.course_id, r.id, r.kind))
+                   else '{}'::jsonb end
+           || case when r.kind <> 'link' and r.status = 'uploading'
                    then jsonb_build_object('finish_by', r.created_at + _work_hold())
                    else '{}'::jsonb end
       from assessment_resource r
@@ -562,6 +648,11 @@ begin
         insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
         select _work_bucket(), _handout_path(old.course_id, old.id, n), old.course_id, _why, now() + interval '10 minutes'
           from generate_series(1, old.page_count) n
+        on conflict (bucket, path) do nothing;
+    elsif old.kind in ('html', 'txt', 'epub') then
+        insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
+        values (_handout_file_bucket(), _handout_file_path(old.course_id, old.id, old.kind), old.course_id, _why,
+                now() + interval '10 minutes')
         on conflict (bucket, path) do nothing;
     end if;
     return null;
@@ -1292,11 +1383,63 @@ declare
 begin
     perform set_config('fv.handout_removal_reason', 'handout_expired', true);
     delete from assessment_resource
-     where course_id = p_course_id and kind = 'pdf' and status = 'uploading' and created_at < now() - _work_hold();
+     where course_id = p_course_id and kind <> 'link' and status = 'uploading' and created_at < now() - _work_hold();
     get diagnostics _n = row_count;
     perform set_config('fv.handout_removal_reason', '', true);
     return _n;
 end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public._handout_file_bucket()
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select 'handout-files'::text;
+$function$;
+
+CREATE OR REPLACE FUNCTION public._handout_file_max_bytes()
+ RETURNS bigint
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select 20971520::bigint;
+$function$;
+
+CREATE OR REPLACE FUNCTION public._handout_file_mime(p_kind text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select case p_kind when 'html' then 'text/html' when 'txt' then 'text/plain' when 'epub' then 'application/epub+zip' end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public._handout_file_object(p_path text)
+ RETURNS TABLE(bytes bigint, mimetype text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select nullif(o.metadata->>'size', '')::bigint, o.metadata->>'mimetype'
+      from storage.objects o
+     where o.bucket_id = public._handout_file_bucket()
+       and o.name = p_path collate "C"
+       and o.archived_at is null
+       and not o.is_delete_marker
+     limit 1;
+$function$;
+
+CREATE OR REPLACE FUNCTION public._handout_file_path(p_course_id uuid, p_resource_id uuid, p_kind text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select p_course_id::text || '/' || p_resource_id::text || '.' || p_kind
+     where p_kind in ('html', 'txt', 'epub');
 $function$;
 
 CREATE OR REPLACE FUNCTION public._handout_path(p_course_id uuid, p_resource_id uuid, p_page integer)
@@ -3906,6 +4049,51 @@ begin
     end loop;
     return _n;
 end; $function$;
+
+CREATE OR REPLACE FUNCTION public.finish_handout_file(p_resource_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _course uuid;
+    _r      assessment_resource%rowtype;
+    _o      record;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select r.course_id into _course from assessment_resource r
+     where r.id = p_resource_id and r.kind in ('html', 'txt', 'epub') and fv_owns_assessment(r.assessment_id);
+    if _course is not null then
+        perform _grade_return_lock_first(_course);
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'finish_handout_file');
+    if _cached is not null then return _cached; end if;
+    if _course is null then
+        return jsonb_build_object('id', p_resource_id, 'status', 'gone');
+    end if;
+    perform _handout_drop_expired(_course);
+    select * into _r from assessment_resource where id = p_resource_id for update;
+    if not found then
+        return jsonb_build_object('id', p_resource_id, 'status', 'gone');
+    end if;
+    if _r.status = 'uploading' then
+        select o.bytes, o.mimetype into _o from _handout_file_object(_handout_file_path(_r.course_id, _r.id, _r.kind)) o;
+        if not found then
+            return _assessment_resource_json(_r.id) || jsonb_build_object('missing', true);
+        end if;
+        if _o.mimetype is distinct from _handout_file_mime(_r.kind)
+           or coalesce(_o.bytes, 0) not between 1 and _handout_file_max_bytes() then
+            return _assessment_resource_json(_r.id) || jsonb_build_object('bad', true);
+        end if;
+        update assessment_resource set status = 'ready', bytes = _o.bytes, updated_at = now() where id = _r.id;
+    end if;
+    _cached := _assessment_resource_json(_r.id);
+    perform fv_idem_store(p_idempotency_key, 'finish_handout_file', _cached);
+    return _cached;
+end;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.finish_handout_upload(p_resource_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -7077,6 +7265,47 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _e      uuid;
+    _out    jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'issue_scan_labels');
+    if _cached is not null then
+        return _cached;
+    end if;
+    -- Another teacher's class, one in the trash, or one that is gone: nothing
+    -- is made and nothing is said about it.
+    if not fv_owns_course(p_course_id) then
+        return jsonb_build_object('labels', '[]'::jsonb);
+    end if;
+    -- One call at a time for a class, so two windows printing at once give
+    -- each student one code, not two.
+    perform pg_advisory_xact_lock(hashtext('fv.scan_label'), hashtext(p_course_id::text));
+    for _e in
+        select e.id from enrollment e
+         where e.course_id = p_course_id and e.withdrawn_at is null
+           and not exists (select 1 from scan_label l where l.enrollment_id = e.id and l.retired_at is null)
+         order by e.roster_position, e.id
+    loop
+        perform fv_private.scan_label_new(_e);
+    end loop;
+    _out := jsonb_build_object('labels', coalesce((
+        select jsonb_agg(jsonb_build_object('enrollment_id', l.enrollment_id, 'code', l.code) order by e.roster_position, e.id)
+          from scan_label l join enrollment e on e.id = l.enrollment_id
+         where e.course_id = p_course_id and e.withdrawn_at is null and l.retired_at is null), '[]'::jsonb));
+    perform fv_idem_store(p_idempotency_key, 'issue_scan_labels', _out);
+    return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_assessment_copies(p_copy_group uuid)
  RETURNS TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
  LANGUAGE sql
@@ -7624,6 +7853,26 @@ AS $function$
      order by c.display_order, c.name;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.list_scan_labels(p_course_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    -- Another teacher's class, one in the trash, or one that is gone: nothing.
+    if not fv_owns_course(p_course_id) then
+        return jsonb_build_object('labels', '[]'::jsonb);
+    end if;
+    return jsonb_build_object('labels', coalesce((
+        select jsonb_agg(jsonb_build_object('enrollment_id', l.enrollment_id, 'code', l.code, 'retired', l.retired_at is not null)
+                         order by e.roster_position, e.id, l.created_at, l.id)
+          from scan_label l join enrollment e on e.id = l.enrollment_id
+         where e.course_id = p_course_id), '[]'::jsonb));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_student_cards(p_course_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7859,6 +8108,9 @@ begin
         select c.id from public.course c
          where c.id in (select distinct fv_private.work_path_course(o.name) from storage.objects o
                          where o.bucket_id = public._work_bucket() and o.archived_at is null and not o.is_delete_marker)
+        union
+        -- and every class with a handout still uploading (2026111706), so one never finished is dropped
+        select r.course_id from public.assessment_resource r where r.status = 'uploading'
         order by 1
     loop
         begin
@@ -7983,6 +8235,42 @@ begin
     _result := jsonb_build_object('enrollment_id', p_enrollment_id);
     perform fv_idem_store(p_idempotency_key, 'reenrol_student', _result);
     return _result;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.reissue_scan_label(p_enrollment_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _course uuid;
+    _code   text;
+    _out    jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'reissue_scan_label');
+    if _cached is not null then
+        return _cached;
+    end if;
+    -- Another teacher's student, a class in the trash, or a student who is
+    -- gone: nothing changes.
+    if not fv_owns_enrollment(p_enrollment_id) then
+        return jsonb_build_object('label', null);
+    end if;
+    -- A withdrawn student gets no new sheet; the code they had is left as it is.
+    select e.course_id into _course from enrollment e where e.id = p_enrollment_id and e.withdrawn_at is null;
+    if _course is null then
+        return jsonb_build_object('label', null);
+    end if;
+    perform pg_advisory_xact_lock(hashtext('fv.scan_label'), hashtext(_course::text));
+    update scan_label set retired_at = now() where enrollment_id = p_enrollment_id and retired_at is null;
+    _code := fv_private.scan_label_new(p_enrollment_id);
+    _out := jsonb_build_object('label', jsonb_build_object('enrollment_id', p_enrollment_id, 'code', _code));
+    perform fv_idem_store(p_idempotency_key, 'reissue_scan_label', _out);
+    return _out;
 end;
 $function$;
 
@@ -9654,6 +9942,56 @@ begin
     if not found then
         raise exception 'teacher not found' using errcode = 'P0002';
     end if;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _course uuid;
+    _title  text := btrim(coalesce(p_title, ''));
+    _id     uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_assessment(p_assessment_id) then
+        raise exception 'assessment not found' using errcode = 'P0002';
+    end if;
+    if p_kind is null or p_kind not in ('html', 'txt', 'epub') then
+        raise exception 'a handout file is a web page (html), a text file (txt) or an EPUB (epub)' using errcode = '22023';
+    end if;
+    if p_bytes is null or p_bytes < 1 or p_bytes > _handout_file_max_bytes() then
+        raise exception 'a handout file can be 20 MB at most' using errcode = '22023';
+    end if;
+    if _title = '' then
+        _title := 'Handout';
+    end if;
+    if char_length(_title) > 200 then
+        raise exception 'a name can be 200 characters at most' using errcode = '22023';
+    end if;
+    select a.course_id into _course from assessment a where a.id = p_assessment_id;
+
+    perform _grade_return_lock_first(_course);
+    _cached := fv_idem_check(p_idempotency_key, 'start_handout_file');
+    if _cached is not null then return _cached; end if;
+    if not exists (select 1 from assessment a where a.id = p_assessment_id) then
+        raise exception 'assessment not found' using errcode = 'P0002';
+    end if;
+    perform _handout_drop_expired(_course);
+    if (select count(*) from assessment_resource r where r.assessment_id = p_assessment_id) >= 50 then
+        raise exception 'an assessment can hold 50 handouts and links at most' using errcode = '22023';
+    end if;
+    insert into assessment_resource (assessment_id, course_id, kind, title, bytes, status, position)
+    values (p_assessment_id, _course, p_kind, _title, p_bytes, 'uploading',
+            (select coalesce(max(r.position), 0) + 1 from assessment_resource r where r.assessment_id = p_assessment_id))
+    returning id into _id;
+    _cached := _assessment_resource_json(_id) || jsonb_build_object('bucket', _handout_file_bucket());
+    perform fv_idem_store(p_idempotency_key, 'start_handout_file', _cached);
+    return _cached;
 end;
 $function$;
 
@@ -12449,6 +12787,36 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit.handout_file(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in jsonb := _session_class(p_session_token, p_enrollment_id);
+    _r  assessment_resource%rowtype;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    select r.* into _r
+      from assessment_resource r
+      join assessment a on a.id = r.assessment_id
+      join course c on c.id = a.course_id
+     where r.id = p_resource_id and r.kind in ('html', 'txt', 'epub') and r.status = 'ready'
+       and r.course_id = (_in->>'course_id')::uuid and a.course_id = r.course_id
+       and student_submit._listed(a, (now() at time zone public._fv_timezone(c.timezone))::date);
+    if not found then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    return jsonb_build_object(
+        'ok', true, 'bucket', public._handout_file_bucket(),
+        'resource_id', _r.id, 'assessment_id', _r.assessment_id, 'title', _r.title, 'kind', _r.kind,
+        'bytes', _r.bytes, 'path', public._handout_file_path(_r.course_id, _r.id, _r.kind));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit.handout_links(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -13393,7 +13761,9 @@ begin
        -- a path a page has since been given cannot happen (a file's name is
        -- its row's id); if it ever did, the file would not be marked gone
        and not exists (select 1 from submission_file f where f.path = r.path or f.thumb_path = r.path)
-       and not exists (select 1 from public._work_object(r.path));
+       and not exists (select 1 from storage.objects o
+                        where o.bucket_id = r.bucket and o.name = r.path collate "C"
+                          and o.archived_at is null and not o.is_delete_marker);
     get diagnostics _gone = row_count;
     select coalesce(jsonb_agg(r.id order by r.id), '[]'::jsonb) into _still
       from submission_file_removal r

@@ -168,6 +168,7 @@ export type Database = {
       assessment_resource: {
         Row: {
           assessment_id: string
+          bytes: number | null
           course_id: string
           created_at: string
           id: string
@@ -182,6 +183,7 @@ export type Database = {
         ComputedFields: never
         Insert: {
           assessment_id: string
+          bytes?: number | null
           course_id: string
           created_at?: string
           id?: string
@@ -195,6 +197,7 @@ export type Database = {
         }
         Update: {
           assessment_id?: string
+          bytes?: number | null
           course_id?: string
           created_at?: string
           id?: string
@@ -580,6 +583,29 @@ export type Database = {
             foreignKeyName: "course_teacher_id_fkey"
             columns: ["teacher_id"]
             referencedRelation: "teacher"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_opened: {
+        Row: {
+          course_id: string
+          last_opened_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          course_id: string
+          last_opened_at?: string
+        }
+        Update: {
+          course_id?: string
+          last_opened_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_opened_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "course"
             referencedColumns: ["id"]
           },
         ]
@@ -1346,6 +1372,8 @@ export type Database = {
           course_id: string
           created_at: string
           dims: string[]
+          follow_up_kind: string | null
+          follow_up_of: string | null
           id: string
           level: number | null
           sentiment: string | null
@@ -1360,6 +1388,8 @@ export type Database = {
           course_id: string
           created_at?: string
           dims?: string[]
+          follow_up_kind?: string | null
+          follow_up_of?: string | null
           id?: string
           level?: number | null
           sentiment?: string | null
@@ -1373,6 +1403,8 @@ export type Database = {
           course_id?: string
           created_at?: string
           dims?: string[]
+          follow_up_kind?: string | null
+          follow_up_of?: string | null
           id?: string
           level?: number | null
           sentiment?: string | null
@@ -1390,6 +1422,12 @@ export type Database = {
             foreignKeyName: "observation_course_id_fkey"
             columns: ["course_id"]
             referencedRelation: "course"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "observation_follow_up_of_fkey"
+            columns: ["follow_up_of"]
+            referencedRelation: "observation"
             referencedColumns: ["id"]
           },
           {
@@ -2356,6 +2394,38 @@ export type Database = {
             foreignKeyName: "rubric_tag_tag_id_fkey"
             columns: ["tag_id"]
             referencedRelation: "tag"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_label: {
+        Row: {
+          code: string
+          created_at: string
+          enrollment_id: string
+          id: string
+          retired_at: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          code: string
+          created_at?: string
+          enrollment_id: string
+          id?: string
+          retired_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          enrollment_id?: string
+          id?: string
+          retired_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_label_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            referencedRelation: "enrollment"
             referencedColumns: ["id"]
           },
         ]
@@ -3520,6 +3590,26 @@ export type Database = {
         Returns: number
       }
       _handout_drop_expired: { Args: { p_course_id: string }; Returns: number }
+      _handout_file_bucket: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      _handout_file_max_bytes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      _handout_file_mime: { Args: { p_kind: string }; Returns: string }
+      _handout_file_object: {
+        Args: { p_path: string }
+        Returns: {
+          bytes: number
+          mimetype: string
+        }[]
+      }
+      _handout_file_path: {
+        Args: { p_course_id: string; p_kind: string; p_resource_id: string }
+        Returns: string
+      }
       _handout_path: {
         Args: { p_course_id: string; p_page: number; p_resource_id: string }
         Returns: string
@@ -3806,6 +3896,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_observation_follow_up: {
+        Args: {
+          p_body: string
+          p_created_at?: string
+          p_follow_up_of: string
+          p_idempotency_key?: string
+          p_kind?: string
+        }
+        Returns: string
+      }
       create_phone_report: {
         Args: {
           p_course_id: string
@@ -3909,6 +4009,10 @@ export type Database = {
           p_value: number
         }
         Returns: number
+      }
+      finish_handout_file: {
+        Args: { p_idempotency_key?: string; p_resource_id: string }
+        Returns: Json
       }
       finish_handout_upload: {
         Args: { p_idempotency_key?: string; p_resource_id: string }
@@ -4025,6 +4129,10 @@ export type Database = {
         Args: { p_idempotency_key?: string; p_payload: Json }
         Returns: Json
       }
+      issue_scan_labels: {
+        Args: { p_course_id: string; p_idempotency_key?: string }
+        Returns: Json
+      }
       list_assessment_copies: {
         Args: { p_copy_group: string }
         Returns: {
@@ -4076,6 +4184,14 @@ export type Database = {
         Returns: Json
       }
       list_course_guardians: { Args: { p_course_id: string }; Returns: Json }
+      list_course_photo_expiry: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          course_id: string
+          last_opened_at: string
+          photos: number
+        }[]
+      }
       list_course_questionnaires: {
         Args: { p_course_id: string }
         Returns: Json
@@ -4126,6 +4242,7 @@ export type Database = {
           rubric_id: string
         }[]
       }
+      list_scan_labels: { Args: { p_course_id: string }; Returns: Json }
       list_student_cards: { Args: { p_course_id: string }; Returns: Json }
       list_teacher_courses: {
         Args: Record<PropertyKey, never>
@@ -4170,9 +4287,17 @@ export type Database = {
         }
         Returns: Json
       }
+      note_course_opened: {
+        Args: { p_course_id: string; p_idempotency_key?: string }
+        Returns: boolean
+      }
       photo_removal_call: { Args: Record<PropertyKey, never>; Returns: number }
       photo_removal_due: { Args: Record<PropertyKey, never>; Returns: boolean }
       reenrol_student: {
+        Args: { p_enrollment_id: string; p_idempotency_key?: string }
+        Returns: Json
+      }
+      reissue_scan_label: {
         Args: { p_enrollment_id: string; p_idempotency_key?: string }
         Returns: Json
       }
@@ -4383,6 +4508,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      start_handout_file: {
+        Args: {
+          p_assessment_id: string
+          p_bytes: number
+          p_idempotency_key?: string
+          p_kind: string
+          p_title: string
+        }
+        Returns: Json
+      }
       start_handout_upload: {
         Args: {
           p_assessment_id: string
@@ -4443,6 +4578,15 @@ export type Database = {
           p_id: string
           p_patch: Json
           p_tag_ids?: string[]
+        }
+        Returns: undefined
+      }
+      update_observation_follow_up: {
+        Args: {
+          p_body: string
+          p_id: string
+          p_idempotency_key?: string
+          p_kind?: string
         }
         Returns: undefined
       }

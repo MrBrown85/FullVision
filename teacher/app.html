@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/teacher/work-wall.css" />
     <link rel="stylesheet" href="/teacher/add-work-class.css" />
     <link rel="stylesheet" href="/teacher/add-work-split.css" />
+    <link rel="stylesheet" href="/teacher/scan-labels.css" />
     <link rel="stylesheet" href="/teacher/gradebook.css" />
     <link rel="stylesheet" href="/teacher/class-results.css" />
     <link rel="stylesheet" href="/teacher/observations.css" />
@@ -36,6 +37,7 @@
     <link rel="stylesheet" href="/teacher/cm-reflect-answers.css" />
     <link rel="stylesheet" href="/teacher/preview-student.css" />
     <link rel="stylesheet" href="/s/page-view.css" />
+    <link rel="stylesheet" href="/shared/handout-viewer.css" />
     <link rel="stylesheet" href="/shared/phone-report.css" />
     <link rel="stylesheet" href="/teacher/grades-print.css" />
     <!-- Last, so it wins: an iPad held upright only (html.fv-tablet, set by shared/device.js). -->
@@ -100,6 +102,7 @@
     <script src="/shared/data-student-records.js"></script>
     <script src="/shared/data-student-cards.js"></script>
     <script src="/shared/data-student-work.js"></script>
+    <script src="/shared/data-handout-files.js"></script>
     <script src="/shared/data-feedback-live.js"></script>
     <script src="/shared/data-markup.js"></script>
     <script src="/shared/data-reflect.js"></script>
@@ -129,6 +132,9 @@
     <script src="/shared/photo-readers.js"></script>
     <!-- A teacher's files made into pages of work (Add Work, the row's +, Add Work for the Class) -->
     <script src="/shared/add-work-files.js"></script>
+    <!-- Handout files: a web page, a text file or an EPUB, made ready to attach, and opened as students see it -->
+    <script src="/shared/handout-files.js"></script>
+    <script src="/shared/handout-viewer.js"></script>
     <script src="/shared/name-match.js"></script>
     <!-- Pictures of student work on the Work Wall and the Work tab -->
     <script src="/shared/work-thumbs.js"></script>
@@ -156,6 +162,10 @@
     <script src="/teacher/cm-reflect-answers.js"></script>
     <script src="/teacher/cm-questionnaires.js"></script>
     <script src="/teacher/student-cards.js"></script>
+    <!-- Sticker Sheets for Scanning (B4); jsQR (vendor/jsqr) loads only when a scan is read -->
+    <script src="/shared/data-scan-labels.js"></script>
+    <script src="/shared/scan-label-read.js"></script>
+    <script src="/teacher/scan-labels.js"></script>
     <script src="/teacher/preview-student.js"></script>
     <script src="/teacher/cm-student-page.js"></script>
     <script src="/shared/student-voice.js"></script>
@@ -189,10 +199,17 @@
     <script src="/teacher/work-rubric-card.js"></script>
     <!-- Add Work for the Class: paper work for every student of one piece (after add-work-files.js) -->
     <script src="/teacher/add-work-stage.js"></script>
+    <script src="/teacher/add-work-targets.js"></script>
     <script src="/teacher/add-work-split-model.js"></script>
     <script src="/teacher/add-work-split.js"></script>
+    <script src="/teacher/add-work-page-view.js"></script>
+    <script src="/teacher/add-work-split-setup.js"></script>
+    <script src="/teacher/add-work-split-move.js"></script>
+    <script src="/teacher/add-work-split-turn.js"></script>
+    <script src="/teacher/add-work-split-stickers.js"></script>
     <script src="/teacher/add-work-class.js"></script>
     <script src="/teacher/add-work-tray.js"></script>
+    <script src="/teacher/add-work-two-classes.js"></script>
     <script src="/shared/competency-wording.js"></script>
     <!-- grades-print.js and grading-setup-copy.js load the first time Print Grades
          or Copy Grading Setup is pressed, rubric-library.js and rubric-bank.js

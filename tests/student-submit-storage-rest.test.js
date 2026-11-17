@@ -12,8 +12,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUCKET,
+  FILE_BUCKET,
+  HANDOUT_FILE_PATH,
   HANDOUT_PATH,
   PATH,
+  handoutFilePathParts,
   handoutPathParts,
   pathParts,
   storageRest,
@@ -291,6 +294,85 @@ describe('a teacher’s handout page', () => {
       await expect(step()).rejects.toThrow('storage path');
     }
     expect(f.sent.length).toBe(asked);
+  });
+});
+
+/* Handout files (migrations/2026111706_handout_files.sql): a web page, a
+   text file or an EPUB, <course>/<resource>.<kind> in the bucket
+   handout-files, is signed for a student and removed by the worker, told
+   that bucket; no other shape goes there, and no file goes to the other. */
+describe('a teacher’s handout file', () => {
+  const R = 'a2a2a2a2-0000-4000-8000-000000000002';
+  const FILE = `${C}/${R}.html`;
+
+  it('is its own shape: html, txt or epub, lower-case ids, nothing else', () => {
+    expect(FILE_BUCKET).toBe('handout-files');
+    expect(handoutFilePathParts(FILE)).toEqual({ course: C, resource: R, kind: 'html' });
+    expect(handoutFilePathParts(`${C}/${R}.epub`)).toMatchObject({ kind: 'epub' });
+    expect(handoutFilePathParts(`${C}/${R}.txt`)).toMatchObject({ kind: 'txt' });
+    for (const bad of [
+      `${C}/${R}.htm`,
+      `${C}/${R}.HTML`,
+      `${C}/${R}.html.js`,
+      `${C}/${R}.pdf`,
+      `${C}/handouts/${R}.html`,
+      `${C}/../${R}.html`,
+      FILE.toUpperCase(),
+      `/${FILE}`,
+      FILE + '?x',
+      PAGE,
+      `${C}/handouts/${R}/3.jpg`,
+      null,
+    ]) {
+      expect(handoutFilePathParts(bad), String(bad)).toBe(null);
+    }
+    expect(HANDOUT_FILE_PATH.source.startsWith('^')).toBe(true);
+    expect(pathParts(FILE)).toBe(null);
+    expect(handoutPathParts(FILE)).toBe(null);
+  });
+
+  it('signDownloads and remove take one in handout-files, by that bucket’s address', async () => {
+    const f = fakeFetch((url, init) =>
+      init.method === 'POST' && /object\/sign\/handout-files$/.test(url)
+        ? json(
+            200,
+            JSON.parse(init.body).paths.map(p => ({ path: p, signedURL: `/object/sign/handout-files/${p}?t=1` })),
+          )
+        : json(200, []),
+    );
+    const store = storageRest(f.fetcher, URL_, KEY);
+    expect(await store.signDownloads([FILE], 60, FILE_BUCKET)).toEqual({
+      [FILE]: `https://proj.supabase.co/storage/v1/object/sign/handout-files/${FILE}?t=1`,
+    });
+    expect(f.sent[0]).toMatchObject({
+      url: 'https://proj.supabase.co/storage/v1/object/sign/handout-files',
+      body: JSON.stringify({ expiresIn: 60, paths: [FILE] }),
+    });
+    await store.remove([FILE], FILE_BUCKET);
+    expect(f.sent[1]).toMatchObject({
+      url: 'https://proj.supabase.co/storage/v1/object/handout-files',
+      method: 'DELETE',
+      body: JSON.stringify({ prefixes: [FILE] }),
+    });
+  });
+
+  it('a file is never taken in student-photos, a photo never in handout-files, and no other bucket at all', async () => {
+    const f = fakeFetch(() => json(200, []));
+    const store = storageRest(f.fetcher, URL_, KEY);
+    for (const step of [
+      () => store.signDownloads([FILE], 60),
+      () => store.remove([FILE]),
+      () => store.signDownloads([PAGE], 60, FILE_BUCKET),
+      () => store.remove([`${C}/handouts/${R}/1.jpg`], FILE_BUCKET),
+      () => store.signDownloads([PAGE], 60, 'public'),
+      () => store.remove([FILE], 'avatars'),
+      () => store.signUpload(FILE),
+      () => store.read(FILE, 10),
+      () => store.overwrite(FILE, new Uint8Array(1)),
+    ]) {
+      await expect(step()).rejects.toThrow('storage path');
+    }
+    expect(f.sent).toEqual([]);
   });
 });
 

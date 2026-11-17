@@ -1,7 +1,8 @@
 // The student-photos bucket, through the Storage service's own HTTP API,
 // with the service key (Batch B's contract, "Storage").
 //
-// Six things are done with it, and nothing else:
+// Six things are done with it (and, for a teacher's handout file, signDownloads
+// and remove in the bucket handout-files), and nothing else:
 //   signUpload     a link that lets one file be put at one path, once. Never
 //                  with upsert: no x-upsert header is sent when it is made,
 //                  so a second upload to a path that holds a file is refused.
@@ -35,7 +36,13 @@
 // migrations/2026111170_handouts_links.sql) is
 //   <course>/handouts/<resource>/<n>.jpg      n from 1 to 20
 // and is taken only by signDownloads and remove: a student never uploads
-// one, and nothing here reads or overwrites one. Only the database names paths; this is a
+// one, and nothing here reads or overwrites one. A teacher's handout file
+// (a web page, a text file or an EPUB; migrations/2026111706_handout_files.sql)
+// is in a second bucket, handout-files, as
+//   <course>/<resource>.<html|txt|epub>
+// and is taken by signDownloads and remove only, each told that bucket
+// (FILE_BUCKET); in it no other shape is taken, and in student-photos no
+// handout file's. Only the database names paths; this is a
 // second look, so a path with anything else in it (a dot-dot, a slash too
 // many, a query) never reaches the Storage service, from any caller.
 //
@@ -50,6 +57,8 @@
 // No Deno imports: `fetcher` is fetch, so the tests can run it under Node.
 
 export const BUCKET = 'student-photos';
+/** The teachers' handout files (2026111706): private, 20 MB, text/html, text/plain, application/epub+zip. */
+export const FILE_BUCKET = 'handout-files';
 
 const ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 export const PATH = new RegExp(`^(${ID})/(${ID})/(${ID})/(${ID})/(${ID})(-thumb)?\\.jpg$`);
@@ -73,6 +82,16 @@ export function handoutPathParts(path: unknown): { course: string; resource: str
   return m ? { course: m[1], resource: m[2], page: Number(m[3]) } : null;
 }
 
+/** A teacher's handout file in FILE_BUCKET: <course>/<resource>.<html|txt|epub>. */
+export const HANDOUT_FILE_PATH = new RegExp(`^(${ID})/(${ID})\\.(html|txt|epub)$`);
+
+/** A handout file's parts, or null when it is not one. */
+export function handoutFilePathParts(path: unknown): { course: string; resource: string; kind: string } | null {
+  if (typeof path !== 'string') return null;
+  const m = HANDOUT_FILE_PATH.exec(path);
+  return m ? { course: m[1], resource: m[2], kind: m[3] } : null;
+}
+
 /** A path's parts, or null when it is not one of the bucket's two shapes. */
 export function pathParts(path: unknown): PathParts | null {
   if (typeof path !== 'string') return null;
@@ -86,10 +105,11 @@ export type Read = { bytes: Uint8Array<ArrayBuffer> } | 'missing' | 'too_large';
 
 export type Store = {
   signUpload: (path: string) => Promise<string>;
-  signDownloads: (paths: string[], seconds: number) => Promise<Record<string, string>>;
+  // bucket: FILE_BUCKET for a handout file; left out, student-photos.
+  signDownloads: (paths: string[], seconds: number, bucket?: string) => Promise<Record<string, string>>;
   read: (path: string, maxBytes: number) => Promise<Read>;
   overwrite: (path: string, bytes: Uint8Array<ArrayBuffer>) => Promise<void>;
-  remove: (paths: string[]) => Promise<void>;
+  remove: (paths: string[], bucket?: string) => Promise<void>;
 };
 
 class StorageError extends Error {
@@ -104,9 +124,14 @@ function checked(path: string): string {
   return path;
 }
 
-// A path signDownloads and remove take: a student's page or thumbnail, or a teacher's handout page.
-function checkedOrHandout(path: string): string {
-  if (!PATH.test(path) && !HANDOUT_PATH.test(path)) throw new StorageError('path', 0);
+// A path signDownloads and remove take: in student-photos a student's page or thumbnail, or a
+// teacher's handout page; in handout-files a handout file, and nothing else. Any other bucket: none.
+function checkedOrHandout(path: string, bucket: string): string {
+  if (bucket === FILE_BUCKET) {
+    if (!HANDOUT_FILE_PATH.test(path)) throw new StorageError('path', 0);
+  } else if (bucket !== BUCKET || (!PATH.test(path) && !HANDOUT_PATH.test(path))) {
+    throw new StorageError('path', 0);
+  }
   return path;
 }
 
@@ -180,11 +205,11 @@ export function storageRest(
       });
     },
 
-    async signDownloads(paths, seconds) {
+    async signDownloads(paths, seconds, bucket = BUCKET) {
       if (!paths.length) return {};
-      paths.forEach(checkedOrHandout);
+      paths.forEach(p => checkedOrHandout(p, bucket));
       const said = await deadline('sign-download', ms, async signal => {
-        const res = await fetcher(`${api}/object/sign/${BUCKET}`, {
+        const res = await fetcher(`${api}/object/sign/${bucket}`, {
           method: 'POST',
           headers: { ...auth, 'Content-Type': 'application/json' },
           body: JSON.stringify({ expiresIn: seconds, paths }),
@@ -266,11 +291,11 @@ export function storageRest(
       });
     },
 
-    async remove(paths) {
+    async remove(paths, bucket = BUCKET) {
       if (!paths.length) return;
-      paths.forEach(checkedOrHandout);
+      paths.forEach(p => checkedOrHandout(p, bucket));
       await deadline('remove', ms, async signal => {
-        const res = await fetcher(`${api}/object/${BUCKET}`, {
+        const res = await fetcher(`${api}/object/${bucket}`, {
           method: 'DELETE',
           headers: { ...auth, 'Content-Type': 'application/json' },
           body: JSON.stringify({ prefixes: paths }),

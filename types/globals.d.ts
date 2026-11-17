@@ -313,6 +313,14 @@ declare var AddWorkStage: {
   run(s: any, api: any, opts?: any): Promise<any>;
 };
 declare var AddWorkSplitModel: any; // teacher/add-work-split-model.js, for teacher/add-work-split.js
+// B5's touches, for teacher/add-work-split.js, add-work-split-move.js and add-work-tray.js
+declare var AddWorkSplitSetup: any; // teacher/add-work-split-setup.js
+declare var AddWorkSplitMove: any; // teacher/add-work-split-move.js
+declare var AddWorkSplitTurn: any; // teacher/add-work-split-turn.js
+declare var AddWorkSplitStickers: any; // teacher/add-work-split-stickers.js (B4)
+declare var AddWorkPageView: any; // teacher/add-work-page-view.js
+declare var AddWorkTargets: any; // teacher/add-work-targets.js (B6)
+declare var AddWorkTwoClasses: any; // teacher/add-work-two-classes.js (B6)
 declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses-terms.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
@@ -332,3 +340,11 @@ interface Window {
   PhotoReaders?: typeof PhotoReaders;
   GraderWork?: typeof GraderWork;
 }
+// The phone's Split a Scan (teacher-mobile/split-scan.js, B7) and the
+// modules it calls, which are not typed.
+declare var AddWorkClass: any;
+declare var AddWorkSplit: any;
+declare var MSplitScanModel: any;
+declare var MComponents: any;
+declare var MGrade: any;
+declare var MGradePhotos: any;
