@@ -16,7 +16,7 @@
    the hover opened), and closes on ← or Esc or on hovering another item.
    It is placed against the window, so a menu that scrolls inside itself
    can't cut it off, and follows its item when the page scrolls. */
-window.CardMenu = (function () {
+/** @type {any} */ (window).CardMenu = (function () {
   'use strict';
 
   var TOGGLES = '[data-action="toggleCardMenu"], [data-action="attachWorkMenu"]';
@@ -64,7 +64,8 @@ window.CardMenu = (function () {
   }
 
   function close(except) {
-    document.querySelectorAll('.assess-menu-wrap .assess-menu').forEach(function (menu) {
+    document.querySelectorAll('.assess-menu-wrap .assess-menu').forEach(function (el) {
+      var menu = /** @type {HTMLElement} */ (el);
       if (menu === except || menu.hidden) return;
       menu.hidden = true;
       var btn = _opener(menu);
@@ -161,11 +162,12 @@ window.CardMenu = (function () {
 
   // Hover: a submenu's item opens it; any other item in its menu closes it.
   document.addEventListener('mouseover', function (e) {
-    var item = e.target.closest && e.target.closest('.assess-menu-wrap .assess-menu-item');
+    var t = /** @type {Element} */ (e.target);
+    var item = t && t.closest && t.closest('.assess-menu-wrap .assess-menu-item');
     if (!item) return;
     var menu = item.closest('.assess-menu');
     if (item.getAttribute('aria-haspopup') === 'menu') openSub(item, false);
-    else if (!menu.classList.contains('assess-submenu')) _closeSubs(menu);
+    else if (menu && !menu.classList.contains('assess-submenu')) _closeSubs(menu);
   });
   // A submenu is placed against the window, so it follows its item when
   // the page scrolls or the window changes size.
