@@ -452,10 +452,10 @@ describe('the tray', () => {
     expect(text(tray.querySelector('.awt-drop-title'))).toBe('Drop the Scan, a Folder or Files');
     expect($$('.awt-pick-btn').map(text)).toEqual(['Choose Files…', 'Choose a Folder…']);
     expect($('.awt-input[data-awt-input="folder"]').hasAttribute('webkitdirectory')).toBe(true);
-    expect([...tray.querySelectorAll('.awt-note > *')].map(text)).toEqual([
-      'Nothing is added until you press Add Work.',
+    expect(text(tray.querySelector('.awt-note'))).toBe(
       'File names are read on this computer to find each student. Only the pages upload, made smaller; the names are not kept.',
-    ]);
+    );
+    expect(text($('.awc-hint'))).toBe('Nothing is added until you press Add Work.');
   });
 });
 

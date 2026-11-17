@@ -95,12 +95,14 @@
   }
 
   /* A folder dropped: every file in it and its sub-folders, hidden ones
-     left out, at most MAX_FILES + 1 (so the page knows there were more).
+     left out, until MAX_FILES + 1 photos and PDFs are found (so the page
+     knows there were more).
      → Promise of File[]. */
   function _walk(entries) {
     var out = [];
+    var used = 0;
     function full() {
-      return out.length > MAX_FILES;
+      return used > MAX_FILES;
     }
     function entry(e) {
       if (!e || full() || String(e.name || '').charAt(0) === '.' || e.name === '__MACOSX') return Promise.resolve();
@@ -108,7 +110,10 @@
         return new Promise(function (done) {
           e.file(
             function (f) {
-              if (!full()) out.push(f);
+              if (!full()) {
+                out.push(f);
+                if (_readable(f)) used++;
+              }
               done(undefined);
             },
             function () {
@@ -402,7 +407,7 @@
         hold(
           piece.from,
           piece.pages,
-          { kind: 'none', why: 'no_name' },
+          { kind: 'none', why: piece.sid ? 'unknown' : 'no_name' },
           r.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '',
         );
       });
@@ -696,9 +701,9 @@
           esc(grid ? 'Nothing is waiting.' : 'Files that don’t match a student wait here.') +
           '</p>';
       var hint = items.length ? '<p class="awt-hint">Drag each onto a student, or choose one.</p>' : '';
+      // The footer already says nothing is added until Add Work.
       var note =
-        '<div class="awt-note"><strong>Nothing is added until you press Add Work.</strong>' +
-        '<span>File names are read on this computer to find each student. Only the pages upload, made smaller; the names are not kept.</span></div>';
+        '<p class="awt-note">File names are read on this computer to find each student. Only the pages upload, made smaller; the names are not kept.</p>';
       return (
         '<section class="awt-tray' +
         (grid ? ' is-strip' : '') +
