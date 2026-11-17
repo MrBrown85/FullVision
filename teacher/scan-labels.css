@@ -1,0 +1,297 @@
+/* ── scan-labels.css — Sticker Sheets for Scanning (teacher/scan-labels.js) ── */
+
+/* Over Class Settings, under a question (showConfirm). */
+.sl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3850;
+  background: var(--bg);
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+}
+.sl-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--divider-subtle),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.sl-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.sl-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sl-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.sl-sub,
+.sl-hint,
+.sl-choice-hint {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.sl-gap {
+  flex: 1;
+}
+.sl-note {
+  margin: 12px 16px 0;
+  font-size: 14px;
+  color: var(--text);
+}
+.sl-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  overflow: auto;
+}
+.sl-side {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.sl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sl-h {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.sl-p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.sl-choice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--divider-subtle);
+  cursor: pointer;
+  transition: box-shadow 180ms ease;
+}
+.sl-choice.is-on {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.sl-choice-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sl-choice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sl-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px 2px;
+}
+.sl-pick-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text);
+}
+.sl-preview {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.sl-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sl-nav-words {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 220px;
+  text-align: center;
+}
+.sl-arrow {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: 0;
+  background: var(--seg-track);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+}
+.sl-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* The sheet at about half size: 8.5 × 11 inches is 816 × 1056 CSS pixels. */
+.sl-paper {
+  width: 449px;
+  height: 581px;
+  flex: none;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px var(--divider-subtle),
+    0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.sl-paper-scale {
+  transform: scale(0.55);
+  transform-origin: 0 0;
+}
+.sl-lost {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 560px;
+}
+.sl-lost-words {
+  flex: 1;
+  min-width: 200px;
+}
+.sl-lost-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sl-preview > .sl-hint {
+  max-width: 560px;
+  text-align: center;
+}
+
+/* ── The sheet: one letter page, labels where Avery 5167 puts them ── */
+.sl-sheet {
+  position: relative;
+  width: 8.5in;
+  height: 11in;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-base);
+  break-after: page;
+  page-break-after: always;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.sl-sheet:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+.sl-cell {
+  position: absolute;
+  box-sizing: border-box;
+}
+.sl-plain .sl-cell {
+  outline: 0.5pt dashed #b5b5b5;
+}
+.sl-sticker {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.07in;
+  padding: 0 0.06in 0 0.04in;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.sl-qr {
+  width: 0.44in;
+  height: 0.44in;
+  flex: none;
+  display: block;
+}
+.sl-words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.01in;
+  line-height: 1.1;
+}
+.sl-name {
+  font-size: 11pt;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-class {
+  font-size: 7.5pt;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Off screen until printed; while body.scan-labels-active is set it is the only thing printed. */
+#scan-labels-root {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  width: 8.5in;
+  pointer-events: none;
+}
+@media print {
+  body.scan-labels-active {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body.scan-labels-active > :not(#scan-labels-root) {
+    display: none !important;
+  }
+  body.scan-labels-active #scan-labels-root {
+    position: static;
+    left: auto;
+    width: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .sl-overlay {
+    padding: 0;
+  }
+  .sl-body {
+    flex-direction: column;
+  }
+  .sl-side {
+    flex: none;
+  }
+}
