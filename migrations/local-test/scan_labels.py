@@ -22,11 +22,14 @@ here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
            code-drawing function; no function of the student page names the table.
   cascade  Deleting a withdrawn student for good, and purging a class from the trash, take their codes along;
            the other class's codes stay.
-  taken    A code that is already taken is drawn again (the draw is forced to repeat); a student who already
-           has a live code is answered that code and no second row is made; a code outside the alphabet or
-           a second live code for one student is refused by the table itself.
+  taken    A code that is already taken is drawn again (the draw is forced to repeat); five in a row fail and
+           add nothing; a student who already has a live code is answered that code and no second row is made;
+           a code outside the alphabet or a second live code for one student is refused by the table itself;
+           1,500 of the function's own draws all differ and every place shows all 32 characters.
   race     Two issue calls for one class on connections of their own: every student ends with exactly one live
            code and both calls answer the same codes. Two reissues for one student: one live code at the end.
+  missing  A relied-on function that is missing altogether stops the file, catalog unchanged, named by the pre-check.
+  defaults With Supabase's default privileges in place the file still leaves the grants exact.
   apply    The guards stop with the catalog unchanged; the file changes only what its header says; no existing
            row changes and the table starts empty; a second run; the header's md5s; pre-check and post-check;
            lock timeout; the file's size.
@@ -142,7 +145,12 @@ def scen_issue():
     d.run('update enrollment set withdrawn_at = null where id = :e', e=w.gone)
     back = issue(w)
     ok('issue: a student who comes back gets a code', w.gone in [x['enrollment_id'] for x in back], back)
-    ok('issue: no cursor of the class moves (no other device reloads)', True)
+    cur = lambda: row_checksums(d.c, table_columns(d.c)).get('public.course_sync_cursor')
+    c0 = cur(); n0 = len(rows(d))
+    d.run('update scan_label set retired_at = now() where enrollment_id = :e and retired_at is null', e=w.here[1])
+    issue(w); reissue(w, w.here[2])
+    ok('issue: (setup) that issue and reissue each made a code', len(rows(d)) == n0 + 2, (n0, len(rows(d))))
+    ok('issue: no sync cursor moves (no other device loads the class again)', c0 is not None and cur() == c0, (c0, cur()))
     d.close()
 
 def scen_reissue():
@@ -217,6 +225,13 @@ def scen_others():
     ok('others: null ids answer empty, no error', T(d, 'list_scan_labels(null)')['labels'] == [] and T(d, 'issue_scan_labels(null, null)')['labels'] == []
        and T(d, 'reissue_scan_label(null, null)')['label'] is None)
     ok('others: none of it changed a row', row_checksums(d.c, table_columns(d.c)) == sums)
+    key = nid(); mine = issue(w, key=key); k2 = nid(); new = reissue(w, w.here[0], key=k2)
+    ok("others: B sending A's issue key is answered nothing of A's", issue(w, w.c, B, key=key) == [] and issue(w, w.cb, B, key=key) != mine, issue(w, w.c, B, key=key))
+    ok("others: B sending A's reissue key is answered null, and A's code stands", reissue(w, w.here[0], B, key=k2) is None and live(d, w.here[0]) == [[new['code']]])
+    for name, call, kw in (('list', 'select list_scan_labels(:c)', {'c': w.c}), ('issue', 'select issue_scan_labels(:c, null)', {'c': w.c}),
+                           ('reissue', 'select reissue_scan_label(:e, null)', {'e': w.here[0]})):
+        r = refusal(lambda: d.role('service_role', call, **kw))
+        ok('others: the edge functions\' role, with no teacher, is PT401 on %s' % name, r and r[0] == 'PT401', r)
     ok("others: B reads B's own and nothing of A's", [x['enrollment_id'] for x in listed(w, w.cb, B)] == [w.eb] and listed(w, w.c, B) == [])
     for name, call in (('list', 'list_scan_labels(:c)'), ('issue', 'issue_scan_labels(:c, null)')):
         r = refusal(lambda: d.role('authenticated', 'select ' + call, uid='', c=w.c))
@@ -270,12 +285,7 @@ def scen_taken():
     n = len(rows(d))
     ok('taken: a student with a live code is answered that code', d.one('select fv_private.scan_label_new(:e)', e=w.here[0]) == got[0]['code'])
     ok('taken: and no second row is made', len(rows(d)) == n)
-    # The mapping from random bytes to characters, checked on a known draw.
     d.run('update scan_label set retired_at = now() where enrollment_id = :e', e=w.here[0])
-    d.run("""create function pg_temp.first_draw() returns text language plpgsql as $$
-             declare _b bytea := uuid_send('00000000-0000-4000-8000-000000000000'::uuid); _c text := '';
-             begin for i in 0..11 loop _c := _c || substr('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', (get_byte(_b, case when i < 6 then i else i + 4 end) & 31) + 1, 1); end loop; return _c; end $$""")
-    ok('taken: the code of an all-zero draw is twelve 2s (the version and variant bytes are not used)', d.one('select pg_temp.first_draw()') == '2' * 12)
     # Force the draw to repeat: a trigger rewrites the first drawn code to one that is already there. A
     # sequence counts the tries (a failed insert rolls a table's count back, never a sequence's).
     d.run('create sequence pg_temp.tries')
@@ -305,13 +315,18 @@ def scen_taken():
     ok('taken: a second live code for one student is refused by the table', r and r[0] == '23505', r)
     r = refusal(lambda: d.run('insert into scan_label (enrollment_id, code) values (:e, :c)', e=w.gone, c=got[1]['code']))
     ok('taken: a code another student has is refused by the table', r and r[0] == '23505', r)
-    # Spread: many draws use the whole alphabet and never repeat.
-    codes = [d.one("select fv_private.scan_label_new(e) from (select :e::uuid as e, pg_catalog.pg_advisory_xact_lock(1)) x", e=w.gone)]
-    for _ in range(400):
-        d.run('update scan_label set retired_at = now() where enrollment_id = :e and retired_at is null', e=w.gone)
-        codes.append(d.one('select fv_private.scan_label_new(:e)', e=w.gone))
-    ok('taken: 401 draws, all different, every character of the alphabet used', len(set(codes)) == 401 and set(''.join(codes)) == set('23456789ABCDEFGHJKLMNPQRSTUVWXYZ'),
-       (len(set(codes)), ''.join(sorted(set(''.join(codes))))))
+    # Spread, on the function's own draws: 1,500 codes, all different, and every one of the twelve places
+    # shows all 32 characters (a place fed by the uuid's version byte could show only 16).
+    d.run("""do $$ begin for i in 1..1500 loop
+                 update public.scan_label set retired_at = now() where enrollment_id = '%s' and retired_at is null;
+                 perform fv_private.scan_label_new('%s');
+             end loop; end $$""" % (w.gone, w.gone))
+    codes = [r[0] for r in d.all('select code from scan_label where enrollment_id = :e', e=w.gone)]
+    ok('taken: 1,500 draws, all different', len(codes) == 1500 and len(set(codes)) == 1500, (len(codes), len(set(codes))))
+    places = [len({c[i] for c in codes}) for i in range(12)]
+    ok('taken: every one of the twelve places shows all 32 characters', places == [32] * 12, places)
+    worst = max(max(abs(sum(1 for c in codes if c[i] == ch) - 1500 / 32) for ch in '23456789ABCDEFGHJKLMNPQRSTUVWXYZ') for i in range(12))
+    ok('taken: no character is far from its share in any place (within 35 of 47)', worst < 35, worst)
     d.close()
 
 class Conn:
@@ -350,12 +365,17 @@ def scen_race():
         ok('race %d: two reissues made two codes, one live at the end' % rnd,
            d.one('select count(*) from scan_label where enrollment_id = :e', e=e) == n + 2 and len(live(d, e)) == 1, live(d, e))
         ok('race %d: the live code is one of the two answered' % rnd, live(d, e)[0][0] in [v['label']['code'] for v in out.values() if isinstance(v, dict)], out)
-    # The same key from two windows at once: one reply, one new code.
-    key = nid(); out.clear(); n = d.one('select count(*) from scan_label where enrollment_id = :e', e=e)
-    ts = [threading.Thread(target=call, args=(k, 'select reissue_scan_label(:e, :k)'), kwargs={'e': e, 'k': key}) for k in ('one', 'two')]
-    [t.start() for t in ts]; [t.join() for t in ts]
-    ok('race: one key from two windows at once makes one new code and one reply',
-       d.one('select count(*) from scan_label where enrollment_id = :e', e=e) == n + 1 and out['one'] == out['two'], out)
+    # The same key from two windows at once: both wait behind the key's own lock (held here so they
+    # queue together), then one makes a code and the other is answered the first reply.
+    for rnd in range(3):
+        key = nid(); out.clear(); n = d.one('select count(*) from scan_label where enrollment_id = :e', e=e)
+        gate = Conn(d); gate.run('begin'); gate.run('select pg_advisory_xact_lock(hashtext(:u), hashtext(:k))', u=A, k=key)
+        ts = [threading.Thread(target=call, args=(k, 'select reissue_scan_label(:e, :k)'), kwargs={'e': e, 'k': key}) for k in ('one', 'two')]
+        [t.start() for t in ts]; time.sleep(0.5)
+        ok('race %d: both calls with one key wait behind its lock' % rnd, out == {} and d.one('select count(*) from scan_label where enrollment_id = :e', e=e) == n, out)
+        gate.run('commit'); gate.close(); [t.join() for t in ts]
+        ok('race %d: one key from two windows at once makes one new code and one reply' % rnd,
+           d.one('select count(*) from scan_label where enrollment_id = :e', e=e) == n + 1 and isinstance(out.get('one'), dict) and out['one'] == out.get('two'), out)
     d.close()
 
 def catalog_of(d): return catalog(d.c)
@@ -433,6 +453,36 @@ def scen_apply():
     ok('apply: the header says it is not applied or applied, and names its tests', 'scan_labels.py' in HEADER and 'scan-labels-undo.sql' in HEADER)
     d.close()
 
+def scen_missing():
+    """A relied-on function that is missing altogether stops the file (on a world of its own: nothing is put back)."""
+    w = world('missing', with_file=False); d = w.d
+    d.run('drop function public.fv_idem_store(uuid, text, jsonb)')
+    before = catalog_of(d)
+    r = d.file(FILE)
+    ok('apply guard: a missing fv_idem_store stops the file', r.startswith('STOPPED') and 'none: the function is missing' in r, r)
+    ok('apply guard: a missing fv_idem_store leaves the catalog as it was', catalog_of(d) == before, differences(before, catalog_of(d)))
+    ok('apply guard: a missing fv_idem_store is named by the pre-check', d.statements(split(text_of(PRE))) == 'ok'
+       and ['fingerprint public.fv_idem_store(uuid,text,jsonb)', 'absent'] in d.rows, d.rows)
+    d.close()
+
+def scen_defaults():
+    """With Supabase's default privileges in place (every new table and function in public granted to anon,
+    authenticated and service_role), the file still leaves the grants exact: the post-check says ok."""
+    w = world('defaults', with_file=False); d = w.d
+    d.run('alter default privileges in schema public grant all on tables to anon, authenticated, service_role')
+    d.run('alter default privileges in schema public grant all on functions to anon, authenticated, service_role')
+    d.run('alter default privileges in schema fv_private grant all on functions to anon, authenticated, service_role')
+    r = d.file(FILE); ok('defaults: the file applies', r == 'ok', r)
+    r = d.statements(split(text_of(POST)))
+    ok('defaults: the post-check says ok on every row', r == 'ok' and d.rows and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or r)
+    x = refusal(lambda: d.role('anon', 'select list_scan_labels(:c)', c=w.c))
+    ok('defaults: a visitor still may not run list', x and x[0] == '42501', x)
+    x = refusal(lambda: d.role('authenticated', 'select count(*) from public.scan_label', uid=A))
+    ok('defaults: a teacher still cannot read the table', x and x[0] == '42501', x)
+    x = refusal(lambda: d.role('authenticated', 'select fv_private.scan_label_new(:e)', uid=A, e=w.here[0]))
+    ok('defaults: a teacher still cannot call the code-drawing function', x and x[0] == '42501', x)
+    d.close()
+
 def scen_undo():
     w = world('undo', with_file=False); d = w.d
     base = catalog_of(d); sums = row_checksums(d.c, table_columns(d.c))
@@ -473,7 +523,8 @@ def scen_undo():
     d.close()
 
 SCENARIOS = {'issue': scen_issue, 'reissue': scen_reissue, 'list': scen_list, 'others': scen_others, 'cascade': scen_cascade,
-             'taken': scen_taken, 'race': scen_race, 'apply': scen_apply, 'undo': scen_undo}
+             'taken': scen_taken, 'race': scen_race, 'apply': scen_apply, 'missing': scen_missing, 'defaults': scen_defaults,
+             'undo': scen_undo}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or SCENARIOS):
         SCENARIOS[name]()

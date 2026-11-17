@@ -117,7 +117,7 @@ begin
         ('fv_private.scan_label_new(uuid)', null, '09f8ff09c3fbd118697d0eeddbe93ba2')
     ) as v(fn, was, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
-        if _md5 is distinct from _f.was and _md5 is distinct from _f.now then
+        if _md5 is distinct from _f.was and (_f.now is null or _md5 is distinct from _f.now) then
             raise exception '% is not the definition this file was written against (md5 %, expected %). Nothing was changed.',
                 _f.fn, coalesce(_md5, 'none: the function is missing'), coalesce(_f.was, 'none');
         end if;
@@ -132,7 +132,7 @@ begin
     if to_regclass('public.scan_label') is not null then
         select string_agg(attname || ' ' || format_type(atttypid, atttypmod), ', ' order by attnum) into _cols
           from pg_attribute where attrelid = 'public.scan_label'::regclass and attnum > 0 and not attisdropped;
-        if _cols <> 'id uuid, enrollment_id uuid, code text, created_at timestamp with time zone, retired_at timestamp with time zone' then
+        if _cols is distinct from 'id uuid, enrollment_id uuid, code text, created_at timestamp with time zone, retired_at timestamp with time zone' then
             raise exception 'public.scan_label exists and is not this file''s (%). Nothing was changed.', _cols;
         end if;
     end if;

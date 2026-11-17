@@ -46,4 +46,5 @@ union all select 'no role may call the code-drawing function directly',
 union all select 'no function of the student page reads the table',
        case when not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                               where n.nspname = 'student_submit' and p.prosrc like '%scan_label%') then 'ok' else 'NOT AS EXPECTED' end
-union all select 'the table starts empty (' || (select count(*) from public.scan_label) || ' codes)', 'ok';
+union all select 'the table starts empty (' || (select count(*) from public.scan_label) || ' codes)',
+       case when (select count(*) from public.scan_label) = 0 then 'ok' else 'NOT AS EXPECTED' end;
