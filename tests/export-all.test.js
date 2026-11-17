@@ -549,3 +549,29 @@ describe('photos of student work (S8-F2)', () => {
     }
   });
 });
+
+describe('Handouts and Links', () => {
+  it('names each kind, a handout file by its kind, name and size (Handout files, 2026111706)', () => {
+    seed({ assessments: [level('Lesson')] });
+    const was = globalThis.getAssessmentResources;
+    globalThis.getAssessmentResources = () => [
+      { id: 'r1', kind: 'pdf', title: 'Lab Sheet', pageCount: 2 },
+      { id: 'r2', kind: 'link', title: 'Density', url: 'https://example.org/d' },
+      { id: 'r3', kind: 'html', title: 'Lesson 1.1 Practice', bytes: 52000 },
+      { id: 'r4', kind: 'txt', title: 'Notes', bytes: 300 },
+      { id: 'r5', kind: 'epub', title: 'The Novel', bytes: 3 * 1024 * 1024 },
+    ];
+    try {
+      const s = sheet(rows(), 'Handouts and Links');
+      expect(s.rows.map(r => r.slice(2))).toEqual([
+        ['Handout', 'Lab Sheet', '2 pages'],
+        ['Link', 'Density', 'https://example.org/d'],
+        ['Web Page', 'Lesson 1.1 Practice', '51 KB'],
+        ['Text File', 'Notes', '1 KB'],
+        ['EPUB', 'The Novel', '3 MB'],
+      ]);
+    } finally {
+      globalThis.getAssessmentResources = was;
+    }
+  });
+});

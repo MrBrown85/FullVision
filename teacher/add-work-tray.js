@@ -404,6 +404,7 @@
         label: more.label,
         had: more.had,
         noListOrder: more.noListOrder,
+        cids: more.cids,
         onPieces: function (pieces) {
           // Marked as off the scan, for Grade in Scan Order (B5).
           if (host.alive())

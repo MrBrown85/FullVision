@@ -32,6 +32,15 @@
   var LEVEL_TEXT = { 1: '991B1B', 2: '7A5A1E', 3: '365C3A', 4: '2A5868' };
 
   var HABIT_WORDS = { 1: 'Rarely', 2: 'Sometimes', 3: 'Usually', 4: 'Consistently', 5: 'Not Seen' };
+  // A handout file's kind as the form names it (2026111706).
+  /** @type {Record<string, string>} */
+  var RESOURCE_KIND_WORDS = { html: 'Web Page', txt: 'Text File', epub: 'EPUB' };
+  /** @param {unknown} bytes */
+  function sizeWords(bytes) {
+    var n = Number(bytes) || 0;
+    if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + ' KB';
+    return Math.round((n / (1024 * 1024)) * 10) / 10 + ' MB';
+  }
 
   /* ── Small helpers ─────────────────────────────────────────── */
 
@@ -282,17 +291,23 @@
         byId[a.id] = a;
       });
 
-      // Handouts and Links: the links, and each handout's name and pages
-      // (a handout's pages are pictures, kept out like photos of student work).
+      // Handouts and Links: the links, each handout's name and pages, and
+      // each handout file's name and size (a handout's pages and a handout
+      // file are kept out, like photos of student work).
       if (typeof getAssessmentResources === 'function')
         assessments.forEach(function (a) {
           getAssessmentResources(cid, a.id, { ready: true }).forEach(function (r) {
+            var file = RESOURCE_KIND_WORDS[r.kind];
             resources.push([
               cname,
               text(a.title),
-              r.kind === 'pdf' ? 'Handout' : 'Link',
+              r.kind === 'pdf' ? 'Handout' : file || 'Link',
               text(r.title),
-              r.kind === 'pdf' ? r.pageCount + (r.pageCount === 1 ? ' page' : ' pages') : text(r.url),
+              r.kind === 'pdf'
+                ? r.pageCount + (r.pageCount === 1 ? ' page' : ' pages')
+                : file
+                  ? sizeWords(r.bytes)
+                  : text(r.url),
             ]);
           });
         });
@@ -659,13 +674,14 @@
       },
       {
         name: 'Handouts and Links',
-        about: 'The handouts and links on each assessment. A handout’s pages are pictures and are not in this file.',
+        about:
+          'The handouts and links on each assessment. A handout’s pages and a handout file (a web page, a text file or an EPUB) are not in this file.',
         columns: [
           COL.classCol,
           COL.assessment,
           COL.short('Kind', 10),
           COL.short('Name', 32),
-          COL.long('Address or Pages'),
+          COL.long('Address, Pages or Size'),
         ],
         rows: resources,
       },

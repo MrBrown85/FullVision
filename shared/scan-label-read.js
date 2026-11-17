@@ -97,6 +97,15 @@
     return _lib;
   }
 
+  /* A pause between two jsQR looks: a macrotask, so the page stays live (a
+     teacher typing names while stickers are read in the background). It
+     changes nothing about what is found. */
+  function _pause() {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+  }
+
   /* ── The picture as pixels ── */
 
   /** @param {number} w @param {number} h */
@@ -325,6 +334,7 @@
       var r = regions[g];
       for (var look = 0; look < MAX_LOOKS; look++) {
         var part = _crop(px, r);
+        await _pause();
         var got = jsQR(part.data, part.width, part.height, { inversionAttempts: 'dontInvert' });
         if (!got || !got.location) break;
         var loc = _moved(got.location, r);
@@ -345,6 +355,7 @@
     // A second, different sticker on the same page names no one.
     own();
     _blank(px, found.location);
+    await _pause();
     var other = jsQR(px.data, px.width, px.height, { inversionAttempts: 'dontInvert' });
     var otherCode = other ? stickerCode(other.data) : '';
     if (otherCode && otherCode !== found.code) return null;

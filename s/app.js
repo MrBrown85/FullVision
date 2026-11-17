@@ -2349,6 +2349,8 @@
     'group-links': 1,
     // A handout's pages (Handouts and Links; s/handouts.js).
     'handout-links': 1,
+    // A handout file, a web page, a text file or an EPUB (2026111706; s/handouts.js).
+    'handout-file': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
