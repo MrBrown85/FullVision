@@ -33,6 +33,7 @@
   // The page's own chooser takes these (teacher/add-work-class.js).
   var ACCEPT = 'image/*,.heic,.heif,application/pdf';
   var MAX_FILES = 300;
+  var DRAW_MS = 120;
   // What PhotoShrink reads, and the Office files it refuses with "Save it as a PDF first."
   var READS = /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?|pdf|docx?|docm|dotx?|pptx?|pptm|ppsx?|potx?)$/i;
 
@@ -302,12 +303,18 @@
         total = 0;
         if (host.alive()) host.draw();
       });
-      // One file at a time, each drawn as it lands.
+      /* One file at a time. The page is drawn as they land, at most every
+         DRAW_MS while a pile is read: a folder of 300 is not drawn 300 times. */
+      var drawn = 0;
       function next() {
         if (!host.alive()) return finish();
         var file = queue.shift();
         if (!file) return finish();
-        host.draw();
+        var now = Date.now();
+        if (now - drawn >= DRAW_MS) {
+          drawn = now;
+          host.draw();
+        }
         _one(file).then(next, next);
       }
       next();

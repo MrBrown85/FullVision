@@ -215,6 +215,9 @@ describe('a pile of files', () => {
     AddWorkClass.open(CID, PIECE);
     const waits = [];
     PhotoShrink.prepare = vi.fn(() => new Promise(r => waits.push(r)));
+    // Each file takes a second to read, as a real photo might.
+    let clock = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1000));
     const going = AddWorkClass.takeFiles([file('Avery Chen.pdf'), file('Priya Kaur.pdf')]);
     await tick();
     expect(text($('.awc-primary'))).toBe('Reading 1 of 2…');
