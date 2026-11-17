@@ -214,7 +214,7 @@ describe('Class Settings › Student Page: Return Grades', () => {
       );
       expect((html().match(/class="sp-row"/g) || []).length).toBe(1);
       expect(html()).toContain(
-        '<div class="sp-row-title">Questionnaires</div><div class="cm-hint">Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.</div>',
+        '<div class="sp-row-title">Reflections</div><div class="cm-hint">Students answer them on their page’s Reflect tab, with the same card. Turn them on under Reflect, here in Class Settings.</div>',
       );
       // Student Cards came with S0-W1, in a card of its own under this one
       // (tests/student-cards.test.js), not as a row of it.

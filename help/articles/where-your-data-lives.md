@@ -49,7 +49,7 @@ Choose **Download All My Data** from the account menu at the top right. FullVisi
 
 ## Download a Class Backup
 
-A class backup is a file that holds one class's students, competencies, assessments, scores, comments and observations. Questionnaires are not included. It is saved on the computer, not in FullVision.
+A class backup is a file that holds one class's students, competencies, assessments, scores, comments and observations. Reflections are not included. It is saved on the computer, not in FullVision.
 
 1. Open **Class Settings** from the Dashboard and select the class.
 2. Choose **Class Actions**, then **Download Class Backup**. The browser saves the class as a .json file.

@@ -215,9 +215,9 @@ describe('Class Settings › Student Page: the board’s two columns', () => {
     expect(text(sum.querySelector('button'))).toBe('Manage Cards');
     // The last row says where questionnaires are answered and set up.
     const rows = [...doc.querySelectorAll('.sp-card .sp-row-title')].map(text);
-    expect(rows[rows.length - 1]).toBe('Questionnaires');
+    expect(rows[rows.length - 1]).toBe('Reflections');
     expect(text(doc.querySelector('.sp-card .sp-questionnaires .cm-hint'))).toBe(
-      'Students answer them on their page’s Reflections tab, with the same card. Set them up on the Questionnaires tab.',
+      'Students answer them on their page’s Reflect tab, with the same card. Turn them on under Reflect, here in Class Settings.',
     );
   });
 
@@ -303,9 +303,9 @@ describe('the preview', () => {
     expect(text(screen().querySelector('[data-act="feedback-close"]'))).toBe('My Learning');
     click(screen().querySelector('[data-act="feedback-close"]'));
     expect(screen().querySelector('.sp-ml-row[data-piece="essay"]')).toBeTruthy();
-    // Reflections, with nothing there yet.
+    // Reflect, with nothing there yet.
     tab(el, 'questionnaires');
-    expect(text(screen().querySelector('.sp-page-title'))).toBe('Reflections');
+    expect(text(screen().querySelector('.sp-page-title'))).toBe('Reflect');
     expect(text(screen().querySelector('.sp-empty'))).toBe('Reflections from your teacher will show here.');
     // Log Out asks first; its Log Out and Your Classes reach for the student's session: here they do nothing.
     click(screen().querySelector('[data-act="logout-ask"]'));

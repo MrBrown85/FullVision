@@ -1,12 +1,12 @@
 /**
- * Questionnaires from a real card, on the Reflections tab (S4-F4; s/app.js's
+ * Questionnaires from a real card, on the Reflect tab (S4-F4; s/app.js's
  * loadForms and openRealForm, s/questionnaire.js's sendFromCard), against
  * the routes of supabase/functions/student-submit/forms-routes.ts as
  * phase2-routes-contract.md (Batch E) writes them: `forms` once the page is
  * up, `form` to open one, `answer` to send, each with the session and the
  * student it is for.
  *
- * - Reflections lists the questionnaires `forms` gave; a function without
+ * - Reflect lists the questionnaires `forms` gave; a function without
  *   the route (bad_request) leaves the page exactly as drawn.
  * - Start opens the questions from `form`; Send posts `answer` once, with
  *   no token, and shows Sent (already_sent too); a refusal says why.
@@ -131,7 +131,7 @@ async function answerAndSend(page) {
   await page.settle();
 }
 
-describe('Reflections', () => {
+describe('Reflect', () => {
   it('asks `forms` once after sign-in, with the session and the student', async () => {
     const page = await signIn(school({}));
     const asks = bodies(page, 'forms');
@@ -146,7 +146,7 @@ describe('Reflections', () => {
       [Q, 'November Reflection', 'open'],
     ]);
     await page.click('[data-act="tab"][data-tab="questionnaires"]');
-    expect(words(page.root().querySelector('.sp-page-title'))).toBe('Reflections');
+    expect(words(page.root().querySelector('.sp-page-title'))).toBe('Reflect');
     expect(page.root().querySelector('[data-act="q-start"][data-form-id="' + Q + '"]')).toBeTruthy();
   });
 
@@ -264,5 +264,103 @@ describe('nothing outlasts the session', () => {
     const asks = bodies(page, 'forms');
     expect(asks.map(b => b.enrollment_id)).toEqual([CECE, OMAR]);
     expect(viewOf(page).questionnaires[0].title).toBe('Omar’s Check-In');
+  });
+});
+
+describe('Reflect asks again', () => {
+  it('opening Reflect asks `forms` again at most every 20 seconds, so one turned on mid-class shows', async () => {
+    const page = await signIn(school({}));
+    expect(bodies(page, 'forms')).toHaveLength(1);
+    // Just asked when the page came up: opening Reflect now asks nothing.
+    await page.click('[data-act="tab"][data-tab="questionnaires"]');
+    expect(bodies(page, 'forms')).toHaveLength(1);
+    // The badge counts the one open.
+    expect(words(page.root().querySelector('.sp-tabs-bottom [data-tab="questionnaires"] .sp-tab-badge'))).toBe('1');
+    page.advance(21000);
+    await page.click('[data-act="tab"][data-tab="assignments"]');
+    expect(bodies(page, 'forms')).toHaveLength(1);
+    await page.click('[data-act="tab"][data-tab="questionnaires"]');
+    await page.settle();
+    expect(bodies(page, 'forms')).toHaveLength(2);
+    await page.click('[data-act="tab"][data-tab="assignments"]');
+    await page.click('[data-act="tab"][data-tab="questionnaires"]');
+    expect(bodies(page, 'forms')).toHaveLength(2);
+  });
+});
+
+describe('a teacher-built reflection from a real card', () => {
+  const CUSTOM = [
+    {
+      id: 'c1',
+      kind: 'custom',
+      title: 'Unit 2 Exit Reflection',
+      theme: 'A few questions.',
+      closes_on: null,
+      grade: null,
+      questions: [
+        { id: 'r', kind: 'rating', prompt: 'How sure?', options: { levels: 5 }, core_ids: [], teacher_only: false },
+        {
+          id: 'c',
+          kind: 'choice',
+          prompt: 'Which?',
+          options: { choices: ['Labs', 'Notes'], multiple: false, other: true },
+          core_ids: [],
+          teacher_only: false,
+        },
+        {
+          id: 'l',
+          kind: 'likert',
+          prompt: 'How often?',
+          options: { statements: ['Asked', 'Checked'], choices: ['Never', 'Always'] },
+          core_ids: [],
+          teacher_only: false,
+        },
+        {
+          id: 'k',
+          kind: 'ranking',
+          prompt: 'Order',
+          options: { choices: ['A', 'B', 'C'] },
+          core_ids: [],
+          teacher_only: false,
+        },
+        { id: 's', kind: 'section', prompt: 'Last', options: {}, core_ids: [], teacher_only: false },
+        { id: 'd', kind: 'date', prompt: 'When?', options: {}, core_ids: [], teacher_only: false },
+      ],
+    },
+  ];
+
+  it('keeps a draft of every new shape, brings it back, and sends the contract’s answers', async () => {
+    const page = await signIn(school({ form: { ok: true, parts: CUSTOM, context: {} } }));
+    await openQuestions(page);
+    await page.click('[data-act="rate"][data-q="r"][data-value="3"]');
+    await page.click('[data-act="kc-other"][data-q="c"]');
+    page.type('#q-c-other', 'Videos');
+    await page.click('[data-act="likert"][data-q="l"][data-s="1"][data-value="Always"]');
+    await page.click('[data-act="rank-up"][data-q="k"][data-i="2"]');
+    page.type('#q-d', '2026-12-01');
+    // Back to the page and in again: the draft brings every answer back.
+    await page.click('[data-act="back"]');
+    expect(JSON.parse(page.tab['fv-s-card-drafts'])).toBeTruthy();
+    await page.click('[data-act="q-start"][data-form-id="' + Q + '"]');
+    await page.settle();
+    expect(page.root().querySelector('[data-act="rate"][data-value="3"]').getAttribute('aria-checked')).toBe('true');
+    expect(page.root().querySelector('#q-c-other').value).toBe('Videos');
+    expect(
+      page.root().querySelector('[data-act="likert"][data-s="1"][data-value="Always"]').getAttribute('aria-checked'),
+    ).toBe('true');
+    expect([...page.root().querySelectorAll('[data-rank-q="k"] .sp-rq-rank-text')].map(words)).toEqual(['A', 'C', 'B']);
+    expect(page.root().querySelector('#q-d').value).toBe('2026-12-01');
+    await page.click('[data-act="send"]');
+    await page.settle();
+    const [sent] = bodies(page, 'answer');
+    expect(sent.answers).toEqual({
+      r: 3,
+      c: ['Videos'],
+      l: { Checked: 'Always' },
+      k: ['A', 'C', 'B'],
+      d: '2026-12-01',
+    });
+    expect(words(page.root().querySelector('.sp-big'))).toBe('Sent to Your Teacher');
+    expect(page.tab).toEqual({});
   });
 });

@@ -9,6 +9,7 @@
     "teacher/report-qn-voice-observations.js",
     "teacher/cm-std-help.js",
     "teacher/cm-terms.js",
+    "teacher/cm-grading-bars.js",
     "teacher/report-one-zoom.js",
     "teacher/report-one-head.js",
     "teacher/report-print-paper.js",
@@ -38,9 +39,13 @@
     "teacher/assign-show.js",
     "teacher/assign-list.js",
     "teacher/assign-draft.js",
+    "teacher/assessment-type-field.js",
     "teacher/grade-change.js",
     "teacher/expand-motion.js",
-    "teacher/card-menu.js"
+    "teacher/card-menu.js",
+    "s/question-kinds.js",
+    "teacher/cm-reflect-answers.js",
+    "teacher/cm-reflect-builder.js"
   ],
   "notYetChecked": [
     "s/app.js",

@@ -38,7 +38,8 @@ for (const size of [
       const posts = await demo(page);
       const tabs = page.locator(size.tag === 'phone' ? '.sp-tabs-bottom' : '.sp-tabs-top');
       await expect(tabs.getByRole('button', { name: 'My Learning 6 new' })).toBeVisible();
-      await expect(tabs.locator('.sp-tab-badge')).toHaveText(['6']);
+      // My Learning's count, and Reflect's: two reflections open and not answered.
+      await expect(tabs.locator('.sp-tab-badge')).toHaveText(['6', '2']);
       await expect(tabs.getByRole('button', { name: 'Assignments', exact: true })).toBeVisible();
       await tabs.getByRole('button', { name: 'My Learning 6 new' }).click();
       const work = page.locator('.sp-ml-work');

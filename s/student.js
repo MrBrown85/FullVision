@@ -577,6 +577,8 @@ var StudentPage = (function () {
   /* ── Demo Mode ─────────────────────────────────────────────── */
 
   function demoData(which) {
+    // The teacher-built sample (s/questionnaire.js): no template behind it.
+    if (which === 'custom' && api.demoCustom) return api.demoCustom();
     var tpls = typeof QUESTIONNAIRE_TEMPLATES !== 'undefined' ? QUESTIONNAIRE_TEMPLATES : [];
     function part(id, extra) {
       var t = tpls.find(function (x) {

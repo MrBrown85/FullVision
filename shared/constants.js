@@ -521,6 +521,88 @@ function categoryTintByIndex(idx, fallbackName) {
 /* A class with categories needs one on every scored assessment (data.js
    categoryRequired). The form says why next to its Category field; work
    saved before the rule is marked where it appears. */
+/* An assessment's Type, the form's Type field (Colin, Nov 17: "There's no
+   oral or presentation, but there are media types"). The kind of task, in
+   the order work runs: what students hand in, what they say or do, what
+   the teacher sees and hears. Only the teacher sees it (the Student page's
+   Group By Type and Where It Shows); no grade reads it. Stored in
+   assessment.evidence_type as the lowercase word; a type a teacher adds in
+   the form is stored as typed (teacher/assessment-type-field.js). */
+const ASSESSMENT_TYPES = [
+  'written',
+  'test',
+  'quiz',
+  'project',
+  'lab',
+  'presentation',
+  'oral',
+  'performance',
+  'observation',
+  'conversation',
+];
+/* Words the list had before Nov 17. Audio reads as Oral; Video and Photo
+   keep their own word on an assessment that has one and are not offered
+   for new ones. Nothing stored is rewritten. */
+const ASSESSMENT_TYPES_RETIRED = ['video', 'photo'];
+/** @type {Record<string, string>} */
+const ASSESSMENT_TYPE_READS_AS = { audio: 'oral' };
+const ASSESSMENT_TYPE_MAX_LENGTH = 30;
+
+/** A stored or typed type as the app reads it: a built-in or retired word
+ *  in lowercase (Audio as oral), a teacher's own type as typed with its
+ *  spaces tidied, '' for none.
+ *  @param {unknown} t
+ *  @returns {string} */
+function assessmentTypeKey(t) {
+  var s = String(t == null ? '' : t)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, ASSESSMENT_TYPE_MAX_LENGTH)
+    .trim();
+  var low = s.toLowerCase();
+  if (ASSESSMENT_TYPE_READS_AS[low]) return ASSESSMENT_TYPE_READS_AS[low];
+  if (ASSESSMENT_TYPES.indexOf(low) >= 0 || ASSESSMENT_TYPES_RETIRED.indexOf(low) >= 0) return low;
+  return s;
+}
+
+/** @param {{ evidenceType?: string } | null | undefined} a */
+function assessmentTypeOf(a) {
+  return assessmentTypeKey(a && a.evidenceType);
+}
+
+/** "Oral", "Socratic Seminar", or "No Type".
+ *  @param {unknown} t */
+function assessmentTypeLabel(t) {
+  var k = assessmentTypeKey(t);
+  return k ? k.charAt(0).toUpperCase() + k.slice(1) : 'No Type';
+}
+
+/** True for a type a teacher added (not in the list, not a retired word).
+ *  @param {string} k a key from assessmentTypeKey */
+function isAddedAssessmentType(k) {
+  return !!k && ASSESSMENT_TYPES.indexOf(k) < 0 && ASSESSMENT_TYPES_RETIRED.indexOf(k) < 0;
+}
+
+/** The types teachers added in a class's assessments, one per word
+ *  whatever its case, A to Z.
+ *  @param {Array<{ evidenceType?: string }>} assessments
+ *  @returns {string[]} */
+function addedAssessmentTypes(assessments) {
+  /** @type {Record<string, boolean>} */
+  var seen = {};
+  /** @type {string[]} */
+  var out = [];
+  (assessments || []).forEach(function (a) {
+    var k = assessmentTypeOf(a);
+    if (!isAddedAssessmentType(k) || seen[k.toLowerCase()]) return;
+    seen[k.toLowerCase()] = true;
+    out.push(k);
+  });
+  return out.sort(function (x, y) {
+    return x.localeCompare(y);
+  });
+}
+
 const CATEGORY_REQUIRED_HINT = 'This class has categories, so each assignment needs one to count toward the grade.';
 const NEEDS_CATEGORY_LABEL = 'Needs a Category';
 const NEEDS_CATEGORY_TIP = 'This class has categories, so this work needs one. Edit the assignment to choose one.';
