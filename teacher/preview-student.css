@@ -132,6 +132,7 @@
   justify-content: center;
 }
 .ps-device {
+  position: relative;
   flex: none;
   padding: 12px;
   background: #1d1d1f;
@@ -370,4 +371,16 @@
   padding: 5px 8px;
   color: var(--text);
   background-color: var(--surface);
+}
+
+/* A handout file open over the device's screen (shared/handout-viewer.js). */
+.ps-device > .hv-layer {
+  inset: 12px;
+  overflow: hidden;
+}
+.ps-device-phone > .hv-layer {
+  border-radius: 34px;
+}
+.ps-device-chromebook > .hv-layer {
+  border-radius: 4px;
 }

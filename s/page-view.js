@@ -651,6 +651,12 @@ window.StudentPageView = (function () {
   var RES_GO =
     '<svg class="sp-res-go" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"/></svg>';
   var VIDEO_HOSTS = /^(youtube\.com|m\.youtube\.com|youtu\.be|vimeo\.com)$/;
+  // A handout file (2026111706): it opens over the page, in shared/handout-viewer.js.
+  var RES_PAGE =
+    '<svg class="sp-res-icon sp-res-icon-page" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 8.5h18"/><path d="m9.5 12.5-2 2 2 2M14.5 12.5l2 2-2 2"/></svg>';
+  var RES_BOOK =
+    '<svg class="sp-res-icon sp-res-icon-book" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/></svg>';
+  var FILE_WORDS = { html: 'Web Page', txt: 'Text File', epub: 'Book' };
 
   function pagesWord(n) {
     return n === 1 ? '1 page' : n + ' pages';
@@ -666,6 +672,19 @@ window.StudentPageView = (function () {
         '</span></span>'
       );
     };
+    if (r.kind === 'file' && FILE_WORDS[r.type]) {
+      return (
+        '<button type="button" class="sp-res-row" data-act="handout-file" data-piece="' +
+        esc(p.id) +
+        '" data-resource="' +
+        esc(r.id) +
+        '">' +
+        (r.type === 'html' ? RES_PAGE : r.type === 'epub' ? RES_BOOK : RES_DOC) +
+        words(FILE_WORDS[r.type]) +
+        RES_GO +
+        '</button>'
+      );
+    }
     if (r.kind === 'handout') {
       return (
         '<button type="button" class="sp-res-row" data-act="handout" data-piece="' +

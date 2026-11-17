@@ -228,6 +228,8 @@ export function openStudentPage(opts = {}) {
     sandbox.URL = { createObjectURL: () => 'blob:page/' + ++made, revokeObjectURL() {} };
     // A page's picture, as the browser holds it (s/handouts.js makes a JPEG of each).
     sandbox.Blob = Blob;
+    // A handout file's text is read as a browser reads it (shared/handout-viewer.js).
+    sandbox.TextDecoder = TextDecoder;
   }
   sandbox.window = sandbox;
   const ctx = vm.createContext(sandbox);
