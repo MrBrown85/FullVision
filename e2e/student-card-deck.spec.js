@@ -25,7 +25,7 @@ test.describe('on a phone', () => {
   test('Outstanding: the cards one under another, to scroll; Upcoming: what is due later', async ({ page }) => {
     const posts = await demo(page);
     const cards = page.locator('.sp-deck .sp-piece');
-    await expect(cards.getByRole('heading')).toHaveText(['Immune System Quick Check', 'Disease Research Poster']);
+    await expect(cards.locator('.sp-piece-title')).toHaveText(['Immune System Quick Check', 'Disease Research Poster']);
     await expect(page.locator('.sp-deck-count')).toHaveCount(0);
     // Stacked: the second card starts below the first, at the same left edge.
     const [a, b] = await cards.evaluateAll(els => els.map(e => e.getBoundingClientRect().toJSON()));
@@ -40,7 +40,7 @@ test.describe('on a phone', () => {
     await expect(page.locator('.sp-deck')).not.toContainText('Graded On');
     await expect(page.locator('.sp-category-pill, .sp-core')).toHaveCount(0);
     await cards.nth(1).scrollIntoViewIfNeeded();
-    await expect(cards.nth(1).getByRole('heading')).toBeInViewport();
+    await expect(cards.nth(1).locator('.sp-piece-title')).toBeInViewport();
     await fits(page);
     await named(page);
     await contrast(page);
@@ -48,7 +48,7 @@ test.describe('on a phone', () => {
 
     await page.getByRole('button', { name: 'Upcoming 1' }).click();
     await expect(page.getByRole('button', { name: 'Upcoming 1' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(cards.getByRole('heading')).toHaveText(['Science Fair Proposal']);
+    await expect(cards.locator('.sp-piece-title')).toHaveText(['Science Fair Proposal']);
     await expect(cards.locator('.sp-piece-head .sp-flag-due')).toHaveText(/^Due \w{3}, \w{3} \d+ · in \d+ days$/);
     await fits(page);
     await contrast(page);
@@ -82,7 +82,7 @@ test.describe('on a Chromebook', () => {
     await expect(page.locator('.sp-piece:visible')).toHaveCount(1);
     await side.getByRole('button', { name: /Disease Research Poster/ }).click();
     const card = page.locator('.sp-piece:visible');
-    await expect(card.getByRole('heading')).toHaveText('Disease Research Poster');
+    await expect(card.locator('.sp-piece-title')).toHaveText('Disease Research Poster');
     await expect(side.getByRole('button', { name: /Disease Research Poster/ })).toHaveAttribute('aria-pressed', 'true');
     // Work still to do: no result rows, no feedback.
     await expect(card.locator('.sp-piece-row-name, [data-act="feedback"]')).toHaveCount(0);
