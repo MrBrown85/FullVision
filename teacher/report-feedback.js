@@ -184,7 +184,7 @@ window.ReportFeedback = (function () {
     (getCategories(cid) || []).forEach(function (c) {
       cats[c.id] = c.name;
     });
-    var list = getAssessments(cid)
+    var list = getAssignedAssessments(cid)
       .filter(function (a) {
         return a && !isDibelsScored(a) && assessmentInYearToDate(cid, a);
       })

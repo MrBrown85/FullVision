@@ -2582,3 +2582,40 @@ Result on 2026-11-12, PostgreSQL 17.12, local (port 54329), from empty databases
 - The md5 of `student_submit.page` on this build before the file is `8d8e3f9aa91e43b0163cb3189430b758`, the same as the header's "Before" and 2026111170's own list. After the file it is `b460f6f2753ad24317ad2d1f2f4149ce`, the same as the header's "After".
 - A wrong version of the file, with the removed-section filter taken out of `rubric_tags`, fails 2 checks of `on`.
 - Sanity check on the same server: `batch_e_e9.py` 32 of 32.
+
+## Assessment drafts (2026111701, 2026-11-16)
+
+One file, `../2026111701_assessment_drafts.sql`, **not applied**. It adds `assessment.is_draft` (false on every row), the trigger `assessment_draft_guard` (Unassign refused with `draft_has_work`, P0001, while a student has a result or work), `p_is_draft` (last) on `create_assessment`, and replaces 16 functions, each guarded by the md5 read from gradebook-prod on Nov 16. `assessment_drafts.py` runs on a database rebuilt from the repo and proved equal to live (`scripts/db-rebuild.mjs --check`; all 343 function md5s equal live's), not on `harness.sql`:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54461/drafts_live node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54461 PGDATABASE=drafts_live python3 assessment_drafts.py                                  # every scenario
+```
+
+Scenarios (the script's docstring says what each checks): `student` (each of 13 routes gives a Draft the byte-for-byte answer it gives the same piece dated in the future, names nothing of it, and gives it back once assigned), `create`, `update` (17 kinds of student result or work each refuse Unassign; 5 things that do not), `copies` (bundle, gradebook, Duplicate, Teams import, restore), `rls`, `race` (four orders and a send holding the class's lock, three rounds each, on connections of their own; twenty sends and Unassigns started at once, no deadlock; the trigger with its class lock taken out lets the first race through, as it must), `apply` (five guards, a second run, only is_draft added to each body, the header's md5s, pre-check, post-check, lock timeout), `undo` (PART 1, the fast stop, drops only the trigger and the file puts it back; PART 2 refuses while a Draft exists; catalog and rows as before but one dropped-column slot on `assessment`; a second run; a database without the file).
+
+Result on 2026-11-16, PostgreSQL 17.11 (embedded-postgres): **166 of 166** after the review of PR 1484 (the trigger no longer takes the piece's row for update; the 40P01 the review reported did not reproduce on this build, with either trigger): student 35, create 7, update 40, copies 8, rls 27, race 17, apply 18, undo 14. The pre-check, run read-only on gradebook-prod (17.6) the same day: every fingerprint ok; 149 assessments, 0 dated in the future, 146 with a result or work, 73 empty score rows and 2 seen-only grade_return rows (neither blocks).
+
+Not verified here: PostgREST's schema cache and the app's calls through it, the edge functions, gradebook-prod itself. `tests/db/run.mjs` rebuilds from `migrations/baseline/`, so it covers this file only after the baseline is refreshed following the apply.
+
+## Reflect from the card (2026111620)
+
+`reflect_from_card.py` exercises `../2026111620_reflect_from_the_card.sql` on live as it is after Slips Keyed (`slips_keyed.py`'s template with `2026111160` applied). The later files (`2026111170` to `2026111310`) touch none of the functions it patches or relies on.
+
+```bash
+PGDATABASE=rc python3 batch_c_common.py build
+PGDATABASE=rc python3 reflect_from_card.py                    # every scenario
+PGDATABASE=rc python3 reflect_from_card.py fingerprints check
+```
+
+- `live`: the six functions it patches or relies on have, on this build, the md5 read from gradebook-prod on Nov 16.
+- `listed`: before the file (the fault), a questionnaire that is on with no slip is not on a card. After: it is, for every student of the class; off, closed, not open yet and answered; `form` and `answer` with no slip; another class, another student's session, a withdrawn student; a Goal Check-In still rides on its reflection; a printed slip still opens and sends, and a card answer still uses one up.
+- `custom`: a teacher saves a reflection with every kind of question (refused before the file); another teacher cannot; a student answers it from the card and each answer is kept as `docs/plans/reflect-plan.md` says; an answered one cannot be deleted.
+- `answers`: `_clean_answer` for rating, date, ranking and likert: what each takes, refuses and keeps.
+- `same`: every old kind's answers come out of `_clean_answer` exactly as before the file, refusals included.
+- `apply`: six guards (a relied-on function changed stops it too); a database in use; only the two functions and two checks change; no row changes; a second run; anon and authenticated cannot run either function; the pre-check and post-check.
+- `undo`: the catalog comes back line for line; with a teacher's reflection in place both functions go back, the checks stay wide and nothing is deleted; the fast stop.
+
+Result on 2026-11-16, PostgreSQL 17.11, embedded-postgres, from an empty database: **174 of 174**; `fingerprints check` every list current. The pre-check, run read-only on gradebook-prod the same day, returned no row that would stop the file.
+
+Not verified here: the edge function (not changed: it passes a question's `options` and an answer through as they are), gradebook-prod.

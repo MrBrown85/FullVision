@@ -3431,6 +3431,7 @@ function _assessmentFromDetail(existing, detail) {
   if (a.rubric_id !== undefined) next.rubricId = a.rubric_id || '';
   if (a.module_id !== undefined) next.moduleId = a.module_id || '';
   if (a.copy_group !== undefined) next.copyGroup = a.copy_group || null;
+  if (a.is_draft !== undefined) next.isDraft = !!a.is_draft;
   if (a.core_competency_ids !== undefined) next.coreCompetencyIds = _coreCompetencyIdsOf(a.core_competency_ids);
   if (a.evidence_type !== undefined) next.evidenceType = a.evidence_type || '';
   if (a.collab_mode !== undefined) next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
@@ -3995,6 +3996,7 @@ function _v2GradebookToCache(cid, payload) {
       moduleId: a.module_id || '',
       copyGroup: a.copy_group || null,
       coreCompetencyIds: _coreCompetencyIdsOf(a.core_competency_ids),
+      isDraft: !!a.is_draft,
       has_rubric: !!a.has_rubric,
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
@@ -8999,9 +9001,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 var _firstVersionScope = null; // { cid, sid, aid, entries } while getRevisionFirstCell reads
 
 /* Preview as Student shows what the student's page shows. The page lists,
-   and the server sends, only work whose date has come in the class's time
-   zone, or that has no date (student_submit.page: date_assigned is null or
-   on or before today). So while Preview works a student's grades out
+   and the server sends, only assigned work (not a Draft) whose date has come
+   in the class's time zone, or that has no date (student_submit.page:
+   date_assigned is null or on or before today). So while Preview works a student's grades out
    (shared/student-view.js fromCache), a returned grade or a status on work
    dated after today is not read: getReturnedScores and getAssignmentStatuses
    leave it out for that class, and only inside `fn`. calc.js's caches are
@@ -9014,7 +9016,7 @@ function withStudentsToday(cid, fn) {
   var later = {};
   (getAssessments(cid) || []).forEach(function (a) {
     var d = a && a.date ? String(a.date).slice(0, 10) : '';
-    if (a && a.id && d && d > today) later[a.id] = true;
+    if (a && a.id && ((d && d > today) || a.isDraft)) later[a.id] = true;
   });
   if (!Object.keys(later).length) return fn();
   var was = _studentsTodayScope;

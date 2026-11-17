@@ -389,7 +389,7 @@ window.MComponents = (function () {
      score (points, a level or Complete/Incomplete): the student screen's
      "N Scored" and the card's growth line read this one count. */
   function scoredAssessmentCount(cid, sid) {
-    return getAssessments(cid).filter(function (a) {
+    return getAssignedAssessments(cid).filter(function (a) {
       if (typeof assessmentInYearToDate === 'function' && !assessmentInYearToDate(cid, a)) return false;
       var kind = assessmentCellValue(cid, sid, a).kind;
       return kind === 'points' || kind === 'level' || kind === 'complete';

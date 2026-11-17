@@ -28,7 +28,7 @@ window.ClassResults = (function () {
 
   /* ── Lookups ─────────────────────────────────────────────── */
   function _assessment(cid, aid) {
-    return (getAssessments(cid) || []).find(function (a) {
+    return (getAssignedAssessments(cid) || []).find(function (a) {
       return a.id === aid;
     });
   }

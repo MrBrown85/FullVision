@@ -2763,7 +2763,7 @@ window.PageStudent = (function () {
     // Every grade on this page is the year so far (Colin, 2026-11-03).
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
-    var assessments = getAssessments(cid);
+    var assessments = getAssignedAssessments(cid);
     var assessMap = {};
     assessments.forEach(function (a) {
       assessMap[a.id] = a;

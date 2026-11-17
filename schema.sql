@@ -266,6 +266,7 @@ create table assessment (
   accept_until   date,                                              -- there exactly when after_due is 'until' (check)
   group_work     text        not null default 'each',               -- each | group. Stored only; one submission for a group is Batch C
   students_see_markup boolean not null default true,                -- Stored only; Mark Up is Batch C
+  is_draft       boolean     not null default false,                -- a Draft: the teacher's alone, nothing of it on the student page until assigned; back to a Draft only with no student result or work (trigger assessment_draft_guard, refuses 'draft_has_work' P0001) (2026111701_assessment_drafts; not applied when this was written)
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -719,7 +720,7 @@ create table questionnaire (                                          -- RLS fv_
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references course(id) on delete cascade,
   template_id text references questionnaire_template(id) on delete set null,
-  kind text not null,                                                 -- about_me | core_reflection | goal_checkin | curricular_self_assessment
+  kind text not null,                                                 -- about_me | core_reflection | goal_checkin | curricular_self_assessment | custom (2026111620: one a teacher builds)
   title text not null, theme text, report_period integer,
   parent_id uuid references questionnaire(id) on delete set null,     -- a Goal Check-In rides on its reflection's slip
   opens_on date, closes_on date, is_on boolean not null default true, myed_comment text,
@@ -731,7 +732,7 @@ create table question (                                               -- RLS thr
   questionnaire_id uuid not null references questionnaire(id) on delete cascade,
   display_order integer not null default 0, prompt text not null,
   prompt_translations jsonb not null default '{}',
-  kind text not null,                                                 -- text | short_set | scale4 | choice | goal_status | core_pick
+  kind text not null,                                                 -- text | short_set | scale4 | choice | goal_status | core_pick | rating | date | ranking | likert | section (2026111620)
   options jsonb not null default '{}', core_ids text[] not null default '{}',
   repeated_key text, teacher_only boolean not null default false,
   archived boolean not null default false,                            -- removed after students answered it
