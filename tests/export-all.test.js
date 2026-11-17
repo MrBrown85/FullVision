@@ -409,6 +409,10 @@ describe('the export stays complete', () => {
     getPointsScore: 'read through assessmentCellValue',
     getQuickObs: 'read through getAllQuickObs',
     getQuickObsByDim: 'a subset of getAllQuickObs',
+    // Follow-ups (docs/DECISIONS.md, "Observation follow-ups"): teacher-only
+    // notes under an observation, never sent anywhere; the class backup keeps them.
+    getObservationFollowUps: 'teacher-only follow-ups; Download Class Backup keeps them',
+    getOpenConcerns: 'a subset of getAllQuickObs',
     getRemovedSections: 'the learning map, not student data',
     getReportConfig: 'report layout settings, not student data',
     getRubricById: 'read through _assessmentRubric',

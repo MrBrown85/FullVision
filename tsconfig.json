@@ -24,6 +24,7 @@
     "shared/data-assessments.js",
     "shared/data-config-settings.js",
     "shared/data-observations.js",
+    "shared/obs-follow-ups.js",
     "shared/data-term-ratings.js",
     "shared/data-student-records.js",
     "shared/data-student-cards.js",

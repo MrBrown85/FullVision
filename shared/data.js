@@ -2420,6 +2420,7 @@ var _ID_PARAM_KINDS = {
   p_module_id: 'module',
   p_category_id: 'category',
   p_resource_id: 'resource',
+  p_follow_up_of: 'observation',
 };
 var _P_ID_KINDS = {
   update_assessment: 'assessment',
@@ -2442,6 +2443,7 @@ var _P_ID_KINDS = {
   upsert_category: 'category',
   delete_category: 'category',
   update_observation: 'observation',
+  update_observation_follow_up: 'observation',
   delete_observation: 'observation',
   upsert_observation_template: 'observationTemplate',
   delete_observation_template: 'observationTemplate',
@@ -2902,6 +2904,10 @@ function _rekey(cid, kind, localId, serverId, extra) {
       var changed = false;
       Object.keys(obs || {}).forEach(function (sid) {
         if (_rekeyRowId(obs[sid], localId, serverId)) changed = true;
+        // A follow-up is an observation on the server, kept under its own.
+        (obs[sid] || []).forEach(function (ob) {
+          if (ob && _rekeyRowId(ob.followUps, localId, serverId)) changed = true;
+        });
       });
       return changed;
     });
@@ -3706,145 +3712,8 @@ async function _hydrateLearningMap(cid) {
   }
 }
 
-/* An observation's `dims` are plain string keys: a disposition code
-   ('engagement'), a Core Competency ('cc:<id>') or a custom tag
-   ('tag:<label>'). They travel to and from the server as observation.dims
-   (text[]), so keep only non-empty strings, once each, in order. */
-function _observationDims(dims) {
-  var out = [];
-  (Array.isArray(dims) ? dims : []).forEach(function (d) {
-    if (typeof d === 'string' && d && out.indexOf(d) === -1) out.push(d);
-  });
-  return out;
-}
-
-/* An observation's optional level on its linked competency: 1-4 (Emerging,
-   Developing, Proficient, Extending) or null. It is evidence only; no grade
-   reads it (docs/DECISIONS.md, "Observations (2026-10-18)"). */
-function _observationLevel(v) {
-  var n = typeof v === 'string' && v !== '' ? Number(v) : v;
-  return typeof n === 'number' && n >= 1 && n <= 4 && Math.floor(n) === n ? n : null;
-}
-
-/* The competency (one learning-map tag id) an observation links to, as the
-   p_tag_ids array: empty when there is none or the id is neither the
-   server's nor a local one whose create is queued (rule 6). */
-function _observationTagIds(competencyId) {
-  return competencyId && _isSendableId(competencyId) ? [competencyId] : [];
-}
-
-/* The server stores only an observation's assessment_id. The title the
-   badge shows comes from the course's assessments, so it is filled in here;
-   an assessment that is gone or not loaded leaves the title empty. */
-function _observationAssessmentTitles(cid) {
-  var titles = {};
-  if (!cid) return titles;
-  var list = [];
-  try {
-    list = getAssessments(cid) || [];
-  } catch (e) {
-    list = [];
-  }
-  list.forEach(function (a) {
-    if (a && a.id) titles[a.id] = a.title || '';
-  });
-  return titles;
-}
-
-function _observationsPayloadToBlob(payload, cid) {
-  payload = _rpcObject(payload) || payload || {};
-  var blob = {};
-  var titles = null;
-  // A withdrawn student's observations stay on the server, out of the class.
-  var withdrawn = cid ? _withdrawnIds(cid) : {};
-  (payload.observations || []).forEach(function (ob) {
-    var enrollmentIds = ob.enrollment_ids || ob.enrollmentIds || [];
-    enrollmentIds.forEach(function (sid) {
-      if (!sid || withdrawn[sid]) return;
-      if (!blob[sid]) blob[sid] = [];
-      var entry = {
-        id: ob.id,
-        text: ob.body || ob.text || '',
-        dims: _observationDims(ob.dims),
-        sentiment: ob.sentiment || null,
-        context: ob.context_type || ob.context || null,
-        created: ob.created_at || ob.created || new Date().toISOString(),
-        date: _localDayOf(ob.observed_at || ob.created_at || ob.created),
-      };
-      var tagIds = ob.tag_ids || ob.tagIds || [];
-      if (tagIds.length && tagIds[0]) entry.competencyId = tagIds[0];
-      var level = _observationLevel(ob.level);
-      if (level) entry.level = level;
-      if (ob.assessment_id) {
-        if (!titles) titles = _observationAssessmentTitles(cid);
-        entry.assignmentContext = { assessmentId: ob.assessment_id, assessmentTitle: titles[ob.assessment_id] || '' };
-      }
-      blob[sid].push(entry);
-    });
-  });
-  return blob;
-}
-
-/* get_observations returns at most 200 a page, newest first, and says
-   whether more follow. Asking for a bigger page still gets 200. */
-var _OBSERVATION_PAGE = 200;
-async function _fetchObservationPages(cid, firstPage) {
-  var rows = [];
-  for (var page = firstPage; page < firstPage + 500; page++) {
-    var res = await window.v2.getObservations(cid, { filters: {}, page: page, pageSize: _OBSERVATION_PAGE });
-    if (res && res.error) throw res.error;
-    var data = _rpcObject(res && res.data !== undefined ? res.data : res) || {};
-    rows = rows.concat(data.observations || []);
-    if (!data.has_more) break;
-  }
-  return rows;
-}
-
-async function _hydrateObservations(cid) {
-  try {
-    var rows = await _fetchObservationPages(cid, 1);
-    _persistLoadedField(cid, 'observations', _observationsPayloadToBlob({ observations: rows }, cid));
-  } catch (e) {
-    console.warn('get_observations failed for ' + cid + '; keeping existing observations:', e);
-  }
-}
-
-/* The class bundle carries the newest 500 observations and the total. The
-   older ones are fetched after the class is on screen and added to what is
-   there, so an observation written in the meantime is kept. */
-var _olderObservationsLoading = {};
-function _loadOlderObservations(cid, loadedCount) {
-  if (_olderObservationsLoading[cid]) return;
-  var firstPage = Math.floor(loadedCount / _OBSERVATION_PAGE) + 1;
-  _olderObservationsLoading[cid] = _fetchObservationPages(cid, firstPage)
-    .then(function (rows) {
-      var current = _cloneValue(getQuickObs(cid) || {}) || {};
-      var have = {};
-      Object.keys(current).forEach(function (sid) {
-        (current[sid] || []).forEach(function (ob) {
-          if (ob && ob.id) have[sid + '|' + ob.id] = true;
-        });
-      });
-      var older = _observationsPayloadToBlob({ observations: rows }, cid);
-      var added = false;
-      Object.keys(older).forEach(function (sid) {
-        older[sid].forEach(function (ob) {
-          if (have[sid + '|' + ob.id]) return;
-          (current[sid] = current[sid] || []).push(ob);
-          added = true;
-        });
-      });
-      if (!added) return;
-      _persistLoadedField(cid, 'observations', current);
-      if (cid === getActiveCourse()) _invalidateAndRerender();
-    })
-    .catch(function (e) {
-      console.warn('Older observations failed to load for ' + cid + ':', e);
-    })
-    .finally(function () {
-      delete _olderObservationsLoading[cid];
-    });
-}
+/* Observation helpers and loading (_observationDims, _observationLevel, _observationsPayloadToBlob,
+   _hydrateObservations, _loadOlderObservations) are in shared/data-observations.js, which loads just after this file. */
 
 async function _hydrateCanonicalDetails(cid) {
   await Promise.all([_hydrateLearningMap(cid), _hydrateObservations(cid)]);

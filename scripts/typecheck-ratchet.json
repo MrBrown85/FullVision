@@ -31,6 +31,7 @@
     "shared/data-learning-map.js",
     "shared/data-student-records.js",
     "shared/data-observations.js",
+    "shared/obs-follow-ups.js",
     "shared/data-rubrics.js",
     "shared/data-student-cards.js",
     "shared/data-demo.js",

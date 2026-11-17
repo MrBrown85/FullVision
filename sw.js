@@ -164,6 +164,7 @@ const PRECACHE_URLS = [
   '/teacher/rubric-guard.js',
   '/shared/obs-capture.js',
   '/shared/obs-card.js',
+  '/shared/obs-follow-ups.js',
   '/teacher/student-evidence.js',
   '/teacher/competency-evidence.js',
   '/shared/work-wall.js',

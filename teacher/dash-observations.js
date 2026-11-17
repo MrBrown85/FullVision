@@ -875,10 +875,57 @@ window.DashObservations = (function () {
           '</span></div>',
       );
     }
-    var h = _headHtml(m, state, students.length, _flagsHtml(m));
+    var h = _headHtml(m, state, students.length, _flagsHtml(m) + openConcernsHtml(cid));
     h += _keyHtml(m) + _gridHtml(m);
     h += '<div class="dash-ob2-pop" id="dash-ob2-pop" role="tooltip" hidden></div>';
     return h;
+  }
+
+  /* "3 open concerns": Concerns with no Resolved follow-up (docs/DECISIONS.md,
+     "Observation follow-ups"), opening to a short list; each goes to its card
+     on the Observations page, filtered to that student, with the timeline
+     open. '' with none. */
+  var OPEN_SHOWN = 8;
+  // html-safe: names, the note's first line and kind labels go through esc; ids are escaped in the link.
+  function openConcernsHtml(cid) {
+    var list = typeof getOpenConcerns === 'function' ? getOpenConcerns(cid) : [];
+    if (!list.length) return '';
+    var byId = {};
+    (getStudents(cid) || []).forEach(function (s) {
+      byId[s.id] = s;
+    });
+    var h =
+      '<details class="dash-ob2-open"><summary class="dash-ob2-flag dash-ob2-open-sum"><b>' +
+      list.length +
+      '</b> open ' +
+      _plural(list.length, 'concern', 'concerns') +
+      '</summary><div class="dash-ob2-open-list">';
+    list.slice(0, OPEN_SHOWN).forEach(function (o) {
+      var st = byId[o.studentId];
+      var fus = o.followUps || [];
+      var last = fus[fus.length - 1];
+      var line = String(o.text || '').split('\n')[0];
+      if (line.length > 80) line = line.slice(0, 79) + '…';
+      var when = last
+        ? (ObsFollowUps.kindLabel(last.kind) || 'Follow-up') + ' · ' + ObsFollowUps.shortDate(last)
+        : 'No follow-up yet · ' + ObsFollowUps.shortDate(o);
+      h +=
+        '<a class="dash-ob2-open-item" role="link" tabindex="0" data-href="/observations?course=' +
+        encodeURIComponent(cid) +
+        '&student=' +
+        encodeURIComponent(o.studentId) +
+        '&ob=' +
+        encodeURIComponent(o.id) +
+        '"><b>' +
+        esc(st ? displayName(st) : '') +
+        '</b><span class="dash-ob2-open-text">' +
+        esc(line) +
+        '</span><span class="dash-ob2-open-when">' +
+        esc(when) +
+        '</span></a>';
+    });
+    if (list.length > OPEN_SHOWN) h += '<div class="dash-ob2-open-more">' + (list.length - OPEN_SHOWN) + ' more</div>';
+    return h + '</div></details>';
   }
 
   /* The popover for a week cell: up to 5 notes, newest first. */
@@ -943,6 +990,7 @@ window.DashObservations = (function () {
     headerFull: headerFull,
     rowName: rowName,
     flagList: flagList,
+    openConcernsHtml: openConcernsHtml,
     rowMatches: rowMatches,
     obType: obType,
     FIXED: FIXED,

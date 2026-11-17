@@ -671,8 +671,9 @@ function seedIfNeeded() {
     entries.forEach(s => {
       if (!obs[s.sid]) obs[s.sid] = [];
       const ts = new Date(s.date + 'T12:00:00');
+      const id = 'qo_seed_' + s.sid + '_' + obs[s.sid].length;
       obs[s.sid].push({
-        id: 'qo_seed_' + s.sid + '_' + obs[s.sid].length,
+        id: id,
         text: s.text,
         dims: s.dims || [],
         sentiment: s.sentiment || null,
@@ -681,6 +682,18 @@ function seedIfNeeded() {
         date: s.date,
         ...(s.assessmentId
           ? { assignmentContext: { assessmentId: s.assessmentId, assessmentTitle: s.assessmentTitle } }
+          : {}),
+        // Follow-ups under it (docs/DECISIONS.md, "Observation follow-ups").
+        ...(s.followUps
+          ? {
+              followUps: s.followUps.map((f, i) => ({
+                id: 'fu_seed_' + id.slice(8) + '_' + i,
+                kind: f.kind || null,
+                text: f.text || '',
+                created: new Date(f.date + 'T12:00:00').toISOString(),
+                date: f.date,
+              })),
+            }
           : {}),
       });
     });
@@ -2412,6 +2425,19 @@ function seedIfNeeded() {
           dims: ['selfRegulation'],
           sentiment: 'concern',
           context: 'independent',
+          // A concern still open, with two follow-ups.
+          followUps: [
+            {
+              date: '2025-11-20',
+              kind: 'called_home',
+              text: 'Spoke with his mom. She will check his planner each night this week.',
+            },
+            {
+              date: '2025-12-03',
+              kind: 'still_happening',
+              text: 'Better at the start of the week; still drifting on Friday afternoons.',
+            },
+          ],
         },
         {
           sid: 'st6',

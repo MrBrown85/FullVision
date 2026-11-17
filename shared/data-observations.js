@@ -2,6 +2,157 @@
 /* Observations: quick observations, sentence starters, custom tags and the tag resolver.
    Moved from shared/data.js on 2026-11-12 (S19 split, move only). */
 
+/* ── Loading: the server's rows in the per-student shape (moved from shared/data.js, Nov 17) ── */
+
+/* An observation's `dims` are plain string keys: a disposition code
+   ('engagement'), a Core Competency ('cc:<id>') or a custom tag
+   ('tag:<label>'). They travel to and from the server as observation.dims
+   (text[]), so keep only non-empty strings, once each, in order. */
+function _observationDims(dims) {
+  var out = [];
+  (Array.isArray(dims) ? dims : []).forEach(function (d) {
+    if (typeof d === 'string' && d && out.indexOf(d) === -1) out.push(d);
+  });
+  return out;
+}
+
+/* An observation's optional level on its linked competency: 1-4 (Emerging,
+   Developing, Proficient, Extending) or null. It is evidence only; no grade
+   reads it (docs/DECISIONS.md, "Observations (2026-10-18)"). */
+function _observationLevel(v) {
+  var n = typeof v === 'string' && v !== '' ? Number(v) : v;
+  return typeof n === 'number' && n >= 1 && n <= 4 && Math.floor(n) === n ? n : null;
+}
+
+/* The competency (one learning-map tag id) an observation links to, as the
+   p_tag_ids array: empty when there is none or the id is neither the
+   server's nor a local one whose create is queued (rule 6). */
+function _observationTagIds(competencyId) {
+  return competencyId && _isSendableId(competencyId) ? [competencyId] : [];
+}
+
+/* The server stores only an observation's assessment_id. The title the
+   badge shows comes from the course's assessments, so it is filled in here;
+   an assessment that is gone or not loaded leaves the title empty. */
+function _observationAssessmentTitles(cid) {
+  var titles = {};
+  if (!cid) return titles;
+  var list = [];
+  try {
+    list = getAssessments(cid) || [];
+  } catch (e) {
+    list = [];
+  }
+  list.forEach(function (a) {
+    if (a && a.id) titles[a.id] = a.title || '';
+  });
+  return titles;
+}
+
+/* payload: { observations, follow_ups } as get_class_bundle and
+   get_observations answer (2026111703). Each follow-up goes under its
+   observation, in every student's copy of it, oldest first; it is never an
+   observation of its own. */
+function _observationsPayloadToBlob(payload, cid) {
+  payload = _rpcObject(payload) || payload || {};
+  var blob = {};
+  /** @type {Object<string, string>|null} */
+  var titles = null;
+  var followUps = _followUpsByParent(payload.follow_ups);
+  // A withdrawn student's observations stay on the server, out of the class.
+  var withdrawn = cid ? _withdrawnIds(cid) : {};
+  (payload.observations || []).forEach(function (ob) {
+    var enrollmentIds = ob.enrollment_ids || ob.enrollmentIds || [];
+    enrollmentIds.forEach(function (sid) {
+      if (!sid || withdrawn[sid]) return;
+      if (!blob[sid]) blob[sid] = [];
+      var entry = {
+        id: ob.id,
+        text: ob.body || ob.text || '',
+        dims: _observationDims(ob.dims),
+        sentiment: ob.sentiment || null,
+        context: ob.context_type || ob.context || null,
+        created: ob.created_at || ob.created || new Date().toISOString(),
+        date: _localDayOf(ob.observed_at || ob.created_at || ob.created),
+      };
+      var tagIds = ob.tag_ids || ob.tagIds || [];
+      if (tagIds.length && tagIds[0]) entry.competencyId = tagIds[0];
+      var level = _observationLevel(ob.level);
+      if (level) entry.level = level;
+      if (ob.assessment_id) {
+        var t = titles || (titles = _observationAssessmentTitles(cid));
+        entry.assignmentContext = { assessmentId: ob.assessment_id, assessmentTitle: t[ob.assessment_id] || '' };
+      }
+      if (followUps[ob.id]) entry.followUps = followUps[ob.id].map(_cloneFollowUp);
+      blob[sid].push(entry);
+    });
+  });
+  return blob;
+}
+
+/* get_observations returns at most 200 a page, newest first, and says
+   whether more follow. Asking for a bigger page still gets 200. */
+var _OBSERVATION_PAGE = 200;
+async function _fetchObservationPages(cid, firstPage) {
+  var rows = [];
+  var followUps = [];
+  var v2 = /** @type {any} */ (window).v2;
+  for (var page = firstPage; page < firstPage + 500; page++) {
+    var res = await v2.getObservations(cid, { filters: {}, page: page, pageSize: _OBSERVATION_PAGE });
+    if (res && res.error) throw res.error;
+    var data = _rpcObject(res && res.data !== undefined ? res.data : res) || {};
+    rows = rows.concat(data.observations || []);
+    followUps = followUps.concat(data.follow_ups || []);
+    if (!data.has_more) break;
+  }
+  return { observations: rows, follow_ups: followUps };
+}
+
+async function _hydrateObservations(cid) {
+  try {
+    _persistLoadedField(cid, 'observations', _observationsPayloadToBlob(await _fetchObservationPages(cid, 1), cid));
+  } catch (e) {
+    console.warn('get_observations failed for ' + cid + '; keeping existing observations:', e);
+  }
+}
+
+/* The class bundle carries the newest 500 observations and the total. The
+   older ones are fetched after the class is on screen and added to what is
+   there, so an observation written in the meantime is kept. */
+var _olderObservationsLoading = {};
+function _loadOlderObservations(cid, loadedCount) {
+  if (_olderObservationsLoading[cid]) return;
+  var firstPage = Math.floor(loadedCount / _OBSERVATION_PAGE) + 1;
+  _olderObservationsLoading[cid] = _fetchObservationPages(cid, firstPage)
+    .then(function (pages) {
+      var current = _cloneValue(getQuickObs(cid) || {}) || {};
+      var have = {};
+      Object.keys(current).forEach(function (sid) {
+        (current[sid] || []).forEach(function (ob) {
+          if (ob && ob.id) have[sid + '|' + ob.id] = true;
+        });
+      });
+      var older = _observationsPayloadToBlob(pages, cid);
+      var added = false;
+      Object.keys(older).forEach(function (sid) {
+        older[sid].forEach(function (ob) {
+          if (have[sid + '|' + ob.id]) return;
+          (current[sid] = current[sid] || []).push(ob);
+          added = true;
+        });
+      });
+      if (!added) return;
+      _persistLoadedField(cid, 'observations', current);
+      if (cid === getActiveCourse()) _invalidateAndRerender();
+    })
+    .catch(function (e) {
+      console.warn('Older observations failed to load for ' + cid + ':', e);
+    })
+    .finally(function () {
+      delete _olderObservationsLoading[cid];
+    });
+}
+
 /* ── Quick Observations — in-the-moment capture ─────────── */
 function getQuickObs(cid) {
   if (_cache.observations[cid] !== undefined) return _cache.observations[cid];
@@ -261,6 +412,203 @@ function _persistObservationDelete(cid, obId) {
   _trackPendingSync(
     _writeRpc('delete_observation', { p_id: obId }).then(function (res) {
       if (res.error) console.warn('delete_observation failed:', res.error);
+    }),
+  );
+}
+
+/* ── Follow-ups (docs/DECISIONS.md, "Observation follow-ups") ───────────
+   Dated entries under one observation: { id, kind, text, created, date,
+   modified }, kept oldest first on the observation itself as `followUps`
+   (in every student's copy of it). Nothing that reads observations for a
+   report, a grade, the Comment Bank or the student page looks at
+   `followUps`, so a follow-up reaches none of them. A follow-up has the
+   observation's students and its Private; on the server it is an
+   observation row with follow_up_of set and no students of its own
+   (migrations/2026111703_observation_follow_ups.sql). A Concern with a
+   Resolved follow-up is closed. */
+var _FOLLOW_UP_KINDS = { called_home: true, spoke_with_student: true, still_happening: true, resolved: true };
+function _followUpKind(kind) {
+  return kind && _FOLLOW_UP_KINDS[kind] ? kind : null;
+}
+function _cloneFollowUp(f) {
+  return Object.assign({}, f);
+}
+function _sortFollowUps(list) {
+  return list.sort(function (a, b) {
+    return (a.created || '').localeCompare(b.created || '');
+  });
+}
+/* follow_ups rows from the server → { parentId: [follow-up] }. */
+function _followUpsByParent(rows) {
+  /** @type {Object<string, any[]>} */
+  var out = {};
+  (Array.isArray(rows) ? rows : []).forEach(function (f) {
+    if (!f || !f.id || !f.follow_up_of) return;
+    (out[f.follow_up_of] = out[f.follow_up_of] || []).push({
+      id: f.id,
+      kind: _followUpKind(f.kind),
+      text: f.body || '',
+      created: f.created_at || new Date().toISOString(),
+      date: _localDayOf(f.created_at),
+    });
+  });
+  Object.keys(out).forEach(function (k) {
+    _sortFollowUps(out[k]);
+  });
+  return out;
+}
+
+/* Every student's copy of one observation (one per student it names). */
+function _observationCopies(cid, obId) {
+  var all = getQuickObs(cid);
+  var out = [];
+  Object.keys(all).forEach(function (sid) {
+    (all[sid] || []).forEach(function (ob) {
+      if (ob && ob.id === obId) out.push(ob);
+    });
+  });
+  return out;
+}
+
+function _saveFollowUps(cid) {
+  var all = getQuickObs(cid);
+  _cache.observations[cid] = all;
+  var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  _markLocalWrite('observations', cid);
+  _broadcastChange(cid, 'observations');
+  return lsOk;
+}
+
+/* The observation's follow-ups, oldest first (a copy of the list). */
+function getObservationFollowUps(cid, obId) {
+  var copies = _observationCopies(cid, resolveObservationId(cid, obId));
+  return _sortFollowUps(((copies[0] && copies[0].followUps) || []).slice());
+}
+
+function isObservationResolved(ob) {
+  return (
+    !!ob &&
+    (ob.followUps || []).some(function (f) {
+      return f && f.kind === 'resolved';
+    })
+  );
+}
+
+/* A Concern with no Resolved follow-up. */
+function isOpenConcern(ob) {
+  return !!ob && ob.sentiment === 'concern' && !isObservationResolved(ob);
+}
+
+/* The class's open concerns, once each, newest first, as getAllQuickObs
+   gives them (with studentId; one for several students names the first). */
+function getOpenConcerns(cid) {
+  var seen = {};
+  return getAllQuickObs(cid).filter(function (ob) {
+    if (!isOpenConcern(ob) || seen[ob.id]) return false;
+    seen[ob.id] = true;
+    return true;
+  });
+}
+
+/* kind: one of the four, or null; text: the teacher's words. One of the two
+   is needed. Returns the new follow-up, or null. */
+function addObservationFollowUp(cid, obId, kind, text) {
+  obId = resolveObservationId(cid, obId);
+  var copies = _observationCopies(cid, obId);
+  kind = _followUpKind(kind);
+  text = String(text || '').trim();
+  if (!copies.length || (!kind && !text)) return null;
+  var entry = {
+    id: 'fu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    kind: kind,
+    text: text,
+    created: new Date().toISOString(),
+    date: getTodayStr(),
+  };
+  copies.forEach(function (ob) {
+    ob.followUps = (ob.followUps || []).concat([_cloneFollowUp(entry)]);
+  });
+  _saveFollowUps(cid);
+  if (_writesEnabled()) _persistFollowUpCreate(cid, obId, entry);
+  return entry;
+}
+
+function _eachFollowUpCopy(cid, obId, fuId, fn) {
+  var found = false;
+  _observationCopies(cid, resolveObservationId(cid, obId)).forEach(function (ob) {
+    (ob.followUps || []).forEach(function (f) {
+      if (f && f.id === fuId) {
+        fn(f);
+        found = true;
+      }
+    });
+  });
+  return found;
+}
+
+function updateObservationFollowUp(cid, obId, fuId, kind, text) {
+  fuId = resolveObservationId(cid, fuId);
+  kind = _followUpKind(kind);
+  text = String(text || '').trim();
+  if (!kind && !text) return false;
+  var stamp = new Date().toISOString();
+  var found = _eachFollowUpCopy(cid, obId, fuId, function (f) {
+    f.kind = kind;
+    f.text = text;
+    f.modified = stamp;
+  });
+  if (!found) return false;
+  _saveFollowUps(cid);
+  if (_writesEnabled() && _isSendableId(fuId)) {
+    _trackPendingSync(
+      _writeRpc(
+        'update_observation_follow_up',
+        { p_id: fuId, p_body: text, p_kind: kind },
+        { retryKey: 'update_observation_follow_up:' + fuId },
+      ).then(function (res) {
+        if (res.error && !res.error.handledSessionExpired)
+          console.warn('update_observation_follow_up failed:', res.error);
+      }),
+    );
+  }
+  return true;
+}
+
+function deleteObservationFollowUp(cid, obId, fuId) {
+  fuId = resolveObservationId(cid, fuId);
+  if (!_eachFollowUpCopy(cid, obId, fuId, function () {})) return false;
+  _observationCopies(cid, resolveObservationId(cid, obId)).forEach(function (ob) {
+    ob.followUps = (ob.followUps || []).filter(function (f) {
+      return f && f.id !== fuId;
+    });
+    if (!ob.followUps.length) delete ob.followUps;
+  });
+  _saveFollowUps(cid);
+  // A follow-up is an observation row on the server: the same delete.
+  if (_writesEnabled()) _persistObservationDelete(cid, fuId);
+  return true;
+}
+
+/* v2 create_observation_follow_up(p_follow_up_of, p_body, p_kind,
+   p_idempotency_key, p_created_at) → uuid. The follow-up's local id is re-keyed when it
+   lands (rule 6). A parent still waiting for its own create is a local id
+   here: the outbox holds this behind it and puts in its server id. */
+function _persistFollowUpCreate(cid, parentId, entry) {
+  if (!_isUuid(cid) || !_isSendableId(parentId)) return;
+  var rec = _registerPendingCreate(cid, 'observation', entry.id, 'create_observation_follow_up');
+  _trackPendingSync(
+    _writeRpc(
+      'create_observation_follow_up',
+      // p_created_at: when it was saved here, so one sent later keeps its day.
+      { p_follow_up_of: parentId, p_body: entry.text || '', p_kind: entry.kind || null, p_created_at: entry.created },
+      { retryKey: 'create_observation_follow_up:' + entry.id, entryId: rec ? rec.entryId : undefined },
+    ).then(function (res) {
+      if (res.error) {
+        if (res.error.handledSessionExpired || res.error.cancelled) return;
+        console.warn('create_observation_follow_up failed:', res.error);
+        return;
+      }
+      if (rec) _onCreateLanded(rec.entryId, res.data);
     }),
   );
 }
