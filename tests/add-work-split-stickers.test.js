@@ -414,13 +414,47 @@ describe('a wrong cut, caught by the stickers on later pages', () => {
     expect(m.take().map(p => [p.sid, p.pages.map(pg => pg.n)])).toEqual([['s1', [1, 2, 3]]]);
   });
 
-  it('a retired or another class’s sticker on a later page says nothing', async () => {
-    answers = { 1: sticker(CODE.s1), 2: sticker(OLD_S2), 3: sticker(CODE.s2), 4: sticker('ZZZZZZZZZZZZ') };
+  it('on a later page, another student’s retired sticker, another class’s and a departed student’s are each a wrong cut', async () => {
+    answers = {
+      1: sticker(CODE.s1),
+      2: sticker(OLD_S2), // Ben's old sheet, inside Ava's piece
+      3: sticker(CODE.s3),
+      4: sticker('ZZZZZZZZZZZZ'), // not this class's
+      5: sticker(CODE.s4),
+      6: sticker(LEFT), // a student no longer in the class
+    };
+    const { s, m, ctx } = opened(6, 2);
+    await Stk.start(s, ctx);
+    await settled(s);
+    expect(who(m)).toEqual(['', '', '']);
+    expect(m.pieces().map(p => Stk.note(s, p, ctx))).toEqual([
+      'Page 2 of this piece has Ben’s sticker. Check where this piece ends.',
+      'Page 2 of this piece has a sticker that isn’t this class’s. Check where this piece ends.',
+      'Page 2 of this piece has a sticker that isn’t this class’s. Check where this piece ends.',
+    ]);
+    expect(m.take()).toEqual([]);
+  });
+
+  it('a student’s own old sheet on their second page is no warning', async () => {
+    answers = { 1: sticker(CODE.s2), 2: sticker(OLD_S2) };
     const { s, m, ctx } = opened(4, 2);
     await Stk.start(s, ctx);
     await settled(s);
-    expect(who(m)).toEqual(['s1', 's2']);
-    expect(m.pieces().map(p => Stk.note(s, p, ctx))).toEqual(['', '']);
+    expect(who(m)).toEqual(['s2', '']);
+    expect(Stk.note(s, m.pieces()[0], ctx)).toBe('');
+  });
+
+  it('with two classes, a sticker of neither inside a piece says so in the plural', async () => {
+    listed.c2 = { data: { labels: [] }, error: null, refused: null };
+    answers = { 1: sticker(CODE.s1), 2: sticker('ZZZZZZZZZZZZ') };
+    const { s, m, ctx } = opened(4, 2, CLASS, { cids: ['c1', 'c2'] });
+    m.name(0, 's1'); // typed: it stays, with the line
+    await Stk.start(s, ctx);
+    await settled(s);
+    expect(who(m)).toEqual(['s1', '']);
+    expect(Stk.note(s, m.pieces()[0], ctx)).toBe(
+      'Page 2 of this piece has a sticker that isn’t one of these classes’. Check where this piece ends.',
+    );
   });
 
   it('counts pages while it reads', async () => {

@@ -211,9 +211,10 @@
         var bySticker = false;
         var clash = -1;
         var sid = pin;
-        /* A wrong cut: a later page of this piece carries a live sticker of
-           another student (`inside`, page no → sid). The piece is not named
-           by its sticker; a typed name stays, and the warning shows. */
+        /* A wrong cut: a later page of this piece carries a sticker that is
+           not its own student's (`inside`, page no → sid, '?' for one not
+           of the class). The piece is not named by its sticker; a typed
+           name stays, and the warning shows. */
         var own = pin || (sticker && sticker.sid) || '';
         /** @type {any} */
         var wrong = null;
@@ -399,8 +400,9 @@
 
     /* Stickers (B4). setStickers(map): page no → { sid, why, code, also }
        for the pieces' first pages, replacing what was there; inside: page
-       no → sid for every page read with a live sticker of a listed student
-       (a later page's is a wrong cut when it is another student's).
+       no → whose sticker is on every page read (a listed student's sid,
+       live or retired, or '?'); on a later page, anyone's but the piece's
+       own student's is a wrong cut.
        useSticker(at): the teacher asks for the sticker's name on a piece
        they had typed or emptied: their name on it is let go. */
     function setStickers(map, inside) {

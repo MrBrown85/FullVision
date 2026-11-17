@@ -190,6 +190,12 @@ test('stickers name their pieces, the rest are typed, and every page goes to the
     { timeout: 60000 },
   );
   await expect(aws.locator('#aws-name-0')).toHaveValue('');
+  // Piece 3 (pages 7–9): page 9 is E's paper (E's old, retired sticker), so C's sticker does not name it.
+  await expect(aws.locator('.aws-card[data-at="2"] .aws-stk-note')).toHaveText(
+    /^Page 3 of this piece has .+’s sticker\. Check where this piece ends\.$/,
+    { timeout: 60000 },
+  );
+  await expect(aws.locator('#aws-name-2')).toHaveValue('');
   await expect(aws.locator('.aws-stk-line')).toHaveText(/ named by sticker, /, { timeout: 60000 });
   await shot(page, 'add-work-stickers-wrong-cut');
 

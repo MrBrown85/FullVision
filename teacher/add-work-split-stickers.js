@@ -16,11 +16,12 @@
    turned by hand is a new picture and is read again); the reader pauses
    between looks, so typing stays live. Match the Named Pieces never waits.
 
-   A wrong cut: a later page of a piece carries a live sticker of another
-   student than the piece's sticker or typed name. The piece is not named
-   by its sticker (a typed name stays) and says which page. A student's own
-   sticker on more of their pages is fine, and is not "twice": only the
-   same code on two pieces' first pages is.
+   A wrong cut: a later page of a piece carries any sticker but the piece's
+   own student's (another listed student's, live or retired; another
+   class's; a student no longer on the list). The piece is not named by its
+   sticker (a typed name stays) and says which page. A student's own
+   sticker on more of their pages, an old sheet's included, is fine, and is
+   not "twice": only the same code on two pieces' first pages is.
 
    What a read does (ScanLabelRead.resolve over the pieces' first pages,
    worked out again at every draw, so it follows the cuts):
@@ -53,6 +54,8 @@
   function _defaultRead(picture) {
     return W.ScanLabelRead.read(picture);
   }
+  // A sticker on a page that is not of these classes, or of a student no longer on the list.
+  var OTHER = '?';
   var _list = _defaultList;
   var _read = _defaultRead;
   // Each picture read: picture → { code, upsideDown, turn } or null. Pictures are let go with the scan.
@@ -136,20 +139,23 @@
         });
       map[ps[i].first] = { sid: r.sid || '', why: r.why || '', code: r.code, also: also };
     });
-    // Every page read with a live sticker of a listed student: a later page's is a wrong cut.
+    /* Whose sticker is on every page read: a listed student's (live or
+       retired), or OTHER for a code not these classes' or of a student no
+       longer on the list. On a later page of a piece, anyone's but the
+       piece's own student's is a wrong cut. */
     var listed = {};
     (s.list || []).forEach(function (st) {
       if (st && st.id) listed[st.id] = true;
     });
-    var live = {};
+    var whose = {};
     stk.labels.forEach(function (l) {
-      if (l && !l.retired && listed[l.enrollment_id]) live[l.code] = l.enrollment_id;
+      if (l && listed[l.enrollment_id]) whose[l.code] = l.enrollment_id;
     });
     var inside = {};
     var order = _order(s);
     order.forEach(function (no) {
       var r = _readOf(s, no);
-      if (r && live[r.code]) inside[no] = live[r.code];
+      if (r && r.code) inside[no] = whose[r.code] || OTHER;
     });
     s.m.setStickers(map, inside);
     stk.total = order.length;
@@ -251,9 +257,18 @@
     var call = function (sid) {
       return (ctx && ctx.call ? ctx.call(s, sid) : '') || 'a student';
     };
+    var two = Array.isArray(s.cids) && s.cids.length > 1;
     if (p.wrong)
       return (
-        'Page ' + p.wrong.pos + ' of this piece has ' + call(p.wrong.sid) + '’s sticker. Check where this piece ends.'
+        'Page ' +
+        p.wrong.pos +
+        ' of this piece has ' +
+        (p.wrong.sid === OTHER
+          ? two
+            ? 'a sticker that isn’t one of these classes’.'
+            : 'a sticker that isn’t this class’s.'
+          : call(p.wrong.sid) + '’s sticker.') +
+        ' Check where this piece ends.'
       );
     if (p.clash >= 0) return 'The sticker says ' + call(k.sid) + ', who is typed on piece ' + (p.clash + 1) + '.';
     if (p.clashFrom && p.clashFrom.length)
