@@ -260,9 +260,9 @@
       '<div class="awc-body is-' +
       esc(s.layout) +
       '" data-keep-scroll="awc-body">' +
-      (_two() ? AddWorkTwoClasses.barHtml(s, _ctx) : '') +
       (s.layout === 'grid' ? '' : s.tray.html()) +
       '<div class="awc-scroll" data-keep-scroll="awc-scroll">' +
+      (_two() ? AddWorkTwoClasses.barHtml(s, _ctx) : '') +
       (s.layout === 'grid' ? s.tray.html() + _gridHtml(s) : _columnHtml(s)) +
       '</div></div>' +
       '<div class="awc-foot">' +

@@ -711,3 +711,113 @@ describe('no file name leaves the page', () => {
     expect(getStudentSubmission(CID, MATEO, PIECE).files.length).toBe(3);
   });
 });
+
+/* ── One pile, two classes (B6) ── */
+describe('one pile, two classes', () => {
+  const CID2 = U(2);
+  const PIECE2 = U(32);
+  const B_AVERY = U(200); // the same name as Socials 10's Avery Chen
+  const XIMENA = U(201);
+
+  function seedSecond() {
+    seedClass(CID2, {
+      students: [
+        { id: B_AVERY, firstName: 'Avery', lastName: 'Chen' },
+        { id: XIMENA, firstName: 'Ximena', lastName: 'Quill' },
+      ],
+      learningMaps: { subjects: [], sections: [], _customized: true, _version: 1, _flatVersion: 2 },
+      assessments: [{ id: PIECE2, title: ' conscription ', tagIds: [], date: '2026-10-20' }],
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_save' },
+    });
+    COURSES[CID2].name = 'Block C';
+    saveDemoStudentWork(CID2, {
+      course: { send_work: true },
+      assessments: [{ id: PIECE2, students_send: 'photos' }],
+      submissions: [],
+    });
+  }
+  afterEach(() => clearClass(CID2));
+
+  async function turnOn() {
+    click($('[data-awc="two"]'));
+    await tick(8);
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('true');
+  }
+
+  it('is offered only for a same-titled assessment, and is never on by itself', async () => {
+    AddWorkClass.open(CID, PIECE);
+    expect($('[data-awc="two"]')).toBeNull(); // no other class yet
+    AddWorkClass.close(true);
+    seedSecond();
+    AddWorkClass.open(CID, PIECE);
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('false');
+    expect($$('.awc-row').length).toBe(6);
+    await turnOn();
+    expect($$('.awc-class-head').map(text)).toEqual(['Socials 10', 'Block C']);
+    expect($$('.awc-row').length).toBe(8);
+  });
+
+  it('a name in both classes is offered with each class, never taken; a name in one goes to its class', async () => {
+    seedSecond();
+    AddWorkClass.open(CID, PIECE);
+    await turnOn();
+    await AddWorkClass.takeFiles([file('Avery Chen.pdf'), file('Ximena Quill.pdf')]);
+    await tick();
+    expect(chipsOf(AVERY)).toEqual([]);
+    expect(chipsOf(B_AVERY)).toEqual([]);
+    expect(chipsOf(XIMENA)).toEqual(['Ximena Quill.pdf']);
+    const avery = itemNamed('Avery Chen.pdf');
+    expect([...avery.querySelectorAll('.awt-act')].map(text).slice(0, 2)).toEqual([
+      'Avery Chen · Socials 10',
+      'Avery Chen · Block C',
+    ]);
+    // A file named for nobody says which classes it looked in.
+    await AddWorkClass.takeFiles([file('Zed Nobody.pdf')]);
+    await tick();
+    expect(text(itemNamed('Zed Nobody.pdf').querySelector('.awt-why'))).toBe(
+      'No student in Socials 10 or Block C has that name.',
+    );
+  });
+
+  it('turned off, the second class’s files go back to the tray, never to a student of the first', async () => {
+    seedSecond();
+    AddWorkClass.open(CID, PIECE);
+    await turnOn();
+    await AddWorkClass.takeFiles([file('Ximena Quill.pdf')]);
+    await tick();
+    expect(chipsOf(XIMENA)).toEqual(['Ximena Quill.pdf']);
+    click($('[data-awc="two"]'));
+    await tick();
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('false');
+    expect(rowOf(XIMENA)).toBeNull();
+    expect($$('.awc-chip').length).toBe(0);
+    expect(items().length).toBe(1);
+    expect(text($('.awc-two-line'))).toBe('1 file from Block C went back to Waiting for a Student.');
+  });
+
+  it('adds each student’s pages in their own class; On Paper goes to the student’s own class', async () => {
+    seedSecond();
+    memoryQueue();
+    AddWorkClass.open(CID, PIECE);
+    await turnOn();
+    await AddWorkClass.takeFiles([file('Ximena Quill.pdf', { n: 2 }), file('Priya Kaur.pdf')]);
+    await tick();
+    click($('.awc-primary'));
+    for (let i = 0; i < 40 && !$('.awc-done'); i++) await tick(1);
+    window.PhotoQueue.release();
+    expect(getStudentSubmission(CID2, XIMENA, PIECE2).files.length).toBe(2);
+    expect(getStudentSubmission(CID, XIMENA, PIECE)).toBeNull();
+    expect(getStudentSubmission(CID, PRIYA, PIECE).files.length).toBe(1);
+    expect(getStudentSubmission(CID2, PRIYA, PIECE2)).toBeNull();
+    // Not In: both classes, each with their class.
+    const bAvery = $$('.awc-done-row').find(li => {
+      const tag = li.querySelector('.awc-class-tag');
+      return tag && text(tag) === 'Block C';
+    });
+    expect(text(bAvery.querySelector('.awc-name'))).toBe('Avery Chen');
+    click(bAvery.querySelector('.awc-paper'));
+    await tick();
+    expect(getStudentSubmission(CID2, B_AVERY, PIECE2).on_paper).toBe(true);
+    expect(getStudentSubmission(CID, AVERY, PIECE)).toBeNull();
+  });
+});
