@@ -229,6 +229,8 @@ describe('follow-ups for a signed-in teacher', () => {
     var sent = fake.committed.filter(c => c.name === 'create_observation_follow_up');
     expect(sent).toHaveLength(1);
     expect(sent[0].params).toMatchObject({ p_follow_up_of: OB, p_body: 'Met with family', p_kind: 'resolved' });
+    // The time it was saved here, so one sent later keeps its day.
+    expect(sent[0].params.p_created_at).toBe(f.created);
     expect(_isUuid(sent[0].params.p_idempotency_key)).toBe(true);
     var now = getObservationFollowUps(CID, OB)[0];
     expect(_isUuid(now.id)).toBe(true);
@@ -283,6 +285,39 @@ describe('follow-ups for a signed-in teacher', () => {
     expect(fake.committed.filter(c => c.name === 'delete_observation').map(c => c.params.p_id)).toEqual([FU1]);
   });
 
+  it("a follow-up queues behind its observation's own writes, under its server id once it has one", async () => {
+    var answer;
+    fake.on('create_observation_follow_up', () => new Promise(r => (answer = r)));
+    fake.hold();
+    addQuickOb(CID, E1, 'Late to the lab', [], 'concern');
+    var local = getStudentQuickObs(CID, E1).find(o => o.text === 'Late to the lab');
+    addObservationFollowUp(CID, local.id, 'called_home', '');
+    var key = () =>
+      JSON.parse(localStorage.getItem('fv-sync-queue-v1')).entries.find(
+        e => e.endpoint === 'create_observation_follow_up',
+      ).key;
+    await settle();
+    expect(key()).toBe('id:' + local.id);
+    await fake.release();
+    await settle();
+    var parent = getStudentQuickObs(CID, E1).find(o => o.text === 'Late to the lab');
+    expect(_isUuid(parent.id)).toBe(true);
+    // Sent, under the observation's server id, and not yet answered.
+    expect(key()).toBe('id:' + parent.id);
+    answer({ data: 'c7000000-0000-4000-8000-000000000041', error: null });
+    await settle();
+  });
+
+  it('a change to a follow-up deleted meanwhile is settled, not a dead letter', async () => {
+    fake.on('update_observation_follow_up', () => ({
+      data: null,
+      error: { code: 'P0002', message: 'follow-up not found' },
+    }));
+    var res = await window.v2Queue.push('update_observation_follow_up', { p_id: FU1, p_body: 'x', p_kind: null });
+    expect(res.error).toBeNull();
+    expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+  });
+
   it('both new writes are idempotent', () => {
     expect(FV_IDEMPOTENT_RPCS.create_observation_follow_up).toBe(true);
     expect(FV_IDEMPOTENT_RPCS.update_observation_follow_up).toBe(true);
@@ -333,6 +368,7 @@ describe('teacher-only: no report, Comment Bank, export or student page reader s
       'shared/data.js', // re-keying a follow-up's id
       'shared/obs-card.js', // the log's strip, only with opts.followUps
       'shared/obs-follow-ups.js',
+      'shared/offline-queue.js', // a follow-up queues behind its observation; a change to a deleted one is done
       'shared/seed-data.js',
       'teacher-mobile/shell.js', // the delete question
       'teacher-mobile/tab-observe.js',

@@ -4,7 +4,7 @@ with want(sig, after_md5) as (values
     ('public.get_class_bundle(uuid,bigint)', 'ed59fcd4ef9bc85c6e5bcc24c3fdd608'),
     ('public.get_observations(uuid,jsonb,integer,integer)', '184fc8e045969e593ea641901bf2f0c3'),
     ('public.import_json_restore(jsonb,uuid)', '1a201d1ab42337ebb572469c67e8fcfc'),
-    ('public.create_observation_follow_up(uuid,text,text,uuid)', '9dec66bdc1d9b34809f58746e14e4f10'),
+    ('public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', 'ee948114be4962f2286cdc34562c425d'),
     ('public.update_observation_follow_up(uuid,text,text,uuid)', '00e70abda3f41746f89a96969ff33c48'),
     ('fv_private.observation_follow_up_rule()', '20e37bafa4e23be32d1943735c0ee277'))
 select 'fingerprint ' || sig as check,
@@ -24,9 +24,9 @@ union all select 'the rule on observation and observation_student',
        case when (select count(*) from pg_trigger where tgname = 'observation_follow_up_rule' and tgenabled = 'O'
                     and tgrelid in ('public.observation'::regclass, 'public.observation_student'::regclass)) = 2 then 'ok' else 'NOT AS EXPECTED' end
 union all select 'a teacher may run the two new functions; a visitor may not',
-       case when has_function_privilege('authenticated', 'public.create_observation_follow_up(uuid,text,text,uuid)', 'execute')
+       case when has_function_privilege('authenticated', 'public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', 'execute')
              and has_function_privilege('authenticated', 'public.update_observation_follow_up(uuid,text,text,uuid)', 'execute')
-             and not has_function_privilege('anon', 'public.create_observation_follow_up(uuid,text,text,uuid)', 'execute')
+             and not has_function_privilege('anon', 'public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', 'execute')
              and not has_function_privilege('anon', 'public.update_observation_follow_up(uuid,text,text,uuid)', 'execute') then 'ok' else 'NOT AS EXPECTED' end
 union all select 'nobody may run the rule as a function',
        case when not has_function_privilege('anon', 'fv_private.observation_follow_up_rule()', 'execute')

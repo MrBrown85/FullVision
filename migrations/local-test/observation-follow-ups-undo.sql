@@ -5,7 +5,7 @@
 -- follow-up saves are then refused (the sync dot turns red); observations,
 -- reports and the student page are as they are.
 --
---   revoke execute on function public.create_observation_follow_up(uuid, text, text, uuid),
+--   revoke execute on function public.create_observation_follow_up(uuid, text, text, uuid, timestamptz),
 --                              public.update_observation_follow_up(uuid, text, text, uuid) from authenticated, service_role;
 --
 -- ── PART 2, the full removal: the rest of this file ──────────────────────────
@@ -28,6 +28,8 @@
 begin;
 
 set local lock_timeout = '5s';
+-- No follow-up can be made between the check below and the columns going.
+lock table public.observation in share row exclusive mode;
 
 do $guard$
 declare
@@ -41,7 +43,7 @@ begin
         ('public.get_class_bundle(uuid,bigint)', '62bd0c41564652e983ccfbcadaafc5a7', 'ed59fcd4ef9bc85c6e5bcc24c3fdd608'),
         ('public.get_observations(uuid,jsonb,integer,integer)', 'b3e204a54b8b988061bcd62bb800aa30', '184fc8e045969e593ea641901bf2f0c3'),
         ('public.import_json_restore(jsonb,uuid)', '2de65ba2bca9babf90d5efb9134190ab', '1a201d1ab42337ebb572469c67e8fcfc'),
-        ('public.create_observation_follow_up(uuid,text,text,uuid)', null, '9dec66bdc1d9b34809f58746e14e4f10'),
+        ('public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', null, 'ee948114be4962f2286cdc34562c425d'),
         ('public.update_observation_follow_up(uuid,text,text,uuid)', null, '00e70abda3f41746f89a96969ff33c48'),
         ('fv_private.observation_follow_up_rule()', null, '20e37bafa4e23be32d1943735c0ee277')
     ) as v(fn, was, now) loop
@@ -138,7 +140,7 @@ begin
 end
 $patch$;
 
-drop function if exists public.create_observation_follow_up(uuid, text, text, uuid);
+drop function if exists public.create_observation_follow_up(uuid, text, text, uuid, timestamptz);
 drop function if exists public.update_observation_follow_up(uuid, text, text, uuid);
 drop trigger if exists observation_follow_up_rule on public.observation;
 drop trigger if exists observation_follow_up_rule on public.observation_student;

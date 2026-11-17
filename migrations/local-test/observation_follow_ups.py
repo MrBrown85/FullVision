@@ -17,6 +17,10 @@ dropped here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
            student_submit function names the tables.
   same     With no follow-up, get_class_bundle and get_observations give, byte for byte, what they gave
            before the file, but for the new empty 'follow_ups'; every other reader gives the same answer.
+  dates    p_created_at: kept when it is after the observation; the observation's own time when before
+           it (an observation and its follow-up made offline together); refused more than 5 minutes ahead;
+           now() when null.
+  purge    fv_retention_cleanup purges a class, and a teacher, holding follow-ups: everything goes.
   restore  import_json_restore keeps a follow-up's link and kind, and refuses one whose parent is missing.
   race     A follow-up made while its parent is deleted, in both orders, on connections of their own:
            never a follow-up without its parent; two follow-ups at once.
@@ -38,7 +42,7 @@ POST = 'observation-follow-ups-live-postcheck.sql'
 A = '11111111-1111-1111-1111-111111111111'; B = '22222222-2222-2222-2222-222222222222'
 PATCHED = ['public.get_class_bundle(uuid,bigint)', 'public.get_observations(uuid,jsonb,integer,integer)',
            'public.import_json_restore(jsonb,uuid)']
-NEW = ['public.create_observation_follow_up(uuid,text,text,uuid)', 'public.update_observation_follow_up(uuid,text,text,uuid)',
+NEW = ['public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', 'public.update_observation_follow_up(uuid,text,text,uuid)',
        'fv_private.observation_follow_up_rule()']
 HEADER = text_of(FILE)
 
@@ -254,6 +258,50 @@ def scen_same():
     finally:
         d.close()
 
+# ── dates ───────────────────────────────────────────────────────────────────────────────────────────
+def scen_dates():
+    w = world('dates'); d = w.d
+    try:
+        d.run("update observation set created_at = now() - interval '3 days' where id = :o", o=w.o1)
+        at = lambda f: d.one("select extract(epoch from created_at)::bigint from observation where id = :f", f=f)
+        def fu_at(when, kind='called_home'):
+            return str(T(d, "create_observation_follow_up(:p, 'x', :k, gen_random_uuid(), %s)" % when, p=w.o1, k=kind))
+        f = fu_at("now() - interval '1 day'")
+        ok('dates: a time after the observation is kept (a follow-up made offline yesterday reads yesterday)',
+           abs(at(f) - d.one("select extract(epoch from now() - interval '1 day')::bigint")) < 5)
+        f = fu_at("now() - interval '10 days'")
+        ok('dates: a time before the observation takes the observation\'s own time', at(f) == at(w.o1))
+        e = refused(d, lambda: fu_at("now() + interval '6 minutes'"))
+        ok('dates: more than 5 minutes ahead is refused (22023)', e and e[1] == '22023', e)
+        f = fu_at("now() + interval '4 minutes'")
+        ok('dates: up to 5 minutes ahead (a clock a little fast) is taken', f is not None)
+        f = str(T(d, "create_observation_follow_up(:p, 'x', null, gen_random_uuid())", p=w.o1))
+        ok('dates: with no time it is now()', abs(at(f) - d.one("select extract(epoch from now())::bigint")) < 5)
+        ok('dates: the follow-ups sort oldest first in the bundle',
+           [x['created_at'] for x in bundle(w)['observations']['follow_ups']] ==
+           sorted(x['created_at'] for x in bundle(w)['observations']['follow_ups']))
+    finally:
+        d.close()
+
+# ── purge ───────────────────────────────────────────────────────────────────────────────────────────
+def scen_purge():
+    w = world('purge'); d = w.d
+    try:
+        f1 = fu(w, w.o1, 'purged', 'called_home'); f2 = fu(w, w.o1, 'purged too', 'resolved')
+        fb = fu(w, w.ob, 'Bravo follow-up', 'called_home', uid=B)
+        d.run("update course set deleted_at = now() - interval '31 days' where id = :c", c=w.c)
+        r = refused(d, lambda: d.one('select public.fv_retention_cleanup()'))
+        ok('purge: fv_retention_cleanup runs with follow-ups in the purged class', r is None, r)
+        ok('purge: the class\'s observations and follow-ups are gone',
+           d.one('select count(*) from observation where id = any(:ids)', ids=[w.o1, w.o2, f1, f2]) == 0)
+        ok('purge: other classes keep theirs', d.one('select count(*) from observation where id = any(:ids)', ids=[w.o3, w.ob, fb]) == 3)
+        d.run("update teacher set deleted_at = now() - interval '31 days' where id = :b", b=B)
+        r = refused(d, lambda: d.one('select public.fv_retention_cleanup()'))
+        ok('purge: a purged teacher\'s class goes with its follow-ups', r is None
+           and d.one('select count(*) from observation where id = any(:ids)', ids=[w.ob, fb]) == 0, r)
+    finally:
+        d.close()
+
 # ── restore ───────────────────────────────────────────────────────────────────────────────────────────
 def scen_restore():
     w = world('restore'); d = w.d
@@ -439,6 +487,9 @@ def scen_undo():
     try:
         cols = table_columns(d.c)
         cat0, rows0 = catalog_of(d), rows_of(d, cols)
+        ok('undo: it locks observation against new follow-ups before its checks',
+           "set local lock_timeout = '5s';\n-- No follow-up can be made between the check below and the columns going.\nlock table public.observation in share row exclusive mode;"
+           in text_of(UNDO))
         ok('undo: on a database without the file it changes nothing', d.file(UNDO) == 'ok' and catalog_of(d) == cat0 and rows_of(d, cols) == rows0)
         ok('undo: (setup) the file applies', d.file(FILE) == 'ok')
         f = fu(w, w.o1, 'kept', 'resolved')
@@ -455,7 +506,7 @@ def scen_undo():
         ok('undo: nor changed', e and 'permission denied' in e[0], e)
         ok('undo: and the rest works as before (a new observation, the bundle)',
            refused(d, lambda: w.obs(w.c, w.e2, 'after the stop', 'note')) is None and len(bundle(w)['observations']['observations']) == 3)
-        d.run('grant execute on function public.create_observation_follow_up(uuid, text, text, uuid), public.update_observation_follow_up(uuid, text, text, uuid) to authenticated, service_role')
+        d.run('grant execute on function public.create_observation_follow_up(uuid, text, text, uuid, timestamptz), public.update_observation_follow_up(uuid, text, text, uuid) to authenticated, service_role')
         T(d, "delete_observation(:f)", f=f)
         d.run("delete from observation where body = 'after the stop'")
         ok('undo: (setup) back to the file applied, no follow-up', catalog_of(d) == cat1)
@@ -477,7 +528,8 @@ def scen_undo():
     finally:
         d.close()
 
-SCENARIOS = {'rules': scen_rules, 'readers': scen_readers, 'same': scen_same, 'restore': scen_restore,
+SCENARIOS = {'rules': scen_rules, 'readers': scen_readers, 'same': scen_same, 'dates': scen_dates, 'purge': scen_purge,
+             'restore': scen_restore,
              'race': scen_race, 'apply': scen_apply, 'undo': scen_undo}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):

@@ -590,7 +590,7 @@ function deleteObservationFollowUp(cid, obId, fuId) {
 }
 
 /* v2 create_observation_follow_up(p_follow_up_of, p_body, p_kind,
-   p_idempotency_key) → uuid. The follow-up's local id is re-keyed when it
+   p_idempotency_key, p_created_at) → uuid. The follow-up's local id is re-keyed when it
    lands (rule 6). A parent still waiting for its own create is a local id
    here: the outbox holds this behind it and puts in its server id. */
 function _persistFollowUpCreate(cid, parentId, entry) {
@@ -599,7 +599,8 @@ function _persistFollowUpCreate(cid, parentId, entry) {
   _trackPendingSync(
     _writeRpc(
       'create_observation_follow_up',
-      { p_follow_up_of: parentId, p_body: entry.text || '', p_kind: entry.kind || null },
+      // p_created_at: when it was saved here, so one sent later keeps its day.
+      { p_follow_up_of: parentId, p_body: entry.text || '', p_kind: entry.kind || null, p_created_at: entry.created },
       { retryKey: 'create_observation_follow_up:' + entry.id, entryId: rec ? rec.entryId : undefined },
     ).then(function (res) {
       if (res.error) {

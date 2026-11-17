@@ -79,7 +79,7 @@ begin
     obs := public.create_observation(c, p_mark || ' Observed', 'strength', null, a_prof, array[e1], array[tg],
              array[ctag], gen_random_uuid(), null, null, otpl);
     -- A follow-up under it, once 2026111703 is applied (until then the function is missing).
-    if to_regprocedure('public.create_observation_follow_up(uuid,text,text,uuid)') is not null then
+    if to_regprocedure('public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)') is not null then
         execute 'select public.create_observation_follow_up($1, $2, $3, gen_random_uuid())'
            into fup using obs, p_mark || ' Followed up', 'called_home';
     end if;

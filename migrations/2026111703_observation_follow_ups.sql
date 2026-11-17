@@ -23,7 +23,14 @@
 --   row is made, and a class never changes under a follow-up or its parent.
 --   A follow-up has no students of its own: it is its parent's.
 -- create_observation_follow_up(p_follow_up_of, p_body, p_kind,
---   p_idempotency_key) returns the new id; update_observation_follow_up(
+--   p_idempotency_key, p_created_at) returns the new id. p_created_at is
+--   when the teacher saved it (a follow-up made offline on Friday reads
+--   Friday): more than 5 minutes ahead of the server's clock is refused;
+--   earlier than its observation's own created_at it takes that time
+--   instead (create_observation stamps an observation when it reaches the
+--   server, so an observation and its follow-up made offline together
+--   would otherwise be refused and lost); null is now().
+--   update_observation_follow_up(
 --   p_id, p_body, p_kind, p_idempotency_key) changes the words and kind.
 --   Both are idempotent through p_idempotency_key (CLAUDE.md rule 7), run
 --   as the teacher (row security decides what they reach), and refuse an
@@ -53,7 +60,7 @@
 --   public.get_class_bundle(uuid,bigint)                 62bd0c41564652e983ccfbcadaafc5a7  ed59fcd4ef9bc85c6e5bcc24c3fdd608
 --   public.get_observations(uuid,jsonb,integer,integer)  b3e204a54b8b988061bcd62bb800aa30  184fc8e045969e593ea641901bf2f0c3
 --   public.import_json_restore(jsonb,uuid)               2de65ba2bca9babf90d5efb9134190ab  1a201d1ab42337ebb572469c67e8fcfc
---   public.create_observation_follow_up(uuid,text,text,uuid) (new)   9dec66bdc1d9b34809f58746e14e4f10
+--   public.create_observation_follow_up(uuid,text,text,uuid,timestamptz) (new)   ee948114be4962f2286cdc34562c425d
 --   public.update_observation_follow_up(uuid,text,text,uuid) (new)   00e70abda3f41746f89a96969ff33c48
 --   fv_private.observation_follow_up_rule() (new)                    20e37bafa4e23be32d1943735c0ee277
 --
@@ -102,7 +109,7 @@ begin
         ('public.get_class_bundle(uuid,bigint)', '62bd0c41564652e983ccfbcadaafc5a7', 'ed59fcd4ef9bc85c6e5bcc24c3fdd608'),
         ('public.get_observations(uuid,jsonb,integer,integer)', 'b3e204a54b8b988061bcd62bb800aa30', '184fc8e045969e593ea641901bf2f0c3'),
         ('public.import_json_restore(jsonb,uuid)', '2de65ba2bca9babf90d5efb9134190ab', '1a201d1ab42337ebb572469c67e8fcfc'),
-        ('public.create_observation_follow_up(uuid,text,text,uuid)', null, '9dec66bdc1d9b34809f58746e14e4f10'),
+        ('public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', null, 'ee948114be4962f2286cdc34562c425d'),
         ('public.update_observation_follow_up(uuid,text,text,uuid)', null, '00e70abda3f41746f89a96969ff33c48'),
         ('fv_private.observation_follow_up_rule()', null, '20e37bafa4e23be32d1943735c0ee277')
     ) as v(fn, was, now) loop
@@ -113,7 +120,7 @@ begin
         end if;
     end loop;
     if exists (select 1 from pg_proc where proname in ('create_observation_follow_up', 'update_observation_follow_up', 'observation_follow_up_rule')
-                 and oid not in (coalesce(to_regprocedure('public.create_observation_follow_up(uuid,text,text,uuid)'), 0),
+                 and oid not in (coalesce(to_regprocedure('public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)'), 0),
                                  coalesce(to_regprocedure('public.update_observation_follow_up(uuid,text,text,uuid)'), 0),
                                  coalesce(to_regprocedure('fv_private.observation_follow_up_rule()'), 0))) then
         raise exception 'A follow-up function exists with other arguments or in another schema. Nothing was changed.';
@@ -203,7 +210,7 @@ create trigger observation_follow_up_rule before insert or update of observation
     for each row execute function fv_private.observation_follow_up_rule();
 
 -- ── 4. The two write functions ─────────────────────────────────────────────
-create or replace function public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text DEFAULT NULL::text, p_idempotency_key uuid DEFAULT NULL::uuid)
+create or replace function public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text DEFAULT NULL::text, p_idempotency_key uuid DEFAULT NULL::uuid, p_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone)
  returns uuid
  language plpgsql
  set search_path to 'public'
@@ -212,6 +219,7 @@ declare
     _id     uuid;
     _cached jsonb;
     _course uuid;
+    _parent timestamptz;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
 
@@ -228,11 +236,15 @@ begin
     end if;
 
     -- Row security hides another teacher's observation, so theirs reads as missing.
-    select course_id into _course from observation where id = p_follow_up_of;
+    select course_id, created_at into _course, _parent from observation where id = p_follow_up_of;
     if _course is null then raise exception 'observation not found' using errcode = 'P0002'; end if;
+    -- When the teacher saved it; never in the future, never before its observation.
+    if p_created_at > now() + interval '5 minutes' then
+        raise exception 'a follow-up cannot be dated in the future' using errcode = '22023';
+    end if;
 
-    insert into observation (course_id, body, follow_up_of, follow_up_kind)
-    values (_course, coalesce(p_body, ''), p_follow_up_of, p_kind)
+    insert into observation (course_id, body, follow_up_of, follow_up_kind, created_at)
+    values (_course, coalesce(p_body, ''), p_follow_up_of, p_kind, greatest(coalesce(p_created_at, now()), _parent))
     returning id into _id;
 
     perform fv_idem_store(p_idempotency_key, 'create_observation_follow_up', jsonb_build_object('id', _id));
@@ -268,8 +280,8 @@ begin
     perform fv_idem_store(p_idempotency_key, 'update_observation_follow_up', jsonb_build_object('id', p_id));
 end; $function$;
 
-revoke all on function public.create_observation_follow_up(uuid, text, text, uuid) from public, anon;
-grant execute on function public.create_observation_follow_up(uuid, text, text, uuid) to authenticated, service_role;
+revoke all on function public.create_observation_follow_up(uuid, text, text, uuid, timestamptz) from public, anon;
+grant execute on function public.create_observation_follow_up(uuid, text, text, uuid, timestamptz) to authenticated, service_role;
 revoke all on function public.update_observation_follow_up(uuid, text, text, uuid) from public, anon;
 grant execute on function public.update_observation_follow_up(uuid, text, text, uuid) to authenticated, service_role;
 
@@ -356,7 +368,7 @@ declare
     _f record;
 begin
     for _f in select * from (values
-        ('public.create_observation_follow_up(uuid,text,text,uuid)', '9dec66bdc1d9b34809f58746e14e4f10'),
+        ('public.create_observation_follow_up(uuid,text,text,uuid,timestamptz)', 'ee948114be4962f2286cdc34562c425d'),
         ('public.update_observation_follow_up(uuid,text,text,uuid)', '00e70abda3f41746f89a96969ff33c48'),
         ('fv_private.observation_follow_up_rule()', '20e37bafa4e23be32d1943735c0ee277')
     ) as v(fn, now) loop

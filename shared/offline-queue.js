@@ -32,12 +32,11 @@
  *   the browser hands the lock to the next tab when the owner closes, reloads
  *   or is discarded. Where Web Locks are missing, the owner keeps a lease in
  *   fv-sync-owner-v1 alive with a heartbeat and another tab takes a stale one.
- *   The other tabs only queue; they ask the owner to send over the
- *   BroadcastChannel fv-sync-queue-v1 and hear back through the owner's
- *   events, which it posts to every tab, so push() callers, listeners (the
- *   sync dot, shared/data.js's re-keys) and stats() see the same thing in
- *   every tab. sent_at marks an entry the owner has started, so another tab
- *   never replaces or edits it; a new owner clears the marks it inherits.
+ *   The other tabs only queue; they ask the owner to send over the BroadcastChannel
+ *   fv-sync-queue-v1 and hear back through its events, posted to every tab, so
+ *   push() callers, listeners (the sync dot, shared/data.js's re-keys) and stats()
+ *   see the same in every tab. sent_at marks an entry the owner has started, so
+ *   another tab never replaces or edits it; a new owner clears the marks it inherits.
  *
  * Key: the record the write touches (see _entryKey). Entries with the same
  *   key are sent one at a time, in order; different keys go in parallel.
@@ -45,18 +44,16 @@
  * Barrier: a write to a whole column (clear_column_scores, delete_assessment)
  *   has no cell key. It waits for every earlier entry that names its
  *   assessment, and every later entry that names it waits for the barrier
- *   (see _pump). Cell writes in one column still run in parallel with each
- *   other.
+ *   (see _pump). Cell writes in one column still run in parallel.
  *
  * Restore: an entry naming a record of a class restore (import_json_restore)
  *   still queued ahead of it waits until the restore lands.
  *
- * Blocked: an entry whose payload names a record the server doesn't have yet
- *   (a local id whose create is still queued) carries those ids in
- *   blocked_on and is held, with everything behind it on its key. When the
- *   create lands, shared/data.js calls rewrite() to put the server id into
- *   the waiting payloads and clear blocked_on; the held entries then go.
- *   A reload keeps all of this, because it is in the entry, not in memory.
+ * Blocked: an entry naming a record the server doesn't have yet (a local
+ *   id whose create is still queued) carries those ids in blocked_on and is
+ *   held, with everything behind it on its key. When the create lands,
+ *   shared/data.js calls rewrite() to put in the server id and clear
+ *   blocked_on; the held entries then go. A reload keeps it (it is in the entry).
  *
  * Owner: the signed-in user's id when the entry was queued. The queue lives
  *   in localStorage, so on a shared computer it can outlast a sign-out. An
@@ -185,6 +182,8 @@
     ) {
       return 'cell:' + payload.p_enrollment_ids[0] + ':' + payload.p_assessment_id;
     }
+    // A follow-up waits behind its observation's writes (re-keyed by rewrite()).
+    if (endpoint === 'create_observation_follow_up' && payload.p_follow_up_of) return 'id:' + payload.p_follow_up_of;
     if (payload.p_id) return 'id:' + payload.p_id;
     if (payload.p_course_id) return 'course:' + payload.p_course_id;
     if (payload.p_enrollment_id) return 'enrollment:' + payload.p_enrollment_id;
@@ -1020,12 +1019,13 @@
     }
   }
 
-  /* A delete whose row is already gone (deleted elsewhere, or by an earlier
-     attempt whose response was lost) has done its job. Seed observation
-     templates also report "not found" but genuinely can't be deleted. */
+  /* A delete whose row is already gone (deleted elsewhere, or an earlier try
+     whose response was lost) has done its job; so has a change to a deleted
+     follow-up. Seed observation templates report "not found" but can't go. */
   function _isGoneOnDelete(entry, res) {
     var err = res && res.error;
-    if (!err || !/^delete_/.test(entry.endpoint) || entry.endpoint === 'delete_observation_template') return false;
+    var gone = /^delete_/.test(entry.endpoint) || entry.endpoint === 'update_observation_follow_up';
+    if (!err || !gone || entry.endpoint === 'delete_observation_template') return false;
     return err.code === 'P0002' || /not found/i.test(err.message || '');
   }
 
