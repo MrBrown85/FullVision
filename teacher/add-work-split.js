@@ -17,9 +17,11 @@
    page-2.jpg … as soon as it is read.
 
    Two parts:
-   - The model (AddWorkSplit.model): the scan's pages, which are blank,
-     which are kept, where the cuts are, and the names. No HTML and no DOM.
-   - The screen: a page over whatever is showing, like the class page.
+   - The model (teacher/add-work-split-model.js, AddWorkSplitModel): the
+     scan's pages, which are blank, which are kept, where the cuts are, and
+     the names. No HTML and no DOM.
+   - This file: reading the scan, and the screen, a page over whatever is
+     showing, like the class page.
 
    AddWorkSplit.takes(files)              true for exactly one PDF.
    AddWorkSplit.open(cid, aid, file, opts) the page, reading `file`; true
@@ -652,7 +654,7 @@
       '" tabindex="-1" aria-label="' +
       esc((busy ? 'Turning page ' : 'Turn page ') + no) +
       '" title="Turn a quarter turn"' +
-      (busy ? ' disabled' : '') +
+      (busy ? ' aria-disabled="true"' : '') +
       '>' +
       TURN_ICON +
       '</button>' +
@@ -690,8 +692,11 @@
     var s = _s;
     if (!s) return;
     opts = opts || {};
-    var scroll = s.overlay.querySelector('.aws-scroll');
-    var top = scroll ? scroll.scrollTop : 0;
+    // The pieces scroll; in a narrow window the whole body does.
+    var tops = ['.aws-scroll', '.aws-body'].map(function (sel) {
+      var el = s.overlay.querySelector(sel);
+      return el ? el.scrollTop : 0;
+    });
     var active = /** @type {any} */ (document.activeElement);
     var key = opts.focus || (active && s.overlay.contains(active) ? active.getAttribute('data-key') : null);
     var typing =
@@ -705,8 +710,10 @@
       });
     // html-safe: _pageHtml escapes every name and word; the rest is fixed markup
     s.overlay.innerHTML = _pageHtml(s);
-    var again = s.overlay.querySelector('.aws-scroll');
-    if (again) again.scrollTop = top;
+    ['.aws-scroll', '.aws-body'].forEach(function (sel, i) {
+      var el = s.overlay.querySelector(sel);
+      if (el) el.scrollTop = tops[i];
+    });
     _fill(s);
     if (key) {
       var el = /** @type {any} */ (s.overlay.querySelector('[data-key="' + key + '"]'));
@@ -853,7 +860,7 @@
           esc(o.sid) +
           '">' +
           esc(_fullOf(s, o.sid)) +
-          (o.on !== undefined ? '<span class="aws-option-on">' + esc(' · on piece ' + (o.on + 1)) + '</span>' : '') +
+          (o.on !== undefined ? '<span class="aws-option-on">' + esc('· on piece ' + (o.on + 1)) + '</span>' : '') +
           '</div>'
         );
       })
