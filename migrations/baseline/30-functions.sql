@@ -1489,6 +1489,7 @@ AS $function$
 declare
     _expired int;
     _cutoff  timestamptz;
+    _opened  timestamptz;
     _marks   int := 0;
     _pages   int := 0;
     _c       record;
@@ -1499,14 +1500,19 @@ begin
     if _expired > 0 then
         perform _photo_log(p_course_id, 'expired', _expired, null);
     end if;
-    select c.timezone, c.deleted_at, c.keep_photos_until, c.reporting_terms into _c from course c where c.id = p_course_id;
+    select c.timezone, c.deleted_at, c.created_at, c.keep_photos_until, c.reporting_terms into _c from course c where c.id = p_course_id;
     if not found or _c.deleted_at is not null then
-        -- Gone, or in the trash: Keep Photos Until waits (section 7).
+        -- Gone, or in the trash: the 30-day purge deletes its photos.
         return jsonb_build_object('expired', _expired, 'pages', 0, 'marks_kept', 0, 'before', null, 'skipped', found);
     end if;
-    _cutoff := _photo_keep_cutoff(p_course_id, p_now);
-    if _cutoff is not null then
-        -- Mark Up stays (section 3): copied before its page goes.
+    -- Photos stay with the class until it goes unopened for 365 days
+    -- (2026111704). A class with no stamp counts from when it was made. For
+    -- update: an open that commits first is seen; one after waits for this.
+    select o.last_opened_at into _opened from course_opened o where o.course_id = p_course_id for update;
+    _opened := greatest(_opened, _c.created_at);
+    if _opened < p_now - interval '365 days' then
+        _cutoff := p_now;
+        -- Mark Up stays: copied before its page goes.
         insert into markup_kept (file_id, submission_id, course_id, assessment_id, enrollment_id, page, width, height, rotation,
                                  added_by, working, working_rev, working_at, given, given_rev, given_at, marked_at)
         select m.file_id, f.submission_id, m.course_id, m.assessment_id, m.enrollment_id, f.page, f.width, f.height, f.rotation,
@@ -1515,28 +1521,27 @@ begin
           join submission_file f on f.id = m.file_id
           join submission s on s.id = f.submission_id
          where s.course_id = p_course_id and s.state = 'sent' and f.created_at < _cutoff
-           -- handed in after the day (ruling 106): stays
-           and not (f.created_at >= _cutoff - _work_hold() and greatest(s.sent_at, s.updated_at) >= _cutoff)
         on conflict (file_id) do nothing;
         get diagnostics _marks = row_count;
         -- The pages go; Batch B's trigger queues both files of each.
-        perform set_config('fv.work_removal_reason', 'keep_photos_until', true);
+        perform set_config('fv.work_removal_reason', 'not_opened_a_year', true);
         delete from submission_file f
          using submission s
-         where s.id = f.submission_id and s.course_id = p_course_id and s.state = 'sent' and f.created_at < _cutoff
-           and not (f.created_at >= _cutoff - _work_hold() and greatest(s.sent_at, s.updated_at) >= _cutoff);
+         where s.id = f.submission_id and s.course_id = p_course_id and s.state = 'sent' and f.created_at < _cutoff;
         get diagnostics _pages = row_count;
         perform set_config('fv.work_removal_reason', '', true);
         if _pages > 0 then
-            perform _photo_log(p_course_id, 'keep_photos_until', _pages, jsonb_build_object('before', _cutoff, 'marks_kept', _marks));
+            perform _photo_log(p_course_id, 'keep_photos_until', _pages,
+                               jsonb_build_object('before', _cutoff, 'marks_kept', _marks, 'rule', 'not_opened_a_year', 'last_opened', _opened));
         end if;
     end if;
+    -- Unused here; kept current so the undo's old body judges from yesterday.
     insert into photo_keep_check (course_id, checked_through, judged_choice, judged_terms, at)
     values (p_course_id, (p_now at time zone _fv_timezone(_c.timezone))::date - 1, _c.keep_photos_until, _c.reporting_terms, now())
     on conflict (course_id) do update
         set checked_through = greatest(photo_keep_check.checked_through, excluded.checked_through),
             judged_choice = excluded.judged_choice, judged_terms = excluded.judged_terms, at = now();
-    return jsonb_build_object('expired', _expired, 'pages', _pages, 'marks_kept', _marks, 'before', _cutoff);
+    return jsonb_build_object('expired', _expired, 'pages', _pages, 'marks_kept', _marks, 'before', _cutoff, 'last_opened', _opened);
 end;
 $function$;
 
@@ -7771,6 +7776,29 @@ begin
     _result := jsonb_build_object('scores', _moved, 'checks', _checks);
     perform fv_idem_store(p_idempotency_key, 'move_rubric_scores', _result);
     return _result;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.note_course_opened(p_course_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'note_course_opened');
+    if _cached is not null then return (_cached->>'noted')::boolean; end if;
+    -- Another teacher's class, one in the trash, or one that is gone: nothing
+    -- to note, and no error (a class deleted on another device must not leave
+    -- a write that fails on the sync dot).
+    if not fv_owns_course(p_course_id) then return false; end if;
+    insert into course_opened (course_id, last_opened_at) values (p_course_id, now())
+    on conflict (course_id) do update set last_opened_at = greatest(course_opened.last_opened_at, excluded.last_opened_at);
+    perform fv_idem_store(p_idempotency_key, 'note_course_opened', jsonb_build_object('noted', true));
+    return true;
 end;
 $function$;
 

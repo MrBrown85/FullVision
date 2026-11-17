@@ -275,6 +275,12 @@ table public.course (rls on)
   CREATE TRIGGER grade_return_release AFTER UPDATE OF student_page_enabled, return_grades ON public.course FOR EACH ROW WHEN ((old.student_page_enabled AND (NOT (old.return_grades IS DISTINCT FROM 'on_return'::text)) AND (NOT (new.student_page_enabled AND (NOT (new.return_grades IS DISTINCT FROM 'on_return'::text)))))) EXECUTE FUNCTION public._grade_return_release()
   CREATE TRIGGER markup_given_on_release AFTER UPDATE OF student_page_enabled, return_grades ON public.course FOR EACH ROW WHEN ((old.student_page_enabled AND (NOT (old.return_grades IS DISTINCT FROM 'on_return'::text)) AND (NOT (new.student_page_enabled AND (NOT (new.return_grades IS DISTINCT FROM 'on_return'::text)))))) EXECUTE FUNCTION public._markup_on_release()
   policy course_owner for all to public using ((teacher_id = ( SELECT auth.uid() AS uid))) with check ((teacher_id = ( SELECT auth.uid() AS uid)))
+table public.course_opened (rls on)
+  course_id uuid not null
+  last_opened_at timestamp with time zone not null default now()
+  constraint course_opened_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint course_opened_pkey PRIMARY KEY (course_id)
+  CREATE UNIQUE INDEX course_opened_pkey ON public.course_opened USING btree (course_id)
 table public.course_sync_cursor (rls on)
   course_id uuid not null
   gradebook_updated_at timestamp with time zone not null default now()
@@ -1848,6 +1854,7 @@ function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_l
 function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
+function public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) returns boolean security definer
 procedure public.photo_lifecycle_nightly()
 function public.photo_removal_call() returns bigint
 function public.photo_removal_due() returns boolean security definer
