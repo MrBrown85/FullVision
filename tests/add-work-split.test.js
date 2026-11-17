@@ -251,14 +251,88 @@ describe('a name belongs to the page it was read from', () => {
 });
 
 describe('Class List Order', () => {
-  it('gives the pieces the listed students in order, and none to pieces past the list', () => {
-    const m = M.model(scan(16), CLASS);
-    m.setPer(2); // 8 pieces, 6 students
+  it('with one piece for each student, gives every piece the listed student in its place', () => {
+    const m = M.model(scan(12), CLASS);
+    m.setPer(2); // 6 pieces, 6 students
     m.setOrder('list');
-    expect(sids(m)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', '', '']);
-    expect(m.counts()).toMatchObject({ named: 6, unnamed: 2 });
+    expect(m.listFits()).toBe(true);
+    expect(sids(m)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+    expect(m.counts()).toMatchObject({ named: 6, unnamed: 0 });
+    expect(m.canMatch()).toBe(true);
   });
 
+  it('with more or fewer pieces than students, names no piece from the list, and nothing can be matched', () => {
+    // One paper missing from the pile: 5 pieces for 6 students.
+    const short = M.model(scan(10), CLASS);
+    short.setPer(2);
+    short.setOrder('list');
+    expect(short.listFits()).toBe(false);
+    expect(sids(short)).toEqual(['', '', '', '', '']);
+    expect(short.canMatch()).toBe(false);
+    expect(short.take()).toEqual([]);
+    // One paper too many: 7 pieces for 6 students.
+    const over = M.model(scan(14), CLASS);
+    over.setPer(2);
+    over.setOrder('list');
+    expect(sids(over)).toEqual(['', '', '', '', '', '', '']);
+    // A name typed meanwhile still counts.
+    short.name(2, 's4');
+    expect(sids(short)).toEqual(['', '', 's4', '', '']);
+    expect(short.take().map(p => p.sid)).toEqual(['s4']);
+  });
+
+  it('a count that stops matching after a change drops the list’s names and keeps typed ones', () => {
+    const m = M.model(scan(12), CLASS);
+    m.setPer(1); // 12 pieces for 6 students
+    m.setOrder('list');
+    expect(sids(m)).toEqual(Array(12).fill(''));
+    m.setPer(2); // 6 pieces
+    expect(sids(m)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+    m.name(1, 's6'); // typed, against page 3
+    // Piece 5 takes one more page, then the last one: 5 pieces.
+    m.more(4);
+    expect(m.pieces().length).toBe(6);
+    m.more(4);
+    expect(cut(m)).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+      [7, 8],
+      [9, 10, 11, 12],
+    ]);
+    expect(sids(m)).toEqual(['', 's6', '', '', '']);
+    expect(m.canMatch()).toBe(true); // the typed name only
+    // Back to 6: the list's names return beside the typed one.
+    m.fewer(4);
+    expect(sids(m)).toEqual(['s1', 's6', 's3', 's4', 's5', 's6']);
+  });
+
+  it('a blank page kept or left out that changes the count changes the names too', () => {
+    // Six students, six pages of work, and one blank page between pieces 3 and 4.
+    const m = M.model(scan(7, [4]), CLASS);
+    m.setPer(1);
+    m.setOrder('list');
+    expect(sids(m)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+    // Turned off, the blank page joins piece 3: still six pieces.
+    m.setLeaveOut(false);
+    expect(sids(m)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+    // Cut again at 1 with every page kept: seven pieces, no list names.
+    m.setPer(1);
+    expect(m.pieces().length).toBe(7);
+    expect(sids(m)).toEqual(Array(7).fill(''));
+    // Left out again: six pieces, the names are back.
+    m.setLeaveOut(true);
+    expect(sids(m)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+  });
+
+  it('pieces taken by Match end Class List Order for the rest', () => {
+    const m = M.model(scan(12), CLASS);
+    m.setPer(2);
+    m.setOrder('list');
+    m.take();
+    expect(m.order()).toBe('typed');
+    expect(m.pieces()).toEqual([]);
+  });
   it('a name typed on a piece wins, and an emptied box is no one', () => {
     const m = M.model(scan(12), CLASS);
     m.setPer(2);
@@ -354,11 +428,12 @@ describe('the named pieces handed over', () => {
   });
 
   it('in Class List Order, the pieces left do not take the list’s names again', () => {
-    const m = M.model(scan(16), CLASS);
+    const m = M.model(scan(12), CLASS);
     m.setPer(2);
     m.setOrder('list');
-    expect(m.take().map(p => p.sid)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
-    expect(sids(m)).toEqual(['', '']);
+    m.name(5, ''); // the last piece: no one
+    expect(m.take().map(p => p.sid)).toEqual(['s1', 's2', 's3', 's4', 's5']);
+    expect(sids(m)).toEqual(['']);
     expect(m.order()).toBe('typed');
   });
 

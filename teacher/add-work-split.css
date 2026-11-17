@@ -156,6 +156,10 @@
   font-size: 12px;
   color: var(--text-3);
 }
+.aws-hint.is-bad {
+  color: var(--danger);
+  font-weight: 600;
+}
 
 /* ── The side and the grid ── */
 .aws-body {
