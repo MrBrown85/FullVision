@@ -1746,7 +1746,6 @@ window.StudentPageView = (function () {
      Every level, letter and % is the view's text. ──────────────── */
 
   var ML_ICON = {
-    next: '<path d="M4 12h15M13 6l6 6-6 6"/>',
     up: '<path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/>',
     down: '<path d="M12 5v13M6.5 12.5L12 18l5.5-5.5"/>',
   };
@@ -1828,22 +1827,6 @@ window.StudentPageView = (function () {
     );
   }
 
-  /* Work On Next: the comment bank's step for the skill Generate would
-     name, one line under the grade. */
-  function nextHtml(l) {
-    var n = l.next;
-    if (!n) return '';
-    return (
-      '<div class="sp-ml-next">' +
-      mlIcon('next', 18) +
-      '<p class="sp-ml-next-text"><span class="sp-ml-next-title">' +
-      esc('Work On Next: ' + n.name) +
-      '</span><span class="sp-ml-next-line">' +
-      esc(n.text) +
-      '</span></p></div>'
-    );
-  }
-
   function stepName(l, at) {
     var st = (l.steps || [])[at - 1];
     return st ? st.name : '';
@@ -1870,7 +1853,6 @@ window.StudentPageView = (function () {
         '</span>' +
         trendHtml(l) +
         '</span></div>' +
-        nextHtml(l) +
         '</section>'
       );
     }
@@ -1888,7 +1870,6 @@ window.StudentPageView = (function () {
       '</div>' +
       ladderHtml(l.steps, o.level, ladderLabel(l, o.level), false) +
       '</div>' +
-      nextHtml(l) +
       '</section>'
     );
   }

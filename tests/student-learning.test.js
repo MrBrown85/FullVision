@@ -456,7 +456,7 @@ describe('the My Learning screens (s/page-view.js)', () => {
     expect(cards[cards.length - 1]).toContain('sp-ml-work');
   });
 
-  it('the month line and Work On Next, from the view; Work On Next is a line, not a button', () => {
+  it('the month line from the view; no Work On Next, even when the view names a step (Colin, Nov 17)', () => {
     seed('proficiency', { show: true });
     const view = viewOf();
     const l = view.learning;
@@ -464,21 +464,14 @@ describe('the My Learning screens (s/page-view.js)', () => {
     l.next = { id: 'per', name: 'Perspective', text: 'Explain which beliefs or values shaped that point of view.' };
     let box = drawn(view);
     expect(words(box.querySelector('.sp-ml-trend'))).toBe('Up from Developing a month ago');
-    const next = box.querySelector('.sp-ml-next');
-    expect(words(next.querySelector('.sp-ml-next-title'))).toBe('Work On Next: Perspective');
-    expect(words(next.querySelector('.sp-ml-next-line'))).toBe(
-      'Explain which beliefs or values shaped that point of view.',
-    );
-    expect(next.tagName).toBe('DIV');
-    expect(next.querySelector('button, [data-act]')).toBeNull();
+    expect(box.querySelector('.sp-ml-next')).toBeNull();
+    expect(box.textContent).not.toContain('Work On Next');
+    expect(box.textContent).not.toContain('Explain which beliefs');
     l.trend = { dir: -1, from: 'C' };
     expect(words(drawn(view).querySelector('.sp-ml-trend'))).toBe('Down from C a month ago');
-    // Nothing to compare, nothing to work on: neither shows.
     l.trend = null;
-    l.next = null;
     box = drawn(view);
     expect(box.textContent).not.toContain('a month ago');
-    expect(box.querySelector('.sp-ml-next')).toBeNull();
   });
 
   it('the ladder: every step reached in the student’s own level’s colour, You on theirs', () => {
