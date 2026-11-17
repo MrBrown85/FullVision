@@ -270,6 +270,8 @@ load('shared/photo-shrink.js');
 load('shared/photo-queue.js');
 // The PDF reader (pdf.js is fetched only when a PDF is opened).
 load('shared/photo-readers.js');
+// A teacher's files made into pages of work (Add Work, the row's +).
+load('shared/add-work-files.js');
 // Pictures of student work through one helper (S14-T1).
 load('shared/work-thumbs.js');
 // Mark Up: drawing over a page of student work (S9).
