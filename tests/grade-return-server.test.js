@@ -194,8 +194,9 @@ describe('the class’s two settings come from the server with the class', () =>
       expect(Object.prototype.hasOwnProperty.call(getCourseConfig(CID), 'return_grades')).toBe(true);
       expect(getCourseConfig(CID).return_grades).toBe(kept);
       expect('student_page_enabled' in getCourseConfig(CID)).toBe(false);
-      // And nothing was asked about its rows.
-      expect(names()).toEqual(['get_class_bundle']);
+      // And nothing was asked about its rows. Pin moved: its work is read, as
+      // in every live class (Add Work for the Class; was: get_class_bundle alone).
+      expect(names()).toEqual(['get_class_bundle', 'list_course_submissions_since']);
     },
   );
 
@@ -205,7 +206,8 @@ describe('the class’s two settings come from the server with the class', () =>
     expect(getReturnSettings(CID)).toEqual({ student_page: false, return_grades: null });
     expect('return_grades' in getCourseConfig(CID)).toBe(false);
     expect('student_page_enabled' in getCourseConfig(CID)).toBe(false);
-    expect(names()).toEqual(['get_class_bundle']);
+    // Pin moved: its work is read (was: get_class_bundle alone).
+    expect(names()).toEqual(['get_class_bundle', 'list_course_submissions_since']);
   });
 
   it('turned on from another device: this one learns of it with the class, and reads its rows', async () => {
@@ -1214,7 +1216,9 @@ describe('the class’s rows are the server’s', () => {
       [WEEK1]: { [PRIYA]: { is_draft: true } },
     };
     await openClass();
-    expect(names()).toEqual(['get_class_bundle', 'list_course_grade_returns']);
+    // Pin moved (Add Work for the Class, offered in every class): the class's
+    // work is read with every load (was: get_class_bundle, list_course_grade_returns).
+    expect(names()).toEqual(['get_class_bundle', 'list_course_submissions_since', 'list_course_grade_returns']);
     expect(callsTo('list_course_grade_returns')).toEqual([{ p_course_id: CID }]);
     expect(_gradeReturnsLoadedFor[CID]).toBe(true);
     expect(getGradeReturn(CID, NOOR, CAUSES)).toEqual({

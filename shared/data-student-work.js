@@ -1191,18 +1191,13 @@ function _noteCourseSendWork(cid, courseRow) {
   _workChanged(cid);
 }
 
-/* Whether the class's work is worth reading. With Send Work off there is
-   nothing to draw and nothing is read (S6-W1 review, should-fix 4).
-   Read anyway when Send Work is not known yet (the read tells; only with
-   the student page on, so a class with it off and Send Work off is sent
-   nothing new), while a change to it is on its way (the view already says
-   on), or when the last answer held work (a class just turned off stays
-   current). */
+/* Whether the class's work is worth reading: every live class's, whatever
+   its Send Work and student page say. A teacher adds work in any class
+   (Add Work for the Class is offered in every class, Colin, Nov 17 2026),
+   and work they add must show again on every device. An unchanged class
+   is answered in a few bytes (the version goes with the ask). */
 function _workReadWanted(cid) {
-  if (!_workCourseRow[cid]) return _workRowsOnServer(cid);
-  if (_workServerView(cid).course.send_work === true) return true;
-  var srv = _workServer[cid];
-  return !!(srv && Array.isArray(srv.submissions) && srv.submissions.length);
+  return _workOnServer(cid);
 }
 
 function _workLook(cid) {
@@ -1311,14 +1306,11 @@ function readStudentWorkForDelete(cid) {
   );
 }
 
-/* The class has just loaded from the server with its student page on
-   (_loadServerGradeReturns): its work too, when Send Work is on or not
-   known yet. Never waited for, never a failed load. */
-function _loadServerStudentWork(cid, fresh) {
+/* The class has just loaded from the server (_loadServerGradeReturns),
+   student page on or off: its work too, whatever Send Work says (see
+   _workReadWanted). Never waited for, never a failed load. */
+function _loadServerStudentWork(cid) {
   if (!_workOnServer(cid)) return;
-  var known = _workCourseRow[cid];
-  var readBefore = !!(_workRead[cid] && _workRead[cid].at);
-  if (known ? known.send_work !== true : readBefore || fresh) return;
   refreshStudentWork(cid, { force: true });
 }
 

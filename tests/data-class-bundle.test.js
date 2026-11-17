@@ -457,7 +457,9 @@ describe('get_class_bundle', () => {
       };
     };
     await initData(CID);
-    expect(calls).toEqual(['get_class_bundle']);
+    // Pin moved (Add Work for the Class, offered in every class): one request
+    // for the class, then one for its work (was: get_class_bundle alone).
+    expect(calls).toEqual(['get_class_bundle', 'list_course_submissions_since']);
     expect(_classVersion[CID]).toBe(7);
   });
 
