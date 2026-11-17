@@ -272,6 +272,7 @@ load('shared/photo-queue.js');
 load('shared/photo-readers.js');
 // A teacher's files made into pages of work (Add Work, the row's +).
 load('shared/add-work-files.js');
+load('shared/name-match.js');
 // Pictures of student work through one helper (S14-T1).
 load('shared/work-thumbs.js');
 // Mark Up: drawing over a page of student work (S9).
@@ -339,6 +340,7 @@ load('teacher/add-work-stage.js');
 load('teacher/add-work-split-model.js');
 load('teacher/add-work-split.js');
 load('teacher/add-work-class.js');
+load('teacher/add-work-tray.js');
 load('shared/competency-wording.js');
 load('teacher/report-feedback.js');
 load('teacher/report-feedback-cards.js');
