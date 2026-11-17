@@ -1,0 +1,562 @@
+/* ── add-work-class.css — Add Work for the Class (teacher/add-work-class.js) ── */
+
+/* Over the Assignments page and the Work Wall (3800), under the grader (3900). */
+.awc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3850;
+  background: var(--bg);
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+}
+.awc-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--divider-subtle),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.awc-gap {
+  flex: 1;
+}
+
+/* ── The bar ── */
+.awc-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.awc-back {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 16px;
+  border: 0;
+  background: var(--seg-track);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.awc-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.awc-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.awc-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.awc-note {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  min-width: 0;
+}
+.awc-note:empty {
+  display: none;
+}
+.awc-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.awc-seg {
+  display: flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--seg-track);
+}
+.awc-seg-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.awc-seg-btn.is-on {
+  background: var(--seg-thumb);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.awc-cancel,
+.awc-primary {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 17px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awc-cancel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.awc-primary {
+  border: 0;
+  background: var(--active);
+  color: #fff;
+}
+.awc-overlay button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.awc-overlay button:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* ── The scroll and the foot ── */
+.awc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.awc-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  background: var(--bg);
+  box-shadow: inset 0 0.5px 0 var(--divider-heavy);
+  font-size: 13px;
+}
+.awc-count {
+  font-weight: 600;
+}
+.awc-hint {
+  color: var(--text-3);
+}
+
+/* ── Column ── */
+.awc-head,
+.awc-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 210px) minmax(0, 1fr) minmax(170px, 320px);
+  gap: 16px;
+  align-items: center;
+  padding: 8px 16px;
+}
+.awc-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.awc-row {
+  min-height: 54px;
+  box-sizing: border-box;
+  box-shadow: inset 0 -0.5px 0 var(--divider-subtle);
+}
+.awc-row.is-over,
+.awc-card.is-over {
+  background: var(--active-light);
+}
+.awc-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.awc-work {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.awc-in {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.awc-had {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* The drop space: also a button. */
+.awc-drop {
+  flex: 1;
+  min-width: 160px;
+  height: 38px;
+  box-sizing: border-box;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.awc-drop.is-more {
+  flex: none;
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+}
+.is-over .awc-drop {
+  border-color: var(--active);
+  background: var(--active-light);
+  color: var(--link);
+  font-weight: 700;
+}
+.awc-paper,
+.awc-leave-in {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awc-paper.is-on {
+  border-color: var(--active);
+  background: var(--active-light);
+  color: var(--link);
+}
+.awc-paper-set {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--link);
+}
+.awc-reading {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.awc-row-note,
+.awc-warn {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.awc-warn {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* A file waiting: its first page, its name, its pages. */
+.awc-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--active-light);
+  box-shadow: 0 0 0 1px var(--divider-medium);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  cursor: grab;
+}
+.awc-chip.is-dragging {
+  opacity: 0.5;
+}
+.awc-thumb {
+  width: 26px;
+  height: 34px;
+  flex: none;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.awc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.awc-file-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.awc-pages {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.awc-move-wrap {
+  position: relative;
+  flex: none;
+}
+.awc-move {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--link);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awc-move-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.awc-move-item {
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awc-move-item:hover,
+.awc-move-item:focus-visible {
+  background: var(--active-light);
+}
+.awc-off {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* A student with work in: what to do. */
+.awc-choices {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--seg-track);
+}
+.awc-choice {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.awc-choice.is-on {
+  background: var(--seg-thumb);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Grid ── */
+.awc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+.awc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--divider-medium);
+  min-width: 0;
+}
+.awc-card.is-over {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.awc-card-pic {
+  height: 150px;
+  margin: -10px -10px 0;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider-subtle);
+}
+.awc-card-pic img {
+  width: 100%;
+  display: block;
+}
+.awc-card .awc-drop {
+  flex: 1 1 100%;
+  height: 120px;
+  min-width: 0;
+}
+.awc-card .awc-drop.is-more {
+  height: 32px;
+  flex: none;
+}
+.awc-card .awc-chip {
+  width: 100%;
+  height: auto;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 6px 4px 4px 8px;
+}
+.awc-card .awc-file-name {
+  flex: 1 1 100%;
+  font-weight: 600;
+}
+.awc-card .awc-pages {
+  flex: 1;
+}
+.awc-card .awc-choices {
+  flex-direction: column;
+  width: 100%;
+}
+.awc-card .awc-choice {
+  text-align: left;
+}
+.awc-drop {
+  padding: 0 10px;
+}
+
+/* ── After the run ── */
+.awc-done {
+  padding: 20px 24px;
+}
+.awc-done-title {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.awc-done-paper {
+  margin: -8px 0 16px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.awc-done-sub {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.awc-done-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 560px;
+}
+.awc-done-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-subtle);
+}
+.awc-done-row .awc-name {
+  flex: 1;
+}
+
+/* The Work Wall's Add Work (shared/work-wall.js), on the computer only. */
+.ww-add-work {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── A narrow window: each student's row stacks. ── */
+@media (max-width: 760px) {
+  .awc-overlay {
+    padding: 0;
+  }
+  .awc-page {
+    border-radius: 0;
+  }
+  .awc-bar {
+    padding: 10px 16px;
+  }
+  .awc-head {
+    display: none;
+  }
+  .awc-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  .awc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    padding: 12px;
+  }
+  .awc-chip {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 4px;
+  }
+}
