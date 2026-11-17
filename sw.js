@@ -197,6 +197,7 @@ const PRECACHE_URLS = [
   '/teacher/add-work-split-setup.js',
   '/teacher/add-work-split-move.js',
   '/teacher/add-work-split-turn.js',
+  '/teacher/add-work-split-stickers.js',
   '/teacher/add-work-class.js',
   '/teacher/add-work-tray.js',
   '/teacher/add-work-two-classes.js',

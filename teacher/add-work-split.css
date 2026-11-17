@@ -415,6 +415,35 @@
 .aws-card-note.is-bad {
   color: var(--danger);
 }
+/* ── B4: what a piece's sticker says (teacher/add-work-split-stickers.js) ── */
+.aws-stk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 11px;
+}
+.aws-by-sticker {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--active-light);
+  color: var(--active);
+  font-weight: 700;
+}
+.aws-stk-note {
+  color: var(--late);
+  font-weight: 600;
+}
+.aws-stk-use {
+  border: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .aws-list {
   position: absolute;
   left: 8px;
@@ -857,4 +886,8 @@
   .aws-switch-knob {
     transition: none;
   }
+}
+.aws-stk-pending {
+  color: var(--text-3);
+  font-weight: 600;
 }
