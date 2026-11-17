@@ -1728,6 +1728,7 @@ window.PageAssignments = (function () {
       var c =
         '<div class="assess-card' +
         (isOpen ? ' open active' : '') +
+        (a.isDraft ? ' is-draft' : '') +
         '" id="ac-' +
         a.id +
         '" draggable="true"' +
@@ -1811,6 +1812,7 @@ window.PageAssignments = (function () {
           ? '<span class="collab-badge">' + esc(a.collaboration[0].toUpperCase() + a.collaboration.slice(1)) + '</span>'
           : '') +
         (window.AssessmentCopy ? AssessmentCopy.renderCardCopies(cid, a) : '') +
+        AssignDraft.chipHtml(cid, a) +
         '<span class="assess-date">' +
         // Assigned \u2192 due. `date` is the assigned date (date_assigned on the
         // server); the due date is its own field.
@@ -1836,6 +1838,7 @@ window.PageAssignments = (function () {
             _drawnReturn('s' + a.id, _returnDraftsButtonHtml(cid, a, shownIds)) +
             '</span>'
           : '') +
+        AssignDraft.assignButtonHtml(cid, a) +
         _cardMoreMenuHtml(cid, a) +
         '</div>' +
         '<span class="assess-chevron" aria-hidden="true">' +
@@ -1846,7 +1849,7 @@ window.PageAssignments = (function () {
         // card's whole-class grid used to be built and kept out of sight:
         // 80,000 elements on a class of 30 with 36 pieces.)
         '<div class="assess-body">' +
-        (isOpen ? _cardBodyHtml(cid, a, focusSt, students, scores) : '') +
+        (isOpen ? (a.isDraft ? AssignDraft.bodyHtml(cid, a) : _cardBodyHtml(cid, a, focusSt, students, scores)) : '') +
         '</div>' +
         '</div>';
       return c;
@@ -3199,19 +3202,8 @@ window.PageAssignments = (function () {
       // Create and Add Another says what it saved, until the next edit.
       '<p class="af-saved-note" id="af-saved-note" role="status" hidden></p>' +
       '<p class="af-counts-toward" id="af-counts-toward" aria-live="polite"></p>' +
-      '<button class="btn btn-ghost" data-action="cancelAssessForm">Cancel</button>' +
-      // Create and Add Another (redesign PR 11): saves, then a fresh form
-      // keeping the settings a run of similar work shares.
-      (isEdit
-        ? ''
-        : '<button class="btn btn-ghost" data-action="saveAndAddAnother" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter" title="Ctrl/⌘+Shift+Enter">Create and Add Another</button>') +
-      '<button class="btn btn-primary" data-action="' +
-      (isEdit ? 'saveEditAssess' : 'saveNewAssess') +
-      '" data-aid="' +
-      (isEdit ? assess.id : '') +
-      '">' +
-      (isEdit ? 'Save Changes' : 'Create Assessment') +
-      '</button>' +
+      // Cancel, Save as Draft, Create and Add Another, Create Assessment; a Draft's edit form ends with Assign.
+      AssignDraft.footerHtml(isEdit, assess) +
       '</div>';
 
     return html;
@@ -4467,7 +4459,7 @@ window.PageAssignments = (function () {
     // Shift adds another (new assessments only).
     var save = e.shiftKey
       ? form.querySelector('[data-action="saveAndAddAnother"]')
-      : form.querySelector('[data-action="saveNewAssess"], [data-action="saveEditAssess"]');
+      : form.querySelector('[data-action="saveNewAssess"]:not([data-draft]), [data-action="saveEditAssess"]');
     if (!save) return;
     e.preventDefault();
     save.click();
@@ -6533,8 +6525,8 @@ window.PageAssignments = (function () {
     }
   }
 
-  function saveNewAssess(addAnother) {
-    addAnother = addAnother === true;
+  function saveNewAssess(how) {
+    var addAnother = how === true;
     if (_formResBusy()) return;
     var titleEl = document.getElementById('af-title');
     var title = (titleEl ? titleEl.value : '').trim();
@@ -6551,7 +6543,7 @@ window.PageAssignments = (function () {
     if (!_formCompetencyTagged()) return;
     if (
       _commitOpenBlank(function () {
-        saveNewAssess(addAnother);
+        saveNewAssess(how);
       })
     )
       return;
@@ -6559,7 +6551,7 @@ window.PageAssignments = (function () {
     // with the rubric's saved id (redesign PR 8).
     if (
       _persistPendingFormRubric(function () {
-        saveNewAssess(addAnother);
+        saveNewAssess(how);
       })
     )
       return;
@@ -6591,6 +6583,7 @@ window.PageAssignments = (function () {
       notes: '',
       created: new Date().toISOString(),
     };
+    if (how === 'draft') newAssess.isDraft = true;
     if (categoryId) {
       newAssess.categoryId = categoryId;
       newAssess.category_id = categoryId;
@@ -7060,6 +7053,7 @@ window.PageAssignments = (function () {
       var assessWeight = _formAssessWeight();
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
+    if (AssignDraft.assigning === aid && next.isDraft) AssignDraft.assignInto(activeCourse, next);
     // A change that moves grades asks first (grade-change.js).
     if (
       GradeChange.askFirst(activeCourse, before, next, function () {
@@ -11412,9 +11406,10 @@ window.PageAssignments = (function () {
         saveNewAssess(true);
       },
       saveNewAssess: function () {
-        saveNewAssess();
+        saveNewAssess(el.dataset.draft ? 'draft' : false);
       },
       saveEditAssess: function () {
+        AssignDraft.assigning = el.dataset.assign ? el.dataset.aid : null;
         saveEditAssess(el.dataset.aid);
       },
       toggleModuleFolder: function () {
@@ -13811,17 +13806,20 @@ window.PageAssignments = (function () {
   // html-safe: ids are ours; labels and icons are fixed
   function _cardMoreMenuHtml(cid, a) {
     var aid = 'data-aid="' + a.id + '"';
+    // A Draft has no grading: Assign, Print, then what any piece has (assign-draft.js).
     var html =
-      _cardMenuItem(
-        'data-action="classResults" data-cid="' + esc(cid) + '" ' + aid,
-        _CLASS_RESULTS_ICON,
-        'Class Results',
-      ) + _cardPrintItem(cid, a);
+      (a.isDraft
+        ? AssignDraft.menuItemsHtml(cid, a, _cardMenuItem)
+        : _cardMenuItem(
+            'data-action="classResults" data-cid="' + esc(cid) + '" ' + aid,
+            _CLASS_RESULTS_ICON,
+            'Class Results',
+          )) + _cardPrintItem(cid, a);
     // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
-    if (!focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
+    if (!a.isDraft && !focusStudentId && window.WorkWall && GraderWork.workShown(cid, a))
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
-    var rubric = a.rubricId && getRubricById(cid, a.rubricId);
+    var rubric = !a.isDraft && a.rubricId && getRubricById(cid, a.rubricId);
     if (rubric) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       html +=
@@ -13841,7 +13839,7 @@ window.PageAssignments = (function () {
       }
     }
     html +=
-      _setEveryoneMenuHtml(cid, a) +
+      (a.isDraft ? '' : _setEveryoneMenuHtml(cid, a)) +
       '<span class="assess-menu-sep" role="separator"></span>' +
       _cardMenuItem('data-action="editAssess" ' + aid, LINE_ICONS.edit, 'Edit Assessment') +
       _cardMenuItem('data-action="dupeAssess" ' + aid, LINE_ICONS.copy, 'Duplicate');
@@ -13849,6 +13847,7 @@ window.PageAssignments = (function () {
     if (targets && (targets.sameCourse.length || targets.other.length))
       html += _cardMenuItem('data-action="copyAssessToClass" ' + aid, _ARROW_RIGHT_ICON, 'Copy to Another Class…');
     html +=
+      (a.isDraft ? '' : AssignDraft.menuItemsHtml(cid, a, _cardMenuItem)) +
       '<span class="assess-menu-sep" role="separator"></span>' +
       _cardMenuItem('data-action="deleteAssess" ' + aid, LINE_ICONS.trash, 'Delete…', 'is-delete');
     return (
@@ -17011,6 +17010,7 @@ window.PageAssignments = (function () {
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
     AssignList.listen(_addDocListener);
+    AssignDraft.listen(_addDocListener);
     ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
       _addDocListener(type, _queuePrintMarks);
     });

@@ -367,7 +367,7 @@ window.MObserve = (function () {
   }
 
   function _assessmentTitle(cid, aid) {
-    var a = (getAssessments(cid) || []).find(function (x) {
+    var a = (getAssignedAssessments(cid) || []).find(function (x) {
       return x.id === aid;
     });
     return a ? a.title || 'Assessment' : '';
@@ -557,7 +557,7 @@ window.MObserve = (function () {
     } else if (kind === 'assessment') {
       rows +=
         '<input type="search" class="m-pick-search" data-pick-search placeholder="Search assessments" aria-label="Search assessments">';
-      (getAssessments(cid) || []).forEach(function (a) {
+      (getAssignedAssessments(cid) || []).forEach(function (a) {
         var title = a.title || 'Untitled';
         var date = a.date ? parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
         rows += _pickRow(kind, a.id, title, _selectedAssessment === a.id, { search: title, meta: date });

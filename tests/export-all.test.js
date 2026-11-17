@@ -382,6 +382,7 @@ describe('the export stays complete', () => {
   // added here with its reason, so nothing a teacher wrote goes missing.
   const LEFT_OUT = {
     getAllTags: 'the learning map, not student data',
+    getAssignedAssessments: 'getAssessments without its Drafts; the export reads getAssessments, Drafts included',
     getAssignmentStatus: 'read through getAssignmentStatuses',
     getAssignmentObs: 'a subset of getAllQuickObs',
     getCategories: 'read through getAssessmentCategoryName',

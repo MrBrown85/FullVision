@@ -129,7 +129,7 @@ window.GradeReport = (function () {
     (getCategories(cid) || []).forEach(function (c) {
       cats[c.id] = c.name;
     });
-    var list = getAssessments(cid)
+    var list = getAssignedAssessments(cid)
       .filter(function (a) {
         return (
           a &&
@@ -224,7 +224,7 @@ window.GradeReport = (function () {
      each (rows(), with opts), and the student's grade in each, as the
      gradebook works it out. */
   function categorySummary(cid, student, opts) {
-    var termWork = getAssessments(cid).filter(function (a) {
+    var termWork = getAssignedAssessments(cid).filter(function (a) {
       return a && assessmentInYearToDate(cid, a);
     });
     var shown = {};
@@ -767,7 +767,7 @@ window.GradeReport = (function () {
     });
     var groups = [];
     if (org === 'category') {
-      var termWork = getAssessments(cid).filter(function (a) {
+      var termWork = getAssignedAssessments(cid).filter(function (a) {
         return assessmentInYearToDate(cid, a);
       });
       var byCat = {};
@@ -802,7 +802,7 @@ window.GradeReport = (function () {
     } else if (org === 'competency') {
       var per = Math.max(1, Number(o.per) || 5);
       var byId = {};
-      getAssessments(cid).forEach(function (a) {
+      getAssignedAssessments(cid).forEach(function (a) {
         byId[a.id] = a;
       });
       var secs = window.ReportBlocks && ReportBlocks.reportSections ? ReportBlocks.reportSections(cid) : [];

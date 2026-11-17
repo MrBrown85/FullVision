@@ -307,7 +307,7 @@ window.DashInsights = (function () {
   /* Work labelled Missing or Late in the active term, newest assessment
      first. An empty cell past its due date is not missing. */
   function missingItems(cid, allStudents) {
-    var assessments = getAssessments(cid)
+    var assessments = getAssignedAssessments(cid)
       .filter(function (a) {
         return assessmentInYearToDate(cid, a);
       })
