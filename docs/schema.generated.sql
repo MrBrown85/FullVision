@@ -1093,6 +1093,20 @@ table public.rubric_tag (rls on)
      JOIN public.tag t ON ((t.id = rubric_tag.tag_id)))
      JOIN public.section s ON ((s.id = t.section_id)))
   WHERE ((r.id = rubric_tag.rubric_id) AND (s.course_id = r.course_id) AND public.fv_owns_course(r.course_id)))))
+table public.scan_label (rls on)
+  id uuid not null default gen_random_uuid()
+  enrollment_id uuid not null
+  code text not null
+  created_at timestamp with time zone not null default now()
+  retired_at timestamp with time zone
+  constraint scan_label_code_check CHECK ((code ~ '^[2-9A-HJ-NP-Z]{12}$'::text))
+  constraint scan_label_code_key UNIQUE (code)
+  constraint scan_label_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint scan_label_pkey PRIMARY KEY (id)
+  CREATE UNIQUE INDEX scan_label_code_key ON public.scan_label USING btree (code)
+  CREATE INDEX scan_label_enrollment_idx ON public.scan_label USING btree (enrollment_id)
+  CREATE UNIQUE INDEX scan_label_one_live_idx ON public.scan_label USING btree (enrollment_id) WHERE (retired_at IS NULL)
+  CREATE UNIQUE INDEX scan_label_pkey ON public.scan_label USING btree (id)
 table public.score (rls on)
   id uuid not null default gen_random_uuid()
   enrollment_id uuid not null
@@ -1827,6 +1841,7 @@ procedure public.grade_return_repair_nightly()
 function public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) returns jsonb
+function public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.list_assessment_copies(p_copy_group uuid) returns TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
 function public.list_assessment_markup(p_assessment_id uuid) returns jsonb security definer
 function public.list_categories(p_course_id uuid) returns TABLE(id uuid, course_id uuid, name text, weight numeric, display_order integer, calc_mode text, created_at timestamp with time zone, updated_at timestamp with time zone)
@@ -1852,6 +1867,7 @@ function public.list_removed_sections(p_course_id uuid) returns jsonb
 function public.list_report_issues(p_course_id uuid, p_term integer) returns jsonb
 function public.list_report_templates() returns jsonb
 function public.list_rubric_copies(p_copy_group uuid) returns TABLE(rubric_id uuid, course_id uuid, course_name text, name text)
+function public.list_scan_labels(p_course_id uuid) returns jsonb security definer
 function public.list_student_cards(p_course_id uuid) returns jsonb security definer
 function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
 function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
@@ -1862,6 +1878,7 @@ procedure public.photo_lifecycle_nightly()
 function public.photo_removal_call() returns bigint
 function public.photo_removal_due() returns boolean security definer
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
+function public.reissue_scan_label(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
 function public.remove_assessment_resource(p_resource_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.remove_section(p_id uuid, p_idempotency_key uuid) returns jsonb

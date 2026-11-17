@@ -67,6 +67,7 @@ export const OWNERS = {
   'public.rubric_print': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.rubric_score': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.rubric_tag': 'rls_test.of_rubric(t.rubric_id)',
+  'public.scan_label': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.score': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.score_audit': 'rls_test.of_score(t.score_id)',
   'public.section': 'rls_test.of_course(t.course_id)',
