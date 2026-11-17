@@ -106,7 +106,9 @@
      piece's first page (`pins`, page no → sid, '' for "no one"), so a
      piece that still starts on that page keeps it and one that now starts
      elsewhere has none. In Class List Order a piece with no typed name
-     gets the listed student in its place. */
+     gets the listed student in its place, but only while there is one
+     piece for each student listed: a pile one paper short would otherwise
+     give every piece after the gap to the next student down. */
   function model(given, students) {
     var pages = (given || []).map(function (g, i) {
       return { no: i + 1, page: g.page, blank: !!g.blank, kept: false, cut: false };
@@ -168,12 +170,24 @@
       _tidy();
     }
 
+    // How many pieces there are now.
+    function _count() {
+      return _keptAll().length ? _runs().length : 0;
+    }
+
+    // Class List Order names pieces only when there is one for each student.
+    function listFits() {
+      return _count() === list.length;
+    }
+
     function pieces() {
       if (!_keptAll().length) return [];
-      return _runs().map(function (r, at) {
+      var runs = _runs();
+      var byList = st.order === 'list' && runs.length === list.length;
+      return runs.map(function (r, at) {
         var first = pages[r.kept[0]];
         var pin = Object.prototype.hasOwnProperty.call(st.pins, first.no) ? st.pins[first.no] : undefined;
-        var sid = pin !== undefined ? pin : st.order === 'list' && list[at] ? list[at].id : '';
+        var sid = pin !== undefined ? pin : byList ? list[at].id : '';
         return {
           at: at,
           from: r.from,
@@ -388,6 +402,10 @@
       },
       order: function () {
         return st.order;
+      },
+      listFits: listFits,
+      students: function () {
+        return list.length;
       },
       setPer: setPer,
       more: more,

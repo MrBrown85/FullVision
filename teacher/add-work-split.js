@@ -475,18 +475,34 @@
       orderBtn('list', 'Class List Order') +
       orderBtn('typed', 'No Order: I’ll Type Names') +
       '</div>' +
-      '<p class="aws-hint">' +
-      esc(
-        order === 'list'
-          ? 'Each piece gets the next student on the class list. Type a name on a piece to change it.'
-          : 'Each piece shows the top of its first page. Type two or three letters and press Return; the next piece is ready.',
-      ) +
+      '<p class="aws-hint' +
+      (order === 'list' && !m.listFits() ? ' is-bad' : '') +
+      '">' +
+      esc(_orderHint(m, c)) +
       '</p>' +
+      (order === 'list' && m.listFits()
+        ? '<p class="aws-hint">Check the first and last pieces against their pages.</p>'
+        : '') +
       '</section>' +
       tally +
       '<p class="aws-privacy">FullVision does not read the handwriting. The scan is split on this computer and is not uploaded whole; each student’s pages upload on their own.</p>' +
       '</aside>'
     );
+  }
+
+  // The words under The Pile Is in.
+  function _orderHint(m, c) {
+    if (m.order() !== 'list')
+      return 'Each piece shows the top of its first page. Type two or three letters and press Return; the next piece is ready.';
+    if (!m.listFits())
+      return (
+        'Class List Order needs one piece for each student: ' +
+        _plural(m.students(), 'student', 'students') +
+        ', ' +
+        _plural(c.pieces, 'piece', 'pieces') +
+        '. Type the names instead.'
+      );
+    return 'Each piece gets the next student on the class list. Type a name on a piece to change it.';
   }
 
   // html-safe: names go through esc; numbers and urls are ours (esc too)
