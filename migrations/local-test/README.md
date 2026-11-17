@@ -2715,6 +2715,8 @@ Result on 2026-11-17, PostgreSQL 17.12 (Postgres.app), from an empty database: *
 
 The pre-check (`scan-labels-live-precheck.sql`, catalog facts only, returns only the rows that differ) was run read-only on gradebook-prod on Nov 17 and returned no rows. After the apply the post-check said ok on every row.
 
+Since the apply, `docs/schema.generated.sql`, `migrations/baseline/` and `types/database.d.ts` have the file (a rebuild with `--check` matches; 355 functions), so a rebuilt database is the database after it: `scan_labels.py` takes each scenario's copy back to before the file with the full undo and goes on from there. On that baseline: **204 of 204**, and every rule test passed with `scan_label` one of live's own tables.
+
 **Independent review (Nov 17).** One must-fix, fixed: the first guard let a relied-on function that was missing altogether through (it now stops; scenario `missing`). Also fixed: the undo's header and message now say that a full removal which stops leaves PART 1's revoke in place and how to give the functions back, and that the removal needs `public.enrollment` to itself for a moment; the post-check's last row fails when the table is not empty; four harness checks that asserted less than their names (the sync cursor, the spread of draws by place, one key from two windows, another teacher sending this teacher's key). The reviewer agreed with keeping the code readable: no function takes a code as input, so there is nothing to guess against.
 
 Not verified here: gradebook-prod itself; the app that calls the functions (its own tests are in the B4 app PR).
