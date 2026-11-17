@@ -1189,6 +1189,12 @@
     _leave();
   }
 
+  // A file dropped here is not taken, and never opens in the browser.
+  function _noDrop(e) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+  }
+
   function _beforeUnload(e) {
     var s = _s;
     if (!s || !(s.phase === 'split' || (s.phase === 'reading' && s.read))) return;
@@ -1259,6 +1265,8 @@
     overlay.addEventListener('focusin', _focusIn);
     overlay.addEventListener('focusout', _focusOut);
     overlay.addEventListener('keydown', _keyIn);
+    overlay.addEventListener('dragover', _noDrop);
+    overlay.addEventListener('drop', _noDrop);
     document.addEventListener('keydown', _keydown, true);
     if (window.addEventListener) window.addEventListener('beforeunload', _beforeUnload);
     _draw({ focus: 'cancel' });
