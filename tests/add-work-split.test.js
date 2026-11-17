@@ -725,3 +725,97 @@ describe('the page', () => {
     expect(closed).toBe(1);
   });
 });
+
+describe('Set Up Like Last Time (B5)', () => {
+  const Setup = window.AddWorkSplitSetup;
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+  const fresh = { per: 1, order: 'typed', leaveOut: true };
+
+  it('keeps only the class, the assessment and the three choices, under a key signing out wipes', () => {
+    const m = M.model(scan(12, [2]), CLASS);
+    m.setLeaveOut(false);
+    m.setPer(2);
+    m.setOrder('list');
+    m.name(0, 's3');
+    Setup.save('c1', 'a1', m);
+    const raw = localStorage.getItem(Setup.KEY);
+    expect(JSON.parse(raw)).toEqual({ cid: 'c1', aid: 'a1', per: 2, order: 'list', leaveOut: false });
+    // No student, no name, no file name, no page.
+    for (const st of CLASS) {
+      expect(raw).not.toContain('"' + st.id + '"');
+      expect(raw).not.toContain(st.lastName);
+    }
+    expect(raw).not.toContain('Block C');
+    expect(raw).not.toContain('page');
+    // shared/supabase.js _clearDeviceData wipes every fv- key on sign-out.
+    expect(Setup.KEY.startsWith('fv-')).toBe(true);
+  });
+
+  it('sets the last choices on a new scan, and says so; Start Fresh puts the usual start back', () => {
+    localStorage.setItem(Setup.KEY, JSON.stringify({ cid: 'c1', aid: 'a1', per: 2, order: 'list', leaveOut: false }));
+    const s = { m: M.model(scan(12, [2]), CLASS), list: CLASS };
+    expect(Setup.apply(s, fresh)).toBe(true);
+    expect([s.m.per(), s.m.order(), s.m.leaveOut()]).toEqual([2, 'list', false]);
+    expect(Setup.words(s.setup.last)).toBe('2 pages per student, Class List Order, blank pages kept');
+    let drawn = null;
+    expect(Setup.click(s, 'fresh', null, { draw: o => (drawn = o) })).toBe(true);
+    expect([s.m.per(), s.m.order(), s.m.leaveOut()]).toEqual([1, 'typed', true]);
+    expect(s.setup).toBe(null);
+    expect(drawn).toBeTruthy();
+  });
+
+  it('says nothing when the last choices are the usual start, or when what is kept is not choices', () => {
+    localStorage.setItem(Setup.KEY, JSON.stringify({ per: 1, order: 'typed', leaveOut: true }));
+    const s = { m: M.model(scan(4), CLASS), list: CLASS };
+    expect(Setup.apply(s, fresh)).toBe(false);
+    expect(s.setup).toBe(null);
+    for (const bad of ['{', '{"per":40,"order":"typed","leaveOut":true}', '{"per":2,"order":"x","leaveOut":true}']) {
+      localStorage.setItem(Setup.KEY, bad);
+      expect(Setup.load()).toBe(null);
+    }
+  });
+});
+
+describe('upside-down pages (B5)', () => {
+  const T = window.AddWorkSplitTurn;
+  const ctxOf = s => ({ state: () => s, draw: () => {} });
+  const stateOf = m => ({ m, overlay: { querySelector: () => null } });
+
+  it('Turn Every Page turns every page, and pressed again gives each its own first picture back', async () => {
+    const real = T.half;
+    T.half = async pg => ({ ...pg, turned: (pg.turned || 0) + 1 });
+    try {
+      const m = M.model(scan(3), CLASS);
+      const s = stateOf(m);
+      const first = m.pages().map(p => p.page);
+      await T.all(s, ctxOf(s));
+      expect(s.allTurned).toBe(true);
+      expect(m.pages().map(p => p.page.turned)).toEqual([1, 1, 1]);
+      // Page 2 turned by hand since: it is turned again, not put back.
+      const byHand = { ...m.page(2).page, turned: 5 };
+      m.setPage(2, byHand);
+      await T.all(s, ctxOf(s));
+      expect(s.allTurned).toBe(false);
+      expect(m.page(1).page).toBe(first[0]);
+      expect(m.page(3).page).toBe(first[2]);
+      expect(m.page(2).page.turned).toBe(6);
+    } finally {
+      T.half = real;
+    }
+  });
+
+  it('a finder marks only the pages it is sure of, and a page turned since is no longer marked', async () => {
+    const m = M.model(scan(3), CLASS);
+    const s = stateOf(m);
+    T.finders.push(async pg => (pg.page === 2 ? true : pg.page === 3 ? null : false));
+    try {
+      expect(await T.find(s, ctxOf(s))).toBe(1);
+      expect([1, 2, 3].map(no => T.marked(s, no))).toEqual([false, true, false]);
+      m.setPage(2, { ...m.page(2).page });
+      expect(T.marked(s, 2)).toBe(false);
+    } finally {
+      T.finders.length = 0;
+    }
+  });
+});

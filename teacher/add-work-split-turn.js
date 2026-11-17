@@ -127,7 +127,8 @@
             delete s.flips[no];
             return;
           }
-          return half(was)
+          return api
+            .half(was)
             .then(null, function () {
               return null;
             })
@@ -211,5 +212,16 @@
     return !!(p && now && now.page === p);
   }
 
-  return { finders: finders, find: find, html: html, busy: busy, click: click, half: half, marked: marked };
+  // `half` is called through here, so a test can stand in for the canvas.
+  var api = {
+    finders: finders,
+    find: find,
+    html: html,
+    busy: busy,
+    click: click,
+    half: half,
+    marked: marked,
+    all: _all,
+  };
+  return api;
 })();
