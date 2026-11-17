@@ -158,6 +158,7 @@ const PRECACHE_URLS = [
   '/teacher/dash-insights.js',
   '/teacher/assign-collab.js',
   '/teacher/assessment-copy.js',
+  '/teacher/add-from-class.js',
   '/teacher/factor-field.js',
   '/teacher/class-results.js',
   '/teacher/rubric-guard.js',
