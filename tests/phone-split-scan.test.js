@@ -99,6 +99,28 @@ describe('which assessment comes first', () => {
   });
 });
 
+describe('offered in every class (plan decision 2)', () => {
+  it('a class with its student page and Send Work off lists every piece but a draft or DIBELS', () => {
+    const pieces = [
+      { id: 'b1', title: 'Paper Quiz', date: '2026-11-10' },
+      { id: 'b2', title: 'Draft', date: '2026-11-11', isDraft: true },
+      { id: 'b3', title: 'Benchmark', date: '2026-11-12', scoreMode: 'dibels', scoringType: 'dibels' },
+    ];
+    swap('getAssessments', () => pieces);
+    swap('getStudents', () => CLASS);
+    swap('getStudentSubmission', () => null);
+    // The real AddWorkClass.offered, with the student page and Send Work off.
+    swap('getReturnSettings', () => ({ student_page: false, return_grades: null }));
+    swap('getCourseSendWork', () => ({ send_work: false }));
+    expect(GraderWork.workShown('c9', pieces[0])).toBe(false);
+    expect(
+      M()
+        .assessments('c9')
+        .map(r => r.a.id),
+    ).toEqual(['b1']);
+  });
+});
+
 describe('the named pieces staged on their students', () => {
   it('places each named piece, in order, with its pages renamed; a student with work gets the default choice', () => {
     swap('getStudentSubmission', (cid, sid) =>

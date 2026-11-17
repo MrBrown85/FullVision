@@ -28,6 +28,8 @@ import { compareLogs, runSession } from './helpers/settings-session.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const recordTo = process.env.FV_SESSION_LOG;
+// Three loads in the sitting: open, reload, reopen.
+const WORK_READS = 3;
 
 describe('one computer, one sitting in Class Settings', () => {
   it.runIf(recordTo)('writes what this commit sends', async () => {
@@ -44,6 +46,11 @@ describe('one computer, one sitting in Class Settings', () => {
     const opened = run.log.filter(e => e.name === 'note_course_opened');
     expect(opened.length).toBe(1);
     run.log = run.log.filter(e => e.name !== 'note_course_opened');
+    // Pin moved (Add Work for the Class, offered in every class): every load
+    // of the class reads its work, Send Work on or off (was: none). Not a setting.
+    const workReads = run.log.filter(e => e.name === 'list_course_submissions_since');
+    expect(workReads.length).toBe(WORK_READS);
+    run.log = run.log.filter(e => e.name !== 'list_course_submissions_since');
     const diff = compareLogs(main.log, run.log, main.start);
 
     expect(diff.notAllowed).toEqual([]);

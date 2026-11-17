@@ -304,19 +304,27 @@ describe('reading a signed-in class’s work', () => {
     expect(GraderWork.workStateOf(CID, CAUSES, MATEO)).toBe('notin');
   });
 
-  it('with Send Work off on the course row, the class load asks nothing about work', async () => {
+  // Pin moved (Add Work for the Class, offered in every class): a class's
+  // work is read with Send Work off too, once a load (was: nothing).
+  it('with Send Work off on the course row, the class load still reads its work, once', async () => {
     course.send_work = false;
+    srv.course.send_work = false;
     await openClass();
-    expect(callsTo('list_course_submissions_since')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toHaveLength(1);
     expect(getCourseSendWork(CID).send_work).toBe(false);
   });
 
-  it('with Send Work off, opening the grader, the Assignments page or the Work Wall reads nothing', async () => {
+  // Pin moved: with Send Work off the screens read the work as with it on
+  // (was: no read). The read 30 s from the last is not due; a forced one is.
+  it('with Send Work off, opening the grader, the Assignments page or the Work Wall reads as with it on', async () => {
     course.send_work = false;
+    srv.course.send_work = false;
     await openClass();
-    expect((await refreshStudentWork(CID)).changed).toBe(false);
-    expect((await refreshStudentWork(CID, { force: true })).changed).toBe(false);
-    expect(callsTo('list_course_submissions_since')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toHaveLength(1);
+    await refreshStudentWork(CID);
+    expect(callsTo('list_course_submissions_since')).toHaveLength(1);
+    await refreshStudentWork(CID, { force: true });
+    expect(callsTo('list_course_submissions_since')).toHaveLength(2);
     // Turned on (still on its way): read again.
     fake.on('set_course_send_work', p => ({ data: Object.assign({}, srv.course, p.p_patch), error: null }));
     setOnline(false);
@@ -326,10 +334,15 @@ describe('reading a signed-in class’s work', () => {
     expect(callsTo('list_course_submissions_since').length).toBeGreaterThan(0);
   });
 
-  it('with Send Work off, Delete Class reads the class’s work once and names the photos sent before', async () => {
+  // Pin moved: the load reads the work now (was: no read at load, so the
+  // warning's own read was the first). Here the load's read fails, so the
+  // warning still reads it, as it did: 1 + 2 reads (was 0 + 2).
+  it('with Send Work off, Delete Class reads the class’s work when the load could not, and names the photos sent before', async () => {
     course.send_work = false;
+    srv.course.send_work = false;
+    fake.on('list_course_submissions_since', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
     await openClass();
-    expect(callsTo('list_course_submissions_since')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toHaveLength(1);
     const doc = globalThis.document;
     globalThis.document = parseHTML('<!DOCTYPE html><html><body><div id="main"></div></body></html>').document;
     const message = () => document.querySelector('.confirm-card .confirm-message').textContent;
@@ -350,11 +363,11 @@ describe('reading a signed-in class’s work', () => {
       await settle();
       expect(message()).toMatch(PHOTOS);
       document.getElementById('confirm-cancel-btn').onclick();
-      expect(callsTo('list_course_submissions_since')).toHaveLength(2);
+      expect(callsTo('list_course_submissions_since')).toHaveLength(3);
       // Read once this session: the next warning asks nothing more.
       DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
       expect(message()).toMatch(PHOTOS);
-      expect(callsTo('list_course_submissions_since')).toHaveLength(2);
+      expect(callsTo('list_course_submissions_since')).toHaveLength(3);
     } finally {
       DashClassManager.resetState();
       globalThis.document = doc;
@@ -371,10 +384,11 @@ describe('reading a signed-in class’s work', () => {
     expect(GraderWork.workStateOf(CID, CAUSES, MATEO)).toBeNull();
   });
 
+  // Pin moved: the class load reads the work itself (was: the first read came with the next refresh).
   it('a class whose student page is off, with Send Work on: its work is read and shown, and the settings stay closed', async () => {
     course.student_page_enabled = false;
     await openClass();
-    expect(callsTo('list_course_submissions_since')).toEqual([]);
+    expect(callsTo('list_course_submissions_since')).toHaveLength(1);
     await refreshStudentWork(CID);
     expect(callsTo('list_course_submissions_since')).toHaveLength(1);
     expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
@@ -388,16 +402,23 @@ describe('reading a signed-in class’s work', () => {
     expect(fake.calls.map(c => c.name).filter(n => settings.test(n))).toEqual([]);
   });
 
-  it('a class whose student page and Send Work are both off is sent nothing new', async () => {
+  // Pin moved: such a class's work is read (was: nothing read, and Noor's
+  // work not shown). A teacher adds work in any class and must see it again.
+  it('a class whose student page and Send Work are both off: its work is read, and nothing about work is written', async () => {
     course.student_page_enabled = false;
     course.send_work = false;
+    srv.course.send_work = false;
     await openClass();
     await refreshStudentWork(CID, { force: true });
     expect(readStudentWorkForDelete(CID)).toBeNull();
     await window.v2Queue.flush();
     const work = /submission|work|paper/;
-    expect(fake.calls.map(c => c.name).filter(n => work.test(n))).toEqual([]);
-    expect(getStudentSubmission(CID, NOOR, CAUSES)).toBeNull();
+    expect(fake.calls.map(c => c.name).filter(n => work.test(n))).toEqual([
+      'list_course_submissions_since',
+      'list_course_submissions_since',
+    ]);
+    expect(getStudentSubmission(CID, NOOR, CAUSES).files).toHaveLength(2);
+    expect(studentWorkLive(CID)).toBe(false);
   });
 
   it('an unchanged list is answered in a few bytes: the version held goes with the ask', async () => {

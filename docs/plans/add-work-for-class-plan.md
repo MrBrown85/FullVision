@@ -82,7 +82,7 @@ Not checked: a signed-in class (the sticker calls have not been made against the
 
 ### Not built
 
-- **The answer key** (B5). Decided Nov 17: kept in the database in a table of its own (DECISIONS, "Add Work for the Class" 14). To be designed and built; its SQL goes to Colin first.
+- **The answer key** (B5). Cancelled by Colin on Nov 17 (DECISIONS, "Add Work for the Class" 14). It is bigger than it looked: the Work Wall has no Compare to show it in, and keeping it where no student can reach it means new storage rules, a change to the nightly clean-up and a change to the server function that removes files.
 - **Finding upside-down pages from the picture** (B5). The trial (90 made-up pages, each both ways up) made wrong calls: tall letters against hanging ones was wrong on 1 page, more ink at the top on 9. A sticker read upside down points its page out instead; nothing turns by itself.
 - **A scan shared from an Android phone's mail** (B7). Built, then taken out before merging: when the service worker with the handler is not the active one, the phone sends the whole PDF to the web host. Kept on the branch `claude/add-work-share-target-kept`.
 
@@ -203,13 +203,13 @@ On Android the installed app can receive a shared PDF. On an iPhone a web app ca
 ## Decisions that are Colin's
 
 1. **The page limit for a class scan.** Settled Nov 17: 150 pages on this page only ("Yes, 150 pages"); the 20 MB limit and every other upload's 20 pages are unchanged. DECISIONS, "Add Work for the Class" 7.
-2. **Whether the page is offered in classes without the student page.** Recommended: yes. Paper is where it helps most. Taken as recommended, Nov 17 (DECISIONS 16).
+2. **Whether the page is offered in classes without the student page.** Recommended: yes. Paper is where it helps most. Taken as recommended, Nov 17 (DECISIONS 16). Built in PR 1544.
 3. **How a sticker's code is kept** (B4): a table of its own, or the enrolment's id. Recommended: the table. Taken as recommended, Nov 17 (DECISIONS, "Add Work for the Class" 8).
 4. **Reading stickers outside Chrome** (B4): add a small reader to `vendor/`, or fall back to typing names. Settled in the build, Nov 17: one reader, jsQR, in every browser, Chrome included (DECISIONS 8).
 5. **The sticker privacy check** (B4): that the code says nothing about the student and cannot sign anyone in. This needs the district privacy officer's view, not mine. Colin chose on Nov 17 to go ahead in real classes without waiting for it (DECISIONS 13); the officer has not been asked.
 6. **The sticker's design and the cost of label stock**: about 28 sheets per class per term. Taken as Avery 5167 plus plain paper (DECISIONS 8).
 7. **Whether a sticker names the student only** (B4). Colin asked on Nov 17 whether it should also say the assignment. Recommended: the student only, so one sheet lasts the term; the assessment is chosen when the scan is dropped. Taken as recommended (DECISIONS 8).
-8. **The answer key** (B5): kept in the database in a table of its own (DECISIONS 14); to be designed and built. **The Android share** (B7): stays out (DECISIONS 15).
+8. **The answer key** (B5): cancelled (DECISIONS 14). **The Android share** (B7): stays out (DECISIONS 15).
 
 ## Risks
 

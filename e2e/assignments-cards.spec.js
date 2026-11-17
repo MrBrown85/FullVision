@@ -55,6 +55,8 @@ test('a card opens to a ⋯ menu that holds its actions, Set Everyone To in a su
   await expect(menu.getByRole('menuitem')).toHaveText([
     'Class Results',
     'Print Rubrics',
+    // In every class, student page or not (plan decision 2, Nov 17 2026).
+    'Add Work for the Class',
     'Grade by Competencies',
     'Set Everyone To',
     'Edit Assessment',

@@ -3975,6 +3975,8 @@ async function _doInitData(cid) {
         var bundle = _rpcObject(bundleRes.data) || {};
         if (bundle.not_modified) {
           if (!_serverKeepsRows(cid)) {
+            // Its work, student page off: a teacher adds work in any class.
+            _loadServerStudentWork(cid);
             _clearLoadError(cid);
             _classFresh[cid] = true;
             _markLoadSynced();
@@ -3996,6 +3998,8 @@ async function _doInitData(cid) {
           _bundleToCache(cid, bundle);
           rowsToo = _serverKeepsRows(cid);
           if (!rowsToo) {
+            // Its work, student page off: a teacher adds work in any class.
+            _loadServerStudentWork(cid);
             _clearLoadError(cid);
             _markLoadSynced();
           }
@@ -4042,6 +4046,7 @@ async function _doInitData(cid) {
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
     if (_serverKeepsRows(cid)) await _loadServerGradeReturns(cid, true);
+    else _loadServerStudentWork(cid); // its work, student page off
     return;
   }
 
@@ -7135,7 +7140,7 @@ async function _fetchGradeReturns(cid) {
    (_refreshMustSkip's way). */
 async function _loadServerGradeReturns(cid, fresh) {
   if (!_serverKeepsRows(cid)) return;
-  _loadServerStudentWork(cid, fresh);
+  _loadServerStudentWork(cid);
   _loadServerFeedback(cid);
   if (!fresh && _gradeReturnsLoadedFor[cid] === true && !_gradeReturnsStale[cid]) return;
   var got = await _fetchGradeReturns(cid);
