@@ -31,6 +31,9 @@ const shot = (page, name) => (SHOTS ? page.screenshot({ path: SHOTS + '/' + name
 test('a pile of named files lands on its students; the one that matches nobody is placed from the tray', async ({
   page,
 }) => {
+  // Six photos are shrunk twice (the page, then the check's own copy): about
+  // 20 s on CI's two cores, and over the usual 30 s when the shard is busy.
+  test.setTimeout(90_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.emulateMedia({ reducedMotion: 'reduce' });
