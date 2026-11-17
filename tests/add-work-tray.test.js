@@ -821,3 +821,82 @@ describe('one pile, two classes', () => {
     expect(getStudentSubmission(CID, AVERY, PIECE)).toBeNull();
   });
 });
+
+describe('one pile, two classes: while the other class is read', () => {
+  const CID2 = U(2);
+  const PIECE2 = U(32);
+  const XIMENA = U(201);
+  let realLoad;
+  let finish;
+  beforeEach(() => {
+    seedClass(CID2, {
+      students: [{ id: XIMENA, firstName: 'Ximena', lastName: 'Quill' }],
+      learningMaps: { subjects: [], sections: [], _customized: true, _version: 1, _flatVersion: 2 },
+      assessments: [{ id: PIECE2, title: 'Conscription', tagIds: [], date: '2026-10-20' }],
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_save' },
+    });
+    COURSES[CID2].name = 'Block C';
+    saveDemoStudentWork(CID2, {
+      course: { send_work: true },
+      assessments: [{ id: PIECE2, students_send: 'photos' }],
+      submissions: [],
+    });
+    // The other class's load, held until the test lets it go.
+    realLoad = globalThis.loadClass;
+    globalThis.loadClass = () => new Promise(r => (finish = r));
+  });
+  afterEach(() => {
+    globalThis.loadClass = realLoad;
+    clearClass(CID2);
+  });
+
+  it('Add Work waits, and says so, until the other class is read', async () => {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Priya Kaur.pdf')]);
+    await tick();
+    expect(text($('.awc-primary'))).toBe('Add Work for 1 Student');
+    click($('[data-awc="two"]'));
+    await tick();
+    expect(text($('.awc-primary'))).toBe('Reading Block C…');
+    expect($('.awc-primary').hasAttribute('disabled')).toBe(true);
+    finish();
+    await tick(8);
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('true');
+    expect(text($('.awc-primary'))).toBe('Add Work for 1 Student');
+    expect($('.awc-primary').hasAttribute('disabled')).toBe(false);
+  });
+
+  it('a class read after Add Work was pressed, or on the summary, is dropped and says nothing', async () => {
+    for (const late of [{ busy: true }, { view: 'done' }]) {
+      const a = getAssessments(CID).find(x => x.id === PIECE);
+      const list = AddWorkClass.students(CID, a);
+      const s = {
+        cid: CID,
+        a,
+        view: 'stage',
+        busy: false,
+        byId: {},
+        subs: {},
+        stage: AddWorkTargets.create({ cid: CID, aid: PIECE, a, list, subs: {}, name: 'Socials 10' }, () => null),
+      };
+      const ctx = {
+        state: () => s,
+        draw: () => {},
+        offered: AddWorkClass.offered,
+        students: AddWorkClass.students,
+        read: (cid, aid) => {
+          const x = getAssessments(cid).find(y => y.id === aid);
+          return { cid, aid, a: x, list: AddWorkClass.students(cid, x), subs: {}, name: 'Block C' };
+        },
+      };
+      const going = AddWorkTwoClasses.turnOn(s, CID2, ctx);
+      expect(s.twoState.reading).toBe('Block C');
+      Object.assign(s, late);
+      finish();
+      expect(await going).toBe(false);
+      expect(s.stage.classes().length).toBe(1);
+      expect(s.byId[XIMENA]).toBeUndefined();
+      expect(s.twoState).toMatchObject({ reading: '', line: '' });
+    }
+  });
+});

@@ -30,6 +30,8 @@ const SHOTS = process.env.FV_SHOTS || '';
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: SHOTS + '/' + name + '.png' }) : null);
 
 test('one pile, two classes, and a late paper: every page in its own class and assessment', async ({ page }) => {
+  // The scan specs take about 20 s on CI's two cores (main's run, PR 1537).
+  test.setTimeout(90_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -229,5 +231,15 @@ test('one pile, two classes, and a late paper: every page in its own class and a
   await expect(awc.locator('[data-awc="scanOrder"]')).toHaveText(['Grade Block C in Scan Order']);
   await shot(page, 'add-work-two-classes-done');
   expect(await page.evaluate(() => getActiveCourse())).toBe(set.cidA);
+
+  // Block C's grader: the app switches to Block C, as Open Copy In does, and
+  // the grader opens on Block C's first student off the scan.
+  await awc.getByRole('button', { name: 'Grade Block C in Scan Order' }).click();
+  await expect(awc).toHaveCount(0);
+  const grader = page.locator('#grader-overlay');
+  await expect(grader.locator('.grader-student')).toContainText(set.b[0].name.split(' ')[0], { timeout: 15000 });
+  expect(await page.evaluate(() => getActiveCourse())).toBe(set.cidB);
+  await page.keyboard.press('Escape');
+  await expect(grader).toHaveCount(0);
   expect(errors).toEqual([]);
 });

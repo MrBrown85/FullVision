@@ -369,6 +369,14 @@
     }, 0);
     var out = { added: 0, paper: 0, stopped: null, said: '', closed: false, total: total };
     var said = [];
+    // Each student counted once, however many targets they were added in.
+    var sent = {};
+    var counted = function (sid) {
+      return function (res) {
+        if (res && res.result === 'sent') sent[sid] = true;
+        return res;
+      };
+    };
     var before = 0;
     return list
       .reduce(function (chain, t, i) {
@@ -376,14 +384,26 @@
           if (out.closed) return;
           var base = before;
           before += totals[i];
-          return AddWorkStage.run(t.stage, apiFor(t), {
-            alive: opts.alive,
-            release: opts.release,
-            progress: function (n) {
-              if (opts.progress) opts.progress(Math.min(base + n, total), total);
+          var api = apiFor(t);
+          return AddWorkStage.run(
+            t.stage,
+            {
+              add: function (sid, pages, mode) {
+                return Promise.resolve(api.add(sid, pages, mode)).then(counted(sid));
+              },
+              replace: function (sid, pages) {
+                return Promise.resolve(api.replace(sid, pages)).then(counted(sid));
+              },
+              paper: api.paper,
             },
-          }).then(function (one) {
-            out.added += one.added;
+            {
+              alive: opts.alive,
+              release: opts.release,
+              progress: function (n) {
+                if (opts.progress) opts.progress(Math.min(base + n, total), total);
+              },
+            },
+          ).then(function (one) {
             out.paper += one.paper;
             if (one.closed) out.closed = true;
             if (one.stopped && !out.stopped) out.stopped = one.stopped;
@@ -392,6 +412,7 @@
         });
       }, Promise.resolve())
       .then(function () {
+        out.added = Object.keys(sent).length;
         out.said = said
           .filter(function (x, i) {
             return said.indexOf(x) === i;

@@ -159,6 +159,19 @@ describe('a late paper', () => {
     expect(r.got).toEqual({ 'cA/a26/sA1': [11], 'cA/a25/sA1': [9, 10] });
   });
 
+  it('a student added in two targets is counted once; On Paper still counts its own', async () => {
+    const set = twoClasses();
+    const late = set.place('sA1', { from: 'late', pages: pages(1) }).piece;
+    set.setFor('sA1', late.id, LATE.aid);
+    set.place('sA1', { from: 'now', pages: pages(2) });
+    set.place('sB1', { from: 'b', pages: pages(3) });
+    set.setOnPaper('sA2', true);
+    const r = recorder();
+    const out = await T.run(set, r.apiFor);
+    expect(r.got).toEqual({ 'cA/a26/sA1': [2], 'cA/a25/sA1': [1], 'cB/b26/sB1': [3] });
+    expect(out).toMatchObject({ added: 2, paper: 1 });
+  });
+
   it('the choices follow what the student has in that assessment', async () => {
     const set = twoClasses();
     const piece = set.place('sA2', { from: 'late', pages: pages(7) }).piece;

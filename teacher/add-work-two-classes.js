@@ -167,6 +167,8 @@
       .then(function (res) {
         if (ctx.state() !== s) return false;
         st.reading = '';
+        // Add Work pressed meanwhile, or the summary showing: dropped, unsaid.
+        if (s.view !== 'stage' || s.busy) return false;
         var given = res && res.error ? null : ctx.read(cid, c.aid);
         var students = given ? getStudents(cid) || [] : [];
         if (!given || !students.length) {

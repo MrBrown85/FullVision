@@ -252,7 +252,9 @@
         busy
           ? s.progress || 'Adding…'
           : reading
-            ? (s.tray && s.tray.progress()) || 'Reading Files…'
+            ? (s.twoState && s.twoState.reading ? 'Reading ' + s.twoState.reading + '…' : '') ||
+              (s.tray && s.tray.progress()) ||
+              'Reading Files…'
             : s.stage.buttonLabel(),
       ) +
       '</button>' +
@@ -277,6 +279,8 @@
   // Whether any file is still being read (shrunk) for any student.
   function _readingAny(s) {
     if (s.tray && s.tray.reading()) return true;
+    // The other class being read (B6): Add Work waits for it too.
+    if (s.twoState && s.twoState.reading) return true;
     return Object.keys(s.reading).some(function (sid) {
       return s.reading[sid] > 0;
     });
@@ -841,6 +845,7 @@
     // Who was added to the page's assessment, for Grade in Scan Order.
     var sent = function (t, sid) {
       return function (res) {
+        if (res && res.result === 'sent') s.addedAny[sid] = true;
         if (t.home && res && res.result === 'sent' && s.addedSids.indexOf(sid) < 0) s.addedSids.push(sid);
         return res;
       };
@@ -876,7 +881,8 @@
     ).then(function (out) {
       if (_s !== s || out.closed) return;
       s.busy = false;
-      s.added += out.added;
+      // Each student once, across targets and runs.
+      s.added = Object.keys(s.addedAny).length;
       s.paperSet += out.paper;
       _readSubs(s);
       var waiting = s.stage.counts();
@@ -1302,6 +1308,7 @@
       paperDone: {},
       scanOrder: [],
       addedSids: [],
+      addedAny: {},
       overlay: overlay,
       opener: document.activeElement,
       onClose: typeof opts.onClose === 'function' ? opts.onClose : null,
