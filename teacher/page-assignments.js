@@ -41,6 +41,18 @@ window.PageAssignments = (function () {
   // While a search or filter is on, every module with matches shows open;
   // a module the teacher closes during it is kept here, not saved.
   var _filterClosedModules = {};
+  // Show: Submitted (assign-show.js) opens and closes cards through these.
+  AssignShow.bind({
+    get: function () {
+      return { open: openAssessIds, allExpanded: _allExpanded, collapsed: _collapsedIds, closed: _filterClosedModules };
+    },
+    set: function (v) {
+      openAssessIds = v.open;
+      _allExpanded = v.allExpanded;
+      _collapsedIds = v.collapsed;
+      _filterClosedModules = v.closed;
+    },
+  });
   // Closed modules stay closed per class, saved with the teacher's
   // preferences so they survive signing out. This key is the old
   // browser-only copy, read once when a class has nothing saved yet.
@@ -198,6 +210,7 @@ window.PageAssignments = (function () {
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;
+    AssignShow.reset();
     _filterMenuOpen = false;
     focusStudentId = null;
     collapsedModules = _loadClosedModules(cid);
@@ -572,7 +585,7 @@ window.PageAssignments = (function () {
       '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
       (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
-      _toGradeSegHtml(cid) +
+      AssignShow.barHtml(cid, _toGradeOnly, _toGradeTotal) +
       '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
       '<button class="seg-btn assess-seg-btn"' +
       segAttr(seg[0]) +
@@ -1604,6 +1617,7 @@ window.PageAssignments = (function () {
   // An open card's body: its description and its grading controls.
   // html-safe: the description goes through esc; the grading builders are reviewed
   function _cardBodyHtml(cid, a, focusSt, students, scores) {
+    students = AssignShow.students(cid, a, students);
     var tagObjs = _scoreTagObjs(cid, a);
     return (
       (a.description
@@ -1636,7 +1650,7 @@ window.PageAssignments = (function () {
           _WARNING_ICON +
           missingCount +
           ' missing</span>'
-        : '') + _toGradeChipHtml(cid, a, shownIds, tograde);
+        : '') + AssignShow.toGradeChipHtml(cid, a, shownIds, tograde);
     var out = { meta: meta, button: _gradeSubmissionsHtml(cid, a, shownIds, tograde) };
     _drawnReturn('n' + a.id, meta + '|' + out.button);
     return out;
@@ -1845,7 +1859,8 @@ window.PageAssignments = (function () {
       grouped[key].push(a);
     });
 
-    var filtersActive = filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly;
+    var filtersActive =
+      filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly || AssignShow.on();
     if (!filtersActive) _filterClosedModules = {};
 
     // Nothing to show: say so first, above any modules.
@@ -2571,6 +2586,7 @@ window.PageAssignments = (function () {
         });
     } else _toReturnOnly = false;
 
+    assessments = AssignShow.listed(cid, assessments, nums, shownIds);
     // Work to grade (S6-F4): the same count as the gradebook's bar and the
     // dashboard's To Grade cell (GraderWork.workCounts), over the students
     // on screen. With To Grade on, only the assessments with work waiting.
@@ -7249,7 +7265,7 @@ window.PageAssignments = (function () {
     if (_grader || !main || !COURSES[cid]) return false;
     // A filter on grades (Ungraded, To Return, To Grade) can drop a card graded since the draw.
     if (showUngraded || _toReturnOnly || _toGradeOnly) return false;
-    var filtersActive = filterCategories.length > 0 || !!assessSearch;
+    var filtersActive = filterCategories.length > 0 || !!assessSearch || AssignShow.on();
     var all = getAssessments(cid);
     var byId = {};
     all.forEach(function (a) {
@@ -7477,6 +7493,12 @@ window.PageAssignments = (function () {
     // Draft or Returned beside the name (S1-F2); '' in a class that holds
     // no grades, where the row is as it was.
     var mark = _returnMarkHtml(activeCourse, aid, st.id);
+    var group = _groupRowFor(aid, st.id);
+    // The work icon, as on a rubric's or competencies' rows (Colin, Nov 16:
+    // every kind of work takes Add Work and See the Work). A group's row
+    // has none, as there.
+    var work = group && group.view ? '' : _workIconHtml(activeCourse, aid, st);
+    var wrap = mark || work;
     return (
       '<div class="score-row ldg-row ldg-' +
       kind +
@@ -7490,15 +7512,12 @@ window.PageAssignments = (function () {
       aid +
       '">' +
       '<span class="ldg-name' +
-      (mark ? ' ldg-name-ret' : '') +
+      (wrap ? ' ldg-name-ret' : '') +
+      (work ? ' ldg-name-work' : '') +
       '">' +
-      (mark ? '<span class="ldg-name-text">' : '') +
-      esc(
-        _groupRowFor(aid, st.id) && _groupRowFor(aid, st.id).view
-          ? _groupRowFor(aid, st.id).view.label
-          : displayNameWithLast(st),
-      ) +
-      (mark ? '</span>' + mark : '') +
+      (wrap ? '<span class="ldg-name-text">' : '') +
+      esc(group && group.view ? group.view.label : displayNameWithLast(st)) +
+      (wrap ? '</span>' + mark + work : '') +
       '</span>'
     );
   }
@@ -11473,11 +11492,11 @@ window.PageAssignments = (function () {
       },
       // Work to grade (S6-F4).
       setToGradeShow: function () {
-        _toGradeOnly = el.dataset.show === 'tograde';
+        var show = AssignShow.choose(el.dataset.show, _toGradeOnly);
+        _toGradeOnly = show === 'tograde';
         render();
-        var again = document.querySelector(
-          '.assess-tograde-seg [data-show="' + (_toGradeOnly ? 'tograde' : 'all') + '"]',
-        );
+        AssignShow.afterDraw();
+        var again = document.querySelector('.assess-tograde-seg [data-show="' + show + '"]');
         if (again) again.focus({ preventScroll: true });
       },
       gradeSubmissions: function () {
@@ -11553,7 +11572,9 @@ window.PageAssignments = (function () {
         filterCategories = [];
         assessSearch = '';
         showUngraded = false;
+        AssignShow.choose('all', false);
         render();
+        AssignShow.afterDraw();
       },
       selectTagLevel: function () {
         selectTagLevel(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.tagid);
@@ -12107,8 +12128,15 @@ window.PageAssignments = (function () {
       return;
     }
     var ldgRow = document.activeElement.closest && document.activeElement.closest('.ldg-row.ldg-cmp');
-    // Typing in the row's Overall Comment is not a c / i answer.
-    if (ldgRow && document.activeElement.tagName !== 'TEXTAREA' && handleLedgerKey(e, ldgRow)) return;
+    // Typing in the row's Overall Comment, or in its + menu and Link…
+    // form, is not a c / i answer.
+    if (
+      ldgRow &&
+      document.activeElement.tagName !== 'TEXTAREA' &&
+      !document.activeElement.closest('.rsg-attach') &&
+      handleLedgerKey(e, ldgRow)
+    )
+      return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
       // Shift+Enter is a new line.
@@ -13658,35 +13686,11 @@ window.PageAssignments = (function () {
   }
 
   /* ── Work to grade on the Assignments page (S6-F4) ───────────
-     In a class whose student page and Send Work are on: Show All | To
-     Grade 9 on the toolbar, "6 to grade" on a card, Grade Submissions,
+     In a class whose student page and Send Work are on: the Show bar
+     (All | Submitted | To Grade 9, assign-show.js) on the toolbar, "6 to grade" on a card, Grade Submissions,
      which opens the grader dialog on the work waiting (Show on To Grade),
      and on one student's grader, what came in and Add Work. Every number is
      GraderWork.workCounts', as the gradebook's and the dashboard's are. */
-  // html-safe: fixed words and a number
-  function _toGradeSegHtml(cid) {
-    if (!GraderWork.workOnInClass(cid)) return '';
-    return (
-      '<div class="seg seg-sm assess-tograde-seg" role="group" aria-label="Show">' +
-      '<button type="button" class="seg-btn"' +
-      segAttr(!_toGradeOnly) +
-      ' data-action="setToGradeShow" data-show="all">All</button>' +
-      '<button type="button" class="seg-btn"' +
-      segAttr(_toGradeOnly) +
-      ' data-action="setToGradeShow" data-show="tograde">To Grade <span class="assess-tograde-n">' +
-      _toGradeTotal +
-      '</span></button></div>'
-    );
-  }
-
-  // `tograde`, when given, is the card's To Grade count as render() worked it out.
-  // html-safe: a number and fixed words
-  function _toGradeChipHtml(cid, a, shownIds, tograde) {
-    if (!GraderWork.workOn(cid, a)) return '';
-    var n = tograde != null ? tograde : GraderWork.workCounts(cid, a.id, shownIds).tograde;
-    return n ? '<span class="assess-to-grade">' + n + ' to grade</span>' : '';
-  }
-
   // html-safe: ids are ours; fixed words
   function _gradeSubmissionsHtml(cid, a, shownIds, tograde) {
     if (focusStudentId || !GraderWork.workOn(cid, a)) return '';
@@ -16940,6 +16944,7 @@ window.PageAssignments = (function () {
     _toReturnOnly = false;
     // The dashboard's To Grade cell opens the page with To Grade on.
     _toGradeOnly = !!(params && params.show === 'tograde');
+    AssignShow.reset();
     _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;

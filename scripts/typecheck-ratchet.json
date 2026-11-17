@@ -35,6 +35,7 @@
     "shared/data-feedback-live.js",
     "shared/overwrite-count.js",
     "teacher/work-rubric-card.js",
+    "teacher/assign-show.js",
     "teacher/expand-motion.js",
     "teacher/card-menu.js"
   ],
