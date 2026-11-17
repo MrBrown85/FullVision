@@ -33,6 +33,10 @@ here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
   undo     PART 1 alone puts the old step back (the 366-day class keeps its photos again, stamps still land);
            the full undo leaves the catalog and every row as before the file; a second run; on a database
            without the file it changes nothing; the file applies again.
+  levers   PART 0 alone deletes nothing: every class, the one unopened for 366 days and the one whose End of
+           Term is ending included, keeps its photos through the nightly job, and stamps still land. PART 1
+           after it brings Keep Photos Until's deleting back: the End of Term class loses its photos the night
+           after its term ends, though it was opened today (so nobody runs PART 1 thinking it is harmless).
 """
 import json, os, re, sys, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -61,6 +65,7 @@ def header_md5s():
     new = dict(re.findall(r'^--   (\S+\(\S*\)) \(new\)\s+([0-9a-f]{32})$', HEADER, re.M))
     return rows, new
 def part1(): return text_of(UNDO).split('-- PART 1 begins')[1].split('-- PART 1 ends')[0]
+def part0(): return text_of(UNDO).split('-- PART 0 begins')[1].split('-- PART 0 ends')[0]
 
 def term_ended_yesterday(d, c):
     """End of Term, with the class's one term ending yesterday on its own calendar: the old rule deletes tonight."""
@@ -76,6 +81,11 @@ CLASSES = ['recent', 'old', 'arch_old', 'arch_recent', 'trash', 'nostamp_new', '
 def world(tag, with_file=True, classes=CLASSES):
     d = Db('ps_' + tag)
     w = W(); w.d = d; w.c = {}; w.a = {}; w.e = {}; w.s = {}; w.f = {}; w.h = {}
+    if applied(d):
+        # The repo's baseline has the file since it was applied (Nov 17). The full undo, proven to leave the
+        # catalog exactly as before the file (scenario undo, run on the baseline from before), gives that database.
+        r = d.file(UNDO)
+        if r != 'ok' or applied(d): sys.exit('could not take the template back to before the file: %s' % r)
     d.run('alter table cron.job add column if not exists database text, add column if not exists username text, '
           'add column if not exists active boolean')
     d.run("insert into cron.job (jobname, schedule, command) values ('fv_photo_lifecycle_daily', '27 10 * * *', 'call public.photo_lifecycle_nightly()')")
@@ -449,8 +459,45 @@ def scen_undo():
     finally:
         d.close()
 
+# ── levers ────────────────────────────────────────────────────────────────────────────────────────────
+def scen_levers():
+    w = world('levers', classes=['old', 'recent', 'keep_passed']); d = w.d
+    try:
+        # End of Term, the class's one term ending today on its own calendar: the old rule deletes tomorrow night.
+        d.run("""update course set keep_photos_until = 'end_of_term',
+                   reporting_terms = jsonb_build_array(jsonb_build_object('ordinal', 1, 'label', 'Term 1',
+                       'starts_on', ((now() at time zone 'America/Vancouver')::date - 60)::text,
+                       'ends_on', (now() at time zone 'America/Vancouver')::date::text))
+                 where id = :c""", c=w.c['keep_passed'])
+        ok('levers: (setup) the class unopened for 366 days is due tonight under the year rule',
+           d.one("select last_opened_at < now() - interval '365 days' from course_opened where course_id = :c", c=w.c['old']))
+        cat0 = catalog(d.c)
+        r = d.statements(split(part0()))
+        ok('levers: PART 0 alone runs', r == 'ok', r)
+        ok('levers: PART 0 changes no definition', catalog(d.c) == cat0, differences(cat0, catalog(d.c)))
+        ok('levers: PART 0 stamps every class now',
+           d.one("select bool_and(now() - last_opened_at < interval '1 minute') and count(*) = (select count(*) from course) from course_opened"))
+        r = nightly(d)
+        ok('levers: after PART 0 the nightly job deletes nothing, the 366-day class and End of Term included',
+           r == 'ok' and all(pages(w, k) == 2 for k in w.c) and d.one('select count(*) from submission_file_removal') == 0,
+           (r, {k: pages(w, k) for k in w.c}))
+        ok('levers: after PART 0 a stamp still lands', T(d, 'note_course_opened(:c, gen_random_uuid())', c=w.c['recent']) is True)
+        # PART 1 run today, before the night after the term's last day (tomorrow's run, now() + 1 day).
+        r = d.statements(split(part1()))
+        ok('levers: PART 1 runs after PART 0', r == 'ok', r)
+        n = d.one("select (public._photo_keep_class(:c, now() + interval '1 day')->>'pages')::int", c=w.c['keep_passed'])
+        ok('levers: PART 1 brings Keep Photos Until back: the End of Term class, opened today, loses its photos the night after its term',
+           n == 2 and pages(w, 'keep_passed') == 0
+           and d.one("select count(*) from submission_file_removal where course_id = :c and reason = 'keep_photos_until'", c=w.c['keep_passed']) == 4,
+           n)
+        ok('levers: and the classes on End of Year keep theirs', pages(w, 'old') == 2 and pages(w, 'recent') == 2)
+        ok('levers: the undo\'s header says PART 0 deletes nothing and PART 1 deletes photos',
+           'PART 0, the stop that deletes nothing (recommended)' in text_of(UNDO) and 'PART 1, put the old nightly step back (DELETES PHOTOS)' in text_of(UNDO))
+    finally:
+        d.close()
+
 SCENARIOS = {'stamp': scen_stamp, 'year': scen_year, 'without': scen_without, 'oldapp': scen_oldapp, 'purge': scen_purge,
-             'race': scen_race, 'apply': scen_apply, 'undo': scen_undo}
+             'race': scen_race, 'apply': scen_apply, 'undo': scen_undo, 'levers': scen_levers}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         SCENARIOS[name]()

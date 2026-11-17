@@ -426,7 +426,10 @@ async function switchActiveCourse(cid) {
    among them; it sends only for the class on screen, after the load's
    check has answered, so the load never waits on it. A class loaded in the
    background (preloadClasses, a copy between classes) is not the class on
-   screen and is never noted. Nothing in Demo Mode, and nothing for a class
+   screen and is never noted. A class picked or opened in Class Settings is
+   noted too, archived or not: an archived class is never the class on
+   screen, and would otherwise lose its photos a year after it was archived
+   however often the teacher looked at it there. Nothing in Demo Mode, and nothing for a class
    with no server id yet: a new class counts from when it was made. */
 var _CLASS_OPENED_KEY = 'gb-class-opened';
 var _classOpenedHere = { day: '', ids: {} }; // this visit's, kept too in case storage is blocked
@@ -467,9 +470,12 @@ function noteClassOpened(cid) {
   return true;
 }
 
-// From initData: the class on screen is noted once its check has answered.
-function noteClassOpenedSoon(cid) {
-  if (!cid || cid !== getActiveCourse()) return;
+/* Noted once the class's check has answered. From initData only for the
+   class on screen; `picked` is a class the teacher picked or opened in Class
+   Settings (dash-class-manager.js), which may be archived and so never the
+   class on screen. */
+function noteClassOpenedSoon(cid, picked) {
+  if (!cid || (!picked && cid !== getActiveCourse())) return;
   var check = _refreshState[cid] && _refreshState[cid].running;
   Promise.resolve(check)
     .catch(function () {

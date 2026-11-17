@@ -1855,6 +1855,7 @@ window.DashClassManager = (function () {
     var cid = cmSelectedCourse;
     if (!cid || !sid) return;
     classManagerOpen = false;
+    _cmNoteOpened(cid);
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
     Router.navigate('/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid));
   }
@@ -3406,6 +3407,19 @@ window.DashClassManager = (function () {
     else _cmRefreshSidebar();
   }
 
+  /* A class picked or opened here was opened, archived or not (photos stay
+     until a class goes a year unopened: noteClassOpenedSoon, once a day per
+     device). Never the classes loading in the background (_cmFollowLoads).
+     A load under way is waited for, so it never waits on the stamp; nothing
+     is loaded for it. */
+  function _cmNoteOpened(cid) {
+    if (!cid || typeof noteClassOpenedSoon !== 'function') return;
+    var loading = typeof _classLoads !== 'undefined' && _classLoads[cid] !== true ? _classLoads[cid] : null;
+    Promise.resolve(loading).then(function () {
+      noteClassOpenedSoon(cid, true);
+    });
+  }
+
   // Load the picked class, then show it if it is still the one picked.
   function _cmShowWhenLoaded(cid) {
     if (_cmClassReady(cid)) return;
@@ -3442,6 +3456,7 @@ window.DashClassManager = (function () {
       return;
     }
     renderClassManager();
+    _cmNoteOpened(cmSelectedCourse);
     _cmFollowLoads();
   }
 
@@ -4281,6 +4296,7 @@ window.DashClassManager = (function () {
   function cmOpenGradebook(cid) {
     if (!cid || !COURSES[cid]) return;
     classManagerOpen = false;
+    _cmNoteOpened(cid);
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
     if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/gradebook');
   }
@@ -6309,6 +6325,7 @@ window.DashClassManager = (function () {
     cmMode = 'edit';
     renderClassManager();
     _cmShowWhenLoaded(cid);
+    _cmNoteOpened(cid);
   }
 
   function cmStartCreate() {

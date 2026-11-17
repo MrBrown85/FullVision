@@ -312,6 +312,7 @@ declare var AddWorkStage: {
   stage(list: { id: string; had?: string }[]): any;
   run(s: any, api: any, opts?: any): Promise<any>;
 };
+declare var AddWorkSplitModel: any; // teacher/add-work-split-model.js, for teacher/add-work-split.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
 declare var GraderWork: { workShown(cid: string, a: unknown): boolean };

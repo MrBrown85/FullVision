@@ -270,7 +270,8 @@ describe('Class Settings: the student page’s build switch', () => {
         serverSaysStudentPageOn(LIVE, false);
         session.signOut();
       });
-      const writes = () => session.sent().filter(c => !/^(list|get)_/.test(c[0]));
+      // Opening Class Settings notes the class as opened (note_course_opened, 2026111704): not a setting.
+      const writes = () => session.sent().filter(c => !/^(list|get)_|^note_course_opened$/.test(c[0]));
       const note = () => (html().match(/id="sp-switch-note" role="status">([^<]*)</) || [])[1] || null;
       const disabled = () => /id="sp-build-switch"[^>]* disabled>/.test(html());
 
@@ -383,7 +384,7 @@ describe('Class Settings: the student page’s build switch', () => {
         expect(getReturnSettings(LIVE).student_page).toBe(false);
         expect(getGradeReturn(LIVE, U(11), U(31)).is_draft).toBe(false);
         await settle();
-        const sent = session.since().filter(c => !/^(list|get)_/.test(c[0]));
+        const sent = session.since().filter(c => !/^(list|get)_|^note_course_opened$/.test(c[0]));
         expect(sent).toEqual([['update_course', { p_course_id: LIVE, p_patch: { student_page_enabled: false } }]]);
       });
 
