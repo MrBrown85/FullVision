@@ -21,6 +21,7 @@ declare
     rub uuid; crit uuid; chk uuid; a_pts uuid; a_prof uuid; a_rub uuid; a_dib uuid; ctag uuid; otpl uuid;
     obs uuid; tr uuid; q uuid; qq uuid; resp uuid; pr uuid; ri uuid; gu uuid; ct uuid; rt uuid; res uuid;
     sec2 uuid; ho uuid; sub2 uuid; sf2 uuid;
+    fup uuid;
     sub uuid; sf uuid; card uuid; code uuid; rr uuid; sc uuid; nt uuid; ds uuid; fr uuid;
     a_grp uuid := gen_random_uuid();
     r_grp uuid := gen_random_uuid();
@@ -77,6 +78,11 @@ begin
     otpl := public.upsert_observation_template(null, c, p_mark || ' Template', 'strength', null, 0, gen_random_uuid());
     obs := public.create_observation(c, p_mark || ' Observed', 'strength', null, a_prof, array[e1], array[tg],
              array[ctag], gen_random_uuid(), null, null, otpl);
+    -- A follow-up under it, once 2026111703 is applied (until then the function is missing).
+    if to_regprocedure('public.create_observation_follow_up(uuid,text,text,uuid)') is not null then
+        execute 'select public.create_observation_follow_up($1, $2, $3, gen_random_uuid())'
+           into fup using obs, p_mark || ' Followed up', 'called_home';
+    end if;
     perform public.save_term_rating(e1, 1, jsonb_build_object(
         'narrative_html', p_mark || ' Narrative', 'work_habits_rating', 3,
         'dimensions', jsonb_build_array(jsonb_build_object('section_id', sec, 'rating', 3)),
@@ -180,7 +186,7 @@ begin
         'category', cat, 'module', md, 'competency_group', cg, 'section', sec, 'tag', tg, 'rubric', rub,
         'criterion', crit, 'criterion_check', chk, 'assessment', a_pts, 'assessment_prof', a_prof,
         'assessment_rubric', a_rub, 'assessment_dibels', a_dib, 'score', sc, 'custom_tag', ctag,
-        'observation_template', otpl, 'observation', obs, 'term_rating', tr, 'note', nt, 'guardian', gu,
+        'observation_template', otpl, 'observation', obs, 'observation_follow_up', fup, 'term_rating', tr, 'note', nt, 'guardian', gu,
         'questionnaire', q, 'question', qq, 'response', resp, 'comment_template', ct, 'report_template', rt,
         'phone_report', pr, 'report_issue', ri, 'resource', res, 'submission', sub, 'submission_file', sf,
         'student_card', card, 'access_code', code, 'revision_request', rr, 'feedback_reflection', fr,

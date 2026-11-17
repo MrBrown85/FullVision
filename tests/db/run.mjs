@@ -11,6 +11,8 @@
  * structure there with scripts/db-rebuild.mjs --check, seeds two teachers
  * (tests/db/seed.sql), runs every test, and drops the database again
  * (KEEP_DB=1 keeps it). It refuses any host but this computer.
+ * FV_DB_TEST_APPLY=<file.sql> loads one migration not yet applied, right
+ * after the rebuild, so its functions are tested before it goes live.
  *
  * What it tests, all read from the catalogs at run time:
  *   1. Tables. Every table in public, student_submit and fv_private has an
@@ -205,6 +207,7 @@ function setUp() {
     console.error('The rebuild failed, so the tests did not run.');
     process.exit(1);
   }
+  if (process.env.FV_DB_TEST_APPLY) psql(url, readFileSync(process.env.FV_DB_TEST_APPLY, 'utf-8'));
   return drop;
 }
 

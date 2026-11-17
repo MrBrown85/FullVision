@@ -2634,3 +2634,20 @@ Scenarios (the script's docstring says what each checks): `rule` (16 cases again
 Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres): **64 of 64**: rule 7, same 22, apply 24, undo 11. The pre-check, run read-only on gradebook-prod (17.6) the same day: all 11 rows ok.
 
 Not verified here: the edge functions and gradebook-prod itself. `tests/db/run.mjs` covers this file only after the baseline is refreshed following the apply.
+
+## Observation follow-ups (2026111703, 2026-11-17)
+
+One file, `../2026111703_observation_follow_ups.sql`, **not applied**, 22 KB. It adds `observation.follow_up_of` (references `observation`, on delete cascade, indexed) and `observation.follow_up_kind` (four kinds or null, only on a follow-up), both null on every row; `fv_private.observation_follow_up_rule()` on `observation` and `observation_student` (same class, one level, the link and the class never change, no students of a follow-up's own); `create_observation_follow_up` and `update_observation_follow_up` (idempotent, run as the teacher); and patches `get_class_bundle`, `get_observations` and `import_json_restore` in place, each md5-checked before and after. It changes no existing row. `observation_follow_ups.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same function md5s as gradebook-prod:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54491/fu_base node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54491 PGDATABASE=fu_base python3 observation_follow_ups.py                                 # every scenario
+DATABASE_URL=postgresql://postgres@127.0.0.1:54491/postgres \
+  FV_DB_TEST_APPLY=$PWD/migrations/2026111703_observation_follow_ups.sql npm run test:db         # the rule tests, with the file
+```
+
+Scenarios (the script's docstring says what each checks): `rules` (the two functions as A, B, signed out and a visitor; kinds, words, idempotency; the rule at the table and through `update_observation`; the check; the cascade), `readers` (every reader of observations: the bundle's list, total, follow-ups and profiles, `get_observations` with paging and every filter, the Term Questionnaire's picker, a withdrawn student's records, the profile lists, deleting a withdrawn student; no `student_submit` function names the tables), `same` (with no follow-up, 20 answers byte for byte as before but the new empty `follow_ups`), `restore`, `race` (follow-up and delete in both orders, two follow-ups at once, three rounds, connections of their own), `apply` (three guards, only the header's changes, no row, attributes and grants kept, the header's md5s, pre-check, post-check, a second run, lock timeout, size), `undo` (nothing without the file; stops while a follow-up exists; the fast stop; catalog and rows as before but two dropped-column slots; a second run; the file applies again).
+
+Result on 2026-11-17, PostgreSQL 17.12 (Postgres.app), from an empty database: **149 of 149**: rules 39, readers 18, same 24, restore 8, race 19, apply 23, undo 14, and 4 setup steps. `npm run test:db` with the file loaded: every rule test passed (348 functions, `create_observation_follow_up` and `update_observation_follow_up` refused B's ids by the ownership check); without it, as before (345).
+
+Not verified here: PostgREST's schema cache and the app's calls through it, gradebook-prod itself. The pre-check (`observation-follow-ups-live-precheck.sql`) returns only rows that differ; it has not been run on gradebook-prod.
