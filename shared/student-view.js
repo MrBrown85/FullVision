@@ -243,9 +243,9 @@ window.StudentView = (function () {
       };
     });
 
-    // An assessment is listed once its date has come; one with no date as soon as it exists.
+    // An assessment is listed once its date has come; one with no date as soon as it exists. Never a Draft.
     var listed = (getAssessments(cid) || []).filter(function (a) {
-      return a && a.id && (!a.date || String(a.date).slice(0, 10) <= today);
+      return a && a.id && !a.isDraft && (!a.date || String(a.date).slice(0, 10) <= today);
     });
     // Undated first, then oldest first; the class's own order within a day.
     listed = listed

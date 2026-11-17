@@ -329,7 +329,7 @@
   /* The assessments the period and the Assessments choice leave in. */
   function assessmentsFor(cid, opts, period) {
     period = period || periodFor(cid, opts);
-    var list = getAssessments(cid).filter(function (a) {
+    var list = getAssignedAssessments(cid).filter(function (a) {
       var d = _assessmentDate(a);
       // Undated work is part of every year to date; Custom Dates asks.
       if (!d) return period.kind !== 'custom' || !!opts.undated;
@@ -1328,7 +1328,7 @@
   }
 
   function _undatedCount(cid) {
-    return getAssessments(cid).filter(function (a) {
+    return getAssignedAssessments(cid).filter(function (a) {
       return !_assessmentDate(a);
     }).length;
   }

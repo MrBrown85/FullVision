@@ -31,7 +31,7 @@ window.GradebookCsv = (function () {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
     // The export matches the page: the year so far.
-    var assessments = getAssessments(cid)
+    var assessments = getAssignedAssessments(cid)
       .slice()
       .sort(function (a, b) {
         return (b.date || '').localeCompare(a.date || '');

@@ -474,7 +474,7 @@ window.GradebookChrome = (function () {
       } else if (key.startsWith('avg-')) {
         var aid = key.slice(4);
         var sc = getScores(cid);
-        var assess = getAssessments(cid).find(function (a) {
+        var assess = getAssignedAssessments(cid).find(function (a) {
           return a.id === aid;
         });
         var tagIds = assess ? scoreTagIds(assess, cid) : [];
