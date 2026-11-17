@@ -10569,10 +10569,16 @@ window.PageAssignments = (function () {
       sid = _commentPopoverState.sid,
       aid = _commentPopoverState.aid;
     if (obId === _commentEditId) _commentEditId = null;
+    var after = function () {
+      renderCommentPopover();
+      updateCommentBadge(sid, aid);
+    };
     if (obId === OVERALL_COMMENT_ID) Grader.setOverallComment(cid, sid, aid, '');
+    // An observation with follow-ups asks first (ObsFollowUps.confirmDelete).
+    else if (window.ObsFollowUps)
+      return ObsFollowUps.confirmDelete(cid, obId, () => (deleteQuickOb(cid, sid, obId), after()));
     else deleteQuickOb(cid, sid, obId);
-    renderCommentPopover();
-    updateCommentBadge(sid, aid);
+    after();
   }
   function closeCommentPopover() {
     _commentPopoverState = null;

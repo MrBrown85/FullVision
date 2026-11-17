@@ -923,3 +923,221 @@ span.obsc-chip-label {
   height: 10px;
   flex: none;
 }
+
+/* ── Follow-ups under an observation (shared/obs-follow-ups.js) ──────────
+   The strip at a card's foot ("2 follow-ups · last Nov 15", + Follow Up),
+   the timeline it opens in place, the edit window's panel and the small
+   Follow Up window. The phone's sheet uses the same pieces. */
+.obs-fu {
+  margin-top: 8px;
+}
+.obs-fu-bar,
+.obs-fu-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.obs-fu-head {
+  margin-bottom: 6px;
+}
+.obs-fu-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  font-family: var(--font-base);
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.obs-fu-toggle:hover {
+  color: var(--text);
+}
+.obs-fu-toggle:focus-visible,
+.obs-fu-entry:focus-visible,
+.obs-fu-chip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.obs-fu-chev {
+  flex: none;
+  transition: transform 0.2s;
+}
+.obs-fu-toggle[aria-expanded='true'] .obs-fu-chev {
+  transform: rotate(90deg);
+}
+.obs-fu-add {
+  padding: 1px 8px;
+  font-size: var(--text-xs, 12px);
+}
+.obs-fu-closed {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid var(--score-3);
+  border-radius: 99px;
+  font-size: var(--text-xs, 11px);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--score-3);
+}
+.obs-fu-tl {
+  margin-top: 6px;
+}
+.obs-fu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--border);
+}
+.obs-fu-item {
+  position: relative;
+}
+.obs-fu-item::before {
+  content: '';
+  position: absolute;
+  left: -17px;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-2);
+}
+.obs-fu-item[data-kind='resolved']::before {
+  background: var(--score-3);
+}
+.obs-fu-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  font-family: var(--font-base);
+  font-size: var(--text-sm, 13px);
+  line-height: 1.45;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.obs-fu-entry:hover {
+  background: var(--overlay-hover);
+}
+.obs-fu-date {
+  min-width: 46px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.obs-fu-kind {
+  font-weight: 600;
+}
+.obs-fu-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.obs-fu-panel {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.obs-fu-none {
+  font-size: var(--text-sm, 13px);
+  color: var(--text-3);
+}
+.obs-card.obs-fu-revealed {
+  border-color: var(--active);
+}
+
+/* The Follow Up window, over the page or the edit window. */
+.obs-fu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.obs-fu-dialog {
+  width: 520px;
+  max-width: calc(100% - 48px);
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16);
+}
+.obs-fu-dialog-title {
+  margin-bottom: 10px;
+  font-size: var(--text-lg, 17px);
+  font-weight: 650;
+  color: var(--text);
+}
+.obs-fu-of {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+}
+.obs-fu-of b {
+  color: var(--text);
+  font-weight: 600;
+}
+.obs-fu-of-text {
+  margin-top: 2px;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.obs-fu-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.obs-fu-chip {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface);
+  font-family: var(--font-base);
+  font-size: var(--text-sm, 13px);
+  color: var(--text);
+  cursor: pointer;
+}
+.obs-fu-chip:hover:not(.on) {
+  background: var(--overlay-hover);
+}
+.obs-fu-chip.on {
+  border-color: var(--active);
+  background: var(--active);
+  color: #fff;
+}
+.obs-fu-chip.on[data-fu-kind='resolved'] {
+  border-color: var(--score-3);
+  background: var(--score-3);
+}
+.obs-fu-textarea {
+  min-height: 84px;
+}
+.obs-fu-dialog .btn-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.obs-fu-form {
+  padding: 12px 16px;
+}
+.obs-fu-form .obs-fu-chip {
+  min-height: 36px;
+  font-size: var(--text-base, 15px);
+}

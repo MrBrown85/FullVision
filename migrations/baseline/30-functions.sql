@@ -66,6 +66,48 @@ AS $function$
                       and fv_owns_assessment(r.assessment_id));
 $function$;
 
+CREATE OR REPLACE FUNCTION fv_private.observation_follow_up_rule()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+    _parent record;
+begin
+    if tg_table_name = 'observation_student' then
+        if exists (select 1 from public.observation o where o.id = new.observation_id and o.follow_up_of is not null) then
+            raise exception 'A follow-up has no students of its own: it is its observation''s.' using errcode = '23514';
+        end if;
+        return new;
+    end if;
+    if tg_op = 'UPDATE' then
+        if new.follow_up_of is distinct from old.follow_up_of then
+            raise exception 'A follow-up stays under the observation it was made for.' using errcode = '23514';
+        end if;
+        if new.course_id is distinct from old.course_id
+           and (new.follow_up_of is not null or exists (select 1 from public.observation f where f.follow_up_of = new.id)) then
+            raise exception 'A follow-up and its observation stay in their class.' using errcode = '23514';
+        end if;
+        return new;
+    end if;
+    if new.follow_up_of is null then
+        return new;
+    end if;
+    select o.course_id, o.follow_up_of into _parent from public.observation o where o.id = new.follow_up_of;
+    if not found then
+        raise exception 'The observation to follow up was not found.' using errcode = '23503';
+    end if;
+    if _parent.course_id <> new.course_id then
+        raise exception 'A follow-up is in its observation''s class.' using errcode = '23514';
+    end if;
+    if _parent.follow_up_of is not null then
+        raise exception 'A follow-up cannot be followed up: add it to the observation.' using errcode = '23514';
+    end if;
+    return new;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION fv_private.report_note_hold(p_enrollment_id uuid, p_assessment_id uuid)
  RETURNS void
  LANGUAGE sql
@@ -3001,6 +3043,47 @@ begin
     return _id;
 end; $function$;
 
+CREATE OR REPLACE FUNCTION public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text DEFAULT NULL::text, p_idempotency_key uuid DEFAULT NULL::uuid, p_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+    _id     uuid;
+    _cached jsonb;
+    _course uuid;
+    _parent timestamptz;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+
+    _cached := fv_idem_check(p_idempotency_key, 'create_observation_follow_up');
+    if _cached is not null then
+        return (_cached->>'id')::uuid;
+    end if;
+
+    if p_kind is not null and p_kind <> all (array['called_home', 'spoke_with_student', 'still_happening', 'resolved']) then
+        raise exception 'unknown follow-up kind' using errcode = '22023';
+    end if;
+    if p_kind is null and nullif(btrim(coalesce(p_body, '')), '') is null then
+        raise exception 'a follow-up needs a kind or some words' using errcode = '22023';
+    end if;
+
+    -- Row security hides another teacher's observation, so theirs reads as missing.
+    select course_id, created_at into _course, _parent from observation where id = p_follow_up_of;
+    if _course is null then raise exception 'observation not found' using errcode = 'P0002'; end if;
+    -- When the teacher saved it; never in the future, never before its observation.
+    if p_created_at > now() + interval '5 minutes' then
+        raise exception 'a follow-up cannot be dated in the future' using errcode = '22023';
+    end if;
+
+    insert into observation (course_id, body, follow_up_of, follow_up_kind, created_at)
+    values (_course, coalesce(p_body, ''), p_follow_up_of, p_kind, greatest(coalesce(p_created_at, now()), _parent))
+    returning id into _id;
+
+    perform fv_idem_store(p_idempotency_key, 'create_observation_follow_up', jsonb_build_object('id', _id));
+    return _id;
+end; $function$;
+
 CREATE OR REPLACE FUNCTION public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4682,7 +4765,7 @@ begin
     --    get_observations, plus the total so the client knows what's older.
     with
     obs as (
-        select o.* from public.observation o where o.course_id = p_course_id
+        select o.* from public.observation o where o.course_id = p_course_id and o.follow_up_of is null
          order by o.created_at desc limit 500
     ),
     os as (
@@ -4713,7 +4796,13 @@ begin
               left join os on os.observation_id = obs.id
               left join ot on ot.observation_id = obs.id
               left join oct on oct.observation_id = obs.id), '[]'::jsonb),
-        'total', (select count(*) from public.observation o where o.course_id = p_course_id)
+        'total', (select count(*) from public.observation o where o.course_id = p_course_id and o.follow_up_of is null),
+        -- Follow-ups of these observations (2026111703): never one of the observations above.
+        'follow_ups', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                       'id', f.id, 'follow_up_of', f.follow_up_of, 'kind', f.follow_up_kind, 'body', f.body,
+                       'created_at', f.created_at, 'updated_at', f.updated_at) order by f.created_at)
+              from public.observation f where f.follow_up_of in (select id from obs)), '[]'::jsonb)
     ) into _observations;
 
     -- ── Profiles: same row shape as list_course_student_profiles, without the
@@ -5416,6 +5505,7 @@ begin
       select o.id, o.created_at
         from observation o
        where o.course_id = p_course_id
+         and o.follow_up_of is null
          and (_sent_filter is null or o.sentiment = any(_sent_filter))
          and (_asmt_filter is null or o.assessment_id = _asmt_filter)
          and (_search     is null or o.body ilike '%' || _search || '%')
@@ -5445,6 +5535,7 @@ begin
     select array_agg(id) into _ids from (
       select id from observation o
        where o.course_id = p_course_id
+         and o.follow_up_of is null
          and (_sent_filter is null or o.sentiment = any(_sent_filter))
          and (_asmt_filter is null or o.assessment_id = _asmt_filter)
          and (_search     is null or o.body ilike '%' || _search || '%')
@@ -5530,7 +5621,13 @@ begin
       'has_more',      _offset + _size < _total,
       'students_index',    _students_index,
       'tags_index',        _tags_index,
-      'custom_tags_index', _ctags_index
+      'custom_tags_index', _ctags_index,
+      -- Follow-ups of the page's observations (2026111703).
+      'follow_ups', coalesce((
+         select jsonb_agg(jsonb_build_object(
+                  'id', f.id, 'follow_up_of', f.follow_up_of, 'kind', f.follow_up_kind, 'body', f.body,
+                  'created_at', f.created_at, 'updated_at', f.updated_at) order by f.created_at)
+           from observation f where f.follow_up_of = any(coalesce(_ids, '{}'::uuid[]))), '[]'::jsonb)
     );
 end; $function$;
 
@@ -6608,7 +6705,7 @@ begin
       for _row in select * from jsonb_array_elements(p_payload->'observations') loop
         _id := (_row->>'id')::uuid;
         insert into observation (id, course_id, body, sentiment, context_type, assessment_id,
-                                 created_at, dims, level, template_id)
+                                 created_at, dims, level, template_id, follow_up_of, follow_up_kind)
         values (_id, (_row->>'course_id')::uuid, coalesce(_row->>'body',''),
                 nullif(_row->>'sentiment',''), nullif(_row->>'context_type',''),
                 nullif(_row->>'assessment_id','')::uuid,
@@ -6618,11 +6715,12 @@ begin
                          then _row->'dims' else '[]'::jsonb end)), '{}'),
                 nullif(_row->>'level','')::smallint,
                 (select t.id from observation_template t
-                  where t.id::text = nullif(_row->>'template_id','')))
+                  where t.id::text = nullif(_row->>'template_id','')),
+                nullif(_row->>'follow_up_of','')::uuid, nullif(_row->>'follow_up_kind',''))
         on conflict (id) do update set
           body=excluded.body, sentiment=excluded.sentiment, context_type=excluded.context_type,
           assessment_id=excluded.assessment_id, dims=excluded.dims, level=excluded.level,
-          template_id=excluded.template_id, updated_at=now();
+          template_id=excluded.template_id, follow_up_kind=excluded.follow_up_kind, updated_at=now();
         insert into observation_student (observation_id, enrollment_id)
         select _id, e::uuid from jsonb_array_elements_text(
           case when jsonb_typeof(_row->'enrollment_ids') = 'array' then _row->'enrollment_ids' else '[]'::jsonb end) e
@@ -9931,6 +10029,35 @@ begin
             insert into observation_custom_tag (observation_id, custom_tag_id) values (p_id, _x) on conflict do nothing;
         end loop;
     end if;
+end; $function$;
+
+CREATE OR REPLACE FUNCTION public.update_observation_follow_up(p_id uuid, p_body text, p_kind text DEFAULT NULL::text, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+    _cached jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+
+    _cached := fv_idem_check(p_idempotency_key, 'update_observation_follow_up');
+    if _cached is not null then
+        return;
+    end if;
+
+    if p_kind is not null and p_kind <> all (array['called_home', 'spoke_with_student', 'still_happening', 'resolved']) then
+        raise exception 'unknown follow-up kind' using errcode = '22023';
+    end if;
+    if p_kind is null and nullif(btrim(coalesce(p_body, '')), '') is null then
+        raise exception 'a follow-up needs a kind or some words' using errcode = '22023';
+    end if;
+
+    update observation set body = coalesce(p_body, ''), follow_up_kind = p_kind, updated_at = now()
+     where id = p_id and follow_up_of is not null;
+    if not found then raise exception 'follow-up not found' using errcode = 'P0002'; end if;
+
+    perform fv_idem_store(p_idempotency_key, 'update_observation_follow_up', jsonb_build_object('id', p_id));
 end; $function$;
 
 CREATE OR REPLACE FUNCTION public.update_phone_report(p_id uuid, p_students jsonb DEFAULT '[]'::jsonb, p_expires_on date DEFAULT NULL::date, p_idempotency_key uuid DEFAULT NULL::uuid)

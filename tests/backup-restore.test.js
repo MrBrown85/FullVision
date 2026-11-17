@@ -824,3 +824,39 @@ describe('a backup of an observation from a reflection', () => {
     expect(ReportBlocks.renderBlockObservations(restored.cid, st)).not.toContain('Helped a classmate');
   });
 });
+
+/* Follow-ups (docs/DECISIONS.md, "Observation follow-ups") are kept in the
+   backup under their observation and sent after it, with no students of
+   their own, so a restored class has them under the right observation. */
+describe('a backup of an observation with follow-ups', () => {
+  const FU1 = 'b1000000-0000-4000-8000-000000000082';
+  const FU2 = 'b1000000-0000-4000-8000-000000000083';
+  beforeEach(() => {
+    resetClass();
+    var b = bundle();
+    b.observations.follow_ups = [
+      { id: FU1, follow_up_of: OB1, kind: 'called_home', body: 'Called home', created_at: '2026-10-04T10:00:00Z' },
+      { id: FU2, follow_up_of: OB1, kind: 'resolved', body: '', created_at: '2026-10-09T10:00:00Z' },
+    ];
+    _bundleToCache(CID, b);
+  });
+
+  it('sends each follow-up once, after the observations, under its observation, with fresh ids', () => {
+    var plan = FVBackupRestore.planRestore(downloadBackup(), { name: 'Copy', makeId: counterIds() });
+    var id = old => plan.ids[old];
+    expect(plan.payload.observations.map(r => r.id)).toEqual([id(OB1), id(FU1), id(FU2)]);
+    expect(plan.payload.observations[1]).toEqual({
+      id: id(FU1),
+      course_id: plan.cid,
+      body: 'Called home',
+      created_at: '2026-10-04T10:00:00Z',
+      dims: [],
+      enrollment_ids: [],
+      tag_ids: [],
+      follow_up_of: id(OB1),
+      follow_up_kind: 'called_home',
+    });
+    expect(plan.payload.observations[2].follow_up_kind).toBe('resolved');
+    [FU1, FU2].forEach(old => expect(JSON.stringify(plan.payload)).not.toContain(old));
+  });
+});

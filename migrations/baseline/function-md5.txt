@@ -4,6 +4,7 @@ fv_private.grade_return_remap(p_assessment_id uuid, p_criterion_map jsonb, p_che
 fv_private.handout_path_parts(p_name text) 9dd1528f2d0d1f49014b4b425b60492b 491
 fv_private.handout_read_allowed(p_name text) c49416c21dea4d9ebdae95e1ca881b8c 564
 fv_private.handout_upload_allowed(p_name text) b7a01941ecc710558b161f247c6cb413 678
+fv_private.observation_follow_up_rule() 20e37bafa4e23be32d1943735c0ee277 1760
 fv_private.report_note_hold(p_enrollment_id uuid, p_assessment_id uuid) f3ded8cae1f22c24b15fa2f7ba55427f 679
 fv_private.restore_grade_returns(p_payload jsonb) 66501afe2d758a938cfc8f1d4fc13a92 7761
 fv_private.same_teacher() 81cd77e2e122e6b12562a3ff412871f0 765
@@ -116,6 +117,7 @@ public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_d
 public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) 4ff682abea55af06136dfdfca5dc9a59 1972
 public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) 2a6b7a84af01bede93f1c4459f8f3720 755
 public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) e5bdcd077bf2b437eb5e02ac7a8ab01c 2346
+public.create_observation_follow_up(p_follow_up_of uuid, p_body text, p_kind text, p_idempotency_key uuid, p_created_at timestamp with time zone) ee948114be4962f2286cdc34562c425d 1993
 public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid) 55a852bc57853ac9b558b13b4dd965ff 1330
 public.create_report_issue(p_course_id uuid, p_term integer, p_term_label text, p_paper text, p_form jsonb, p_students jsonb, p_idempotency_key uuid) 14790ed39e4831db3c1f5901e6d7127f 2333
 public.create_student_and_enroll(p_course_id uuid, p_first_name text, p_last_name text, p_preferred_name text, p_pronouns text, p_student_number text, p_email text, p_date_of_birth date, p_designations text[], p_existing_student_id uuid, p_idempotency_key uuid) d63bd1f5393fdfb3ff26e9439f906dce 1931
@@ -165,18 +167,18 @@ public.fv_retention_cleanup() a8da46d6664ba5956f4215ba3b2ada39 2099
 public.fv_section_proficiency(p_enrollment_id uuid, p_section_id uuid) 7712c1ae1c2588c3453fee863dd7dba0 212
 public.fv_status_counts(p_enrollment_id uuid, p_course_id uuid) 099ffee42b63f7a6ff8f9aca37402e79 1279
 public.get_assessment_detail(p_assessment_id uuid) 55d1f49f14d78a713eebadfd20417afa 4731
-public.get_class_bundle(p_course_id uuid, p_if_version bigint) 62bd0c41564652e983ccfbcadaafc5a7 22661
+public.get_class_bundle(p_course_id uuid, p_if_version bigint) ed59fcd4ef9bc85c6e5bcc24c3fdd608 23204
 public.get_class_dashboard(p_course_id uuid) 24c3e969c92abb6390a1f42289bdd51c 8296
 public.get_gradebook(p_course_id uuid) 08d83934dcacbf14ddfce6ec6cf9068b 6898
 public.get_learning_map(p_course_id uuid) 151c16b70a6f7e70a87985463c62123d 4620
-public.get_observations(p_course_id uuid, p_filters jsonb, p_page integer, p_page_size integer) b3e204a54b8b988061bcd62bb800aa30 7559
+public.get_observations(p_course_id uuid, p_filters jsonb, p_page integer, p_page_size integer) 184fc8e045969e593ea641901bf2f0c3 8073
 public.get_report(p_enrollment_id uuid, p_term integer) c2cc106a10d89c23d210c51864db20e2 8552
 public.get_report_issue(p_issue_id uuid) a81afb37f669ca3f3247322aa868e468 1086
 public.get_student_profile(p_enrollment_id uuid) 32fdc89e09de01707c290d60ee3fed64 5257
 public.get_term_rating(p_enrollment_id uuid, p_term integer) a121736eebd08a499bf11341fbd967df 5829
 public.get_withdrawn_student_records(p_enrollment_id uuid) 218afcff7d47714d89ee45848a30b211 2684
 public.grade_return_repair_nightly() 42936da9b8bbf1d25eca30d1267cd099 1452
-public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) 2de65ba2bca9babf90d5efb9134190ab 37415
+public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) 1a201d1ab42337ebb572469c67e8fcfc 37577
 public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) 58e0720ca12c8f09bbec775496cf67b1 3749
 public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) f15548a3b9fb9c6b46680fdff5d0a3cd 4592
 public.list_assessment_copies(p_copy_group uuid) 6fdf67f7a6fdfe01e42591ec71094ff1 566
@@ -262,6 +264,7 @@ public.update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[]) c48044d5e0d
 public.update_course(p_course_id uuid, p_patch jsonb) 3d391cf6046f55d0079dcf8b6bb590b1 4176
 public.update_enrollment(p_id uuid, p_patch jsonb) 3cfcb3dd88253a54a5fc5b65a749ac82 1249
 public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[]) 4c6a5e1a6a507e6f525d4faa2f9e1902 2361
+public.update_observation_follow_up(p_id uuid, p_body text, p_kind text, p_idempotency_key uuid) 00e70abda3f41746f89a96969ff33c48 1286
 public.update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid) d3d30f8a96ecfd8431c6e44683e6bebd 1518
 public.update_student(p_id uuid, p_patch jsonb) 21f99396d3b996f4f0c40ceabdab4545 1224
 public.upsert_category(p_id uuid, p_course_id uuid, p_name text, p_weight numeric, p_display_order integer, p_idempotency_key uuid) 8b4f5ba01af0ffca54ac1d3b1975ee85 1246

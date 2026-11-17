@@ -759,7 +759,11 @@ window.StudentEvidence = (function () {
     if (del) {
       e.preventDefault();
       e.stopPropagation();
-      deleteOb(del.getAttribute('data-obid'));
+      var delId = del.getAttribute('data-obid');
+      // One with follow-ups asks first.
+      ObsFollowUps.confirmDelete(_cid, delId, function () {
+        deleteOb(delId);
+      });
       return;
     }
     var card = e.target.closest('.obs-card[data-action="evEditOb"]');

@@ -100,6 +100,7 @@ window.MObserve = (function () {
       MC.esc(ob.text) +
       '</div>' +
       (meta ? '<div class="m-obs-meta">' + meta + '</div>' : '') +
+      (editable ? ObsFollowUps.cardHtml(cid, ob) : '') +
       '</div>' +
       (editable
         ? '<button type="button" class="m-obs-chev" data-action="m-obs-edit"' +
@@ -480,6 +481,7 @@ window.MObserve = (function () {
       '<div class="m-edit-tags" id="m-obs-edit-tags" role="group" aria-labelledby="m-obs-tags-label">' +
       _tagChipsHtml() +
       '</div>' +
+      (isNew ? '' : ObsFollowUps.panelHtml(cid, ob)) +
       (isNew
         ? '<label class="m-edit-switch"><span class="m-edit-switch-text"><span class="m-edit-row-k">Also Save as Starter</span>' +
           '<small>For all your classes. Leave out names.</small></span>' +
@@ -985,8 +987,15 @@ window.MObserve = (function () {
 
   /* One tap hides the card and offers Undo for six seconds; the delete
      reaches the data layer when that time is up. */
-  function holdDelete(cid, sid, obId) {
+  function holdDelete(cid, sid, obId, asked) {
     if (!obId || !sid || _pendingDeletes[obId]) return;
+    // One with follow-ups asks first; a swiped card goes back meanwhile.
+    if (!asked && getObservationFollowUps(cid, obId).length) {
+      _refreshFeed(cid, false);
+      return ObsFollowUps.confirmDelete(cid, obId, function () {
+        holdDelete(cid, sid, obId, true);
+      });
+    }
     MC.haptic();
     _pendingDeletes[obId] = setTimeout(function () {
       delete _pendingDeletes[obId];

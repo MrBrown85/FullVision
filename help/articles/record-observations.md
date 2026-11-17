@@ -29,6 +29,12 @@ labels:
   - Edit My Starters…
   - My Sentence Starters
   - Add Starter
+  - + Follow Up
+  - Called Home
+  - Spoke With Student
+  - Still Happening
+  - Resolved
+  - Save
 next:
   - score-a-student-from-the-gradebook
   - fill-in-the-term-questionnaire
@@ -55,6 +61,18 @@ shots:
 The observation appears in the list under its date, and the strip clears for the next one.
 
 ![The capture strip with a student chosen and the starter menu open](img/record-observations.jpg 'The + Starter menu lists the most-used starters first.')
+
+## Follow Up on an Observation
+
+A follow-up is a dated entry under an observation, such as a call home about a concern. Follow-ups are for the teacher only: they are never printed, sent home or shown to students.
+
+1. On the observation's card, choose **+ Follow Up**. It is also in the window that opens when the card is clicked.
+2. Choose **Called Home**, **Spoke With Student**, **Still Happening** or **Resolved**, and type any details. Either one is enough.
+3. Choose **Save**, or press Enter.
+
+The card then shows how many follow-ups it has and the date of the last one; choose that line to show or hide them. Choose a follow-up to change or delete it. A concern with a **Resolved** follow-up is closed. The Observations card on the dashboard counts the open concerns, and each one opens its card here.
+
+Deleting an observation also deletes its follow-ups. The question before the delete says how many.
 
 ## Sentence Starters
 
