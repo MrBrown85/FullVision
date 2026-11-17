@@ -2697,3 +2697,22 @@ Result on 2026-11-17, PostgreSQL 17.12 (Postgres.app), from an empty database: *
 The pre-check (`photo-expiry-live-precheck.sql`, catalog facts only, returns only the rows that differ) is to be run read-only on gradebook-prod before the apply. After it, the post-check (`photo-expiry-live-postcheck.sql`) says ok on every row.
 
 Not verified here: gradebook-prod itself; pg_cron itself.
+
+## Handout files (2026111706, 2026-11-17)
+
+One file, `../2026111706_handout_files.sql`, not applied (needs Colin's OK), about 50 KB. Colin's call on Nov 17: "+ Add a PDF" becomes "+ Add a File"; a web page, a text file or an EPUB is kept as uploaded. It adds the kinds `html`, `txt` and `epub` and a column `bytes` to `assessment_resource`, a second private bucket `handout-files` (20 MB a file, `text/html`, `text/plain`, `application/epub+zip`; `student-photos` is not touched), four policies for it on `storage.objects` (read, upload, and two restricting ones, the shape of `student-photos`'), `start_handout_file` and `finish_handout_file` for a signed-in teacher, `student_submit.handout_file` for the edge function, and helpers. It replaces five functions, each guarded by its live md5: `_assessment_resource_json` (a file's row carries `bytes` and `path`), `_assessment_resource_removed` (a file's row going queues its file, bucket `handout-files`), `_handout_drop_expired` (drops an unfinished file upload too), `student_submit.removal_done` (asks the queued row's own bucket whether the file is gone) and `photo_lifecycle_nightly` (also visits a class with a handout still uploading). It changes no row and no file. `handout_files.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has 2026111705 as live does:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54733/hf_base node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54733 PGDATABASE=hf_base python3 handout_files.py fingerprints                              # write the md5 lists
+PGPORT=54733 PGDATABASE=hf_base python3 handout_files.py                                           # every scenario
+DATABASE_URL=postgresql://postgres@127.0.0.1:54733/postgres FV_DB_TEST_APPLY=migrations/2026111706_handout_files.sql npm run test:db
+```
+
+Scenarios (the script's docstring says what each checks): `teacher` (start and finish: what each answers and refuses, a request sent twice, a missing file, a file of another type or over 20 MB, the list, Remove, the 50-a-piece limit, the shape check; a PDF's and a link's rows answer exactly as before), `storage` (the exact name a teacher may write and only while it uploads, no overwrite, change or delete, who reads, a visitor, the PDF pages in `student-photos` as before, a careless policy added later), `student` (`handout_file` for a ready file on a listed piece; not found while uploading, for a PDF or a link, another class, a future date, a Draft; a bad session; `page` lists each file's kind), `lifecycle` (deleting the assessment and the 30-day purge of the class or the teacher queue the file; Keep Photos Until a year unopened leaves it; an upload never finished is dropped by the nightly job in a class with no photos, which without the file it is not: differs, as required; `removal_done` for a file still in `handout-files`, and gone), `apply` (each guard stops with the catalog unchanged and the pre-check names it; only the header's changes; no row but the bucket's own; the md5s; a second run; pre-check and post-check; lock timeout; size), `undo` (PART 0 alone; the full undo refuses while a file is held or not yet gone, then leaves the catalog as before but one dropped-column slot; a changed function stops it; a second run; the file applies again).
+
+Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), from an empty database: **142 of 142**. `npm run test:db` with the file loaded: every rule test passed (362 functions; a visitor may run none).
+
+The md5 of `pg_get_functiondef` depends on the search path: `student_submit._listed(public.assessment, date)` prints its argument as `assessment` only while `public` is on it. The file sets `search_path = public, pg_temp`; run the pre-check and post-check with `public` on the search path, as Supabase's SQL tools do.
+
+Not verified here: gradebook-prod itself; the Storage service's own checks (that it refuses a type or size the bucket does not allow, and an upload to a name that holds a file); the project's upload limit (must be 20 MB or more).
