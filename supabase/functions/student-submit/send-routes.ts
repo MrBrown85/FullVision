@@ -58,7 +58,14 @@
 //
 // Kept free of Deno and database imports, as handler.ts is.
 import { inspectJpeg, sha256Hex, type JpegOk } from '../_shared/jpeg-check.ts';
-import { BUCKET, handoutPathParts, pathParts, type Store } from '../_shared/storage-rest.ts';
+import {
+  BUCKET,
+  FILE_BUCKET,
+  handoutFilePathParts,
+  handoutPathParts,
+  pathParts,
+  type Store,
+} from '../_shared/storage-rest.ts';
 import { tokenShape } from '../_shared/teacher-auth.ts';
 
 type Json = Record<string, unknown>;
@@ -444,17 +451,27 @@ export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'no
         if (!good(r)) throw new TypeError('reply');
         left = whole(r.left, 0, Number.MAX_SAFE_INTEGER) ? r.left : 0;
         const items: { id: string; path: string }[] = [];
+        const files: { id: string; path: string }[] = [];
         for (const it of list(r.items)) {
           const x = isObject(it) ? it : {};
           const id = typeof x.id === 'number' && Number.isSafeInteger(x.id) && x.id > 0 ? String(x.id) : null;
-          // A teacher's handout page is queued the same way when it is removed (Handouts and Links).
+          // A teacher's handout page is queued the same way when it is removed (Handouts and Links),
+          // and a handout file in its own bucket (2026111706).
           if (id && x.bucket === BUCKET && (pathParts(x.path) || handoutPathParts(x.path))) {
             items.push({ id, path: x.path as string });
+          } else if (id && x.bucket === FILE_BUCKET && handoutFilePathParts(x.path)) {
+            files.push({ id, path: x.path as string });
           } else skipped++;
         }
-        if (items.length) {
-          await store.remove(items.map(i => i.path));
-          const done = await db.call(SQL.removalDone, ['{' + items.map(i => i.id).join(',') + '}']);
+        if (items.length) await store.remove(items.map(i => i.path));
+        if (files.length)
+          await store.remove(
+            files.map(i => i.path),
+            FILE_BUCKET,
+          );
+        const both = items.concat(files);
+        if (both.length) {
+          const done = await db.call(SQL.removalDone, ['{' + both.map(i => i.id).join(',') + '}']);
           if (!good(done)) throw new TypeError('reply');
           if (whole(done.gone, 0, Number.MAX_SAFE_INTEGER)) removed += done.gone;
         }

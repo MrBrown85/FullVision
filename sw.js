@@ -56,6 +56,8 @@ const PRECACHE_URLS = [
   '/shared/overwrite-count.js',
   '/shared/photo-shrink.js',
   '/shared/photo-queue.js',
+  '/shared/handout-files.js',
+  '/shared/handout-viewer.js',
   '/shared/photo-readers.js',
   '/shared/add-work-files.js',
   '/shared/name-match.js',
@@ -66,6 +68,8 @@ const PRECACHE_URLS = [
   // used.
   '/vendor/pdfjs/pdf.min.js',
   '/vendor/pdfjs/pdf.worker.min.js',
+  // The EPUB handout reader's unzip (vendor/fflate/README.md), loaded the first time a book is opened.
+  '/vendor/fflate/fflate.min.js',
   '/shared/work-thumbs.js',
   '/shared/markup-draw.js',
   '/shared/auto-update.js',
@@ -105,6 +109,7 @@ const PRECACHE_URLS = [
   '/teacher/cm-reflect-answers.css',
   '/teacher/preview-student.css',
   '/shared/phone-report.css',
+  '/shared/handout-viewer.css',
   '/teacher/grades-print.css',
   '/teacher/ui.js',
   '/teacher/report-scores.js',

@@ -124,6 +124,29 @@ const server = createServer(async (req, res) => {
     const ext = extname(diskPath).toLowerCase();
     const mime = MIME[ext] || 'application/octet-stream';
 
+    // The sealed handout frame keeps its own policy, as inject-env.js gives it.
+    if (resolved === '/shared/handout-frame.html') {
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Cache-Control': 'no-cache',
+        'Content-Security-Policy': [
+          "default-src 'none'",
+          "script-src 'unsafe-inline' 'unsafe-eval' https: data: blob:",
+          "style-src 'unsafe-inline' https: data: blob:",
+          'img-src https: data: blob:',
+          'font-src https: data: blob:',
+          'media-src https: data: blob:',
+          'connect-src https:',
+          'frame-src https:',
+          "form-action 'none'",
+          "frame-ancestors 'self'",
+          'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals',
+        ].join('; '),
+      });
+      res.end(body);
+      return;
+    }
+
     if (ext === '.html') {
       const { html, nonce } = processHtml(body.toString('utf-8'));
       res.writeHead(200, {

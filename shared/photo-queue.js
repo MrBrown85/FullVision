@@ -70,6 +70,10 @@
  *   (<course>/handouts/<resource>/<n>.jpg), which placeHandout() writes into
  *   the record once start_handout_upload answers: until then it is blocked.
  *   Its batch commits as { kind: 'handout', key, ids, files }.
+ *   A handout file (a web page, a text file or an EPUB; 2026111706) is one
+ *   such record whose page is the file itself, kept with its own type
+ *   (meta.mime) and sent to the path the server named in the bucket
+ *   handout-files (<course>/<resource>.<html|txt|epub>).
  *
  * Everything here is a window.PhotoQueue.* public surface; no other globals.
  */
@@ -89,6 +93,11 @@ window.PhotoQueue = (function () {
   // Where a handout's page goes: the class's handouts folder, the resource, the page's number.
   var HANDOUT_PATH =
     /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/handouts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([1-9]|1[0-9]|20)\.jpg$/;
+  // A handout file's name in the bucket handout-files: <course>/<resource>.<kind>.
+  var HANDOUT_FILE_PATH =
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(html|txt|epub)$/;
+  // The types a handout file is kept and sent as, and nothing else.
+  var FILE_TYPES = { 'text/html': true, 'text/plain': true, 'application/epub+zip': true };
   // The same test shared/data.js uses (_isUuid) to tell a server id from a local one.
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var BUSY = {}; // another tab holds the lease
@@ -206,7 +215,7 @@ window.PhotoQueue = (function () {
   /* Does `path` belong to a handout page of this class and resource? Both
      ids must be server ids, and the path the bucket's handout layout. */
   function handoutPathOk(path, course, resource) {
-    var m = typeof path === 'string' ? HANDOUT_PATH.exec(path) : null;
+    var m = typeof path === 'string' ? HANDOUT_PATH.exec(path) || HANDOUT_FILE_PATH.exec(path) : null;
     return (
       !!m &&
       isServerId(course) &&
@@ -328,7 +337,14 @@ window.PhotoQueue = (function () {
           return tx(['meta', 'blobs'], 'readwrite', function (t) {
             items.forEach(function (item, i) {
               t.objectStore('meta').put(item.meta);
-              t.objectStore('blobs').put({ photo: bytes[i][0], thumb: bytes[i][1] }, item.meta.id);
+              // A handout file keeps its own type; a photo is a JPEG.
+              var type = item.meta && FILE_TYPES[item.meta.mime] ? item.meta.mime : null;
+              t.objectStore('blobs').put(
+                type
+                  ? { photo: bytes[i][0], thumb: bytes[i][1], type: type }
+                  : { photo: bytes[i][0], thumb: bytes[i][1] },
+                item.meta.id,
+              );
             });
           });
         });
@@ -346,9 +362,13 @@ window.PhotoQueue = (function () {
         return tx(['blobs'], 'readonly', function (t, done) {
           var req = t.objectStore('blobs').get(id);
           req.onsuccess = function () {
+            var r = req.result;
             done(
-              req.result
-                ? { photo: jpeg(req.result.photo), thumb: req.result.thumb ? jpeg(req.result.thumb) : null }
+              r
+                ? {
+                    photo: FILE_TYPES[r.type] ? new Blob([r.photo], { type: r.type }) : jpeg(r.photo),
+                    thumb: r.thumb ? jpeg(r.thumb) : null,
+                  }
                 : null,
             );
           };
@@ -656,7 +676,9 @@ window.PhotoQueue = (function () {
   /* Queue the pages of one handout (the teacher's PDF, Handouts and Links).
      ref: { course, assessment, resource } (ids local or server). pages are
      PhotoShrink's, in order; their thumbnails are not kept. All of them are
-     kept, or none. Answers as add() does. */
+     kept, or none. Answers as add() does. A handout file is one page, {
+     blob, mime } with mime text/html, text/plain or application/epub+zip:
+     it is kept and sent with that type. */
   async function addHandout(ref, pageList) {
     ref = ref || {};
     var bad = ['course', 'assessment', 'resource'].some(function (k) {
@@ -680,6 +702,8 @@ window.PhotoQueue = (function () {
           batch: batch,
           kind: 'handout',
           path: null,
+          // A handout file's own type (text/html, text/plain, application/epub+zip); none for a PDF's page.
+          mime: FILE_TYPES[page.mime] ? page.mime : null,
           owner: owner,
           ids: { course: ref.course, assessment: ref.assessment, resource: ref.resource, file: id },
           order: i,

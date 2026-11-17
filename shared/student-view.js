@@ -575,6 +575,9 @@ window.StudentView = (function () {
     });
   }
 
+  // A handout file's kinds (2026111706): a web page, a text file, an EPUB.
+  var FILE_KINDS = { html: true, txt: true, epub: true };
+
   // A link a student may open: http:// or https:// only, as text.
   var WEB = /^https?:\/\/[^\s"'<>]+$/i;
   function hostOf(url) {
@@ -584,9 +587,10 @@ window.StudentView = (function () {
 
   /* The reply's handouts and links for one piece (Handouts and Links), each
      checked as the contract types it: a handout with 1 to 20 pages, a link
-     with an http(s) address; anything else is left out. [ { id, kind:
-     'handout' | 'link', title, pages (a handout's), url and host (a
-     link's) } ]. */
+     with an http(s) address, a handout file (kind html, txt or epub); anything
+     else is left out. [ { id, kind: 'handout' | 'link' | 'file', title,
+     pages (a handout's), url and host (a link's), type (a file's: 'html' |
+     'txt' | 'epub') } ]. */
   function resourcesOf(v) {
     var seen = {};
     return list(v)
@@ -601,6 +605,7 @@ window.StudentView = (function () {
           var n = typeof r.page_count === 'number' && isFinite(r.page_count) ? Math.floor(r.page_count) : 0;
           return n >= 1 && n <= 20 ? { id: r.id, kind: 'handout', title: title || 'Handout', pages: n } : null;
         }
+        if (FILE_KINDS[r.kind] === true) return { id: r.id, kind: 'file', type: r.kind, title: title || 'Handout' };
         if (r.kind === 'link') {
           var url = text(r.url).trim();
           if (!WEB.test(url) || url.length > 2000) return null;

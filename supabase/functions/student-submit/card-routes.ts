@@ -142,8 +142,10 @@ const named = (v: unknown): Json[] =>
    database sends no other). Each is copied as the contract types it: an
    id, kind 'pdf' with 1 to 20 pages and no address, or kind 'link' with
    an http(s) address of at most 2,000 characters and no page count; a
-   title of 1 to 200 characters. Anything else is left behind, so nothing
-   but a web address reaches the phone as a link. */
+   title of 1 to 200 characters. A handout file (2026111706) is kind
+   'html', 'txt' or 'epub' with no address and no page count: it is
+   opened through the handout-file route. Anything else is left behind, so
+   nothing but a web address reaches the phone as a link. */
 const WEB = /^https?:\/\/[^\s"'<>]+$/i;
 const resources = (v: unknown): Json[] =>
   list(v)
@@ -156,6 +158,9 @@ const resources = (v: unknown): Json[] =>
         return typeof n === 'number' && Number.isSafeInteger(n) && n >= 1 && n <= 20
           ? { id: r.id, kind: 'pdf', title: r.title, url: null, page_count: n }
           : null;
+      }
+      if (r.kind === 'html' || r.kind === 'txt' || r.kind === 'epub') {
+        return { id: r.id, kind: r.kind, title: r.title, url: null, page_count: null };
       }
       if (r.kind === 'link') {
         const url = r.url;
