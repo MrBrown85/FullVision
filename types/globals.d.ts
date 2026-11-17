@@ -110,6 +110,8 @@ interface Window {
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
   ReportPrintPaper: unknown;
+  // The Overview's picture of the grade (teacher/student-overview.js).
+  StudentOverview: unknown;
   // The phone's tab bar and last tab (teacher-mobile/tab-bar.js).
   MTabBar: unknown;
 }

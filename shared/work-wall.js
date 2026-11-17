@@ -1323,6 +1323,8 @@ window.WorkWall = (function () {
   }
 
   // html-safe: the title goes through esc; ids are ours; fixed words
+  /* The student's pages beside the feedback on the teacher's student page, each opening the grader:
+     thumbnails where the file has one, so a list of many pieces stays light. */
   function pieceHtml(cid, sid, aid) {
     var a = _piece(cid, aid);
     if (!a || !GraderWork.workShown(cid, a)) return '';
@@ -1344,6 +1346,7 @@ window.WorkWall = (function () {
     if (!pages.length) return head + (links || '<div class="stu-ov-read">Handed in on paper.</div>') + '</div>';
     return (
       head +
+      '<div class="ovw-pages">' +
       pages
         .map(function (f, i) {
           var what = 'Page ' + (i + 1) + ' of ' + pages.length;
@@ -1352,7 +1355,9 @@ window.WorkWall = (function () {
             i +
             '" aria-label="' +
             esc(what + ', open in the grader') +
-            '"><img class="ovw-img" data-work-pic data-work-which="page" data-aid="' +
+            '"><img class="ovw-img" data-work-pic' +
+            (f.thumb_path ? '' : ' data-work-which="page"') +
+            ' data-aid="' +
             esc(aid) +
             '" data-page="' +
             i +
@@ -1362,7 +1367,7 @@ window.WorkWall = (function () {
           );
         })
         .join('') +
-      '</div>'
+      '</div></div>'
     );
   }
 

@@ -11,6 +11,7 @@
     "teacher/cm-terms.js",
     "teacher/cm-grading-bars.js",
     "teacher/report-one-zoom.js",
+    "teacher/student-overview.js",
     "teacher/report-one-head.js",
     "teacher/report-print-paper.js",
     "shared/data-withdrawn.js",
