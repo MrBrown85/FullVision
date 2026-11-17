@@ -561,7 +561,9 @@ describe('student card: a draft is nowhere on the page', () => {
         .replace(/>[^<]+</g, '><')
         .replace(/sp-flag-(overdue|due)/g, 'sp-flag-')
         .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
-        .replace(/ sp-picked/, '');
+        .replace(/ sp-picked/, '')
+        // The poster carries the teacher's handout (Demo Mode's Poster Checklist); that is not a grade.
+        .replace(/<section class="sp-res"[\s\S]*?<\/section>/, '');
     const poster = page.root().querySelector('.sp-deck .sp-piece[data-piece="demo-poster"]');
     await page.click('[data-segment="upcoming"]');
     const fair = page.root().querySelector('.sp-deck .sp-piece[data-piece="demo-fair"]');

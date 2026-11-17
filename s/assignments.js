@@ -86,6 +86,11 @@
       workPage: state.workPage,
       marksOff: state.marksOff,
       workPages: state.workPages,
+      // A handout open in the page (Handouts and Links; s/handouts.js fetches its pages).
+      handout: state.handout,
+      handoutPiece: state.handoutPiece,
+      handoutPage: state.handoutPage,
+      handoutPages: state.handoutPages,
       form: state.form,
       sheet: state.sheet,
       sending: state.sending,

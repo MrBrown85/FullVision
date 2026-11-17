@@ -104,7 +104,9 @@ describe('Outstanding: work due by today, Missing, and revisions', () => {
         .replace(/>[^<]+</g, '><')
         .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
         .replace(' sp-picked', '')
-        .replace('sp-flag-overdue', 'sp-flag-due');
+        .replace('sp-flag-overdue', 'sp-flag-due')
+        // The poster carries the teacher's handout (Demo Mode's Poster Checklist); that is not a grade.
+        .replace(/<section class="sp-res"[\s\S]*?<\/section>/, '');
     const draft = shape(card(page, 'Disease Research Poster'));
     expect(page.root().innerHTML).not.toContain('two of your sources');
     await page.click('[data-segment="upcoming"]');
