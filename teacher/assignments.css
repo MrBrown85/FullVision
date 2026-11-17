@@ -40,9 +40,6 @@
 .assess-card.active {
   border-color: transparent;
 }
-.assess-card.open .assess-header {
-  padding: 14px 16px 12px 10px;
-}
 /* No hover tint, as in the mockup. */
 .assess-header:hover {
   background: transparent;
@@ -63,10 +60,6 @@
   letter-spacing: -0.01em;
   color: var(--text);
   line-height: 1.3;
-}
-.assess-card.open .assess-title {
-  font-size: 1.125rem;
-  letter-spacing: -0.015em;
 }
 .assess-header-info {
   display: contents;
