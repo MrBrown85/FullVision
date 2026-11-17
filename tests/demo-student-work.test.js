@@ -64,7 +64,7 @@ describe('the sample work, in the shape of list_course_submissions', () => {
     const all = getCourseSubmissions(CID);
     expect(Object.keys(all).sort()).toEqual(['assessments', 'bucket', 'course', 'submissions', 'uploads']);
     expect(all.bucket).toBe('student-photos');
-    expect(all.course).toEqual({ send_work: false, keep_photos_until: 'end_of_year' });
+    expect(all.course).toEqual({ send_work: false });
     expect(all.uploads).toEqual([]);
     expect(all.assessments).toHaveLength(getAssessments(CID).length);
     all.assessments.forEach(a =>
@@ -334,7 +334,7 @@ describe('showing a page', () => {
 describe('outside Demo Mode, and the store’s limits', () => {
   it('gives a signed-in class the empty answers and stores nothing for it', async () => {
     window.isDemoMode = () => false;
-    expect(getCourseSendWork(CID)).toEqual({ send_work: false, keep_photos_until: 'end_of_year' });
+    expect(getCourseSendWork(CID)).toEqual({ send_work: false });
     expect(getCourseSubmissions(CID).submissions).toEqual([]);
     expect(getAssessmentStudentWork(CID, LAB).students_send).toBe('nothing');
     expect(getStudentWork(CID, 'st1')).toEqual({ ok: true, v: 1, send_work: false, assessments: [] });

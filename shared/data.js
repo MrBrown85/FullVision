@@ -1639,7 +1639,6 @@ function _revalidateActiveClass() {
   _handleExternalCourseUpdate(cid, 'gradebook');
 }
 
-/** Load all data for a specific course into the cache. */
 /* ── Every class, loaded ──────────────────────────────────────
    Boot loads the class the teacher opens with; preloadClasses then loads the
    rest in the background, one at a time, so a class's roster, settings and
@@ -1703,6 +1702,7 @@ async function initData(cid) {
     return await _initClassData(cid);
   } finally {
     _classLoads[cid] = true;
+    if (typeof noteClassOpenedSoon === 'function') noteClassOpenedSoon(cid); // the class on screen only (photos stay a year)
   }
 }
 

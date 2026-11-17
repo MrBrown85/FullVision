@@ -332,7 +332,8 @@ function testTables(tables, rows) {
   const names = new Set(tables.map(t => t.name));
   for (const t of tables) if (!known.has(t.name)) fail('tables', `${t.name} has no owner in tests/db/table-owners.mjs`);
   for (const n of known)
-    if (!names.has(n) && !NOT_YET_APPLIED[n]) fail('tables', `tests/db/table-owners.mjs names ${n}, which is not in the database`);
+    if (!names.has(n) && !NOT_YET_APPLIED[n])
+      fail('tables', `tests/db/table-owners.mjs names ${n}, which is not in the database`);
   for (const t of tables) {
     if (!t.rls && (t.kind === 'r' || t.kind === 'p')) fail('tables', `${t.name} has row security off`);
     const r = rows[t.name];
