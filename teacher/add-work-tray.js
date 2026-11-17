@@ -394,7 +394,13 @@
       if (!s || !host.alive()) return false;
       return !!s.open(host.cid, host.aid, file, {
         onPieces: function (pieces) {
-          if (host.alive()) placeOrHold(pieces);
+          // Marked as off the scan, for Grade in Scan Order (B5).
+          if (host.alive())
+            placeOrHold(
+              (pieces || []).map(function (p) {
+                return Object.assign({}, p, { scan: true });
+              }),
+            );
         },
         onClose: function () {
           if (!host.alive()) return;
@@ -615,9 +621,22 @@
         '">' +
         (item.refused
           ? ''
-          : '<span class="awt-pic">' +
-            (item.url ? '<img src="' + esc(item.url) + '" alt="' + esc('First page of ' + item.from) + '">' : '') +
-            '</span>') +
+          : /** @type {any} */ (window).AddWorkPageView
+            ? // B5: the picture shows the file's pages full size.
+              '<button type="button" class="awt-pic" data-awt="view" data-item="' +
+              esc(item.id) +
+              '" data-key="awt-view:' +
+              esc(item.id) +
+              '" aria-label="' +
+              esc('See ' + item.from + ' full size') +
+              '">' +
+              (item.url
+                ? '<img src="' + esc(item.url) + '" alt="' + esc('First page of ' + item.from) + '" draggable="false">'
+                : '') +
+              '</button>'
+            : '<span class="awt-pic">' +
+              (item.url ? '<img src="' + esc(item.url) + '" alt="' + esc('First page of ' + item.from) + '">' : '') +
+              '</span>') +
         '<div class="awt-body">' +
         '<span class="awt-file"><span class="awt-file-name">' +
         esc(item.from || 'File') +
@@ -764,7 +783,8 @@
       }
       var item = _waitingItem(btn.getAttribute('data-item'));
       if (!item) return true;
-      if (what === 'to') placeItem(item.id, btn.getAttribute('data-sid'));
+      if (what === 'view') _view(item, 'awt-view:' + item.id);
+      else if (what === 'to') placeItem(item.id, btn.getAttribute('data-sid'));
       else if (what === 'off') remove(item.id);
       else if (what === 'else' || what === 'pick') _openPicker(item);
       return true;
@@ -797,6 +817,22 @@
       return true;
     }
 
+    // A waiting file's pages full size; the focus comes back to `key`.
+    function _view(item, key) {
+      var view = /** @type {any} */ (window).AddWorkPageView;
+      if (!view) return false;
+      return view.open({
+        title: item.from || 'File',
+        pages: item.pages.map(function (pg, i) {
+          return { blob: pg && pg.blob, label: 'Page ' + (i + 1) };
+        }),
+        onClose: function () {
+          var el = /** @type {any} */ (document.querySelector('[data-key="' + key + '"]'));
+          if (el) el.focus();
+        },
+      });
+    }
+
     /* Keys inside an open Choose a Student: arrows move through the list,
        Return takes the first student found, Escape closes it. → true when
        the tray took the key. */
@@ -822,6 +858,12 @@
         var next = at < 0 ? (down ? 0 : options.length - 1) : at + (down ? 1 : -1);
         if (next < 0) return (picker.querySelector('.awt-find').focus(), true);
         options[Math.min(next, options.length - 1)].focus();
+        return true;
+      }
+      // Space in an empty box: the file full size, as in Split the Scan.
+      if (e.key === ' ' && at < 0 && el.classList.contains('awt-find') && !String(el.value || '').trim()) {
+        e.preventDefault();
+        _view(item, 'awt-find:' + item.id);
         return true;
       }
       if (e.key === 'Enter' && at < 0 && el.classList.contains('awt-find')) {
