@@ -790,9 +790,10 @@
     // Read every row first, then write: one layout, not one per row.
     /** @type {{ row: HTMLElement, dy: number }[]} */
     var moved = [];
+    var rects = from;
     root.querySelectorAll('tr[data-alv-row]').forEach(function (tr) {
       var row = /** @type {HTMLElement} */ (tr);
-      var was = from[row.dataset.alvRow || ''];
+      var was = rects[row.dataset.alvRow || ''];
       var dy = was ? was.top - row.getBoundingClientRect().top : 0;
       if (dy) moved.push({ row: row, dy: dy });
     });
