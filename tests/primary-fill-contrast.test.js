@@ -59,6 +59,20 @@ describe('white on the primary blue fill', () => {
     }
   });
 
+  it('the dark fill is at least 3:1 against the dark surface, so a chosen pill stands out', () => {
+    const fill = one(dark, '--active-fill');
+    const surface = one(dark, '--surface');
+    const [a, b] = [lum(fill), lum(surface)].sort((x, y) => y - x);
+    expect((a + 0.05) / (b + 0.05)).toBeGreaterThanOrEqual(3.0);
+  });
+
+  it('the Dashboard Inbox buttons use the fill token', () => {
+    const css = read('teacher/dash-inbox.css');
+    for (const sel of ['dash-inbox-new', 'dash-inbox-grade']) {
+      expect(css).toMatch(new RegExp(`\\.${sel}\\s*\\{[^}]*background:\\s*var\\(--active-fill\\)`));
+    }
+  });
+
   it('student page: --sp-blue-fill passes 4.5:1 in both stylesheets that define it', () => {
     for (const f of ['s/student.css', 's/page-view.css']) {
       const found = tokens(read(f), '--sp-blue-fill');

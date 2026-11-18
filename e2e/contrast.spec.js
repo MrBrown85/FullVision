@@ -56,6 +56,29 @@ async function expectReadable(page) {
 const DESKTOP = [
   { name: 'dashboard', hash: '/dashboard', ready: '.dash-card' },
   {
+    // The Inbox is behind a build switch; its +N badge and Grade button are
+    // white words on the blue fill.
+    name: 'dashboard with the Inbox on',
+    hash: '/dashboard',
+    ready: '.dash-glance',
+    flag: ['fv-build-dashRow', '1'],
+    open: async page => {
+      // Send Work on, so the sample work shows: Light Refraction Lab has work waiting.
+      await page.evaluate(() => {
+        const cid = getActiveCourse();
+        setStudentPageSwitch(cid, true, 'on_return');
+        const work = getCourseSubmissions(cid);
+        work.course.send_work = true;
+        saveDemoStudentWork(cid, work);
+        // A kept time long ago, so the students' sends show as +N.
+        localStorage.setItem('fv-dash-inbox-seen:' + cid, '2000-01-01T00:00:00.000Z');
+        PageDashboard.render();
+      });
+      await expect(page.locator('.dash-inbox-grade').first()).toBeVisible();
+      await expect(page.locator('.dash-inbox-new').first()).toBeVisible();
+    },
+  },
+  {
     name: 'assignments with a rubric open',
     hash: '/assignments',
     ready: '#ac-sci8a1',
@@ -96,6 +119,7 @@ for (const colorScheme of ['light', 'dark']) {
     for (const p of DESKTOP) {
       test(`${p.name}`, async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
+        if (p.flag) await page.addInitScript(([k, v]) => localStorage.setItem(k, v), p.flag);
         await enterDemo(page);
         await page.goto(p.hash);
         await expect(page.locator(p.ready).first()).toBeVisible();
