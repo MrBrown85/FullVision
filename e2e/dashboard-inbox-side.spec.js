@@ -195,6 +195,28 @@ test('after the grader closes the focus returns to the page that was clicked, an
   expect(await page.evaluate(() => document.activeElement.tagName)).not.toBe('BODY');
 });
 
+test('after a mouse click on a page and Escape in the grader, a pile with the pointer away gathers', async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .locator(PILE + ' .dash-inbox-side-page')
+    .first()
+    .hover();
+  await expect.poll(async () => (await box(page, PILE)).width).toBeGreaterThan(200);
+  await page
+    .locator(PILE + ' .dash-inbox-side-page')
+    .nth(1)
+    .click();
+  await expect(page.locator('.grader-dialog')).toBeVisible();
+  await page.mouse.move(5, 5);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.grader-dialog')).toHaveCount(0);
+  await expect(page.locator(PILE)).not.toHaveClass(/is-open/);
+  await expect.poll(() => lowerHidden(page)).toBe(true);
+  expect(await page.evaluate(() => document.activeElement.tagName)).not.toBe('BODY');
+});
+
 test('the focus returns to the second page of a pile when the grader closes from the keyboard', async ({ page }) => {
   await open(page);
   await page
@@ -484,9 +506,7 @@ test.describe('touch', () => {
     await expect(page.locator('.grader-dialog')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('.grader-dialog')).toHaveCount(0);
-    // The pile is as it was left, open. A tap elsewhere gathers it; a tap on it spreads it again.
-    await expect(page.locator(PILE)).toHaveClass(/is-open/);
-    await page.locator('.dash-inbox-side-foot').tap();
+    // With no pointer over it, the pile is gathered when the grader closes; a tap spreads it again.
     await expect(page.locator(PILE)).not.toHaveClass(/is-open/);
     await page
       .locator(PILE + ' .dash-inbox-side-page')
