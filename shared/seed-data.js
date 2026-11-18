@@ -4252,7 +4252,6 @@ function seedIfNeeded() {
   seedDemoReflections();
   seedDemoRevisions();
   seedDemoDrafts();
-  seedDemoBulletins();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
@@ -4667,8 +4666,10 @@ function seedDemoRevisions() {
    PDF and reactions, and a Photo of the Board. Who has seen each is the
    students' ids, so "Seen by 19 of 27" works; pause one student in Class
    Settings and the count follows. The pictures are drawn, in
-   assets/sample-bulletins. Seeded once per class (shared/data-bulletins.js
-   writes it, and writes nothing where the class already has bulletins). */
+   assets/sample-bulletins. Written once per class, the first time Bulletins is
+   read in Demo Mode (shared/data-bulletins.js _bltDemoRead), so with the build
+   switch off nothing is written; it writes nothing where the class already has
+   bulletins. */
 function seedDemoBulletins() {
   if (typeof saveDemoBulletinsSeed !== 'function' || !COURSES.sci8) return false;
   var ids = getStudents('sci8').map(function (s) {
@@ -4683,13 +4684,17 @@ function seedDemoBulletins() {
       return out.indexOf(id) < 0;
     });
   };
-  // A time on a day this many days back, never in the future.
-  var at = function (daysBack, hour, minute) {
+  /* The rule for the samples' times, so none can land in the future and none is moved by a clamp:
+     today's are "N minutes before now" (so they are never ahead of the clock, whatever time it is);
+     older ones are "N days back at a fixed hour". */
+  var minutesAgo = function (n) {
+    return new Date(Date.now() - n * 60000).toISOString();
+  };
+  var daysBack = function (n, hour, minute) {
     var d = new Date();
-    d.setDate(d.getDate() - daysBack);
+    d.setDate(d.getDate() - n);
     d.setHours(hour, minute, 0, 0);
-    var latest = Date.now() - 5 * 60000;
-    return new Date(Math.min(d.getTime(), latest)).toISOString();
+    return d.toISOString();
   };
   var day = function (daysAhead) {
     var d = new Date();
@@ -4725,9 +4730,9 @@ function seedDemoBulletins() {
       })
         ? 'sci8a1'
         : null,
-    posted_at: at(2, 8, 42),
-    created_at: at(2, 8, 42),
-    updated_at: at(2, 8, 42),
+    posted_at: daysBack(2, 8, 42),
+    created_at: daysBack(2, 8, 42),
+    updated_at: daysBack(2, 8, 42),
     // Everyone but two.
     seen: except(['st22', 'st24']),
   });
@@ -4735,9 +4740,9 @@ function seedDemoBulletins() {
     kind: 'announcement',
     body: "Read the Cell Theory pages before Thursday's lab. Bring one question.",
     reactions_on: true,
-    posted_at: at(0, 10, 15),
-    created_at: at(0, 10, 15),
-    updated_at: at(0, 10, 15),
+    posted_at: minutesAgo(20),
+    created_at: minutesAgo(20),
+    updated_at: minutesAgo(20),
     files: [
       {
         id: '00000000-0000-4000-8000-00000000f001',
@@ -4775,9 +4780,9 @@ function seedDemoBulletins() {
   var board = Object.assign(base(3), {
     kind: 'announcement',
     body: '',
-    posted_at: at(0, 9, 58),
-    created_at: at(0, 9, 58),
-    updated_at: at(0, 9, 58),
+    posted_at: minutesAgo(37),
+    created_at: minutesAgo(37),
+    updated_at: minutesAgo(37),
     files: [
       {
         id: '00000000-0000-4000-8000-00000000f002',

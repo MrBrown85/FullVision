@@ -38,6 +38,14 @@
   /** The bulletin outlined for a few seconds after an arrival, or ''. */
   var _arrivedId = '';
   var _arrivedTimer = 0;
+  /** A sentence about one bulletin, shown beside it: bulletin id → sentence. */
+  /** @type {Record<string, string>} */
+  var _notes = {};
+  var _lastHead = '';
+  var _lastFeed = '';
+  var _lastReturned = '';
+  /** The bulletins drawn so far, by key, so a new one glides in; null before the first draw. @type {Record<string, boolean> | null} */
+  var _known = null;
 
   /** @typedef {{ key: string, kind: string, title: string, pageCount: number, pages: any[] }} DraftFile */
   /** @typedef {{ open: boolean, editId: string, kind: string, body: string, linkOn: boolean, linkUrl: string, linkTitle: string, until: string, assessmentId: string, reactions: boolean, files: DraftFile[], note: string, busy: boolean, focus: string, nextFile: number }} Draft */
@@ -87,6 +95,18 @@
       at.getDate() +
       (at.getFullYear() !== today.getFullYear() ? ', ' + at.getFullYear() : '')
     );
+  }
+
+  /**
+   * When a returned bulletin was written, for "Your bulletin from …": the time
+   * today, else the day with it ("yesterday at 12:17 p.m.", "Monday at 12:17 p.m.").
+   * @param {string} iso @param {Date} [now]
+   */
+  function returnedWhen(iso, now) {
+    var day = dayHeading(iso, now);
+    var t = _timeOf(iso);
+    if (!day || day === 'Today') return t;
+    return (day === 'Yesterday' ? 'yesterday' : day) + ' at ' + t;
   }
 
   /** The time on a bulletin: the time today, else the weekday and time. @param {string} iso @param {Date} [now] */
@@ -144,6 +164,84 @@
   function _any(id) {
     return document.getElementById(id);
   }
+  /**
+   * What has keyboard focus inside `root`, as something that can be found again
+   * after that markup is drawn anew (a redraw must not drop focus on the page).
+   * @param {Element | null} root @returns {Record<string, string> | null}
+   */
+  function _focusSpec(root) {
+    var a = /** @type {any} */ (document.activeElement);
+    if (!a || a === document.body || !root || !root.contains(a)) return null;
+    var art = a.closest ? a.closest('[data-bulletin-id]') : null;
+    return {
+      id: a.id || '',
+      action: a.getAttribute('data-bulletin') || '',
+      did: a.getAttribute('data-id') || '',
+      kind: a.getAttribute('data-kind') || '',
+      index: a.getAttribute('data-index') || '',
+      art: art ? art.getAttribute('data-bulletin-id') : '',
+    };
+  }
+
+  /** The control of a bulletin, found by its action. @param {Element | null} root @param {string} bid @param {string} action @returns {any} */
+  function _controlOf(root, bid, action) {
+    if (!root) return null;
+    var cards = root.querySelectorAll('[data-bulletin-id]');
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute('data-bulletin-id') !== bid) continue;
+      var all = cards[i].querySelectorAll('[data-bulletin]');
+      for (var j = 0; j < all.length; j++) if (all[j].getAttribute('data-bulletin') === action) return all[j];
+    }
+    return null;
+  }
+
+  /**
+   * Put focus back on what had it (see _focusSpec); when that control is gone,
+   * on its bulletin's ⋯ button. true when something took focus.
+   * @param {Element | null} root @param {Record<string, string> | null} spec
+   */
+  function _applyFocus(root, spec) {
+    if (!root || !spec) return false;
+    /** @type {any} */
+    var found = null;
+    if (spec.id) found = document.getElementById(spec.id);
+    else {
+      var all = root.querySelectorAll('[data-bulletin]');
+      for (var i = 0; i < all.length && !found; i++) {
+        var n = /** @type {any} */ (all[i]);
+        if (
+          n.getAttribute('data-bulletin') === spec.action &&
+          (n.getAttribute('data-id') || '') === spec.did &&
+          (n.getAttribute('data-kind') || '') === spec.kind &&
+          (n.getAttribute('data-index') || '') === spec.index &&
+          !n.disabled &&
+          !n.closest('[hidden]')
+        )
+          found = n;
+      }
+    }
+    if (!found && spec.art) found = _controlOf(root, spec.art, 'menu');
+    if (found && typeof found.focus === 'function') {
+      found.focus();
+      return true;
+    }
+    return false;
+  }
+
+  /** Focus a bulletin's ⋯ button. @param {string} bid */
+  function _focusMenuButton(bid) {
+    var btn = _controlOf(_el('bulletin-feed'), bid, 'menu');
+    if (btn) btn.focus();
+  }
+
+  /** Focus the closed box's Write to… button, when nothing else holds focus. */
+  function _focusBar() {
+    var a = document.activeElement;
+    if (a && a !== document.body) return;
+    var btn = /** @type {any} */ (document.querySelector('.bulletin-bar-open'));
+    if (btn && typeof btn.focus === 'function') btn.focus();
+  }
+
   /** @param {string} type @param {any} handler @param {any} [options] */
   function _listen(type, handler, options) {
     document.addEventListener(type, handler, options);
@@ -238,8 +336,12 @@
 
   function _drawHead() {
     var el = _el('bulletin-head');
+    if (!el) return;
+    var html = _headHtml();
+    if (html === _lastHead && el.firstChild) return;
+    _lastHead = html;
     // html-safe: the class name never reaches here; counts are numbers; names and the address are escaped above.
-    if (el) el.innerHTML = _headHtml();
+    el.innerHTML = html;
   }
 
   /* ── Composer ────────────────────────────────────────────────── */
@@ -265,6 +367,7 @@
   /** The words in the box, with a link and files, as bulletinDraftProblem reads them. @param {Draft} d */
   function _asDraft(d) {
     return {
+      cid: _cid,
       kind: d.kind,
       body: d.body,
       link_url: d.linkOn ? d.linkUrl : '',
@@ -300,6 +403,10 @@
 
   function _assessmentOptions(selected) {
     var list = (typeof getAssessments === 'function' && getAssessments(_cid)) || [];
+    // An assessment still waiting to be saved has an id made here, which the server would not know: not offered.
+    list = list.filter(function (a) {
+      return _isDemo() || _isUuid(a.id);
+    });
     var sorted = list.slice().sort(function (a, b) {
       return String(b.date || '') < String(a.date || '') ? -1 : 1;
     });
@@ -346,7 +453,9 @@
       (_opening ? ' bulletin-compose-opening' : '') +
       '" id="bulletin-compose"' +
       (d.open ? '' : ' hidden') +
-      '><div class="bulletin-compose-inner">';
+      '><fieldset class="bulletin-set"' +
+      (d.busy ? ' disabled' : '') +
+      '>';
     h +=
       '<div class="seg bulletin-kinds" role="group" aria-label="Kind of Bulletin">' +
       ['announcement', 'reminder']
@@ -384,7 +493,7 @@
       if (canDate) {
         h +=
           '<label class="bulletin-label" for="bulletin-until">Stays Pinned Until<input class="bulletin-field" type="date" id="bulletin-until" min="' +
-          esc(getTodayStr()) +
+          esc(typeof courseToday === 'function' ? courseToday(_cid) : getTodayStr()) +
           '" value="' +
           esc(d.until) +
           '"></label>';
@@ -471,8 +580,8 @@
       '</button></span></div>';
     h += '<span class="bulletin-hint">' + esc(REACT_HINT) + '</span>';
     h +=
-      '<input type="file" class="bulletin-file-input" id="bulletin-file-input" accept="image/*,application/pdf" multiple hidden>';
-    h += '</div></div>';
+      '<input type="file" class="bulletin-file-input" id="bulletin-file-input" accept="image/*,.heic,.heif,application/pdf" multiple hidden>';
+    h += '</fieldset></div>';
     return h;
   }
 
@@ -497,6 +606,7 @@
     if (!host) return;
     if (!fresh) _readInputs();
     var d = _draft(_cid);
+    var held = d.focus ? null : _focusSpec(host);
     // html-safe: every word, name, date and address in the box is escaped; the rest is fixed markup.
     host.innerHTML = _composerHtml(d);
     _opening = false;
@@ -508,6 +618,11 @@
       });
     }
     _syncBits();
+    if (held && !_applyFocus(host, held) && d.open) {
+      // The control is gone (a file taken out): focus goes to the next thing to do in the box.
+      var next = /** @type {any} */ (host.querySelector('[data-bulletin="add-file"], #bulletin-words'));
+      if (next) next.focus();
+    }
     if (d.focus) {
       var focus = d.focus;
       d.focus = '';
@@ -536,10 +651,9 @@
     }
     var note = _el('bulletin-link-note');
     if (note) {
-      var link = d.linkUrl.trim();
-      var bad = !!link && !bulletinLinkOk(link);
-      note.hidden = !bad;
-      note.textContent = bad ? 'A link must start with http:// or https://.' : '';
+      var why = bulletinLinkProblem(d.linkUrl);
+      note.hidden = !why;
+      note.textContent = why;
     }
     var post = /** @type {HTMLButtonElement | null} */ (_el('bulletin-post'));
     if (post) post.disabled = !_canPost(d);
@@ -571,6 +685,7 @@
     _resetDraft(_cid);
     _opening = false;
     _drawComposer(true);
+    _focusBar();
   }
 
   /** Files chosen: each photo or PDF made into JPEG pages (shared/photo-shrink.js), added to the box. @param {FileList | File[]} chosen */
@@ -631,6 +746,11 @@
     if (out && out.reason === R.TOO_MANY_PAGES) return 'That PDF has more than ' + BULLETIN_PAGES_MAX + ' pages.';
     if (out && out.reason === R.PDF_TOO_LARGE) return 'That PDF is too large. Save a smaller copy, then add it.';
     if (out && out.locked) return 'That PDF has a password. Save a copy without one, then add it.';
+    // The words Add Work uses (shared/add-work-files.js): a photo the browser cannot read, and a PDF reader that did not load.
+    if (out && out.kind === 'heic' && out.reason === R.NO_DECODER)
+      return 'Save that photo as a JPEG first, then add it.';
+    if (out && out.kind === 'pdf' && out.reason === R.NO_DECODER)
+      return "The PDF reader couldn't load. Check the connection and try again.";
     if (out && out.reason === R.NO_DECODER) return "The file reader couldn't load. Check the connection and try again.";
     if (out && out.reason === R.OFFICE) return 'Save it as a PDF first.';
     if (out && out.reason === R.UNSUPPORTED) return 'Choose a photo or a PDF.';
@@ -677,17 +797,21 @@
       );
       if (problem) return _say(problem);
       d.busy = true;
-      _syncBits();
+      _drawComposer();
       return void editBulletin(cid, b.id, patch).then(function (out) {
         var cur = _draft(cid);
         cur.busy = false;
         if (!out.ok) {
           cur.note = out.message || '';
+          cur.focus = 'words';
           if (_alive && cid === _cid) _drawComposer(true);
           return;
         }
         _resetDraft(cid);
-        if (_alive && cid === _cid) _drawComposer(true);
+        if (_alive && cid === _cid) {
+          _drawComposer(true);
+          _focusBar();
+        }
       });
     }
     var problemNow = bulletinDraftProblem(_asDraft(d));
@@ -696,7 +820,7 @@
     if (withFiles && typeof navigator !== 'undefined' && navigator.onLine === false) {
       return _say('A file needs a connection. Your draft is kept; post it when you are back online.');
     }
-    // Held, so a refusal gives the words back.
+    // What goes: a refusal gives the words back through the data layer's returned list (never over what is typed since).
     var snapshot = Object.assign({}, d, { files: d.files.slice() });
     var files = d.files.map(function (f) {
       return { kind: f.kind, title: f.title, pages: f.pages };
@@ -707,20 +831,26 @@
     } else {
       _resetDraft(cid);
       _drawComposer(true);
+      _focusBar();
     }
     postBulletin(cid, _asDraftForPost(snapshot), files).then(function (out) {
-      var cur = _draft(cid);
-      if (withFiles) cur.busy = false;
-      if (out.ok) {
-        if (withFiles) _resetDraft(cid);
-      } else if (out.message) {
-        // Nothing was posted: the words come back, with the sentence beside them.
-        _drafts[cid] = Object.assign({}, snapshot, { open: true, busy: false, note: out.message, focus: '' });
+      // A post with no file that is refused is given back by the data layer (getReturnedBulletins): the
+      // box is not touched here, so what is typed since is never overwritten or lost.
+      if (withFiles) {
+        var cur = _draft(cid);
+        cur.busy = false;
+        if (out.ok) _resetDraft(cid);
+        else if (out.message) {
+          // Nothing was posted and the draft was never cleared: the sentence goes beside it.
+          cur.note = out.message;
+          cur.focus = 'words';
+        }
+        if (_alive && cid === _cid) {
+          _drawComposer(true);
+          if (out.ok) _focusBar();
+        }
       }
-      if (_alive && cid === _cid) {
-        _drawComposer(true);
-        _drawFeed();
-      }
+      if (_alive && cid === _cid) _drawFeed();
     });
   }
 
@@ -801,24 +931,27 @@
 
   /** @param {any} b */
   function _linkHtml(b) {
-    var url = bulletinLinkOk(b.link_url);
-    if (!url) return '';
-    var host = bulletinLinkHost(url);
+    // From a real parse: the site's host, with any user name or password dropped (never split from the string).
+    var shown = bulletinLinkShown(b.link_url);
+    if (!shown) return '';
     return (
       '<a class="bulletin-linkcard" href="' +
-      esc(url) +
+      esc(shown.href) +
       '" target="_blank" rel="noopener noreferrer"><span class="bulletin-icon-btn" aria-hidden="true">' +
       ICON_LINK +
       '</span><span class="bulletin-linkcard-text"><span>' +
-      esc(b.link_title || host) +
+      esc(b.link_title || shown.host) +
       '</span><span class="bulletin-linkcard-host">' +
-      esc(host) +
-      '</span></span></a>'
+      esc(shown.host) +
+      '</span><span class="bulletin-linkcard-host">Students are asked before it opens</span></span></a>'
     );
   }
 
   /** @param {any} b */
   function _factsHtml(b) {
+    if (b.stalled) {
+      return '<span class="bulletin-problem">Its file didn\'t finish uploading. Delete it and post again.</span>';
+    }
     if (b.waiting) {
       var back = b.key && bulletinCanTakeBack(_cid, b.key);
       return (
@@ -871,8 +1004,8 @@
   /** @param {any} b */
   function _menuHtml(b) {
     if (b.waiting) {
-      // A bulletin the server holds that is still waiting for its files can only be deleted.
-      if (!b.key && b.id) {
+      // A bulletin the server holds whose file did not finish uploading can only be deleted.
+      if (b.stalled) {
         return (
           '<div class="bulletin-more"><button type="button" class="bulletin-more-btn" data-bulletin="menu" data-id="' +
           esc(b.id) +
@@ -960,19 +1093,16 @@
             esc(data.no_card.length + ' Have No Card Yet') +
             '</a></span>';
         }
-        if (b.reactions_on) {
-          ['got_it', 'done', 'question'].forEach(function (w) {
-            var ids = data.reactions[/** @type {'got_it'} */ (w)];
-            if (!ids || !ids.length) return;
-            h +=
-              '<span class="bulletin-seen-head">' +
-              esc(BULLETIN_REACTION_WORDS[/** @type {'got_it'} */ (w)]) +
-              ' · ' +
-              ids.length +
-              '</span><span class="bulletin-seen-names">' +
-              esc(_names(ids)) +
-              '</span>';
-          });
+        // Names only where they are for acting on (board B3): who has a question. Got It and Done are counts on the facts line.
+        if (b.reactions_on && data.reactions.question && data.reactions.question.length) {
+          h +=
+            '<span class="bulletin-seen-head">' +
+            esc(BULLETIN_REACTION_WORDS.question) +
+            ' · ' +
+            data.reactions.question.length +
+            '</span><span class="bulletin-seen-names">' +
+            esc(_names(data.reactions.question)) +
+            '</span>';
         }
         if (data.seen.length) {
           h +=
@@ -996,6 +1126,8 @@
       (b.id === _arrivedId ? ' bulletin-arrived' : '') +
       '" data-bulletin-id="' +
       esc(b.id) +
+      '" data-bulletin-key="' +
+      esc(b.key || b.idempotency_key || b.id) +
       '">';
     h +=
       '<div class="bulletin-meta"><span class="bulletin-kind-label">' +
@@ -1009,6 +1141,7 @@
       h += _fileHtml(f, b.id);
     });
     h += '<div class="bulletin-foot">' + _factsHtml(b) + _menuHtml(b) + '</div>';
+    if (_notes[b.id]) h += '<span class="bulletin-problem" role="status">' + esc(_notes[b.id]) + '</span>';
     if (!b.waiting) h += _seenHtml(b);
     return h + '</article>';
   }
@@ -1049,11 +1182,36 @@
     return h;
   }
 
-  function _drawFeed() {
+  /** @param {boolean} [force] draw even when the markup is the same */
+  function _drawFeed(force) {
     var el = _el('bulletin-feed');
     if (!el) return;
+    var html = _feedHtml();
+    // Nothing changed (the 15-second read found the same bulletins): the page is left as it is, focus included.
+    if (!force && html === _lastFeed && el.firstChild) return;
+    _lastFeed = html;
+    var held = _focusSpec(el);
     // html-safe: every word, name, date, address and title in the feed is escaped; counts are numbers; the rest is fixed markup.
-    el.innerHTML = _feedHtml();
+    el.innerHTML = html;
+    var cards = el.querySelectorAll('article[data-bulletin-id]');
+    /** @type {Record<string, boolean>} */
+    var now = {};
+    for (var i = 0; i < cards.length; i++) {
+      var card = /** @type {HTMLElement} */ (cards[i]);
+      var key = card.getAttribute('data-bulletin-key') || '';
+      now[key] = true;
+      // A bulletin that was not here before glides in (150 to 250 ms; none under Reduce Motion, in the CSS).
+      if (_known && !_known[key]) {
+        card.classList.add('bulletin-glide');
+        card.addEventListener('animationend', function (/** @type {any} */ e) {
+          if (e.currentTarget) e.currentTarget.classList.remove('bulletin-glide');
+        });
+        // Under Reduce Motion there is no animation to end: the class goes anyway.
+        window.setTimeout(card.classList.remove.bind(card.classList, 'bulletin-glide'), 400);
+      }
+    }
+    _known = now;
+    if (held) _applyFocus(el, held);
     _loadPictures();
   }
 
@@ -1077,7 +1235,8 @@
         if (!pic || !_alive || cid !== _cid || !link.isConnected) return;
         var img = link.querySelector('img');
         if (img) img.src = pic.url;
-        link.href = pic.url;
+        // Opens in a new tab only from a blob: or this site's own picture; never from a data: address.
+        if (/^(blob:|\/assets\/)/.test(pic.url)) link.href = pic.url;
       });
     });
   }
@@ -1105,6 +1264,7 @@
     _drawHead();
     _drawFeed();
     _syncBits();
+    _adoptReturned();
     _arrive();
     Object.keys(_seen).forEach(function (id) {
       if (_seen[id] && _seen[id].data !== undefined && !_seen[id].loading) _loadSeen(id, true);
@@ -1177,6 +1337,119 @@
 
   /* ── Events ──────────────────────────────────────────────────── */
 
+  /** Focus the first item of a bulletin's open menu. @param {string} bid */
+  function _focusMenuItem(bid) {
+    var menu = _controlOf(_el('bulletin-feed'), bid, 'menu');
+    var item = menu && menu.parentNode ? menu.parentNode.querySelector('[role="menuitem"]') : null;
+    if (item) item.focus();
+  }
+
+  /** @param {Draft} d */
+  function _draftEmpty(d) {
+    return !d.editId && !d.body.trim() && !d.linkUrl.trim() && !d.files.length;
+  }
+
+  /** Put a returned bulletin's words in the box. @param {Draft} d @param {{ bulletin: Record<string, any> }} e */
+  function _loadReturned(d, e) {
+    var b = e.bulletin || {};
+    d.editId = '';
+    d.kind = b.kind === 'reminder' ? 'reminder' : 'announcement';
+    d.body = String(b.body || '');
+    d.linkOn = !!b.link_url;
+    d.linkUrl = String(b.link_url || '');
+    d.linkTitle = String(b.link_title || '');
+    d.until = String(b.pinned_until || '');
+    d.assessmentId = String(b.assessment_id || '');
+    d.reactions = b.reactions_on === true;
+    d.files = [];
+  }
+
+  /**
+   * Bulletins that were not posted (refused, or lost from the outbox) come
+   * back: into the box when it is empty, with one plain sentence; otherwise
+   * as a line under the box that asks before it replaces what is typed.
+   */
+  function _adoptReturned() {
+    var list = getReturnedBulletins(_cid);
+    if (list.length && _el('bulletin-composer')) {
+      _readInputs();
+      var d = _draft(_cid);
+      if (!d.busy && _draftEmpty(d)) {
+        var e = list[list.length - 1];
+        _loadReturned(d, e);
+        dropReturnedBulletin(_cid, e.key);
+        d.note =
+          'Your bulletin from ' +
+          returnedWhen(e.at) +
+          " wasn't posted, so its words are back in the box." +
+          (e.message ? ' ' + e.message : '');
+        d.open = true;
+        d.focus = '';
+        _opening = true;
+        _drawComposer(true);
+      }
+    }
+    _drawReturned();
+  }
+
+  function _drawReturned() {
+    var host = _el('bulletin-returned');
+    if (!host) return;
+    var html = getReturnedBulletins(_cid)
+      .map(function (e) {
+        return (
+          '<div class="bulletin-card bulletin-returned-line" role="status"><span>Your bulletin from ' +
+          esc(returnedWhen(e.at)) +
+          " wasn't posted." +
+          (e.message ? ' ' + esc(e.message) : '') +
+          '</span><button type="button" class="bulletin-text-btn" data-bulletin="put-back" data-key="' +
+          esc(e.key) +
+          '">Put It Back in the Box</button><button type="button" class="bulletin-text-btn" data-bulletin="drop-returned" data-key="' +
+          esc(e.key) +
+          '">Dismiss</button></div>'
+        );
+      })
+      .join('');
+    if (html === _lastReturned) return;
+    _lastReturned = html;
+    var held = _focusSpec(host);
+    // html-safe: the time and the sentence are escaped; the key is a uuid made on this device; the rest is fixed markup.
+    host.innerHTML = html;
+    if (held) _focusBar();
+  }
+
+  /** Put a returned bulletin back in the box, asking first when the box holds words. @param {string} key */
+  function _putBack(key) {
+    var cid = _cid;
+    var e = getReturnedBulletins(cid).filter(function (x) {
+      return x.key === key;
+    })[0];
+    if (!e) return;
+    var go = function () {
+      var d = _draft(cid);
+      _loadReturned(d, e);
+      d.note = '';
+      d.open = true;
+      d.focus = 'words';
+      _opening = true;
+      dropReturnedBulletin(cid, key);
+      if (_alive && cid === _cid) {
+        _drawComposer(true);
+        _drawReturned();
+      }
+    };
+    _readInputs();
+    if (_draftEmpty(_draft(cid))) return go();
+    showConfirm(
+      'Put It Back in the Box?',
+      'The box holds words you have not posted. Put the other bulletin there instead? What is in the box now is replaced.',
+      'Put It Back',
+      'primary',
+      go,
+      'Keep What I Have',
+    );
+  }
+
   function _closeMenu() {
     if (!_menuId) return;
     _menuId = '';
@@ -1194,6 +1467,8 @@
     var action = el.dataset.bulletin;
     var id = el.dataset.id || '';
     var d = _draft(_cid);
+    // Whatever was said beside a bulletin is cleared when the teacher does something else to it.
+    if (id && _notes[id]) delete _notes[id];
     switch (action) {
       case 'open':
         return _openComposer();
@@ -1229,22 +1504,44 @@
         return _closeComposer();
       case 'post':
         return _post();
-      case 'menu':
-        _menuId = _menuId === id ? '' : id;
-        return _drawFeed();
+      case 'menu': {
+        var opening = _menuId !== id;
+        _menuId = opening ? id : '';
+        _drawFeed();
+        if (opening) _focusMenuItem(id);
+        else _focusMenuButton(id);
+        return;
+      }
       case 'edit':
         return _edit(id);
       case 'pin': {
         _menuId = '';
+        _drawFeed();
+        _focusMenuButton(id);
         var pinned = el.dataset.pinned === 'true';
-        return void setBulletinPinned(_cid, id, !pinned).then(function (out) {
-          if (!out.ok && out.message) _say(out.message);
+        var cidNow = _cid;
+        return void setBulletinPinned(cidNow, id, !pinned).then(function (out) {
+          // Said beside the bulletin it is about, where the teacher is looking.
+          if (!out.ok && out.message && _alive && cidNow === _cid) {
+            _notes[id] = out.message;
+            _drawFeed();
+          }
         });
       }
       case 'delete':
         _menuId = '';
         _drawFeed();
+        // The confirm gives focus back to what had it when it opened: the ⋯ button.
+        _focusMenuButton(id);
         return _confirmDelete(id);
+      case 'put-back':
+        return _putBack(el.dataset.key || '');
+      case 'drop-returned':
+        dropReturnedBulletin(_cid, el.dataset.key || '');
+        _drawReturned();
+        // The line had focus and is gone: it goes to the words when the box is open, else to the box's bar.
+        if (_draft(_cid).open && _any('bulletin-words')) return _any('bulletin-words').focus();
+        return _focusBar();
       case 'seen': {
         var st = _seen[id];
         if (st && st.data !== undefined) {
@@ -1262,7 +1559,8 @@
         return _showAgain(id);
       case 'take-back':
         takeBackBulletin(_cid, el.dataset.key || '');
-        return _drawFeed();
+        _drawFeed();
+        return _focusBar();
     }
   }
 
@@ -1283,7 +1581,13 @@
       function () {
         delete _seen[id];
         deleteBulletin(cid, id).then(function (out) {
-          if (!out.ok && out.message && _alive && cid === _cid) _say(out.message);
+          if (!_alive || cid !== _cid) return;
+          if (!out.ok && out.message && !out.gone) {
+            _notes[id] = out.message;
+            _drawFeed();
+          }
+          // The bulletin that had focus is gone: focus goes to the box at the top.
+          _focusBar();
         });
       },
       'Keep It',
@@ -1298,9 +1602,23 @@
     _drawFeed();
     var cid = _cid;
     showBulletinAgain(cid, id).then(function (out) {
-      if (!_alive || cid !== _cid || !_seen[id]) return;
+      if (!_alive || cid !== _cid) return;
+      if (out.gone) {
+        // Deleted a moment before: it is gone, so it leaves the page.
+        delete _seen[id];
+        _notes[id] = out.message || '';
+        _drawFeed();
+        return;
+      }
+      if (!_seen[id]) return;
       _seen[id].again = out.ok ? 'done' : '';
+      if (!out.ok && out.message) _notes[id] = out.message;
       _drawFeed();
+      var a = document.activeElement;
+      if (!a || a === document.body) {
+        var back = _controlOf(_el('bulletin-feed'), id, 'seen');
+        if (back) back.focus();
+      }
     });
   }
 
@@ -1338,7 +1656,9 @@
   function _onKeydown(e) {
     if (!_alive) return;
     if (e.key === 'Escape' && _menuId) {
+      var was = _menuId;
       _closeMenu();
+      _focusMenuButton(was);
     }
   }
 
@@ -1352,6 +1672,7 @@
     if (side) side.innerHTML = renderSidebar(cid);
     _menuId = '';
     _seen = {};
+    _notes = {};
     releaseBulletinPictures();
     render();
   }
@@ -1366,11 +1687,17 @@
       '<div class="bulletin-page"><div class="bulletin-col">' +
       '<div class="bulletin-top" id="bulletin-head"></div>' +
       (offeredNothing ? '' : '<div id="bulletin-composer"></div>') +
+      '<div id="bulletin-returned"></div>' +
       '<div id="bulletin-feed"></div>' +
       '</div></div>';
+    _lastHead = '';
+    _lastFeed = '';
+    _lastReturned = '';
+    _known = null;
     _drawHead();
     if (!offeredNothing) _drawComposer();
-    _drawFeed();
+    _drawFeed(true);
+    _adoptReturned();
   }
 
   /** @param {{ course?: string, write?: string, open?: string, seen?: string }} [params] */
@@ -1380,6 +1707,7 @@
     _alive = true;
     _menuId = '';
     _seen = {};
+    _notes = {};
     _opening = false;
     _arrivedId = '';
     var side = document.getElementById('sidebar-mount');
@@ -1454,6 +1782,8 @@
       dateLabel: dateLabel,
       canSeeText: canSeeText,
       headerNotes: headerNotes,
+      returnedWhen: returnedWhen,
+      refusal: _refusal,
     },
   };
 })();
