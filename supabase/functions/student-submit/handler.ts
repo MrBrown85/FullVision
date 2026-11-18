@@ -13,7 +13,9 @@
 // a student sends work through, in send-routes.ts: work, send-start,
 // replace, send-finish, unsend, file-links, the teacher's sweep, and the
 // database timer's scheduled-sweep; and a teacher's handout's pages, in
-// handout-routes.ts: handout-links.
+// handout-routes.ts: handout-links; and a class's bulletins, in
+// bulletin-routes.ts: bulletins, bulletin-seen, bulletin-react and
+// bulletin-files.
 // The SQL functions (migrations/20261025_student_submit.sql, and
 // migrations/2026110904_student_sessions_page.sql for a card) hold every
 // rule; this file only checks the request's shape, refuses to run outside
@@ -34,6 +36,8 @@ import { REVISION_ROUTES, makeRevisionRoutes } from './revision-routes.ts';
 import { FORM_ROUTES, makeFormRoutes } from './forms-routes.ts';
 // Handouts and Links: a teacher's handout's pages, signed (handout-routes.ts).
 import { HANDOUT_ROUTES, makeHandoutRoutes } from './handout-routes.ts';
+// Bulletins: the class's one-way feed, Seen and reactions, a bulletin's pages signed (bulletin-routes.ts).
+import { BULLETIN_ROUTES, makeBulletinRoutes } from './bulletin-routes.ts';
 // A slip's open and verify, with the key (plan S3-S1).
 import { openSlip, verifySlip } from './slip-routes.ts';
 
@@ -231,6 +235,7 @@ export function makeHandler(opts: Options) {
   const feedbackRoute = makeFeedbackRoutes({ db: opts.db });
   const formRoute = makeFormRoutes({ db: opts.db });
   const handoutRoute = makeHandoutRoutes({ db: opts.db, store: opts.store || null });
+  const bulletinRoute = makeBulletinRoutes({ db: opts.db, store: opts.store || null });
   const revisionRoute = makeRevisionRoutes({ db: opts.db, store: opts.store || null, log, removal });
   const sendRoute = makeSendRoutes({
     removal,
@@ -292,7 +297,9 @@ export function makeHandler(opts: Options) {
                 ? formRoute
                 : Object.hasOwn(HANDOUT_ROUTES, route)
                   ? handoutRoute
-                  : null;
+                  : Object.hasOwn(BULLETIN_ROUTES, route)
+                    ? bulletinRoute
+                    : null;
     let result: Record<string, unknown>;
     try {
       const hash = await ipHash(req, opts.ipKey);
