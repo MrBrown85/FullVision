@@ -15108,6 +15108,44 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _s jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+begin
+    if _s ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _s->>'error');
+    end if;
+    -- Every piece of the session's class that quiz would open (the one rule, _quiz_window), and this student's
+    -- own tries, counted as quiz counts them. Nothing of the questions, the key or the answers is read.
+    return jsonb_build_object('ok', true, 'quizzes', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                   'assessment_id', x.id,
+                   'tries_left', x.left_,
+                   'can_answer', case when x.open_try then x.reopened or x.open
+                                      else x.open and (x.left_ is null or x.left_ > 0) end,
+                   'closed', not x.open,
+                   'has_open_try', x.open_try)
+                   order by x.id)
+          from (select z.assessment_id as id, (w.w->>'open')::boolean as open,
+                       case when z.tries = 0 then null
+                            else greatest(z.tries - (select count(*) from quiz_attempt t
+                                                      where t.assessment_id = z.assessment_id and t.enrollment_id = p_enrollment_id
+                                                        and t.reopened_at is null), 0)::int end as left_,
+                       o.id is not null as open_try, o.reopened_at is not null as reopened
+                  from quiz z
+                  join assessment a on a.id = z.assessment_id and a.course_id = (_s->>'course_id')::uuid
+                 cross join lateral (select student_submit._quiz_window(z.assessment_id, a.course_id) as w) w
+                  left join quiz_attempt o on o.assessment_id = z.assessment_id and o.enrollment_id = p_enrollment_id
+                                          and o.sent_at is null
+                 where w.w is not null) x), '[]'::jsonb));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
