@@ -10,9 +10,10 @@ import { findLowContrastText } from './contrast-check.js';
    Left out on purpose:
    - Level colours (--score-*), as text or as a fill under white text: the
      gradebook and level colours stay as they are (Colin, 2026-10-19).
-   - White text on a solid --active fill is not left out any more: filled
-     buttons and chosen pills use --active-fill (5.57:1), so this spec holds
-     them to 4.5:1.
+   - White text on a solid --active fill is not left out: filled buttons and
+     chosen pills use --active-fill (5.57:1 light, 6.51:1 dark), and this spec
+     holds them to 4.5:1 in both modes. A level fill is exempt only on the
+     elements that draw one (fillSelectors), never by its colour value.
    - The gradebook table (.gb-grid): its tiles keep their colours, as above. */
 
 const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
@@ -26,6 +27,9 @@ const OPTIONS = {
   skip: ['.gb-grid'],
   textTokens: LEVEL_TOKENS,
   fillTokens: LEVEL_TOKENS,
+  // Level fills are exempt on the elements that draw them, never by colour
+  // alone: in dark mode --score-4 and --active are the same value.
+  fillSelectors: ['.rsg-mod', '.rsg-level-name', '.m-obs-type', '.obs-type'],
 };
 
 async function enterDemo(page, { phone = false } = {}) {

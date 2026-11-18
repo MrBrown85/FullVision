@@ -75,7 +75,7 @@
   --priority-light: rgba(255, 59, 48, 0.08);
 
   /* Interactive states */
-  --btn-hover-blue: #0057b8; /* white on it: 6.87:1 */
+  --btn-hover-blue: #0052a3; /* white on it: 7.68:1; 1.33 darker than --active-fill */
   --toggle-hover-dark: #1a1a2e;
 
   /* Status badges */
@@ -3220,8 +3220,9 @@ body.offline-active #app-dock {
     --text-3: #98989d;
     --active: #0a84ff;
     --active-light: rgba(10, 132, 255, 0.18);
-    /* White on --active here is 3.65:1; white on this is 5.14:1. */
-    --active-fill: #0a6bd6;
+    /* White on --active here is 3.65:1; white on this is 6.51:1. The hover is
+       lighter (the lightest blue that keeps 4.5:1 under white is about #0070e0). */
+    --active-fill: #005ac0;
     --link: #5ca9ff;
     --priority: #ff453a;
     --priority-light: rgba(255, 69, 58, 0.18);
@@ -3250,7 +3251,7 @@ body.offline-active #app-dock {
     --obs-note-on: #1d1d1f;
     --obs-note-text: #ffd60a;
     --obs-note-edge: #ffd60a;
-    --btn-hover-blue: #0070e0; /* white on it: 4.78:1 */
+    --btn-hover-blue: #0070e0; /* white on it: 4.78:1; 1.36 apart from --active-fill */
     --toggle-hover-dark: #4a4a4e;
     --danger: #ff453a;
     --iep-badge: #ff9f0a;

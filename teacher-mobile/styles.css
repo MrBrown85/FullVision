@@ -5758,7 +5758,7 @@ body.fv-switching-course::after {
   font-size: 13px;
 }
 .m-addwork-pile-name.is-now {
-  background: #0a84ff;
+  background: var(--active-fill);
 }
 .m-addwork-pile-name.is-done {
   opacity: 0.5;
@@ -5839,7 +5839,7 @@ body.fv-switching-course::after {
   min-height: 50px;
   border: none;
   border-radius: 12px;
-  background: #0a84ff;
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 17px;
@@ -6170,7 +6170,7 @@ body.fv-switching-course::after {
   cursor: pointer;
 }
 .m-markup-btn.is-main {
-  background: #0a84ff;
+  background: var(--active-fill);
 }
 .m-markup-tools {
   display: flex;
@@ -6187,7 +6187,7 @@ body.fv-switching-course::after {
   cursor: pointer;
 }
 .m-markup-tool.is-on {
-  background: #0a84ff;
+  background: var(--active-fill);
 }
 .m-markup-note-edit {
   display: flex;

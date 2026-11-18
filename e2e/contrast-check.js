@@ -7,13 +7,14 @@
  * element's ancestors' background colours down to the page. Skipped:
  * aria-hidden and disabled controls, screen-reader-only text, anything
  * inside `opts.skip` selectors, text drawn in one of `opts.textTokens` colours, and text on a
- * fill of one of `opts.fillTokens` colours (tokens are custom property names,
- * read in the current colour scheme).
+ * fill of one of `opts.fillTokens` colours that is painted by an element
+ * matching `opts.fillSelectors` (tokens are custom property names, read in the
+ * current colour scheme). Both must hold, so a colour match alone exempts nothing.
  */
 
 export async function findLowContrastText(page, opts = {}) {
   return page.evaluate(
-    ({ skip, textTokens, fillTokens, min, maxPx }) => {
+    ({ skip, textTokens, fillTokens, fillSelectors, min, maxPx }) => {
       // Computed colours come back as rgb()/rgba(), or as color(srgb …) with
       // 0–1 channels when color-mix() made them. Anything else throws, so a
       // new format fails the test instead of being skipped.
@@ -120,7 +121,15 @@ export async function findLowContrastText(page, opts = {}) {
         if (!fg || fg.a === 0) continue;
         if (textKeys.has(rgbKey(fg))) continue;
         const under = backgroundOf(el);
-        if (under.fill.a === 1 && fillKeys.has(rgbKey(under.fill))) continue;
+        // A level fill is exempt on the level elements that carry it, not by its colour:
+        // in dark mode --score-4 and --active are the same value.
+        if (
+          under.fill.a === 1 &&
+          fillKeys.has(rgbKey(under.fill)) &&
+          fillSelectors.length &&
+          el.closest(fillSelectors.join(','))
+        )
+          continue;
         let r = Infinity;
         let text, bg;
         for (const b of under.bgs) {
@@ -148,6 +157,7 @@ export async function findLowContrastText(page, opts = {}) {
       skip: opts.skip || [],
       textTokens: opts.textTokens || [],
       fillTokens: opts.fillTokens || [],
+      fillSelectors: opts.fillSelectors || [],
       min: opts.min || 4.5,
       maxPx: opts.maxPx || 18,
     },

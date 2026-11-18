@@ -27,11 +27,35 @@ function tokens(css, name) {
 describe('white on the primary blue fill', () => {
   const styles = read('teacher/styles.css');
 
-  it('teacher app: --active-fill (light and dark) and the hover blue pass 4.5:1', () => {
+  /* The `:root` block inside `@media (prefers-color-scheme: dark)`, and the
+     `:root` block before it. */
+  const darkAt = styles.indexOf('@media (prefers-color-scheme: dark) {\n  :root {');
+  const darkEnd = styles.indexOf('\n  }\n', darkAt);
+  const dark = styles.slice(darkAt, darkEnd);
+  const light = styles.slice(0, darkAt);
+  const one = (css, name) => {
+    const found = tokens(css, name);
+    expect(found.length, `${name} declared once here`).toBe(1);
+    return found[0];
+  };
+
+  it('teacher app: --active-fill and the hover blue pass 4.5:1 under white, in light and in the dark block', () => {
+    expect(darkAt).toBeGreaterThan(0);
     for (const name of ['--active-fill', '--btn-hover-blue']) {
-      const found = tokens(styles, name);
-      expect(found.length, `${name} is declared for light and dark`).toBe(2);
-      for (const hex of found) expect(whiteOn(hex), `${name} ${hex}`).toBeGreaterThanOrEqual(4.5);
+      for (const [mode, css] of [
+        ['light', light],
+        ['dark', dark],
+      ]) {
+        const hex = one(css, name);
+        expect(whiteOn(hex), `${mode} ${name} ${hex}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('the hover blue reads as a different state from the fill (at least 1.25:1 apart)', () => {
+    for (const css of [light, dark]) {
+      const [a, b] = [lum(one(css, '--active-fill')), lum(one(css, '--btn-hover-blue'))].sort((x, y) => y - x);
+      expect((a + 0.05) / (b + 0.05)).toBeGreaterThanOrEqual(1.25);
     }
   });
 
