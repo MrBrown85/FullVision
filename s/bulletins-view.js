@@ -638,8 +638,10 @@
   /* Puts the question (shared/website-ask.js's box) wholly below the card
      that was tapped, or wholly above it, whichever has room for it; when
      neither has, on the larger side with the address shortened to fit (it
-     scrolls inside). So the card, and the finger on it, are never under the
-     question, Open Website included. Lengths in the screen's own pixels: the
+     scrolls inside), and if it is still too tall, inside the screen over the
+     card but never over the point that was tapped (the tap point wins over the
+     screen's edge). So the finger is never under the question, Open Website
+     included. Lengths in the screen's own pixels: the
      question is on <body>, outside the zoomed page. */
   function placeAsk(box, card) {
     if (!box || !card || !card.getBoundingClientRect || typeof window === 'undefined') return;
@@ -668,7 +670,22 @@
       url.style.overflowY = 'auto';
       h = box.getBoundingClientRect().height;
     }
-    box.style.top = Math.round(down ? bottom + GAP : Math.max(EDGE, top - GAP - h)) + 'px';
+    var t = down ? bottom + GAP : top - GAP - h;
+    // Still too tall for either side (a long title at Larger on a short phone): kept inside the
+    // screen, over the card if it must, but never over the point the finger tapped (the card's middle).
+    if (h > room) {
+      t = Math.min(Math.max(t, EDGE), H - EDGE - h);
+      var tap = (top + bottom) / 2;
+      if (t < tap + GAP && t + h > tap - GAP) {
+        var over = tap - GAP - h; // ending above the tap
+        var under = tap + GAP; // starting below it
+        if (over >= EDGE) t = over;
+        else if (under + h <= H - EDGE) t = under;
+        // Neither fits the screen: the tap point wins, on the side with more of the question shown.
+        else t = tap > H / 2 ? over : under;
+      }
+    }
+    box.style.top = Math.round(t) + 'px';
   }
 
   /* ── The page full size, fitted ────────────────────────────── */

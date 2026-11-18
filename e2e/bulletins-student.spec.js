@@ -58,6 +58,11 @@ async function open(page, opts = {}) {
               }),
               b('own-4', 560),
               b('own-long', 550, { link_url: long, link_title: 'A Long Address' }),
+              b('own-longtitle', 545, {
+                link_url: long,
+                link_title:
+                  'Inside a Cell: The Whole Walkthrough of the Membrane, the Nucleus, the Mitochondria and Everything Between Them, Part Two',
+              }),
               b('own-5', 540),
               b('own-tall', 530, {
                 files: [
@@ -436,7 +441,7 @@ for (const width of WIDTHS) {
         const found = [];
         for (const font of ['own', 'wide']) {
           if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
-          for (const which of ['own-link', 'own-long']) {
+          for (const which of ['own-link', 'own-long', 'own-longtitle']) {
             const card = page.locator('[data-bulletin="' + which + '"] .sp-bulletin-link');
             for (const at of [0.2, 0.5, 0.8]) {
               await card.evaluate((el, f) => {
@@ -455,9 +460,15 @@ for (const width of WIDTHS) {
               const tag = font + ' font, ' + which + ' at ' + at + ': ';
               if (x >= go.x && x <= go.x + go.width && y >= go.y && y <= go.y + go.height)
                 found.push(tag + 'Open Website under the tap');
-              if (box.y < tap.y + tap.height - 0.5 && box.y + box.height > tap.y + 0.5)
+              // Never over the tapped point; over the card only when neither side had room for it.
+              if (box.y < y && box.y + box.height > y) found.push(tag + 'the question over the tap point');
+              const beside = Math.max(tap.y - 16, H - (tap.y + tap.height) - 16);
+              if (box.height <= beside && box.y < tap.y + tap.height - 0.5 && box.y + box.height > tap.y + 0.5)
                 found.push(tag + 'the question over the card');
-              if (box.y < -0.5 || box.y + box.height > H + 0.5) found.push(tag + 'the question past the screen');
+              // Inside the screen, unless that would put it over the tapped point.
+              const fits = Math.max(y - 16, H - y - 16) >= box.height;
+              if (fits && (box.y < -0.5 || box.y + box.height > H + 0.5))
+                found.push(tag + 'the question past the screen');
               await page.locator('.sp-bulletin-ask-no').click();
               await expect(ask).toHaveCount(0);
             }
