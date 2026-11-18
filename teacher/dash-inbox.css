@@ -305,6 +305,9 @@
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+.dash-inbox-drop-back {
+  color: var(--text);
+}
 .dash-inbox-drop-line a,
 .dash-inbox-drop-wall {
   margin: 0;

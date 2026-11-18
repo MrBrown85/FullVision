@@ -187,7 +187,7 @@ window.DashInboxDrop = (function () {
     );
   }
 
-  /** The caught-up space (DashInbox's hook): one list item.
+  /** The space when nothing is to grade (DashInbox's hook): one list item.
    * @param {string} cid @param {any} model
    * @returns {string} */
   // html-safe: every title goes through esc; the rest is fixed markup and numbers
@@ -195,8 +195,25 @@ window.DashInboxDrop = (function () {
     var list = choices(cid);
     var c = chosen(cid, list);
     var split = /** @type {any} */ (window).AddWorkSplit;
-    var out =
-      '<li class="dash-inbox-drop-home" id="dash-inbox-caught"><div class="dash-inbox-drop-top"><span class="dash-inbox-drop-caught">All Caught Up</span>' +
+    /* As the top bar's To Grade cell: "All Caught Up" only when nothing is
+       to return either. Work assessed and not returned comes first instead. */
+    var back = notReturned(model);
+    var out = '<li class="dash-inbox-drop-home" id="dash-inbox-caught">';
+    if (back) {
+      out +=
+        '<p class="dash-inbox-drop-line dash-inbox-drop-back">' +
+        esc(back.title) +
+        ': ' +
+        back.n +
+        ' assessed, not returned' +
+        (back.more ? ' (and ' + back.more + (back.more === 1 ? ' more assessment' : ' more assessments') + ')' : '') +
+        ' <a role="link" tabindex="0" data-href="' +
+        esc('/assignments?course=' + encodeURIComponent(cid) + '&open=' + encodeURIComponent(back.aid)) +
+        '">Return Them →</a></p>';
+    }
+    out +=
+      '<div class="dash-inbox-drop-top">' +
+      (back ? '' : '<span class="dash-inbox-drop-caught">All Caught Up</span>') +
       (list.length ? _forHtml(cid, list, c) : '') +
       '</div>';
     if (list.length) {
@@ -213,19 +230,6 @@ window.DashInboxDrop = (function () {
         '</div></div>';
     } else {
       out += '<p class="dash-inbox-drop-line">No assessment is taking work.</p>';
-    }
-    var back = notReturned(model);
-    if (back) {
-      out +=
-        '<p class="dash-inbox-drop-line">' +
-        esc(back.title) +
-        ': ' +
-        back.n +
-        ' assessed, not returned' +
-        (back.more ? ' (and ' + back.more + (back.more === 1 ? ' more assessment' : ' more assessments') + ')' : '') +
-        ' <a role="link" tabindex="0" data-href="' +
-        esc('/assignments?course=' + encodeURIComponent(cid) + '&open=' + encodeURIComponent(back.aid)) +
-        '">Return Them →</a></p>';
     }
     var next = nextTaking(cid, model);
     if (next) {

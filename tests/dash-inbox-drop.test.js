@@ -25,6 +25,13 @@ function sendWorkOn() {
   saveDemoStudentWork(CID, work);
 }
 const ids = () => getStudents(CID).map(s => s.id);
+// Every graded piece returned: nothing to grade and nothing to return.
+function returnAll() {
+  getAssessments(CID).forEach(a => {
+    const back = GraderWork.workCounts(CID, a.id, ids()).ids.toreturn;
+    if (back.length) Grader.returnGrades(CID, a.id, back);
+  });
+}
 function caughtUp() {
   getAssessments(CID).forEach(a =>
     GraderWork.workCounts(CID, a.id, ids()).ids.tograde.forEach(sid =>
@@ -134,10 +141,12 @@ describe('which assessment', () => {
 });
 
 describe('All Caught Up', () => {
-  it('draws Add Work’s drop area, its three buttons, and two lines whose numbers are GraderWork’s', () => {
+  it('0 to grade, 7 to return: the drop area, the not-returned line first, and not "All Caught Up"', () => {
     caughtUp();
     const html = DashInbox.html(CID);
-    expect(html).toContain('All Caught Up');
+    // As the top bar: work waits to be returned, so nothing is caught up.
+    expect(GraderWork.classWorkCounts(CID, ids())).toMatchObject({ tograde: 0, toreturn: 7 });
+    expect(html).not.toContain('All Caught Up');
     expect(html).toContain('Drop the Scan, a Folder or Files');
     expect(html).toContain('Photos or PDFs. Files are matched to students by name.');
     expect(html).not.toContain('dash-inbox-row');
@@ -156,6 +165,22 @@ describe('All Caught Up', () => {
     expect(doc.querySelector('.dash-inbox-drop-line a').getAttribute('data-href')).toBe(
       '/assignments?course=' + CID + '&open=' + LIGHT,
     );
+    // The not-returned line is the first thing in the space.
+    expect(doc.querySelector('#dash-inbox-caught').firstElementChild.classList.contains('dash-inbox-drop-back')).toBe(
+      true,
+    );
+  });
+
+  it('nothing to grade and nothing to return: "All Caught Up", as the top bar says it', () => {
+    caughtUp();
+    returnAll();
+    expect(GraderWork.classWorkCounts(CID, ids())).toMatchObject({ tograde: 0, toreturn: 0 });
+    const doc = mountTile();
+    const home = doc.querySelector('#dash-inbox-caught');
+    expect(home.querySelector('.dash-inbox-drop-caught').textContent).toBe('All Caught Up');
+    expect(home.querySelector('.dash-inbox-drop-back')).toBeNull();
+    expect(home.textContent).not.toContain('not returned');
+    expect(home.querySelector('.dash-inbox-drop-area')).not.toBeNull();
   });
 
   it('escapes the titles', () => {

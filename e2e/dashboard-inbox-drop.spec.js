@@ -67,6 +67,12 @@ async function open(page, { flag = true, bulletins = false, caughtUp = false } =
           Grader.setOverallComment(cid, sid, a.id, 'Seen.'),
         ),
       );
+      // ...and returned: nothing to return either.
+      if (caughtUp === 'returned')
+        getAssessments(cid).forEach(a => {
+          const back = GraderWork.workCounts(cid, a.id, ids).ids.toreturn;
+          if (back.length) Grader.returnGrades(cid, a.id, back);
+        });
     }
     PageDashboard.render();
   }, caughtUp);
@@ -174,11 +180,17 @@ test('files dropped on the tile while By Assessment shows open Add Work with eac
   expect(errors).toEqual([]);
 });
 
-test('All Caught Up: the drop area adds to the piece chosen in Add Work For', async ({ page }) => {
+test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Work For', async ({ page }) => {
   test.setTimeout(60_000);
   await open(page, { caughtUp: true });
   const home = page.locator('#dash-inbox-caught');
-  await expect(home).toContainText('All Caught Up');
+  // As the top bar: work assessed and not returned is not "All Caught Up", and it comes first.
+  await expect(page.locator('.dash-glance-tograde')).toContainText('7 Not Returned');
+  await expect(page.locator('.dash-glance-tograde')).not.toContainText('All Caught Up');
+  await expect(home).not.toContainText('All Caught Up');
+  await expect(home.locator(':scope > :first-child')).toHaveText(
+    'Light Refraction Lab: 7 assessed, not returned Return Them →',
+  );
   await expect(home.locator('.dash-inbox-drop-area')).toContainText('Drop the Scan, a Folder or Files');
   await expect(home.locator('.dash-inbox-drop-area')).toContainText(
     'Photos or PDFs. Files are matched to students by name.',
@@ -221,6 +233,16 @@ test('All Caught Up: the drop area adds to the piece chosen in Add Work For', as
   await expect(awc).toContainText('Cell Microscope Lab');
   for (const s of two) await expect(chips(page, s.id)).toHaveText(s.name, { timeout: 20000 });
   expect(await stored(page)).toBe(before);
+});
+
+test('nothing to grade and nothing to return: All Caught Up, as the top bar says', async ({ page }) => {
+  await open(page, { caughtUp: 'returned' });
+  await expect(page.locator('.dash-glance-tograde')).toContainText('All Caught Up');
+  const home = page.locator('#dash-inbox-caught');
+  await expect(home.locator('.dash-inbox-drop-caught')).toHaveText('All Caught Up');
+  await expect(home).not.toContainText('not returned');
+  await expect(home.locator('.dash-inbox-drop-area')).toBeVisible();
+  await shot(page, 'inbox-caught-up-returned-510');
 });
 
 test('a dropped folder lands its files', async ({ page }) => {
@@ -321,7 +343,9 @@ test('each of the three buttons opens Add Work and its file chooser', async ({ p
   await expect(awc).toBeVisible();
 });
 
-test('beside Bulletins (299 px) All Caught Up fits with no scrolling and its icon hidden', async ({ page }) => {
+test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrolling and its icon hidden', async ({
+  page,
+}) => {
   await open(page, { bulletins: true, caughtUp: true });
   expect(Math.round(await page.locator('#dash-inbox').evaluate(el => el.getBoundingClientRect().height))).toBe(299);
   const m = await page.evaluate(() => {
@@ -351,7 +375,7 @@ test('with the switch off there is no Inbox, and a file dropped on the Dashboard
   await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
 });
 
-test('at 390 px All Caught Up wraps and nothing goes sideways', async ({ page }) => {
+test('at 390 px the nothing-to-grade space wraps and nothing goes sideways', async ({ page }) => {
   // A phone opens the phone app; Switch to Desktop is how the Dashboard shows at this width.
   await page.addInitScript(() => localStorage.setItem('td-mobile-pref', 'desktop'));
   await page.setViewportSize({ width: 390, height: 844 });
