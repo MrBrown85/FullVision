@@ -155,7 +155,7 @@ afterEach(() => {
   window.isDemoMode = wasDemo;
 });
 
-describe('Cards | List', () => {
+describe('Grade | Bulk Edit', () => {
   it('List draws one row per assessment in the class order, without Expand and Collapse', () => {
     AssignList.setView(false);
     openAssignments(seed, CID, {});
