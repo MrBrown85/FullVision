@@ -35,36 +35,14 @@ body.cm-open #app-dock [data-action='toggleSidebar'] {
 }
 
 /* ── Class Overview Panel ──────────────────────────────────── */
-/* The top bar (Class Average, Missing and Late, Upcoming Birthdays); then
-   Curricular and Core Competencies side by side; then the students; then
-   Observations across the page. */
-.dash-overview-row {
-  display: grid;
-  gap: 12px;
-  align-items: stretch;
-}
-/* Curricular and Core Competencies side by side, always one height: the
-   grid row stretches both to the taller (Colin, Nov 5). Below 900px they
-   stack. */
-.dash-overview-cards {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  margin-top: 12px;
-}
-/* Both cards are at least 300 px; the taller sets the row (plan F.1), and
-   each card's rows share what it has (F.2). */
-.dash-overview-cards > .dash-overview-section {
-  min-height: 300px;
-}
+/* The top bar (Class Average, To Grade, Missing and Late, Upcoming
+   Birthdays); then the middle row (.dash-row, below); then the students;
+   then Observations across the page. */
 /* Observations, last on the page: #main is a flex column, so the card
    must not shrink to fit it (its grid would be squeezed to nothing). */
 .page-dashboard .dash-ob2 {
   flex-shrink: 0;
   margin-top: 12px;
-}
-@media (max-width: 900px) {
-  .dash-overview-cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* The top bar: one white box, its cells split by hairlines. */
@@ -525,18 +503,6 @@ a.dash-glance-cell:hover {
   border-radius: 1.5px;
   background: var(--divider-medium);
 }
-.dash-core-sq.is-self-1 {
-  background: var(--self-1);
-}
-.dash-core-sq.is-self-2 {
-  background: var(--self-2);
-}
-.dash-core-sq.is-self-3 {
-  background: var(--self-3);
-}
-.dash-core-sq.is-self-4 {
-  background: var(--self-4);
-}
 .dash-core-sq.is-work {
   background: var(--text-2);
 }
@@ -658,27 +624,9 @@ a.dash-glance-cell:hover {
 .dash-comp-lab-val {
   text-align: right;
 }
-.dash-comp-lab-mid.is-cells {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3px;
-  text-align: center;
-}
 .dash-comp-lab-mid.is-ends {
   display: flex;
   justify-content: space-between;
-}
-/* Level Mix's headings: the level's code, or one letter on a narrow card. */
-.dash-comp-lv-short {
-  display: none;
-}
-@container (max-width: 340px) {
-  .dash-comp-lv-long {
-    display: none;
-  }
-  .dash-comp-lv-short {
-    display: inline;
-  }
 }
 .dash-comp-codes,
 .dash-comp-squares {
@@ -741,7 +689,6 @@ a.dash-glance-cell:hover {
   background: var(--active-light);
 }
 .dash-comp-row:focus-visible,
-.dash-comp-pick:focus-visible,
 .dash-comp-code:focus-visible,
 .dash-comp-more:focus-visible,
 .dash-comp-moreline:focus-visible,
@@ -755,17 +702,6 @@ a.dash-glance-cell:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.dash-comp-pick {
-  align-self: stretch;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
 }
 .dash-comp-val {
   text-align: right;
@@ -784,49 +720,6 @@ a.dash-glance-cell:hover {
 }
 .dash-comp-row .dash-outcome-bar-fill {
   display: block;
-}
-/* Level Mix: a count per level, tinted by it; the row's largest is bold. */
-.dash-comp-cells {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3px;
-  height: 18px;
-}
-.dash-comp-cell {
-  display: grid;
-  place-items: center;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: var(--cell-bg);
-  color: var(--cell-fg);
-  font-family: var(--font-base);
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-.dash-comp-cell.is-top {
-  font-weight: 700;
-}
-.dash-comp-cell.is-empty {
-  background: var(--overlay-hover);
-  /* --text-2, not --text-3: the dark theme's --text-3 on this cell is 4.0:1
-     (e2e/contrast.spec.js wants 4.5). */
-  color: var(--text-2);
-  cursor: default;
-}
-button.dash-comp-cell:hover {
-  box-shadow: inset 0 0 0 1px var(--cell-fg);
-}
-.dash-comp-cell.active {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
-}
-.dash-comp-cell:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 1px;
 }
 /* Needs Support: a cell per competency in the student's level colour, or
    (past 8 columns, or below 14 px a column) the codes of the columns the
@@ -1154,18 +1047,9 @@ button.dash-comp-cell:hover {
   max-height: 64px;
   font-size: var(--text-base);
 }
-.dash-comp-card.is-roomy .dash-comp-pick {
-  font-size: var(--text-base);
-}
 .dash-comp-card.is-roomy .dash-outcome-bar-track {
   height: 10px;
   border-radius: 5px;
-}
-.dash-comp-card.is-roomy .dash-comp-cells {
-  height: 22px;
-}
-.dash-comp-card.is-roomy .dash-comp-cell {
-  font-size: var(--text-sm);
 }
 .dash-comp-card.is-roomy .dash-comp-squares {
   height: 18px;
@@ -1256,28 +1140,8 @@ button.dash-comp-cell:hover {
   text-decoration: underline;
 }
 
-/* The students at one level on a competency (a Level Mix count). */
-.dash-mix-pop {
-  position: fixed;
-  z-index: var(--z-fab);
-  width: 340px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--divider-strong);
-  border-radius: 10px;
-  box-shadow: var(--shadow-md);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text);
-}
-.dash-mix-pop[hidden] {
-  display: none;
-}
+/* The head of a competency row's list of students (the Competencies tile's
+   .dash-comp-pop), and the shared next step under it. */
 .dash-mix-pop-head {
   display: flex;
   align-items: center;
@@ -8819,7 +8683,7 @@ button.rb-v-prompt {
   color: var(--text-3);
 }
 
-/* ── The middle row, behind the dashRow switch (D2, docs/plans/dashboard-inbox-plan.md) ──
+/* ── The middle row (D2, docs/plans/dashboard-inbox-plan.md; on since D9) ──
    A left column at two thirds and one Competencies tile at one third, as
    tall as the window leaves (--dash-row-h, set by DashOverview.sizeRow;
    510 px with no script), so the Students heading starts below the first
@@ -8963,16 +8827,21 @@ button.rb-v-prompt {
    sideways in 220 ms. Each page is today's card with its box taken off, so
    the tile's is the only one. A page that is not shown is hidden (not just
    moved), so nothing in it takes focus. */
+/* The title and Curricular | Core on one line when they fit; when the tile
+   is too narrow for both (1100 wide with the roster shown, or a wider font)
+   the switch goes under the title, at the right, whole. */
 .dash-comp-tile-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   flex: 0 0 auto;
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text);
 }
 .dash-comp-seg {
+  flex: 0 0 auto;
   margin-left: auto;
 }
 .dash-comp-pages {

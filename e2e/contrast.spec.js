@@ -18,21 +18,7 @@ import { TODAY, serve, signIn } from './student-card-fake.js';
      elements that draw one (fillSelectors), never by its colour value.
    - The gradebook table (.gb-grid): its tiles keep their colours, as above. */
 
-const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
-  `--score-${n}`,
-  `--score-${n}-bg`,
-  `--score-${n}-text`,
-  `--score-${n}-dark`,
-]);
-
-const OPTIONS = {
-  skip: ['.gb-grid'],
-  textTokens: LEVEL_TOKENS,
-  fillTokens: LEVEL_TOKENS,
-  // Level fills are exempt on the elements that draw them, never by colour
-  // alone: in dark mode --score-4 and --active are the same value.
-  fillSelectors: ['.rsg-mod', '.rsg-level-name', '.m-obs-type', '.obs-type'],
-};
+const OPTIONS = { skip: ['.gb-grid'] };
 
 async function enterDemo(page, { phone = false } = {}) {
   if (phone) await page.setViewportSize({ width: 390, height: 844 });
@@ -107,14 +93,12 @@ const DESKTOP = [
     name: 'dashboard with the Inbox on, ' + label,
     hash: '/dashboard',
     ready: '.dash-glance',
-    flag: ['fv-build-dashRow', '1'],
     open: page => openInbox(page, { view }),
   })),
   {
     name: 'dashboard with the Inbox on, All Caught Up and the drop area',
     hash: '/dashboard',
     ready: '.dash-glance',
-    flag: ['fv-build-dashRow', '1'],
     open: page => openInbox(page, { caughtUp: true }),
   },
   {
@@ -171,6 +155,27 @@ for (const colorScheme of ['light', 'dark']) {
       await enterDemo(page, { phone: true });
       await page.locator('.m-tab-item[data-tab="observe"]').click();
       await expect(page.locator('.m-obs-card').first()).toBeVisible();
+      await expectReadable(page);
+    });
+
+    // The phone's Bulletins tab (B1f): the feed with its blue Post a Photo, Write a Bulletin, and a delete's red confirm.
+    test('phone Bulletins: the feed, Write a Bulletin and the confirm', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await enterDemo(page, { phone: true });
+      await page.locator('.m-tab-item[data-tab="bulletins"]').click();
+      await expect(page.locator('.m-bulletin-card').first()).toBeVisible();
+      await expectReadable(page);
+      await page.locator('[data-m-bulletin="write"]').click();
+      await expect(page.locator('#m-bulletin-write')).toBeVisible();
+      await page.waitForTimeout(400);
+      await expectReadable(page);
+      await page.locator('#m-bulletin-write [data-m-bulletin="close"]').click();
+      await expect(page.locator('#m-sheet-container .m-sheet')).toHaveCount(0);
+      await page.locator('.m-bulletin-seen').first().click();
+      await page.locator('#m-bulletin-seen-sheet [data-m-bulletin="delete"]').click();
+      await expect(page.locator('.m-bulletin-confirm-ok')).toBeVisible();
+      await page.waitForTimeout(400);
       await expectReadable(page);
     });
   });

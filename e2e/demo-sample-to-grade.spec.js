@@ -167,3 +167,29 @@ test.describe('phone, 375 wide', () => {
     await shot(page, 'Demo-sample-phone-speed-grader-375');
   });
 });
+
+/* The front page's Try Demo Mode turns the student page and Send Work on as
+   it opens. Its first load has Maya's and Liv's drafts already, so the top
+   bar, the Inbox and Assignments say 4 to grade and 2 to return from the
+   first look (D9; before, the first load said 6 and 0 until the page was
+   loaded again). */
+test('the front page Demo Mode: the top bar, the Inbox and Assignments agree on the first load', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto('/login.html?demo=1&student=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.locator('#dash-inbox').waitFor();
+  const cell = page.locator('.dash-glance-tograde');
+  await expect(cell.locator('.dash-glance-value')).toHaveText('4');
+  await expect(cell.locator('.dash-glance-sub')).toContainText('2 Not Returned');
+  const rows = await page.evaluate(() => DashInbox.model().rows.reduce((n, r) => n + r.tograde, 0));
+  expect(rows).toBe(4);
+  await expect(page.locator('#dash-inbox .dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-counts')).toContainText(
+    '4 to grade',
+  );
+  await page
+    .locator('a, button', { hasText: /^Assignments$/ })
+    .first()
+    .click();
+  await page.waitForURL(/\/assignments/);
+  await expect(page.locator('.assess-tograde-n')).toHaveText('4');
+});

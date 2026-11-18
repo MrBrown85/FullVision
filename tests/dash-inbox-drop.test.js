@@ -70,7 +70,6 @@ beforeEach(() => {
   localStorage.clear();
   CURRICULUM_INDEX = newBankIndex(['SCI8']);
   seedIfNeeded();
-  localStorage.setItem('fv-build-dashRow', '1');
   sendWorkOn();
 });
 afterEach(() => {

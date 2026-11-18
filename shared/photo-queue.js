@@ -75,6 +75,14 @@
  *   (meta.mime) and sent to the path the server named in the bucket
  *   handout-files (<course>/<resource>.<html|txt|epub>).
  *
+ * Bulletins (B1f): a page of a bulletin posted from the phone, kind
+ *   'bulletin', added by addBulletin(), ids { course, key, file } (key: the
+ *   bulletin's device idempotency key; no local bulletin id), no thumbnail.
+ *   Blocked until placeBulletin() writes the path post_bulletin named
+ *   (<course>/<bulletin file>/<n>.jpg, bucket bulletin-files). Sent and
+ *   committed only by bulletinUpload and bulletinCommit, as { kind:
+ *   'bulletin', key, batch, ids, files }.
+ *
  * Everything here is a window.PhotoQueue.* public surface; no other globals.
  */
 window.PhotoQueue = (function () {
@@ -96,6 +104,10 @@ window.PhotoQueue = (function () {
   // A handout file's name in the bucket handout-files: <course>/<resource>.<kind>.
   var HANDOUT_FILE_PATH =
     /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(html|txt|epub)$/;
+  var BULLETIN_KEYS = ['course']; // a page's key is the bulletin's own, already a uuid; its file id stays local
+  // Where a bulletin's page goes in the bucket bulletin-files: <course>/<bulletin file>/<n>.jpg.
+  var BULLETIN_PATH =
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([1-9]|1[0-9]|20)\.jpg$/;
   // The types a handout file is kept and sent as, and nothing else.
   var FILE_TYPES = { 'text/html': true, 'text/plain': true, 'application/epub+zip': true };
   // The same test shared/data.js uses (_isUuid) to tell a server id from a local one.
@@ -105,6 +117,8 @@ window.PhotoQueue = (function () {
   var _store = null; // where pages are kept (IndexedDB unless configured)
   var _upload = null; // (path, blob, info) → Promise<{ error }>
   var _commit = null; // ({ key, ids, files }) → Promise<{ error }>
+  var _bulletinUpload = null; // (path, blob, info) → Promise<{ error }>, a bulletin's page only
+  var _bulletinCommit = null; // ({ kind: 'bulletin', key, batch, ids, files }) → Promise<{ error }>
   var _isDemo = null;
   var _owner = null; // () → who is signed in
   var _metas = null; // this tab's copy of every record, without the bytes
@@ -126,11 +140,16 @@ window.PhotoQueue = (function () {
        commit({ key, ids, files }) → Promise<{ error }> optional, see Confirming
        isDemo() → true in Demo Mode (default: the page's isDemoMode())
        owner() → the signed-in user's id, or null
-       store    where pages are kept (tests pass a fake; default IndexedDB) */
+       store    where pages are kept (tests pass a fake; default IndexedDB)
+       bulletinUpload, bulletinCommit: a bulletin's pages only (see Bulletins) */
   function configure(opts) {
     opts = opts || {};
     if ('upload' in opts) _upload = typeof opts.upload === 'function' ? opts.upload : null;
     if ('commit' in opts) _commit = typeof opts.commit === 'function' ? opts.commit : null;
+    if ('bulletinUpload' in opts)
+      _bulletinUpload = typeof opts.bulletinUpload === 'function' ? opts.bulletinUpload : null;
+    if ('bulletinCommit' in opts)
+      _bulletinCommit = typeof opts.bulletinCommit === 'function' ? opts.bulletinCommit : null;
     if ('isDemo' in opts) _isDemo = typeof opts.isDemo === 'function' ? opts.isDemo : null;
     if ('owner' in opts) _owner = typeof opts.owner === 'function' ? opts.owner : null;
     if ('store' in opts) {
@@ -194,11 +213,18 @@ window.PhotoQueue = (function () {
     return !!meta && meta.kind === 'handout';
   }
 
+  function _isBulletin(meta) {
+    return !!meta && meta.kind === 'bulletin';
+  }
+
   function _keysOf(meta) {
+    if (_isBulletin(meta)) return BULLETIN_KEYS;
     return _isHandout(meta) ? HANDOUT_KEYS : ID_KEYS;
   }
 
   function _blocked(meta) {
+    // A bulletin's page waits for its path and for the two functions that send it.
+    if (_isBulletin(meta) && (!meta.path || !_bulletinUpload || !_bulletinCommit)) return true;
     if (_isHandout(meta) && !meta.path) return true;
     return !_keysOf(meta).every(function (k) {
       return isServerId(meta.ids && meta.ids[k]);
@@ -207,6 +233,10 @@ window.PhotoQueue = (function () {
 
   // Where this record's page goes. A handout's is the path the server named; it throws until there is one.
   function _pathOf(meta) {
+    if (_isBulletin(meta)) {
+      if (!meta.path) throw new Error('A bulletin page cannot upload before the server names its path');
+      return meta.path;
+    }
     if (!_isHandout(meta)) return pathFor(meta.ids);
     if (!meta.path) throw new Error('A handout page cannot upload before the server names its path');
     return meta.path;
@@ -223,6 +253,13 @@ window.PhotoQueue = (function () {
       m[1] === String(course).toLowerCase() &&
       m[2] === String(resource).toLowerCase()
     );
+  }
+
+  /* Does `path` belong to a bulletin page of this class? The class must be a
+     server id, and the path the bucket bulletin-files' layout. */
+  function bulletinPathOk(path, course) {
+    var m = typeof path === 'string' ? BULLETIN_PATH.exec(path) : null;
+    return !!m && isServerId(course) && m[1] === String(course).toLowerCase();
   }
 
   /* ── The IndexedDB store ──────────────────────────────────────────────── */
@@ -778,6 +815,110 @@ window.PhotoQueue = (function () {
     return { ok: true, changed: rows.length };
   }
 
+  /* Queue the pages of one bulletin the teacher posted (Bulletins, B1f).
+     ref: { course, key }: the class's server id and the bulletin's
+     idempotency key made on the device (both uuids: a bulletin has no
+     local id). pages are PhotoShrink's, in order, every page of every file
+     of the bulletin; each may say which file it is from and its page number
+     in it ({ file, page }). Their thumbnails are not kept. All of them are
+     kept, or none. Answers as add() does. */
+  async function addBulletin(ref, pageList) {
+    ref = ref || {};
+    var bad = !isServerId(ref.course) || !isServerId(ref.key);
+    if (bad || !Array.isArray(pageList) || !pageList.length) return { ok: false, reason: 'invalid' };
+    var unsized = pageList.some(function (p) {
+      return !p || !p.blob || !(p.blob.size > 0);
+    });
+    if (unsized) return { ok: false, reason: 'invalid' };
+
+    await ready();
+    var now = Date.now();
+    var batch = _uuid4();
+    var owner = _ownerNow();
+    var items = pageList.map(function (page, i) {
+      var id = newLocalId();
+      return {
+        meta: {
+          id: id,
+          batch: batch,
+          kind: 'bulletin',
+          path: null,
+          owner: owner,
+          ids: { course: ref.course, key: ref.key, file: id },
+          order: i,
+          file_index: typeof page.file === 'number' ? page.file : 0,
+          page: typeof page.page === 'number' ? page.page : i + 1,
+          hash: page.hash || null,
+          bytes: page.blob.size,
+          thumb_bytes: 0,
+          width: page.width || null,
+          height: page.height || null,
+          name: page.name || null,
+          queued_at: now,
+          state: 'waiting',
+          sent: { photo: false, thumb: true },
+          attempts: 0,
+          last_error: null,
+          last_code: null,
+          next_at: 0,
+        },
+        photo: page.blob,
+        thumb: null,
+      };
+    });
+    try {
+      await _getStore().putAll(items);
+    } catch (err) {
+      if (_isQuota(err)) {
+        _storageFull = true;
+        _notifyLocal('storage-full', { error: _message(err) });
+        return { ok: false, reason: 'storage_full', error: _message(err) };
+      }
+      _storeError = _message(err);
+      _notifyLocal('store-failed', { error: _storeError });
+      return { ok: false, reason: 'store_failed', error: _storeError };
+    }
+    _storageFull = false;
+    await _reload();
+    var ids = items.map(function (item) {
+      return item.meta.id;
+    });
+    _changed('add', { batch: batch, ids: ids });
+    return { ok: true, batch: batch, ids: ids };
+  }
+
+  /* post_bulletin answered: each waiting bulletin page takes the path the
+     server named for it. map: { pageId: path }. Every path must be in the
+     page's own class's folder of the bucket's layout, or nothing is
+     written. */
+  async function placeBulletin(map) {
+    map = map || {};
+    var ids = Object.keys(map);
+    if (!ids.length) return { ok: false, reason: 'invalid' };
+    await ready();
+    await _reload();
+    var rows = ids.map(function (id) {
+      return (
+        (_metas || []).filter(function (m) {
+          return m.id === id;
+        })[0] || null
+      );
+    });
+    for (var i = 0; i < rows.length; i++) {
+      var m = rows[i];
+      if (!m) return { ok: false, reason: 'not_found', id: ids[i] };
+      if (!_isBulletin(m) || !bulletinPathOk(String(map[ids[i]]).toLowerCase(), m.ids && m.ids.course)) {
+        return { ok: false, reason: 'bad_path', id: ids[i] };
+      }
+    }
+    for (var j = 0; j < rows.length; j++) {
+      await _save(rows[j], { path: String(map[ids[j]]).toLowerCase() });
+    }
+    await _reload();
+    _changed('place', { changed: rows.length });
+    return { ok: true, changed: rows.length };
+  }
+
   /* A record came back from the server: put its id into every waiting page
      that names the local one. rekey(localId, serverId) or rekey({ local:
      server, … }). A page's own file id is rekeyed the same way, by the local
@@ -909,10 +1050,11 @@ window.PhotoQueue = (function () {
     return _status(res) === 409 || /already exists|duplicate/i.test(_errorText(res));
   }
 
-  function _callUpload(path, blob, info) {
+  // `send`: the upload to use (a bulletin's own, never the work upload).
+  function _callUpload(path, blob, info, send) {
     return Promise.resolve()
       .then(function () {
-        return _upload(path, blob, info);
+        return send(path, blob, info);
       })
       .then(
         function (res) {
@@ -972,19 +1114,27 @@ window.PhotoQueue = (function () {
       var blobs = await _getStore().blobs(meta.id);
       if (epoch !== _epoch || !blobs) return null;
       var handout = _isHandout(meta);
-      var paths = { photo: _pathOf(meta), thumb: handout ? null : thumbPathFor(meta.ids) };
-      meta.sent = meta.sent || { photo: false, thumb: handout };
-      var parts = handout ? ['photo'] : ['photo', 'thumb'];
+      // A bulletin's page is one picture, like a handout's, and goes by its own upload.
+      var bulletin = _isBulletin(meta);
+      if (bulletin && !_bulletinUpload) return null; // never by another kind's upload
+      var paths = { photo: _pathOf(meta), thumb: handout || bulletin ? null : thumbPathFor(meta.ids) };
+      meta.sent = meta.sent || { photo: false, thumb: handout || bulletin };
+      var parts = handout || bulletin ? ['photo'] : ['photo', 'thumb'];
       for (var i = 0; i < parts.length; i++) {
         var part = parts[i];
         if (meta.sent[part]) continue;
-        var res = await _callUpload(paths[part], blobs[part], {
-          part: part,
-          id: meta.id,
-          ids: Object.assign({}, meta.ids),
-          order: meta.order,
-          hash: meta.hash,
-        });
+        var res = await _callUpload(
+          paths[part],
+          blobs[part],
+          {
+            part: part,
+            id: meta.id,
+            ids: Object.assign({}, meta.ids),
+            order: meta.order,
+            hash: meta.hash,
+          },
+          bulletin ? _bulletinUpload : _upload,
+        );
         if (epoch !== _epoch) return null;
         if (res.error && !_alreadyThere(res)) {
           _sendingId = null;
@@ -995,7 +1145,8 @@ window.PhotoQueue = (function () {
         landed[part] = true;
         await _save(meta, { sent: landed });
       }
-      if (typeof _commit === 'function') {
+      // A bulletin's pages always wait for their commit (it makes the bulletin visible).
+      if (bulletin || typeof _commit === 'function') {
         await _save(meta, { state: 'uploaded', attempts: 0, last_error: null, last_code: null, next_at: 0 });
       } else {
         await _getStore().remove([meta.id]);
@@ -1031,18 +1182,25 @@ window.PhotoQueue = (function () {
       });
       if (!allUp || (!due && !opts.force)) continue;
       var first = rows[0];
+      // Each batch is committed only by its own kind's commit.
+      if (_isBulletin(first) ? typeof _bulletinCommit !== 'function' : typeof _commit !== 'function') continue;
       var res;
       try {
-        res = _isHandout(first)
-          ? await _commit({
-              kind: 'handout',
-              key: keys[i],
-              ids: { course: first.ids.course, assessment: first.ids.assessment, resource: first.ids.resource },
+        res = _isBulletin(first)
+          ? await _bulletinCommit({
+              kind: 'bulletin',
+              key: first.ids.key,
+              batch: keys[i],
+              ids: { course: first.ids.course },
               files: rows.map(function (m) {
+                var path = _pathOf(m);
                 return {
-                  id: m.ids.file,
+                  id: m.id,
                   order: m.order,
-                  path: _pathOf(m),
+                  path: path,
+                  file: (BULLETIN_PATH.exec(path) || [])[2] || null, // the bulletin file its path names
+                  fileIndex: m.file_index || 0,
+                  page: m.page,
                   hash: m.hash,
                   bytes: m.bytes,
                   width: m.width,
@@ -1050,28 +1208,45 @@ window.PhotoQueue = (function () {
                 };
               }),
             })
-          : await _commit({
-              key: keys[i],
-              ids: {
-                course: first.ids.course,
-                assessment: first.ids.assessment,
-                enrollment: first.ids.enrollment,
-                submission: first.ids.submission,
-              },
-              files: rows.map(function (m) {
-                return {
-                  id: m.ids.file,
-                  order: m.order,
-                  path: pathFor(m.ids),
-                  thumbPath: thumbPathFor(m.ids),
-                  hash: m.hash,
-                  bytes: m.bytes,
-                  thumbBytes: m.thumb_bytes,
-                  width: m.width,
-                  height: m.height,
-                };
-              }),
-            });
+          : _isHandout(first)
+            ? await _commit({
+                kind: 'handout',
+                key: keys[i],
+                ids: { course: first.ids.course, assessment: first.ids.assessment, resource: first.ids.resource },
+                files: rows.map(function (m) {
+                  return {
+                    id: m.ids.file,
+                    order: m.order,
+                    path: _pathOf(m),
+                    hash: m.hash,
+                    bytes: m.bytes,
+                    width: m.width,
+                    height: m.height,
+                  };
+                }),
+              })
+            : await _commit({
+                key: keys[i],
+                ids: {
+                  course: first.ids.course,
+                  assessment: first.ids.assessment,
+                  enrollment: first.ids.enrollment,
+                  submission: first.ids.submission,
+                },
+                files: rows.map(function (m) {
+                  return {
+                    id: m.ids.file,
+                    order: m.order,
+                    path: pathFor(m.ids),
+                    thumbPath: thumbPathFor(m.ids),
+                    hash: m.hash,
+                    bytes: m.bytes,
+                    thumbBytes: m.thumb_bytes,
+                    width: m.width,
+                    height: m.height,
+                  };
+                }),
+              });
       } catch (err) {
         res = { error: { message: _message(err) || 'commit failed' } };
       }
@@ -1105,7 +1280,8 @@ window.PhotoQueue = (function () {
       if (sent === true) out.sent++;
       else if (sent === false) out.failed++;
     }
-    if (epoch === _epoch && _online() && typeof _commit === 'function') await _commitBatches(opts, out, epoch);
+    if (epoch === _epoch && _online() && (typeof _commit === 'function' || typeof _bulletinCommit === 'function'))
+      await _commitBatches(opts, out, epoch);
   }
 
   function _retryIn(ms) {
@@ -1123,7 +1299,8 @@ window.PhotoQueue = (function () {
     var soonest = null;
     (_metas || []).forEach(function (m) {
       if (!_mine(m, owner) || m.state === 'failed' || !m.next_at) return;
-      if (m.state === 'waiting' && _blocked(m)) return;
+      // A page this tab cannot send or commit (a bulletin's, unwired here) is no reason to wake.
+      if ((m.state === 'waiting' && _blocked(m)) || (_isBulletin(m) && !(_bulletinUpload && _bulletinCommit))) return;
       if (soonest == null || m.next_at < soonest) soonest = m.next_at;
     });
     if (soonest != null) _retryIn(Math.max(0, soonest - Date.now()));
@@ -1200,7 +1377,7 @@ window.PhotoQueue = (function () {
     var meta = await _find(id);
     if (!meta) return { ok: false, reason: 'not_found' };
     var patch = { state: 'waiting', attempts: 0, next_at: 0, last_error: null, last_code: null };
-    if (opts && opts.again) patch.sent = { photo: false, thumb: _isHandout(meta) };
+    if (opts && opts.again) patch.sent = { photo: false, thumb: _isHandout(meta) || _isBulletin(meta) };
     await _save(meta, patch);
     await _reload();
     _changed('retry:reset', { id: id });
@@ -1295,6 +1472,9 @@ window.PhotoQueue = (function () {
     addHandout: addHandout,
     placeHandout: placeHandout,
     handoutPathOk: handoutPathOk,
+    addBulletin: addBulletin,
+    placeBulletin: placeBulletin,
+    bulletinPathOk: bulletinPathOk,
     rekey: rekey,
     send: send,
     stats: stats,

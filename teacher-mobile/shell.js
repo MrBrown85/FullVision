@@ -7,9 +7,9 @@
   var MC = window.MComponents;
   var APP_VERSION = '1.0';
   var _activeTab = 'students';
-  var _navStacks = { students: [], observe: [], grade: [] };
+  var _navStacks = { students: [], observe: [], grade: [], bulletins: [] };
   // Where each tab was left: scroll, card, and the screens open on it.
-  var _tabState = { students: null, observe: null, grade: null };
+  var _tabState = { students: null, observe: null, grade: null, bulletins: null };
   var _cid = null;
   var _searchTimer = null;
   // The student whose page opened the current grading screen (Grade button).
@@ -253,7 +253,7 @@
           reject(new Error('timeout'));
         }, 8000);
       });
-      await Promise.race([retryActiveCourseLoad(), timeout]);
+      await Promise.race([Promise.all([retryActiveCourseLoad(), window.MBulletins && MBulletins.refresh()]), timeout]);
       if (courseLoadFailed(getActiveCourse())) throw new Error('could not reach the server');
     } catch (e) {
       console.warn('Pull-to-refresh error:', e);
@@ -739,8 +739,8 @@
     } else if (tab === 'grade') {
       html = MGrade.renderPicker(_cid);
     }
-
-    // html-safe: html is MStudents.renderList, MObserve.renderFeed or MGrade.renderPicker, each checked to escape its text.
+    if (window.MBulletins) html = MBulletins.tab(tab, _cid, html); // the fourth tab (B1f), behind its build flag
+    // html-safe: html is MStudents.renderList, MObserve.renderFeed, MGrade.renderPicker or MBulletins.render, each checked to escape its text.
     stack.innerHTML = html;
     _navStacks[tab].push(tab);
     _addDemoPill(stack.querySelector('.m-screen'));

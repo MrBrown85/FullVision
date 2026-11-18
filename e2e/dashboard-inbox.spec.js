@@ -1,10 +1,11 @@
 /**
  * The Dashboard's Inbox tile, By Assessment (D4 of
- * docs/plans/dashboard-inbox-plan.md), behind the dashRow switch. Demo Mode,
+ * docs/plans/dashboard-inbox-plan.md). Demo Mode,
  * Science 8, the student page and Send Work on, so the sample work shows:
  * Light Refraction Lab has work waiting.
  */
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
 const LIGHT = 'sci8a21';
 const SHOTS = process.env.FV_SHOTS || '';
@@ -24,11 +25,12 @@ const shot = async (page, name) => {
   await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { flag = true, bulletins = false, sendWork = true, dark = false } = {}) {
+async function open(page, { oldFlag = null, bulletins = false, sendWork = true, dark = false } = {}) {
   await page.addInitScript(
-    ([flag, bulletins]) => {
+    ([oldFlag, bulletins]) => {
       try {
-        if (flag) localStorage.setItem('fv-build-dashRow', '1');
+        // What a browser that saw the row before D9 may still have kept.
+        if (oldFlag != null) localStorage.setItem('fv-build-dashRow', oldFlag);
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');
         }
@@ -36,7 +38,7 @@ async function open(page, { flag = true, bulletins = false, sendWork = true, dar
         /* storage blocked */
       }
     },
-    [flag, bulletins],
+    [oldFlag, bulletins],
   );
   if (dark) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login.html?demo=1');
@@ -51,7 +53,7 @@ async function open(page, { flag = true, bulletins = false, sendWork = true, dar
       saveDemoStudentWork(cid, work);
       PageDashboard.render();
     });
-    if (flag) await page.locator('#dash-inbox').waitFor();
+    await page.locator('#dash-inbox').waitFor();
   }
 }
 
@@ -406,15 +408,102 @@ test('dark beside Bulletins', async ({ page }) => {
   expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(299);
 });
 
-test('with the switch off there is no Inbox and To Grade opens Assignments', async ({ page }) => {
-  await open(page, { flag: false });
-  await expect(page.locator('#dash-inbox')).toHaveCount(0);
-  await expect(page.locator('.dash-inbox')).toHaveCount(0);
-  await expect(page.locator('.dash-glance-tograde')).not.toHaveAttribute('data-dash-inbox-jump', /.*/);
-  await page.locator('.dash-glance-tograde').click();
-  await page.waitForURL(/\/assignments/);
-  expect(page.url()).toContain('show=tograde');
+test("a browser that kept 'fv-build-dashRow' as 0 still gets the row and the Inbox", async ({ page }) => {
+  await open(page, { oldFlag: '0' });
+  await expect(page.locator('.dash-row')).toHaveCount(1);
+  await expect(page.locator('#dash-inbox')).toBeVisible();
+  await expect(page.locator('.dash-glance-tograde')).toHaveAttribute('data-dash-inbox-jump', '1');
 });
+
+/* A row is 109 px. With Late, You Added and on paper all on its counts line
+   the line wraps to a third line where the words column is narrowest (the
+   roster shown beside the row at 1100 wide; the reviewer saw it at 769):
+   the row then leaves out its Newest line and nothing runs past it (D9). */
+for (const [w, h] of [
+  [769, 1024],
+  [1024, 768],
+  [1100, 800],
+  [1280, 800],
+]) {
+  test(`at ${w} x ${h} a row with Late, You Added and on paper stays inside its 109 px`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await open(page);
+    await page.evaluate(() => {
+      const cid = getActiveCourse();
+      const work = getCourseSubmissions(cid);
+      const ids = getStudents(cid).map(s => s.id);
+      const light = work.submissions.filter(x => x.assessment_id === 'sci8a21');
+      // Added by the teacher, on paper, and late, among Light Refraction Lab's own.
+      light[0].sent_by = 'teacher';
+      light[1].on_paper = true;
+      light[1].files = [];
+      light[2].is_late = true;
+      // More in, so every number has two digits.
+      ids.forEach((sid, i) => {
+        if (i > 20 || work.submissions.some(x => x.assessment_id === 'sci8a21' && x.enrollment_id === sid)) return;
+        work.submissions.push(
+          Object.assign({}, light[3], {
+            id: 'fit-' + sid,
+            enrollment_id: sid,
+            is_late: i % 2 === 0,
+            sent_by: i % 3 ? 'student' : 'teacher',
+            on_paper: i % 5 === 0,
+            files: i % 5 === 0 ? [] : light[3].files,
+          }),
+        );
+      });
+      saveDemoStudentWork(cid, work);
+      // Two assessed and not returned yet, so the counts say "to return" too.
+      GraderWork.workCounts(cid, 'sci8a21', ids)
+        .ids.tograde.slice(-2)
+        .forEach(sid => Grader.setOverallComment(cid, sid, 'sci8a21', 'Seen.'));
+      PageDashboard.render();
+    });
+    const row = page.locator('#dash-inbox .dash-inbox-row[data-aid="sci8a21"]');
+    await expect(row.locator('.dash-inbox-counts')).toContainText('to return');
+    await expect(row.locator('.dash-inbox-late')).toBeVisible();
+    await expect(row.locator('.dash-inbox-quiet')).toContainText('You Added');
+    await expect(row.locator('.dash-inbox-quiet')).toContainText('on paper');
+    for (const font of FONTS) {
+      await useFont(page, font);
+      const m = await row.evaluate(r => {
+        const cs = getComputedStyle(r);
+        const box = r.getBoundingClientRect();
+        const inner = { top: box.top + parseFloat(cs.paddingTop), bottom: box.bottom - parseFloat(cs.paddingBottom) };
+        const shown = [...r.querySelectorAll('.dash-inbox-info > *, .dash-inbox-grade, .dash-inbox-pics')].filter(
+          el => getComputedStyle(el).display !== 'none',
+        );
+        const late = r.querySelector('.dash-inbox-late').getBoundingClientRect();
+        return {
+          h: Math.round(box.height),
+          past: Math.max(...shown.map(el => el.getBoundingClientRect().bottom - inner.bottom)),
+          above: Math.max(...shown.map(el => inner.top - el.getBoundingClientRect().top)),
+          lateIn: late.bottom <= inner.bottom + 0.5 && late.height > 0,
+          lines: Math.round(r.querySelector('.dash-inbox-counts').getBoundingClientRect().height / 19.5),
+          tight: r.classList.contains('is-tight'),
+          newest: r.querySelector('.dash-inbox-newest').textContent.trim(),
+          newestShown: getComputedStyle(r.querySelector('.dash-inbox-newest')).display !== 'none',
+          label: r.querySelector('.dash-inbox-name').getAttribute('aria-label'),
+          title: r.querySelector('.dash-inbox-name').getAttribute('title') || '',
+          sideways: r.scrollWidth - r.clientWidth,
+        };
+      });
+      // Where the words column is narrowest the counts take three lines: the case this guards.
+      if (w === 1100 && font === 'page') expect(m.lines).toBe(3);
+      if (w === 1100) expect(m.tight, font).toBe(true);
+      // Newest, out of sight on a tight row, is still in the piece name's accessible name and its title.
+      if (!m.newestShown) {
+        expect(m.label, font).toContain(m.newest);
+        expect(m.title, font).toContain(m.newest);
+      } else expect(m.label, font).not.toContain('Newest:');
+      expect(m.h, font).toBe(109);
+      expect(m.past, font).toBeLessThanOrEqual(0.5);
+      expect(m.above, font).toBeLessThanOrEqual(0.5);
+      expect(m.lateIn, font).toBe(true);
+      expect(m.sideways, font).toBeLessThanOrEqual(0);
+    }
+  });
+}
 
 test('with Send Work off the slot keeps Recent Assessments', async ({ page }) => {
   await open(page, { sendWork: false });

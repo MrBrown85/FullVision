@@ -204,77 +204,31 @@ export async function buildClass(page, o) {
 /* The dashboard for a class built here: the page drawn again for it. */
 export async function showClass(page, cid) {
   await page.evaluate(id => window._pageSwitchCourse && window._pageSwitchCourse(id), cid);
-  await page.locator('.dash-comp-card').waitFor();
+  await page.locator('.dash-comp-tile .dash-comp-card').waitFor();
 }
 
-/* What the stress test measured, for one view of the two overview cards:
-   their heights, whether they sit side by side, the largest blank band
-   inside each (from the last thing drawn to the card's inner bottom edge,
-   and between rows), the Needs Support codes, sideways overflow. */
-export async function measureCards(page) {
+/* What the stress test measures for the Competencies tile's open page: the
+   tile's and the row's heights, sideways overflow, the Needs Support codes
+   drawn, the heights of Level Mix's and Self-Assessment's rows, and whether
+   the page itself scrolls (only the list inside it may). */
+export async function measureTile(page) {
   return page.evaluate(() => {
-    const comp = document.querySelector('.dash-comp-card');
-    const core = document.querySelector('.dash-core-card');
-    const inner = el => {
-      const r = el.getBoundingClientRect();
-      const cs = getComputedStyle(el);
-      return { top: r.top + parseFloat(cs.paddingTop), bottom: r.bottom - parseFloat(cs.paddingBottom) };
-    };
-    // The largest vertical gap inside a card between drawn things (rows,
-    // labels, the head) and below the last, to the card's inner bottom.
-    const band = (card, sel) => {
-      const box = inner(card);
-      const els = Array.prototype.slice
-        .call(card.querySelectorAll(sel))
-        .filter(el => el.offsetParent !== null && el.getBoundingClientRect().height > 0)
-        .map(el => el.getBoundingClientRect())
-        .sort((a, b) => a.top - b.top);
-      let max = 0;
-      let edge = box.top;
-      els.forEach(r => {
-        max = Math.max(max, r.top - edge);
-        edge = Math.max(edge, r.bottom);
-      });
-      max = Math.max(max, box.bottom - edge);
-      return Math.round(max);
-    };
-    const cr = comp.getBoundingClientRect();
-    const kr = core.getBoundingClientRect();
-    const codes = Array.prototype.map.call(
-      document.querySelectorAll('.dash-comp-card .dash-comp-code'),
-      el => el.textContent,
+    const tile = document.querySelector('.dash-comp-tile');
+    const row = document.querySelector('.dash-row');
+    const on = document.querySelector('.dash-comp-page.is-on');
+    const lines = Array.prototype.map.call(on.querySelectorAll('.dash-comp-ln'), el =>
+      Math.round(el.getBoundingClientRect().height),
     );
-    // Inside a row, what is drawn: the row's own content box with its
-    // contents, so a tall row with its bar in the middle is not a gap.
-    const compBand = band(
-      comp,
-      '.dash-comp-head, .dash-comp-labels, .dash-comp-row, .dash-comp-more, .dash-comp-moreline, .dash-comp-none',
-    );
-    const coreBand = band(core, '.dash-core-head, .dash-core-row');
-    // Names cut short, and whether each keeps its full text in a title.
-    const cut = Array.prototype.filter
-      .call(
-        document.querySelectorAll('.dash-comp-name, .dash-core-name, .dash-card-name'),
-        el =>
-          el.offsetParent !== null && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1),
-      )
-      .map(el => ({ cls: el.className.split(' ')[0], text: el.textContent, title: !!el.getAttribute('title') }));
-    const cid = getActiveCourse();
-    const allCodes = Object.values(DashInsights.columnCodes(cid));
+    const codes = Array.prototype.map.call(on.querySelectorAll('.dash-comp-code'), el => el.textContent);
+    const m = document.getElementById('main');
     return {
-      cut,
-      allCodes,
-      compH: Math.round(cr.height),
-      coreH: Math.round(kr.height),
-      sideBySide: Math.abs(cr.top - kr.top) < 1 && kr.left > cr.right,
-      compBand,
-      coreBand,
+      tileH: Math.round(tile.getBoundingClientRect().height),
+      rowH: Math.round(row.getBoundingClientRect().height),
+      lines,
       codes,
+      pageScrolls: on.scrollHeight > on.clientHeight + 1,
       docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      mainOverflow: (() => {
-        const m = document.getElementById('main');
-        return m.scrollWidth - m.clientWidth;
-      })(),
+      mainOverflow: m.scrollWidth - m.clientWidth,
     };
   });
 }

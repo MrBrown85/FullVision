@@ -222,7 +222,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
 
       // The whole panel: the top bar and the Inbox share the one count.
       calls.workCounts = calls.classWorkCounts = 0;
-      localStorage.setItem('fv-build-dashRow', '1');
       const html = DashOverview.renderOverviewPanel({
         cid: CID,
         sections: [],
@@ -238,7 +237,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
         compView: 'mix',
         obs: {},
         classChange: null,
-        mixPop: null,
         helpRule: null,
         naComp: null,
       });
@@ -249,7 +247,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     } finally {
       GraderWork.workCounts = wc;
       GraderWork.classWorkCounts = cwc;
-      localStorage.removeItem('fv-build-dashRow');
     }
   });
 
@@ -264,7 +261,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
     GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
     try {
-      localStorage.setItem('fv-build-dashRow', '1');
       localStorage.setItem('fv-dash-inbox-view:' + CID, 'side');
       const draw = () =>
         DashOverview.renderOverviewPanel({
@@ -282,7 +278,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
           compView: 'mix',
           obs: {},
           classChange: null,
-          mixPop: null,
           helpRule: null,
           naComp: null,
         });
@@ -311,7 +306,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
       GraderWork.workCounts = wc;
       GraderWork.classWorkCounts = cwc;
       GraderWork.workInIds = wi;
-      localStorage.removeItem('fv-build-dashRow');
       localStorage.removeItem('fv-dash-inbox-view:' + CID);
     }
   });
@@ -327,7 +321,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
     GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
     try {
-      localStorage.setItem('fv-build-dashRow', '1');
       localStorage.setItem('fv-dash-inbox-view:' + CID, 'flip');
       const draw = () =>
         DashOverview.renderOverviewPanel({
@@ -345,7 +338,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
           compView: 'mix',
           obs: {},
           classChange: null,
-          mixPop: null,
           helpRule: null,
           naComp: null,
         });
@@ -374,7 +366,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
       GraderWork.workCounts = wc;
       GraderWork.classWorkCounts = cwc;
       GraderWork.workInIds = wi;
-      localStorage.removeItem('fv-build-dashRow');
       localStorage.removeItem('fv-dash-inbox-view:' + CID);
     }
   });
@@ -392,7 +383,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
     GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
     try {
-      localStorage.setItem('fv-build-dashRow', '1');
       localStorage.setItem('fv-dash-inbox-view:' + CID, 'roll');
       const draw = () =>
         DashOverview.renderOverviewPanel({
@@ -410,7 +400,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
           compView: 'mix',
           obs: {},
           classChange: null,
-          mixPop: null,
           helpRule: null,
           naComp: null,
         });
@@ -441,7 +430,6 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
       GraderWork.classWorkCounts = cwc;
       GraderWork.workInIds = wi;
       GraderWork.workStateOf = ws;
-      localStorage.removeItem('fv-build-dashRow');
       localStorage.removeItem('fv-dash-inbox-view:' + CID);
     }
   });

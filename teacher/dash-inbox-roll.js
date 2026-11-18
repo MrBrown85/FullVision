@@ -254,8 +254,13 @@ window.DashInboxRoll = (function () {
       .map(function (/** @type {any} */ c) {
         return c.sid;
       });
+    // Each student is counted once, so the foot adds up to the class: one who
+    // sent work and is Excused is counted as Excused, the word their chip
+    // shows, and not as in.
     out.counts = {
-      in: out.order.length,
+      in: out.students.filter(function (/** @type {any} */ c) {
+        return c.kind === 'in' && c.status !== 'excused';
+      }).length,
       notin: out.notIn.length,
       late: late,
       excused: excused,

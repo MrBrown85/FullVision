@@ -19,12 +19,16 @@
    and Show It Again only ever name a real server id.
 
    A file (a photo, or a PDF made into JPEG pages by PhotoShrink) goes up
-   while online, right after post_bulletin answers with the paths. It is not
-   queued: with no connection the post is refused up front (offline) and the
-   draft stays with the teacher. The phone's offline photo queue is slice B1f.
+   while online, right after post_bulletin answers with the paths: with no
+   connection the post is refused up front and the draft stays with the
+   teacher. The phone posts with { queue: true }: its pages wait in the photo
+   queue (shared/data-bulletins-queue.js, B1f; the hooks below call into it
+   only where it is loaded).
 
    Demo Mode keeps everything on this device in gb-bulletins-<cid>, in the
-   shapes the server answers, and never calls the server. */
+   shapes the server answers, and never calls the server
+   (shared/data-bulletins-demo.js). The refusals' plain sentences are
+   shared/bulletins-refusals.js. Both load after this file. */
 
 var BULLETIN_WORDS_MAX = 2000;
 var BULLETIN_LINK_MAX = 2000;
@@ -39,7 +43,7 @@ var BULLETIN_BUCKET = 'bulletin-files';
 /** @typedef {{ ok: boolean, message?: string, gone?: boolean }} BulletinWriteResult */
 /** @typedef {{ id: string, kind: string, body: string, link_url: string | null, link_title: string | null, pinned: boolean, pinned_until: string | null, assessment_id: string | null, reactions_on: boolean, visible: boolean, waiting: boolean, stalled: boolean, key: string | null, posted_at: string | null, shown_again_at: string | null, edited_at: string | null, created_at: string | null, updated_at: string | null, idempotency_key: string | null, files: BulletinFile[], seen: number, can_see: number, reactions: BulletinReactions }} Bulletin */
 /** @typedef {{ can_see: number, no_card: number, paused: number, page_on: boolean, more: boolean }} BulletinsMeta */
-/** @typedef {{ key: string, at: string, bulletin: Record<string, any>, files: { kind: string, title: string, pages: number }[] }} BulletinWaiting */
+/** @typedef {{ key: string, at: string, bulletin: Record<string, any>, files: { kind: string, title: string, pages: number }[], queued?: boolean, takenBack?: boolean, old?: string[], [more: string]: any }} BulletinWaiting */
 /** @typedef {{ state: string, list: Bulletin[], meta: BulletinsMeta, at: number, loading: Promise<boolean> | null, writes: number }} BulletinMemory */
 
 /** @type {Record<string, BulletinMemory>} */
@@ -416,175 +420,6 @@ function _bltWaitingBulletin(e) {
   };
 }
 
-/* ── Demo Mode: kept on this device ─────────────────────────────────────── */
-
-/** @param {string} cid */
-function _bltDemoKey(cid) {
-  return 'gb-bulletins-' + cid;
-}
-
-/** @typedef {{ bulletins: any[], seen: Record<string, string[]>, reactions: Record<string, Record<string, string[]>> }} BulletinDemoStore */
-
-/** @param {string} cid @returns {BulletinDemoStore} */
-function _bltDemoLoad(cid) {
-  var kept = _safeParseLS(_bltDemoKey(cid), null);
-  var out = { bulletins: [], seen: {}, reactions: {} };
-  if (!kept || typeof kept !== 'object') return out;
-  if (Array.isArray(kept.bulletins)) out.bulletins = kept.bulletins.filter(Boolean);
-  if (kept.seen && typeof kept.seen === 'object') out.seen = kept.seen;
-  if (kept.reactions && typeof kept.reactions === 'object') out.reactions = kept.reactions;
-  return out;
-}
-/** @param {string} cid @param {BulletinDemoStore} store */
-function _bltDemoSave(cid, store) {
-  _safeLSSet(_bltDemoKey(cid), JSON.stringify(store));
-}
-
-/**
- * The sample class's bulletins, written once (shared/seed-data.js). `rows`
- * are bulletins in the server's shape with `seen` (student ids) and
- * `reactions` ({ word: [student ids] }) added. Nothing is written when the
- * class already has any.
- * @param {string} cid @param {any[]} rows
- * @returns {boolean}
- */
-function saveDemoBulletinsSeed(cid, rows) {
-  if (!cid || !_isDemoSession() || localStorage.getItem(_bltDemoKey(cid)) != null) return false;
-  /** @type {BulletinDemoStore} */
-  var store = { bulletins: [], seen: {}, reactions: {} };
-  (rows || []).forEach(function (r) {
-    if (!r || !r.id) return;
-    var seen = Array.isArray(r.seen) ? r.seen.map(String) : [];
-    var reactions = r.reactions && typeof r.reactions === 'object' ? r.reactions : {};
-    var row = Object.assign({}, r);
-    delete row.seen;
-    delete row.reactions;
-    store.bulletins.push(row);
-    store.seen[r.id] = seen;
-    store.reactions[r.id] = {
-      got_it: (reactions.got_it || []).map(String),
-      done: (reactions.done || []).map(String),
-      question: (reactions.question || []).map(String),
-    };
-  });
-  _bltDemoSave(cid, store);
-  return true;
-}
-
-/**
- * Who counts, for a Demo Mode class: students not paused (the class's
- * per-student options) are counted; a student is Without a Card only when
- * the class has cards and theirs is not one.
- * @param {string} cid
- * @returns {{ can_see: string[], paused: string[], no_card: string[] }}
- */
-function _bltDemoGroups(cid) {
-  var students = (typeof getStudents === 'function' && getStudents(cid)) || [];
-  var options = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid) : {};
-  var cards = typeof _demoCardsListed === 'function' ? _demoCardsListed(cid) : [];
-  /** @type {Record<string, boolean>} */
-  var carded = {};
-  (cards || []).forEach(function (c) {
-    if (c && c.enrollment_id) carded[c.enrollment_id] = true;
-  });
-  var haveCards = Object.keys(carded).length > 0;
-  /** @type {{ can_see: string[], paused: string[], no_card: string[] }} */
-  var out = { can_see: [], paused: [], no_card: [] };
-  students.forEach(function (s) {
-    if (!s || !s.id) return;
-    if (options[s.id] && options[s.id].paused_at) out.paused.push(s.id);
-    else if (haveCards && !carded[s.id]) out.no_card.push(s.id);
-    else out.can_see.push(s.id);
-  });
-  return out;
-}
-
-/** @param {any} row @param {BulletinDemoStore} store @param {{ can_see: string[] }} groups @param {string} cid @returns {Bulletin | null} */
-function _bltDemoBulletin(row, store, groups, cid) {
-  var b = _bltFromRow(Object.assign({}, row, { visible: true }));
-  if (!b) return null;
-  var can = {};
-  groups.can_see.forEach(function (id) {
-    can[id] = true;
-  });
-  var seen = (store.seen[b.id] || []).filter(function (id) {
-    return can[id];
-  });
-  var r = store.reactions[b.id] || {};
-  var inCan = function (/** @type {string[]} */ ids) {
-    return (ids || []).filter(function (id) {
-      return can[id];
-    }).length;
-  };
-  b.seen = seen.length;
-  b.can_see = groups.can_see.length;
-  b.reactions = { got_it: inCan(r.got_it), done: inCan(r.done), question: inCan(r.question) };
-  // As the server computes it: pinned only while its last day has not gone by.
-  if (b.pinned && b.pinned_until && b.pinned_until < _bltToday(cid)) b.pinned = false;
-  return b;
-}
-
-/** @param {string} cid */
-function _bltDemoRead(cid) {
-  // The sample class's bulletins are written the first time Bulletins is read (never at seeding, so a
-  // Demo Mode with the build switch off writes nothing new).
-  if (localStorage.getItem(_bltDemoKey(cid)) == null && typeof seedDemoBulletins === 'function' && cid === 'sci8') {
-    seedDemoBulletins();
-  }
-  var store = _bltDemoLoad(cid);
-  var groups = _bltDemoGroups(cid);
-  var list = store.bulletins
-    .map(function (row) {
-      return _bltDemoBulletin(row, store, groups, cid);
-    })
-    .filter(Boolean);
-  var mem = _bltMemory(cid);
-  mem.state = 'ok';
-  mem.list = bulletinsSorted(/** @type {Bulletin[]} */ (list));
-  mem.at = Date.now();
-  mem.meta = {
-    can_see: groups.can_see.length,
-    no_card: groups.no_card.length,
-    paused: groups.paused.length,
-    page_on: !!(typeof getReturnSettings === 'function' && getReturnSettings(cid).student_page),
-    more: false,
-  };
-  return mem;
-}
-
-/**
- * Pictures for a file added in Demo Mode: each page's small copy as a data
- * address, so it stays on the device.
- * @param {Blob | null | undefined} blob
- * @returns {Promise<string>}
- */
-function _bltDataUrl(blob) {
-  if (!blob) return Promise.resolve('');
-  if (typeof FileReader === 'undefined') {
-    return blob
-      .arrayBuffer()
-      .then(function (buf) {
-        var bytes = new Uint8Array(buf);
-        var text = '';
-        for (var i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i]);
-        return 'data:' + (blob.type || 'image/jpeg') + ';base64,' + btoa(text);
-      })
-      .then(null, function () {
-        return '';
-      });
-  }
-  return new Promise(function (resolve) {
-    var reader = new FileReader();
-    reader.onload = function () {
-      resolve(typeof reader.result === 'string' ? reader.result : '');
-    };
-    reader.onerror = function () {
-      resolve('');
-    };
-    reader.readAsDataURL(blob);
-  });
-}
-
 /* ── Reading ────────────────────────────────────────────────────────────── */
 
 /** True when Bulletins is offered for a class: Demo Mode, or a signed-in class whose server answered. @param {string} cid */
@@ -694,8 +529,10 @@ function _bltLandedKeys(cid, list) {
     if (b.idempotency_key) onServer[b.idempotency_key] = true;
   });
   var q = window.v2Queue;
+  if (typeof _bltQueuedSeenAll === 'function') _bltQueuedSeenAll(cid, list);
   _bltSweepDead(cid);
   var keep = _bltPending(cid).filter(function (e) {
+    if (e.queued) return true; // the phone's queued post: shared/data-bulletins-queue.js lets it go
     if (onServer[e.key]) return false;
     if (_bltFlows[e.key]) return true;
     if (q && typeof q.has === 'function' && q.has(e.key)) return true;
@@ -713,6 +550,12 @@ function getBulletins(cid) {
   var mem = _bltMemory(cid);
   var list = mem.list.slice();
   if (_isDemoSession()) return bulletinsSorted(list);
+  if (typeof _bltQueuedView === 'function') list = _bltQueuedView(cid, list);
+  // A bulletin whose delete waits in the outbox (offline included) is gone from the list at once.
+  var deleting = _bltDeleting();
+  list = list.filter(function (b) {
+    return deleting.indexOf(b.id) < 0;
+  });
   /** @type {Record<string, boolean>} */
   var onServer = {};
   list.forEach(function (b) {
@@ -720,7 +563,7 @@ function getBulletins(cid) {
   });
   var waiting = _bltPending(cid)
     .filter(function (e) {
-      return !onServer[e.key];
+      return !onServer[e.key] && !e.takenBack;
     })
     .map(_bltWaitingBulletin);
   // A bulletin the server holds that students are not sent, whose files this
@@ -730,6 +573,32 @@ function getBulletins(cid) {
     return Object.assign({}, b, { stalled: true });
   });
   return bulletinsSorted(waiting.concat(rows));
+}
+
+/** @type {string[] | null} */
+var _bltDeletingIds = null; // the bulletins whose delete waits in the outbox, read once until the outbox changes
+/** @type {any} */
+var _bltDeletingFor = null; // the outbox they were read from
+
+/** The ids of the bulletins whose delete waits in the outbox: read and parsed once, then again only after the outbox changes. @returns {string[]} */
+function _bltDeleting() {
+  var outbox = /** @type {any} */ (window.v2Queue);
+  if (!outbox || typeof outbox.queued !== 'function') return [];
+  if (_bltDeletingFor !== outbox) {
+    _bltDeletingFor = outbox;
+    _bltDeletingIds = null;
+    if (typeof outbox.subscribe === 'function') {
+      outbox.subscribe(function () {
+        if (_bltDeletingFor === outbox) _bltDeletingIds = null;
+      });
+    } else _bltDeletingFor = null; // no word of changes: read every time
+  }
+  if (!_bltDeletingIds) {
+    _bltDeletingIds = outbox.queued('delete_bulletin').map(function (/** @type {any} */ e) {
+      return String((e && e.payload && e.payload.p_bulletin_id) || '');
+    });
+  }
+  return /** @type {string[]} */ (_bltDeletingIds);
 }
 
 /** { can_see, no_card, paused, page_on, more } as last read. @param {string} cid @returns {BulletinsMeta} */
@@ -878,98 +747,6 @@ function releaseBulletinPictures() {
 
 /* ── Writing ────────────────────────────────────────────────────────────── */
 
-/**
- * Today as the class keeps it (its own time zone, as the server's date checks do:
- * courseToday in shared/data.js), not the device's. The device's date only where
- * the class is not known.
- * @param {string} [cid]
- */
-function _bltToday(cid) {
-  return cid && typeof courseToday === 'function' ? courseToday(cid) : getTodayStr();
-}
-
-var BULLETIN_GENERAL = 'Bulletins could not be saved. Try again in a moment.';
-var BULLETIN_NOT_ACCEPTED = 'This bulletin was not accepted. Check it and try again.';
-
-/**
- * The server's refusals, each with its own plain sentence. The keys are the
- * messages migrations/2026111801_bulletins.sql raises (B1a, commit fb3bebfa;
- * tests/fixtures/bulletins-m1-messages.js holds the list). Each is matched
- * whole (an anchored pattern, with the words that carry a name or a number as
- * a wildcard), so no refusal can take another's sentence. A message not listed
- * here gets BULLETIN_GENERAL, never a neighbour's sentence.
- * @type {[RegExp, string][]}
- */
-var _BLT_REFUSALS = [
-  // The shape of what was sent: nothing the page's own box can make.
-  [/^a bulletin is an object$/, BULLETIN_NOT_ACCEPTED],
-  [/^a bulletin has no [a-z_]+ that can be set$/, BULLETIN_NOT_ACCEPTED],
-  [/^[a-z_]+ must be a (boolean|string)$/, BULLETIN_NOT_ACCEPTED],
-  [/^files must be a list$/, BULLETIN_NOT_ACCEPTED],
-  // A value.
-  [/^pinned_until must be a date$/, 'Stays Pinned Until must be a date.'],
-  [/^assessment_id must be a id$/, 'The linked assessment could not be found. Choose another one, or None.'],
-  [/^a bulletin is an announcement or a reminder$/, 'Choose Announcement or Reminder.'],
-  [/^a bulletin's words can be 2000 characters at most$/, 'Words can be up to 2,000 characters.'],
-  [
-    /^a link must start with http:\/\/ or https:\/\/ and a host/,
-    'A link must start with http:// or https:// and a host, with no user name, password, spaces or hidden characters.',
-  ],
-  [/^a link's name needs a link$/, 'A link name needs a link. Add the link, or clear the name.'],
-  [/^a link's name can be 200 characters at most$/, 'A link name can be up to 200 characters.'],
-  [/^only a reminder can stay pinned until a date$/, 'Only a reminder can stay pinned until a date.'],
-  [
-    /^a date to stay pinned until needs the reminder pinned$/,
-    'A reminder has to be pinned to stay pinned until a date.',
-  ],
-  [/^the date to stay pinned until has passed$/, 'Stays Pinned Until cannot be before today.'],
-  [
-    /^the linked assessment is not in this class$/,
-    'The linked assessment is not in this class. Choose another one, or None.',
-  ],
-  [/^a bulletin needs words, a link or a file$/, 'Write something, add a link or add a file.'],
-  // Files.
-  [
-    /^a file is \{ kind: photo or pdf, title, pages \}/,
-    'A file could not be used. A photo is one page, and a PDF is 1 to 20 pages.',
-  ],
-  [/^a file's name can be 200 characters at most$/, 'A file name can be up to 200 characters.'],
-  [/^a bulletin can have 20 pages at most$/, 'A bulletin can hold up to 20 pages in all.'],
-  [
-    /^a class can hold 2000 bulletin pages at most/,
-    'This class holds as many bulletin pages as it can. Delete some bulletins with files, then try again.',
-  ],
-  // Show It Again.
-  [
-    /^a bulletin students cannot see yet cannot be shown again$/,
-    'Students cannot see that bulletin yet, so it cannot be shown again.',
-  ],
-];
-
-/**
- * The plain sentence for a refused write. The server's own words are never
- * shown. PT401 (signed out) and P0002 (not found) are told apart by the call
- * they came from: for a post or a read, P0002 is the class (gone or in the
- * trash); for any other call it is the bulletin. Everything else is looked up
- * in _BLT_REFUSALS by its whole message.
- * @param {any} error @param {string} [rpc] the call that was refused
- */
-function _bltMessage(error, rpc) {
-  var code = error && error.code ? String(error.code) : '';
-  var text = error && error.message ? String(error.message).trim() : '';
-  if (code === 'PT401') return 'You are signed out. Sign in again, then try again.';
-  if (code === 'P0002') {
-    var classCall = rpc === 'post_bulletin' || rpc === 'list_bulletins' || (!rpc && text === 'course not found');
-    return classCall ? 'This class is no longer there.' : 'That bulletin is no longer there.';
-  }
-  for (var i = 0; i < _BLT_REFUSALS.length; i++) {
-    if (_BLT_REFUSALS[i][0].test(text)) return _BLT_REFUSALS[i][1];
-  }
-  return BULLETIN_GENERAL;
-}
-
-var BULLETIN_LOST = ''; // a lost post has no reason to give: the page says it was not posted
-
 /* ── A post that was refused or lost: its words come back ───────────────── */
 
 /** @param {string} cid */
@@ -1012,13 +789,14 @@ function dropReturnedBulletin(cid, key) {
 
 /**
  * Keep the words of a bulletin that was not posted, once per key, and tell
- * the page. A bulletin with nothing in it is not kept.
- * @param {string} cid @param {string} key @param {any} payload @param {string} message @param {string} [at]
+ * the page. A bulletin with nothing in it is not kept, unless `always` (the
+ * phone's photo with no words: the teacher is still told it was not posted).
+ * @param {string} cid @param {string} key @param {any} payload @param {string} message @param {string} [at] @param {boolean} [always]
  */
-function _bltReturn(cid, key, payload, message, at) {
+function _bltReturn(cid, key, payload, message, at, always) {
   if (!cid || !payload || typeof payload !== 'object') return;
   if (_bltKept[key]) return; // the page still holds this draft in its box
-  var has = String(payload.body || '').trim() || payload.link_url;
+  var has = String(payload.body || '').trim() || payload.link_url || always;
   if (!has) return;
   var list = getReturnedBulletins(cid);
   if (
@@ -1106,6 +884,7 @@ function _bltListen() {
     if (!meta || meta.endpoint !== 'post_bulletin') return;
     var cid = meta.payload && meta.payload.p_course_id;
     var key = String(meta.id || '');
+    if (typeof _bltQueuedEvent === 'function' && _bltQueuedEvent(evt.kind, cid, key, meta)) return;
     if (!cid || !key || _bltFlows[key]) return; // this page's own post is handled where it was sent
     if (evt.kind === 'flush:dead-letter') {
       // Refused after a reload (or by another tab): the words come back, with a plain sentence.
@@ -1144,9 +923,10 @@ function _bltListen() {
  * @param {string} cid
  * @param {Record<string, any>} bulletin
  * @param {{ kind: string, title: string, pages: { blob: Blob, thumb?: Blob }[] }[]} [files]
- * @returns {Promise<{ ok: boolean, message?: string, offline?: boolean, bulletin?: Bulletin }>}
+ * @param {{ queue?: boolean }} [opts] the phone: files wait in the photo queue (shared/data-bulletins-queue.js)
+ * @returns {Promise<{ ok: boolean, message?: string, offline?: boolean, waiting?: boolean, key?: string, bulletin?: Bulletin }>}
  */
-function postBulletin(cid, bulletin, files) {
+function postBulletin(cid, bulletin, files, opts) {
   var list = Array.isArray(files) ? files : [];
   var problem = bulletinDraftProblem(
     Object.assign({ cid: cid }, bulletin, {
@@ -1161,6 +941,8 @@ function postBulletin(cid, bulletin, files) {
   if (!_bltOnServer(cid) || bulletinsState(cid) === 'missing') {
     return Promise.resolve({ ok: false, message: 'Bulletins are not available yet.' });
   }
+  if (list.length && opts && opts.queue && typeof _bltQueuedPost === 'function')
+    return _bltQueuedPost(cid, bulletinPayload(bulletin), list);
   if (list.length && typeof navigator !== 'undefined' && navigator.onLine === false) {
     return Promise.resolve({
       ok: false,
@@ -1363,6 +1145,8 @@ function _bltUploadFiles(cid, posted, files) {
  */
 function takeBackBulletin(cid, key) {
   if (!cid || !key || _bltFlows[key]) return false;
+  var queued = typeof _bltQueuedTakeBack === 'function' ? _bltQueuedTakeBack(cid, key) : null;
+  if (queued !== null) return queued;
   var q = window.v2Queue;
   var mine = _bltPending(cid).some(function (e) {
     return e.key === key;
@@ -1377,6 +1161,10 @@ function takeBackBulletin(cid, key) {
 /** Whether a waiting bulletin can still be taken back. @param {string} cid @param {string} key */
 function bulletinCanTakeBack(cid, key) {
   if (!cid || !key || _bltFlows[key] || _isDemoSession()) return false;
+  var held = _bltPending(cid).filter(function (e) {
+    return e.key === key;
+  })[0];
+  if (held && held.queued) return !held.takenBack; // a queued post can be taken back until students see it
   var q = window.v2Queue;
   return !!q && typeof q.has === 'function' && typeof q.remove === 'function' && q.has(key);
 }
@@ -1518,135 +1306,4 @@ function showBulletinAgain(cid, id) {
   return _bltChange(cid, id, 'show_bulletin_again', {}, function (b) {
     return Object.assign({}, b, { shown_again_at: new Date().toISOString() });
   });
-}
-
-/* ── Demo Mode's writes ─────────────────────────────────────────────────── */
-
-/**
- * @param {string} cid @param {Record<string, any>} draft @param {{ kind: string, title: string, pages: { blob: Blob, thumb?: Blob }[] }[]} files
- * @returns {Promise<{ ok: boolean, message?: string, bulletin?: Bulletin }>}
- */
-function _bltDemoPost(cid, draft, files) {
-  var payload = bulletinPayload(draft);
-  var now = new Date().toISOString();
-  var id = _newEntryId();
-  return Promise.all(
-    files.map(function (f) {
-      return Promise.all(
-        f.pages.map(function (p) {
-          return _bltDataUrl(p.thumb || p.blob);
-        }),
-      );
-    }),
-  ).then(function (pictures) {
-    var store = _bltDemoLoad(cid);
-    var row = Object.assign(
-      {
-        id: id,
-        body: '',
-        link_url: null,
-        link_title: null,
-        pinned: false,
-        pinned_until: null,
-        assessment_id: null,
-        reactions_on: false,
-        shown_again_at: null,
-        edited_at: null,
-        posted_at: now,
-        created_at: now,
-        updated_at: now,
-        idempotency_key: null,
-      },
-      payload,
-      {
-        files: files.map(function (f, i) {
-          return {
-            id: _newEntryId(),
-            kind: f.kind === 'pdf' ? 'pdf' : 'photo',
-            title: String(f.title || (f.kind === 'pdf' ? 'PDF' : 'Photo')).slice(0, BULLETIN_NAME_MAX),
-            page_count: f.pages.length,
-            bytes: f.pages.reduce(function (n, p) {
-              return n + (p.blob && p.blob.size ? p.blob.size : 0);
-            }, 0),
-            status: 'ready',
-            position: i + 1,
-            paths: pictures[i].filter(Boolean),
-          };
-        }),
-      },
-    );
-    store.bulletins.push(row);
-    store.seen[id] = [];
-    store.reactions[id] = { got_it: [], done: [], question: [] };
-    _bltDemoSave(cid, store);
-    _bltDemoRead(cid);
-    _bltChanged(cid);
-    return {
-      ok: true,
-      bulletin: _bltMemory(cid).list.filter(function (b) {
-        return b.id === id;
-      })[0],
-    };
-  });
-}
-
-/** @param {string} cid @param {string} id @param {Record<string, any>} patch @returns {Promise<BulletinWriteResult>} */
-function _bltDemoEdit(cid, id, patch) {
-  var store = _bltDemoLoad(cid);
-  var at = -1;
-  store.bulletins.forEach(function (b, i) {
-    if (b.id === id) at = i;
-  });
-  if (at < 0) return Promise.resolve({ ok: false, message: 'That bulletin is not there.' });
-  var row = _bltApplyPatch(/** @type {Bulletin} */ (store.bulletins[at]), patch);
-  /** @type {any} */
-  var next = Object.assign({}, store.bulletins[at]);
-  ['body', 'link_url', 'link_title', 'pinned', 'pinned_until', 'assessment_id', 'reactions_on', 'edited_at'].forEach(
-    function (k) {
-      next[k] = /** @type {any} */ (row)[k];
-    },
-  );
-  var files = Array.isArray(next.files) ? next.files : [];
-  var words = String(next.body || '').trim();
-  if (!words && !next.link_url && !files.length) {
-    return Promise.resolve({ ok: false, message: 'A bulletin needs words, a link or a file.' });
-  }
-  next.updated_at = new Date().toISOString();
-  store.bulletins[at] = next;
-  _bltDemoSave(cid, store);
-  _bltDemoRead(cid);
-  _bltChanged(cid);
-  return Promise.resolve({ ok: true });
-}
-
-/** @param {string} cid @param {string} id @returns {Promise<BulletinWriteResult>} */
-function _bltDemoDelete(cid, id) {
-  var store = _bltDemoLoad(cid);
-  var rest = store.bulletins.filter(function (b) {
-    return b.id !== id;
-  });
-  if (rest.length === store.bulletins.length)
-    return Promise.resolve({ ok: false, message: 'That bulletin is not there.' });
-  store.bulletins = rest;
-  delete store.seen[id];
-  delete store.reactions[id];
-  _bltDemoSave(cid, store);
-  _bltDemoRead(cid);
-  _bltChanged(cid);
-  return Promise.resolve({ ok: true });
-}
-
-/** @param {string} cid @param {string} id @returns {Promise<BulletinWriteResult>} */
-function _bltDemoAgain(cid, id) {
-  var store = _bltDemoLoad(cid);
-  var row = store.bulletins.filter(function (b) {
-    return b.id === id;
-  })[0];
-  if (!row) return Promise.resolve({ ok: false, message: 'That bulletin is not there.' });
-  row.shown_again_at = new Date().toISOString();
-  row.updated_at = row.shown_again_at;
-  _bltDemoSave(cid, store);
-  _bltDemoRead(cid);
-  _bltChanged(cid);
-  return Promise.resolve({ ok: true });
 }

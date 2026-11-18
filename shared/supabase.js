@@ -415,8 +415,17 @@
     }
   }
 
+  /* Set just before the device is cleared for Sign Out: code that would
+     write to the device after an answer lands (the phone's bulletin queue)
+     reads it and writes nothing. Read only, through window.isSigningOut. */
+  var _signingOut = false;
+  window.isSigningOut = function () {
+    return _signingOut;
+  };
+
   function _onSignedOutElsewhere() {
     if (/\/login\.html$/.test(window.location.pathname || '')) return;
+    _signingOut = true;
     _clearDeviceData();
     window.addEventListener('pagehide', _clearDeviceData);
     window.location.href = '/login.html';
@@ -488,7 +497,13 @@
     } catch (err) {
       console.warn('Sign-out exception (proceeding anyway):', err);
     }
-    _clearDeviceData();
+    _signingOut = true;
+    try {
+      _clearDeviceData();
+    } catch (err) {
+      _signingOut = false; // the device was not cleared: sign-out did not complete
+      throw err;
+    }
     // The other open tabs leave too, so they do not save the class back.
     _postSignedOut();
     // Clear service worker caches

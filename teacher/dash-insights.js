@@ -243,7 +243,7 @@ window.DashInsights = (function () {
     return (
       '<div class="dash-mix-pop-head"><span>' +
       esc(col.label + ' · ' + band.label + ' · ' + band.ids.length) +
-      '</span><button type="button" class="dash-mix-pop-close" data-action="mixClose" aria-label="Close">×</button></div>' +
+      '</span><button type="button" class="dash-mix-pop-close" data-comp-close aria-label="Close">×</button></div>' +
       (next
         ? '<div class="dash-mix-pop-next">' + _nextHead('Shared next step', next) + esc(next.text) + '</div>'
         : '') +

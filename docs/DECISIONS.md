@@ -1386,7 +1386,7 @@ Colin, after attaching the assignment page to 11 Social Studies 10 assessments f
 
 ## The Dashboard's middle row (2026-11-17)
 
-Teachers told Colin the Dashboard is "overwhelming". A designer proposed a Today strip in place of the top bar and quieter student cards. Colin: "the student cards can be "below the fold"- so size the top bars appropriately . I still want to keep my top bar exactly as is I don't want the cards to change appearance at all." The board is the "Dashboard Inbox Artboard" (https://claude.ai/artifact/8rcZpmvi8tbjcid8KrPCGf); the plan is `docs/plans/dashboard-inbox-plan.md`. Nothing is built yet.
+Teachers told Colin the Dashboard is "overwhelming". A designer proposed a Today strip in place of the top bar and quieter student cards. Colin: "the student cards can be "below the fold"- so size the top bars appropriately . I still want to keep my top bar exactly as is I don't want the cards to change appearance at all." The board is the "Dashboard Inbox Artboard" (https://claude.ai/artifact/8rcZpmvi8tbjcid8KrPCGf); the plan is `docs/plans/dashboard-inbox-plan.md`. Built on `main` in slices D1 to D9; on by default since D9 (Nov 18), not released.
 
 1. **The top bar and the student cards keep their look.** The top bar (Class Average with its bar, To Grade, Missing and Late, Upcoming Birthdays) is not redesigned, moved or merged; a Today strip is not built. The cards keep their chips, level pill, flag, observation line and alert count. The calm comes from the row between them, and the cards may start below the first view.
 2. **Two small changes to the top bar**, taken later the same night ("update it base on the council's suggestions"): Missing and Late never repeats its own number ("All Missing" or "All Late" when the other part is zero); "No Change Since Report N" is hidden when nothing changed, keeping its space. "2.9 Proficient" stays.
@@ -1394,6 +1394,17 @@ Teachers told Colin the Dashboard is "overwhelming". A designer proposed a Today
 4. **This will replace "Dashboard cards" 7's two cards side by side at one height** when it is turned on, and not before. Until then that entry stands.
 5. **Bulletins sits under the Inbox, and the row takes the whole first view.** Colin sent the stacked board (Inbox over Bulletins in the left two thirds, Competencies beside both) and said: "the 'students' row at the bottom can also be below the fold, to increase the size fo the above the fold boxes." Stacked is the orchestrating session's reading of that, told to him. The Students heading and the cards start below the first view.
 6. **The rest was delegated.** Colin, Nov 17: "make whatever choices you think is best". Chosen by the orchestrating session under that, and told to him: the drop area matches the Add Work page (grey and dashed at rest, blue while files are held); Side by Side and Flip Through both stay and the Inbox opens on By Assessment; work the teacher added shows as one quiet "You Added" line, and To Grade keeps the meaning it has; "new since you last looked" is kept on the device; with Send Work off the slot shows Recent Assessments; the roster keeps its level badges; until Bulletins is on, the Inbox has the whole left column.
+7. **The row is on** (D9, Nov 18). `dashRow` is on by default in `shared/build-flags.js`, and the old row of two cards side by side at one height is gone, with its stylesheet rules and the tests that held it. This replaces "Dashboard cards" 7's two cards at one height: the Curricular and Core cards are now the two pages of the one Competencies tile, each keeping its view menu and remembered view. A browser that still has `fv-build-dashRow` set, to `1` or `0`, sees the same row. Bulletins and Quizzes stay off. The Bulletins tile is built and sits under the Inbox in the left column behind the `bulletins` switch (`teacher/dash-bulletins.js`); while that switch is off the Inbox has the whole column.
+8. **Choices made in the build** (D2 to D9, under the delegation in 6):
+   - Recent Assessments follows the board: up to 12 rows, newest first, each with how many are assessed and no dates.
+   - Roll Call has no Mark Missing: an empty outline offers Add Work only, which opens the grader on that student. Setting Missing can change a grade; it stays in the gradebook and the grader.
+   - No Compare in Side by Side ("Not in this plan" in the plan).
+   - "+N" on a row is a student's own send since the teacher last looked at this class's Dashboard on this device that is still to grade. A first visit on a device starts at zero, so nothing reads as new.
+   - All Caught Up shows only when nothing is to grade and nothing is to return either, the top bar's own rule.
+   - "Only" beside a Self-Assessed count marks under two thirds of the class, the same test today's Core card used for its amber.
+   - A click on a page in Side by Side opens the grader at that student.
+   - Flip Through's button reads Open in Grader, and after grading the stage stays where it was.
+   - A Level Mix row's list keeps the shared next step today's Level Mix list gave each band (Emerging and Developing), under that level's students.
 
 ## Bulletins (2026-11-17)
 

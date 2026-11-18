@@ -1,22 +1,24 @@
 /**
- * The Dashboard's middle row behind the dashRow switch (D2 of
- * docs/plans/dashboard-inbox-plan.md): a left tile at two thirds and one
- * Competencies tile at one third, as tall as the window leaves, with the
- * Students heading below the first view. Demo Mode, Science 8.
+ * The Dashboard's middle row (D2 of docs/plans/dashboard-inbox-plan.md, on
+ * since D9): a left tile at two thirds and one Competencies tile at one
+ * third, as tall as the window leaves, with the Students heading below the
+ * first view. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
-async function openDashboard(page, { flag = true, bulletins = false } = {}) {
+async function openDashboard(page, { oldFlag = null, bulletins = false } = {}) {
   await page.addInitScript(
-    ([flag, bulletins]) => {
+    ([oldFlag, bulletins]) => {
       try {
-        if (flag) localStorage.setItem('fv-build-dashRow', '1');
+        // What a browser that saw the row before D9 may still have kept.
+        if (oldFlag != null) localStorage.setItem('fv-build-dashRow', oldFlag);
         if (bulletins) localStorage.setItem('fv-build-bulletins', '1');
       } catch (e) {
         /* storage blocked */
       }
     },
-    [flag, bulletins],
+    [oldFlag, bulletins],
   );
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -94,13 +96,15 @@ test('a photo-expiry line that arrives after the first draw: the row still ends 
   expect(Math.round(after.row.height)).toBeLessThan(610);
 });
 
-test('with the switch off the page has none of the new row', async ({ page }) => {
+test("the old two-card row is gone, whatever an old 'fv-build-dashRow' says", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await openDashboard(page, { flag: false });
-  await expect(page.locator('.dash-comp-card')).toBeVisible();
-  for (const sel of ['.dash-row', '.dash-comp-tile', '.dash-recent', '.dash-row-left']) {
-    await expect(page.locator(sel)).toHaveCount(0);
-  }
+  await openDashboard(page, { oldFlag: '0' });
+  for (const sel of ['.dash-row', '.dash-comp-tile', '.dash-recent', '.dash-row-left'])
+    await expect(page.locator(sel)).toHaveCount(1);
+  await expect(page.locator('.dash-overview-cards')).toHaveCount(0);
+  // Each card is a page of the one tile, never a box of its own in the row.
+  expect(await page.locator('.dash-comp-card').evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
+  expect(await page.locator('.dash-core-card').evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
 });
 
 test('at 800 wide the tiles stack and nothing scrolls sideways', async ({ page }) => {
@@ -123,7 +127,6 @@ test('at 800 wide the tiles stack and nothing scrolls sideways', async ({ page }
 
 test('at 335 wide the tile does not scroll the page sideways', async ({ page }) => {
   await page.setViewportSize({ width: 335, height: 800 });
-  await page.addInitScript(() => localStorage.setItem('fv-build-dashRow', '1'));
   // The phone app takes a phone-width window at sign-in; the desktop page is
   // opened by its address, as phone-width-desktop-pages.spec.js does.
   await page.goto('/login.html');
@@ -299,3 +302,127 @@ test('without Bulletins the Inbox slot has the whole column', async ({ page }) =
   const left = await box(page, '.dash-row-left');
   expect(Math.round(inbox.height)).toBe(Math.round(left.height));
 });
+
+/* "View Gradebook →" and "Questionnaires →" sit beside the view pill, on one
+   line, inside the tile at its narrowest (329 px at 1024 wide, 335 at 1280),
+   in the page's font and in the wide stand-in for CI's fonts. */
+for (const [w, h] of [
+  [1024, 768],
+  [1280, 800],
+  [1440, 900],
+]) {
+  test(`at ${w} wide each page's link sits beside its pill, inside the tile, in both fonts`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await openDashboard(page);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      for (const pg of ['curricular', 'core']) {
+        await page.locator('#dash-comp-tab-' + pg).click();
+        await page.waitForTimeout(300);
+        const m = await page.evaluate(pg => {
+          const tile = document.querySelector('.dash-comp-tile').getBoundingClientRect();
+          const head = document.querySelector('#dash-comp-page-' + pg + ' .dash-section-title');
+          const a = head.querySelector(':scope > a');
+          const link = a.getBoundingClientRect();
+          const pill = head.querySelector('.dash-view-btn, .dash-core-sub').getBoundingClientRect();
+          const lh = parseFloat(getComputedStyle(a).lineHeight) || 20;
+          return {
+            inside: link.right <= tile.right + 0.5 && link.left >= tile.left - 0.5,
+            beside: link.left >= pill.right && Math.abs(link.top + link.height / 2 - (pill.top + pill.height / 2)) < 8,
+            oneLine: link.height <= lh + 1,
+          };
+        }, pg);
+        expect(m, `${w} ${font} ${pg}`).toEqual({ inside: true, beside: true, oneLine: true });
+      }
+    }
+  });
+}
+
+/* With Questions From Students waiting (the front page's Demo Mode has one),
+   that card sits above the top bar, so the row starts lower and its tiles run
+   past the first view; the cards may sit below the fold (Colin). The page
+   scrolls cleanly to the row's foot and nothing in the row is cut off. */
+test('with a question waiting the row starts lower, the page scrolls to its foot, and nothing is cut off', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/login.html?demo=1&student=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.locator('#dash-inbox').waitFor();
+  await expect(page.locator('.dash-questions')).toBeVisible();
+  const before = await box(page, '.dash-row');
+  expect(before.top).toBeGreaterThan(278);
+  expect(Math.round(before.height)).toBe(510);
+  await page.locator('.dash-row').evaluate(el => el.scrollIntoView({ block: 'end' }));
+  await page.waitForTimeout(200);
+  const m = await page.evaluate(() => {
+    const row = document.querySelector('.dash-row').getBoundingClientRect();
+    const tiles = ['#dash-inbox', '.dash-comp-tile'].map(s =>
+      Math.round(document.querySelector(s).getBoundingClientRect().height),
+    );
+    const main = document.getElementById('main');
+    return {
+      rowTop: row.top,
+      rowBottom: row.bottom,
+      tiles,
+      winH: innerHeight,
+      sideways: [
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        main.scrollWidth - main.clientWidth,
+      ],
+    };
+  });
+  // The whole row can be brought into view, and both tiles are the row's full height.
+  expect(m.rowBottom).toBeLessThanOrEqual(m.winH + 0.5);
+  expect(m.rowTop).toBeGreaterThanOrEqual(0);
+  expect(m.tiles).toEqual([510, 510]);
+  expect(m.sideways).toEqual([0, 0]);
+  // The Students heading follows the row, 12 px under it.
+  const heading = await box(page, '.dash-students-head');
+  const row = await box(page, '.dash-row');
+  expect(Math.round(heading.top - row.bottom)).toBe(12);
+});
+
+/* The tile's head: "Competencies" and Curricular | Core on one line when they
+   fit; at 1100 wide (the roster beside the row) or in a wider font the switch
+   goes under the title, whole, inside the tile. */
+for (const [w, h] of [
+  [1100, 800],
+  [1024, 768],
+  [1280, 800],
+]) {
+  test(`at ${w} wide the Competencies title and Curricular | Core stay whole inside the tile, in both fonts`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await openDashboard(page);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      const m = await page.evaluate(() => {
+        const tile = document.querySelector('.dash-comp-tile');
+        const tb = tile.getBoundingClientRect();
+        const cs = getComputedStyle(tile);
+        const inner = { left: tb.left + parseFloat(cs.paddingLeft), right: tb.right - parseFloat(cs.paddingRight) };
+        const parts = [
+          '.dash-comp-tile-title',
+          '.dash-comp-seg',
+          '#dash-comp-tab-curricular',
+          '#dash-comp-tab-core',
+        ].map(s => {
+          const el = document.querySelector(s);
+          const r = el.getBoundingClientRect();
+          return { s, left: r.left, right: r.right, cut: el.scrollWidth > el.clientWidth + 1 };
+        });
+        const t = document.querySelector('.dash-comp-tile-title').getBoundingClientRect();
+        const seg = document.querySelector('.dash-comp-seg').getBoundingClientRect();
+        return {
+          outside: parts.filter(p => p.left < inner.left - 0.5 || p.right > inner.right + 0.5).map(p => p.s),
+          cut: parts.filter(p => p.cut).map(p => p.s),
+          overlap: !(seg.left >= t.right - 0.5 || seg.top >= t.bottom - 0.5),
+          core: document.querySelector('#dash-comp-tab-core').textContent,
+        };
+      });
+      expect(m, `${w} ${font}`).toEqual({ outside: [], cut: [], overlap: false, core: 'Core' });
+    }
+  });
+}

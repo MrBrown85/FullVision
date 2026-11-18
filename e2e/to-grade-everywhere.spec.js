@@ -79,9 +79,16 @@ test('the dashboard, the gradebook and Assignments give the same number', async 
   await expect(waiting).toHaveCount(2);
   await shot(page, 'S6-F4-gradebook-to-grade-1366');
 
-  // The dashboard's cell opens Assignments with To Grade on.
+  // The dashboard's cell: a click goes to the Inbox on the page (D9); its
+  // link, for a new tab, opens Assignments with To Grade on.
   await page.goto('/dashboard');
-  await page.locator('.dash-glance-tograde').click();
+  const cell = page.locator('.dash-glance-tograde');
+  await cell.click();
+  await expect(page.locator('#dash-inbox')).toBeInViewport();
+  await expect(page).toHaveURL(/dashboard/);
+  const href = await cell.getAttribute('data-href');
+  expect(href).toMatch(/^\/assignments\?course=.*&show=tograde$/);
+  await page.goto(href);
   await expect(page).toHaveURL(/assignments/);
   await expect(page.locator('.assess-tograde-seg [data-show="tograde"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.assess-tograde-n')).toHaveText('2');
