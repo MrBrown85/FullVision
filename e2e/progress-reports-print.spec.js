@@ -821,7 +821,8 @@ test.describe('The Quick Report’s choices, read as parts', () => {
     const kinds = await sideKinds(student);
     expect(kinds[0]).toBe('report');
     expect(kinds).toContain('feedback');
-    await expect(page.locator('#studio-fit')).toContainText('sheets for');
+    // The fit line lays the class out while the page is idle; on CI that took longer than 5 s (Nov 18, main f69c5179).
+    await expect(page.locator('#studio-fit')).toContainText('sheets for', { timeout: 20000 });
     await expect(page.locator('.fb-rb').first()).toBeVisible();
 
     // Rubrics off takes the rubric tables off.
