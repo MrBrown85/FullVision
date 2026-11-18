@@ -639,7 +639,6 @@ function refreshBulletins(cid, opts) {
   var quiet = { suppressSessionExpiredModal: true };
   var run = Promise.resolve()
     .then(function () {
-      // @ts-expect-error list_bulletins is not in types/database.d.ts until the migration is applied and the types are regenerated.
       return _callRpcWithAuthGuard('list_bulletins', asked, quiet);
     })
     .then(function (res) {
@@ -795,7 +794,6 @@ function getBulletinSeen(cid, bulletinId) {
   var quiet = { suppressSessionExpiredModal: true };
   return Promise.resolve()
     .then(function () {
-      // @ts-expect-error list_bulletin_seen is not in types/database.d.ts until the migration is applied and the types are regenerated.
       return _callRpcWithAuthGuard('list_bulletin_seen', args, quiet);
     })
     .then(function (res) {

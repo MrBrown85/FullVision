@@ -471,7 +471,6 @@ function _bltQueueUpload(path, blob, info) {
       if (!entry) return { error: null }; // let go meanwhile: its pages go with the commit
       var finish = { p_bulletin_file_id: fileId, p_idempotency_key: fileId };
       var quiet = { suppressSessionExpiredModal: true };
-      // @ts-expect-error finish_bulletin_file is not in types/database.d.ts until the migration is applied and the types are regenerated.
       var asked = _callRpcWithAuthGuard('finish_bulletin_file', finish, quiet);
       return Promise.resolve(asked).then(function (/** @type {any} */ ans) {
         var data = _rpcObject(ans && ans.data);
@@ -521,7 +520,6 @@ async function _bltQueueCommit(batch) {
     for (var i = 0; i < fileIds.length; i++) {
       var fid = fileIds[i];
       var finish = { p_bulletin_file_id: fid, p_idempotency_key: fid };
-      // @ts-expect-error finish_bulletin_file is not in types/database.d.ts until the migration is applied and the types are regenerated.
       var res = await _callRpcWithAuthGuard('finish_bulletin_file', finish, quiet);
       if (!res || res.error) return { error: (res && res.error) || { message: 'no answer', status: 503 } };
       var data = _rpcObject(res.data) || {};
