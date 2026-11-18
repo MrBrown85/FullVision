@@ -193,7 +193,8 @@ test('up and down turn through a two-page student, stopping at the first and the
   await page.locator('.dash-inbox-flip-slider').fill('2');
   await expect(name(page)).toHaveText('Noor Al-Rashid');
   await expect(page.locator('.dash-inbox-flip-pagetext')).toHaveText('Page 1 of 2');
-  const src = () => page.locator('.dash-inbox-flip-pg.is-centre [data-flip-part="page"]').getAttribute('data-flip-pic');
+  const src = () =>
+    page.locator('.dash-inbox-flip-pg.is-centre [data-flip-part="page"]:not([hidden])').getAttribute('data-flip-pic');
   const first = await src();
   await stage.focus();
   await page.keyboard.press('ArrowDown');
@@ -567,11 +568,11 @@ test('the centre and one stop each side show the whole page over a thumbnail, th
     .toBeGreaterThan(8);
   const got = await page.evaluate(() =>
     [...document.querySelectorAll('.dash-inbox-flip-pg')].map((b, i) => {
-      const t = b.querySelector('[data-flip-part="thumb"]');
-      const p = b.querySelector('[data-flip-part="page"]');
+      const t = b.querySelector('[data-flip-part="thumb"]:not([hidden])');
+      const p = b.querySelector('[data-flip-part="page"]:not([hidden])');
       return {
         i,
-        sheet: !!b.querySelector('[data-flip-part="sheet"]'),
+        sheet: !!b.querySelector('[data-flip-id="sheet"]'),
         centre: b.classList.contains('is-centre'),
         thumb: t ? t.currentSrc : '',
         page: p ? p.currentSrc : '',
@@ -582,8 +583,9 @@ test('the centre and one stop each side show the whole page over a thumbnail, th
   got.forEach(g => {
     const d = Math.abs(g.i - c);
     if (g.sheet) return;
-    if (d <= 5) expect(g.thumb).toContain('thumb');
-    else expect(g.thumb).toBe('');
+    // One thumbnail beyond the stage's edge is held (and kept until two beyond).
+    if (d <= 6) expect(g.thumb).toContain('thumb');
+    else if (d > 7) expect(g.thumb).toBe('');
     if (d <= 1) {
       expect(g.page).not.toBe('');
       expect(g.page).not.toContain('thumb');
@@ -810,6 +812,276 @@ test('after the grader closes the focus goes back to what opened it', async ({ p
     await expect(page.locator('.grader-dialog')).toHaveCount(0);
     await expect(page.locator(sel)).toBeFocused();
   }
+});
+
+test('a file dragged over the tile raises the drop cover over Flip Through, and the stage ignores events under it', async ({
+  page,
+}) => {
+  await open(page);
+  const slider = page.locator('.dash-inbox-flip-slider');
+  await expect(slider).toHaveValue('0');
+  const cover = page.locator('#dash-inbox .dash-inbox-drop-cover');
+  const coverShown = () => cover.evaluate(el => !el.hidden && getComputedStyle(el).display !== 'none');
+  expect(await coverShown()).toBe(false);
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
+    window.__dt = dt;
+    document
+      .getElementById('dash-inbox')
+      .dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  });
+  expect(await coverShown()).toBe(true);
+  // A sideways wheel on the stage does nothing while the cover is up. (A key, a press and a
+  // mouse move each end the drop's own drag first, before the stage hears them, so the cover is
+  // gone by then: the stage's guards for them are the belt to that brace.)
+  const raise = () =>
+    page.evaluate(() =>
+      document
+        .getElementById('dash-inbox')
+        .dispatchEvent(new DragEvent('dragenter', { dataTransfer: window.__dt, bubbles: true, cancelable: true })),
+    );
+  await raise();
+  expect(await coverShown()).toBe(true);
+  await page.evaluate(() => {
+    const stage = document.querySelector('.dash-inbox-flip-stage');
+    stage.dispatchEvent(new WheelEvent('wheel', { deltaX: 200, deltaY: 0, bubbles: true, cancelable: true }));
+  });
+  await expect(slider).toHaveValue('0');
+  expect(await coverShown()).toBe(true);
+  // A key press ends the drag, and then it is the stage's.
+  await page.evaluate(() => {
+    const stage = document.querySelector('.dash-inbox-flip-stage');
+    stage.focus();
+    stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+  });
+  expect(await coverShown()).toBe(false);
+  await raise();
+  await page.evaluate(() =>
+    document
+      .getElementById('dash-inbox')
+      .dispatchEvent(new DragEvent('dragleave', { dataTransfer: window.__dt, bubbles: true, cancelable: true })),
+  );
+  await expect.poll(coverShown).toBe(false);
+  // Cleared: the stage answers again.
+  await page.locator('.dash-inbox-flip-stage').focus();
+  await page.keyboard.press('ArrowRight');
+  // The key press that ended the drag moved one stop; this one moves another.
+  await expect(slider).toHaveValue('2');
+});
+
+test('a drag that starts on the stage (text, not files) is no file drop and flips no stop', async ({ page }) => {
+  await open(page);
+  const slider = page.locator('.dash-inbox-flip-slider');
+  const r = await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'a selected line');
+    const page0 = document.querySelector('.dash-inbox-flip-pg.is-centre');
+    for (const t of ['dragstart', 'dragenter', 'dragover']) {
+      page0.dispatchEvent(new DragEvent(t, { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }
+    const cover = document.querySelector('#dash-inbox .dash-inbox-drop-cover');
+    return {
+      coverShown: !!cover && !cover.hidden,
+      imgsDraggable: [...document.querySelectorAll('.dash-inbox-flip-img')].every(
+        i => i.getAttribute('draggable') === 'false',
+      ),
+    };
+  });
+  expect(r).toEqual({ coverShown: false, imgsDraggable: true });
+  await expect(slider).toHaveValue('0');
+  // Dragging the slider's thumb moves stops only through the slider.
+  const b = await box(page, '.dash-inbox-flip-slider');
+  await page.mouse.move(b.left + 12, b.top + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.left + b.width / 2, b.top + b.height / 2, { steps: 5 });
+  await page.mouse.up();
+  expect(Number(await slider.inputValue())).toBeGreaterThan(0);
+  await expect(page.locator('#dash-inbox .dash-inbox-drop-cover')).toBeHidden();
+});
+
+test('a paper hand-in holds its words under a wide font, in the page font and at both sizes', async ({ page }) => {
+  await open(page, { bulletins: true });
+  await page.locator('.dash-inbox-flip-slider').fill('7');
+  await expect(name(page)).toHaveText('Ethan Dubois');
+  await settle(page);
+  const FONTS = {
+    own: '',
+    wide: 'body, .dash-inbox-flip-sheet, .dash-inbox-flip-sheet * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }',
+  };
+  for (const [fontName, css] of Object.entries(FONTS)) {
+    await page.evaluate(c => {
+      let t = document.getElementById('__font');
+      if (!t) {
+        t = document.createElement('style');
+        t.id = '__font';
+        document.head.appendChild(t);
+      }
+      t.textContent = c;
+    }, css);
+    const m = await page.evaluate(() =>
+      [...document.querySelectorAll('.dash-inbox-flip-pg:not(.is-off) .dash-inbox-flip-sheet')].map(el => {
+        const lines = n => Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).lineHeight));
+        const name = el.querySelector('.dash-inbox-flip-sheet-name');
+        const note = el.querySelector('.dash-inbox-flip-sheet-note');
+        return {
+          centre: !!el.closest('.is-centre'),
+          fits: el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1,
+          nameLines: lines(name),
+          noteLines: lines(note),
+          noteWords: (() => {
+            const r = document.createRange();
+            r.selectNodeContents(note);
+            return r.getBoundingClientRect().right <= el.getBoundingClientRect().right + 0.5;
+          })(),
+        };
+      }),
+    );
+    expect(m.length, fontName).toBeGreaterThan(0);
+    m.forEach(x => {
+      expect(x.fits, fontName).toBe(true);
+      expect(x.nameLines, fontName).toBeLessThanOrEqual(2);
+      expect(x.noteLines, fontName).toBeLessThanOrEqual(2);
+      expect(x.noteWords, fontName).toBe(true);
+    });
+  }
+});
+
+test('over the stage a mostly vertical wheel scrolls the page and moves no stop; a sideways one moves one stop and does not scroll', async ({
+  page,
+}) => {
+  await open(page);
+  const scrolled = () =>
+    page.evaluate(() => {
+      const main = document.getElementById('main');
+      return Math.max(window.scrollY, main ? main.scrollTop : 0);
+    });
+  const reset = () =>
+    page.evaluate(() => {
+      window.scrollTo(0, 0);
+      const main = document.getElementById('main');
+      if (main) main.scrollTop = 0;
+    });
+  const s = await box(page, '.dash-inbox-flip-stage');
+  await page.mouse.move(s.left + s.width / 2, s.top + s.height / 2);
+  for (const [dx, dy] of [
+    [1, 40],
+    [3, 40],
+    [10, 40],
+    [20, 30],
+  ]) {
+    await reset();
+    await page.waitForTimeout(100);
+    await page.mouse.wheel(dx, dy);
+    await expect.poll(scrolled, { message: dx + ',' + dy }).toBeGreaterThan(0);
+    await expect(page.locator('.dash-inbox-flip-slider')).toHaveValue('0');
+  }
+  await reset();
+  await page.waitForTimeout(300);
+  await page.mouse.wheel(40, 3);
+  await expect(page.locator('.dash-inbox-flip-slider')).toHaveValue('1');
+  await page.waitForTimeout(300);
+  expect(await scrolled()).toBe(0);
+});
+
+test('the arrows keep working from a page, to the last stop and back, and after the grader closes', async ({
+  page,
+}) => {
+  await open(page);
+  const names = await page.evaluate(() => DashInboxFlip.entries(getActiveCourse(), 'sci8a1').map(e => e.name));
+  const last = names.length - 1;
+  const onBody = () => page.evaluate(() => document.activeElement === document.body);
+  const walk = async () => {
+    for (let i = 1; i <= last; i++) {
+      await page.keyboard.press('ArrowRight');
+      await expect(name(page)).toHaveText(names[i]);
+      expect(await onBody(), 'right ' + i).toBe(false);
+    }
+    for (let i = last - 1; i >= 0; i--) {
+      await page.keyboard.press('ArrowLeft');
+      await expect(name(page)).toHaveText(names[i]);
+      expect(await onBody(), 'left ' + i).toBe(false);
+    }
+  };
+  // Click a page (it takes the focus), then walk the whole piece and back.
+  await settle(page);
+  const at = await visiblePoint(page, names[1]);
+  await page.mouse.click(at.x, at.y);
+  await expect(name(page)).toHaveText(names[1]);
+  await page.keyboard.press('ArrowLeft');
+  await expect(name(page)).toHaveText(names[0]);
+  await page.keyboard.press('ArrowRight');
+  await expect(name(page)).toHaveText(names[1]);
+  for (let i = 2; i <= last; i++) {
+    await page.keyboard.press('ArrowRight');
+    await expect(name(page)).toHaveText(names[i]);
+    expect(await onBody(), 'right ' + i).toBe(false);
+  }
+  for (let i = last - 1; i >= 0; i--) {
+    await page.keyboard.press('ArrowLeft');
+    await expect(name(page)).toHaveText(names[i]);
+    expect(await onBody(), 'left ' + i).toBe(false);
+  }
+  // Back from the grader with the focus on the centre page: the same walk.
+  await page.locator('.dash-inbox-flip-pg.is-centre').click();
+  await expect(page.locator('.grader-dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.grader-dialog')).toHaveCount(0);
+  await expect(page.locator('.dash-inbox-flip-pg.is-centre')).toBeFocused();
+  await walk();
+});
+
+test('five round trips ask for nothing after the first; down, up, down in a 13-page pile asks each page once', async ({
+  page,
+}) => {
+  await open(page);
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const work = getCourseSubmissions(cid);
+    const noor = DashInboxFlip.entries(cid, 'sci8a1')[2];
+    const sub = work.submissions.find(x => x.assessment_id === 'sci8a1' && x.enrollment_id === noor.sid);
+    sub.files = Array.from({ length: 13 }, (_, i) => ({ ...sub.files[0], id: 'big-' + (i + 1), page: i + 1 }));
+    saveDemoStudentWork(cid, work);
+    PageDashboard.render();
+    window.__asks = [];
+    const was = window.openStudentWorkPage;
+    window.openStudentWorkPage = function (c, file, which) {
+      window.__asks.push(file.id + '|' + which);
+      return was.apply(this, arguments);
+    };
+  });
+  const asks = () => page.evaluate(() => window.__asks.length);
+  const stage = page.locator('.dash-inbox-flip-stage');
+  await page.locator('.dash-inbox-flip-slider').fill('4');
+  await settle(page);
+  await stage.focus();
+  const round = async () => {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(60);
+    await page.keyboard.press('ArrowLeft');
+    await page.waitForTimeout(60);
+  };
+  await round();
+  await settle(page);
+  const after1 = await asks();
+  for (let i = 0; i < 4; i++) await round();
+  await settle(page);
+  expect(await asks()).toBe(after1);
+  // A 13-page pile: down, up, down again.
+  await page.locator('.dash-inbox-flip-slider').fill('2');
+  await settle(page);
+  await expect(page.locator('.dash-inbox-flip-pagetext')).toHaveText('Page 1 of 13');
+  await stage.focus();
+  for (const key of ['ArrowDown', 'ArrowUp', 'ArrowDown']) {
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(40);
+    }
+  }
+  await settle(page);
+  const all = await page.evaluate(() => window.__asks);
+  expect(new Set(all).size).toBe(all.length);
+  expect(all.filter(a => a.startsWith('big-') && a.endsWith('|page')).length).toBe(13);
 });
 
 test('with the switch off there is no Flip Through', async ({ page }) => {

@@ -41,7 +41,6 @@
   border-radius: 8px;
   outline: none;
   touch-action: pan-y;
-  overscroll-behavior-x: contain;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -104,6 +103,9 @@
 .dash-inbox-flip-pg.is-centre .dash-inbox-flip-face {
   box-shadow: var(--shadow-md, var(--shadow-sm));
 }
+.dash-inbox-flip-img[hidden] {
+  display: none;
+}
 .dash-inbox-flip-img {
   position: absolute;
   inset: 0;
@@ -137,12 +139,15 @@
 }
 .dash-inbox-flip-sheet-name,
 .dash-inbox-flip-sheet-note {
+  display: -webkit-box;
   overflow: hidden;
   font-size: clamp(10px, 8cqh, 14px);
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   background: #fbfaf6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 /* The caption sits under the centre page only. */

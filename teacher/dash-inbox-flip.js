@@ -195,15 +195,19 @@
   }
 
   /* ── Drawing ───────────────────────────────────────────── */
-  /** @param {string} key @param {string} which */
-  function imgHtml(key, which) {
+  // The most pages of one student kept fetched while they are the centre: the
+  // largest pile on file is 13, so turning down and back up asks for nothing again.
+  var KEEP_PAGES = 13;
+
+  /** @param {string} key @param {string} which @param {string} id */
+  function imgHtml(key, which, id) {
     return (
       '<img class="dash-inbox-flip-img" data-work-pic data-flip-pic="' +
       esc(key) +
       '" data-flip-part="' +
       which +
-      '" data-flip-want="' +
-      esc(key) +
+      '" data-flip-id="' +
+      esc(id) +
       '"' +
       (which === 'page' ? ' data-work-which="page"' : '') +
       ' alt="" decoding="async" draggable="false">'
@@ -213,7 +217,7 @@
   /** @param {any} e */
   function sheetHtml(e) {
     return (
-      '<span class="dash-inbox-flip-sheet" data-flip-part="sheet" data-flip-want="1"><span class="dash-inbox-flip-sheet-name">' +
+      '<span class="dash-inbox-flip-sheet" data-flip-id="sheet"><span class="dash-inbox-flip-sheet-name">' +
       esc(e.name) +
       '</span><span class="dash-inbox-flip-sheet-note">' +
       (e.onPaper ? 'Handed In on Paper' : 'No Pages') +
@@ -221,37 +225,77 @@
     );
   }
 
-  /** What a face holds, as { part: [want, html] }: a thumbnail for every page on
-   * the stage, the whole page over it for the centre and one stop each side
-   * (and, once a page is held, until it is two stops away), or a lined sheet.
+  /** What a face holds, as [id, html, hidden] (html null: keep the one there).
+   * A thumbnail for each page on the stage and one stop beyond its edge (kept
+   * until two beyond, so a step back and forth asks for nothing again); the
+   * whole page over it for the centre and one stop each side (kept until two
+   * away); for the centre student, every page of theirs already fetched, out
+   * of sight; or a lined sheet.
    * @param {string} cid @param {string} aid @param {any} e @param {number} dist
-   * @param {State} st @param {boolean} hadPage @param {Record<string, any>} files
-   * @returns {Record<string, [string, string]>} */
-  function faceParts(cid, aid, e, dist, st, hadPage, files) {
+   * @param {State} st @param {Element | null} face @param {Record<string, any>} files
+   * @returns {[string, string | null, boolean][]} */
+  function faceWanted(cid, aid, e, dist, st, face, files) {
     var f = e.files[pageShown(st, e)];
-    if (!f) return { sheet: ['1', sheetHtml(e)] };
+    if (!f) return [['sheet', sheetHtml(e), false]];
     var key = picKey(cid, aid, e.sid, f.id);
     files[key] = f;
-    /** @type {Record<string, [string, string]>} */
-    var out = { thumb: [key, imgHtml(key, 'thumb')] };
-    if (dist <= 1 || (hadPage && dist <= 2)) out.page = [key, imgHtml(key, 'page')];
+    /** @param {string} id */
+    var has = function (id) {
+      return !!face && !!face.querySelector('[data-flip-id="' + id + '"]');
+    };
+    /** @type {[string, string | null, boolean][]} */
+    var out = [];
+    var tid = 'thumb:' + f.id;
+    var pid = 'page:' + f.id;
+    if (dist <= WINDOW + 1 || (has(tid) && dist <= WINDOW + 2)) out.push([tid, imgHtml(key, 'thumb', tid), false]);
+    if (dist <= 1 || (has(pid) && dist <= 2)) out.push([pid, imgHtml(key, 'page', pid), false]);
+    if (dist === 0 && face) {
+      // Other pages already fetched, oldest first, the newest KEEP_PAGES - 1 of them.
+      /** @type {string[]} */
+      var fids = [];
+      face.querySelectorAll('[data-flip-id]').forEach(function (el) {
+        var id = el.getAttribute('data-flip-id') || '';
+        var fid = id.slice(id.indexOf(':') + 1);
+        if (id !== 'sheet' && fid !== f.id && fids.indexOf(fid) < 0) fids.push(fid);
+      });
+      fids.slice(-(KEEP_PAGES - 1)).forEach(function (fid) {
+        ['thumb:', 'page:'].forEach(function (w) {
+          if (has(w + fid)) out.push([w + fid, null, true]);
+        });
+      });
+    }
     return out;
   }
 
-  /** @param {Element} face @param {string} part @param {string} want @param {string} html */
-  function syncPart(face, part, want, html) {
-    var now = face.querySelector('[data-flip-part="' + part + '"]');
-    var cur = now ? now.getAttribute('data-flip-want') || '' : '';
-    if (cur === want) return;
-    if (now) now.remove();
-    if (!want) return;
-    var tmp = document.createElement('div');
-    // html-safe: imgHtml and sheetHtml escape every key and name with esc
-    tmp.innerHTML = html;
-    var el = tmp.firstChild;
-    if (!el) return;
-    if (part === 'page') face.appendChild(el);
-    else face.insertBefore(el, face.firstChild);
+  /** Make a face hold what it is wanted to: add what is missing, take away what
+   * is not wanted, hide what is kept but not showing.
+   * @param {Element} face @param {[string, string | null, boolean][]} wanted */
+  function syncFace(face, wanted) {
+    /** @type {Record<string, boolean>} */
+    var ids = {};
+    wanted.forEach(function (w) {
+      ids[w[0]] = true;
+    });
+    face.querySelectorAll('[data-flip-id]').forEach(function (el) {
+      if (!ids[el.getAttribute('data-flip-id') || '']) el.remove();
+    });
+    wanted.forEach(function (w) {
+      var el = face.querySelector('[data-flip-id="' + w[0] + '"]');
+      if (!el) {
+        if (w[1] == null) return;
+        var tmp = document.createElement('div');
+        // html-safe: imgHtml and sheetHtml escape every key and name with esc
+        tmp.innerHTML = w[1];
+        el = /** @type {Element | null} */ (tmp.firstChild);
+        if (!el) return;
+        if (w[0].indexOf('page:') === 0) face.appendChild(el);
+        else face.insertBefore(el, face.firstChild);
+      }
+      if (/** @type {Element} */ (el).hasAttribute('hidden') !== w[2]) {
+        if (w[2]) /** @type {Element} */ (el).setAttribute('hidden', '');
+        else /** @type {Element} */ (el).removeAttribute('hidden');
+      }
+    });
   }
 
   /** The side a page stands on (-1, 0, 1), the steps back from the centre,
@@ -291,16 +335,16 @@
       .map(function (e, i) {
         var p = _place(i, c);
         var cap = caption(cid, e, pageShown(st, e));
-        var parts = p.on ? faceParts(cid, aid, e, p.a, st, false, files) : {};
+        var parts = p.a <= WINDOW + 1 ? faceWanted(cid, aid, e, p.a, st, null, files) : [];
         return (
           '<button type="button" tabindex="-1" data-flip-i="' +
           i +
           '"' +
           _pgAttrs(p, e, p.centre ? e.fullName + ', ' + cap.label : e.fullName) +
           '><span class="dash-inbox-flip-face">' +
-          Object.keys(parts)
-            .map(function (k) {
-              return parts[k][1];
+          parts
+            .map(function (w) {
+              return w[1];
             })
             .join('') +
           '</span></button>'
@@ -459,12 +503,7 @@
       var face = b.querySelector('.dash-inbox-flip-face');
       if (!face) return;
       var fc = face;
-      var parts = p.on
-        ? faceParts(L.cid, L.aid, e, p.a, st, !!face.querySelector('[data-flip-part="page"]'), files)
-        : {};
-      ['sheet', 'thumb', 'page'].forEach(function (k) {
-        syncPart(fc, k, parts[k] ? parts[k][0] : '', parts[k] ? parts[k][1] : '');
-      });
+      syncFace(fc, p.a <= WINDOW + 2 ? faceWanted(L.cid, L.aid, e, p.a, st, fc, files) : []);
     });
     L.main.querySelectorAll('[data-flip-goto]').forEach(function (/** @type {Element} */ b, /** @type {number} */ i) {
       if (i === c) b.setAttribute('aria-current', 'true');
@@ -519,7 +558,14 @@
   function go(L, i) {
     var before = centreOf(L.st, L.list);
     var at = moveTo(L.st, L.list, i);
-    if (at !== before) place(L);
+    if (at !== before) {
+      // A page holding the focus must not be left behind: it would go out of sight.
+      var held = document.activeElement;
+      var onPage = !!held && held.classList.contains('dash-inbox-flip-pg') && L.root.contains(held);
+      place(L);
+      var now = onPage ? L.main.querySelector('.dash-inbox-flip-pg.is-centre') : null;
+      if (now) /** @type {HTMLElement} */ (now).focus({ preventScroll: true });
+    }
   }
 
   /** @param {any} L @param {number} delta */
@@ -536,14 +582,22 @@
       /** @type {any} */ (window).PageDashboard.render();
   }
 
-  // The grader is over the tile: what happens under it is not meant for the stage.
+  // The grader is over the page.
   function _graderOpen() {
     return !!document.getElementById('grader-overlay');
   }
 
+  // The grader is over the tile, or the file-drop cover is: what happens then
+  // is not meant for the stage.
+  function _blocked() {
+    if (_graderOpen()) return true;
+    var cover = /** @type {HTMLElement | null} */ (document.querySelector('#dash-inbox .dash-inbox-drop-cover'));
+    return !!cover && !cover.hidden;
+  }
+
   /** The grader on the centre student, in this order. @param {any} L @param {string} how */
   function openGrader(L, how) {
-    if (_graderOpen()) return;
+    if (_blocked()) return;
     var e = L.list[centreOf(L.st, L.list)];
     if (!e || !window.PageAssignments || !PageAssignments.openGrader) return;
     _opener = how;
@@ -674,7 +728,7 @@
   /** @param {any} L @param {MouseEvent} e */
   function onClick(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (!t || !t.closest || _graderOpen()) return;
+    if (!t || !t.closest || _blocked()) return;
     var turnBtn = t.closest('[data-flip-turn]');
     if (turnBtn) {
       if (turnBtn.getAttribute('aria-disabled') !== 'true') flip(L, Number(turnBtn.getAttribute('data-flip-turn')));
@@ -699,7 +753,7 @@
   /** @param {any} L @param {KeyboardEvent} e */
   function onKey(L, e) {
     var stage = L.main.querySelector('.dash-inbox-flip-stage');
-    if (!stage || _graderOpen() || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (!stage || _blocked() || e.altKey || e.ctrlKey || e.metaKey) return;
     // The stage, or a page on it (clicked, or the grader closed on it); the
     // slider and the caption's controls have their own keys.
     var t = /** @type {any} */ (e.target);
@@ -737,7 +791,7 @@
   /** @param {any} L @param {WheelEvent} e */
   function onWheel(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (!t || !t.closest || _graderOpen() || !t.closest('.dash-inbox-flip-stage')) return;
+    if (!t || !t.closest || _blocked() || !t.closest('.dash-inbox-flip-stage')) return;
     var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0;
     if (!dx) return;
     // Sideways over the stage is the stage's: never the browser's Back or a sideways scroll.
@@ -760,7 +814,7 @@
   /** @param {any} L @param {PointerEvent} e */
   function onDown(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (e.button || !t.closest || _graderOpen() || !t.closest('.dash-inbox-flip-stage')) return;
+    if (e.button || !t.closest || _blocked() || !t.closest('.dash-inbox-flip-stage')) return;
     L.downX = e.clientX;
     L.downY = e.clientY;
     L.swiped = false;
@@ -769,7 +823,7 @@
 
   /** @param {any} L @param {PointerEvent} e */
   function onMove(L, e) {
-    if (L.downX == null || L.swiped || _graderOpen()) return;
+    if (L.downX == null || L.swiped || _blocked()) return;
     var dx = e.clientX - L.downX;
     var dy = e.clientY - L.downY;
     if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy)) {
@@ -782,7 +836,7 @@
   /** @param {any} L @param {Event} e */
   function onInput(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (_graderOpen()) return;
+    if (_blocked()) return;
     if (t && t.classList && t.classList.contains('dash-inbox-flip-slider')) go(L, Number(t.value));
   }
 

@@ -221,10 +221,9 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     DashInboxPick.set(CID, LAB);
     const html = DashInboxFlip.html(CID);
     // The key an img carries is the key place() compares against: one function.
-    const keys = [...html.matchAll(/data-flip-pic="([^"]+)" data-flip-part="(thumb|page)" data-flip-want="([^"]+)"/g)];
+    const keys = [...html.matchAll(/data-flip-pic="([^"]+)" data-flip-part="(thumb|page)" data-flip-id="[^"]+"/g)];
     expect(keys.length).toBeGreaterThan(0);
     keys.forEach(k => {
-      expect(k[1]).toBe(k[3]);
       expect(k[1].startsWith(CID + '|' + LAB + '|')).toBe(true);
     });
     // The centre and one stop each side hold the whole page; the rest a thumbnail only.
