@@ -5,11 +5,8 @@
  * its height are tried in a browser (e2e/dashboard-bulletins-tile.spec.js).
  */
 import './setup.js';
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { readFileSync } from 'fs';
-import { runInThisContext } from 'vm';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
-runInThisContext(readFileSync('teacher/page-bulletins.js', 'utf-8'), { filename: 'teacher/page-bulletins.js' });
 const D = window.DashBulletins;
 const H = D._helpers;
 const now = new Date(2026, 10, 17, 12, 0, 0); // Tue, Nov 17, 2026
@@ -79,13 +76,13 @@ describe('the words and the time', () => {
     const justNow = new Date(now.getTime() - 20000).toISOString();
     expect(H.timeText(b('a', { posted_at: justNow }), now)).toBe('Just Now');
     expect(H.timeText(b('w', { waiting: true, posted_at: at(17, 8, 0) }), now)).toBe('Just Now');
-    expect(H.timeText(b('a', { posted_at: at(17, 10, 15) }), now)).toBe('10:15');
-    expect(H.timeText(b('a', { posted_at: at(17, 13, 5) }), new Date(2026, 10, 17, 14, 0))).toBe('1:05');
-    expect(H.timeText(b('a', { posted_at: at(16, 10, 15) }), now)).toBe('Yesterday');
-    expect(H.timeText(b('a', { posted_at: at(15, 10, 15) }), now)).toBe('Sun');
-    expect(H.timeText(b('a', { posted_at: at(9, 10, 15) }), now)).toBe('Nov 9');
+    expect(H.timeText(b('a', { posted_at: at(17, 10, 15) }), now)).toBe('10:15 a.m.');
+    expect(H.timeText(b('a', { posted_at: at(17, 23, 58) }), new Date(2026, 10, 17, 23, 59))).toBe('11:58 p.m.');
+    expect(H.timeText(b('a', { posted_at: at(16, 10, 15) }), now)).toBe('Yesterday 10:15 a.m.');
+    expect(H.timeText(b('a', { posted_at: at(15, 10, 15) }), now)).toBe('Sun 10:15 a.m.');
+    expect(H.timeText(b('a', { posted_at: at(9, 10, 15) }), now)).toBe('Nov 9 10:15 a.m.');
     // A minute and a bit ago is just a time.
-    expect(H.timeText(b('a', { posted_at: new Date(now.getTime() - 61000).toISOString() }), now)).toBe('11:58');
+    expect(H.timeText(b('a', { posted_at: new Date(now.getTime() - 61000).toISOString() }), now)).toBe('11:58 a.m.');
   });
 });
 
@@ -177,20 +174,105 @@ describe('the tile', () => {
     expect(out).not.toContain('dash-bulletins-row');
   });
 
-  it('not offered (the server has no Bulletins functions yet): one sentence, no buttons', () => {
+  describe('a signed-in class the server has not said has Bulletins: no slot at all', () => {
     const cid = '11111111-2222-4333-8444-555555555555';
-    globalThis._bltMem[cid] = {
-      state: 'missing',
-      list: [],
-      meta: { can_see: 0, no_card: 0, paused: 0, page_on: true, more: false },
-      at: 0,
-      loading: null,
-      writes: 0,
+    const seed = state => {
+      globalThis._bltMem[cid] = {
+        state,
+        list: [b('a', { posted_at: at(17, 10, 15) })],
+        meta: { can_see: 27, no_card: 0, paused: 0, page_on: true, more: false },
+        at: Date.now(),
+        loading: null,
+        writes: 0,
+      };
     };
-    const out = H.tileHtml(cid, now);
-    expect(out).toContain('Bulletins are not available yet.');
-    expect(out).not.toContain('dash-bulletins-write');
-    expect(out).not.toContain('dash-bulletins-row');
-    delete globalThis._bltMem[cid];
+    afterEach(() => {
+      delete globalThis._bltMem[cid];
+    });
+
+    it('missing, failed and never answered each draw nothing, and the tile says nothing', () => {
+      for (const state of ['missing', 'failed', '']) {
+        seed(state);
+        expect(D.html(cid)).toBe('');
+        expect(H.tileHtml(cid, now)).toBe('');
+        D.destroy();
+      }
+    });
+
+    it('a failed read is not asked for again on every draw', () => {
+      seed('failed');
+      const real = globalThis.refreshBulletins;
+      const asked = vi.fn(() => Promise.resolve(false));
+      globalThis.refreshBulletins = asked;
+      try {
+        D.html(cid);
+        D.html(cid);
+        expect(asked).not.toHaveBeenCalled();
+        seed('');
+        D.html(cid);
+        expect(asked).toHaveBeenCalledTimes(1);
+      } finally {
+        globalThis.refreshBulletins = real;
+      }
+    });
+
+    it('answers late: the row is drawn once more, once, and only when nothing is open', () => {
+      const handlers = {};
+      document.addEventListener = (t, h) => (handlers[t] = h);
+      const realOffered = globalThis.bulletinsOffered;
+      globalThis.bulletinsOffered = () => true;
+      const render = vi.fn();
+      window.PageDashboard = { render };
+      let open = true;
+      const row = { contains: () => false, querySelector: () => (open ? {} : null) };
+      document.querySelector = sel => (sel === '.dash-row' ? row : null);
+      document.getElementById = () => null;
+      try {
+        seed('');
+        expect(D.html(cid)).toBe('');
+        // The server answers: a list is open on the row, so it waits.
+        seed('ok');
+        handlers['fv:bulletins-changed']({ detail: { cid } });
+        expect(render).not.toHaveBeenCalled();
+        open = false;
+        handlers['fv:bulletins-changed']({ detail: { cid } });
+        expect(render).toHaveBeenCalledTimes(1);
+        // Another class's answer asks for nothing.
+        handlers['fv:bulletins-changed']({ detail: { cid: 'other' } });
+        expect(render).toHaveBeenCalledTimes(1);
+        // The row drawn again now has the tile.
+        expect(D.html(cid)).toContain('dash-bulletins-tile');
+        // A read that fails later keeps what the tile showed.
+        globalThis._bltMem[cid].state = 'ok';
+        expect(H.tileHtml(cid, now)).toContain('Words a');
+      } finally {
+        globalThis.bulletinsOffered = realOffered;
+        delete window.PageDashboard;
+        document.addEventListener = () => {};
+        document.querySelector = () => null;
+      }
+    });
+  });
+
+  it('the header reads the data layer: how many can see it and how many pages are paused', () => {
+    globalThis.isDemoMode = () => true;
+    localStorage.setItem('gb-bulletins-sci8', JSON.stringify({ bulletins: [], seen: {}, reactions: {} }));
+    globalThis.getBulletinsMeta = () => ({ can_see: 26, no_card: 0, paused: 1, page_on: true, more: false });
+    expect(D.html('sci8')).toContain('26 can see it, 1 page paused');
+    globalThis.getBulletinsMeta = () => ({ can_see: 25, no_card: 0, paused: 2, page_on: true, more: false });
+    expect(D.html('sci8')).toContain('25 can see it, 2 pages paused');
+  });
+
+  it('a stalled bulletin is not Just Now: it says it did not finish uploading', () => {
+    const out = H.rowHtml(H.rowModel(b('s', { waiting: true, stalled: true, posted_at: at(17, 9, 0) }), 'sci8', now));
+    expect(out).toContain('Didn&#39;t Finish Uploading');
+    expect(out).not.toContain('Not Sent Yet');
+    expect(out).not.toContain('dash-bulletins-fresh');
+    expect(out).toContain('data-href="/bulletins?course=sci8&amp;open=s"');
+  });
+
+  it('a row’s accessible name has its kind, its words and its time', () => {
+    const out = H.rowHtml(H.rowModel(b('a', { posted_at: at(17, 10, 15) }), 'sci8', now));
+    expect(out).toContain('aria-label="Announcement: Words a, 10:15 a.m."');
   });
 });

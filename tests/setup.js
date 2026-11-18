@@ -328,6 +328,7 @@ load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-competencies.js');
 load('teacher/dash-recent.js');
+load('teacher/bulletins-format.js');
 load('teacher/dash-bulletins.js');
 load('teacher/dash-inbox-model.js');
 load('teacher/dash-inbox.js');

@@ -19,8 +19,6 @@
 
   var MAX_ROWS = 3;
   var EMPTY_LINE = "Bulletins reach every student's phone, on the first tab of their page.";
-  var UNAVAILABLE_LINE = 'Bulletins are not available yet.';
-  var UNREAD_LINE = 'Bulletins could not be read. Try again in a moment.';
   var PAGE_OFF_LINE = 'Students cannot see Bulletins until the Student Page is turned on.';
   var JUST_NOW_MS = 60000;
 
@@ -29,6 +27,9 @@
   var _drawing = false;
   var _lastHtml = '';
   var _timer = 0;
+  /** The tile has become available while there is no slot for it: the row is drawn once more when nothing is open. */
+  var _wantRow = false;
+  var _retry = 0;
   var REFRESH_MS = 30000;
 
   /* ── Pure helpers ─────────────────────────────────────────── */
@@ -72,8 +73,7 @@
 
   /** @returns {any} */
   function _helpers() {
-    var page = /** @type {any} */ (window).PageBulletins;
-    return (page && page._helpers) || null;
+    return /** @type {any} */ (window).BulletinsFormat || null;
   }
 
   /** "Reminder", "Announcement" or "Photo of the Board". @param {any} b */
@@ -98,26 +98,17 @@
 
   /** @param {any} b @param {number} nowMs */
   function isFresh(b, nowMs) {
-    if (b.waiting) return true;
+    if (b.waiting) return !b.stalled;
     var at = new Date(_timeOf(b)).getTime();
     return !isNaN(at) && nowMs - at < JUST_NOW_MS && nowMs - at > -JUST_NOW_MS;
   }
 
-  /** "Just Now", "10:15", "Yesterday", "Mon" or "Nov 9". @param {any} b @param {Date} now */
+  /** "Just Now", else the page's own wording shortened to fit: "10:15 a.m.", "Yesterday 10:15 a.m.", "Mon 10:15 a.m.", "Nov 9 10:15 a.m.". @param {any} b @param {Date} now */
   function timeText(b, now) {
     if (isFresh(b, now.getTime())) return 'Just Now';
-    var iso = _timeOf(b);
     var h = _helpers();
-    var heading = h ? h.dayHeading(iso, now) : '';
-    if (!heading) return '';
-    if (heading === 'Today') {
-      var d = new Date(iso);
-      return (d.getHours() % 12 || 12) + ':' + String(d.getMinutes()).padStart(2, '0');
-    }
-    if (heading === 'Yesterday' || /^[A-Z][a-z]+day$/.test(heading)) {
-      return heading === 'Yesterday' ? heading : heading.slice(0, 3);
-    }
-    return heading;
+    var label = h ? h.timeLabel(_timeOf(b), now) : '';
+    return label.replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]+ /, '$1 ');
   }
 
   /** One row, as the tile draws it. @param {any} b @param {string} cid @param {Date} now */
@@ -134,7 +125,8 @@
         .trim(),
       time: timeText(b, now),
       fresh: isFresh(b, now.getTime()),
-      waiting: !!b.waiting,
+      waiting: !!b.waiting && !b.stalled,
+      stalled: !!b.stalled,
       seenMain: split < 0 ? label : label.slice(0, split),
       seenNot: split < 0 ? '' : label.slice(split + 3),
       href: q + '&open=' + encodeURIComponent(b.id),
@@ -143,22 +135,20 @@
   }
 
   /**
-   * What the tile shows for a class: { mode, rows, ... }. mode is 'rows',
-   * 'empty', 'unavailable', 'unread', 'pending' (the first answer has not
-   * come) or 'pageoff' (the Student Page is off for the class).
+   * What the tile shows for a class: { mode, rows, ... }. mode is 'none' (the
+   * server has not said Bulletins is there, so the app offers nothing and the
+   * Inbox keeps the whole column), 'rows', 'empty', or 'pageoff' (the Student
+   * Page is off for the class).
    * @param {string} cid @param {Date} [now]
    */
   function model(cid, now) {
     var at = now || new Date();
     /** @type {{ mode: string, offered: boolean, rows: ReturnType<typeof rowModel>[] }} */
-    var out = { mode: 'pending', offered: false, rows: [] };
-    var state = bulletinsState(cid);
+    var out = { mode: 'none', offered: false, rows: [] };
     var demo = typeof isDemoMode === 'function' && isDemoMode();
-    if (!demo && state === 'missing') return Object.assign(out, { mode: 'unavailable' });
-    if (!demo && state === 'failed') return Object.assign(out, { mode: 'unread' });
-    if (!demo && state !== 'ok') return out;
+    if (!demo && bulletinsState(cid) !== 'ok') return out;
     out.offered = bulletinsOffered(cid);
-    if (!out.offered) return Object.assign(out, { mode: 'unavailable' });
+    if (!out.offered) return out;
     if (!getBulletinsMeta(cid).page_on) return Object.assign(out, { mode: 'pageoff' });
     var today =
       typeof courseToday === 'function' ? courseToday(cid) : typeof getTodayStr === 'function' ? getTodayStr() : '';
@@ -178,15 +168,17 @@
 
   /** @param {ReturnType<typeof rowModel>} r */
   function _rowHtml(r) {
-    var aria = r.allWords ? r.kind + ': ' + r.allWords : r.kind + ': ' + r.words;
-    var seen = r.waiting
-      ? '<span class="dash-bulletins-seen dash-bulletins-pending">Not Sent Yet</span>'
-      : '<button type="button" class="dash-bulletins-seen" data-dash-bulletins-go="' +
-        esc(r.seenHref) +
-        '">' +
-        esc(r.seenMain) +
-        (r.seenNot ? ' · <span class="dash-bulletins-ns">' + esc(r.seenNot) + '</span>' : '') +
-        '</button>';
+    var aria = r.kind + ': ' + (r.allWords || r.words) + (r.time ? ', ' + r.time : '');
+    var seen = r.stalled
+      ? '<span class="dash-bulletins-seen dash-bulletins-pending">Didn&#39;t Finish Uploading</span>'
+      : r.waiting
+        ? '<span class="dash-bulletins-seen dash-bulletins-pending">Not Sent Yet</span>'
+        : '<button type="button" class="dash-bulletins-seen" data-dash-bulletins-go="' +
+          esc(r.seenHref) +
+          '">' +
+          esc(r.seenMain) +
+          (r.seenNot ? ' · <span class="dash-bulletins-ns">' + esc(r.seenNot) + '</span>' : '') +
+          '</button>';
     return (
       '<li class="dash-bulletins-row' +
       (r.fresh ? ' dash-bulletins-fresh' : '') +
@@ -209,8 +201,13 @@
   /** The tile as a string: no state is read from the page. @param {string} cid @param {Date} [now] */
   function tileHtml(cid, now) {
     var m = model(cid, now);
-    var course = typeof COURSES !== 'undefined' && COURSES[cid];
-    var name = course && course.name ? String(course.name) : '';
+    if (m.mode === 'none') return '';
+    var meta = getBulletinsMeta(cid);
+    var sub = '';
+    if (m.mode !== 'pageoff') {
+      sub = meta.can_see > 0 ? meta.can_see + ' can see it' : 'No one can see it yet';
+      if (meta.paused > 0) sub += ', ' + meta.paused + (meta.paused === 1 ? ' page paused' : ' pages paused');
+    }
     var actions = m.offered
       ? '<span class="dash-bulletins-actions"><button type="button" class="dash-bulletins-write" data-dash-bulletins-go="' +
         esc(_link(cid, '&write=1')) +
@@ -220,7 +217,7 @@
       : '';
     var h =
       '<section class="dash-bulletins-tile" aria-labelledby="dash-bulletins-title"><div class="dash-bulletins-head"><h2 class="dash-bulletins-title" id="dash-bulletins-title">Bulletins</h2>' +
-      (name ? '<span class="dash-bulletins-class">' + esc(name) + '</span>' : '') +
+      (sub ? '<span class="dash-bulletins-sub">' + esc(sub) + '</span>' : '') +
       actions +
       '</div>';
     if (m.mode === 'rows') {
@@ -234,12 +231,6 @@
         ' <a role="link" tabindex="0" data-href="' +
         esc('/dashboard?course=' + encodeURIComponent(cid) + '&manage=student-page') +
         '">Class Settings →</a></span></div>';
-    } else if (m.mode === 'unavailable') {
-      h += '<div class="dash-bulletins-none"><span>' + esc(UNAVAILABLE_LINE) + '</span></div>';
-    } else if (m.mode === 'unread') {
-      h += '<div class="dash-bulletins-none"><span>' + esc(UNREAD_LINE) + '</span></div>';
-    } else {
-      h += '<div class="dash-bulletins-none"></div>';
     }
     return h + '</section>';
   }
@@ -250,17 +241,51 @@
     return document.querySelector('.dash-row-bulletins');
   }
 
-  /** The class's bulletins changed: draw the tile again, only if what it shows is different and only for the class it is showing. @param {any} e */
+  /** True while something on the row is open or has the keyboard: a menu, a list, a pile, the grader. The row is not drawn again then. */
+  function _blocked() {
+    if (document.getElementById('grader-overlay')) return true;
+    var row = document.querySelector('.dash-row');
+    if (!row) return false;
+    var a = document.activeElement;
+    if (a && a !== document.body && row.contains(a)) return true;
+    return !!row.querySelector('[aria-expanded="true"], .dash-view-menu:not([hidden]), .is-open');
+  }
+
+  /** The tile has become available and there is no slot: the Dashboard draws its row once more, when nothing is open. */
+  function _tryRow() {
+    if (!_wantRow) return;
+    if (_retry) window.clearTimeout(_retry);
+    _retry = 0;
+    if (!_listening || !_cid || _slot()) {
+      _wantRow = false;
+      return;
+    }
+    if (_blocked() || !document.querySelector('.dash-row')) {
+      _retry = window.setTimeout(_tryRow, 2000);
+      return;
+    }
+    _wantRow = false;
+    var page = /** @type {any} */ (window).PageDashboard;
+    if (page && typeof page.render === 'function') page.render();
+  }
+
+  /** The class's bulletins changed: draw the tile again, only if what it shows is different and only for the class it is showing. With no slot, a class that has become available asks for the row once. @param {any} e */
   function _onChanged(e) {
     if (!_listening || _drawing || !_cid) return;
     var cid = e && e.detail && e.detail.cid;
     if (cid && cid !== _cid) return;
     var slot = _slot();
-    if (!slot) return;
+    if (!slot) {
+      if (model(_cid).mode !== 'none') {
+        _wantRow = true;
+        _tryRow();
+      }
+      return;
+    }
     // A press or a focus inside the tile is never taken away: the next change draws it.
     if (document.activeElement && slot.contains(document.activeElement)) return;
     var next = tileHtml(_cid);
-    if (next === _lastHtml) return;
+    if (!next || next === _lastHtml) return;
     _lastHtml = next;
     // html-safe: tileHtml escapes every word, name and address; the rest is fixed markup.
     slot.innerHTML = next;
@@ -276,7 +301,23 @@
     if (url && router && typeof router.navigate === 'function') router.navigate(url);
   }
 
-  /** The tile's markup for the middle row. Asks for fresh bulletins (the data layer throttles that). @param {string} cid */
+  /** @param {string} cid */
+  function _ask(cid) {
+    refreshBulletins(cid, {
+      stillShown: function () {
+        return _listening && _cid === cid;
+      },
+    });
+  }
+
+  /**
+   * The tile's markup for the middle row, or '' when the app offers no
+   * Bulletins for the class yet (a signed-in class whose server has not
+   * answered, or has no Bulletins functions): then there is no slot and the
+   * Inbox keeps the whole column. Asks for fresh bulletins on a draw, except
+   * after a failed read: that waits for the 30-second tick.
+   * @param {string} cid
+   */
   function html(cid) {
     var flags = /** @type {any} */ (window).BuildFlags;
     if (!(flags && flags.on('dashRow') && flags.on('bulletins'))) return '';
@@ -286,25 +327,18 @@
       _listening = true;
       // Every 30 seconds while the page is showing; the data layer throttles it.
       _timer = window.setInterval(function () {
-        var shown = _cid;
-        if (!shown || !_slot() || document.visibilityState === 'hidden') return;
-        refreshBulletins(shown, {
-          stillShown: function () {
-            return _listening && _cid === shown;
-          },
-        });
+        if (!_cid || document.visibilityState === 'hidden') return;
+        _ask(_cid);
       }, REFRESH_MS);
     }
     _cid = cid;
-    _drawing = true;
-    try {
-      refreshBulletins(cid, {
-        stillShown: function () {
-          return _listening && _cid === cid;
-        },
-      });
-    } finally {
-      _drawing = false;
+    if (bulletinsState(cid) !== 'failed') {
+      _drawing = true;
+      try {
+        _ask(cid);
+      } finally {
+        _drawing = false;
+      }
     }
     _lastHtml = tileHtml(cid);
     return _lastHtml;
@@ -317,7 +351,10 @@
       document.removeEventListener('click', _onClick);
     }
     if (_timer) window.clearInterval(_timer);
+    if (_retry) window.clearTimeout(_retry);
     _timer = 0;
+    _retry = 0;
+    _wantRow = false;
     _listening = false;
     _cid = '';
     _lastHtml = '';

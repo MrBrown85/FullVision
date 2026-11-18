@@ -97,6 +97,7 @@ test('a row opens the Bulletins page at that bulletin, outlined', async ({ page 
   await expect(arrived).toHaveCount(1);
   await expect(arrived).toContainText(words.slice(0, 20));
   await expect(arrived).toBeInViewport();
+  await expect(arrived).toBeFocused();
   // Its Seen by list is not open.
   await expect(arrived.locator('.bulletin-seenlist')).toBeHidden();
   expect(page.url()).not.toContain('open=');
@@ -109,6 +110,7 @@ test('Seen by opens that bulletin with its list open', async ({ page }) => {
   const arrived = page.locator('.bulletin-post.bulletin-arrived');
   await expect(arrived).toHaveCount(1);
   await expect(arrived.locator('.bulletin-seenlist')).toBeVisible();
+  await expect(arrived.locator('.bulletin-seen-btn')).toBeFocused();
   await expect(arrived.locator('.bulletin-seen-head').first()).toContainText('Not Seen Yet');
 });
 

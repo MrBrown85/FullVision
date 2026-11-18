@@ -33,7 +33,7 @@
   font-weight: 600;
   color: var(--text);
 }
-.dash-bulletins-class {
+.dash-bulletins-sub {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -172,7 +172,7 @@
   }
 }
 @container dash-bulletins (max-width: 560px) {
-  .dash-bulletins-class {
+  .dash-bulletins-sub {
     display: none;
   }
 }
