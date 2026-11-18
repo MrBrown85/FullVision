@@ -115,8 +115,10 @@ window.DashOverview = (function () {
     if (opts.classChange) {
       html +=
         '<span class="dash-glance-change' +
-        (opts.classChange.dir > 0 ? ' is-up' : opts.classChange.dir < 0 ? ' is-down' : '') +
-        '">' +
+        (opts.classChange.dir > 0 ? ' is-up' : opts.classChange.dir < 0 ? ' is-down' : ' is-none') +
+        '"' +
+        (opts.classChange.dir ? '' : ' aria-hidden="true"') +
+        '>' +
         esc(opts.classChange.text + ' Since ' + opts.classChange.since) +
         '</span>';
     }
