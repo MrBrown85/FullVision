@@ -315,6 +315,11 @@ async function signedIn(page) {
           write(t);
           return ok({ bucket: 'bulletin-files', bulletin: row });
         };
+        // __bltHoldAnswer: the server makes it at once, and its answer reaches the phone late.
+        if (window.__bltHoldAnswer) {
+          const made = answer();
+          return window.__bltHoldAnswer.then(() => made);
+        }
         return window.__bltHoldPost ? window.__bltHoldPost.then(answer) : answer();
       }
       if (name === 'finish_bulletin_file') {
@@ -334,6 +339,18 @@ async function signedIn(page) {
       }
       if (name === 'delete_bulletin') {
         log(name, params);
+        // e2e-delete-hold: the delete waits (as offline) until it is cleared; e2e-delete-refuse: then it is refused.
+        if (localStorage.getItem('e2e-delete-hold')) {
+          return new Promise(r => {
+            const t = setInterval(() => {
+              if (localStorage.getItem('e2e-delete-hold')) return;
+              clearInterval(t);
+              r(client.rpc(name, params));
+            }, 100);
+          });
+        }
+        if (localStorage.getItem('e2e-delete-refuse'))
+          return Promise.resolve({ data: null, error: { code: '42501', message: 'permission denied' } });
         delete s.rows[params.p_bulletin_id];
         write(s);
         return ok({ deleted: true, id: params.p_bulletin_id });
@@ -462,4 +479,65 @@ test('signed in: Take It Back while the post is on its way: the card goes at onc
   await expect(page.locator('.m-bulletin-card')).toHaveCount(0);
   expect(await rpcs(page, 'storage.upload')).toEqual([]);
   expect(await serverRows(page)).toEqual([]);
+});
+
+test('signed in: the post held, a list read took its row, its photo went up and was finished; Take It Back then says it will be deleted, and it is', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await signedIn(page);
+  await page.evaluate(() => {
+    window.__bltHoldAnswer = new Promise(r => (window.__bltReleaseAnswer = r));
+  });
+  await postPhoto(page, 'Reached students');
+  await expect.poll(async () => (await serverRows(page)).length).toBe(1);
+  // The question opens while it is still on its way.
+  await page.locator('[data-m-bulletin="take-back"]').first().click();
+  await expect(page.locator('.m-bulletin-confirm')).toContainText('It will not be posted');
+  // Meanwhile a list read takes the server's row, and its photo goes up and is finished.
+  await page.evaluate(() => MBulletins.refresh(true));
+  await expect.poll(async () => (await serverRows(page)).filter(r => r.visible).length, { timeout: 15000 }).toBe(1);
+  // OK: the words were no longer true, so the question is asked again, truly.
+  await page.locator('.m-bulletin-confirm-ok').click();
+  await expect(page.locator('.m-bulletin-confirm')).toContainText(
+    'Students may already have seen it. It will be deleted.',
+  );
+  await page.locator('.m-bulletin-confirm-ok').click();
+  await expect.poll(async () => (await rpcs(page, 'delete_bulletin')).length, { timeout: 15000 }).toBe(1);
+  expect(await serverRows(page)).toEqual([]);
+  await page.evaluate(() => window.__bltReleaseAnswer());
+  await page.evaluate(() => MBulletins.refresh(true));
+  await expect(page.locator('.m-bulletin-card')).toHaveCount(0);
+  expect((await rpcs(page, 'post_bulletin')).length).toBe(1);
+});
+
+test('signed in: Delete This Bulletin hides it at once and while it waits, across a reload; a refused delete brings it back with its sentence', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await signedIn(page);
+  await postPhoto(page, 'Delete me');
+  await expect.poll(async () => (await serverRows(page)).filter(r => r.visible).length, { timeout: 15000 }).toBe(1);
+  await page.evaluate(() => MBulletins.refresh(true));
+  await page.evaluate(() => localStorage.setItem('e2e-delete-hold', '1'));
+  await page.locator('.m-bulletin-seen').first().click();
+  await page.locator('#m-bulletin-seen-sheet [data-m-bulletin="delete"]').click();
+  await page.locator('.m-bulletin-confirm-ok').click();
+  await expect(page.locator('.m-bulletin-card')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('#m-screen-bulletins')).toBeVisible({ timeout: 15000 });
+  await page.evaluate(() => MBulletins.refresh(true));
+  await expect(page.locator('.m-bulletin-card')).toHaveCount(0);
+  // The server refuses it: the card comes back with the refusal's plain sentence, and the failed write is let go.
+  await page.evaluate(() => {
+    localStorage.setItem('e2e-delete-refuse', '1');
+    localStorage.removeItem('e2e-delete-hold');
+  });
+  await expect(page.locator('.m-bulletin-card')).toHaveCount(1, { timeout: 15000 });
+  await expect(page.locator('.m-bulletin-note-line')).toHaveText(
+    'Bulletins could not be saved. Try again in a moment.',
+  );
+  expect(await page.evaluate(() => window.v2Queue.deadLetter().filter(e => e.endpoint === 'delete_bulletin'))).toEqual(
+    [],
+  );
 });

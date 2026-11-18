@@ -1343,6 +1343,12 @@ window.MBulletins = (function () {
     document.addEventListener('change', _onChange);
     document.addEventListener('visibilitychange', _onVisibility);
     document.addEventListener('fv:bulletins-changed', _onChanged);
+    // A delete answered or given up by the outbox (after a reload too): the card goes, or comes back with its sentence.
+    if (W.v2Queue && typeof W.v2Queue.subscribe === 'function') {
+      W.v2Queue.subscribe(function (/** @type {any} */ evt) {
+        if (_cid && evt && evt.meta && evt.meta.endpoint === 'delete_bulletin') _drawFeed();
+      });
+    }
   }
 
   /** @param {any} e */
