@@ -105,7 +105,6 @@ function probeQuizzes(cid) {
   if (read.loading) return read.loading;
   read.loading = Promise.resolve()
     .then(function () {
-      // @ts-expect-error list_quiz is not in types/database.d.ts until MQ1 is applied and the types are regenerated.
       return _callRpcWithAuthGuard('list_quiz', { p_assessment_id: _QUIZ_PROBE_ID }, _QUIZ_QUIET);
     })
     .then(function (res) {
@@ -681,7 +680,6 @@ function loadQuiz(cid, aid) {
   if (!_isUuid(id)) return Promise.resolve({ quiz: null, questions: [], archived: [] });
   return Promise.resolve()
     .then(function () {
-      // @ts-expect-error list_quiz is not in types/database.d.ts until MQ1 is applied and the types are regenerated.
       return _callRpcWithAuthGuard('list_quiz', { p_assessment_id: id }, _QUIZ_QUIET);
     })
     .then(function (res) {
