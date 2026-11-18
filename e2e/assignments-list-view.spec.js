@@ -1,6 +1,6 @@
 /**
  * The Assignments page's List view (teacher/assign-list.js; Colin, Nov 16).
- * Demo Mode, Science 8, at 1366 x 900: Cards | List on the toolbar, one row
+ * Demo Mode, Science 8, at 1366 x 900: Grade | Bulk Edit on the toolbar, one row
  * per assessment that fits the window, ticked rows changed together with
  * Undo, Keep This Order after a sort, a row dragged by its handle, and Open.
  */
