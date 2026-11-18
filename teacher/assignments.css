@@ -5607,19 +5607,6 @@ body.af-comp-open #gb-tooltip {
   align-items: center;
   gap: 4px;
 }
-/* Show Level Words (teacher/rubric-words.js): one switch at the top of a
-   Standard rubric's grid. */
-.rsg-words-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 4px 4px 10px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-2);
-  cursor: pointer;
-}
 /* A level's words, joined under the level bar in its grey: part of the
    rubric, not feedback. The chosen level's cell is the one that reads dark. */
 .rsg-words {
