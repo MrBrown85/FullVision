@@ -123,7 +123,7 @@ begin
     if to_regprocedure('public.save_quiz(uuid,jsonb,uuid)') is not null then
         execute 'select public.save_quiz($1, $2, gen_random_uuid())' into _r using a_pts, jsonb_build_object(
             'shuffle_questions', true, 'shuffle_choices', true, 'tries', 1, 'counts', 'best', 'shows', 'answers',
-            'add_total', false, 'after_due', 'keep', 'accept_until', null,
+            'add_total', false, 'after_due', 'keep', 'accept_until', null, 'updated_at', null,
             'questions', jsonb_build_array(jsonb_build_object('kind', 'text', 'prompt', p_mark || ' Explain', 'points', 2,
                 'tag_id', tg, 'key', jsonb_build_object('answer', null, 'why', p_mark || ' Because'))));
         qz := _r->'questions'->0->>'id';

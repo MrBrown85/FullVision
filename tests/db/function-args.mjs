@@ -163,6 +163,7 @@ export const VALUES = {
       add_total: false,
       after_due: 'keep',
       accept_until: null,
+      updated_at: null,
       questions: [],
     },
   },
