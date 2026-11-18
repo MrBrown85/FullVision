@@ -2780,4 +2780,3 @@ For the student page (B1d), from how these functions behave:
 - **A write that meets a teacher's delete or a student's removal** (the bulletin or the enrolment gone between the check and the insert) fails with a server error (500); a retry gets an ordinary answer (the id skipped, or `not_found`). Treat a 500 on `bulletin-seen` and `bulletin-react` as "try again", never as signed out.
 
 Not verified here: gradebook-prod; the edge function deployed; Supabase Storage signing a `bulletin-files` link.
-
