@@ -758,7 +758,80 @@ var StudentData = (function () {
     return g === 'show' ? true : g === 'hide' ? false : !!classOn;
   }
 
+  /* Demo Mode only: the sample class's bulletins as the teacher's Demo Mode
+     keeps them on this device (shared/data-bulletins.js, gb-bulletins-sci8),
+     read here and never written, in the shape student_submit.bulletins
+     sends a student (docs/plans/bulletins-plan.md B1d): Cece's (st1) own
+     Seen and reaction, nothing about anyone else. Oldest first by the time
+     each was posted, parsed. null when the device holds none (s/bulletins.js
+     then shows the board's samples). */
+  function demoBulletins(store) {
+    var kept;
+    try {
+      kept = JSON.parse((store && store.getItem('gb-bulletins-sci8')) || 'null');
+    } catch (e) {
+      return null;
+    }
+    if (!kept || typeof kept !== 'object' || !Array.isArray(kept.bulletins)) return null;
+    var seen = kept.seen && typeof kept.seen === 'object' ? kept.seen : {};
+    var reactions = kept.reactions && typeof kept.reactions === 'object' ? kept.reactions : {};
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var dayOf = function (ymd) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ''));
+      return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : null;
+    };
+    var has = function (list) {
+      return Array.isArray(list) && list.indexOf('st1') >= 0;
+    };
+    return kept.bulletins
+      .filter(function (b) {
+        return b && b.id && b.posted_at && !isNaN(Date.parse(b.posted_at));
+      })
+      .map(function (b) {
+        var until = dayOf(b.pinned_until);
+        var mine = reactions[b.id] || {};
+        var word = ['got_it', 'done', 'question'].filter(function (w) {
+          return has(mine[w]);
+        })[0];
+        return {
+          id: String(b.id),
+          kind: b.kind === 'reminder' ? 'reminder' : 'announcement',
+          body: String(b.body || ''),
+          link_url: b.link_url ? String(b.link_url) : null,
+          link_title: b.link_title ? String(b.link_title) : null,
+          pinned: b.pinned === true && (until == null || until >= today),
+          pinned_until: until == null ? null : String(b.pinned_until).slice(0, 10),
+          assessment_id: b.assessment_id ? String(b.assessment_id) : null,
+          reactions_on: b.reactions_on === true,
+          posted_at: String(b.posted_at),
+          edited_at: b.edited_at ? String(b.edited_at) : null,
+          files: (Array.isArray(b.files) ? b.files : [])
+            .filter(function (f) {
+              return f && f.id && f.status !== 'uploading';
+            })
+            .map(function (f, i) {
+              return {
+                id: String(f.id),
+                kind: f.kind === 'pdf' ? 'pdf' : 'photo',
+                title: String(f.title || ''),
+                page_count: Math.max(1, Number(f.page_count) || 1),
+                position: Number(f.position) || i + 1,
+                // The pictures, on this device: the sample pictures or the teacher's small copies.
+                paths: Array.isArray(f.paths) ? f.paths.map(String) : [],
+              };
+            }),
+          seen_at: has(seen[b.id]) ? String(b.posted_at) : null,
+          reaction: word || null,
+        };
+      })
+      .sort(function (x, y) {
+        return Date.parse(x.posted_at) - Date.parse(y.posted_at) || (x.id < y.id ? -1 : 1);
+      });
+  }
+
   return {
+    demoBulletins: demoBulletins,
     demoOwnOptions: demoOwnOptions,
     demoShowsGrade: demoShowsGrade,
     demoPaused: function (store) {

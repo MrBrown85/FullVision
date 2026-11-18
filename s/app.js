@@ -1500,127 +1500,65 @@
   /* ── What the student has opened ───────────────────────────── */
 
   /* A returned piece counts as opened once its row has been on screen in a
-     visible tab (Colin, Nov 10), and stayed there: a row counts only if it
-     is still in view when SEEN_AFTER_MS is up. A flick down the list
-     passes every row and reads none, and a piece wrongly told as opened
-     would lose its Updated mark for good. A row that leaves before then is
-     not sent, and starts again the next time it comes into view. Time in a
-     tab nobody is looking at does not count.
-     assignments.js marks the rows that could be opened (data-unseen:
-     returned, a result drawn, not opened since it came back). They are
-     watched here; the ones read are told to the server in one call, once
-     each. Nothing is watched while the results have not loaded. A browser
-     that cannot say what is on screen sends nothing.
-     The feedback screen (S4) will tighten this to a piece actually opened:
-     it changes `watchRows` and `shown`, and nothing else. */
-  var SEEN_AFTER_MS = 600;
-  // Rows that came into view in the same moment go in the same call.
-  var SEEN_SLACK_MS = 150;
-  var watching = null; // { page, observer, since: { id: when it came into view }, timer }
+     visible tab, and stayed there (Colin, Nov 10): the rule is
+     s/seen-watch.js's, which bulletins use too. assignments.js marks the
+     rows that could be opened (data-unseen: returned, a result drawn, not
+     opened since it came back). They are watched here; the ones read are
+     told to the server in one call, once each in a session whatever the
+     answer; the server's own record decides what the next visit shows. A
+     session that has ended signs this tab out. Nothing is watched while
+     the results have not loaded. */
+  var watching = null; // StudentSeenWatch's watcher of the rows on screen
 
   function stopWatchingRows() {
-    if (!watching) return;
-    if (watching.timer) clearTimeout(watching.timer);
-    if (watching.observer) watching.observer.disconnect();
+    if (watching) watching.stop();
     watching = null;
-  }
-
-  function tabHidden() {
-    return typeof document !== 'undefined' && document.visibilityState === 'hidden';
   }
 
   function watchRows() {
     stopWatchingRows();
     if (!S.page || !session || S.screen !== 'assignments') return;
-    if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
-    var rows = document.querySelectorAll('[data-unseen]');
-    if (!rows.length) return;
-    var w = { page: S.page, observer: null, since: {}, timer: 0 };
-    // The header stays over the top of the list: a row under it is not on screen.
-    // Heights as drawn on the screen (getBoundingClientRect), so a Text Size's zoom is counted.
-    var head = document.querySelector('.sp-head');
-    var headRect = head && typeof head.getBoundingClientRect === 'function' ? head.getBoundingClientRect() : null;
-    var under = (headRect && headRect.height) || 0;
-    // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
-    var bar = document.querySelector('.sp-tabs-bottom');
-    var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
-    var over =
-      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? rect.height || 0 : 0;
-    w.observer = new IntersectionObserver(
-      function (entries) {
-        entries.forEach(function (entry) {
-          var id = entry.target.getAttribute('data-unseen');
-          if (!entry.isIntersecting) delete w.since[id];
-          else if (!(id in w.since)) w.since[id] = Date.now();
-        });
-        if (watching === w) shown();
+    var page = S.page;
+    watching = StudentSeenWatch.watch({
+      attr: 'data-unseen',
+      max: 500,
+      live: function () {
+        return S.page === page && S.screen === 'assignments';
       },
-      { rootMargin: '-' + under + 'px 0px -' + over + 'px 0px', threshold: 0.6 },
-    );
-    Array.prototype.forEach.call(rows, function (row) {
-      w.observer.observe(row);
+      ready: function () {
+        return S.page === page && !!session;
+      },
+      unseen: function () {
+        return page.assessments
+          .filter(function (a) {
+            return a.unseen;
+          })
+          .map(function (a) {
+            return a.id;
+          });
+      },
+      mark: function (ids) {
+        page.assessments.forEach(function (a) {
+          if (ids.indexOf(a.id) >= 0) a.unseen = false;
+        });
+      },
+      send: function (ids) {
+        var body = { session: session.token, enrollment_id: session.enrollment, assessment_ids: ids };
+        return ask('seen', body).then(function (res) {
+          if (res && res.error === 'signed_out' && S.page === page) leave(MESSAGES.signed_out);
+        });
+      },
     });
-    watching = w;
   }
 
   // The tab has been hidden or shown: a row's time on screen starts over.
   function lookAgain() {
-    if (!watching) return;
-    var now = Date.now();
-    Object.keys(watching.since).forEach(function (id) {
-      watching.since[id] = now;
-    });
-    shown();
+    if (watching) watching.lookAgain();
   }
 
-  /* Rows are in view. When the first of them has been there long enough,
-     the ones that have are told to the server. */
-  function shown() {
-    var w = watching;
-    if (!w || S.page !== w.page || S.screen !== 'assignments') return;
-    if (w.timer) clearTimeout(w.timer);
-    w.timer = 0;
-    if (tabHidden()) return;
-    var first = Infinity;
-    w.page.assessments.forEach(function (a) {
-      if (a.unseen && a.id in w.since) first = Math.min(first, w.since[a.id]);
-    });
-    if (first === Infinity) return;
-    w.timer = setTimeout(tellSeen, Math.max(first + SEEN_AFTER_MS + SEEN_SLACK_MS - Date.now(), 0));
-  }
-
-  /* Tells the server which pieces were opened: one call for every row that
-     is still in view and has been for long enough. A piece is marked as
-     told when it is sent, so it is sent once in a session whatever the
-     answer; the server's own record decides what the next visit shows. A
-     session that has ended signs this tab out. */
+  // The rows on screen long enough, told now (tests; the watcher's own timer otherwise).
   function tellSeen() {
-    var w = watching;
-    if (!w) return Promise.resolve();
-    if (w.timer) clearTimeout(w.timer);
-    w.timer = 0;
-    var page = w.page;
-    if (S.page !== page || !session || tabHidden()) return Promise.resolve();
-    var now = Date.now();
-    var ids = page.assessments
-      .filter(function (a) {
-        return a.unseen && a.id in w.since && now - w.since[a.id] >= SEEN_AFTER_MS;
-      })
-      .map(function (a) {
-        return a.id;
-      })
-      .slice(0, 500);
-    page.assessments.forEach(function (a) {
-      if (ids.indexOf(a.id) >= 0) a.unseen = false;
-    });
-    // Rows still in view that have not been there long enough yet.
-    shown();
-    if (!ids.length) return Promise.resolve();
-    return ask('seen', { session: session.token, enrollment_id: session.enrollment, assessment_ids: ids }).then(
-      function (res) {
-        if (res && res.error === 'signed_out' && S.page === page) leave(MESSAGES.signed_out);
-      },
-    );
+    return watching ? watching.tell() : Promise.resolve();
   }
 
   /* ── Flow ──────────────────────────────────────────────────── */
@@ -1849,6 +1787,9 @@
     // Settings (the gear) open, and the Text Size chosen there.
     'settings',
     'textSize',
+    // A bulletin's file open full size, and its page (s/bulletins-view.js).
+    'bulletinFile',
+    'bulletinPage',
   ];
   function uiOf() {
     var ui = {};
@@ -2261,7 +2202,10 @@
     S.sending = true;
     S.message = '';
     paint();
-    return ask('page', { session: mine.token, enrollment_id: mine.enrollment }).then(function (res) {
+    var asked = ask('page', { session: mine.token, enrollment_id: mine.enrollment });
+    // With Bulletins on, `bulletins` is asked beside it and waited for a second at most (s/bulletins.js).
+    if (StudentPage.bulletinsWith) asked = StudentPage.bulletinsWith(mine, asked);
+    return asked.then(function (res) {
       S.sending = false;
       if (!(res && res.ok && typeof StudentData !== 'undefined')) {
         pageRefused(res && res.ok ? { ok: false, error: 'network' } : res);
@@ -2272,9 +2216,11 @@
         mine.expires = String(res.expires_at);
         if (mine.kept) keep(mine);
       }
-      // A class opened afresh starts on Assignments, To Do.
+      /* A class opened afresh starts on Assignments, To Do; with Bulletins on, on Bulletins when the
+         class has one (s/bulletins.js, openingTab). The only place the opening tab is chosen: an answer
+         that comes later never moves it, so the page never changes tab under the student's finger. */
       if (!S.page) {
-        S.tab = 'assignments';
+        S.tab = StudentPage.openingTab ? StudentPage.openingTab(mine.enrollment) : 'assignments';
         S.segment = 'outstanding';
         S.pick = '';
         S.card = '';
@@ -2304,6 +2250,7 @@
       setTitle();
       paint('.sp-page-title');
       window.scrollTo(0, 0);
+      if (StudentPage.bulletinsPlace) StudentPage.bulletinsPlace(); // Bulletins opens at its New line
       // Drawn in a tab nobody is looking at: covered until it is shown.
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') cover();
       arm();
@@ -2350,6 +2297,11 @@
     'handout-links': 1,
     // A handout file, a web page, a text file or an EPUB (2026111706; s/handouts.js).
     'handout-file': 1,
+    // Bulletins: the class's feed, Seen, a reaction, a file's pages (docs/plans/bulletins-plan.md B1d; s/bulletins.js).
+    bulletins: 1,
+    'bulletin-seen': 1,
+    'bulletin-react': 1,
+    'bulletin-files': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
@@ -2566,7 +2518,7 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|pick|open-piece|card-close|settings-open|settings-close|text-size|logout-ask|logout-cancel|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page)$/.test(
+      /^(tab|segment|pick|open-piece|card-close|settings-open|settings-close|text-size|logout-ask|logout-cancel|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page|bulletin-page|bulletin-page-close|bulletin-turn|bulletin-pin)$/.test(
         act,
       )
     ) {

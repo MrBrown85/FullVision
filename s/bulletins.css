@@ -1,0 +1,494 @@
+/* Bulletins on the student's page (s/bulletins-view.js; docs/plans/
+   bulletins-plan.md B1d; the Bulletins Artboard, C1 to C3). Loaded by the
+   student page (s/index.html) and by the teacher's Preview as Student
+   (teacher/app.html). Every rule is under .sp-view (or is the question over
+   the page, .sp-bulletin-ask) and every name starts sp-bulletin-, so nothing
+   here touches a screen that is not Bulletins, and no ad blocker's list
+   names it (tests/fixtures/adblock-hidden-names.txt).
+
+   Lengths that follow the screen's height use --sp-screen-h (s/student.css):
+   the page is zoomed at Large and Larger, and a zoomed vh is taller than the
+   screen. Motion: a new bulletin glides up 12 px in 200 ms; a reaction's
+   colour changes in 150 ms; nothing fades in; nothing moves under Reduce
+   Motion. */
+
+.sp-view .sp-bulletin-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* The active reminder, a slim amber bar that stays under the header. */
+.sp-view .sp-bulletin-pinbar {
+  position: sticky;
+  top: var(--sp-bulletin-under, 69px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  min-height: 44px;
+  margin: -16px -16px 0;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid #f0dcb8;
+  background: #fff8ec;
+  color: #7a4200;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.sp-view .sp-bulletin-pinbar-words {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-view .sp-bulletin-pinbar-until {
+  flex: none;
+}
+.sp-view .sp-bulletin-pin-icon {
+  flex: none;
+}
+
+.sp-view .sp-bulletin-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.sp-view .sp-bulletin-day {
+  align-self: center;
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-bulletin-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0000f;
+  scroll-margin-top: 130px;
+}
+.sp-view .sp-bulletin-new::before,
+.sp-view .sp-bulletin-new::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(215, 0, 21, 0.35);
+}
+
+/* A bulletin: the teacher's words, as a bubble from the left. */
+.sp-view .sp-bulletin {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: 88%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 18px 18px 18px 6px;
+  background: var(--sp-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  font-size: 15px;
+  line-height: 1.4;
+  scroll-margin-top: 130px;
+  scroll-margin-bottom: 96px;
+}
+.sp-view .sp-bulletin:focus {
+  outline: none;
+}
+.sp-view .sp-bulletin:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.45);
+}
+/* One with pages to swipe takes the width, so a page is big enough to read. */
+.sp-view .sp-bulletin:has(.sp-bulletin-file) {
+  width: 88%;
+}
+.sp-view .sp-bulletin-glide {
+  animation: sp-bulletin-glide 200ms ease-out;
+}
+@keyframes sp-bulletin-glide {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: none;
+  }
+}
+.sp-view .sp-bulletin-kind {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--sp-fill);
+  color: #3a3a3c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sp-view .sp-bulletin-kind-reminder {
+  background: #fff1db;
+  color: #7a4200;
+}
+.sp-view .sp-bulletin-words {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+}
+.sp-view .sp-bulletin-time {
+  align-self: flex-end;
+  font-size: 11px;
+  color: var(--sp-text-2);
+}
+
+/* The assignment a reminder is linked to: its card's band, and its name. */
+.sp-view .sp-bulletin-piece {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--sp-line);
+  border-radius: 12px;
+  background: var(--sp-card);
+  text-align: left;
+}
+.sp-view .sp-bulletin-piece .sp-band {
+  margin: 0;
+  border-radius: 0;
+  padding: 7px 12px;
+}
+.sp-view .sp-bulletin-piece-title {
+  display: block;
+  padding: 8px 12px 10px;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+/* A link: the site's name, and a sign that it leaves the page. */
+.sp-view .sp-bulletin-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: 10px;
+  background: var(--sp-card);
+  text-align: left;
+}
+.sp-view .sp-bulletin-link-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sp-view .sp-bulletin-link-title {
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+.sp-view .sp-bulletin-link-host {
+  font-size: 12px;
+  color: var(--sp-text-2);
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-bulletin-link-go {
+  flex: none;
+  color: var(--sp-blue-text);
+}
+
+/* A file's pages: one wide, 200 px tall, swiped sideways (CSS scroll-snap). */
+.sp-view .sp-bulletin-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.sp-view .sp-bulletin-file-frame {
+  position: relative;
+  border: 1px solid var(--sp-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eceef2;
+}
+.sp-view .sp-bulletin-file-track {
+  display: flex;
+  height: 200px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.sp-view .sp-bulletin-file-track::-webkit-scrollbar {
+  display: none;
+}
+.sp-view .sp-bulletin-file-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  scroll-snap-align: start;
+  cursor: zoom-in;
+}
+.sp-view .sp-bulletin-file-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+.sp-view .sp-bulletin-file-count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.sp-view .sp-bulletin-file-dots,
+.sp-view .sp-bulletin-viewer-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+.sp-view .sp-bulletin-file-dot,
+.sp-view .sp-bulletin-viewer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #aeaeb2;
+}
+.sp-view .sp-bulletin-file-dot-on,
+.sp-view .sp-bulletin-viewer-dot-on {
+  background: #3a3a3c;
+}
+.sp-view .sp-bulletin-file-name {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sp-text-2);
+  overflow-wrap: break-word;
+}
+
+/* Reactions: three words, one tap, the student's own choice filled in. */
+.sp-view .sp-bulletin-reacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sp-view .sp-bulletin-react {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--sp-line);
+  border-radius: 999px;
+  background: var(--sp-card);
+  color: #3a3a3c;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background-color 150ms,
+    color 150ms,
+    border-color 150ms;
+}
+.sp-view .sp-bulletin-react-on {
+  border-color: #0066cc;
+  background: #0066cc;
+  color: #fff;
+}
+.sp-view .sp-bulletin-react:disabled {
+  cursor: default;
+}
+
+/* A page full size, in place of the feed. */
+.sp-view .sp-bulletin-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.sp-view .sp-bulletin-viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-view .sp-bulletin-viewer-back,
+.sp-view .sp-bulletin-viewer-turn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: rgba(118, 118, 128, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-view .sp-bulletin-viewer-turn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.sp-view .sp-bulletin-viewer-next svg {
+  transform: scaleX(-1);
+}
+.sp-view .sp-bulletin-viewer-words {
+  min-width: 0;
+}
+.sp-view .sp-bulletin-viewer-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+.sp-view .sp-bulletin-viewer-title:focus {
+  outline: none;
+}
+.sp-view .sp-bulletin-viewer-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-bulletin-viewer-page {
+  margin: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--sp-card);
+  box-shadow: var(--sp-shadow);
+}
+.sp-view .sp-bulletin-viewer-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(var(--sp-screen-h, 100vh) - 220px);
+  object-fit: contain;
+  background: #eceef2;
+}
+.sp-view .sp-bulletin-viewer-wait {
+  padding: 40px 16px;
+}
+.sp-view .sp-bulletin-viewer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* "2 new" beside a class in Switch Class (Settings). */
+.sp-view .sp-bulletin-class-new {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: #fde7e9;
+  color: #b00010;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* "Open this website in a new tab?" over the page (shared/website-ask.js),
+   in the half of the screen away from the card that was tapped. On <body>,
+   outside the page, so it takes the Text Size itself. */
+.sp-bulletin-ask-back {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.32);
+}
+.sp-bulletin-ask {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  z-index: 71;
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #fff;
+  color: #1d1d1f;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.sp-bulletin-ask-top {
+  top: calc(16px + env(safe-area-inset-top));
+}
+.sp-bulletin-ask-bottom {
+  bottom: calc(24px + env(safe-area-inset-bottom));
+}
+.sp-bulletin-ask-words {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.sp-bulletin-ask-url {
+  margin: 0;
+  font-size: 13px;
+  color: #636366;
+  overflow-wrap: anywhere;
+}
+.sp-bulletin-ask-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sp-bulletin-ask-go,
+.sp-bulletin-ask-no {
+  min-height: 44px;
+  min-width: 88px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sp-bulletin-ask-no {
+  background: rgba(118, 118, 128, 0.12);
+  color: #0066cc;
+}
+.sp-bulletin-ask-go {
+  background: #0066cc;
+  color: #fff;
+}
+html.sp-size-large .sp-bulletin-ask,
+html.sp-size-larger .sp-bulletin-ask {
+  zoom: var(--sp-zoom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-view .sp-bulletin-glide {
+    animation: none;
+  }
+  .sp-view .sp-bulletin-react {
+    transition: none;
+  }
+}
