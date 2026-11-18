@@ -139,7 +139,7 @@ def catalog(c):
                         union all select 'collations', count(*) from pg_collation where oid >= 16384
                         union all select 'foreign servers', count(*) from pg_foreign_server
                         union all select 'foreign data wrappers', count(*) from pg_foreign_data_wrapper
-                        union all select 'user mappings', count(*) from pg_user_mapping
+                        union all select 'user mappings', count(*) from pg_user_mappings
                         union all select 'large objects', count(*) from pg_largeobject_metadata
                         union all select 'security labels', count(*) from pg_seclabel
                         union all select 'initial privileges', count(*) from pg_init_privs where objoid >= 16384 order by 1""")

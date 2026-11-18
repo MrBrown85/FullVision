@@ -272,6 +272,197 @@ export type Database = {
           },
         ]
       }
+      bulletin: {
+        Row: {
+          assessment_id: string | null
+          body: string
+          course_id: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          idempotency_key: string | null
+          kind: string
+          link_title: string | null
+          link_url: string | null
+          pinned: boolean
+          pinned_until: string | null
+          posted_at: string | null
+          reactions_on: boolean
+          shown_again_at: string | null
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          assessment_id?: string | null
+          body?: string
+          course_id: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          kind: string
+          link_title?: string | null
+          link_url?: string | null
+          pinned?: boolean
+          pinned_until?: string | null
+          posted_at?: string | null
+          reactions_on?: boolean
+          shown_again_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string | null
+          body?: string
+          course_id?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          kind?: string
+          link_title?: string | null
+          link_url?: string | null
+          pinned?: boolean
+          pinned_until?: string | null
+          posted_at?: string | null
+          reactions_on?: boolean
+          shown_again_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_assessment_id_fkey"
+            columns: ["assessment_id"]
+            referencedRelation: "assessment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "course"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulletin_file: {
+        Row: {
+          bulletin_id: string
+          bytes: number | null
+          course_id: string
+          created_at: string
+          id: string
+          kind: string
+          page_count: number
+          position: number
+          status: string
+          title: string
+        }
+        ComputedFields: never
+        Insert: {
+          bulletin_id: string
+          bytes?: number | null
+          course_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          page_count: number
+          position: number
+          status?: string
+          title: string
+        }
+        Update: {
+          bulletin_id?: string
+          bytes?: number | null
+          course_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          page_count?: number
+          position?: number
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_file_bulletin_fkey"
+            columns: ["bulletin_id", "course_id"]
+            referencedRelation: "bulletin"
+            referencedColumns: ["id", "course_id"]
+          },
+          {
+            foreignKeyName: "bulletin_file_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "course"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulletin_reaction: {
+        Row: {
+          bulletin_id: string
+          enrollment_id: string
+          updated_at: string
+          word: string
+        }
+        ComputedFields: never
+        Insert: {
+          bulletin_id: string
+          enrollment_id: string
+          updated_at?: string
+          word: string
+        }
+        Update: {
+          bulletin_id?: string
+          enrollment_id?: string
+          updated_at?: string
+          word?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_reaction_bulletin_id_fkey"
+            columns: ["bulletin_id"]
+            referencedRelation: "bulletin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_reaction_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            referencedRelation: "enrollment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulletin_seen: {
+        Row: {
+          bulletin_id: string
+          enrollment_id: string
+          seen_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          bulletin_id: string
+          enrollment_id: string
+          seen_at?: string
+        }
+        Update: {
+          bulletin_id?: string
+          enrollment_id?: string
+          seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_seen_bulletin_id_fkey"
+            columns: ["bulletin_id"]
+            referencedRelation: "bulletin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_seen_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            referencedRelation: "enrollment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       category: {
         Row: {
           calc_mode: string
@@ -3952,6 +4143,10 @@ export type Database = {
         Returns: Json
       }
       delete_assessment: { Args: { p_id: string }; Returns: undefined }
+      delete_bulletin: {
+        Args: { p_bulletin_id: string; p_idempotency_key?: string }
+        Returns: Json
+      }
       delete_category: { Args: { p_id: string }; Returns: undefined }
       delete_comment_template: {
         Args: { p_id: string; p_idempotency_key?: string }
@@ -4007,6 +4202,14 @@ export type Database = {
         Args: { p_idempotency_key?: string; p_src_id: string }
         Returns: string
       }
+      edit_bulletin: {
+        Args: {
+          p_bulletin_id: string
+          p_idempotency_key?: string
+          p_patch: Json
+        }
+        Returns: Json
+      }
       fill_rubric: {
         Args: {
           p_assessment_id: string
@@ -4015,6 +4218,10 @@ export type Database = {
           p_value: number
         }
         Returns: number
+      }
+      finish_bulletin_file: {
+        Args: { p_bulletin_file_id: string; p_idempotency_key?: string }
+        Returns: Json
       }
       finish_handout_file: {
         Args: { p_idempotency_key?: string; p_resource_id: string }
@@ -4152,6 +4359,8 @@ export type Database = {
         Args: { p_assessment_id: string }
         Returns: Json
       }
+      list_bulletin_seen: { Args: { p_bulletin_id: string }; Returns: Json }
+      list_bulletins: { Args: { p_course_id: string }; Returns: Json }
       list_categories: {
         Args: { p_course_id: string }
         Returns: {
@@ -4303,6 +4512,15 @@ export type Database = {
       }
       photo_removal_call: { Args: Record<PropertyKey, never>; Returns: number }
       photo_removal_due: { Args: Record<PropertyKey, never>; Returns: boolean }
+      post_bulletin: {
+        Args: {
+          p_bulletin: Json
+          p_course_id: string
+          p_files?: Json
+          p_idempotency_key?: string
+        }
+        Returns: Json
+      }
       reenrol_student: {
         Args: { p_enrollment_id: string; p_idempotency_key?: string }
         Returns: Json
@@ -4522,6 +4740,10 @@ export type Database = {
           p_paused: boolean
           p_show_overall_grade: string
         }
+        Returns: Json
+      }
+      show_bulletin_again: {
+        Args: { p_bulletin_id: string; p_idempotency_key?: string }
         Returns: Json
       }
       soft_delete_teacher: {
