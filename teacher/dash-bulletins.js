@@ -351,6 +351,19 @@
     _lastHtml = next;
     // html-safe: tileHtml escapes every word, name and address; the rest is fixed markup.
     slot.innerHTML = next;
+    _order();
+  }
+
+  /** Keeps the keyboard and screen-reader order the same as the screen: in the wide form the two buttons sit in a foot under the cards, so they follow the cards in the page; in rows they sit in the header, so they come first. The CSS says which (the foot is grid row 3). Nothing moves while a button has focus. */
+  function _order() {
+    var t = document.querySelector('.dash-bulletins-tile');
+    if (!t) return;
+    var a = t.querySelector('.dash-bulletins-actions');
+    var l = t.querySelector('.dash-bulletins-rows, .dash-bulletins-none');
+    if (!a || !l || a.contains(document.activeElement)) return;
+    var foot = getComputedStyle(a).gridRowStart === '3';
+    if (foot && a.previousElementSibling !== l) t.appendChild(a);
+    else if (!foot && l.previousElementSibling !== a) t.insertBefore(a, l);
   }
 
   /** A press on Write a Bulletin or Seen by opens that address in the app. @param {any} e */
@@ -395,6 +408,7 @@
     if (!_listening) {
       document.addEventListener('fv:bulletins-changed', _onChanged);
       document.addEventListener('click', _onClick);
+      if (typeof window.addEventListener === 'function') window.addEventListener('resize', _order);
       _listening = true;
       // Every 30 seconds while the page is showing; the data layer throttles it.
       _timer = window.setInterval(function () {
@@ -412,6 +426,8 @@
       }
     }
     _lastHtml = tileHtml(cid);
+    // The Dashboard puts the markup in its slot once this returns; the order is set then.
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(_order);
     return _lastHtml;
   }
 
@@ -420,6 +436,7 @@
     if (_listening) {
       document.removeEventListener('fv:bulletins-changed', _onChanged);
       document.removeEventListener('click', _onClick);
+      if (typeof window.removeEventListener === 'function') window.removeEventListener('resize', _order);
     }
     if (_timer) window.clearInterval(_timer);
     if (_retry) window.clearTimeout(_retry);

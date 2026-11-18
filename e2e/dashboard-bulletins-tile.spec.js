@@ -411,3 +411,50 @@ test('at 1280 x 800 the tile is rows, with no class name in the subtitle', async
   expect(c.width).toBeLessThan(900);
   expect(c.sub).toMatch(/^\d+ can see it/);
 });
+
+/** What Tab reaches, in order, starting from the first row's words. */
+async function tabOrder(page, count) {
+  await page.locator('.dash-bulletins-words').first().focus();
+  const order = [];
+  for (let i = 0; i < count; i++) {
+    order.push(
+      await page.evaluate(() => {
+        const a = document.activeElement;
+        const k = a.className.match(/dash-bulletins-(words|seen|write|open)/);
+        return k ? k[1] : a.className || a.tagName;
+      }),
+    );
+    await page.keyboard.press('Tab');
+  }
+  return order;
+}
+
+test('wide: Tab goes through the cards, then Write a Bulletin, then Open Bulletins', async ({ page }) => {
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await open(page);
+  // The foot follows the cards in the page, which is where it is on screen.
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-actions').previousElementSibling.className))
+    .toContain('dash-bulletins-rows');
+  expect(await tabOrder(page, 8)).toEqual(['words', 'seen', 'words', 'seen', 'words', 'seen', 'write', 'open']);
+  // Reading order: the same.
+  const dom = await page.evaluate(() =>
+    [...document.querySelectorAll('.dash-bulletins-tile > *')].map(e => e.className.replace('dash-bulletins-', '')),
+  );
+  expect(dom).toEqual(['head', 'rows', 'actions']);
+});
+
+test('rows: the buttons in the header come first, as on screen, and the order follows a resize', async ({ page }) => {
+  await open(page);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-rows').previousElementSibling.className))
+    .toContain('dash-bulletins-actions');
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-actions').previousElementSibling.className))
+    .toContain('dash-bulletins-rows');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-rows').previousElementSibling.className))
+    .toContain('dash-bulletins-actions');
+});
