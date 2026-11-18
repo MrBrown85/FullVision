@@ -78,8 +78,8 @@ describe('the tile', () => {
     const head = doc.querySelector('.dash-inbox-head');
     expect(head.querySelector('.dash-inbox-title').textContent).toBe('Inbox');
     expect(head.querySelector('.dash-view-btn').textContent.trim()).toBe('By Assessment');
-    // The pill's menu lists the one view registered in this slice.
-    expect(head.querySelectorAll('.dash-view-item')).toHaveLength(1);
+    // The pill's menu lists the views registered; By Assessment is first (later slices add theirs).
+    expect(head.querySelector('.dash-view-item').textContent).toContain('By Assessment');
     expect(head.querySelectorAll('a')).toHaveLength(1);
     expect(head.querySelector('a').textContent).toBe('Assignments →');
     expect(head.textContent).not.toMatch(/\d/);
