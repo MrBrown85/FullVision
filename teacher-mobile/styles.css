@@ -6619,6 +6619,12 @@ body.fv-switching-course::after {
   font-size: 15px;
   color: var(--text);
 }
+/* Safari draws a select at its own height unless it draws it plainly: the row's value
+   shows in link blue, as Settings rows do, and the whole 44 px is the target. */
+.m-bulletin-row select {
+  -webkit-appearance: none;
+  appearance: none;
+}
 .m-bulletin-row input,
 .m-bulletin-row select {
   min-height: 44px;
