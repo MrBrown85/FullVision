@@ -459,13 +459,14 @@ window.DashInbox = (function () {
         if (_cid !== cid) return null;
         return _files[img.getAttribute('data-dash-pic') || ''] || null;
       });
-      // The new page's pictures are in; let go of any the old one held alone.
-      _pics.sweep();
     }
     _glide(cid);
     var view = viewOf(cid);
     _mounted = view;
     if (view.mount) view.mount(tile, cid, _model);
+    // The new page's pictures are in, the view's own included (it fills them
+    // from mount, through pics()); let go of any the old page held alone.
+    if (_pics) _pics.sweep();
     // A drop of files anywhere on the tile, in every view (D5).
     if (window.DashInboxDrop) DashInboxDrop.mount(tile, cid, _model);
     _fresh(cid);
@@ -573,6 +574,20 @@ window.DashInbox = (function () {
     countsText: countsText,
     countsHtml: countsHtml,
     whenText: whenText,
+    /* The tile's picture holder, for a view that shows pictures (D6). The
+       contract every view follows:
+       - Fill your pictures synchronously inside mount(): afterRender sweeps
+         the holder right after mount, and anything no img on the page shows
+         by then is let go (and asked for again later).
+       - Key your pictures so another class's keys cannot match (the By
+         Assessment view's key is aid|student|file id; an aid is unique to
+         its class).
+       - Never keep a holder of your own: this one lives across the
+         Dashboard's redraws, which is what stops a picture being asked for
+         twice. It is null until the tile has drawn once. */
+    pics: function () {
+      return _pics;
+    },
     model: function () {
       return _model;
     },

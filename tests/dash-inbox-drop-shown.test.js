@@ -269,6 +269,16 @@ describe('drags around the tile', () => {
     const imgs = html.match(/<img [^>]*>/g) || [];
     expect(imgs.length).toBeGreaterThan(0);
     imgs.forEach(i => expect(i).toContain('draggable="false"'));
+    // Every view's own pictures too: each <img written in an Inbox file says it.
+    for (const f of ['teacher/dash-inbox.js', 'teacher/dash-inbox-side.js', 'teacher/dash-inbox-pick.js']) {
+      let src = '';
+      try {
+        src = readFileSync(f, 'utf-8');
+      } catch (e) {
+        continue;
+      }
+      (src.match(/<img [^>]*/g) || []).forEach(i => expect(i, f).toContain('draggable="false"'));
+    }
   });
 
   it('one set of listeners however many draws: one drop, one open', () => {
