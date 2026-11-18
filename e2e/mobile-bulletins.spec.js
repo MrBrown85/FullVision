@@ -169,22 +169,99 @@ test('who has seen it: the sheet lists the students not seen first, with Show It
   await expect(page.locator('#m-sheet-backdrop')).toBeHidden();
 });
 
-test('nothing scrolls sideways at 320 px: the feed, Post a Photo and Write a Bulletin', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 640 });
-  await openPhone(page);
-  await openTab(page);
-  const wide = () => page.evaluate(() => document.documentElement.scrollWidth);
-  expect(await wide()).toBeLessThanOrEqual(320);
-  await page.locator('[data-m-bulletin="photo"]').click();
-  await page.locator('#m-bulletin-camera input[type=file]').setInputFiles(await boardPhoto(page));
-  await expect(page.locator('#m-bulletin-caption')).toBeVisible({ timeout: 15000 });
-  expect(await wide()).toBeLessThanOrEqual(320);
-  await page.locator('#m-bulletin-camera [data-m-bulletin-cam="close"]').click();
-  await page.locator('[data-m-bulletin="write"]').click();
-  await page.locator('#m-bulletin-write [data-m-bulletin="kind"][data-kind="reminder"]').click();
-  await page.locator('#m-bulletin-write [data-m-bulletin="add-link"]').click();
-  expect(await wide()).toBeLessThanOrEqual(320);
-});
+/* Fit and touch targets, in the page's own font and in a wider one (Verdana,
+   with a little more space between letters, as CI's and some laptops' fonts
+   draw it), at 320, 390 and 430 px: nothing scrolls sideways, no text is cut
+   inside a card, a sheet or the camera screen, and every control a finger
+   taps is at least 44 px each way. */
+const FONTS = {
+  own: '',
+  wide: 'body, body * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }',
+};
+
+async function setFont(page, css) {
+  await page.evaluate(c => {
+    let t = document.getElementById('__font');
+    if (!t) {
+      t = document.createElement('style');
+      t.id = '__font';
+      document.head.appendChild(t);
+    }
+    t.textContent = c;
+  }, css);
+}
+
+// Problems in what is on screen under `root`: sideways scroll, text cut, controls under 44 px.
+async function fitProblems(page, root, width) {
+  return page.evaluate(
+    ({ root, width }) => {
+      const out = [];
+      if (document.documentElement.scrollWidth > width)
+        out.push('page scrolls sideways: ' + document.documentElement.scrollWidth);
+      const box = document.querySelector(root);
+      if (!box) return ['no ' + root];
+      box.querySelectorAll('*').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') return;
+        const cs = getComputedStyle(el);
+        const clips = cs.overflowX === 'hidden' || cs.overflowX === 'clip' || cs.textOverflow === 'ellipsis';
+        if (clips && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim())
+          out.push('cut: ' + el.className + ' "' + el.textContent.trim().slice(0, 30) + '"');
+        if (r.right > width + 0.5 && el.textContent.trim()) out.push('off screen: ' + el.className);
+      });
+      box
+        .querySelectorAll(
+          'button, label.m-bulletin-btn, label.m-addwork-shutter, label.m-addwork-choice, select, input:not([type=file]):not([type=checkbox])',
+        )
+        .forEach(el => {
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          if (r.height < 43.5 || r.width < 43.5)
+            out.push('small: ' + (el.className || el.tagName) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
+        });
+      return out;
+    },
+    { root, width },
+  );
+}
+
+for (const width of [320, 390, 430]) {
+  test(`fit and touch targets at ${width} px, in the page font and a wide one`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await openPhone(page);
+    await openTab(page);
+    const photo = await boardPhoto(page);
+    for (const [name, css] of Object.entries(FONTS)) {
+      await setFont(page, css);
+      expect(await fitProblems(page, '#m-bulletin-feed', width), name + ' feed').toEqual([]);
+      expect(await fitProblems(page, '#m-bulletin-head', width), name + ' buttons').toEqual([]);
+      await page.locator('.m-bulletin-seen').first().click();
+      await page.waitForTimeout(400);
+      expect(await fitProblems(page, '#m-bulletin-seen-sheet', width), name + ' seen').toEqual([]);
+      await page.locator('#m-bulletin-seen-sheet [data-m-bulletin="delete"]').click();
+      await page.waitForTimeout(400);
+      expect(await fitProblems(page, '.m-bulletin-confirm', width), name + ' confirm').toEqual([]);
+      await page.locator('.m-bulletin-confirm-cancel').click();
+      await expect(page.locator('#m-sheet-container .m-sheet')).toHaveCount(0);
+      await page.locator('[data-m-bulletin="write"]').click();
+      await page.locator('#m-bulletin-write [data-m-bulletin="kind"][data-kind="reminder"]').click();
+      // The box keeps its draft between the two fonts: the link field is open from the first pass.
+      const addLink = page.locator('#m-bulletin-write [data-m-bulletin="add-link"]');
+      if (await addLink.count()) await addLink.click();
+      await expect(page.locator('#m-bulletin-link-url')).toBeVisible();
+      await page.waitForTimeout(400);
+      expect(await fitProblems(page, '#m-bulletin-write', width), name + ' write').toEqual([]);
+      await page.locator('#m-bulletin-write [data-m-bulletin="close"]').click();
+      await expect(page.locator('#m-sheet-container .m-sheet')).toHaveCount(0);
+      await page.locator('[data-m-bulletin="photo"]').click();
+      expect(await fitProblems(page, '#m-bulletin-camera', width), name + ' camera').toEqual([]);
+      await page.locator('#m-bulletin-camera input[type=file]').setInputFiles(photo);
+      await expect(page.locator('#m-bulletin-caption')).toBeVisible({ timeout: 15000 });
+      expect(await fitProblems(page, '#m-bulletin-camera', width), name + ' photo').toEqual([]);
+      await page.locator('#m-bulletin-camera [data-m-bulletin-cam="close"]').click();
+    }
+  });
+}
 
 test('with the flag off: three tabs, no Bulletins anywhere, and a remembered Bulletins opens on Students', async ({
   page,
@@ -498,10 +575,18 @@ test('signed in: the post held, a list read took its row, its photo went up and 
   await page.evaluate(() => MBulletins.refresh(true));
   await expect.poll(async () => (await serverRows(page)).filter(r => r.visible).length, { timeout: 15000 }).toBe(1);
   // OK: the words were no longer true, so the question is asked again, truly.
-  await page.locator('.m-bulletin-confirm-ok').click();
+  const first = await page.locator('.m-bulletin-confirm-ok').boundingBox();
+  const tapY = first.y + first.height / 2;
+  await page.mouse.click(first.x + first.width / 2, tapY);
   await expect(page.locator('.m-bulletin-confirm')).toContainText(
     'Students may already have seen it. It will be deleted.',
   );
+  // Asked again: red, for a delete, and its main button not where the first OK was tapped.
+  const again = page.locator('.m-bulletin-confirm-ok');
+  await expect(again).toHaveClass(/is-danger/);
+  await page.waitForTimeout(450);
+  const box = await again.boundingBox();
+  expect(tapY >= box.y && tapY <= box.y + box.height).toBe(false);
   await page.locator('.m-bulletin-confirm-ok').click();
   await expect.poll(async () => (await rpcs(page, 'delete_bulletin')).length, { timeout: 15000 }).toBe(1);
   expect(await serverRows(page)).toEqual([]);

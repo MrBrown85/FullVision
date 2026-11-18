@@ -6388,7 +6388,7 @@ body.fv-switching-course::after {
   -webkit-tap-highlight-color: transparent;
 }
 .m-bulletin-btn-main {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .m-bulletin-btn:disabled {
@@ -6401,7 +6401,7 @@ body.fv-switching-course::after {
 .m-bulletin-btn-wide {
   width: 100%;
   margin: 4px 0 8px;
-  background: var(--overlay-pressed);
+  background: var(--bg);
 }
 .m-bulletin-note,
 .m-bulletin-empty {
@@ -6621,6 +6621,7 @@ body.fv-switching-course::after {
 }
 .m-bulletin-row input,
 .m-bulletin-row select {
+  min-height: 44px;
   min-width: 0;
   max-width: 60%;
   border: none;
@@ -6657,7 +6658,7 @@ body.fv-switching-course::after {
   margin-top: 6px;
 }
 .m-bulletin-write .m-bulletin-btn {
-  background: var(--overlay-pressed);
+  background: var(--bg);
 }
 .m-bulletin-file-input {
   display: none;
@@ -6691,11 +6692,16 @@ body.fv-switching-course::after {
   margin-top: 8px;
 }
 .m-bulletin-confirm-ok {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
+/* A delete: red, as the phone's other in-sheet destructive confirm (Reset Demo Data) is, in the
+   deeper red white words read on at 4.5:1 in light and dark (--danger's light value). */
+.m-bulletin-confirm-ok.is-danger {
+  background: #c62828;
+}
 .m-bulletin-confirm-cancel {
-  background: var(--overlay-pressed);
+  background: var(--bg);
 }
 
 /* Post a Photo: Add Work's camera screen (.m-addwork), with the photo, its

@@ -1197,9 +1197,10 @@ window.MBulletins = (function () {
    * opened it was: of the two orders (main button first or last), the one
    * that keeps the tap point off the main button's resting place is drawn.
    * @param {string} title @param {string} text @param {string} okLabel
-   * @param {() => void} onOk @param {{ x: number, y: number } | null} tap @param {string} [cancelLabel]
+   * @param {(tap: { x: number, y: number } | null) => void} onOk given where the main button was tapped
+   * @param {{ x: number, y: number } | null} tap @param {string} [cancelLabel] @param {boolean} [danger] red, for a delete
    */
-  function _confirm(title, text, okLabel, onOk, tap, cancelLabel) {
+  function _confirm(title, text, okLabel, onOk, tap, cancelLabel, danger) {
     MC.presentSheet(
       '<div class="m-bulletin-sheet m-bulletin-confirm" role="dialog" aria-modal="true" aria-labelledby="m-bulletin-confirm-title">' +
         '<h2 class="m-bulletin-sheet-title" id="m-bulletin-confirm-title">' +
@@ -1207,7 +1208,9 @@ window.MBulletins = (function () {
         '</h2><p class="m-bulletin-hint">' +
         esc(text) +
         '</p><div class="m-bulletin-confirm-acts">' +
-        '<button type="button" class="m-bulletin-btn m-bulletin-confirm-ok">' +
+        '<button type="button" class="m-bulletin-btn m-bulletin-confirm-ok' +
+        (danger ? ' is-danger' : '') +
+        '">' +
         esc(okLabel) +
         '</button>' +
         '<button type="button" class="m-bulletin-btn m-bulletin-confirm-cancel" data-m-bulletin="close">' +
@@ -1238,11 +1241,11 @@ window.MBulletins = (function () {
       if (under()) acts.insertBefore(ok, cancel);
     }
     var done = false;
-    ok.onclick = function () {
+    ok.onclick = function (/** @type {MouseEvent} */ ev) {
       if (done) return;
       done = true;
       MC.dismissSheet();
-      onOk();
+      onOk(ev && (ev.clientX || ev.clientY) ? { x: ev.clientX, y: ev.clientY } : null);
     };
     cancel.focus({ preventScroll: true });
   }
@@ -1270,13 +1273,16 @@ window.MBulletins = (function () {
         ? 'Students may already have seen it. It will be deleted.'
         : 'It will not be posted, and students will never see it.',
       sent ? 'Delete It' : 'Take It Back',
-      function () {
+      function (okTap) {
         var now = _takeBackState(cid, key);
-        // Moved on while the question was open: ask again in words that are true now (after this sheet has gone).
-        if ((now === 'sent') !== sent && now !== 'none') return void setTimeout(_askTakeBack, 380, cid, key, null);
+        // Moved on while the question was open: ask again in words that are true now (after this sheet has gone),
+        // its main button kept off the place the first OK was tapped.
+        if ((now === 'sent') !== sent && now !== 'none') return void setTimeout(_askTakeBack, 380, cid, key, okTap);
         _takeBackNow(cid, key, true);
       },
       tap,
+      undefined,
+      sent,
     );
   }
 
@@ -1284,7 +1290,11 @@ window.MBulletins = (function () {
   function _takeBackNow(cid, key, retry) {
     if (W.takeBackBulletin(cid, key)) return _drawFeed();
     if (!retry) {
-      MC.showToast('It could not be taken back. Open it and choose Delete This Bulletin.');
+      // Said on its card, as a refused delete is.
+      var card = feedModel(W.getBulletins(cid)).filter(function (c) {
+        return c.key === key || c.id === 'waiting:' + key;
+      })[0];
+      if (card) _notes[card.id] = 'It could not be taken back. Open it and choose Delete This Bulletin.';
       return _drawFeed();
     }
     // Not known here yet (its answer has not been read): read the class, then try once more.
@@ -1294,7 +1304,7 @@ window.MBulletins = (function () {
   }
 
   /** @type {Record<string, string>} */
-  var _notes = {}; // bulletin id → the plain sentence of a refused delete, shown on its card
+  var _notes = {}; // bulletin id → the plain sentence of a refused delete (or a Take It Back that could not be done), on its card
 
   /** Delete a sent bulletin: gone from the feed at once (and while it waits in the outbox); a refusal brings it back with its sentence. @param {string} cid @param {string} id */
   function _deleteNow(cid, id) {
@@ -1404,6 +1414,8 @@ window.MBulletins = (function () {
           _deleteNow(cid, id);
         },
         tap,
+        undefined,
+        true,
       );
     }
   }

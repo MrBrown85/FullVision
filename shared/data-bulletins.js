@@ -552,10 +552,7 @@ function getBulletins(cid) {
   if (_isDemoSession()) return bulletinsSorted(list);
   if (typeof _bltQueuedView === 'function') list = _bltQueuedView(cid, list);
   // A bulletin whose delete waits in the outbox (offline included) is gone from the list at once.
-  var outbox = /** @type {any} */ (window.v2Queue);
-  var deleting = (outbox && outbox.queued ? outbox.queued('delete_bulletin') : []).map(function (/** @type {any} */ e) {
-    return e && e.payload && e.payload.p_bulletin_id;
-  });
+  var deleting = _bltDeleting();
   list = list.filter(function (b) {
     return deleting.indexOf(b.id) < 0;
   });
@@ -576,6 +573,32 @@ function getBulletins(cid) {
     return Object.assign({}, b, { stalled: true });
   });
   return bulletinsSorted(waiting.concat(rows));
+}
+
+/** @type {string[] | null} */
+var _bltDeletingIds = null; // the bulletins whose delete waits in the outbox, read once until the outbox changes
+/** @type {any} */
+var _bltDeletingFor = null; // the outbox they were read from
+
+/** The ids of the bulletins whose delete waits in the outbox: read and parsed once, then again only after the outbox changes. @returns {string[]} */
+function _bltDeleting() {
+  var outbox = /** @type {any} */ (window.v2Queue);
+  if (!outbox || typeof outbox.queued !== 'function') return [];
+  if (_bltDeletingFor !== outbox) {
+    _bltDeletingFor = outbox;
+    _bltDeletingIds = null;
+    if (typeof outbox.subscribe === 'function') {
+      outbox.subscribe(function () {
+        if (_bltDeletingFor === outbox) _bltDeletingIds = null;
+      });
+    } else _bltDeletingFor = null; // no word of changes: read every time
+  }
+  if (!_bltDeletingIds) {
+    _bltDeletingIds = outbox.queued('delete_bulletin').map(function (/** @type {any} */ e) {
+      return String((e && e.payload && e.payload.p_bulletin_id) || '');
+    });
+  }
+  return /** @type {string[]} */ (_bltDeletingIds);
 }
 
 /** { can_see, no_card, paused, page_on, more } as last read. @param {string} cid @returns {BulletinsMeta} */

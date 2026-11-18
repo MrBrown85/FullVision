@@ -452,6 +452,8 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     _bltListening = false;
     _bltPlacing = {};
     _bltCommitting = {};
+    _bltDeletingIds = null;
+    _bltDeletingFor = null;
     _bltFlows = {};
     for (const k of Object.keys(_bltMem)) delete _bltMem[k];
   }
@@ -1092,6 +1094,48 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(calls('delete_bulletin')[0].p_idempotency_key).toMatch(UUID);
     expect(server.rows.size).toBe(0);
     expect(getBulletins(CID)).toEqual([]);
+  });
+
+  it('a feed of 20 pictures reads the outbox’s waiting deletes once, and again only when the outbox changes', async () => {
+    for (let n = 0; n < 20; n++) {
+      server.rows.set(U(7000 + n), {
+        id: U(7000 + n),
+        kind: 'announcement',
+        body: 'Photo ' + n,
+        visible: true,
+        posted_at: '2026-11-17T17:00:00Z',
+        created_at: '2026-11-17T17:00:00Z',
+        idempotency_key: null,
+        files: [
+          { id: U(7100 + n), kind: 'photo', title: 'Board', page_count: 1, status: 'ready', position: 1, paths: [] },
+        ],
+        seen: 0,
+        can_see: 5,
+        reactions: { got_it: 0, done: 0, question: 0 },
+      });
+    }
+    await refreshBulletins(CID, { force: true });
+    const queued = window.v2Queue.queued;
+    let reads = 0;
+    window.v2Queue.queued = (...a) => {
+      reads++;
+      return queued.apply(window.v2Queue, a);
+    };
+    try {
+      _bltDeletingIds = null;
+      // Once for the list, then once per picture on screen (MBulletins asks getBulletins for each).
+      for (let i = 0; i < 21; i++) expect(getBulletins(CID).length).toBe(20);
+      expect(reads).toBe(1);
+      setOnline(false);
+      deleteBulletin(CID, U(7003));
+      expect(getBulletins(CID).length).toBe(19);
+      expect(reads).toBe(2);
+      getBulletins(CID);
+      expect(reads).toBe(2);
+    } finally {
+      window.v2Queue.queued = queued;
+      setOnline(true);
+    }
   });
 
   it('Delete This Bulletin: gone from the feed at once and while it waits offline; a refusal brings it back', async () => {
