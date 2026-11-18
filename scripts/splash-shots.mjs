@@ -148,6 +148,92 @@ async function printedRubrics(page, base) {
   await pause(page, 400);
 }
 
+// A made-up class scan for Split the Scan: one Chemical Reactions Lab page
+// per student, in class-list order, each with the student's name written at
+// the top, printed to a PDF the way a photocopier sends one.
+const SCAN_NAMES = [
+  'Cece A.',
+  'Noor A.',
+  'Hannah B.',
+  'Sam B.',
+  'Liam C.',
+  'Mateo C.',
+  'Ethan D.',
+  'Caleb F.',
+  'Jas G.',
+  'Fatima H.',
+  'Tessa I.',
+  'Anisa J.',
+  'Priya K.',
+  'Jordan K.',
+  'Ines L.',
+  'Marcus L.',
+  'Leo M.',
+  'Amara O.',
+  'Sofia P.',
+  'Tyler R.',
+  'Aiden S.',
+  'Olivia T.',
+  'Darius T.',
+  'Raj V.',
+  'Maya W.',
+  'Mei W.',
+  'Liv Z.',
+];
+async function classScan(page) {
+  const rows = [
+    ['Baking soda + vinegar', 'fizzing, bubbles, cold'],
+    ['Steel wool + vinegar', 'turned brown after a day'],
+    ['Milk + lemon juice', 'lumps formed'],
+    ['Candle burning', 'wax melted, smoke'],
+  ];
+  const said = [
+    'New stuff forms, so it is chemical. Melting wax is physical.',
+    'Gas and a colour change mean a new substance.',
+    'The bubbles were a gas we did not start with.',
+    'Rust is a new substance. It can not go back.',
+  ];
+  const sheet = (name, i) =>
+    '<section style="page-break-after:always;width:8.5in;height:11in;box-sizing:border-box;padding:.7in .8in;' +
+    'background:#fdfcf7 repeating-linear-gradient(#fdfcf7 0 31px,#c9d6e8 31px 32px);font-family:Caveat,cursive;color:#1f3a7a;' +
+    'transform:rotate(' +
+    ((i % 3) - 1) * 0.4 +
+    'deg)">' +
+    '<div style="font-size:26px">Name: <b style="font-size:36px">' +
+    name +
+    '</b></div>' +
+    '<div style="font-size:38px"><b>Chemical Reactions Lab</b></div>' +
+    '<div style="font-size:26px;margin-top:6px">Purpose: tell a chemical change from a physical change.</div>' +
+    '<table style="font-size:25px;margin-top:26px;width:100%">' +
+    rows
+      .map(
+        (r, k) =>
+          '<tr><td style="padding:6px 0;width:50%">' +
+          r[0] +
+          '</td><td>' +
+          (k === (i + 1) % 4 ? r[1].split(',')[0] : r[1]) +
+          '</td></tr>',
+      )
+      .join('') +
+    '</table><div style="font-size:30px;margin-top:30px;text-decoration:underline">Chemical or physical?</div>' +
+    '<div style="font-size:25px;line-height:32px;margin-top:6px">' +
+    said[i % 4] +
+    '</div></section>';
+  const printer = await page.context().newPage();
+  await printer.setContent(
+    '<!doctype html><html><head><link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap" rel="stylesheet">' +
+      '<style>@page{size:8.5in 11in;margin:0}body{margin:0}</style></head><body>' +
+      SCAN_NAMES.map(sheet).join('') +
+      '</body></html>',
+    { waitUntil: 'networkidle' },
+  );
+  await printer.evaluate(() => document.fonts.ready);
+  const out = join(TMP, 'class-scan.pdf');
+  await printer.pdf({ path: out, width: '8.5in', height: '11in', printBackground: true });
+  await printer.close();
+  return out;
+}
+
 const SHOTS = [
   {
     file: 'rubric-print.jpg',
@@ -233,7 +319,84 @@ const SHOTS = [
       await studentPageOn(page, base);
       await page.goto(base + '/dashboard');
       await pause(page, 1800);
+      // The Inbox as Side by Side: each student's pages in a row.
+      await page
+        .getByRole('button', { name: /By Assessment/ })
+        .first()
+        .click();
+      await pause(page, 400);
+      await page.getByText('Side by Side', { exact: true }).first().click();
+      await pause(page, 1500);
       return { clip: [0, 0, W, H] };
+    },
+  },
+  {
+    file: 'add-work.jpg',
+    async run(page, base) {
+      await studentPageOn(page, base);
+      const scan = await classScan(page);
+      await page.goto(base + '/assignments');
+      await pause(page, 1500);
+      await page.evaluate(() => {
+        const head = [...document.querySelectorAll('.assess-header[data-aid]')].find(e =>
+          /Chemical Reactions Lab/.test(e.textContent),
+        );
+        document.querySelector('[data-action=openAddWorkClass][data-aid="' + head.dataset.aid + '"]').click();
+      });
+      await pause(page, 1500);
+      const [chooser] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        page.getByRole('button', { name: /Split a Scan/ }).click(),
+      ]);
+      await chooser.setFiles(scan);
+      await page.getByRole('button', { name: 'Class List Order' }).waitFor({ timeout: 30000 });
+      await pause(page, 4000);
+      await page.getByRole('button', { name: 'Class List Order' }).click();
+      await page.mouse.move(0, 0);
+      await pause(page, 1500);
+      return { clip: [0, 0, W, H] };
+    },
+  },
+  {
+    file: 'bulletins.jpg',
+    async run(page, base) {
+      await studentPageOn(page, base);
+      await page.goto(base + '/bulletins');
+      await page.locator('.bulletin-card').first().waitFor({ timeout: 10000 });
+      await pause(page, 1500);
+      // The feed's column: the box to write in, down to the last bulletin.
+      return {
+        clip: await page.evaluate(h => {
+          const els = [...document.querySelectorAll('#main h1, #main h2, .bulletin-card')];
+          const rs = els.map(e => e.getBoundingClientRect()).filter(r => r.width);
+          const pad = 28;
+          const left = Math.min(...rs.map(r => r.left)) - pad;
+          const top = Math.min(...rs.map(r => r.top)) - pad;
+          const right = Math.max(...rs.map(r => r.right)) + pad;
+          const bottom = Math.min(Math.max(...rs.map(r => r.bottom)) + pad, h);
+          return [left, top, right - left, bottom - top];
+        }, H),
+      };
+    },
+  },
+  {
+    file: 'reflect.jpg',
+    async run(page, base) {
+      await page.goto(base + '/dashboard?manage=questionnaires');
+      await page.locator('[data-action=sqSeeAnswers]').first().waitFor({ timeout: 10000 });
+      await page.mouse.move(0, 0);
+      await pause(page, 1200);
+      // The Reflections panel: each reflection, its switch, and who has answered.
+      return {
+        clip: await page.evaluate(() => {
+          let el = document.querySelector('[data-action=sqSeeAnswers]');
+          while (el.parentElement && !/New Reflection/.test(el.textContent)) el = el.parentElement;
+          const r = el.getBoundingClientRect();
+          const pad = 20;
+          // Less above, so the Class Settings tabs' line stays out.
+          return [r.left - pad, r.top - 12, r.width + 2 * pad, r.height + 12 + pad];
+        }),
+      };
     },
   },
   {
@@ -339,9 +502,19 @@ const SHOTS = [
     file: 'student-feedback.jpg',
     async run(page, base) {
       await openPreview(page, base);
-      await page.locator('.ps-screen').getByText(/^Back/).first().click();
-      await pause(page, 1000);
-      await page.locator('.ps-screen').getByText('See Your Feedback').first().click();
+      // The newest returned piece, opened from My Learning.
+      await page.locator('.ps-screen').getByText('My Learning', { exact: true }).last().click();
+      await pause(page, 1200);
+      await page.locator('.ps-screen').getByText('Science Fair Proposal').first().click();
+      await pause(page, 1500);
+      return page.locator('.ps-screen');
+    },
+  },
+  {
+    file: 'student-bulletins.jpg',
+    async run(page, base) {
+      await openPreview(page, base);
+      await page.locator('.ps-screen').getByText('Bulletins', { exact: true }).last().click();
       await pause(page, 1500);
       return page.locator('.ps-screen');
     },
