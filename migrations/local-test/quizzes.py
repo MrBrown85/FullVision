@@ -919,7 +919,7 @@ def scen_apply():
     for f, n in ((FILE, 1), (FILE2, 2)):
         size = os.path.getsize(os.path.join(HERE, f))
         ok('apply: file %d is under 40 KB, to go whole through apply_migration (%d bytes)' % (n, size), size < 40960, size)
-    ok('apply: the headers say not applied and name the tests and undo', 'NOT APPLIED' in H1 and 'NOT APPLIED' in H2 and 'quizzes.py' in H1
+    ok('apply: the headers say whether applied and name the tests and undo', 'APPLIED' in H1 and 'APPLIED' in H2 and 'quizzes.py' in H1
        and 'quizzes-undo.sql' in H1 and 'quiz-results-undo.sql' in H2)
     d.close()
 

@@ -1,4 +1,4 @@
--- Quizzes, MQ1 part 2: the results functions (2026-11-17). NOT APPLIED.
+-- Quizzes, MQ1 part 2: the results functions (2026-11-17). APPLIED Nov 18 2026 (as quiz_results).
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
 -- It adds four functions a teacher may run, on the tables of

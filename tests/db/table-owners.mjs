@@ -123,10 +123,4 @@ export const NO_TEACHER = {
 /* Tables that a file in migrations/ adds and live does not have yet. Each is tested only when it is
    there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
    out once the file is applied and migrations/baseline/ is refreshed. */
-export const NOT_YET_APPLIED = {
-  'public.quiz': '2026111804_quizzes.sql',
-  'public.quiz_answer': '2026111804_quizzes.sql',
-  'public.quiz_attempt': '2026111804_quizzes.sql',
-  'public.quiz_key': '2026111804_quizzes.sql',
-  'public.quiz_question': '2026111804_quizzes.sql',
-};
+export const NOT_YET_APPLIED = {};

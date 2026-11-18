@@ -1,4 +1,4 @@
--- Quizzes, MQ1: the tables and the teacher's functions (2026-11-17). NOT APPLIED.
+-- Quizzes, MQ1: the tables and the teacher's functions (2026-11-17). APPLIED Nov 18 2026 (as quizzes).
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
 -- It adds five empty tables, list_quiz (with the key) and save_quiz for the

@@ -71,6 +71,7 @@ table public.assessment (rls on)
   CREATE UNIQUE INDEX assessment_pkey ON public.assessment USING btree (id)
   CREATE INDEX assessment_rubric_idx ON public.assessment USING btree (rubric_id)
   CREATE TRIGGER assessment_draft_guard BEFORE UPDATE OF is_draft ON public.assessment FOR EACH ROW WHEN ((new.is_draft AND (NOT old.is_draft))) EXECUTE FUNCTION public._assessment_draft_guard()
+  CREATE TRIGGER assessment_quiz_draft_guard BEFORE UPDATE OF is_draft ON public.assessment FOR EACH ROW WHEN ((new.is_draft AND (NOT old.is_draft))) EXECUTE FUNCTION public._quiz_draft_guard()
   CREATE TRIGGER assessment_resource_gone AFTER DELETE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._assessment_resource_gone()
   CREATE TRIGGER assessment_resource_truncate AFTER TRUNCATE ON public.assessment FOR EACH STATEMENT EXECUTE FUNCTION public._assessment_resource_truncated()
   CREATE TRIGGER course_sync_cursor_assessment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
@@ -114,9 +115,11 @@ table public.assessment_tag (rls on)
   constraint assessment_tag_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
   constraint assessment_tag_pkey PRIMARY KEY (assessment_id, tag_id)
   constraint assessment_tag_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tag(id) ON DELETE CASCADE
+  constraint quiz_tag_gone TRIGGER DEFERRABLE INITIALLY DEFERRED
   CREATE UNIQUE INDEX assessment_tag_pkey ON public.assessment_tag USING btree (assessment_id, tag_id)
   CREATE INDEX assessment_tag_tag_idx ON public.assessment_tag USING btree (tag_id)
   CREATE TRIGGER course_sync_cursor_assessment_tag_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.assessment_tag FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'assessment')
+  CREATE CONSTRAINT TRIGGER quiz_tag_gone AFTER DELETE OR UPDATE OF assessment_id, tag_id ON public.assessment_tag DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public._quiz_tag_gone()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF assessment_id, tag_id ON public.assessment_tag FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('assessment_id:assessment', 'tag_id:tag')
   policy assessment_tag_via_assessment for all to public using (public.fv_owns_assessment(assessment_id)) with check (public.fv_owns_assessment(assessment_id))
 table public.attendance (rls on)
@@ -945,6 +948,110 @@ table public.questionnaire_template (rls on)
   constraint questionnaire_template_questions_check CHECK ((jsonb_typeof(questions) = 'array'::text))
   CREATE UNIQUE INDEX questionnaire_template_pkey ON public.questionnaire_template USING btree (id)
   policy questionnaire_template_read for select to public using ((( SELECT auth.uid() AS uid) IS NOT NULL))
+table public.quiz (rls on)
+  assessment_id uuid not null
+  shuffle_questions boolean not null default true
+  shuffle_choices boolean not null default true
+  tries smallint not null default 1
+  counts text not null default 'best'::text
+  shows text not null default 'answers'::text
+  add_total boolean not null default false
+  after_due text not null default 'keep'::text
+  accept_until date
+  created_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now()
+  constraint quiz_accept_until_check CHECK (((after_due = 'until'::text) = (accept_until IS NOT NULL)))
+  constraint quiz_after_due_check CHECK ((after_due = ANY (ARRAY['keep'::text, 'stop'::text, 'until'::text])))
+  constraint quiz_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
+  constraint quiz_counts_check CHECK ((counts = ANY (ARRAY['best'::text, 'latest'::text])))
+  constraint quiz_pkey PRIMARY KEY (assessment_id)
+  constraint quiz_shows_check CHECK ((shows = ANY (ARRAY['grade'::text, 'right'::text, 'answers'::text])))
+  constraint quiz_tries_check CHECK ((tries = ANY (ARRAY[0, 1, 2])))
+  CREATE UNIQUE INDEX quiz_pkey ON public.quiz USING btree (assessment_id)
+table public.quiz_answer (rls on)
+  attempt_id uuid not null
+  question_id uuid not null
+  assessment_id uuid not null
+  answer jsonb not null
+  saved_at timestamp with time zone not null default now()
+  given_points numeric
+  note text
+  constraint quiz_answer_answer_check CHECK (((jsonb_typeof(answer) = ANY (ARRAY['array'::text, 'boolean'::text, 'number'::text])) OR ((jsonb_typeof(answer) = 'string'::text) AND (char_length((answer #>> '{}'::text[])) <= 5000))))
+  constraint quiz_answer_attempt_fkey FOREIGN KEY (attempt_id, assessment_id) REFERENCES public.quiz_attempt(id, assessment_id) ON DELETE CASCADE
+  constraint quiz_answer_given_points_check CHECK (((given_points >= (0)::numeric) AND (given_points <= (100)::numeric)))
+  constraint quiz_answer_note_check CHECK (((char_length(note) >= 1) AND (char_length(note) <= 1000)))
+  constraint quiz_answer_pkey PRIMARY KEY (attempt_id, question_id)
+  constraint quiz_answer_question_fkey FOREIGN KEY (question_id, assessment_id) REFERENCES public.quiz_question(id, assessment_id) ON DELETE CASCADE
+  CREATE UNIQUE INDEX quiz_answer_pkey ON public.quiz_answer USING btree (attempt_id, question_id)
+  CREATE INDEX quiz_answer_question_idx ON public.quiz_answer USING btree (question_id)
+table public.quiz_attempt (rls on)
+  id uuid not null default gen_random_uuid()
+  assessment_id uuid not null
+  enrollment_id uuid not null
+  try integer not null
+  question_order jsonb
+  started_at timestamp with time zone
+  sent_at timestamp with time zone
+  reopened_at timestamp with time zone
+  marked jsonb
+  marked_at timestamp with time zone
+  created_at timestamp with time zone not null default now()
+  constraint quiz_attempt_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.quiz(assessment_id) ON DELETE CASCADE
+  constraint quiz_attempt_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint quiz_attempt_id_assessment_key UNIQUE (id, assessment_id)
+  constraint quiz_attempt_marked_check CHECK ((((marked IS NULL) = (marked_at IS NULL)) AND ((marked IS NULL) OR ((sent_at IS NOT NULL) AND (jsonb_typeof(marked) = 'object'::text)))))
+  constraint quiz_attempt_order_check CHECK ((jsonb_typeof(question_order) = 'object'::text))
+  constraint quiz_attempt_pkey PRIMARY KEY (id)
+  constraint quiz_attempt_sent_check CHECK (((sent_at IS NULL) OR (started_at IS NOT NULL)))
+  constraint quiz_attempt_started_check CHECK (((started_at IS NULL) = (question_order IS NULL)))
+  constraint quiz_attempt_try_check CHECK ((try >= 1))
+  constraint quiz_attempt_try_key UNIQUE (assessment_id, enrollment_id, try)
+  CREATE INDEX quiz_attempt_enrollment_idx ON public.quiz_attempt USING btree (enrollment_id)
+  CREATE UNIQUE INDEX quiz_attempt_id_assessment_key ON public.quiz_attempt USING btree (id, assessment_id)
+  CREATE UNIQUE INDEX quiz_attempt_one_marked_idx ON public.quiz_attempt USING btree (assessment_id, enrollment_id) WHERE (marked IS NOT NULL)
+  CREATE UNIQUE INDEX quiz_attempt_one_open_idx ON public.quiz_attempt USING btree (assessment_id, enrollment_id) WHERE (sent_at IS NULL)
+  CREATE UNIQUE INDEX quiz_attempt_pkey ON public.quiz_attempt USING btree (id)
+  CREATE UNIQUE INDEX quiz_attempt_try_key ON public.quiz_attempt USING btree (assessment_id, enrollment_id, try)
+  CREATE TRIGGER quiz_attempt_same_class BEFORE INSERT OR UPDATE OF assessment_id, enrollment_id ON public.quiz_attempt FOR EACH ROW EXECUTE FUNCTION public._quiz_attempt_same_class()
+table public.quiz_key (rls on)
+  question_id uuid not null
+  answer jsonb
+  tolerance numeric
+  why text
+  constraint quiz_key_answer_check CHECK (((answer IS NULL) OR (jsonb_typeof(answer) = ANY (ARRAY['array'::text, 'boolean'::text, 'number'::text]))))
+  constraint quiz_key_pkey PRIMARY KEY (question_id)
+  constraint quiz_key_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.quiz_question(id) ON DELETE CASCADE
+  constraint quiz_key_tolerance_check CHECK ((tolerance >= (0)::numeric))
+  constraint quiz_key_why_check CHECK (((char_length(why) >= 1) AND (char_length(why) <= 500)))
+  CREATE UNIQUE INDEX quiz_key_pkey ON public.quiz_key USING btree (question_id)
+table public.quiz_question (rls on)
+  id uuid not null default gen_random_uuid()
+  assessment_id uuid not null
+  position integer
+  kind text not null
+  prompt text not null
+  choices jsonb
+  multiple boolean not null default false
+  points numeric not null default 1
+  tag_id uuid
+  archived_at timestamp with time zone
+  created_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now()
+  constraint quiz_question_archived_check CHECK (((archived_at IS NULL) = ("position" IS NOT NULL)))
+  constraint quiz_question_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.quiz(assessment_id) ON DELETE CASCADE
+  constraint quiz_question_choices_check CHECK ((((kind = 'choice'::text) = (choices IS NOT NULL)) AND ((choices IS NULL) OR ((jsonb_typeof(choices) = 'array'::text) AND ((jsonb_array_length(choices) >= 2) AND (jsonb_array_length(choices) <= 20))))))
+  constraint quiz_question_id_assessment_key UNIQUE (id, assessment_id)
+  constraint quiz_question_kind_check CHECK ((kind = ANY (ARRAY['choice'::text, 'true_false'::text, 'number'::text, 'text'::text])))
+  constraint quiz_question_multiple_check CHECK (((NOT multiple) OR (kind = 'choice'::text)))
+  constraint quiz_question_pkey PRIMARY KEY (id)
+  constraint quiz_question_points_check CHECK (((points >= (0)::numeric) AND (points <= (100)::numeric)))
+  constraint quiz_question_position_check CHECK ((("position" >= 1) AND ("position" <= 100)))
+  constraint quiz_question_position_key UNIQUE (assessment_id, "position") DEFERRABLE INITIALLY DEFERRED
+  constraint quiz_question_prompt_check CHECK (((char_length(prompt) >= 1) AND (char_length(prompt) <= 1000)))
+  CREATE UNIQUE INDEX quiz_question_id_assessment_key ON public.quiz_question USING btree (id, assessment_id)
+  CREATE UNIQUE INDEX quiz_question_pkey ON public.quiz_question USING btree (id)
+  CREATE UNIQUE INDEX quiz_question_position_key ON public.quiz_question USING btree (assessment_id, "position")
+  CREATE INDEX quiz_question_tag_idx ON public.quiz_question USING btree (assessment_id, tag_id) WHERE (tag_id IS NOT NULL)
 table public.reflection (rls on)
   id uuid not null default gen_random_uuid()
   enrollment_id uuid not null
@@ -1807,6 +1914,9 @@ function public._photo_strays(p_course_id uuid, p_now timestamp with time zone) 
 function public._photo_stuck() returns jsonb security definer
 function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid) returns public.submission security definer
 function public._questionnaire_json(p_id uuid) returns jsonb
+function public._quiz_attempt_same_class() returns trigger security definer
+function public._quiz_draft_guard() returns trigger security definer
+function public._quiz_tag_gone() returns trigger security definer
 function public._reflection_json(p_reflection_id uuid) returns jsonb security definer
 function public._report_preset_defaults(p_preset text) returns jsonb
 function public._revision_gone() returns trigger security definer
@@ -1857,6 +1967,7 @@ function public.clear_row_scores(p_enrollment_id uuid, p_course_id uuid) returns
 function public.clear_score(p_enrollment_id uuid, p_assessment_id uuid) returns void
 function public.clear_section_override(p_enrollment_id uuid, p_section_id uuid) returns void
 function public.close_phone_report(p_id uuid, p_idempotency_key uuid) returns jsonb
+function public.confirm_quiz(p_assessment_id uuid, p_marks jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.course_draft_count(p_course_id uuid) returns integer
 function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) returns uuid
 function public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) returns uuid
@@ -1954,6 +2065,8 @@ function public.list_course_submissions_since(p_course_id uuid, p_version text) 
 function public.list_course_term_attendance(p_course_id uuid) returns jsonb
 function public.list_phone_reports(p_course_id uuid) returns jsonb
 function public.list_questionnaire_templates() returns jsonb
+function public.list_quiz(p_assessment_id uuid) returns jsonb security definer
+function public.list_quiz_tries(p_assessment_id uuid) returns jsonb security definer
 function public.list_removed_sections(p_course_id uuid) returns jsonb
 function public.list_report_issues(p_course_id uuid, p_term integer) returns jsonb
 function public.list_report_templates() returns jsonb
@@ -1963,6 +2076,7 @@ function public.list_student_cards(p_course_id uuid) returns jsonb security defi
 function public.list_student_page_options(p_course_id uuid) returns jsonb security definer
 function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
 function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
+function public.mark_quiz_answer(p_attempt_id uuid, p_question_id uuid, p_points numeric, p_note text, p_idempotency_key uuid) returns jsonb security definer
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
 function public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) returns boolean security definer
@@ -1975,6 +2089,7 @@ function public.reissue_scan_label(p_enrollment_id uuid, p_idempotency_key uuid)
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
 function public.remove_assessment_resource(p_resource_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.remove_section(p_id uuid, p_idempotency_key uuid) returns jsonb
+function public.reopen_quiz(p_assessment_id uuid, p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.reorder_categories(p_ids uuid[]) returns void
 function public.reorder_competency_groups(p_ids uuid[]) returns void
 function public.reorder_modules(p_ids uuid[]) returns void
@@ -1995,6 +2110,7 @@ function public.save_collab(p_id uuid, p_mode text, p_config jsonb) returns void
 function public.save_comment_template(p_text text, p_slots jsonb, p_condition jsonb, p_id uuid, p_uses integer, p_idempotency_key uuid) returns jsonb
 function public.save_competency_descriptors(p_entries jsonb) returns integer
 function public.save_markup(p_file_id uuid, p_marks jsonb, p_base_rev integer, p_idempotency_key uuid) returns jsonb security definer
+function public.save_quiz(p_assessment_id uuid, p_quiz jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.save_report_config(p_course_id uuid, p_blocks_config jsonb, p_preset text) returns void
 function public.save_report_template(p_name text, p_form jsonb, p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.save_score_comment(p_enrollment_id uuid, p_assessment_id uuid, p_comment text) returns uuid
