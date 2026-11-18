@@ -358,13 +358,21 @@ html.sp-size-larger .hv-layer.hv-whole {
 .sp-grid4 .sp-opt {
   font-size: 13px;
 }
-/* At Large and Larger, the four steps two by two where four across would
-   cut "Beginning" and "Confident". Normal is as it was. */
-html.sp-size-large .sp-core,
-html.sp-size-larger .sp-core {
+/* The four steps two by two where four across would cut "Beginning" and
+   "Confident": at Large and Larger under 300 px, and at Normal under 270 px
+   (a 320 px phone, where they spilled their buttons; 360 px and wider are
+   as they were). */
+.sp-core {
   container: sp-core / inline-size;
 }
 @container sp-core (max-width: 299.98px) {
+  html.sp-size-large .sp-grid4,
+  html.sp-size-larger .sp-grid4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+@container sp-core (max-width: 269.98px) {
   .sp-grid4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
@@ -590,19 +598,21 @@ html.sp-size-larger .sp-core {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+/* A long label ("Send to My Teacher", "Next: My Goals") takes two lines
+   rather than spilling out of its button and widening the page: at Large
+   and Larger, and at Normal where the device's font is wide (a Chromebook,
+   Android, Windows). The words may use the button's sides before they
+   wrap (4 px, not 10), so where a label fits one line nothing moves. */
 .sp-foot .sp-btn {
   font-size: 16px;
-  padding: 0 10px;
-  white-space: nowrap;
+  padding: 4px;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
-/* At Large and Larger a long label ("Send to My Teacher", "Next: My
-   Goals") takes two lines rather than being cut. Normal is as it was. */
 html.sp-size-large .sp-foot .sp-btn,
 html.sp-size-larger .sp-foot .sp-btn {
   padding: 4px 10px;
   line-height: 1.2;
-  white-space: normal;
-  overflow-wrap: break-word;
 }
 .sp-foot .sp-msg {
   text-align: center;
