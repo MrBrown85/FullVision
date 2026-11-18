@@ -57,6 +57,9 @@ export const KIND_BY_ARG = {
   p_issue_id: 'report_issue',
   p_report_id: 'phone_report',
   p_key: 'idempotency_key',
+  p_bulletin_id: 'bulletin',
+  p_bulletin_file_id: 'bulletin_file',
+  p_bulletin_ids: 'bulletin',
 };
 
 /* p_id, p_ids and p_src_id name a different kind in each function. */
@@ -204,6 +207,10 @@ export const VALUES = {
   work_read_allowed: { p_name: "'${course}/${submission}/${submission_file}.jpg'" },
   work_upload_allowed: { p_name: "'${course}/${enrollment2_submission}/${sending_file}.jpg'" },
   work_path_course: { p_name: "'${course}/${submission}/${submission_file}.jpg'" },
+  post_bulletin: { p_bulletin: { kind: 'announcement', body: 'rls test' }, p_files: [] },
+  edit_bulletin: { p_patch: { body: 'rls test' } },
+  bulletin_file_read_allowed: { p_name: "'${course}/${bulletin_file}/1.jpg'" },
+  bulletin_file_upload_allowed: { p_name: "'${course}/${bulletin_file}/1.jpg'" },
   handout_read_allowed: { p_name: "'${course}/handouts/${handout}/1.jpg'" },
   handout_upload_allowed: { p_name: "'${course}/handouts/${handout}/1.jpg'" },
   report_note_hold: { p_enrollment_id: "'${enrollment2}'::uuid", p_assessment_id: "'${assessment_prof}'::uuid" },

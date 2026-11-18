@@ -221,7 +221,7 @@ window.DashOverview = (function () {
   // html-safe: numbers and fixed words; the link is our path and id
   function toGradeGlanceHtml(cid, studentIds) {
     if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return '';
-    var c = GraderWork.classWorkCounts(cid, studentIds);
+    var c = classWorkCounts(cid, studentIds);
     // A question waiting (S10-F4) rides in the same cell: "· 1 Question".
     var asked = questionsIn(cid).length;
     var parts = [];
@@ -241,8 +241,12 @@ window.DashOverview = (function () {
         parts.push('<span class="dash-glance-old dash-obs-when is-overdue">Oldest ' + days + ' Days</span>');
       if (asked) parts.push('<b>' + asked + '</b> ' + (asked === 1 ? 'Question' : 'Questions'));
     }
+    // With the Inbox on the page a click goes to it (DashInbox.click); the link stays for a new tab.
+    var toInbox = rowOn() && !!window.DashInbox;
     return (
-      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0" data-href="' +
+      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0"' +
+      (toInbox ? ' data-dash-inbox-jump="1"' : '') +
+      ' data-href="' +
       esc('/assignments?course=' + (cid || '') + '&show=tograde') +
       '" aria-label="' +
       esc(
@@ -252,7 +256,7 @@ window.DashOverview = (function () {
           c.toreturn +
           ' not returned' +
           (asked ? ', ' + asked + (asked === 1 ? ' question' : ' questions') : '') +
-          ': open Assignments',
+          (toInbox ? ': go to the Inbox' : ': open Assignments'),
       ) +
       '">' +
       '<span class="dash-glance-label">To Grade</span>' +
@@ -1247,7 +1251,25 @@ window.DashOverview = (function () {
      Competencies side by side at one height (Colin, Nov 5: Needs Attention
      is gone). The students follow (page-dashboard.js), and Observations
      goes last (obsCardHtml) until Colin decides its place. */
+  /* One count of the class's work for one draw, shared by the top bar's To
+     Grade cell and the Inbox (D4 follow-up): classWorkCounts goes through
+     every piece, and a busy class has dozens. Outside a draw, a plain call. */
+  var _draw = null;
+  function classWorkCounts(cid, studentIds) {
+    if (!_draw || _draw.cid !== cid) return GraderWork.classWorkCounts(cid, studentIds);
+    return _draw.counts || (_draw.counts = GraderWork.classWorkCounts(cid, studentIds));
+  }
+
   function renderOverviewPanel(opts) {
+    _draw = { cid: opts.cid, counts: null };
+    try {
+      return _renderOverviewPanel(opts);
+    } finally {
+      _draw = null;
+    }
+  }
+
+  function _renderOverviewPanel(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;
     var missing = DashInsights.missingItems(cid, allStudents);
@@ -1302,7 +1324,7 @@ window.DashOverview = (function () {
     var cid = opts.cid;
     var inboxHome =
       window.DashInbox && window.GraderWork && GraderWork.workOnInClass && GraderWork.workOnInClass(cid)
-        ? DashInbox.html(cid)
+        ? DashInbox.html(cid, { classCounts: classWorkCounts })
         : DashRecent.html(cid, opts.allStudents || []);
     var bulletins =
       window.BuildFlags && BuildFlags.on('bulletins') && window.DashBulletins ? DashBulletins.html(cid) : '';
@@ -1402,6 +1424,7 @@ window.DashOverview = (function () {
     renderDashToolbar: renderDashToolbar,
     studentControlsHtml: studentControlsHtml,
     renderOverviewPanel: renderOverviewPanel,
+    classWorkCounts: classWorkCounts,
     rowHeight: rowHeight,
     sizeRow: sizeRow,
     obsCardHtml: obsCardHtml,
