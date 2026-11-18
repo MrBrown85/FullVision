@@ -2,7 +2,7 @@
 -- SELECTs only, catalog facts only (no row of any table is read). Every row says ok.
 with want(sig, after_md5) as (values
     ('student_submit._bulletin_visible(uuid,uuid)', 'cab9dc514218ac1839b112895e2baa11'),
-    ('student_submit.bulletins(text,uuid,text)', '08b1f6637c7ada669563388865f31cb7'),
+    ('student_submit.bulletins(text,uuid,text)', 'e055c811b42aec87be4124ca3ae93f87'),
     ('student_submit.bulletin_seen(text,uuid,uuid[],text)', '96185b2e8173c90ccd40f2a054ad5cc7'),
     ('student_submit.bulletin_react(text,uuid,uuid,text,text)', 'e86e2c4c9454186390ad1fe9a845d8c1'),
     ('student_submit.bulletin_file_links(text,uuid,uuid,text)', '5e93daec794c4f5f5b936c385e4905ca'),
@@ -13,7 +13,8 @@ with want(sig, after_md5) as (values
     ('student_submit._write_limit(uuid,text,integer)', 'c2edfa96402a2eb7a839db3c106e11a9'),
     ('student_submit._listed(public.assessment,date)', 'ee5745a778e8ac1cb56f013d1c3e034e'),
     ('public._fv_timezone(text)', '8dbcb5716f155e2441f47416a0b28527'),
-    ('fv_private.bulletin_file_path(uuid,uuid,integer)', '026f508189e7fd22dc2fcb661dc8917c')),
+    ('fv_private.bulletin_file_path(uuid,uuid,integer)', '382dc77b5c162295891790d42fb13763'),
+    ('fv_private.bulletin_pinned_now(boolean,date,text)', '3d68484d7051fd8f380fe2a84c401546')),
 routes(sig) as (values
     ('student_submit.bulletins(text,uuid,text)'), ('student_submit.bulletin_seen(text,uuid,uuid[],text)'),
     ('student_submit.bulletin_react(text,uuid,uuid,text,text)'), ('student_submit.bulletin_file_links(text,uuid,uuid,text)'))

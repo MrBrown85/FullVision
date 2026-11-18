@@ -36,7 +36,7 @@
 --
 -- md5 of pg_get_functiondef (as the file leaves them):
 --   student_submit._bulletin_visible(uuid,uuid)                   cab9dc514218ac1839b112895e2baa11
---   student_submit.bulletins(text,uuid,text)                      08b1f6637c7ada669563388865f31cb7
+--   student_submit.bulletins(text,uuid,text)                      e055c811b42aec87be4124ca3ae93f87
 --   student_submit.bulletin_seen(text,uuid,uuid[],text)           96185b2e8173c90ccd40f2a054ad5cc7
 --   student_submit.bulletin_react(text,uuid,uuid,text,text)       e86e2c4c9454186390ad1fe9a845d8c1
 --   student_submit.bulletin_file_links(text,uuid,uuid,text)       5e93daec794c4f5f5b936c385e4905ca
@@ -68,7 +68,7 @@ declare
 begin
     for _f in select * from (values
         ('student_submit._bulletin_visible(uuid,uuid)', 'cab9dc514218ac1839b112895e2baa11'),
-        ('student_submit.bulletins(text,uuid,text)', '08b1f6637c7ada669563388865f31cb7'),
+        ('student_submit.bulletins(text,uuid,text)', 'e055c811b42aec87be4124ca3ae93f87'),
         ('student_submit.bulletin_seen(text,uuid,uuid[],text)', '96185b2e8173c90ccd40f2a054ad5cc7'),
         ('student_submit.bulletin_react(text,uuid,uuid,text,text)', 'e86e2c4c9454186390ad1fe9a845d8c1'),
         ('student_submit.bulletin_file_links(text,uuid,uuid,text)', '5e93daec794c4f5f5b936c385e4905ca')

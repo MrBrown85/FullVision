@@ -11,7 +11,8 @@ with want(sig, md5) as (values
     ('student_submit._write_limit(uuid,text,integer)', 'c2edfa96402a2eb7a839db3c106e11a9'),
     ('student_submit._listed(public.assessment,date)', 'ee5745a778e8ac1cb56f013d1c3e034e'),
     ('public._fv_timezone(text)', '8dbcb5716f155e2441f47416a0b28527'),
-    ('fv_private.bulletin_file_path(uuid,uuid,integer)', '026f508189e7fd22dc2fcb661dc8917c')),
+    ('fv_private.bulletin_file_path(uuid,uuid,integer)', '382dc77b5c162295891790d42fb13763'),
+    ('fv_private.bulletin_pinned_now(boolean,date,text)', '3d68484d7051fd8f380fe2a84c401546')),
 cols(tab, col, typ) as (values
     ('bulletin', 'id', 'uuid'), ('bulletin', 'course_id', 'uuid'), ('bulletin', 'kind', 'text'), ('bulletin', 'body', 'text'),
     ('bulletin', 'link_url', 'text'), ('bulletin', 'link_title', 'text'), ('bulletin', 'pinned', 'boolean'),

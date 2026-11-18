@@ -56,11 +56,11 @@
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   student_submit._bulletin_visible(uuid,uuid) (new)                     cab9dc514218ac1839b112895e2baa11
---   student_submit.bulletins(text,uuid,text) (new)                        08b1f6637c7ada669563388865f31cb7
+--   student_submit.bulletins(text,uuid,text) (new)                        e055c811b42aec87be4124ca3ae93f87
 --   student_submit.bulletin_seen(text,uuid,uuid[],text) (new)             96185b2e8173c90ccd40f2a054ad5cc7
 --   student_submit.bulletin_react(text,uuid,uuid,text,text) (new)         e86e2c4c9454186390ad1fe9a845d8c1
 --   student_submit.bulletin_file_links(text,uuid,uuid,text) (new)         5e93daec794c4f5f5b936c385e4905ca
--- Relied on, unchanged (function, live; the last from M1):
+-- Relied on, unchanged (function, live; the last two from M1):
 --   student_submit._session_class(text,uuid)                              1ae94981ff32f804d12079a24bd7b41a
 --   student_submit._card_refusal(uuid)                                    4b982e451dbd5c9c68916c99d29d2d37
 --   student_submit._device_session(text)                                  fa1e510e4ccd3bccbf91e29540a837bb
@@ -68,13 +68,14 @@
 --   student_submit._write_limit(uuid,text,integer)                        c2edfa96402a2eb7a839db3c106e11a9
 --   student_submit._listed(public.assessment,date)                        ee5745a778e8ac1cb56f013d1c3e034e
 --   public._fv_timezone(text)                                             8dbcb5716f155e2441f47416a0b28527
---   fv_private.bulletin_file_path(uuid,uuid,integer)                      026f508189e7fd22dc2fcb661dc8917c
+--   fv_private.bulletin_file_path(uuid,uuid,integer)                      382dc77b5c162295891790d42fb13763
+--   fv_private.bulletin_pinned_now(boolean,date,text)                     3d68484d7051fd8f380fe2a84c401546
 -- Changed: the constraint student_submit.write_log.write_log_kind_check,
 --   from  CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text])))
 --   to    CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text])))
 --
 -- ── The checks it makes first ──────────────────────────────────────────────
--- It stops with nothing changed unless: the eight functions it relies on are
+-- It stops with nothing changed unless: the nine functions it relies on are
 -- the definitions it was tested against; its own five are missing or this
 -- file's (a second run); no function of those names exists with other
 -- arguments or in another schema; write_log_kind_check is exactly the
@@ -95,7 +96,8 @@
 -- with nothing applied: run it again.
 --
 -- ── Order ──────────────────────────────────────────────────────────────────
--- After 2026111801 (it reads M1's tables and fv_private.bulletin_file_path).
+-- After 2026111801 (it reads M1's tables, fv_private.bulletin_file_path and
+-- fv_private.bulletin_pinned_now).
 -- Before the edge function with bulletin-routes.ts is deployed. The student
 -- page released now calls none of these, so it is unchanged.
 --
@@ -129,9 +131,10 @@ begin
         ('student_submit._write_limit(uuid,text,integer)', 'c2edfa96402a2eb7a839db3c106e11a9', null),
         ('student_submit._listed(public.assessment,date)', 'ee5745a778e8ac1cb56f013d1c3e034e', null),
         ('public._fv_timezone(text)', '8dbcb5716f155e2441f47416a0b28527', null),
-        ('fv_private.bulletin_file_path(uuid,uuid,integer)', '026f508189e7fd22dc2fcb661dc8917c', null),
+        ('fv_private.bulletin_file_path(uuid,uuid,integer)', '382dc77b5c162295891790d42fb13763', null),
+        ('fv_private.bulletin_pinned_now(boolean,date,text)', '3d68484d7051fd8f380fe2a84c401546', null),
         ('student_submit._bulletin_visible(uuid,uuid)', null, 'cab9dc514218ac1839b112895e2baa11'),
-        ('student_submit.bulletins(text,uuid,text)', null, '08b1f6637c7ada669563388865f31cb7'),
+        ('student_submit.bulletins(text,uuid,text)', null, 'e055c811b42aec87be4124ca3ae93f87'),
         ('student_submit.bulletin_seen(text,uuid,uuid[],text)', null, '96185b2e8173c90ccd40f2a054ad5cc7'),
         ('student_submit.bulletin_react(text,uuid,uuid,text,text)', null, 'e86e2c4c9454186390ad1fe9a845d8c1'),
         ('student_submit.bulletin_file_links(text,uuid,uuid,text)', null, '5e93daec794c4f5f5b936c385e4905ca')
@@ -233,13 +236,14 @@ as $function$
 declare
     _in     jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
     _course uuid;
+    _tz     text;
     _today  date;
 begin
     if _in ? 'error' then
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     _course := (_in->>'course_id')::uuid;
-    select (now() at time zone public._fv_timezone(c.timezone))::date into _today from public.course c where c.id = _course;
+    select c.timezone, (now() at time zone public._fv_timezone(c.timezone))::date into _tz, _today from public.course c where c.id = _course;
     return jsonb_build_object(
         'ok', true,
         -- Oldest first; one shown again that this student has not seen sorts at its Show It Again time.
@@ -252,8 +256,8 @@ begin
                            jsonb_build_object(
                                'id', b.id, 'kind', b.kind, 'body', b.body,
                                'link_url', b.link_url, 'link_title', b.link_title,
-                               -- Pinned as the teacher's list shows it: off once its last day has passed.
-                               'pinned', b.pinned and (b.pinned_until is null or b.pinned_until >= _today),
+                               -- Pinned as the teacher's list shows it (M1's rule): off once its last day has passed.
+                               'pinned', fv_private.bulletin_pinned_now(b.pinned, b.pinned_until, _tz),
                                'pinned_until', b.pinned_until,
                                -- The linked piece only when the student's page lists it (not a draft, assigned).
                                'assessment_id', (select a.id from public.assessment a
@@ -408,7 +412,7 @@ declare
 begin
     for _f in select * from (values
         ('student_submit._bulletin_visible(uuid,uuid)', 'cab9dc514218ac1839b112895e2baa11'),
-        ('student_submit.bulletins(text,uuid,text)', '08b1f6637c7ada669563388865f31cb7'),
+        ('student_submit.bulletins(text,uuid,text)', 'e055c811b42aec87be4124ca3ae93f87'),
         ('student_submit.bulletin_seen(text,uuid,uuid[],text)', '96185b2e8173c90ccd40f2a054ad5cc7'),
         ('student_submit.bulletin_react(text,uuid,uuid,text,text)', 'e86e2c4c9454186390ad1fe9a845d8c1'),
         ('student_submit.bulletin_file_links(text,uuid,uuid,text)', '5e93daec794c4f5f5b936c385e4905ca')

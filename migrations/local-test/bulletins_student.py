@@ -70,7 +70,8 @@ REACT = 'student_submit.bulletin_react(text,uuid,uuid,text,text)'; LINKS = 'stud
 ROUTES = [FEED, SEEN, REACT, LINKS]; OURS = [VIS] + ROUTES
 RELIED = ['student_submit._session_class(text,uuid)', 'student_submit._card_refusal(uuid)', 'student_submit._device_session(text)',
           'student_submit._session_classes(uuid)', 'student_submit._write_limit(uuid,text,integer)',
-          'student_submit._listed(public.assessment,date)', 'public._fv_timezone(text)', 'fv_private.bulletin_file_path(uuid,uuid,integer)']
+          'student_submit._listed(public.assessment,date)', 'public._fv_timezone(text)', 'fv_private.bulletin_file_path(uuid,uuid,integer)',
+          'fv_private.bulletin_pinned_now(boolean,date,text)']
 OLD_CHECK = "CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text])))"
 NEW_CHECK = "CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text])))"
 HEADER = text_of(FILE)
@@ -555,7 +556,7 @@ def scen_apply():
     w = world('apply', with_file=False); d = w.d
     base = catalog(d.c); sums = row_checksums(d.c, table_columns(d.c))
     new, relied = header_md5s()
-    ok('apply: the header names its five new functions and the eight it relies on', sorted(new) == sorted(OURS) and sorted(relied) == sorted(RELIED), (new, relied))
+    ok('apply: the header names its five new functions and the nine it relies on', sorted(new) == sorted(OURS) and sorted(relied) == sorted(RELIED), (new, relied))
     ok("apply: the relied-on functions are the header's on this database", all(md5(d, s) == relied[s] for s in RELIED), {s: md5(d, s) for s in RELIED})
     ok('apply: the header names the check before and after', OLD_CHECK in HEADER and NEW_CHECK in HEADER)
     ok('apply: write_log has today\'s check', kind_check(d) == [[OLD_CHECK, True]], kind_check(d))
