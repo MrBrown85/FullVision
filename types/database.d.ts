@@ -857,7 +857,9 @@ export type Database = {
           enrolled_at: string
           id: string
           is_flagged: boolean
+          page_paused_at: string | null
           roster_position: number
+          show_overall_grade: boolean | null
           student_id: string
           updated_at: string
           withdrawn_at: string | null
@@ -869,7 +871,9 @@ export type Database = {
           enrolled_at?: string
           id?: string
           is_flagged?: boolean
+          page_paused_at?: string | null
           roster_position?: number
+          show_overall_grade?: boolean | null
           student_id: string
           updated_at?: string
           withdrawn_at?: string | null
@@ -880,7 +884,9 @@ export type Database = {
           enrolled_at?: string
           id?: string
           is_flagged?: boolean
+          page_paused_at?: string | null
           roster_position?: number
+          show_overall_grade?: boolean | null
           student_id?: string
           updated_at?: string
           withdrawn_at?: string | null
@@ -4244,6 +4250,10 @@ export type Database = {
       }
       list_scan_labels: { Args: { p_course_id: string }; Returns: Json }
       list_student_cards: { Args: { p_course_id: string }; Returns: Json }
+      list_student_page_options: {
+        Args: { p_course_id: string }
+        Returns: Json
+      }
       list_teacher_courses: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -4503,6 +4513,16 @@ export type Database = {
           p_status: string
         }
         Returns: string
+      }
+      set_student_page_options: {
+        Args: {
+          p_course_id: string
+          p_enrollment_ids: string[]
+          p_idempotency_key?: string
+          p_paused: boolean
+          p_show_overall_grade: string
+        }
+        Returns: Json
       }
       soft_delete_teacher: {
         Args: Record<PropertyKey, never>

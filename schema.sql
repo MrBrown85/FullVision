@@ -238,8 +238,18 @@ create table enrollment (
   withdrawn_at    timestamptz,
   enrolled_at     timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
+  show_overall_grade boolean,                                         -- Show Overall Grade for this student: null follows the class (course.show_my_learning), true shown, false hidden (2026111720)
+  page_paused_at  timestamptz,                                        -- set: the student page is paused for this student since then, every card scan and session route answers closed; null: open (2026111720)
   unique (student_id, course_id)
 );
+-- Per-student options (2026111720_student_page_per_student). No reason is
+-- stored for either. Teachers: set_student_page_options(course, ids,
+-- 'class'|'show'|'hide'|null, paused|null, key) and
+-- list_student_page_options(course), owner only, granted to authenticated
+-- alone. Students: student_submit._card_refusal answers 'closed' for a paused
+-- student, _session_classes leaves the class out, and page and feedback read
+-- coalesce(show_overall_grade, course.show_my_learning) in place of the
+-- class's switch.
 
 -- Assessments
 create table assessment (
