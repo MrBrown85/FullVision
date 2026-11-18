@@ -21,7 +21,7 @@ declare
     rub uuid; crit uuid; chk uuid; a_pts uuid; a_prof uuid; a_rub uuid; a_dib uuid; ctag uuid; otpl uuid;
     obs uuid; tr uuid; q uuid; qq uuid; resp uuid; pr uuid; ri uuid; gu uuid; ct uuid; rt uuid; res uuid;
     sec2 uuid; ho uuid; sub2 uuid; sf2 uuid; qz uuid; qa uuid;
-    fup uuid;
+    fup uuid; bl uuid; blf uuid;
     sub uuid; sf uuid; card uuid; code uuid; rr uuid; sc uuid; nt uuid; ds uuid; fr uuid;
     a_grp uuid := gen_random_uuid();
     r_grp uuid := gen_random_uuid();
@@ -195,6 +195,16 @@ begin
            into qa using a_pts, e1, jsonb_build_object('questions', jsonb_build_array(qz), 'choices', '{}'::jsonb);
         execute 'insert into public.quiz_answer (attempt_id, question_id, assessment_id, answer) values ($1, $2, $3, to_jsonb($4::text))'
            using qa, qz, a_pts, p_mark || ' Quiz answer';
+    end if;
+    -- A bulletin with a file, seen and reacted to, once 2026111801 is applied (until then the tables are missing).
+    if to_regclass('public.bulletin') is not null then
+        execute 'insert into public.bulletin (course_id, kind, body, posted_at) values ($1, ''announcement'', $2, now()) returning id'
+           into bl using c, p_mark || ' Bulletin';
+        execute 'insert into public.bulletin_file (course_id, bulletin_id, kind, title, page_count, position) values ($1, $2, ''pdf'', $3, 2, 1) returning id'
+           into blf using c, bl, p_mark || ' Bulletin File';
+        execute 'insert into public.bulletin_seen (bulletin_id, enrollment_id) values ($1, $2)' using bl, e1;
+        execute 'insert into public.bulletin_reaction (bulletin_id, enrollment_id, word) values ($1, $2, ''got_it'')' using bl, e1;
+        _ids := _ids || jsonb_build_object('bulletin', bl, 'bulletin_file', blf);
     end if;
     insert into public.submission_file_removal (bucket, path, course_id, reason, link_dies_at)
     values ('student-photos', c || '/' || p_mark || '-gone.jpg', c, 'test', now());

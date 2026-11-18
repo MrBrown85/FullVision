@@ -337,6 +337,35 @@ describe('what a press changes is decided in one place, for the page and the pre
     expect(press(page, {}, 'segment', { 'data-segment': 'back' })).toBeNull();
     expect(press(page, {}, 'card-done')).toBeNull();
     expect(press(page, {}, 'classes-open')).toBeNull();
+    // Switch Class and Add Another Card reach for the session: the student page's own, not a press.
+    expect(press(page, { settings: true }, 'class-open', { 'data-enrollment': 'e1' })).toBeNull();
+    expect(press(page, { settings: true }, 'card-add')).toBeNull();
+    // A text size only from Settings, and only one of the three.
+    expect(press(page, {}, 'text-size', { 'data-size': 'large' })).toBeNull();
+    expect(press(page, { settings: true }, 'text-size', { 'data-size': 'huge' })).toBeNull();
+    // Settings opens over what is showing (a piece's feedback stays), slides in once, and its
+    // closes, Log Out?'s Cancel included, give the focus back to the gear without scrolling.
+    const opened = press(page, { tab: 'learning', feedback: 'p1', whole: true }, 'settings-open');
+    expect(opened).toMatchObject({ focus: '#sp-set-title', stay: true, slide: true });
+    expect(opened.ui).toMatchObject({ settings: true, feedback: 'p1', whole: true });
+    expect(press(page, { settings: true }, 'settings-close')).toMatchObject({
+      ui: { settings: false },
+      focus: '.sp-gear',
+      stay: true,
+    });
+    const sized = press(page, { settings: true }, 'text-size', { 'data-size': 'larger' });
+    expect(sized).toMatchObject({ ui: { settings: true, textSize: 'larger' }, stay: true });
+    expect(sized.slide).toBeUndefined();
+    expect(
+      press(page, { settings: true, textSize: 'larger' }, 'text-size', { 'data-size': 'normal' }).ui.textSize,
+    ).toBe('');
+    expect(press(page, { settings: true }, 'logout-ask')).toMatchObject({
+      ui: { settings: false, logout: true },
+      focus: '#sp-logout-title',
+    });
+    expect(press(page, { logout: true }, 'logout-cancel')).toMatchObject({ ui: { logout: false }, focus: '.sp-gear' });
+    // Any other press closes Settings.
+    expect(press(page, { settings: true }, 'tab', { 'data-tab': 'learning' }).ui.settings).toBe(false);
     const excused = { kind: 'excused', id: 'x', title: 'Excused Piece' };
     expect(
       page.run('StudentPageView.press')({}, { work: [excused] }, 'open-piece', button({ 'data-piece': 'x' })),
@@ -411,12 +440,22 @@ describe('what the server also tells, in Demo Mode (S4-W1)', () => {
     expect(page.root().innerHTML).not.toContain('Rivera');
   });
 
-  it('Your Classes says how many pieces wait in each class; none where nothing waits or the server does not say', async () => {
+  it('Switch Class says how many pieces wait in each class; none where nothing waits or the server does not say', async () => {
     const page = await demo();
-    await page.click('[data-act="classes-open"]');
-    expect([...page.root().querySelectorAll('.sp-class-todo')].map(el => el.textContent)).toEqual(['3 to do']);
-    const html = page.run('StudentPage.classesSheet')({
-      student: { id: 'e1' },
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="card-add"]');
+    page.type('#sp-code', 'ABCD-EFGH');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    await page.click('[data-act="settings-open"]');
+    expect([...page.root().querySelectorAll('.sp-class-todo')].map(el => el.textContent)).toEqual([
+      '3 to do',
+      '2 to do',
+    ]);
+    const html = page.run('StudentPageView.html')(viewOf(page), {
+      settings: true,
+      classOn: 'e1',
       classes: [
         { enrollmentId: 'e1', name: 'Science 8', block: 'B', toDo: 0 },
         { enrollmentId: 'e2', name: 'Humanities 8', block: 'A', toDo: null },

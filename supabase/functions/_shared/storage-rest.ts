@@ -2,7 +2,8 @@
 // with the service key (Batch B's contract, "Storage").
 //
 // Six things are done with it (and, for a teacher's handout file, signDownloads
-// and remove in the bucket handout-files), and nothing else:
+// and remove in the bucket handout-files; for a bulletin's page, the same two
+// in the bucket bulletin-files), and nothing else:
 //   signUpload     a link that lets one file be put at one path, once. Never
 //                  with upsert: no x-upsert header is sent when it is made,
 //                  so a second upload to a path that holds a file is refused.
@@ -42,7 +43,13 @@
 //   <course>/<resource>.<html|txt|epub>
 // and is taken by signDownloads and remove only, each told that bucket
 // (FILE_BUCKET); in it no other shape is taken, and in student-photos no
-// handout file's. Only the database names paths; this is a
+// handout file's. A page of a file on a teacher's bulletin (Bulletins,
+// migrations/2026111801_bulletins.sql) is in a third bucket, bulletin-files,
+// as
+//   <course>/<bulletin_file>/<n>.jpg          n from 1 to 20
+// and is taken by signDownloads and remove only, each told that bucket
+// (BULLETIN_BUCKET); in it no other shape is taken, and in the other two
+// buckets no bulletin page's. Only the database names paths; this is a
 // second look, so a path with anything else in it (a dot-dot, a slash too
 // many, a query) never reaches the Storage service, from any caller.
 //
@@ -92,6 +99,19 @@ export function handoutFilePathParts(path: unknown): { course: string; resource:
   return m ? { course: m[1], resource: m[2], kind: m[3] } : null;
 }
 
+/** The pages of the files on teachers' bulletins (2026111801): private, 2 MB a page, image/jpeg only. */
+export const BULLETIN_BUCKET = 'bulletin-files';
+
+/** A bulletin file's page in BULLETIN_BUCKET: <course>/<bulletin_file>/<n>.jpg, n from 1 to 20, no leading zero. */
+export const BULLETIN_PATH = new RegExp(`^(${ID})/(${ID})/([1-9]|1[0-9]|20)\\.jpg$`);
+
+/** A bulletin page's parts, or null when it is not one. */
+export function bulletinPathParts(path: unknown): { course: string; file: string; page: number } | null {
+  if (typeof path !== 'string') return null;
+  const m = BULLETIN_PATH.exec(path);
+  return m ? { course: m[1], file: m[2], page: Number(m[3]) } : null;
+}
+
 /** A path's parts, or null when it is not one of the bucket's two shapes. */
 export function pathParts(path: unknown): PathParts | null {
   if (typeof path !== 'string') return null;
@@ -105,7 +125,7 @@ export type Read = { bytes: Uint8Array<ArrayBuffer> } | 'missing' | 'too_large';
 
 export type Store = {
   signUpload: (path: string) => Promise<string>;
-  // bucket: FILE_BUCKET for a handout file; left out, student-photos.
+  // bucket: FILE_BUCKET for a handout file, BULLETIN_BUCKET for a bulletin page; left out, student-photos.
   signDownloads: (paths: string[], seconds: number, bucket?: string) => Promise<Record<string, string>>;
   read: (path: string, maxBytes: number) => Promise<Read>;
   overwrite: (path: string, bytes: Uint8Array<ArrayBuffer>) => Promise<void>;
@@ -125,10 +145,13 @@ function checked(path: string): string {
 }
 
 // A path signDownloads and remove take: in student-photos a student's page or thumbnail, or a
-// teacher's handout page; in handout-files a handout file, and nothing else. Any other bucket: none.
+// teacher's handout page; in handout-files a handout file; in bulletin-files a bulletin page; and nothing
+// else. Any other bucket: none.
 function checkedOrHandout(path: string, bucket: string): string {
   if (bucket === FILE_BUCKET) {
     if (!HANDOUT_FILE_PATH.test(path)) throw new StorageError('path', 0);
+  } else if (bucket === BULLETIN_BUCKET) {
+    if (!BULLETIN_PATH.test(path)) throw new StorageError('path', 0);
   } else if (bucket !== BUCKET || (!PATH.test(path) && !HANDOUT_PATH.test(path))) {
     throw new StorageError('path', 0);
   }

@@ -64,11 +64,16 @@ export const PARTS = [
 const COMPARED = PARTS.filter(p => p !== 'checks.txt');
 
 /* Lines of docs/schema.generated.sql a rebuild cannot give back exactly.
-   Live stores these two checks with a nested AND (they were written with
-   BETWEEN). Printed and loaded again, PostgreSQL flattens it. The two allow
-   the same rows. A difference is accepted only for these constraints, and
-   only when the two lines are equal once every bracket is taken out. */
-export const KNOWN_DIFFERENCES = ['rubric_score_modifier_check', 'tag_score_modifier_check'];
+   Live stores these three checks with a nested AND (they were written with
+   BETWEEN; bulletin_file_page_count_check by 2026111801). Printed and loaded
+   again, PostgreSQL flattens it. The two allow the same rows. A difference is
+   accepted only for these constraints, and only when the two lines are equal
+   once every bracket is taken out. */
+export const KNOWN_DIFFERENCES = [
+  'rubric_score_modifier_check',
+  'tag_score_modifier_check',
+  'bulletin_file_page_count_check',
+];
 
 export const HEADER =
   "-- Printed by scripts/db-baseline.sql from gradebook-prod's system catalogs.\n" +

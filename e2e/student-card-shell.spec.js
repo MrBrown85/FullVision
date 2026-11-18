@@ -105,13 +105,15 @@ for (const size of [
       await shot(page, size.tag + '-s4f1-reflections');
 
       // Log Out asks first; Cancel leaves the page as it was.
-      await page.locator('.sp-head [data-act="logout-ask"]').click();
+      await page.locator('.sp-head [data-act="settings-open"]').click();
+      await page.locator('.sp-set [data-act="logout-ask"]').click();
       const sheet = page.getByRole('alertdialog', { name: 'Log Out?' });
       await expect(sheet).toBeVisible();
       await expect(sheet).toContainText('You’ll need your card to open your page again.');
       await expect(page.locator('#sp-logout-title')).toBeFocused();
       await contrast(page);
       await shot(page, size.tag + '-s4f1-log-out');
+      await page.waitForTimeout(450); // Log Out? takes a press once it has been up a moment.
       await sheet.getByRole('button', { name: 'Cancel' }).click();
       await expect(sheet).toHaveCount(0);
       await expect(page.getByRole('heading', { level: 1, name: 'Reflect', exact: true })).toBeVisible();
