@@ -9,7 +9,12 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
+// The clock is pinned before the page loads: Wednesday, Nov 18, 2026 at 13:00 where the browser is, so a heading is
+// always the same word whatever time the test runs.
+const NOW = new Date('2026-11-18T13:00:00');
+
 async function open(page, { on = true, studentPage = true } = {}) {
+  await page.clock.install({ time: NOW });
   if (on) await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
   // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
   await page.goto(studentPage ? '/login.html?student=1' : '/login.html');
@@ -38,8 +43,11 @@ test('the Bulletins tab is after Assignments, and the page has the sample bullet
   await expect(page.locator('.bulletin-title')).toHaveText('Bulletins');
   await expect(page.locator('.bulletin-sub')).toHaveText('27 students can see it');
   await expect(cards(page)).toHaveCount(3);
+  // The samples are 2 days back at 8:42 (Monday) and 20 and 37 minutes before now, on Today.
+  await expect(feed(page).locator('.bulletin-day')).toHaveText(['Pinned', 'Today']);
+  await expect(feed(page).locator('.bulletin-time')).toHaveText(['Monday 8:42 a.m.', '12:40 p.m.', '12:23 p.m.']);
   await expect(feed(page).locator('.bulletin-day').first()).toHaveText('Pinned');
-  await expect(cards(page).first().locator('.bulletin-kind-label')).toHaveText(/^Reminder · Until \w{3}, \w{3} \d+$/);
+  await expect(cards(page).first().locator('.bulletin-kind-label')).toHaveText('Reminder · Until Fri, Nov 20');
   await expect(cards(page).first().locator('.bulletin-foot')).toContainText('Linked to Cell Microscope Lab');
   await expect(feed(page)).toContainText('Seen by 19 of 27 · 8 Not Seen');
   await expect(feed(page)).toContainText('14 Got It · 2 Have a Question');
@@ -108,7 +116,7 @@ test('a reminder takes a date and a linked assessment, and is pinned', async ({ 
   await expect(card.locator('.bulletin-foot a')).toHaveText('Immune System Quick Check');
   await expect(card.locator('.bulletin-foot a')).toHaveAttribute('href', /\/assignments\?course=sci8&open=sci8a2$/);
   // Pinned, under the heading, above the older pinned reminder (newest first).
-  await expect(feed(page).locator('.bulletin-day')).toHaveText(['Pinned', /^(Today|Yesterday)$/]);
+  await expect(feed(page).locator('.bulletin-day')).toHaveText(['Pinned', 'Today']);
   await expect(feed(page).locator('.bulletin-post').nth(0)).toContainText('Permission forms are due.');
   await expect(feed(page).locator('.bulletin-post').nth(1)).toContainText('Lab safety form');
 });
@@ -155,7 +163,7 @@ test('pin, edit and delete from the menu; the confirm shows only for Delete', as
   await pinned.locator('.bulletin-more-btn').click();
   await expect(pinned.locator('.bulletin-menu').getByRole('menuitem')).toHaveText(['Edit', 'Unpin', 'Delete']);
   await pinned.locator('.bulletin-menu').getByRole('menuitem', { name: 'Unpin' }).click();
-  await expect(feed(page).locator('.bulletin-day')).toHaveText(['Pinned', /^(Today|Yesterday)$/]);
+  await expect(feed(page).locator('.bulletin-day')).toHaveText(['Pinned', 'Today']);
 
   // Edit: the box opens on it, files cannot be changed.
   const again = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
@@ -370,7 +378,7 @@ test('a bulletin that was not posted comes back: into an empty box, or offered u
   // An empty box: the words come back into it, with one plain sentence.
   await page.evaluate(
     r => localStorage.setItem('gb-bulletins-returned-sci8', JSON.stringify([r])),
-    returned(new Date(2026, 10, 17, 8, 42).toISOString()),
+    returned(new Date(2026, 10, 16, 12, 17).toISOString()),
   );
   await page.evaluate(() =>
     document.dispatchEvent(new CustomEvent('fv:bulletins-changed', { detail: { cid: 'sci8' } })),
@@ -378,7 +386,7 @@ test('a bulletin that was not posted comes back: into an empty box, or offered u
   await expect(page.locator('#bulletin-compose')).toBeVisible();
   await expect(page.locator('#bulletin-words')).toHaveValue('Words that were refused.');
   await expect(page.locator('#bulletin-note')).toHaveText(
-    "Your bulletin from 8:42 a.m. wasn't posted, so its words are back in the box. Words can be up to 2,000 characters.",
+    "Your bulletin from Monday at 12:17 p.m. wasn't posted, so its words are back in the box. Words can be up to 2,000 characters.",
   );
   expect(await page.evaluate(() => localStorage.getItem('gb-bulletins-returned-sci8'))).toBe(null);
 
@@ -386,7 +394,7 @@ test('a bulletin that was not posted comes back: into an empty box, or offered u
   await page.locator('#bulletin-words').fill('Newer words I am typing.');
   await page.evaluate(
     r => localStorage.setItem('gb-bulletins-returned-sci8', JSON.stringify([r])),
-    returned(new Date(2026, 10, 17, 9, 5).toISOString()),
+    returned(new Date(2026, 10, 18, 9, 5).toISOString()),
   );
   await page.evaluate(() =>
     document.dispatchEvent(new CustomEvent('fv:bulletins-changed', { detail: { cid: 'sci8' } })),

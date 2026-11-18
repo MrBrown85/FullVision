@@ -519,10 +519,10 @@ describe('signed in, against stand-in answers', () => {
     await refreshBulletins(REAL);
     fake.on('post_bulletin', () => ({
       data: null,
-      error: { code: '22023', message: 'A link must start with http:// or https://.' },
+      error: { code: '22023', message: 'a bulletin needs words, a link or a file' },
     }));
     const out = await postBulletin(REAL, { kind: 'announcement', body: 'Hi' });
-    expect(out).toEqual({ ok: false, message: 'A link must start with http:// or https://.' });
+    expect(out).toEqual({ ok: false, message: 'Write something, add a link or add a file.' });
     expect(getBulletins(REAL)).toEqual([]);
     expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
     expect(sent('post_bulletin').length).toBe(1);
@@ -565,11 +565,14 @@ describe('signed in, against stand-in answers', () => {
     expect(await say('22023', 'assessment_id must be a id')).toBe(
       'The linked assessment could not be found. Choose another one, or None.',
     );
-    expect(await say('22023', 'link_url must be http or https')).toBe('A link must start with http:// or https://.');
-    expect(await say('22023', 'something new the server says')).toBe(
-      'This bulletin was not accepted. Check it and try again.',
+    expect(await say('22023', "a link's name needs a link")).toBe(
+      'A link name needs a link. Add the link, or clear the name.',
     );
-    expect(await say('P0002', 'class not found')).toBe('That bulletin is no longer there.');
+    // A message nobody listed is the general sentence, never a rule's.
+    expect(await say('22023', 'something new the server says')).toBe(
+      'Bulletins could not be saved. Try again in a moment.',
+    );
+    expect(await say('P0002', 'class not found')).toBe('This class is no longer there.');
     expect(await say('XX000', 'internal failure at line 4')).toBe(
       'Bulletins could not be saved. Try again in a moment.',
     );
@@ -586,7 +589,7 @@ describe('signed in, against stand-in answers', () => {
     it('refused now (no file): the words are kept for the page, nothing waits, the box is not touched', async () => {
       fake.on('list_bulletins', () => listAnswer([]));
       await refreshBulletins(REAL);
-      fake.on('post_bulletin', () => ({ data: null, error: { code: '22023', message: 'x' } }));
+      fake.on('post_bulletin', () => ({ data: null, error: { code: '22023', message: 'a bulletin is an object' } }));
       const out = await postBulletin(REAL, {
         kind: 'announcement',
         body: 'My careful words',
@@ -613,7 +616,10 @@ describe('signed in, against stand-in answers', () => {
       await refreshBulletins(REAL); // the page listens to the outbox
       const key = crypto.randomUUID();
       localStorage.setItem('gb-bulletins-pending-' + REAL, JSON.stringify([entry(key, 'Written before the reload')]));
-      fake.on('post_bulletin', () => ({ data: null, error: { code: '22023', message: 'Words are too long.' } }));
+      fake.on('post_bulletin', () => ({
+        data: null,
+        error: { code: '22023', message: "a bulletin's words can be 2000 characters at most" },
+      }));
       // As after a reload: the entry is only in the outbox, no promise of this page waits for it.
       window.v2Queue.enqueue(
         'post_bulletin',
@@ -644,7 +650,7 @@ describe('signed in, against stand-in answers', () => {
           endpoint: 'post_bulletin',
           payload: { p_course_id: REAL, p_bulletin: { kind: 'announcement', body: 'Kept words' } },
           last_code: '22023',
-          last_error: 'link_url must be http',
+          last_error: "a link's name needs a link",
         },
         { id: 'other', endpoint: 'edit_bulletin', payload: { p_course_id: REAL } },
       ];
@@ -657,7 +663,7 @@ describe('signed in, against stand-in answers', () => {
         window.v2Queue.dismissDeadLetter = was.dismiss;
       }
       expect(getReturnedBulletins(REAL).map(e => [e.bulletin.body, e.message])).toEqual([
-        ['Kept words', 'A link must start with http:// or https://.'],
+        ['Kept words', 'A link name needs a link. Add the link, or clear the name.'],
       ]);
       expect(dismissed).toEqual([key]);
       expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
@@ -809,6 +815,39 @@ describe('signed in, against stand-in answers', () => {
       expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
     });
 
+    it('a refused post with a file keeps its draft in the box only: the sweep does not return the words a second time', async () => {
+      fake.on('post_bulletin', () => ({
+        data: null,
+        error: { code: '22023', message: 'a bulletin can have 20 pages at most' },
+      }));
+      const out = await postBulletin(REAL, { kind: 'announcement', body: 'With a file' }, [
+        { kind: 'photo', title: 'Board', pages: [page()] },
+      ]);
+      expect(out).toEqual({ ok: false, message: 'A bulletin can hold up to 20 pages in all.' });
+      const key = fake.calls.find(c => c.name === 'post_bulletin').params.p_idempotency_key;
+      // The outbox still lists the refusal as a dead letter; the box has the draft.
+      const was = { dead: window.v2Queue.deadLetter, dismiss: window.v2Queue.dismissDeadLetter };
+      const dismissed = [];
+      window.v2Queue.deadLetter = () => [
+        {
+          id: key,
+          endpoint: 'post_bulletin',
+          payload: { p_course_id: REAL, p_bulletin: { kind: 'announcement', body: 'With a file' } },
+          last_code: '22023',
+          last_error: 'a bulletin can have 20 pages at most',
+        },
+      ];
+      window.v2Queue.dismissDeadLetter = id => dismissed.push(id);
+      try {
+        await refreshBulletins(REAL, { force: true });
+      } finally {
+        window.v2Queue.deadLetter = was.dead;
+        window.v2Queue.dismissDeadLetter = was.dismiss;
+      }
+      expect(getReturnedBulletins(REAL)).toEqual([]);
+      expect(dismissed).toEqual([key]);
+    });
+
     it('with no connection a file is refused up front, nothing queued, the draft kept', async () => {
       setOnline(false);
       const out = await postBulletin(REAL, { kind: 'announcement', body: 'Look' }, [
@@ -860,7 +899,10 @@ describe('signed in, against stand-in answers', () => {
     });
 
     it('a refused edit puts back what was shown and says why', async () => {
-      fake.on('edit_bulletin', () => ({ data: null, error: { code: '22023', message: 'Words are too long.' } }));
+      fake.on('edit_bulletin', () => ({
+        data: null,
+        error: { code: '22023', message: "a bulletin's words can be 2000 characters at most" },
+      }));
       const out = await editBulletin(REAL, U(1001), { body: 'x' });
       // The server's own words are never shown: a sentence of this app's.
       expect(out).toEqual({ ok: false, gone: false, message: 'Words can be up to 2,000 characters.' });
@@ -915,5 +957,43 @@ describe('the Bulletins tab', () => {
     localStorage.setItem('fv-build-bulletins', '1');
     expect(tabs()).toEqual(['Dashboard', 'Assignments', 'Bulletins', 'Observations', 'Gradebook', 'Reporting']);
     expect(Router.isRoute('/bulletins')).toBe(true);
+  });
+});
+
+describe('the Stays Pinned Until date is the class’s, not the device’s', () => {
+  const CLASS = U(950);
+  let was;
+  beforeEach(() => {
+    was = process.env.TZ;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    clearClass(CLASS);
+    seedClass(CLASS, { students: STUDENTS, courseConfigs: ON });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (was === undefined) delete process.env.TZ;
+    else process.env.TZ = was;
+    clearClass(CLASS);
+  });
+  const reminder = until => ({ cid: CLASS, kind: 'reminder', body: 'x', pinned_until: until });
+
+  it('a device ahead of the class (Auckland) near midnight: the class’s today is accepted', () => {
+    process.env.TZ = 'Pacific/Auckland';
+    COURSES[CLASS].timezone = 'America/Vancouver';
+    vi.setSystemTime(new Date('2026-11-19T04:00:00Z')); // 8 pm on Nov 18 in Vancouver, 5 pm on Nov 19 in Auckland
+    expect(getTodayStr()).toBe('2026-11-19');
+    expect(courseToday(CLASS)).toBe('2026-11-18');
+    expect(bulletinDraftProblem(reminder('2026-11-18'))).toBe('');
+    expect(bulletinDraftProblem(reminder('2026-11-17'))).toMatch(/before today/);
+  });
+
+  it('a device behind the class (Vancouver) near midnight: the class’s today is the cut-off', () => {
+    process.env.TZ = 'America/Vancouver';
+    COURSES[CLASS].timezone = 'Pacific/Auckland';
+    vi.setSystemTime(new Date('2026-11-19T04:00:00Z'));
+    expect(getTodayStr()).toBe('2026-11-18');
+    expect(courseToday(CLASS)).toBe('2026-11-19');
+    expect(bulletinDraftProblem(reminder('2026-11-18'))).toMatch(/before today/);
+    expect(bulletinDraftProblem(reminder('2026-11-19'))).toBe('');
   });
 });
