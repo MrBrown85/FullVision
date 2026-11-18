@@ -56,6 +56,7 @@
     "teacher/dash-inbox-drop.js",
     "teacher/dash-inbox-pick.js",
     "teacher/dash-inbox-side.js",
+    "teacher/dash-inbox-flip.js",
     "teacher/dash-inbox-roll.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",

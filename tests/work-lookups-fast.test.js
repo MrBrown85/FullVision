@@ -15,6 +15,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { parseHTML } from 'linkedom';
 import { U, seedClass, clearClass, openAssignments, closePages } from './helpers/pin-save-paths.js';
 
 const CID = U(1);
@@ -165,6 +166,29 @@ describe("one student's work on one piece", { timeout: 120000 }, () => {
   });
 });
 
+// The panel drawn and then mounted, as the Dashboard does it: the tile's view
+// runs its mount in afterRender, and the counting guards must see that too.
+let mounts = 0;
+function drawAndMount(draw) {
+  const was = globalThis.document;
+  const pm = DashInboxPick.mount;
+  DashInboxPick.mount = (...a) => (mounts++, pm.apply(DashInboxPick, a));
+  const html = draw();
+  const dom = parseHTML('<!DOCTYPE html><html><body><main id="main">' + html + '</main></body></html>');
+  const proto = Object.getPrototypeOf(Object.getPrototypeOf(dom.document.createElement('div')));
+  proto.scrollIntoView = proto.scrollIntoView || function () {};
+  proto.focus = proto.focus || function () {};
+  globalThis.document = dom.document;
+  try {
+    DashInbox.afterRender(CID);
+    DashInbox.beforeRender();
+  } finally {
+    globalThis.document = was;
+    DashInboxPick.mount = pm;
+  }
+  return html;
+}
+
 describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }, () => {
   it('counting the class’s work, the rows’ buttons, and Same Photo As', () => {
     seed();
@@ -264,12 +288,13 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
         });
       // The tile's own By Assessment model is built in every view: that is the baseline.
       localStorage.setItem('fv-dash-inbox-view:' + CID, 'assessment');
-      draw();
+      drawAndMount(draw);
       const base = { ...calls };
       expect(base.classWorkCounts).toBe(1);
       calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
       localStorage.setItem('fv-dash-inbox-view:' + CID, 'side');
-      const html = draw();
+      const html = drawAndMount(draw);
+      expect(mounts).toBeGreaterThan(0);
       expect(html).toContain('dash-inbox-side-row');
       expect(html).toContain('dash-inbox-pick-btn');
       // One count of the class, shared with the top bar; the switch counts no piece again.
@@ -280,7 +305,70 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
       // The next draw counts afresh (a new send shows), and no more than the first.
       const first = { ...calls };
       calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
-      draw();
+      drawAndMount(draw);
+      expect(calls).toEqual(first);
+    } finally {
+      GraderWork.workCounts = wc;
+      GraderWork.classWorkCounts = cwc;
+      GraderWork.workInIds = wi;
+      localStorage.removeItem('fv-build-dashRow');
+      localStorage.removeItem('fv-dash-inbox-view:' + CID);
+    }
+  });
+
+  it('the Dashboard draw with Flip Through counts the class once and no piece again', () => {
+    seed();
+    const ids = getStudents(CID).map(s => s.id);
+    const calls = { workCounts: 0, classWorkCounts: 0, workInIds: 0 };
+    const wc = GraderWork.workCounts;
+    const cwc = GraderWork.classWorkCounts;
+    const wi = GraderWork.workInIds;
+    GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
+    GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
+    GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
+    try {
+      localStorage.setItem('fv-build-dashRow', '1');
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'flip');
+      const draw = () =>
+        DashOverview.renderOverviewPanel({
+          cid: CID,
+          sections: [],
+          allStudents: getStudents(CID),
+          assessments: [],
+          classAvg: 0,
+          classR: 0,
+          ccCounts: {},
+          ccAssessments: {},
+          ccObs: {},
+          coreSelf: coreSelfRatings(CID, ids),
+          coreView: 'self',
+          compView: 'mix',
+          obs: {},
+          classChange: null,
+          mixPop: null,
+          helpRule: null,
+          naComp: null,
+        });
+      // The tile's own By Assessment model is built in every view: that is the baseline.
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'assessment');
+      drawAndMount(draw);
+      const base = { ...calls };
+      expect(base.classWorkCounts).toBe(1);
+      calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'flip');
+      const html = drawAndMount(draw);
+      expect(mounts).toBeGreaterThan(0);
+      expect(html).toContain('dash-inbox-flip-stage');
+      expect(html).toContain('dash-inbox-pick-btn');
+      // One count of the class, shared with the top bar; the switch counts no piece again.
+      expect(calls.classWorkCounts).toBe(1);
+      // Over the baseline only the chosen piece's own row asks: its counts, and who is in.
+      expect(calls.workCounts).toBeLessThanOrEqual(base.workCounts + 1);
+      expect(calls.workInIds).toBeLessThanOrEqual(base.workInIds + 1);
+      // The next draw counts afresh (a new send shows), and no more than the first.
+      const first = { ...calls };
+      calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
+      drawAndMount(draw);
       expect(calls).toEqual(first);
     } finally {
       GraderWork.workCounts = wc;
