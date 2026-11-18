@@ -896,6 +896,88 @@ function forgetQuiz(cid, aid) {
   _safeLSSet(_quizKeysKey(cid), JSON.stringify(keys));
 }
 
+/**
+ * A quiz goes with its copy (docs/plans/quizzes-plan.md, Q7). Reads the
+ * quiz of piece `srcAid` in `srcCid` and saves it, whole, onto the new piece
+ * `dstAid` in `dstCid`: the settings, the questions and each question's key,
+ * a new id for every question, never any student's tries or answers. Each
+ * question's competency goes through mapTag (source competency id → the
+ * other class's, or null; the caller's own matching, teacher/assessment-copy.js);
+ * one that has no match, or is not one of the copy's competencies (dstTagIds),
+ * counts toward no competency. The save is a new one: updated_at null, a new
+ * idempotency key, under the new piece's outbox key (saveQuiz), so it waits
+ * for the piece's own create.
+ *
+ * Answers null with the quizzes switch off, or when the source has no quiz
+ * (nothing is read or sent that a plain copy did not). Otherwise a Promise of
+ * { copied, unmatched, notOffered }: notOffered when the other class does not
+ * take quizzes (its student page is off).
+ * @param {string} srcCid @param {string} srcAid @param {string} dstCid @param {string} dstAid
+ * @param {(tagId: string) => string | null} mapTag @param {string[]} dstTagIds
+ * @returns {Promise<{ copied: boolean, unmatched: number, notOffered: boolean } | null> | null}
+ */
+function copyQuiz(srcCid, srcAid, dstCid, dstAid, mapTag, dstTagIds) {
+  if (typeof BuildFlags === 'undefined' || !BuildFlags.on('quizzes')) return null;
+  if (!srcCid || !srcAid || !dstCid || !dstAid) return null;
+  var tags = Array.isArray(dstTagIds) ? dstTagIds : [];
+  return Promise.resolve(probeQuizzes(srcCid))
+    .then(function (ok) {
+      return ok ? loadQuiz(srcCid, srcAid) : null;
+    })
+    .then(function (reply) {
+      if (!reply || !reply.quiz || !Array.isArray(reply.questions)) return null;
+      return Promise.resolve(probeQuizzes(dstCid)).then(function (offered) {
+        if (!offered) return { copied: false, unmatched: 0, notOffered: true };
+        var unmatched = 0;
+        /** @type {Record<string, any>} */
+        var payload = { updated_at: null };
+        var settings = quizDefaults();
+        Object.keys(settings).forEach(function (k) {
+          payload[k] =
+            k in /** @type {any} */ (reply.quiz)
+              ? /** @type {any} */ (reply.quiz)[k]
+              : /** @type {any} */ (settings)[k];
+        });
+        payload.questions = reply.questions.map(function (/** @type {any} */ q) {
+          var tag = q.tag_id ? mapTag(q.tag_id) : null;
+          if (tag && tags.indexOf(tag) < 0) tag = null;
+          if (q.tag_id && !tag) unmatched += 1;
+          var key = q.key || {};
+          /** @type {Record<string, any>} */
+          var out = {
+            kind: q.kind,
+            prompt: q.prompt,
+            multiple: q.multiple === true,
+            points: q.points,
+            tag_id: tag,
+            key: {
+              answer: key.answer == null ? null : JSON.parse(JSON.stringify(key.answer)),
+              tolerance: q.kind === 'number' && key.tolerance != null ? key.tolerance : null,
+              why: key.why || null,
+            },
+          };
+          if (q.kind === 'choice') {
+            out.choices = (q.choices || []).map(function (/** @type {any} */ c) {
+              return { id: c.id, text: c.text };
+            });
+          }
+          return out;
+        });
+        var problem = quizPayloadProblem(payload, tags);
+        if (problem) {
+          console.warn('The quiz was not copied:', problem);
+          return { copied: false, unmatched: 0, notOffered: false };
+        }
+        var res = saveQuiz(dstCid, dstAid, payload, tags);
+        return { copied: !!(res && res.ok), unmatched: unmatched, notOffered: false };
+      });
+    })
+    .then(null, function (e) {
+      console.warn('The quiz was not copied:', e);
+      return null;
+    });
+}
+
 if (typeof window !== 'undefined') {
   /** @type {any} */ (window).QuizData = {
     offered: quizzesOffered,
@@ -903,6 +985,7 @@ if (typeof window !== 'undefined') {
     get: getQuiz,
     load: loadQuiz,
     save: saveQuiz,
+    copy: copyQuiz,
     forget: forgetQuiz,
     factsKnown: quizFactsKnown,
     loadFacts: quizLoadFacts,
