@@ -732,7 +732,37 @@ var StudentData = (function () {
     },
   };
 
+  /* Demo Mode only: the teacher's per-student options for the sample card's
+     student, kept on this device by the teacher's Demo Mode
+     (shared/data-reflect.js, gb-student-page-options-<class>). The sample
+     card is Cece's, st1 in the teacher's sample class sci8
+     (shared/seed-data.js). s/app.js honours them as student_submit does:
+     Hide, no overall grade; Paused, the card and the page are refused as
+     closed. { grade: 'class'|'show'|'hide', paused }. */
+  function demoOwnOptions() {
+    try {
+      var all = JSON.parse(G.localStorage.getItem('gb-student-page-options-sci8') || 'null');
+      var own = all && typeof all === 'object' ? all.st1 : null;
+      if (!own || typeof own !== 'object') return { grade: 'class', paused: false };
+      var g = own.show_overall_grade;
+      return { grade: g === 'show' || g === 'hide' ? g : 'class', paused: !!own.paused_at };
+    } catch (e) {
+      return { grade: 'class', paused: false };
+    }
+  }
+
+  // Demo Mode: whether the sample page shows the overall grade (`classOn`, the class's switch), Cece's own first.
+  function demoShowsGrade(classOn, otherClass) {
+    var g = otherClass ? 'class' : demoOwnOptions().grade;
+    return g === 'show' ? true : g === 'hide' ? false : !!classOn;
+  }
+
   return {
+    demoOwnOptions: demoOwnOptions,
+    demoShowsGrade: demoShowsGrade,
+    demoPaused: function () {
+      return demoOwnOptions().paused;
+    },
     fromServer: fromServer,
     use: use,
     readers: Object.keys(READERS),

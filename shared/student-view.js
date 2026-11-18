@@ -1227,15 +1227,10 @@ window.StudentView = (function () {
   /* ── My Learning (S13-T1) ──────────────────────────────────── */
 
   /* Show My Learning, the class's switch (Class Settings › Student Page,
-     S13-F1): on only when the class's settings say so. Missing is off.
-     In the teacher's apps a signed-in class's switch is the server's, read
-     through getCourseFeedbackOptions (shared/data.js), so Preview as
-     Student follows it too. The student's page has no such reader: its
-     settings say it (s/student-data.js).
-
-     With `sid`, it is that one student's: their own Show or Hide (Class
-     Settings › Student Page, per-student options), else the class's switch
-     (effectiveShowOverallGrade, shared/data-reflect.js). */
+     S13-F1), or with `sid` that student's own Show or Hide first
+     (effectiveShowOverallGrade, shared/data-reflect.js). Missing is off. In the teacher's apps a
+     signed-in class's switch is the server's (getCourseFeedbackOptions), so Preview as Student
+     follows it too; the student's page reads its own settings (s/student-data.js). */
   function learningOn(cid, sid) {
     if (sid && typeof effectiveShowOverallGrade === 'function') return effectiveShowOverallGrade(cid, sid);
     var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};

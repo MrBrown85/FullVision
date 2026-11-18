@@ -7892,6 +7892,28 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.list_student_page_options(p_course_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    return jsonb_build_object('ok', true, 'options', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                   'enrollment_id', e.id,
+                   'show_overall_grade', case e.show_overall_grade when true then 'show' when false then 'hide' else 'class' end,
+                   'paused_at', e.page_paused_at) order by e.roster_position, e.id)
+          from enrollment e
+         where e.course_id = p_course_id and e.withdrawn_at is null
+           and (e.show_overall_grade is not null or e.page_paused_at is not null)), '[]'::jsonb));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_teacher_courses()
  RETURNS TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
  LANGUAGE sql
@@ -9923,6 +9945,74 @@ begin
     return _id;
 end; $function$;
 
+CREATE OR REPLACE FUNCTION public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached  jsonb;
+    _ids     uuid[];
+    _skipped jsonb;
+    _out     jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'set_student_page_options');
+    if _cached is not null then return _cached; end if;
+    if p_show_overall_grade is null and p_paused is null then
+        raise exception 'nothing to change' using errcode = '22023';
+    end if;
+    if p_show_overall_grade not in ('class', 'show', 'hide') then
+        raise exception 'show_overall_grade must be class, show or hide' using errcode = '22023';
+    end if;
+    if coalesce(cardinality(p_enrollment_ids), 0) = 0 then
+        raise exception 'no students given' using errcode = '22023';
+    end if;
+    if cardinality(p_enrollment_ids) > 500 then
+        raise exception 'at most 500 students at a time' using errcode = '22023';
+    end if;
+    if array_position(p_enrollment_ids, null) is not null then
+        raise exception 'a student id is missing' using errcode = '22023';
+    end if;
+    -- The students of this class who are not withdrawn. Any other id (withdrawn, gone, another class's or
+    -- another teacher's) is skipped: nothing changes for it, and it comes back in skipped as it was sent,
+    -- with nothing said about why.
+    _ids := array(select e.id from enrollment e
+                   where e.id = any (p_enrollment_ids) and e.course_id = p_course_id and e.withdrawn_at is null);
+    _skipped := coalesce((select jsonb_agg(x.id order by x.n)
+                            from (select u.id, min(u.n) as n from unnest(p_enrollment_ids) with ordinality u(id, n)
+                                   where u.id <> all (_ids) group by u.id) x), '[]'::jsonb);
+    if cardinality(_ids) = 0 then
+        raise exception 'no student of this class given' using errcode = 'P0002';
+    end if;
+    -- Only the rows that change are written (a pause keeps the time it began).
+    update enrollment e
+       set show_overall_grade = case p_show_overall_grade when 'class' then null when 'show' then true
+                                                          when 'hide' then false else e.show_overall_grade end,
+           page_paused_at = case when p_paused then coalesce(e.page_paused_at, now())
+                                 when not p_paused then null else e.page_paused_at end,
+           updated_at = now()
+     where e.id = any (_ids) and e.course_id = p_course_id and e.withdrawn_at is null
+       and (e.show_overall_grade is distinct from case p_show_overall_grade when 'class' then null when 'show' then true
+                                                                            when 'hide' then false else e.show_overall_grade end
+            or e.page_paused_at is distinct from case when p_paused then coalesce(e.page_paused_at, now())
+                                                      when not p_paused then null else e.page_paused_at end);
+    _out := jsonb_build_object('ok', true, 'options', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                   'enrollment_id', e.id,
+                   'show_overall_grade', case e.show_overall_grade when true then 'show' when false then 'hide' else 'class' end,
+                   'paused_at', e.page_paused_at) order by e.roster_position, e.id)
+          from enrollment e where e.id = any (_ids)), '[]'::jsonb),
+        'skipped', _skipped);
+    perform fv_idem_store(p_idempotency_key, 'set_student_page_options', _out);
+    return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.soft_delete_teacher()
  RETURNS void
  LANGUAGE plpgsql
@@ -11476,7 +11566,8 @@ AS $function$
     select case
                when k.stopped_at is not null then 'card_stopped'
                when c.deleted_at is not null or e.withdrawn_at is not null then 'not_found'
-               when not c.student_page_enabled then 'closed'
+               -- 2026111720: a student whose page the teacher paused is refused as a class with its page off
+               when not c.student_page_enabled or e.page_paused_at is not null then 'closed'
                when (now() at time zone public._fv_timezone(c.timezone))::date > k.works_until then 'card_expired'
            end
       from student_card k
@@ -12136,7 +12227,8 @@ AS $function$
       join student s on s.id = e.student_id
       join course c on c.id = e.course_id
      where x.session_id = p_session_id
-       and k.stopped_at is null and e.withdrawn_at is null and c.deleted_at is null and c.student_page_enabled;
+       and k.stopped_at is null and e.withdrawn_at is null and c.deleted_at is null and c.student_page_enabled
+       and e.page_paused_at is null;  -- 2026111720: a class whose page the teacher paused for this student is left out
 $function$;
 
 CREATE OR REPLACE FUNCTION student_submit._slip_old_until()
@@ -12491,6 +12583,9 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
+    -- 2026111720: Show Overall Grade as this student has it (their own, or the class's when they have none).
+    _course.show_my_learning := coalesce((select e.show_overall_grade from enrollment e where e.id = p_enrollment_id),
+                                         _course.show_my_learning);
     _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
     return jsonb_build_object(
         'ok', true, 'v', 1,
@@ -13454,6 +13549,10 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
+    -- 2026111720: Show Overall Grade as this student has it (their own, or the class's when they have none).
+    -- Every read of _course.show_my_learning below is this student's value.
+    _course.show_my_learning := coalesce((select e.show_overall_grade from enrollment e where e.id = p_enrollment_id),
+                                         _course.show_my_learning);
     _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
     -- What the class's category weights total: 100, or null with no categories.
     select sum(k.weight) into _weights from category k where k.course_id = _course.id;

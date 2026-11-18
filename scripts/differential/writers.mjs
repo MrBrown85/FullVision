@@ -138,6 +138,7 @@ export const NOT_WRITERS = {
   setRubricPrints: 'which rubrics are printed',
   setSectionGroup: 'learning-map groups',
   setStudentFollowedPlan: "the student's reflection",
+  setStudentPageOptions: "a student's Show Overall Grade and Paused options on the student page; no mark",
   unsendStudentRevision: "the student's revised work",
 };
 
