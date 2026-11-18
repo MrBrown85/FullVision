@@ -11,7 +11,7 @@
 -- in the course %, and the teacher wants the student to see "20 / 24", not
 -- "5 / 6". The score as entered (5 / 6) stays the only stored score and what
 -- the teacher grades in; the factored score is worked out for display only,
--- in shared/calc.js. Nothing about the course % changes.
+-- in shared/constants.js (factoredPoints). Nothing about the course % changes.
 --
 -- -- What it does -----------------------------------------------------------
 -- 1. assessment.students_see_factored boolean not null default false.
@@ -36,7 +36,7 @@
 --   function                                   before                            after
 --   public.create_assessment (old, dropped)    2852ea5862f02785711a2d8125b5fadf
 --   public.create_assessment (new)                                               c8389c88180a9e4d4f36200b5ff94270
---   public.update_assessment                   c48044d5e0d902e3e5a6fef63cb74049  adb8a2212c88e31e81833efad294ebe3
+--   public.update_assessment                   c48044d5e0d902e3e5a6fef63cb74049  a80a08dff47da5ab3db72a0bff254691
 --   public.get_class_bundle                    ed59fcd4ef9bc85c6e5bcc24c3fdd608  c3f21f882ec87368e9584976bc5ca122
 --   public.get_gradebook                       08d83934dcacbf14ddfce6ec6cf9068b  0ca28a1e62ef28fd30e9312e61346041
 --   public.duplicate_assessment                91fb43611f5a93739c32e2ee8cbcc7d2  3797369592647effba25aaedaa9f18d6
@@ -73,7 +73,7 @@ declare
     _col  record;
 begin
     for _f in select * from (values
-        ('public.update_assessment(uuid,jsonb,uuid[])', 'c48044d5e0d902e3e5a6fef63cb74049', 'adb8a2212c88e31e81833efad294ebe3'),
+        ('public.update_assessment(uuid,jsonb,uuid[])', 'c48044d5e0d902e3e5a6fef63cb74049', 'a80a08dff47da5ab3db72a0bff254691'),
         ('public.get_class_bundle(uuid,bigint)',        'ed59fcd4ef9bc85c6e5bcc24c3fdd608', 'c3f21f882ec87368e9584976bc5ca122'),
         ('public.get_gradebook(uuid)',                  '08d83934dcacbf14ddfce6ec6cf9068b', '0ca28a1e62ef28fd30e9312e61346041'),
         ('public.duplicate_assessment(uuid,uuid)',      '91fb43611f5a93739c32e2ee8cbcc7d2', '3797369592647effba25aaedaa9f18d6'),
@@ -173,7 +173,7 @@ begin
     if p_patch ? 'is_draft' and jsonb_typeof(p_patch->'is_draft') is distinct from 'boolean' then
         raise exception 'is_draft must be true or false' using errcode = '22023';
     end if;
-    -- 2026111901: students_see_factored is true or false.
+    -- 2026111808: students_see_factored is true or false.
     if p_patch ? 'students_see_factored' and jsonb_typeof(p_patch->'students_see_factored') is distinct from 'boolean' then
         raise exception 'students_see_factored must be true or false' using errcode = '22023';
     end if;
