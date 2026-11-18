@@ -54,7 +54,9 @@ const offBy = (track, i) =>
 test.describe('on a phone', () => {
   test.use(PHONE);
 
-  test('a Missing card shows page 1; a swipe shows page 2; a tap opens it full size', async ({ page }) => {
+  test('a Missing card shows page 1; a swipe shows page 2; a tap opens it full size', async ({ page, browserName }) => {
+    // The swipe is sent as touch events through Chromium's DevTools protocol, which WebKit has not.
+    test.skip(browserName !== 'chromium', 'the swipe needs a Chromium DevTools session');
     const { posts, pictures } = await demo(page);
     const quick = card(page, 'demo-quick');
     const car = quick.locator('.sp-car');

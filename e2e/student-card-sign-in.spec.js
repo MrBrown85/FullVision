@@ -48,7 +48,7 @@ for (const size of [
   test.describe('Switching Classes on ' + size.name, () => {
     test.use(size.use);
 
-    test('Your Classes, Add Another Card, Is This You?, the second class, and back to the first', async ({ page }) => {
+    test('Settings, Add Another Card, Is This You?, the second class, and back to the first', async ({ page }) => {
       const fn = twoClasses();
       const posts = await serve(page, fn);
       const errors = [];
@@ -56,23 +56,25 @@ for (const size of [
       await signIn(page);
       const token = JSON.parse((await stored(page)).local[KEY]).t;
 
-      // The class's name opens Your Classes.
-      await page.getByRole('button', { name: 'Science 8 Block B' }).click();
-      const sheet = page.getByRole('dialog', { name: 'Your Classes' });
+      // The gear opens Settings; with one class there is no Switch Class.
+      await expect(page.locator('.sp-head-class')).toHaveText('Science 8Block B');
+      await page.getByRole('button', { name: 'Settings' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Settings' });
       await expect(sheet).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Your Classes' })).toBeFocused();
+      await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused();
       await expect(sheet.getByRole('button', { name: 'Add Another Card' })).toBeVisible();
+      await expect(sheet.getByText('Switch Class')).toHaveCount(0);
       await fits(page);
       await named(page);
       await contrast(page);
       await shot(page, size.tag + '-s3f3-your-classes');
-      // Escape closes it and gives the focus back to the class's name.
+      // Escape closes it and gives the focus back to the gear.
       await page.keyboard.press('Escape');
       await expect(sheet).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Science 8 Block B' })).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();
 
       // Add Another Card.
-      await page.getByRole('button', { name: 'Science 8 Block B' }).click();
+      await page.getByRole('button', { name: 'Settings' }).click();
       await sheet.getByRole('button', { name: 'Add Another Card' }).click();
       await expect(page.getByRole('heading', { name: 'Add Another Card' })).toBeVisible();
       await expect(page.getByText('Type the code on the card for your other class.')).toBeVisible();
@@ -88,7 +90,7 @@ for (const size of [
       await page.getByLabel('Student Number').fill('0123456');
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Humanities 8 Block A' })).toBeVisible();
+      await expect(page.locator('.sp-head-class')).toHaveText('Humanities 8Block A');
       // Its one piece is due in four days: Upcoming.
       await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 0', 'Upcoming 1']);
       await page.getByRole('button', { name: 'Upcoming 1' }).click();
@@ -99,8 +101,9 @@ for (const size of [
       expect(kept.t).toBe(token);
       expect(kept.e).toBe(HUM);
 
-      // Both classes listed; back to the first.
-      await page.getByRole('button', { name: 'Humanities 8 Block A' }).click();
+      // Both classes listed under Switch Class; back to the first.
+      await page.getByRole('button', { name: 'Settings' }).click();
+      await expect(sheet.getByRole('heading', { name: 'Switch Class' })).toBeVisible();
       await expect(sheet.locator('.sp-class-name')).toHaveText(['Science 8', 'Humanities 8']);
       await expect(sheet.locator('.sp-class[aria-current="true"] .sp-class-name')).toHaveText('Humanities 8');
       await fits(page);
@@ -108,7 +111,7 @@ for (const size of [
       await contrast(page);
       await shot(page, size.tag + '-s3f3-two-classes');
       await sheet.locator('.sp-class', { hasText: 'Science 8' }).click();
-      await expect(page.getByRole('button', { name: 'Science 8 Block B' })).toBeVisible();
+      await expect(page.locator('.sp-head-class')).toHaveText('Science 8Block B');
       await expect(page.locator('.sp-piece.sp-picked .sp-piece-title')).toBeVisible();
       expect(JSON.parse((await stored(page)).local[KEY]).e).toBe(CECE);
       expect(errors).toEqual([]);
@@ -119,7 +122,7 @@ for (const size of [
       fn.state.cards.K7M4QX2P.locked = true;
       await serve(page, fn);
       await signIn(page);
-      await page.getByRole('button', { name: 'Science 8 Block B' }).click();
+      await page.getByRole('button', { name: 'Settings' }).click();
       await page.getByRole('button', { name: 'Add Another Card' }).click();
       await page.getByLabel('Card Code').fill('K7M4-QX2P');
       await page.getByRole('button', { name: 'Continue' }).click();
@@ -242,7 +245,12 @@ async function fakeCamera(page) {
 }
 
 test.describe('Scan the Code With the Camera', () => {
-  test('on a Chromebook: the camera reads the card and Is This You? opens; the camera is off', async ({ browser }) => {
+  test('on a Chromebook: the camera reads the card and Is This You? opens; the camera is off', async ({
+    browser,
+    browserName,
+  }) => {
+    // A Chromebook's camera is Chrome's: this page offers it only with Chrome's code reader.
+    test.skip(browserName === 'webkit', 'the camera path is a Chromebook’s (Chrome) only');
     const ctx = await browser.newContext(CHROMEBOOK);
     const page = await ctx.newPage();
     await fakeCamera(page);

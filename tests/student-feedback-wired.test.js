@@ -223,7 +223,10 @@ describe('a class that takes work, with Reflect on Feedback on', () => {
     const dev = school(world, TAKES);
     const page = await signIn(dev);
     expect(page.T.feedbackOf(page.T.state()).assessments).toHaveLength(1);
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('.sp-logout [data-act="card-done"]');
     expect(page.T.state().realFeedback || null).toBeNull();
     expect(page.T.feedbackOf(page.T.state())).toBeNull();
