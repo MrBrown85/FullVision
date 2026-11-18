@@ -23,10 +23,13 @@
 
    Pictures: the centre page's whole page (its thumbnail while that loads)
    and thumbnails for the pages on or next to the stage, through the tile's
-   own WorkThumbs holder (DashInbox.fillPics).
+   own WorkThumbs holder (DashInbox.pics()), filled inside mount.
 
-   DashInboxPick (the assessment switch, D6) is used when it is there; when
-   it is not, the first piece with work in is shown with no switch. */
+   The piece comes from DashInboxPick (the switch the views share): picking
+   one there shows in every view. The students come from Side by Side's own
+   item builder, DashInboxSide.model, so a pair or group is one stop named the
+   same way there. Moving the centre is local; a pick, or the grader closing,
+   draws the Dashboard again and this view comes back as it was. */
 /** @type {any} */ (window).DashInboxFlip = (function () {
   'use strict';
 
@@ -42,47 +45,30 @@
   var _live = null;
   /** @type {{ cid: string, token: string, at: number } | null} */
   var _refocus = null;
+  // What opened the grader, until the grader has closed and the page is back:
+  // 'page' (the centre page), 'open' (the caption's button) or 'stage' (Enter).
+  /** @type {string | null} */
+  var _opener = null;
+  // The files the imgs drawn ask for, by key (class id first).
+  /** @type {Record<string, any>} */
+  var _files = {};
+  // The list the last html() drew, for the mount that follows it.
+  /** @type {{ cid: string, aid: string, list: any[] } | null} */
+  var _drawn = null;
+  // The class the last html() drew for; keys start with it, so no other class's can match.
+  var _cidOf = '';
 
   /** @returns {any} */
   function _inbox() {
     return /** @type {any} */ (window).DashInbox || null;
   }
 
-  /** @returns {any} */
-  function _pick() {
-    var p = /** @type {any} */ (window).DashInboxPick;
-    return p && typeof p.html === 'function' && typeof p.current === 'function' ? p : null;
-  }
-
-  /** @param {string} cid @param {any} model
+  /** The chosen piece's id, from the switch the views share.
+   * @param {string} cid
    * @returns {string} */
-  function chosen(cid, model) {
-    var pieces = (model && model.pieces) || [];
-    var P = _pick();
-    var want = null;
-    if (P) {
-      try {
-        want = P.current(cid);
-      } catch (e) {
-        want = null;
-      }
-    }
-    if (
-      want &&
-      pieces.some(function (/** @type {any} */ p) {
-        return p.aid === want;
-      })
-    )
-      return want;
-    // Work to grade first, else any work in.
-    var first =
-      pieces.filter(function (/** @type {any} */ p) {
-        return p.tograde > 0 && p.in > 0;
-      })[0] ||
-      pieces.filter(function (/** @type {any} */ p) {
-        return p.in > 0;
-      })[0];
-    return first ? first.aid : '';
+  function chosen(cid) {
+    var d = /** @type {any} */ (window).DashInboxPick.draw(cid);
+    return d && d.current ? d.current.aid : '';
   }
 
   /** @param {string} cid @param {string} aid
@@ -93,90 +79,31 @@
     return st;
   }
 
-  /** @param {any} s */
-  function _pagesOf(s) {
-    return (Array.isArray(s && s.files) ? s.files : [])
-      .filter(function (/** @type {any} */ f) {
-        return !!f;
-      })
-      .slice()
-      .sort(function (/** @type {any} */ x, /** @type {any} */ y) {
-        return (x.page || 0) - (y.page || 0);
-      });
-  }
-
-  /** @param {any} s */
-  function _at(s) {
-    return String((s && (s.sent_at || s.created_at)) || '');
-  }
-
-  /** The students with work in on a piece, in the order the stage shows them:
-   * work to grade first, then the rest, each in the order the work came in.
+  /** The students with work in on a piece, in the order the stage shows
+   * them: work to grade first, then the rest, each in the order the work came
+   * in. Side by Side's own item builder (DashInboxSide.model) does the
+   * reading, so a pair or group is one stop named the same way there; this
+   * only shapes its items for the stage.
    * @param {string} cid @param {string} aid
    * @returns {any[]} */
   function entries(cid, aid) {
-    var GW = /** @type {any} */ (window).GraderWork;
-    if (!GW || !cid || !aid) return [];
-    var students = getStudents(cid) || [];
-    var ids = students.map(function (s) {
-      return s.id;
-    });
-    /** @type {Record<string, any>} */
-    var by = {};
-    students.forEach(function (s) {
-      by[s.id] = s;
-    });
-    var counts = GW.workCounts(cid, aid, ids);
-    /** @type {Record<string, boolean>} */
-    var inn = {};
-    GW.workInIds(cid, aid, ids).forEach(function (/** @type {string} */ id) {
-      inn[id] = true;
-    });
-    /** @type {Record<string, string>} */
-    var state = {};
-    ['tograde', 'toreturn', 'returned'].forEach(function (k) {
-      counts.ids[k].forEach(function (/** @type {string} */ id) {
-        state[id] = k;
-      });
-    });
-    var out = [];
-    ids.forEach(function (sid) {
-      if (!inn[sid]) return;
-      // One page-set per student who sent; a group-mate who did not has the group's.
-      var s = getStudentSubmission(cid, sid, aid);
-      if (!s) return;
-      var group = typeof getStudentWorkGroup === 'function' ? getStudentWorkGroup(cid, sid, aid) : null;
-      var mates = group
-        ? group.members
-            .filter(function (/** @type {string} */ m) {
-              return m !== sid && by[m];
-            })
-            .map(function (/** @type {string} */ m) {
-              return displayName(by[m]);
-            })
-        : [];
-      var pages = _pagesOf(s);
-      out.push({
+    var side = /** @type {any} */ (window).DashInboxSide;
+    if (!side || !cid || !aid) return [];
+    return side.model(cid, aid).items.map(function (/** @type {any} */ it) {
+      return {
         aid: aid,
-        sid: sid,
-        name: displayName(by[sid]),
-        state: state[sid] || 'started',
-        waiting: state[sid] === 'tograde',
-        at: _at(s),
-        files: pages,
-        pages: pages.length,
-        onPaper: !!s.on_paper,
-        late: !!s.is_late,
-        added: s.sent_by === 'teacher',
-        with: mates,
-      });
-    });
-    return out.sort(function (x, y) {
-      if (x.waiting !== y.waiting) return x.waiting ? -1 : 1;
-      var p = Date.parse(x.at) || 0;
-      var q = Date.parse(y.at) || 0;
-      if (p !== q) return p - q;
-      return x.name < y.name ? -1 : x.name > y.name ? 1 : 0;
+        sid: it.sid,
+        name: it.name,
+        fullName: it.fullName,
+        state: it.state || 'started',
+        waiting: !!it.tograde,
+        at: it.at,
+        files: it.sheet ? [] : it.pages,
+        pages: it.sheet ? 0 : it.pages.length,
+        onPaper: !!it.paper,
+        late: !!it.late,
+        added: !!it.added,
+      };
     });
   }
 
@@ -241,7 +168,6 @@
       late: entry.late,
       added: entry.added,
       onPaper: entry.onPaper,
-      with: entry.with,
       label: entry.waiting ? 'Grade Submissions' : 'Open',
     };
   }
@@ -262,11 +188,11 @@
         '</span></span>'
       );
     }
-    var key = 'flip|' + aid + '|' + e.sid + '|' + f.id;
+    var key = _cidOf + '|' + aid + '|' + e.sid + '|' + f.id;
     files[key] = f;
     var which = centre ? 'page' : 'thumb';
     return (
-      '<img class="dash-inbox-flip-img" data-work-pic data-dash-pic="' +
+      '<img class="dash-inbox-flip-img" data-work-pic data-flip-pic="' +
       esc(key) +
       '" data-flip-want="' +
       esc(key + '|' + which) +
@@ -317,7 +243,7 @@
           '<button type="button" tabindex="-1" data-flip-i="' +
           i +
           '"' +
-          _pgAttrs(p, e, p.centre ? e.name + ', ' + cap.label : e.name) +
+          _pgAttrs(p, e, p.centre ? e.fullName + ', ' + cap.label : e.fullName) +
           '><span class="dash-inbox-flip-face">' +
           (p.on ? faceHtml(aid, e, p.centre, st, files) : '') +
           '</span></button>'
@@ -343,7 +269,7 @@
       ' aria-label="' +
       esc('Student ' + (c + 1) + ' of ' + list.length) +
       '" aria-valuetext="' +
-      esc(list[c].name) +
+      esc(list[c].fullName) +
       '" data-flip-focus="slider"></div>'
     );
   }
@@ -369,8 +295,6 @@
     if (c.late) bits.push('<span class="dash-inbox-flip-late">Late</span>');
     if (c.added) bits.push('<span class="dash-inbox-flip-quiet">Added by You</span>');
     if (c.onPaper) bits.push('<span class="dash-inbox-flip-quiet">On Paper</span>');
-    if (c.with.length)
-      bits.push('<span class="dash-inbox-flip-quiet">' + esc('With ' + c.with.join(' and ')) + '</span>');
     return (
       '<strong class="dash-inbox-flip-name">' +
       esc(c.name) +
@@ -383,30 +307,22 @@
   }
 
   /** @param {string} cid
-   * @param {any} model
    * @returns {string} */
-  function html(cid, model) {
-    var aid = chosen(cid, model);
+  function html(cid) {
+    _cidOf = cid;
+    var aid = chosen(cid);
     var st = stateOf(cid, aid);
     var list = entries(cid, aid);
+    _drawn = { cid: cid, aid: aid, list: list };
     /** @type {Record<string, any>} */
     var files = {};
-    var P = _pick();
-    var pick = '';
-    if (P) {
-      try {
-        pick = '<div class="dash-inbox-flip-pick" id="dash-inbox-flip-pick">' + P.html(cid) + '</div>';
-      } catch (e) {
-        pick = '';
-      }
-    }
     var body = mainHtml(cid, aid, list, st, files);
-    // The tile's holder looks these up when the page is set.
-    if (_inbox()) _inbox().fillPics(null, files);
+    _files = files;
     return (
       '<div class="dash-inbox-flip" id="dash-inbox-flip">' +
-      pick +
-      '<div class="dash-inbox-flip-main" id="dash-inbox-flip-main">' +
+      '<div class="dash-inbox-flip-pick" id="dash-inbox-flip-pick">' +
+      DashInboxPick.html(cid) +
+      '</div><div class="dash-inbox-flip-main" id="dash-inbox-flip-main">' +
       body +
       '</div></div>'
     );
@@ -440,7 +356,7 @@
       b.style.setProperty('--s', String(p.s));
       b.style.setProperty('--k', String(p.k));
       b.style.zIndex = String(100 - p.a);
-      b.setAttribute('aria-label', p.centre ? e.name + ', ' + cap.label : e.name);
+      b.setAttribute('aria-label', p.centre ? e.fullName + ', ' + cap.label : e.fullName);
       var face = b.querySelector('.dash-inbox-flip-face');
       if (!face) return;
       if (!p.on) {
@@ -468,9 +384,24 @@
     if (range) {
       range.value = String(c);
       range.setAttribute('aria-label', 'Student ' + (c + 1) + ' of ' + list.length);
-      range.setAttribute('aria-valuetext', list[c].name);
+      range.setAttribute('aria-valuetext', list[c].fullName);
     }
-    if (_inbox()) _inbox().fillPics(stage, files);
+    Object.keys(files).forEach(function (k) {
+      _files[k] = files[k];
+    });
+    _fillPics(L.root, L.cid);
+    var pics = _inbox() && _inbox().pics();
+    if (pics) pics.sweep();
+  }
+
+  /** The pictures the stage's imgs ask for, from the tile's own holder (DashInbox.pics()).
+   * @param {Element} root @param {string} cid */
+  function _fillPics(root, cid) {
+    var pics = _inbox() && _inbox().pics();
+    if (!pics) return;
+    pics.fill(root, cid, function (/** @type {HTMLElement} */ img) {
+      return _files[img.getAttribute('data-flip-pic') || ''] || null;
+    });
   }
 
   /** The data-flip-focus token of the focused control inside `root`; given a
@@ -508,10 +439,17 @@
       /** @type {any} */ (window).PageDashboard.render();
   }
 
-  /** The grader on the centre student, in this order. @param {any} L */
-  function openGrader(L) {
+  // The grader is over the tile: what happens under it is not meant for the stage.
+  function _graderOpen() {
+    return !!document.getElementById('grader-overlay');
+  }
+
+  /** The grader on the centre student, in this order. @param {any} L @param {string} how */
+  function openGrader(L, how) {
+    if (_graderOpen()) return;
     var e = L.list[centreOf(L.st, L.list)];
     if (!e || !window.PageAssignments || !PageAssignments.openGrader) return;
+    _opener = how;
     PageAssignments.openGrader(L.cid, L.aid, e.sid, {
       studentIds: L.list.map(function (/** @type {any} */ x) {
         return x.sid;
@@ -520,38 +458,16 @@
     });
   }
 
-  /** Redraw the stage for another piece (the switch changed it). @param {any} L */
-  function _switched(L) {
-    var model = _inbox() ? _inbox().model() : null;
-    var aid = chosen(L.cid, model);
-    if (aid === L.aid) return;
-    var st = stateOf(L.cid, aid);
-    st.sid = null;
-    st.idx = 0;
-    st.pages = {};
-    L.aid = aid;
-    L.st = st;
-    L.list = entries(L.cid, aid);
-    /** @type {Record<string, any>} */
-    var files = {};
-    // The first student to grade is the centre.
-    if (L.list.length) moveTo(st, L.list, 0);
-    // html-safe: mainHtml escapes every name and key with esc
-    L.main.innerHTML = mainHtml(L.cid, aid, L.list, st, files);
-    if (_inbox()) {
-      _inbox().fillPics(null, files);
-      _inbox().fillPics(L.main, null);
-    }
-  }
-
-  /** @param {HTMLElement} tile @param {string} cid @param {any} model */
-  function mount(tile, cid, model) {
+  /** @param {HTMLElement} tile @param {string} cid */
+  function mount(tile, cid) {
     unmount();
     var root = /** @type {HTMLElement | null} */ (tile.querySelector('#dash-inbox-flip'));
     if (!root) return;
     var main = /** @type {HTMLElement} */ (root.querySelector('#dash-inbox-flip-main'));
-    var aid = chosen(cid, model);
+    var aid = chosen(cid);
     var st = stateOf(cid, aid);
+    var drawn = _drawn && _drawn.cid === cid && _drawn.aid === aid ? _drawn.list : entries(cid, aid);
+    _drawn = null;
     /** @type {any} */
     var L = {
       root: root,
@@ -559,8 +475,7 @@
       cid: cid,
       aid: aid,
       st: st,
-      list: entries(cid, aid),
-      pickEl: root.querySelector('#dash-inbox-flip-pick'),
+      list: drawn,
       acc: 0,
       lastWheel: 0,
       locked: false,
@@ -578,16 +493,8 @@
       st.sid = L.list[c].sid;
       st.idx = c;
     }
-    var P = _pick();
-    if (P && L.pickEl && typeof P.mount === 'function') {
-      try {
-        P.mount(L.pickEl, cid, function () {
-          _switched(L);
-        });
-      } catch (e) {
-        /* the switch's own fault stays its own */
-      }
-    }
+    // The shared switch: a pick keeps the choice and draws the Dashboard again.
+    DashInboxPick.mount(root, cid, _redraw);
 
     root.addEventListener('click', (L.onClick = onClick.bind(null, L)));
     root.addEventListener('keydown', (L.onKey = onKey.bind(null, L)));
@@ -616,6 +523,20 @@
       else _focusToken(root, _refocus.token);
     }
     _refocus = null;
+    _fillPics(root, cid);
+    // Back from the grader: the control that opened it takes the focus.
+    if (_opener && !_graderOpen()) {
+      var how = _opener;
+      _opener = null;
+      var back = /** @type {HTMLElement | null} */ (
+        how === 'open'
+          ? root.querySelector('[data-flip-open]')
+          : how === 'stage'
+            ? root.querySelector('.dash-inbox-flip-stage')
+            : root.querySelector('.dash-inbox-flip-pg.is-centre')
+      );
+      if (back) back.focus({ preventScroll: true });
+    }
   }
 
   function unmount() {
@@ -636,41 +557,34 @@
     window.removeEventListener('pointerup', L.onUp);
     window.removeEventListener('pointercancel', L.onUp);
     clearTimeout(L.movedTimer);
-    var P = _pick();
-    if (P && L.pickEl && typeof P.unmount === 'function') {
-      try {
-        P.unmount(L.pickEl);
-      } catch (e) {
-        /* its own */
-      }
-    }
+    DashInboxPick.unmount(L.root);
   }
 
   /* ── Mounted: events ───────────────────────────────────── */
   /** @param {any} L @param {MouseEvent} e */
   function onClick(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (!t || !t.closest) return;
+    if (!t || !t.closest || _graderOpen()) return;
     var turnBtn = t.closest('[data-flip-turn]');
     if (turnBtn) {
       if (turnBtn.getAttribute('aria-disabled') !== 'true') flip(L, Number(turnBtn.getAttribute('data-flip-turn')));
       return;
     }
     if (t.closest('[data-flip-open]')) {
-      openGrader(L);
+      openGrader(L, 'open');
       return;
     }
     var pg = t.closest('.dash-inbox-flip-pg');
     if (!pg || L.moved) return;
     var i = Number(pg.getAttribute('data-flip-i'));
-    if (i === centreOf(L.st, L.list)) openGrader(L);
+    if (i === centreOf(L.st, L.list)) openGrader(L, 'page');
     else go(L, i);
   }
 
   /** @param {any} L @param {KeyboardEvent} e */
   function onKey(L, e) {
     var stage = L.main.querySelector('.dash-inbox-flip-stage');
-    if (!stage || e.target !== stage || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (!stage || _graderOpen() || e.target !== stage || e.altKey || e.ctrlKey || e.metaKey) return;
     var c = centreOf(L.st, L.list);
     if (e.key === 'ArrowRight') {
       e.preventDefault();
@@ -693,7 +607,7 @@
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      openGrader(L);
+      openGrader(L, 'stage');
     }
   }
 
@@ -703,7 +617,7 @@
   /** @param {any} L @param {WheelEvent} e */
   function onWheel(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (!t || !t.closest || !t.closest('.dash-inbox-flip-stage')) return;
+    if (!t || !t.closest || _graderOpen() || !t.closest('.dash-inbox-flip-stage')) return;
     var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0;
     if (!dx) return;
     var now = Date.now();
@@ -724,7 +638,7 @@
   /** @param {any} L @param {PointerEvent} e */
   function onDown(L, e) {
     var t = /** @type {any} */ (e.target);
-    if (e.button || !t.closest || !t.closest('.dash-inbox-flip-stage')) return;
+    if (e.button || !t.closest || _graderOpen() || !t.closest('.dash-inbox-flip-stage')) return;
     L.downX = e.clientX;
     L.downY = e.clientY;
     L.swiped = false;
@@ -733,7 +647,7 @@
 
   /** @param {any} L @param {PointerEvent} e */
   function onMove(L, e) {
-    if (L.downX == null || L.swiped) return;
+    if (L.downX == null || L.swiped || _graderOpen()) return;
     var dx = e.clientX - L.downX;
     var dy = e.clientY - L.downY;
     if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy)) {
@@ -746,6 +660,7 @@
   /** @param {any} L @param {Event} e */
   function onInput(L, e) {
     var t = /** @type {any} */ (e.target);
+    if (_graderOpen()) return;
     if (t && t.classList && t.classList.contains('dash-inbox-flip-slider')) go(L, Number(t.value));
   }
 
@@ -780,6 +695,9 @@
       _states = {};
       _live = null;
       _refocus = null;
+      _opener = null;
+      _files = {};
+      _drawn = null;
     },
   };
 })();

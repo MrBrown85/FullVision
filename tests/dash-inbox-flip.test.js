@@ -37,15 +37,9 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     work.course.send_work = true;
     saveDemoStudentWork(CID, work);
     DashInboxFlip.reset();
-    delete window.DashInboxPick;
-  });
-  afterEach(() => {
-    delete window.DashInboxPick;
   });
 
   const ids = () => getStudents(CID).map(s => s.id);
-  // Work to grade first, else any work in.
-  const firstPiece = m => (m.pieces.find(p => p.tograde > 0 && p.in > 0) || m.pieces.find(p => p.in > 0)).aid;
   const find = (list, name) => list.find(e => e.name === name);
 
   it('registers as a view of the Inbox', () => {
@@ -156,19 +150,18 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     expect(DashInboxFlip.centreOf(st, gone)).toBe(1);
   });
 
-  it('shows the first piece with work in when the switch is not there, and the switch otherwise', () => {
-    const model = DashInboxModel.build(CID, { seen: null });
-    expect(DashInboxFlip.chosen(CID, model)).toBe(firstPiece(model));
+  it('takes the piece from the shared switch: work to grade first, then the one kept', () => {
+    expect(DashInboxFlip.chosen(CID)).toBe(DashInboxPick.draw(CID).current.aid);
     // The sample class has work to grade only on the Light Refraction Lab.
-    expect(DashInboxFlip.chosen(CID, model)).toBe(LIGHT);
-    window.DashInboxPick = { current: () => LIGHT, html: () => '', mount() {}, unmount() {}, pieces: () => [] };
-    expect(DashInboxFlip.chosen(CID, model)).toBe(LIGHT);
-    // A piece the model does not list falls back to the first.
-    window.DashInboxPick = { current: () => 'nope', html: () => '', mount() {}, unmount() {}, pieces: () => [] };
-    expect(DashInboxFlip.chosen(CID, model)).toBe(firstPiece(model));
-    // The switch has nothing to say yet: the first.
-    window.DashInboxPick = { current: () => null, html: () => '', mount() {}, unmount() {}, pieces: () => [] };
-    expect(DashInboxFlip.chosen(CID, model)).toBe(firstPiece(model));
+    expect(DashInboxFlip.chosen(CID)).toBe(LIGHT);
+    // The Cell Microscope Lab is fully assessed: the Inbox's model no longer lists it, the switch does.
+    expect(DashInboxModel.build(CID, { seen: null }).pieces.some(p => p.aid === LAB)).toBe(false);
+    expect(DashInboxPick.draw(CID).pieces.some(p => p.aid === LAB)).toBe(true);
+    DashInboxPick.set(CID, LAB);
+    expect(DashInboxFlip.chosen(CID)).toBe(LAB);
+    // A piece that is gone falls back to the switch's own default.
+    DashInboxPick.set(CID, 'nope');
+    expect(DashInboxFlip.chosen(CID)).toBe(LIGHT);
   });
 
   it('a piece switch starts the centre again, and its pages', () => {
@@ -185,44 +178,42 @@ describe('Flip Through, Science 8 with Send Work on', () => {
   });
 
   it('draws the stage: one button a student, the centre named with what it does, a labelled slider', () => {
-    DashInbox.setView(CID, 'flip');
-    const model = DashInboxModel.build(CID, { seen: null });
-    const html = DashInboxFlip.html(CID, model);
-    const list = DashInboxFlip.entries(CID, DashInboxFlip.chosen(CID, model));
+    DashInboxPick.set(CID, LAB);
+    const html = DashInboxFlip.html(CID);
+    const list = DashInboxFlip.entries(CID, LAB);
     expect((html.match(/dash-inbox-flip-pg/g) || []).length).toBeGreaterThanOrEqual(list.length);
-    expect(html).toContain(
-      'aria-label="' + list[0].name + ', ' + (list[0].waiting ? 'Grade Submissions' : 'Open') + '"',
-    );
+    expect(html).toContain('aria-label="' + list[0].fullName + ', Open"');
     expect(html).toContain('aria-label="Student 1 of ' + list.length + '"');
     expect(html).toContain('aria-roledescription="carousel"');
-    // No switch of the other builder's: none drawn.
-    expect(html).not.toContain('dash-inbox-flip-pick');
+    // Pages off the stage carry no picture; pictures are keyed by class first.
     const imgs = (html.match(/<img /g) || []).length;
     expect(imgs).toBeLessThanOrEqual(2 * DashInboxFlip.WINDOW + 1);
+    expect(html).toContain('data-flip-pic="' + CID + '|' + LAB + '|');
   });
 
-  it('draws the switch above the stage when there is one', () => {
-    window.DashInboxPick = {
-      current: () => null,
-      html: () => '<button type="button">Cell Microscope Lab · 10 In</button>',
-      mount() {},
-      unmount() {},
-      pieces: () => [],
-    };
-    const html = DashInboxFlip.html(CID, DashInboxModel.build(CID, { seen: null }));
+  it('draws the shared switch above the stage, with the chosen piece pressed', () => {
+    const html = DashInboxFlip.html(CID);
     expect(html).toContain('id="dash-inbox-flip-pick"');
+    expect(html).toContain('dash-inbox-pick-btn');
     expect(html.indexOf('dash-inbox-flip-pick')).toBeLessThan(html.indexOf('dash-inbox-flip-stage'));
+    expect(html).toMatch(/data-dash-inbox-pick="sci8a21" aria-pressed="true"/);
   });
 
-  it('says so, in a sentence, when the piece has no work in', () => {
-    window.DashInboxPick = { current: () => 'sci8a2', html: () => '', mount() {}, unmount() {}, pieces: () => [] };
-    const model = DashInboxModel.build(CID, { seen: null });
-    // A piece listed with nothing in has an empty stage.
-    const empty = DashInboxFlip.entries(CID, 'sci8a-none');
-    expect(empty).toEqual([]);
-    const html = DashInboxFlip.html(CID, { pieces: [] });
+  it('names a pair as one stop, as Side by Side does, and the accessible name lists everyone', () => {
+    const side = DashInboxSide.model(CID, LIGHT).items;
+    const list = DashInboxFlip.entries(CID, LIGHT);
+    expect(list.map(e => e.name)).toEqual(side.map(i => i.name));
+    expect(list.map(e => e.fullName)).toEqual(side.map(i => i.fullName));
+    expect(list.map(e => e.sid)).toEqual(side.map(i => i.sid));
+  });
+
+  it('says so, in a sentence, when nothing is in', () => {
+    expect(DashInboxFlip.entries(CID, 'sci8a-none')).toEqual([]);
+    const work = getCourseSubmissions(CID);
+    work.submissions = [];
+    saveDemoStudentWork(CID, work);
+    const html = DashInboxFlip.html(CID);
     expect(html).toContain('No work in yet');
-    expect(model.on).toBe(true);
   });
 
   it('escapes a name with markup in it', () => {
@@ -230,7 +221,7 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     const was = st.firstName;
     st.firstName = '<img src=x onerror=1>';
     st.preferred = '';
-    const html = DashInboxFlip.html(CID, DashInboxModel.build(CID, { seen: null }));
+    const html = DashInboxFlip.html(CID);
     st.firstName = was;
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x');

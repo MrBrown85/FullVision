@@ -18,7 +18,7 @@ const shot = async (page, name) => {
   await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { bulletins = false, dark = false, pick = true, view = true } = {}) {
+async function open(page, { bulletins = false, dark = false, piece = 'sci8a1', view = true } = {}) {
   await page.addInitScript(() => {
     // Every wheel listener added to an element, with whether it is passive.
     window.__wheelListeners = [];
@@ -32,7 +32,7 @@ async function open(page, { bulletins = false, dark = false, pick = true, view =
     };
   });
   await page.addInitScript(
-    ([bulletins, pick]) => {
+    ([bulletins, piece]) => {
       try {
         localStorage.setItem('fv-build-dashRow', '1');
         if (bulletins) {
@@ -43,34 +43,13 @@ async function open(page, { bulletins = false, dark = false, pick = true, view =
               '<section class="dash-bulletins-stub" style="flex:1;background:var(--surface);border-radius:12px"></section>',
           };
         }
-        if (pick) {
-          // A stand-in for the assessment switch (D6): two buttons and a callback.
-          let current = 'sci8a1';
-          window.DashInboxPick = {
-            current: () => current,
-            set: aid => {
-              current = aid;
-            },
-            html: () =>
-              '<span class="stub-pick"><button type="button" data-stub-pick="sci8a1">Cell</button><button type="button" data-stub-pick="sci8a21">Light</button></span>',
-            mount: (root, cid, onChange) => {
-              root._h = e => {
-                const b = e.target.closest('[data-stub-pick]');
-                if (!b) return;
-                current = b.getAttribute('data-stub-pick');
-                onChange(current);
-              };
-              root.addEventListener('click', root._h);
-            },
-            unmount: root => root.removeEventListener('click', root._h),
-            pieces: () => [],
-          };
-        }
+        // The piece the switch has kept for this class: Cell Microscope Lab unless a test says none.
+        if (piece) localStorage.setItem('fv-dash-inbox-piece:sci8', piece);
       } catch (e) {
         /* storage blocked */
       }
     },
-    [bulletins, pick],
+    [bulletins, piece],
   );
   if (dark) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login.html?demo=1');
@@ -214,7 +193,7 @@ test('up and down turn through a two-page student, stopping at the first and the
   await page.locator('.dash-inbox-flip-slider').fill('2');
   await expect(name(page)).toHaveText('Noor Al-Rashid');
   await expect(page.locator('.dash-inbox-flip-pagetext')).toHaveText('Page 1 of 2');
-  const src = () => page.locator('.dash-inbox-flip-pg.is-centre img').getAttribute('data-dash-pic');
+  const src = () => page.locator('.dash-inbox-flip-pg.is-centre img').getAttribute('data-flip-pic');
   const first = await src();
   await stage.focus();
   await page.keyboard.press('ArrowDown');
@@ -262,7 +241,7 @@ test('the caption says what is true of the student', async ({ page }) => {
 });
 
 test('with no switch the first piece with work to grade shows, Grade Submissions first', async ({ page }) => {
-  await open(page, { pick: false });
+  await open(page, { piece: null });
   await page.locator('.dash-inbox-flip-stage').waitFor();
   const got = await page.evaluate(() => {
     const cid = getActiveCourse();
@@ -630,23 +609,48 @@ test('dark, beside Bulletins and with the whole column', async ({ page }) => {
   expect(bg).toBeTruthy();
 });
 
-test('with the assessment switch, a change redraws the stage and the centre starts again', async ({ page }) => {
-  await open(page, { pick: true });
-  await expect(page.locator('#dash-inbox-flip-pick')).toContainText('Light');
+test('the shared switch: a pick redraws the stage, the centre starts again, the focus stays on the button', async ({
+  page,
+}) => {
+  await open(page);
+  await expect(page.locator('#dash-inbox-flip-pick')).toContainText('Light Refraction Lab');
   await page.locator('.dash-inbox-flip-slider').fill('5');
   const was = await name(page).textContent();
-  await page.locator('[data-stub-pick="sci8a21"]').click();
+  const light = page.locator('[data-dash-inbox-pick="sci8a21"]');
+  await light.focus();
+  await light.click();
+  await expect(light).toHaveAttribute('aria-pressed', 'true');
+  await expect(light).toBeFocused();
   await expect(page.locator('.dash-inbox-flip-slider')).toHaveValue('0');
   await expect(name(page)).not.toHaveText(was);
-  const first = await page.evaluate(() => {
-    const cid = getActiveCourse();
-    return DashInboxFlip.entries(cid, 'sci8a21')[0].name;
-  });
+  const first = await page.evaluate(() => DashInboxFlip.entries(getActiveCourse(), 'sci8a21')[0].name);
   await expect(name(page)).toHaveText(first);
-  // And it survives a redraw on the new piece.
+  // A redraw keeps the piece and the page; the piece is the same in Side by Side.
   await page.evaluate(() => PageDashboard.render());
   await expect(name(page)).toHaveText(first);
-  await expect(page.locator('#dash-inbox-flip-pick')).toContainText('Cell');
+  await page.locator('#dash-view-btn-inbox').click();
+  await page.locator('#dash-view-menu-inbox [data-view="side"]').click();
+  await expect(page.locator('[data-dash-inbox-pick="sci8a21"]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('after the grader closes the focus goes back to what opened it', async ({ page }) => {
+  await open(page);
+  for (const [how, sel] of [
+    ['page', '.dash-inbox-flip-pg.is-centre'],
+    ['open', '.dash-inbox-flip-open'],
+    ['stage', '.dash-inbox-flip-stage'],
+  ]) {
+    if (how === 'stage') {
+      await page.locator(sel).focus();
+      await page.keyboard.press('Enter');
+    } else await page.locator(sel).click();
+    await expect(page.locator('.grader-dialog')).toBeVisible();
+    // A key meant for the grader does not move the stage under it.
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.grader-dialog')).toHaveCount(0);
+    await expect(page.locator(sel)).toBeFocused();
+  }
 });
 
 test('with the switch off there is no Flip Through', async ({ page }) => {

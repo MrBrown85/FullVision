@@ -260,7 +260,11 @@ test('clicking a competency in the tile still filters the student cards', async 
   await openDashboard(page);
   const before = await page.locator('.dash-grid > .dash-card').count();
   expect(before).toBeGreaterThan(0);
-  await page.locator('.dash-comp-tile .dash-comp-row .dash-comp-pick, .dash-comp-tile .dash-comp-pick').first().click();
+  // The tile opens on Level Mix (D3), where a row opens its list first; Class
+  // Average keeps today's one-click filter.
+  await page.locator('#dash-view-btn-comp').click();
+  await page.locator('#dash-view-menu-comp [data-view="avg"]').click();
+  await page.locator('.dash-comp-tile .dash-comp-row').first().click();
   await expect(page.locator('.dash-comp-filter')).toBeVisible();
   await expect(
     page.locator('.dash-comp-tile .dash-comp-row.is-picked, .dash-comp-tile [aria-pressed="true"]').first(),
