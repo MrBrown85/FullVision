@@ -521,6 +521,17 @@ var QuizBuilder = (function () {
     // Tied only while the server's copy of the class says the piece has no score, at this moment.
     var tie = S.picked && _mode() === 'points' && _known() && !_scored();
     box.readOnly = tie;
+    // The 10 / 25 / 50 / 100 picks follow the box: off while the quiz sets it.
+    Array.from(document.querySelectorAll('#af-maxpoints-picks .seg-btn')).forEach(function (b) {
+      var btn = /** @type {HTMLButtonElement} */ (b);
+      if (tie) {
+        if (!btn.disabled) btn.setAttribute('data-quiz-off', '1');
+        btn.disabled = true;
+      } else if (btn.getAttribute('data-quiz-off')) {
+        btn.disabled = false;
+        btn.removeAttribute('data-quiz-off');
+      }
+    });
     var win = box.ownerDocument && box.ownerDocument.defaultView;
     var Ev = (win && /** @type {any} */ (win).Event) || Event;
     if (!tie && S.maxBefore != null) {
@@ -551,11 +562,16 @@ var QuizBuilder = (function () {
      score that arrives from the server lets the tie go before any Save. */
   /** @type {any} */
   var _tieTimer = null;
+  /* The assessment form is open on the page. */
+  function _formShown() {
+    var form = $('new-assess-form');
+    return !!form && form.style.display !== 'none' && !!$('quiz-mount') && form.contains($('quiz-mount'));
+  }
   /** @param {boolean} on */
   function _watchTie(on) {
     if (on && !_tieTimer) {
       _tieTimer = setInterval(function () {
-        if (!S || !$('quiz-mount')) {
+        if (!S || !$('quiz-mount') || !_formShown()) {
           clearInterval(_tieTimer);
           _tieTimer = null;
           return;
@@ -952,6 +968,8 @@ var QuizBuilder = (function () {
     ].join('|');
   }
   function _formMoved() {
+    // The form hidden or gone (Cancel, Escape, Save, another page): the tie's check stops.
+    if (!_formShown()) _watchTie(false);
     if (!S || !$('quiz-mount')) return;
     if (_sig() === S.sig) return;
     _draw();
@@ -993,6 +1011,7 @@ var QuizBuilder = (function () {
     document.addEventListener('keydown', function (e) {
       var t = /** @type {HTMLElement} */ (e.target);
       if (S && t && t.closest && t.closest('#quiz-mount')) _onKey(e, t);
+      else if (e.key === 'Escape') setTimeout(_formMoved, 0);
     });
   }
 
@@ -1400,6 +1419,9 @@ var QuizBuilder = (function () {
       return S ? _payload() : null;
     },
     _problems: _problems,
+    _tieWatched: function () {
+      return !!_tieTimer;
+    },
   };
 })();
 if (typeof window !== 'undefined') /** @type {any} */ (window).QuizBuilder = QuizBuilder;

@@ -31,6 +31,7 @@ import {
   clearClass,
   click,
   fire,
+  key,
   tick,
   settle,
   openAssignments,
@@ -171,6 +172,54 @@ describe('in Demo Mode', () => {
     expect(box.value).toBe('10');
     expect(box.readOnly).toBe(false);
     expect(document.getElementById('quiz-maxpoints-hint')).toBeNull();
+  });
+
+  /* A Points piece with no scores, its quiz chosen: Max Points tied to the quiz. */
+  async function tiedForm() {
+    openAssignments(seed({ scores: {} }), CID);
+    await settled();
+    edit(PTS);
+    await settled();
+    click(mount().querySelector('[data-quiz-act="answer"][data-value="quiz"]'));
+    await settled();
+    expect(form().querySelector('#af-maxpoints').readOnly).toBe(true);
+  }
+
+  it('while Max Points is tied the 10 / 25 / 50 / 100 picks are off, and come back when it lets go', async () => {
+    await tiedForm();
+    const picks = () => Array.from(form().querySelectorAll('#af-maxpoints-picks .seg-btn'));
+    expect(picks().length).toBeGreaterThan(0);
+    // Off as the box is read-only: a disabled button takes no click in a browser.
+    picks().forEach(b => expect(b.disabled).toBe(true));
+    // The quiz taken off: the box and its picks are the teacher's again.
+    click(mount().querySelector('[data-quiz-act="answer"][data-value="nothing"]'));
+    await settled();
+    expect(form().querySelector('#af-maxpoints').readOnly).toBe(false);
+    picks().forEach(b => expect(b.disabled).toBe(false));
+  });
+
+  it('no check keeps running once the form is closed: Cancel', async () => {
+    await tiedForm();
+    expect(QuizBuilder._tieWatched()).toBe(true);
+    click(form().querySelector('[data-action="cancelAssessForm"]'));
+    // The quiz chosen is a change: Discard This Assessment? asks first.
+    await settled();
+    click(document.querySelector('.af-dialog-card [data-i="1"]'));
+    await settled();
+    expect(form().style.display).toBe('none');
+    expect(QuizBuilder._tieWatched()).toBe(false);
+  });
+
+  it('no check keeps running once the form is closed: Escape', async () => {
+    await tiedForm();
+    expect(QuizBuilder._tieWatched()).toBe(true);
+    key(form().querySelector('#af-title'), 'Escape');
+    // The quiz chosen is a change: Discard This Assessment? asks first.
+    await settled();
+    click(document.querySelector('.af-dialog-card [data-i="1"]'));
+    await settled();
+    expect(form().style.display).toBe('none');
+    expect(QuizBuilder._tieWatched()).toBe(false);
   });
 
   it('a piece with no scores on Points: the quiz sets Max Points, and the box says so', async () => {
