@@ -28,12 +28,14 @@
          See the Rubric), compare: true for its Before and After (a
          returned revision, S11-F2), levels: What the Levels Mean is open
          (it starts closed), card: the id of a sent piece opened from My
-         Learning, logout: Log Out? is asking,
+         Learning, logout: Log Out? is asking, settings: Settings (the
+         gear) is open, textSize: 'large' or 'larger' ('' is Normal),
+         classes and classOn: the classes Switch Class lists and the one
+         showing,
          form: the questionnaire picked on a Chromebook,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
-         note: a line under the body (Demo Mode's), sheet: Your Classes is
-         open }.
+         note: a line under the body (Demo Mode's) }.
 
    The three tabs (Colin, 2026-11-14): Assignments is what the student
    still has to do, Outstanding and Upcoming, the cards one under another
@@ -2140,8 +2142,13 @@ window.StudentPageView = (function () {
 
   /* ── The frame ─────────────────────────────────────────────── */
 
-  var CHEVRON =
-    '<svg class="sp-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
+  // The gear in the header's right corner: it opens Settings.
+  var GEAR =
+    '<svg class="sp-gear-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  var TICK =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var PLUS =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
   var TABS = [
     {
       id: 'assignments',
@@ -2209,26 +2216,134 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* Text Size: how big the page is drawn on this device. Normal is the
+     page as it was; Large and Larger draw everything bigger (student.css
+     on the student page, preview-student.css in the preview). */
+  var TEXT_SIZES = [
+    { id: 'normal', label: 'Normal' },
+    { id: 'large', label: 'Large' },
+    { id: 'larger', label: 'Larger' },
+  ];
+  var TEXT_SIZE_IDS = { normal: 1, large: 1, larger: 1 };
+  // The size the page is drawn at: 'large', 'larger', or '' for Normal.
+  function textSizeOf(ui) {
+    var z = ui && ui.textSize;
+    return z === 'large' || z === 'larger' ? z : '';
+  }
+
+  /* Settings (Colin, 2026-11-17: "let's replace the log out button and the
+     class picker button at the top with a gear icon. include relevant
+     options for students."): a sheet from the bottom on a phone, a small
+     menu under the gear on a Chromebook (page-view.css). Whose page this
+     is, by the first name the page was sent; Switch Class, with more than
+     one class on this device; Add Another Card; Text Size; and Log Out,
+     last and set apart, which asks first as it did in the header.
+     `ui.classes` is the classes this device's session has opened
+     ({ enrollmentId, name, block, toDo }, s/assignments.js), and
+     `ui.classOn` the one showing; the preview has neither. */
+  function settingsSheetHtml(view, ui) {
+    var first = String((view && view.student && view.student.firstName) || '').trim();
+    var classes = (Array.isArray(ui.classes) ? ui.classes : []).filter(function (c) {
+      return c && c.enrollmentId;
+    });
+    var size = textSizeOf(ui) || 'normal';
+    var classList =
+      classes.length > 1
+        ? '<h3 class="sp-set-label" id="sp-set-classes">Switch Class</h3>' +
+          '<ul class="sp-classes sp-set-classes" aria-labelledby="sp-set-classes">' +
+          classes
+            .map(function (c) {
+              var on = c.enrollmentId === ui.classOn;
+              return (
+                '<li><button type="button" class="sp-class' +
+                (on ? ' sp-class-on' : '') +
+                '" data-act="class-open" data-enrollment="' +
+                esc(c.enrollmentId) +
+                '"' +
+                (on ? ' aria-current="true"' : '') +
+                '><span class="sp-class-words"><span class="sp-class-name">' +
+                esc(c.name) +
+                '</span>' +
+                (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
+                '</span>' +
+                // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
+                (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
+                (on ? '<span class="sp-class-tick">' + TICK + '</span>' : '') +
+                '</button></li>'
+              );
+            })
+            .join('') +
+          '</ul>'
+        : '';
+    return (
+      '<button type="button" class="sp-sheet-back sp-set-back" data-act="settings-close" aria-label="Close" tabindex="-1"></button>' +
+      '<div class="sp-sheet sp-set" role="dialog" aria-modal="true" aria-labelledby="sp-set-title">' +
+      '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
+      '<div class="sp-set-top">' +
+      '<h2 class="sp-sheet-title sp-set-title" id="sp-set-title" tabindex="-1">Settings</h2>' +
+      '<button type="button" class="sp-set-done" data-act="settings-close">Done</button>' +
+      '</div>' +
+      (first ? '<p class="sp-set-who">Signed in as ' + esc(first) + '</p>' : '') +
+      classList +
+      '<button type="button" class="sp-set-row" data-act="card-add">' +
+      PLUS +
+      '<span>Add Another Card</span></button>' +
+      '<h3 class="sp-set-label" id="sp-set-size-label">Text Size</h3>' +
+      '<div class="sp-set-sizes" role="radiogroup" aria-labelledby="sp-set-size-label" aria-describedby="sp-set-size-hint">' +
+      TEXT_SIZES.map(function (t) {
+        var on = t.id === size;
+        return (
+          '<button type="button" class="sp-set-size sp-set-size-' +
+          t.id +
+          (on ? ' sp-set-size-on' : '') +
+          '" role="radio" aria-checked="' +
+          (on ? 'true' : 'false') +
+          '" data-act="text-size" data-size="' +
+          t.id +
+          '">' +
+          esc(t.label) +
+          '</button>'
+        );
+      }).join('') +
+      '</div>' +
+      '<p class="sp-set-hint" id="sp-set-size-hint">Makes everything on your page bigger on this device.</p>' +
+      '<button type="button" class="sp-set-out" data-act="logout-ask" aria-haspopup="dialog">Log Out</button>' +
+      '</div>'
+    );
+  }
+
+  /* The sheet just opened slides in from where it starts: up from the
+     bottom on a phone, down from the gear on a Chromebook (page-view.css).
+     Only on the drawing that opened it: drawn again under it (a text size
+     chosen, the page's data arriving), it stays still. */
+  function slideIn(root) {
+    var sheet = root && root.querySelector ? root.querySelector('.sp-set') : null;
+    if (sheet) sheet.classList.add('sp-set-in');
+  }
+
   /* Log Out? (Colin, 2026-11-14: "Done should be Log Out and should also
      prompt a warning"): asked over the page before the session ends. Log
      Out ends it as Done did (card-done, s/app.js). */
   function logoutSheetHtml() {
     return (
-      '<button type="button" class="sp-sheet-back" data-act="logout-cancel" aria-label="Cancel" tabindex="-1"></button>' +
+      '<button type="button" class="sp-sheet-back sp-set-back" data-act="logout-cancel" aria-label="Cancel" tabindex="-1"></button>' +
       '<div class="sp-sheet sp-logout" role="alertdialog" aria-modal="true" aria-labelledby="sp-logout-title" aria-describedby="sp-logout-line">' +
-      '<span class="sp-sheet-grip" aria-hidden="true"></span>' +
-      '<h2 class="sp-sheet-title" id="sp-logout-title" tabindex="-1">Log Out?</h2>' +
+      '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title sp-set-title" id="sp-logout-title" tabindex="-1">Log Out?</h2>' +
       '<p class="sp-lead" id="sp-logout-line">You’ll need your card to open your page again.</p>' +
+      /* One under the other, Cancel last: at the foot of the sheet, where
+         Settings' Log Out was under the finger, so a double tap cancels
+         (s/app.js also ignores presses here for a moment after it opens). */
       '<div class="sp-logout-buttons">' +
-      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
       '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">Log Out</button>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
       '</div></div>'
     );
   }
 
-  /* The whole page: the class's name with its block (it opens Your
-     Classes), the tabs on a Chromebook, Log Out; the tab's body; the tabs
-     along the bottom on a phone. */
+  /* The whole page: the class's name with its block, the tabs on a
+     Chromebook, the gear (Settings); the tab's body; the tabs along the
+     bottom on a phone. */
   function html(view, ui) {
     ui = ui || {};
     var course = (view && view.course) || ui.course || {};
@@ -2242,26 +2357,29 @@ window.StudentPageView = (function () {
       (open ? ' sp-on-feedback' : '') +
       // The cards or a piece open, with its list: on a Chromebook, a sidebar down the left (page-view.css).
       ((tab === 'assignments' || open) && ready ? ' sp-on-deck' : '') +
+      (textSizeOf(ui) ? ' sp-text-' + textSizeOf(ui) : '') +
       '">' +
       '<header class="sp-head">' +
-      '<button type="button" class="sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
-      (ui.sheet ? 'true' : 'false') +
-      '"><span class="sp-head-title">' +
+      '<div class="sp-head-class"><span class="sp-head-title">' +
       esc(course.name || '') +
       '</span>' +
       (block ? '<span class="sp-pill">' + esc(blockLabel(block)) + '</span>' : '') +
-      CHEVRON +
-      '</button>' +
+      '</div>' +
       '<span class="sp-head-gap"></span>' +
       tabBarHtml(ui, 'top', view) +
       '<span class="sp-head-gap"></span>' +
-      '<button type="button" class="sp-done" data-act="logout-ask" aria-haspopup="dialog">Log Out</button>' +
+      '<button type="button" class="sp-gear" data-act="settings-open" aria-label="Settings" aria-haspopup="dialog" aria-expanded="' +
+      (ui.settings && !ui.logout ? 'true' : 'false') +
+      '">' +
+      GEAR +
+      '</button>' +
       '</header>' +
       '<main class="sp-page">' +
       bodyHtml(view, ui) +
       (ui.note ? '<p class="sp-fine">' + esc(ui.note) + '</p>' : '') +
       '</main>' +
       tabBarHtml(ui, 'bottom', view) +
+      (ui.settings && !ui.logout ? settingsSheetHtml(view, ui) : '') +
       (ui.logout ? logoutSheetHtml() : '') +
       '</div>'
     );
@@ -2311,7 +2429,8 @@ window.StudentPageView = (function () {
   /* A press on one of the page's own buttons, answered with what the
      student now looks at: { ui, focus } (focus: where the keyboard goes
      after the page is drawn again), or null when the press is not one of
-     these (Log Out, Your Classes, Try Again: the student page's own).
+     these (Log Out, Switch Class, Add Another Card, Try Again: the
+     student page's own).
      Nothing here reaches the network or the session, so the student page
      and the preview answer the same presses the same way. `el` is the
      button. */
@@ -2322,11 +2441,27 @@ window.StudentPageView = (function () {
     };
     // Log Out? goes with any press but its own.
     if (act !== 'logout-ask') next.logout = false;
+    // Settings goes with any press but its own and a text size chosen in it.
+    if (act !== 'settings-open' && act !== 'text-size') next.settings = false;
+    /* Settings, and Log Out? from it, open over whatever is showing and
+       leave it as it was: the page is not scrolled (`stay`), and closing
+       either gives the focus back to the gear. */
+    if (act === 'settings-open') {
+      next.settings = true;
+      return { ui: next, focus: '#sp-set-title', stay: true, slide: true };
+    }
+    if (act === 'settings-close') return { ui: next, focus: '.sp-gear', stay: true };
+    if (act === 'text-size') {
+      var z = attr('data-size');
+      if (!has(TEXT_SIZE_IDS, z) || !next.settings) return null;
+      next.textSize = z === 'normal' ? '' : z;
+      return { ui: next, focus: '.sp-set-size[data-size="' + z + '"]', stay: true };
+    }
     if (act === 'logout-ask') {
       next.logout = true;
-      return { ui: next, focus: '#sp-logout-title' };
+      return { ui: next, focus: '#sp-logout-title', stay: true };
     }
-    if (act === 'logout-cancel') return { ui: next, focus: '.sp-done' };
+    if (act === 'logout-cancel') return { ui: next, focus: '.sp-gear', stay: true };
     // Any other press leaves Your Feedback and The Whole Rubric.
     if (!has(FEEDBACK_ACTS, act)) {
       next.feedback = '';
@@ -2528,6 +2663,8 @@ window.StudentPageView = (function () {
     draw: draw,
     press: press,
     settle: settle,
+    slideIn: slideIn,
+    textSizeOf: textSizeOf,
     rowView: rowView,
     counts: counts,
     inSegment: inSegment,

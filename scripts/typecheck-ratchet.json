@@ -60,6 +60,7 @@
     "teacher/card-menu.js",
     "s/question-kinds.js",
     "s/page-carousel.js",
+    "s/settings.js",
     "teacher/cm-reflect-answers.js",
     "teacher/question-cards.js",
     "teacher/cm-reflect-builder.js",

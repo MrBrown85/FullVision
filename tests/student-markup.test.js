@@ -244,7 +244,10 @@ describe('answers that arrive late, or wrong', () => {
     const h = held();
     page.T.setFeedbackAnswer(() => h.promise);
     await openWork(page);
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('.sp-logout [data-act="card-done"]');
     h.settle({ ok: true, files: [] });
     await page.settle();

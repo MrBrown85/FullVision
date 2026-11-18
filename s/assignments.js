@@ -92,7 +92,11 @@
       handoutPage: state.handoutPage,
       handoutPages: state.handoutPages,
       form: state.form,
-      sheet: state.sheet,
+      // Settings (the gear) and what it holds: Text Size, and the classes Switch Class lists.
+      settings: state.settings,
+      textSize: state.textSize,
+      classes: state.page ? state.page.classes : null,
+      classOn: state.page && state.page.student ? state.page.student.id : '',
       sending: state.sending,
       noResults: !gradesAreIn(),
       waiting: !view || typeof StudentPageView === 'undefined',
@@ -105,7 +109,6 @@
         : '<p class="sp-lead sp-msg-calm sp-empty" role="status">Opening your page…</p>';
     return (
       page +
-      (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '') +
       // Unsend Your Work? and Replace Your Photos? over the card (s/send.js).
       (typeof StudentPage.sendDialog === 'function' ? StudentPage.sendDialog(state) : '')
     );

@@ -1252,6 +1252,29 @@ Colin, on seeing the Back tab on a phone: "this has to be the best app." He aske
 13. **No Work On Next on the student page** (Colin, 2026-11-17, of the box "→ Work On Next: Continuity & Change / Name a turning point and explain what changed after it.": "not necessary on the student page. It seems like clutter."). My Learning's grade box shows the grade, its trend and the ladder, with nothing under it, and nothing replaces the line. This narrows 7 ("one Work On Next line from the comment bank"). The comment bank's next steps are unchanged everywhere a teacher uses them.
 14. **One status band across the top of each card, each status with its own word, icon and colour** (Colin, 2026-11-17: "Students are having a tough time differentiating between not yet marked/graded and a late assignment. maybe a cleaner layout/pill structure on the student cards. less wasted whitespace."). He chose Option B, the band, on the mockup (https://claude.ai/artifact/2MaLHfhH2EknQ7iPgxvH6Y). This replaces 4's "red once it has passed". The band carries the status with its icon on the left and the due date on the right: "In 4 Days · Fri, Nov 20" in blue, "Due Tomorrow" or "Due Today" in amber, and "Not Assessed Yet · Was due Oct 22" in grey once the day has passed and the work is neither Missing nor back. Nothing turns red from the date alone. Missing is the teacher's word and the one solid band, white on red, with no countdown in it and nothing more (Colin: "don't say 'counts as zero until it's in' on the card."); My Learning's row still says it in a Letter or Both class (7). Revise by is purple, Sent and Updated blue, Returned green, Closed grey. The teacher's Late is a pale red pill of its own under the title, beside Group. Under the band, the unit is in plain grey with no capitals. Cards are tighter (14 px padding, a 19 px title) and Outstanding and Upcoming are 44 px tall. Why: on Nov 17, 146 pieces of student work past due and never marked showed a red "26 days ago" that students read as Late, and all 342 Missing pieces in History 12 and Philosophy 12 were due Jan 31, so they showed "Missing" beside "in 75 days".
 
+## Settings on the student page: the gear (2026-11-17)
+
+Colin: "let's replace the log out button and the class picker button at the top with a gear icon. include relevant options for students." Built in `s/page-view.js` (the gear and Settings), `s/settings.js`, `s/app.js` and `s/student.css`. Preview as Student draws the same Settings. PR 1556.
+
+1. **The header holds the class's name and block as plain text, and one gear.** The gear is a button named Settings, 44 × 44 px, where Log Out was. The class's name stays in view, because a student in two classes needs to see which one is open.
+2. **Settings, top to bottom:**
+   - "Signed in as" the first name the page already shows.
+   - Switch Class, only with two or more classes; with one class it is not there at all.
+   - Add Another Card, always.
+   - Text Size: Normal, Large, Larger.
+   - Log Out, last and set apart.
+
+   It is a sheet from the bottom on a phone and a small menu under the gear on a Chromebook. It fits the screen at every size and scrolls inside when it must. Done, Escape and a tap outside close it, and the focus goes back to the gear.
+
+3. **Log Out still asks first** ("Student page from the student's side" 9). On "Log Out?", Cancel is the lower button, where Settings' Log Out was, so a double tap cancels. The sheet also takes no press for its first 400 ms.
+4. **Text Size zooms the whole card page.** Large is 1.15 and Larger 1.3. At Normal every screen draws exactly as it did before Text Size; outside the header and Log Out?, nothing changes there, and the rows and buttons that wrap to fit the narrower zoomed page do so only at Large and Larger. The zoom covers the reflections, Add Another Card, Send My Work and the handout viewer opened from the page. Every student screen must hold together at 320 to 430 px wide at each size; `e2e/student-text-size-sweep.spec.js` checks it in Chromium, and in WebKit with `FV_WEBKIT=1`.
+5. **What the device keeps.** Text Size is stored inside the session's one localStorage entry, `fv-s-session`, beside the token, as `z: 'large'` or `z: 'larger'`. At Normal there is no `z`. Nothing else is added, and nothing is sent to the server.
+   - It is cleared with the session: at Log Out, at midnight, after 15 idle minutes, when another card is recognised on the device, and when the page is refused.
+   - The next student on the device starts at Normal.
+   - A size chosen in one tab of a session reaches the session's other tabs.
+   - Demo Mode keeps the size in memory only.
+6. **Left out:** Appearance (the student page has no dark theme), a link to the privacy page (it is written for teachers and districts), and notifications, language and profile pictures (each needs the server).
+
 ## Draft assessments (2026-11-16)
 
 Colin: "When teachers create assignments, they might want to keep them as Drafts (like teams) before they're issued to students." He made these calls one at a time on a real-size mockup (https://claude.ai/artifact/2W43qEk6ApahtkiRShSzR7). Built in `teacher/assign-draft.js`, `getAssignedAssessments` in `shared/data-assessments.js`, and `migrations/2026111701_assessment_drafts.sql` (`assessment.is_draft`).
