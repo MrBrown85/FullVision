@@ -674,6 +674,31 @@ describe('Demo Mode', () => {
     expect(page.store['gb-bulletins-sci8']).toBe(raw);
   });
 
+  it('Switch Class: each class opened afresh decides its own tab, and keeps its bulletins', async () => {
+    const page = await demo();
+    expect(current(page)).toBe('bulletins');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="card-add"]');
+    page.type('#sp-code', 'ABCD-EFGH');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    // The second sample class has nothing posted: Assignments, with the tab there.
+    expect(page.root().querySelector('.sp-head-title').textContent).toBe('Humanities 8');
+    expect(current(page)).toBe('assignments');
+    expect(tabs(page)[0]).toBe('bulletins');
+    await page.click('[data-act="settings-open"]');
+    const science = [...page.root().querySelectorAll('.sp-set-classes .sp-class')].find(b =>
+      b.textContent.includes('Science 8'),
+    );
+    expect(science.querySelector('.sp-bulletin-class-new').textContent).toBe('2 new');
+    await page.click('.sp-set-classes .sp-class[data-enrollment="demo-cece"]');
+    expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
+    expect(current(page)).toBe('bulletins');
+    expect(page.T.bulletins().student).toBe('demo-cece');
+    expect(page.calls).toEqual([]);
+  });
+
   it('a paused student: the card says it is closed, as today', async () => {
     const page = openStudentPage({
       store: Object.assign({}, ON, {

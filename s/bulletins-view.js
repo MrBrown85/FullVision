@@ -322,13 +322,24 @@
   }
 
   // The active reminder as a slim bar under the header: a tap brings it into view.
+  /* The bar's words: the reminder's first line, cut at a space near 48
+     characters with an ellipsis, so the bar stays slim and nothing is
+     clipped by its box (the whole reminder is a tap away). */
+  function shortWords(line) {
+    if (line.length <= 48) return line;
+    var cut = line.lastIndexOf(' ', 48);
+    return line.slice(0, cut > 20 ? cut : 48).replace(/[\s,.;:]+$/, '') + '…';
+  }
+
   function pinBarHtml(b) {
     if (!b) return '';
     var d = dayOf(b.pinned_until);
     var words =
-      String(b.body || '')
-        .split('\n')[0]
-        .trim() || 'Reminder';
+      shortWords(
+        String(b.body || '')
+          .split('\n')[0]
+          .trim(),
+      ) || 'Reminder';
     return (
       '<button type="button" class="sp-bulletin-pinbar" data-act="bulletin-pin" data-bulletin="' +
       esc(b.id) +

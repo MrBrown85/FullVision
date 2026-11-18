@@ -245,11 +245,19 @@
   }
   function demoAnswer(route, body, student) {
     if (route === 'bulletins') {
-      var list = demoList(student);
-      var count = list.filter(function (b) {
-        return !b.seen_at;
-      }).length;
-      return { ok: true, bulletins: list, new: [{ enrollment_id: student, count: count }] };
+      var unseen = function (who) {
+        return demoList(who).filter(function (b) {
+          return !b.seen_at;
+        }).length;
+      };
+      // Every sample class's count, as the server counts every class on the device.
+      return {
+        ok: true,
+        bulletins: demoList(student),
+        new: ['demo-cece', 'demo-cece-hum'].map(function (who) {
+          return { enrollment_id: who, count: unseen(who) };
+        }),
+      };
     }
     if (route === 'bulletin-seen') {
       (body.bulletin_ids || []).forEach(function (id) {
@@ -839,7 +847,9 @@
 
   function onClick(act, el) {
     if (!S) return;
-    if (act === 'card-done' || act === 'class-open' || act === 'card-add') return forget();
+    /* Log Out: the student's bulletins go. Another class (Switch Class, a card added) opens through
+       s/app.js openPage, which starts its own (bulletinsWith) before this runs: nothing to drop here. */
+    if (act === 'card-done') return forget();
     if (!on()) return;
     if (act === 'bulletin-link') return askLink(el);
     if (act === 'bulletin-react') return react(el);

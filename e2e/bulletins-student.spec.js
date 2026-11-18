@@ -174,7 +174,15 @@ test.describe('on a phone, 390 px', () => {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(
       page.locator('.sp-set-classes .sp-class', { hasText: 'Science 8' }).locator('.sp-bulletin-class-new'),
+    ).toHaveText('2 new');
+    await expect(
+      page.locator('.sp-set-classes .sp-class', { hasText: 'Humanities 8' }).locator('.sp-bulletin-class-new'),
     ).toHaveCount(0);
+    // Back to Science 8 from Switch Class: a class opened afresh, so it opens on Bulletins again.
+    await page.locator('.sp-set-classes .sp-class', { hasText: 'Science 8' }).click();
+    await expect(page.locator('.sp-head-title')).toHaveText('Science 8');
+    await expect(bar(page).locator('[data-tab="bulletins"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#sp-bulletin-new')).toBeVisible();
   });
 
   test('with the switch off: three tabs, nothing of Bulletins, nothing sent', async ({ page }) => {

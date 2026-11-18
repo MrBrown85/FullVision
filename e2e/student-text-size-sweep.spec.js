@@ -27,8 +27,8 @@ const WIDTHS = [
   { width: 430, height: 932 },
 ];
 const SIZES = ['normal', 'large', 'larger'];
-// The only boxes that may scroll sideways: the carousel's strip of pages.
-const SIDEWAYS = '.sp-car-track';
+// The only boxes that may scroll sideways: the carousel's strip of pages, and a bulletin file's.
+const SIDEWAYS = '.sp-car-track, .sp-bulletin-file-track';
 
 /* What `main` already draws at Normal on narrow phones (checked on main on
    2026-11-18, both engines): left as they are, since Normal must not
@@ -69,7 +69,8 @@ function faults(page, vw, vh) {
       const words = el => '"' + el.textContent.trim().replace(/\s+/g, ' ').slice(0, 30) + '"';
       if (document.documentElement.scrollWidth > W + 1)
         out.push('page wider than the screen: ' + document.documentElement.scrollWidth + ' > ' + W);
-      for (const el of document.querySelectorAll('#app *, .hv-layer *')) {
+      // The page, a handout open over it, and a bulletin link's question over it (on <body>).
+      for (const el of document.querySelectorAll('#app *, .hv-layer *, .sp-bulletin-ask, .sp-bulletin-ask *')) {
         if (!shown(el) || readerOnly(el)) continue;
         const r = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
@@ -89,10 +90,12 @@ function faults(page, vw, vh) {
           out.push('clipped: ' + name(el) + ' ' + words(el));
       }
       // A word drawn on two lines.
-      const walker = document.createTreeWalker(document.getElementById('app'), NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       for (let n = walker.nextNode(); n; n = walker.nextNode()) {
         const el = n.parentElement;
-        if (!el || !shown(el) || readerOnly(el) || inStrip(el)) continue;
+        if (!el || !el.closest('#app, .sp-bulletin-ask') || !shown(el) || readerOnly(el) || inStrip(el)) continue;
+        // A web address breaks anywhere, on purpose (the link question shows it whole).
+        if (el.closest('.sp-bulletin-ask-url')) continue;
         // Hyphens, slashes and dashes are places a line may break.
         for (const m of n.textContent.matchAll(/[^\s\-/–—·]{2,}/g)) {
           const range = document.createRange();
@@ -103,7 +106,7 @@ function faults(page, vw, vh) {
         }
       }
       // A sheet or menu: inside the screen, top and bottom.
-      for (const el of document.querySelectorAll('.sp-set, .sp-logout, .sp-sheet')) {
+      for (const el of document.querySelectorAll('.sp-set, .sp-logout, .sp-sheet, .sp-bulletin-ask')) {
         if (!shown(el)) continue;
         const r = el.getBoundingClientRect();
         if (r.top < -1 || r.bottom > H + 1)
@@ -113,19 +116,6 @@ function faults(page, vw, vh) {
     },
     [vw, vh, SIDEWAYS],
   );
-}
-
-/* A fourth tab is coming (Bulletins, first). Added here in the test only, by
-   copying a tab: the bar holds four labels at every width and size. */
-async function addFourthTab(page) {
-  await page.evaluate(() => {
-    const bar = document.querySelector('.sp-tabs-bottom');
-    const tab = bar.querySelector('.sp-tab').cloneNode(true);
-    tab.classList.remove('sp-tab-on');
-    tab.removeAttribute('aria-current');
-    tab.querySelector('.sp-tab-label').textContent = 'Bulletins';
-    bar.insertBefore(tab, bar.firstChild);
-  });
 }
 
 for (const vp of WIDTHS) {
@@ -151,26 +141,40 @@ for (const vp of WIDTHS) {
         expect(errors).toEqual([]);
       });
 
-      test('the tab bar holds four tabs', async ({ page }) => {
-        await openDemo(page, { size }, 'demo-card');
-        await addFourthTab(page);
-        /* Where the words are drawn (a range over the label's text), inside
+      /* Every bar the page can show: three tabs (Bulletins off, or no route on the
+         server), and four with Bulletins on (docs/plans/bulletins-plan.md B1d). */
+      for (const bulletins of [false, true]) {
+        test('the tab bar holds ' + (bulletins ? 'four tabs, Bulletins on' : 'three tabs'), async ({ page }) => {
+          if (bulletins) {
+            await page.goto('/s/');
+            await page.evaluate(() => localStorage.setItem('fv-build-bulletins', '1'));
+          }
+          await openDemo(page, { size }, 'demo-card');
+          /* Where the words are drawn (a range over the label's text), inside
            the tab's own box: a label's box can grow past its tab with the
            words in it, so its own scroll width proves nothing. */
-        const labels = await page.locator('.sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
-          els.map(el => {
-            const tab = el.closest('.sp-tab').getBoundingClientRect();
-            const range = document.createRange();
-            range.selectNodeContents(el);
-            const words = [...range.getClientRects()].filter(r => r.width > 0);
-            const fits = words.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1);
-            return { text: el.textContent, fits };
-          }),
-        );
-        expect(labels.map(l => l.text)).toEqual(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
-        expect(labels.filter(l => !l.fits)).toEqual([]);
-        expect((await faults(page, vp.width, vp.height)).filter(f => /tab/.test(f))).toEqual([]);
-      });
+          const labels = await page.locator('.sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
+            els.map(el => {
+              const tab = el.closest('.sp-tab').getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              const words = [...range.getClientRects()].filter(r => r.width > 0);
+              const fits = words.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1);
+              return { text: el.textContent, fits };
+            }),
+          );
+          expect(labels.map(l => l.text)).toEqual(
+            (bulletins ? ['Bulletins'] : []).concat(['Assignments', 'My Learning', 'Reflect']),
+          );
+          expect(labels.filter(l => !l.fits)).toEqual([]);
+          // The icons in one row, however the labels wrap.
+          const icons = await page
+            .locator('.sp-tabs-bottom .sp-tab-icon')
+            .evaluateAll(els => [...new Set(els.map(el => Math.round(el.getBoundingClientRect().top)))]);
+          expect(icons).toHaveLength(1);
+          expect((await faults(page, vp.width, vp.height)).filter(f => /tab/.test(f))).toEqual([]);
+        });
+      }
     });
   }
 }

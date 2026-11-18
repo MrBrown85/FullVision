@@ -2613,9 +2613,13 @@ html.sp-size-larger .sp-view .sp-head-class {
   color: var(--sp-text-2);
 }
 /* Switch Class: a class's "3 to do" goes under its name when both don't
-   fit, so a name is never broken mid-word. */
+   fit, so a name is never broken mid-word. The counts are held together
+   (.sp-class-counts), drawn at Normal as if they were the row's own items. */
 .sp-view .sp-set .sp-class {
   flex-wrap: wrap;
+}
+.sp-view .sp-class-counts {
+  display: contents;
 }
 .sp-view .sp-set .sp-class-words {
   flex: 1 1 7em;
@@ -2738,6 +2742,34 @@ html.sp-size-larger .sp-view .sp-head-class {
 .sp-view.sp-text-larger .sp-ml-row > .sp-level {
   margin-left: auto;
   max-width: 100%;
+}
+/* Switch Class at Large and Larger: the name and the tick hold one line,
+   and the counts ("3 to do", "2 new") go under the name, so the current
+   class's tick never drops to a line of its own. */
+.sp-view.sp-text-large .sp-set .sp-class,
+.sp-view.sp-text-larger .sp-set .sp-class {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+.sp-view.sp-text-large .sp-set .sp-class-words,
+.sp-view.sp-text-larger .sp-set .sp-class-words {
+  grid-column: 1;
+  grid-row: 1;
+}
+.sp-view.sp-text-large .sp-set .sp-class-tick,
+.sp-view.sp-text-larger .sp-set .sp-class-tick {
+  grid-column: 2;
+  grid-row: 1;
+}
+.sp-view.sp-text-large .sp-set .sp-class-counts,
+.sp-view.sp-text-larger .sp-set .sp-class-counts {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 /* The bottom tabs: a label's one long word ("Assignments") fits its tab, at
    12 px or less, from the bar's width (cqi): about six letter-widths to the

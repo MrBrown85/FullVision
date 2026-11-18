@@ -2268,6 +2268,17 @@ window.StudentPageView = (function () {
      `ui.classes` is the classes this device's session has opened
      ({ enrollmentId, name, block, toDo }, s/assignments.js), and
      `ui.classOn` the one showing; the preview has neither. */
+  /* A class's counts in Switch Class: how many pieces wait there ("3 to do"), once the server says,
+     and bulletins not seen there yet ("2 new", s/bulletins.js); nothing at 0. Held together, so at
+     Large and Larger they go under the name while the tick stays beside it (page-view.css). */
+  function countsHtml(c, ui) {
+    var news = ui.classNews && ui.classNews[c.enrollmentId] > 0 ? ui.classNews[c.enrollmentId] : 0;
+    var html =
+      (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
+      (news ? '<span class="sp-bulletin-class-new">' + esc(news + ' new') + '</span>' : '');
+    return html ? '<span class="sp-class-counts">' + html + '</span>' : '';
+  }
+
   function settingsSheetHtml(view, ui) {
     var first = String((view && view.student && view.student.firstName) || '').trim();
     var classes = (Array.isArray(ui.classes) ? ui.classes : []).filter(function (c) {
@@ -2293,12 +2304,7 @@ window.StudentPageView = (function () {
                 '</span>' +
                 (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
                 '</span>' +
-                // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
-                (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
-                // Bulletins not seen there yet ("2 new"), as the server counts them (s/bulletins.js).
-                (ui.classNews && ui.classNews[c.enrollmentId] > 0
-                  ? '<span class="sp-bulletin-class-new">' + esc(ui.classNews[c.enrollmentId] + ' new') + '</span>'
-                  : '') +
+                countsHtml(c, ui) +
                 (on ? '<span class="sp-class-tick">' + TICK + '</span>' : '') +
                 '</button></li>'
               );
