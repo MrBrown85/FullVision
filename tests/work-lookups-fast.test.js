@@ -177,6 +177,18 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     expect(wholeClassCopies).toBe(0);
   });
 
+  it('the Dashboard Inbox’s model for 635 pieces of work reads the class’s work once', () => {
+    seed();
+    wholeClassCopies = 0;
+    const m = DashInboxModel.build(CID, { seen: null });
+    // One read of the class's work for the whole model, not one for each ask.
+    expect(wholeClassCopies).toBe(1);
+    expect(m.pieces.length).toBeGreaterThan(20);
+    expect(m.rows).toHaveLength(4);
+    const ids = getStudents(CID).map(s => s.id);
+    expect(m.pieces.reduce((n, p) => n + p.tograde, 0)).toBe(GraderWork.classWorkCounts(CID, ids).tograde);
+  });
+
   it('the Assignments page: every card closed, one open, and one student', () => {
     openAssignments(seed, CID, {});
     closePages();

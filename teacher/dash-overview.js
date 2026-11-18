@@ -241,8 +241,12 @@ window.DashOverview = (function () {
         parts.push('<span class="dash-glance-old dash-obs-when is-overdue">Oldest ' + days + ' Days</span>');
       if (asked) parts.push('<b>' + asked + '</b> ' + (asked === 1 ? 'Question' : 'Questions'));
     }
+    // With the Inbox on the page a click goes to it (DashInbox.click); the link stays for a new tab.
+    var toInbox = rowOn() && !!window.DashInbox;
     return (
-      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0" data-href="' +
+      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0"' +
+      (toInbox ? ' data-dash-inbox-jump="1"' : '') +
+      ' data-href="' +
       esc('/assignments?course=' + (cid || '') + '&show=tograde') +
       '" aria-label="' +
       esc(
@@ -252,7 +256,7 @@ window.DashOverview = (function () {
           c.toreturn +
           ' not returned' +
           (asked ? ', ' + asked + (asked === 1 ? ' question' : ' questions') : '') +
-          ': open Assignments',
+          (toInbox ? ': go to the Inbox' : ': open Assignments'),
       ) +
       '">' +
       '<span class="dash-glance-label">To Grade</span>' +
@@ -1253,13 +1257,80 @@ window.DashOverview = (function () {
     var missing = DashInsights.missingItems(cid, allStudents);
     var html = '<div class="dash-section dash-overview">';
     html += glanceHtml(Object.assign({}, opts, { missing: missing }));
-    html +=
-      '<div class="dash-overview-row dash-overview-cards">' +
-      competenciesCardHtml(opts) +
-      coreCardHtml(opts) +
-      '</div>';
+    if (rowOn()) html += rowHtml(opts);
+    else
+      html +=
+        '<div class="dash-overview-row dash-overview-cards">' +
+        competenciesCardHtml(opts) +
+        coreCardHtml(opts) +
+        '</div>';
     html += '</div>';
     return html;
+  }
+
+  /* ── The middle row, behind the dashRow switch (D2, docs/plans/dashboard-inbox-plan.md) ──
+     One row: a left column at two thirds and one Competencies tile at one
+     third. The row is as tall as the window leaves it, never under 510 px,
+     so the Students heading starts below the first view. */
+  var ROW_MIN = 510;
+  var ROW_GAP = 12;
+  // The height last measured, so a redraw starts from it and nothing jumps.
+  var _rowH = null;
+
+  function rowOn() {
+    return !!(window.BuildFlags && BuildFlags.on('dashRow'));
+  }
+
+  /* The row's height: the window's height less where the row starts (on the
+     page at scroll 0) and less one gap, never under ROW_MIN. */
+  function rowHeight(winH, rowTop) {
+    return Math.max(ROW_MIN, Math.round(winH - rowTop - ROW_GAP));
+  }
+
+  /* Measures the row on screen, sets its height variable and keeps it for the
+     next draw. Where the row starts is read from the row itself, so the
+     photo-expiry line above the top bar is counted. */
+  function sizeRow() {
+    var row = document.querySelector('.dash-row');
+    if (!row) return null;
+    var main = document.getElementById('main');
+    var top = row.getBoundingClientRect().top + (main ? main.scrollTop : 0) + (window.scrollY || 0);
+    _rowH = rowHeight(window.innerHeight, top);
+    row.style.setProperty('--dash-row-h', _rowH + 'px');
+    return _rowH;
+  }
+
+  /* The left column: the Inbox slot, and under it Bulletins when that is on
+     and built. Neither module exists yet; a later slice defines it. */
+  function leftColumnHtml(opts) {
+    var cid = opts.cid;
+    var inboxHome =
+      window.DashInbox && window.GraderWork && GraderWork.workOnInClass && GraderWork.workOnInClass(cid)
+        ? DashInbox.html(cid)
+        : DashRecent.html(cid, opts.allStudents || []);
+    var bulletins =
+      window.BuildFlags && BuildFlags.on('bulletins') && window.DashBulletins ? DashBulletins.html(cid) : '';
+    return (
+      '<div class="dash-row-left' +
+      (bulletins ? ' has-bulletins' : '') +
+      '"><div class="dash-row-slot dash-row-inbox">' +
+      inboxHome +
+      '</div>' +
+      (bulletins ? '<div class="dash-row-slot dash-row-bulletins">' + bulletins + '</div>' : '') +
+      '</div>'
+    );
+  }
+
+  function rowHtml(opts) {
+    return (
+      '<div class="dash-row"' +
+      (_rowH ? ' style="--dash-row-h:' + _rowH + 'px"' : '') +
+      '>' +
+      leftColumnHtml(opts) +
+      '<div class="dash-row-comp">' +
+      DashCompetencies.html(opts) +
+      '</div></div>'
+    );
   }
 
   /* The Observations card, at the foot of the page. page-dashboard.js
@@ -1335,6 +1406,8 @@ window.DashOverview = (function () {
     renderDashToolbar: renderDashToolbar,
     studentControlsHtml: studentControlsHtml,
     renderOverviewPanel: renderOverviewPanel,
+    rowHeight: rowHeight,
+    sizeRow: sizeRow,
     obsCardHtml: obsCardHtml,
     glanceHtml: glanceHtml,
     questionsCardHtml: questionsCardHtml,
