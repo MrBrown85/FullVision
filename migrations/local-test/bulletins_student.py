@@ -62,6 +62,8 @@ as the owner, so these scenarios test M2 alone, not the teacher's functions.
            through (the old order, delete then lock, is shown to deadlock, so the race is real).
 """
 import json, os, re, sys, threading, time
+if os.environ.get("PG8000_PATH"): sys.path.insert(0, os.environ["PG8000_PATH"])
+import pg8000.native
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from card_codes_common import Db, tx, refused, ok, finish, nid, connect, message, sqlstate, split, text_of, KEY_ID
@@ -158,9 +160,42 @@ def world(tag, with_file=True):
     d.run('update assessment set is_draft = true where id = :a', a=w.a_draft)
     w.a_later = str(T(d, "create_assessment(:c, 'Next Week', p_idempotency_key => gen_random_uuid())", c=w.c))
     d.run("update assessment set date_assigned = current_date + 7 where id = :a", a=w.a_later)
+    if NONSUPER:
+        as_live_postgres(d)
     if with_file:
         r = d.file(FILE); ok('(setup %s) the file applies' % tag, r == 'ok', r)
     return w
+
+# FV_NONSUPER=<role>: the file is applied and undone as a role that is NOT a superuser, as Supabase's postgres
+# is. The world is made as the superuser; then this copy's app schemas and everything in them (M1's too) are
+# given to that role, which, like live's postgres, may read every table (pg_read_all_data) and act as anon,
+# authenticated and service_role, and every later statement on d's connection is that role's.
+NONSUPER = os.environ.get('FV_NONSUPER')
+def as_live_postgres(d):
+    role = NONSUPER
+    if not d.one('select exists (select 1 from pg_roles where rolname = :r)', r=role):
+        d.run('create role "%s" login nosuperuser' % role)
+    d.run('grant pg_read_all_data, anon, authenticated, service_role to "%s"' % role)
+    d.run("""do $own$ declare r record; begin
+      for r in select nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private') loop
+        execute format('alter schema %%I owner to %%I', r.nspname, '%(r)s'); end loop;
+      for r in select c.oid::regclass::text t, c.relkind k from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname in ('public', 'student_submit', 'fv_private') and c.relkind in ('r', 'p', 'v', 'm', 'S', 'f')
+                  and not exists (select 1 from pg_depend dp where dp.objid = c.oid and dp.classid = 'pg_class'::regclass and dp.deptype in ('a', 'i'))
+      loop execute format('alter %%s %%s owner to %%I', case r.k when 'S' then 'sequence' when 'v' then 'view' when 'm' then 'materialized view'
+                                                         when 'f' then 'foreign table' else 'table' end, r.t, '%(r)s'); end loop;
+      for r in select p.oid::regprocedure::text s, p.prokind k from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname in ('public', 'student_submit', 'fv_private')
+      loop execute format('alter %%s %%s owner to %%I', case r.k when 'p' then 'procedure' when 'a' then 'aggregate' else 'function' end, r.s, '%(r)s'); end loop;
+      for r in select t.oid::regtype::text s from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                where n.nspname in ('public', 'student_submit', 'fv_private') and t.typtype in ('d', 'e')
+      loop execute format('alter type %%s owner to %%I', r.s, '%(r)s'); end loop;
+    end $own$""" % {'r': role})
+    ok('(setup) the app schemas belong to %s, not a superuser' % role,
+       d.one("select r.rolname || ' ' || r.rolsuper::text from pg_class c join pg_roles r on r.oid = c.relowner where c.oid = 'student_submit.write_log'::regclass") == role + ' false')
+    d.c.close()
+    d.c = pg8000.native.Connection(role, host=os.environ.get('PGHOST', '127.0.0.1'), port=int(os.environ.get('PGPORT', '5432')), database=d.name)
+    ok('(setup) every later statement runs as %s, not a superuser' % role, d.one('select current_user::text || rolsuper::text from pg_roles where rolname = current_user') == role + 'false')
 
 def sign_in(d, code):
     r = d.verify(code, birthday='2012-05-15'); assert r['ok'], r

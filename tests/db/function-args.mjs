@@ -59,6 +59,7 @@ export const KIND_BY_ARG = {
   p_key: 'idempotency_key',
   p_bulletin_id: 'bulletin',
   p_bulletin_file_id: 'bulletin_file',
+  p_bulletin_ids: 'bulletin',
 };
 
 /* p_id, p_ids and p_src_id name a different kind in each function. */

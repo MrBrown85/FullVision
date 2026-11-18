@@ -260,13 +260,13 @@ Words 2000 characters; a link 2000; a link's name and a file's name 200; 20 page
 - **Character classes follow the database's collation.** On live (ICU `en-US`) `[[:space:]]` also matches non-ASCII spaces (U+00A0, U+3000, U+2028), so trimming words and names and the link check are stricter there than on a `C` database, where they match ASCII only. Nothing else in M1 depends on the collation; no list a teacher sees is ordered by text.
 - **M3 and M4 keep calling `fv_private.bulletin_patched`** from `post_bulletin` and `edit_bulletin`. Hidden characters in a link (U+200B to U+200F, U+202A to U+202E, U+2060 to U+2069, U+FEFF) and the assessment's same-class rule are refused by that function, not by the table.
 - **Notes for B1d, from B1b:**
-  - A class whose card has expired is still counted in `can see`.
+  - A class whose card has expired still gets a `new` count for Your Classes from the `bulletins` route: `_bulletin_session_enrollments` names every class on the device whose card is not stopped (it does not test `works_until`, as `_session_classes` does not), and `bulletins` counts that enrolment's visible bulletins with no seen mark. Opening that class is refused `card_expired`. M1's Seen by N of M counts the same student as `no_card`, not in `can_see`.
   - `bulletin-seen` is sent only for bulletins whose `seen_at` is null.
   - A 500 from `bulletin-seen` or `bulletin-react` means try again later.
 
 ## For B1b: the student's side (M2), to build exactly
 
-M2 adds these to `student_submit`, each `security definer`, `search_path` `public, student_submit, pg_temp`, executable by `service_role` only, each taking `p_ip_hash text` last, and **each beginning** `_in := student_submit._session_class(p_session_token, p_enrollment_id)` and answering `{ "ok": false, "error": _in->>'error' }` when it has one (that refuses a signed-out session, a paused or withdrawn student, a class with its page off or in the trash, and a stopped or expired card, in the middle of a session too). Only the session's own class (`_in->>'course_id'`) is ever read.
+M2 adds these to `student_submit`, each `security definer`, `search_path` `public, student_submit, pg_temp`, granted to `service_role` and no other role (the edge function signs in as the database's owner, which may run them grant or not, so they are stopped by dropping them), each taking `p_ip_hash text` last, and **each beginning** `_in := student_submit._session_class(p_session_token, p_enrollment_id)` and answering `{ "ok": false, "error": _in->>'error' }` when it has one (that refuses a signed-out session, a paused or withdrawn student, a class with its page off or in the trash, and a stopped or expired card, in the middle of a session too). The bulletins sent are the session's own class's (`_in->>'course_id'`); the counts in `new` also read the device's other classes' bulletins and only that device's own enrolments' seen marks.
 
 M2 also widens `student_submit.write_log`'s `write_log_kind_check` to add `bulletin` (drop and add in one transaction), and the two write routes call `student_submit._write_limit(card_id, 'bulletin', 120)` (shared by both: 120 an hour per card), answering its `{ ok: false, error: 'too_many', retry_after_s }` as it comes.
 
@@ -301,7 +301,7 @@ M2 also widens `student_submit.write_log`'s `write_log_kind_check` to add `bulle
 }
 ```
 
-`bulletins`: the session's class's visible bulletins, **oldest first** by `coalesce(case when shown_again_at is not null and seen_at is null then shown_again_at end, posted_at)`, then `id` (so one shown again and not seen by this student sits at the new end), the newest 100 of that order. Files are `ready` ones in `position` order (all of a visible bulletin's are). `new`: for every class `student_submit._session_classes(session)` lists for this device, that enrolment's visible bulletins with no `bulletin_seen` row of theirs: the student's own count, for the red number and "2 new". Read-only (`stable`).
+`bulletins`: the session's class's visible bulletins, **oldest first** by `coalesce(case when shown_again_at is not null and seen_at is null then shown_again_at end, posted_at)`, then `id` (so one shown again and not seen by this student sits at the new end), the newest 100 of that order. Files are `ready` ones in `position` order (all of a visible bulletin's are). `new`: for every enrolment `student_submit._bulletin_session_enrollments(session)` names for this device (a private helper that mirrors the tests of `_session_classes`, without its to-do counts and names; `tests/student-submit-bulletin-mirror.test.js` holds the two together), that enrolment's visible bulletins with no `bulletin_seen` row of theirs: the student's own count, for the red number and "2 new". Read-only (`stable`).
 
 ### `student_submit.bulletin_seen(p_session_token text, p_enrollment_id uuid, p_bulletin_ids uuid[], p_ip_hash text) → jsonb` (route `bulletin-seen`)
 
