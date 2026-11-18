@@ -4313,8 +4313,47 @@ function _classMeta(cid) {
   return _safeParseLS('gb-bundle-meta-' + cid, null);
 }
 
+/* A class's saved copy with a part this device could not save (the browser's
+   storage was full): cid → the keys that failed. Such a copy is never
+   opened from, because it reads as a class with nothing in that part: on
+   Nov 18 2026 a phone whose scores would not fit reopened History 12 after
+   Safari reloaded the page with every Missing mark and no scores, so every
+   student read IE 0%, and the server answered "not modified" to the copy's
+   version, so it stayed that way. Its record (gb-bundle-meta) is removed
+   instead, and the class is downloaded in full the next time it opens. */
+var _copyKeysUnsaved = {};
+function _classOfCopyKey(key) {
+  if (typeof key !== 'string' || key.indexOf('gb-') !== 0 || key.indexOf('gb-bundle-meta-') === 0) return null;
+  var m = key.match(/-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+  return m ? m[1] : null;
+}
+function _copyKeyUnsaved(key) {
+  var cid = _classOfCopyKey(key);
+  if (!cid) return;
+  (_copyKeysUnsaved[cid] || (_copyKeysUnsaved[cid] = new Set())).add(key);
+  _dropClassMeta(cid);
+}
+function _copyKeySaved(key) {
+  var cid = _classOfCopyKey(key);
+  if (!cid || !_copyKeysUnsaved[cid]) return;
+  _copyKeysUnsaved[cid].delete(key);
+  if (!_copyKeysUnsaved[cid].size) delete _copyKeysUnsaved[cid];
+}
+function _dropClassMeta(cid) {
+  try {
+    localStorage.removeItem('gb-bundle-meta-' + cid);
+  } catch (e) {
+    /* storage unreadable: there is no copy to open from either */
+  }
+}
+
 function _saveClassMeta(cid, patch) {
   var meta = Object.assign({}, _classMeta(cid) || {}, patch);
+  // An incomplete copy keeps no record, so it is never opened from.
+  if (_copyKeysUnsaved[cid]) {
+    _dropClassMeta(cid);
+    return meta;
+  }
   _safeLSSet('gb-bundle-meta-' + cid, JSON.stringify(meta));
   return meta;
 }
@@ -4964,6 +5003,7 @@ function _safeLSSet(key, value) {
     }
     console.warn('localStorage write failed (' + key + '):', e);
     if (key.indexOf('gb-scores-') === 0) _scoresApart[key] = true;
+    _copyKeyUnsaved(key);
     // Every quota failure counts until that key saves again; the sync dot
     // says so (getSaveProblem).
     if (e.name === 'QuotaExceededError' && !_storageFullKeys.has(key)) {
@@ -4975,6 +5015,7 @@ function _safeLSSet(key, value) {
 }
 
 function _storageSaved(key) {
+  _copyKeySaved(key);
   if (_storageFullKeys.delete(key)) _saveProblemChanged();
 }
 
