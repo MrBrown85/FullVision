@@ -15,6 +15,12 @@ MQ1 is two files, applied in this order, each under 40 KB: `migrations/202611180
 5. **`confirm_quiz` refuses two tries of one student both given a `marked` in one call**: `22023` `bad_marks`, detail "Each student is confirmed on one try."
 6. All refusals, with their exact words, are in one table under "Teacher functions".
 
+**Three notes for app builders (from the review):**
+
+- Send `updated_at` back as the exact string received. Parsed and cut to milliseconds (as a JavaScript `Date` does) it no longer matches, and every save is `stale`.
+- Never reuse an idempotency key across pieces: a key already used makes a `save_quiz` of another piece save nothing; it answers that piece as it is, unchanged.
+- Trimming is ASCII white space only, so the form trims Unicode white space (a no-break space and the like) itself before sending.
+
 ## Where this differs from the brief or the plan
 
 1. **`quiz_answer` carries `assessment_id`** as well, so two composite keys make an answer to another quiz's question impossible in the table itself, whatever a later function does.
