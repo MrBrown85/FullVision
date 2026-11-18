@@ -127,7 +127,7 @@ window.BulletinSeen = (function () {
       var again =
         st.again === 'done'
           ? '<span class="bsl-aside">Back at the top of their student page.</span>'
-          : '<div class="bsl-again-row"><button type="button" class="bsl-again" data-bulletin="again" data-id="' +
+          : '<div class="bsl-again-row"><button type="button" class="btn btn-ghost bsl-again" data-bulletin="again" data-id="' +
             esc(b.id) +
             '" data-all="' +
             notSeen.length +
