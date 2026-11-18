@@ -52,6 +52,12 @@
   text-decoration: underline;
 }
 
+#bulletin-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* ── Cards ── */
 .bulletin-card {
   background: var(--surface);

@@ -43,10 +43,6 @@
   function _pad(n) {
     return String(n).padStart(2, '0');
   }
-  /** @param {Date} d */
-  function _ymd(d) {
-    return d.getFullYear() + '-' + _pad(d.getMonth() + 1) + '-' + _pad(d.getDate());
-  }
   /** @param {string} ymd @returns {Date | null} */
   function _dayOf(ymd) {
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ''));
@@ -1329,7 +1325,7 @@
       '<div class="bulletin-page"><div class="bulletin-col">' +
       '<div class="bulletin-top" id="bulletin-head"></div>' +
       (offeredNothing ? '' : '<div id="bulletin-composer"></div>') +
-      '<div id="bulletin-feed" class="bulletin-feed-col" style="display:flex;flex-direction:column;gap:12px"></div>' +
+      '<div id="bulletin-feed"></div>' +
       '</div></div>';
     _drawHead();
     if (!offeredNothing) _drawComposer();
