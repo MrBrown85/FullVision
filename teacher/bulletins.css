@@ -568,3 +568,12 @@ textarea.bulletin-field {
     padding: 14px 12px 32px;
   }
 }
+
+/* A bulletin arrived at from the Dashboard's tile: outlined for a few seconds, with room above it when scrolled to. */
+.bulletin-post {
+  scroll-margin-top: 16px;
+}
+.bulletin-arrived {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}

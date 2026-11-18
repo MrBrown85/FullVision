@@ -167,7 +167,7 @@ body.fv-switching-course::after {
   width: auto;
   height: auto;
   padding: 8px 16px;
-  background: var(--color-primary, #007aff);
+  background: var(--active-fill);
   color: #fff;
   border-radius: 8px;
   font-size: 14px;
@@ -1385,9 +1385,9 @@ body.fv-switching-course::after {
     color 0.15s;
 }
 .m-filter-pill.m-filter-active {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
-  border-color: var(--active);
+  border-color: var(--active-fill);
 }
 /* Wrapping variant used inside the Grade-picker filter sheet — categories
  * and modules can exceed one line. */
@@ -1435,7 +1435,7 @@ body.fv-switching-course::after {
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -1482,7 +1482,7 @@ body.fv-switching-course::after {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   border: none;
   box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
@@ -1654,7 +1654,7 @@ body.fv-switching-course::after {
   width: 100%;
   padding: 14px;
   border-radius: 12px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   border: none;
   font-size: 17px;
@@ -1808,8 +1808,8 @@ body.fv-switching-course::after {
   min-height: 32px;
 }
 .m-work-tab-on {
-  background: var(--active);
-  border-color: var(--active);
+  background: var(--active-fill);
+  border-color: var(--active-fill);
   color: #fff;
 }
 
@@ -2581,7 +2581,7 @@ body.fv-switching-course::after {
   margin-top: 16px;
   border: none;
   border-radius: 12px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-family: inherit;
   font-size: 17px;
@@ -4425,7 +4425,7 @@ body.fv-switching-course::after {
   color: var(--active);
 }
 .m-crit-comment-btn.is-on {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .m-crit-comment-btn.is-labelled {
@@ -4797,7 +4797,7 @@ body.fv-switching-course::after {
   min-height: 48px;
   border: none;
   border-radius: 14px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 17px;
@@ -4933,7 +4933,7 @@ body.fv-switching-course::after {
   height: 36px;
   padding: 0 14px;
   border-radius: 18px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -5004,7 +5004,7 @@ body.fv-switching-course::after {
 
 /* The confirm sheet's action is the filled button; Cancel stays plain. */
 .m-confirm-sheet .m-confirm-ok {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -5032,7 +5032,7 @@ body.fv-switching-course::after {
   height: 26px;
   padding: 0 10px;
   border-radius: 13px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 14px;
   font-weight: 700;
@@ -5045,7 +5045,7 @@ body.fv-switching-course::after {
 }
 /* To Grade's count is blue, as on the board. */
 .m-seg-count.m-seg-count-tograde {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 /* All Caught Up: a green tick, the line, and See All Assessments as a pill. */
@@ -5448,7 +5448,7 @@ body.fv-switching-course::after {
   min-height: 44px;
   border: none;
   border-radius: 12px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 16px;
@@ -5618,7 +5618,7 @@ body.fv-switching-course::after {
   gap: 5px;
   padding: 7px 14px;
   border-radius: 18px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -5758,7 +5758,7 @@ body.fv-switching-course::after {
   font-size: 13px;
 }
 .m-addwork-pile-name.is-now {
-  background: #0a84ff;
+  background: var(--active-fill);
 }
 .m-addwork-pile-name.is-done {
   opacity: 0.5;
@@ -5839,7 +5839,7 @@ body.fv-switching-course::after {
   min-height: 50px;
   border: none;
   border-radius: 12px;
-  background: #0a84ff;
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 17px;
@@ -5916,7 +5916,7 @@ body.fv-switching-course::after {
   gap: 10px;
 }
 .m-addwork-conflict .m-addwork-choice {
-  background: var(--active);
+  background: var(--active-fill);
 }
 .m-addwork-conflict .m-addwork-conflict-more .m-addwork-choice {
   flex: 1 1 0;
@@ -6170,7 +6170,7 @@ body.fv-switching-course::after {
   cursor: pointer;
 }
 .m-markup-btn.is-main {
-  background: #0a84ff;
+  background: var(--active-fill);
 }
 .m-markup-tools {
   display: flex;
@@ -6187,7 +6187,7 @@ body.fv-switching-course::after {
   cursor: pointer;
 }
 .m-markup-tool.is-on {
-  background: #0a84ff;
+  background: var(--active-fill);
 }
 .m-markup-note-edit {
   display: flex;
@@ -6348,7 +6348,7 @@ body.fv-switching-course::after {
   margin-top: 16px;
   border: none;
   border-radius: 14px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 17px;

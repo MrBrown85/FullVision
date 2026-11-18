@@ -227,7 +227,7 @@ span.obsc-chip-label {
   padding: 5px 16px;
   border: 0;
   border-radius: var(--radius-sm, 8px);
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: var(--text-sm, 13px);
@@ -826,7 +826,7 @@ span.obsc-chip-label {
   outline: none;
 }
 .obs-menu-item.on {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .obs-menu-none {
@@ -1119,8 +1119,8 @@ span.obsc-chip-label {
   background: var(--overlay-hover);
 }
 .obs-fu-chip.on {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .obs-fu-chip.on[data-fu-kind='resolved'] {

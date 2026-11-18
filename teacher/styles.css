@@ -56,6 +56,11 @@
   --text-3: #58585d;
   --active: #007aff;
   --active-light: rgba(0, 122, 255, 0.08);
+  /* The blue under white words: filled buttons, chosen chips, count badges.
+     White on --active is 4.02:1, under the 4.5:1 that words need; white on
+     this is 5.57:1. Anything that is not under words (focus rings, borders,
+     switches, dots, bars) stays --active. */
+  --active-fill: #0066cc;
   /* Blue for text (links, "→" actions, blue labels and counts). --active stays
      for fills, focus rings, selected states and icons; as text it is under
      4.5:1. --link is the nearest shade that passes on --surface, --bg and
@@ -70,7 +75,7 @@
   --priority-light: rgba(255, 59, 48, 0.08);
 
   /* Interactive states */
-  --btn-hover-blue: #0066dd;
+  --btn-hover-blue: #0052a3; /* white on it: 7.68:1; 1.38 darker than --active-fill */
   --toggle-hover-dark: #1a1a2e;
 
   /* Status badges */
@@ -247,7 +252,7 @@ textarea:focus {
   position: fixed;
   top: -100px;
   left: 16px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   padding: 8px 16px;
   z-index: var(--z-skip);
@@ -672,8 +677,8 @@ body.offline-active #app-dock {
   border-color: var(--text-3);
 }
 .tb-help-btn.is-open {
-  background: var(--active);
-  border-color: var(--active);
+  background: var(--active-fill);
+  border-color: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -1255,7 +1260,7 @@ body.offline-active #app-dock {
   font-weight: 600;
   border-radius: 8px;
   white-space: nowrap;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -1870,7 +1875,7 @@ body.offline-active #app-dock {
   font-size: var(--text-base);
   font-weight: 600;
   letter-spacing: 0.01em;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -2340,7 +2345,7 @@ body.offline-active #app-dock {
 }
 /* Primary — filled blue */
 .btn-primary {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .btn-primary:hover {
@@ -2823,7 +2828,7 @@ body.offline-active #app-dock {
   filter: brightness(0.85);
 }
 .confirm-ok.primary {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .confirm-ok.primary:hover {
@@ -2874,7 +2879,7 @@ body.offline-active #app-dock {
   cursor: pointer;
 }
 .drafts-print-give {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .drafts-print-give:hover {
@@ -3215,6 +3220,10 @@ body.offline-active #app-dock {
     --text-3: #98989d;
     --active: #0a84ff;
     --active-light: rgba(10, 132, 255, 0.18);
+    /* White on --active here is 3.65:1; white on this is 4.64:1, and it is 3.00:1
+       against --surface, so a chosen pill still stands out from an unchosen one.
+       The hover is darker, like the app's other hovers. */
+    --active-fill: #0072e4;
     --link: #5ca9ff;
     --priority: #ff453a;
     --priority-light: rgba(255, 69, 58, 0.18);
@@ -3243,7 +3252,7 @@ body.offline-active #app-dock {
     --obs-note-on: #1d1d1f;
     --obs-note-text: #ffd60a;
     --obs-note-edge: #ffd60a;
-    --btn-hover-blue: #409cff;
+    --btn-hover-blue: #005ac0; /* white on it: 6.51:1 */
     --toggle-hover-dark: #4a4a4e;
     --danger: #ff453a;
     --iep-badge: #ff9f0a;
