@@ -256,7 +256,7 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 Teachers asked to show students the score with its Factor: an assignment out of 6 at Factor 4× shown as 20 / 24. Colin chose the design on Nov 18.
 
 - **The score as entered stays the only score.** The teacher grades out of the Max Points (5 / 6); the factored score is worked out for display only (`factoredPoints` in `constants.js`, beside `formatPoints`) and nothing about the course % changes. The percent is the same either way.
-- **The grader shows it beside each score box**, read-only: "= 20 / 24", on points work whose Factor isn't 1×. The gradebook cell is unchanged.
+- **The grader shows it beside each score box**, read-only: "= 20 / 24", on points work whose Factor isn't 1×; the phone grader shows it under the %. The gradebook cell is unchanged.
 - **Students see it only when the teacher says so**: Show Students the Factored Score, a switch under the share bar on the assessment form, per assessment, off by default (`assessment.students_see_factored`). It is on the form only for points work at a Factor other than 1×. With it on, the student's result reads "20 / 24" with the same percent and bar; nothing else is added.
 - Linked copies take it like the Factor; Duplicate copies it. A restored backup or a Teams import starts with it off.
 
