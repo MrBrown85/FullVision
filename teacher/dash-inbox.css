@@ -56,35 +56,54 @@
   overscroll-behavior: contain;
 }
 
-/* A row: pictures, the piece, and one button. 88 px of picture and 10 px
-   above and below, so no row is ever shorter than the pictures it holds. */
+/* A row: pictures, the piece, and one button. The rows with pages share the
+   list's height (board A and Heights: "the pages grow with the row"), each
+   at least 109 px (88 px of picture and 10 px above and below, so no page is
+   under 80 px); a piece with nothing in is a slim row of its own height. The
+   pages are as tall as their row (container units), and never wider than
+   two fifths of it, so the piece's words keep their room. */
+.dash-inbox-list {
+  display: flex;
+  flex-direction: column;
+}
 .dash-inbox-row {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   box-sizing: border-box;
-  height: 109px;
+  flex: 1 0 109px;
+  min-height: 109px;
   padding: 10px 4px;
   scroll-snap-align: start;
+  container-type: size;
 }
 .dash-inbox-row + .dash-inbox-row {
   border-top: 1px solid var(--divider-subtle);
 }
 .dash-inbox-row.is-slim {
   display: block;
-  height: auto;
+  flex: 0 0 auto;
+  min-height: 0;
   padding: 8px 4px;
+  container-type: normal;
+}
+.dash-inbox-row.is-slim.has-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 52px;
 }
 .dash-inbox-pics {
+  --dash-inbox-pic-h: clamp(88px, 100cqh, calc((40cqw - 48px) / 0.75));
   position: relative;
-  height: 88px;
+  width: calc(var(--dash-inbox-pic-h) * 0.75 + 48px);
+  height: var(--dash-inbox-pic-h);
 }
 .dash-inbox-pic {
   position: absolute;
   top: 0;
-  width: 66px;
-  height: 88px;
+  width: calc(var(--dash-inbox-pic-h) * 0.75);
+  height: var(--dash-inbox-pic-h);
   box-sizing: border-box;
   overflow: hidden;
   background: #f4f1ea;
@@ -120,7 +139,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  width: 84px;
+  width: max(84px, calc(var(--dash-inbox-pic-h) * 0.75));
   padding: 5px 3px;
   color: #3b3b3f;
   background-color: #fbfaf6;
@@ -152,17 +171,20 @@
   display: block;
   white-space: nowrap;
 }
-/* +N: students' own sends since the last look. */
+/* +N: students' own sends since the last look; a white label with an edge,
+   as the board draws it. */
 .dash-inbox-new {
   position: absolute;
-  right: 0;
+  right: -4px;
   bottom: -2px;
   z-index: 4;
   padding: 0 6px;
   font-size: var(--text-xs);
   font-weight: 700;
-  color: #fff;
-  background: var(--active-fill);
+  line-height: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
   border-radius: 9px;
 }
 
@@ -190,7 +212,8 @@
   text-decoration: underline;
 }
 .dash-inbox-name:focus-visible,
-.dash-inbox-grade:focus-visible {
+.dash-inbox-grade:focus-visible,
+.dash-inbox-add:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
   border-radius: 4px;
@@ -243,21 +266,14 @@
   font-weight: 600;
   color: var(--score-2-text);
 }
-.dash-inbox-grade {
-  height: 30px;
-  padding: 0 12px;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: #fff;
+/* Grade Submissions and Add Work for the Class: the app's .btn-ghost, as the
+   board draws them; Grade Submissions in the link colour. */
+.dash-inbox-grade,
+.dash-inbox-add {
   white-space: nowrap;
-  background: var(--active-fill);
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
 }
-.dash-inbox-grade:hover {
-  filter: brightness(0.92);
+.dash-inbox-grade {
+  color: var(--link);
 }
 
 /* All Caught Up, and the busy day's folded line. */
@@ -423,11 +439,13 @@
 /* Under 900 px the tiles stack; a row's button goes under its words. */
 @media (max-width: 600px) {
   .dash-inbox-row {
-    grid-template-columns: 120px minmax(0, 1fr);
-    height: 144px;
+    grid-template-columns: auto minmax(0, 1fr);
+    flex-basis: 144px;
+    min-height: 144px;
     align-content: center;
   }
-  .dash-inbox-grade {
+  .dash-inbox-grade,
+  .dash-inbox-add {
     grid-column: 2;
     justify-self: start;
   }

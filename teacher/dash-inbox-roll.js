@@ -180,6 +180,8 @@ window.DashInboxRoll = (function () {
     var excused = 0;
     /** @type {string[]} */
     var paper = [];
+    /** @type {string[]} */
+    var lateNames = [];
     roster.forEach(function (s) {
       var isIn = !!inSet[s.id];
       var state = GW.workStateOf(cid, aid, s.id);
@@ -235,7 +237,10 @@ window.DashInboxRoll = (function () {
         said: '',
       };
       c.said = _said(c);
-      if (kind === 'in' && c.late) late++;
+      if (kind === 'in' && c.late) {
+        late++;
+        lateNames.push(c.full);
+      }
       if (kind === 'in' && c.paper) paper.push(c.full);
       if (status === 'excused') excused++;
       out.students.push(c);
@@ -268,15 +273,20 @@ window.DashInboxRoll = (function () {
       all: ids.length,
     };
     out.paperNames = paper;
-    out.foot = footText(out.counts, paper);
+    out.lateNames = lateNames;
+    out.foot = footText(out.counts, paper, lateNames);
     return out;
   }
 
-  /** "10 in · 17 not in · 2 Late · Ethan Dubois on paper".
-   * @param {{ in: number, notin: number, late: number, excused?: number }} c @param {string[]} paper */
-  function footText(c, paper) {
+  /** "10 in · 17 not in · 2 Late · Ethan Dubois on paper". Given who is late,
+   * one or two are named as the board names them ("Late: Sam Blackwood,
+   * Fatima Hassan"); the name chips do not carry the word.
+   * @param {{ in: number, notin: number, late: number, excused?: number }} c @param {string[]} paper
+   * @param {string[]} [late] */
+  function footText(c, paper, late) {
     var s = [c.in + ' in', c.notin + ' not in'];
-    if (c.late) s.push(c.late + ' Late');
+    if (late && late.length && late.length <= 2 && late.length === c.late) s.push('Late: ' + late.join(', '));
+    else if (c.late) s.push(c.late + ' Late');
     if (c.excused) s.push(c.excused + ' Excused');
     if (paper.length === 1) s.push(paper[0] + ' on paper');
     else if (paper.length === 2) s.push(paper[0] + ' and ' + paper[1] + ' on paper');
@@ -285,8 +295,9 @@ window.DashInboxRoll = (function () {
   }
 
   /* ── Drawing ───────────────────────────────────────────── */
+  // Returned work: a green tick, as on Side by Side's pages (board C4).
   var TICK =
-    '<svg class="dash-inbox-roll-tick" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.2 6.4 4.9 9 9.8 3.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    '<svg class="dash-inbox-roll-tick" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.4 8.3 6.9 10.7 11.6 5.6" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var PAPER =
     '<svg class="dash-inbox-roll-paper" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 1.5h4.2L9.5 3.8V10.5H3z M7 1.5v2.5h2.5 M4.6 6h3.4 M4.6 8h3.4" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>';
 
@@ -327,6 +338,9 @@ window.DashInboxRoll = (function () {
       '"';
     var mark = (c.state === 'returned' && c.kind === 'in' ? TICK : '') + (c.paper ? PAPER : '');
     var tag = _tag(c);
+    // A name chip says Late on the foot line, by name, as the board does; a
+    // page keeps the word on its corner.
+    if (form === 'names' && tag === 'Late') tag = '';
     var tagHtml = tag
       ? '<span class="dash-inbox-roll-tag is-' + tag.toLowerCase() + '" aria-hidden="true">' + tag + '</span>'
       : '';
@@ -420,6 +434,12 @@ window.DashInboxRoll = (function () {
       '</div><div class="dash-inbox-roll-foot"><span class="dash-inbox-roll-count" role="status">' +
       esc(m.foot) +
       '</span>' +
+      // What the tick means, once, where any chip has one.
+      (m.students.some(function (/** @type {any} */ c) {
+        return c.kind === 'in' && c.state === 'returned';
+      })
+        ? '<span class="dash-inbox-roll-key">' + TICK + 'Returned</span>'
+        : '') +
       all +
       '</div></div>'
     );

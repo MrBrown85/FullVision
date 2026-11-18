@@ -1,40 +1,52 @@
 /* The assessment switch the Inbox's views share (D6 of
-   docs/plans/dashboard-inbox-plan.md): one button a piece, scrolling sideways
-   inside itself. Loaded on its own, so no view depends on another's stylesheet. */
-/* The switch: one button a piece, scrolling sideways inside itself. */
+   docs/plans/dashboard-inbox-plan.md): one button a piece, drawn as board C
+   draws it, a segmented control on the app's .seg track with the chosen piece
+   raised. It scrolls sideways inside itself when the pieces do not fit (the
+   switch keeps the chosen one in view). Loaded on its own, so no view depends
+   on another's stylesheet. */
 .dash-inbox-pick {
   display: flex;
   flex: 0 0 auto;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 2px 2px 4px;
+  align-self: flex-start;
+  gap: 2px;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0 0 10px;
+  padding: 2px;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  background: var(--seg-track);
+  border-radius: 8px;
+}
+.dash-inbox-pick::-webkit-scrollbar {
+  display: none;
 }
 .dash-inbox-pick-btn {
   flex: 0 0 auto;
-  height: 28px;
-  padding: 0 12px;
+  height: 22px;
+  padding: 0 10px;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 22px;
   color: var(--text-2);
   white-space: nowrap;
-  background: var(--surface);
-  border: 1px solid var(--divider-strong);
-  border-radius: 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
   cursor: pointer;
 }
 .dash-inbox-pick-btn:hover {
   color: var(--text);
 }
 .dash-inbox-pick-btn[aria-pressed='true'] {
+  font-weight: 600;
   color: var(--text);
-  background: var(--surface-2);
-  border-color: var(--active);
+  background: var(--seg-thumb);
+  box-shadow: var(--shadow-sm);
 }
 .dash-inbox-pick-btn:focus-visible {
   outline: 2px solid var(--active);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }

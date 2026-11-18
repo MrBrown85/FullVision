@@ -8886,6 +8886,18 @@ button.rb-v-prompt {
   border-radius: 0;
   box-shadow: none;
 }
+/* In the tile every view's rows share the page's whole height, as Level Mix's
+   do (board D; "each fills the tile's height"), so no view leaves a band of
+   empty tile under its list. The old cards' 44 and 64 px tops held two cards
+   to one height; the tile is as tall as the row. */
+.dash-comp-tile .dash-comp-row,
+.dash-comp-tile .dash-comp-card.is-roomy .dash-comp-row,
+.dash-comp-tile .dash-core-row {
+  max-height: none;
+}
+.dash-comp-tile .dash-core-group {
+  max-height: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .dash-comp-track,
   .dash-comp-page {

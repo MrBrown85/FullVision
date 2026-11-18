@@ -187,6 +187,13 @@
 .dash-inbox-flip-meta > span {
   flex: 0 0 auto;
 }
+/* The board's caption reads as one line of words: "Sat 3:30 pm · 1 page". */
+.dash-inbox-flip-meta > span + span::before {
+  content: '·';
+  margin-right: 8px;
+  font-weight: 400;
+  color: var(--text-2);
+}
 .dash-inbox-flip-quiet {
   color: var(--text-3);
 }
@@ -275,7 +282,7 @@
 }
 .dash-inbox-flip-slider::-webkit-slider-runnable-track {
   height: 24px;
-  background: var(--divider-strong);
+  background: var(--seg-track);
   border-radius: 12px;
 }
 .dash-inbox-flip-slider::-webkit-slider-thumb {
@@ -291,7 +298,7 @@
 }
 .dash-inbox-flip-slider::-moz-range-track {
   height: 24px;
-  background: var(--divider-strong);
+  background: var(--seg-track);
   border-radius: 12px;
 }
 .dash-inbox-flip-slider::-moz-range-thumb {

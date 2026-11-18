@@ -250,18 +250,37 @@ window.DashInbox = (function () {
       (first
         ? '<p class="dash-inbox-newest">Newest: ' + esc(first.name) + ', ' + esc(whenText(cid, first.at)) + '</p>'
         : '') +
-      '</div><button type="button" class="dash-inbox-grade" data-dash-inbox="grade" data-aid="' +
+      '</div><button type="button" class="btn btn-ghost dash-inbox-grade" data-dash-inbox="grade" data-aid="' +
       esc(p.aid) +
       '">Grade Submissions</button></li>'
     );
   }
 
-  /** A piece taking work with nothing in yet: two lines.
+  /** Whether Add Work for the Class takes work for this piece.
+   * @param {string} cid @param {string} aid */
+  function _addWorkPiece(cid, aid) {
+    var AW = /** @type {any} */ (window).AddWorkClass;
+    if (!AW || typeof getAssessments !== 'function') return null;
+    var a = (getAssessments(cid) || []).filter(function (/** @type {any} */ x) {
+      return x.id === aid;
+    })[0];
+    return a && AW.offered(cid, a) ? a : null;
+  }
+
+  /** A piece taking work with nothing in yet: two lines, and Add Work for the
+   * Class beside them (board A) where that page takes work for it.
    * @param {string} cid @param {any} p */
   function slimRowHtml(cid, p) {
     var until = p.closesOn ? untilText(p.closesOn) : '';
+    var add = _addWorkPiece(cid, p.aid)
+      ? '<button type="button" class="btn btn-ghost dash-inbox-add" data-dash-inbox="addwork" data-aid="' +
+        esc(p.aid) +
+        '">Add Work for the Class</button>'
+      : '';
     return (
-      '<li class="dash-inbox-row is-slim" data-aid="' +
+      '<li class="dash-inbox-row is-slim' +
+      (add ? ' has-add' : '') +
+      '" data-aid="' +
       esc(p.aid) +
       '"><div class="dash-inbox-info"><button type="button" class="dash-inbox-name" data-dash-inbox="wall" data-aid="' +
       esc(p.aid) +
@@ -269,7 +288,9 @@ window.DashInbox = (function () {
       esc(p.title) +
       '</button><p class="dash-inbox-counts"><span class="dash-inbox-main">Nothing in yet' +
       (until ? ' · ' + esc(until) : '') +
-      '</span></p></div></li>'
+      '</span></p></div>' +
+      add +
+      '</li>'
     );
   }
 
@@ -631,6 +652,10 @@ window.DashInbox = (function () {
     };
     if (el.getAttribute('data-dash-inbox') === 'wall') {
       if (window.WorkWall) WorkWall.open(cid, aid, { onClose: redraw });
+      return true;
+    }
+    if (el.getAttribute('data-dash-inbox') === 'addwork') {
+      if (_addWorkPiece(cid, aid)) /** @type {any} */ (window).AddWorkClass.open(cid, aid, { onClose: redraw });
       return true;
     }
     if (el.getAttribute('data-dash-inbox') === 'grade') {

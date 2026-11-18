@@ -830,7 +830,9 @@ window.DashOverview = (function () {
       viewMenuHtml({ id: 'comp', label: 'Curricular Competencies view', views: _compViews(level), current: view }) +
       '<a role="link" tabindex="0" data-href="/gradebook?course=' +
       esc(cid) +
-      '">View Gradebook →</a></div>';
+      // The board's words (board D): the tile hides the card's title, so the
+      // link sits beside the view pill at 335 px.
+      '">Gradebook →</a></div>';
     // Level Mix: the Competencies tile draws the body in place of this empty one.
     if (view === 'mix' && cols.length) return html + '<div class="dash-comp-body"></div></section>';
     html +=

@@ -123,7 +123,7 @@ window.DashCompetencies = (function () {
       '">' +
       '<div class="dash-comp-tile-head">' +
       '<h2 class="dash-comp-tile-title" id="dash-comp-tile-title">Competencies</h2>' +
-      '<div class="seg dash-comp-seg" role="tablist" aria-label="Competencies">' +
+      '<div class="seg seg-sm dash-comp-seg" role="tablist" aria-label="Competencies">' +
       tabs +
       '</div>' +
       '</div>' +
@@ -318,6 +318,7 @@ window.DashCompetencies = (function () {
       '<button type="button" class="dash-comp-ln' +
       (split ? ' is-split' : '') +
       (r.tag ? ' is-flag' : '') +
+      (r.tag === 'Lowest' ? ' is-low' : '') +
       (r.picked ? ' is-picked' : '') +
       '" data-comp-open="' +
       esc(r.key) +
@@ -329,8 +330,16 @@ window.DashCompetencies = (function () {
       esc(r.label) +
       '"><span class="dash-comp-ln-name">' +
       esc(r.name) +
-      '</span><span class="dash-comp-ln-num">' +
-      (r.tag ? '<span class="dash-comp-ln-tag">' + esc(r.tag) + '</span>' : '') +
+      '</span><span class="dash-comp-ln-num' +
+      (r.tag === 'Only' ? ' is-few' : '') +
+      '">' +
+      // As board D draws them: "Lowest" a red label beside the number, and a
+      // low Self-Assessed count said as "Only 13 of 27" in amber.
+      (r.tag === 'Only'
+        ? '<span class="dash-comp-ln-few">Only</span> '
+        : r.tag
+          ? '<span class="dash-comp-ln-tag">' + esc(r.tag) + '</span>'
+          : '') +
       esc(r.num) +
       '</span>' +
       (split ? '' : '<span class="dash-comp-ln-bar" aria-hidden="true">' + r.bar + '</span>') +
