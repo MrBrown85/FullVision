@@ -108,6 +108,8 @@ interface Window {
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
   CmTerms: unknown;
+  DashCompetencies: unknown;
+  DashRecent: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
@@ -353,6 +355,8 @@ declare var MGradePhotos: any;
 // Class Settings and the modules the Students list calls
 // (teacher/student-page-students.js), which are not typed.
 declare var DashClassManager: any;
+declare var DashOverview: any; // teacher/dash-overview.js
+declare function segSelect(btn: Element): void; // teacher/ui.js
 declare var StudentCards: any;
 declare var CmStudentPage: any;
 declare var StudentView: any;

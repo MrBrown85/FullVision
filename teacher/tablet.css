@@ -312,6 +312,29 @@
   html.fv-tablet .sp-row .sps-except {
     min-height: 44px;
   }
+  /* ── The Dashboard's middle row (dashRow switch) ────────────────── */
+
+  /* The row stacks at every upright width, not only under 900 px: Inbox 450,
+     Bulletins 300, then Competencies 520, as on the board (an iPad is far
+     too tall for the row's window-height rule). */
+  html.fv-tablet .dash-row {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  html.fv-tablet .dash-row-left,
+  html.fv-tablet .dash-row-left.has-bulletins {
+    grid-template-rows: none;
+  }
+  html.fv-tablet .dash-row-inbox {
+    height: 450px;
+  }
+  html.fv-tablet .dash-row-bulletins {
+    height: 300px;
+  }
+  html.fv-tablet .dash-row-comp {
+    height: 520px;
+  }
+
   @media (max-width: 799px) {
     html.fv-tablet .sps-panel {
       width: 100%;
