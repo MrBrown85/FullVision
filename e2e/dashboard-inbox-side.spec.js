@@ -6,6 +6,7 @@
  * assessed. There is no Compare view, so no Compare control.
  */
 import { test, expect } from '@playwright/test';
+import { useFont, WIDE_CSS, HARSH_CSS } from './wide-font.js';
 
 const LIGHT = 'sci8a21';
 const CELL = 'sci8a1';
@@ -439,28 +440,48 @@ test('at the full column and at 299 px every picture is 80 px or more and nothin
 
 test('beside Bulletins the Inbox is 299 px and the pictures are 80 px or more', async ({ page }) => {
   await open(page, { bulletins: true });
-  const m = await page.evaluate(() => {
-    const tile = document.getElementById('dash-inbox');
-    const row = document.getElementById('dash-inbox-side-row');
-    const pages = [...document.querySelectorAll('#dash-inbox .dash-inbox-side-page')].map(
-      p => p.getBoundingClientRect().height,
+  // In the page's font, the wide stand-in for CI's fonts, and a harsher one
+  // (13.3 px text, 1.37 lines): the captions hold on one line each, inside the row.
+  for (const [font, css] of [
+    ['page', ''],
+    ['wide', WIDE_CSS],
+    ['harsh', HARSH_CSS],
+  ]) {
+    await useFont(page, font, css);
+    await page.waitForFunction(() =>
+      document.getElementById('dash-inbox-side-row')?.style.getPropertyValue('--dash-inbox-side-h'),
     );
-    const rb = row.getBoundingClientRect();
-    const lines = [...document.querySelectorAll('.dash-inbox-side-line')].map(l => l.getBoundingClientRect().bottom);
-    return {
-      tile: Math.round(tile.getBoundingClientRect().height),
-      pages,
-      captionsInside: Math.max(...lines) <= rb.bottom + 0.5,
-      tileOver: tile.scrollHeight - tile.clientHeight,
-      sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    };
-  });
-  expect(m.tile).toBe(299);
-  m.pages.forEach(h => expect(h).toBeGreaterThanOrEqual(80));
-  expect(m.captionsInside).toBe(true);
-  expect(m.tileOver).toBeLessThanOrEqual(0);
-  expect(m.sideways).toBe(0);
-  console.log('299 px page height', Math.min(...m.pages));
+    const m = await page.evaluate(() => {
+      const tile = document.getElementById('dash-inbox');
+      const row = document.getElementById('dash-inbox-side-row');
+      const pages = [...document.querySelectorAll('#dash-inbox .dash-inbox-side-page')].map(
+        p => p.getBoundingClientRect().height,
+      );
+      const rb = row.getBoundingClientRect();
+      const lines = [...document.querySelectorAll('.dash-inbox-side-line')].map(l => l.getBoundingClientRect().bottom);
+      return {
+        tile: Math.round(tile.getBoundingClientRect().height),
+        pages,
+        captionsInside: Math.max(...lines) <= rb.bottom + 0.5,
+        // Each caption is one line: its box is no taller than one of its lines.
+        oneLine: [...document.querySelectorAll('.dash-inbox-side-name, .dash-inbox-side-line')].every(
+          el => el.getBoundingClientRect().height <= parseFloat(getComputedStyle(el).lineHeight) + 1,
+        ),
+        named: [...document.querySelectorAll('.dash-inbox-side-line')].every(el => !!el.getAttribute('title')),
+        tileOver: tile.scrollHeight - tile.clientHeight,
+        sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    expect(m.tile, font).toBe(299);
+    m.pages.forEach(h => expect(h, font).toBeGreaterThanOrEqual(80));
+    expect(m.captionsInside, font).toBe(true);
+    expect(m.oneLine, font).toBe(true);
+    expect(m.named, font).toBe(true);
+    expect(m.tileOver, font).toBeLessThanOrEqual(0);
+    expect(m.sideways, font).toBe(0);
+    console.log('299 px page height, ' + font, Math.min(...m.pages));
+  }
+  await useFont(page, 'page');
   await shot(page, 'side-closed-299-light');
   await page
     .locator(PILE + ' .dash-inbox-side-page')

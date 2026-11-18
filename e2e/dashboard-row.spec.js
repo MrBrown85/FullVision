@@ -5,6 +5,7 @@
  * first view. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
 async function openDashboard(page, { oldFlag = null, bulletins = false } = {}) {
   await page.addInitScript(
@@ -300,4 +301,84 @@ test('without Bulletins the Inbox slot has the whole column', async ({ page }) =
   const inbox = await box(page, '.dash-row-inbox');
   const left = await box(page, '.dash-row-left');
   expect(Math.round(inbox.height)).toBe(Math.round(left.height));
+});
+
+/* "View Gradebook →" and "Questionnaires →" sit beside the view pill, on one
+   line, inside the tile at its narrowest (329 px at 1024 wide, 335 at 1280),
+   in the page's font and in the wide stand-in for CI's fonts. */
+for (const [w, h] of [
+  [1024, 768],
+  [1280, 800],
+  [1440, 900],
+]) {
+  test(`at ${w} wide each page's link sits beside its pill, inside the tile, in both fonts`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await openDashboard(page);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      for (const pg of ['curricular', 'core']) {
+        await page.locator('#dash-comp-tab-' + pg).click();
+        await page.waitForTimeout(300);
+        const m = await page.evaluate(pg => {
+          const tile = document.querySelector('.dash-comp-tile').getBoundingClientRect();
+          const head = document.querySelector('#dash-comp-page-' + pg + ' .dash-section-title');
+          const a = head.querySelector(':scope > a');
+          const link = a.getBoundingClientRect();
+          const pill = head.querySelector('.dash-view-btn, .dash-core-sub').getBoundingClientRect();
+          const lh = parseFloat(getComputedStyle(a).lineHeight) || 20;
+          return {
+            inside: link.right <= tile.right + 0.5 && link.left >= tile.left - 0.5,
+            beside: link.left >= pill.right && Math.abs(link.top + link.height / 2 - (pill.top + pill.height / 2)) < 8,
+            oneLine: link.height <= lh + 1,
+          };
+        }, pg);
+        expect(m, `${w} ${font} ${pg}`).toEqual({ inside: true, beside: true, oneLine: true });
+      }
+    }
+  });
+}
+
+/* With Questions From Students waiting (the front page's Demo Mode has one),
+   that card sits above the top bar, so the row starts lower and its tiles run
+   past the first view; the cards may sit below the fold (Colin). The page
+   scrolls cleanly to the row's foot and nothing in the row is cut off. */
+test('with a question waiting the row starts lower, the page scrolls to its foot, and nothing is cut off', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/login.html?demo=1&student=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.locator('#dash-inbox').waitFor();
+  await expect(page.locator('.dash-questions')).toBeVisible();
+  const before = await box(page, '.dash-row');
+  expect(before.top).toBeGreaterThan(278);
+  expect(Math.round(before.height)).toBe(510);
+  await page.locator('.dash-row').evaluate(el => el.scrollIntoView({ block: 'end' }));
+  await page.waitForTimeout(200);
+  const m = await page.evaluate(() => {
+    const row = document.querySelector('.dash-row').getBoundingClientRect();
+    const tiles = ['#dash-inbox', '.dash-comp-tile'].map(s =>
+      Math.round(document.querySelector(s).getBoundingClientRect().height),
+    );
+    const main = document.getElementById('main');
+    return {
+      rowTop: row.top,
+      rowBottom: row.bottom,
+      tiles,
+      winH: innerHeight,
+      sideways: [
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        main.scrollWidth - main.clientWidth,
+      ],
+    };
+  });
+  // The whole row can be brought into view, and both tiles are the row's full height.
+  expect(m.rowBottom).toBeLessThanOrEqual(m.winH + 0.5);
+  expect(m.rowTop).toBeGreaterThanOrEqual(0);
+  expect(m.tiles).toEqual([510, 510]);
+  expect(m.sideways).toEqual([0, 0]);
+  // The Students heading follows the row, 12 px under it.
+  const heading = await box(page, '.dash-students-head');
+  const row = await box(page, '.dash-row');
+  expect(Math.round(heading.top - row.bottom)).toBe(12);
 });

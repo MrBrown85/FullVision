@@ -7,10 +7,11 @@
  * were "SIG, SIG". At 1440, 1280 and 1024 wide, in every view of both
  * pages: the tile is the row's height, nothing scrolls sideways, every
  * Level Mix and Self-Assessment row is one height, and the codes are
- * unique. Past 12 rows a list scrolls inside the page, never the page.
+ * unique, in the page's font and in the wide stand-in for CI's fonts. Past 12 rows a list scrolls inside the page, never the page.
  */
 import { test, expect } from '@playwright/test';
 import { buildClass, showClass, measureTile } from './dashboard-shapes.js';
+import { FONTS, useFont } from './wide-font.js';
 
 const CLASSES = [
   { key: 'many', name: 'Career Education 8', tags: ['CAREE8'], self: true, rows: 13 },
@@ -19,7 +20,7 @@ const CLASSES = [
 
 for (const shape of CLASSES) {
   test(`${shape.name}, ${shape.rows} competencies: the tile holds it in every view, unique codes`, async ({ page }) => {
-    test.setTimeout(90000);
+    test.setTimeout(180000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -43,29 +44,33 @@ for (const shape of CLASSES) {
       ['curricular', 'trend'],
     ];
     for (const core of shape.self ? ['self', 'evidence'] : ['evidence']) views.push(['core', core]);
-    for (const width of [1440, 1280, 1024]) {
-      await page.setViewportSize({ width, height: 900 });
-      for (const [pg, view] of views) {
-        await page.evaluate(
-          ({ cid, pg, view }) => {
-            localStorage.setItem('fv-dash-comp-page:' + cid, pg);
-            localStorage.setItem(pg === 'core' ? 'fv-dash-core-view:' + cid : 'fv-dash-comp-view:' + cid, view);
-            PageDashboard.render();
-          },
-          { cid, pg, view },
-        );
-        await expect(page.locator('.dash-comp-tile')).toHaveAttribute('data-page', pg);
-        if (pg === 'curricular') await expect(page.locator('.dash-comp-card')).toHaveAttribute('data-view', view);
-        const m = await measureTile(page);
-        const at = `${width} ${pg}/${view}`;
-        expect(m.tileH, at).toBe(m.rowH);
-        expect(m.docOverflow, at).toBeLessThanOrEqual(0);
-        expect(m.mainOverflow, at).toBeLessThanOrEqual(0);
-        expect(m.pageScrolls, 'the page itself scrolls at ' + at).toBe(false);
-        if (m.lines.length) expect(new Set(m.lines).size, 'row heights at ' + at + ': ' + m.lines).toBe(1);
-        if (m.codes.length) expect(new Set(m.codes).size, at).toBe(m.codes.length);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      for (const width of [1440, 1280, 1024]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const [pg, view] of views) {
+          await page.evaluate(
+            ({ cid, pg, view }) => {
+              localStorage.setItem('fv-dash-comp-page:' + cid, pg);
+              localStorage.setItem(pg === 'core' ? 'fv-dash-core-view:' + cid : 'fv-dash-comp-view:' + cid, view);
+              PageDashboard.render();
+            },
+            { cid, pg, view },
+          );
+          await expect(page.locator('.dash-comp-tile')).toHaveAttribute('data-page', pg);
+          if (pg === 'curricular') await expect(page.locator('.dash-comp-card')).toHaveAttribute('data-view', view);
+          const m = await measureTile(page);
+          const at = `${font} font, ${width} ${pg}/${view}`;
+          expect(m.tileH, at).toBe(m.rowH);
+          expect(m.docOverflow, at).toBeLessThanOrEqual(0);
+          expect(m.mainOverflow, at).toBeLessThanOrEqual(0);
+          expect(m.pageScrolls, 'the page itself scrolls at ' + at).toBe(false);
+          if (m.lines.length) expect(new Set(m.lines).size, 'row heights at ' + at + ': ' + m.lines).toBe(1);
+          if (m.codes.length) expect(new Set(m.codes).size, at).toBe(m.codes.length);
+        }
       }
     }
+    await useFont(page, 'page');
 
     // Past 12 rows Class Average's list scrolls inside the card, with "+N more".
     if (shape.rows > 12) {

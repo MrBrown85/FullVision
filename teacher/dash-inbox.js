@@ -410,7 +410,8 @@ window.DashInbox = (function () {
      line wraps to a third line (Late, You Added and on paper all at once),
      the words ran 3 to 17 px past the row. Then the row leaves out its
      "Newest:" line, the one line that says nothing the counts and the
-     pictures do not, and Late is never cut. Fitted after each draw and
+     pictures do not; in a wider font, if that is not enough, the quiet words
+     go too. The counts and Late are never cut. Fitted after each draw and
      whenever the tile changes width. */
   /** @type {ResizeObserver | null} */
   var _fitWatch = null;
@@ -418,13 +419,20 @@ window.DashInbox = (function () {
   /** @param {ParentNode} root */
   function fitRows(root) {
     root.querySelectorAll('.dash-inbox-row:not(.is-slim)').forEach(function (/** @type {any} */ row) {
-      row.classList.remove('is-tight');
+      row.classList.remove('is-tight', 'is-tighter');
       var info = row.querySelector('.dash-inbox-info');
       if (!info || typeof row.getBoundingClientRect !== 'function' || typeof getComputedStyle !== 'function') return;
       var cs = getComputedStyle(row);
       var room = row.getBoundingClientRect().bottom - (parseFloat(cs.paddingBottom) || 0);
-      var last = info.lastElementChild;
-      if (last && last.getBoundingClientRect().bottom > room + 0.5) row.classList.add('is-tight');
+      var over = function () {
+        var last = info.lastElementChild;
+        while (last && getComputedStyle(last).display === 'none') last = last.previousElementSibling;
+        return !!last && last.getBoundingClientRect().bottom > room + 0.5;
+      };
+      // First the Newest line goes, then the quiet words (You Added, on paper):
+      // the counts and Late always stay.
+      if (over()) row.classList.add('is-tight');
+      if (over()) row.classList.add('is-tighter');
     });
   }
 

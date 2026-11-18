@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
 /* The desktop app on an iPad held upright (teacher/tablet.css).
  *
@@ -227,7 +228,8 @@ for (const [width, height, ipad] of [
 /* The Dashboard's middle row upright (DECISIONS, "The Dashboard's middle
    row"; board F): stacked, the Inbox 450 px and Competencies 520 px under
    it, nothing sideways, and every control in it a finger's size (44 px) in
-   each Inbox view and on both Competencies pages. */
+   each Inbox view and on both Competencies pages, in the page's font and in
+   the wide stand-in for CI's fonts (e2e/wide-font.js). */
 for (const [width, height, ipad] of [
   [744, 1133, 'iPad mini'],
   [820, 1180, 'iPad Air'],
@@ -244,44 +246,47 @@ for (const [width, height, ipad] of [
     await page.goto('/dashboard');
     await page.locator('#dash-inbox').waitFor();
     const found = {};
-    for (const view of ['assessment', 'side', 'flip', 'roll']) {
-      for (const pg of ['curricular', 'core']) {
-        await page.evaluate(
-          ([view, pg]) => {
-            localStorage.setItem('fv-dash-inbox-view:sci8', view);
-            localStorage.setItem('fv-dash-comp-page:sci8', pg);
-            PageDashboard.render();
-          },
-          [view, pg],
-        );
-        await page.waitForTimeout(400);
-        const m = await page.evaluate(() => {
-          const box = s => document.querySelector(s).getBoundingClientRect();
-          const small = [
-            ...document.querySelectorAll(
-              '.dash-row button, .dash-row a, .dash-row [role=link], .dash-row [role=tab], .dash-row input, .dash-row select',
-            ),
-          ]
-            .filter(e => {
-              // The list a screen reader reads behind Flip Through's pages is out of sight.
-              if (e.closest('.dash-inbox-flip-vh')) return false;
-              const r = e.getBoundingClientRect();
-              const cs = getComputedStyle(e);
-              return r.width && r.height && cs.visibility !== 'hidden' && Math.min(r.width, r.height) < 44 - 0.5;
-            })
-            .map(e => (e.textContent || e.getAttribute('aria-label') || e.className).trim().slice(0, 30));
-          const inbox = box('.dash-row-inbox');
-          const comp = box('.dash-row-comp');
-          return {
-            inbox: Math.round(inbox.height),
-            comp: Math.round(comp.height),
-            stacked: comp.top >= inbox.bottom + 11,
-            sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-            small: [...new Set(small)],
-          };
-        });
-        if (m.inbox !== 450 || m.comp !== 520 || !m.stacked || m.sideways > 0 || m.small.length)
-          found[view + '/' + pg] = m;
+    for (const font of FONTS) {
+      await useFont(page, font);
+      for (const view of ['assessment', 'side', 'flip', 'roll']) {
+        for (const pg of ['curricular', 'core']) {
+          await page.evaluate(
+            ([view, pg]) => {
+              localStorage.setItem('fv-dash-inbox-view:sci8', view);
+              localStorage.setItem('fv-dash-comp-page:sci8', pg);
+              PageDashboard.render();
+            },
+            [view, pg],
+          );
+          await page.waitForTimeout(400);
+          const m = await page.evaluate(() => {
+            const box = s => document.querySelector(s).getBoundingClientRect();
+            const small = [
+              ...document.querySelectorAll(
+                '.dash-row button, .dash-row a, .dash-row [role=link], .dash-row [role=tab], .dash-row input, .dash-row select',
+              ),
+            ]
+              .filter(e => {
+                // The list a screen reader reads behind Flip Through's pages is out of sight.
+                if (e.closest('.dash-inbox-flip-vh')) return false;
+                const r = e.getBoundingClientRect();
+                const cs = getComputedStyle(e);
+                return r.width && r.height && cs.visibility !== 'hidden' && Math.min(r.width, r.height) < 44 - 0.5;
+              })
+              .map(e => (e.textContent || e.getAttribute('aria-label') || e.className).trim().slice(0, 30));
+            const inbox = box('.dash-row-inbox');
+            const comp = box('.dash-row-comp');
+            return {
+              inbox: Math.round(inbox.height),
+              comp: Math.round(comp.height),
+              stacked: comp.top >= inbox.bottom + 11,
+              sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              small: [...new Set(small)],
+            };
+          });
+          if (m.inbox !== 450 || m.comp !== 520 || !m.stacked || m.sideways > 0 || m.small.length)
+            found[font + '/' + view + '/' + pg] = m;
+        }
       }
     }
     expect(found).toEqual({});

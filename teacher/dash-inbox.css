@@ -204,9 +204,11 @@
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-/* A row whose counts wrap to a third line leaves out "Newest:" so its words
-   stay inside its 109 px (DashInbox.fitRows). */
-.dash-inbox-row.is-tight .dash-inbox-newest {
+/* A row whose counts wrap to a third line leaves out "Newest:", and if that
+   is not enough its quiet words, so its words stay inside its 109 px
+   (DashInbox.fitRows). */
+.dash-inbox-row.is-tight .dash-inbox-newest,
+.dash-inbox-row.is-tighter .dash-inbox-quiet {
   display: none;
 }
 /* The counts line wraps to a second line rather than cut anything: Late is

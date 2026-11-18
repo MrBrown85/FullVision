@@ -5,6 +5,7 @@
  * Light Refraction Lab has work waiting.
  */
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
 const LIGHT = 'sci8a21';
 const SHOTS = process.env.FV_SHOTS || '';
@@ -463,30 +464,33 @@ for (const [w, h] of [
     await expect(row.locator('.dash-inbox-late')).toBeVisible();
     await expect(row.locator('.dash-inbox-quiet')).toContainText('You Added');
     await expect(row.locator('.dash-inbox-quiet')).toContainText('on paper');
-    const m = await row.evaluate(r => {
-      const cs = getComputedStyle(r);
-      const box = r.getBoundingClientRect();
-      const inner = { top: box.top + parseFloat(cs.paddingTop), bottom: box.bottom - parseFloat(cs.paddingBottom) };
-      const shown = [...r.querySelectorAll('.dash-inbox-info > *, .dash-inbox-grade, .dash-inbox-pics')].filter(
-        el => getComputedStyle(el).display !== 'none',
-      );
-      const late = r.querySelector('.dash-inbox-late').getBoundingClientRect();
-      return {
-        h: Math.round(box.height),
-        past: Math.max(...shown.map(el => el.getBoundingClientRect().bottom - inner.bottom)),
-        above: Math.max(...shown.map(el => inner.top - el.getBoundingClientRect().top)),
-        lateIn: late.bottom <= inner.bottom + 0.5 && late.height > 0,
-        lines: Math.round(r.querySelector('.dash-inbox-counts').getBoundingClientRect().height / 19.5),
-        sideways: r.scrollWidth - r.clientWidth,
-      };
-    });
-    // Where the words column is narrowest the counts take three lines: the case this guards.
-    if (w === 1100) expect(m.lines).toBe(3);
-    expect(m.h).toBe(109);
-    expect(m.past).toBeLessThanOrEqual(0.5);
-    expect(m.above).toBeLessThanOrEqual(0.5);
-    expect(m.lateIn).toBe(true);
-    expect(m.sideways).toBeLessThanOrEqual(0);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      const m = await row.evaluate(r => {
+        const cs = getComputedStyle(r);
+        const box = r.getBoundingClientRect();
+        const inner = { top: box.top + parseFloat(cs.paddingTop), bottom: box.bottom - parseFloat(cs.paddingBottom) };
+        const shown = [...r.querySelectorAll('.dash-inbox-info > *, .dash-inbox-grade, .dash-inbox-pics')].filter(
+          el => getComputedStyle(el).display !== 'none',
+        );
+        const late = r.querySelector('.dash-inbox-late').getBoundingClientRect();
+        return {
+          h: Math.round(box.height),
+          past: Math.max(...shown.map(el => el.getBoundingClientRect().bottom - inner.bottom)),
+          above: Math.max(...shown.map(el => inner.top - el.getBoundingClientRect().top)),
+          lateIn: late.bottom <= inner.bottom + 0.5 && late.height > 0,
+          lines: Math.round(r.querySelector('.dash-inbox-counts').getBoundingClientRect().height / 19.5),
+          sideways: r.scrollWidth - r.clientWidth,
+        };
+      });
+      // Where the words column is narrowest the counts take three lines: the case this guards.
+      if (w === 1100 && font === 'page') expect(m.lines).toBe(3);
+      expect(m.h, font).toBe(109);
+      expect(m.past, font).toBeLessThanOrEqual(0.5);
+      expect(m.above, font).toBeLessThanOrEqual(0.5);
+      expect(m.lateIn, font).toBe(true);
+      expect(m.sideways, font).toBeLessThanOrEqual(0);
+    }
   });
 }
 
