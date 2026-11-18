@@ -479,11 +479,61 @@ describe('the page', () => {
     expect(AddWorkClass.students(CID, piece).map(s => s.id)).toEqual(IDS);
   });
 
-  it('is not offered when the piece shows no work', () => {
+  // Offered in every class (plan decision 2, Nov 17 2026): it was not offered
+  // where the piece took no work.
+  it('is offered in a class whose student page is off, Send Work off, or the piece takes nothing', () => {
     seedScreen();
+    const piece = () => getAssessments(CID).find(a => a.id === PIECE);
     setStudentPageSwitch(CID, false);
-    expect(AddWorkClass.open(CID, PIECE)).toBe(false);
-    expect($('#add-work-class-overlay')).toBeNull();
+    expect(getReturnSettings(CID).student_page).toBe(false);
+    expect(AddWorkClass.offered(CID, piece())).toBe(true);
+    const work = getCourseSubmissions(CID);
+    work.course.send_work = false;
+    work.assessments = work.assessments.map(x => (x.id === PIECE ? { ...x, students_send: 'nothing' } : x));
+    saveDemoStudentWork(CID, work);
+    expect(GraderWork.workOn(CID, piece())).toBe(false);
+    expect(AddWorkClass.offered(CID, piece())).toBe(true);
+    expect(AddWorkClass.open(CID, PIECE)).toBe(true);
+    expect($('#add-work-class-overlay')).not.toBeNull();
+    // Never on a draft, or on a DIBELS piece.
+    expect(AddWorkClass.offered(CID, { ...piece(), isDraft: true })).toBe(false);
+    expect(
+      AddWorkClass.offered(
+        CID,
+        getAssessments(CID).find(a => a.id === DIBELS),
+      ),
+    ).toBe(false);
+  });
+
+  it('in Demo Mode with the student page off, work the teacher adds shows; the class’s other work stays hidden', async () => {
+    seedScreen(); // Jordan Baker (IDS[1]) has sample work in on PIECE, sent before
+    setStudentPageSwitch(CID, false);
+    const store = {
+      list: async () => [],
+      putAll: async () => {},
+      update: async () => {},
+      blobs: async () => null,
+      remove: async () => {},
+      clear: async () => {},
+    };
+    runInThisContext(readFileSync('shared/photo-queue.js', 'utf-8'), { filename: 'shared/photo-queue.js' });
+    window.PhotoQueue.configure({ store, isDemo: () => true, upload: async () => ({ error: null }) });
+    const group = () => getAssessments(CID).find(a => a.id === GROUP);
+    const piece = () => getAssessments(CID).find(a => a.id === PIECE);
+    // The sample work is hidden with the switch off, as before.
+    expect(GraderWork.workShown(CID, piece())).toBe(false);
+    expect(GraderWork.workShown(CID, group())).toBe(false);
+    const res = await addStudentWorkPages(CID, IDS[0], PIECE, pages(1), { mode: 'new' });
+    window.PhotoQueue.release();
+    expect(res.result).toBe('sent');
+    expect(getStudentSubmission(CID, IDS[0], PIECE).files.length).toBe(1);
+    // That piece shows now (Work Wall, the grader's work pane); the other does not.
+    expect(GraderWork.workShown(CID, piece())).toBe(true);
+    expect(GraderWork.workShown(CID, group())).toBe(false);
+    expect(getReturnSettings(CID).student_page).toBe(false);
+    // On Paper is the teacher's own too.
+    await markStudentWorkOnPaper(CID, GROUP, [IDS[3]]);
+    expect(GraderWork.workShown(CID, group())).toBe(true);
   });
 
   it("says the board's words, and what is already in", () => {

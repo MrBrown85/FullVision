@@ -93,6 +93,9 @@ export function seedClass(cid, data) {
   _rememberServerState('scores', cid, fields.scores);
   _rememberServerState('statuses', cid, fields.statuses);
   _classLoads[cid] = true;
+  // A load reads the class's work too, Send Work on or off (Add Work for the
+  // Class, offered in every class): the page's own read 30 s later is not due.
+  if (typeof _workRead !== 'undefined') _workRead[cid] = { at: Date.now() };
   if (typeof clearProfCache === 'function') clearProfCache();
 }
 
@@ -102,6 +105,7 @@ export function clearClass(cid) {
   });
   delete COURSES[cid];
   delete _classLoads[cid];
+  if (typeof _workRead !== 'undefined') delete _workRead[cid];
 }
 
 /* A signed-in teacher's class has its student page on only when the server

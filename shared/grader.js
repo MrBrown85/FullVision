@@ -439,19 +439,21 @@ window.Grader = (function () {
   /* { assessment id: true } for the pieces with work handed in. The screens
      ask for every card and row they draw, so the answer is kept beside the
      stored work it was worked out from, and nothing is copied. */
-  var _withWork = { cid: null, stored: null, ids: {} };
+  var _withWork = { cid: null, stored: null, own: false, ids: {} };
   function _piecesWithWork(cid) {
     // Demo Mode keeps the student page build behind its switch, as before:
     // its sample class holds sample work, and a visitor is not shown it.
-    if (typeof isDemoMode === 'function' && isDemoMode() && !getReturnSettings(cid).student_page) return {};
+    // Work the teacher adds there (Add Work for the Class, offered in every
+    // class) is marked demo_added as it is written, and that alone shows.
+    var own = typeof isDemoMode === 'function' && isDemoMode() && !getReturnSettings(cid).student_page;
     var stored = typeof peekStudentWork === 'function' ? peekStudentWork(cid) : null;
     if (!stored) return {};
-    if (_withWork.cid !== cid || _withWork.stored !== stored) {
+    if (_withWork.cid !== cid || _withWork.stored !== stored || _withWork.own !== own) {
       var ids = {};
       (stored.submissions || []).forEach(function (s) {
-        if (s && s.state === 'sent' && s.assessment_id) ids[s.assessment_id] = true;
+        if (s && s.state === 'sent' && s.assessment_id && (!own || s.demo_added === true)) ids[s.assessment_id] = true;
       });
-      _withWork = { cid: cid, stored: stored, ids: ids };
+      _withWork = { cid: cid, stored: stored, own: own, ids: ids };
     }
     return _withWork.ids;
   }

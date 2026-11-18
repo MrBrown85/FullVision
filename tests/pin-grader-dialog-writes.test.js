@@ -695,7 +695,9 @@ describe('pin: the grader dialog’s writes', () => {
       click(mark('complete'));
       expect(getCompletionMark(CID, BEN, EXIT)).toBe(null);
       expect(entries(CID, BEN)).toEqual([]);
-      expect(session.sent()).toEqual([]);
+      // Pin moved: opening the grader reads the class's work, Send Work on or
+      // off (Add Work for the Class, offered in every class); nothing is written (was: []).
+      expect(session.sent()).toEqual([['list_course_submissions_since', { p_course_id: CID, p_version: null }]]);
     });
 
     it('Late on scored work sends the status and leaves the score; Missing and Excused are refused there', () => {

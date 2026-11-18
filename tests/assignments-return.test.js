@@ -367,8 +367,16 @@ describe('with the build switch off the Assignments page is what it was', () => 
     return;
   }
   const before = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) : {};
+  // Pin moved on purpose (plan decision 2, Colin, Nov 17 2026): Add Work for
+  // the Class is offered in every class, so its card-menu item is drawn with
+  // the switch off too. That item alone is taken out before comparing; every
+  // other byte must still be what it was. The snapshot is not re-recorded.
+  const ADD_WORK =
+    /<button type="button" role="menuitem" class="assess-menu-item assess-add-class-btn" data-action="openAddWorkClass" [^>]*>[\s\S]*?<\/button>/g;
   const same = now => {
-    const packed = pack(now);
+    const stripped = {};
+    Object.keys(now).forEach(name => (stripped[name] = String(now[name]).replace(ADD_WORK, '')));
+    const packed = pack(stripped);
     expect(Object.keys(packed)).toEqual(Object.keys(before));
     Object.keys(before).forEach(name => expect(packed[name] === before[name], name).toBe(true));
   };

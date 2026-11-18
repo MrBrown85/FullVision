@@ -740,12 +740,34 @@ var CmStudentPage = (function () {
           _previewCard(cid) +
           '</div>' +
           '</div>'
-        : '')
+        : _stickersCard(cid))
+    );
+  }
+
+  /* With the student page off there are no cards, and no card to hold Print
+     Sticker Sheets: its row stands on its own (Add Work for the Class, and
+     with it the stickers, is in every class). */
+  // html-safe: the row is StudentCards.stickersHtml's fixed words; the id goes through esc
+  function _stickersCard(cid) {
+    var row = typeof StudentCards !== 'undefined' && StudentCards.stickersHtml ? StudentCards.stickersHtml(cid) : '';
+    if (!row) return '';
+    return (
+      '<div class="cm-section sp-stickers" data-cid="' +
+      esc(cid) +
+      '"><h2 class="cm-grade-title">Sticker Sheets for Scanning</h2>' +
+      row +
+      '</div>'
     );
   }
 
   // Each returns true when the click, change or blur was this tab's.
   function handleAction(action, el) {
+    // Print Sticker Sheets: in every class, student page on or off.
+    if (action === 'spCardsStickers') {
+      var at = _cid(el);
+      if (at && typeof ScanLabels !== 'undefined') ScanLabels.open(at);
+      return true;
+    }
     if (/^spCards/.test(action)) {
       var cid = _cid(el);
       if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;

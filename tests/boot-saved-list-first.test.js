@@ -319,7 +319,9 @@ describe('a repeat visit, with this teacher’s class list saved on the device',
     await settle();
     gates.getUser.open();
     await quiet();
-    expect(answered.slice().sort()).toEqual(GATED.slice().sort());
+    // Pin moved (Add Work for the Class, offered in every class): the class's
+    // load reads its work too, once it is in (was: the four gated alone).
+    expect(answered.slice().sort()).toEqual(GATED.concat(['list_course_submissions_since']).sort());
   });
 
   it('draws the saved class list and class before any of them answers, locked', async () => {

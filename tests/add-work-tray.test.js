@@ -757,6 +757,16 @@ describe('one pile, two classes', () => {
     expect($$('.awc-row').length).toBe(8);
   });
 
+  it('the other class is offered with its student page off too (offered in every class)', async () => {
+    seedSecond();
+    setStudentPageSwitch(CID2, false);
+    expect(getReturnSettings(CID2).student_page).toBe(false);
+    AddWorkClass.open(CID, PIECE);
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('false');
+    await turnOn();
+    expect($$('.awc-class-head').map(text)).toEqual(['Socials 10', 'Block C']);
+  });
+
   it('a name in both classes is offered with each class, never taken; a name in one goes to its class', async () => {
     seedSecond();
     AddWorkClass.open(CID, PIECE);
