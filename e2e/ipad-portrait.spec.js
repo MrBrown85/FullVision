@@ -114,6 +114,8 @@ function audit() {
       const a = leaves[i];
       const b = leaves[j];
       if (a.contains(b) || b.contains(a) || layer(a) !== layer(b)) continue;
+      // Rubric boxes scroll under the grader's foot bar, which covers them: that is the bar doing its job.
+      if (!!a.closest('.grader-foot') !== !!b.closest('.grader-foot')) continue;
       const ra = shown(a);
       const rb = shown(b);
       const ix = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);

@@ -10,8 +10,11 @@
  * call as a drop on that page; nothing is saved until Add Work is pressed.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import fs from 'fs';
 import path from 'path';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const LIGHT = 'sci8a21';
 const CELL = 'sci8a1';

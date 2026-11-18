@@ -6,6 +6,9 @@
  * shows.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 1366, height: 900 } });
 

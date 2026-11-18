@@ -29,6 +29,9 @@ const DESKTOP = { width: 1440, height: 900 };
 function watchFailures(page) {
   const failed = [];
   page.on('response', r => {
+    // The sample class's work pictures are not part of the saved app, so offline they are not there
+    // (the Inbox shows three of them while the Student Page is on, as it does for Try Demo Mode).
+    if (new URL(r.url()).pathname.startsWith('/assets/sample-work/')) return;
     if (r.status() >= 500) failed.push(r.status() + ' ' + new URL(r.url()).pathname + new URL(r.url()).search);
   });
   return failed;

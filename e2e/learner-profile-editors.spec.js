@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* The Learner Profile's competency goal and reflection editors (Nov 3
    sweep, step 4), in Demo Mode on Liam in Science 8, who has no goals or
    reflections yet. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 1440, height: 900 } });
 

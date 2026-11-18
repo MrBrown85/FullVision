@@ -290,7 +290,9 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     expect(Object.keys(backup)).toEqual([
       'course',
       'savedAt',
-      // "Bulletins are not in this file." (B1g); `photos` only once the class takes work.
+      // `photos` is in once the class takes work, which the sample class does from the start.
+      'photos',
+      // "Bulletins are not in this file." (B1g)
       'bulletins',
       'courseInfo',
       'students',

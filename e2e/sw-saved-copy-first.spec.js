@@ -83,7 +83,10 @@ function watch(page) {
 
 /* A log without the looks for sw.js: the browser makes its own a moment
    after each page load, when it likes, so one may land in any log. */
-const notSw = log => log.filter(u => u !== '/sw.js');
+// The sample class's work pictures (Inbox thumbnails) are pictures, not the app's files: the saved copy
+// holds the app, and a thumbnail is fetched like any other picture.
+const isSamplePicture = url => new URL(url, 'http://x').pathname.startsWith('/assets/sample-work/');
+const notSw = log => log.filter(u => u !== '/sw.js' && !u.startsWith('/assets/sample-work/'));
 
 /* Wait for the browser's own look for sw.js after the page load just made
    (the log was emptied before it), so a release made next is found only when
@@ -351,7 +354,7 @@ test('offline, every page opens from the saved copy as one release', async ({ pa
   test.setTimeout(90_000);
   const errors = watch(page);
   const failed = [];
-  page.on('response', r => r.status() >= 500 && failed.push(r.status() + ' ' + r.url()));
+  page.on('response', r => r.status() >= 500 && !isSamplePicture(r.url()) && failed.push(r.status() + ' ' + r.url()));
   server.release('a', filesOf('a'));
   await firstVisit(page, 'a');
 
@@ -645,7 +648,7 @@ test('after Sign Out the worker installs again: the next visits come from the sa
   test.setTimeout(120_000);
   const errors = watch(page);
   const failed = [];
-  page.on('response', r => r.status() >= 500 && failed.push(r.status() + ' ' + r.url()));
+  page.on('response', r => r.status() >= 500 && !isSamplePicture(r.url()) && failed.push(r.status() + ' ' + r.url()));
   server.release('a', filesOf('a'));
   await firstVisit(page, 'a');
   expect(await missingFromInstall(page, 'a')).toEqual([]);

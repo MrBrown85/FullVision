@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { findLowContrastText } from './contrast-check.js';
 import { fakeStudentSubmit, id, sampleCard, samplePage } from '../tests/helpers/fake-student-submit.js';
 import { TODAY, serve, signIn } from './student-card-fake.js';
@@ -17,6 +18,8 @@ import { TODAY, serve, signIn } from './student-card-fake.js';
      holds them to 4.5:1 in both modes. A level fill is exempt only on the
      elements that draw one (fillSelectors), never by its colour value.
    - The gradebook table (.gb-grid): its tiles keep their colours, as above. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const OPTIONS = { skip: ['.gb-grid'] };
 

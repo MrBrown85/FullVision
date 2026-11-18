@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* One primary action per screen, and the breadcrumb on the dashboard's child
    screens (docs/DECISIONS.md, "Buttons and breadcrumbs (2026-10-19)"). Runs
    in Demo Mode on Science 8 at desktop width. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 1440, height: 900 } });
 

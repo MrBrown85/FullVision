@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Progress Reports, Everyone view: the Zoom control (teacher/report-one-zoom.js).
    Whole Class is the Fit Map exactly as it was; a percent draws each
@@ -8,6 +9,8 @@ import { test, expect } from '@playwright/test';
 
 // Every render lays the whole class out; a GitHub runner is slower than a Mac.
 test.setTimeout(150_000);
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 test.use({ viewport: { width: 1916, height: 1100 } });
 
 /* The Fit Map on origin/main (d60b4b9c), read from a run of main in this

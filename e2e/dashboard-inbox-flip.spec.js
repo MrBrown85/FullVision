@@ -6,6 +6,9 @@
  * Mateo Cruz added by the teacher, Ethan Dubois on paper.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const SHOTS = process.env.FV_SHOTS || '';
 const shot = async (page, name) => {

@@ -5,7 +5,10 @@
  * the view menus and hover tips showing whole. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { mkdirSync } from 'node:fs';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function openDashboard(page, { w = 1280, h = 800 } = {}) {
   await page.setViewportSize({ width: Math.max(w, 1024), height: h });

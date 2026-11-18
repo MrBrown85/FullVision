@@ -15,10 +15,13 @@ async function open(page, { oldKey = null, studentPage = true } = {}) {
   await page.clock.install({ time: NOW });
   // What a browser that saw Bulletins before B1g may still have kept.
   if (oldKey != null) await page.addInitScript(v => localStorage.setItem('fv-build-bulletins', v), oldKey);
-  // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
-  await page.goto(studentPage ? '/login.html?student=1' : '/login.html');
-  await page.locator('#demo-mode-btn').click();
+  // Demo Mode starts the sample class with the Student Page on, however it is entered.
+  await page.goto('/login.html?demo=1');
   await page.waitForURL(/dashboard/);
+  if (!studentPage) {
+    await page.locator('.dash-glance').waitFor();
+    await page.evaluate(() => setStudentPageSwitch(getActiveCourse(), false));
+  }
   await page.goto('/bulletins');
 }
 
@@ -239,6 +242,30 @@ test('nothing scrolls sideways at 1280 × 800, with the composer and a list open
     };
   });
   expect(sideways).toEqual({ doc: false, main: false, page: false });
+});
+
+test('the sample announcement has a link, and its card fits in the page font and in a wide one', async ({ page }) => {
+  await open(page);
+  const card = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
+  await expect(card).toContainText('Cell Theory Video');
+  await expect(card).toContainText('khanacademy.org');
+  const fits = () =>
+    card.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      const wide = [el, ...el.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth + 1);
+      const out = [...el.querySelectorAll('*')].filter(e => {
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && (r.right > box.right + 1 || r.left < box.left - 1);
+      });
+      return { clipped: wide.length, outside: out.length };
+    });
+  expect(await fits()).toEqual({ clipped: 0, outside: 0 });
+  // A wider face with a little letter-spacing, as a Linux runner or a Windows laptop draws it.
+  await page.addStyleTag({
+    content:
+      '.bulletin-page, .bulletin-page * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }',
+  });
+  expect(await fits()).toEqual({ clipped: 0, outside: 0 });
 });
 
 test('a class whose Student Page is off says students cannot see Bulletins, and posting still works', async ({

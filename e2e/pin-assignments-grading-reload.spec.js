@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { gotoApp } from './helpers.js';
 
 /* Pins what the Assignments cards do today with grades that must outlast a
@@ -8,6 +9,8 @@ import { gotoApp } from './helpers.js';
    Missing and to Complete, each taken back with the toast's Undo. Demo data
    lives in localStorage, so page.reload() keeps it. Tests only: written
    before any split of page-assignments.js. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 1440, height: 900 } });
 

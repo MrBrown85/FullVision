@@ -1,9 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* S4-W1 follow-up (Colin's ruling 111): the assessment form's Description
    box says "Students see this on their page." only while the class's
    Student Page is on, in Demo Mode as signed in
    (tests/assessment-form-description-hint.test.js holds the HTML). */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const SHOTS = process.env.NIGHT_SHOTS || '';
 

@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Phone grading of Group work (Group grading). Demo Mode, Science 8: the
    Science Fair Proposal (a rubric) is made Group work with three groups of
    four. The strip shows G1, G2 …; a group's card lists its members with
    their own M | EXC | LATE and a ⋯ sheet with Grade Separately; a member
    graded separately gets their own card after their group. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function open(page) {
   await page.setViewportSize({ width: 390, height: 844 });

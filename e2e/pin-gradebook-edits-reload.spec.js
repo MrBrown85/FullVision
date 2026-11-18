@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { gotoApp, clickAction, getText } from './helpers.js';
 
 /* Pins what the gradebook does today with edits that must outlast a reload,
@@ -8,6 +9,8 @@ import { gotoApp, clickAction, getText } from './helpers.js';
    window, an Overall Comment from the grader dialog, and one student's
    Export CSV row. Demo data lives in localStorage, so page.reload() keeps
    it. Tests only: written before any split of page-gradebook.js. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
