@@ -126,7 +126,7 @@ create table if not exists public.bulletin_file (
   position integer not null,
   created_at timestamptz not null default now(),
   constraint bulletin_file_bytes_check check ((status = 'uploading' and bytes is null)
-                      or (status = 'ready' and bytes between 1 and page_count * 2097152::bigint)),
+                      or (status = 'ready' and bytes is not null and bytes between 1 and page_count * 2097152::bigint)),
   -- A file is in its bulletin's class.
   constraint bulletin_file_bulletin_fkey foreign key (bulletin_id, course_id) references public.bulletin (id, course_id) on delete cascade
 );

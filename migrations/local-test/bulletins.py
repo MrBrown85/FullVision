@@ -62,7 +62,7 @@ TABLES_SQL = """select md5(string_agg(attrelid::regclass::text || '.' || attname
 POLICIES_SQL = """select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname))
                     from pg_policy where polrelid = 'storage.objects'::regclass and polname ~ '^fv_bulletin_files_'"""
 
-def obj(v): return json.loads(v) if isinstance(v, str) else v
+def obj(v): return json.loads(v) if isinstance(v, str) and v[:1] in ('{', '[') else v
 def T(d, sql, uid=A, **kw): return obj(d.teacher(sql, uid, **kw))
 def applied(d): return d.one("select to_regclass('public.bulletin') is not null")
 def without_final(text):
@@ -235,8 +235,8 @@ def scen_post():
     ls = listed(w)
     ok('list: the class\'s counts and switch', (ls['can_see'], ls['no_card'], ls['paused'], ls['page_on'], ls['more']) == (2, 3, 1, True, False), ls)
     ids = [x['id'] for x in ls['bulletins']]
-    ok('list: pinned first, then newest first', ids[0] == r['id'] and ids[1:] == sorted(ids[1:], key=lambda i: [x for x in ls['bulletins'] if x['id'] == i][0]['posted_at'] or '', reverse=True)
-       or ids[0] == r['id'], ids)
+    at = [x['posted_at'] or x['created_at'] for x in ls['bulletins'][1:]]
+    ok('list: pinned first, then newest first', ids[0] == r['id'] and len(ids) == 5 and at == sorted(at, reverse=True), (ids, at))
     up = post(w, {'kind': 'announcement', 'body': 'later'}, [{'kind': 'photo', 'pages': 1}])['bulletin']
     ls = listed(w)
     ok('list: one still uploading is there, not visible', [x['visible'] for x in ls['bulletins'] if x['id'] == up['id']] == [False], ls)
@@ -428,7 +428,9 @@ def scen_others():
            for s in ('fv_private.bulletin_file_upload_allowed(text)', 'fv_private.bulletin_file_read_allowed(text)')))
     ok('others: no function of the student page names the tables (B1b adds them)',
        d.one("select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'student_submit' and p.prosrc ~ 'bulletin'") == 0)
-    ok('others: no sync cursor moves (no other device reloads the class)', True)
+    cur = lambda: sums(d).get('public.course_sync_cursor')
+    c0 = cur(); nb = post(w, {'kind': 'announcement', 'body': 'cursor'})['bulletin']['id']; edit(w, nb, {'body': 'c2'}); again(w, nb); delete(w, nb)
+    ok('others: no sync cursor moves (no other device reloads the class)', c0 is not None and cur() == c0, (c0, cur()))
     d.close()
 
 # ── storage ────────────────────────────────────────────────────────────────────────────────────────────
@@ -633,6 +635,7 @@ def scen_race():
         res = sorted('ok' if isinstance(v, dict) else v.split(' ')[1] for v in out.values())
         ok('race %d: two posts at the page cap at once: one taken, one refused (22023)' % rnd, res == ['22023', 'ok']
            and d.one('select sum(page_count) from bulletin_file where course_id = :c', c=w.c) == have + 1990 + 6, (res, out))
+    d.run('delete from bulletin where id = :b', b=hold)
     # Two files of one bulletin finished at once: the bulletin is visible once, at the second.
     for rnd in range(3):
         p = post(w, {'kind': 'announcement', 'body': 'two'}, [{'kind': 'photo', 'pages': 1}, {'kind': 'photo', 'pages': 1}])['bulletin']
@@ -677,7 +680,7 @@ def norm(lines):
     def acl(m): return '{' + ','.join(sorted(m.group(1).split(','))) + '}'
     return [re.sub(r'pg_attver=\d+', 'pg_attver=N', re.sub(r'\{([^{}]*=[^{}]*)\}', acl, l)) for l in lines]
 def same(a, b): return norm(a) == norm(b)
-EXPECTED = re.compile(r'bulletin|^comments on |^depends |^internal triggers public\.(course|enrollment|assessment) \|')
+EXPECTED = re.compile(r'bulletin|^comments on |^depends |^internal triggers (public\.)?(course|enrollment|assessment) \|')
 
 def scen_apply():
     w = world('apply', with_file=False); d = w.d
@@ -725,7 +728,8 @@ def scen_apply():
     ok('apply: the catalog changes only in what the header names', all(EXPECTED.search(l) for l in gone + came), [l for l in gone + came if not EXPECTED.search(l)][:8])
     ok('apply: nothing that existed is dropped or changed, but counts', all(re.match(r'(depends |internal triggers |comments on )', l) for l in gone), gone)
     ok('apply: the internal triggers that change are the new keys\' on course, enrollment and assessment',
-       sorted(l.split(' | ')[0] for l in came if l.startswith('internal triggers')) == ['internal triggers public.assessment', 'internal triggers public.course', 'internal triggers public.enrollment'], came)
+       sorted(l for l in came if re.match(r'internal triggers (assessment|course|enrollment) ', l)) == ['internal triggers assessment | 28', 'internal triggers course | 40', 'internal triggers enrollment | 50']
+       and sorted(l for l in gone if re.match(r'internal triggers (assessment|course|enrollment) ', l)) == ['internal triggers assessment | 26', 'internal triggers course | 36', 'internal triggers enrollment | 46'], (gone, came))
     now = sums(d)
     changed = {k for k in set(now) | set(rows0) if now.get(k) != rows0.get(k)}
     ok('apply: no existing row changed; rows added only in storage.buckets (the bucket) and the new tables',
