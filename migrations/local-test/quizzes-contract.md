@@ -4,6 +4,8 @@ What `migrations/2026111802_quizzes.sql` (MQ1, slice Q1) gives the teacher's bro
 
 Not in MQ1: any `student_submit` function, any change to `student_submit.write_log`, the edge function, any app code. MQ1 changes no existing row, table, policy, constraint or function. It adds five tables, six functions a teacher may run, one private helper, three trigger functions and three triggers (one on `assessment`, one on `assessment_tag`, one on its own `quiz_attempt`), and the foreign keys' own internal triggers on `assessment` and `enrollment`.
 
+MQ1 is two files, applied in this order, each under 40 KB: `migrations/2026111802_quizzes.sql` (the tables, the triggers, `list_quiz`, `save_quiz`, `list_quiz_tries`) and `migrations/2026111803_quiz_results.sql` (`mark_quiz_answer`, `reopen_quiz`, `confirm_quiz`), each with its own guard, pre-check, post-check and undo.
+
 ## Where this differs from the brief or the plan
 
 1. **`quiz_answer` carries `assessment_id`** as well, so two composite keys make an answer to another quiz's question impossible in the table itself, whatever a later function does.
@@ -13,7 +15,9 @@ Not in MQ1: any `student_submit` function, any change to `student_submit.write_l
 5. **Reopen gives one try beyond the quiz's number, answerable after the quiz closes** (the rule is under "Tries"). It is the rule for "Reopen for One Student" the plan names but does not define.
 6. **MQ2's `quiz` takes `p_new_try boolean default false`.** The first open starts the first try; a later try ("Try Again") starts only when asked, or opening the screen to see "Sent" would spend a try.
 7. **A key is required for Choice, True or False and Number questions.** The builder checks before it saves; `save_quiz` refuses a question without one.
-8. **`save_quiz` refuses only DIBELS and pair or group pieces**, as briefed. A rubric-scored or Complete/Incomplete piece is not refused here; the form does not offer the quiz on them (plan, "Grade math").
+8. **Two files.** Written whole, the first file was 53 KB; the results functions are the second file, as the brief said to do past 40 KB.
+9. **`updated_at` on a question also moves** when the competency trigger empties its `tag_id`.
+10. **`save_quiz` refuses only DIBELS and pair or group pieces**, as briefed. A rubric-scored or Complete/Incomplete piece is not refused here; the form does not offer the quiz on them (plan, "Grade math").
 
 ## Tables
 
@@ -70,7 +74,7 @@ Constraints and indexes: `quiz_question_pkey (id)`; `quiz_question_id_assessment
 | `tolerance`   | `numeric` | yes  |         | `quiz_key_tolerance_check`: null or ≥ 0                        |
 | `why`         | `text`    | yes  |         | `quiz_key_why_check`: null or 1 to 500 characters              |
 
-Every question has exactly one key row. **The key's JSON, by kind:**
+`save_quiz` writes exactly one key row for every question. **The key's JSON, by kind:**
 
 | Kind         | `answer`                                                                                                  | `tolerance`       |
 | ------------ | --------------------------------------------------------------------------------------------------------- | ----------------- |
