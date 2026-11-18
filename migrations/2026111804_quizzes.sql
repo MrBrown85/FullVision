@@ -6,69 +6,61 @@
 -- (mark_quiz_answer, reopen_quiz, confirm_quiz) are 2026111805_quiz_results.sql,
 -- split off to keep each file under 40 KB.
 --
--- Why: docs/plans/quizzes-plan.md, slice Q1. A quiz is a way students do an
--- assessment. The exact contract every later slice builds to:
--- migrations/local-test/quizzes-contract.md.
+-- Why: docs/plans/quizzes-plan.md, slice Q1. The contract every later slice
+-- builds to: migrations/local-test/quizzes-contract.md.
 --
--- public.quiz          one per assessment: the settings.
--- public.quiz_question the questions; a choice's id is random and says
---                      nothing about being right. Archived once answered.
--- public.quiz_key      THE ANSWER KEY, and the only place it is kept.
--- public.quiz_attempt  one student's try: their order, started, sent,
---                      reopened, and what the teacher confirmed (marked).
--- public.quiz_answer   a raw answer; the teacher's points for Text, a note.
--- Row security on, no policy, no grant: only the functions touch them.
--- Foreign keys cascade with the assessment and with the student.
--- list_quiz (with the key), save_quiz, list_quiz_tries (sent tries only):
--- the class's teacher only, authenticated only; save_quiz is idempotent.
--- fv_private.quiz_json: the quiz as they answer it; no role may call it.
--- Triggers: assessment_quiz_draft_guard (Unassign refused with draft_has_work
--- once any try exists; the existing guard is not changed); quiz_tag_gone on
--- assessment_tag (at commit, a competency off the piece is off its
--- questions; the form's delete-and-insert of the same ones changes nothing);
--- quiz_attempt_same_class. No function here does grade math.
+-- Tables quiz, quiz_question, quiz_key (THE ANSWER KEY, kept only here),
+-- quiz_attempt, quiz_answer: row security on, no policy, no grant; keys
+-- cascade with the assessment and the student. list_quiz (with the key),
+-- save_quiz, list_quiz_tries (sent tries only): the class's teacher only.
+-- fv_private.quiz_json: no role may call it. Triggers:
+-- assessment_quiz_draft_guard (Unassign refused once a try exists; the
+-- existing guard is not changed), quiz_tag_gone on assessment_tag (at commit
+-- a competency off the piece is off its questions), quiz_attempt_same_class.
+-- No grade math.
 --
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
---   public.list_quiz(uuid) (new)                                 4b5a877bdade0126970b90acbfa613d7
---   public.save_quiz(uuid,jsonb,uuid) (new)                      514d96e7fe70d09121d1068e7e7f70d1
---   public.list_quiz_tries(uuid) (new)                           e929cbfe0aa1130741bd2b3af1615a2d
---   fv_private.quiz_json(uuid) (new)                             c1d41659890c23cb02d0f517cd5c037d
---   public._quiz_draft_guard() (new)                             9e6ed6b0336305322b22c309161472f9
---   public._quiz_tag_gone() (new)                                3cd4fba9441edaec432cc3322c654826
---   public._quiz_attempt_same_class() (new)                      5b0045acab2f7eb94cf3d8ff75210e1f
+--   public.list_quiz(uuid) (new) 4b5a877bdade0126970b90acbfa613d7
+--   public.save_quiz(uuid,jsonb,uuid) (new) 514d96e7fe70d09121d1068e7e7f70d1
+--   public.list_quiz_tries(uuid) (new) e929cbfe0aa1130741bd2b3af1615a2d
+--   fv_private.quiz_json(uuid) (new) c1d41659890c23cb02d0f517cd5c037d
+--   public._quiz_draft_guard() (new) 9e6ed6b0336305322b22c309161472f9
+--   public._quiz_tag_gone() (new) 3cd4fba9441edaec432cc3322c654826
+--   public._quiz_attempt_same_class() (new) 5b0045acab2f7eb94cf3d8ff75210e1f
 -- Relied on, unchanged (function, live):
---   public.fv_owns_assessment(uuid)                              9f4c680c35f9f3ac32e8290824707673
---   public.fv_idem_check(uuid,text)                              1c7b546434bee4b774557e0e6b16024f
---   public.fv_idem_store(uuid,text,jsonb)                        6d0b48c458d273a332db39e1a4b68626
+--   public.fv_owns_assessment(uuid) 9f4c680c35f9f3ac32e8290824707673
+--   public.fv_idem_check(uuid,text) 1c7b546434bee4b774557e0e6b16024f
+--   public.fv_idem_store(uuid,text,jsonb) 6d0b48c458d273a332db39e1a4b68626
 --
--- Checks first: it stops with nothing changed unless the three functions it
--- relies on are as tested, its own seven are missing or this file's, no
--- function of those names is elsewhere, each table is missing or exactly
--- this file's, and its two triggers on existing tables are missing or its.
--- Read-only pre-check: migrations/local-test/quizzes-live-precheck.sql.
+-- Checks first: nothing changes unless the three it relies on are as tested,
+-- its own seven, five tables and two triggers on existing tables are missing
+-- or its, and no function of those names is elsewhere. Read-only pre-check:
+-- migrations/local-test/quizzes-live-precheck.sql.
 --
 -- Rows: none changes and none is added. Unassign is refused only on a piece
 -- with a quiz try, and none has one until MQ2 is applied.
 --
--- Locks: the keys and triggers take brief locks on assessment, enrollment
--- and assessment_tag; after five seconds it gives up, nothing applied. Every
--- quiz writer locks in one order (the contract, "Locks, in order"), and no
--- quiz table has a sync-cursor trigger, so a cascade never meets the class's
--- lock the other way. What it costs a teacher who never makes a quiz: each
--- competency row a form save deletes runs one indexed update at commit that
--- finds nothing, and each Unassign one more trigger that reads one index.
+-- Locks: brief ones on assessment, enrollment and assessment_tag; after five
+-- seconds it gives up, nothing applied. Quiz writers lock in one order (the
+-- contract, "Locks, in order"); no quiz table has a sync-cursor trigger. Cost
+-- to a teacher with no quiz: one empty indexed update at commit per
+-- competency row a form save deletes; one more trigger on Unassign.
 --
--- After 2026111730 (needs nothing of Bulletins' 2026111801 to 03), before the app that calls these. Tested on PostgreSQL 17
--- rebuilt equal to live: migrations/local-test/quizzes.py (README.md,
--- "Quizzes"). Undo: quizzes-undo.sql. After: quizzes-live-postcheck.sql.
+-- The last check names each part not as tested: a function's md5, a grant
+-- (read from proacl and relacl), a table, a trigger.
+--
+-- After 2026111730 (needs nothing of Bulletins' 2026111801 to 03), before
+-- the app that calls these. Tested on PostgreSQL 17, ICU en-US and C:
+-- migrations/local-test/quizzes.py (README.md, "Quizzes"). Undo:
+-- quizzes-undo.sql. After: quizzes-live-postcheck.sql.
 -- One transaction: all or nothing. Can be run again.
 
 begin;
 
 set local lock_timeout = '5s';
 
--- ── 1. The checks, before anything changes ─────────────────────────────────
+-- == 1. The checks, before anything changes ==
 do $guard$
 declare
     _f    record;
@@ -125,7 +117,7 @@ begin
 end
 $guard$;
 
--- ── 2. The tables ──────────────────────────────────────────────────────────
+-- == 2. The tables ==
 create table if not exists public.quiz (
     assessment_id     uuid primary key references public.assessment(id) on delete cascade,
     shuffle_questions boolean not null default true,
@@ -222,7 +214,7 @@ comment on table public.quiz is 'A quiz on an assessment (Quizzes, MQ1): its set
 comment on table public.quiz_key is 'The answer key, kept apart from the questions. No student_submit function reads it but the returned view (MQ3).';
 comment on table public.quiz_attempt is 'One student''s try at a quiz. Until sent, only that student''s own session reads it; the teacher''s functions answer sent tries only.';
 
--- ── 3. Triggers ────────────────────────────────────────────────────────────
+-- == 3. Triggers ==
 -- Unassign is refused once any student has a try, with the existing guard's
 -- word. A start of a try (MQ2) holds the assessment's row for share, so an
 -- Unassign waits for it and then sees the try.
@@ -294,7 +286,7 @@ create constraint trigger quiz_tag_gone
     deferrable initially deferred
     for each row execute function public._quiz_tag_gone();
 
--- ── 4. The quiz as the teacher's functions answer it ───────────────────────
+-- == 4. The quiz as the teacher's functions answer it ==
 create or replace function fv_private.quiz_json(p_assessment_id uuid)
  returns jsonb
  language sql
@@ -316,7 +308,7 @@ $function$;
 
 revoke all on function fv_private.quiz_json(uuid) from public, anon, authenticated, service_role;
 
--- ── 5. The teacher's functions ─────────────────────────────────────────────
+-- == 5. The teacher's functions ==
 create or replace function public.list_quiz(p_assessment_id uuid)
  returns jsonb
  language plpgsql
@@ -595,24 +587,65 @@ revoke all on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uui
     from public, anon, service_role;
 grant execute on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid), public.list_quiz_tries(uuid) to authenticated;
 
--- ── 6. The new functions are this file's ───────────────────────────────────
+-- == 6. The last check: each part that is not as tested is named ==
 do $after$
 declare
-    _f record;
+    _bad text[] := '{}';
+    _f   record;
+    _got text;
+    _who constant text := 'case when a.grantee = 0 then ''PUBLIC'' else a.grantee::regrole::text end';
 begin
     for _f in select * from (values
-        ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', '514d96e7fe70d09121d1068e7e7f70d1'),
-        ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
-        ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d'),
-        ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9'),
-        ('public._quiz_tag_gone()', '3cd4fba9441edaec432cc3322c654826'),
-        ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f')
-    ) as v(fn, now) loop
-        if md5(pg_get_functiondef(to_regprocedure(_f.fn))) is distinct from _f.now then
-            raise exception '% did not come out as expected (md5 %). Nothing was changed.', _f.fn, md5(pg_get_functiondef(to_regprocedure(_f.fn)));
+        ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7', 'authenticated'),
+        ('public.save_quiz(uuid,jsonb,uuid)', '514d96e7fe70d09121d1068e7e7f70d1', 'authenticated'),
+        ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d', 'authenticated'),
+        ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d', null),
+        ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9', null),
+        ('public._quiz_tag_gone()', '3cd4fba9441edaec432cc3322c654826', null),
+        ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f', null)
+    ) as v(fn, now, runs) loop
+        _got := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
+        if _got is distinct from _f.now then
+            _bad := _bad || format('function %s has md5 %s, not %s', _f.fn, coalesce(_got, 'none (missing)'), _f.now);
+        end if;
+        execute 'select string_agg(w, '', '' order by w collate "C") from (select distinct ' || _who || ' as w
+                   from pg_proc p, aclexplode(coalesce(p.proacl, acldefault(''f'', p.proowner))) a
+                  where p.oid = $1 and a.grantee <> p.proowner) x' into _got using to_regprocedure(_f.fn);
+        if _got is distinct from _f.runs then
+            _bad := _bad || format('grant: function %s may be run by %s, not %s', _f.fn, coalesce(_got, 'its owner only'), coalesce(_f.runs, 'its owner only'));
         end if;
     end loop;
+    for _f in select t from unnest(array['public.quiz', 'public.quiz_question', 'public.quiz_key', 'public.quiz_attempt', 'public.quiz_answer']) t loop
+        if to_regclass(_f.t) is null then
+            _bad := _bad || format('table %s is missing', _f.t);
+            continue;
+        end if;
+        if not (select relrowsecurity from pg_class where oid = to_regclass(_f.t)) then
+            _bad := _bad || format('table %s has row security off', _f.t);
+        end if;
+        if exists (select 1 from pg_policy where polrelid = to_regclass(_f.t)) then
+            _bad := _bad || format('table %s has a policy', _f.t);
+        end if;
+        execute 'select string_agg(w, '', '' order by w collate "C") from (select distinct ' || _who || ' as w
+                   from pg_class c, aclexplode(coalesce(c.relacl, acldefault(''r'', c.relowner))) a
+                  where c.oid = $1 and a.grantee <> c.relowner) x' into _got using to_regclass(_f.t);
+        if _got is not null then
+            _bad := _bad || format('grant: table %s may be read or written by %s, not its owner only', _f.t, _got);
+        end if;
+    end loop;
+    for _f in select * from (values
+        ('assessment_quiz_draft_guard', 'public.assessment', 'public._quiz_draft_guard()', false),
+        ('quiz_tag_gone', 'public.assessment_tag', 'public._quiz_tag_gone()', true),
+        ('quiz_attempt_same_class', 'public.quiz_attempt', 'public._quiz_attempt_same_class()', false)
+    ) as v(t, tbl, fn, deferred) loop
+        if not exists (select 1 from pg_trigger where tgname = _f.t and tgrelid = to_regclass(_f.tbl) and tgfoid = to_regprocedure(_f.fn)
+                          and tgenabled = 'O' and tgdeferrable = _f.deferred and tginitdeferred = _f.deferred) then
+            _bad := _bad || format('trigger %s on %s is missing or not this file''s', _f.t, _f.tbl);
+        end if;
+    end loop;
+    if cardinality(_bad) > 0 then
+        raise exception 'Not as tested (% found): %. Nothing was changed.', cardinality(_bad), array_to_string(_bad, '; ');
+    end if;
 end
 $after$;
 

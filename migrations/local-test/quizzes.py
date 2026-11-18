@@ -997,7 +997,158 @@ def scen_collation():
     ok('collation: the fingerprints are the same under ICU en-US and C', got['icu'][0] == got['c'][0], (got['icu'][0], got['c'][0]))
     ok('collation: the stored key and choices are the same under both', got['icu'][1:] == got['c'][1:], got)
 
-SCENARIOS = {'collation': scen_collation, 'save': scen_save, 'list': scen_list, 'tries': scen_tries, 'mark': scen_mark, 'reopen': scen_reopen, 'confirm': scen_confirm,
+def mutant(rel, before_marker, extra=None, replace=None):
+    """The file's text with statements put in just before its last check, or one piece of text replaced."""
+    t = text_of(rel)
+    if replace:
+        assert replace[0] in t, replace[0]
+        t = t.replace(replace[0], replace[1], 1)
+    if extra:
+        i = t.index(before_marker); t = t[:i] + extra + '\n' + t[i:]
+    return t
+
+def scen_lastcheck():
+    """Each part the last checks read, tripped alone and two at once: the file stops naming exactly that part (and
+    how many), and nothing is left behind. On the ICU database (PG_ICU_TEMPLATE)."""
+    w = world('lastcheck', with_file=False, template=ICU_TEMPLATE); d = w.d
+    M1 = '-- == 6. The last check'; M2 = '-- == The last check'
+    base = catalog_of(d)
+    cases = [
+        ('a function body', None, ('    return fv_private.quiz_json(p_assessment_id);\nend;', '    return  fv_private.quiz_json(p_assessment_id);\nend;'),
+         ['function public.list_quiz(uuid) has md5 ']),
+        ('a function granted to anon', 'grant execute on function public.list_quiz_tries(uuid) to anon;', None,
+         ['grant: function public.list_quiz_tries(uuid) may be run by anon, authenticated, not authenticated']),
+        ('a private function granted to a teacher', 'grant execute on function fv_private.quiz_json(uuid) to authenticated;', None,
+         ['grant: function fv_private.quiz_json(uuid) may be run by authenticated, not its owner only']),
+        ('a table granted to a teacher', 'grant select on public.quiz_key to authenticated;', None,
+         ['grant: table public.quiz_key may be read or written by authenticated, not its owner only']),
+        ('a table with row security off', 'alter table public.quiz_answer disable row level security;', None,
+         ['table public.quiz_answer has row security off']),
+        ('a table with a policy', 'create policy p on public.quiz using (true);', None, ['table public.quiz has a policy']),
+        ('a trigger missing', 'drop trigger quiz_tag_gone on public.assessment_tag;', None,
+         ["trigger quiz_tag_gone on public.assessment_tag is missing or not this file's"]),
+        ('a trigger disabled', 'alter table public.assessment disable trigger assessment_quiz_draft_guard;', None,
+         ["trigger assessment_quiz_draft_guard on public.assessment is missing or not this file's"]),
+        ('two at once: a table grant and a missing trigger',
+         'grant select on public.quiz_key to authenticated; drop trigger quiz_attempt_same_class on public.quiz_attempt;', None,
+         ['grant: table public.quiz_key may be read or written by authenticated, not its owner only',
+          "trigger quiz_attempt_same_class on public.quiz_attempt is missing or not this file's"]),
+    ]
+    PART = r'(function \S+ has md5|grant: |table \S+ has|trigger \S+ on)'
+    for name, extra, rep, want in cases:
+        r = d.statements(split(mutant(FILE, M1, extra, rep)))
+        ok('last check, file 1, %s: stops' % name, r.startswith('STOPPED: Not as tested (%d found): ' % len(want)), r)
+        ok('last check, file 1, %s: names that part and nothing else' % name, all(x in r for x in want) and len(re.findall(PART, r)) == len(want), r)
+        ok('last check, file 1, %s: nothing is left behind' % name, catalog_of(d) == base, differences(base, catalog_of(d)))
+    r = d.file(FILE); ok('last check: the file as written applies', r == 'ok', r)
+    mid = catalog_of(d)
+    body = ("detail = 'Only a sent try can be confirmed.'", "detail = 'Only a sent try can be confirmed!'")
+    cases2 = [
+        ('a function granted to the edge functions', 'grant execute on function public.confirm_quiz(uuid, jsonb, uuid) to service_role;', None,
+         ['grant: function public.confirm_quiz(uuid,jsonb,uuid) may be run by authenticated, service_role, not authenticated']),
+        ('a function body', None, body, ['function public.confirm_quiz(uuid,jsonb,uuid) has md5 ']),
+        ('two at once', 'revoke execute on function public.reopen_quiz(uuid, uuid, uuid) from authenticated;', body,
+         ['grant: function public.reopen_quiz(uuid,uuid,uuid) may be run by its owner only, not authenticated',
+          'function public.confirm_quiz(uuid,jsonb,uuid) has md5 ']),
+    ]
+    for name, extra, rep, want in cases2:
+        r = d.statements(split(mutant(FILE2, M2, extra, rep)))
+        ok('last check, file 2, %s: stops naming that part and nothing else (%d found)' % (name, len(want)),
+           r.startswith('STOPPED: Not as tested (%d found): ' % len(want)) and all(x in r for x in want) and len(re.findall(PART, r)) == len(want), r)
+        ok('last check, file 2, %s: nothing is left behind' % name, catalog_of(d) == mid, differences(mid, catalog_of(d)))
+    r = d.file(FILE2); ok('last check: the second file as written applies', r == 'ok', r)
+    # The route row: if the route turned an escape into its character, the pre-check says so in one row.
+    for pre in (PRE, PRE2):
+        t = text_of(pre).replace("length('\\x41')", "length('A')")
+        r = d.statements(split(t))
+        ok('route row: %s returns it when an escape arrives changed' % pre, r == 'ok' and ['the route changes backslash escapes', '1 4'] in d.rows, d.rows)
+    d.close()
+
+NONSUPER = os.environ.get('FV_NONSUPER', 'q1_live_postgres')
+def as_live_postgres(d):
+    """As Supabase's postgres on live: not a superuser, createrole, bypassrls, a member of anon, authenticated,
+    service_role and pg_read_all_data, owning the app schemas and what is in them, with live's default privileges
+    for what it creates. Every later statement on d's connection is that role's. (As bulletins_student.py.)"""
+    import pg8000.native
+    role = NONSUPER
+    if not d.one('select exists (select 1 from pg_roles where rolname = :r)', r=role):
+        d.run('create role "%s" login nosuperuser createrole bypassrls' % role)
+    d.run('grant pg_read_all_data, anon, authenticated, service_role to "%s"' % role)
+    d.run("""do $own$ declare r record; begin
+      for r in select nspname from pg_namespace where nspname in ('public', 'student_submit', 'fv_private') loop
+        execute format('alter schema %%I owner to %%I', r.nspname, '%(r)s'); end loop;
+      for r in select c.oid::regclass::text t, c.relkind k from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname in ('public', 'student_submit', 'fv_private') and c.relkind in ('r', 'p', 'v', 'm', 'S', 'f')
+                  and not exists (select 1 from pg_depend dp where dp.objid = c.oid and dp.classid = 'pg_class'::regclass and dp.deptype in ('a', 'i'))
+      loop execute format('alter %%s %%s owner to %%I', case r.k when 'S' then 'sequence' when 'v' then 'view' when 'm' then 'materialized view'
+                                                         when 'f' then 'foreign table' else 'table' end, r.t, '%(r)s'); end loop;
+      for r in select p.oid::regprocedure::text s, p.prokind k from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname in ('public', 'student_submit', 'fv_private')
+      loop execute format('alter %%s %%s owner to %%I', case r.k when 'p' then 'procedure' when 'a' then 'aggregate' else 'function' end, r.s, '%(r)s'); end loop;
+      for r in select t.oid::regtype::text s from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                where n.nspname in ('public', 'student_submit', 'fv_private') and t.typtype in ('d', 'e')
+      loop execute format('alter type %%s owner to %%I', r.s, '%(r)s'); end loop;
+    end $own$""" % {'r': role})
+    # Live's default privileges for what postgres creates.
+    d.run('alter default privileges for role "%s" revoke execute on functions from public' % role)
+    d.run('alter default privileges for role "%s" in schema public grant execute on functions to authenticated, service_role' % role)
+    d.run('alter default privileges for role "%s" in schema public grant select, insert, update, delete on tables to authenticated' % role)
+    d.run('alter default privileges for role "%s" in schema public grant select, usage on sequences to authenticated' % role)
+    d.c.close()
+    d.c = pg8000.native.Connection(role, host=os.environ.get('PGHOST', '127.0.0.1'), port=int(os.environ.get('PGPORT', '5432')), database=d.name)
+    return d.one('select rolsuper::text || rolcreaterole::text || rolbypassrls::text from pg_roles where rolname = current_user')
+
+ACL_SQL = {'r': """select coalesce(string_agg(w, ', ' order by w collate "C"), '') from (select distinct case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end w
+                     from pg_class c, aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a where c.oid = to_regclass(:o) and a.grantee <> c.relowner) x""",
+           'f': """select coalesce(string_agg(w, ', ' order by w collate "C"), '') from (select distinct case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end w
+                     from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where p.oid = to_regprocedure(:o) and a.grantee <> p.proowner) x"""}
+def acls(d):
+    """{object: the roles other than its owner with any right on it}, from relacl and proacl themselves."""
+    return dict({t: d.one(ACL_SQL['r'], o=t) for t in TABLES}, **{f: d.one(ACL_SQL['f'], o=f) for f in FUNCS})
+def contract_acls():
+    return dict({t: '' for t in TABLES}, **{f: ('authenticated' if re.match(r'public\.[a-z]', f) else '') for f in FUNCS})
+
+def scen_nonsuper():
+    """Applied as a role that is not a superuser, with live's default privileges in place (tables born granted to
+    authenticated, functions to authenticated and service_role): the files apply, the grants end exactly as the
+    contract says, both post-checks say ok, the undo and a second apply work. On the ICU database."""
+    w = world('nonsuper', with_file=False, template=ICU_TEMPLATE); d = w.d
+    flags = as_live_postgres(d)
+    ok("nonsuper: the role is not a superuser and may create roles and bypass row security, as live's postgres", flags == 'falsetruetrue', flags)
+    r = d.statements(split(text_of(PRE))); ok('nonsuper: the pre-check returns no rows as that role', r == 'ok' and d.rows == [], d.rows)
+    d.run('create table public.q1_probe (x int)'); d.run('create function public.q1_probe() returns int language sql as $$ select 1 $$')
+    born = (d.one("select relacl::text from pg_class where oid = 'public.q1_probe'::regclass"), d.one("select proacl::text from pg_proc where oid = 'public.q1_probe()'::regprocedure"))
+    ok("nonsuper: with live's default privileges a new table is born granted to authenticated, a new function to authenticated and service_role",
+       'authenticated=arwd' in born[0] and 'authenticated=X' in born[1] and 'service_role=X' in born[1], born)
+    d.run('drop table public.q1_probe'); d.run('drop function public.q1_probe()')
+    base = catalog_of(d)
+    r = d.statements(split(mutant(FILE, '-- == 6. The last check', None, ('revoke all on table public.quiz, ', 'revoke all on table '))))
+    ok("nonsuper: without the file's revoke, live's default privileges grant public.quiz, and the last check names it",
+       r.startswith('STOPPED') and 'grant: table public.quiz may be read or written by authenticated, not its owner only' in r, r)
+    ok('nonsuper: and nothing is left behind', catalog_of(d) == base, differences(base, catalog_of(d)))
+    for f in (FILE, FILE2):
+        r = d.file(f); ok('nonsuper: %s applies' % f, r == 'ok', r)
+    got = acls(d); want = contract_acls()
+    ok("nonsuper: every table and function ends with exactly the contract's grants (relacl, proacl)", got == want,
+       {k: (v, want[k]) for k, v in got.items() if v != want[k]})
+    for f in (POST, POST2):
+        r = d.statements(split(text_of(f)))
+        ok('nonsuper: %s says ok on every row' % f, r == 'ok' and d.rows and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or r)
+    ok('nonsuper: the five tables belong to that role', d.one("select count(*) from pg_class c join pg_roles r on r.oid = c.relowner where c.oid = any(cast(:t as regclass[])) and r.rolname = :n", t=TABLES, n=NONSUPER) == 5)
+    rq = save(w, w.a, quiz([tf(tag=w.t[1]), text()]))
+    ok('nonsuper: a teacher saves a quiz through it', len(rq['questions']) == 2)
+    T(d, 'save_assessment_tags(:a, cast(:g as uuid[]))', a=w.a, g=w.t[:1])
+    ok("nonsuper: the competency trigger runs under the released app's save_assessment_tags", [q['tag_id'] for q in listed(w, w.a)['questions']] == [None, None])
+    save(w, w.a, None)
+    for f in (UNDO2, UNDO):
+        r = d.file(f); ok('nonsuper: %s runs as that role' % f, r == 'ok', r)
+    ok('nonsuper: the catalog is as before', catalog_of(d) == base, differences(base, catalog_of(d)))
+    for f in (FILE, FILE2):
+        r = d.file(f); ok('nonsuper: %s applies again' % f, r == 'ok', r)
+    ok("nonsuper: and the grants are the contract's again", acls(d) == want)
+    d.close()
+
+SCENARIOS = {'collation': scen_collation, 'lastcheck': scen_lastcheck, 'nonsuper': scen_nonsuper,'save': scen_save, 'list': scen_list, 'tries': scen_tries, 'mark': scen_mark, 'reopen': scen_reopen, 'confirm': scen_confirm,
              'draft': scen_draft, 'others': scen_others, 'cascade': scen_cascade, 'race': scen_race, 'missing': scen_missing,
              'defaults': scen_defaults, 'apply': scen_apply, 'undo': scen_undo}
 if __name__ == '__main__':

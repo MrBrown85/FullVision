@@ -52,6 +52,12 @@ checks(check_name, value) as (
       from unnest(array['public', 'fv_private']) n
      where to_regnamespace(n) is not null and not has_schema_privilege(current_user, n, 'CREATE')
     union all
+    -- The route the file is sent through must deliver backslash escapes as written: on Nov 18 it turned every
+    -- backslash-u-four-hex into the character itself. This file and the migrations use none; one row here
+    -- means the route now changes the text, and nothing should be sent through it.
+    select 'the route changes backslash escapes', length('\x41')::text || ' ' || length('a\\b')::text
+     where length('\x41') <> 4 or length('a\\b') <> 4
+    union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17)
 select * from checks order by check_name collate "C";

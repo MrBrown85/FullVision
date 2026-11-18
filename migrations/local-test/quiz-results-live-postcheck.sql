@@ -20,4 +20,4 @@ union all select 'a teacher may run the three; a visitor and the edge functions 
 union all select 'none of the three names a score, tag score, rubric score or returned grade table',
        case when not exists (select 1 from pg_proc p where p.oid in ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)'::regprocedure,
                                  'public.reopen_quiz(uuid,uuid,uuid)'::regprocedure, 'public.confirm_quiz(uuid,jsonb,uuid)'::regprocedure)
-                               and p.prosrc ~* '(from|into|update|join)\s+(public\.)?(score|tag_score|rubric_score|grade_return)\M') then 'ok' else 'NOT AS EXPECTED' end;
+                               and p.prosrc ~* '(from|into|update|join)[[:space:]]+(public[.])?(score|tag_score|rubric_score|grade_return)([^a-z_]|$)') then 'ok' else 'NOT AS EXPECTED' end;

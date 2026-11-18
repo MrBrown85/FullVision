@@ -1,6 +1,6 @@
 -- Undo for migrations/2026111804_quizzes.sql (2026-11-17).
 --
--- ── PART 1, the stop that deletes nothing ────────────────────────────────────
+-- == PART 1, the stop that deletes nothing ==
 -- Takes list_quiz, save_quiz and list_quiz_tries away from teachers (revokes
 -- execute from authenticated), and the three results functions of
 -- 2026111805 too when they are there. Every quiz, question, key, try and
@@ -11,7 +11,7 @@
 -- (their grants are restated). Run PART 1 alone (from "PART 1 begins" to
 -- "PART 1 ends").
 --
--- ── PART 2, the full removal: the rest of this file ──────────────────────────
+-- == PART 2, the full removal: the rest of this file ==
 -- Drops the two triggers on existing tables, the functions and the five
 -- tables. It REFUSES while any quiz exists, so it deletes no teacher's
 -- question and no student's answer: if a removal is truly wanted after use,

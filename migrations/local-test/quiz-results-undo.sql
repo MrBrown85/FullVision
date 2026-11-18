@@ -1,13 +1,13 @@
 -- Undo for migrations/2026111805_quiz_results.sql (2026-11-17).
 --
--- ── PART 1, the stop that deletes nothing ────────────────────────────────────
+-- == PART 1, the stop that deletes nothing ==
 -- Takes mark_quiz_answer, reopen_quiz and confirm_quiz away from teachers
 -- (revokes execute from authenticated). Every given point, note, reopened
 -- try and confirmed marking stays. To turn it back on, run the migration
 -- file again (its grants are restated). Run PART 1 alone (from "PART 1
 -- begins" to "PART 1 ends").
 --
--- ── PART 2, the full removal: the rest of this file ──────────────────────────
+-- == PART 2, the full removal: the rest of this file ==
 -- Drops the three functions. It deletes no row: the columns they wrote are
 -- 2026111804's and stay. Stops, with the functions kept, if one is not this
 -- file's definition. Takes no lock on an existing table.

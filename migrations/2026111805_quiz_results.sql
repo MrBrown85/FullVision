@@ -18,14 +18,14 @@
 --
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
---   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new)   77bd2789ea9f46790f6eef639a605c24
---   public.reopen_quiz(uuid,uuid,uuid) (new)                     daabc9bbdd81761d4ddfd72b773eca78
---   public.confirm_quiz(uuid,jsonb,uuid) (new)                   8380e8fa33795295b97e17623376414f
+--   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new) 77bd2789ea9f46790f6eef639a605c24
+--   public.reopen_quiz(uuid,uuid,uuid) (new) daabc9bbdd81761d4ddfd72b773eca78
+--   public.confirm_quiz(uuid,jsonb,uuid) (new) 8380e8fa33795295b97e17623376414f
 -- Relied on, unchanged (function, live, and 2026111804's):
---   public.fv_owns_assessment(uuid)                              9f4c680c35f9f3ac32e8290824707673
---   public.fv_idem_check(uuid,text)                              1c7b546434bee4b774557e0e6b16024f
---   public.fv_idem_store(uuid,text,jsonb)                        6d0b48c458d273a332db39e1a4b68626
---   public._quiz_attempt_same_class()                            5b0045acab2f7eb94cf3d8ff75210e1f
+--   public.fv_owns_assessment(uuid) 9f4c680c35f9f3ac32e8290824707673
+--   public.fv_idem_check(uuid,text) 1c7b546434bee4b774557e0e6b16024f
+--   public.fv_idem_store(uuid,text,jsonb) 6d0b48c458d273a332db39e1a4b68626
+--   public._quiz_attempt_same_class() 5b0045acab2f7eb94cf3d8ff75210e1f
 --
 -- Checks first: it stops with nothing changed unless the four functions it
 -- relies on are as tested (the last says 2026111804 is applied), its own
@@ -34,6 +34,7 @@
 -- pre-check: migrations/local-test/quiz-results-live-precheck.sql.
 --
 -- Rows: none changes. Locks: none on an existing table (functions only).
+-- The last check names each function whose md5 or grants are not as tested.
 -- Tested with 2026111804 by migrations/local-test/quizzes.py. Undo:
 -- quiz-results-undo.sql. After: quiz-results-live-postcheck.sql.
 -- One transaction: all or nothing. Can be run again.
@@ -274,19 +275,34 @@ revoke all on function public.mark_quiz_answer(uuid, uuid, numeric, text, uuid),
 grant execute on function public.mark_quiz_answer(uuid, uuid, numeric, text, uuid), public.reopen_quiz(uuid, uuid, uuid),
     public.confirm_quiz(uuid, jsonb, uuid) to authenticated;
 
+-- == The last check: each part that is not as tested is named ==
+-- Grants are read from proacl itself, so default privileges show here.
 do $after$
 declare
-    _f record;
+    _bad text[] := '{}';
+    _f   record;
+    _got text;
 begin
     for _f in select * from (values
         ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),
         ('public.reopen_quiz(uuid,uuid,uuid)', 'daabc9bbdd81761d4ddfd72b773eca78'),
         ('public.confirm_quiz(uuid,jsonb,uuid)', '8380e8fa33795295b97e17623376414f')
     ) as v(fn, now) loop
-        if md5(pg_get_functiondef(to_regprocedure(_f.fn))) is distinct from _f.now then
-            raise exception '% did not come out as expected (md5 %). Nothing was changed.', _f.fn, md5(pg_get_functiondef(to_regprocedure(_f.fn)));
+        _got := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
+        if _got is distinct from _f.now then
+            _bad := _bad || format('function %s has md5 %s, not %s', _f.fn, coalesce(_got, 'none (missing)'), _f.now);
+        end if;
+        select string_agg(w, ', ' order by w collate "C") into _got
+          from (select distinct case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end as w
+                  from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                 where p.oid = to_regprocedure(_f.fn) and a.grantee <> p.proowner) x;
+        if _got is distinct from 'authenticated' then
+            _bad := _bad || format('grant: function %s may be run by %s, not authenticated', _f.fn, coalesce(_got, 'its owner only'));
         end if;
     end loop;
+    if cardinality(_bad) > 0 then
+        raise exception 'Not as tested (% found): %. Nothing was changed.', cardinality(_bad), array_to_string(_bad, '; ');
+    end if;
 end
 $after$;
 
