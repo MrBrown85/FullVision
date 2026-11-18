@@ -55,6 +55,9 @@ as the owner, so these scenarios test M2 alone, not the teacher's functions.
   mirror   _bulletin_session_enrollments names exactly the enrolments _session_classes lists, in its order, for a
            device with a class whose page is off, one in the trash, a paused one, a withdrawn enrolment, an
            expired card and a stopped card; an expired card's class is named and gets its count.
+  collations  On a copy of each of two templates, ICU en-US (as live) and C (FV_ICU_DB, FV_C_DB): the pre-check
+           is empty, the file applies, runs again, passes its post-check, undoes and applies again, every md5 is
+           the header's, and the fingerprints and both checks' rows are the same under the two.
   undolock The full undo takes write_log before it deletes: a student's write arriving between waits and goes
            through (the old order, delete then lock, is shown to deadlock, so the race is real).
 """
@@ -279,7 +282,7 @@ def scen_seen():
     a = post(w); b = post(w, minutes_ago=30); up = post(w, posted=False); x = post(w, course=w.cb); y = post(w, course=w.c2)
     r = seen(w, [a, b, x, y, up, nid()])
     ok('seen: only the bulletins the student may see are marked', r == {'ok': True, 'seen': 2}, r)
-    rows = d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by 1')
+    rows = d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by bulletin_id, enrollment_id')
     ok('seen: rows for those two only, this student\'s', sorted(rows) == sorted([[a, w.cece], [b, w.cece]]), rows)
     first = d.one('select seen_at from public.bulletin_seen where bulletin_id = :b and enrollment_id = :e', b=a, e=w.cece)
     time.sleep(0.05)
@@ -413,12 +416,12 @@ def scen_limit():
         out.append(react(w, b, words[i % 4]) if i % 2 else seen(w, [c]))
     ok('limit: 120 writes in an hour, both routes counted together, all ok', all(r.get('ok') is True for r in out), [r for r in out if not r.get('ok')][:2])
     ok('limit: each counted once, as bulletin', d.one("select count(*) from student_submit.write_log where kind = 'bulletin'") == 120)
-    n = log_rows(d); reacted = d.all('select word from public.bulletin_reaction')
+    n = log_rows(d); reacted = d.all('select word from public.bulletin_reaction order by bulletin_id, enrollment_id')
     r = react(w, b, 'got_it')
     ok('limit: the 121st (a reaction) is too_many with a wait', r.get('ok') is False and r.get('error') == 'too_many' and 1 <= r.get('retry_after_s', 0) <= 3600 and set(r) == {'ok', 'error', 'retry_after_s'}, r)
     r = seen(w, [post(w)])
     ok('limit: the 122nd (a seen mark) is too_many too', r.get('error') == 'too_many', r)
-    ok('limit: the refusals wrote nothing', log_rows(d) == n and d.all('select word from public.bulletin_reaction') == reacted
+    ok('limit: the refusals wrote nothing', log_rows(d) == n and d.all('select word from public.bulletin_reaction order by bulletin_id, enrollment_id') == reacted
        and d.one('select count(*) from public.bulletin_seen') == 1)
     ok("limit: a classmate's card is not counted", react(w, b, 'done', w.dev) == {'ok': True, 'reaction': 'done'})
     ok('limit: reading is not limited', feed(w).get('ok') is True and links(w, add_file(w, c)).get('ok') is True)
@@ -622,6 +625,11 @@ def scen_apply():
           'drop function public.bulletin_react(uuid)', 'other arguments or in another schema')
     guard("a bulletin_seen that is not this file's", "create function student_submit.bulletin_seen(text, uuid, uuid[], text) returns jsonb language sql as $$ select null::jsonb $$",
           'drop function student_submit.bulletin_seen(text, uuid, uuid[], text)', 'is not the definition this file was written against')
+    # Run as a role that does not own write_log (here service_role): stopped before anything.
+    d.run('set role service_role'); r = d.file(FILE); d.run('reset role')
+    ok('apply guard: a run as a role that does not own write_log stops the file', r.startswith('STOPPED') and 'Run this as the owner' in r, r)
+    d.run('set role service_role'); r = d.file(PRE); rows_ = d.rows; d.run('reset role')
+    ok('apply guard: and the pre-check, run as that role, names it', r == 'ok' and any(x[0].startswith('the role running this') for x in rows_), (r, rows_))
     ok('apply: after the guards the catalog is the one before', catalog(d.c) == base, differences(base, catalog(d.c)))
     # Lock timeout: a transaction holding write_log makes the file give up, nothing applied.
     hold = Conn(d); hold.run('begin'); hold.run('lock table student_submit.write_log in access exclusive mode')
@@ -672,8 +680,8 @@ def scen_undo():
     r = d.file(FILE); ok('undo: (setup) the file applies', r == 'ok', r)
     withfile = catalog(d.c)
     b = post(w, reactions_on=True); seen(w, [b]); react(w, b, 'done'); seen(w, [b], w.dev)
-    kept = d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction')
-    marks = d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by 2')
+    kept = d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction order by bulletin_id, enrollment_id')
+    marks = d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by bulletin_id, enrollment_id')
     # The edge function signs in as the database's owner. This connection is that owner: every call below
     # is made as the edge function really makes it.
     calls = ((FEED, "select student_submit.bulletins(:t, :e, 'ip')"), (SEEN, "select student_submit.bulletin_seen(:t, :e, array[:b]::uuid[], 'ip')"),
@@ -690,8 +698,8 @@ def scen_undo():
         x = refusal(lambda: d.one(call, t=w.tok[w.cece], e=w.cece, b=b))
         ok('undo PART 1: the owner (the edge function) can no longer run %s: it is gone' % sig.split('(')[0], x and x[0] == '42883', x)
     ok('undo PART 1: every seen mark and reaction is kept',
-       d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction') == kept
-       and d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by 2') == marks)
+       d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction order by bulletin_id, enrollment_id') == kept
+       and d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by bulletin_id, enrollment_id') == marks)
     ok('undo PART 1: the two helpers and write_log\'s check are kept',
        md5(d, VIS) is not None and md5(d, ENROL) is not None and kind_check(d) == [[NEW_CHECK, True]])
     gone, came = differences(withfile, catalog(d.c))
@@ -721,7 +729,7 @@ def scen_undo():
        d.one("select count(*) from student_submit.write_log where kind = 'bulletin'") == 0
        and d.all("select id, kind from student_submit.write_log order by id") == others)
     ok('undo: every seen mark and reaction is kept (M1\'s tables are M1\'s undo\'s)',
-       d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction') == kept)
+       d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction order by bulletin_id, enrollment_id') == kept)
     r = d.file(UNDO); ok('undo: a second run is ok and changes nothing', r == 'ok' and catalog(d.c) == base, r)
     r = d.file(FILE); ok('undo: the file applies again', r == 'ok' and same(catalog(d.c), withfile), differences(norm(withfile), norm(catalog(d.c))))
     ok('undo: and the feed answers', feed(w)['ok'] is True)
@@ -814,9 +822,45 @@ def scen_undolock():
     d.run('drop trigger b1b_test_pause on student_submit.write_log'); d.run('drop function public.b1b_test_pause()')
     d.close()
 
+def scen_collations():
+    """The file, its checks and its undo under live's locale (ICU en-US) and under C: each applies, runs again,
+    passes its post-check, undoes and applies again, and every fingerprint and check answer is the same under
+    both. FV_ICU_DB and FV_C_DB name two templates rebuilt from the repo, made as README.md says."""
+    names = {'icu': os.environ.get('FV_ICU_DB'), 'c': os.environ.get('FV_C_DB')}
+    want = {'icu': ['i', 'en-US', 'en_US.UTF-8', 'en_US.UTF-8'], 'c': ['c', None, 'C', 'C']}
+    ok('collations: (setup) FV_ICU_DB and FV_C_DB name the two templates', all(names.values()), names)
+    if not all(names.values()): return
+    seen = {}
+    for tag, template in names.items():
+        d = Db('b1b_coll_' + tag, template=template)
+        loc = d.all('select datlocprovider::text, datlocale, datcollate, datctype from pg_database where datname = current_database()')[0]
+        ok('collations: the %s copy is %s' % (tag, want[tag]), loc == want[tag], loc)
+        if not m1_applied(d):
+            r = d.statements(split(open(M1).read())); ok('collations %s: (setup) M1 applies' % tag, r == 'ok', r)
+        r = d.file(PRE); pre = d.rows
+        ok('collations %s: the pre-check returns no rows' % tag, r == 'ok' and pre == [], pre)
+        r = d.file(FILE); ok('collations %s: the file applies' % tag, r == 'ok', r)
+        r = d.file(FILE); ok('collations %s: a second run is ok' % tag, r == 'ok', r)
+        r = d.file(POST); post = d.rows
+        ok('collations %s: the post-check says ok on every row' % tag, r == 'ok' and post and all(x[1] == 'ok' for x in post), [x for x in post if x[1] != 'ok'] or r)
+        r = d.file(PRE); pre_after = d.rows
+        fp = {s: md5(d, s) for s in OURS + RELIED}
+        fp['check'] = kind_check(d)
+        r = d.file(UNDO); ok('collations %s: the undo runs' % tag, r == 'ok' and kind_check(d) == [[OLD_CHECK, True]] and not applied(d), r)
+        r = d.file(FILE); ok('collations %s: the file applies again' % tag, r == 'ok' and applied(d), r)
+        new, relied = header_md5s()
+        ok("collations %s: every fingerprint is the header's" % tag, all(fp[s] == new[s] for s in OURS) and all(fp[s] == relied[s] for s in RELIED),
+           {s: fp[s] for s in OURS + RELIED if fp[s] != {**new, **relied}.get(s)})
+        seen[tag] = (fp, post, pre_after)
+        d.close()
+    ok('collations: the fingerprints are the same under ICU en-US and under C', seen['icu'][0] == seen['c'][0], (seen['icu'][0], seen['c'][0]))
+    ok("collations: the post-check's rows are the same under both", seen['icu'][1] == seen['c'][1])
+    ok("collations: the pre-check's rows after the apply are the same under both, in the same order", seen['icu'][2] == seen['c'][2], (seen['icu'][2], seen['c'][2]))
+
 SCENARIOS = {'feed': scen_feed, 'new': scen_new, 'seen': scen_seen, 'react': scen_react, 'links': scen_links, 'refused': scen_refused,
              'limit': scen_limit, 'leak': scen_leak, 'others': scen_others, 'race': scen_race, 'defaults': scen_defaults,
-             'apply': scen_apply, 'missing': scen_missing, 'undo': scen_undo, 'mirror': scen_mirror, 'undolock': scen_undolock}
+             'apply': scen_apply, 'missing': scen_missing, 'undo': scen_undo, 'mirror': scen_mirror, 'undolock': scen_undolock,
+             'collations': scen_collations}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or SCENARIOS):
         SCENARIOS[name]()

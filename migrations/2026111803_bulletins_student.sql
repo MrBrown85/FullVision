@@ -99,8 +99,11 @@
 -- file's (a second run); no function of those names exists with other
 -- arguments or in another schema; write_log_kind_check is exactly the
 -- 'from' above (or the 'to', a second run) and is write_log's only check;
--- M1's four tables have the columns and keys these functions read; and the
--- server is PostgreSQL 17. Read-only from gradebook-prod: the query in
+-- M1's four tables have the columns and keys these functions read; the role
+-- running it owns write_log and _session_class; and the server is PostgreSQL
+-- 17. Nothing it compares depends on the database's collation (every text
+-- order it aggregates is collate "C"), its time zone or the session's search
+-- path (set below). Read-only from gradebook-prod: the query in
 -- migrations/local-test/bulletins-student-live-precheck.sql.
 --
 -- ── Rows ───────────────────────────────────────────────────────────────────
@@ -145,6 +148,13 @@ begin
     if current_setting('server_version_num')::int / 10000 <> 17 then
         raise exception 'This file was tested on PostgreSQL 17 only (this is %). Nothing was changed.', current_setting('server_version');
     end if;
+    -- Run as the role that owns write_log and the student functions (postgres on Supabase, not a superuser):
+    -- swapping the check needs the table's owner, and the new functions must belong to the edge function's role.
+    if (select relowner from pg_class where oid = to_regclass('student_submit.write_log')) is distinct from (select oid from pg_roles where rolname = current_user)
+       or (select proowner from pg_proc where oid = to_regprocedure('student_submit._session_class(text,uuid)')) is distinct from (select oid from pg_roles where rolname = current_user)
+       or not has_schema_privilege('student_submit', 'create') then
+        raise exception 'Run this as the owner of student_submit.write_log and student_submit._session_class (% is not). Nothing was changed.', current_user;
+    end if;
     for _f in select * from (values
         ('student_submit._session_class(text,uuid)', '1ae94981ff32f804d12079a24bd7b41a', null),
         ('student_submit._card_refusal(uuid)', '4b982e451dbd5c9c68916c99d29d2d37', null),
@@ -179,7 +189,7 @@ begin
         raise exception 'A function of this file''s names exists with other arguments or in another schema. Nothing was changed.';
     end if;
     -- write_log's kind check: today's, or this file's (a second run), and its only check.
-    select string_agg(pg_get_constraintdef(c.oid), ' | ') into _def
+    select string_agg(pg_get_constraintdef(c.oid), ' | ' order by c.conname collate "C", c.oid) into _def
       from pg_constraint c where c.conrelid = to_regclass('student_submit.write_log') and c.contype = 'c';
     if _def is distinct from 'CHECK ((kind = ANY (ARRAY[''reflect''::text, ''seen''::text, ''finish''::text, ''answer''::text])))'
        and _def is distinct from 'CHECK ((kind = ANY (ARRAY[''reflect''::text, ''seen''::text, ''finish''::text, ''answer''::text, ''bulletin''::text])))' then
@@ -190,7 +200,7 @@ begin
         raise exception 'student_submit.write_log has no validated check named write_log_kind_check. Nothing was changed.';
     end if;
     -- M1's tables, with the columns these functions read.
-    select string_agg(t.tab || '.' || t.col, ', ') into _miss
+    select string_agg(t.tab || '.' || t.col, ', ' order by t.tab collate "C", t.col collate "C") into _miss
       from (values ('bulletin', 'id', 'uuid'), ('bulletin', 'course_id', 'uuid'), ('bulletin', 'kind', 'text'),
                    ('bulletin', 'body', 'text'), ('bulletin', 'link_url', 'text'), ('bulletin', 'link_title', 'text'),
                    ('bulletin', 'pinned', 'boolean'), ('bulletin', 'pinned_until', 'date'), ('bulletin', 'assessment_id', 'uuid'),
@@ -212,7 +222,7 @@ begin
     -- The two keys bulletin_seen and bulletin_react write on.
     if (select count(*) from pg_constraint c
          where c.contype = 'p' and c.conrelid in (to_regclass('public.bulletin_seen'), to_regclass('public.bulletin_reaction'))
-           and (select array_agg(a.attname::text order by a.attname) from pg_attribute a
+           and (select array_agg(a.attname::text order by a.attname::text collate "C") from pg_attribute a
                  where a.attrelid = c.conrelid and a.attnum = any (c.conkey)) = array['bulletin_id', 'enrollment_id']) <> 2 then
         raise exception 'bulletin_seen or bulletin_reaction lacks its key (bulletin_id, enrollment_id). Nothing was changed.';
     end if;

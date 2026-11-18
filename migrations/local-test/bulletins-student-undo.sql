@@ -104,7 +104,7 @@ begin
             raise exception '% is not the definition 2026111803 left (md5 %). Everything is kept; if PART 1 ran before this, students are without the four routes until the migration file is run again.', _f.fn, _md5;
         end if;
     end loop;
-    select string_agg(pg_get_constraintdef(c.oid), ' | ') into _def
+    select string_agg(pg_get_constraintdef(c.oid), ' | ' order by c.conname collate "C", c.oid) into _def
       from pg_constraint c where c.conrelid = 'student_submit.write_log'::regclass and c.contype = 'c';
     if _def is distinct from 'CHECK ((kind = ANY (ARRAY[''reflect''::text, ''seen''::text, ''finish''::text, ''answer''::text, ''bulletin''::text])))'
        and _def is distinct from 'CHECK ((kind = ANY (ARRAY[''reflect''::text, ''seen''::text, ''finish''::text, ''answer''::text])))' then

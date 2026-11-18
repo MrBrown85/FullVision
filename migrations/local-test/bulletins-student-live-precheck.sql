@@ -34,9 +34,9 @@ checks(check_name, value) as (
     select 'already there: function ' || p.oid::regprocedure::text, 'present'
       from pg_proc p where p.proname in ('_bulletin_visible', '_bulletin_session_enrollments', 'bulletins', 'bulletin_seen', 'bulletin_react', 'bulletin_file_links')
     union all
-    select 'student_submit.write_log checks', coalesce(string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | '), 'none')
+    select 'student_submit.write_log checks', coalesce(string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | ' order by c.conname collate "C", c.oid), 'none')
       from pg_constraint c where c.conrelid = to_regclass('student_submit.write_log') and c.contype = 'c'
-    having coalesce(string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | '), 'none')
+    having coalesce(string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | ' order by c.conname collate "C", c.oid), 'none')
            <> 'CHECK ((kind = ANY (ARRAY[''reflect''::text, ''seen''::text, ''finish''::text, ''answer''::text]))) write_log_kind_check true'
     union all
     select 'M1: public.' || c.tab || '.' || c.col, 'absent or another type'
@@ -47,12 +47,18 @@ checks(check_name, value) as (
     select 'M1: the key (bulletin_id, enrollment_id) on bulletin_seen and bulletin_reaction', 'absent'
      where (select count(*) from pg_constraint c
              where c.contype = 'p' and c.conrelid in (to_regclass('public.bulletin_seen'), to_regclass('public.bulletin_reaction'))
-               and (select array_agg(a.attname::text order by a.attname) from pg_attribute a
+               and (select array_agg(a.attname::text order by a.attname::text collate "C") from pg_attribute a
                      where a.attrelid = c.conrelid and a.attnum = any (c.conkey)) = array['bulletin_id', 'enrollment_id']) <> 2
     union all
     select 'the edge function''s role may use the schema student_submit', 'no'
      where not has_schema_privilege('service_role', 'student_submit', 'usage')
     union all
+    -- Run as the role that will apply the file (postgres on Supabase): it must own these and may create in the schema.
+    select 'the role running this owns student_submit.write_log and _session_class, and may create in student_submit', current_user::text
+     where (select relowner from pg_class where oid = to_regclass('student_submit.write_log')) is distinct from (select oid from pg_roles where rolname = current_user)
+        or (select proowner from pg_proc where oid = to_regprocedure('student_submit._session_class(text,uuid)')) is distinct from (select oid from pg_roles where rolname = current_user)
+        or not has_schema_privilege('student_submit', 'create')
+    union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17)
-select * from checks order by 1;
+select * from checks order by check_name collate "C";

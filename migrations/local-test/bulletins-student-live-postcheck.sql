@@ -41,7 +41,7 @@ union all select 'the six are owned by the owner of _session_class (the role the
                    where p.proowner = (select proowner from pg_proc where oid = to_regprocedure('student_submit._session_class(text,uuid)'))) = 6
             then 'ok' else 'NOT AS EXPECTED' end
 union all select 'write_log_kind_check allows the four kinds it did and bulletin, validated, and is write_log''s only check',
-       case when (select string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | ')
+       case when (select string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | ' order by c.conname collate "C", c.oid)
                     from pg_constraint c where c.conrelid = 'student_submit.write_log'::regclass and c.contype = 'c')
                  = 'CHECK ((kind = ANY (ARRAY[''reflect''::text, ''seen''::text, ''finish''::text, ''answer''::text, ''bulletin''::text]))) write_log_kind_check true'
             then 'ok' else 'NOT AS EXPECTED' end
