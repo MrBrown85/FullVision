@@ -210,7 +210,7 @@
 }
 .sp-view .sp-segment {
   flex: 1;
-  min-height: 34px;
+  min-height: 40px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -292,7 +292,7 @@
 .sp-view .sp-deck {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 .sp-view .sp-piece {
   scroll-margin-top: 12px;
@@ -301,11 +301,13 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px;
+  gap: 8px;
+  padding: 14px 16px;
   background: var(--sp-card);
-  border-radius: 20px;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 4px 14px rgba(0, 0, 0, 0.05);
 }
 .sp-view .sp-piece-tags {
   display: flex;
@@ -314,9 +316,10 @@
 }
 .sp-view .sp-piece-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 .sp-view .sp-piece-title:focus {
@@ -1409,17 +1412,15 @@
    Description. Each shows only when the page is sent it. */
 .sp-view .sp-piece-unit {
   margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 13px;
   color: var(--sp-text-2);
   overflow-wrap: anywhere;
 }
 
 .sp-view .sp-piece-about {
   margin: 0;
-  font-size: 15px;
+  font-size: 14.5px;
+  color: #3a3a3c;
   line-height: 1.45;
   white-space: pre-line;
   overflow-wrap: anywhere;
@@ -1983,23 +1984,13 @@
 
 /* ── The boards' cards and lists (board drift fixes, Nov 11) ───────── */
 
-/* A card's first line: the unit, and the due pill at the right (To Do Card). */
+/* A card's unit, in plain grey under its status band (Colin, 2026-11-17). */
 .sp-view .sp-piece-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-.sp-view .sp-piece-head .sp-piece-unit {
-  flex: 1;
-  min-width: 0;
-}
-.sp-view .sp-piece-head .sp-flag {
-  flex: none;
-}
-.sp-view .sp-piece-title + .sp-piece-tags {
-  margin-top: -4px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--sp-text-2);
+  overflow-wrap: anywhere;
 }
 .sp-view .sp-flag {
   gap: 5px;
@@ -2346,13 +2337,77 @@
 
 /* ── Three tabs (Colin, 2026-11-14) ─────────────────────────── */
 
-/* A due date that has passed. */
-.sp-view .sp-flag-overdue {
+/* The status band across the top of a card (Colin, 2026-11-17, Option B:
+   students could not tell work not assessed yet from late work). The
+   status with its icon on the left, the due date on the right. Each status
+   has its own word, icon and colour, and the colours differ in lightness
+   too: due later blue, due today or tomorrow amber, past due and not
+   assessed yet grey, Missing the one solid band, Revise by purple, Sent
+   blue, Returned green. Every pair passes 4.5:1. */
+.sp-view .sp-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 2px;
+  min-height: 34px;
+  margin: -14px -16px 0;
+  padding: 7px 16px;
+  border-radius: 16px 16px 0 0;
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.sp-view .sp-band .sp-flag {
+  gap: 6px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.sp-view .sp-band-note {
+  font-weight: 500;
+}
+.sp-view .sp-band-when {
+  margin-left: auto;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.sp-view .sp-band-later {
+  background: #e8f0fe;
+  color: #1a56b8;
+}
+.sp-view .sp-band-due {
+  background: #fff1db;
+  color: #8a4b00;
+}
+.sp-view .sp-band-waiting,
+.sp-view .sp-band-closed {
+  background: #ececf0;
+  color: #3a3a3c;
+}
+.sp-view .sp-band-missing {
+  background: #c62828;
+  color: #fff;
+}
+.sp-view .sp-band-revise {
+  background: #f1e8ff;
+  color: #6b21a8;
+}
+.sp-view .sp-band-sent,
+.sp-view .sp-band-updated {
+  background: #e6f0ff;
+  color: #0058d0;
+}
+.sp-view .sp-band-back {
+  background: #dcfce7;
+  color: #166534;
+}
+.sp-view .sp-flag-late {
   background: #fde2e1;
   color: #9b1c1c;
-}
-.sp-view .sp-piece-head {
-  flex-wrap: wrap;
 }
 .sp-view .sp-rubric-link {
   align-self: flex-start;

@@ -46,6 +46,7 @@ const piece = (page, title) => viewOf(page).work.find(p => p.title === title);
 
 // How far a day is from the view's today, in days, and the day as a due pill names it.
 const daysOff = (day, today) => Math.round((Date.parse(day + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 864e5);
+const shortDay = day => new Date(day + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
 const dueDay = day =>
   new Date(day + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
 
@@ -86,15 +87,27 @@ describe('Outstanding: work due by today, Missing, and revisions', () => {
     });
   });
 
-  it('past its day, the due pill says how long ago, in red', async () => {
+  it('past its day and not Missing, the band says Not Assessed Yet in grey, never red', async () => {
     const page = await demo();
     const view = viewOf(page);
     const poster = piece(page, 'Disease Research Poster');
-    const n = -daysOff(poster.dueDate, view.today);
-    expect(n).toBeGreaterThan(0);
-    const pill = card(page, 'Disease Research Poster').querySelector('.sp-piece-head .sp-flag');
-    expect(pill.textContent).toBe('Due ' + dueDay(poster.dueDate) + ' · ' + (n === 1 ? 'yesterday' : n + ' days ago'));
-    expect(pill.classList.contains('sp-flag-overdue')).toBe(true);
+    expect(-daysOff(poster.dueDate, view.today)).toBeGreaterThan(0);
+    const c = card(page, 'Disease Research Poster');
+    const band = c.querySelector('.sp-piece-card > .sp-band');
+    expect(band.classList.contains('sp-band-waiting')).toBe(true);
+    expect(band.querySelector('.sp-flag').textContent).toBe('Not Assessed Yet');
+    expect(band.querySelector('svg')).not.toBeNull();
+    expect(band.querySelector('.sp-band-when').textContent).toBe('Was due ' + shortDay(poster.dueDate));
+    expect(c.innerHTML).not.toMatch(/days ago|yesterday/);
+  });
+
+  it('Missing is the one solid band, with no countdown in it', async () => {
+    const page = await demo();
+    const c = card(page, 'Immune System Quick Check');
+    const band = c.querySelector('.sp-piece-card > .sp-band');
+    expect(band.classList.contains('sp-band-missing')).toBe(true);
+    expect(band.querySelector('.sp-flag').textContent).toBe('Missing');
+    expect(c.querySelector('.sp-band-due, .sp-band-later, .sp-band-waiting')).toBeNull();
   });
 
   it('a draft’s card is a not-graded card: no level, no comment, nothing that says a draft exists', async () => {
@@ -104,7 +117,9 @@ describe('Outstanding: work due by today, Missing, and revisions', () => {
         .replace(/>[^<]+</g, '><')
         .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
         .replace(' sp-picked', '')
-        .replace('sp-flag-overdue', 'sp-flag-due')
+        .replace(/sp-(flag|band)-(waiting|later)/g, 'sp-$1-due')
+        // Each status draws its own icon; the shape is the same.
+        .replace(/<(path|rect|circle) [^>]*\/>/g, '')
         // The poster and the proposal carry the teacher's handouts (their pages, to swipe through); that is not a grade.
         .replace(/<section [^>]*class="sp-(res|car)"[\s\S]*?<\/section>/, '');
     const draft = shape(card(page, 'Disease Research Poster'));
@@ -135,16 +150,17 @@ describe('Outstanding: work due by today, Missing, and revisions', () => {
 });
 
 describe('Upcoming: work due after today, soonest first', () => {
-  it('the Science Fair Proposal, with how many days off in a plain pill', async () => {
+  it('the Science Fair Proposal, how many days off and its date in a blue band', async () => {
     const page = await demo();
     await page.click('[data-segment="upcoming"]');
     expect(page.root().querySelector('.sp-segment-on').textContent).toBe('Upcoming 1');
     expect(titles(page)).toEqual(['Science Fair Proposal']);
     const fair = piece(page, 'Science Fair Proposal');
     const n = daysOff(fair.dueDate, viewOf(page).today);
-    const pill = card(page, 'Science Fair Proposal').querySelector('.sp-piece-head .sp-flag');
-    expect(pill.textContent).toBe('Due ' + dueDay(fair.dueDate) + ' · in ' + n + ' days');
-    expect(pill.classList.contains('sp-flag-due')).toBe(true);
+    const band = card(page, 'Science Fair Proposal').querySelector('.sp-band');
+    expect(band.classList.contains('sp-band-later')).toBe(true);
+    expect(band.querySelector('.sp-flag').textContent).toBe('In ' + n + ' Days');
+    expect(band.querySelector('.sp-band-when').textContent).toBe(dueDay(fair.dueDate));
   });
 });
 
@@ -198,8 +214,8 @@ describe('which segment and in what order, by the class’s today', () => {
   });
 });
 
-describe('the due pill', () => {
-  it('Today, Tomorrow, in N days, yesterday, N days ago; red once the day has passed', async () => {
+describe('the status band (Colin, 2026-11-17)', () => {
+  it('In N Days, Due Tomorrow, Due Today, then Not Assessed Yet once the day has passed; Missing is its own', async () => {
     const page = await demo();
     const view = viewWith([
       due('d0', '2026-11-14'),
@@ -211,16 +227,43 @@ describe('the due pill', () => {
     ]);
     const pill = (ui, id) => {
       const box = drawIn(page, view, ui);
-      const el = box.querySelector('.sp-piece[data-piece="' + id + '"] .sp-piece-head .sp-flag');
-      return [el.textContent, el.className.replace(/^sp-flag /, '')];
+      const band = box.querySelector('.sp-piece[data-piece="' + id + '"] .sp-band');
+      return [
+        band.className.replace(/^sp-band /, ''),
+        band.querySelector('.sp-flag').textContent,
+        band.querySelector('.sp-band-when').textContent,
+      ];
     };
     const up = { segment: 'upcoming' };
-    expect(pill({}, 'd0')).toEqual(['Due Today', 'sp-flag-due']);
-    expect(pill(up, 'd1')).toEqual(['Due Tomorrow', 'sp-flag-due']);
-    expect(pill(up, 'd4')).toEqual(['Due Wed, Nov 18 · in 4 days', 'sp-flag-due']);
-    expect(pill({}, 'p1')).toEqual(['Due Fri, Nov 13 · yesterday', 'sp-flag-overdue']);
-    expect(pill({}, 'p2')).toEqual(['Due Thu, Nov 12 · 2 days ago', 'sp-flag-overdue']);
-    expect(pill({}, 'm')).toEqual(['Due Sun, Nov 1 · 13 days ago', 'sp-flag-overdue']);
+    expect(pill({}, 'd0')).toEqual(['sp-band-due', 'Due Today', 'Sat, Nov 14']);
+    expect(pill(up, 'd1')).toEqual(['sp-band-due', 'Due Tomorrow', 'Sun, Nov 15']);
+    expect(pill(up, 'd4')).toEqual(['sp-band-later', 'In 4 Days', 'Wed, Nov 18']);
+    expect(pill({}, 'p1')).toEqual(['sp-band-waiting', 'Not Assessed Yet', 'Was due Nov 13']);
+    expect(pill({}, 'p2')).toEqual(['sp-band-waiting', 'Not Assessed Yet', 'Was due Nov 12']);
+    expect(pill({}, 'm')).toEqual(['sp-band-missing', 'Missing', 'Was due Nov 1']);
+  });
+
+  it('Missing says it counts as 0 in a class with a course %, and not in a Proficiency class', async () => {
+    const page = await demo();
+    const work = [{ id: 'm', title: 'Piece m', kind: 'missing', dueDate: '2027-01-31' }];
+    const note = system => {
+      const view = viewWith(work);
+      view.course = Object.assign({}, view.course, { gradingSystem: system });
+      const c = drawIn(page, view, {}).querySelector('.sp-piece[data-piece="m"]');
+      const n = c.querySelector('.sp-band-note');
+      return [c.querySelector('.sp-band-when').textContent, n && n.textContent];
+    };
+    // A Missing piece due later (342 such live, Nov 17) shows no countdown.
+    expect(note('letter')).toEqual(['Due Jan 31', '· Counts as 0 until it’s in']);
+    expect(note('proficiency')).toEqual(['Due Jan 31', null]);
+  });
+
+  it('a teacher’s Late is its own pale red pill with its own icon', async () => {
+    const page = await demo();
+    const box = drawIn(page, viewWith([due('l', '2026-11-12', { late: true })]), {});
+    const late = box.querySelector('.sp-piece[data-piece="l"] .sp-flag-late');
+    expect(late.textContent).toBe('Late');
+    expect(late.querySelector('svg')).not.toBeNull();
   });
 });
 
@@ -332,7 +375,7 @@ describe('what a press changes is decided in one place, for the page and the pre
 /* S4-W1: what the server also sends about each piece and class, in Demo
    Mode's sample (which sends it as the database does since S4-M1). */
 describe('what the server also tells, in Demo Mode (S4-W1)', () => {
-  it('a card still to do: its unit and due pill on one line, the title and the Description; nothing more about grading', async () => {
+  it('a card still to do: its band, its unit in plain grey, the title and the Description; nothing more about grading', async () => {
     const page = await demo();
     await page.click('[data-segment="upcoming"]');
     const fair = card(page, 'Science Fair Proposal');
@@ -341,8 +384,9 @@ describe('what the server also tells, in Demo Mode (S4-W1)', () => {
     expect(text('.sp-piece-about')).toEqual([
       'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
     ]);
-    expect(fair.querySelector('.sp-piece-head .sp-piece-unit')).not.toBeNull();
-    expect(fair.querySelector('.sp-piece-head .sp-flag-due').textContent).toMatch(/^Due /);
+    expect(fair.querySelector('.sp-band + .sp-piece-unit')).not.toBeNull();
+    expect(fair.querySelector('.sp-piece-head').textContent).toBe('Unit 2: Body Systems');
+    expect(fair.querySelector('.sp-band-when').textContent).toMatch(/^\w{3}, \w{3} \d+$/);
     // No category, What You’re Graded On, I Can lines or Core Competencies (Colin, 2026-11-14), though the sample sends them.
     ['.sp-piece-category', '.sp-category-pill', '.sp-graded-on', '.sp-graded-on-ican', '.sp-core'].forEach(sel =>
       expect(fair.querySelector(sel), sel).toBeNull(),
