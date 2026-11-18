@@ -352,6 +352,7 @@ declare var MGradePhotos: any;
 // (teacher/student-page-students.js), which are not typed.
 declare var DashClassManager: any;
 declare var StudentCards: any;
+declare var CmStudentPage: any;
 declare var StudentView: any;
 declare var PreviewStudent: any;
 declare var Questionnaires: any;
