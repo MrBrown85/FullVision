@@ -814,7 +814,7 @@ def scen_apply():
     size = os.path.getsize(os.path.join(HERE, FILE))
     ok('apply: the file is 40 KB or smaller (%d bytes)' % size, size <= 40960, size)
     h = text_of(FILE)[:1500]
-    ok('apply: the header says not applied and names its tests, undo and checks', 'Not applied' in h and 'local-test/bulletins-*' in h and 'undo' in h and 'collate "C"' in h)
+    ok('apply: the header says applied and names its tests, undo and checks', 'APPLIED to gradebook-prod' in h and 'local-test/bulletins-*' in h and 'undo' in h and 'collate "C"' in h)
     d.close()
 
 # ── undo ───────────────────────────────────────────────────────────────────────────────────────────────

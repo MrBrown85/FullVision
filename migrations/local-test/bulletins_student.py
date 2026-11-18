@@ -693,7 +693,7 @@ def scen_apply():
     ok('apply: a second run changes nothing', catalog(d.c) == after and row_checksums(d.c, table_columns(d.c)) == rows_now, differences(after, catalog(d.c)))
     size = os.path.getsize(os.path.join(HERE, FILE))
     ok('apply: the file is 40 KB at most (%d bytes)' % size, size <= 40960, size)
-    ok('apply: the header says it is not applied, and names its tests', 'NOT APPLIED' in HEADER and 'bulletins_student.py' in HEADER and UNDO in HEADER)
+    ok('apply: the header says it is applied, and names its tests', 'APPLIED to gradebook-prod' in HEADER and 'bulletins_student.py' in HEADER and UNDO in HEADER)
     d.close()
 
 def scen_missing():
@@ -870,6 +870,9 @@ def scen_collations():
         d = Db('b1b_coll_' + tag, template=template)
         loc = d.all('select datlocprovider::text, datlocale, datcollate, datctype from pg_database where datname = current_database()')[0]
         ok('collations: the %s copy is %s' % (tag, want[tag]), loc == want[tag], loc)
+        if applied(d):
+            # A template rebuilt since the apply has the file: the full undo gives the database from before.
+            r = d.file(UNDO); ok('collations %s: (setup) the template goes back to before the file' % tag, r == 'ok' and not applied(d), r)
         if not m1_applied(d):
             r = d.statements(split(open(M1).read())); ok('collations %s: (setup) M1 applies' % tag, r == 'ok', r)
         r = d.file(PRE); pre = d.rows

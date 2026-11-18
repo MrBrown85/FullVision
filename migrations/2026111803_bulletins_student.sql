@@ -1,6 +1,6 @@
--- Bulletins, the student's side (2026-11-17). NOT APPLIED. Apply only on
--- Colin's OK, after 2026111801_bulletins.sql (M1), and before the
--- student-submit edge function that calls these functions is deployed.
+-- Bulletins, the student's side (2026-11-17). APPLIED to gradebook-prod on
+-- 2026-11-18 as bulletins_student, after 2026111801_bulletins.sql (M1), and
+-- before the student-submit edge function that calls these functions was deployed.
 --
 -- THIS FILE CHANGES ONE EXISTING THING: the check constraint on
 -- student_submit.write_log.kind gains the word 'bulletin' (dropped and added

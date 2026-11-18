@@ -105,11 +105,12 @@ a role only when it is missing.
    The other printed parts are compared too.
 
 **Result (2026-11-13, PostgreSQL 17.11):** all three match. The one
-difference the check accepts, by name: `rubric_score_modifier_check` and
-`tag_score_modifier_check`. Live stores them with a nested `AND` (they were
-written with `between`), and printed and loaded again PostgreSQL flattens it.
-The two allow the same rows. The check accepts a difference only on those
-two constraints, and only when the lines are equal once every bracket is
+difference the check accepts, by name: `rubric_score_modifier_check`,
+`tag_score_modifier_check` and (since 2026111801, Nov 18)
+`bulletin_file_page_count_check`. Live stores them with a nested `AND` (they
+were written with `between`), and printed and loaded again PostgreSQL
+flattens it. The two allow the same rows. The check accepts a difference only
+on those constraints, and only when the lines are equal once every bracket is
 taken out.
 
 ## The security rule tests

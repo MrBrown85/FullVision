@@ -7,17 +7,15 @@
  * statement, comments and spacing aside, so a later migration that changes
  * one without the other fails here.
  *
- * Until 2026111803 is applied and migrations/baseline/ refreshed, the mirror
- * is read from the migration file. IN THE BASELINE REFRESH PR: read both
- * functions from migrations/baseline/30-functions.sql (set MIRROR_FROM to
- * BASELINE below).
+ * Both are read from migrations/baseline/30-functions.sql, as live has them
+ * (2026111803 applied Nov 18 2026, baseline refreshed after it).
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const BASELINE = 'migrations/baseline/30-functions.sql';
-const MIRROR_FROM = 'migrations/2026111803_bulletins_student.sql';
+const MIRROR_FROM = BASELINE;
 
 /* A function's body as the given file defines it last: from its header to the closing $function$. */
 function body(file, name) {

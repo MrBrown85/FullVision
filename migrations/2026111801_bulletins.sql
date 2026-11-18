@@ -1,4 +1,4 @@
--- Bulletins, the teacher's side (2026-11-17). Not applied: needs Colin's OK.
+-- Bulletins, the teacher's side (2026-11-17). APPLIED to gradebook-prod on 2026-11-18 as bulletins.
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY OR FUNCTION. It adds four
 -- empty tables (row security on, no policy, no grant), the private bucket
 -- bulletin-files with four storage policies, and seven teacher functions;
