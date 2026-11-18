@@ -108,7 +108,7 @@ describe('the row', () => {
   });
 
   it('splits the column only with the bulletins flag on and DashBulletins built', () => {
-    window.DashBulletins = { html: () => '<section id="stub-bulletins"></section>' };
+    window.DashBulletins = { html: () => '<section id="stub-bulletins"></section>', destroy: () => {} };
     // Built, flag off: the Inbox has the whole column.
     let html = DashOverview.renderOverviewPanel(opts());
     expect(html).not.toContain('stub-bulletins');
@@ -119,7 +119,7 @@ describe('the row', () => {
     html = DashOverview.renderOverviewPanel(opts());
     expect(html).not.toContain('has-bulletins');
     // Both: the split.
-    window.DashBulletins = { html: () => '<section id="stub-bulletins"></section>' };
+    window.DashBulletins = { html: () => '<section id="stub-bulletins"></section>', destroy: () => {} };
     html = DashOverview.renderOverviewPanel(opts());
     expect(html).toContain('dash-row-left has-bulletins');
     expect(html).toContain('<div class="dash-row-slot dash-row-bulletins"><section id="stub-bulletins">');

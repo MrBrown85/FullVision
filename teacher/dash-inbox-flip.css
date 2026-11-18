@@ -50,15 +50,18 @@
 
 .dash-inbox-flip-pg {
   --turn: 1;
-  --ph: calc(100cqh - 2px);
+  /* The page's height is the stage's own, less one pixel for its edge: a percentage of the
+     stage, so a fractional stage height (another font's line heights) is followed exactly.
+     --ph is the same size in container units, for the width and the steps only. */
+  --ph: calc(100cqh - 1px);
   --pw: calc(var(--ph) * 0.75);
   --x1: calc(var(--pw) * 0.62);
   --xmax: calc(50cqw - var(--pw) * 0.25 - 14px);
   --step: max(10px, calc((var(--xmax) - var(--x1)) / 4));
   position: absolute;
-  top: 1px;
+  top: 0.5px;
   left: 50%;
-  height: var(--ph);
+  height: calc(100% - 1px);
   width: var(--pw);
   margin-left: calc(var(--pw) * -0.5);
   padding: 0;

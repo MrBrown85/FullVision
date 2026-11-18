@@ -11,6 +11,8 @@
   --sp-field: #c7c7cc;
   --sp-fill: #e5e5ea;
   --sp-blue: #007aff;
+  /* The blue under white words (buttons). White on --sp-blue is 4.02:1; on this, 5.57:1. */
+  --sp-blue-fill: #0066cc;
   --sp-blue-text: #0066cc;
   --sp-blue-soft: rgba(0, 122, 255, 0.08);
   --sp-green: #166534;
@@ -552,7 +554,7 @@ html.sp-size-larger .sp-core {
   text-align: center;
 }
 .sp-btn-primary {
-  background: var(--sp-blue);
+  background: var(--sp-blue-fill);
   color: #fff;
 }
 .sp-btn-primary[disabled] {
@@ -1424,7 +1426,7 @@ label.sp-btn:focus-within {
   border-radius: 42px;
 }
 .sp-send-big-done {
-  background: var(--sp-blue);
+  background: var(--sp-blue-fill);
   color: #fff;
 }
 .sp-send-big-wait {

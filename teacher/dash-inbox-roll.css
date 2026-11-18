@@ -226,7 +226,7 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--active);
+  color: var(--link);
   white-space: nowrap;
   background: none;
   border: 1px solid var(--active);

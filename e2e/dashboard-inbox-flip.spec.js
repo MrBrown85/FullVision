@@ -673,25 +673,61 @@ async function sizes(page) {
   });
 }
 
-function fills(m) {
+function fills(m, at) {
   // The centre page is as tall as the stage; the caption and slider sit inside the tile.
-  expect(Math.abs(m.centre.height - m.stage.height)).toBeLessThanOrEqual(2);
-  expect(m.centre.top).toBeGreaterThanOrEqual(m.stage.top - 0.5);
-  expect(m.centre.bottom).toBeLessThanOrEqual(m.stage.bottom + 0.5);
-  expect(m.cap.top).toBeGreaterThanOrEqual(m.stage.bottom - 0.5);
-  expect(m.slider.top).toBeGreaterThanOrEqual(m.cap.bottom - 0.5);
-  expect(m.slider.bottom).toBeLessThanOrEqual(m.tile.bottom + 0.5);
-  expect(m.inTile).toBe(0);
-  expect(m.sideways).toEqual([0, 0, 0]);
+  // Within a pixel and a half: the page keeps one pixel for its edge, so another font's
+  // fractional line heights cannot push it past the 2 px the board allows.
+  expect(Math.abs(m.centre.height - m.stage.height), at).toBeLessThanOrEqual(1.5);
+  expect(m.centre.top, at).toBeGreaterThanOrEqual(m.stage.top - 0.5);
+  expect(m.centre.bottom, at).toBeLessThanOrEqual(m.stage.bottom + 0.5);
+  expect(m.cap.top, at).toBeGreaterThanOrEqual(m.stage.bottom - 0.5);
+  expect(m.slider.top, at).toBeGreaterThanOrEqual(m.cap.bottom - 0.5);
+  expect(m.slider.bottom, at).toBeLessThanOrEqual(m.tile.bottom + 0.5);
+  expect(m.inTile, at).toBe(0);
+  expect(m.sideways, at).toEqual([0, 0, 0]);
+}
+
+// The page's own font, and a wider one with more space between letters and between lines, as a
+// Windows laptop, a Chromebook or the Linux machine that runs CI may draw it; its chrome is a
+// fraction of a pixel taller, as line heights in other fonts make it. Every fit holds in both.
+const FONTS = {
+  own: '',
+  wide: '#dash-inbox, #dash-inbox * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; line-height: 1.37 !important; font-size: 13.3px !important; } #dash-inbox-flip-pick { margin-bottom: 6.35px !important; } .dash-inbox-flip-cap { margin-top: 6.45px !important; }',
+};
+
+async function setFont(page, css) {
+  await page.evaluate(c => {
+    let t = document.getElementById('__font');
+    if (!t) {
+      t = document.createElement('style');
+      t.id = '__font';
+      document.head.appendChild(t);
+    }
+    t.textContent = c;
+  }, css);
+  await page.waitForTimeout(350);
+}
+
+/** Every fit assertion, in each font; the tile's own height must not move. Returns the page-font sizes. */
+async function fitsInEveryFont(page, tileHeight) {
+  let own;
+  for (const [fontName, css] of Object.entries(FONTS)) {
+    await setFont(page, css);
+    const m = await sizes(page);
+    const at = fontName + ' font';
+    if (tileHeight) expect(Math.round(m.tile.height), at).toBe(tileHeight);
+    fills(m, at);
+    if (fontName === 'own') own = m;
+  }
+  await setFont(page, '');
+  return own;
 }
 
 test('beside Bulletins the tile is 299 px and the centre page fills the stage', async ({ page }) => {
   await open(page, { bulletins: true });
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
-  const m = await sizes(page);
-  expect(Math.round(m.tile.height)).toBe(299);
-  fills(m);
+  const m = await fitsInEveryFont(page, 299);
   console.log(
     '299',
     JSON.stringify({
@@ -707,7 +743,7 @@ test('beside Bulletins the tile is 299 px and the centre page fills the stage', 
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.dash-inbox-flip-pagetext')).toHaveText('Page 2 of 2');
   await settle(page);
-  fills(await sizes(page));
+  await fitsInEveryFont(page, 299);
   await shot(page, 'flip-299-page2');
 });
 
@@ -715,9 +751,7 @@ test('with the whole column the tile is 510 px and the centre page fills the sta
   await open(page);
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
-  const m = await sizes(page);
-  expect(Math.round(m.tile.height)).toBe(510);
-  fills(m);
+  const m = await fitsInEveryFont(page, 510);
   expect(m.centre.height).toBeGreaterThan(300);
   console.log(
     '510',
@@ -735,8 +769,7 @@ test('on a taller window the column is 610 px', async ({ page }) => {
   await open(page);
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
-  const m = await sizes(page);
-  fills(m);
+  const m = await fitsInEveryFont(page, 610);
   console.log(
     'tall',
     JSON.stringify({
@@ -747,13 +780,22 @@ test('on a taller window the column is 610 px', async ({ page }) => {
   );
 });
 
+test('on a 1440 x 900 window beside Bulletins the tile is 359 px and the centre page fills the stage', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, { bulletins: true });
+  await page.locator('.dash-inbox-flip-slider').fill('4');
+  await settle(page);
+  await fitsInEveryFont(page, 359);
+});
+
 test('stacked on an iPad the tile is 450 px and the centre page fills the stage', async ({ page }) => {
   await page.setViewportSize({ width: 796, height: 1100 });
   await open(page);
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
-  const m = await sizes(page);
-  fills(m);
+  const m = await fitsInEveryFont(page, 450);
   console.log(
     'ipad',
     JSON.stringify({

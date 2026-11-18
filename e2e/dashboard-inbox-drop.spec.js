@@ -39,10 +39,6 @@ async function open(page, { sendWork = true, bulletins = false, caughtUp = false
       try {
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');
-          window.DashBulletins = {
-            html: () =>
-              '<section class="dash-bulletins-stub" style="flex:1;background:var(--surface);border-radius:12px"></section>',
-          };
         }
       } catch (e) {
         /* storage blocked */
@@ -409,6 +405,40 @@ test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrollin
   expect(m).toEqual({ scrolls: false, inside: true, icon: 'none' });
   await expect(page.locator('#dash-inbox-caught')).toContainText('Next taking work');
   await shot(page, 'inbox-caught-up-299');
+});
+
+test('with the Bulletins tile showing a file over it is refused, the cover is as before, and the 30-second tick leaves the cover alone', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await open(page, { bulletins: true });
+  await expect(page.locator('.dash-bulletins-tile')).toBeVisible();
+  await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
+  await namedFiles(page, LIGHT);
+  // Held over the Inbox: the cover shows, as before.
+  await drag(page, '.dash-inbox-row', 'dragenter');
+  expect(await drag(page, '.dash-inbox-row', 'dragover')).toBe(true);
+  expect(await coverShown(page)).toBe(true);
+  // Held over the Bulletins tile: a near miss, refused (the browser does not open the file in the app's place).
+  expect(await drag(page, '.dash-bulletins-tile', 'dragover')).toBe(true);
+  // The tile's 30-second read runs mid-drag: the cover stays and the tile is not drawn out from under it.
+  await page.evaluate(() => {
+    window.__tileNode = document.querySelector('.dash-bulletins-tile');
+    window.__renders = 0;
+    const render = PageDashboard.render;
+    PageDashboard.render = function () {
+      window.__renders++;
+      return render.apply(this, arguments);
+    };
+  });
+  await page.clock.fastForward(31000);
+  expect(await coverShown(page)).toBe(true);
+  expect(await page.evaluate(() => window.__renders)).toBe(0);
+  expect(await page.evaluate(() => window.__tileNode === document.querySelector('.dash-bulletins-tile'))).toBe(true);
+  // Let go over the tile: refused, nothing opens, and the cover goes with the drag.
+  expect(await drag(page, '.dash-bulletins-tile', 'drop')).toBe(true);
+  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
+  expect(await coverShown(page)).toBe(false);
 });
 
 test('with Send Work off there is no Inbox, and a file dropped on the Dashboard is left alone', async ({ page }) => {
