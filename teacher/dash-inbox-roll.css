@@ -76,8 +76,24 @@
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-.dash-inbox-roll-chip.is-menu {
-  border-color: var(--active);
+.dash-inbox-roll-chip.is-menu:not(.is-page) {
+  border: 2px solid var(--active);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--active) 25%, transparent);
+}
+/* Excused: quiet, neither solid nor a dashed "not in" outline. */
+.dash-inbox-roll-chip.is-excused {
+  color: var(--text-3);
+  font-style: italic;
+  cursor: default;
+  background: none;
+  border: 1px solid transparent;
+}
+.dash-inbox-roll-chip.is-excused:hover {
+  border-color: transparent;
+}
+.dash-inbox-roll-chip.is-page.is-excused .dash-inbox-roll-pg {
+  border: 1px solid var(--divider-subtle);
+  background: none;
 }
 .dash-inbox-roll-name {
   min-width: 0;
@@ -150,9 +166,12 @@
   border: 1px solid var(--divider-strong);
   box-shadow: var(--shadow-sm);
 }
-.dash-inbox-roll-chip.is-page:hover .dash-inbox-roll-pg,
-.dash-inbox-roll-chip.is-page.is-menu .dash-inbox-roll-pg {
+.dash-inbox-roll-chip.is-page:not(.is-excused):hover .dash-inbox-roll-pg {
   border-color: var(--active);
+}
+.dash-inbox-roll-chip.is-page.is-menu .dash-inbox-roll-pg {
+  border: 2px solid var(--active);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--active) 25%, transparent);
 }
 .dash-inbox-roll-img {
   display: block;

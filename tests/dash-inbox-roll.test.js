@@ -106,6 +106,51 @@ describe('the model', () => {
   });
 });
 
+describe('Excused and Missing', () => {
+  const firstOut = aid => DashInboxRoll.model(CID, aid).students.find(c => !c.in);
+
+  it('says Excused, leaves it out of the not-in count and the Add Work list', () => {
+    const before = DashInboxRoll.model(CID, LIGHT);
+    const out = firstOut(LIGHT);
+    setAssignmentStatus(CID, out.sid, LIGHT, 'EXC');
+    const m = DashInboxRoll.model(CID, LIGHT);
+    const c = m.students.find(x => x.sid === out.sid);
+    expect(c.status).toBe('excused');
+    expect(c.said).toBe(c.full + ': Excused');
+    expect(m.counts.notin).toBe(GraderWork.workCounts(CID, LIGHT, ids()).notin);
+    expect(m.counts.notin).toBe(before.counts.notin - 1);
+    expect(m.notIn).not.toContain(out.sid);
+    const html = DashInboxRoll.html(CID, DashInboxModel.build(CID));
+    expect(html).toContain('is-excused');
+    expect(html).toContain('data-excused="1"');
+  });
+
+  it('says Missing, and still counts it as not in', () => {
+    const before = DashInboxRoll.model(CID, LIGHT);
+    const out = firstOut(LIGHT);
+    setAssignmentStatus(CID, out.sid, LIGHT, 'NS');
+    const m = DashInboxRoll.model(CID, LIGHT);
+    const c = m.students.find(x => x.sid === out.sid);
+    expect(c.said).toBe(c.full + ': Missing');
+    expect(m.counts.notin).toBe(before.counts.notin);
+    expect(m.notIn).toContain(out.sid);
+  });
+});
+
+describe('the grading style', () => {
+  it('does not change a state, a count or a name', () => {
+    const was = JSON.stringify(DashInboxRoll.model(CID, LIGHT));
+    for (const style of ['letter', 'both', 'proficiency']) {
+      COURSES[CID].gradingSystem = style;
+      expect(JSON.stringify(DashInboxRoll.model(CID, LIGHT))).toBe(was);
+      const m = DashInboxRoll.model(CID, LIGHT);
+      m.students.forEach(c => {
+        if (c.in) expect(c.state).toBe(GraderWork.workStateOf(CID, LIGHT, c.sid) || 'tograde');
+      });
+    }
+  });
+});
+
 describe('the names', () => {
   it('is a first name, with the last initial when two share one', () => {
     const names = DashInboxRoll.shortNames([

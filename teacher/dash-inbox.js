@@ -423,6 +423,26 @@ window.DashInbox = (function () {
     });
   }
 
+  /* A view that changes its own pictures between draws (Flip Through) hands
+     the files here, key → file, for the imgs it drew with data-dash-pic, and
+     passes the root of any it has added since to be filled. The tile's own
+     holder fills them, so a picture is asked for once, and what no picture
+     shows is let go. */
+  /** @param {Element | null} root @param {Record<string, any> | null} [files] */
+  function fillPics(root, files) {
+    if (files) {
+      Object.keys(files).forEach(function (k) {
+        _files[k] = files[k];
+      });
+    }
+    var cid = _cid;
+    if (!root || !cid || !_pics) return;
+    _pics.fill(root, cid, function (/** @type {HTMLElement} */ img) {
+      return _cid !== cid ? null : _files[img.getAttribute('data-dash-pic') || ''] || null;
+    });
+    _pics.sweep();
+  }
+
   /* Called once the page is set. */
   /** @param {string} cid */
   function afterRender(cid) {
@@ -558,6 +578,7 @@ window.DashInbox = (function () {
     shows: shows,
     html: html,
     emptyHtml: emptyHtml,
+    fillPics: fillPics,
     beforeRender: beforeRender,
     afterRender: afterRender,
     leave: leave,
@@ -565,10 +586,6 @@ window.DashInbox = (function () {
     click: click,
     countsText: countsText,
     whenText: whenText,
-    // A view's own picture: html() gives each <img data-work-pic data-dash-pic="key"> its file here, and the tile's holder fills it.
-    pic: function (/** @type {string} */ key, /** @type {any} */ file) {
-      _files[key] = file;
-    },
     model: function () {
       return _model;
     },

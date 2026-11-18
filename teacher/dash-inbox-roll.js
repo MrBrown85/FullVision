@@ -118,9 +118,10 @@ window.DashInboxRoll = (function () {
   }
 
   /** One chip's accessible name and tooltip: "Ethan Dubois: Returned, On Paper".
-   * @param {{ full: string, in: boolean, state: string | null, paper: boolean, late: boolean, mates: string[] }} c */
+   * @param {{ full: string, in: boolean, status: string, state: string | null, paper: boolean, late: boolean, mates: string[] }} c */
   function _said(c) {
-    if (!c.in) return c.full + ': Not in';
+    if (!c.in)
+      return c.full + ': ' + (c.status === 'excused' ? 'Excused' : c.status === 'missing' ? 'Missing' : 'Not in');
     var bits = [c.state === 'returned' ? 'Returned' : c.state === 'toreturn' ? 'Graded, not returned' : 'To grade'];
     if (c.paper) bits.push('On Paper');
     if (c.late) bits.push('Late');
@@ -194,6 +195,13 @@ window.DashInboxRoll = (function () {
         name: names[s.id],
         full: displayName(s),
         in: isIn,
+        // Marked Excused or Missing with nothing in: the status workStateOf reads.
+        status: isIn
+          ? ''
+          : (function () {
+              var st = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, s.id, aid) : '';
+              return st === 'EXC' ? 'excused' : st === 'NS' ? 'missing' : '';
+            })(),
         state: isIn ? GW.workStateOf(cid, aid, s.id) : null,
         paper: !!(mine && mine.on_paper),
         late: !!(mine && mine.is_late),
@@ -208,9 +216,13 @@ window.DashInboxRoll = (function () {
       out.students.push(c);
     });
     out.order = inIds.slice();
-    out.notIn = ids.filter(function (/** @type {string} */ id) {
-      return !inSet[id];
-    });
+    out.notIn = out.students
+      .filter(function (/** @type {any} */ c) {
+        return !c.in && c.status !== 'excused';
+      })
+      .map(function (/** @type {any} */ c) {
+        return c.sid;
+      });
     out.counts = { in: inIds.length, notin: counts.notin, late: late, paper: paper.length, all: ids.length };
     out.paperNames = paper;
     out.foot = footText(out.counts, paper);
@@ -236,7 +248,7 @@ window.DashInboxRoll = (function () {
 
   /** @param {any} c */
   function _stateClass(c) {
-    if (!c.in) return ' is-out';
+    if (!c.in) return c.status === 'excused' ? ' is-excused' : ' is-out';
     var k = ' is-in';
     if (c.state === 'returned') k += ' is-returned';
     else if (c.state === 'tograde') k += ' is-tograde';
@@ -252,6 +264,7 @@ window.DashInboxRoll = (function () {
       esc(c.sid) +
       '" data-in="' +
       (c.in ? '1' : '0') +
+      (c.status === 'excused' ? '" data-excused="1' : '') +
       '" aria-label="' +
       esc(c.said) +
       '" title="' +
@@ -348,7 +361,9 @@ window.DashInboxRoll = (function () {
     var chips = m.students
       .map(function (/** @type {any} */ c) {
         return chipHtml(c, aid, form, function (key, file) {
-          /** @type {any} */ (window).DashInbox.pic(key, file);
+          var f = /** @type {Record<string, any>} */ ({});
+          f[key] = file;
+          /** @type {any} */ (window).DashInbox.fillPics(null, f);
         });
       })
       .join('');
@@ -409,7 +424,7 @@ window.DashInboxRoll = (function () {
     var chip = /** @type {HTMLElement | null} */ (
       root.querySelector('.dash-inbox-roll-chip[data-sid="' + CSS.escape(menu.sid) + '"]')
     );
-    if (!chip || chip.getAttribute('data-in') === '1') {
+    if (!chip || chip.getAttribute('data-in') === '1' || chip.hasAttribute('data-excused')) {
       _menu = null;
       return;
     }
@@ -484,6 +499,8 @@ window.DashInboxRoll = (function () {
           _menu = null;
           _closeMenu(root);
           _grader(cid, aid, sid, model(cid, aid).order, _redraw);
+        } else if (el.hasAttribute('data-excused')) {
+          return;
         } else if (!(_menu && _menu.sid === sid)) {
           _menu = { sid: sid, aid: aid };
           _showMenu(root, cid, el.detail === 0);

@@ -225,6 +225,16 @@ test('a click on a student with nothing in opens a menu with only Add Work', asy
   await expect(menu).toBeVisible();
   await expect(out).toHaveClass(/is-menu/);
   await expect(out).toHaveAttribute('aria-expanded', 'true');
+  // The open chip is plainly marked: its drawn box differs from a resting one's.
+  const look = el =>
+    el.evaluate(n => {
+      const b = n.querySelector('.dash-inbox-roll-pg') || n;
+      const cs = getComputedStyle(b);
+      return cs.borderTopColor + '|' + cs.borderTopWidth + '|' + cs.borderTopStyle + '|' + cs.boxShadow;
+    });
+  const resting = page.locator('.dash-inbox-roll-chip.is-out').nth(3);
+  expect(await look(out)).not.toBe(await look(resting));
+  expect(await look(out)).toContain('solid');
   await expect(menu.locator('[role="menuitem"]')).toHaveCount(1);
   await expect(menu).toContainText('Add Work');
   await expect(page.locator('body')).not.toContainText('Mark Missing');
@@ -292,4 +302,68 @@ test('dark mode, full column', async ({ page }) => {
   await chooseRoll(page);
   await expect(page.locator('.dash-inbox-roll-img').first()).toHaveAttribute('src', /.+/);
   await shot(page, 'roll-pages-510-dark');
+});
+
+test('at 299 px the menu is whole, inside the window and the tile, and not clipped', async ({ page }) => {
+  await open(page, { bulletins: true });
+  await chooseRoll(page);
+  const menu = page.locator('.dash-inbox-roll-menu');
+  await expect(menu).toHaveCount(0);
+  // The last student with nothing in: the worst place for a menu.
+  const outs = page.locator('.dash-inbox-roll-chip.is-out');
+  const last = outs.last();
+  await last.click();
+  await expect(menu).toBeVisible();
+  const got = await page.evaluate(() => {
+    const m = document.querySelector('.dash-inbox-roll-menu').getBoundingClientRect();
+    const t = document.getElementById('dash-inbox').getBoundingClientRect();
+    const hit = (x, y) => !!document.elementFromPoint(x, y)?.closest('.dash-inbox-roll-menu');
+    const chip = document.querySelector('.dash-inbox-roll-chip.is-menu').getBoundingClientRect();
+    return {
+      inWindow: m.left >= 0 && m.top >= 0 && m.right <= innerWidth && m.bottom <= innerHeight,
+      inTile: m.left >= t.left && m.top >= t.top && m.right <= t.right && m.bottom <= t.bottom,
+      corners: [
+        hit(m.left + 5, m.top + 5),
+        hit(m.right - 5, m.top + 5),
+        hit(m.left + 5, m.bottom - 5),
+        hit(m.right - 5, m.bottom - 5),
+      ],
+      apart: m.top >= chip.bottom || m.bottom <= chip.top,
+    };
+  });
+  expect(got.inWindow).toBe(true);
+  expect(got.inTile).toBe(true);
+  expect(got.corners).toEqual([true, true, true, true]);
+  expect(got.apart).toBe(true);
+  await shot(page, 'roll-menu-299-light');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+});
+
+test('an Excused student is quiet and offers no menu; a Missing one is said', async ({ page }) => {
+  await open(page, { bulletins: true });
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const m = DashInboxRoll.model(cid, 'sci8a21');
+    const outs = m.students.filter(c => !c.in);
+    setAssignmentStatus(cid, outs[0].sid, 'sci8a21', 'EXC');
+    setAssignmentStatus(cid, outs[1].sid, 'sci8a21', 'NS');
+    window.__ex = [outs[0].sid, outs[1].sid];
+    localStorage.setItem('fv-dash-inbox-view:' + cid, 'roll');
+    PageDashboard.render();
+  });
+  const [ex, ms] = await page.evaluate(() => window.__ex);
+  const exc = page.locator('.dash-inbox-roll-chip[data-sid="' + ex + '"]');
+  await expect(exc).toHaveAttribute('aria-label', /: Excused$/);
+  await expect(exc).toHaveAttribute('title', /: Excused$/);
+  await expect(exc).toHaveClass(/is-excused/);
+  expect(await exc.evaluate(n => getComputedStyle(n).borderTopStyle)).not.toBe('dashed');
+  await exc.click();
+  await expect(page.locator('.dash-inbox-roll-menu')).toHaveCount(0);
+  await expect(page.locator('.dash-inbox-roll-chip[data-sid="' + ms + '"]')).toHaveAttribute(
+    'aria-label',
+    /: Missing$/,
+  );
+  await page.locator('.dash-inbox-roll-chip[data-sid="' + ms + '"]').click();
+  await expect(page.locator('.dash-inbox-roll-menu')).toBeVisible();
 });
