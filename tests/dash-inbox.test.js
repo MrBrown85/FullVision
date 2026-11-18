@@ -17,11 +17,6 @@ const LIGHT = 'sci8a21';
 let wasDemo;
 let stubDocument;
 
-function flags(on) {
-  localStorage.removeItem('fv-build-dashRow');
-  localStorage.removeItem('fv-build-bulletins');
-  for (const [k, v] of Object.entries(on)) if (v) localStorage.setItem('fv-build-' + k, '1');
-}
 function sendWorkOn() {
   setStudentPageSwitch(CID, true, 'on_return');
   const work = getCourseSubmissions(CID);
@@ -64,7 +59,6 @@ beforeEach(() => {
   localStorage.clear();
   CURRICULUM_INDEX = newBankIndex(['SCI8']);
   seedIfNeeded();
-  flags({ dashRow: true });
   sendWorkOn();
 });
 afterEach(() => {
@@ -236,7 +230,7 @@ const glance = () => DashOverview.glanceHtml({ cid: CID, allStudents: getStudent
 describe("the top bar's To Grade cell", () => {
   const cell = () => parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
 
-  it('goes to the Inbox with the switch on and the tile built', () => {
+  it('goes to the Inbox with the tile built', () => {
     const a = cell();
     expect(a.hasAttribute('data-dash-inbox-jump')).toBe(true);
     expect(a.getAttribute('aria-label')).toMatch(/: go to the Inbox$/);
@@ -245,20 +239,25 @@ describe("the top bar's To Grade cell", () => {
     expect(a.getAttribute('data-href')).toBe('/assignments?course=' + CID + '&show=tograde');
   });
 
-  it('opens Assignments with the switch off, or no tile built', () => {
-    flags({});
-    let a = cell();
-    expect(a.hasAttribute('data-dash-inbox-jump')).toBe(false);
-    expect(a.getAttribute('aria-label')).toMatch(/: open Assignments$/);
-    flags({ dashRow: true });
+  it('opens Assignments with no tile built', () => {
     const was = window.DashInbox;
     delete window.DashInbox;
     try {
-      a = cell();
+      const a = cell();
       expect(a.hasAttribute('data-dash-inbox-jump')).toBe(false);
+      expect(a.getAttribute('aria-label')).toMatch(/: open Assignments$/);
     } finally {
       window.DashInbox = was;
     }
+  });
+
+  it('goes to the Inbox whatever an old fv-build-dashRow on the device says (D9: the row is on)', () => {
+    for (const v of ['0', '1', 'no']) {
+      localStorage.setItem('fv-build-dashRow', v);
+      expect(cell().hasAttribute('data-dash-inbox-jump')).toBe(true);
+      expect(DashInbox.shows(CID)).toBe(true);
+    }
+    localStorage.removeItem('fv-build-dashRow');
   });
 
   it('a click scrolls to the Inbox and rings it; with none on the page the link is left alone', () => {

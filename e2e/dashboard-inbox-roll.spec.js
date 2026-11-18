@@ -1,9 +1,9 @@
 /**
- * The Inbox's Roll Call view (D8 of docs/plans/dashboard-inbox-plan.md),
- * behind the dashRow switch. Demo Mode, Science 8, the student page and Send
- * Work on. Set FV_SHOTS to a folder to keep pictures.
+ * The Inbox's Roll Call view (D8 of docs/plans/dashboard-inbox-plan.md).
+ * Demo Mode, Science 8, the student page and Send Work on. Set FV_SHOTS to a folder to keep pictures.
  */
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
 const LIGHT = 'sci8a21';
 const SHOTS = process.env.FV_SHOTS || '';
@@ -20,7 +20,6 @@ const shot = async (page, name) => {
 async function open(page, { bulletins = false, dark = false } = {}) {
   await page.addInitScript(bulletins => {
     try {
-      localStorage.setItem('fv-build-dashRow', '1');
       if (bulletins) {
         localStorage.setItem('fv-build-bulletins', '1');
         window.DashBulletins = {
@@ -452,7 +451,6 @@ for (const [w, h] of [
 ]) {
   test('at ' + w + 'x' + h + ' the first draw is one render, and a redraw keeps the scroll', async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
-    await page.addInitScript(() => localStorage.setItem('fv-build-dashRow', '1'));
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/\/dashboard/);
     await page.locator('.dash-glance').waitFor();
@@ -541,3 +539,52 @@ test('one live observer after ten redraws, none after leaving the Dashboard', as
     menuListener: false,
   });
 });
+
+/* The foot: each student counted once, the numbers adding up to the class
+   (D9), and the line and Add Work for the Class inside the tile, clear of each
+   other and of the chips, at 299 px and at the full column, in the page's
+   font and in the wide stand-in for CI's fonts. An Excused student who sent
+   work and a paper hand-in make the line as long as it gets. */
+for (const bulletins of [true, false]) {
+  test(`the foot adds up to the class and fits, ${bulletins ? 'at 299 px' : 'at the full column'}, in both fonts`, async ({
+    page,
+  }) => {
+    await open(page, { bulletins });
+    await chooseRoll(page);
+    await page.evaluate(aid => {
+      const cid = getActiveCourse();
+      const m = DashInboxRoll.model(cid, aid);
+      setAssignmentStatus(cid, m.students.find(c => c.kind === 'in' && !c.mates.length).sid, aid, 'EXC');
+      setAssignmentStatus(cid, m.students.find(c => c.kind === 'out').sid, aid, 'EXC');
+      PageDashboard.render();
+    }, LIGHT);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      const m = await page.evaluate(aid => {
+        const cid = getActiveCourse();
+        const model = DashInboxRoll.model(cid, aid);
+        const tile = document.getElementById('dash-inbox').getBoundingClientRect();
+        const foot = document.querySelector('.dash-inbox-roll-foot').getBoundingClientRect();
+        const count = document.querySelector('.dash-inbox-roll-count').getBoundingClientRect();
+        const all = document.querySelector('.dash-inbox-roll-all').getBoundingClientRect();
+        const grid = document.getElementById('dash-inbox-roll-grid').getBoundingClientRect();
+        const apart = count.right <= all.left + 0.5 || count.bottom <= all.top + 0.5 || all.bottom <= count.top + 0.5;
+        return {
+          text: document.querySelector('.dash-inbox-roll-count').textContent,
+          sum: model.counts.in + model.counts.notin + model.counts.excused,
+          n: model.students.length,
+          inside: [count, all].every(
+            r => r.left >= tile.left && r.right <= tile.right && r.bottom <= tile.bottom + 0.5,
+          ),
+          apart,
+          belowGrid: foot.top >= grid.bottom - 0.5,
+        };
+      }, LIGHT);
+      expect(m.sum, font).toBe(m.n);
+      expect(m.text, font).toMatch(/ Excused/);
+      expect(m.inside, font).toBe(true);
+      expect(m.apart, font).toBe(true);
+      expect(m.belowGrid, font).toBe(true);
+    }
+  });
+}

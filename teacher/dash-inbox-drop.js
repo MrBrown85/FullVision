@@ -1,7 +1,7 @@
 // @ts-check
 /* dash-inbox-drop.js — the Inbox's space when nothing is to grade, and a file
    drop on the tile (D5 of docs/plans/dashboard-inbox-plan.md; boards E1 and
-   E1b), behind the dashRow build switch with the rest of the Inbox.
+   E1b).
 
    Nothing to grade: "Add Work For" with up to three pieces taking work, the
    drop area in Add Work for the Class's own words and look, and under it two
@@ -489,10 +489,13 @@ window.DashInboxDrop = (function () {
 
   /* Elsewhere on the Dashboard's own page: a file let go near the tile is
      refused rather than opened by the browser in place of the app. Only the
-     page's surface (#main) behind everything else: a file box, its label, a
-     dialog or an overlay (the grader, Add Work, the Work Wall, Restore from
-     Backup) is never touched, and neither is a place that took the drag
-     itself first (preventDefault). Only while the tile is on screen. */
+     page's surface (#main) and the class list beside it (#sidebar-mount,
+     about 13 px left of the tile, so a near miss lands there), behind
+     everything else: a file box, its label, a dialog or an overlay (the
+     grader, Add Work, the Work Wall, Restore from Backup) is never touched,
+     and neither is a place that took the drag itself first
+     (preventDefault). The dock across the top is left as it is. Only while
+     the tile is on screen. */
   var LEAVE_ALONE =
     'input[type="file"], label, dialog, [role="dialog"], [aria-modal="true"], .confirm-overlay, [class*="-overlay"]';
   /** @param {DragEvent} e */
@@ -501,7 +504,8 @@ window.DashInboxDrop = (function () {
     var t = /** @type {any} */ (e.target);
     if (!t || !t.closest) return false;
     var main = document.getElementById('main');
-    if (!main || !main.contains(t)) return false;
+    var list = document.getElementById('sidebar-mount');
+    if (!(main && main.contains(t)) && !(list && list.contains(t))) return false;
     return !t.closest(LEAVE_ALONE);
   }
   /** @param {DragEvent} e */

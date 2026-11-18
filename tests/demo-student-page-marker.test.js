@@ -69,3 +69,22 @@ describe('Demo Mode and the student features', () => {
     expect(getReturnSettings(CID).student_page).toBe(false);
   });
 });
+
+/* The front page's Demo Mode turns Send Work on after the sample class is
+   seeded, and the sample drafts are made only while Send Work is on. The
+   first load must already have them, so the Dashboard's To Grade, the
+   Inbox and Assignments agree from the start (D9, 5g). */
+describe('the first load from the front page', () => {
+  it('has the sample drafts, so To Grade is the same on the first load as on the next', async () => {
+    seedDemo('pending');
+    await window.loadSeedIfNeeded();
+    const ids = getStudents(CID).map(s => s.id);
+    const first = GraderWork.classWorkCounts(CID, ids);
+    expect(getCourseSendWork(CID).send_work).toBe(true);
+    // Maya and Liv's Light Refraction Lab are drafts: to return, not to grade.
+    expect(first).toMatchObject({ tograde: 4, toreturn: 2 });
+    // The next load (seedIfNeeded again) changes nothing.
+    seedIfNeeded();
+    expect(GraderWork.classWorkCounts(CID, ids)).toMatchObject({ tograde: first.tograde, toreturn: first.toreturn });
+  });
+});

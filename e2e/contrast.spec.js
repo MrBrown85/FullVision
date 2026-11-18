@@ -107,14 +107,12 @@ const DESKTOP = [
     name: 'dashboard with the Inbox on, ' + label,
     hash: '/dashboard',
     ready: '.dash-glance',
-    flag: ['fv-build-dashRow', '1'],
     open: page => openInbox(page, { view }),
   })),
   {
     name: 'dashboard with the Inbox on, All Caught Up and the drop area',
     hash: '/dashboard',
     ready: '.dash-glance',
-    flag: ['fv-build-dashRow', '1'],
     open: page => openInbox(page, { caughtUp: true }),
   },
   {
