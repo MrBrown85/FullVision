@@ -9187,7 +9187,7 @@ window.PageAssignments = (function () {
     var advanced = _isAdvancedRubric(rubric);
     var single = rubricStyle(rubric) === 'single_point';
     var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + (single ? ' is-single-point' : '') + '">';
-    if (single) html += _singlePointStripHtml(rubric);
+    html += single ? _singlePointStripHtml(rubric) : advanced ? '' : RubricWords.switchHtml(rubric, levelOrderFor(cid));
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -9288,11 +9288,7 @@ window.PageAssignments = (function () {
       '</span></div>' +
       (advanced || commentBtn
         ? '<div class="rsg-crit-tools">' +
-          (advanced
-            ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>'
-            : single
-              ? ''
-              : RubricWords.buttonHtml(crit, levelOrderFor(cid))) +
+          (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>' : '') +
           commentBtn +
           '</div>'
         : '') +
@@ -9330,9 +9326,9 @@ window.PageAssignments = (function () {
         critMod,
       ) +
       '</div>' +
+      (advanced || single ? '' : RubricWords.panelHtml(crit, levelOrderFor(cid), displayScore)) +
       (note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '') +
       (open ? _checklistPanelHtml(cid, aid, sid, crit, displayScore) : '') +
-      (advanced || single ? '' : RubricWords.panelHtml(crit, levelOrderFor(cid), displayScore)) +
       (single ? _rsgSinglePointNotesHtml(cid, aid, sid, crit) : '') +
       '</div></div>'
     );
