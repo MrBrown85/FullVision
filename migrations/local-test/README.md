@@ -2914,7 +2914,7 @@ Since the apply, `docs/schema.generated.sql`, `migrations/baseline/` (the Databa
 
 ## The factored score (2026111808, 2026-11-18)
 
-One file, `../2026111808_factored_score.sql`, **not applied**. It adds `assessment.students_see_factored` (false on every row), `p_students_see_factored` (last) on `create_assessment`, and replaces `update_assessment`, `get_class_bundle`, `get_gradebook`, `duplicate_assessment` and `student_submit.page`, each guarded by its md5 in `migrations/baseline/function-md5.txt` (Nov 18). `get_class_bundle`'s own comments lose their box-drawing characters (plain hyphens), so the file is plain ASCII; nothing else in it changes.
+One file, `../2026111808_factored_score.sql`, **applied to gradebook-prod on Nov 18** (Colin's OK; live then read every "after" md5 in its header). It adds `assessment.students_see_factored` (false on every row), `p_students_see_factored` (last) on `create_assessment`, and replaces `update_assessment`, `get_class_bundle`, `get_gradebook`, `duplicate_assessment` and `student_submit.page`, each guarded by its md5 in `migrations/baseline/function-md5.txt` (Nov 18). `get_class_bundle`'s own comments lose their box-drawing characters (plain hyphens), so the file is plain ASCII; nothing else in it changes.
 
 Run on PostgreSQL 17.11 (embedded-postgres), rebuilt from the repo and proved equal to live (`scripts/db-rebuild.mjs --check`):
 
