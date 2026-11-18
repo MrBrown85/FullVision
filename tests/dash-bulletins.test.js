@@ -29,14 +29,17 @@ const b = (id, over = {}) => ({
 });
 
 describe('which bulletins show', () => {
-  it('the pinned reminder first, then the latest, three at most', () => {
+  it('the pinned reminder first, then the latest, five at most', () => {
     const list = [
       b('a', { posted_at: at(17, 10, 15) }),
       b('r', { kind: 'reminder', pinned: true, pinned_until: '2026-11-19', posted_at: at(14, 8, 42) }),
       b('c', { posted_at: at(17, 9, 58) }),
       b('d', { posted_at: at(16, 9, 0) }),
+      b('e', { posted_at: at(16, 8, 0) }),
+      b('f', { posted_at: at(15, 8, 0) }),
+      b('g', { posted_at: at(14, 9, 0) }),
     ];
-    expect(H.pick(list, '2026-11-17').map(x => x.id)).toEqual(['r', 'a', 'c']);
+    expect(H.pick(list, '2026-11-17').map(x => x.id)).toEqual(['r', 'a', 'c', 'd', 'e']);
   });
 
   it('a pin that has run out is not a pin', () => {
@@ -72,17 +75,20 @@ describe('the words and the time', () => {
     expect(H.firstLine(b('p', { body: '', files: [{ kind: 'photo' }] }))).toBe('A photo');
   });
 
-  it('Just Now for the last minute and for one not sent yet; else the time, the day or the date', () => {
+  it('Just Now for the last minute and for one not sent yet; else the time alone, the weekday alone or the date, as the artboard writes them', () => {
     const justNow = new Date(now.getTime() - 20000).toISOString();
     expect(H.timeText(b('a', { posted_at: justNow }), now)).toBe('Just Now');
     expect(H.timeText(b('w', { waiting: true, posted_at: at(17, 8, 0) }), now)).toBe('Just Now');
-    expect(H.timeText(b('a', { posted_at: at(17, 10, 15) }), now)).toBe('10:15 a.m.');
-    expect(H.timeText(b('a', { posted_at: at(17, 23, 58) }), new Date(2026, 10, 17, 23, 59))).toBe('11:58 p.m.');
-    expect(H.timeText(b('a', { posted_at: at(16, 10, 15) }), now)).toBe('Yesterday 10:15 a.m.');
-    expect(H.timeText(b('a', { posted_at: at(15, 10, 15) }), now)).toBe('Sun 10:15 a.m.');
-    expect(H.timeText(b('a', { posted_at: at(9, 10, 15) }), now)).toBe('Nov 9 10:15 a.m.');
+    expect(H.timeText(b('a', { posted_at: at(17, 10, 15) }), now)).toBe('10:15');
+    expect(H.timeText(b('a', { posted_at: at(17, 23, 58) }), new Date(2026, 10, 17, 23, 59))).toBe('11:58');
+    expect(H.timeText(b('a', { posted_at: at(16, 10, 15) }), now)).toBe('Yesterday');
+    expect(H.timeText(b('a', { posted_at: at(15, 10, 15) }), now)).toBe('Sun');
+    expect(H.timeText(b('a', { posted_at: at(9, 10, 15) }), now)).toBe('Nov 9');
+    // The accessible name keeps the full day and clock.
+    expect(H.timeFull(b('a', { posted_at: at(15, 10, 15) }), now)).toBe('Sunday 10:15 a.m.');
+    expect(H.timeFull(b('a', { posted_at: at(9, 10, 15) }), now)).toBe('Nov 9 10:15 a.m.');
     // A minute and a bit ago is just a time.
-    expect(H.timeText(b('a', { posted_at: new Date(now.getTime() - 61000).toISOString() }), now)).toBe('11:58 a.m.');
+    expect(H.timeText(b('a', { posted_at: new Date(now.getTime() - 61000).toISOString() }), now)).toBe('11:58');
   });
 });
 
@@ -110,6 +116,12 @@ describe('the tile', () => {
     ];
     const out = rows.map(r => H.rowModel(r, 'sci8', now)).map(r => r.seenMain + (r.seenNot ? ' · ' + r.seenNot : ''));
     expect(out).toEqual(['Seen by 24 of 26 · 2 Not Seen', 'Seen by All 26', 'Not Seen Yet']);
+  });
+
+  it('the tile shows Seen by N of M alone; the full numbers are the button’s accessible name', () => {
+    const out = H.rowHtml(H.rowModel(b('a', { seen: 24, can_see: 26 }), 'sci8', now));
+    expect(out).toContain('aria-label="Seen by 24 of 26, 2 Not Seen">Seen by 24 of 26</button>');
+    expect(out).not.toContain('Not Seen</');
   });
 
   it('a bulletin not sent yet has no Seen by button and says Just Now in bold', () => {
@@ -303,8 +315,23 @@ describe('the tile', () => {
     expect(out).toContain('data-href="/bulletins?course=sci8&amp;open=s"');
   });
 
+  it('a Reminder label carries the amber class and a pin; other kinds do not', () => {
+    const rem = H.rowHtml(H.rowModel(b('r', { kind: 'reminder', pinned: true }), 'sci8', now));
+    expect(rem).toContain('dash-bulletins-kind dash-bulletins-rem"><svg');
+    const ann = H.rowHtml(H.rowModel(b('a'), 'sci8', now));
+    expect(ann).not.toContain('dash-bulletins-rem');
+    expect(ann).not.toContain('<svg');
+  });
+
+  it('a row’s words are the whole post, joined, for the two-line clamp', () => {
+    const out = H.rowHtml(H.rowModel(b('a', { body: 'Read the pages.\nBring a question.' }), 'sci8', now));
+    expect(out).toContain('>Read the pages. Bring a question.</a>');
+  });
+
   it('a row’s accessible name has its kind, its words and its time', () => {
     const out = H.rowHtml(H.rowModel(b('a', { posted_at: at(17, 10, 15) }), 'sci8', now));
     expect(out).toContain('aria-label="Announcement: Words a, 10:15 a.m."');
+    const old = H.rowHtml(H.rowModel(b('a', { posted_at: at(15, 10, 15) }), 'sci8', now));
+    expect(old).toContain('Sunday 10:15 a.m."');
   });
 });

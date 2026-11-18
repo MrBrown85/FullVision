@@ -1,6 +1,6 @@
 /**
  * The Bulletins tile on the Dashboard (slice B1e; on since B1g), Demo Mode: it sits under the Inbox in 40% of the left column, shows the
- * sample class's three bulletins in whole 38 px rows, and its links open the
+ * sample class's three bulletins in whole rows that share its height (two lines of words each), and its links open the
  * Bulletins page at that bulletin, at its Seen by list, or with the box open.
  */
 import { test, expect } from '@playwright/test';
@@ -41,7 +41,9 @@ const box = (page, sel) =>
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height };
     });
 
-test('the Inbox slot is 299 px and the tile 199 px, with three whole rows and nothing cut off', async ({ page }) => {
+test('the Inbox slot is 299 px and the tile 199 px, with three whole rows that fill it and nothing cut off', async ({
+  page,
+}) => {
   await open(page);
   await expect(page.locator('.dash-bulletins-tile')).toBeVisible();
   const inbox = await box(page, '.dash-row-inbox');
@@ -52,7 +54,7 @@ test('the Inbox slot is 299 px and the tile 199 px, with three whole rows and no
   expect(Math.abs(tile.height - 199)).toBeLessThanOrEqual(1);
   expect(Math.round(slot.top - inbox.bottom)).toBe(12);
 
-  const rows = page.locator('.dash-bulletins-row');
+  const rows = page.locator('.dash-bulletins-row:visible');
   await expect(rows).toHaveCount(3);
   const inside = await rows.evaluateAll((els, tileSel) => {
     const t = document.querySelector(tileSel);
@@ -69,9 +71,11 @@ test('the Inbox slot is 299 px and the tile 199 px, with three whole rows and no
       }),
     };
   }, '.dash-bulletins-tile');
-  expect(inside.heights).toEqual([38, 38, 38]);
+  // Every row at least 40 px; together they fill the tile to its padding: no empty band.
+  expect(inside.heights.every(h => h >= 40)).toBe(true);
   expect(inside.shown).toEqual([true, true, true]);
-  expect(inside.lastBottom).toBeLessThan(inside.tileBottom);
+  expect(inside.tileBottom - inside.lastBottom).toBeGreaterThanOrEqual(12);
+  expect(inside.tileBottom - inside.lastBottom).toBeLessThanOrEqual(14);
   expect(inside.scrolls).toEqual([0, 0]);
   expect(inside.words).toEqual([true, true, true]);
 
@@ -84,7 +88,19 @@ test('the Inbox slot is 299 px and the tile 199 px, with three whole rows and no
   await expect(page.locator('.dash-bulletins-write')).toHaveText('Write a Bulletin');
   await expect(page.locator('.dash-bulletins-open')).toHaveText('Open Bulletins →');
   // The Seen line is the data layer's own words.
-  await expect(page.locator('.dash-bulletins-seen').first()).toHaveText(/^Seen by \d+ of \d+ · \d+ Not Seen$/);
+  await expect(page.locator('.dash-bulletins-seen').first()).toHaveText(
+    /^Seen by (\d+ of \d+|All \d+)$|^Not Seen Yet$/,
+  );
+  expect(await page.locator('.dash-bulletins-tile').textContent()).not.toContain('Not Seen');
+  // Write a Bulletin is the secondary button; the Reminder label is amber with a pin.
+  await expect(page.locator('.dash-bulletins-write')).toHaveClass(/btn-ghost/);
+  expect(await page.locator('.dash-bulletins-write').evaluate(e => getComputedStyle(e).backgroundColor)).not.toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+  await expect(page.locator('.dash-bulletins-rem').first().locator('svg')).toHaveCount(1);
+  // Times are the weekday or the clock alone, with no a.m. or p.m.
+  const times = await page.locator('.dash-bulletins-time').allTextContents();
+  for (const t of times) expect(t).toMatch(/^(Just Now|Yesterday|[A-Z][a-z]{2}|[A-Z][a-z]{2} \d{1,2}|\d{1,2}:\d{2})$/);
 });
 
 test('a row opens the Bulletins page at that bulletin, outlined', async ({ page }) => {
@@ -139,7 +155,7 @@ test('a bulletin posted on the page is in the tile when the Dashboard comes back
   await page.locator('.dash-bulletins-tile').waitFor();
   // The pinned reminder keeps the top row; the new bulletin is the first of the latest.
   const rows = page.locator('.dash-bulletins-row');
-  await expect(rows).toHaveCount(3);
+  await expect(page.locator('.dash-bulletins-row:visible')).toHaveCount(3);
   await expect(rows.nth(0).locator('.dash-bulletins-kind')).toHaveText('Reminder');
   await expect(rows.nth(1)).toContainText('Bring a calculator tomorrow.');
   await expect(rows.nth(1).locator('.dash-bulletins-time')).toHaveText('Just Now');
@@ -229,4 +245,94 @@ test("an old 'fv-build-bulletins' of 0 changes nothing: the Inbox slot is 299 px
   expect(Math.round((await box(page, '.dash-row-inbox')).height)).toBe(299);
   await expect(page.locator('.dash-bulletins-tile')).toHaveCount(1);
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
+});
+
+/** The rows drawn and what is left over, for any font. */
+async function fit(page) {
+  return page.evaluate(() => {
+    const t = document.querySelector('.dash-bulletins-tile');
+    const tr = t.getBoundingClientRect();
+    const rows = [...document.querySelectorAll('.dash-bulletins-row')].filter(
+      r => getComputedStyle(r).display !== 'none',
+    );
+    const list = document.querySelector('.dash-bulletins-rows').getBoundingClientRect();
+    const heights = rows.map(r => r.getBoundingClientRect().height);
+    const kinds = rows.map(r => r.querySelector('.dash-bulletins-kind'));
+    return {
+      shown: rows.length,
+      min: Math.min(...heights),
+      spare: list.bottom - rows[rows.length - 1].getBoundingClientRect().bottom,
+      scrolls: [t.scrollHeight - t.clientHeight, t.scrollWidth - t.clientWidth],
+      inside: rows.every(r => r.getBoundingClientRect().bottom <= tr.bottom && r.getBoundingClientRect().top >= tr.top),
+      wordsCut: rows.map(r => {
+        const w = r.querySelector('.dash-bulletins-words');
+        const lh = parseFloat(getComputedStyle(w).lineHeight);
+        return w.getBoundingClientRect().height <= lh * 2 + 4;
+      }),
+      seenWhole: [...document.querySelectorAll('.dash-bulletins-seen')].every(e => e.scrollWidth <= e.clientWidth),
+      kindWhole: kinds.every(k => !k || k.scrollWidth <= k.clientWidth + 1),
+    };
+  });
+}
+
+const WIDE =
+  '.dash-bulletins-tile, .dash-bulletins-tile * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }';
+
+for (const [w, h, rowsShown] of [
+  [1280, 800, 3],
+  [1440, 900, 3],
+]) {
+  for (const wide of [false, true]) {
+    test(`at ${w} x ${h} the rows are whole and fill the tile${wide ? ' in a wide font' : ''}`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await open(page, { questions: w === 1280 });
+      if (wide) await page.addStyleTag({ content: WIDE });
+      const f = await fit(page);
+      expect(f.shown).toBe(rowsShown);
+      expect(f.min).toBeGreaterThanOrEqual(40);
+      // Nothing is left under the last row: the rows share the whole height.
+      expect(f.spare).toBeLessThan(1);
+      expect(f.inside).toBe(true);
+      expect(f.scrolls).toEqual([0, 0]);
+      expect(f.wordsCut.every(Boolean)).toBe(true);
+      expect(f.seenWhole).toBe(true);
+      expect(f.kindWhole).toBe(true);
+    });
+  }
+}
+
+test('more bulletins than fit: as many whole rows as the height holds, at four heights', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => {
+    const now = Date.now();
+    const list = [];
+    for (let i = 0; i < 8; i++)
+      list.push({
+        id: 'x' + i,
+        kind: 'announcement',
+        body: 'Post number ' + i + ' with enough words to need a second line when the tile is not very wide at all.',
+        posted_at: new Date(now - (i + 2) * 3600000).toISOString(),
+        created_at: new Date(now - (i + 2) * 3600000).toISOString(),
+        seen: 3,
+        can_see: 26,
+      });
+    localStorage.setItem('gb-bulletins-sci8', JSON.stringify({ bulletins: list, seen: {}, reactions: {} }));
+  });
+  await page.goto('/dashboard');
+  await page.locator('.dash-bulletins-tile').waitFor();
+  for (const wide of [false, true]) {
+    if (wide) await page.addStyleTag({ content: WIDE });
+    // Whole rows only: whatever the tile's height, rows are 40 px or more and nothing is left under them.
+    for (const px of [120, 199, 239, 300]) {
+      await page.evaluate(px => {
+        document.querySelector('.dash-bulletins-tile').style.height = px + 'px';
+      }, px);
+      const f = await fit(page);
+      expect(f.shown).toBe(Math.min(5, Math.max(0, Math.floor((px - 2 - 24 - 32) / 40))));
+      expect(f.min).toBeGreaterThanOrEqual(40);
+      expect(f.spare).toBeLessThan(1);
+      expect(f.inside).toBe(true);
+      expect(f.scrolls).toEqual([0, 0]);
+    }
+  }
 });

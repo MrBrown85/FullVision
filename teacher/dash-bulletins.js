@@ -5,9 +5,11 @@
    (dash-overview.js) calls DashBulletins.html(cid) and gives the tile the
    40% of the left column that is left under the Inbox.
 
-   The pinned reminder first if there is one, then the latest, three rows at
-   most, one 38 px row each: a small grey kind label, the first line of the
-   words, the time, and Seen by as its own button. The words open the
+   The pinned reminder first if there is one, then the latest, five at most;
+   the tile draws as many whole rows as its height holds (dash-bulletins.css).
+   Each row: a small kind label (the Reminder one amber with a pin), the words
+   over two lines, the time as the Dashboard artboard writes it, and Seen by N
+   of M as its own button (the full numbers are its accessible name). The words open the
    bulletin on the Bulletins page; Seen by opens it with its list; Write a
    Bulletin opens the page with the box open. Nothing is counted here: Seen
    by N of M is what shared/data-bulletins.js answers. The tile keeps no
@@ -17,10 +19,13 @@
 /** @type {any} */ (window).DashBulletins = (function () {
   'use strict';
 
-  var MAX_ROWS = 3;
+  var MAX_ROWS = 5;
   var EMPTY_LINE = "Bulletins reach every student's phone, on the first tab of their page.";
   var PAGE_OFF_LINE = 'Students cannot see Bulletins until the Student Page is turned on.';
   var JUST_NOW_MS = 60000;
+  /** The pin the artboard draws before Reminder; fixed markup, no words. */
+  var PIN_ICON =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg>';
 
   var _cid = '';
   var _listening = false;
@@ -105,12 +110,21 @@
     return !isNaN(at) && nowMs - at < JUST_NOW_MS && nowMs - at > -JUST_NOW_MS;
   }
 
-  /** "Just Now", else the page's own wording shortened to fit: "10:15 a.m.", "Yesterday 10:15 a.m.", "Mon 10:15 a.m.", "Nov 9 10:15 a.m.". @param {any} b @param {Date} now */
+  /** The time as the Dashboard artboard writes it: "Just Now", the time alone for today ("10:15"), the weekday alone for the last six days ("Mon"), "Yesterday", and "Nov 9" after that. @param {any} b @param {Date} now */
   function timeText(b, now) {
     if (isFresh(b, now.getTime())) return 'Just Now';
     var h = _helpers();
     var label = h ? h.timeLabel(_timeOf(b), now) : '';
-    return label.replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]+ /, '$1 ');
+    var clock = /\s*\d{1,2}:\d{2}(?: [ap]\.m\.)?$/;
+    if (/^\d{1,2}:\d{2}/.test(label)) return label.replace(/ [ap]\.m\.$/, '');
+    return label.replace(clock, '').replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]+$/, '$1');
+  }
+
+  /** The time with its full day and clock, for the accessible name: "Just Now", "10:15 a.m.", "Monday 8:42 a.m.". @param {any} b @param {Date} now */
+  function timeFull(b, now) {
+    if (isFresh(b, now.getTime())) return 'Just Now';
+    var h = _helpers();
+    return h ? h.timeLabel(_timeOf(b), now) : '';
   }
 
   /** One row, as the tile draws it. @param {any} b @param {string} cid @param {Date} now */
@@ -126,11 +140,14 @@
         .replace(/\s+/g, ' ')
         .trim(),
       time: timeText(b, now),
+      timeFull: timeFull(b, now),
       fresh: isFresh(b, now.getTime()),
       waiting: !!b.waiting && !b.stalled,
       stalled: !!b.stalled,
       seenMain: split < 0 ? label : label.slice(0, split),
       seenNot: split < 0 ? '' : label.slice(split + 3),
+      seenFull: split < 0 ? label : label.slice(0, split) + ', ' + label.slice(split + 3),
+      reminder: b.kind === 'reminder',
       href: q + '&open=' + encodeURIComponent(b.id),
       seenHref: q + '&seen=' + encodeURIComponent(b.id),
     };
@@ -170,28 +187,32 @@
 
   /** @param {ReturnType<typeof rowModel>} r */
   function _rowHtml(r) {
-    var aria = r.kind + ': ' + (r.allWords || r.words) + (r.time ? ', ' + r.time : '');
+    var aria = r.kind + ': ' + (r.allWords || r.words) + (r.timeFull ? ', ' + r.timeFull : '');
     var seen = r.stalled
       ? '<span class="dash-bulletins-seen dash-bulletins-pending">Didn&#39;t Finish Uploading</span>'
       : r.waiting
         ? '<span class="dash-bulletins-seen dash-bulletins-pending">Not Sent Yet</span>'
         : '<button type="button" class="dash-bulletins-seen" data-dash-bulletins-go="' +
           esc(r.seenHref) +
+          '" aria-label="' +
+          esc(r.seenFull) +
           '">' +
           esc(r.seenMain) +
-          (r.seenNot ? ' · <span class="dash-bulletins-ns">' + esc(r.seenNot) + '</span>' : '') +
           '</button>';
     return (
       '<li class="dash-bulletins-row' +
       (r.fresh ? ' dash-bulletins-fresh' : '') +
-      '"><span class="dash-bulletins-kind">' +
+      '"><span class="dash-bulletins-kind' +
+      (r.reminder ? ' dash-bulletins-rem' : '') +
+      '">' +
+      (r.reminder ? PIN_ICON : '') +
       esc(r.kind) +
       '</span><a class="dash-bulletins-words" role="link" tabindex="0" data-href="' +
       esc(r.href) +
       '" aria-label="' +
       esc(aria) +
       '">' +
-      esc(r.words) +
+      esc(r.allWords || r.words) +
       '</a><span class="dash-bulletins-time">' +
       esc(r.time) +
       '</span>' +
@@ -211,7 +232,7 @@
       if (meta.paused > 0) sub += ', ' + meta.paused + (meta.paused === 1 ? ' page paused' : ' pages paused');
     }
     var actions = m.offered
-      ? '<span class="dash-bulletins-actions"><button type="button" class="dash-bulletins-write" data-dash-bulletins-go="' +
+      ? '<span class="dash-bulletins-actions"><button type="button" class="btn btn-ghost dash-bulletins-write" data-dash-bulletins-go="' +
         esc(_link(cid, '&write=1')) +
         '">Write a Bulletin</button><a class="dash-bulletins-open" role="link" tabindex="0" data-href="' +
         esc(_link(cid)) +
@@ -398,6 +419,7 @@
       kindText: kindText,
       firstLine: firstLine,
       timeText: timeText,
+      timeFull: timeFull,
       rowModel: rowModel,
       rowHtml: _rowHtml,
       tileHtml: tileHtml,

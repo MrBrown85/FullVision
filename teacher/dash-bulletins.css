@@ -1,8 +1,8 @@
 /* dash-bulletins.css — the Bulletins tile on the Dashboard (teacher/dash-bulletins.js,
    slice B1e). It fills the slot the middle row gives it (40% of the left
-   column: 199 px at 1280 x 800, 300 px stacked on an iPad). The header and
-   three 38 px rows fit at 199 px; where the slot is shorter, whole rows are
-   dropped from the bottom, never cut: a container query on the tile's height.
+   column: 199 px at 1280 x 800, 300 px stacked on an iPad). The rows share the
+   height under the header (up to five, each at least 40 px); where the slot is
+   shorter, whole rows are dropped from the bottom, never cut.
    Colours are the app's tokens, so dark mode follows. Every class starts
    with dash-bulletins- (tests/adblock-names.test.js). */
 .dash-bulletins-tile {
@@ -21,10 +21,9 @@
 .dash-bulletins-head {
   flex: 0 0 auto;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  height: 28px;
-  margin-bottom: 2px;
+  height: 32px;
 }
 .dash-bulletins-title {
   margin: 0;
@@ -44,11 +43,10 @@
 .dash-bulletins-actions {
   margin-left: auto;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
   white-space: nowrap;
 }
-.dash-bulletins-write,
 .dash-bulletins-open,
 .dash-bulletins-seen {
   background: none;
@@ -60,10 +58,15 @@
   cursor: pointer;
   text-decoration: none;
 }
-.dash-bulletins-write {
+/* Write a Bulletin is the app's secondary button (btn btn-ghost), in the link colour as on the artboard. */
+.dash-bulletins-tile .dash-bulletins-write {
+  color: var(--link);
+  font-size: var(--text-sm);
   font-weight: 600;
+  min-height: 32px;
+  padding: 6px 14px;
 }
-.dash-bulletins-write:hover,
+.dash-bulletins-open:hover,
 .dash-bulletins-open:hover,
 .dash-bulletins-seen:hover,
 .dash-bulletins-words:hover {
@@ -78,8 +81,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
   column-gap: 12px;
-  grid-auto-rows: 38px;
-  align-content: start;
+  grid-auto-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 .dash-bulletins-row {
@@ -87,8 +89,8 @@
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
   align-items: center;
-  height: 38px;
   box-sizing: border-box;
+  min-height: 0;
   border-top: 1px solid var(--divider-subtle);
 }
 .dash-bulletins-kind {
@@ -102,14 +104,29 @@
   color: var(--text-2);
   white-space: nowrap;
 }
+.dash-bulletins-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* The Reminder label is amber with a pin: the app's notice colours, which hold 4.5 to 1 in both modes. */
+.dash-bulletins-rem {
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
 .dash-bulletins-fresh .dash-bulletins-kind {
   border-color: var(--link);
 }
 .dash-bulletins-words {
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  padding: 1px 0;
   font-size: var(--text-base);
   color: var(--text);
   text-decoration: none;
@@ -136,10 +153,6 @@
   color: var(--text-2);
   cursor: default;
 }
-.dash-bulletins-ns {
-  font-weight: 600;
-  color: var(--text);
-}
 .dash-bulletins-none {
   flex: 1 1 auto;
   min-height: 0;
@@ -160,14 +173,80 @@
   color: var(--link);
   white-space: nowrap;
 }
-/* Fewer whole rows when the slot is short: the content box is the tile less its padding, border and header. */
-@container dash-bulletins (max-height: 143px) {
+/* Rows share the height under the header, each at least 40 px (48 on an iPad) so two lines of words fit; a row that would be thinner is not drawn, so none is ever cut and the spare is under one row's share. The container's height is the tile less its padding and border; the header is 32 px (44 on an iPad). */
+@container dash-bulletins (max-height: 231.99px) {
+  .dash-bulletins-row:nth-child(5) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 191.99px) {
+  .dash-bulletins-row:nth-child(4) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 151.99px) {
   .dash-bulletins-row:nth-child(3) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 105px) {
+@container dash-bulletins (max-height: 111.99px) {
   .dash-bulletins-row:nth-child(2) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 71.99px) {
+  .dash-bulletins-row:nth-child(1) {
+    display: none;
+  }
+}
+/* iPad: header 44 px, every control a finger's size (44 px), rows at least 48 px. teacher/tablet.css has older rules for this tile (one-line words at 44 px, rows fixed at 48 px); these are more specific and take their place, so the words keep two lines and the rows share the height. */
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-head {
+  height: 44px;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-write {
+  justify-content: center;
+  min-height: 44px;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-open,
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-seen {
+  min-height: 44px;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-words {
+  display: -webkit-box;
+  -webkit-box-pack: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 4px 0;
+  line-height: 1.3;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-rows {
+  grid-auto-rows: minmax(0, 1fr);
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
+  height: auto;
+}
+@container dash-bulletins (max-height: 283.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(5) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 235.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(4) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 187.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(3) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 139.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(2) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 91.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(1) {
     display: none;
   }
 }
