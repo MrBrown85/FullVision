@@ -498,6 +498,23 @@ describe('quizzes: the routes copy exactly the keys the SQL builds', () => {
     expect(mq2Objects('student_submit._quiz_new_order')).toEqual([['questions', 'choices']]);
   });
 
+  it('quiz_list (2026111807) builds a refusal, then ok and quizzes, then each entry, and no others', () => {
+    const file = read('migrations/2026111807_quizzes_student_list.sql');
+    const at = file.lastIndexOf('create or replace function student_submit.quiz_list(');
+    const open = file.indexOf('$function$', at);
+    const text = file.slice(open, file.indexOf('$function$;', open)).replace(/--.*$/gm, '');
+    const found = [];
+    let i = -1;
+    while ((i = text.indexOf('jsonb_build_object(', i + 1)) >= 0) {
+      found.push(
+        args(text, i + 'jsonb_build_object('.length)
+          .filter((_, n) => n % 2 === 0)
+          .map(k => /^'([a-z0-9_]+)'$/.exec(k)[1]),
+      );
+    }
+    expect(found).toEqual([REFUSAL, Q.list, Q.listed]);
+  });
+
   it('a reply with a made-up key at every level comes out with exactly the SQL’s keys', async () => {
     const extra = v => {
       if (Array.isArray(v)) return v.map(extra);
