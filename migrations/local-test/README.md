@@ -2756,3 +2756,23 @@ Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), from an empty databa
 Since the apply, `docs/schema.generated.sql` (its md5 equal to live's snapshot, read read-only), `migrations/baseline/` (the Database baseline workflow's output) and `types/database.d.ts` have the file, and a rebuild with `--check` matches (368 functions). `per_student.py` then takes each scenario's copy back to before the file with the full undo and goes on from there: **149 of 149** on that baseline; `npm run test:db`: every security rule test passed.
 
 Not verified here: PostgREST's schema cache and the app's calls through it, the edge function (not changed: `closed` is already in its whitelist).
+
+## Bulletins, the student's side (2026111803, 2026-11-17)
+
+One file, `../2026111803_bulletins_student.sql`, NOT APPLIED, 28 KB. Slice B1b of `docs/plans/bulletins-plan.md`; the contract is `bulletins-contract.md`, "For B1b". It needs M1 (`../2026111801_bulletins.sql`) applied first. It adds five `student_submit` functions, each `security definer` with the path pinned: `_bulletin_visible` (the one rule for whether a student may see a bulletin; no role may call it) and `bulletins`, `bulletin_seen`, `bulletin_react`, `bulletin_file_links` (service_role only, each beginning with `_session_class`). It changes one existing thing: `student_submit.write_log`'s `write_log_kind_check` gains `bulletin` (dropped and added in one statement, behind a guard that stops if the check is not today's). No row changes.
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54732/b1b_base node scripts/db-rebuild.mjs --check   # an empty database
+FV_M1=<M1's file> PGPORT=54732 PGDATABASE=b1b_base python3 bulletins_student.py                  # every scenario
+FV_DB_TEST_APPLY=<M1 and M2 in one file> DATABASE_URL=postgresql://postgres@127.0.0.1:54732/postgres npm run test:db
+```
+
+Until M1 is on this branch, `FV_M1` names a copy of it (none is kept here); once the baseline has M1, the template has it and the script skips it. `npm run test:db` with M1 loaded needs M1's own additions to `tests/db/` (on its branch).
+
+Scenarios (the docstring says what each checks): `feed`, `new`, `seen`, `react`, `links`, `refused` (on all four functions: paused mid-session, withdrawn, page off, trash, stopped card, expired card, unknown or expired session, an enrolment not on the session; nothing written), `limit` (120 an hour per card across both write routes; every older kind still passes the widened check), `leak` (key sets at every level are the contract's; no other student's id, time, count or name), `others`, `race` (two `bulletin_seen` for the same ids at once; a reaction set and taken back at once), `defaults`, `apply` (the guards, each named by the pre-check; the lock timeout; only the header's changes; a second run; size), `missing`, `undo` (PART 1 takes the four from the edge function; the full undo puts the check back exactly, deleting only write_log's `bulletin` rate-limit rows; the file applies again).
+
+Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), M1 at `ae48fbf1`: **349 of 349**. `npm run test:db`: every rule test passed without the files (62 student_submit functions), with M1 (62), and with M1 and M2 (67; service_role may run 41 entry points).
+
+M1 and M2 together: M1's guard, post-check and undo fingerprint every function whose name contains `bulletin`, so once M2 is applied M1 cannot be run again (it stops, nothing changed), its post-check reads NOT AS EXPECTED, and its undo stops until M2's undo has run. Undo M2 before M1.
+
+Not verified here: gradebook-prod; the edge function deployed; Supabase Storage signing a `bulletin-files` link.
