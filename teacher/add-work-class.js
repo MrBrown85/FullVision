@@ -787,6 +787,8 @@
       if (!given || s.busy || s.view !== 'stage') return { ok: false, reason: 'busy' };
       var placed = s.stage.place(given.sid, { from: given.from, pages: given.pages });
       if (!placed.ok) return placed;
+      // A For choice the teacher made, kept while the file waited (B6).
+      if (given.forAid && _two()) placed = AddWorkTwoClasses.carryFor(s, given, placed);
       // Off a scan: its place in the pile, for Grade in Scan Order.
       if (given.scan && s.scanOrder.indexOf(given.sid) < 0) s.scanOrder.push(given.sid);
       // Placed by the app from the file's name (the tray), not by the teacher's hand.

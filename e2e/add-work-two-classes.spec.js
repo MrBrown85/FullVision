@@ -275,12 +275,16 @@ test('turned on after the files: a name now in both classes waits, never stays o
     const st = AddWorkClass.students(cidA, lab).find(
       x => !getStudentSubmission(cidA, x.id, LAB) && NameMatch.match(x.lastName, roster).kind === 'one',
     );
+    // Another assessment for the file's For choice, where the student has nothing in.
+    const other = getAssessments(cidA).find(
+      x => x.id !== LAB && !x.isDraft && AddWorkClass.offered(cidA, x) && !getStudentSubmission(cidA, st.id, x.id),
+    );
     const cidB = createCourse({ name: 'Block C', gradeLevel: '8' }).id;
     saveStudents(cidB, [{ id: crypto.randomUUID(), firstName: 'Hana', lastName: st.lastName }]);
     saveAssessments(cidB, [Object.assign({}, lab, { id: 'blab-' + Date.now().toString(36) })]);
     sendWork(cidB);
     PageAssignments.render();
-    return { sid: st.id, last: st.lastName };
+    return { sid: st.id, last: st.lastName, other: other.id };
   }, LAB);
 
   const card = page.locator('#ac-' + LAB);
@@ -297,6 +301,9 @@ test('turned on after the files: a name now in both classes waits, never stays o
     buffer: fs.readFileSync(PHOTO),
   });
   await expect(row.locator('.awc-chip')).toHaveCount(1, { timeout: 15000 });
+  // The teacher sets the file For another assessment.
+  await row.locator('.awc-for select').selectOption(set.other);
+  await expect(row.locator('.awc-chip.is-late')).toHaveCount(1);
 
   // Then the switch: the name is in both classes now, so the file waits.
   const two = awc.getByRole('switch', { name: 'This Pile Has Two Classes' });
@@ -313,5 +320,8 @@ test('turned on after the files: a name now in both classes waits, never stays o
   await expect(item.locator('.awt-act').nth(0)).toContainText('· Science 8');
   await expect(item.locator('.awt-act').nth(1)).toContainText('· Block C');
   await expect(awc.locator('.awc-primary')).toHaveText('Add Work for 0 Students');
+  // Placed back on the student, it is for the assessment the teacher chose.
+  await item.locator('.awt-act').nth(0).click();
+  await expect(row.locator('.awc-chip.is-late .awc-for select')).toHaveValue(set.other);
   expect(errors).toEqual([]);
 });

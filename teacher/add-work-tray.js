@@ -449,16 +449,21 @@
       return out;
     }
 
-    /* A second class came onto the page (B6): each file waiting by its name
-       is matched again against both, as if it were dropped now. A certain
-       one goes on its student; the rest wait, saying why. → how many went. */
-    function again() {
+    /* The classes on the page changed (B6): each file waiting by its name is
+       matched again, so what it says is true. With `place` (a second class
+       came), a certain one goes on its student, as if it were dropped now,
+       unless it went back from a student (noAuto); the rest wait, saying
+       why. Without (the second class left), nothing is placed.
+       → how many were placed. */
+    function again(place) {
       var went = 0;
       items.slice().forEach(function (item) {
         if (!item.byName || item.refused) return;
         var m = _match(item.from);
         item.match = m;
-        if (m.kind !== 'one') return;
+        // A note on the old match (no room left on that student) is not this one's.
+        if (m.kind !== 'one') item.note = '';
+        if (m.kind !== 'one' || !place || item.noAuto) return;
         var res =
           host.place([{ sid: m.sid, from: item.from, pages: item.pages, url: item.url, byName: true }])[0] || {};
         if (res.ok) {
@@ -489,7 +494,10 @@
       if (!item || item.refused || host.busy()) return false;
       var focus = _nextKey(id);
       var before = _rect(id);
-      var res = host.place([{ sid: sid, from: item.from, pages: item.pages, url: item.url }])[0] || {};
+      var res =
+        host.place([
+          { sid: sid, from: item.from, pages: item.pages, url: item.url, forCid: item.forCid, forAid: item.forAid },
+        ])[0] || {};
       if (!res.ok) {
         item.note = res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '';
         item.picking = false;
@@ -917,8 +925,9 @@
       placeOrHold: placeOrHold,
       // Two classes (B6): a name matched as a drop is; a placed file held again.
       match: _match,
-      hold: function (from, pages, m) {
-        hold(from, pages, m);
+      // more: { byName, noAuto, forCid, forAid } (a For choice the teacher made).
+      hold: function (from, pages, m, more) {
+        Object.assign(hold(from, pages, m), more || {});
       },
       again: again,
       placeItem: placeItem,

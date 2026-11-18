@@ -17,8 +17,10 @@
    Waiting tray and Split the Scan search both lists and show the class, so
    a name in both classes is offered, never taken; Class List Order is not
    offered. Turned on after files were placed, every file the app matched
-   by its name is matched again against both (_matchAgain). Turning it off puts every piece on the second class's students
-   back in the Waiting tray.
+   by its name is matched again against both (_matchAgain). Turning it off
+   puts every piece on the second class's students back in the Waiting
+   tray, and the files waiting by their names are matched again against
+   the one class (never placed).
 
    A late paper. Each piece has a For choice: the page's assessment to
    start, or another of the student's class on which Add Work for the Class
@@ -34,7 +36,8 @@
    AddWorkTwoClasses.lateHtml(s, sid, ctx)  a student's pieces for other assessments.
    AddWorkTwoClasses.splitOpts(s)      Split the Scan's lists with two classes.
    AddWorkTwoClasses.click / change(s, …, ctx) → true when taken.
-   AddWorkTwoClasses.candidates(s, ctx), turnOn(s, cid, ctx), turnOff(s, ctx). */
+   AddWorkTwoClasses.candidates(s, ctx), turnOn(s, cid, ctx), turnOff(s, ctx).
+   AddWorkTwoClasses.carryFor(s, given, placed)  a waiting file's For choice, again. */
 /** @type {any} */ (window).AddWorkTwoClasses = (function () {
   'use strict';
 
@@ -189,12 +192,7 @@
             s.byId[x.id] = x;
           });
           s.subs = s.stage.subs();
-          var back = _matchAgain(s, ctx);
-          st.line = back
-            ? 'Both classes are listed. ' +
-              (back === 1 ? '1 file' : back + ' files') +
-              ' went back to Waiting for a Student.'
-            : '';
+          st.line = _againLine(_matchAgain(s, ctx));
           ok = true;
         }
         ctx.draw({ focus: 'two' });
@@ -202,18 +200,36 @@
       });
   }
 
+  function _files(n) {
+    return n === 1 ? '1 file' : n + ' files';
+  }
+  // The line under the switch once it is on: what moved, or the usual line.
+  function _againLine(n) {
+    var parts = [];
+    if (n.back) parts.push(_files(n.back) + ' went back to Waiting for a Student');
+    if (n.placed) parts.push(n.placed === 1 ? '1 waiting file was placed' : n.placed + ' waiting files were placed');
+    if (!parts.length) return '';
+    var said = parts.join(', and ');
+    return 'Both classes are listed. ' + said.charAt(0).toUpperCase() + said.slice(1) + '.';
+  }
+
   /* With both classes listed, every file the app matched by its name is
-     matched again, as if it were dropped now: the result never depends on
-     whether the files or the switch came first. One still certain for the
+     matched again, as if it were dropped now. One still certain for the
      same student stays; any other goes back to waiting, saying why, and is
-     never moved to another student. A file the teacher placed or moved, and
-     a piece from Split the Scan (named by the teacher or by its sticker),
-     is not matched by name and is left alone. → how many went back. */
+     never moved to another student. So the switch's order changes nothing,
+     but in one case: a name certain for one student in each view (the
+     first class's Noor Al-Rashid, then the second class's Al Rashid) waits
+     when the files came first, where a drop with the switch on places it.
+     Waiting is the safe answer. A file the teacher placed or moved, and a
+     piece from Split the Scan (named by the teacher or by its sticker), is
+     not matched by name and is left alone. A For choice the teacher made
+     goes with the file to the tray (carryFor). → { back, placed }. */
   function _matchAgain(s, ctx) {
-    if (!s.tray || typeof s.tray.again !== 'function' || !s.byName) return 0;
+    var out = { back: 0, placed: 0 };
+    if (!s.tray || typeof s.tray.again !== 'function' || !s.byName) return out;
     // Waiting files first, so a file sent back below is not placed again.
-    s.tray.again();
-    var back = 0;
+    out.placed = s.tray.again(true);
+    var held = [];
     Object.keys(s.byName).forEach(function (pid) {
       var h = s.stage.holder(pid);
       if (!h) {
@@ -223,14 +239,58 @@
       var m = s.tray.match(h.piece.from);
       if (m.kind === 'one' && m.sid === h.sid) return;
       delete s.byName[pid];
+      // Only a choice the teacher made: the class's own assessment is the default.
+      var chose = h.t.home ? null : { forCid: h.t.cid, forAid: h.t.aid };
       var gone = s.stage.takeOff(h.sid, pid);
       ctx.release(gone);
       gone.forEach(function (p) {
-        s.tray.hold(p.from, p.pages, m);
-        back++;
+        held.push({ from: p.from, pages: p.pages, m: m, chose: chose });
       });
     });
-    return back;
+    // In the order of their names, as a drop of them would be.
+    held.sort(function (a, b) {
+      return NameMatch.compare(a.from, b.from);
+    });
+    held.forEach(function (x) {
+      s.tray.hold(x.from, x.pages, x.m, Object.assign({ byName: true, noAuto: true }, x.chose));
+    });
+    out.back = held.length;
+    return out;
+  }
+
+  function _title(cid, aid) {
+    var a = (getAssessments(cid) || []).find(function (x) {
+      return x && x.id === aid;
+    });
+    return (a && a.title) || 'that assessment';
+  }
+
+  /* A waiting file's For choice, made by the teacher before it went back,
+     put on it again when it is placed: on a student of the same class it is
+     for that assessment again; in the other class, which doesn't have it,
+     it is for that class's own, and the row says so. → the placing. */
+  function carryFor(s, given, placed) {
+    var home = s.stage.home(given.sid);
+    if (!placed.ok || !given.forAid || !home) return placed;
+    var title = _title(given.forCid, given.forAid);
+    if (home.cid === given.forCid) {
+      var res = s.stage.setFor(given.sid, placed.piece.id, given.forAid);
+      if (res.ok) return { ok: true, piece: res.piece };
+      s.stage.note(given.sid, (given.from || 'That file') + ' couldn’t go to ' + title + '.');
+      return placed;
+    }
+    s.stage.note(
+      given.sid,
+      title +
+        ' isn’t in ' +
+        (home.name || 'this class') +
+        ', so ' +
+        (given.from || 'this file') +
+        ' is for ' +
+        ((home.a && home.a.title) || 'this assessment') +
+        '.',
+    );
+    return placed;
   }
 
   /* The second class off: its students leave the page, and every piece that
@@ -247,6 +307,8 @@
       return !!s.stage.home(sid);
     });
     s.subs = s.stage.subs();
+    // The files waiting by their names: matched again against one class, never placed.
+    if (s.tray && typeof s.tray.again === 'function') s.tray.again(false);
     var st = _st(s);
     st.line = pieces.length
       ? (pieces.length === 1 ? '1 file' : pieces.length + ' files') +
@@ -473,6 +535,7 @@
     candidates: candidates,
     turnOn: turnOn,
     turnOff: turnOff,
+    carryFor: carryFor,
     barHtml: barHtml,
     heading: heading,
     label: label,
