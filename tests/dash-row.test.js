@@ -76,28 +76,14 @@ describe('the row height rule', () => {
     expect(DashOverview.rowHeight(900, 318)).toBe(570); // a taller start: the photo-expiry line
     expect(DashOverview.rowHeight(1000, 278)).toBe(710);
     expect(DashOverview.rowHeight(400, 278)).toBe(510);
+    // 200% zoom on an 800 px window: a 400 px tall layout viewport. The floor holds.
+    expect(DashOverview.rowHeight(400, 278)).toBe(510);
+    expect(DashOverview.rowHeight(450, 278)).toBe(510);
   });
 });
 
-describe('with the dashRow switch off', () => {
-  it('draws exactly the two-card row, as before', () => {
-    setFlags({ dashRow: false });
-    const o = opts();
-    const missing = DashInsights.missingItems(CID, STUDENTS);
-    const expected =
-      '<div class="dash-section dash-overview">' +
-      DashOverview.glanceHtml(Object.assign({}, o, { missing })) +
-      '<div class="dash-overview-row dash-overview-cards">' +
-      DashOverview.competenciesCardHtml(o) +
-      DashOverview.coreCardHtml(o) +
-      '</div></div>';
-    const html = DashOverview.renderOverviewPanel(o);
-    expect(html).toBe(expected);
-    expect(html).not.toContain('class="dash-row');
-    expect(html).not.toContain('dash-comp-tile');
-    expect(html).not.toContain('dash-recent');
-  });
-});
+// The flag-off row is guarded byte for byte against the pre-D2 output in
+// tests/dash-overview-flag-off.test.js.
 
 describe('with the dashRow switch on', () => {
   beforeEach(() => setFlags({ dashRow: true }));
@@ -242,6 +228,20 @@ describe('the Competencies tile', () => {
     expect(DashCompetencies.pageForKey('core', 'Home')).toBe('curricular');
     expect(DashCompetencies.pageForKey('curricular', 'End')).toBe('core');
     expect(DashCompetencies.pageForKey('core', 'Enter')).toBeNull();
+  });
+
+  it('show() flips aria-selected on the real markup, with the real segSelect', () => {
+    const { document: doc } = parseHTML('<html><body>' + DashCompetencies.html(opts()) + '</body></html>');
+    // linkedom has no layout: the pill's glide measures boxes, so give it some.
+    const box = { top: 0, left: 0, width: 80, height: 28, right: 80, bottom: 28 };
+    doc.querySelectorAll('.dash-comp-tile *').forEach(el => (el.getBoundingClientRect = () => box));
+    const sel = id => doc.querySelector('#dash-comp-tab-' + id).getAttribute('aria-selected');
+    expect([sel('curricular'), sel('core')]).toEqual(['true', 'false']);
+    DashCompetencies.show(doc, 'core');
+    expect([sel('curricular'), sel('core')]).toEqual(['false', 'true']);
+    expect(doc.querySelector('#dash-comp-tab-core').classList.contains('active')).toBe(true);
+    DashCompetencies.show(doc, 'curricular');
+    expect([sel('curricular'), sel('core')]).toEqual(['true', 'false']);
   });
 
   it('show() turns the tile in place and keeps one tab in the tab order', () => {
