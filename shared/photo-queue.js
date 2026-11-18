@@ -856,7 +856,7 @@ window.PhotoQueue = (function () {
           kind: 'bulletin',
           path: null,
           owner: owner,
-          ids: { course: String(ref.course).toLowerCase(), key: String(ref.key).toLowerCase(), file: id },
+          ids: { course: ref.course, key: ref.key, file: id },
           order: i,
           file_index: typeof page.file === 'number' ? page.file : 0,
           page: typeof page.page === 'number' ? page.page : i + 1,
@@ -1221,44 +1221,44 @@ window.PhotoQueue = (function () {
               }),
             })
           : _isHandout(first)
-          ? await _commit({
-              kind: 'handout',
-              key: keys[i],
-              ids: { course: first.ids.course, assessment: first.ids.assessment, resource: first.ids.resource },
-              files: rows.map(function (m) {
-                return {
-                  id: m.ids.file,
-                  order: m.order,
-                  path: _pathOf(m),
-                  hash: m.hash,
-                  bytes: m.bytes,
-                  width: m.width,
-                  height: m.height,
-                };
-              }),
-            })
-          : await _commit({
-              key: keys[i],
-              ids: {
-                course: first.ids.course,
-                assessment: first.ids.assessment,
-                enrollment: first.ids.enrollment,
-                submission: first.ids.submission,
-              },
-              files: rows.map(function (m) {
-                return {
-                  id: m.ids.file,
-                  order: m.order,
-                  path: pathFor(m.ids),
-                  thumbPath: thumbPathFor(m.ids),
-                  hash: m.hash,
-                  bytes: m.bytes,
-                  thumbBytes: m.thumb_bytes,
-                  width: m.width,
-                  height: m.height,
-                };
-              }),
-            });
+            ? await _commit({
+                kind: 'handout',
+                key: keys[i],
+                ids: { course: first.ids.course, assessment: first.ids.assessment, resource: first.ids.resource },
+                files: rows.map(function (m) {
+                  return {
+                    id: m.ids.file,
+                    order: m.order,
+                    path: _pathOf(m),
+                    hash: m.hash,
+                    bytes: m.bytes,
+                    width: m.width,
+                    height: m.height,
+                  };
+                }),
+              })
+            : await _commit({
+                key: keys[i],
+                ids: {
+                  course: first.ids.course,
+                  assessment: first.ids.assessment,
+                  enrollment: first.ids.enrollment,
+                  submission: first.ids.submission,
+                },
+                files: rows.map(function (m) {
+                  return {
+                    id: m.ids.file,
+                    order: m.order,
+                    path: pathFor(m.ids),
+                    thumbPath: thumbPathFor(m.ids),
+                    hash: m.hash,
+                    bytes: m.bytes,
+                    thumbBytes: m.thumb_bytes,
+                    width: m.width,
+                    height: m.height,
+                  };
+                }),
+              });
       } catch (err) {
         res = { error: { message: _message(err) || 'commit failed' } };
       }
