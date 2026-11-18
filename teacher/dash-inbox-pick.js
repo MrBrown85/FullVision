@@ -199,7 +199,7 @@ window.DashInboxPick = (function () {
   // to the pressed button (the whole Dashboard is drawn again).
   var _refocus = false;
 
-  /** @type {WeakMap<Element, { click: any, key: any }>} */
+  /** @type {WeakMap<Element, { click: any, key: any, box: HTMLElement | null, wheel: any, edges: any }>} */
   var _bound = new WeakMap();
 
   /** Where the switch's buttons are, with the pressed one in view.

@@ -773,8 +773,9 @@ window.DashCompetencies = (function () {
   function fit() {
     var tile = /** @type {HTMLElement | null} */ (document.querySelector('.dash-comp-tile'));
     if (!tile || typeof tile.getBoundingClientRect !== 'function') return;
-    tile.classList.toggle('is-tall', tile.getBoundingClientRect().height >= TALL);
-    Array.prototype.forEach.call(tile.querySelectorAll('.dash-comp-page'), function (/** @type {HTMLElement} */ pg) {
+    var box = tile;
+    box.classList.toggle('is-tall', box.getBoundingClientRect().height >= TALL);
+    Array.prototype.forEach.call(box.querySelectorAll('.dash-comp-page'), function (/** @type {HTMLElement} */ pg) {
       _fitSupport(pg);
       // The one-line row's number column: the widest number on the page.
       var numW = 0;
@@ -786,8 +787,8 @@ window.DashCompetencies = (function () {
       var n = list ? list.querySelectorAll('.dash-comp-lnbox, .dash-comp-lines > .dash-comp-ln').length : 0;
       // A row with its counts needs COUNTS_ROW px, or the full 72 when the
       // bar and name are the tall ones and the row is not one line.
-      var wide = tile.getBoundingClientRect().width >= 440;
-      var need = tile.classList.contains('is-tall') && !wide ? 72 : COUNTS_ROW;
+      var wide = box.getBoundingClientRect().width >= 440;
+      var need = box.classList.contains('is-tall') && !wide ? 72 : COUNTS_ROW;
       pg.classList.toggle('has-counts', !!list && n > 0 && list.clientHeight / n >= need);
     });
     if (_fitWatch || typeof ResizeObserver === 'undefined') return;

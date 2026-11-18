@@ -650,6 +650,7 @@ window.DashInboxRoll = (function () {
     var w = grid.clientWidth || 629;
     // Pages only where the whole class fits at MIN_PAGE or more: a page the
     // tile cannot show is never hidden under its foot (review of #1603).
+    /** @type {'names' | 'pages'} */
     var form = formFor(h) === 'pages' && room > 0 && !layoutFor(n, w, room).scrolls ? 'pages' : 'names';
     var drawn = root.classList.contains('is-pages') ? 'pages' : 'names';
     if (form !== drawn) {
