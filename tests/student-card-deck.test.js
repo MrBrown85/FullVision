@@ -243,19 +243,16 @@ describe('the status band (Colin, 2026-11-17)', () => {
     expect(pill({}, 'm')).toEqual(['sp-band-missing', 'Missing', 'Was due Nov 1']);
   });
 
-  it('Missing says it counts as 0 in a class with a course %, and not in a Proficiency class', async () => {
+  it('Missing says only Missing and its date, in every grading style: no "counts as 0" on the card', async () => {
     const page = await demo();
     const work = [{ id: 'm', title: 'Piece m', kind: 'missing', dueDate: '2027-01-31' }];
-    const note = system => {
+    const band = system => {
       const view = viewWith(work);
       view.course = Object.assign({}, view.course, { gradingSystem: system });
-      const c = drawIn(page, view, {}).querySelector('.sp-piece[data-piece="m"]');
-      const n = c.querySelector('.sp-band-note');
-      return [c.querySelector('.sp-band-when').textContent, n && n.textContent];
+      return drawIn(page, view, {}).querySelector('.sp-piece[data-piece="m"] .sp-band').textContent;
     };
     // A Missing piece due later (342 such live, Nov 17) shows no countdown.
-    expect(note('letter')).toEqual(['Due Jan 31', '· Counts as 0 until it’s in']);
-    expect(note('proficiency')).toEqual(['Due Jan 31', null]);
+    ['letter', 'both', 'proficiency'].forEach(system => expect(band(system)).toBe('MissingDue Jan 31'));
   });
 
   it('a teacher’s Late is its own pale red pill with its own icon', async () => {

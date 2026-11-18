@@ -322,20 +322,17 @@ window.StudentPageView = (function () {
   }
 
   /* Where a piece stands, as the band across the top of its card says it
-     (Colin, 2026-11-17, Option B of the mockup): { kind, word, icon, note },
+     (Colin, 2026-11-17, Option B of the mockup): { kind, word, icon },
      or null when there is nothing to say (work to do with no due date).
      How far off the due date is, Returned, Updated, Missing, Revise by,
-     Sent with its photos, or Closed. Missing is the one solid band; in a
-     class with a course % it says it counts as 0 until it's in. */
+     Sent with its photos, or Closed. Missing is the one solid band, with
+     nothing more on it (Colin, 2026-11-17: no "counts as 0" on the card). */
   function statusOf(p, view) {
     // A returned grade changed since the student last looked says when (the board's "Updated Nov 12").
     if (p.kind === 'back' && p.updated)
       return { kind: 'updated', word: 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY), icon: 'tick' };
     if (p.kind === 'back') return { kind: 'back', word: 'Returned ' + fmtDate(p.returnedAt, DAY), icon: 'tick' };
-    if (p.kind === 'missing') {
-      var zero = view && view.course && view.course.gradingSystem && view.course.gradingSystem !== 'proficiency';
-      return { kind: 'missing', word: 'Missing', icon: 'alert', note: zero ? 'Counts as 0 until it’s in' : '' };
-    }
+    if (p.kind === 'missing') return { kind: 'missing', word: 'Missing', icon: 'alert' };
     // "Closed Nov 13" (the Closed Assignment board).
     if (isClosed(p))
       return {
@@ -370,7 +367,6 @@ window.StudentPageView = (function () {
       st.kind +
       '">' +
       pillHtml(st.kind, st.word, st.icon) +
-      (st.note ? '<span class="sp-band-note">' + esc(SEP.trim() + ' ' + st.note) + '</span>' : '') +
       (when ? '<span class="sp-band-when">' + esc(when) + '</span>' : '') +
       '</div>'
     );
