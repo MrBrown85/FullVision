@@ -343,7 +343,9 @@ test('at the full column and at 299 px every picture is 80 px or more and nothin
   expect(full.lastCaption).toBeLessThanOrEqual(full.rowBottom + 0.5);
   expect(full.tileOver).toBeLessThanOrEqual(0);
   await page.locator(PILE).evaluate(el => el.scrollIntoView({ inline: 'center', block: 'nearest' }));
-  await expect(page.locator(PILE + ' img')).toHaveAttribute('src', /./);
+  await expect(page.locator(PILE + ' img').first()).toHaveAttribute('src', /./);
+  // A closed pile asks for its top page alone.
+  await expect(page.locator(PILE + ' img').nth(1)).not.toHaveAttribute('src', /./);
   await shot(page, 'side-closed-510-light');
   console.log('full column page height', Math.min(...full.pages));
 });
@@ -384,7 +386,9 @@ test('beside Bulletins the Inbox is 299 px and the pictures are 80 px or more', 
 test('dark: a closed and an open pile', async ({ page }) => {
   await open(page, { dark: true });
   await page.locator(PILE).evaluate(el => el.scrollIntoView({ inline: 'center', block: 'nearest' }));
-  await expect(page.locator(PILE + ' img')).toHaveAttribute('src', /./);
+  await expect(page.locator(PILE + ' img').first()).toHaveAttribute('src', /./);
+  // A closed pile asks for its top page alone.
+  await expect(page.locator(PILE + ' img').nth(1)).not.toHaveAttribute('src', /./);
   await shot(page, 'side-closed-510-dark');
   await page
     .locator(PILE + ' .dash-inbox-side-page')
