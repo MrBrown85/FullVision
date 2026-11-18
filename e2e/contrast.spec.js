@@ -173,6 +173,27 @@ for (const colorScheme of ['light', 'dark']) {
       await expect(page.locator('.m-obs-card').first()).toBeVisible();
       await expectReadable(page);
     });
+
+    // The phone's Bulletins tab (B1f): the feed with its blue Post a Photo, Write a Bulletin, and a delete's red confirm.
+    test('phone Bulletins: the feed, Write a Bulletin and the confirm', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await enterDemo(page, { phone: true });
+      await page.locator('.m-tab-item[data-tab="bulletins"]').click();
+      await expect(page.locator('.m-bulletin-card').first()).toBeVisible();
+      await expectReadable(page);
+      await page.locator('[data-m-bulletin="write"]').click();
+      await expect(page.locator('#m-bulletin-write')).toBeVisible();
+      await page.waitForTimeout(400);
+      await expectReadable(page);
+      await page.locator('#m-bulletin-write [data-m-bulletin="close"]').click();
+      await expect(page.locator('#m-sheet-container .m-sheet')).toHaveCount(0);
+      await page.locator('.m-bulletin-seen').first().click();
+      await page.locator('#m-bulletin-seen-sheet [data-m-bulletin="delete"]').click();
+      await expect(page.locator('.m-bulletin-confirm-ok')).toBeVisible();
+      await page.waitForTimeout(400);
+      await expectReadable(page);
+    });
   });
 }
 

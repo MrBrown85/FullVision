@@ -47,6 +47,9 @@ const PRECACHE_URLS = [
   '/shared/data-markup.js',
   '/shared/data-reflect.js',
   '/shared/data-bulletins.js',
+  '/shared/bulletins-refusals.js',
+  '/shared/data-bulletins-demo.js',
+  '/shared/data-bulletins-queue.js',
   '/shared/data-revisions.js',
   '/shared/data-roster.js',
   '/shared/data-withdrawn.js',
@@ -288,6 +291,8 @@ const PRECACHE_URLS = [
   '/teacher-mobile/split-scan.js',
   '/teacher-mobile/markup.js',
   '/teacher-mobile/tab-grade.js',
+  '/teacher-mobile/bulletins-model.js',
+  '/teacher-mobile/tab-bulletins.js',
   '/teacher-mobile/tab-bar.js',
   '/teacher-mobile/shell.js',
 ];
