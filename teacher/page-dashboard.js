@@ -64,6 +64,9 @@ window.PageDashboard = (function () {
     _writePref(COMP_VIEW_KEY + activeCourse, view);
     mixPop = null;
   };
+  _viewSetters.inbox = function (key) {
+    if (window.DashInbox) DashInbox.setView(activeCourse, key);
+  };
   // The next render slides the student cards to their new places (the
   // filter was set or cleared, or the sort changed).
   var _slideCards = false;
@@ -142,6 +145,7 @@ window.PageDashboard = (function () {
 
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
+    if (window.DashInbox && activeCourse && activeCourse !== cid) DashInbox.leave(activeCourse);
     activeCourse = cid;
     obsHighlight = null;
     mixPop = null;
@@ -323,12 +327,15 @@ window.PageDashboard = (function () {
     var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
+    if (window.DashInbox) DashInbox.beforeRender();
     document.getElementById('main').innerHTML = html;
     if (before) StudentCards.slideFrom(before);
+    if (window.DashInbox) DashInbox.afterRender(cid);
     if (_compFade) _fadeCompRows();
     _compFade = false;
     _afterObsRender(null);
     DashOverview.sizeRow();
+    _watchAboveRow();
     _placeMixPop();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
@@ -881,6 +888,22 @@ window.PageDashboard = (function () {
     _closeMixPop();
   }
 
+  /* The middle row is as tall as the window leaves below where it starts, so
+     it is measured again whenever what sits above it changes height (the
+     photo-expiry line arriving after the first draw). */
+  var _aboveRowWatch = null;
+  function _watchAboveRow() {
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
+    if (typeof ResizeObserver === 'undefined' || !document.querySelector('.dash-row')) return;
+    _aboveRowWatch = new ResizeObserver(function () {
+      DashOverview.sizeRow();
+    });
+    document.querySelectorAll('.page-dashboard .photo-expiry, .page-dashboard .dash-glance').forEach(function (el) {
+      _aboveRowWatch.observe(el);
+    });
+  }
+
   function _onResize() {
     DashOverview.sizeRow();
     _placeMixPop();
@@ -1032,6 +1055,7 @@ window.PageDashboard = (function () {
     if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
     // A click outside the open view menu (and not on its pill) closes it.
     if (openMenu && !e.target.closest('.dash-view-menu, .dash-view-btn')) _closeViewMenu();
+    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render })) return;
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -1393,6 +1417,7 @@ window.PageDashboard = (function () {
     openMenu = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
+    if (window.DashInbox) DashInbox.configure({ read: _readPref, write: _writePref });
 
     // The student list, as on the other pages (_syncSidebar in render)
     document.getElementById('sidebar-mount').innerHTML = '';
@@ -1444,9 +1469,12 @@ window.PageDashboard = (function () {
   }
 
   function destroy() {
+    if (window.DashInbox) DashInbox.leave(activeCourse);
     if (typeof ObsCapture !== 'undefined') ObsCapture.closeDialog();
     _hidePop();
     window.removeEventListener('resize', _onResize);
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
     clearTimeout(_resizeTimer);
     CM.destroy();
     _listeners.forEach(function (l) {

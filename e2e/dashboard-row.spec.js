@@ -67,18 +67,31 @@ for (const [w, h, rowH] of [
   });
 }
 
-test('the row starts where the page puts it, so the photo-expiry line above is counted', async ({ page }) => {
+test('a photo-expiry line that arrives after the first draw: the row still ends 12 px above the window', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await openDashboard(page);
   const before = await row(page);
   expect(Math.round(before.row.height)).toBe(610);
-  // Push the row down 40 px, then draw again: the row gives back the 40 px.
+  // The line arrives late, as it does for a signed-in teacher: the list comes
+  // in and only the line's own box is drawn again. Nothing here measures the row.
   await page.evaluate(() => {
-    document.querySelector('.dash-glance').style.marginTop = '40px';
-    DashOverview.sizeRow();
+    const cid = createCourse({ name: 'Social Studies 10' }).id;
+    const opened = new Date(Date.now() - 350 * 86400000).toISOString();
+    PhotoExpiry._reset([{ course_id: cid, last_opened_at: opened, photos: 6 }]);
+    PhotoExpiry.opened('none-such');
   });
+  await expect(page.locator('.page-dashboard .photo-expiry-line')).toHaveCount(1);
+  await expect
+    .poll(async () => {
+      const m = await row(page);
+      return Math.round(m.row.top) > 278 ? Math.abs(Math.round(900 - 12 - m.row.bottom)) : 999;
+    })
+    .toBeLessThanOrEqual(1);
   const after = await row(page);
-  expect(Math.round(after.row.height)).toBe(570);
+  expect(after.row.top).toBeGreaterThan(300);
+  expect(Math.round(after.row.height)).toBeLessThan(610);
 });
 
 test('with the switch off the page has none of the new row', async ({ page }) => {
@@ -247,7 +260,11 @@ test('clicking a competency in the tile still filters the student cards', async 
   await openDashboard(page);
   const before = await page.locator('.dash-grid > .dash-card').count();
   expect(before).toBeGreaterThan(0);
-  await page.locator('.dash-comp-tile .dash-comp-row .dash-comp-pick, .dash-comp-tile .dash-comp-pick').first().click();
+  // The tile opens on Level Mix (D3), where a row opens its list first; Class
+  // Average keeps today's one-click filter.
+  await page.locator('#dash-view-btn-comp').click();
+  await page.locator('#dash-view-menu-comp [data-view="avg"]').click();
+  await page.locator('.dash-comp-tile .dash-comp-row').first().click();
   await expect(page.locator('.dash-comp-filter')).toBeVisible();
   await expect(
     page.locator('.dash-comp-tile .dash-comp-row.is-picked, .dash-comp-tile [aria-pressed="true"]').first(),
