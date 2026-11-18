@@ -777,7 +777,7 @@ def scen_race():
     ok('race: and writes nothing', len(listed(w, w.a)['questions']) == 2)
     # One key from two connections at once.
     for rnd in range(3):
-        key = nid(); out.clear(); qn = quiz([tf('Round %d' % rnd), text()])
+        key = nid(); out.clear(); qn = dict(quiz([tf('Round %d' % rnd), text()]), updated_at=last_read(d, w.a2))
         gate = Conn(d); gate.run('begin'); gate.run('select pg_advisory_xact_lock(hashtext(:u), hashtext(:k))', u=A, k=key)
         ts = [threading.Thread(target=call, args=(n, 'select save_quiz(:a, cast(:q as jsonb), :k)'), kwargs={'a': w.a2, 'q': json.dumps(qn), 'k': key}) for n in ('one', 'two')]
         [t.start() for t in ts]; time.sleep(0.5)
@@ -818,11 +818,11 @@ def scen_race():
         save(w, a, quiz([tf(), text()]))
         first, second = (('save', 'delete') if rnd == 0 else ('delete', 'save'))
         h = Conn(d); h.as_teacher(); h.run('begin')
-        if first == 'save': h.run('select save_quiz(:a, cast(:q as jsonb), null)', a=a, q=json.dumps(quiz([tf(), choice(), text()])))
+        if first == 'save': h.run('select save_quiz(:a, cast(:q as jsonb), null)', a=a, q=json.dumps(dict(quiz([tf(), choice(), text()]), updated_at=last_read(d, a))))
         else: h.run('select delete_assessment(:a)', a=a)
         out.clear()
         sql = 'select delete_assessment(:a)' if second == 'delete' else 'select save_quiz(:a, cast(:q as jsonb), null)'
-        th = threading.Thread(target=call, args=(second, sql), kwargs={'a': a, 'q': json.dumps(quiz([tf()]))}); th.start(); time.sleep(0.5)
+        th = threading.Thread(target=call, args=(second, sql), kwargs={'a': a, 'q': json.dumps(dict(quiz([tf()]), updated_at=last_read(d, a)))}); th.start(); time.sleep(0.5)
         ok('race: a %s waits for a %s in progress' % (second, first), out == {}, out)
         h.run('commit'); h.close(); th.join()
         res = out.get(second)
@@ -1062,7 +1062,7 @@ def scen_undo():
     ok('undo: and deletes no row', quiz_rows(d) == kept)
     r = d.file(UNDO); ok('undo: the full removal stops while a quiz exists', r.startswith('STOPPED') and 'There are 1 quizzes' in r, r)
     ok('undo: and keeps every row', quiz_rows(d) == kept)
-    d.run("grant execute on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid), public.list_quiz_tries(uuid) to authenticated")
+    d.run("grant execute on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid) to authenticated")
     d.run("create temp table kept as select pg_get_functiondef(to_regprocedure('public.list_quiz(uuid)')) as def")
     d.run("do $$ begin execute replace((select def from kept), 'begin', 'begin -- changed later'); end $$")
     d.run('delete from quiz')
