@@ -394,6 +394,7 @@ describe('the export stays complete', () => {
     getCardsWorkUntil: 'the last day the class’s student cards open; a class setting, not student data',
     getCourseConfig: 'class settings, not student data',
     getCourseFeedbackOptions: 'two class switches (Reflect on Feedback, Show My Learning), not student data',
+    getStudentPageOptions: 'per-student Student Page settings (Show Overall Grade, Page Paused), not a record',
     getCustomTags: 'observation tag names, not student data',
     getDibelsScore: 'read through assessmentCellValue (the reading level)',
     getDibelsScores: 'read through assessmentCellValue (the reading level)',

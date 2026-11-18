@@ -117,7 +117,7 @@ window.PreviewStudent = (function () {
         'Your Result',
         'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
       ) +
-      (StudentView.learningOn(cid) || (_open && _open.learning)
+      (StudentView.learningOn(cid, _open && _open.sid) || (_open && _open.learning)
         ? _item('My Learning', 'Their grade, only from work you’ve returned.')
         : '') +
       (_commentsSeen(view) ? _item('Your comment and criterion comments', 'Word for word, as you wrote them.') : '') +
@@ -131,6 +131,21 @@ window.PreviewStudent = (function () {
         : '') +
       '</ul></section>'
     );
+  }
+
+  // Why the grade is not shown: the class's switch, or this one student's Hide (per-student options).
+  function _gradeOffLine(first, cid, sid) {
+    var own = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid)[sid] : null;
+    if (own && own.show_overall_grade === 'hide') {
+      return 'Show Overall Grade is off for ' + first + '. Change it in Class Settings › Student Page.';
+    }
+    return 'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.';
+  }
+
+  // True when this student's page is paused (per-student options).
+  function _pausedFor(cid, sid) {
+    var own = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid)[sid] : null;
+    return !!(own && own.paused_at);
   }
 
   function _notSeenHtml(first, cid, sid, ready) {
@@ -149,12 +164,12 @@ window.PreviewStudent = (function () {
       _item('Grades you haven’t returned', drafts) +
       _item('Other students', 'No class average, no one else’s work.') +
       _item('Your private notes', 'Observations marked Private stay with you.') +
-      (StudentView.learningOn(cid) || (_open && _open.learning)
+      (StudentView.learningOn(cid, sid) || (_open && _open.learning)
         ? ''
-        : _item(
-            'Their grade',
-            'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.',
-          )) +
+        : _item('Their grade', _gradeOffLine(first, cid, sid))) +
+      (_pausedFor(cid, sid)
+        ? _item('Their page', 'Paused. ' + first + '’s card doesn’t open it until you choose Open.')
+        : '') +
       '</ul></section>'
     );
   }

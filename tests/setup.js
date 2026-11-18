@@ -308,6 +308,7 @@ load('shared/questionnaires.js');
 load('teacher/qr-slips.js');
 load('teacher/cm-questionnaires.js');
 load('teacher/student-cards.js');
+load('teacher/student-page-students.js');
 load('teacher/preview-student.js');
 load('teacher/cm-student-page.js');
 load('shared/student-voice.js');

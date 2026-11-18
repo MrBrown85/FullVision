@@ -288,4 +288,33 @@
   html.fv-tablet .afc-search .assess-search-input {
     height: 40px;
   }
+
+  /* ── Class Settings › Student Page: Students ───────────────────── */
+
+  /* A finger-sized box to tick, name to open, and panel and bar buttons
+     (teacher/student-page-students.js). The panel takes the full width of
+     an iPad mini. */
+  html.fv-tablet .sps-pick-box {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  html.fv-tablet .sps-check {
+    width: 20px;
+    height: 20px;
+  }
+  html.fv-tablet .sps-name {
+    min-height: 44px;
+  }
+  html.fv-tablet .sps-bar .sps-bar-btn,
+  html.fv-tablet .sps-panel .cm-action-btn,
+  html.fv-tablet .sps-panel .btn,
+  html.fv-tablet .sps-panel .seg-btn,
+  html.fv-tablet .sp-row .sps-except {
+    min-height: 44px;
+  }
+  @media (max-width: 799px) {
+    html.fv-tablet .sps-panel {
+      width: 100%;
+    }
+  }
 }

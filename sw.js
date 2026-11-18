@@ -154,6 +154,7 @@ const PRECACHE_URLS = [
   '/teacher/cm-reflect-answers.js',
   '/teacher/cm-questionnaires.js',
   '/teacher/student-cards.js',
+  '/teacher/student-page-students.js',
   // Sticker sheets (B4): the reader, its jsQR (fetched only when a scan is read), and the screen.
   '/shared/scan-label-read.js',
   '/vendor/jsqr/jsQR.js',

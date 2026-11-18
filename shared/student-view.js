@@ -1231,8 +1231,13 @@ window.StudentView = (function () {
      In the teacher's apps a signed-in class's switch is the server's, read
      through getCourseFeedbackOptions (shared/data.js), so Preview as
      Student follows it too. The student's page has no such reader: its
-     settings say it (s/student-data.js). */
-  function learningOn(cid) {
+     settings say it (s/student-data.js).
+
+     With `sid`, it is that one student's: their own Show or Hide (Class
+     Settings › Student Page, per-student options), else the class's switch
+     (effectiveShowOverallGrade, shared/data-reflect.js). */
+  function learningOn(cid, sid) {
+    if (sid && typeof effectiveShowOverallGrade === 'function') return effectiveShowOverallGrade(cid, sid);
     var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
     if (cfg.show_my_learning === true) return true;
     return typeof getCourseFeedbackOptions === 'function' && getCourseFeedbackOptions(cid).show_my_learning === true;
@@ -1540,7 +1545,7 @@ window.StudentView = (function () {
   function fromCache(cid, sid, opts) {
     // opts.learning: work My Learning out as if the class showed it (Preview's See What They'd See,
     // S13-F1). Nothing is saved; the class's switch is not read or changed.
-    var showLearning = !!(opts && opts.learning) || learningOn(cid);
+    var showLearning = !!(opts && opts.learning) || learningOn(cid, sid);
     var page = unopened(reply(cid, sid));
     if (!page) return { ready: false };
     var feedback = feedbackReply(cid, sid, page);
