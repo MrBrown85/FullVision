@@ -930,6 +930,32 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(calls('post_bulletin')).toEqual([]);
   });
 
+  it('a page a tab without bulletin uploads marked failed is tried once more at the next start', async () => {
+    fake.storage = noDesk();
+    await postBulletin(CID, { kind: 'announcement', body: 'Marked failed' }, PHOTO(), { queue: true });
+    await window.v2Queue.flush();
+    await settle(10);
+    // The released queue file (no bulletin kind) refused the page and marked it failed.
+    const [meta] = store.metas();
+    await store.update(meta.id, { state: 'failed', attempts: 1, last_error: 'refused' });
+    fake.storage = undefined;
+    standIn();
+    const row = (
+      await fake.rpc('post_bulletin', {
+        p_course_id: CID,
+        p_bulletin: pending()[0].bulletin,
+        p_files: pending()[0].files,
+        p_idempotency_key: pending()[0].key,
+      })
+    ).data.bulletin;
+    reload();
+    resumeBulletinUploads();
+    await quiet();
+    expect(uploads.map(u => u[1])).toEqual(row.files[0].paths);
+    expect(store.count()).toBe(0);
+    expect(pending()).toBe(null);
+  });
+
   it('a bulletin page no waiting entry holds is removed at start, so the sync dot can settle', async () => {
     await window.PhotoQueue.ready();
     await window.PhotoQueue.addBulletin({ course: CID, key: crypto.randomUUID() }, [page(1)]);
