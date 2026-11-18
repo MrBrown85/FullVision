@@ -16,7 +16,7 @@ with want(sig, md5) as (values
     ('fv_private.bulletin_file_removed()', 'f5d9ff024d8f189564993de228d302b0'),
     ('fv_private.bulletin_file_upload_allowed(text)', '8a17cc9d6971e5d3e9dc8e3e8975c8aa'),
     ('fv_private.bulletin_json(uuid)', 'a9ff292bcbce828af1020e58a5dae1c1'),
-    ('fv_private.bulletin_patched(bulletin,jsonb,boolean)', 'ba36bb8518537938220b8b66ece60add'),
+    ('fv_private.bulletin_patched(bulletin,jsonb,boolean)', 'c89216a349964fc16d39033a365ccaf6'),
     ('fv_private.bulletin_pinned_now(boolean,date,text)', '3d68484d7051fd8f380fe2a84c401546'),
     ('fv_private.bulletin_student_same_class()', 'e141cc62d498e426078f6f1da638416d'),
     ('list_bulletin_seen(uuid)', '7e8055f12c4300d0e16d7c884b103494'),

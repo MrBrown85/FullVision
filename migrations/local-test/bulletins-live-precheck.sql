@@ -56,6 +56,12 @@ checks(check_name, value) as (
     union all
     select 'authenticated may use the schema fv_private', 'no' where not has_schema_privilege('authenticated', 'fv_private', 'usage')
     union all
+    -- The route the file is sent through must hand PostgreSQL the text as written: one backslash kept
+    -- as one character, two kept as two. (On Nov 18 it turned each backslash, small u and four hex
+    -- digits into the real character, which changed a function's text. This row has none of those.)
+    select 'the apply route changes backslashes', length('\x41') || ' ' || length('a\\b')
+     where length('\x41') <> 4 or length('a\\b') <> 4
+    union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17)
 select * from checks order by 1;

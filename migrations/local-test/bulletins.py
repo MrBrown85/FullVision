@@ -37,6 +37,9 @@ B1A_C_TEMPLATE names a second one rebuilt under C, for scenario collations. Neve
             and post-check; the size.
   collations On ICU en-US (as live) and on C: apply, fingerprints the file carries and identical on both, a second
             run, post-check, pre-check, full undo, apply again; the server's own order differs from C on ICU.
+  route     The four files are plain ASCII with no backslash-u escape; the chr() class refuses exactly what the old
+            escaped class did, every code point to U+FFFF, on ICU and C; post and edit still refuse U+202E, U+200B, U+FEFF.
+  named     The last check names each of its six parts on its own, and two at once; nothing is left behind.
   m2        With a stand-in for M2's student_submit functions: M1 again, its post-check, PART 1 and the grants
             back, the full undo refusing until M2 is undone.
   locks     A delete holding the class's lock first: show again, edit, delete, finish and the seen list refuse
@@ -958,7 +961,7 @@ def scen_lastcheck():
     w = world('lastcheck', with_file=False); d = w.d
     base = catalog(d.c); rows0 = sums(d)
     text = text_of(FILE)
-    broken = text.replace("     or _p::text ~ '^fv_private\\.bulletin_file_(upload|read)_allowed\\(' then", "     or _p::text ~ '^fv_private\\.bulletin_file_upload_allowed\\(' then")
+    broken = text.replace("     or _p::text ~ '^fv_private[.]bulletin_file_(upload|read)_allowed[(]' then", "     or _p::text ~ '^fv_private[.]bulletin_file_upload_allowed[(]' then")
     ok('lastcheck: (setup) the grant of the read helper is taken out of the copy', broken != text)
     r = d.statements(split(broken))
     ok('lastcheck: without the read helper\'s grant the last check stops the file', r.startswith('STOPPED') and 'did not come out as written' in r, r)
@@ -1034,7 +1037,83 @@ def scen_collations():
             d.close()
     ok('collations: every fingerprint is identical under ICU en-US and C', seen.get('icu') == seen.get('c') and len(seen) == 2, seen)
 
-SCENARIOS_MORE = {'collations': scen_collations, 'm2': scen_m2, 'locks': scen_locks, 'lastcheck': scen_lastcheck, 'spentkey': scen_spentkey}
+# ── route: the file holds nothing the apply route rewrites; the hidden-character class is the same ───────
+OLD_CLASS = '[​-‏‪-‮⁠-⁩﻿]'   # the real characters, as the route delivered them
+NEW_CLASS_SQL = "('[' || chr(8203) || '-' || chr(8207) || chr(8234) || '-' || chr(8238) || chr(8288) || '-' || chr(8297) || chr(65279) || ']')"
+
+def scen_route():
+    """No backslash-u escape and no byte outside printable ASCII in the four files; the chr() class refuses exactly what
+    the old escaped class refused, for every code point to U+FFFF, on ICU en-US and on C; post and edit still refuse."""
+    for rel in (FILE, PRE, POST, UNDO):
+        t = open(os.path.join(HERE, rel), 'rb').read()
+        ok('route: %s is printable ASCII and newlines only' % rel, all(b == 10 or 32 <= b <= 126 for b in t), [i for i, b in enumerate(t) if not (b == 10 or 32 <= b <= 126)][:5])
+        ok('route: %s has no backslash-u escape' % rel, not re.search(rb'\\u[0-9a-fA-F]{4}|\\u\{', t))
+    ok('route: the file builds the class with chr()', NEW_CLASS_SQL in text_of(FILE))
+    for name, tpl in (('icu', None), ('c', C_TEMPLATE or None)):
+        if name == 'c' and not C_TEMPLATE: continue
+        d = Db('b1a_route_' + name, template=tpl)
+        try:
+            diff = d.all("""select c from generate_series(1, 65535) c
+                             where c not between 55296 and 57343
+                               and (('https://e.org/a' || chr(c) || 'b') ~ :old) is distinct from (('https://e.org/a' || chr(c) || 'b') ~ %s)""" % NEW_CLASS_SQL, old=OLD_CLASS)
+            n = d.one("select count(*) from generate_series(1, 65535) c where c not between 55296 and 57343 and ('x' || chr(c)) ~ %s" % NEW_CLASS_SQL)
+            ok('route %s: for every code point U+0001 to U+FFFF (no surrogates) the new class refuses exactly what the old one did' % name, diff == [], diff[:10])
+            ok('route %s: it matches the 21 hidden characters, no more' % name, n == 21, n)
+        finally:
+            d.close()
+    w = world('route'); d = w.d
+    for cp in (0x202e, 0x200b, 0xfeff):
+        url = 'https://example.org/a' + chr(cp) + 'b'
+        r = err(d, lambda: post(w, {'kind': 'announcement', 'link_url': url}))
+        ok('route: post refuses U+%04X in a link (22023)' % cp, code(r) == '22023', r)
+        bid = post(w, {'kind': 'announcement', 'body': 'x'})['bulletin']['id']
+        r = err(d, lambda: edit(w, bid, {'link_url': url}))
+        ok('route: edit refuses U+%04X in a link (22023)' % cp, code(r) == '22023', r)
+    ok('route: a plain link is still taken', post(w, {'kind': 'announcement', 'link_url': 'https://example.org/ab'})['bulletin']['link_url'] == 'https://example.org/ab')
+    d.close()
+
+# ── named: the last check names each part that did not come out ───────────────────────────────────────
+PARTS = ['functions', 'policies', 'bucket', 'helper grants', 'function grants', 'table grants']
+def scen_named():
+    w = world('named', with_file=False); d = w.d
+    base = catalog(d.c); rows0 = sums(d)
+    text = text_of(FILE); mark = '-- 9. Everything came out as written'
+    def extra(sql): return text.replace(mark, sql + '\n' + mark, 1)
+    trips = [
+        ('functions', [('select p_pinned and (p_until', 'select p_pinned  and (p_until')]),
+        ('policies', None, "create policy fv_extra on storage.objects for select to authenticated using (false);"),
+        ('bucket', [("values ('bulletin-files', 'bulletin-files', false, 2097152,", "values ('bulletin-files', 'bulletin-files', false, 2097153,")]),
+        ('helper grants', [("bulletin_file_(upload|read)_allowed[(]' then", "bulletin_file_upload_allowed[(]' then")]),
+        ('function grants', None, "grant execute on function public.list_bulletins(uuid) to anon;"),
+        ('table grants', None, "grant select on public.bulletin_seen to authenticated;"),
+    ]
+    def run(name, src, want):
+        r = d.statements(split(src))
+        ok('named: %s: the last check stops the file' % name, r.startswith('STOPPED') and 'did not come out as written' in r, r)
+        msg = r.split('STOPPED: ')[-1].split(' did not come out')[0]
+        named = [p for p in PARTS if re.search(r'(^|, )%s( |,|$)' % re.escape(p), msg)]
+        ok('named: %s: the message names exactly %s' % (name, want), named == want, msg)
+        ok('named: %s: nothing is left behind, the bucket row included' % name, catalog(d.c) == base and sums(d) == rows0
+           and d.one("select count(*) from storage.buckets where id = :b", b=BUCKET) == 0, differences(base, catalog(d.c)))
+        return msg
+    for t in trips:
+        name = t[0]
+        src = text
+        if t[1]:
+            for a, b in t[1]:
+                ok('named: %s: (setup) the copy is changed' % name, a in src, a); src = src.replace(a, b, 1)
+        else:
+            src = extra(t[2])
+        msg = run(name, src, [name])
+        if name == 'functions':
+            fp = re.search(r'fp:own ([0-9a-f]{32})', msg)
+            ok('named: functions: the message gives the computed fp:own, not the expected one', fp is not None and fp.group(1) != file_fps()['own'][0], msg)
+    src = extra("grant select on public.bulletin_seen to authenticated;").replace("false, 2097152,", "false, 2097153,", 1)
+    run('two at once', src, ['bucket', 'table grants'])
+    r = d.file(FILE); ok('named: the file as written applies', r == 'ok', r)
+    d.close()
+
+SCENARIOS_MORE = {'collations': scen_collations, 'route': scen_route, 'named': scen_named, 'm2': scen_m2, 'locks': scen_locks, 'lastcheck': scen_lastcheck, 'spentkey': scen_spentkey}
 
 SCENARIOS = {'post': scen_post, 'edit': scen_edit, 'delete': scen_delete, 'counts': scen_counts, 'others': scen_others,
              'storage': scen_storage, 'cascade': scen_cascade, 'limits': scen_limits, 'race': scen_race, 'defaults': scen_defaults,
