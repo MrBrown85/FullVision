@@ -1345,6 +1345,10 @@
       full: function (sid) {
         return _full(s, sid) + (_two() ? AddWorkTwoClasses.label(s, sid) : '');
       },
+      // The name alone, without its class: for "Two students are named …".
+      name: function (sid) {
+        return _full(s, sid);
+      },
       // Split the Scan with two classes: both lists, each name with its class.
       split: function () {
         return _two() ? AddWorkTwoClasses.splitOpts(s, _ctx) : null;
