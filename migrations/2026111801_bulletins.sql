@@ -1,20 +1,19 @@
 -- Bulletins, the teacher's side (2026-11-17). Not applied: needs Colin's OK.
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY OR FUNCTION. It adds four
--- empty tables (bulletin, bulletin_file, bulletin_seen, bulletin_reaction: row
--- security on, no policy, no grant), the private bucket bulletin-files with
--- four storage policies, and seven functions for a signed-in teacher, one of
--- which, delete_bulletin, DELETES a bulletin and what students did on it.
+-- empty tables (row security on, no policy, no grant), the private bucket
+-- bulletin-files with four storage policies, and seven teacher functions;
+-- delete_bulletin DELETES a bulletin and what students did on it.
 -- Contract, tests, checks, undo: local-test/bulletins-*. Stops with nothing
 -- changed unless what it relies on is as tested. Adds one row, the bucket's.
--- Locks course, enrollment, assessment, storage.objects a moment (5 s at most).
--- One transaction. A second run changes nothing; it is refused once a later
--- file has changed one of its functions or a column of its tables.
--- Fingerprints sort with collate "C": live sorts text by ICU en-US, so an order
--- by the server's collation would give another md5 there.
+-- Locks course, enrollment, assessment, storage.objects (5 s at most). One
+-- transaction. A second run changes nothing; it is refused once a later file
+-- has changed one of its functions or a column of its tables.
+-- Fingerprints sort with collate "C" (live sorts text by ICU en-US). Plain
+-- ASCII, no backslash-u escapes: the apply route rewrites those.
 -- Accepts: until B1b teaches the removal worker this bucket, a queued page is
 -- handed out on every run, the hourly call logs an error, and
 -- photo_lifecycle_nightly RAISES once one has waited six hours. A page is
--- queued only when a bulletin with a file is deleted, which no released app does.
+-- queued only when a bulletin with a file is deleted (no released app does).
 
 begin;
 
@@ -36,14 +35,14 @@ begin
       raise exception '% is missing or not the definition this file was tested against. Nothing was changed.', _f.fn;
     end if;
   end loop;
-  -- Its function names in public and fv_private: none, or exactly this file's (one md5, bulletins.py writes it).
+  -- Its functions (public, fv_private): none, or exactly this file's.
   perform set_config('fv.b1a', 'bulletin_file_path,bulletin_file_path_parts,bulletin_file_upload_allowed,bulletin_file_read_allowed,'
     || 'bulletin_audience,bulletin_pinned_now,bulletin_json,bulletin_patched,bulletin_drop_expired,bulletin_student_same_class,'
     || 'bulletin_file_removed,list_bulletins,post_bulletin,finish_bulletin_file,edit_bulletin,delete_bulletin,list_bulletin_seen,show_bulletin_again', true);
   select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
    into _c from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
     and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace);
-  if _c is distinct from null and _c is distinct from 'f1e9a1ee924a1d33eded50b75333f810' then -- fp:own
+  if _c is distinct from null and _c is distinct from '625965fa52170dfcdb620c6e8fb03e36' then -- fp:own
     raise exception 'functions of this file''s names are there and are not exactly this file''s. Nothing was changed.';
   end if;
   -- Its tables: none, or exactly these columns.
@@ -93,7 +92,7 @@ $guard$;
 create table if not exists public.bulletin (
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references public.course(id) on delete cascade,
-  -- M3 and M4 widen this check (drop, add not valid, validate): no row is rewritten.
+  -- M3, M4 widen it (drop, add not valid, validate).
   kind text not null constraint bulletin_kind_check check (kind in ('announcement', 'reminder')),
   body text not null default '' constraint bulletin_body_check check (char_length(body) <= 2000),
   link_url text constraint bulletin_link_check check (link_url is null or (char_length(link_url) <= 2000
@@ -104,7 +103,6 @@ create table if not exists public.bulletin (
   assessment_id uuid references public.assessment(id) on delete set null,
   reactions_on boolean not null default false,
   shown_again_at timestamptz,
-  -- Null until every file is ready.
   posted_at timestamptz,
   edited_at timestamptz,
   created_at timestamptz not null default now(),
@@ -167,7 +165,6 @@ as $function$
   select p_course_id::text || '/' || p_file_id::text || '/' || p_page::text || '.jpg';
 $function$;
 
--- A page's name's parts, or no row.
 create or replace function fv_private.bulletin_file_path_parts(p_name text)
  returns table (course_id uuid, file_id uuid, page integer) language sql immutable set search_path to 'public', 'pg_temp'
 as $function$
@@ -176,7 +173,6 @@ as $function$
   where m is not null;
 $function$;
 
--- Upload: the teacher's own file, uploading, within two hours.
 create or replace function fv_private.bulletin_file_upload_allowed(p_name text)
  returns boolean language sql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -195,7 +191,7 @@ as $function$
 $function$;
 
 -- 4. Helpers
--- Each student not withdrawn: paused, can_see (a card not stopped or expired, _card_refusal's tests) or no_card.
+-- Each student not withdrawn: paused, can_see (_card_refusal's card tests) or no_card.
 create or replace function fv_private.bulletin_audience(p_course_id uuid)
  returns table (enrollment_id uuid, roster_position integer, state text) language sql stable set search_path to 'public', 'pg_temp'
 as $function$
@@ -215,7 +211,6 @@ as $function$
   select p_pinned and (p_until is null or p_until >= (now() at time zone _fv_timezone(p_timezone))::date);
 $function$;
 
--- One bulletin, as in the contract.
 create or replace function fv_private.bulletin_json(p_id uuid)
  returns jsonb language sql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -243,7 +238,7 @@ as $function$
   where b.id = p_id;
 $function$;
 
--- A change applied, after every rule (22023). For post (no id yet: takes kind) and edit.
+-- A change applied, after every rule (22023), for post and edit.
 create or replace function fv_private.bulletin_patched(p_b public.bulletin, p_patch jsonb, p_has_files boolean)
  returns public.bulletin language plpgsql stable set search_path to 'public', 'pg_temp'
 as $function$
@@ -275,7 +270,7 @@ begin
         when 'pinned' then p_b.pinned := coalesce(_t::boolean, false);
         when 'reactions_on' then p_b.reactions_on := coalesce(_t::boolean, false);
         when 'pinned_until' then
-          if _t !~ '^\d{4}-\d\d-\d\d$' then raise exception using errcode = '22007'; end if;
+          if _t !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then raise exception using errcode = '22007'; end if;
           p_b.pinned_until := _t::date;
         else p_b.assessment_id := _t::uuid;
       end case;
@@ -289,7 +284,7 @@ begin
     when p_b.kind is null or p_b.kind not in ('announcement', 'reminder') then 'a bulletin is an announcement or a reminder'
     when char_length(p_b.body) > 2000 then 'a bulletin''s words can be 2000 characters at most'
     when char_length(p_b.link_url) > 2000 or p_b.link_url !~* '^https?://[^[:space:][:cntrl:]/?#@\\]+([/?#][^[:space:][:cntrl:]]*)?$'
-       or p_b.link_url ~ '[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]'
+       or p_b.link_url ~ ('[' || chr(8203) || '-' || chr(8207) || chr(8234) || '-' || chr(8238) || chr(8288) || '-' || chr(8297) || chr(65279) || ']')
       then 'a link must start with http:// or https:// and a host (no name or password), with no spaces or hidden characters, 2000 characters at most'
     when p_b.link_title is not null and p_b.link_url is null then 'a link''s name needs a link'
     when char_length(p_b.link_title) > 200 then 'a link''s name can be 200 characters at most'
@@ -309,7 +304,7 @@ begin
 end;
 $function$;
 
--- A class's bulletins not visible two hours after their post go, under its lock.
+-- Uploads not finished in two hours go, under the class's lock.
 create or replace function fv_private.bulletin_drop_expired(p_course_id uuid)
  returns integer language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -337,7 +332,6 @@ begin
 end;
 $function$;
 
--- A file row going, by any path, queues its pages.
 create or replace function fv_private.bulletin_file_removed()
  returns trigger language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -359,7 +353,6 @@ create or replace trigger bulletin_file_removed after delete on public.bulletin_
   for each row execute function fv_private.bulletin_file_removed();
 
 -- 6. The teacher's functions
--- A class's writes take its lock, after the idempotency key's.
 create or replace function public.list_bulletins(p_course_id uuid)
  returns jsonb language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -453,7 +446,7 @@ begin
 end;
 $function$;
 
--- Not there: an answer, not an error, so an expired upload's drop is kept.
+-- Not there: an answer, so an expired upload's drop is kept.
 create or replace function public.finish_bulletin_file(p_bulletin_file_id uuid, p_idempotency_key uuid default null)
  returns jsonb language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -647,32 +640,38 @@ begin
                and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', _p);
     -- The seven, and the two the storage policies call.
-    if _p::text ~ '^(list_bulletins|post_bulletin|finish_bulletin_file|edit_bulletin|delete_bulletin|list_bulletin_seen|show_bulletin_again)\('
-     or _p::text ~ '^fv_private\.bulletin_file_(upload|read)_allowed\(' then
+    if _p::text ~ '^(list_bulletins|post_bulletin|finish_bulletin_file|edit_bulletin|delete_bulletin|list_bulletin_seen|show_bulletin_again)[(]'
+     or _p::text ~ '^fv_private[.]bulletin_file_(upload|read)_allowed[(]' then
       execute format('grant execute on function %s to authenticated', _p);
     end if;
   end loop;
 end
 $grants$;
 
--- 9. Everything came out as written
+-- 9. Everything came out as written; a stop names each part that did not
 do $final$
-begin
-  if (select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
+declare
+  _o text := (select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
      from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
-        and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)) is distinct from 'f1e9a1ee924a1d33eded50b75333f810' -- fp:own
-   or (select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname collate "C"))
+      and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace));
+  _w text;
+begin
+  _w := concat_ws(', ',
+   case when _o is distinct from '625965fa52170dfcdb620c6e8fb03e36' -- fp:own
+    then 'functions (fp:own ' || coalesce(_o, 'none') || ')' end,
+   case when (select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname collate "C"))
       from pg_policy where polrelid = 'storage.objects'::regclass and polname ~ '^fv_bulletin_files_') is distinct from 'f47bbf23863608c3e1310969de4f36ee' -- fp:policies
-   or (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass) <> 14
-   or not exists (select 1 from storage.buckets where id = 'bulletin-files' and public = false and file_size_limit = 2097152 and allowed_mime_types = array['image/jpeg'])
-   or not has_function_privilege('authenticated', 'fv_private.bulletin_file_read_allowed(text)', 'execute')
-   or not has_function_privilege('authenticated', 'fv_private.bulletin_file_upload_allowed(text)', 'execute')
-   or exists (select 1 from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
-          and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('service_role', p.oid, 'execute')
-            or (p.prosecdef and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) s where s ~ '^search_path=(.*, )?pg_temp$'))))
-   or exists (select 1 from pg_class c, aclexplode(c.relacl) a where c.relnamespace = 'public'::regnamespace
-          and c.relname in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction') and (a.grantee = 0 or a.grantee in ('anon'::regrole, 'authenticated'::regrole, 'service_role'::regrole))) then
-    raise exception 'a function, policy, grant or the bucket did not come out as written. Nothing was changed.';
+    or (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass) <> 14 then 'policies' end,
+   case when not exists (select 1 from storage.buckets where id = 'bulletin-files' and public = false and file_size_limit = 2097152 and allowed_mime_types = array['image/jpeg']) then 'bucket' end,
+   case when not has_function_privilege('authenticated', 'fv_private.bulletin_file_read_allowed(text)', 'execute')
+    or not has_function_privilege('authenticated', 'fv_private.bulletin_file_upload_allowed(text)', 'execute') then 'helper grants' end,
+   case when exists (select 1 from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
+      and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('service_role', p.oid, 'execute')
+       or (p.prosecdef and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) s where s ~ '^search_path=(.*, )?pg_temp$')))) then 'function grants' end,
+   case when exists (select 1 from pg_class c, aclexplode(c.relacl) a where c.relnamespace = 'public'::regnamespace
+      and c.relname in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction') and (a.grantee = 0 or a.grantee in ('anon'::regrole, 'authenticated'::regrole, 'service_role'::regrole))) then 'table grants' end);
+  if _w <> '' then
+    raise exception '% did not come out as written. Nothing was changed.', _w;
   end if;
 end
 $final$;

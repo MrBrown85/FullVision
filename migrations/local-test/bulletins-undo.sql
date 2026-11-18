@@ -1,6 +1,6 @@
 -- Undo for migrations/2026111801_bulletins.sql (2026-11-17).
 --
--- ── PART 1, the fast stop (deletes nothing) ─────────────────────────────────
+-- PART 1, the fast stop (deletes nothing)
 -- Takes the seven teacher functions away from signed-in teachers (revokes
 -- execute from authenticated). Every bulletin, file, seen and reaction row is
 -- kept, and so is every page in storage. The app's Bulletins page then gets
@@ -22,7 +22,7 @@
 -- (Running the migration file again also restates them, but only while none
 -- of its functions or tables has been changed by a later file.)
 --
--- ── PART 2, the full removal: the rest of this file ─────────────────────────
+-- PART 2, the full removal: the rest of this file
 -- Drops the four policies, the four tables and the eighteen functions, and
 -- deletes the bucket's row. It STOPS WITH NOTHING CHANGED while any function
 -- outside this file's own (M2's student_submit functions, say) names a
@@ -83,7 +83,7 @@ begin
   end if;
   select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
     into _c from pg_proc p where p.oid in (select oid from b1a_own);
-  if _c is distinct from null and _c is distinct from 'f1e9a1ee924a1d33eded50b75333f810' then -- fp:own
+  if _c is distinct from null and _c is distinct from '625965fa52170dfcdb620c6e8fb03e36' then -- fp:own
     raise exception 'a function of 2026111801 is not as it left it: a later change would be lost. Nothing was changed; if PART 1 ran, give teachers the functions back with the seven grants in this file''s header.';
   end if;
   if to_regclass('public.bulletin') is not null then
