@@ -7,6 +7,8 @@ keywords:
   - Class Management
 checked: 2026-11-18
 labels:
+  - Bulletins
+  - Let Students React
   - Inbox
   - By Assessment
   - Grade Submissions
@@ -55,6 +57,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 18, 2026: Bulletins
+
+**Bulletins** is a new tab after Assignments: a feed of announcements and reminders for the class, posted from the laptop, from the Dashboard's Bulletins tile, or from the phone app's new fourth tab. A bulletin can hold a link, a photo or a PDF, and a reminder can stay pinned until a day and link to an assessment. Each bulletin shows how many students have seen it; select the count to see who has not. **Let Students React** lets students answer with Got It, Done or I Have a Question. On the Student Page, Bulletins is the first tab, and a class with a bulletin opens on it. Only the teacher sees who has seen a bulletin or reacted. See [Post Bulletins](post-bulletins).
 
 ## Nov 18, 2026: The Dashboard's Middle Row
 

@@ -186,6 +186,9 @@ describe('Demo Mode sends nothing from the student page', () => {
       expect(page.root().querySelector('.sp-msg').textContent).toContain('4 tries left.');
       page.type('#sp-ident', hash === '#demo-card-password' ? page.T.DEMO.password : page.T.DEMO.number);
       await page.click('[data-act="card-yes"]');
+      // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+      expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+      await page.click('.sp-tabs-bottom [data-tab="assignments"]');
       expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
       expect(page.root().querySelectorAll('.sp-row, .sp-piece').length).toBeGreaterThan(0);
       expect(page.calls).toEqual([]);

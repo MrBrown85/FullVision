@@ -33,24 +33,19 @@ const shot = async (page, name) => {
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { sendWork = true, bulletins = false, caughtUp = false } = {}) {
-  await page.addInitScript(
-    ([bulletins]) => {
-      try {
-        if (bulletins) {
-          localStorage.setItem('fv-build-bulletins', '1');
-        }
-      } catch (e) {
-        /* storage blocked */
-      }
-    },
-    [bulletins],
-  );
+async function open(page, { sendWork = true, tile = true, caughtUp = false } = {}) {
   await page.addInitScript(EXPIRING);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
   await page.evaluate(
     ([caughtUp, sendWork]) => {
       if (!sendWork) return;
@@ -221,7 +216,7 @@ test('files dropped on the tile while By Assessment shows open Add Work with eac
 
 test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Work For', async ({ page }) => {
   test.setTimeout(60_000);
-  await open(page, { caughtUp: true });
+  await open(page, { caughtUp: true, tile: false });
   const home = page.locator('#dash-inbox-caught');
   // As the top bar: work assessed and not returned is not "All Caught Up".
   await expect(page.locator('.dash-glance-tograde')).toContainText('7 Not Returned');
@@ -377,20 +372,50 @@ test('each of the three buttons opens Add Work and its file chooser', async ({ p
     await page.evaluate(() => AddWorkClass.close());
     await expect(awc).toHaveCount(0);
   }
-  // With the keyboard alone: Tab to Choose Files… and press Enter.
-  await page.locator('.dash-inbox-drop-select').focus();
-  await page.keyboard.press('Tab');
-  await expect(page.locator('.dash-inbox-drop-pick').first()).toBeFocused();
-  const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
-  await page.keyboard.press('Enter');
-  await chooser;
-  await expect(awc).toBeVisible();
+  /* With the keyboard alone: Tab to Choose Files…, then Enter or Space.
+     Each opens Add Work and clicks the page's own file box, in the page and
+     inside the key's own gesture: the browser's rule for showing a chooser,
+     checked here to its door. The chooser itself is awaited for the mouse
+     above only: on a slowed machine Playwright's keyboard gets no
+     filechooser event from a bare page with one button and one file box
+     (Enter 10 times in 20, Space 4 in 20, the mouse 0 in 20, CPU slowed six
+     times, four workers), so waiting for it after a key tests Playwright. */
+  await page.evaluate(() => {
+    window.__boxClicks = [];
+    const click = HTMLInputElement.prototype.click;
+    HTMLInputElement.prototype.click = function () {
+      window.__boxClicks.push({
+        box: this.getAttribute('data-awt-input'),
+        inAddWork: !!this.closest('#add-work-class-overlay'),
+        inPage: this.isConnected,
+        gesture: navigator.userActivation.isActive,
+      });
+      // Not passed on: no chooser is left open between the keys.
+    };
+    window.__restoreClick = () => (HTMLInputElement.prototype.click = click);
+  });
+  const pick = page.locator('.dash-inbox-drop-pick').first();
+  for (const key of ['Enter', 'Space']) {
+    await page.evaluate(() => (window.__boxClicks = []));
+    await page.locator('.dash-inbox-drop-select').focus();
+    await page.keyboard.press('Tab');
+    await expect(pick).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(awc).toBeVisible();
+    await expect(awc).toContainText('Light Refraction Lab');
+    expect(await page.evaluate(() => window.__boxClicks), key).toEqual([
+      { box: 'files', inAddWork: true, inPage: true, gesture: true },
+    ]);
+    await page.evaluate(() => AddWorkClass.close());
+    await expect(awc).toHaveCount(0);
+  }
+  await page.evaluate(() => window.__restoreClick());
 });
 
 test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrolling and its icon hidden', async ({
   page,
 }) => {
-  await open(page, { bulletins: true, caughtUp: true });
+  await open(page, { caughtUp: true });
   expect(Math.round(await page.locator('#dash-inbox').evaluate(el => el.getBoundingClientRect().height))).toBe(299);
   const m = await page.evaluate(() => {
     const list = document.getElementById('dash-inbox-list');
@@ -411,7 +436,7 @@ test('with the Bulletins tile showing a file over it is refused, the cover is as
   page,
 }) => {
   await page.clock.install();
-  await open(page, { bulletins: true });
+  await open(page);
   await expect(page.locator('.dash-bulletins-tile')).toBeVisible();
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
   await namedFiles(page, LIGHT);

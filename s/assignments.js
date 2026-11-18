@@ -64,7 +64,11 @@
       var feedback = typeof StudentPage.feedbackOf === 'function' ? StudentPage.feedbackOf(state) : null;
       // Group work (S12-F1): counts only, Demo Mode's until the server sends `group_work`.
       var groups = typeof StudentPage.groupOf === 'function' ? StudentPage.groupOf(state) : null;
-      return StudentView.fromPage(reply, state.page, work, feedback, groups);
+      var view = StudentView.fromPage(reply, state.page, work, feedback, groups);
+      // Bulletins (s/bulletins.js): only with the build switch on and the server's answer in; else no tab.
+      var bulletins = typeof StudentPage.bulletinsOf === 'function' ? StudentPage.bulletinsOf(state) : null;
+      if (bulletins) view.bulletins = bulletins;
+      return view;
     } catch (e) {
       return null;
     }
@@ -91,6 +95,10 @@
       handoutPiece: state.handoutPiece,
       handoutPage: state.handoutPage,
       handoutPages: state.handoutPages,
+      // A bulletin's file open full size (s/bulletins-view.js), and "2 new" by class in Switch Class.
+      bulletinFile: state.bulletinFile,
+      bulletinPage: state.bulletinPage,
+      classNews: typeof StudentPage.bulletinNews === 'function' ? StudentPage.bulletinNews(state) : null,
       form: state.form,
       // Settings (the gear) and what it holds: Text Size, and the classes Switch Class lists.
       settings: state.settings,

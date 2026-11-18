@@ -107,18 +107,14 @@ describe('the row', () => {
     }
   });
 
-  it('splits the column only with the bulletins flag on and DashBulletins built', () => {
-    window.DashBulletins = { html: () => '<section id="stub-bulletins"></section>', destroy: () => {} };
-    // Built, flag off: the Inbox has the whole column.
-    let html = DashOverview.renderOverviewPanel(opts());
-    expect(html).not.toContain('stub-bulletins');
-    expect(html).not.toContain('has-bulletins');
-    // Flag on, not built: the same.
+  it('splits the column when DashBulletins is built (Bulletins on since B1g), and only then', () => {
+    // Not built: the Inbox has the whole column.
     delete window.DashBulletins;
-    setFlags({ bulletins: true });
-    html = DashOverview.renderOverviewPanel(opts());
+    let html = DashOverview.renderOverviewPanel(opts());
     expect(html).not.toContain('has-bulletins');
-    // Both: the split.
+    // An old fv-build-bulletins key of 0 changes nothing: built, the split.
+    setFlags({});
+    localStorage.setItem('fv-build-bulletins', '0');
     window.DashBulletins = { html: () => '<section id="stub-bulletins"></section>', destroy: () => {} };
     html = DashOverview.renderOverviewPanel(opts());
     expect(html).toContain('dash-row-left has-bulletins');

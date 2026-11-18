@@ -244,7 +244,9 @@ export function sampleCard(today, more) {
  * there is its revision request, which revise-finish and revise-unsend
  * change); state.groupWork what `group-work` answers. With `sendWork`,
  * revise-start, revise-finish, revise-unsend and group-links run over the
- * send world's submissions and bucket.
+ * send world's submissions and bucket. Bulletins: state.bulletins is what
+ * `bulletins` answers, else a class with nothing posted (the route is
+ * deployed, so a real card asks it beside `page`).
  */
 export function fakeStudentSubmit(opts = {}) {
   const now = opts.now || (() => Date.now());
@@ -654,6 +656,11 @@ export function fakeStudentSubmit(opts = {}) {
           return found.error
             ? no(found.error)
             : clone(state.forms || { ok: true, v: 1, questionnaires: [], reports: [] });
+        }
+        // Bulletins (B1b, deployed): what state.bulletins holds, else a class with nothing posted.
+        if (fn === 'bulletins') {
+          const found = inSession(params[0], params[1]);
+          return found.error ? no(found.error) : clone(state.bulletins || { ok: true, bulletins: [], new: [] });
         }
         // Batch C's `feedback`: what state.feedback holds, else a class with no marks and Reflect on Feedback off.
         if (fn === 'feedback') {

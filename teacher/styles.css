@@ -3055,6 +3055,19 @@ body.offline-active #app-dock {
   }
 }
 
+/* ── Top tabs under 1100 px ────────────────────────────────
+   Six tabs since Bulletins (B1g). At their full size the centred row ran
+   into the Demo Mode pill on its left from 1099 px down in a wide font (the
+   stand-in for CI's, e2e/wide-font.js), so here they are a size smaller
+   with 8 px sides. An iPad upright has its own (teacher/tablet.css). */
+@media (max-width: 1099px) {
+  .tb-seg .tb-seg-link {
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: var(--text-sm);
+  }
+}
+
 /* ── Top tabs on a phone ───────────────────────────────────
    The five tabs don't fit beside the sidebar button, sync dot and account
    button at phone width, and the centred row ran under both ends. Under

@@ -32,6 +32,8 @@ async function demo(hash) {
   await page.submit('form[data-form="card"]');
   page.type('#sp-ident', page.T.DEMO.number);
   await page.click('[data-act="card-yes"]');
+  // The sample class has bulletins, so the page opens on Bulletins (B1g); these tests start on Assignments.
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
   return page;
 }
 
@@ -45,8 +47,8 @@ async function real(card) {
   return { page, fn };
 }
 
-describe('the three tabs', () => {
-  it('Assignments, My Learning and Reflect, the first one current', async () => {
+describe('the four tabs', () => {
+  it('Bulletins, Assignments, My Learning and Reflect; Assignments current once pressed', async () => {
     const page = await demo();
     // Drawn twice: in the header for a Chromebook, along the bottom for a phone; page-view.css shows one.
     expect(page.root().querySelector('.sp-tabs-top').tagName).toBe('NAV');
@@ -55,12 +57,18 @@ describe('the three tabs', () => {
     );
     const tabs = [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')];
     expect(tabs.map(t => t.querySelector('.sp-tab-label').textContent)).toEqual([
+      'Bulletins',
       'Assignments',
       'My Learning',
       'Reflect',
     ]);
-    expect(tabs.map(t => t.getAttribute('data-tab'))).toEqual(['assignments', 'learning', 'questionnaires']);
-    expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual(['page', null, null]);
+    expect(tabs.map(t => t.getAttribute('data-tab'))).toEqual([
+      'bulletins',
+      'assignments',
+      'learning',
+      'questionnaires',
+    ]);
+    expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual([null, 'page', null, null]);
     // No Reports tab any more.
     expect(page.root().querySelector('[data-tab="reports"]')).toBeNull();
   });
@@ -86,7 +94,33 @@ describe('the three tabs', () => {
     expect(page.calls.length).toBe(asked);
   });
 
-  it('a tab that is not one of the three opens nothing, not even the old Reports', async () => {
+  it('the sample class has bulletins, so it opens on Bulletins, first in the bar (docs/plans/bulletins-plan.md B1d)', async () => {
+    const page = openStudentPage();
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    const tabs = [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')];
+    expect(tabs.map(t => t.querySelector('.sp-tab-label').textContent)).toEqual([
+      'Bulletins',
+      'Assignments',
+      'My Learning',
+      'Reflect',
+    ]);
+    expect(tabs.map(t => t.getAttribute('data-tab'))).toEqual([
+      'bulletins',
+      'assignments',
+      'learning',
+      'questionnaires',
+    ]);
+    // The sample class has bulletins: it opens on them.
+    expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual(['page', null, null, null]);
+    expect(page.root().querySelector('.sp-tabs-top').innerHTML.replace('sp-tabs-top', '')).toBe(
+      page.root().querySelector('.sp-tabs-bottom').innerHTML.replace('sp-tabs-bottom', ''),
+    );
+  });
+
+  it('a tab that is not one of the four opens nothing, not even the old Reports', async () => {
     const page = await demo();
     const tab = page.root().querySelector('[data-tab="questionnaires"]');
     tab.setAttribute('data-tab', 'reports');

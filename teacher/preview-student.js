@@ -45,8 +45,93 @@ window.PreviewStudent = (function () {
      My Learning is worked out as if the class showed it, for this preview
      only: nothing is saved, and every other screen reads the class as it is. */
   function _fromCache(cid, sid) {
-    return StudentView.fromCache(cid, sid, { learning: !!(_open && _open.learning) });
+    var built = StudentView.fromCache(cid, sid, { learning: !!(_open && _open.learning) });
+    var bulletins = built && built.ready && built.view ? _bulletinsOf(cid) : null;
+    if (bulletins) built.view.bulletins = bulletins;
+    return built;
   }
+
+  /* Bulletins (docs/plans/bulletins-plan.md B1d), with the build switch on
+     and the class's bulletins read (shared/data-bulletins.js): the ones
+     students are sent, oldest first, in the shape s/bulletins-view.js draws,
+     with nothing of the class's Seen counts or reactions. The preview sends
+     nothing, a Seen mark included, so every bulletin is drawn as seen (no
+     New line) and the reactions as nobody's. */
+  function _bulletinsOf(cid) {
+    if (typeof BuildFlags === 'undefined' || !BuildFlags.on('bulletins')) return null;
+    if (typeof StudentBulletinsView === 'undefined' || typeof getBulletins !== 'function') return null;
+    if (typeof bulletinsOffered !== 'function' || !bulletinsOffered(cid)) return null;
+    var list = (getBulletins(cid) || [])
+      .filter(function (b) {
+        return b && b.visible && b.posted_at && !isNaN(Date.parse(b.posted_at));
+      })
+      .sort(function (a, b) {
+        return Date.parse(a.posted_at) - Date.parse(b.posted_at) || (a.id < b.id ? -1 : 1);
+      })
+      .map(function (b) {
+        return {
+          id: b.id,
+          kind: b.kind,
+          body: b.body,
+          link_url: b.link_url,
+          link_title: b.link_title,
+          pinned: b.pinned,
+          pinned_until: b.pinned_until,
+          assessment_id: b.assessment_id,
+          reactions_on: b.reactions_on,
+          posted_at: b.posted_at,
+          edited_at: b.edited_at,
+          files: (b.files || [])
+            .filter(function (f) {
+              return f.status === 'ready';
+            })
+            .map(function (f) {
+              return { id: f.id, kind: f.kind, title: f.title, page_count: f.page_count };
+            }),
+          seen: true,
+          fresh: false,
+          reaction: null,
+        };
+      });
+    return { list: list, pictures: (_open && _open.bltPictures) || {}, now: Date.now(), preview: true };
+  }
+
+  // A bulletin's file as the class's store holds it, for its pictures.
+  function _bulletinFile(cid, fid) {
+    var out = null;
+    (typeof getBulletins === 'function' ? getBulletins(cid) : []).forEach(function (b) {
+      (b.files || []).forEach(function (f) {
+        if (f.id === fid) out = f;
+      });
+    });
+    return out;
+  }
+
+  /* A bulletin file's pages as the student sees them: getBulletinPage, the
+     teacher's own reader (Demo Mode's pictures, or a signed link). Kept
+     while the preview is open, let go when it closes. */
+  var _bltSource = {
+    known: function (fid, i) {
+      var p = _open && _open.bltPictures && _open.bltPictures[fid];
+      return (p && p[i]) || '';
+    },
+    load: function (fid, i) {
+      var mine = _open;
+      var f = mine ? _bulletinFile(mine.cid, fid) : null;
+      if (!f || typeof getBulletinPage !== 'function') return Promise.resolve('');
+      return Promise.resolve(getBulletinPage(mine.cid, f, Number(i) || 0)).then(
+        function (o) {
+          if (!o || !o.url || _open !== mine) return '';
+          mine.bltPictures = mine.bltPictures || {};
+          (mine.bltPictures[fid] = mine.bltPictures[fid] || [])[i] = o.url;
+          return o.url;
+        },
+        function () {
+          return '';
+        },
+      );
+    },
+  };
 
   function _student(cid, sid) {
     return (getStudents(cid) || []).find(function (s) {
@@ -307,6 +392,8 @@ window.PreviewStudent = (function () {
       if (e.key === 'Escape') {
         // Escape over a handout file closes the file (shared/handout-viewer.js), not the preview.
         if (typeof HandoutViewer !== 'undefined' && HandoutViewer.isOpen()) return;
+        // Escape over a bulletin link's question closes the question (shared/website-ask.js).
+        if (document.querySelector('.sp-bulletin-ask')) return;
         e.preventDefault();
         e.stopPropagation();
         // Escape over the student page's Settings or Log Out? closes that, as on the student's device.
@@ -340,6 +427,13 @@ window.PreviewStudent = (function () {
     if (typeof window.addEventListener === 'function') window.addEventListener('popstate', _onLeave);
     document.body.appendChild(el);
     _draw();
+    // Bulletins, with the build switch on: the class's are read, and the device drawn again when they are.
+    if (typeof BuildFlags !== 'undefined' && BuildFlags.on('bulletins') && typeof refreshBulletins === 'function') {
+      var opened = _open;
+      Promise.resolve(refreshBulletins(cid)).then(function () {
+        if (_open === opened) _drawScreen();
+      });
+    }
     var start = el.querySelector('[data-ps-close]');
     if (start) start.focus();
     return true;
@@ -350,6 +444,7 @@ window.PreviewStudent = (function () {
     var was = _open;
     _open = null;
     if (typeof HandoutViewer !== 'undefined') HandoutViewer.close();
+    if (typeof WebsiteAsk !== 'undefined') WebsiteAsk.close();
     if (was) {
       _letGo(was);
       (was.carReleases || []).forEach(function (release) {
@@ -385,6 +480,8 @@ window.PreviewStudent = (function () {
       return;
     }
     if (act === 'handout-file') return _openFile(el);
+    // A bulletin's link asks first, as on the student's phone (shared/website-ask.js); a reaction sends nothing here.
+    if (act === 'bulletin-link') return _askLink(built.view, el);
     var out = StudentPageView.press(_open.ui, built.view, act, el);
     if (!out) return;
     _open.ui = out.ui;
@@ -397,6 +494,25 @@ window.PreviewStudent = (function () {
     _drawScreen(out.focus);
     // Settings slides in on the drawing that opens it, as on the student's device.
     if (out.slide && _overlay()) StudentPageView.slideIn(_overlay());
+  }
+
+  function _askLink(view, el) {
+    var id = (el && el.getAttribute('data-bulletin')) || '';
+    var b = ((view && view.bulletins && view.bulletins.list) || []).filter(function (x) {
+      return x.id === id;
+    })[0];
+    var l = b && typeof StudentBulletinsView !== 'undefined' ? StudentBulletinsView.linkOf(b.link_url) : null;
+    if (!l || typeof WebsiteAsk === 'undefined') return;
+    var box = WebsiteAsk.open({
+      host: document.body,
+      url: l.href,
+      cls: 'sp-bulletin-ask',
+      backdrop: true,
+      cancelFirst: true,
+      focus: 'no',
+      returnTo: el,
+    });
+    if (box) StudentBulletinsView.placeAsk(box, el);
   }
 
   /* ── A handout file (a web page, a text file or an EPUB) ───── */
@@ -571,6 +687,23 @@ window.PreviewStudent = (function () {
     StudentPageView.settle(screen);
     if (typeof StudentPageCarousel !== 'undefined') {
       StudentPageCarousel.attach(screen, _carSource, { scrollRoot: screen });
+    }
+    if (typeof StudentBulletinsView !== 'undefined') {
+      StudentBulletinsView.attach(screen, _bltSource, { scrollRoot: screen });
+      StudentBulletinsView.fitViewer(screen, { scrollRoot: screen });
+      StudentBulletinsView.fitTabs(screen);
+      // A bulletin's page open full size: drawn again once its picture is here.
+      var ui = _open.ui || {};
+      if (ui.bulletinFile && !screen.querySelector('.sp-bulletin-viewer-img')) {
+        var mine = _open;
+        var fid = ui.bulletinFile;
+        var pg = Number(ui.bulletinPage) || 0;
+        _bltSource.load(fid, pg).then(function (url) {
+          if (url && _open === mine && mine.ui.bulletinFile === fid && Number(mine.ui.bulletinPage) === pg) {
+            _drawScreen('#sp-bulletin-viewer-title');
+          }
+        });
+      }
     }
   }
 

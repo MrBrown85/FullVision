@@ -33,6 +33,15 @@ export const LISTED = [
   'migrations/local-test/bulletins-student-live-precheck.sql',
   'migrations/local-test/bulletins-student-live-postcheck.sql',
   'migrations/local-test/bulletins-student-undo.sql',
+  'migrations/local-test/quizzes-live-precheck.sql',
+  'migrations/local-test/quizzes-live-postcheck.sql',
+  'migrations/local-test/quizzes-undo.sql',
+  'migrations/local-test/quiz-results-live-precheck.sql',
+  'migrations/local-test/quiz-results-live-postcheck.sql',
+  'migrations/local-test/quiz-results-undo.sql',
+  'migrations/local-test/quizzes-student-live-precheck.sql',
+  'migrations/local-test/quizzes-student-live-postcheck.sql',
+  'migrations/local-test/quizzes-student-undo.sql',
 ];
 
 const BS = String.fromCharCode(92);
@@ -62,6 +71,9 @@ describe('migration files reach PostgreSQL as written', () => {
   it('finds the dated files and the listed checks', () => {
     expect(dated).toContain('migrations/2026111801_bulletins.sql');
     expect(dated).toContain('migrations/2026111803_bulletins_student.sql');
+    expect(dated).toContain('migrations/2026111804_quizzes.sql');
+    expect(dated).toContain('migrations/2026111805_quiz_results.sql');
+    expect(dated).toContain('migrations/2026111806_quizzes_student.sql');
     for (const f of LISTED) expect(() => readFileSync(join(root, f))).not.toThrow();
   });
 

@@ -1,0 +1,420 @@
+/* The Quiz card on the assessment form (teacher/quiz-builder.js, slice Q2b;
+   board "Quizzes Artboard", Board 1). The app's tokens only, so it follows
+   light and dark. Nothing here sets display on an element that can carry
+   `hidden`. Motion is the list's 200 ms glide, drawn in the script and left
+   out under Reduce Motion. */
+
+.quiz-card {
+  display: grid;
+  gap: 12px;
+}
+.quiz-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.quiz-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.quiz-head-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.quiz-head-btns .btn {
+  min-height: 44px;
+}
+.quiz-lead {
+  margin: 0;
+}
+.quiz-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1180px) {
+  .quiz-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.quiz-main {
+  min-width: 0;
+}
+
+/* The questions. */
+.quiz-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.quiz-item {
+  min-width: 0;
+}
+.quiz-row {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.quiz-row:hover {
+  background: var(--overlay-hover);
+}
+.quiz-row-num {
+  font-weight: 700;
+  color: var(--text-2);
+}
+.quiz-row-prompt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quiz-row-pts {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.quiz-row-bad,
+.quiz-err {
+  color: var(--danger);
+}
+.quiz-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.quiz-stale-acts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.quiz-stale-acts .btn {
+  min-height: 44px;
+}
+.quiz-err {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.quiz-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.quiz-chip.is-none {
+  background: transparent;
+  color: var(--text-2);
+}
+.quiz-chip-code {
+  font-weight: 700;
+}
+
+/* An open question: Reflect's card, with a right answer, points and a competency. */
+.quiz-edit {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--active);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.quiz-edit .rb-q-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.quiz-edit .rb-tools {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+}
+.quiz-edit .rb-tool {
+  width: 44px;
+  height: 44px;
+}
+.quiz-edit .rb-kind {
+  min-height: 36px;
+}
+.quiz-prompt {
+  font-weight: 600;
+}
+.quiz-choices {
+  display: grid;
+  gap: 6px;
+}
+.quiz-choice {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+.quiz-key {
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+  accent-color: var(--active);
+  cursor: pointer;
+}
+.quiz-x {
+  width: 44px;
+  height: 44px;
+}
+.quiz-x:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.quiz-add-choice {
+  justify-self: start;
+  min-height: 44px;
+}
+.quiz-multi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.quiz-multi .cm-hint {
+  margin: 0;
+}
+.quiz-tf {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.quiz-tf-opt,
+.quiz-sees-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.quiz-number {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.quiz-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.quiz-field .af-label {
+  margin: 0;
+}
+.quiz-num {
+  width: 140px;
+}
+.quiz-range {
+  margin: 0;
+}
+.quiz-foot {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.quiz-field-tag {
+  flex: 1 1 240px;
+}
+.quiz-field-points .quiz-points {
+  width: 80px;
+}
+.quiz-done {
+  min-height: 44px;
+  margin-left: auto;
+}
+.quiz-input {
+  min-height: 40px;
+}
+
+/* Beside the questions: Evidence by Competency and Quiz Settings. */
+.quiz-side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.quiz-side-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.quiz-side-card .cm-hint {
+  margin: 0;
+}
+.quiz-side-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.quiz-ev-row {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--divider-subtle);
+  font-size: var(--text-sm);
+}
+.quiz-ev-what {
+  font-weight: 600;
+  color: var(--text);
+}
+.quiz-ev-what.is-none {
+  color: var(--text-2);
+}
+.quiz-ev-count {
+  color: var(--text-2);
+}
+.quiz-ev-thin {
+  color: var(--text);
+}
+.quiz-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.quiz-set-row .rb-switch {
+  flex: 0 0 auto;
+}
+.quiz-seg .seg-btn {
+  min-height: 36px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.quiz-sees {
+  display: grid;
+  gap: 6px;
+  border: 0;
+  margin: 6px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.quiz-sees legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.quiz-sees-opt {
+  border: 0;
+  padding: 0;
+}
+
+/* The Student Work card with a fourth answer: the answers go under the
+   question and wrap as a group, so the question never narrows to a word a line. */
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .af-work-answer {
+  align-items: flex-start;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .af-work-seg {
+  flex-wrap: wrap;
+  height: auto;
+}
+/* When the four answers do not fit on one line they wrap as whole answers,
+   each its own segment on the track's colour, never one track broken across
+   two lines. */
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .af-work-seg {
+  background: transparent;
+  padding: 0;
+  gap: 6px;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .seg-btn {
+  background: var(--seg-track);
+  padding: 7px 14px;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .seg-btn[aria-checked='true'] {
+  background: var(--seg-thumb);
+}
+/* While the saved quiz is read, the answers wait, with nothing moving. */
+.af-card-work[aria-busy='true'] .af-work-seg,
+.quiz-work[aria-busy='true'] .af-work-seg {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.quiz-not-offered {
+  margin: 0;
+  max-width: 420px;
+}
+
+/* Can Students Send After …?: the Student Work card's own row, stacked to fit beside the questions. */
+.quiz-side .af-work-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+}
+.quiz-side .af-work-answer {
+  align-items: flex-start;
+}
+.quiz-side .af-work-seg .seg-btn {
+  padding: 0 10px;
+}
+
+/* Preview as a Student: a phone's width, nothing to press. */
+.quiz-preview {
+  display: grid;
+  gap: 8px;
+}
+.quiz-pv-phone {
+  max-width: 390px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg);
+}
+.quiz-pv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.quiz-pv-q {
+  display: grid;
+  gap: 4px;
+}
+.quiz-pv-pts {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}

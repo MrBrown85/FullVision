@@ -85,6 +85,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/page-view.js',
       // A handout's pages on a card still to do, to swipe through (Nov 17).
       's/page-carousel.js',
+      // Bulletins, the first tab, drawn (docs/plans/bulletins-plan.md B1d); nothing shows with the switch off.
+      's/bulletins-view.js',
       's/student.js',
       // A teacher-built reflection's questions (docs/plans/reflect-plan.md).
       's/question-kinds.js',
@@ -92,6 +94,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/report.js',
       // Settings (the gear): Text Size's words and the keys over its sheets; nothing stored or sent.
       's/settings.js',
+      // What the student has looked at, the rule returned work and bulletins share.
+      's/seen-watch.js',
       's/app.js',
       's/assignments.js',
       // Sending work (S5-F2); it fetches shared/photo-shrink.js only when a send opens.
@@ -99,11 +103,15 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       // The teacher's Mark Up on returned work (S9-F3), Demo Mode's answers until Batch C.
       's/feedback.js',
       // A handout file (a web page, a text file or an EPUB) opened over the page, sealed (2026111706).
+      // "Open this website in a new tab?", asked by a handout's link and a bulletin's.
+      'shared/website-ask.js',
       'shared/handout-viewer.js',
       // Handouts and Links: a handout's pages, opened in the page (2026111170).
       's/handouts.js',
       // Reflect on Feedback (S10-F1 and F2), Demo Mode only until Batch C.
       's/reflect.js',
+      // Bulletins: asking, Seen, reactions, a file's pages; only with the build switch on.
+      's/bulletins.js',
     ]);
     const page = openStudentPage();
     expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');
@@ -208,6 +216,9 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     expect(yes.hasAttribute('disabled')).toBe(true);
     expect(page.root().querySelector('#sp-ident').getAttribute('value')).toBe(page.T.DEMO.number);
     await page.settle();
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect((await row(page, 'Cell Microscope Lab')).result).toBe('Proficient −');
   });
@@ -219,6 +230,9 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     await page.submit('form[data-form="card"]');
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     // Every piece is listed, with its date; none that came back has a result or a level.
     const all = await rows(page);
@@ -327,6 +341,9 @@ describe('student card: the demo walk', () => {
     page.choose('#sp-bd', d);
     page.choose('#sp-by', y);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
     expect(page.root().querySelector('.sp-pill').textContent).toBe('Block B');
@@ -362,6 +379,9 @@ describe('student card: the demo walk', () => {
     );
     page.type('#sp-ident', page.T.DEMO.password);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect(page.calls).toHaveLength(0);
   });
@@ -424,6 +444,9 @@ describe('student card: wrong tries', () => {
     expect(page.root().querySelector('.sp-msg').textContent).toContain('4 tries left.');
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 });

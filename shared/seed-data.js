@@ -4252,6 +4252,8 @@ function seedIfNeeded() {
   seedDemoReflections();
   seedDemoRevisions();
   seedDemoDrafts();
+  seedDemoQuiz();
+  seedDemoQuizResults();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
@@ -4798,4 +4800,310 @@ function seedDemoBulletins() {
     seen: ids.slice(),
   });
   return saveDemoBulletinsSeed('sci8', [reminder, pdf, board]);
+}
+
+/* ── Sample quiz (Quizzes, Q2b) ────────────────────────────────────
+   The board's quiz ("Quizzes Artboard", Board 1): Data Patterns Quick
+   Check, a Draft piece of Science 8 on three competencies, its ten
+   questions, right answers and points. Made only while the quizzes build
+   switch is on, and only the first time (a device with the switch off gets
+   no new key). A Draft, so students are sent nothing and no grade moves;
+   no student has answered it. The answer key is kept apart from the
+   questions (shared/data-quizzes.js). */
+var DEMO_QUIZ_AID = 'sci8-quiz-data-patterns';
+// [code, kind, points, prompt, choices, right (choice places, true or false, or a number), within, why]
+var DEMO_QUIZ = [
+  [
+    'PA3',
+    'choice',
+    1,
+    'Which graph best shows how plant height changed over six weeks?',
+    ['A line graph', 'A pie chart', 'A table only'],
+    [0],
+  ],
+  [
+    'PA3',
+    'number',
+    2,
+    'From the table, what was the average height at week 4?',
+    null,
+    12.5,
+    0.1,
+    'Add the four trays at week 4 and divide by 4.',
+  ],
+  ['PA3', 'choice', 1, 'Which axis should the weeks go on?', ['The horizontal axis', 'The vertical axis'], [0]],
+  [
+    'PA4',
+    'choice',
+    2,
+    "Which two readings don't fit the pattern?",
+    ['Tray C, week 3', 'Tray A, week 5', 'Tray D, week 2', 'Tray B, week 4'],
+    [0, 2],
+  ],
+  [
+    'PA4',
+    'true_false',
+    1,
+    'The pattern held for every plant.',
+    null,
+    false,
+    null,
+    'Tray C at week 3 and Tray D at week 2 broke the pattern.',
+  ],
+  [
+    'PA4',
+    'choice',
+    1,
+    'Which pattern does the data show?',
+    ['Plants grew the same in every tray', 'More hours of light, taller plants', 'More water, taller plants'],
+    [1],
+    null,
+    'Trays with 8 hours of light grew most; every tray got the same water.',
+  ],
+  [
+    'PA5',
+    'choice',
+    1,
+    'Which conclusion does the data support?',
+    [
+      'Light is the only thing that affects growth',
+      'More light, up to 8 hours, means taller plants',
+      'Plants need water to grow',
+    ],
+    [1],
+    null,
+    "The trays only tested light, so the data can't rule out other causes.",
+  ],
+  ['PA5', 'text', 2, 'What would you test next to be more sure? Explain in one or two sentences.'],
+  [
+    'PA5',
+    'choice',
+    1,
+    'Which conclusion goes further than the data?',
+    [
+      'Light helped these plants grow taller',
+      'All plants everywhere need 8 hours of light',
+      'The 8-hour trays grew most',
+    ],
+    [1],
+  ],
+  [null, 'choice', 1, 'Which unit is plant height measured in?', ['Centimetres', 'Grams', 'Litres'], [0]],
+];
+
+function seedDemoQuiz() {
+  if (typeof BuildFlags === 'undefined' || !BuildFlags.on('quizzes')) return false;
+  if (typeof saveDemoQuizSeed !== 'function' || typeof quizNewId !== 'function' || !COURSES.sci8) return false;
+  if (localStorage.getItem('gb-quizzes-sci8') != null) return false;
+  var tags = {};
+  getAllTags('sci8').forEach(function (t) {
+    if (t && (t.code === 'PA3' || t.code === 'PA4' || t.code === 'PA5')) tags[t.code] = t.id;
+    if (t && (t.id === 'PA3' || t.id === 'PA4' || t.id === 'PA5')) tags[t.id] = t.id;
+  });
+  if (!tags.PA3 || !tags.PA4 || !tags.PA5) return false;
+  var pieces = getAssessments('sci8') || [];
+  if (
+    !pieces.some(function (a) {
+      return a && a.id === DEMO_QUIZ_AID;
+    })
+  ) {
+    var today = getTodayStr();
+    pieces.push({
+      id: DEMO_QUIZ_AID,
+      title: 'Data Patterns Quick Check',
+      date: today,
+      dateAssigned: today,
+      dueDate: _demoDayAfter(today, 7),
+      type: 'formative',
+      tagIds: [tags.PA3, tags.PA4, tags.PA5],
+      evidenceType: 'quiz',
+      categoryId: 'sci8-cat-checks',
+      category_id: 'sci8-cat-checks',
+      isDraft: true,
+      created: new Date().toISOString(),
+    });
+    saveAssessments('sci8', pieces);
+  }
+  var questions = DEMO_QUIZ.map(function (row) {
+    var kind = row[1];
+    var q = { kind: kind, prompt: row[3], multiple: false, points: row[2], tag_id: row[0] ? tags[row[0]] : null };
+    q.key = { answer: null, tolerance: null, why: row[7] || null };
+    if (kind === 'choice') {
+      q.choices = row[4].map(function (text) {
+        return { id: quizNewId(), text: text };
+      });
+      q.multiple = row[5].length > 1;
+      q.key.answer = row[5]
+        .map(function (i) {
+          return q.choices[i].id;
+        })
+        .sort();
+    } else if (kind === 'true_false' || kind === 'number') {
+      q.key.answer = row[5];
+      if (kind === 'number') q.key.tolerance = row[6];
+    }
+    return q;
+  });
+  // Closes on the due date, a week from today, so the sample is open.
+  var settings = Object.assign(quizDefaults(), { after_due: 'stop' });
+  return saveDemoQuizSeed('sci8', DEMO_QUIZ_AID, Object.assign(settings, { questions: questions }), [
+    tags.PA3,
+    tags.PA4,
+    tags.PA5,
+  ]);
+}
+
+/* ── Sample quiz with answers (Quizzes, Q4) ─────────────────────────
+   The board's results ("Quizzes Artboard", Board 3): the same ten
+   questions on an assigned piece, Plant Growth Quick Check, set to Two
+   Tries with Best counting, answered by Science 8's students. What each
+   earned on each question is the board's own sample (window.QUIZ.S), read
+   as the plan marks it: a Choice with several right is all or nothing, so
+   the board's one-point part marks on Question 4 earn nothing here. Three
+   short answers wait to be assessed; Sam Blackwood sent two tries; Ethan
+   Dubois and Tyler Rowe have sent nothing. No score is written: nothing
+   here counts toward a grade until the teacher confirms it on the results. Made only while the
+   quizzes build switch is on, and only once. */
+var DEMO_QUIZ_RESULTS_AID = 'sci8-quiz-plant-growth';
+// What each earned on Questions 1 to 10, in the teacher's order; null is a short answer not assessed yet.
+var DEMO_QUIZ_EARNED = [
+  ['Cece', [1, 2, 1, 0, 1, 1, 0, 2, 0, 1], 'Try the same light but change the soil, so we know it is the light.'],
+  ['Noor', [1, 2, 1, 2, 1, 1, 0, null, 1, 1], 'Test more plants of different kinds with the same light hours.'],
+  ['Sam', [1, 0, 1, 0, 1, 0, 0, 1, 0, 1], 'More light.'],
+  [
+    'Liam',
+    [1, 2, 1, 2, 1, 1, 1, 2, 1, 1],
+    'Repeat it with water and soil kept the same and more trays at each light level.',
+  ],
+  ['Mateo', [1, 2, 0, 0, 0, 1, 0, null, 1, 1], 'Do it again but longer, like 10 weeks.'],
+  ['Jasper', [1, 2, 0, 2, 0, 1, 1, 1, 1, 1], 'Change the water and keep light the same.'],
+  ['Fatima', [0, 2, 1, 0, 1, 1, 0, null, 1, 1], 'I would try 10 and 12 hours of light to see if it keeps going up.'],
+  ['Priya', [1, 2, 1, 0, 1, 1, 1, 2, 1, 1], 'Try more hours of light to find where growth stops.'],
+  ['Jordan', [1, 0, 1, 0, 1, 1, 0, 1, 1, 1], 'Use better rulers.'],
+  ['Ines', [1, 2, 1, 0, 1, 1, 0, 1, 0, 1], 'Plant them outside.'],
+  ['Marcus', [0, 2, 1, 0, 1, 0, 0, 2, 1, 1], 'Keep the light the same and change one other thing at a time.'],
+  ['Amara', [1, 2, 1, 2, 1, 1, 1, 2, 0, 1], 'Grow more trays at each light level so one odd plant matters less.'],
+  ['Sofia', [1, 2, 1, 0, 0, 1, 1, 1, 1, 1], 'Check the temperature too.'],
+  ['Aiden', [1, 0, 1, 0, 1, 1, 0, 1, 1, 1], 'Measure every day.'],
+  ['Olivia', [1, 2, 1, 2, 1, 1, 1, 2, 1, 1], 'Test light again with a control tray kept in the dark.'],
+  ['Raj', [1, 2, 0, 0, 1, 1, 0, 2, 1, 1], 'Do the same test with a different plant to see if the pattern holds.'],
+  ['Maya', [1, 2, 1, 0, 1, 0, 0, 1, 1, 0], 'More plants.'],
+  ['Liv', [1, 2, 1, 0, 1, 0, 1, 2, 0, 1], 'Keep the water and soil the same and test 4, 8 and 12 hours.'],
+];
+// Sam Blackwood's second try: better, so it counts under Best.
+var DEMO_QUIZ_SAM_SECOND = [1, 2, 1, 2, 1, 1, 0, 1, 1, 1];
+
+function seedDemoQuizResults() {
+  if (typeof BuildFlags === 'undefined' || !BuildFlags.on('quizzes')) return false;
+  if (
+    typeof _quizDemoSave !== 'function' ||
+    typeof _quizDemoReply !== 'function' ||
+    typeof saveDemoQuizTriesSeed !== 'function' ||
+    !COURSES.sci8
+  )
+    return false;
+  if (localStorage.getItem('gb-quiz-tries-sci8') != null) return false;
+  var tags = {};
+  getAllTags('sci8').forEach(function (t) {
+    if (t && (t.code === 'PA3' || t.code === 'PA4' || t.code === 'PA5')) tags[t.code] = t.id;
+    if (t && (t.id === 'PA3' || t.id === 'PA4' || t.id === 'PA5')) tags[t.id] = t.id;
+  });
+  if (!tags.PA3 || !tags.PA4 || !tags.PA5) return false;
+  var today = getTodayStr();
+  var pieces = getAssessments('sci8') || [];
+  if (!pieces.some(a => a && a.id === DEMO_QUIZ_RESULTS_AID)) {
+    pieces.push({
+      id: DEMO_QUIZ_RESULTS_AID,
+      title: 'Plant Growth Quick Check',
+      date: _demoDayAfter(today, -6),
+      dateAssigned: _demoDayAfter(today, -6),
+      dueDate: _demoDayAfter(today, -2),
+      type: 'formative',
+      tagIds: [tags.PA3, tags.PA4, tags.PA5],
+      evidenceType: 'quiz',
+      categoryId: 'sci8-cat-checks',
+      category_id: 'sci8-cat-checks',
+      isDraft: false,
+      created: new Date().toISOString(),
+    });
+    saveAssessments('sci8', pieces);
+  }
+  var questions = DEMO_QUIZ.map(function (row) {
+    var kind = row[1];
+    var q = { kind: kind, prompt: row[3], multiple: false, points: row[2], tag_id: row[0] ? tags[row[0]] : null };
+    q.key = { answer: null, tolerance: null, why: row[7] || null };
+    if (kind === 'choice') {
+      q.choices = row[4].map(text => ({ id: quizNewId(), text: text }));
+      q.multiple = row[5].length > 1;
+      q.key.answer = row[5].map(i => q.choices[i].id).sort();
+    } else if (kind === 'true_false' || kind === 'number') {
+      q.key.answer = row[5];
+      if (kind === 'number') q.key.tolerance = row[6];
+    }
+    return q;
+  });
+  var settings = Object.assign(quizDefaults(), { tries: 2, counts: 'best', after_due: 'stop' });
+  // Written once: a device that stopped part way keeps the quiz it has.
+  var kept = _quizDemoReply('sci8', DEMO_QUIZ_RESULTS_AID);
+  var saved = kept.quiz
+    ? { ok: true, quiz: kept }
+    : _quizDemoSave(
+        'sci8',
+        DEMO_QUIZ_RESULTS_AID,
+        Object.assign(settings, { updated_at: null, questions: questions }),
+        [tags.PA3, tags.PA4, tags.PA5],
+      );
+  if (!saved.ok) return false;
+  var qs = saved.quiz.questions;
+  // A raw answer that earns `e` on question `q` (and for a Text answer, its words).
+  function answerFor(q, e, words) {
+    if (q.kind === 'text') return { answer: words, given_points: e };
+    if (q.kind === 'true_false') return { answer: e > 0 ? q.key.answer : !q.key.answer };
+    if (q.kind === 'number') return { answer: e > 0 ? q.key.answer : 11.5 };
+    var right = q.key.answer;
+    var wrong = q.choices.filter(c => right.indexOf(c.id) < 0).map(c => c.id);
+    // Several right and none earned: one right and one wrong, as the board's Cece sent.
+    if (q.multiple) return { answer: e > 0 ? right.slice() : [right[0], wrong[0]] };
+    return { answer: e > 0 ? [right[0]] : [wrong[0]] };
+  }
+  var students = getStudents('sci8') || [];
+  var tries = {};
+  var seq = 0;
+  function makeTry(n, earned, words, day, at) {
+    var order = qs.map(q => q.id);
+    // Each student's own shuffled order, the same on every device.
+    for (var i = order.length - 1; i > 0; i--) {
+      var j = (seq * 7 + i * 3) % (i + 1);
+      var x = order[i];
+      order[i] = order[j];
+      order[j] = x;
+    }
+    seq++;
+    var sent = _demoDayAfter(today, day) + 'T' + at + ':00.000Z';
+    return {
+      attempt_id: quizNewId(),
+      try: n,
+      started_at: sent,
+      sent_at: sent,
+      reopened_at: null,
+      question_order: { questions: order, choices: {} },
+      marked: null,
+      marked_at: null,
+      answers: qs.map((q, i) =>
+        Object.assign(
+          { question_id: q.id, saved_at: sent, given_points: null, note: null },
+          answerFor(q, earned[i], words),
+        ),
+      ),
+    };
+  }
+  DEMO_QUIZ_EARNED.forEach(function (row, i) {
+    var st = students.find(s => s && s.firstName === row[0]);
+    if (!st) return;
+    var mine = { tries: [makeTry(1, row[1], row[2], -5 + (i % 3), '18:' + String(10 + i).padStart(2, '0'))] };
+    if (row[0] === 'Sam')
+      mine.tries.push(makeTry(2, DEMO_QUIZ_SAM_SECOND, 'More hours of light, kept the same each day.', -3, '17:05'));
+    tries[st.id] = mine;
+  });
+  if (!saveDemoQuizTriesSeed('sci8', DEMO_QUIZ_RESULTS_AID, tries)) return false;
+  return true;
 }

@@ -218,6 +218,8 @@ function load(file) {
 
 load('shared/html.js');
 load('shared/build-flags.js');
+// "Open this website in a new tab?" (a handout's link and a bulletin's ask it).
+load('shared/website-ask.js');
 load('shared/constants.js');
 // Demo Mode's class (DEFAULT_COURSES, LEARNING_MAP) lives in seed-data.js.
 // Only those two are taken from it here, run inside a function so nothing
@@ -287,6 +289,8 @@ load('shared/markup-draw.js');
 load('s/page-view.js');
 // A handout's pages on a card still to do, to swipe through.
 load('s/page-carousel.js');
+// Bulletins on the student's page, as teacher/app.html loads it for Preview as Student (B1d).
+load('s/bulletins-view.js');
 load('teacher/ui.js');
 load('teacher/markup.js');
 load('teacher/report-scores.js');
@@ -312,6 +316,11 @@ load('shared/questionnaire-templates.js');
 load('shared/questionnaires.js');
 load('teacher/qr-slips.js');
 load('teacher/question-cards.js');
+load('shared/data-quizzes.js');
+load('shared/data-quiz-tries.js');
+load('teacher/quiz-card-draw.js');
+load('teacher/quiz-builder.js');
+load('teacher/quiz-results.js');
 load('teacher/cm-questionnaires.js');
 load('teacher/student-cards.js');
 load('teacher/student-page-students.js');

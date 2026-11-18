@@ -1,0 +1,91 @@
+{
+  "copyToClasses": {
+    "calls": [
+      ["update_assessment", ["p_id", "p_patch", "p_tag_ids"]],
+      ["save_collab", ["p_config", "p_id", "p_mode"]],
+      [
+        "create_assessment",
+        [
+          "p_category_id",
+          "p_copy_group",
+          "p_course_id",
+          "p_date_assigned",
+          "p_description",
+          "p_due_date",
+          "p_evidence_type",
+          "p_idempotency_key",
+          "p_max_points",
+          "p_module_id",
+          "p_rubric_id",
+          "p_score_mode",
+          "p_tag_ids",
+          "p_title",
+          "p_weight"
+        ]
+      ]
+    ],
+    "saved": {
+      "id": "<id>",
+      "title": "Food Webs Check",
+      "date": "2026-11-10",
+      "dateAssigned": "2026-11-10",
+      "type": "summative",
+      "tagIds": ["<id>"],
+      "description": "",
+      "notes": "",
+      "created": "<now>",
+      "copyGroup": "<group>"
+    },
+    "keys": [
+      "gb-assessments-00000000-0000-4000-8000-000000000001",
+      "gb-assessments-00000000-0000-4000-8000-000000000002",
+      "gb-quizzes-00000000-0000-4000-8000-000000000001"
+    ],
+    "toasts": ["Added to Science 8 B."]
+  },
+  "addFrom": {
+    "calls": [["note_course_opened", ["p_course_id", "p_idempotency_key"]]],
+    "keys": [
+      "gb-assessments-00000000-0000-4000-8000-000000000001",
+      "gb-assessments-00000000-0000-4000-8000-000000000002",
+      "gb-quizzes-00000000-0000-4000-8000-000000000001"
+    ],
+    "toasts": ["Added 0 assessments from Science 8."]
+  },
+  "duplicate": {
+    "calls": [
+      [
+        "create_assessment",
+        [
+          "p_category_id",
+          "p_course_id",
+          "p_date_assigned",
+          "p_description",
+          "p_due_date",
+          "p_evidence_type",
+          "p_idempotency_key",
+          "p_max_points",
+          "p_module_id",
+          "p_rubric_id",
+          "p_score_mode",
+          "p_tag_ids",
+          "p_title",
+          "p_weight"
+        ]
+      ]
+    ],
+    "saved": {
+      "id": "<id>",
+      "title": "Food Webs Check (Copy)",
+      "tagIds": ["<id>", "<id>"],
+      "date": "2026-11-10",
+      "created": "<now>"
+    },
+    "keys": [
+      "gb-assessments-00000000-0000-4000-8000-000000000001",
+      "gb-assessments-00000000-0000-4000-8000-000000000002",
+      "gb-quizzes-00000000-0000-4000-8000-000000000001"
+    ],
+    "toasts": []
+  }
+}

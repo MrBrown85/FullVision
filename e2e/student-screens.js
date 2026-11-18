@@ -10,7 +10,12 @@ import { resolve } from 'node:path';
 
    go(page, { base, desk, size }): base is '' under Playwright's own server;
    desk is true at Chromebook width; size is the Text Size to choose
-   ('normal' chooses none). `gear` screens exist only with Settings. */
+   ('normal' chooses none). `gear` screens exist only with Settings.
+
+   The sample class has bulletins, so the demo card opens on Bulletins
+   (B1g); openDemo then presses Assignments, where every screen but the
+   Bulletins ones starts, as it did before Bulletins. ctx.onBulletins
+   leaves it there. */
 
 const PHOTO = resolve('assets/sample-work/cell-lab-cece-1.jpg');
 
@@ -23,6 +28,8 @@ export async function openDemo(page, ctx, hash) {
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   await page.locator('.sp-view').first().waitFor();
+  if (!ctx.onBulletins && (await page.locator('.sp-tab-on[data-tab="bulletins"]').locator('visible=true').count()))
+    await tab(page, 'assignments');
   if (ctx.size && ctx.size !== 'normal') {
     await page.locator('.sp-gear').click();
     await page.locator('.sp-set-size[data-size="' + ctx.size + '"]').click();
@@ -331,6 +338,59 @@ export const SCREENS = [
     },
   },
 ];
+
+/* Bulletins (docs/plans/bulletins-plan.md B1d; on since B1g): the demo card
+   opens on them. They come last, and a copy of `main` from before Bulletins
+   has none of them (`bulletins`). */
+async function bulletinsDemo(p, c) {
+  await openDemo(p, Object.assign({}, c, { onBulletins: true }), 'demo-card');
+  await expect(p.locator('.sp-tab-on[data-tab="bulletins"]').locator('visible=true')).toBeVisible();
+}
+
+SCREENS.push(
+  { name: 'bulletins, the new line', bulletins: true, marker: '#sp-bulletin-new', go: bulletinsDemo },
+  {
+    name: 'bulletins, a file’s pages',
+    bulletins: true,
+    marker: '.sp-bulletin-file-pdf .sp-bulletin-file-count',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      const track = p.locator('.sp-bulletin-file-pdf .sp-bulletin-file-track');
+      await track.scrollIntoViewIfNeeded();
+      await track.evaluate(el => el.scrollTo({ left: el.clientWidth, behavior: 'auto' }));
+      await expect(p.locator('.sp-bulletin-file-pdf .sp-bulletin-file-count')).toHaveText('2 / 2');
+    },
+  },
+  {
+    name: 'bulletins, a page full size',
+    bulletins: true,
+    marker: '.sp-bulletin-viewer-img',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      await p.locator('.sp-bulletin-file-pdf .sp-bulletin-file-slide[data-page="0"]').click();
+    },
+  },
+  {
+    name: 'bulletins, the link question',
+    bulletins: true,
+    marker: '.sp-bulletin-ask',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      await p.locator('.sp-bulletin-link').click();
+    },
+  },
+  {
+    name: 'bulletins, the reminder bar',
+    bulletins: true,
+    marker: '.sp-bulletin-reminder',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      await p.locator('.sp-bulletin-pinbar').click();
+      await expect(p.locator('.sp-bulletin-pinbar')).toBeInViewport();
+      await expect(p.locator('.sp-bulletin-reminder')).toBeInViewport();
+    },
+  },
+);
 
 // Go to `screen` and wait for its mark, and for motion (sheets slide in for about 220 ms).
 export async function reach(page, screen, ctx) {

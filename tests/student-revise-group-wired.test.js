@@ -184,14 +184,14 @@ describe('nothing to show: no new read, and the page as it was drawn', () => {
   it('no revision and no group piece asks nothing past `group-work`, drawn as with a function from before these routes', async () => {
     const none = school();
     const page = await signIn(none);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback', 'group-work']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'feedback', 'group-work']);
     expect(page.storageCalls).toEqual([]);
 
     const old = school();
     old.answer = body => (['feedback', 'group-work'].includes(body.route) ? { ok: false, error: 'bad_request' } : null);
     const before = await signIn(old);
     // A function without Batch C's routes is asked `feedback` once and nothing more.
-    expect(routes(before)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback']);
+    expect(routes(before)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'feedback']);
     expect(before.root().innerHTML).toBe(page.root().innerHTML);
     expect(page.T.groupOf(page.T.state())).toBeNull();
   });
@@ -203,7 +203,17 @@ describe('a revision asked for (S11-W1)', () => {
     handIn(dev.fn.world, WORK.lab, CECE, 1);
     dev.fn.state.feedback = feedbackWith([{ id: WORK.lab, marks: null, revision: revision(), reflection: null }]);
     const page = await signIn(dev);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback', 'group-work', 'file-links']);
+    expect(routes(page)).toEqual([
+      'card',
+      'verify',
+      'page',
+      'bulletins',
+      'work',
+      'forms',
+      'feedback',
+      'group-work',
+      'file-links',
+    ]);
     expect(bodyOf(page, 'file-links')[0]).toMatchObject({ enrollment_id: CECE, assessment_id: WORK.lab });
     expect(pieceIn(page, WORK.lab).kind).toBe('revise');
     // On Outstanding, first: a revision goes before the work that is due.

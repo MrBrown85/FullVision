@@ -18,7 +18,7 @@ const shot = async (page, name) => {
   await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { bulletins = false, dark = false, piece = 'sci8a1', view = true, touch = false } = {}) {
+async function open(page, { tile = true, dark = false, piece = 'sci8a1', view = true, touch = false } = {}) {
   // A touch device answers (pointer: coarse); the desktop browser here does not.
   if (touch)
     await page.addInitScript(() => {
@@ -48,28 +48,27 @@ async function open(page, { bulletins = false, dark = false, piece = 'sci8a1', v
     };
   });
   await page.addInitScript(
-    ([bulletins, piece]) => {
+    ([piece]) => {
       try {
-        if (bulletins) {
-          localStorage.setItem('fv-build-bulletins', '1');
-          // A stand-in for the Bulletins tile, which is built apart from the Inbox.
-          window.DashBulletins = {
-            html: () =>
-              '<section class="dash-bulletins-stub" style="flex:1;background:var(--surface);border-radius:12px"></section>',
-          };
-        }
         // The piece the switch has kept for this class: Cell Microscope Lab unless a test says none.
         if (piece) localStorage.setItem('fv-dash-inbox-piece:sci8', piece);
       } catch (e) {
         /* storage blocked */
       }
     },
-    [bulletins, piece],
+    [piece],
   );
   if (dark) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
   await page.evaluate(() => {
     const cid = getActiveCourse();
     setStudentPageSwitch(cid, true, 'on_return');
@@ -724,7 +723,7 @@ async function fitsInEveryFont(page, tileHeight) {
 }
 
 test('beside Bulletins the tile is 299 px and the centre page fills the stage', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
   const m = await fitsInEveryFont(page, 299);
@@ -748,7 +747,7 @@ test('beside Bulletins the tile is 299 px and the centre page fills the stage', 
 });
 
 test('with the whole column the tile is 510 px and the centre page fills the stage', async ({ page }) => {
-  await open(page);
+  await open(page, { tile: false });
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
   const m = await fitsInEveryFont(page, 510);
@@ -766,7 +765,7 @@ test('with the whole column the tile is 510 px and the centre page fills the sta
 
 test('on a taller window the column is 610 px', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await open(page);
+  await open(page, { tile: false });
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
   const m = await fitsInEveryFont(page, 610);
@@ -784,7 +783,7 @@ test('on a 1440 x 900 window beside Bulletins the tile is 359 px and the centre 
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await open(page, { bulletins: true });
+  await open(page);
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
   await fitsInEveryFont(page, 359);
@@ -808,15 +807,15 @@ test('stacked on an iPad the tile is 450 px and the centre page fills the stage'
 });
 
 test('dark, beside Bulletins and with the whole column', async ({ page }) => {
-  await open(page, { dark: true, bulletins: true });
+  await open(page, { dark: true });
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
   await shot(page, 'flip-299-dark');
+  // With no tile: a signed-in class whose server has not answered list_bulletins draws no Bulletins slot.
   await page.evaluate(() => {
-    localStorage.removeItem('fv-build-bulletins');
-    delete window.DashBulletins;
+    DashBulletins.html = () => '';
+    PageDashboard.render();
   });
-  await page.reload();
   await page.locator('.dash-inbox-flip-stage').waitFor();
   await page.locator('.dash-inbox-flip-slider').fill('4');
   await settle(page);
@@ -958,7 +957,7 @@ test('a drag that starts on the stage (text, not files) is no file drop and flip
 });
 
 test('a paper hand-in holds its words under a wide font, in the page font and at both sizes', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await page.locator('.dash-inbox-flip-slider').fill('7');
   await expect(name(page)).toHaveText('Ethan Dubois');
   await settle(page);
