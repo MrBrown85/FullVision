@@ -207,8 +207,30 @@
     return items[to];
   }
 
+  /**
+   * True when focus has gone to somewhere that is not the ⋯ button or its menu
+   * (so an open menu should close). Focus going to nothing (a redraw) is not
+   * leaving.
+   * @param {any} to the element that took focus, or null
+   */
+  function leftMenu(to) {
+    return !!to && !!to.closest && !to.closest('.bulletin-more');
+  }
+
+  /** A bulletin's card on the page, by its id. @param {string} id @returns {HTMLElement | null} */
+  function cardOf(id) {
+    var cards = document.querySelectorAll('.bulletin-post');
+    for (var i = 0; i < cards.length; i++) {
+      var c = /** @type {HTMLElement} */ (cards[i]);
+      if (c.dataset.bulletinId === id) return c;
+    }
+    return null;
+  }
+
   return {
+    cardOf: cardOf,
     menuStep: menuStep,
+    leftMenu: leftMenu,
     dateLabel: dateLabel,
     dayHeading: dayHeading,
     returnedWhen: returnedWhen,

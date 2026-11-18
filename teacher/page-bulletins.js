@@ -1115,15 +1115,7 @@
     });
   }
 
-  /** @param {string} id @returns {HTMLElement | null} */
-  function _cardOf(id) {
-    var cards = document.querySelectorAll('.bulletin-post');
-    for (var i = 0; i < cards.length; i++) {
-      var c = /** @type {HTMLElement} */ (cards[i]);
-      if (c.dataset.bulletinId === id) return c;
-    }
-    return null;
-  }
+  var _cardOf = F.cardOf;
 
   /** A link from the Dashboard's tile (?open=<id> or ?seen=<id>): scroll to that bulletin and outline it; ?seen also opens its Seen by list. Waits until the bulletin is on the page. */
   function _arrive() {
@@ -1516,13 +1508,6 @@
     }
   }
 
-  /** Focus left an open menu for somewhere else (Tab in Safari does): the menu closes. A redraw that drops focus to nothing does not close it. @param {any} e */
-  function _onFocusout(e) {
-    var to = e.relatedTarget;
-    if (!_alive || !_menuId || !to || !to.closest) return;
-    if (!to.closest('.bulletin-more')) _closeMenu();
-  }
-
   /* ── Class switch, init, destroy ─────────────────────────────── */
 
   /** @param {string} cid */
@@ -1585,7 +1570,9 @@
     _listen('input', _onInput);
     _listen('change', _onChange);
     _listen('keydown', _onKeydown);
-    _listen('focusout', _onFocusout);
+    _listen('focusout', function (/** @type {any} */ e) {
+      if (_alive && _menuId && F.leftMenu(e.relatedTarget)) _closeMenu(); // Tab in Safari leaves the menu open
+    });
     _listen('visibilitychange', _onVisibility);
     _listen('fv:bulletins-changed', _onChanged);
 
