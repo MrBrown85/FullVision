@@ -1858,8 +1858,7 @@
     return ui;
   }
 
-  /* The Text Size chosen in Settings goes beside the session's token (write) until the session
-     ends. Demo Mode keeps nothing on the device; another tab's student is left alone. */
+  // The Text Size goes beside the session's token (write). Demo Mode keeps nothing on the device.
   function keepSize() {
     if (!session) return;
     session.size = sizeOf(S.textSize);
@@ -1873,8 +1872,7 @@
     }
   }
 
-  /* A Text Size chosen in another tab of this session (the device's copy says so):
-     this tab takes it, so neither tab writes the other's choice away. */
+  // A Text Size chosen in another tab of this session: taken here, so neither tab writes it away.
   function adoptSize(stored) {
     if (!session || !stored || stored.token !== session.token) return;
     session.size = stored.size;
@@ -1884,8 +1882,7 @@
     if (S.screen === 'assignments' && S.settings) paint('.sp-set-size[aria-checked="true"]');
   }
 
-  /* Log Out? ignores presses for a moment after it opens: a double tap on Settings' Log Out
-     is not a yes (the second tap lands where the first was). */
+  // Log Out? ignores presses at first: a double tap on Settings' Log Out is not a yes.
   var LOGOUT_SETTLE_MS = 400;
   var logoutAt = 0;
 
@@ -2181,6 +2178,8 @@
     ],
   ];
   var fetching = null;
+  // Each try after the first asks for a new address (?retry=1): WebKit reuses a failed load of the same one.
+  var gradeTries = 0;
 
   function whenGradesAreIn(warm) {
     if (fetching) return fetching;
@@ -2189,11 +2188,12 @@
     });
     if (!need.length || typeof document === 'undefined') return Promise.resolve();
     if (warm) return Promise.resolve(need.forEach(preload));
+    var tries = gradeTries++;
     fetching = new Promise(function (done) {
       var left = need.length;
       need.forEach(function (f) {
         var s = document.createElement('script');
-        s.src = f[0];
+        s.src = f[0] + (tries ? '?retry=' + tries : '');
         s.async = false; // run in this order
         s.onload = s.onerror = function () {
           left -= 1;
