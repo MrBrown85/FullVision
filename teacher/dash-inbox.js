@@ -565,6 +565,10 @@ window.DashInbox = (function () {
     click: click,
     countsText: countsText,
     whenText: whenText,
+    // A view's own picture: html() gives each <img data-work-pic data-dash-pic="key"> its file here, and the tile's holder fills it.
+    pic: function (/** @type {string} */ key, /** @type {any} */ file) {
+      _files[key] = file;
+    },
     model: function () {
       return _model;
     },

@@ -112,6 +112,7 @@ interface Window {
   DashRecent: unknown;
   DashInboxModel: unknown;
   DashInbox: unknown;
+  DashInboxRoll: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;

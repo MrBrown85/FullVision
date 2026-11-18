@@ -14,6 +14,7 @@
     "teacher/dash-recent.js",
     "teacher/dash-inbox-model.js",
     "teacher/dash-inbox.js",
+    "teacher/dash-inbox-roll.js",
     "teacher/cm-grading-bars.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",
