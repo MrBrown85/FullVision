@@ -361,6 +361,7 @@ declare var MGradePhotos: any;
 // (teacher/student-page-students.js), which are not typed.
 declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
+declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
 declare var DashInbox: any; // teacher/dash-inbox.js
 declare var DashInboxPick: any; // teacher/dash-inbox-pick.js
