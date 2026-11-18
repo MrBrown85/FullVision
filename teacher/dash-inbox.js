@@ -23,6 +23,8 @@ window.DashInbox = (function () {
 
   var VIEW_KEY = 'fv-dash-inbox-view:';
   var MAX_NAMES = 2;
+  // How long the ring stays on the tile after To Grade is clicked.
+  var RING_MS = 220;
 
   /** @type {{ read: (k: string) => string | null, write: (k: string, v: string | null) => void }} */
   var _cfg = {
@@ -140,7 +142,8 @@ window.DashInbox = (function () {
         .replace(/\./g, '')
         .toLowerCase();
     var old = Date.now() - d.getTime() > 6 * 86400000;
-    return (old ? (parts.month || '') + ' ' + (parts.day || '') : parts.weekday || '') + ', ' + time;
+    // "Thu 1:05 pm"; past a week "Nov 3, 1:05 pm".
+    return old ? (parts.month || '') + ' ' + (parts.day || '') + ', ' + time : (parts.weekday || '') + ' ' + time;
   }
 
   /** "closes Fri" for a day, or ''.
@@ -164,10 +167,12 @@ window.DashInbox = (function () {
     var quiet = [];
     if (p.addedByTeacher) quiet.push('You Added ' + p.addedByTeacher);
     if (p.onPaper) quiet.push(p.onPaper + ' on paper');
+    // Late comes straight after the counts, before the quiet words, so a
+    // line too long for its box loses the quiet words first, never Late.
     var out = '<span class="dash-inbox-main">' + line + '</span>';
     // html-safe: numbers and fixed words
-    if (quiet.length) out += ' <span class="dash-inbox-quiet">· ' + quiet.join(' · ') + '</span>';
-    if (p.late) out += ' <span class="dash-inbox-late">· Late ' + p.late + '</span>';
+    if (p.late) out += '<span class="dash-inbox-late">· Late ' + p.late + '</span>';
+    if (quiet.length) out += '<span class="dash-inbox-quiet">· ' + quiet.join(' · ') + '</span>';
     return out;
   }
 
@@ -184,7 +189,9 @@ window.DashInbox = (function () {
   function picHtml(cid, aid, pg) {
     if (pg.paper) {
       return (
-        '<span class="dash-inbox-pic dash-inbox-sheet"><span class="dash-inbox-sheet-name">' +
+        '<span class="dash-inbox-pic dash-inbox-sheet" role="img" aria-label="' +
+        esc(pg.name + ': Handed In on Paper') +
+        '"><span class="dash-inbox-sheet-name">' +
         esc(pg.name) +
         '</span><span class="dash-inbox-sheet-note">Handed In on Paper</span></span>'
       );
@@ -278,7 +285,6 @@ window.DashInbox = (function () {
       );
     }
     if (!s.length && f.pieces) s.push(f.pieces + ' more pieces with work (' + f.work + ' pieces of work).');
-    if (f.taking) s.push(f.taking + ' more taking work.');
     return (
       '<li class="dash-inbox-fold"><span class="dash-inbox-fold-text">' +
       s.join(' ') +
@@ -331,12 +337,16 @@ window.DashInbox = (function () {
   }
 
   /** @param {string} cid
+   * @param {{ classCounts?: (cid: string, ids: string[]) => any }} [ctx] the draw's shared count of the class's work
    * @returns {string} */
-  function html(cid) {
+  function html(cid, ctx) {
     _files = {};
     _cid = cid;
-    _model = DashInboxModel.build(cid, { seen: seenOf(cid) });
+    var seen = seenOf(cid);
+    _model = DashInboxModel.build(cid, { seen: seen, classCounts: ctx && ctx.classCounts });
     if (!_model.on) return '';
+    // A first look on this device starts the kept time: nothing is new until then.
+    if (!seen) _cfg.write(DashInboxModel.SEEN_KEY + cid, new Date().toISOString());
     var view = viewOf(cid);
     var menu = DashOverview.viewMenuHtml({
       id: 'inbox',
@@ -499,19 +509,8 @@ window.DashInbox = (function () {
     clearTimeout(_ringTimer);
     _ringTimer = setTimeout(function () {
       tile.classList.remove('is-ring');
-    }, 1000);
+    }, RING_MS);
     return true;
-  }
-
-  /** @param {string} aid */
-  function _piece(aid) {
-    return (
-      (_model &&
-        _model.pieces.filter(function (/** @type {any} */ p) {
-          return p.aid === aid;
-        })[0]) ||
-      null
-    );
   }
 
   /* A click on the tile, or on the top bar's To Grade cell. ctx: { cid,
@@ -541,8 +540,7 @@ window.DashInbox = (function () {
       return true;
     }
     if (el.getAttribute('data-dash-inbox') === 'grade') {
-      var p = _piece(aid);
-      var order = p ? p.gradeOrder : [];
+      var order = DashInboxModel.gradeOrder(cid, aid);
       if (!order.length || !window.PageAssignments || !PageAssignments.openGrader) return true;
       PageAssignments.openGrader(cid, aid, order[0], { studentIds: order, show: 'tograde', onClose: redraw });
       return true;
@@ -564,6 +562,7 @@ window.DashInbox = (function () {
     jump: jump,
     click: click,
     countsText: countsText,
+    countsHtml: countsHtml,
     whenText: whenText,
     model: function () {
       return _model;
