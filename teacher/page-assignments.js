@@ -9187,7 +9187,7 @@ window.PageAssignments = (function () {
     var advanced = _isAdvancedRubric(rubric);
     var single = rubricStyle(rubric) === 'single_point';
     var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + (single ? ' is-single-point' : '') + '">';
-    html += single ? _singlePointStripHtml(rubric) : advanced ? '' : RubricWords.switchHtml(rubric, levelOrderFor(cid));
+    if (single) html += _singlePointStripHtml(rubric);
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -13778,6 +13778,9 @@ window.PageAssignments = (function () {
           null,
           show ? 'Hide Checklists' : 'Show Checklists',
         );
+      } else if (showRubric && rubricStyle(rubric) === 'standard') {
+        // A Standard rubric's words, beside where an Advanced one keeps its checklists (Colin, Nov 18).
+        html += _cardMenuItem('data-rw="toggle"', null, RubricWords.shown() ? 'Hide Level Words' : 'Show Level Words');
       }
     }
     html +=

@@ -1,9 +1,10 @@
 // @ts-check
 /* A Standard rubric's cell words on the class grid (Colin, Nov 18): teachers
    see an Advanced Rubric's boxes under each level and asked for the words
-   they wrote for a Standard one too. Show Level Words, at the top of the
-   grid, shows every Standard row's wording joined under the level bar, each
-   level's under its own button, and this device remembers the choice. The words are drawn only
+   they wrote for a Standard one too. Show Level Words, in the card's menu
+   where an Advanced rubric has Show Checklists, shows every Standard row's
+   wording joined under the level bar, each level's under its own button,
+   and this device remembers the choice. The words are drawn only
    while Words is on (a long class grid stays as light as before), so
    switching draws the page again. It takes the place of the descriptor bar
    that showed one level's words on hover. */
@@ -20,13 +21,6 @@ window.RubricWords = (function () {
     }
   }
 
-  function apply(on) {
-    if (!document.querySelectorAll) return;
-    document.querySelectorAll('[data-rw="toggle"]').forEach(function (b) {
-      /** @type {HTMLInputElement} */ (b).checked = on;
-    });
-  }
-
   function toggle() {
     var on = !shown();
     try {
@@ -34,7 +28,6 @@ window.RubricWords = (function () {
     } catch (e) {
       /* storage blocked: this page only */
     }
-    apply(on);
     if (window.PageAssignments && PageAssignments.render) PageAssignments.render();
   }
 
@@ -47,22 +40,6 @@ window.RubricWords = (function () {
     return order.some(function (lv) {
       return !!words(crit, lv);
     });
-  }
-
-  /* One switch at the top of a Standard rubric's grid, not one per row
-     (the council, Nov 18: seven buttons for one choice read as noise). */
-  // html-safe: fixed markup
-  function switchHtml(rubric, order) {
-    var any = ((rubric && rubric.criteria) || []).some(function (c) {
-      return hasWords(c, order);
-    });
-    if (!any) return '';
-    return (
-      '<label class="rsg-words-bar"><span>Show Level Words</span><span class="gpd-switch">' +
-      '<input type="checkbox" role="switch" data-rw="toggle"' +
-      (shown() ? ' checked' : '') +
-      '><span class="gpd-switch-ui" aria-hidden="true"></span></span></label>'
-    );
   }
 
   // html-safe: each level's words go through esc
@@ -97,7 +74,6 @@ window.RubricWords = (function () {
       },
       true,
     );
-  apply(shown());
 
-  return { switchHtml: switchHtml, panelHtml: panelHtml, shown: shown, toggle: toggle };
+  return { panelHtml: panelHtml, shown: shown, toggle: toggle };
 })();

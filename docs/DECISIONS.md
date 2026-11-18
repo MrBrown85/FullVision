@@ -822,7 +822,7 @@ Context: a teacher with two sections of a course (English 9 in blocks A and B) w
 
 Colin: teachers see an Advanced Rubric's boxes under each level but not the words they wrote for a Standard one; give them the option. Remove the popup at the bottom of the page and its code. Add a Share button to the reminders.
 
-- **Words**, beside a Standard rubric criterion's Comment on the class grid, shows every Standard row's wording, each level's under its own button, and this device remembers the choice (`teacher/rubric-words.js`). The words are drawn only while it is on.
+- **Show Level Words** is in a Standard rubric card's ⋯ menu, where an Advanced rubric has Show Checklists (the council, Nov 18: one place for a view choice, as the app already does it; a Words button on every row, then a switch above the grid, were noise). It shows every row's wording joined under the level bar, each level's under its own button; the comment follows, marked as feedback. This device remembers the choice; the words are drawn only while it is on (`teacher/rubric-words.js`).
 - **The descriptor bar is gone** (`teacher/assign-descriptor-bar.js` and its CSS): the strip at the bottom of the Assignments page that showed one level's words on hover, and a competency level's lines on hover, focus or a held finger. Words takes its place for rubrics; the one-student grader's tiles already show each level's words on hover.
 - **Share** is on a reminder's ⋯ menu (`teacher/bulletin-share.js`): its words and link go to the device's share sheet, or are copied where there is none. Nothing is sent from FullVision.
 
