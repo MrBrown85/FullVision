@@ -38,6 +38,8 @@ window.MBulletins = (function () {
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M9 6l1.5-2h3L15 6"/></svg>';
 
   var _cid = ''; // the class on screen, while the tab shows
+  var _drawnHead = ''; // what the head and the feed show now, so a read that changed nothing draws nothing
+  var _drawnFeed = '';
   var _timer = 0;
   var _bound = false;
   var _booted = false;
@@ -234,6 +236,9 @@ window.MBulletins = (function () {
 
   /** The tab's first screen. html-safe: every word, name and title goes through esc; the rest is fixed markup. @param {string} cid */
   function render(cid) {
+    _cid = cid;
+    _drawnHead = _headHtml(cid);
+    _drawnFeed = _feedHtml(cid);
     var nav = MC.navBar({
       id: 'bulletins',
       title: 'Bulletins',
@@ -250,10 +255,10 @@ window.MBulletins = (function () {
       '<div class="m-screen-content m-bulletin-content">' +
       '<div class="m-title-large">Bulletins</div>' +
       '<div id="m-bulletin-head">' +
-      _headHtml(cid) +
+      _drawnHead +
       '</div>' +
       '<div id="m-bulletin-feed" class="m-bulletin-feed">' +
-      _feedHtml(cid) +
+      _drawnFeed +
       '</div>' +
       '</div></div>'
     );
@@ -398,11 +403,21 @@ window.MBulletins = (function () {
     if (!_cid) return;
     var head = document.getElementById('m-bulletin-head');
     var feed = document.getElementById('m-bulletin-feed');
+    // Drawn again only when something changed: a read every 15 seconds never swaps a card under a finger or blinks a photo.
+    var headHtml = _headHtml(_cid);
+    var feedHtml = _feedHtml(_cid);
     // html-safe: _headHtml is fixed markup and one fixed sentence.
-    if (head) head.innerHTML = _headHtml(_cid);
-    // html-safe: _feedHtml escapes every word, title and name; the rest is fixed markup.
-    if (feed) feed.innerHTML = _feedHtml(_cid);
-    _loadPictures();
+    if (head && _drawnHead !== headHtml) {
+      head.innerHTML = headHtml;
+      _drawnHead = headHtml;
+    }
+    if (feed && _drawnFeed !== feedHtml) {
+      // html-safe: _feedHtml escapes every word, title and name; the rest is fixed markup.
+      feed.innerHTML = feedHtml;
+      _drawnFeed = feedHtml;
+      _releasePictures();
+      _loadPictures();
+    }
   }
 
   /** Read the class again; the feed draws when it changes. @param {boolean} [force] */
@@ -452,6 +467,7 @@ window.MBulletins = (function () {
     _bind();
     _cid = cid;
     _drawFeed();
+    _loadPictures();
     refresh(true);
     _startTimer();
   }
@@ -461,6 +477,8 @@ window.MBulletins = (function () {
     _stopTimer();
     _releasePictures();
     _cid = '';
+    _drawnHead = '';
+    _drawnFeed = '';
   }
 
   /** The app opened with the flag on: posts waiting on this phone go on. */
