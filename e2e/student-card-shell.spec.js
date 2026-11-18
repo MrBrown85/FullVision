@@ -42,14 +42,14 @@ for (const size of [
 
       await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
       await expect(page.getByRole('button', { name: 'Outstanding 2' })).toHaveAttribute('aria-pressed', 'true');
-      // The oldest due date first; work past its day says so in red.
+      // The oldest due date first; work past its day, not Missing, is Not Assessed Yet (Colin, 2026-11-17).
       await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText([
         'Immune System Quick Check',
         'Disease Research Poster',
       ]);
       await expect(
-        page.locator('.sp-piece', { hasText: 'Disease Research Poster' }).locator('.sp-flag-overdue'),
-      ).toHaveText(/^Due \S+ \S+ \d+ · 2 days ago$/);
+        page.locator('.sp-piece', { hasText: 'Disease Research Poster' }).locator('.sp-band .sp-flag-waiting'),
+      ).toHaveText('Not Assessed Yet');
       // A draft is Outstanding with no result, as work never graded is.
       await expect(page.locator('.sp-deck .sp-level')).toHaveCount(0);
       await fits(page);
@@ -65,9 +65,9 @@ for (const size of [
 
       await page.getByRole('button', { name: 'Upcoming 1' }).click();
       await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText(['Science Fair Proposal']);
-      await expect(page.locator('.sp-piece', { hasText: 'Science Fair Proposal' }).locator('.sp-flag-due')).toHaveText(
-        /^Due \S+ \S+ \d+ · in 4 days$/,
-      );
+      await expect(
+        page.locator('.sp-piece', { hasText: 'Science Fair Proposal' }).locator('.sp-flag-later'),
+      ).toHaveText('In 4 Days');
       await fits(page);
       await contrast(page);
       await shot(page, size.tag + '-s4f1-upcoming');

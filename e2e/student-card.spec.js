@@ -84,7 +84,7 @@ for (const size of SIZES) {
       // Outstanding: a draft never returned is a card like work not graded, with no result.
       const card = title => page.locator('.sp-deck .sp-piece', { hasText: title });
       await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
-      await expect(card('Disease Research Poster').locator('.sp-flag-overdue')).toHaveText(/^Due \S+ \S+ \d+ · /);
+      await expect(card('Disease Research Poster').locator('.sp-flag-waiting')).toHaveText('Not Assessed Yet');
       await expect(card('Disease Research Poster').locator('.sp-level')).toHaveCount(0);
       await expect(card('Immune System Quick Check').locator('.sp-flag-missing')).toHaveText('Missing');
       let html = await page.locator('#app').innerHTML();
