@@ -2674,6 +2674,23 @@ html.sp-size-larger .sp-view .sp-head-class {
 .sp-view .sp-set-size-larger {
   font-size: 19px;
 }
+/* A phone under 360 px at Larger: the three buttons are about 60 px wide
+   in the page's own pixels, too narrow for "Larger" at 19 px in a wide
+   font. Each word a step smaller, still in order, and the padding less. */
+@media (max-width: 359.98px) {
+  html.sp-size-larger .sp-view .sp-set-size {
+    padding: 0 2px;
+  }
+  html.sp-size-larger .sp-view .sp-set-size-normal {
+    font-size: 13px;
+  }
+  html.sp-size-larger .sp-view .sp-set-size-large {
+    font-size: 14.5px;
+  }
+  html.sp-size-larger .sp-view .sp-set-size-larger {
+    font-size: 16px;
+  }
+}
 .sp-view .sp-set-size-on {
   background: var(--sp-card);
   color: var(--sp-blue-text);
@@ -2741,24 +2758,69 @@ html.sp-size-larger .sp-view .sp-head-class {
   margin-left: auto;
   max-width: 100%;
 }
-/* The bottom tabs: a label's one long word ("Assignments") fits its tab, at
-   12 px or less, from the bar's width (cqi): about six letter-widths to the
-   word, less the tab's padding. Four tabs at Normal fit at 12 px. */
-.sp-view.sp-text-large .sp-tabs-bottom,
-.sp-view.sp-text-larger .sp-tabs-bottom {
-  container-type: inline-size;
-}
+/* The bottom tabs: a label's one long word ("Assignments") fits its tab in
+   a wide font too (Verdana or DejaVu Sans, bold when its tab is on: about
+   7.3 times its letters' size, kept to 7.6), at 12 px or less. From the
+   screen's width in the page's own pixels (vw over the zoom, not cqi:
+   WebKit measures cqi before the zoom), a third or a quarter of it, less
+   the tab's 2 px each side. Three tabs at Normal are as they were. */
 .sp-view.sp-text-large .sp-tabs-bottom .sp-tab-label,
 .sp-view.sp-text-larger .sp-tabs-bottom .sp-tab-label {
-  font-size: min(12px, calc(5.4cqi - 1.4px));
+  font-size: min(12px, calc((100vw / var(--sp-zoom) / 3 - 4px) / 7.6));
 }
-/* Four tabs: a fixed size, not cqi (WebKit measures cqi before the zoom).
-   Set for the narrowest phone, 320 px: drawn about 12 px, as at Normal. */
-.sp-view.sp-text-large .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab-label {
-  font-size: 10.5px;
+.sp-view .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab-label {
+  font-size: min(12px, calc((100vw / var(--sp-zoom) / 4 - 4px) / 7.6));
 }
-.sp-view.sp-text-larger .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab-label {
-  font-size: 9.5px;
+/* My Learning at Normal: where a title's longest word and its level do not
+   fit one line, the level goes under the title rather than the word being
+   cut in two (a 320 px phone, or a wide font). The title is never narrower
+   than its longest word; where both fit, nothing moves. The arrow keeps
+   its place at the right, out of the wrapping, so the level and not the
+   arrow is what goes under. */
+.sp-view:not(.sp-text-large):not(.sp-text-larger) .sp-ml-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.sp-view:not(.sp-text-large):not(.sp-text-larger) .sp-ml-row > .sp-row-text {
+  min-width: min-content;
+}
+.sp-view:not(.sp-text-large):not(.sp-text-larger) .sp-ml-row .sp-row-title {
+  overflow-wrap: break-word;
+}
+.sp-view:not(.sp-text-large):not(.sp-text-larger) .sp-ml-row > .sp-level {
+  margin-left: auto;
+}
+.sp-view:not(.sp-text-large):not(.sp-text-larger) .sp-ml-row:has(> .sp-row-go) {
+  position: relative;
+  padding-right: 24px;
+}
+.sp-view:not(.sp-text-large):not(.sp-text-larger) .sp-ml-row > .sp-row-go {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  margin-top: -7px;
+}
+/* Switch Class at Large and Larger: the name and the current class's tick
+   hold one line, and the "3 to do" goes under the name, so the tick never
+   drops to a line of its own. Normal is as it was. */
+.sp-view.sp-text-large .sp-set .sp-class,
+.sp-view.sp-text-larger .sp-set .sp-class {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+.sp-view.sp-text-large .sp-set .sp-class > .sp-class-words,
+.sp-view.sp-text-larger .sp-set .sp-class > .sp-class-words,
+.sp-view.sp-text-large .sp-set .sp-class > .sp-class-tick,
+.sp-view.sp-text-larger .sp-set .sp-class > .sp-class-tick {
+  grid-row: 1;
+}
+.sp-view.sp-text-large .sp-set .sp-class > .sp-class-todo,
+.sp-view.sp-text-larger .sp-set .sp-class > .sp-class-todo {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: start;
 }
 @keyframes sp-set-up {
   from {

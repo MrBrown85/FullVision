@@ -14,18 +14,24 @@
    colour changes in 150 ms; nothing fades in; nothing moves under Reduce
    Motion. */
 
-/* The bottom bar with Bulletins in it (four tabs): each label's one long word
-   ("Assignments") fits its tab in the page's font and in a wider one (Verdana
-   or DejaVu Sans with a little letter-spacing, as a Linux CI runner or a
-   Windows laptop draws it). Measured: "Assignments" is 6.81 times its font
-   size wide in that wide font (5.46 in the page's), so the label is the tab's
-   width less its 4 px padding, over 7, and never more than 12 px. The tab's
-   width is a quarter of the bar: cqi where the engine measures it after the
-   Text Size's zoom (Chromium), the screen's width over the zoom where it does
-   not (WebKit); the smaller is used. Only this bar: the three-tab bar is
+/* The bottom bar with Bulletins in it, sized by StudentBulletinsView.fitTabs
+   from the bar as drawn: its own width (in the page and in the preview's phone
+   frame alike), the tabs actually in it, and each label's longest word. Each
+   tab is as wide as its longest word needs (Assignments more, Reflect less),
+   so the label size is the bar's width, less 2 px a side for each tab, over
+   the words' widths: one size for every label, 12 px at most. The 2 px are
+   kept on the screen at every Text Size (divided by the zoom), so a bigger
+   Text Size never draws the labels smaller. Before it has measured, the bar is
    s/page-view.css's. */
-.sp-view .sp-tabs-bottom:has(> .sp-tab[data-tab='bulletins']):has(> .sp-tab:nth-child(4)) .sp-tab-label {
-  font-size: min(12px, calc((25cqi - 4px) / 7), calc((25vw / var(--sp-zoom, 1) - 4px) / 7));
+.sp-view .sp-tabs-bottom.sp-bulletin-tabs:has(> .sp-tab[data-tab='bulletins']) > .sp-tab {
+  padding-left: var(--sp-bulletin-tab-pad, 2px);
+  padding-right: var(--sp-bulletin-tab-pad, 2px);
+  /* The icons in one row at the top, however many lines a label takes ("My Learning" may take two). */
+  justify-content: flex-start;
+  padding-top: 4px;
+}
+.sp-view .sp-tabs-bottom.sp-bulletin-tabs:has(> .sp-tab[data-tab='bulletins']) .sp-tab-label {
+  font-size: var(--sp-bulletin-tab-font, 10px);
 }
 
 .sp-view .sp-bulletin-tab {

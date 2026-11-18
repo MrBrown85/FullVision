@@ -1,9 +1,10 @@
 /**
- * The class dashboard's boxes (docs/plans/dashboard-cards-plan.md, part F):
- * the top bar, then Curricular and Core Competencies side by side at one
- * height (stacked below 900 px), then the students, then Observations;
- * every box 12px from the next. The Needs Attention card is gone; the top
- * bar's Missing and Late opens the gradebook. Demo Mode, Science 8.
+ * The class dashboard's boxes outside the middle row: the top bar's Missing
+ * and Late opens the gradebook, pointing at a competency lights its chip on
+ * the student cards, and a card's flag. The middle row itself (its height,
+ * its two thirds and one third, every box 12 px from the next, stacking
+ * under 900 px) is e2e/dashboard-row.spec.js since D9, when the two
+ * competency cards side by side at one height went. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
 
@@ -12,7 +13,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function openDashboard(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-  await page.locator('.dash-comp-card .dash-comp-row').first().waitFor();
+  await page.locator('.dash-comp-tile .dash-comp-card').waitFor();
 }
 
 // Draws a pair of views without the menu (the menu is tested elsewhere).
@@ -27,54 +28,6 @@ async function showViews(page, comp, core) {
   );
   await expect(page.locator('.dash-comp-card')).toHaveAttribute('data-view', comp);
 }
-
-function measure(page) {
-  return page.evaluate(() => {
-    const a = document.querySelector('.dash-comp-card').getBoundingClientRect();
-    const b = document.querySelector('.dash-core-card').getBoundingClientRect();
-    const main = document.getElementById('main');
-    return {
-      compH: Math.round(a.height),
-      coreH: Math.round(b.height),
-      sideBySide: Math.abs(a.top - b.top) < 1 && b.left > a.right,
-      docX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      mainX: main.scrollWidth - main.clientWidth,
-    };
-  });
-}
-
-for (const width of [1440, 1280, 1024]) {
-  test(`at ${width}px the competency cards share one height in every view, and nothing scrolls sideways`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await openDashboard(page);
-    for (const comp of ['avg', 'mix', 'below', 'trend']) {
-      for (const core of ['self', 'evidence']) {
-        await showViews(page, comp, core);
-        const m = await measure(page);
-        expect(m.sideBySide, `${comp}/${core}`).toBe(true);
-        expect(m.compH, `${comp}/${core}`).toBe(m.coreH);
-        expect(m.compH).toBeGreaterThanOrEqual(300);
-        expect(m.docX, `sideways at ${width} ${comp}/${core}`).toBeLessThanOrEqual(0);
-        expect(m.mainX, `sideways at ${width} ${comp}/${core}`).toBeLessThanOrEqual(0);
-      }
-    }
-  });
-}
-
-test('below 900px the competency cards stack, each at least 300px', async ({ page }) => {
-  await page.setViewportSize({ width: 800, height: 900 });
-  await openDashboard(page);
-  const m = await page.evaluate(() => {
-    const a = document.querySelector('.dash-comp-card').getBoundingClientRect();
-    const b = document.querySelector('.dash-core-card').getBoundingClientRect();
-    return { stacked: b.top >= a.bottom, a: a.height, b: b.height };
-  });
-  expect(m.stacked).toBe(true);
-  expect(m.a).toBeGreaterThanOrEqual(300);
-  expect(m.b).toBeGreaterThanOrEqual(300);
-});
 
 test('Missing and Late opens the gradebook', async ({ page }) => {
   await openDashboard(page);
@@ -127,49 +80,4 @@ test("the flag at a student card's foot is 22px wide and flips to Unflag", async
   expect(Math.round(box.width)).toBe(22);
   await flag.click();
   await expect(card.locator('.dash-card-footer > .dash-flag-btn')).toHaveAttribute('aria-label', 'Unflag student');
-});
-
-test('every box on the dashboard is 12px from the next', async ({ page }) => {
-  await openDashboard(page);
-  const gaps = await page.evaluate(() => {
-    var boxes = Array.prototype.slice
-      .call(document.querySelectorAll('.dash-glance, .dash-overview-section, .dash-students-head, .dash-card'))
-      .slice(0, 12)
-      .map(function (el) {
-        var r = el.getBoundingClientRect();
-        return { l: r.left, r: r.right, t: r.top, b: r.bottom };
-      });
-    var out = [];
-    boxes.forEach(function (a) {
-      // The nearest box to the right on the same line, and the nearest below
-      // that overlaps it across.
-      var right = boxes.filter(function (b) {
-        return Math.abs(b.t - a.t) < 1 && b.l > a.r;
-      });
-      if (right.length)
-        out.push(
-          Math.round(
-            Math.min.apply(
-              null,
-              right.map(b => b.l),
-            ) - a.r,
-          ),
-        );
-      var below = boxes.filter(function (b) {
-        return b.t > a.b && b.l < a.r && b.r > a.l;
-      });
-      if (below.length)
-        out.push(
-          Math.round(
-            Math.min.apply(
-              null,
-              below.map(b => b.t),
-            ) - a.b,
-          ),
-        );
-    });
-    return out;
-  });
-  expect(gaps.length).toBeGreaterThan(10);
-  expect(new Set(gaps)).toEqual(new Set([12]));
 });

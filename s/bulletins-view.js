@@ -700,8 +700,61 @@
     img.style.maxHeight = Math.max(80, Math.floor(room / z)) + 'px';
   }
 
+  /* ── The tab bar with Bulletins in it ──────────────────────── */
+
+  /* How wide a label's longest word is, in ems, in the widest face it may be
+     drawn in (Verdana or DejaVu Sans, bold when its tab is on): 0.69 em a
+     letter, "Assignments" 7.6 em (s/page-view.css measured 7.3 and kept 7.6). */
+  var EM_A_LETTER = 0.69;
+  function wordEms(label) {
+    var longest = 0;
+    String(label || '')
+      .split(/\s+/)
+      .forEach(function (w) {
+        longest = Math.max(longest, w.length);
+      });
+    return Math.max(1, longest) * EM_A_LETTER;
+  }
+
+  /* Sizes the bottom bar that has Bulletins in it, from the bar as drawn:
+     each tab as wide as its longest word needs, and one label size for all,
+     the bar's own width less 2 px a side for each tab over the words' widths,
+     12 px at most. Counts the tabs that are there (three, four, five), and
+     measures the bar's own width and zoom, so it holds in the student's page
+     and in the preview's phone frame at every Text Size. A bar without
+     Bulletins is left as s/page-view.css draws it. */
+  function fitTabs(root) {
+    if (!root || !root.querySelectorAll) return;
+    Array.prototype.forEach.call(root.querySelectorAll('.sp-tabs-bottom'), function (bar) {
+      if (!bar.querySelector(':scope > .sp-tab[data-tab="bulletins"]')) return;
+      var tabs = Array.prototype.slice.call(bar.querySelectorAll(':scope > .sp-tab'));
+      var r = bar.getBoundingClientRect();
+      var icon = bar.querySelector('.sp-tab-icon');
+      var ir = icon ? icon.getBoundingClientRect() : null;
+      if (!r.width || !ir || !ir.width || !tabs.length) return;
+      // Screen pixels per CSS pixel: the icon is drawn 22 CSS px wide.
+      var z = ir.width / 22;
+      var ems = tabs.map(function (t) {
+        var l = t.querySelector('.sp-tab-label');
+        return wordEms(l ? l.textContent : '');
+      });
+      var sum = ems.reduce(function (a, b) {
+        return a + b;
+      }, 0);
+      var font = Math.min(12, (r.width / z - (tabs.length * 4) / z) / sum);
+      bar.classList.add('sp-bulletin-tabs');
+      bar.style.setProperty('--sp-bulletin-tab-font', Math.floor(font * 100) / 100 + 'px');
+      bar.style.setProperty('--sp-bulletin-tab-pad', Math.round(200 / z) / 100 + 'px');
+      tabs.forEach(function (t, k) {
+        t.style.flexGrow = String(Math.round(ems[k] * 100) / 100);
+      });
+    });
+  }
+
   return {
     body: body,
+    fitTabs: fitTabs,
+    wordEms: wordEms,
     placeAsk: placeAsk,
     fitViewer: fitViewer,
     press: press,

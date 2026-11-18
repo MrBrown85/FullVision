@@ -246,15 +246,7 @@ window.MAddWork = (function () {
       (n
         ? '<div class="m-addwork-pages">' + taken + '</div>'
         : '<div class="m-addwork-empty">Take a photo of each page.</div>') +
-      (n < MAX_PAGES
-        ? '<label class="m-addwork-shutter" tabindex="0" aria-label="' +
-          MC.esc('Take page ' + (n + 1)) +
-          '">' +
-          SHUTTER_SVG +
-          '<input type="file" class="m-addwork-input" accept="image/*,application/pdf" capture="environment" multiple' +
-          (_s.busy ? ' disabled' : '') +
-          '></label>'
-        : '') +
+      (n < MAX_PAGES ? shutterHtml({ label: 'Take page ' + (n + 1), busy: _s.busy }) : '') +
       '</div>' +
       '<div class="m-addwork-msg" role="status">' +
       MC.esc(_s.msg) +
@@ -264,6 +256,28 @@ window.MAddWork = (function () {
       '>' +
       MC.esc(save) +
       '</button>'
+    );
+  }
+
+  /* The round shutter: a label over a file input that opens the phone's own
+     camera (capture="environment"). Bulletins' Post a Photo uses it too
+     (teacher-mobile/tab-bulletins.js). opts: label (what a screen reader
+     hears), busy, and for another screen accept and multiple (Add Work's
+     own: photos or a PDF, several at once). */
+  // html-safe: the label goes through MC.esc; accept is the caller's fixed text, escaped too.
+  function shutterHtml(opts) {
+    var o = opts || {};
+    return (
+      '<label class="m-addwork-shutter" tabindex="0" aria-label="' +
+      MC.esc(o.label || 'Take a photo') +
+      '">' +
+      SHUTTER_SVG +
+      '<input type="file" class="m-addwork-input" accept="' +
+      MC.esc(o.accept || 'image/*,application/pdf') +
+      '" capture="environment"' +
+      (o.multiple === false ? '' : ' multiple') +
+      (o.busy ? ' disabled' : '') +
+      '></label>'
     );
   }
 
@@ -560,6 +574,7 @@ window.MAddWork = (function () {
     save: save,
     skip: skip,
     done: done,
+    shutterHtml: shutterHtml,
     _state: function () {
       return _s;
     },

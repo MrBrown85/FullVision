@@ -691,6 +691,7 @@ window.PreviewStudent = (function () {
     if (typeof StudentBulletinsView !== 'undefined') {
       StudentBulletinsView.attach(screen, _bltSource, { scrollRoot: screen });
       StudentBulletinsView.fitViewer(screen, { scrollRoot: screen });
+      StudentBulletinsView.fitTabs(screen);
       // A bulletin's page open full size: drawn again once its picture is here.
       var ui = _open.ui || {};
       if (ui.bulletinFile && !screen.querySelector('.sp-bulletin-viewer-img')) {

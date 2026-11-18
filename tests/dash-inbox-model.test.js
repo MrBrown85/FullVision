@@ -331,6 +331,24 @@ describe('built classes', { timeout: 120000 }, () => {
     expect(p.newest.map(x => x.sid)).toEqual([IDS[0], IDS[2], IDS[1]]);
   });
 
+  it('puts a send with no time at all after the timed ones, keeping the class order among them', () => {
+    const aid = AIDS[0];
+    seed(
+      [aid],
+      [
+        sub(1, aid, IDS[0], { sent_by: 'student', sent_at: null, created_at: null }),
+        sub(2, aid, IDS[1], { sent_by: 'student', sent_at: '2026-11-12T10:00:00Z' }),
+        sub(3, aid, IDS[2], { sent_by: 'student', sent_at: undefined, created_at: '' }),
+        sub(4, aid, IDS[3], { sent_by: 'student', sent_at: '2026-11-10T10:00:00Z' }),
+        sub(5, aid, IDS[4], { sent_by: 'student', sent_at: 'not a time', created_at: undefined }),
+      ],
+    );
+    const order = DashInboxModel.gradeOrder(CID, aid);
+    expect(order).toEqual([IDS[3], IDS[1], IDS[0], IDS[2], IDS[4]]);
+    // The same answer however often it is asked: the sort is consistent.
+    expect(DashInboxModel.gradeOrder(CID, aid)).toEqual(order);
+  });
+
   it('counts late work and pictures a paper hand-in with no scan as a sheet', () => {
     const aid = AIDS[0];
     seed(

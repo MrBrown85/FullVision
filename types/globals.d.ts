@@ -125,6 +125,8 @@ interface Window {
   StudentOverview: unknown;
   // The phone's tab bar and last tab (teacher-mobile/tab-bar.js).
   MTabBar: unknown;
+  MBulletins: unknown;
+  MBulletinsModel: unknown;
 }
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
@@ -310,6 +312,7 @@ declare function signOut(opts?: { force?: boolean; redirect?: string }): Promise
 // seed-data.js (loaded in Demo Mode only): the sample class and its seeder.
 declare var DEFAULT_COURSES: Record<string, unknown>;
 declare function seedIfNeeded(): void;
+declare function seedDemoDrafts(): boolean;
 interface Window {
   // Set by the Netlify edge function (inject-env.js).
   __ENV?: { SUPABASE_URL?: string; SUPABASE_KEY?: string };

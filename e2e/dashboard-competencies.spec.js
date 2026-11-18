@@ -2,21 +2,13 @@
  * The Competencies tile's two pages at one third of the row (D3 of
  * docs/plans/dashboard-inbox-plan.md): Level Mix and Self-Assessment as one
  * row per competency, the row's list, the other views fitting the tile, and
- * the view menus and hover tips showing whole. Demo Mode, Science 8, with the
- * dashRow switch on.
+ * the view menus and hover tips showing whole. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
 async function openDashboard(page, { w = 1280, h = 800 } = {}) {
   await page.setViewportSize({ width: Math.max(w, 1024), height: h });
-  await page.addInitScript(() => {
-    try {
-      localStorage.setItem('fv-build-dashRow', '1');
-    } catch (e) {
-      /* storage blocked */
-    }
-  });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-comp-tile').waitFor();
@@ -561,4 +553,52 @@ test('screenshots', async ({ page }, info) => {
       await page.screenshot({ path: `${dir}/core-list-${scheme}.png` });
     }
   }
+});
+
+/* Today's Level Mix opens any level's students, with that level's shared next
+   step, from its count. The tile keeps it: each level's segment of a row's bar
+   is a button. Every level of every row of the sample class, by click and by
+   Enter or Space, gives the list today's Level Mix gives (DashInsights.popHtml,
+   unchanged), one list at a time, its heading naming the level. */
+test("every level's segment opens that level's students, as today's Level Mix does", async ({ page }) => {
+  await openDashboard(page);
+  const segs = page.locator('#dash-comp-page-curricular [data-comp-level]');
+  const n = await segs.count();
+  expect(n).toBeGreaterThan(12);
+  const seen = new Set();
+  for (let i = 0; i < n; i++) {
+    const seg = segs.nth(i);
+    const key = await seg.getAttribute('data-comp-key');
+    const level = Number(await seg.getAttribute('data-comp-level'));
+    seen.add(level);
+    // Click on even rows, the keyboard on odd ones.
+    if (i % 2) {
+      await seg.focus();
+      await page.keyboard.press(i % 4 === 1 ? 'Enter' : 'Space');
+    } else await seg.click();
+    const pop = page.locator('#dash-comp-pop');
+    await expect(pop).toBeVisible();
+    const same = await page.evaluate(
+      ([key, level]) => {
+        const want = document.createElement('div');
+        want.innerHTML = DashInsights.popHtml('sci8', getStudents('sci8'), { key, level });
+        return document.getElementById('dash-comp-pop').innerHTML === want.innerHTML;
+      },
+      [key, level],
+    );
+    expect(same, key + ' level ' + level).toBe(true);
+    const name = await page.evaluate(l => competencyDistribution('', [], {}).bands[l - 1].label, level);
+    await expect(pop.locator('.dash-mix-pop-head')).toContainText(' · ' + name + ' · ');
+    await expect(page.locator('[data-comp-level][aria-expanded="true"]')).toHaveCount(1);
+    await expect(page.locator('[data-comp-open][aria-expanded="true"]')).toHaveCount(0);
+    // Escape closes it, and the focus is back on the level's segment.
+    await page.keyboard.press('Escape');
+    await expect(pop).toBeHidden();
+    await expect(seg).toBeFocused();
+  }
+  // All four levels came up somewhere in the sample class.
+  expect([...seen].sort()).toEqual([1, 2, 3, 4]);
+  // The row's own click still opens the board's list of those below Proficient.
+  await page.locator('#dash-comp-page-curricular [data-comp-open]').first().click();
+  await expect(page.locator('#dash-comp-pop .dash-comp-pop-sum')).toBeVisible();
 });

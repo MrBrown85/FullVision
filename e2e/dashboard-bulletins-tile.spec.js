@@ -8,13 +8,14 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { bulletins = true, dashRow = true, questions = true } = {}) {
+async function open(page, { bulletins = true, oldDashRow = null, questions = true } = {}) {
   await page.addInitScript(
-    ([bulletins, dashRow]) => {
-      if (dashRow) localStorage.setItem('fv-build-dashRow', '1');
+    ([bulletins, oldDashRow]) => {
+      // What a browser that saw the row before D9 may still have kept.
+      if (oldDashRow != null) localStorage.setItem('fv-build-dashRow', oldDashRow);
       if (bulletins) localStorage.setItem('fv-build-bulletins', '1');
     },
-    [bulletins, dashRow],
+    [bulletins, oldDashRow],
   );
   // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
   await page.goto(questions ? '/login.html?student=1' : '/login.html?demo=1');
@@ -208,10 +209,10 @@ test('at 390 px wide the tile does not scroll the page sideways and no row is cu
   expect(parts.words).toEqual([true, true, true]);
 });
 
-test('with the Dashboard row off nothing of the tile draws, whatever Bulletins says', async ({ page }) => {
-  await open(page, { dashRow: false });
-  await expect(page.locator('.dash-row')).toHaveCount(0);
-  await expect(page.locator('[class*="dash-bulletins-"]')).toHaveCount(0);
+test("an old 'fv-build-dashRow' of 0 changes nothing: the row and the tile draw (D9)", async ({ page }) => {
+  await open(page, { oldDashRow: '0' });
+  await expect(page.locator('.dash-row')).toHaveCount(1);
+  await expect(page.locator('.dash-bulletins-tile')).toBeVisible();
 });
 
 test('stacked on an iPad the tile is 300 px', async ({ page }) => {

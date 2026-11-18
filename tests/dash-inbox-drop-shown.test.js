@@ -66,7 +66,6 @@ beforeEach(() => {
   localStorage.clear();
   CURRICULUM_INDEX = newBankIndex(['SCI8']);
   seedIfNeeded();
-  localStorage.setItem('fv-build-dashRow', '1');
   sendWorkOn();
 });
 afterEach(() => {
@@ -274,6 +273,43 @@ describe('drags around the tile', () => {
     const after = dragEvent(doc, 'dragover', files());
     out.dispatchEvent(after);
     expect(after.defaultPrevented).toBe(false);
+  });
+
+  it('a file let go on the class list beside the tile is refused too; the dock is left alone (D9, 5e)', () => {
+    const html = DashInbox.html(CID);
+    const dom = parseHTML(
+      '<!DOCTYPE html><html><body><div id="dock-mount"><p id="dock">Dock</p></div>' +
+        '<div id="sidebar-mount"><input id="search" type="text"><p id="roster">Cece Adeyemi</p>' +
+        '<label id="lbl">Import<input type="file"></label></div>' +
+        '<main id="main">' +
+        html +
+        '</main></body></html>',
+    );
+    const doc = dom.document;
+    globalThis.document = doc;
+    DashInboxDrop.mount(doc.getElementById('dash-inbox'), CID, DashInbox.model());
+    doc.getElementById('dash-inbox').getClientRects = () => [{}];
+    const fire = (id, type) => {
+      const dt = files();
+      const ev = dragEvent(doc, type, dt);
+      doc.getElementById(id).dispatchEvent(ev);
+      return { prevented: ev.defaultPrevented, effect: dt.dropEffect };
+    };
+    for (const id of ['roster', 'search']) {
+      expect(fire(id, 'dragover'), id).toEqual({ prevented: true, effect: 'none' });
+      expect(fire(id, 'drop').prevented, id).toBe(true);
+    }
+    // A file box (or its label) in the list and the dock are never touched.
+    for (const id of ['lbl', 'dock'])
+      for (const type of ['dragover', 'drop']) expect(fire(id, type).prevented, id + ' ' + type).toBe(false);
+    // The tile not drawn (off screen, then the Dashboard left): the list is left alone.
+    doc.getElementById('dash-inbox').getClientRects = () => [];
+    expect(fire('roster', 'drop').prevented).toBe(false);
+    doc.getElementById('dash-inbox').getClientRects = () => [{}];
+    expect(fire('roster', 'drop').prevented).toBe(true);
+    DashInboxDrop.leave(CID);
+    expect(fire('roster', 'dragover').prevented).toBe(false);
+    expect(fire('roster', 'drop').prevented).toBe(false);
   });
 
   it('a drag that began on the page is never taken as files, even if it says Files', () => {

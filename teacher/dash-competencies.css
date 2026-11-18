@@ -1,8 +1,7 @@
 /* The Competencies tile's two pages at one third of the row (D3 of
    docs/plans/dashboard-inbox-plan.md). Everything here sits inside
-   .dash-comp-tile, which D2 draws only behind the dashRow switch, so with the
-   switch off none of it applies. The tile's own box and sliding pages are in
-   dashboard.css (D2). */
+   .dash-comp-tile. The tile's own box and sliding pages are in dashboard.css
+   (D2). */
 
 /* ── Housing ────────────────────────────────────────────────── */
 /* The tile's side padding is shared with the cards' own, so the rows'
@@ -213,6 +212,72 @@
 .dash-comp-ln-bar i.is-none {
   background: var(--divider-subtle);
 }
+/* Level Mix: the row's button holds the name and number, and the bar under
+   it is one button per level (today's Level Mix had one per count). The box
+   is the row: one height for every row, as before; the bar keeps its place
+   at the foot. A level's button answers a pointer 4 px above and below its
+   8 px. */
+.dash-comp-lnbox {
+  display: flex;
+  flex: 1 0 45px;
+  flex-direction: column;
+  max-height: 64px;
+  padding-bottom: 10px;
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+.dash-comp-lnbox:hover {
+  background: var(--overlay-hover);
+}
+.dash-comp-lnbox > .dash-comp-ln.is-split {
+  flex: 1 1 auto;
+  max-height: none;
+  grid-template-rows: auto;
+  align-content: end;
+  padding-bottom: 3px;
+  border-radius: 6px 6px 0 0;
+}
+.dash-comp-lnbox > .dash-comp-ln.is-split:hover {
+  background: none;
+}
+.dash-comp-ln-segs {
+  flex: none;
+  margin: 0 4px;
+}
+.dash-comp-ln-seg {
+  position: relative;
+  display: block;
+  min-width: 3px;
+  height: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.dash-comp-ln-seg::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+.dash-comp-ln-seg:first-child {
+  border-radius: 4px 2px 2px 4px;
+}
+.dash-comp-ln-seg:last-child {
+  border-radius: 2px 4px 4px 2px;
+}
+.dash-comp-ln-seg:only-child {
+  border-radius: 4px;
+}
+.dash-comp-ln-seg:hover,
+.dash-comp-ln-seg[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.dash-comp-ln-seg:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
 /* The row's counts as text show in the tip box on the window (the name stays
    on screen). The copy inside the row is only what the box reads from. */
 .dash-comp-ln-tip {

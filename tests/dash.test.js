@@ -1323,23 +1323,13 @@ describe('dash-comp-views', () => {
           expect(row.getAttribute('aria-pressed')).toBe('false');
         });
 
-        it('Level Mix: a count per level in the class order, the largest bold, "k of n" Proficient or above', () => {
+        it('Level Mix: the card gives only its head; the Competencies tile draws the rows', () => {
+          // One bar a row, "k of n" under Proficient or Above: tests/dash-competencies-pages.test.js.
           const el = dom(card({ compView: 'mix' }));
-          expect(texts(el, '.dash-comp-lv-long')).toEqual(['EXT', 'PRF', 'DEV', 'EMG']);
-          // On a narrow card one letter each (dashboard.css), the name in the title.
-          expect(texts(el, '.dash-comp-lv-short')).toEqual(['X', 'P', 'D', 'E']);
-          expect(el.querySelector('.dash-comp-lv-long').parentNode.getAttribute('title')).toBe('Extending');
-          const rows = el.querySelectorAll('.dash-comp-row');
-          expect(texts(rows[0], '.dash-comp-cell')).toEqual(['1', '1', '1', '–']);
-          expect(texts(rows[1], '.dash-comp-cell')).toEqual(['–', '–', '1', '1']);
-          expect(texts(el, '.dash-comp-row > .dash-comp-val')).toEqual(['2 of 3', '0 of 2']);
-          const seg = rows[0].querySelector('[data-action="mixSeg"][data-level="4"]');
-          expect(seg.getAttribute('aria-label')).toBe('Inquiry: 1 Extending');
-          expect(seg.classList.contains('is-top')).toBe(true);
-          // The row's name is the filter's button; its "below" count is Ava.
-          const pick = rows[0].querySelector('.dash-comp-pick');
-          expect(pick.getAttribute('data-below')).toBe('1');
-          expect(rows[1].querySelector('.dash-comp-pick').getAttribute('data-below')).toBe('2');
+          expect(el.querySelector('.dash-comp-card').getAttribute('data-view')).toBe('mix');
+          expect(el.querySelector('#dash-view-btn-comp').textContent).toBe('Level Mix');
+          expect(el.querySelector('.dash-comp-body').children).toHaveLength(0);
+          expect(el.querySelector('[data-action="mixSeg"]')).toBeNull();
         });
 
         it('Needs Support: the students below on the most competencies first, a cell per column', () => {
@@ -1398,7 +1388,7 @@ describe('dash-comp-views', () => {
         });
 
         it('marks the picked competency in every view', () => {
-          for (const view of ['avg', 'mix', 'trend']) {
+          for (const view of ['avg', 'trend']) {
             const el = dom(card({ compView: view, naComp: 's:EV' }));
             const picked = el.querySelectorAll('[data-key="s:EV"][aria-pressed="true"]');
             expect(picked.length).toBe(1);
@@ -1444,7 +1434,7 @@ describe('dash-comp-views', () => {
       expect(el.querySelector('.dash-comp-rows.is-scroll')).toBeNull();
       expect(el.querySelector('.dash-comp-moreline')).toBeNull();
       setCols(13);
-      for (const view of ['avg', 'mix', 'trend']) {
+      for (const view of ['avg', 'trend']) {
         el = dom(card({ compView: view }));
         const list = el.querySelector('.dash-comp-scroll > .dash-comp-rows.is-scroll');
         expect(list.querySelectorAll('.dash-comp-row')).toHaveLength(13);
@@ -1486,11 +1476,6 @@ describe('dash-comp-views', () => {
       expect(row.querySelectorAll('.dash-comp-bchip.is-extra')).toHaveLength(2);
       expect(row.querySelector('.dash-comp-bmore.is-wide').textContent).toBe('+2');
       expect(row.querySelector('.dash-comp-bmore.is-narrow').textContent).toBe('+4');
-    });
-
-    it('Level Mix headings carry one letter for a narrow card', () => {
-      const el = dom(card({ compView: 'mix' }));
-      expect(texts(el, '.dash-comp-lv-short')).toEqual(['X', 'P', 'D', 'E']);
     });
   });
 
@@ -1605,7 +1590,15 @@ describe('dash-comp-views', () => {
     }
     const cardOrder = () =>
       Array.from(doc.querySelectorAll('.dash-grid > .dash-card')).map(c => c.getAttribute('data-sid'));
-    const pick = k => doc.querySelector('.dash-comp-card .dash-comp-pick[data-key="' + k + '"]');
+    // A Class Average row: the card's one-click filter (Level Mix's rows open
+    // a list first, in the Competencies tile).
+    const pick = k => {
+      if (doc.querySelector('.dash-comp-card').getAttribute('data-view') !== 'avg') {
+        localStorage.setItem('fv-dash-comp-view:' + CID, 'avg');
+        PageDashboard.render();
+      }
+      return doc.querySelector('.dash-comp-card .dash-comp-row[data-key="' + k + '"]');
+    };
 
     it('remembers the view per class on this device', () => {
       expect(doc.getElementById('dash-view-btn-comp').textContent).toBe('Level Mix');

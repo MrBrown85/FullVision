@@ -896,6 +896,9 @@
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     // The screen turned or resized: a page open full size is fitted again.
     window.addEventListener('resize', function () {
+      if (on() && S && S.screen === 'assignments' && w.StudentBulletinsView && typeof document !== 'undefined') {
+        w.StudentBulletinsView.fitTabs(document.getElementById('app'));
+      }
       if (showing() && S.bulletinFile && w.StudentBulletinsView && typeof document !== 'undefined') {
         w.StudentBulletinsView.fitViewer(document.getElementById('app'));
       }
@@ -914,6 +917,8 @@
     // Once the page is drawn: on the Bulletins tab, the strips are wired and what is on screen is watched.
     drawn: function (root, state) {
       if (!on()) return;
+      // The bar with Bulletins in it, sized from the bar as drawn (StudentBulletinsView.fitTabs).
+      if (w.StudentBulletinsView && state && state.screen === 'assignments') w.StudentBulletinsView.fitTabs(root);
       if (!showing() || state !== S) {
         if (watcher) watcher.stop();
         watcher = null;

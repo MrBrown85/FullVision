@@ -92,7 +92,6 @@ describe('the tile', () => {
     globalThis.getBulletinsMeta = () => ({ can_see: 27, no_card: 0, paused: 0, page_on: on, more: false });
   };
   beforeEach(() => {
-    localStorage.setItem('fv-build-dashRow', '1');
     localStorage.setItem('fv-build-bulletins', '1');
     document.removeEventListener = () => {};
     pageOn(true);
@@ -122,12 +121,13 @@ describe('the tile', () => {
     expect(out).toContain('dash-bulletins-time">Just Now');
   });
 
-  it('draws nothing unless both switches are on', () => {
+  it('draws nothing with the bulletins switch off; the row is on whatever an old dashRow key says (D9)', () => {
     localStorage.removeItem('fv-build-bulletins');
     expect(D.html('sci8')).toBe('');
     localStorage.setItem('fv-build-bulletins', '1');
-    localStorage.removeItem('fv-build-dashRow');
-    expect(D.html('sci8')).toBe('');
+    expect(BuildFlags.on('dashRow')).toBe(true);
+    localStorage.setItem('fv-build-dashRow', '0');
+    expect(BuildFlags.on('dashRow')).toBe(true);
   });
 
   it('Demo Mode: the sample class has its three bulletins, pinned first, with links and Seen by buttons', () => {

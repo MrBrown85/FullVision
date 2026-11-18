@@ -5,8 +5,19 @@ order: 3
 summary: What's New lists changes to FullVision by release date, newest first.
 keywords:
   - Class Management
-checked: 2026-11-14
+checked: 2026-11-18
 labels:
+  - Inbox
+  - By Assessment
+  - Grade Submissions
+  - Side by Side
+  - Flip Through
+  - Roll Call
+  - All Caught Up
+  - Recent Assessments
+  - Competencies
+  - Curricular
+  - Core
   - Add Your Students
   - Check How Your File Was Read
   - Best Guess
@@ -44,6 +55,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 18, 2026: The Dashboard's Middle Row
+
+Between the top bar and the student cards, the Dashboard now has one row as tall as the window allows; the student cards start below it. On the left, in a class whose students send work, the **Inbox** shows the work that has come in. **By Assessment** lists each assessment with work to assess, newest first, with **Grade Submissions** to open the grader on it. **Side by Side**, **Flip Through** and **Roll Call** show the same work as pages side by side, one student at a time, or the whole class. With nothing left to assess, the Inbox says **All Caught Up**, and a scan or files dropped on it open Add Work for the Class with them placed. In a class that does not take work, the left tile is **Recent Assessments**. On the right, one **Competencies** tile switches between **Curricular** and **Core**; select a row to see its students. To Grade in the top bar now goes to the Inbox.
 
 ## Nov 16, 2026: Reflect
 

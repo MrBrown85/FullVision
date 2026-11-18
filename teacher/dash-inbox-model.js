@@ -299,14 +299,21 @@ window.DashInboxModel = (function () {
       if (!newest[key] || (s.version || 1) > (newest[key].version || 1)) newest[key] = s;
     });
     var group = /** @type {any} */ (window).getGroupSubmissions;
+    // A send with no time (or one that does not read as a time) goes after
+    // every timed one; two of them keep the class list's order.
+    /** @param {any} s */
+    function time(s) {
+      var t = Date.parse(_at(s));
+      return isNaN(t) ? Infinity : t;
+    }
     /** @param {string} sid */
     function when(sid) {
       var s = newest[sid];
-      if (s) return Date.parse(_at(s));
+      if (s) return time(s);
       var best = Infinity;
       if (typeof group === 'function')
         group(cid, sid, aid).forEach(function (/** @type {any} */ m) {
-          best = Math.min(best, Date.parse(_at(m)));
+          best = Math.min(best, time(m));
         });
       return best;
     }

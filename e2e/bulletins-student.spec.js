@@ -475,3 +475,167 @@ for (const width of WIDTHS) {
     });
   }
 }
+
+/* The bar with Bulletins in it (StudentBulletinsView.fitTabs): every label whole, inside its tab, at
+   every width and Text Size in both fonts; the drawn size never smaller at a bigger Text Size; five
+   tabs fit as well as four; and in the teacher's Preview as Student, sized from the phone frame's bar,
+   not the teacher's window. */
+async function tabLabels(page, scope) {
+  return page.locator(scope + ' .sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
+    els.map(el => {
+      const tab = el.closest('.sp-tab').getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const rects = [...range.getClientRects()].filter(r => r.width > 0);
+      const lines = new Set(rects.map(r => Math.round(r.top))).size;
+      const icon = el.closest('.sp-tab').querySelector('.sp-tab-icon').getBoundingClientRect();
+      return {
+        text: el.textContent,
+        drawn: Math.round(parseFloat(getComputedStyle(el).fontSize) * (icon.width / 22) * 10) / 10,
+        fits:
+          rects.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1) &&
+          lines <= el.textContent.split(' ').length,
+        icon: Math.round(icon.top),
+      };
+    }),
+  );
+}
+
+for (const width of WIDTHS) {
+  test.describe(width + ' px, the tab bar', () => {
+    test.use({ viewport: { width, height: 700 }, isMobile: true, hasTouch: true });
+
+    test('labels whole in both fonts, and never smaller at a bigger Text Size', async ({ page }) => {
+      test.setTimeout(90_000);
+      for (const font of ['own', 'wide']) {
+        const drawn = [];
+        for (const size of SIZES) {
+          await page.goto('about:blank');
+          await open(page, { size });
+          if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
+          // Drawn again in that font, as a page first drawn in it is.
+          await page.evaluate(() => StudentBulletinsView.fitTabs(document.getElementById('app')));
+          const labels = await tabLabels(page, '#app');
+          expect(labels.map(l => l.text)).toEqual(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
+          expect(
+            labels.filter(l => !l.fits),
+            font + ' ' + size,
+          ).toEqual([]);
+          expect(new Set(labels.map(l => l.icon)).size).toBe(1);
+          drawn.push(labels[1].drawn);
+        }
+        expect(drawn[1], font + ': Large against Normal ' + drawn).toBeGreaterThanOrEqual(drawn[0]);
+        expect(drawn[2], font + ': Larger against Large ' + drawn).toBeGreaterThanOrEqual(drawn[1]);
+      }
+    });
+
+    test('five tabs fit as four do, in the wide font at Larger', async ({ page }) => {
+      await open(page, { size: 'larger' });
+      await page.addStyleTag({ content: WIDE_FONT });
+      await page.evaluate(() => {
+        const bar = document.querySelector('#app .sp-tabs-bottom');
+        const extra = bar.querySelector('[data-tab="assignments"]').cloneNode(true);
+        extra.classList.remove('sp-tab-on');
+        extra.removeAttribute('aria-current');
+        bar.appendChild(extra);
+        StudentBulletinsView.fitTabs(document.getElementById('app'));
+      });
+      const labels = await tabLabels(page, '#app');
+      expect(labels).toHaveLength(5);
+      expect(labels.filter(l => !l.fits)).toEqual([]);
+      expect(new Set(labels.map(l => l.icon)).size).toBe(1);
+    });
+  });
+}
+
+test.describe('Preview as Student, a desktop window', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('the bar in the phone frame holds four tabs at every Text Size, in both fonts', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.clock.install({ time: NOW });
+    await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
+    await page.goto('/login.html?demo=1');
+    await page.waitForFunction(
+      () =>
+        typeof PreviewStudent !== 'undefined' &&
+        typeof getStudents === 'function' &&
+        (getStudents('sci8') || []).length > 0,
+    );
+    await page.evaluate(() => PreviewStudent.open('sci8', 'st1'));
+    const screen = '.ps-screen';
+    await expect(page.locator(screen + ' .sp-tabs-bottom [data-tab="bulletins"]')).toBeVisible();
+    for (const font of ['own', 'wide']) {
+      if (font === 'wide') {
+        await page.addStyleTag({
+          content: '.ps-screen, .ps-screen * { font-family: Verdana, "DejaVu Sans", sans-serif !important; }',
+        });
+      }
+      for (const size of SIZES) {
+        await page.locator(screen + ' .sp-gear').click();
+        await page.locator(screen + ' .sp-set-size[data-size="' + size + '"]').click();
+        await page.locator(screen + ' .sp-set-done').click();
+        await page.evaluate(() => StudentBulletinsView.fitTabs(document.querySelector('.ps-screen')));
+        const labels = await tabLabels(page, screen);
+        expect(labels.map(l => l.text)).toEqual(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
+        expect(
+          labels.filter(l => !l.fits),
+          font + ' ' + size,
+        ).toEqual([]);
+        expect(new Set(labels.map(l => l.icon)).size).toBe(1);
+      }
+    }
+  });
+});
+
+/* Switch Class (gear review, should-fix): at every Text Size, the current class's tick stays on its
+   name's line, and its counts ("3 to do", and "2 new" with Bulletins on) stay whole inside the row. */
+for (const flag of [false, true]) {
+  test.describe('Switch Class at 320 px, Bulletins ' + (flag ? 'on' : 'off'), () => {
+    test.use({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
+
+    test('the tick beside the name, the counts whole, at every Text Size and in both fonts', async ({ page }) => {
+      test.setTimeout(90_000);
+      for (const font of ['own', 'wide']) {
+        for (const size of SIZES) {
+          await page.goto('about:blank');
+          await open(page, { flag, size });
+          if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
+          await page.getByRole('button', { name: 'Settings', exact: true }).click();
+          await page.locator('.sp-set [data-act="card-add"]').click();
+          await page.locator('#sp-code').fill('ABCD-EFGH');
+          await page.getByRole('button', { name: 'Continue' }).click();
+          await page.getByLabel('Student Number').fill('1234567');
+          await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+          await expect(page.locator('.sp-head-title')).toHaveText('Humanities 8');
+          await page.getByRole('button', { name: 'Settings', exact: true }).click();
+          await page.locator('.sp-set .sp-class', { hasText: 'Science 8' }).click();
+          await expect(page.locator('.sp-head-title')).toHaveText('Science 8');
+          await page.getByRole('button', { name: 'Settings', exact: true }).click();
+          await page.waitForTimeout(300);
+          const rows = await page.locator('.sp-set .sp-class').evaluateAll(els =>
+            els.map(el => {
+              const r = el.getBoundingClientRect();
+              const name = el.querySelector('.sp-class-name').getBoundingClientRect();
+              const tick = el.querySelector('.sp-class-tick');
+              const t = tick ? tick.getBoundingClientRect() : null;
+              return {
+                name: el.querySelector('.sp-class-name').textContent,
+                tick: !t || (t.top < name.bottom && t.bottom > name.top),
+                counts: [...el.querySelectorAll('.sp-class-todo, .sp-bulletin-class-new')].every(x => {
+                  const q = x.getBoundingClientRect();
+                  return q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && x.scrollWidth <= x.clientWidth + 1;
+                }),
+              };
+            }),
+          );
+          expect(
+            rows.filter(x => !x.tick || !x.counts),
+            font + ' ' + size,
+          ).toEqual([]);
+          if (flag) await expect(page.locator('.sp-set .sp-bulletin-class-new')).toHaveText('2 new');
+        }
+      }
+    });
+  });
+}
