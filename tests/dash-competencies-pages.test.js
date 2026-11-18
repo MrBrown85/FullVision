@@ -402,7 +402,7 @@ describe('Self-Assessment, one row per Core Competency', () => {
       CORE_COMPETENCIES[0].label + ': 3 of 4 self-assessed. Beginning 1, Growing 1, Confident 0, Leading 1, Not yet 1',
     );
     const few = by(CORE_COMPETENCIES[1].id);
-    expect(few.querySelector('.dash-comp-ln-num').textContent).toBe('Only1 of 4');
+    expect(few.querySelector('.dash-comp-ln-num').textContent).toBe('Only 1 of 4');
     expect(few.getAttribute('aria-label')).toContain(': only 1 of 4 self-assessed.');
     expect(el.textContent).toContain('Self-Assessed');
     // Today's Core card's own test (k * 3 < n * 2): exactly two thirds is not "only".

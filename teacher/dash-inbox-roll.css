@@ -238,8 +238,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--divider-subtle);
+  padding-top: 4px;
+}
+.dash-inbox-roll-count b {
+  font-weight: 600;
+  color: var(--text);
 }
 .dash-inbox-roll-key {
   display: inline-flex;

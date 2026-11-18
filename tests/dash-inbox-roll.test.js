@@ -92,7 +92,8 @@ describe('the model', () => {
     const marcus = light.students.find(c => c.full === 'Marcus Lee');
     expect(marcus.late).toBe(true);
     expect(marcus.said).toContain('Late');
-    expect(light.foot).toContain('1 Late');
+    // One or two late are named on the foot, as board C4 does.
+    expect(light.foot).toContain('Late: Marcus Lee');
   });
 
   it('says Not In Yet for a student with nothing in', () => {
@@ -270,6 +271,12 @@ describe('the names', () => {
     expect(DashInboxRoll.footText(c, ['Ethan Dubois'])).toBe('10 in · 17 not in · 2 Late · Ethan Dubois on paper');
     expect(DashInboxRoll.footText(c, ['A B', 'C D'])).toBe('10 in · 17 not in · 2 Late · A B and C D on paper');
     expect(DashInboxRoll.footText({ in: 1, notin: 2, late: 0 }, ['a', 'b', 'c'])).toBe('1 in · 2 not in · 3 on paper');
+    expect(DashInboxRoll.footText(c, [], ['Sam Blackwood', 'Fatima Hassan'])).toBe(
+      '10 in · 17 not in · Late: Sam Blackwood, Fatima Hassan',
+    );
+    expect(DashInboxRoll.footText({ in: 10, notin: 17, late: 3 }, [], ['A', 'B', 'C'])).toBe(
+      '10 in · 17 not in · 3 Late',
+    );
   });
 });
 

@@ -244,8 +244,11 @@
 .dash-comp-lnbox:hover {
   background: var(--overlay-hover);
 }
+/* The name's button is as tall as a two-line name in every row, so the rows
+   stay one height and their bars line up. */
 .dash-comp-lnbox > .dash-comp-ln.is-split {
   flex: 0 0 auto;
+  min-height: 33px;
   grid-template-rows: auto;
   align-content: end;
   padding-bottom: 3px;

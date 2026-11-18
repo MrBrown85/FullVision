@@ -432,7 +432,8 @@ window.DashInboxRoll = (function () {
       '">' +
       chips +
       '</div><div class="dash-inbox-roll-foot"><span class="dash-inbox-roll-count" role="status">' +
-      esc(m.foot) +
+      // The two counts in bold, as the board draws them.
+      esc(m.foot).replace(/^(\d+)( in · )(\d+)( not in)/, '<b>$1</b>$2<b>$3</b>$4') +
       '</span>' +
       // What the tick means, once, where any chip has one.
       (m.students.some(function (/** @type {any} */ c) {
