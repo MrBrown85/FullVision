@@ -166,16 +166,6 @@ describe('Assignments: one card opens and closes on its own', () => {
     sameAsRedraw();
   });
 
-  it('a rubric card shows the hover bar while open, and hides it once closed', async () => {
-    openAssignments(seed, CID, {});
-    await settled();
-    click(header(LAB));
-    expect(document.getElementById('rsg-descriptor-bar').style.display).toBe('flex');
-    click(header(LAB));
-    expect(document.getElementById('rsg-descriptor-bar').style.display).toBe('none');
-    sameAsRedraw();
-  });
-
   it('what an opened card draws to return is remembered: an event that changes nothing rewrites none of it', async () => {
     openAssignments(seed, CID, {});
     await settled();

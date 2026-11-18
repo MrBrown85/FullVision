@@ -117,6 +117,8 @@
     "shared/scan-label-read.js",
     "teacher/scan-labels.js",
     "teacher-mobile/split-scan-model.js",
-    "teacher-mobile/split-scan.js"
+    "teacher-mobile/split-scan.js",
+    "teacher/rubric-words.js",
+    "teacher/bulletin-share.js"
   ]
 }

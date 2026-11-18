@@ -2,13 +2,13 @@
   "demo": {
     "demo proficiency › toolbar": "sha256:59de13717330bfeaf74c9ed7d60253b984ec4652142bcd5849cd226e5aa8f886 of 3591 characters",
     "demo proficiency › list, nothing open": "sha256:f240ff6ad527f4e0bfb838470bdd861e3493e4369bbd261ebfe988d2ef504155 of 240142 characters",
-    "demo proficiency › list, every card open": "sha256:eb648da9084837678a937fabf603244a908a9112b8ede62374119744cf2e8186 of 8241437 characters",
+    "demo proficiency › list, every card open": "sha256:5dabd1aa88cf5fd66bfd391a6015d74c6119a199eba15a30b07e087d77b03956 of 8295869 characters",
     "demo letter › toolbar": "sha256:59de13717330bfeaf74c9ed7d60253b984ec4652142bcd5849cd226e5aa8f886 of 3591 characters",
     "demo letter › list, nothing open": "sha256:f240ff6ad527f4e0bfb838470bdd861e3493e4369bbd261ebfe988d2ef504155 of 240142 characters",
-    "demo letter › list, every card open": "sha256:eb648da9084837678a937fabf603244a908a9112b8ede62374119744cf2e8186 of 8241437 characters",
+    "demo letter › list, every card open": "sha256:5dabd1aa88cf5fd66bfd391a6015d74c6119a199eba15a30b07e087d77b03956 of 8295869 characters",
     "demo both › toolbar": "sha256:59de13717330bfeaf74c9ed7d60253b984ec4652142bcd5849cd226e5aa8f886 of 3591 characters",
     "demo both › list, nothing open": "sha256:f240ff6ad527f4e0bfb838470bdd861e3493e4369bbd261ebfe988d2ef504155 of 240142 characters",
-    "demo both › list, every card open": "sha256:eb648da9084837678a937fabf603244a908a9112b8ede62374119744cf2e8186 of 8241437 characters",
+    "demo both › list, every card open": "sha256:5dabd1aa88cf5fd66bfd391a6015d74c6119a199eba15a30b07e087d77b03956 of 8295869 characters",
     "keys": "gb-assessments-sci8 gb-categories-sci8 gb-config gb-core-self-sci8 gb-courseconfig-sci8 gb-courses gb-demo-unit2-reflection gb-learningmap-sci8 gb-modules-sci8 gb-obs-templates-teacher gb-questionnaires-sci8 gb-quick-obs-sci8 gb-responses-sci8 gb-rubric-checks-sci8 gb-rubrics-sci8 gb-scores-sci8 gb-statuses-sci8 gb-student-feedback-sci8 gb-student-work-sci8 gb-students-sci8 gb-term-ratings-sci8"
   },
   "signedIn": {

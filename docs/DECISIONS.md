@@ -818,6 +818,14 @@ Context: a teacher with two sections of a course (English 9 in blocks A and B) w
 8. **The form's Classes row** (2026-10-18 follow-up) sits under the title as chips: this class fixed, the other sections of the course as toggles, other classes behind "More classes". A new assessment starts with the classes ticked last time in that class (remembered per class on this device); an edit starts with none. Dates are "Same for every class" unless "Set per class" is chosen.
 9. **Linked copies are visible where the teacher works:** an "Also in …" chip on the assessment card opens that copy in its class; a section toggle beside the course picker switches between sections of the same course; the delete confirmation says a copy stays elsewhere; the "Update the other classes too?" dialog lists exactly what will change in each class.
 
+## Standard rubrics' words, Share on reminders, no descriptor bar (2026-11-18)
+
+Colin: teachers see an Advanced Rubric's boxes under each level but not the words they wrote for a Standard one; give them the option. Remove the popup at the bottom of the page and its code. Add a Share button to the reminders.
+
+- **Words**, beside a Standard rubric criterion's Comment on the class grid, shows every Standard row's wording, each level's under its own button, and this device remembers the choice (`teacher/rubric-words.js`). The words are drawn only while it is on.
+- **The descriptor bar is gone** (`teacher/assign-descriptor-bar.js` and its CSS): the strip at the bottom of the Assignments page that showed one level's words on hover, and a competency level's lines on hover, focus or a held finger. Words takes its place for rubrics; the one-student grader's tiles already show each level's words on hover.
+- **Share** is on a reminder's ⋯ menu (`teacher/bulletin-share.js`): its words and link go to the device's share sheet, or are copied where there is none. Nothing is sent from FullVision.
+
 ## Assignments: Grade and Bulk Edit (2026-11-18)
 
 Colin, on the toolbar's Cards | List switch: "List is confusing- this should be Grade and Bulk Edit." The switch now reads **Grade | Bulk Edit**: the cards are where work is graded, the list where settings are changed for many pieces at once. Only the words change; the views, what each holds and what is remembered are as before.

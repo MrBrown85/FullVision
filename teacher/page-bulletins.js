@@ -817,7 +817,9 @@
         : esc(label.slice(0, split)) + ' · <span class="bulletin-not-seen">' + esc(label.slice(split + 3)) + '</span>';
     var open = !!(_seen[b.id] && _seen[b.id].data !== undefined);
     var h =
-      '<button type="button" class="bulletin-seen-btn" data-bulletin="seen" data-id="' +
+      '<button type="button" class="bulletin-seen-btn" style="--seen:' +
+      (canSee ? Math.round((100 * seen) / canSee) : 0) +
+      '%" data-bulletin="seen" data-id="' +
       esc(b.id) +
       '" aria-expanded="' +
       open +
@@ -833,7 +835,7 @@
       })[0];
       if (a) {
         h +=
-          '<span>Linked to <a href="/assignments?course=' +
+          '<span class="bulletin-linked">Linked to <a href="/assignments?course=' +
           esc(encodeURIComponent(_cid)) +
           '&amp;open=' +
           esc(encodeURIComponent(a.id)) +
@@ -875,7 +877,9 @@
       (open ? '' : ' hidden') +
       '><button type="button" role="menuitem" class="bulletin-menu-item" data-bulletin="edit" data-id="' +
       id +
-      '">Edit</button><button type="button" role="menuitem" class="bulletin-menu-item" data-bulletin="pin" data-id="' +
+      '">Edit</button>' +
+      (window.BulletinShare ? BulletinShare.itemHtml(b) : '') +
+      '<button type="button" role="menuitem" class="bulletin-menu-item" data-bulletin="pin" data-id="' +
       id +
       '" data-pinned="' +
       b.pinned +
@@ -966,7 +970,8 @@
   function _postHtml(b) {
     var when = b.posted_at || b.created_at || '';
     var h =
-      '<article class="bulletin-card bulletin-post' +
+      '<article class="bulletin-card bulletin-post is-' +
+      (b.kind === 'reminder' ? 'reminder' : 'announcement') +
       (b.id === _arrivedId ? ' bulletin-arrived" tabindex="-1' : '') +
       '" data-bulletin-id="' +
       esc(b.id) +
@@ -1008,7 +1013,7 @@
       return b.pinned;
     });
     if (pinned.length) {
-      h += '<span class="bulletin-day">Pinned</span>';
+      h += '<span class="bulletin-day is-pinned">Pinned</span>';
       pinned.forEach(function (b) {
         h += _postHtml(b);
       });
