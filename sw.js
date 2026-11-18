@@ -306,6 +306,7 @@ const PRECACHE_URLS = [
   // Teacher mobile
   '/teacher-mobile/index.html',
   '/teacher-mobile/styles.css',
+  '/teacher-mobile/pin-page.js',
   '/teacher-mobile/components.js',
   '/teacher-mobile/card-widgets.js',
   '/teacher-mobile/card-widget-editor.js',
