@@ -280,6 +280,7 @@ function serverPage(gradingSystem) {
         score_mode: a.scoreMode || 'proficiency',
         max_points: a.maxPoints == null ? null : a.maxPoints,
         weight: 1,
+        students_see_factored: false,
         rubric_id: a.rubricId || null,
         tag_ids: a.tagIds.slice().sort(),
         description: null,
@@ -521,6 +522,23 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
       percent: formatPointsPercent(8, 10),
       bar: 80,
     });
+    // Points at a Factor: the score as entered until the teacher turns on
+    // Show Students the Factored Score, then the score times the Factor,
+    // the same percent and bar (DECISIONS, "The factored score").
+    const quick = getAssessments(CID).find(a => a.id === 'a-quick');
+    const kept = { weight: quick.weight, on: quick.studentsSeeFactored };
+    const quickNow = () => StudentView.fromCache(CID, S1).view.work.find(p => p.id === 'a-quick').result;
+    try {
+      quick.weight = 4;
+      expect(quickNow().text).toBe('8 / 10');
+      quick.studentsSeeFactored = true;
+      expect(quickNow()).toEqual(
+        Object.assign({}, by['a-quick'].result, { text: '32 / 40', points: '32', outOf: '40', factor: 4 }),
+      );
+    } finally {
+      quick.weight = kept.weight;
+      quick.studentsSeeFactored = kept.on;
+    }
     // Preview: no Updated mark, and every returned piece unopened, whatever
     // the student has opened (ruling 116). The student's own page still
     // marks them: below, the same reply drawn by the phone.

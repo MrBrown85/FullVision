@@ -476,6 +476,24 @@ function formatFactor(w) {
   return (v > 0 && isFinite(v) ? formatPoints(v) : '1') + '\u00d7';
 }
 
+/* A points score times its assessment's Factor, for display only
+   (DECISIONS, "The factored score"): 5 of 6 at Factor 4× is 20 of 24. The
+   stored score stays the one entered and the course % is unchanged; the
+   percent is the same either way. { points, outOf, factor }, or null where
+   it means nothing: not points work (Complete/Incomplete included), a
+   Factor of 1× (anything not more than 0 counts as 1, as
+   getAssessmentWeight), or no score. maxPoints defaults to the
+   assessment's own. */
+function factoredPoints(a, points, maxPoints) {
+  if (!a || !isPointsScored(a) || isCompletionScored(a)) return null;
+  var factor = Number(a.weight) > 0 ? Number(a.weight) : 1;
+  if (factor === 1) return null;
+  if (points == null || points === '' || !isFinite(Number(points))) return null;
+  var most = maxPoints != null ? maxPoints : a.maxPoints != null ? a.maxPoints : a.max_points;
+  var max = Number(most) || 100;
+  return { points: Number(points) * factor, outOf: max * factor, factor: factor };
+}
+
 /* Category pill tint — soft pastel chip palette assigned by index.
    Categories rotate through CATEGORY_PALETTE in the order they were created
    (1st category → palette[0], 2nd → palette[1], …, 11th → palette[0] again).
