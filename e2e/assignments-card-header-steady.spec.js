@@ -1,11 +1,17 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 // A closed card's edit / duplicate / delete (and print, Grade By) buttons
 // stay out of its layout: the title and chips use the card's full width,
 // hovering moves nothing, and a narrow window puts them on their own row
 // once the card is open.
+//
+// Measured with the Student Page off, as written: with it on, every card
+// gains a Returned chip, and the longest chip rows wrap on CI's wider fonts
+// (Nov 18), which says nothing about the hidden buttons.
 
 async function openDemoAssignments(page, path = '/assignments?course=sci8', ready = '.assess-card') {
+  await demoStudentPageOff(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/);
