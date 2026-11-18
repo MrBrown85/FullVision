@@ -7,11 +7,21 @@
    shown is kept per class on the device by page-dashboard.js, which reads
    and writes it through its _readPref and _writePref and hands it to html()
    as opts.compPage. Nothing here holds state: the Dashboard redraws as one
-   string, so the open page is always read from that choice. */
+   string, so the open page is always read from that choice.
+
+   D3 draws the two pages for the tile's one-third width. Curricular opens on
+   Level Mix: one row per competency, one stacked bar in the top bar's solid
+   level colours, "21 of 27" under "Proficient or Above". Core opens on
+   Self-Assessment: the same, in the self-assessment blues, under
+   "Self-Assessed". A row is a button; a click opens a small list in place
+   (the one thing this module does hold: which row is open, so a redraw
+   keeps it). The other views are today's cards, drawn by DashOverview. */
 window.DashCompetencies = (function () {
   'use strict';
 
   var PREF_KEY = 'fv-dash-comp-page:';
+  var VIEW_PREF = 'fv-dash-comp-view:';
+  var VIEW_KEYS = ['avg', 'mix', 'below', 'trend'];
   /** @type {{ key: string, label: string }[]} */
   var PAGES = [
     { key: 'curricular', label: 'Curricular' },
@@ -78,11 +88,22 @@ window.DashCompetencies = (function () {
         '</button>'
       );
     }).join('');
+    _last = opts;
+    var cid = String(opts && opts.cid);
+    var curView = curricularView(opts);
+    var coreSelfOn = coreSelfShown(opts);
+    // A list left open on another visit to the Dashboard is not brought back.
+    if (_open && !document.getElementById('dash-comp-pop')) _open = null;
+    // The open row is kept only while its page still shows rows.
+    if (_open && (_open.cid !== cid || (_open.page === 'curricular' ? curView !== 'mix' : !coreSelfOn))) _open = null;
     /** @type {Record<string, string>} */
     var cards = {
-      curricular: DashOverview.competenciesCardHtml(opts),
-      core: DashOverview.coreCardHtml(opts),
+      curricular: curricularCard(opts, curView),
+      core: coreSelfOn ? coreSelfCard(opts) : DashOverview.coreCardHtml(opts),
     };
+    var popInner = _open ? popBody(opts, _open) : '';
+    if (!popInner) _open = null;
+    _queuePlace();
     var pages = PAGES.map(function (p) {
       var on = p.key === page;
       return (
@@ -110,7 +131,13 @@ window.DashCompetencies = (function () {
       '<div class="dash-comp-pages"><div class="dash-comp-track">' +
       pages +
       '</div></div>' +
-      '</section>'
+      '</section>' +
+      // Outside the tile, which clips: the list is placed on the window (place).
+      '<div class="dash-comp-pop" id="dash-comp-pop" role="dialog" aria-label="Students"' +
+      (popInner ? '' : ' hidden') +
+      '>' +
+      popInner +
+      '</div>'
     );
   }
 
@@ -141,5 +168,579 @@ window.DashCompetencies = (function () {
     return tab;
   }
 
-  return { PREF_KEY: PREF_KEY, PAGES: PAGES, pageOf: pageOf, pageForKey: pageForKey, html: html, show: show };
+  /* ── State: the one open row ───────────────────────────────── */
+  /** The row whose list is open, kept here so a redraw loses nothing.
+   * @type {{ cid: string, page: string, key: string } | null} */
+  var _open = null;
+  /** What the last draw was given: the list is drawn from it without a redraw.
+   * @type {any} */
+  var _last = null;
+  /** Where focus was when the page was last drawn, to put it back after.
+   * @type {{ pop?: boolean, key?: string, page?: string } | null} */
+  var _refocus = null;
+
+  /** @param {string} id */
+  function _el(id) {
+    return document.getElementById(id);
+  }
+
+  /** The Curricular page's view. Level Mix is the tile's default in every
+   * grading style; the flag-off card keeps its own default (Class Average in
+   * a Letter class). A saved pick always wins.
+   * @param {any} opts
+   * @returns {string} */
+  function curricularView(opts) {
+    var cid = opts.cid;
+    var view = DashOverview.compView(cid, opts.compView);
+    if (view !== 'avg') return view;
+    var saved = null;
+    try {
+      saved = localStorage.getItem(VIEW_PREF + cid);
+    } catch (e) {
+      /* storage blocked: the default stands */
+    }
+    return saved === 'avg' ? view : 'mix';
+  }
+
+  /** The counts one competency's bar and number are made of, as
+   * competencyDistribution bands them: no level is worked out here.
+   * @param {any} dist
+   * @returns {{ counts: number[], scored: number, above: number }} */
+  function mixCounts(dist) {
+    var counts = dist.bands.map(function (/** @type {any} */ b) {
+      return b.ids.length;
+    });
+    var scored = counts.reduce(function (/** @type {number} */ a, /** @type {number} */ b) {
+      return a + b;
+    }, 0);
+    return { counts: counts, scored: scored, above: counts[2] + counts[3] };
+  }
+
+  /** The one competency with the fewest at Proficient or above, or '' when
+   * two or more share the fewest, when fewer than two are scored on by
+   * anyone, or when no one is scored. A competency nobody is scored on never
+   * counts.
+   * @param {{ key: string, scored: number, above: number }[]} rows
+   * @returns {string} */
+  function lowestKey(rows) {
+    var scored = rows.filter(function (r) {
+      return r.scored > 0;
+    });
+    if (scored.length < 2) return '';
+    var min = Math.min.apply(
+      null,
+      scored.map(function (r) {
+        return r.above;
+      }),
+    );
+    var at = scored.filter(function (r) {
+      return r.above === min;
+    });
+    return at.length === 1 ? at[0].key : '';
+  }
+
+  /** Whether a Self-Assessed count is low: under half the class.
+   * @param {number} k
+   * @param {number} n */
+  function isFew(k, n) {
+    return n > 0 && k * 2 < n;
+  }
+
+  /** @param {string} label @param {string} cls */
+  function _legendItem(label, cls) {
+    return '<span><i class="' + cls + '"></i>' + esc(label) + '</span>';
+  }
+
+  /** @param {string} legend @param {string} head @param {string} rows @param {string} label */
+  function _linesBody(legend, head, rows, label) {
+    return (
+      '<div class="dash-comp-body dash-comp-lines-body">' +
+      '<div class="dash-comp-legend">' +
+      legend +
+      '</div>' +
+      '<div class="dash-comp-colhead"><span>Competency</span><span>' +
+      esc(head) +
+      '</span></div>' +
+      '<div class="dash-comp-lines" aria-label="' +
+      esc(label) +
+      '">' +
+      rows +
+      '</div></div>'
+    );
+  }
+
+  /** One row: a button with its name, number and one bar. `tag` is the word
+   * beside the number (Lowest, Only); `bar` the stacked segments.
+   * @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean }} r */
+  function _line(r) {
+    return (
+      '<button type="button" class="dash-comp-ln' +
+      (r.tag ? ' is-flag' : '') +
+      (r.picked ? ' is-picked' : '') +
+      '" data-comp-open="' +
+      esc(r.key) +
+      '" data-comp-page="' +
+      r.page +
+      '" aria-haspopup="dialog" aria-expanded="' +
+      r.open +
+      '" aria-label="' +
+      esc(r.label) +
+      '" title="' +
+      esc(r.label) +
+      '"><span class="dash-comp-ln-name">' +
+      esc(r.name) +
+      '</span><span class="dash-comp-ln-num">' +
+      (r.tag ? '<span class="dash-comp-ln-tag">' + esc(r.tag) + '</span>' : '') +
+      esc(r.num) +
+      '</span><span class="dash-comp-ln-bar" aria-hidden="true">' +
+      r.bar +
+      '</span><span class="dash-comp-ln-tip" aria-hidden="true">' +
+      esc(r.tip) +
+      '</span></button>'
+    );
+  }
+
+  /** The Curricular page's card. Level Mix is drawn here; every other view
+   * is today's card.
+   * @param {any} opts @param {string} view */
+  function curricularCard(opts, view) {
+    var o = Object.assign({}, opts, { compView: view });
+    var card = DashOverview.competenciesCardHtml(o);
+    if (view !== 'mix') return card;
+    var cid = opts.cid;
+    var cols = DashInsights.columns(cid);
+    var at = card.indexOf('<div class="dash-comp-body">');
+    if (!cols.length || at < 0) return card;
+    var ids = (opts.allStudents || []).map(function (/** @type {any} */ s) {
+      return s.id;
+    });
+    var model = cols.map(function (/** @type {any} */ col) {
+      var m = mixCounts(competencyDistribution(cid, ids, col.which));
+      return { col: col, key: col.key, counts: m.counts, scored: m.scored, above: m.above };
+    });
+    var low = lowestKey(model);
+    var rows = model
+      .map(function (m) {
+        var names = m.counts
+          .map(function (/** @type {number} */ n, /** @type {number} */ i) {
+            return PROF_LABELS[i + 1] + ' ' + n;
+          })
+          .join(' · ');
+        var bar = m.scored
+          ? m.counts
+              .map(function (/** @type {number} */ n, /** @type {number} */ i) {
+                return n ? '<i style="flex:' + n + ';background:var(--score-' + (i + 1) + ')"></i>' : '';
+              })
+              .join('')
+          : '<i class="is-none" style="flex:1"></i>';
+        var label = m.scored
+          ? m.col.title +
+            ': ' +
+            m.above +
+            ' of ' +
+            m.scored +
+            ' Proficient or above' +
+            (m.key === low ? ', the lowest' : '') +
+            '. ' +
+            names.replace(/ · /g, ', ')
+          : m.col.title + ': not scored yet';
+        return _line({
+          key: m.key,
+          page: 'curricular',
+          name: m.col.label,
+          num: m.scored ? m.above + ' of ' + m.scored : '—',
+          tag: m.key === low ? 'Lowest' : '',
+          label: label,
+          tip: m.scored ? names : 'Not scored yet',
+          bar: bar,
+          picked: opts.naComp === m.key,
+          open: !!_open && _open.page === 'curricular' && _open.key === m.key,
+        });
+      })
+      .join('');
+    var legend = [1, 2, 3, 4]
+      .map(function (l) {
+        return _legendItem(PROF_LABELS[l], 'dash-comp-sw-' + l);
+      })
+      .join('');
+    return (
+      card.slice(0, at) + _linesBody(legend, 'Proficient or Above', rows, 'Curricular competencies') + '</section>'
+    );
+  }
+
+  /** Each Core Competency with the students at each self-assessed step.
+   * @param {any} opts */
+  function coreModel(opts) {
+    var students =
+      typeof sortStudents === 'function' ? sortStudents(opts.allStudents || [], 'lastName') : opts.allStudents || [];
+    return CORE_COMPETENCIES.map(function (/** @type {any} */ cc) {
+      var ratings = (opts.coreSelf && opts.coreSelf.byCore && opts.coreSelf.byCore[cc.id]) || {};
+      /** @type {Record<number, any[]>} */
+      var by = { 1: [], 2: [], 3: [], 4: [] };
+      /** @type {any[]} */
+      var notYet = [];
+      students.forEach(function (/** @type {any} */ s) {
+        var lv = ratings[s.id];
+        if (by[lv]) by[lv].push(s);
+        else notYet.push(s);
+      });
+      var n = students.length;
+      return { cc: cc, by: by, notYet: notYet, n: n, k: n - notYet.length };
+    });
+  }
+
+  /** The Core page's Self-Assessment card, in the blues.
+   * @param {any} opts */
+  function coreSelfCard(opts) {
+    var card = DashOverview.coreCardHtml(opts);
+    var at = card.indexOf('<div class="dash-core-list ');
+    if (at < 0) return card;
+    var rows = coreModel(opts)
+      .map(function (m) {
+        var counts = [1, 2, 3, 4]
+          .map(function (lv) {
+            return CONFIDENCE_LABELS[lv] + ' ' + m.by[lv].length;
+          })
+          .concat(['Not yet ' + m.notYet.length]);
+        var few = isFew(m.k, m.n);
+        var bar = [1, 2, 3, 4]
+          .map(function (lv) {
+            return m.by[lv].length
+              ? '<i class="dash-comp-st-' + lv + '" style="flex:' + m.by[lv].length + '"></i>'
+              : '';
+          })
+          .join('');
+        if (m.notYet.length) bar += '<i class="is-none" style="flex:' + m.notYet.length + '"></i>';
+        return _line({
+          key: m.cc.id,
+          page: 'core',
+          name: m.cc.label,
+          num: m.k + ' of ' + m.n,
+          tag: few ? 'Only' : '',
+          label: m.cc.label + ': ' + (few ? 'only ' : '') + m.k + ' of ' + m.n + ' self-assessed. ' + counts.join(', '),
+          tip: counts.join(' · '),
+          bar: bar,
+          picked: false,
+          open: !!_open && _open.page === 'core' && _open.key === m.cc.id,
+        });
+      })
+      .join('');
+    var legend = [1, 2, 3, 4]
+      .map(function (lv) {
+        return _legendItem(CONFIDENCE_LABELS[lv], 'dash-comp-st-' + lv);
+      })
+      .join('');
+    return card.slice(0, at) + _linesBody(legend, 'Self-Assessed', rows, 'Core competencies') + '</section>';
+  }
+
+  /* ── The row's list ─────────────────────────────────────────── */
+  /** The people chips DashInsights.popHtml draws for one band, as it draws
+   * them (each name and its level, the way the class shows grades).
+   * @param {any} opts @param {string} key @param {number} level */
+  function _bandPeople(opts, key, level) {
+    var h = DashInsights.popHtml(opts.cid, opts.allStudents || [], { key: key, level: level });
+    var m = /<div class="dash-ins-people">[\s\S]*?<\/div>/.exec(h);
+    return m ? m[0] : '';
+  }
+
+  /** @param {string} title */
+  function _popHead(title) {
+    return (
+      '<div class="dash-mix-pop-head"><span>' +
+      esc(title) +
+      '</span><button type="button" class="dash-mix-pop-close" data-comp-close aria-label="Close">×</button></div>'
+    );
+  }
+
+  /** The list for the open row, or '' when its row is gone.
+   * @param {any} opts @param {{ page: string, key: string }} open */
+  function popBody(opts, open) {
+    if (open.page === 'core') return _corePop(opts, open.key);
+    var cid = opts.cid;
+    var col = DashInsights.columns(cid).find(function (/** @type {any} */ c) {
+      return c.key === open.key;
+    });
+    if (!col) return '';
+    var ids = (opts.allStudents || []).map(function (/** @type {any} */ s) {
+      return s.id;
+    });
+    var m = mixCounts(competencyDistribution(cid, ids, col.which));
+    var below = m.counts[0] + m.counts[1];
+    var parts = [1, 2]
+      .filter(function (l) {
+        return m.counts[l - 1] > 0;
+      })
+      .map(function (l) {
+        return m.counts[l - 1] + ' ' + PROF_LABELS[l];
+      });
+    var summary = !m.scored
+      ? 'No one is scored on this yet.'
+      : below
+        ? below + ' below ' + PROF_LABELS[3] + ': ' + parts.join(', ')
+        : 'No one is below ' + PROF_LABELS[3] + '.';
+    var groups = [1, 2]
+      .map(function (l) {
+        if (!m.counts[l - 1]) return '';
+        return (
+          '<div class="dash-comp-pop-level"><span>' +
+          esc(PROF_LABELS[l] + ' · ' + m.counts[l - 1]) +
+          '</span>' +
+          _bandPeople(opts, open.key, l) +
+          '</div>'
+        );
+      })
+      .join('');
+    var show = '';
+    if (below) {
+      var label = 'Show These ' + below + ' in Student Cards ↓';
+      show =
+        '<button type="button" class="dash-comp-pop-act" data-comp-first data-comp-scroll' +
+        (opts.naComp === open.key ? '' : ' data-action="naComp" data-key="' + esc(open.key) + '"') +
+        '>' +
+        esc(label) +
+        '</button>';
+    }
+    return (
+      _popHead(col.title) +
+      '<div class="dash-comp-pop-sum">' +
+      esc(summary) +
+      '</div>' +
+      (groups ? '<div class="dash-comp-pop-people">' + groups + '</div>' : '') +
+      '<div class="dash-comp-pop-links">' +
+      show +
+      '<a class="dash-ins-link" role="link" tabindex="0"' +
+      (show ? '' : ' data-comp-first') +
+      ' data-href="' +
+      esc(DashInsights.gradebookHref(cid, [], col)) +
+      '">Open in Gradebook →</a></div>'
+    );
+  }
+
+  /** @param {any} opts @param {string} id */
+  function _corePop(opts, id) {
+    var m = coreModel(opts).find(function (x) {
+      return x.cc.id === id;
+    });
+    if (!m) return '';
+    var counts = [1, 2, 3, 4]
+      .map(function (lv) {
+        return CONFIDENCE_LABELS[lv] + ' ' + m.by[lv].length;
+      })
+      .concat(['Not yet ' + m.notYet.length])
+      .join(' · ');
+    /** @param {string} title @param {any[]} list */
+    var group = function (title, list) {
+      if (!list.length) return '';
+      return (
+        '<div class="dash-comp-pop-level"><span>' +
+        esc(title + ' · ' + list.length) +
+        '</span><div class="dash-ins-people">' +
+        list
+          .map(function (s) {
+            return '<span class="dash-comp-pop-name">' + esc(displayName(s)) + '</span>';
+          })
+          .join('') +
+        '</div></div>'
+      );
+    };
+    var people = [1, 2, 3, 4]
+      .map(function (lv) {
+        return group(CONFIDENCE_LABELS[lv], m.by[lv]);
+      })
+      .join('');
+    people += group('Not Yet', m.notYet);
+    return (
+      _popHead(m.cc.label + ' · ' + m.cc.group) +
+      '<div class="dash-comp-pop-sum">' +
+      esc(counts) +
+      '</div>' +
+      '<div class="dash-comp-pop-people">' +
+      people +
+      '</div>' +
+      '<div class="dash-comp-pop-links">' +
+      (m.notYet.length
+        ? '<a class="dash-ins-link" role="link" tabindex="0" data-comp-first data-href="' +
+          esc('/dashboard?course=' + opts.cid + '&manage=questionnaires') +
+          '">Open the Questionnaire →</a>'
+        : '<button type="button" class="dash-comp-pop-act" data-comp-first data-comp-close>Close</button>') +
+      '</div>'
+    );
+  }
+
+  /** @param {string} key @param {string} page
+   * @returns {HTMLElement | null} */
+  function _rowFor(key, page) {
+    var rows = document.querySelectorAll('[data-comp-open]');
+    for (var i = 0; i < rows.length; i++) {
+      var r = /** @type {HTMLElement} */ (rows[i]);
+      if (r.dataset.compOpen === key && r.dataset.compPage === page) return r;
+    }
+    return null;
+  }
+
+  /** Puts the open list under its row, inside the window: below the row, or
+   * above it when there is no room, and never past the window's edges. The
+   * list sits outside the tile, which clips, and on the window (fixed). */
+  function place() {
+    var pop = _el('dash-comp-pop');
+    if (!pop || pop.hidden || !_open) return;
+    var row = _rowFor(_open.key, _open.page);
+    if (!row) {
+      pop.hidden = true;
+      return;
+    }
+    var r = row.getBoundingClientRect();
+    var pw = pop.offsetWidth;
+    var ph = pop.offsetHeight;
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
+    var top = r.bottom + 6;
+    if (top + ph > window.innerHeight - 8) top = r.top - ph - 6;
+    top = Math.max(8, Math.min(top, window.innerHeight - 8 - ph));
+    pop.style.left = Math.round(left) + 'px';
+    pop.style.top = Math.round(top) + 'px';
+  }
+
+  /** After a draw: place the list, and put focus back where it was. */
+  function _queuePlace() {
+    var a = document.activeElement;
+    _refocus = null;
+    if (a && a.closest) {
+      if (a.closest('#dash-comp-pop')) _refocus = { pop: true };
+      else {
+        var r = /** @type {HTMLElement | null} */ (a.closest('[data-comp-open]'));
+        if (r) _refocus = { key: r.dataset.compOpen, page: r.dataset.compPage };
+      }
+    }
+    var run = function () {
+      place();
+      var want = _refocus;
+      _refocus = null;
+      var cur = document.activeElement;
+      if (want && (!cur || cur === document.body)) {
+        var t = want.pop
+          ? document.querySelector('#dash-comp-pop [data-comp-first]')
+          : _rowFor(String(want.key), String(want.page));
+        if (t) /** @type {HTMLElement} */ (t).focus();
+      }
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else setTimeout(run, 0);
+  }
+
+  /** Draws the open list (or hides it) without redrawing the page. */
+  function _refresh() {
+    var pop = _el('dash-comp-pop');
+    if (!pop) return;
+    var inner = _open && _last ? popBody(_last, _open) : '';
+    if (!inner) _open = null;
+    // html-safe: popBody escapes every name, title and label; the rest is a count.
+    pop.innerHTML = inner;
+    pop.hidden = !inner;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-comp-open]'), function (/** @type {HTMLElement} */ r) {
+      r.setAttribute(
+        'aria-expanded',
+        String(!!_open && r.dataset.compOpen === _open.key && r.dataset.compPage === _open.page),
+      );
+    });
+    place();
+  }
+
+  /** Closes the list; with `refocus`, focus goes back to its row.
+   * @param {boolean} refocus */
+  function close(refocus) {
+    if (!_open) return;
+    var row = _rowFor(_open.key, _open.page);
+    _open = null;
+    _refresh();
+    if (refocus && row) row.focus();
+  }
+
+  /** @param {HTMLElement} row */
+  function _toggle(row) {
+    var key = String(row.dataset.compOpen);
+    var page = String(row.dataset.compPage);
+    if (_open && _open.key === key && _open.page === page) {
+      close(true);
+      return;
+    }
+    if (!_last) return;
+    _open = { cid: String(_last.cid), page: page, key: key };
+    _refresh();
+    var first = document.querySelector('#dash-comp-pop [data-comp-first]');
+    if (first) /** @type {HTMLElement} */ (first).focus();
+  }
+
+  /** Show These N: the page's own click filters the cards (from the button's
+   * data-action); this closes the list, scrolls down to the cards and puts
+   * focus on the chip that clears the filter. */
+  function _toCards() {
+    _open = null;
+    var pop = _el('dash-comp-pop');
+    if (pop) pop.hidden = true;
+    setTimeout(function () {
+      var target = document.querySelector('.dash-comp-filter') || document.querySelector('.dash-students-head');
+      if (target && target.scrollIntoView) {
+        var calm = false;
+        try {
+          calm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        } catch (e) {
+          /* no media queries */
+        }
+        target.scrollIntoView({ block: 'start', behavior: calm ? 'auto' : 'smooth' });
+      }
+      var chip = document.querySelector('.dash-comp-chip');
+      if (chip) /** @type {HTMLElement} */ (chip).focus({ preventScroll: true });
+    }, 0);
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = /** @type {Element | null} */ (e.target);
+    if (!t || !t.closest) return;
+    var row = /** @type {HTMLElement | null} */ (t.closest('[data-comp-open]'));
+    if (row) {
+      _toggle(row);
+      return;
+    }
+    if (t.closest('[data-comp-close]')) {
+      close(true);
+      return;
+    }
+    if (t.closest('[data-comp-scroll]')) {
+      _toCards();
+      return;
+    }
+    // A link in the list leaves the page; a click anywhere else outside closes it.
+    if (_open && !t.closest('#dash-comp-pop')) close(false);
+    else if (_open && t.closest('#dash-comp-pop a')) _open = null;
+  });
+
+  // Escape closes the list before the page can use it to clear the filter.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !_open) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    close(true);
+  });
+  window.addEventListener('resize', place);
+  document.addEventListener(
+    'scroll',
+    function (e) {
+      var pop = _el('dash-comp-pop');
+      if (_open && !(pop && e.target instanceof Node && pop.contains(e.target))) place();
+    },
+    true,
+  );
+
+  return {
+    PREF_KEY: PREF_KEY,
+    PAGES: PAGES,
+    pageOf: pageOf,
+    pageForKey: pageForKey,
+    html: html,
+    show: show,
+    lowestKey: lowestKey,
+    isFew: isFew,
+    close: close,
+    place: place,
+  };
 })();
