@@ -119,7 +119,7 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: /^Upcoming \d+$/ }).click();
     const fair = page.locator('.sp-piece', { hasText: 'Science Fair Proposal' });
     await expect(fair).toBeVisible();
-    await expect(fair.locator('.sp-flag-due')).toHaveText(/ · in 4 days$/);
+    await expect(fair.locator('.sp-flag-later')).toHaveText('In 4 Days');
     await expect(fair.getByText('What You’re Graded On')).toHaveCount(0);
     await expect(fair.getByText('Questioning and Predicting')).toHaveCount(0);
     await fits(page);

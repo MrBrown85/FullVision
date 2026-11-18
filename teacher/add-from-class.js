@@ -191,37 +191,38 @@
   function _rowHtml(r, on) {
     var off = r.state !== 'ok';
     var chip = '';
-    if (r.state === 'here') chip = '<span class="afc-chip">Already Here</span>';
-    else if (r.state === 'refused') chip = '<span class="afc-chip">DIBELS Is Only for ELA and Social Studies 8</span>';
+    if (r.state === 'here') chip = '<span class="afrom-chip">Already Here</span>';
+    else if (r.state === 'refused')
+      chip = '<span class="afrom-chip">DIBELS Is Only for ELA and Social Studies 8</span>';
     else if (r.sameTitle)
       chip =
-        '<span class="afc-chip afc-chip-warn" title="This class already has an assessment with this title.">Same Title Here</span>';
+        '<span class="afrom-chip afrom-chip-warn" title="This class already has an assessment with this title.">Same Title Here</span>';
     return (
-      '<label class="afc-row' +
+      '<label class="afrom-row' +
       (off ? ' is-off' : '') +
       (on ? ' is-on' : '') +
-      '" data-afc-row="' +
+      '" data-afrom-row="' +
       G.esc(r.id) +
       '">' +
-      '<input type="checkbox" class="afc-box" tabindex="-1" data-afc-pick="' +
+      '<input type="checkbox" class="afrom-box" tabindex="-1" data-afrom-pick="' +
       G.esc(r.id) +
       '"' +
       (on ? ' checked' : '') +
       (off ? ' disabled' : '') +
       '>' +
-      '<span class="afc-title-cell"><span class="afc-name">' +
+      '<span class="afrom-title-cell"><span class="afrom-name">' +
       G.esc(r.title) +
       '</span>' +
       (r.isDraft ? '<span class="draft-badge">Draft</span>' : '') +
       chip +
       '</span>' +
-      '<span class="afc-cell afc-cat">' +
+      '<span class="afrom-cell afrom-cat">' +
       G.esc(r.category) +
       '</span>' +
-      '<span class="afc-cell afc-scoring">' +
+      '<span class="afrom-cell afrom-scoring">' +
       G.esc(r.scoring) +
       '</span>' +
-      '<span class="afc-cell afc-date">' +
+      '<span class="afrom-cell afrom-date">' +
       G.esc(r.date ? G.formatShortDate(r.date) : '') +
       '</span>' +
       '</label>'
@@ -234,7 +235,7 @@
     var targets = G.AssessmentCopy.copyTargets(cid);
     /** @type {{ id: string, name: string }[]} */
     var classes = targets.sameCourse.concat(targets.other);
-    if (!classes.length || document.querySelector('.afc-overlay')) return;
+    if (!classes.length || document.querySelector('.afrom-overlay')) return;
 
     var here = G.AssessmentCopy.className(cid);
     var trigger = /** @type {HTMLElement | null} */ (document.activeElement);
@@ -253,25 +254,25 @@
     var skipped = 0;
 
     var overlay = document.createElement('div');
-    overlay.className = 'confirm-overlay afc-overlay';
+    overlay.className = 'confirm-overlay afrom-overlay';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'afc-title');
-    overlay.setAttribute('aria-describedby', 'afc-what');
+    overlay.setAttribute('aria-labelledby', 'afrom-title');
+    overlay.setAttribute('aria-describedby', 'afrom-what');
     // html-safe: class ids and names through esc; the rest is fixed text
     overlay.innerHTML =
-      '<div class="afc-card">' +
-      '<div class="afc-head">' +
-      '<h2 class="afc-title" id="afc-title">Add From Another Class</h2>' +
-      '<p class="afc-what" id="afc-what">Into <strong>' +
+      '<div class="afrom-card">' +
+      '<div class="afrom-head">' +
+      '<h2 class="afrom-title" id="afrom-title">Add From Another Class</h2>' +
+      '<p class="afrom-what" id="afrom-what">Into <strong>' +
       G.esc(here) +
       '</strong>. Each copy brings its dates, settings, rubric and competencies. Student scores are never copied.</p>' +
-      '<div class="afc-from"><span class="afc-label" id="afc-from-label">From</span>' +
-      '<div class="afc-classes" role="radiogroup" aria-labelledby="afc-from-label">' +
+      '<div class="afrom-from"><span class="afrom-label" id="afrom-from-label">From</span>' +
+      '<div class="afrom-classes" role="radiogroup" aria-labelledby="afrom-from-label">' +
       classes
         .map(function (c) {
           return (
-            '<button type="button" class="afc-class" role="radio" aria-checked="false" tabindex="-1" data-afc-class="' +
+            '<button type="button" class="afrom-class" role="radio" aria-checked="false" tabindex="-1" data-afrom-class="' +
             G.esc(c.id) +
             '">' +
             G.esc(c.name) +
@@ -280,26 +281,26 @@
         })
         .join('') +
       '</div></div>' +
-      '<div class="afc-tools">' +
-      '<div class="assess-search-wrap afc-search"><span class="assess-search-icon" aria-hidden="true">' +
+      '<div class="afrom-tools">' +
+      '<div class="assess-search-wrap afrom-search"><span class="assess-search-icon" aria-hidden="true">' +
       SEARCH_ICON +
-      '</span><input class="assess-search-input" type="search" id="afc-search" placeholder="Search" autocomplete="off" aria-label="Search this class’s assessments"></div>' +
-      '<select class="afc-select" id="afc-cat" aria-label="Category" hidden></select>' +
-      '<select class="afc-select" id="afc-mod" aria-label="Module" hidden></select>' +
+      '</span><input class="assess-search-input" type="search" id="afrom-search" placeholder="Search" autocomplete="off" aria-label="Search this class’s assessments"></div>' +
+      '<select class="afrom-select" id="afrom-cat" aria-label="Category" hidden></select>' +
+      '<select class="afrom-select" id="afrom-mod" aria-label="Module" hidden></select>' +
       '</div>' +
       '</div>' +
-      '<div class="afc-cols">' +
-      '<input type="checkbox" class="afc-box" id="afc-all" aria-label="Select all shown">' +
-      '<label class="afc-col afc-col-all" for="afc-all">Select All</label>' +
-      '<span class="afc-col afc-cat">Category</span>' +
-      '<span class="afc-col afc-scoring">Scoring</span>' +
-      '<span class="afc-col afc-date">Date Assigned</span>' +
+      '<div class="afrom-cols">' +
+      '<input type="checkbox" class="afrom-box" id="afrom-all" aria-label="Select all shown">' +
+      '<label class="afrom-col afrom-col-all" for="afrom-all">Select All</label>' +
+      '<span class="afrom-col afrom-cat">Category</span>' +
+      '<span class="afrom-col afrom-scoring">Scoring</span>' +
+      '<span class="afrom-col afrom-date">Date Assigned</span>' +
       '</div>' +
-      '<div class="afc-list" id="afc-list" role="group" aria-label="Assessments to add"></div>' +
-      '<div class="afc-foot">' +
-      '<div class="afc-status" id="afc-status" role="status"></div>' +
-      '<button type="button" class="confirm-cancel" data-afc-cancel>Cancel</button>' +
-      '<button type="button" class="confirm-ok primary" data-afc-add disabled>Add</button>' +
+      '<div class="afrom-list" id="afrom-list" role="group" aria-label="Assessments to add"></div>' +
+      '<div class="afrom-foot">' +
+      '<div class="afrom-status" id="afrom-status" role="status"></div>' +
+      '<button type="button" class="confirm-cancel" data-afrom-cancel>Cancel</button>' +
+      '<button type="button" class="confirm-ok primary" data-afrom-add disabled>Add</button>' +
       '</div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -308,9 +309,9 @@
     var $ = function (s) {
       return overlay.querySelector(s);
     };
-    var listEl = $('#afc-list');
-    var allBox = $('#afc-all');
-    var addBtn = $('[data-afc-add]');
+    var listEl = $('#afrom-list');
+    var allBox = $('#afrom-all');
+    var addBtn = $('[data-afrom-add]');
 
     function srcName() {
       var c = classes.filter(function (x) {
@@ -321,8 +322,8 @@
 
     /* The class chips: one chosen, and only it in the Tab order. */
     function drawClasses() {
-      overlay.querySelectorAll('[data-afc-class]').forEach(function (b) {
-        var on = b.getAttribute('data-afc-class') === src;
+      overlay.querySelectorAll('[data-afrom-class]').forEach(function (b) {
+        var on = b.getAttribute('data-afrom-class') === src;
         b.setAttribute('aria-checked', on ? 'true' : 'false');
         b.setAttribute('tabindex', on ? '0' : '-1');
       });
@@ -332,8 +333,8 @@
     function drawFilters() {
       var cat = _options(rows, 'category', 'All Categories', 'No Category', filters.cat);
       var mod = _options(rows, 'module', 'All Modules', 'No Module', filters.mod);
-      var catEl = $('#afc-cat');
-      var modEl = $('#afc-mod');
+      var catEl = $('#afrom-cat');
+      var modEl = $('#afrom-mod');
       // html-safe: _options escapes every id and name
       catEl.innerHTML = cat;
       catEl.hidden = !cat;
@@ -350,7 +351,7 @@
       else if (!shown.length) {
         // html-safe: fixed text
         listEl.innerHTML =
-          '<span>No assessments match.</span> <button type="button" class="afc-link" data-afc-reset>Show All</button>';
+          '<span>No assessments match.</span> <button type="button" class="afrom-link" data-afrom-reset>Show All</button>';
       } else {
         // html-safe: _rowHtml escapes every id, title and name
         listEl.innerHTML = shown
@@ -359,9 +360,9 @@
           })
           .join('');
       }
-      listEl.classList.toggle('afc-empty', !shown.length);
-      listEl.classList.toggle('afc-filtered', filtered);
-      var first = listEl.querySelector('.afc-box:not(:disabled)');
+      listEl.classList.toggle('afrom-empty', !shown.length);
+      listEl.classList.toggle('afrom-filtered', filtered);
+      var first = listEl.querySelector('.afrom-box:not(:disabled)');
       if (first) first.setAttribute('tabindex', '0');
       listEl.scrollTop = 0;
       drawStatus();
@@ -386,7 +387,7 @@
       addBtn.disabled = !n;
       addBtn.textContent = n ? 'Add ' + n : 'Add';
 
-      var status = $('#afc-status');
+      var status = $('#afrom-status');
       if (loading || !rows.length) {
         status.textContent = '';
         return;
@@ -427,7 +428,7 @@
         '<span>' +
         G.esc(text) +
         '</span>' +
-        (n ? ' <button type="button" class="afc-link" data-afc-clear>Clear</button>' : '');
+        (n ? ' <button type="button" class="afrom-link" data-afrom-clear>Clear</button>' : '');
     }
 
     /* Load the class to copy from and list it. A slower, older load that
@@ -458,12 +459,12 @@
     function tick(id, on) {
       if (on) sel.add(id);
       else sel.delete(id);
-      var row = Array.from(listEl.querySelectorAll('[data-afc-row]')).filter(function (/** @type {any} */ el) {
-        return el.getAttribute('data-afc-row') === id;
+      var row = Array.from(listEl.querySelectorAll('[data-afrom-row]')).filter(function (/** @type {any} */ el) {
+        return el.getAttribute('data-afrom-row') === id;
       })[0];
       if (!row) return;
       row.classList.toggle('is-on', on);
-      /** @type {HTMLInputElement} */ (row.querySelector('.afc-box')).checked = on;
+      /** @type {HTMLInputElement} */ (row.querySelector('.afrom-box')).checked = on;
     }
 
     function close() {
@@ -525,18 +526,19 @@
         return;
       }
       var at = /** @type {HTMLElement} */ (document.activeElement);
-      if (at && at.matches && at.matches('[data-afc-class]')) {
+      if (at && at.matches && at.matches('[data-afrom-class]')) {
         var chip = rove(
           e,
-          Array.from(overlay.querySelectorAll('[data-afc-class]')),
+          Array.from(overlay.querySelectorAll('[data-afrom-class]')),
           ['ArrowLeft', 'ArrowUp'],
           ['ArrowRight', 'ArrowDown'],
         );
         // As a radio group does: the arrows choose as they move.
-        if (chip && chip.getAttribute('data-afc-class') !== src) load(chip.getAttribute('data-afc-class') || '');
+        if (chip && chip.getAttribute('data-afrom-class') !== src) load(chip.getAttribute('data-afrom-class') || '');
         if (chip) return;
-      } else if (at && at.matches && at.matches('.afc-list .afc-box')) {
-        if (rove(e, Array.from(listEl.querySelectorAll('.afc-box:not(:disabled)')), ['ArrowUp'], ['ArrowDown'])) return;
+      } else if (at && at.matches && at.matches('.afrom-list .afrom-box')) {
+        if (rove(e, Array.from(listEl.querySelectorAll('.afrom-box:not(:disabled)')), ['ArrowUp'], ['ArrowDown']))
+          return;
       }
       if (e.key !== 'Tab') return;
       var f = Array.from(
@@ -565,14 +567,14 @@
     });
     overlay.addEventListener('click', function (e) {
       var t = /** @type {HTMLElement} */ (e.target);
-      if (t === overlay || t.closest('[data-afc-cancel]')) return close();
-      if (t.closest('[data-afc-add]')) return add();
-      var chip = t.closest('[data-afc-class]');
+      if (t === overlay || t.closest('[data-afrom-cancel]')) return close();
+      if (t.closest('[data-afrom-add]')) return add();
+      var chip = t.closest('[data-afrom-class]');
       if (chip) {
-        if (chip.getAttribute('data-afc-class') !== src) load(chip.getAttribute('data-afc-class') || '');
+        if (chip.getAttribute('data-afrom-class') !== src) load(chip.getAttribute('data-afrom-class') || '');
         return;
       }
-      if (t.closest('[data-afc-clear]')) {
+      if (t.closest('[data-afrom-clear]')) {
         sel.clear();
         skipped = 0;
         lastPick = null;
@@ -580,29 +582,29 @@
         allBox.focus();
         return;
       }
-      if (t.closest('[data-afc-reset]')) {
+      if (t.closest('[data-afrom-reset]')) {
         filters = { q: '', cat: '', mod: '' };
-        $('#afc-search').value = '';
+        $('#afrom-search').value = '';
         drawFilters();
         drawList();
-        $('#afc-search').focus();
+        $('#afrom-search').focus();
       }
     });
     overlay.addEventListener('input', function (e) {
       var t = /** @type {HTMLInputElement} */ (e.target);
-      if (t.id !== 'afc-search') return;
+      if (t.id !== 'afrom-search') return;
       filters.q = t.value;
       drawList();
     });
     overlay.addEventListener('change', function (e) {
       var t = /** @type {HTMLInputElement} */ (e.target);
-      if (t.id === 'afc-cat' || t.id === 'afc-mod') {
-        if (t.id === 'afc-cat') filters.cat = t.value;
+      if (t.id === 'afrom-cat' || t.id === 'afrom-mod') {
+        if (t.id === 'afrom-cat') filters.cat = t.value;
         else filters.mod = t.value;
         drawList();
         return;
       }
-      if (t.id === 'afc-all') {
+      if (t.id === 'afrom-all') {
         var on = t.checked;
         skipped = 0;
         shown.forEach(function (r) {
@@ -614,7 +616,7 @@
         drawStatus();
         return;
       }
-      var id = t.getAttribute && t.getAttribute('data-afc-pick');
+      var id = t.getAttribute && t.getAttribute('data-afrom-pick');
       if (!id) return;
       // Shift and a click: every row from the last one ticked to this one.
       var ids = shown.map(function (r) {
@@ -631,7 +633,7 @@
       lastPick = id;
       skipped = 0;
       // The ticked row is the list's one stop in the Tab order.
-      listEl.querySelectorAll('.afc-box[tabindex="0"]').forEach(function (/** @type {Element} */ x) {
+      listEl.querySelectorAll('.afrom-box[tabindex="0"]').forEach(function (/** @type {Element} */ x) {
         x.setAttribute('tabindex', '-1');
       });
       t.setAttribute('tabindex', '0');
@@ -641,7 +643,7 @@
     load(src);
     // Start on the class to copy from: the first thing to decide, and no
     // keyboard slides up over the list on an iPad.
-    var start = $('[data-afc-class][aria-checked="true"]');
+    var start = $('[data-afrom-class][aria-checked="true"]');
     if (start) start.focus();
   }
 

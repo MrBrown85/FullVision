@@ -559,13 +559,14 @@ describe('student card: a draft is nowhere on the page', () => {
     expect(drafted.sub).toMatch(/^Due \S+ \S+ \d+$/);
     expect(drafted.result).toBe('');
     expect(drafted.dot).toBe(ungraded.dot);
-    // Its card is shaped as the card of work never graded (one is past due and one is not, so only the pill's colour differs).
+    // Its card is shaped as the card of work never graded (one is past due and one is not, so only the pill's colour and icon differ).
     await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     await page.click('[data-segment="outstanding"]');
     const shape = el =>
       el.outerHTML
         .replace(/>[^<]+</g, '><')
-        .replace(/sp-flag-(overdue|due)/g, 'sp-flag-')
+        .replace(/sp-(flag|band)-(waiting|later|due)/g, 'sp-$1-')
+        .replace(/<(path|rect|circle) [^>]*\/>/g, '')
         .replace(/(data-piece|aria-labelledby|id)="[^"]*"/g, '$1=""')
         .replace(/ sp-picked/, '')
         // The poster and the proposal carry the teacher's handouts (their pages, to swipe through); that is not a grade.

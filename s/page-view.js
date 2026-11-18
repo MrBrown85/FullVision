@@ -254,6 +254,13 @@ window.StudentPageView = (function () {
     again: '<path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 4.5V8h-3.5"/>',
     lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
     next: '<path d="M4 12h15M13 6l6 6-6 6"/>',
+    // The status pills (Colin, 2026-11-17): each status its own icon as well as its own word and colour.
+    later: '<rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
+    waiting:
+      '<path d="M7 4h10M7 20h10M8 4v2.5a4 4 0 0 0 1.6 3.2L12 12l2.4-2.3A4 4 0 0 0 16 6.5V4M8 20v-2.5a4 4 0 0 1 1.6-3.2L12 12l2.4 2.3a4 4 0 0 1 1.6 3.2V20"/>',
+    alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>',
+    late: '<circle cx="11" cy="12" r="7.5"/><path d="M11 8.5V12l2.5 1.5M20.5 6.5v5M20.5 15v.01"/>',
+    tick: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   };
   function pillIcon(name, size) {
     return (
@@ -267,7 +274,7 @@ window.StudentPageView = (function () {
     );
   }
   function pillHtml(kind, text, icon) {
-    return '<span class="sp-flag sp-flag-' + kind + '">' + (icon ? pillIcon(icon) : '') + esc(text) + '</span>';
+    return '<span class="sp-flag sp-flag-' + kind + '">' + (icon ? pillIcon(icon, 14) : '') + esc(text) + '</span>';
   }
 
   // Work still to do whose last day to send has passed (the Closed Assignment board).
@@ -275,31 +282,35 @@ window.StudentPageView = (function () {
     return (p.kind === 'due' || p.kind === 'missing') && !!(p.send && p.send.takes && !p.send.open);
   }
 
-  /* How far off a day is from today, in the words a student counts in:
-     "Today", "Tomorrow", "in 4 days", "Yesterday", "3 days ago". */
+  // How many days off a day is from today: 0 today, 1 tomorrow, -1 yesterday; null for no date.
   function daysFrom(day, today) {
     var a = Date.parse(String(day).slice(0, 10) + 'T12:00:00Z');
     var b = Date.parse(String(today).slice(0, 10) + 'T12:00:00Z');
     if (isNaN(a) || isNaN(b)) return null;
     return Math.round((a - b) / 86400000);
   }
-  function dueWhen(p, view) {
+  /* The due date at the right of the status band: "Fri, Nov 20" for work to
+     do, "Due Jan 31" beside Missing, "Was due Oct 22" once the day has passed. */
+  function bandWhen(p, view) {
+    if ((p.kind !== 'due' && p.kind !== 'missing') || !p.dueDate) return '';
     var n = daysFrom(p.dueDate, todayOf(view));
-    if (n === 0) return { text: 'Due Today', past: false };
-    if (n === 1) return { text: 'Due Tomorrow', past: false };
-    var day = 'Due ' + fmtDate(p.dueDate, DUE_DAY);
-    if (n == null) return { text: day, past: false };
-    if (n > 1) return { text: day + SEP + 'in ' + n + ' days', past: false };
-    return { text: day + SEP + (n === -1 ? 'yesterday' : -n + ' days ago'), past: true };
+    if (n != null && n < 0) return 'Was due ' + fmtDate(p.dueDate, DAY);
+    return p.kind === 'missing' ? 'Due ' + fmtDate(p.dueDate, DAY) : fmtDate(p.dueDate, DUE_DAY);
   }
 
-  /* The pill at the top right of a card still to do, on the unit's line:
-     when it is due and how far off, with a clock; red once the day has
-     passed. A closed piece has none. */
-  function duePill(p, view) {
-    if ((p.kind !== 'due' && p.kind !== 'missing') || !p.dueDate || isClosed(p)) return '';
-    var w = dueWhen(p, view);
-    return pillHtml(w.past ? 'overdue' : 'due', w.text, 'clock');
+  /* Work still to do, by its due date (Colin, 2026-11-17: students could not
+     tell work not assessed yet from late work). "In 4 Days" in blue, "Due
+     Tomorrow" and "Due Today" in amber, and once the day has passed "Not
+     Assessed Yet" in grey: nobody has marked it Missing and it is not back,
+     so nothing is wrong yet. Missing is the teacher's word, never the date's. */
+  function timeStatus(p, view) {
+    if (!p.dueDate) return null;
+    var n = daysFrom(p.dueDate, todayOf(view));
+    if (n == null) return null;
+    if (n < 0) return { kind: 'waiting', word: 'Not Assessed Yet', icon: 'waiting' };
+    if (n === 0) return { kind: 'due', word: 'Due Today', icon: 'clock' };
+    if (n === 1) return { kind: 'due', word: 'Due Tomorrow', icon: 'clock' };
+    return { kind: 'later', word: 'In ' + n + ' Days', icon: 'later' };
   }
 
   // When work was sent, to the minute: "Sent Nov 12, 3:41 p.m.".
@@ -310,32 +321,66 @@ window.StudentPageView = (function () {
     return 'Sent ' + fmtDate(at, DAY) + ', ' + t.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
   }
 
-  /* The card's pills under its title: where it stands (Returned, Updated,
-     Missing, Revise by, Sent with its photos, Closed), Group, Late. */
-  function pills(p) {
-    var out = [];
+  /* Where a piece stands, as the band across the top of its card says it
+     (Colin, 2026-11-17, Option B of the mockup): { kind, word, icon },
+     or null when there is nothing to say (work to do with no due date).
+     How far off the due date is, Returned, Updated, Missing, Revise by,
+     Sent with its photos, or Closed. Missing is the one solid band, with
+     nothing more on it (Colin, 2026-11-17: no "counts as 0" on the card). */
+  function statusOf(p, view) {
     // A returned grade changed since the student last looked says when (the board's "Updated Nov 12").
     if (p.kind === 'back' && p.updated)
-      out.push(pillHtml('updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)));
-    else if (p.kind === 'back') out.push(pillHtml('back', 'Returned ' + fmtDate(p.returnedAt, DAY)));
-    else if (p.kind === 'missing') out.push(pillHtml('missing', 'Missing'));
-    else if (p.kind === 'revise') {
+      return { kind: 'updated', word: 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY), icon: 'tick' };
+    if (p.kind === 'back') return { kind: 'back', word: 'Returned ' + fmtDate(p.returnedAt, DAY), icon: 'tick' };
+    if (p.kind === 'missing') return { kind: 'missing', word: 'Missing', icon: 'alert' };
+    // "Closed Nov 13" (the Closed Assignment board).
+    if (isClosed(p))
+      return {
+        kind: 'closed',
+        word: p.send.closesOn ? 'Closed ' + fmtDate(p.send.closesOn, DAY) : 'Closed',
+        icon: 'lock',
+      };
+    if (p.kind === 'due') return timeStatus(p, view);
+    if (p.kind === 'revise') {
       // "Revise by Tue, Nov 10" (the Needs Revision board).
       var by = p.revision && p.revision.reviseBy;
-      out.push(pillHtml('revise', by ? 'Revise by ' + fmtDate(by, DUE_DAY) : 'Needs Revision', 'again'));
-    } else if (p.kind === 'sent') {
+      return { kind: 'revise', word: by ? 'Revise by ' + fmtDate(by, DUE_DAY) : 'Needs Revision', icon: 'again' };
+    }
+    if (p.kind === 'sent') {
       // "Sent Nov 4 · 3 photos" (the Sent, Being Graded board).
       var sent = (p.send && p.send.sent) || {};
       var at = sent.at || (p.group && p.group.sentAt) || '';
       var pages = p.group && p.group.sent ? p.group.pages : sent.pages;
-      out.push(pillHtml('sent', [sentAt(at), photosWord(pages)].filter(Boolean).join(SEP), 'camera'));
+      return { kind: 'sent', word: [sentAt(at), photosWord(pages)].filter(Boolean).join(SEP), icon: 'camera' };
     }
-    // "Closed Nov 13" (the Closed Assignment board).
-    if (isClosed(p))
-      out.push(pillHtml('closed', p.send.closesOn ? 'Closed ' + fmtDate(p.send.closesOn, DAY) : 'Closed'));
+    return null;
+  }
+
+  /* The band across the top of a card: the status with its icon on the left,
+     the due date on the right. Each status has its own word, icon and colour. */
+  function bandHtml(p, view) {
+    var st = statusOf(p, view);
+    if (!st) return '';
+    var when = bandWhen(p, view);
+    return (
+      '<div class="sp-band sp-band-' +
+      st.kind +
+      '">' +
+      pillHtml(st.kind, st.word, st.icon) +
+      (when ? '<span class="sp-band-when">' + esc(when) + '</span>' : '') +
+      '</div>'
+    );
+  }
+
+  /* The pills under a card's title, beside its band: Closed on work that is
+     also Missing, Group, and the teacher's Late. */
+  function pills(p) {
+    var out = [];
+    if (p.kind === 'missing' && isClosed(p))
+      out.push(pillHtml('closed', p.send.closesOn ? 'Closed ' + fmtDate(p.send.closesOn, DAY) : 'Closed', 'lock'));
     // One per Group (S12-F1, the board's "Group" tag).
     if (p.group) out.push(pillHtml('quiet', 'Group'));
-    if (p.late) out.push(pillHtml('quiet', 'Late'));
+    if (p.late) out.push(pillHtml('late', 'Late', 'late'));
     return out.join('');
   }
 
@@ -625,15 +670,9 @@ window.StudentPageView = (function () {
   // The teacher's comment on a returned card.
   /* A card's first line: its unit on the left and, on work still to do, when
      it is due on the right (the To Do Card board). Nothing when it has neither. */
+  // The card's status band, then its unit in plain grey over the title.
   function headHtml(p, view) {
-    var due = duePill(p, view);
-    if (!p.unit && !due) return '';
-    return (
-      '<div class="sp-piece-head">' +
-      (p.unit ? '<p class="sp-piece-unit">' + esc(p.unit) + '</p>' : '<span></span>') +
-      due +
-      '</div>'
-    );
+    return bandHtml(p, view) + (p.unit ? '<p class="sp-piece-head sp-piece-unit">' + esc(p.unit) + '</p>' : '');
   }
 
   /* ── For This Assignment (Handouts and Links; the board "What the
