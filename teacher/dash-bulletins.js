@@ -14,7 +14,7 @@
    state in the page: the Dashboard draws it again with the rest, and the
    one listener below draws only the tile when the class's bulletins change.
    How many rows fit is a container query in dash-bulletins.css. */
-window.DashBulletins = (function () {
+/** @type {any} */ (window).DashBulletins = (function () {
   'use strict';
 
   var MAX_ROWS = 3;
@@ -70,7 +70,8 @@ window.DashBulletins = (function () {
 
   /** @returns {any} */
   function _helpers() {
-    return (window.PageBulletins && window.PageBulletins._helpers) || null;
+    var page = /** @type {any} */ (window).PageBulletins;
+    return (page && page._helpers) || null;
   }
 
   /** "Reminder", "Announcement" or "Photo of the Board". @param {any} b */
@@ -167,7 +168,7 @@ window.DashBulletins = (function () {
 
   /* ── Drawing ──────────────────────────────────────────────── */
 
-  /** @param {string} cid */
+  /** @param {string} cid @param {string} [query] */
   function _link(cid, query) {
     return '/bulletins?course=' + encodeURIComponent(cid) + (query || '');
   }
@@ -266,12 +267,14 @@ window.DashBulletins = (function () {
     var slot = _slot();
     if (!t || !slot || !slot.contains(t)) return;
     var url = t.getAttribute('data-dash-bulletins-go');
-    if (url && window.Router && typeof window.Router.navigate === 'function') window.Router.navigate(url);
+    var router = /** @type {any} */ (window).Router;
+    if (url && router && typeof router.navigate === 'function') router.navigate(url);
   }
 
   /** The tile's markup for the middle row. Asks for fresh bulletins (the data layer throttles that). @param {string} cid */
   function html(cid) {
-    if (!(window.BuildFlags && BuildFlags.on('dashRow') && BuildFlags.on('bulletins'))) return '';
+    var flags = /** @type {any} */ (window).BuildFlags;
+    if (!(flags && flags.on('dashRow') && flags.on('bulletins'))) return '';
     if (!_listening) {
       document.addEventListener('fv:bulletins-changed', _onChanged);
       document.addEventListener('click', _onClick);
