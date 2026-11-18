@@ -8827,16 +8827,21 @@ button.rb-v-prompt {
    sideways in 220 ms. Each page is today's card with its box taken off, so
    the tile's is the only one. A page that is not shown is hidden (not just
    moved), so nothing in it takes focus. */
+/* The title and Curricular | Core on one line when they fit; when the tile
+   is too narrow for both (1100 wide with the roster shown, or a wider font)
+   the switch goes under the title, at the right, whole. */
 .dash-comp-tile-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   flex: 0 0 auto;
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text);
 }
 .dash-comp-seg {
+  flex: 0 0 auto;
   margin-left: auto;
 }
 .dash-comp-pages {

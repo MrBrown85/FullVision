@@ -344,8 +344,14 @@
   html.fv-tablet .dash-row .dash-inbox-grade,
   html.fv-tablet .dash-row .dash-inbox-flip-open,
   html.fv-tablet .dash-row .dash-inbox-roll-all,
-  html.fv-tablet .dash-row .dash-inbox-flip-slider {
+  html.fv-tablet .dash-row .dash-inbox-flip-slider,
+  html.fv-tablet .dash-row .dash-comp-ln.is-split {
     min-height: 44px;
+  }
+  /* A Level Mix row: its button 44 px, its bar under it. */
+  html.fv-tablet .dash-row .dash-comp-lnbox {
+    flex-basis: 62px;
+    max-height: none;
   }
   /* A row's title keeps the row's 109 px: it answers a tap 10 px above and
      below its line (padding the margin gives back), where nothing else takes

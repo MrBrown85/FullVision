@@ -382,3 +382,47 @@ test('with a question waiting the row starts lower, the page scrolls to its foot
   const row = await box(page, '.dash-row');
   expect(Math.round(heading.top - row.bottom)).toBe(12);
 });
+
+/* The tile's head: "Competencies" and Curricular | Core on one line when they
+   fit; at 1100 wide (the roster beside the row) or in a wider font the switch
+   goes under the title, whole, inside the tile. */
+for (const [w, h] of [
+  [1100, 800],
+  [1024, 768],
+  [1280, 800],
+]) {
+  test(`at ${w} wide the Competencies title and Curricular | Core stay whole inside the tile, in both fonts`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await openDashboard(page);
+    for (const font of FONTS) {
+      await useFont(page, font);
+      const m = await page.evaluate(() => {
+        const tile = document.querySelector('.dash-comp-tile');
+        const tb = tile.getBoundingClientRect();
+        const cs = getComputedStyle(tile);
+        const inner = { left: tb.left + parseFloat(cs.paddingLeft), right: tb.right - parseFloat(cs.paddingRight) };
+        const parts = [
+          '.dash-comp-tile-title',
+          '.dash-comp-seg',
+          '#dash-comp-tab-curricular',
+          '#dash-comp-tab-core',
+        ].map(s => {
+          const el = document.querySelector(s);
+          const r = el.getBoundingClientRect();
+          return { s, left: r.left, right: r.right, cut: el.scrollWidth > el.clientWidth + 1 };
+        });
+        const t = document.querySelector('.dash-comp-tile-title').getBoundingClientRect();
+        const seg = document.querySelector('.dash-comp-seg').getBoundingClientRect();
+        return {
+          outside: parts.filter(p => p.left < inner.left - 0.5 || p.right > inner.right + 0.5).map(p => p.s),
+          cut: parts.filter(p => p.cut).map(p => p.s),
+          overlap: !(seg.left >= t.right - 0.5 || seg.top >= t.bottom - 0.5),
+          core: document.querySelector('#dash-comp-tab-core').textContent,
+        };
+      });
+      expect(m, `${w} ${font}`).toEqual({ outside: [], cut: [], overlap: false, core: 'Core' });
+    }
+  });
+}

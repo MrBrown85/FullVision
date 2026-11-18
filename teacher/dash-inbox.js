@@ -433,7 +433,30 @@ window.DashInbox = (function () {
       // the counts and Late always stay.
       if (over()) row.classList.add('is-tight');
       if (over()) row.classList.add('is-tighter');
+      _sayHidden(row);
     });
+  }
+
+  /* What a tight row leaves off the screen stays in its piece name's
+     accessible name and in a title on it, so no one loses it. */
+  /** @param {any} row */
+  function _sayHidden(row) {
+    var name = row.querySelector('.dash-inbox-name');
+    if (!name) return;
+    if (!name.hasAttribute('data-label')) name.setAttribute('data-label', name.getAttribute('aria-label') || '');
+    var said = [];
+    if (row.classList.contains('is-tight')) {
+      var newest = row.querySelector('.dash-inbox-newest');
+      if (newest) said.push(newest.textContent.trim());
+    }
+    if (row.classList.contains('is-tighter')) {
+      var quiet = row.querySelector('.dash-inbox-quiet');
+      if (quiet) said.push(quiet.textContent.replace(/^\s*·\s*/, '').trim());
+    }
+    var base = name.getAttribute('data-label') || '';
+    name.setAttribute('aria-label', said.length ? base + ' ' + said.join('. ') + '.' : base);
+    if (said.length) name.setAttribute('title', said.join('. '));
+    else name.removeAttribute('title');
   }
 
   /** @param {HTMLElement} tile */

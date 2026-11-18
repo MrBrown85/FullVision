@@ -126,7 +126,9 @@ describe('Level Mix, one row per competency', () => {
     setClass('proficiency', THREE);
     const rows = rowsOf(tile(), 'curricular');
     expect(rows.map(r => r.querySelector('.dash-comp-ln-name').textContent)).toEqual(['Name IN', 'Name EV', 'Name PL']);
-    const segs = Array.from(rows[0].querySelectorAll('.dash-comp-ln-bar i')).map(i => i.getAttribute('style'));
+    // The bar is under the row's button, one button per level (D9).
+    const bar = r => r.closest('.dash-comp-lnbox').querySelectorAll('.dash-comp-ln-bar .dash-comp-ln-seg');
+    const segs = Array.from(bar(rows[0])).map(i => i.getAttribute('style'));
     // The class's own level order (Extending first by default), as today's Level Mix.
     expect(segs).toEqual([
       'flex:2;background:var(--score-4)',
@@ -136,9 +138,7 @@ describe('Level Mix, one row per competency', () => {
     expect(tile().querySelector('.dash-comp-legend').textContent).toBe('ExtendingProficientDevelopingEmerging');
     COURSES[CID].levelOrder = 'asc';
     const asc = rowsOf(tile(), 'curricular')[0];
-    expect(Array.from(asc.querySelectorAll('.dash-comp-ln-bar i')).map(i => i.getAttribute('style'))[0]).toBe(
-      'flex:1;background:var(--score-2)',
-    );
+    expect(Array.from(bar(asc)).map(i => i.getAttribute('style'))[0]).toBe('flex:1;background:var(--score-2)');
     expect(tile().querySelector('.dash-comp-legend').textContent).toBe('EmergingDevelopingProficientExtending');
   });
 
@@ -242,6 +242,63 @@ function openRow(d, key) {
   DashCompetencies.toggle(d.querySelector('[data-comp-open="' + key + '"]'));
   return d.getElementById('dash-comp-pop');
 }
+
+/* Today's Level Mix let a teacher open any level's students (with that
+   level's shared next step) from its count. The tile keeps that: one button
+   per level on its segment of the bar (D9). */
+describe("a Level Mix row's level buttons", () => {
+  const nameOf = l => competencyDistribution('', [], {}).bands[l - 1].label;
+  beforeEach(() => setClass('proficiency', THREE));
+  afterEach(unmount);
+
+  it('draws one button per level with students, in the class order, sized by its count', () => {
+    const el = tile({ compView: 'mix' });
+    const segs = [...el.querySelectorAll('.dash-comp-lnbox')[0].querySelectorAll('[data-comp-level]')];
+    // IN: Ava 2, Ben 3, Cy 4, Di 4: Developing 1, Proficient 1, Extending 2, in the class's level order.
+    const order = levelOrderFor(CID).filter(l => [2, 3, 4].includes(l));
+    expect(segs.map(b => Number(b.dataset.compLevel))).toEqual(order);
+    const want = { 2: '1', 3: '1', 4: '2' };
+    segs.forEach(b => {
+      const l = Number(b.dataset.compLevel);
+      expect(b.getAttribute('style')).toBe('flex:' + want[l] + ';background:var(--score-' + l + ')');
+      expect(b.getAttribute('aria-label')).toMatch(new RegExp(': ' + want[l] + ' ' + nameOf(l) + '$'));
+      expect(b.getAttribute('aria-expanded')).toBe('false');
+      expect(b.tagName).toBe('BUTTON');
+    });
+    // A competency nobody is scored on has none; the row itself stays the board's button.
+    const pl = [...el.querySelectorAll('.dash-comp-lnbox')].find(x => x.querySelector('[data-comp-open="s:PL"]'));
+    expect(pl ? pl.querySelectorAll('[data-comp-level]').length : 0).toBe(0);
+    expect(el.querySelector('.dash-comp-lnbox [data-comp-open]').tagName).toBe('BUTTON');
+  });
+
+  it("each level's button opens today's list for that level, one list at a time, and closes again", () => {
+    const o = opts({ compView: 'mix' });
+    const d = mount(o);
+    const key = d.querySelector('.dash-comp-lnbox [data-comp-open]').dataset.compOpen;
+    for (const level of [2, 3, 4]) {
+      const seg = d.querySelector('[data-comp-key="' + key + '"][data-comp-level="' + level + '"]');
+      DashCompetencies.toggleLevel(seg);
+      const pop = d.getElementById('dash-comp-pop');
+      expect(pop.hidden).toBe(false);
+      // The list is today's, word for word: its heading names the level.
+      const want = d.createElement('div');
+      want.innerHTML = DashInsights.popHtml(CID, o.allStudents, { key, level });
+      expect(pop.innerHTML).toBe(want.innerHTML);
+      expect(pop.querySelector('.dash-mix-pop-head').textContent).toContain(' · ' + nameOf(level) + ' · ');
+      expect(seg.getAttribute('aria-expanded')).toBe('true');
+      expect(d.querySelectorAll('[aria-expanded="true"]')).toHaveLength(1);
+    }
+    // The row's own click swaps to the board's list of those below Proficient.
+    DashCompetencies.toggle(d.querySelector('[data-comp-open="' + key + '"]'));
+    expect(d.getElementById('dash-comp-pop').textContent).toContain('below');
+    expect(d.querySelectorAll('[data-comp-level][aria-expanded="true"]')).toHaveLength(0);
+    // The same level twice: open, then closed.
+    const ext = d.querySelector('[data-comp-key="' + key + '"][data-comp-level="4"]');
+    DashCompetencies.toggleLevel(ext);
+    DashCompetencies.toggleLevel(ext);
+    expect(d.getElementById('dash-comp-pop').hidden).toBe(true);
+  });
+});
 
 describe("a row's list", () => {
   function open(key, extra) {

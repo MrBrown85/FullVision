@@ -125,6 +125,15 @@ describe('the row', () => {
     expect(html).toContain('<div class="dash-row-slot dash-row-bulletins"><section id="stub-bulletins">');
   });
 
+  it('a class with no competencies says so, with no column heading over nothing', () => {
+    for (const compView of ['mix', 'avg', 'below', 'trend']) {
+      const html = DashCompetencies.html(opts({ compView }));
+      expect(html).toContain('No competencies in this class yet.');
+      expect(html).not.toContain('dash-comp-labels');
+      expect(html).not.toContain('>Competency<');
+    }
+  });
+
   it('draws the tile from the open page, Curricular by default', () => {
     expect(DashOverview.renderOverviewPanel(opts())).toContain('<section class="dash-comp-tile"');
     expect(DashOverview.renderOverviewPanel(opts())).toContain('data-page="curricular"');

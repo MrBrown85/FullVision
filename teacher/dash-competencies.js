@@ -170,13 +170,13 @@ window.DashCompetencies = (function () {
 
   /* ── State: the one open row ───────────────────────────────── */
   /** The row whose list is open, kept here so a redraw loses nothing.
-   * @type {{ cid: string, page: string, key: string } | null} */
+   * @type {{ cid: string, page: string, key: string, level?: number } | null} */
   var _open = null;
   /** What the last draw was given: the list is drawn from it without a redraw.
    * @type {any} */
   var _last = null;
   /** Where focus was when the page was last drawn, to put it back after.
-   * @type {{ pop?: boolean, key?: string, page?: string } | null} */
+   * @type {{ pop?: boolean, key?: string, page?: string, level?: number } | null} */
   var _refocus = null;
 
   /** @param {string} id */
@@ -237,8 +237,8 @@ window.DashCompetencies = (function () {
   }
 
   /** Whether a Self-Assessed count is low: under two thirds of the class.
-   * This is the test today's Core card makes (`amber: k * 3 < n * 2` in
-   * _coreSelfRow, teacher/dash-overview.js), said here as a word.
+   * This is the test the Core card's squares made before D9 (amber under two
+   * thirds), said here as a word.
    * @param {number} k
    * @param {number} n */
   function isFew(k, n) {
@@ -269,11 +269,54 @@ window.DashCompetencies = (function () {
   }
 
   /** One row: a button with its name, number and one bar. `tag` is the word
-   * beside the number (Lowest, Only); `bar` the stacked segments.
-   * @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean }} r */
+   * beside the number (Lowest, Only); `bar` the stacked segments. A Level
+   * Mix row (`segs`) is split: the button holds the name and number, and the
+   * bar under it is made of one button per level, as today's Level Mix had
+   * one per count; each opens that level's students with their shared next
+   * step. A competency nobody is scored on has a grey bar with no buttons.
+   * @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean, segs?: { level: number, n: number, label: string, open: boolean }[] }} r */
   function _line(r) {
+    if (!r.segs) return _lineButton(r);
+    var segs = r.segs.length
+      ? r.segs
+          .map(function (g) {
+            return (
+              '<button type="button" class="dash-comp-ln-seg" data-comp-level="' +
+              g.level +
+              '" data-comp-key="' +
+              esc(r.key) +
+              '" style="flex:' +
+              g.n +
+              ';background:var(--score-' +
+              g.level +
+              ')" aria-haspopup="dialog" aria-expanded="' +
+              g.open +
+              '" aria-label="' +
+              esc(g.label) +
+              '"></button>'
+            );
+          })
+          .join('')
+      : '<i class="is-none" style="flex:1"></i>';
+    return (
+      '<div class="dash-comp-lnbox' +
+      (r.tag ? ' is-flag' : '') +
+      '">' +
+      _lineButton(Object.assign({}, r, { bar: '' }), true) +
+      '<div class="dash-comp-ln-bar dash-comp-ln-segs" role="group" aria-label="' +
+      esc(r.name + ', by level') +
+      '">' +
+      segs +
+      '</div></div>'
+    );
+  }
+
+  /** @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean }} r
+   * @param {boolean} [split] the bar is drawn under the button, not in it */
+  function _lineButton(r, split) {
     return (
       '<button type="button" class="dash-comp-ln' +
+      (split ? ' is-split' : '') +
       (r.tag ? ' is-flag' : '') +
       (r.picked ? ' is-picked' : '') +
       '" data-comp-open="' +
@@ -289,9 +332,9 @@ window.DashCompetencies = (function () {
       '</span><span class="dash-comp-ln-num">' +
       (r.tag ? '<span class="dash-comp-ln-tag">' + esc(r.tag) + '</span>' : '') +
       esc(r.num) +
-      '</span><span class="dash-comp-ln-bar" aria-hidden="true">' +
-      r.bar +
-      '</span><span class="dash-comp-ln-tip" aria-hidden="true">' +
+      '</span>' +
+      (split ? '' : '<span class="dash-comp-ln-bar" aria-hidden="true">' + r.bar + '</span>') +
+      '<span class="dash-comp-ln-tip" aria-hidden="true">' +
       esc(r.tip) +
       '</span></button>'
     );
@@ -354,7 +397,21 @@ window.DashCompetencies = (function () {
           tip: m.scored ? names : 'Not scored yet',
           bar: bar,
           picked: opts.naComp === m.key,
-          open: !!_open && _open.page === 'curricular' && _open.key === m.key,
+          open: !!_open && _open.page === 'curricular' && _open.key === m.key && !_open.level,
+          segs: m.scored
+            ? order
+                .filter(function (/** @type {number} */ l) {
+                  return m.counts[l - 1] > 0;
+                })
+                .map(function (/** @type {number} */ l) {
+                  return {
+                    level: l,
+                    n: m.counts[l - 1],
+                    label: m.col.title + ': ' + m.counts[l - 1] + ' ' + levelName(l),
+                    open: !!_open && _open.page === 'curricular' && _open.key === m.key && _open.level === l,
+                  };
+                })
+            : [],
         });
       })
       .join('');
@@ -456,9 +513,11 @@ window.DashCompetencies = (function () {
   }
 
   /** The list for the open row, or '' when its row is gone.
-   * @param {any} opts @param {{ page: string, key: string }} open */
+   * @param {any} opts @param {{ page: string, key: string, level?: number }} open */
   function popBody(opts, open) {
     if (open.page === 'core') return _corePop(opts, open.key);
+    // One level's students, with its shared next step: today's Level Mix list.
+    if (open.level) return DashInsights.popHtml(opts.cid, opts.allStudents || [], { key: open.key, level: open.level });
     var cid = opts.cid;
     var col = DashInsights.columns(cid).find(function (/** @type {any} */ c) {
       return c.key === open.key;
@@ -582,6 +641,24 @@ window.DashCompetencies = (function () {
     return null;
   }
 
+  /** A Level Mix row's button for one level.
+   * @param {string} key @param {number} level
+   * @returns {HTMLElement | null} */
+  function _segFor(key, level) {
+    var segs = document.querySelectorAll('[data-comp-level]');
+    for (var i = 0; i < segs.length; i++) {
+      var b = /** @type {HTMLElement} */ (segs[i]);
+      if (b.dataset.compKey === key && Number(b.dataset.compLevel) === level) return b;
+    }
+    return null;
+  }
+
+  /** What opened the list: a level's button, else the row. */
+  function _opener() {
+    if (!_open) return null;
+    return (_open.level && _segFor(_open.key, _open.level)) || _rowFor(_open.key, _open.page);
+  }
+
   /** Puts the open list under its row, inside the window: below the row, or
    * above it when there is no room, and never past the window's edges. The
    * list sits outside the tile, which clips, and on the window (fixed). */
@@ -626,7 +703,10 @@ window.DashCompetencies = (function () {
     _refocus = null;
     if (a && a.closest) {
       if (a.closest('#dash-comp-pop')) _refocus = { pop: true };
-      else {
+      else if (a.closest('[data-comp-level]')) {
+        var g = /** @type {HTMLElement} */ (a.closest('[data-comp-level]'));
+        _refocus = { key: g.dataset.compKey, level: Number(g.dataset.compLevel) };
+      } else {
         var r = /** @type {HTMLElement | null} */ (a.closest('[data-comp-open]'));
         if (r) _refocus = { key: r.dataset.compOpen, page: r.dataset.compPage };
       }
@@ -638,8 +718,10 @@ window.DashCompetencies = (function () {
       var cur = document.activeElement;
       if (want && (!cur || cur === document.body)) {
         var t = want.pop
-          ? document.querySelector('#dash-comp-pop [data-comp-first]')
-          : _rowFor(String(want.key), String(want.page));
+          ? document.querySelector('#dash-comp-pop [data-comp-first], #dash-comp-pop a, #dash-comp-pop button')
+          : want.level
+            ? _segFor(String(want.key), want.level)
+            : _rowFor(String(want.key), String(want.page));
         if (t) /** @type {HTMLElement} */ (t).focus();
       }
     };
@@ -663,7 +745,16 @@ window.DashCompetencies = (function () {
       function (/** @type {HTMLElement} */ r) {
         r.setAttribute(
           'aria-expanded',
-          String(!!_open && r.dataset.compOpen === _open.key && r.dataset.compPage === _open.page),
+          String(!!_open && !_open.level && r.dataset.compOpen === _open.key && r.dataset.compPage === _open.page),
+        );
+      },
+    );
+    Array.prototype.forEach.call(
+      document.querySelectorAll('[data-comp-level]'),
+      function (/** @type {HTMLElement} */ b) {
+        b.setAttribute(
+          'aria-expanded',
+          String(!!_open && _open.key === b.dataset.compKey && _open.level === Number(b.dataset.compLevel)),
         );
       },
     );
@@ -674,7 +765,7 @@ window.DashCompetencies = (function () {
    * @param {boolean} refocus */
   function close(refocus) {
     if (!_open) return;
-    var row = _rowFor(_open.key, _open.page);
+    var row = _opener();
     _open = null;
     _refresh();
     if (refocus && row) row.focus();
@@ -684,14 +775,37 @@ window.DashCompetencies = (function () {
   function _toggle(row) {
     var key = String(row.dataset.compOpen);
     var page = String(row.dataset.compPage);
-    if (_open && _open.key === key && _open.page === page) {
+    if (_open && _open.key === key && _open.page === page && !_open.level) {
       close(true);
       return;
     }
     if (!_last) return;
     _open = { cid: String(_last.cid), page: page, key: key };
     _refresh();
-    var first = document.querySelector('#dash-comp-pop [data-comp-first]');
+    _focusFirst();
+  }
+
+  /** A level's button in a Level Mix row: that level's students, with their
+   * shared next step, as today's Level Mix list gives them. One list is open
+   * at a time; the same button again closes it.
+   * @param {HTMLElement} seg */
+  function _toggleLevel(seg) {
+    var key = String(seg.dataset.compKey);
+    var level = Number(seg.dataset.compLevel);
+    if (_open && _open.key === key && _open.level === level) {
+      close(true);
+      return;
+    }
+    if (!_last) return;
+    _open = { cid: String(_last.cid), page: 'curricular', key: key, level: level };
+    _refresh();
+    _focusFirst();
+  }
+
+  function _focusFirst() {
+    var first =
+      document.querySelector('#dash-comp-pop [data-comp-first]') ||
+      document.querySelector('#dash-comp-pop a, #dash-comp-pop button');
     if (first) /** @type {HTMLElement} */ (first).focus();
   }
 
@@ -721,6 +835,11 @@ window.DashCompetencies = (function () {
   document.addEventListener('click', function (e) {
     var t = /** @type {Element | null} */ (e.target);
     if (!t || !t.closest) return;
+    var seg = /** @type {HTMLElement | null} */ (t.closest('[data-comp-level]'));
+    if (seg) {
+      _toggleLevel(seg);
+      return;
+    }
     var row = /** @type {HTMLElement | null} */ (t.closest('[data-comp-open]'));
     if (row) {
       _toggle(row);
@@ -854,6 +973,7 @@ window.DashCompetencies = (function () {
     close: close,
     place: place,
     toggle: _toggle,
+    toggleLevel: _toggleLevel,
     showTip: showTip,
   };
 })();

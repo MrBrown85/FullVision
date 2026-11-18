@@ -734,7 +734,8 @@ window.DashOverview = (function () {
     var nRows = cols.length;
     var cardCls = '';
     if (!cols.length) {
-      labels = _compLabels('Competency', '', '', '', true);
+      // No column heading over nothing: the line says why.
+      labels = '';
       rows = '<div class="dash-comp-none">No competencies in this class yet.</div>';
       nRows = 0;
     } else if (view === 'mix') {

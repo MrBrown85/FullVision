@@ -480,11 +480,22 @@ for (const [w, h] of [
           above: Math.max(...shown.map(el => inner.top - el.getBoundingClientRect().top)),
           lateIn: late.bottom <= inner.bottom + 0.5 && late.height > 0,
           lines: Math.round(r.querySelector('.dash-inbox-counts').getBoundingClientRect().height / 19.5),
+          tight: r.classList.contains('is-tight'),
+          newest: r.querySelector('.dash-inbox-newest').textContent.trim(),
+          newestShown: getComputedStyle(r.querySelector('.dash-inbox-newest')).display !== 'none',
+          label: r.querySelector('.dash-inbox-name').getAttribute('aria-label'),
+          title: r.querySelector('.dash-inbox-name').getAttribute('title') || '',
           sideways: r.scrollWidth - r.clientWidth,
         };
       });
       // Where the words column is narrowest the counts take three lines: the case this guards.
       if (w === 1100 && font === 'page') expect(m.lines).toBe(3);
+      if (w === 1100) expect(m.tight, font).toBe(true);
+      // Newest, out of sight on a tight row, is still in the piece name's accessible name and its title.
+      if (!m.newestShown) {
+        expect(m.label, font).toContain(m.newest);
+        expect(m.title, font).toContain(m.newest);
+      } else expect(m.label, font).not.toContain('Newest:');
       expect(m.h, font).toBe(109);
       expect(m.past, font).toBeLessThanOrEqual(0.5);
       expect(m.above, font).toBeLessThanOrEqual(0.5);

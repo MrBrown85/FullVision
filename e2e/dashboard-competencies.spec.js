@@ -554,3 +554,51 @@ test('screenshots', async ({ page }, info) => {
     }
   }
 });
+
+/* Today's Level Mix opens any level's students, with that level's shared next
+   step, from its count. The tile keeps it: each level's segment of a row's bar
+   is a button. Every level of every row of the sample class, by click and by
+   Enter or Space, gives the list today's Level Mix gives (DashInsights.popHtml,
+   unchanged), one list at a time, its heading naming the level. */
+test("every level's segment opens that level's students, as today's Level Mix does", async ({ page }) => {
+  await openDashboard(page);
+  const segs = page.locator('#dash-comp-page-curricular [data-comp-level]');
+  const n = await segs.count();
+  expect(n).toBeGreaterThan(12);
+  const seen = new Set();
+  for (let i = 0; i < n; i++) {
+    const seg = segs.nth(i);
+    const key = await seg.getAttribute('data-comp-key');
+    const level = Number(await seg.getAttribute('data-comp-level'));
+    seen.add(level);
+    // Click on even rows, the keyboard on odd ones.
+    if (i % 2) {
+      await seg.focus();
+      await page.keyboard.press(i % 4 === 1 ? 'Enter' : 'Space');
+    } else await seg.click();
+    const pop = page.locator('#dash-comp-pop');
+    await expect(pop).toBeVisible();
+    const same = await page.evaluate(
+      ([key, level]) => {
+        const want = document.createElement('div');
+        want.innerHTML = DashInsights.popHtml('sci8', getStudents('sci8'), { key, level });
+        return document.getElementById('dash-comp-pop').innerHTML === want.innerHTML;
+      },
+      [key, level],
+    );
+    expect(same, key + ' level ' + level).toBe(true);
+    const name = await page.evaluate(l => competencyDistribution('', [], {}).bands[l - 1].label, level);
+    await expect(pop.locator('.dash-mix-pop-head')).toContainText(' · ' + name + ' · ');
+    await expect(page.locator('[data-comp-level][aria-expanded="true"]')).toHaveCount(1);
+    await expect(page.locator('[data-comp-open][aria-expanded="true"]')).toHaveCount(0);
+    // Escape closes it, and the focus is back on the level's segment.
+    await page.keyboard.press('Escape');
+    await expect(pop).toBeHidden();
+    await expect(seg).toBeFocused();
+  }
+  // All four levels came up somewhere in the sample class.
+  expect([...seen].sort()).toEqual([1, 2, 3, 4]);
+  // The row's own click still opens the board's list of those below Proficient.
+  await page.locator('#dash-comp-page-curricular [data-comp-open]').first().click();
+  await expect(page.locator('#dash-comp-pop .dash-comp-pop-sum')).toBeVisible();
+});
