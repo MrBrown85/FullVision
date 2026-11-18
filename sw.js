@@ -151,6 +151,7 @@ const PRECACHE_URLS = [
   '/shared/questionnaires.js',
   '/teacher/qr-slips.js',
   '/teacher/export-all.js',
+  '/teacher/question-cards.js',
   '/teacher/cm-reflect-builder.js',
   '/teacher/cm-reflect-answers.js',
   '/teacher/cm-questionnaires.js',

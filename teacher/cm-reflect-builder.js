@@ -15,29 +15,11 @@
 var CmReflectBuilder = (function () {
   'use strict';
 
-  var KINDS = [
-    { kind: 'choice', label: 'Choice' },
-    { kind: 'text', label: 'Text' },
-    { kind: 'rating', label: 'Rating' },
-    { kind: 'date', label: 'Date' },
-    { kind: 'ranking', label: 'Ranking' },
-    { kind: 'likert', label: 'Likert' },
-    { kind: 'section', label: 'Section Heading' },
-  ];
-  var MAX = {
-    title: 120,
-    description: 500,
-    prompt: 1000,
-    subtitle: 300,
-    choice: 120,
-    choices: 20,
-    items: 10,
-    statement: 200,
-    statements: 10,
-    column: 40,
-    columns: 7,
-    end: 60,
-  };
+  /* The card pieces (a question's read and edit forms, its list editor and
+     toolbar) are teacher/question-cards.js; this builder passes nothing, so
+     they use the sqB action names and the limits below. */
+  var KINDS = QuestionCards.KINDS;
+  var MAX = Object.assign({ title: 120, description: 500 }, QuestionCards.MAX);
   var LIKERT_COLUMNS = ['Never', 'Sometimes', 'Usually', 'Always'];
   var PREVIEW_KEY = 'fv-reflect-preview';
 
@@ -61,13 +43,6 @@ var CmReflectBuilder = (function () {
     return (
       d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
     );
-  }
-
-  function _label(kind) {
-    var k = KINDS.find(function (x) {
-      return x.kind === kind;
-    });
-    return k ? k.label : 'Question';
   }
 
   function _clean(s) {
@@ -312,133 +287,6 @@ var CmReflectBuilder = (function () {
 
   /* ── Drawing ───────────────────────────────────────────────── */
 
-  var ICONS = {
-    copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
-    up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
-    down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
-    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
-    phone: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
-  };
-  function _icon(name) {
-    return (
-      '<svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      ICONS[name] +
-      '</svg>'
-    );
-  }
-  var GRIP =
-    '<svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="8" cy="6" r="2"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/><circle cx="16" cy="18" r="2"/></svg>';
-
-  function _kindText(d) {
-    if (d.kind === 'text') return 'Text · ' + (d.long ? 'Long Answer' : 'One Line');
-    if (d.kind === 'rating') return 'Rating · ' + (Number(d.levels) || 5) + ' Levels';
-    if (d.kind === 'choice') return 'Choice' + (d.multiple ? ' · Multiple Answers' : d.dropdown ? ' · Drop-Down' : '');
-    return _label(d.kind);
-  }
-
-  function _ph(text, fallback) {
-    var t = _clean(text);
-    return t ? esc(t) : '<span class="rb-v-empty">' + esc(fallback) + '</span>';
-  }
-
-  /* What a student sees for one question, drawn inert. */
-  function _viewBody(d) {
-    if (d.kind === 'text') return '<div class="rb-v-box' + (d.long ? ' rb-v-long' : '') + '">Students type here</div>';
-    if (d.kind === 'date') return '<div class="rb-v-box rb-v-date">Pick a date</div>';
-    if (d.kind === 'section') return '';
-    if (d.kind === 'rating') {
-      var n = Number(d.levels) || 5;
-      var boxes = '';
-      for (var i = 1; i <= n; i++) boxes += '<span class="rb-v-level">' + i + '</span>';
-      return (
-        '<div class="rb-v-rating">' +
-        (_clean(d.low) ? '<span class="rb-v-end">' + esc(_clean(d.low)) + '</span>' : '') +
-        '<span class="rb-v-levels">' +
-        boxes +
-        '</span>' +
-        (_clean(d.high) ? '<span class="rb-v-end">' + esc(_clean(d.high)) + '</span>' : '') +
-        '</div>'
-      );
-    }
-    if (d.kind === 'choice') {
-      if (d.dropdown && !d.multiple) return '<div class="rb-v-box rb-v-select">Choose an answer</div>';
-      var mark = '<span class="rb-mark' + (d.multiple ? ' rb-mark-check' : '') + '" aria-hidden="true"></span>';
-      return (
-        '<div class="rb-v-opts">' +
-        d.choices
-          .map(function (c, j) {
-            return '<div class="rb-v-opt">' + mark + _ph(c, 'Option ' + (j + 1)) + '</div>';
-          })
-          .join('') +
-        (d.other ? '<div class="rb-v-opt">' + mark + 'Other: students type their own</div>' : '') +
-        '</div>'
-      );
-    }
-    if (d.kind === 'ranking') {
-      return (
-        '<div class="rb-v-opts rb-v-rank">' +
-        d.choices
-          .map(function (c, j) {
-            return '<div class="rb-v-item">' + GRIP + _ph(c, 'Item ' + (j + 1)) + '</div>';
-          })
-          .join('') +
-        '</div>'
-      );
-    }
-    if (d.kind === 'likert') {
-      var cols = d.columns.length || 1;
-      var cells = '<span></span>';
-      d.columns.forEach(function (c, j) {
-        cells += '<span class="rb-v-col">' + _ph(c, 'Column ' + (j + 1)) + '</span>';
-      });
-      d.statements.forEach(function (s, j) {
-        cells += '<span class="rb-v-stmt">' + _ph(s, 'Statement ' + (j + 1)) + '</span>';
-        for (var k = 0; k < d.columns.length; k++)
-          cells += '<span class="rb-v-cell"><span class="rb-mark"></span></span>';
-      });
-      return (
-        '<div class="rb-v-likert" style="grid-template-columns:minmax(0,2.4fr) repeat(' +
-        cols +
-        ',minmax(0,1fr))" aria-hidden="true">' +
-        cells +
-        '</div>'
-      );
-    }
-    return '';
-  }
-
-  /* The question as students see it. editable: a click opens it. */
-  // html-safe: prompts, subtitles and options pass through esc (_ph, _viewBody); i and num are numbers
-  function _viewHtml(d, i, num, editable) {
-    var attrs = editable ? ' data-action="sqBEdit" data-i="' + i + '"' : '';
-    var req = d.kind !== 'section' && d.required ? ' <span class="rb-req" aria-label="required">*</span>' : '';
-    var words =
-      d.kind === 'section' ? _ph(d.prompt, 'Section heading') : num + '. ' + _ph(d.prompt, 'Question ' + num) + req;
-    var prompt = editable
-      ? '<button type="button" class="rb-v-prompt" data-action="sqBEdit" data-i="' +
-        i +
-        '" aria-label="Edit ' +
-        (d.kind === 'section' ? 'section heading' : 'question ' + num) +
-        '">' +
-        words +
-        '</button>'
-      : '<span class="rb-v-prompt">' + words + '</span>';
-    return (
-      '<div class="rb-q-view' +
-      (d.kind === 'section' ? ' rb-v-section' : '') +
-      '"' +
-      attrs +
-      '>' +
-      '<div class="rb-v-line">' +
-      prompt +
-      (d.kind === 'section' ? '' : '<span class="rb-v-kind">' + esc(_kindText(d)) + '</span>') +
-      '</div>' +
-      (_clean(d.subtitle) ? '<div class="rb-v-sub">' + esc(_clean(d.subtitle)) + '</div>' : '') +
-      _viewBody(d) +
-      '</div>'
-    );
-  }
-
   /* A saved reflection's questions as students see them (the card's Show Questions). */
   function previewHtml(questions) {
     var num = 0;
@@ -451,229 +299,10 @@ var CmReflectBuilder = (function () {
         .map(function (x, i) {
           var d = fromSaved(x);
           if (d.kind !== 'section') num++;
-          return '<li class="rb-q">' + _viewHtml(d, i, num, false) + '</li>';
+          return '<li class="rb-q">' + QuestionCards.viewHtml(d, i, num, false) + '</li>';
         })
         .join('') +
       '</ol>'
-    );
-  }
-
-  function _input(d, i, path, value, label, max, extra) {
-    var id = 'rb-' + d.k + '-' + path.replace('.', '-');
-    return (
-      '<input type="text" class="cm-input' +
-      (extra || '') +
-      '" id="' +
-      id +
-      '" aria-label="' +
-      esc(label) +
-      '" placeholder="' +
-      esc(label) +
-      '" maxlength="' +
-      max +
-      '" value="' +
-      esc(value || '') +
-      '" data-action-blur="sqBField" data-i="' +
-      i +
-      '" data-rb-path="' +
-      path +
-      '">'
-    );
-  }
-
-  function _switch(d, i, opt, label, on) {
-    return (
-      '<span class="rb-sw">' +
-      esc(label) +
-      '<button type="button" class="rb-switch" role="switch" aria-checked="' +
-      !!on +
-      '" aria-label="' +
-      esc(label) +
-      '" data-action="sqBToggle" data-opt="' +
-      opt +
-      '" data-i="' +
-      i +
-      '"><span></span></button></span>'
-    );
-  }
-
-  /* An editable list: options, ranking items, statements or columns. */
-  function _listEditor(d, i, list, noun, max, len, mark) {
-    var items = d[list];
-    var rows = items
-      .map(function (v, j) {
-        return (
-          '<div class="rb-opt">' +
-          mark +
-          _input(d, i, list + '.' + j, v, noun + ' ' + (j + 1), len) +
-          '<button type="button" class="rb-x" aria-label="Remove ' +
-          esc(noun.toLowerCase()) +
-          ' ' +
-          (j + 1) +
-          '" data-action="sqBOptRemove" data-i="' +
-          i +
-          '" data-list="' +
-          list +
-          '" data-j="' +
-          j +
-          '">✕</button></div>'
-        );
-      })
-      .join('');
-    if (list === 'choices' && d.kind === 'choice' && d.other) {
-      rows +=
-        '<div class="rb-opt">' +
-        mark +
-        '<div class="rb-other">Other: students type their own</div>' +
-        '<button type="button" class="rb-x" aria-label="Remove Other" data-action="sqBOther" data-on="0" data-i="' +
-        i +
-        '">✕</button></div>';
-    }
-    var adds =
-      items.length < max
-        ? '<button type="button" class="cm-add-link" data-action="sqBOptAdd" data-i="' +
-          i +
-          '" data-list="' +
-          list +
-          '">+ Add ' +
-          esc(noun) +
-          '</button>'
-        : '<span class="cm-hint">' + esc('Up to ' + max + ' ' + noun.toLowerCase() + 's.') + '</span>';
-    if (list === 'choices' && d.kind === 'choice' && !d.other) {
-      adds +=
-        '<button type="button" class="cm-add-link" data-action="sqBOther" data-on="1" data-i="' +
-        i +
-        '">+ Add “Other” Option</button>';
-    }
-    return '<div class="rb-opts">' + rows + '</div><div class="rb-adds">' + adds + '</div>';
-  }
-
-  function _kindEditor(d, i) {
-    var mark =
-      '<span class="rb-mark' +
-      (d.kind === 'choice' && d.multiple ? ' rb-mark-check' : '') +
-      '" aria-hidden="true"></span>';
-    if (d.kind === 'choice') return _listEditor(d, i, 'choices', 'Option', MAX.choices, MAX.choice, mark);
-    if (d.kind === 'ranking')
-      return _listEditor(d, i, 'choices', 'Item', MAX.items, MAX.choice, '<span class="rb-grip">' + GRIP + '</span>');
-    if (d.kind === 'likert') {
-      return (
-        '<div class="rb-likert"><div><div class="cm-label">Statements</div>' +
-        _listEditor(d, i, 'statements', 'Statement', MAX.statements, MAX.statement, '') +
-        '</div><div><div class="cm-label">Columns</div>' +
-        _listEditor(d, i, 'columns', 'Column', MAX.columns, MAX.column, '') +
-        '</div></div>'
-      );
-    }
-    if (d.kind === 'rating') {
-      var n = Number(d.levels) || 5;
-      var opts = '';
-      for (var l = 2; l <= 10; l++)
-        opts += '<option value="' + l + '"' + (l === n ? ' selected' : '') + '>' + l + '</option>';
-      return (
-        '<div class="rb-rating">' +
-        '<label class="cm-field"><span class="cm-label">Levels</span><select class="cm-input" data-action-change="sqBLevels" data-i="' +
-        i +
-        '">' +
-        opts +
-        '</select></label>' +
-        '<label class="cm-field"><span class="cm-label">Word for 1</span>' +
-        _input(d, i, 'low', d.low, 'Word for 1', MAX.end) +
-        '</label>' +
-        '<label class="cm-field"><span class="cm-label">' +
-        esc('Word for ' + n) +
-        '</span>' +
-        _input(d, i, 'high', d.high, 'Word for ' + n, MAX.end) +
-        '</label></div>' +
-        _viewBody(d)
-      );
-    }
-    if (d.kind === 'section') return '';
-    return _viewBody(d);
-  }
-
-  function _menuHtml(d, i) {
-    var item = function (label, action, opt, on) {
-      return (
-        '<button type="button" class="rb-qmenu-item" role="' +
-        (opt ? 'menuitemcheckbox' : 'menuitem') +
-        '"' +
-        (opt ? ' aria-checked="' + !!on + '" data-opt="' + opt + '"' : '') +
-        ' data-action="' +
-        action +
-        '" data-i="' +
-        i +
-        '">' +
-        esc(label) +
-        '</button>'
-      );
-    };
-    return (
-      '<div class="rb-qmenu" role="menu" aria-label="More options">' +
-      item(d.subtitle === null ? 'Add a Subtitle' : 'Remove the Subtitle', 'sqBSubtitle') +
-      (d.kind === 'choice'
-        ? item('Shuffle Options', 'sqBToggle', 'shuffle', d.shuffle) +
-          item('Show as a Drop-Down', 'sqBToggle', 'dropdown', d.dropdown && !d.multiple)
-        : '') +
-      '</div>'
-    );
-  }
-
-  // html-safe: every typed word goes through esc (_input, _listEditor, _viewBody); i and num are numbers
-  function _editHtml(d, i, num, last) {
-    var tool = function (action, icon, label, off) {
-      return (
-        '<button type="button" class="rb-tool" data-action="' +
-        action +
-        '" data-i="' +
-        i +
-        '" aria-label="' +
-        label +
-        '"' +
-        (off ? ' disabled' : '') +
-        '>' +
-        _icon(icon) +
-        '</button>'
-      );
-    };
-    var section = d.kind === 'section';
-    var foot = '';
-    if (d.kind === 'choice') foot += _switch(d, i, 'multiple', 'Multiple Answers', d.multiple);
-    if (d.kind === 'text') foot += _switch(d, i, 'long', 'Long Answer', d.long);
-    if (!section) {
-      foot +=
-        _switch(d, i, 'required', 'Required', d.required) +
-        '<span class="rb-qmore"><button type="button" class="rb-qmore-btn" aria-label="More options" aria-haspopup="menu" aria-expanded="' +
-        (_b.menu === i) +
-        '" data-action="sqBMenu" data-i="' +
-        i +
-        '">⋯</button>' +
-        (_b.menu === i ? _menuHtml(d, i) : '') +
-        '</span>';
-    }
-    return (
-      '<div class="rb-q-edit">' +
-      '<div class="rb-q-bar"><span class="rb-q-label">' +
-      (section ? 'Section Heading' : 'Question ' + num) +
-      '</span><select class="cm-input rb-kind" aria-label="Question type" data-action-change="sqBType" data-i="' +
-      i +
-      '">' +
-      KINDS.map(function (k) {
-        return (
-          '<option value="' + k.kind + '"' + (k.kind === d.kind ? ' selected' : '') + '>' + esc(k.label) + '</option>'
-        );
-      }).join('') +
-      '</select><span class="rb-tools">' +
-      tool('sqBCopy', 'copy', 'Copy question') +
-      tool('sqBUp', 'up', 'Move question up', i === 0) +
-      tool('sqBDown', 'down', 'Move question down', last) +
-      tool('sqBDelete', 'trash', 'Delete question') +
-      '</span></div>' +
-      _input(d, i, 'prompt', d.prompt, section ? 'Heading' : 'Question', MAX.prompt, ' rb-prompt') +
-      (d.subtitle !== null ? _input(d, i, 'subtitle', d.subtitle, 'Subtitle', MAX.subtitle, ' rb-subtitle') : '') +
-      _kindEditor(d, i) +
-      (foot ? '<div class="rb-q-foot">' + foot + '</div>' : '') +
-      '</div>'
     );
   }
 
@@ -694,7 +323,9 @@ var CmReflectBuilder = (function () {
           '" data-k="' +
           d.k +
           '">' +
-          (on ? _editHtml(d, i, num, i === last) : _viewHtml(d, i, num, true)) +
+          (on
+            ? QuestionCards.editHtml(d, i, num, i === last, _b.menu === i)
+            : QuestionCards.viewHtml(d, i, num, true)) +
           (err ? '<div class="rb-err" role="alert">' + esc(err) + '</div>' : '') +
           '</li>'
         );
@@ -720,7 +351,7 @@ var CmReflectBuilder = (function () {
       '<div class="rb-top"><div class="cm-section-title">' +
       (editing ? 'Edit Reflection' : 'New Reflection') +
       '</div><button type="button" class="cm-action-btn rb-preview-btn" data-action="sqBPreview">' +
-      _icon('phone') +
+      QuestionCards.icon('phone') +
       'Preview as a Student</button></div>' +
       '<div class="rb-heads">' +
       '<input type="text" class="rb-name" id="rb-name" aria-label="Title" placeholder="Title" maxlength="' +
