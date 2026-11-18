@@ -943,6 +943,24 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(uploads).toEqual([]);
   });
 
+  it('a photo refused for the class’s page limit (the contract’s own message) says so in its plain sentence', async () => {
+    fake.on('post_bulletin', () => ({
+      data: null,
+      error: {
+        code: '22023',
+        message: 'a class can hold 2000 bulletin pages at most: delete some bulletins with files first',
+      },
+    }));
+    await postBulletin(CID, { kind: 'announcement', body: 'Too many pages' }, PHOTO(), { queue: true });
+    await quiet();
+    expect(returned()).toEqual([
+      {
+        body: 'Too many pages',
+        message: 'This class holds as many bulletin pages as it can. Delete some bulletins with files, then try again.',
+      },
+    ]);
+  });
+
   it('words only, on the phone: a refusal that arrives after a reload gives the words back', async () => {
     setOnline(false);
     postBulletin(CID, { kind: 'announcement', body: 'Words after a reload' }, [], { queue: true });
