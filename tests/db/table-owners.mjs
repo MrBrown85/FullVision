@@ -120,9 +120,9 @@ export const NO_TEACHER = {
    there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
    out once the file is applied and migrations/baseline/ is refreshed. */
 export const NOT_YET_APPLIED = {
-  'public.quiz': '2026111802_quizzes.sql',
-  'public.quiz_answer': '2026111802_quizzes.sql',
-  'public.quiz_attempt': '2026111802_quizzes.sql',
-  'public.quiz_key': '2026111802_quizzes.sql',
-  'public.quiz_question': '2026111802_quizzes.sql',
+  'public.quiz': '2026111804_quizzes.sql',
+  'public.quiz_answer': '2026111804_quizzes.sql',
+  'public.quiz_attempt': '2026111804_quizzes.sql',
+  'public.quiz_key': '2026111804_quizzes.sql',
+  'public.quiz_question': '2026111804_quizzes.sql',
 };

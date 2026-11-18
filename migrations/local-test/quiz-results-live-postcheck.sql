@@ -1,4 +1,4 @@
--- Read-only post-check, after the apply of migrations/2026111803_quiz_results.sql (2026-11-17).
+-- Read-only post-check, after the apply of migrations/2026111805_quiz_results.sql (2026-11-17).
 -- SELECTs only. Every row says ok.
 with want(sig, after_md5) as (values
     ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),

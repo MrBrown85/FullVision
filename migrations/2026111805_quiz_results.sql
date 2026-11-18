@@ -2,7 +2,7 @@
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
 -- It adds three functions a teacher may run, on the tables of
--- 2026111802_quizzes.sql, which must be applied first. Split from it to keep
+-- 2026111804_quizzes.sql, which must be applied first. Split from it to keep
 -- each file under 40 KB. The contract: migrations/local-test/quizzes-contract.md.
 --
 -- public.mark_quiz_answer  the teacher's points for a Text answer (0 to the
@@ -21,20 +21,20 @@
 --   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new)   77bd2789ea9f46790f6eef639a605c24
 --   public.reopen_quiz(uuid,uuid,uuid) (new)                     daabc9bbdd81761d4ddfd72b773eca78
 --   public.confirm_quiz(uuid,jsonb,uuid) (new)                   8380e8fa33795295b97e17623376414f
--- Relied on, unchanged (function, live, and 2026111802's):
+-- Relied on, unchanged (function, live, and 2026111804's):
 --   public.fv_owns_assessment(uuid)                              9f4c680c35f9f3ac32e8290824707673
 --   public.fv_idem_check(uuid,text)                              1c7b546434bee4b774557e0e6b16024f
 --   public.fv_idem_store(uuid,text,jsonb)                        6d0b48c458d273a332db39e1a4b68626
 --   public._quiz_attempt_same_class()                            5b0045acab2f7eb94cf3d8ff75210e1f
 --
 -- Checks first: it stops with nothing changed unless the four functions it
--- relies on are as tested (the last says 2026111802 is applied), its own
+-- relies on are as tested (the last says 2026111804 is applied), its own
 -- three are missing or this file's, no function of those names is elsewhere,
--- and the three tables it writes have 2026111802's columns. Read-only
+-- and the three tables it writes have 2026111804's columns. Read-only
 -- pre-check: migrations/local-test/quiz-results-live-precheck.sql.
 --
 -- Rows: none changes. Locks: none on an existing table (functions only).
--- Tested with 2026111802 by migrations/local-test/quizzes.py. Undo:
+-- Tested with 2026111804 by migrations/local-test/quizzes.py. Undo:
 -- quiz-results-undo.sql. After: quiz-results-live-postcheck.sql.
 -- One transaction: all or nothing. Can be run again.
 
@@ -76,7 +76,7 @@ begin
         select string_agg(attname || ' ' || format_type(atttypid, atttypmod), ', ' order by attnum) into _cols
           from pg_attribute where attrelid = to_regclass(_f.t) and attnum > 0 and not attisdropped;
         if _cols is distinct from _f.cols then
-            raise exception '% is not 2026111802''s (%). Apply 2026111802_quizzes.sql first. Nothing was changed.', _f.t, coalesce(_cols, 'missing');
+            raise exception '% is not 2026111804''s (%). Apply 2026111804_quizzes.sql first. Nothing was changed.', _f.t, coalesce(_cols, 'missing');
         end if;
     end loop;
 end

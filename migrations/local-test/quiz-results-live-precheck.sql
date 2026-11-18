@@ -1,10 +1,10 @@
--- Read-only pre-check, before the apply of migrations/2026111803_quiz_results.sql, after 2026111802 (2026-11-17).
+-- Read-only pre-check, before the apply of migrations/2026111805_quiz_results.sql, after 2026111804 (2026-11-17).
 -- SELECTs only, catalog facts only. It returns ONLY the rows that differ: no rows means ready.
 with want(sig, md5) as (values
     ('public.fv_owns_assessment(uuid)', '9f4c680c35f9f3ac32e8290824707673'),
     ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f'),
     ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626'),
-    -- 2026111802's, as that file leaves them.
+    -- 2026111804's, as that file leaves them.
     ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f'),
     ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d')),
 checks(check_name, value) as (
@@ -21,4 +21,4 @@ checks(check_name, value) as (
     union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17)
-select * from checks order by 1;
+select * from checks order by check_name collate "C";

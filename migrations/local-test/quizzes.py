@@ -1,4 +1,4 @@
-"""Quizzes, MQ1: migrations/2026111802_quizzes.sql and 2026111803_quiz_results.sql on a database rebuilt from the
+"""Quizzes, MQ1: migrations/2026111804_quizzes.sql and 2026111805_quiz_results.sql on a database rebuilt from the
 repo and proved equal to live (scripts/db-rebuild.mjs --check; README.md, "Quizzes"). The contract is
 quizzes-contract.md.
 
@@ -34,7 +34,9 @@ locks the contract tells MQ2 to take.
   defaults  with Supabase's default privileges in place the grants still come out exact.
   apply     the guards stop with the catalog unchanged; only the header's changes; no existing row changes;
             the tables start empty; md5s; pre-check, post-check; a second run; lock timeout; sizes.
-  undo      PART 1 alone; the full removal refuses while a quiz exists or 2026111803 is there; a changed
+  collation on ICU en-US (live's) and on C: apply, post-check, a second run, undo, apply again; fingerprints and
+            the stored key identical under both.
+  undo      PART 1 alone; the full removal refuses while a quiz exists or 2026111805 is there; a changed
             function stops it; catalog and rows as before; a second run; the files apply again.
 """
 import json, os, re, sys, threading, time, uuid
@@ -43,7 +45,7 @@ sys.path.insert(0, HERE)
 from card_codes_common import Db, ok, finish, nid, connect, message, sqlstate, split, text_of
 from catalog import catalog, differences, row_checksums, table_columns
 
-FILE = '../2026111802_quizzes.sql'; FILE2 = '../2026111803_quiz_results.sql'
+FILE = '../2026111804_quizzes.sql'; FILE2 = '../2026111805_quiz_results.sql'
 UNDO = 'quizzes-undo.sql'; UNDO2 = 'quiz-results-undo.sql'
 PRE = 'quizzes-live-precheck.sql'; PRE2 = 'quiz-results-live-precheck.sql'
 POST = 'quizzes-live-postcheck.sql'; POST2 = 'quiz-results-live-postcheck.sql'
@@ -102,11 +104,11 @@ def from_reply(r):
 
 class W: pass
 
-def world(tag, with_file=True):
+def world(tag, with_file=True, template=None):
     """Teacher A: a class of four students (the last withdrawn), three competencies, a proficiency piece with two
     of them, a points piece, a DIBELS piece, a pair piece, a Draft, a class in the trash with a piece. Teacher B:
     a class of one student, a piece with a quiz, a sent try and an answer."""
-    d = Db('q1_' + tag)
+    d = Db('q1_' + tag, template)
     w = W(); w.d = d
     if applied(d):
         # Once the files are applied and the baseline refreshed, a rebuilt database already has them; the full
@@ -175,7 +177,7 @@ def answer(d, t, q, value):
              values (:t, :q, (select assessment_id from quiz_attempt where id = :t), cast(:v as jsonb))
              on conflict (attempt_id, question_id) do update set answer = excluded.answer, saved_at = now()""", t=t, q=q, v=json.dumps(value))
 def send(d, t): d.run('update quiz_attempt set sent_at = now() where id = :t', t=t)
-def rows(d, t, where='true', **kw): return d.all('select to_jsonb(x)::text from %s x where %s order by 1' % (t, where), **kw)
+def rows(d, t, where='true', **kw): return d.all('select to_jsonb(x)::text from %s x where %s order by to_jsonb(x)::text collate "C"' % (t, where), **kw)
 def quiz_rows(d): return {t: rows(d, t) for t in TABLES}
 
 def four(w):
@@ -923,14 +925,14 @@ def scen_undo():
     r = d.statements(split(part1(UNDO))); ok('undo PART 1: a second run is ok', r == 'ok', r)
     for f in (FILE, FILE2): d.file(f)
     ok('undo: the files again give the functions back', same(catalog_of(d), withfile), differences(norm(withfile), norm(catalog_of(d))))
-    # The full removal of the first file refuses while 2026111803 is there, and while a quiz exists.
+    # The full removal of the first file refuses while 2026111805 is there, and while a quiz exists.
     r = d.file(UNDO); ok('undo: the full removal stops while the results functions are there', r.startswith('STOPPED') and 'quiz-results-undo.sql first' in r, r)
     ok('undo: and keeps everything', quiz_rows(d) == kept and md5(d, 'public.save_quiz(uuid,jsonb,uuid)'))
     d.run("grant execute on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid), public.list_quiz_tries(uuid) to authenticated")
     # A changed function stops the results' removal.
     d.run("create temp table kept as select pg_get_functiondef(to_regprocedure('public.confirm_quiz(uuid,jsonb,uuid)')) as def")
     d.run("do $$ begin execute replace((select def from kept), 'begin', 'begin -- changed later'); end $$")
-    r = d.file(UNDO2); ok('undo: a results function changed since stops its removal', r.startswith('STOPPED') and 'is not the definition 2026111803 left' in r, r)
+    r = d.file(UNDO2); ok('undo: a results function changed since stops its removal', r.startswith('STOPPED') and 'is not the definition 2026111805 left' in r, r)
     d.run("do $$ begin execute (select def from kept); end $$"); d.run('drop table kept')
     r = d.file(UNDO2); ok('undo: the results removal runs', r == 'ok' and md5(d, 'public.confirm_quiz(uuid,jsonb,uuid)') is None, r)
     ok('undo: and deletes no row', quiz_rows(d) == kept)
@@ -940,7 +942,7 @@ def scen_undo():
     d.run("create temp table kept as select pg_get_functiondef(to_regprocedure('public.list_quiz(uuid)')) as def")
     d.run("do $$ begin execute replace((select def from kept), 'begin', 'begin -- changed later'); end $$")
     d.run('delete from quiz')
-    r = d.file(UNDO); ok('undo: a function changed since stops the full removal', r.startswith('STOPPED') and 'is not the definition 2026111802 left' in r, r)
+    r = d.file(UNDO); ok('undo: a function changed since stops the full removal', r.startswith('STOPPED') and 'is not the definition 2026111804 left' in r, r)
     d.run("do $$ begin execute (select def from kept); end $$"); d.run('drop table kept')
     r = d.file(UNDO); ok('undo: the full removal runs once no quiz is there', r == 'ok', r)
     ok('undo: the catalog is as before the files', catalog_of(d) == base, differences(base, catalog_of(d)))
@@ -950,7 +952,52 @@ def scen_undo():
     ok('undo: and the catalog is as with the files', same(catalog_of(d), withfile), differences(norm(withfile), norm(catalog_of(d))))
     d.close()
 
-SCENARIOS = {'save': scen_save, 'list': scen_list, 'tries': scen_tries, 'mark': scen_mark, 'reopen': scen_reopen, 'confirm': scen_confirm,
+ICU_TEMPLATE = os.environ.get('PG_ICU_TEMPLATE', 'q1_icu'); C_TEMPLATE = os.environ.get('PG_C_TEMPLATE', 'q1_c')
+FUNCS = ['public.list_quiz(uuid)', 'public.save_quiz(uuid,jsonb,uuid)', 'public.list_quiz_tries(uuid)', 'fv_private.quiz_json(uuid)',
+         'public._quiz_draft_guard()', 'public._quiz_tag_gone()', 'public._quiz_attempt_same_class()',
+         'public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', 'public.reopen_quiz(uuid,uuid,uuid)', 'public.confirm_quiz(uuid,jsonb,uuid)']
+
+def scen_collation():
+    """On a database with live's locale (ICU en-US) and on one with C: each applies, says ok, runs again, undoes and
+    applies again, and every fingerprint and every stored key comes out the same. Templates: PG_ICU_TEMPLATE and
+    PG_C_TEMPLATE, each rebuilt with scripts/db-rebuild.mjs --check."""
+    got = {}
+    for name, tpl, want in (('icu', ICU_TEMPLATE, ['i', 'en-US', 'en_US.UTF-8', 'en_US.UTF-8']), ('c', C_TEMPLATE, ['c', None, 'C', 'C'])):
+        w = world('coll_' + name, with_file=False, template=tpl); d = w.d
+        loc = d.all('select datlocprovider::text, datlocale, datcollate, datctype from pg_database where datname = current_database()')[0]
+        ok('collation %s: the database is %s' % (name, want), loc == want, loc)
+        base = catalog_of(d)
+        for f in (FILE, FILE2):
+            r = d.file(f); ok('collation %s: %s applies' % (name, f), r == 'ok', r)
+        for f in (POST, POST2):
+            r = d.statements(split(text_of(f)))
+            ok('collation %s: %s says ok on every row' % (name, f), r == 'ok' and d.rows and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or r)
+        fp = {f: md5(d, f) for f in FUNCS}
+        ok("collation %s: every new function is the headers' md5" % name, fp == dict(list(header_md5s(H1)[0].items()) + list(header_md5s(H2)[0].items())), fp)
+        withfile = catalog_of(d)
+        for f in (FILE, FILE2):
+            r = d.file(f); ok('collation %s: a second run of %s is ok' % (name, f), r == 'ok', r)
+        ok('collation %s: and changes nothing' % name, same(catalog_of(d), withfile), differences(norm(withfile), norm(catalog_of(d))))
+        # Keys and ids that sort differently by collation: underscores, hyphens, capitals.
+        ids = ['00000000-0000-4000-8000-00000000000%s' % c for c in 'abcdef']
+        q = {'kind': 'choice', 'prompt': 'Sort', 'multiple': True, 'points': 1, 'tag_id': None,
+             'choices': [{'id': i, 'text': t} for i, t in zip(ids, ('_x', '-x', 'B', 'a', 'Z', '1'))], 'key': {'answer': list(reversed(ids[:4]))}}
+        r = save(w, w.a, quiz([q]))
+        got[name] = (fp, r['questions'][0]['key']['answer'], [c['text'] for c in r['questions'][0]['choices']])
+        ok('collation %s: the key is stored in byte order' % name, got[name][1] == sorted(ids[:4]), got[name][1])
+        x = refusal(lambda: save(w, w.a, dict(quiz([]), Shows='grade')))
+        ok('collation %s: a setting spelled in capitals is not a setting' % name, x == ('22023', 'bad_quiz'), x)
+        save(w, w.a, None)
+        for f in (UNDO2, UNDO):
+            r = d.file(f); ok('collation %s: %s runs' % (name, f), r == 'ok', r)
+        ok('collation %s: the catalog is as before' % name, catalog_of(d) == base, differences(base, catalog_of(d)))
+        for f in (FILE, FILE2):
+            r = d.file(f); ok('collation %s: %s applies again' % (name, f), r == 'ok', r)
+        d.close()
+    ok('collation: the fingerprints are the same under ICU en-US and C', got['icu'][0] == got['c'][0], (got['icu'][0], got['c'][0]))
+    ok('collation: the stored key and choices are the same under both', got['icu'][1:] == got['c'][1:], got)
+
+SCENARIOS = {'collation': scen_collation, 'save': scen_save, 'list': scen_list, 'tries': scen_tries, 'mark': scen_mark, 'reopen': scen_reopen, 'confirm': scen_confirm,
              'draft': scen_draft, 'others': scen_others, 'cascade': scen_cascade, 'race': scen_race, 'missing': scen_missing,
              'defaults': scen_defaults, 'apply': scen_apply, 'undo': scen_undo}
 if __name__ == '__main__':

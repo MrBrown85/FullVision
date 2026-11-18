@@ -1,4 +1,4 @@
--- Read-only pre-check, before the apply of migrations/2026111802_quizzes.sql and 2026111803_quiz_results.sql
+-- Read-only pre-check, before the apply of migrations/2026111804_quizzes.sql and 2026111805_quiz_results.sql
 -- (2026-11-17). SELECTs only, catalog facts only (no row of any table is read). It returns ONLY the rows that
 -- differ from what the files were written and tested against: no rows means ready for both.
 with want(sig, md5) as (values
@@ -41,6 +41,17 @@ checks(check_name, value) as (
     select 'trigger assessment_draft_guard on public.assessment', 'absent'
      where not exists (select 1 from pg_trigger where tgrelid = 'public.assessment'::regclass and tgname = 'assessment_draft_guard')
     union all
+    -- apply_migration runs as postgres, which on Supabase is not a superuser: it must be able to add the keys and
+    -- triggers, and the functions it will own must be able to read and lock these rows.
+    select 'the role applying it may not reference, add a trigger to, read or lock ' || t, current_user::text
+      from unnest(array['public.assessment', 'public.enrollment', 'public.assessment_tag']) t
+     where not (has_table_privilege(current_user, t, 'REFERENCES') and has_table_privilege(current_user, t, 'TRIGGER')
+                and has_table_privilege(current_user, t, 'SELECT') and has_table_privilege(current_user, t, 'UPDATE'))
+    union all
+    select 'the role applying it may not create in schema ' || n, current_user::text
+      from unnest(array['public', 'fv_private']) n
+     where to_regnamespace(n) is not null and not has_schema_privilege(current_user, n, 'CREATE')
+    union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17)
-select * from checks order by 1;
+select * from checks order by check_name collate "C";

@@ -1,4 +1,4 @@
--- Undo for migrations/2026111803_quiz_results.sql (2026-11-17).
+-- Undo for migrations/2026111805_quiz_results.sql (2026-11-17).
 --
 -- ── PART 1, the stop that deletes nothing ────────────────────────────────────
 -- Takes mark_quiz_answer, reopen_quiz and confirm_quiz away from teachers
@@ -9,7 +9,7 @@
 --
 -- ── PART 2, the full removal: the rest of this file ──────────────────────────
 -- Drops the three functions. It deletes no row: the columns they wrote are
--- 2026111802's and stay. Stops, with the functions kept, if one is not this
+-- 2026111804's and stay. Stops, with the functions kept, if one is not this
 -- file's definition. Takes no lock on an existing table.
 --
 -- On a database where the file was never applied it changes nothing; a
@@ -51,7 +51,7 @@ begin
     ) as v(fn, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
         if _md5 is not null and _md5 <> _f.now then
-            raise exception '% is not the definition 2026111803 left (md5 %). The functions are kept; if PART 1 ran before this, teachers are without them until the migration file is run again.', _f.fn, _md5;
+            raise exception '% is not the definition 2026111805 left (md5 %). The functions are kept; if PART 1 ran before this, teachers are without them until the migration file is run again.', _f.fn, _md5;
         end if;
     end loop;
 end

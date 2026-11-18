@@ -1,8 +1,8 @@
--- Read-only post-check, after the apply of migrations/2026111802_quizzes.sql (2026-11-17).
+-- Read-only post-check, after the apply of migrations/2026111804_quizzes.sql (2026-11-17).
 -- SELECTs only. Every row says ok. The last row counts quizzes, never reads one.
 with want(sig, after_md5) as (values
     ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7'),
-    ('public.save_quiz(uuid,jsonb,uuid)', '146bd8f9022958d70d411bb1dfe1c408'),
+    ('public.save_quiz(uuid,jsonb,uuid)', '514d96e7fe70d09121d1068e7e7f70d1'),
     ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
     ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d'),
     ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9'),

@@ -3,7 +3,7 @@
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
 -- It adds five empty tables, three functions a teacher may run, a private
 -- helper, three trigger functions and three triggers. The results functions
--- (mark_quiz_answer, reopen_quiz, confirm_quiz) are 2026111803_quiz_results.sql,
+-- (mark_quiz_answer, reopen_quiz, confirm_quiz) are 2026111805_quiz_results.sql,
 -- split off to keep each file under 40 KB.
 --
 -- Why: docs/plans/quizzes-plan.md, slice Q1. A quiz is a way students do an
@@ -31,7 +31,7 @@
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   public.list_quiz(uuid) (new)                                 4b5a877bdade0126970b90acbfa613d7
---   public.save_quiz(uuid,jsonb,uuid) (new)                      146bd8f9022958d70d411bb1dfe1c408
+--   public.save_quiz(uuid,jsonb,uuid) (new)                      514d96e7fe70d09121d1068e7e7f70d1
 --   public.list_quiz_tries(uuid) (new)                           e929cbfe0aa1130741bd2b3af1615a2d
 --   fv_private.quiz_json(uuid) (new)                             c1d41659890c23cb02d0f517cd5c037d
 --   public._quiz_draft_guard() (new)                             9e6ed6b0336305322b22c309161472f9
@@ -59,7 +59,7 @@
 -- competency row a form save deletes runs one indexed update at commit that
 -- finds nothing, and each Unassign one more trigger that reads one index.
 --
--- After 2026111730, before the app that calls these. Tested on PostgreSQL 17
+-- After 2026111730 (needs nothing of Bulletins' 2026111801 to 03), before the app that calls these. Tested on PostgreSQL 17
 -- rebuilt equal to live: migrations/local-test/quizzes.py (README.md,
 -- "Quizzes"). Undo: quizzes-undo.sql. After: quizzes-live-postcheck.sql.
 -- One transaction: all or nothing. Can be run again.
@@ -80,7 +80,7 @@ begin
         ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f', null),
         ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626', null),
         ('public.list_quiz(uuid)', null, '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', null, '146bd8f9022958d70d411bb1dfe1c408'),
+        ('public.save_quiz(uuid,jsonb,uuid)', null, '514d96e7fe70d09121d1068e7e7f70d1'),
         ('public.list_quiz_tries(uuid)', null, 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', null, 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', null, '9e6ed6b0336305322b22c309161472f9'),
@@ -384,7 +384,7 @@ begin
         raise exception 'not_offered' using errcode = '22023', detail = 'A quiz is not offered on a DIBELS, pair or group piece.';
     end if;
     if (case when jsonb_typeof(p_quiz) <> 'object' then true
-             else (select array_agg(k order by k) from jsonb_object_keys(p_quiz) k) is distinct from
+             else (select array_agg(k order by k collate "C") from jsonb_object_keys(p_quiz) k) is distinct from
                   array['accept_until', 'add_total', 'after_due', 'counts', 'questions', 'shows', 'shuffle_choices', 'shuffle_questions', 'tries'] end) then
         _bad := 'The quiz must have exactly its nine settings and questions.';
     elsif jsonb_typeof(p_quiz->'shuffle_questions') <> 'boolean' or jsonb_typeof(p_quiz->'shuffle_choices') <> 'boolean'
@@ -399,7 +399,7 @@ begin
     elsif jsonb_typeof(p_quiz->'after_due') <> 'string' or p_quiz->>'after_due' not in ('keep', 'stop', 'until') then
         _bad := 'After the due date must be keep, stop or until.';
     elsif (case when p_quiz->>'after_due' = 'until'
-                then jsonb_typeof(p_quiz->'accept_until') <> 'string' or p_quiz->>'accept_until' !~ '^\d{4}-\d{2}-\d{2}$'
+                then jsonb_typeof(p_quiz->'accept_until') <> 'string' or p_quiz->>'accept_until' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
                      or not pg_input_is_valid(p_quiz->>'accept_until', 'date')
                 else jsonb_typeof(p_quiz->'accept_until') <> 'null' end) then
         _bad := 'The last day must be a date (YYYY-MM-DD) with until, and null otherwise.';
@@ -417,7 +417,7 @@ begin
     insert into quiz (assessment_id) values (p_assessment_id) on conflict (assessment_id) do nothing;
     perform 1 from quiz where assessment_id = p_assessment_id for update;
     perform 1 from assessment_tag where assessment_id = p_assessment_id for key share;
-    select coalesce(array_agg(tag_id), '{}') into _tags
+    select coalesce(array_agg(tag_id order by tag_id), '{}') into _tags
       from (select x.tag_id from assessment_tag x where x.assessment_id = p_assessment_id for key share) x;
     update quiz set shuffle_questions = (p_quiz->>'shuffle_questions')::boolean, shuffle_choices = (p_quiz->>'shuffle_choices')::boolean,
                     tries = (p_quiz->>'tries')::smallint, counts = p_quiz->>'counts', shows = p_quiz->>'shows',
@@ -468,7 +468,7 @@ begin
                                       when jsonb_typeof(e->'id') is distinct from 'string' or e->>'id' !~ _uuid4 then true
                                       when jsonb_typeof(e->'text') is distinct from 'string' then true
                                       else char_length(btrim(e->>'text')) not between 1 and 300 end)
-               or (select count(distinct e->>'id') from jsonb_array_elements(_q->'choices') e) <> jsonb_array_length(_q->'choices') then
+               or (select count(distinct (e->>'id') collate "C") from jsonb_array_elements(_q->'choices') e) <> jsonb_array_length(_q->'choices') then
                 _bad := 'its choices (each an id, a random version-4 UUID used once, and 1 to 300 characters)';
             else
                 select jsonb_agg(jsonb_build_object('id', e->>'id', 'text', btrim(e->>'text')) order by o) into _choices
@@ -494,7 +494,7 @@ begin
                    or (select count(distinct r) from jsonb_array_elements(_k->'answer') r) <> jsonb_array_length(_k->'answer') then
                     _bad := 'its right answer (one of its choices, or with Several Right one or more)';
                 else
-                    select jsonb_agg(r order by r #>> '{}') into _ans from jsonb_array_elements(_k->'answer') r;
+                    select jsonb_agg(r order by (r #>> '{}') collate "C") into _ans from jsonb_array_elements(_k->'answer') r;
                 end if;
             elsif _q->>'kind' = 'true_false' then
                 if jsonb_typeof(_k->'answer') is distinct from 'boolean' then _bad := 'its right answer (true or false)'; else _ans := _k->'answer'; end if;
@@ -520,8 +520,8 @@ begin
                 raise exception 'kind_locked' using errcode = '22023',
                     detail = format('Question %s has answers, so its kind and Several Right cannot change.', _n);
             end if;
-            if (select array_agg(c->>'id' order by c->>'id') from jsonb_array_elements(_old_ch) c)
-               is distinct from (select array_agg(c->>'id' order by c->>'id') from jsonb_array_elements(_choices) c) then
+            if (select array_agg(c->>'id' order by (c->>'id') collate "C") from jsonb_array_elements(_old_ch) c)
+               is distinct from (select array_agg(c->>'id' order by (c->>'id') collate "C") from jsonb_array_elements(_choices) c) then
                 raise exception 'choices_locked' using errcode = '22023',
                     detail = format('Question %s has answers, so a choice cannot be added or removed.', _n);
             end if;
@@ -602,7 +602,7 @@ declare
 begin
     for _f in select * from (values
         ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', '146bd8f9022958d70d411bb1dfe1c408'),
+        ('public.save_quiz(uuid,jsonb,uuid)', '514d96e7fe70d09121d1068e7e7f70d1'),
         ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9'),

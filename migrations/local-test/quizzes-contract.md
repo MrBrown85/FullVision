@@ -1,10 +1,10 @@
 # Quizzes: the contract (Q1, 2026-11-17)
 
-What `migrations/2026111802_quizzes.sql` (MQ1, slice Q1) gives the teacher's browser, and what MQ2 (slice Q3a) and MQ3 (slice Q5a) must give the student page. The plan is `docs/plans/quizzes-plan.md`. The teacher-app builder (Q2b, Q4), the student-page builder (Q3b, Q5b) and the grade-math builder (Q4's `quizSuggestions` in `shared/calc.js`) need nothing else.
+What `migrations/2026111804_quizzes.sql` (MQ1, slice Q1) gives the teacher's browser, and what MQ2 (slice Q3a) and MQ3 (slice Q5a) must give the student page. The plan is `docs/plans/quizzes-plan.md`. The teacher-app builder (Q2b, Q4), the student-page builder (Q3b, Q5b) and the grade-math builder (Q4's `quizSuggestions` in `shared/calc.js`) need nothing else.
 
 Not in MQ1: any `student_submit` function, any change to `student_submit.write_log`, the edge function, any app code. MQ1 changes no existing row, table, policy, constraint or function. It adds five tables, six functions a teacher may run, one private helper, three trigger functions and three triggers (one on `assessment`, one on `assessment_tag`, one on its own `quiz_attempt`), and the foreign keys' own internal triggers on `assessment` and `enrollment`.
 
-MQ1 is two files, applied in this order, each under 40 KB: `migrations/2026111802_quizzes.sql` (the tables, the triggers, `list_quiz`, `save_quiz`, `list_quiz_tries`) and `migrations/2026111803_quiz_results.sql` (`mark_quiz_answer`, `reopen_quiz`, `confirm_quiz`), each with its own guard, pre-check, post-check and undo.
+MQ1 is two files, applied in this order, each under 40 KB: `migrations/2026111804_quizzes.sql` (the tables, the triggers, `list_quiz`, `save_quiz`, `list_quiz_tries`) and `migrations/2026111805_quiz_results.sql` (`mark_quiz_answer`, `reopen_quiz`, `confirm_quiz`), each with its own guard, pre-check, post-check and undo.
 
 ## Where this differs from the brief or the plan
 
@@ -76,12 +76,12 @@ Constraints and indexes: `quiz_question_pkey (id)`; `quiz_question_id_assessment
 
 `save_quiz` writes exactly one key row for every question. **The key's JSON, by kind:**
 
-| Kind         | `answer`                                                                                                  | `tolerance`       |
-| ------------ | --------------------------------------------------------------------------------------------------------- | ----------------- |
-| `choice`     | `["<choice id>"]`, or with `multiple` several: `["<id>", "<id>"]`, sorted, each one of the question's own | null              |
-| `true_false` | `true` or `false`                                                                                         | null              |
-| `number`     | a JSON number, −10¹² to 10¹²: `3.5`                                                                       | null or 0 to 10¹² |
-| `text`       | null (assessed by hand)                                                                                   | null              |
+| Kind         | `answer`                                                                                                                               | `tolerance`       |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `choice`     | `["<choice id>"]`, or with `multiple` several: `["<id>", "<id>"]`, sorted byte by byte (collation `C`), each one of the question's own | null              |
+| `true_false` | `true` or `false`                                                                                                                      | null              |
+| `number`     | a JSON number, −10¹² to 10¹²: `3.5`                                                                                                    | null or 0 to 10¹² |
+| `text`       | null (assessed by hand)                                                                                                                | null              |
 
 **No function of the student page reads this table except MQ3's `student_submit.quiz_result`.** MQ1 has none; `quizzes.py` checks that no `student_submit` function names it.
 

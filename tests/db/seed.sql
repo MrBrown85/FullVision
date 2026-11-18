@@ -119,7 +119,7 @@ begin
     perform public.add_assessment_link(a_prof, 'https://example.test/' || p_mark, p_mark || ' Link', gen_random_uuid());
     select id into res from public.assessment_resource where assessment_id = a_prof;
     perform public.return_grades(a_pts, array[e1], gen_random_uuid());
-    -- A quiz on the points piece, once 2026111802 is applied (until then the function is missing).
+    -- A quiz on the points piece, once 2026111804 is applied (until then the function is missing).
     if to_regprocedure('public.save_quiz(uuid,jsonb,uuid)') is not null then
         execute 'select public.save_quiz($1, $2, gen_random_uuid())' into _r using a_pts, jsonb_build_object(
             'shuffle_questions', true, 'shuffle_choices', true, 'tries', 1, 'counts', 'best', 'shows', 'answers',
@@ -188,7 +188,7 @@ begin
     if to_regclass('public.scan_label') is not null then
         execute 'select fv_private.scan_label_new($1)' using e1;
     end if;
-    -- A sent try at the quiz, with a Text answer (MQ2 writes these; 2026111802 only makes the tables).
+    -- A sent try at the quiz, with a Text answer (MQ2 writes these; 2026111804 only makes the tables).
     if qz is not null then
         execute 'insert into public.quiz_attempt (assessment_id, enrollment_id, try, question_order, started_at, sent_at)
                  values ($1, $2, 1, $3, now(), now()) returning id'
