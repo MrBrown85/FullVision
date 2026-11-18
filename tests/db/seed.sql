@@ -20,7 +20,7 @@ declare
     c uuid; subj uuid; st1 uuid; st2 uuid; e1 uuid; e2 uuid; cat uuid; md uuid; cg uuid; sec uuid; tg uuid;
     rub uuid; crit uuid; chk uuid; a_pts uuid; a_prof uuid; a_rub uuid; a_dib uuid; ctag uuid; otpl uuid;
     obs uuid; tr uuid; q uuid; qq uuid; resp uuid; pr uuid; ri uuid; gu uuid; ct uuid; rt uuid; res uuid;
-    sec2 uuid; ho uuid; sub2 uuid; sf2 uuid;
+    sec2 uuid; ho uuid; sub2 uuid; sf2 uuid; qz uuid; qa uuid;
     fup uuid; bl uuid; blf uuid;
     sub uuid; sf uuid; card uuid; code uuid; rr uuid; sc uuid; nt uuid; ds uuid; fr uuid;
     a_grp uuid := gen_random_uuid();
@@ -119,6 +119,15 @@ begin
     perform public.add_assessment_link(a_prof, 'https://example.test/' || p_mark, p_mark || ' Link', gen_random_uuid());
     select id into res from public.assessment_resource where assessment_id = a_prof;
     perform public.return_grades(a_pts, array[e1], gen_random_uuid());
+    -- A quiz on the points piece, once 2026111804 is applied (until then the function is missing).
+    if to_regprocedure('public.save_quiz(uuid,jsonb,uuid)') is not null then
+        execute 'select public.save_quiz($1, $2, gen_random_uuid())' into _r using a_pts, jsonb_build_object(
+            'shuffle_questions', true, 'shuffle_choices', true, 'tries', 1, 'counts', 'best', 'shows', 'answers',
+            'add_total', false, 'after_due', 'keep', 'accept_until', null, 'updated_at', null,
+            'questions', jsonb_build_array(jsonb_build_object('kind', 'text', 'prompt', p_mark || ' Explain', 'points', 2,
+                'tag_id', tg, 'key', jsonb_build_object('answer', null, 'why', p_mark || ' Because'))));
+        qz := _r->'questions'->0->>'id';
+    end if;
     sec2 := public.upsert_section(null, subj, p_mark || ' Removed', '#336699', cg, 1, gen_random_uuid());
     perform public.remove_section(sec2, gen_random_uuid());
 
@@ -179,6 +188,14 @@ begin
     if to_regclass('public.scan_label') is not null then
         execute 'select fv_private.scan_label_new($1)' using e1;
     end if;
+    -- A sent try at the quiz, with a Text answer (MQ2 writes these; 2026111804 only makes the tables).
+    if qz is not null then
+        execute 'insert into public.quiz_attempt (assessment_id, enrollment_id, try, question_order, started_at, sent_at)
+                 values ($1, $2, 1, $3, now(), now()) returning id'
+           into qa using a_pts, e1, jsonb_build_object('questions', jsonb_build_array(qz), 'choices', '{}'::jsonb);
+        execute 'insert into public.quiz_answer (attempt_id, question_id, assessment_id, answer) values ($1, $2, $3, to_jsonb($4::text))'
+           using qa, qz, a_pts, p_mark || ' Quiz answer';
+    end if;
     -- A bulletin with a file, seen and reacted to, once 2026111801 is applied (until then the tables are missing).
     if to_regclass('public.bulletin') is not null then
         execute 'insert into public.bulletin (course_id, kind, body, posted_at) values ($1, ''announcement'', $2, now()) returning id'
@@ -211,7 +228,8 @@ begin
         'device_session', ds, 'assessment_copy_group', a_grp, 'rubric_copy_group', r_grp,
         'removed_section', sec2, 'handout', ho, 'enrollment2_submission', sub2, 'sending_file', sf2,
         'custom_tag_label', p_mark || ' Custom',
-        'idempotency_key', (select key from public.fv_idempotency where teacher_id = p_uid limit 1));
+        'idempotency_key', (select key from public.fv_idempotency where teacher_id = p_uid limit 1))
+        || jsonb_build_object('quiz_question', qz, 'quiz_attempt', qa);
 end;
 $$;
 
