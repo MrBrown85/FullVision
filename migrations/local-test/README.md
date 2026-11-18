@@ -2757,6 +2757,24 @@ Since the apply, `docs/schema.generated.sql` (its md5 equal to live's snapshot, 
 
 Not verified here: PostgREST's schema cache and the app's calls through it, the edge function (not changed: `closed` is already in its whitelist).
 
+## Quizzes, the student page's list (2026111807, 2026-11-18)
+
+One file, `../2026111807_quizzes_student_list.sql`, APPLIED to gradebook-prod on 2026-11-18 from commit `04d50b81` (the text applied: 13,333 bytes, sha256 `d5f7d52e080d929ba00e9b808118fccca1afaaf5f51639d9fcc6fe3a0767127b`; since then only its first comment line says it is applied); post-check 13 of 13 ok; the `student-submit` edge function (v22) deployed from `04d50b81` after it. It needs 2026111806 (MQ2). It adds one read-only function, `student_submit.quiz_list` (`stable`, `security definer`, the path pinned, `service_role` only), for the route `quiz-list`: which pieces of the session's class are quizzes the student may open, by `quiz`'s own rule (`_quiz_window`), and for each `tries_left`, `can_answer`, `closed` and `has_open_try`. It begins with `_session_class`, reads no question, key or answer, writes nothing (no try, no `write_log` row) and takes no row lock. `student_submit.page` and its reply are not changed. It changes no existing row, table, policy, constraint or function. 13,333 bytes, plain ASCII, no backslash. Contract: `quizzes-contract.md`, "quiz_list".
+
+```bash
+export PGPORT=54761 FV_ICU_DB=q3a_icu FV_C_DB=q3a_c PYTHONDONTWRITEBYTECODE=1     # the two templates as for 2026111806
+PGDATABASE=q3a_icu python3 quizzes_student_list.py
+PGDATABASE=q3a_c python3 quizzes_student_list.py
+FV_NONSUPER=q3a_postgres PGDATABASE=q3a_icu python3 quizzes_student_list.py
+FV_DB_TEST_APPLY=migrations/2026111807_quizzes_student_list.sql DATABASE_URL=postgresql://postgres@127.0.0.1:54761/postgres npm run test:db
+```
+
+The script uses `quizzes_student.py`'s world (MQ2 kept as the template has it). Scenarios: `list` (exactly the pieces `quiz` opens, at every stage of a try, and it agrees with `quiz`; Draft, next week, DIBELS, Pairs and Groups left out), `nowrite` (700 calls: no row, no `write_log` row, no lock left on a quiz row, never `too_many`; it answers at once while the teacher holds the quiz for a save), `leak`, `refused`, `others`, `apply`, `lastcheck`, `undo`, `collations`.
+
+Result on 2026-11-18, PostgreSQL 17.11, on databases rebuilt with `--check` from `main` at `c9864884`: under ICU en-US **207 of 207**; under C **207 of 207**; as the non-superuser **214 of 214**. The post-check has 13 rows. `npm run test:db` without the file: every rule test passed (74 student_submit functions; service_role may run 44); with it: every rule test passed (75; 45).
+
+Not verified here: gradebook-prod; the edge function deployed.
+
 ## Quizzes, the student's side (2026111806, 2026-11-18)
 
 One file, `../2026111806_quizzes_student.sql`, APPLIED to gradebook-prod on 2026-11-18 as `quizzes_student` from commit `ef96d940` (the text applied: 36,786 bytes, sha256 `f8d288da038890a136a2d6501343c9521969db455fac0d642ce179d9c8753719`; since then only its first comment line says it is applied); post-check 28 of 28 ok; the `student-submit` edge function (v21) deployed from `ef96d940` after it. Slice Q3a of `docs/plans/quizzes-plan.md`; the contract is `quizzes-contract.md`, "The student's side (MQ2)". It needs MQ1 (`2026111804`, `2026111805`) and Bulletins' M2 (`2026111803`) applied first, which a database rebuilt from the repo already has. It adds six `student_submit` functions, each `security definer` with the path pinned: three private helpers no role may call (`_quiz_window`, the piece as a quiz this class may open (never a pair or group piece), open or closed read as `_work_window` reads Student Work's from the quiz's own columns; `_quiz_new_order`; `_quiz_questions`, the active questions in a try's order without key, competency or position) and the three the edge function calls, `quiz`, `quiz_save`, `quiz_send`, each beginning with `_session_class`. None of the six reads `quiz_key`. The three are granted to `service_role` and no other role; the edge function signs in as the database's owner, so the undo's fast stop drops them. It changes one existing thing: `write_log_kind_check` gains `quiz` (dropped and added in one statement, behind a guard that stops if the check is not the one Bulletins' M2 left). No row changes. 36,786 bytes, plain ASCII, no backslash.
