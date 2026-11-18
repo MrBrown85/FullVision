@@ -140,10 +140,11 @@ describe('DashInboxSide model', () => {
 
   it('says the state, the time and Late in the line under each page', () => {
     const m = DashInboxSide.model(CID, LIGHT);
-    m.items.forEach(i => expect(i.line).toMatch(/ · (To Grade|Assessed)/));
+    // As board C2 words it: the state first, then the time, then Late.
+    m.items.forEach(i => expect(i.line).toMatch(/^(To Grade|Assessed|Returned) · /));
     const marcus = m.items.find(i => i.name === 'Marcus Lee');
     expect(marcus.late).toBe(true);
-    expect(marcus.line).toMatch(/^Late · \w{3} \d{1,2}:\d{2} [ap]m · To Grade$/);
+    expect(marcus.line).toMatch(/^To Grade · \w{3} \d{1,2}:\d{2} [ap]m · Late$/);
     const sofia = m.items.find(i => i.name === 'Sofia Petrov');
     expect(sofia.late).toBe(false);
     expect(sofia.line).not.toContain('Late');
@@ -164,8 +165,9 @@ describe('DashInboxSide model', () => {
     expect(ethan.paper).toBe(true);
     expect(ethan.line).toContain('On Paper');
     const mateo = m.items.find(i => i.name === 'Mateo Cruz');
-    expect(mateo.line).toMatch(/^Added by You · /);
-    expect(mateo.line).toMatch(/ · Assessed$/);
+    expect(mateo.line).toMatch(/ · Added by You/);
+    expect(mateo.line).toMatch(/^(Assessed|Returned) · /);
+    expect(mateo.line.startsWith('Returned')).toBe(mateo.returned);
     expect(m.items.every(i => !i.tograde)).toBe(true);
   });
 

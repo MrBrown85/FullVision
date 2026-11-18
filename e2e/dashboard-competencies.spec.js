@@ -478,7 +478,9 @@ for (const [w, h] of [
       expect(n).toBeGreaterThan(0);
       for (const i of [0, n - 1]) {
         await rows.nth(i).scrollIntoViewIfNeeded();
-        await rows.nth(i).click();
+        // On the name: on a tile 440 px wide or more the row is one line and
+        // its bar (one button a level) sits in the row's middle.
+        await rows.nth(i).locator('.dash-comp-ln-name').click();
         const pop = page.locator('#dash-comp-pop');
         await expect(pop).toBeVisible();
         const m = await page.evaluate(() => {

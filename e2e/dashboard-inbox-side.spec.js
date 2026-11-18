@@ -137,9 +137,10 @@ test('the row lists every student with work in: to grade first by arrival, then 
   expect([...got.members].sort()).toEqual([...got.inIds].sort());
   expect(got.shown.length).toBe(got.inIds.length - 1);
   await expect(page.locator('.dash-inbox-side-name', { hasText: 'Aiden Singh and Olivia Tam' })).toHaveCount(1);
-  got.shown.forEach(s => expect(s.line).toMatch(/ · (To Grade|Assessed)/));
+  // As board C2 words it: the state first, then the time, then Late.
+  got.shown.forEach(s => expect(s.line).toMatch(/^(To Grade|Assessed|Returned) · /));
   expect(got.foot).toBe('To grade first, then assessed. ' + got.notIn + ' not in yet.');
-  await expect(page.locator('.dash-inbox-side-line', { hasText: /^Late · / })).toHaveCount(1);
+  await expect(page.locator('.dash-inbox-side-line', { hasText: / · Late$/ })).toHaveCount(1);
   // The word Late is said, and only the word is amber.
   await expect(page.locator('.dash-inbox-side-line .dash-inbox-late')).toHaveText('Late');
   await expect(page.locator('#dash-inbox')).not.toContainText(/Compare 2|picked/);

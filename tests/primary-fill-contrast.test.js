@@ -66,10 +66,18 @@ describe('white on the primary blue fill', () => {
     expect((a + 0.05) / (b + 0.05)).toBeGreaterThanOrEqual(3.0);
   });
 
-  it('the Dashboard Inbox badge uses the fill token (Grade Submissions is tinted: the Dashboard has no solid button)', () => {
+  it('the Dashboard Inbox buttons put no white on the bare --active blue', () => {
+    // Board A draws Grade Submissions as a ghost button in the link colour and
+    // +N as a white label, so neither is white on blue now; any rule for them
+    // that does put white text on a blue fill must use the fill token.
     const css = read('teacher/dash-inbox.css');
-    for (const sel of ['dash-inbox-new']) {
-      expect(css).toMatch(new RegExp(`\\.${sel}\\s*\\{[^}]*background:\\s*var\\(--active-fill\\)`));
+    for (const sel of ['dash-inbox-new', 'dash-inbox-grade']) {
+      const rules = css.match(new RegExp(`\\.${sel}\\s*\\{[^}]*\\}`, 'g')) || [];
+      expect(rules.length, sel).toBeGreaterThan(0);
+      for (const r of rules) {
+        expect(r, sel).not.toMatch(/background:\s*var\(--active\)\s*;/);
+        if (/color:\s*#fff/.test(r)) expect(r, sel).toMatch(/background:\s*var\(--active-fill\)/);
+      }
     }
   });
 

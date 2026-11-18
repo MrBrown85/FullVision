@@ -23,10 +23,12 @@ window.DashInboxSide = (function () {
   'use strict';
 
   // A page is this much taller than wide; the gap is between a pile's pages.
+  // A page is as tall as the row leaves it (board C2, "the pages as tall as
+  // the tile allows"), never under MIN_H; there is no top limit, so a tall
+  // row is filled, not left half empty under the pages.
   var RATIO = 0.75;
   var GAP = 8;
   var MIN_H = 80;
-  var MAX_H = 320;
   // What the name and the line under a page take, and the row's padding.
   var CAPTION = 60;
   var PAD = 4;
@@ -148,12 +150,14 @@ window.DashInboxSide = (function () {
       var late = !!(own && own.is_late);
       var added = !!(own && own.sent_by === 'teacher');
       var paper = !!(own && own.on_paper);
-      var parts = [];
+      // As the board words it: the state, the time, then Late and the
+      // quiet marks ("To Grade · Sat 8:48 pm · Late").
+      var returned = !tograde && state === 'returned';
+      var parts = [stateWord(tograde, returned)];
+      if (at) parts.push(_when(cid, at));
       if (late) parts.push('Late');
       if (added) parts.push('Added by You');
       if (paper) parts.push('On Paper');
-      if (at) parts.push(_when(cid, at));
-      parts.push(stateWord(tograde));
       items.push({
         sid: sender,
         members: members,
@@ -161,7 +165,7 @@ window.DashInboxSide = (function () {
         fullName: names.join(', '),
         state: state,
         tograde: tograde,
-        returned: state === 'returned',
+        returned: returned,
         at: at,
         late: late,
         added: added,
@@ -169,6 +173,7 @@ window.DashInboxSide = (function () {
         pages: files,
         // A hand-in on paper with no scan is a lined sheet.
         sheet: !files.length,
+        parts: parts,
         line: parts.join(' · '),
       });
     });
@@ -185,11 +190,12 @@ window.DashInboxSide = (function () {
     return out;
   }
 
-  /** The word for a student's work: To Grade while it waits, else Assessed.
-   * Roll Call words its chips the same way.
-   * @param {boolean} tograde */
-  function stateWord(tograde) {
-    return tograde ? 'To Grade' : 'Assessed';
+  /** The word for a student's work: To Grade while it waits, Returned once
+   * it is back with the student, else Assessed. Roll Call words its chips the
+   * same way (it does not pass `returned`: a chip's tick says that).
+   * @param {boolean} tograde @param {boolean} [returned] */
+  function stateWord(tograde, returned) {
+    return tograde ? 'To Grade' : returned ? 'Returned' : 'Assessed';
   }
 
   /** The line under the row.
@@ -199,6 +205,22 @@ window.DashInboxSide = (function () {
   }
 
   /* ── Drawing ───────────────────────────────────────────── */
+  // Returned work: a green tick on the page's corner and before the word.
+  var TICK =
+    '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.4 8.3 6.9 10.7 11.6 5.6" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  /** The line under a page: the words as drawn, Late in amber and a tick before Returned.
+   * @param {any} it */
+  function _lineHtml(it) {
+    return (it.parts || [it.line])
+      .map(function (/** @type {string} */ w) {
+        if (w === 'Late') return '<span class="dash-inbox-late">Late</span>';
+        if (w === 'Returned') return '<span class="dash-inbox-side-ok">' + TICK + 'Returned</span>';
+        return esc(w);
+      })
+      .join(' · ');
+  }
+
   /** @param {string} cid @param {any} m @param {any} it @param {any} pg @param {number} i */
   function _pageHtml(cid, m, it, pg, i) {
     var n = it.sheet ? 1 : it.pages.length;
@@ -228,7 +250,7 @@ window.DashInboxSide = (function () {
     var badge = '';
     if (i === 0) {
       if (n > 1) badge += '<span class="dash-inbox-side-count" aria-hidden="true">' + n + ' pages</span>';
-      if (it.returned) badge += '<span class="dash-inbox-side-tick" aria-hidden="true">✓</span>';
+      if (it.returned) badge += '<span class="dash-inbox-side-tick" aria-hidden="true">' + TICK + '</span>';
     }
     return (
       '<button type="button" class="dash-inbox-side-page" style="--i:' +
@@ -272,7 +294,7 @@ window.DashInboxSide = (function () {
       esc(it.line) +
       '">' +
       // Late is said in a word, and only the word is amber.
-      (it.late ? '<span class="dash-inbox-late">Late</span>' + esc(it.line.slice(4)) : esc(it.line)) +
+      _lineHtml(it) +
       '</p></li>'
     );
   }
@@ -312,7 +334,8 @@ window.DashInboxSide = (function () {
         })
         .join('') +
       '</ul><p class="dash-inbox-side-foot">' +
-      esc(footText(m)) +
+      // The board's foot, its count in bold: "17 not in yet."
+      esc(footText(m)).replace(/(\d+)( not in yet\.)$/, '<b>$1</b>$2') +
       '</p></div>'
     );
   }
@@ -335,7 +358,7 @@ window.DashInboxSide = (function () {
         CAPTION,
         Math.ceil(name.offsetHeight + (parseFloat(getComputedStyle(name).marginTop) || 0) + line.offsetHeight + 2),
       );
-    var h = Math.max(MIN_H, Math.min(MAX_H, Math.floor(row.clientHeight - PAD - cap)));
+    var h = Math.max(MIN_H, Math.floor(row.clientHeight - PAD - cap));
     _h = h;
     row.style.setProperty('--dash-inbox-side-h', h + 'px');
   }
@@ -357,11 +380,22 @@ window.DashInboxSide = (function () {
     return left + _h * RATIO > row.scrollLeft - w / 2 && left < row.scrollLeft + w * 1.5;
   }
 
+  // A thumbnail's long side is 400 px (shared/photo-shrink.js): only where a
+  // page is drawn with more device pixels than that does it ask for the whole
+  // page, the thumbnail standing in until it is in. A normal-density screen
+  // keeps the thumbnails (review of #1603: a class's whole pages are MBs).
+  var THUMB_PX = 400;
+
   /** @param {Element} root @param {string} cid */
   function _fill(root, cid) {
     var row = _row(root);
     var pics = window.DashInbox && DashInbox.pics();
     if (!row || !pics) return;
+    if (_h * (window.devicePixelRatio || 1) > THUMB_PX)
+      row.querySelectorAll('img[data-dash-side-pic]:not([src])').forEach(function (img) {
+        img.setAttribute('data-work-which', 'page');
+        img.setAttribute('data-work-first', 'thumb');
+      });
     pics.fill(row, cid, function (/** @type {HTMLElement} */ img) {
       var f = _files[img.getAttribute('data-dash-side-pic') || ''];
       if (!f) return null;
