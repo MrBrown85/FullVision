@@ -40,6 +40,7 @@
   border-radius: 8px;
   outline: none;
   touch-action: pan-y;
+  overscroll-behavior-x: contain;
   user-select: none;
   -webkit-user-select: none;
 }

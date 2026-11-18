@@ -423,11 +423,11 @@ window.DashInbox = (function () {
     });
   }
 
-  /* A view that changes its own pictures between draws (Flip Through) hands
-     the files here, key → file, for the imgs it drew with data-dash-pic, and
-     passes the root of any it has added since to be filled. The tile's own
-     holder fills them, so a picture is asked for once, and what no picture
-     shows is let go. */
+  /* The one way for a view to get its pictures. A view draws each
+     <img data-work-pic data-dash-pic="KEY"> and hands the files here, key →
+     file, while it builds its html (root null), and again with the root of
+     any imgs it adds later. The tile's own holder fills them, so a picture is
+     asked for once across redraws, and what no picture shows is let go. */
   /** @param {Element | null} root @param {Record<string, any> | null} [files] */
   function fillPics(root, files) {
     if (files) {

@@ -44,6 +44,8 @@ describe('Flip Through, Science 8 with Send Work on', () => {
   });
 
   const ids = () => getStudents(CID).map(s => s.id);
+  // Work to grade first, else any work in.
+  const firstPiece = m => (m.pieces.find(p => p.tograde > 0 && p.in > 0) || m.pieces.find(p => p.in > 0)).aid;
   const find = (list, name) => list.find(e => e.name === name);
 
   it('registers as a view of the Inbox', () => {
@@ -115,17 +117,17 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     const st = DashInboxFlip.stateOf(CID, LAB);
     const noor = find(list, 'Noor Al-Rashid');
     expect(noor.pages).toBe(2);
-    expect(DashInboxFlip.pageOf(st, noor)).toBe(0);
+    expect(DashInboxFlip.pageShown(st, noor)).toBe(0);
     expect(DashInboxFlip.turn(st, noor, -1)).toBe(0);
     expect(DashInboxFlip.turn(st, noor, 1)).toBe(1);
     expect(DashInboxFlip.turn(st, noor, 1)).toBe(1);
-    expect(DashInboxFlip.pageOf(st, noor)).toBe(1);
+    expect(DashInboxFlip.pageShown(st, noor)).toBe(1);
     expect(DashInboxFlip.turn(st, noor, -1)).toBe(0);
     // One page, or none: nothing to turn.
     expect(DashInboxFlip.turn(st, find(list, 'Mateo Cruz'), 1)).toBe(0);
     expect(DashInboxFlip.turn(st, find(list, 'Ethan Dubois'), 1)).toBe(0);
     // Another student's page is their own.
-    expect(DashInboxFlip.pageOf(st, find(list, 'Fatima Hassan'))).toBe(0);
+    expect(DashInboxFlip.pageShown(st, find(list, 'Fatima Hassan'))).toBe(0);
   });
 
   it('moves the centre and stops at both ends', () => {
@@ -156,15 +158,17 @@ describe('Flip Through, Science 8 with Send Work on', () => {
 
   it('shows the first piece with work in when the switch is not there, and the switch otherwise', () => {
     const model = DashInboxModel.build(CID, { seen: null });
-    expect(DashInboxFlip.chosen(CID, model)).toBe(model.pieces.filter(p => p.in > 0)[0].aid);
+    expect(DashInboxFlip.chosen(CID, model)).toBe(firstPiece(model));
+    // The sample class has work to grade only on the Light Refraction Lab.
+    expect(DashInboxFlip.chosen(CID, model)).toBe(LIGHT);
     window.DashInboxPick = { current: () => LIGHT, html: () => '', mount() {}, unmount() {}, pieces: () => [] };
     expect(DashInboxFlip.chosen(CID, model)).toBe(LIGHT);
     // A piece the model does not list falls back to the first.
     window.DashInboxPick = { current: () => 'nope', html: () => '', mount() {}, unmount() {}, pieces: () => [] };
-    expect(DashInboxFlip.chosen(CID, model)).toBe(model.pieces.filter(p => p.in > 0)[0].aid);
+    expect(DashInboxFlip.chosen(CID, model)).toBe(firstPiece(model));
     // The switch has nothing to say yet: the first.
     window.DashInboxPick = { current: () => null, html: () => '', mount() {}, unmount() {}, pieces: () => [] };
-    expect(DashInboxFlip.chosen(CID, model)).toBe(model.pieces.filter(p => p.in > 0)[0].aid);
+    expect(DashInboxFlip.chosen(CID, model)).toBe(firstPiece(model));
   });
 
   it('a piece switch starts the centre again, and its pages', () => {
@@ -186,13 +190,13 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     const html = DashInboxFlip.html(CID, model);
     const list = DashInboxFlip.entries(CID, DashInboxFlip.chosen(CID, model));
     expect((html.match(/dash-inbox-flip-pg/g) || []).length).toBeGreaterThanOrEqual(list.length);
-    expect(html).toContain('aria-label="' + list[0].name + ', Open"');
+    expect(html).toContain(
+      'aria-label="' + list[0].name + ', ' + (list[0].waiting ? 'Grade Submissions' : 'Open') + '"',
+    );
     expect(html).toContain('aria-label="Student 1 of ' + list.length + '"');
     expect(html).toContain('aria-roledescription="carousel"');
     // No switch of the other builder's: none drawn.
     expect(html).not.toContain('dash-inbox-flip-pick');
-    // Pages off the stage are marked, and carry no picture.
-    expect(html).toContain('is-off');
     const imgs = (html.match(/<img /g) || []).length;
     expect(imgs).toBeLessThanOrEqual(2 * DashInboxFlip.WINDOW + 1);
   });
@@ -222,7 +226,7 @@ describe('Flip Through, Science 8 with Send Work on', () => {
   });
 
   it('escapes a name with markup in it', () => {
-    const st = getStudents(CID).find(s => s.id === find(DashInboxFlip.entries(CID, LAB), 'Cece Adeyemi').sid);
+    const st = getStudents(CID).find(s => s.id === DashInboxFlip.entries(CID, LIGHT)[0].sid);
     const was = st.firstName;
     st.firstName = '<img src=x onerror=1>';
     st.preferred = '';

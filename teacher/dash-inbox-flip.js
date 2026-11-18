@@ -74,9 +74,14 @@
       })
     )
       return want;
-    var first = pieces.filter(function (/** @type {any} */ p) {
-      return p.in > 0;
-    })[0];
+    // Work to grade first, else any work in.
+    var first =
+      pieces.filter(function (/** @type {any} */ p) {
+        return p.tograde > 0 && p.in > 0;
+      })[0] ||
+      pieces.filter(function (/** @type {any} */ p) {
+        return p.in > 0;
+      })[0];
     return first ? first.aid : '';
   }
 
@@ -210,7 +215,7 @@
 
   /** Which of a student's pages shows, kept in range.
    * @param {State} st @param {any} entry */
-  function pageOf(st, entry) {
+  function pageShown(st, entry) {
     return entry && entry.pages ? clamp(st.pages[entry.sid] || 0, entry.pages) : 0;
   }
 
@@ -218,7 +223,7 @@
    * @param {State} st @param {any} entry @param {number} delta */
   function turn(st, entry, delta) {
     if (!entry || entry.pages < 2) return 0;
-    var at = clamp(pageOf(st, entry) + delta, entry.pages);
+    var at = clamp(pageShown(st, entry) + delta, entry.pages);
     st.pages[entry.sid] = at;
     return at;
   }
@@ -247,7 +252,7 @@
    * @param {Record<string, any>} files filled with the file the img asks for
    * @returns {string} */
   function faceHtml(aid, e, centre, st, files) {
-    var f = e.files[pageOf(st, e)];
+    var f = e.files[pageShown(st, e)];
     if (!f) {
       return (
         '<span class="dash-inbox-flip-sheet"><span class="dash-inbox-flip-sheet-name">' +
@@ -307,7 +312,7 @@
     var pgs = list
       .map(function (e, i) {
         var p = _place(i, c);
-        var cap = caption(cid, e, pageOf(st, e));
+        var cap = caption(cid, e, pageShown(st, e));
         return (
           '<button type="button" tabindex="-1" data-flip-i="' +
           i +
@@ -328,7 +333,7 @@
       '">' +
       pgs +
       '</div><div class="dash-inbox-flip-cap" id="dash-inbox-flip-cap" aria-live="polite">' +
-      capHtml(cid, list[c], pageOf(st, list[c])) +
+      capHtml(cid, list[c], pageShown(st, list[c])) +
       '</div><div class="dash-inbox-flip-range"><input type="range" class="dash-inbox-flip-slider" id="dash-inbox-flip-slider" min="0" max="' +
       (list.length - 1) +
       '" step="1" value="' +
@@ -429,7 +434,7 @@
     pgs.forEach(function (/** @type {HTMLElement} */ b, /** @type {number} */ i) {
       var e = list[i];
       var p = _place(i, c);
-      var cap = caption(L.cid, e, pageOf(st, e));
+      var cap = caption(L.cid, e, pageShown(st, e));
       b.classList.toggle('is-centre', p.centre);
       b.classList.toggle('is-off', !p.on);
       b.style.setProperty('--s', String(p.s));
@@ -442,7 +447,7 @@
         if (face.firstChild) face.textContent = '';
         return;
       }
-      var f = e.files[pageOf(st, e)];
+      var f = e.files[pageShown(st, e)];
       var want = f ? 'flip|' + L.aid + '|' + e.sid + '|' + f.id + '|' + (p.centre ? 'page' : 'thumb') : '';
       var img = face.querySelector('img');
       if (!face.firstChild || (img ? img.getAttribute('data-flip-want') : '') !== want) {
@@ -454,10 +459,10 @@
     });
     var cp = L.main.querySelector('.dash-inbox-flip-cap');
     if (cp) {
-      var keep = _focusToken(cp);
+      var held = _focusToken(cp);
       // html-safe: capHtml escapes every name and time with esc
-      cp.innerHTML = capHtml(L.cid, list[c], pageOf(st, list[c]));
-      if (keep) _focusToken(cp, keep);
+      cp.innerHTML = capHtml(L.cid, list[c], pageShown(st, list[c]));
+      if (held) _focusToken(cp, held);
     }
     var range = /** @type {HTMLInputElement | null} */ (L.main.querySelector('.dash-inbox-flip-slider'));
     if (range) {
@@ -493,7 +498,7 @@
   function flip(L, delta) {
     var e = L.list[centreOf(L.st, L.list)];
     if (!e || e.pages < 2) return false;
-    var was = pageOf(L.st, e);
+    var was = pageShown(L.st, e);
     if (turn(L.st, e, delta) !== was) place(L);
     return true;
   }
@@ -586,7 +591,9 @@
 
     root.addEventListener('click', (L.onClick = onClick.bind(null, L)));
     root.addEventListener('keydown', (L.onKey = onKey.bind(null, L)));
-    root.addEventListener('wheel', (L.onWheel = onWheel.bind(null, L)), { passive: false });
+    // On the stage only, and passive: it never stops a scroll, vertical or not.
+    L.stage = root.querySelector('.dash-inbox-flip-stage');
+    if (L.stage) L.stage.addEventListener('wheel', (L.onWheel = onWheel.bind(null, L)), { passive: true });
     root.addEventListener('pointerdown', (L.onDown = onDown.bind(null, L)));
     root.addEventListener('pointermove', (L.onMove = onMove.bind(null, L)));
     root.addEventListener('input', (L.onInput = onInput.bind(null, L)));
@@ -622,7 +629,7 @@
     }
     L.root.removeEventListener('click', L.onClick);
     L.root.removeEventListener('keydown', L.onKey);
-    L.root.removeEventListener('wheel', L.onWheel);
+    if (L.stage) L.stage.removeEventListener('wheel', L.onWheel);
     L.root.removeEventListener('pointerdown', L.onDown);
     L.root.removeEventListener('pointermove', L.onMove);
     L.root.removeEventListener('input', L.onInput);
@@ -699,7 +706,6 @@
     if (!t || !t.closest || !t.closest('.dash-inbox-flip-stage')) return;
     var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0;
     if (!dx) return;
-    e.preventDefault();
     var now = Date.now();
     if (L.locked && now - L.lastWheel > GAP) {
       L.locked = false;
@@ -764,7 +770,7 @@
     centreOf: centreOf,
     moveTo: moveTo,
     move: move,
-    pageOf: pageOf,
+    pageShown: pageShown,
     turn: turn,
     caption: caption,
     html: html,

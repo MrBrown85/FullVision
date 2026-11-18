@@ -18,7 +18,19 @@ const shot = async (page, name) => {
   await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { bulletins = false, dark = false, pick = false, view = true } = {}) {
+async function open(page, { bulletins = false, dark = false, pick = true, view = true } = {}) {
+  await page.addInitScript(() => {
+    // Every wheel listener added to an element, with whether it is passive.
+    window.__wheelListeners = [];
+    const add = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function (type, fn, opts) {
+      if (type === 'wheel') {
+        const passive = !!(opts && typeof opts === 'object' && opts.passive);
+        window.__wheelListeners.push({ passive, el: this.id || this.className || String(this) });
+      }
+      return add.call(this, type, fn, opts);
+    };
+  });
   await page.addInitScript(
     ([bulletins, pick]) => {
       try {
@@ -33,7 +45,7 @@ async function open(page, { bulletins = false, dark = false, pick = false, view 
         }
         if (pick) {
           // A stand-in for the assessment switch (D6): two buttons and a callback.
-          let current = null;
+          let current = 'sci8a1';
           window.DashInboxPick = {
             current: () => current,
             set: aid => {
@@ -249,19 +261,8 @@ test('the caption says what is true of the student', async ({ page }) => {
   await expect(page.locator('.dash-inbox-flip-open')).toHaveText('Open');
 });
 
-test('a piece with work to grade says Grade Submissions and puts it first', async ({ page }) => {
-  await open(page);
-  await page.evaluate(() => {
-    // The Light Refraction Lab is the piece with work waiting.
-    window.DashInboxPick = {
-      current: () => 'sci8a21',
-      html: () => '',
-      mount() {},
-      unmount() {},
-      pieces: () => [],
-    };
-    PageDashboard.render();
-  });
+test('with no switch the first piece with work to grade shows, Grade Submissions first', async ({ page }) => {
+  await open(page, { pick: false });
   await page.locator('.dash-inbox-flip-stage').waitFor();
   const got = await page.evaluate(() => {
     const cid = getActiveCourse();
@@ -364,6 +365,19 @@ test('a sideways scroll moves one page a gesture; a vertical one scrolls the pag
   await expect.poll(scrolled).toBeGreaterThan(before);
   await expect(page.locator('.dash-inbox-flip-slider')).toHaveValue('0');
   expect(await page.evaluate(() => window.__wheel.some(Boolean))).toBe(false);
+});
+
+test('no wheel listener on the tile or the stage can stop a scroll', async ({ page }) => {
+  await open(page);
+  const got = await page.evaluate(() => {
+    const live = window.__wheelListeners;
+    return { all: live.filter(l => !l.passive).map(l => l.el), n: live.length };
+  });
+  // Nothing non-passive was added by the Inbox: its own is passive, on the stage.
+  expect(got.all.some(el => String(el).includes('dash-inbox'))).toBe(false);
+  expect(await page.locator('.dash-inbox-flip-stage').evaluate(el => getComputedStyle(el).overscrollBehaviorX)).toBe(
+    'contain',
+  );
 });
 
 test('a swipe moves one page', async ({ page }) => {
