@@ -41,6 +41,7 @@ const MARK = 'ZEBRA-KEY-MARKER';
 /** A quiz with one question of every kind, the "why" lines holding a marker. */
 function payload(extra) {
   return {
+    updated_at: null,
     ...QuizData.defaults(),
     questions: [
       {
@@ -188,7 +189,7 @@ describe('in Demo Mode', () => {
   it('save and read again keep every field, in the order written', () => {
     expect(
       QuizData.save(CID, AID, payload({ tries: 2, counts: 'latest', shows: 'right', add_total: true }), [T1, T2]),
-    ).toEqual({
+    ).toMatchObject({
       ok: true,
     });
     const back = QuizData.get(CID, AID);
@@ -207,11 +208,63 @@ describe('in Demo Mode', () => {
       expect(q.key.tolerance).toEqual(sent[i].key.tolerance);
       expect(q.key.why).toEqual(sent[i].key.why);
     });
-    // Saved again with their ids, nothing changes.
-    const again = payload();
+    // Saved again with their ids and its updated_at, nothing changes but a new updated_at.
+    const again = payload({ updated_at: back.quiz.updated_at });
     again.questions.forEach((q, i) => (q.id = back.questions[i].id));
     QuizData.save(CID, AID, again, [T1, T2]);
     expect(QuizData.get(CID, AID).questions.map(q => q.id)).toEqual(back.questions.map(q => q.id));
+    expect(QuizData.get(CID, AID).quiz.updated_at).not.toBe(back.quiz.updated_at);
+  });
+
+  it('an updated_at with microseconds is kept and sent back byte for byte', () => {
+    const AT = '2026-11-18T09:15:29.123456+00:00';
+    QuizData.save(CID, AID, payload(), [T1, T2]);
+    const store = JSON.parse(localStorage.getItem('gb-quizzes-' + CID));
+    store.quizzes[AID].quiz.updated_at = AT;
+    localStorage.setItem('gb-quizzes-' + CID, JSON.stringify(store));
+    expect(QuizData.get(CID, AID).quiz.updated_at).toBe(AT);
+    // Cut to milliseconds it is another quiz's read: refused.
+    expect(QuizData.save(CID, AID, payload({ updated_at: new Date(AT).toISOString() }), [T1, T2]).error.message).toBe(
+      'stale',
+    );
+    expect(QuizData.save(CID, AID, payload({ updated_at: AT }), [T1, T2]).ok).toBe(true);
+  });
+
+  it('two tabs: a save made from an older read is refused as stale, and the questions are kept', () => {
+    // Tab A and tab B both read the quiz.
+    QuizData.save(CID, AID, payload(), [T1, T2]);
+    const read = QuizData.get(CID, AID).quiz.updated_at;
+    // Tab B saves first.
+    expect(QuizData.save(CID, AID, payload({ updated_at: read, tries: 2 }), [T1, T2]).ok).toBe(true);
+    // Tab A saves from its older read.
+    const mine = payload({ updated_at: read, shows: 'grade' });
+    const res = QuizData.save(CID, AID, mine, [T1, T2]);
+    expect(res).toMatchObject({ ok: false, error: { code: '22023', message: 'stale' } });
+    expect(QuizData.get(CID, AID).quiz).toMatchObject({ tries: 2, shows: 'answers' });
+    expect(QuizData.unsent(CID, AID)).toEqual({
+      payload: mine,
+      stale: true,
+      message:
+        'This quiz was changed somewhere else, in another tab or on another device, so your changes below were not saved.',
+    });
+    // A new quiz is sent with null; one that is there already refuses null.
+    expect(QuizData.save(CID, AID, payload({ updated_at: null }), [T1, T2]).error.message).toBe('stale');
+  });
+
+  it('trims ASCII white space only, as the server does', () => {
+    const p = payload();
+    p.questions[0].prompt = '\t Which is a producer?\n';
+    p.questions[1].prompt = '\u00a0';
+    expect(QuizData.problem(p, [T1, T2])).toBeNull();
+    QuizData.save(CID, AID, p, [T1, T2]);
+    expect(
+      QuizData.get(CID, AID)
+        .questions.map(q => q.prompt)
+        .slice(0, 2),
+    ).toEqual(['Which is a producer?', '\u00a0']);
+    const blank = payload();
+    blank.questions[0].prompt = ' \t\n\r\f\v';
+    expect(QuizData.problem(blank, [T1, T2])).toMatchObject({ message: 'bad_quiz', detail: 'Question 1: prompt' });
   });
 
   it('the answer key is kept apart from the questions', () => {
@@ -373,11 +426,76 @@ describe('signed in', () => {
     expect(QuizData.unsent(CID, 'c-lost').payload).toEqual(payload());
   });
 
+  it('updated_at goes back exactly as answered, and the next save sends the one its save answered', async () => {
+    // Microseconds, as the server keeps them: a Date would cut them to milliseconds.
+    const AT = '2026-11-18T09:15:29.123456+00:00';
+    const NEXT = '2026-11-18T09:15:30.000001+00:00';
+    let n = 0;
+    session.fake.on('list_quiz', () => ({ data: null, error: { code: 'P0002', message: 'not found' } }));
+    session.fake.on('save_quiz', () => ({
+      data: { quiz: { assessment_id: AID, updated_at: ++n === 1 ? AT : NEXT }, questions: [], archived: [] },
+      error: null,
+    }));
+    await probeQuizzes(CID);
+    // Two saves one after the other, the second made before the first was answered.
+    QuizData.save(CID, AID, payload(), [T1, T2]);
+    QuizData.save(CID, AID, payload({ tries: 2 }), [T1, T2]);
+    for (let i = 0; i < 6; i++) {
+      await window.v2Queue.flush();
+      await settle();
+    }
+    const calls = session.fake.calls.filter(c => c.name === 'save_quiz').map(c => c.params);
+    const saves = calls.map(p => p.p_quiz);
+    expect(saves.map(p => p.updated_at)).toEqual([null, AT]);
+    expect(QuizData.get(CID, AID).quiz.updated_at).toBe(NEXT);
+    // One new key for each save: never the first's again with other questions.
+    expect(calls[0].p_idempotency_key).not.toBe(calls[1].p_idempotency_key);
+  });
+
+  it('a stale save keeps the edits, reads the quiz again, and is not sent again by itself', async () => {
+    const THEIRS = '2026-11-18 19:00:00.5+00';
+    session.fake.on('list_quiz', p =>
+      p.p_assessment_id === AID
+        ? {
+            data: {
+              quiz: { assessment_id: AID, updated_at: THEIRS, ...QuizData.defaults() },
+              questions: [],
+              archived: [],
+            },
+            error: null,
+          }
+        : { data: null, error: { code: 'P0002', message: 'not found' } },
+    );
+    session.fake.on('save_quiz', () => ({
+      data: null,
+      error: {
+        code: '22023',
+        message: 'stale',
+        details: 'This quiz was changed somewhere else. Open it again before saving.',
+      },
+    }));
+    await probeQuizzes(CID);
+    const mine = payload({ updated_at: '2026-11-18 17:00:00+00' });
+    QuizData.save(CID, AID, mine, [T1, T2]);
+    for (let i = 0; i < 4; i++) {
+      await window.v2Queue.flush();
+      await settle();
+    }
+    expect(session.fake.count('save_quiz')).toBe(1);
+    expect(session.fake.count('list_quiz', p => p.p_assessment_id === AID)).toBe(1);
+    expect(QuizData.get(CID, AID).quiz.updated_at).toBe(THEIRS);
+    expect(QuizData.unsent(CID, AID)).toMatchObject({ payload: mine, stale: true });
+  });
+
   it('a refused save keeps the questions and says why, in the teacher’s words', async () => {
     session.fake.on('list_quiz', () => ({ data: null, error: { code: 'P0002', message: 'not found' } }));
     session.fake.on('save_quiz', () => ({
       data: null,
-      error: { code: '22023', message: 'kind_locked', details: 'question 2: kind' },
+      error: {
+        code: '22023',
+        message: 'kind_locked',
+        details: 'Question 2 has answers, so its kind and Several Right cannot change.',
+      },
     }));
     await probeQuizzes(CID);
     QuizData.save(CID, AID, payload(), [T1, T2]);
@@ -387,45 +505,66 @@ describe('signed in', () => {
     }
     const kept = QuizData.unsent(CID, AID);
     expect(kept.payload).toEqual(payload());
-    expect(kept.message).toBe(
-      'Students have answered a question here, so its type and Multiple Answers cannot change.',
-    );
+    expect(kept.message).toBe('Students have answered Question 2, so its type and Multiple Answers cannot change.');
   });
 });
 
-describe('each refusal the contract names, and the sentence the teacher sees', () => {
+describe('each refusal in the contract’s table, and the sentence the teacher sees', () => {
+  const GENERAL = 'This quiz was not saved. Your questions are kept here; save again to send them.';
   it.each([
     [{ code: 'PT401', message: 'not authenticated' }, 'You were signed out. Sign in again, then save the quiz.'],
     [{ code: 'P0002', message: 'not found' }, 'This assessment is no longer there, so its quiz could not be saved.'],
     [
-      { code: '22023', message: 'bad_quiz', detail: 'question 3: points' },
+      {
+        code: '22023',
+        message: 'stale',
+        details: 'This quiz was changed somewhere else. Open it again before saving.',
+      },
+      'This quiz was changed somewhere else, in another tab or on another device, so your changes below were not saved.',
+    ],
+    [
+      { code: '22023', message: 'bad_quiz', details: 'Question 3: its points (0 to 100).' },
       'Question 3 could not be saved as written. Check its words, choices, right answer and points, then save again.',
     ],
-    [{ code: '22023', message: 'bad_quiz' }, 'Check its words, choices, right answer and points, then save again.'],
-    [{ code: '22023', message: 'not_offered' }, 'A quiz cannot go on a pair or group assessment, or on a DIBELS one.'],
-    [{ code: '22023', message: 'too_many_questions' }, 'A quiz can have up to 100 questions.'],
     [
-      { code: '22023', message: 'kind_locked' },
-      'Students have answered a question here, so its type and Multiple Answers cannot change.',
+      { code: '22023', message: 'bad_quiz', details: 'Tries must be 0, 1 or 2.' },
+      "This quiz's settings could not be saved as they are. Check them, then save again.",
     ],
     [
-      { code: '22023', message: 'choices_locked' },
-      'Students have answered a question here, so its choices can be reworded or reordered but not added or removed.',
-    ],
-    [{ code: '22023', message: 'has_tries' }, 'Students have started this quiz, so it cannot be turned off.'],
-    // Anything else, a near miss included, gets the one general sentence.
-    [
-      { code: '22023', message: 'bad_quiz_x' },
-      'This quiz was not saved. Your questions are kept here; save again to send them.',
+      { code: '22023', message: 'not_offered', details: 'A quiz is not offered on a DIBELS, pair or group piece.' },
+      'A quiz cannot go on a pair or group assessment, or on a DIBELS one.',
     ],
     [
-      { code: '22023', message: 'Kind_Locked' },
-      'This quiz was not saved. Your questions are kept here; save again to send them.',
+      { code: '22023', message: 'too_many_questions', details: 'A quiz has 100 questions at most.' },
+      'A quiz can have up to 100 questions.',
     ],
     [
-      { message: 'network: failed to fetch' },
-      'This quiz was not saved. Your questions are kept here; save again to send them.',
+      {
+        code: '22023',
+        message: 'kind_locked',
+        details: 'Question 4 has answers, so its kind and Several Right cannot change.',
+      },
+      'Students have answered Question 4, so its type and Multiple Answers cannot change.',
     ],
+    [
+      {
+        code: '22023',
+        message: 'choices_locked',
+        details: 'Question 2 has answers, so a choice cannot be added or removed.',
+      },
+      'Students have answered Question 2, so its choices can be reworded or reordered but not added or removed.',
+    ],
+    [
+      { code: '22023', message: 'has_tries', details: 'A student has started this quiz, so it cannot be removed.' },
+      'A student has started this quiz, so it cannot be turned off.',
+    ],
+    // Anything else, a near miss or a word under another code included, gets the one general sentence.
+    [{ code: '22023', message: 'bad_quiz_x' }, GENERAL],
+    [{ code: '22023', message: 'Kind_Locked' }, GENERAL],
+    [{ code: 'P0001', message: 'stale' }, GENERAL],
+    [{ code: '22023', message: 'not found' }, GENERAL],
+    [{ code: '22023', message: 'bad_marks' }, GENERAL],
+    [{ message: 'network: failed to fetch' }, GENERAL],
   ])('%o', (error, sentence) => {
     expect(QuizData.refusalText(error)).toBe(sentence);
   });

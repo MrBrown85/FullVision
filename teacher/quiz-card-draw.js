@@ -643,9 +643,16 @@ var QuizCardDraw = (function () {
             ' before it counts.',
         ) +
         '</p>';
-      var msg = S.msg
-        ? '<p class="quiz-err quiz-msg">' + esc('Your last change to this quiz was not saved. ' + S.msg) + '</p>'
-        : '';
+      var msg = S.stale
+        ? '<div class="quiz-stale"><p class="quiz-err quiz-msg" id="quiz-stale-msg">' +
+          esc(S.msg) +
+          '</p><span class="quiz-stale-acts">' +
+          '<button type="button" class="btn btn-primary" data-quiz-act="keepMine" aria-describedby="quiz-stale-msg">Keep Mine</button>' +
+          '<button type="button" class="btn btn-ghost" data-quiz-act="useOther" aria-describedby="quiz-stale-msg">Use the Other One</button>' +
+          '</span></div>'
+        : S.msg
+          ? '<p class="quiz-err quiz-msg">' + esc('Your last change to this quiz was not saved. ' + S.msg) + '</p>'
+          : '';
       var whyLine =
         why && (S.tried || !api.scoringOk() || api.collab() !== 'individual')
           ? '<p class="quiz-err" id="quiz-why">' + esc(why) + '</p>'

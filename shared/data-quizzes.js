@@ -46,6 +46,10 @@ var _QUIZ_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 var _quizProbe = {}; // cid → 'ok', 'missing' (no such function yet), 'failed', or '' before the first answer
 /** @type {Record<string, QuizReply>} */
 var _quizHeld = {}; // aid → the quiz as the server last answered it (signed in)
+/** @type {Record<string, Promise<void>>} */
+var _quizChain = {}; // aid → this page's save of it still on its way
+/** @type {Record<string, string | null>} */
+var _quizAnswered = {}; // aid → the updated_at this page's last save of it was answered
 
 /* The settings a new quiz starts with (the contract's defaults). */
 function quizDefaults() {
@@ -140,9 +144,17 @@ function quizNewId() {
   });
 }
 
+/* White space the server trims from both ends of a prompt, a choice, a "why"
+   line and a note: ASCII only (space, tab, newline, carriage return, form
+   feed, vertical tab). A no-break space is kept, as there. */
+var _QUIZ_TRIM = /^[ \t\n\r\f\v]+|[ \t\n\r\f\v]+$/g;
+/** @param {unknown} v */
+function quizTrim(v) {
+  return typeof v === 'string' ? v.replace(_QUIZ_TRIM, '') : '';
+}
 /** @param {unknown} v */
 function _quizText(v) {
-  return typeof v === 'string' ? v.trim() : '';
+  return quizTrim(v);
 }
 /** @param {unknown} v */
 function _quizNum(v) {
@@ -172,8 +184,9 @@ function quizPayloadProblem(p, tagIds) {
   var bad = function (d) {
     return { message: 'bad_quiz', detail: d };
   };
-  if (!_plainObject(p)) return bad('the quiz is an object');
+  if (!_plainObject(p)) return bad('The quiz must have exactly its settings, updated_at and questions.');
   var keys = [
+    'updated_at',
     'shuffle_questions',
     'shuffle_choices',
     'tries',
@@ -187,8 +200,13 @@ function quizPayloadProblem(p, tagIds) {
   var extra = Object.keys(p).filter(function (k) {
     return keys.indexOf(k) < 0;
   });
-  if (extra.length) return bad('unknown key ' + extra[0]);
-  for (var k = 0; k < keys.length; k++) if (!(keys[k] in p)) return bad('missing ' + keys[k]);
+  if (extra.length) return bad('The quiz must have exactly its settings, updated_at and questions.');
+  for (var k = 0; k < keys.length; k++) {
+    if (!(keys[k] in p)) return bad('The quiz must have exactly its settings, updated_at and questions.');
+  }
+  if (p.updated_at !== null && typeof p.updated_at !== 'string') {
+    return bad("updated_at must be the quiz's updated_at as last read, or null for a new quiz.");
+  }
   if (!_quizBool(p.shuffle_questions) || !_quizBool(p.shuffle_choices) || !_quizBool(p.add_total)) {
     return bad('a switch is true or false');
   }
@@ -204,7 +222,7 @@ function quizPayloadProblem(p, tagIds) {
   var seen = {};
   for (var i = 0; i < p.questions.length; i++) {
     var q = p.questions[i];
-    var at = 'question ' + (i + 1) + ': ';
+    var at = 'Question ' + (i + 1) + ': ';
     if (!_plainObject(q)) return bad(at + 'an object');
     var allowed = ['id', 'kind', 'prompt', 'choices', 'multiple', 'points', 'tag_id', 'key'];
     var more = Object.keys(q).filter(function (x) {
@@ -318,7 +336,7 @@ function _quizDemoReply(cid, aid) {
  * Demo Mode's save: refused as the server refuses; the questions in one key
  * and the answer key in another.
  * @param {string} cid @param {string} aid @param {any} payload @param {string[]} tagIds
- * @returns {{ ok: boolean, error?: { message: string, detail: string } }}
+ * @returns {{ ok: boolean, error?: { message: string, detail: string, code?: string }, quiz?: QuizReply }}
  */
 function _quizDemoSave(cid, aid, payload, tagIds) {
   var store = _quizDemoLoad(cid);
@@ -327,15 +345,22 @@ function _quizDemoSave(cid, aid, payload, tagIds) {
   (before && Array.isArray(before.questions) ? before.questions : []).forEach(function (/** @type {any} */ q) {
     delete keys[q.id];
   });
+  var storedAt = before && before.quiz ? before.quiz.updated_at || null : null;
   if (payload === null) {
     delete store.quizzes[aid];
   } else {
     var problem = quizPayloadProblem(payload, tagIds);
     if (problem) return { ok: false, error: problem };
+    // Saved in another tab since this one read it: refused, and the teacher's questions kept.
+    if (payload.updated_at !== storedAt) {
+      var stale = { code: '22023', message: 'stale', detail: QUIZ_STALE_DETAIL };
+      _quizKeepUnsent(cid, aid, payload, stale);
+      return { ok: false, error: stale };
+    }
     var settings = Object.assign({}, payload);
     delete settings.questions;
     store.quizzes[aid] = {
-      quiz: Object.assign(settings, { updated_at: new Date().toISOString() }),
+      quiz: Object.assign(settings, { updated_at: _quizNextStamp(storedAt) }),
       questions: payload.questions.map(function (/** @type {any} */ q) {
         var id = typeof q.id === 'string' && q.id ? q.id : quizNewId();
         keys[id] = {
@@ -362,7 +387,16 @@ function _quizDemoSave(cid, aid, payload, tagIds) {
   }
   _safeLSSet(_quizDemoKey(cid), JSON.stringify(store));
   _safeLSSet(_quizKeysKey(cid), JSON.stringify(keys));
-  return { ok: true };
+  quizDropUnsent(cid, aid);
+  return { ok: true, quiz: _quizDemoReply(cid, aid) };
+}
+
+/* A new updated_at, never the one before it (two saves in one millisecond). */
+/** @param {string | null} before */
+function _quizNextStamp(before) {
+  var now = new Date().toISOString();
+  if (before && now <= before) now = new Date(Date.parse(before) + 1).toISOString();
+  return now;
 }
 
 /**
@@ -374,7 +408,7 @@ function saveDemoQuizSeed(cid, aid, payload, tagIds) {
   if (!_isDemoSession() || !cid || !aid) return false;
   var store = _quizDemoLoad(cid);
   if (store.seeded || Object.keys(store.quizzes).length) return false;
-  if (!_quizDemoSave(cid, aid, payload, tagIds).ok) return false;
+  if (!_quizDemoSave(cid, aid, Object.assign({}, payload, { updated_at: null }), tagIds).ok) return false;
   var after = _quizDemoLoad(cid);
   after.seeded = true;
   _safeLSSet(_quizDemoKey(cid), JSON.stringify(after));
@@ -387,7 +421,8 @@ function saveDemoQuizSeed(cid, aid, payload, tagIds) {
 function _quizUnsentKey(cid) {
   return 'gb-quiz-unsent-' + cid;
 }
-/** @param {string} cid @returns {Record<string, { aid: string, payload: any, message: string, at: string }>} */
+/** @typedef {{ aid: string, payload: any, message: string, at: string, stale?: boolean }} QuizUnsent */
+/** @param {string} cid @returns {Record<string, QuizUnsent>} */
 function _quizUnsentLoad(cid) {
   var kept = _safeParseLS(_quizUnsentKey(cid), null);
   return _plainObject(kept) ? kept : {};
@@ -411,7 +446,7 @@ function _quizUnsentSave(cid, all) {
  */
 function quizUnsent(cid, aid) {
   var all = _quizUnsentLoad(cid);
-  /** @type {{ aid: string, payload: any, message: string, at: string } | null} */
+  /** @type {QuizUnsent | null} */
   var best = null;
   var keys = Object.keys(all);
   for (var i = 0; i < keys.length; i++) {
@@ -420,7 +455,45 @@ function quizUnsent(cid, aid) {
     var same = e.aid === aid || _resolveKnownId('assessment', e.aid) === aid;
     if (same && (!best || String(e.at) > String(best.at))) best = e;
   }
-  return best ? { payload: best.payload, message: best.message || '' } : null;
+  return best ? { payload: best.payload, message: best.message || '', stale: best.stale === true } : null;
+}
+
+/** @param {QuizUnsent} e @param {string} aid */
+function _quizSamePiece(e, aid) {
+  return !!e && (e.aid === aid || _resolveKnownId('assessment', e.aid) === _resolveKnownId('assessment', aid));
+}
+
+/**
+ * Forget what this device kept of an assessment's quiz: the teacher chose
+ * Use the Other One, or saved again.
+ * @param {string} cid @param {string} aid
+ */
+function quizDropUnsent(cid, aid) {
+  var all = _quizUnsentLoad(cid);
+  var n = Object.keys(all).length;
+  Object.keys(all).forEach(function (k) {
+    if (_quizSamePiece(all[k], aid)) delete all[k];
+  });
+  if (Object.keys(all).length !== n) _quizUnsentSave(cid, all);
+}
+
+/* A refused save kept for the next time the form opens. */
+/** @param {string} cid @param {string} aid @param {any} payload @param {any} error */
+function _quizKeepUnsent(cid, aid, payload, error) {
+  var all = _quizUnsentLoad(cid);
+  all[_newEntryId()] = {
+    aid: aid,
+    payload: payload,
+    message: quizRefusalText(error),
+    at: new Date().toISOString(),
+    stale: _quizIsStale(error),
+  };
+  _quizUnsentSave(cid, all);
+}
+
+/** @param {any} error */
+function _quizIsStale(error) {
+  return !!error && String(error.code || '') === '22023' && String(error.message || '').trim() === 'stale';
 }
 
 /* ── Reading and saving ─────────────────────────────────────────────────── */
@@ -477,35 +550,56 @@ function loadQuiz(cid, aid) {
 }
 
 /**
- * The plain sentence the teacher sees for a refused save_quiz or list_quiz.
- * Matched on the contract's exact words (its "Refusals" table); anything
- * else gets QUIZ_GENERAL. detail may name a question by its place.
+ * The plain sentence the teacher sees for a refused save_quiz or list_quiz,
+ * matched on the code and the word of the contract's one refusal table
+ * ("Teacher functions"). A detail that names a question ("Question 3: …",
+ * "Question 3 has answers, …") gives its number. Anything else gets
+ * QUIZ_GENERAL; the server's own words are never shown.
  * @param {any} error
  */
 function quizRefusalText(error) {
   var code = error && error.code ? String(error.code) : '';
   var text = error && error.message ? String(error.message).trim() : '';
   var detail = error && (error.detail || error.details) ? String(error.detail || error.details) : '';
-  var place = /question (\d+)/i.exec(detail);
-  if (code === 'PT401' || text === 'not authenticated')
+  var place = /^Question (\d+)\b/.exec(detail);
+  var n = place ? place[1] : '';
+  if (code === 'PT401' && text === 'not authenticated')
     return 'You were signed out. Sign in again, then save the quiz.';
-  if (text === 'not found') return 'This assessment is no longer there, so its quiz could not be saved.';
-  var said = QUIZ_REFUSALS[text];
-  if (said)
-    return text === 'bad_quiz' && place ? 'Question ' + place[1] + ' could not be saved as written. ' + said : said;
+  if (code === 'P0002' && text === 'not found')
+    return 'This assessment is no longer there, so its quiz could not be saved.';
+  if (code !== '22023') return QUIZ_GENERAL;
+  switch (text) {
+    case 'stale':
+      return QUIZ_STALE;
+    case 'bad_quiz':
+      return n
+        ? 'Question ' +
+            n +
+            ' could not be saved as written. Check its words, choices, right answer and points, then save again.'
+        : "This quiz's settings could not be saved as they are. Check them, then save again.";
+    case 'kind_locked':
+      return (
+        (n ? 'Students have answered Question ' + n : 'Students have answered a question here') +
+        ', so its type and Multiple Answers cannot change.'
+      );
+    case 'choices_locked':
+      return (
+        (n ? 'Students have answered Question ' + n : 'Students have answered a question here') +
+        ', so its choices can be reworded or reordered but not added or removed.'
+      );
+    case 'has_tries':
+      return 'A student has started this quiz, so it cannot be turned off.';
+    case 'not_offered':
+      return 'A quiz cannot go on a pair or group assessment, or on a DIBELS one.';
+    case 'too_many_questions':
+      return 'A quiz can have up to 100 questions.';
+  }
   return QUIZ_GENERAL;
 }
 var QUIZ_GENERAL = 'This quiz was not saved. Your questions are kept here; save again to send them.';
-/** @type {Record<string, string>} */
-var QUIZ_REFUSALS = {
-  bad_quiz: 'Check its words, choices, right answer and points, then save again.',
-  not_offered: 'A quiz cannot go on a pair or group assessment, or on a DIBELS one.',
-  too_many_questions: 'A quiz can have up to 100 questions.',
-  kind_locked: 'Students have answered a question here, so its type and Multiple Answers cannot change.',
-  choices_locked:
-    'Students have answered a question here, so its choices can be reworded or reordered but not added or removed.',
-  has_tries: 'Students have started this quiz, so it cannot be turned off.',
-};
+var QUIZ_STALE =
+  'This quiz was changed somewhere else, in another tab or on another device, so your changes below were not saved.';
+var QUIZ_STALE_DETAIL = 'This quiz was changed somewhere else. Open it again before saving.';
 
 /**
  * Save one assessment's quiz whole (save_quiz). payload: p_quiz as the
@@ -513,26 +607,34 @@ var QUIZ_REFUSALS = {
  * piece's competencies as saved with it. Answers { ok } at once; Demo Mode
  * answers with the server's refusal word when it refuses.
  * @param {string} cid @param {string} aid @param {any} payload @param {string[]} tagIds
- * @returns {{ ok: boolean, error?: { message: string, detail: string } }}
+ * @returns {{ ok: boolean, error?: { message: string, detail: string, code?: string }, quiz?: QuizReply }}
  */
 function saveQuiz(cid, aid, payload, tagIds) {
   if (!cid || !aid) return { ok: false };
   if (_quizOnDevice(cid)) return _quizDemoSave(cid, aid, payload, tagIds || []);
   if (!quizzesOffered(cid)) return { ok: false };
-  var wire = payload === null ? null : _quizWire(payload);
   var key = _newEntryId();
   var held = _quizUnsentLoad(cid);
   held[key] = { aid: aid, payload: payload, message: '', at: new Date().toISOString() };
   _quizUnsentSave(cid, held);
-  var params = { p_assessment_id: aid, p_quiz: wire, p_idempotency_key: key };
   var id = _resolveKnownId('assessment', aid);
   // A local id with no create waiting for it would reach the server as it is: it is held here instead.
   if (!_isUuid(id) && !_pendingCreateFor('assessment', aid)) {
     console.warn('save_quiz not sent: the assessment has no server id yet (' + aid + ')');
     return { ok: true };
   }
-  _trackPendingSync(
-    Promise.resolve(_writeRpc('save_quiz', params, { entryId: key })).then(function (res) {
+  // A save made while this page's last save of the piece was still on its way
+  // goes after it, with the updated_at that save answered (the form it was
+  // made on already held that save's questions).
+  var chain = _quizChain[aid];
+  var after = !!chain;
+  var run = Promise.resolve(chain).then(function () {
+    var wire = payload === null ? null : _quizWire(payload);
+    if (wire && after && _quizAnswered[aid] !== undefined) wire.updated_at = _quizAnswered[aid];
+    return _writeRpc('save_quiz', { p_assessment_id: aid, p_quiz: wire, p_idempotency_key: key }, { entryId: key });
+  });
+  var done = run
+    .then(function (res) {
       var all = _quizUnsentLoad(cid);
       if (res && res.error) {
         if (res.error.handledSessionExpired) return;
@@ -540,8 +642,11 @@ function saveQuiz(cid, aid, payload, tagIds) {
         else console.warn('save_quiz failed:', res.error);
         if (all[key]) {
           all[key].message = quizRefusalText(res.error);
+          all[key].stale = _quizIsStale(res.error);
           _quizUnsentSave(cid, all);
         }
+        // Changed somewhere else: read what the server has, for the teacher to choose. Never sent again by itself.
+        if (_quizIsStale(res.error)) return loadQuiz(cid, aid);
         return;
       }
       // This save landed: it and every older one for the same piece go.
@@ -561,9 +666,17 @@ function saveQuiz(cid, aid, payload, tagIds) {
         };
         _quizHeld[aid] = reply;
         _quizHeld[_resolveKnownId('assessment', aid)] = reply;
+        _quizAnswered[aid] = reply.quiz ? reply.quiz.updated_at || null : null;
       }
-    }),
-  );
+    })
+    .then(null, function (e) {
+      console.warn('save_quiz failed:', e);
+    })
+    .then(function () {
+      if (_quizChain[aid] === done) delete _quizChain[aid];
+    });
+  _quizChain[aid] = done;
+  _trackPendingSync(done);
   return { ok: true };
 }
 
@@ -588,6 +701,8 @@ if (typeof window !== 'undefined') {
     load: loadQuiz,
     save: saveQuiz,
     unsent: quizUnsent,
+    dropUnsent: quizDropUnsent,
+    trim: quizTrim,
     defaults: quizDefaults,
     problem: quizPayloadProblem,
     refusalText: quizRefusalText,

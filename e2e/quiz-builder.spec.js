@@ -406,3 +406,66 @@ test('with the quizzes switch off the form is today’s: no fourth answer, no Qu
   const keys = await page.evaluate(() => Object.keys(localStorage).filter(k => /quiz/.test(k)));
   expect(keys).toEqual([]);
 });
+
+/* Nothing in the card runs out of its box, in the page's font and in a wider
+   stand-in (CI's fonts are wider than a Mac's), at 1280 and at the narrowest
+   desktop width. */
+const WIDE_FONT =
+  "* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; letter-spacing: 0.04em !important; }";
+const MEASURED = [
+  '.quiz-side-card',
+  '.quiz-card-head',
+  '.seg',
+  '.af-work-row',
+  '.quiz-edit',
+  '.quiz-foot',
+  '.quiz-choice',
+  '.quiz-row',
+  '.quiz-stale',
+]
+  .map(c => '#quiz-mount ' + c)
+  .join(', ');
+
+test.describe('fit', () => {
+  // The stand-in font is a style the page's own CSP would refuse.
+  test.use({ bypassCSP: true });
+  test('the Quiz card fits in the page font and in a wide font, at 1280 and 769', async ({ page }) => {
+    await demo(page, true);
+    await page.evaluate(() =>
+      document.querySelector('[data-action="editAssess"][data-aid="sci8-quiz-data-patterns"]').click(),
+    );
+    await expect(page.locator('#quiz-head')).toBeVisible();
+    // A Choice question open, so its editor is measured too.
+    await page.locator('.quiz-row').nth(3).click();
+    await expect(page.locator('.quiz-edit')).toBeVisible();
+    const overflow = () =>
+      page.evaluate(
+        sel =>
+          Array.from(document.querySelectorAll(sel))
+            .filter(el => el.scrollWidth > el.clientWidth + 1)
+            .map(el => el.className + ' ' + el.scrollWidth + ' > ' + el.clientWidth),
+        MEASURED,
+      );
+    const wide = on =>
+      page.evaluate(
+        ([css, add]) => {
+          const had = document.getElementById('quiz-wide-font');
+          if (had) had.remove();
+          if (!add) return;
+          const tag = document.createElement('style');
+          tag.id = 'quiz-wide-font';
+          tag.textContent = css;
+          document.head.appendChild(tag);
+        },
+        [WIDE_FONT, on],
+      );
+    for (const width of [1280, 769]) {
+      await page.setViewportSize({ width, height: 800 });
+      await wide(false);
+      expect(await overflow(), width + ' in the page font').toEqual([]);
+      await wide(true);
+      await expect(page.locator('#quiz-head')).toHaveCSS('font-family', /Verdana/);
+      expect(await overflow(), width + ' in a wide font').toEqual([]);
+    }
+  });
+});

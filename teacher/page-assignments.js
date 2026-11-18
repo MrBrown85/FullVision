@@ -3427,7 +3427,7 @@ window.PageAssignments = (function () {
           t.field,
           id,
           [
-            { value: 'keep', label: 'Yes, Marked Late' },
+            { value: 'keep', label: t.keepLabel || 'Yes, Marked Late' },
             { value: 'until', label: 'Until ' + formatShortDate(until) },
             { value: 'stop', label: 'No' },
           ],

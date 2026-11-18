@@ -497,6 +497,7 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     click(mount().querySelector('[data-quiz-act="toggle"][data-quiz-set="add_total"]'));
     choose(mount().querySelector('[data-quiz-sees="right"]'));
     const sent = QuizBuilder._payload();
+    expect(sent.updated_at).toBeNull();
     click(form().querySelector('.af-actions .btn-primary'));
     await settled();
     const made = getAssessments(CID).find(a => a.title === 'Food Webs Check');
@@ -506,7 +507,10 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     expect(QuizBuilder.snapshot()).toBe('');
     const back = QuizBuilder._payload();
     back.questions.forEach(x => delete x.id);
-    expect(back).toEqual(sent);
+    // The updated_at the save answered, exactly as it was answered.
+    expect(typeof back.updated_at).toBe('string');
+    expect(back.updated_at).toBe(QuizData.get(CID, made.id).quiz.updated_at);
+    expect({ ...back, updated_at: null }).toEqual(sent);
     expect(back).toMatchObject({ tries: 2, counts: 'latest', shuffle_choices: false, add_total: true, shows: 'right' });
     expect(mount().querySelector('#quiz-head').textContent).toBe('Quiz · 4 Questions · 5 Points');
   });
@@ -520,11 +524,8 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     const row = settings().querySelector('[data-work-row="quiz_after_due"]');
     expect(row.querySelector('.af-work-q').textContent).toBe('Can Students Send After ' + formatShortDate(due) + '?');
     const choices = Array.from(row.querySelectorAll('[data-action="quizAfterDue"]'));
-    expect(choices.map(b => b.textContent)).toEqual([
-      'Yes, Marked Late',
-      'Until ' + formatShortDate(_weekAfterForTest(due)),
-      'No',
-    ]);
+    // A quiz answer has no late mark: its first answer is Yes.
+    expect(choices.map(b => b.textContent)).toEqual(['Yes', 'Until ' + formatShortDate(_weekAfterForTest(due)), 'No']);
     expect(row.querySelector('[aria-checked="true"]').dataset.value).toBe('stop');
     const line = () => settings().querySelector('#quiz-closes').textContent;
     expect(line()).toBe('Students see it once you assign it. It closes on the due date unless you keep it open.');
@@ -692,6 +693,114 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     expect(dupe).toBeTruthy();
     expect(QuizData.get(CID, dupe.id).quiz).toBeNull();
     expect(getAssessmentStudentWork(CID, dupe.id).students_send).toBe('nothing');
+  });
+
+  /* Saved somewhere else (a second tab) after this form read it: the save is
+     refused, and the next time the form opens the teacher's questions are
+     there with the sentence and the two choices. */
+  async function staleQuiz() {
+    await newQuiz();
+    writeQuiz();
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    const made = getAssessments(CID).find(a => a.title === 'Food Webs Check');
+    await reopen(made.id);
+    // Another tab saves it with Two tries.
+    const theirs = QuizData.get(CID, made.id);
+    const other = QuizBuilder._payload();
+    other.tries = 2;
+    expect(QuizData.save(CID, made.id, { ...other, updated_at: theirs.quiz.updated_at }, [T1, T2]).ok).toBe(true);
+    // This tab changes a prompt and saves from its older read.
+    click(mount().querySelector('.quiz-row[data-k="' + q(0).k + '"]'));
+    type(edit(q(0).k).querySelector('.quiz-prompt'), 'Which of these is a producer?');
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    expect(QuizData.get(CID, made.id).questions[0].prompt).toBe('Which is a producer?');
+    await reopen(made.id);
+    return made;
+  }
+
+  it('a stale save keeps the edits and offers Keep Mine or Use the Other One', async () => {
+    await staleQuiz();
+    expect(mount().querySelector('#quiz-stale-msg').textContent).toBe(
+      'This quiz was changed somewhere else, in another tab or on another device, so your changes below were not saved.',
+    );
+    expect(Array.from(mount().querySelectorAll('.quiz-stale-acts .btn')).map(b => b.textContent)).toEqual([
+      'Keep Mine',
+      'Use the Other One',
+    ]);
+    expect(q(0).prompt).toBe('Which of these is a producer?');
+    expect(QuizBuilder._payload().tries).toBe(1);
+    // The form's own Save waits for the choice.
+    const n = getAssessments(CID).length;
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    expect(document.activeElement).toBe(mount().querySelector('[data-quiz-act="keepMine"]'));
+    expect(getAssessments(CID)).toHaveLength(n);
+  });
+
+  it('Keep Mine asks first, then saves the teacher’s questions with the updated_at the other one has', async () => {
+    const made = await staleQuiz();
+    const theirs = QuizData.get(CID, made.id).quiz.updated_at;
+    click(mount().querySelector('[data-quiz-act="keepMine"]'));
+    expect(document.getElementById('confirm-title').textContent).toBe('Keep Your Questions?');
+    document.getElementById('confirm-ok-btn').onclick();
+    const now = QuizData.get(CID, made.id);
+    expect(now.questions[0].prompt).toBe('Which of these is a producer?');
+    expect(now.quiz.tries).toBe(1);
+    expect(now.quiz.updated_at).not.toBe(theirs);
+    expect(QuizData.unsent(CID, made.id)).toBeNull();
+    expect(mount().querySelector('#quiz-stale-msg')).toBeNull();
+    expect(QuizBuilder._payload().updated_at).toBe(now.quiz.updated_at);
+  });
+
+  it('the card sends back a microsecond updated_at exactly as it was read', async () => {
+    await newQuiz();
+    writeQuiz();
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    const made = getAssessments(CID).find(a => a.title === 'Food Webs Check');
+    const AT = '2026-11-18T09:15:29.123456+00:00';
+    const store = JSON.parse(localStorage.getItem('gb-quizzes-' + CID));
+    store.quizzes[made.id].quiz.updated_at = AT;
+    localStorage.setItem('gb-quizzes-' + CID, JSON.stringify(store));
+    await reopen(made.id);
+    expect(QuizBuilder._payload().updated_at).toBe(AT);
+    click(mount().querySelector('[data-quiz-act="set"][data-quiz-set="tries"][data-value="2"]'));
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    expect(QuizData.unsent(CID, made.id)).toBeNull();
+    expect(QuizData.get(CID, made.id).quiz.tries).toBe(2);
+  });
+
+  it('Use the Other One puts what was saved somewhere else in the card', async () => {
+    const made = await staleQuiz();
+    click(mount().querySelector('[data-quiz-act="useOther"]'));
+    expect(q(0).prompt).toBe('Which is a producer?');
+    expect(QuizBuilder._payload()).toMatchObject({ tries: 2, updated_at: QuizData.get(CID, made.id).quiz.updated_at });
+    expect(QuizData.unsent(CID, made.id)).toBeNull();
+    expect(QuizBuilder.snapshot()).toBe('');
+  });
+
+  it('the form refuses what a teacher would call empty: ASCII, no-break, ideographic and zero-width spaces', async () => {
+    await newQuiz();
+    const base = {
+      k: 'x',
+      kind: 'true_false',
+      choices: [],
+      multiple: false,
+      points: '1',
+      answer: true,
+      within: '',
+      why: '',
+    };
+    for (const blank of [' \t\n\r\f\v', '\u00a0', '\u3000', '\u200b', '\ufeff', ' \u00a0\u2060 ']) {
+      expect(QuizBuilder._problems({ ...base, prompt: blank }), JSON.stringify(blank)).toEqual([
+        { field: 'prompt', text: 'Write the question.' },
+      ]);
+    }
+    // Sent trimmed the same way.
+    expect(QuizBuilder._problems({ ...base, prompt: '\u00a0Is a hawk a producer?\u3000' })).toEqual([]);
   });
 
   it('taking a saved quiz off asks first, then removes it on save', async () => {

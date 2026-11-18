@@ -68,6 +68,14 @@ var QuizBuilder = (function () {
   function $(id) {
     return document.getElementById(id);
   }
+  /* Every kind of white space off both ends, no-break, ideographic and zero-width
+     included, so the form refuses what a teacher would call empty. The server
+     trims ASCII white space only; its rule stays the floor under this one. */
+  var _BLANK_ENDS = /^[\s​-‍⁠﻿]+|[\s​-‍⁠﻿]+$/g;
+  /** @param {unknown} v */
+  function _trim(v) {
+    return String(v == null ? '' : v).replace(_BLANK_ENDS, '');
+  }
   /** @param {number} n @param {string} one @param {string} many */
   function _plural(n, one, many) {
     return n + ' ' + (n === 1 ? one : many);
@@ -96,6 +104,9 @@ var QuizBuilder = (function () {
       seq: 0,
       dropOk: false,
       sig: '',
+      updatedAt: null, // the quiz's updated_at exactly as last answered, sent back with the next save
+      stale: false, // the last save was refused: changed somewhere else
+      fresh: null, // what the server has, for Use the Other One
     };
   }
 
@@ -178,7 +189,11 @@ var QuizBuilder = (function () {
         if (k in quiz) settings[k] = quiz[k];
       });
     }
-    return { settings: settings, qs: qs };
+    return {
+      settings: settings,
+      qs: qs,
+      updatedAt: quiz && typeof quiz.updated_at === 'string' ? quiz.updated_at : null,
+    };
   }
 
   /* A save's payload (p_quiz) back to list_quiz's shape, for a kept unsent save. */
@@ -236,6 +251,8 @@ var QuizBuilder = (function () {
       action: 'quizAfterDue',
       change: 'quizAfterDueUntil',
       dateId: 'quiz-accept-until',
+      // Quiz answers carry no late mark: the first answer is a plain Yes.
+      keepLabel: 'Yes',
     });
   }
   function _collab() {
@@ -314,11 +331,11 @@ var QuizBuilder = (function () {
   function _problems(q) {
     var L = _data().LIMITS;
     var out = [];
-    if (!q.prompt.trim()) out.push({ field: 'prompt', text: 'Write the question.' });
+    if (!_trim(q.prompt)) out.push({ field: 'prompt', text: 'Write the question.' });
     if (q.kind === 'choice') {
       if (
         q.choices.some(function (/** @type {any} */ c) {
-          return !c.text.trim();
+          return !_trim(c.text);
         })
       ) {
         out.push({ field: 'choices', text: 'Write each choice, or remove the empty one.' });
@@ -501,16 +518,16 @@ var QuizBuilder = (function () {
   /** @param {any} q */
   function _written(q) {
     return (
-      !!q.prompt.trim() ||
+      !!_trim(q.prompt) ||
       q.answered ||
       (q.kind === 'choice' &&
         (q.answer.length > 0 ||
           q.choices.some(function (/** @type {any} */ c) {
-            return c.text.trim();
+            return _trim(c.text);
           }))) ||
       (q.kind === 'true_false' && q.answer != null) ||
       (q.kind === 'number' && String(q.answer).trim() !== '') ||
-      !!q.why.trim()
+      !!_trim(q.why)
     );
   }
 
@@ -554,6 +571,73 @@ var QuizBuilder = (function () {
       },
     );
     _keepClear(at);
+  }
+
+  /* Keep Mine: the teacher's questions saved over the other, with the updated_at the server has now. Asks first. */
+  /** @param {{ x: number, y: number } | null} at */
+  function _askKeepMine(at) {
+    var go = function () {
+      if (!S || !S.stale) return;
+      var bad = S.qs.some(function (/** @type {any} */ q) {
+        return _problems(q).length > 0;
+      });
+      if (bad || _quizProblem() || !_untilOk()) {
+        // Something here would be refused: said beside it first, and nothing is sent.
+        S.tried = true;
+        var first = S.qs.find(function (/** @type {any} */ q) {
+          return _problems(q).length > 0;
+        });
+        if (first && S.open && S.open !== first.k) _close(S.open);
+        if (first) S.open = first.k;
+        _draw(first ? '.quiz-edit[data-k="' + first.k + '"] .quiz-prompt' : '#quiz-head');
+        return;
+      }
+      var fresh = S.fresh && S.fresh.quiz ? S.fresh.quiz.updated_at || null : null;
+      S.updatedAt = fresh;
+      S.stale = false;
+      S.msg = '';
+      _data().dropUnsent(S.cid, S.aid);
+      var res = _data().save(
+        S.cid,
+        S.aid,
+        _payload(),
+        _tags().map(function (t) {
+          return t.id;
+        }),
+      );
+      if (res && res.quiz && res.quiz.quiz) S.updatedAt = res.quiz.quiz.updated_at;
+      S.existed = true;
+      S.base = _state();
+      _draw('#quiz-head');
+    };
+    if (typeof showConfirm !== 'function') return go();
+    showConfirm(
+      'Keep Your Questions?',
+      'Your questions are saved over the ones saved somewhere else.',
+      'Keep Mine',
+      'primary',
+      go,
+    );
+    _keepClear(at);
+  }
+
+  /* Use the Other One: what the server has, in place of the teacher's unsaved questions. */
+  function _useOther() {
+    if (!S || !S.stale) return;
+    var reply = S.fresh || { quiz: null, questions: [] };
+    var m = _fromReply(reply);
+    S.settings = reply.quiz ? m.settings : Object.assign(_data().defaults(), { after_due: 'stop' });
+    S.qs = m.qs;
+    S.updatedAt = m.updatedAt;
+    S.picked = !!reply.quiz;
+    S.existed = !!reply.quiz;
+    S.stale = false;
+    S.msg = '';
+    S.open = null;
+    _data().dropUnsent(S.cid, S.aid);
+    S.base = _state();
+    _draw(S.picked ? '#quiz-head' : '[data-quiz-act="answer"][data-value="quiz"]');
+    if (_redrawPage) _redrawPage();
   }
 
   /** @param {string} action @param {HTMLElement} el @param {{ x: number, y: number } | null} at */
@@ -640,6 +724,10 @@ var QuizBuilder = (function () {
         q.multiple = !q.multiple;
         if (!q.multiple) q.answer = q.answer.slice(0, 1);
         return _draw('.quiz-edit[data-k="' + k + '"] [data-quiz-act="multiple"]');
+      case 'keepMine':
+        return _askKeepMine(at);
+      case 'useOther':
+        return _useOther();
       case 'quizAfterDue': {
         var when = String(el.dataset.value || '');
         if (['keep', 'until', 'stop'].indexOf(when) < 0) return;
@@ -963,7 +1051,9 @@ var QuizBuilder = (function () {
       S.qs = m.qs;
       S.picked = true;
       S.existed = true;
+      S.updatedAt = m.updatedAt;
     }
+    S.fresh = reply || null;
     S.base = _state();
     var unsent = S.aid ? d.unsent(S.cid, S.aid) : null;
     if (unsent) {
@@ -977,6 +1067,8 @@ var QuizBuilder = (function () {
         S.picked = true;
       }
       S.msg = unsent.message;
+      // Changed somewhere else: the teacher's questions stay, kept apart from what the server has until they choose.
+      S.stale = unsent.stale === true;
     }
     S.sig = '';
   }
@@ -1007,6 +1099,11 @@ var QuizBuilder = (function () {
    * set to the quiz's total first.
    */
   function formOk() {
+    if (S && S.stale && $('quiz-mount')) {
+      S.tried = true;
+      _draw('[data-quiz-act="keepMine"]');
+      return false;
+    }
     if (!S || !S.picked || !$('quiz-mount')) return true;
     _syncPoints();
     S.tried = true;
@@ -1054,6 +1151,7 @@ var QuizBuilder = (function () {
     });
     var s = S.settings;
     return {
+      updated_at: S.updatedAt,
       shuffle_questions: !!s.shuffle_questions,
       shuffle_choices: !!s.shuffle_choices,
       tries: s.tries === 0 || s.tries === 2 ? s.tries : 1,
@@ -1066,16 +1164,16 @@ var QuizBuilder = (function () {
         /** @type {Record<string, any>} */
         var out = {
           kind: q.kind,
-          prompt: q.prompt.trim(),
+          prompt: _trim(q.prompt),
           multiple: q.kind === 'choice' && !!q.multiple,
           points: _pts(q),
           tag_id: tags.indexOf(q.tag) >= 0 ? q.tag : null,
-          key: { answer: null, tolerance: null, why: q.kind === 'text' ? null : q.why.trim() || null },
+          key: { answer: null, tolerance: null, why: q.kind === 'text' ? null : _trim(q.why) || null },
         };
         if (q.id) out.id = q.id;
         if (q.kind === 'choice') {
           out.choices = q.choices.map(function (/** @type {any} */ c) {
-            return { id: c.id, text: c.text.trim() };
+            return { id: c.id, text: _trim(c.text) };
           });
           var ids = out.choices.map(function (/** @type {any} */ c) {
             return c.id;
@@ -1118,6 +1216,7 @@ var QuizBuilder = (function () {
     });
     var res = d.save(cid, aid, _payload(), tags);
     if (res && res.ok === false && res.error) console.warn('Quiz not saved:', res.error);
+    if (res && res.quiz && res.quiz.quiz) S.updatedAt = res.quiz.quiz.updated_at;
     S.base = _state();
     S.existed = true;
     S.msg = '';
