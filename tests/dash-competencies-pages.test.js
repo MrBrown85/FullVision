@@ -200,12 +200,14 @@ describe('Level Mix, one row per competency', () => {
     expect(r[0].getAttribute('aria-haspopup')).toBe('dialog');
   });
 
-  it("opens on today's card's default for the class, and bands by the four levels in every style", () => {
-    // A Letter class with no saved view opens on Class Average, as the flag-off card does.
+  it('opens on Level Mix in every grading style, and bands by the four levels in every style', () => {
+    // A Letter class with no saved view opens on Level Mix too (Colin, Nov 18 2026).
     setClass('letter', THREE);
-    expect(DashOverview.compView(CID, null)).toBe('avg');
-    expect(rowsOf(tile({ compView: DashOverview.compView(CID, null) }), 'curricular')).toHaveLength(0);
-    // Picked, Level Mix bands by the four levels in a Letter class too.
+    expect(DashOverview.compView(CID, null)).toBe('mix');
+    expect(rowsOf(tile({ compView: DashOverview.compView(CID, null) }), 'curricular')).toHaveLength(3);
+    // A saved pick still wins.
+    expect(rowsOf(tile({ compView: DashOverview.compView(CID, 'avg') }), 'curricular')).toHaveLength(0);
+    // Level Mix bands by the four levels in a Letter class too.
     const letter = rowsOf(tile({ compView: 'mix' }), 'curricular');
     expect(numOf(letter[0])).toBe('3 of 4');
     expect(letter[0].getAttribute('aria-label')).toContain('Emerging 0, Developing 1, Proficient 1, Extending 2');
@@ -402,7 +404,7 @@ describe('Self-Assessment, one row per Core Competency', () => {
       CORE_COMPETENCIES[0].label + ': 3 of 4 self-assessed. Beginning 1, Growing 1, Confident 0, Leading 1, Not yet 1',
     );
     const few = by(CORE_COMPETENCIES[1].id);
-    expect(few.querySelector('.dash-comp-ln-num').textContent).toBe('Only1 of 4');
+    expect(few.querySelector('.dash-comp-ln-num').textContent).toBe('Only 1 of 4');
     expect(few.getAttribute('aria-label')).toContain(': only 1 of 4 self-assessed.');
     expect(el.textContent).toContain('Self-Assessed');
     // Today's Core card's own test (k * 3 < n * 2): exactly two thirds is not "only".

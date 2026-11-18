@@ -5,9 +5,11 @@
    (dash-overview.js) calls DashBulletins.html(cid) and gives the tile the
    40% of the left column that is left under the Inbox.
 
-   The pinned reminder first if there is one, then the latest, three rows at
-   most, one 38 px row each: a small grey kind label, the first line of the
-   words, the time, and Seen by as its own button. The words open the
+   The pinned reminder first if there is one, then the latest, five at most;
+   the tile draws as many whole rows as its height holds (dash-bulletins.css).
+   Each row: a small kind label (the Reminder one amber with a pin), the words
+   over two lines, the time as the Dashboard artboard writes it, and Seen by N
+   of M as its own button (the full numbers are its accessible name). The words open the
    bulletin on the Bulletins page; Seen by opens it with its list; Write a
    Bulletin opens the page with the box open. Nothing is counted here: Seen
    by N of M is what shared/data-bulletins.js answers. The tile keeps no
@@ -17,16 +19,23 @@
 /** @type {any} */ (window).DashBulletins = (function () {
   'use strict';
 
-  var MAX_ROWS = 3;
+  var MAX_ROWS = 5;
   var EMPTY_LINE = "Bulletins reach every student's phone, on the first tab of their page.";
   var PAGE_OFF_LINE = 'Students cannot see Bulletins until the Student Page is turned on.';
   var JUST_NOW_MS = 60000;
+  /** The pin the artboard draws before Reminder; fixed markup, no words. */
+  var PIN_ICON =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg>';
 
   var _cid = '';
   var _listening = false;
   var _drawing = false;
   var _lastHtml = '';
   var _timer = 0;
+  /** Watches the drawn tile's size so the buttons' place in the page follows the form it is in. @type {any} */
+  var _ro = null;
+  /** A move of the buttons was put off because one had focus: it is made when focus leaves. */
+  var _again = false;
   /** The tile has become available while there is no slot for it: the row is drawn once more when nothing is open. */
   var _wantRow = false;
   var _retry = 0;
@@ -85,6 +94,19 @@
     return h ? h.kindLabel(b) : 'Announcement';
   }
 
+  /** " · Until Thu" for a reminder that has an end day: the wide tile's card says it after Reminder. @param {any} b */
+  function untilText(b) {
+    var h = _helpers();
+    if (!b || b.kind !== 'reminder' || !b.pinned_until || !h) return '';
+    return ' \u00b7 Until ' + String(h.dateLabel(String(b.pinned_until))).split(',')[0];
+  }
+
+  /** The class's name for the wide tile's subtitle. @param {string} cid */
+  function _className(cid) {
+    var c = typeof COURSES !== 'undefined' ? COURSES[cid] : null;
+    return (c && c.name) || '';
+  }
+
   /** The first line of a bulletin's words, or what stands in for them. @param {any} b */
   function firstLine(b) {
     var lines = String(b.body || '').split(/\r?\n/);
@@ -105,12 +127,21 @@
     return !isNaN(at) && nowMs - at < JUST_NOW_MS && nowMs - at > -JUST_NOW_MS;
   }
 
-  /** "Just Now", else the page's own wording shortened to fit: "10:15 a.m.", "Yesterday 10:15 a.m.", "Mon 10:15 a.m.", "Nov 9 10:15 a.m.". @param {any} b @param {Date} now */
+  /** The time as the Dashboard artboard writes it: "Just Now", the time alone for today ("10:15"), the weekday alone for the last six days ("Mon"), "Yesterday", and "Nov 9" after that. @param {any} b @param {Date} now */
   function timeText(b, now) {
     if (isFresh(b, now.getTime())) return 'Just Now';
     var h = _helpers();
     var label = h ? h.timeLabel(_timeOf(b), now) : '';
-    return label.replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]+ /, '$1 ');
+    var clock = /\s*\d{1,2}:\d{2}(?: [ap]\.m\.)?$/;
+    if (/^\d{1,2}:\d{2}/.test(label)) return label.replace(/ [ap]\.m\.$/, '');
+    return label.replace(clock, '').replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]+$/, '$1');
+  }
+
+  /** The time with its full day and clock, for the accessible name: "Just Now", "10:15 a.m.", "Monday 8:42 a.m.". @param {any} b @param {Date} now */
+  function timeFull(b, now) {
+    if (isFresh(b, now.getTime())) return 'Just Now';
+    var h = _helpers();
+    return h ? h.timeLabel(_timeOf(b), now) : '';
   }
 
   /** One row, as the tile draws it. @param {any} b @param {string} cid @param {Date} now */
@@ -126,11 +157,15 @@
         .replace(/\s+/g, ' ')
         .trim(),
       time: timeText(b, now),
+      timeFull: timeFull(b, now),
       fresh: isFresh(b, now.getTime()),
       waiting: !!b.waiting && !b.stalled,
       stalled: !!b.stalled,
       seenMain: split < 0 ? label : label.slice(0, split),
       seenNot: split < 0 ? '' : label.slice(split + 3),
+      seenFull: split < 0 ? label : label.slice(0, split) + ', ' + label.slice(split + 3),
+      reminder: b.kind === 'reminder',
+      until: untilText(b),
       href: q + '&open=' + encodeURIComponent(b.id),
       seenHref: q + '&seen=' + encodeURIComponent(b.id),
     };
@@ -170,28 +205,34 @@
 
   /** @param {ReturnType<typeof rowModel>} r */
   function _rowHtml(r) {
-    var aria = r.kind + ': ' + (r.allWords || r.words) + (r.time ? ', ' + r.time : '');
+    var aria = r.kind + r.until + ': ' + (r.allWords || r.words) + (r.timeFull ? ', ' + r.timeFull : '');
     var seen = r.stalled
       ? '<span class="dash-bulletins-seen dash-bulletins-pending">Didn&#39;t Finish Uploading</span>'
       : r.waiting
         ? '<span class="dash-bulletins-seen dash-bulletins-pending">Not Sent Yet</span>'
         : '<button type="button" class="dash-bulletins-seen" data-dash-bulletins-go="' +
           esc(r.seenHref) +
+          '" aria-label="' +
+          esc(r.seenFull) +
           '">' +
           esc(r.seenMain) +
-          (r.seenNot ? ' · <span class="dash-bulletins-ns">' + esc(r.seenNot) + '</span>' : '') +
           '</button>';
     return (
       '<li class="dash-bulletins-row' +
       (r.fresh ? ' dash-bulletins-fresh' : '') +
-      '"><span class="dash-bulletins-kind">' +
+      '"><span class="dash-bulletins-kind' +
+      (r.reminder ? ' dash-bulletins-rem' : '') +
+      '"' +
+      (r.until ? ' data-until="' + esc(r.until) + '"' : '') +
+      '>' +
+      (r.reminder ? PIN_ICON : '') +
       esc(r.kind) +
       '</span><a class="dash-bulletins-words" role="link" tabindex="0" data-href="' +
       esc(r.href) +
       '" aria-label="' +
       esc(aria) +
       '">' +
-      esc(r.words) +
+      esc(r.allWords || r.words) +
       '</a><span class="dash-bulletins-time">' +
       esc(r.time) +
       '</span>' +
@@ -211,17 +252,23 @@
       if (meta.paused > 0) sub += ', ' + meta.paused + (meta.paused === 1 ? ' page paused' : ' pages paused');
     }
     var actions = m.offered
-      ? '<span class="dash-bulletins-actions"><button type="button" class="dash-bulletins-write" data-dash-bulletins-go="' +
+      ? '<span class="dash-bulletins-actions"><button type="button" class="btn btn-ghost dash-bulletins-write" data-dash-bulletins-go="' +
         esc(_link(cid, '&write=1')) +
         '">Write a Bulletin</button><a class="dash-bulletins-open" role="link" tabindex="0" data-href="' +
         esc(_link(cid)) +
         '">Open Bulletins →</a></span>'
       : '';
+    var cls = sub ? _className(cid) : '';
     var h =
       '<section class="dash-bulletins-tile" aria-labelledby="dash-bulletins-title"><div class="dash-bulletins-head"><h2 class="dash-bulletins-title" id="dash-bulletins-title">Bulletins</h2>' +
-      (sub ? '<span class="dash-bulletins-sub">' + esc(sub) + '</span>' : '') +
-      actions +
-      '</div>';
+      (sub
+        ? '<span class="dash-bulletins-sub">' +
+          (cls ? '<span class="dash-bulletins-cls">' + esc(cls) + ' &middot; </span>' : '') +
+          esc(sub) +
+          '</span>'
+        : '') +
+      '</div>' +
+      actions;
     if (m.mode === 'rows') {
       h += '<ol class="dash-bulletins-rows">' + m.rows.map(_rowHtml).join('') + '</ol>';
     } else if (m.mode === 'empty') {
@@ -308,6 +355,46 @@
     _lastHtml = next;
     // html-safe: tileHtml escapes every word, name and address; the rest is fixed markup.
     slot.innerHTML = next;
+    _watch();
+  }
+
+  /** Keeps the keyboard and screen-reader order the same as the screen: in the wide form the two buttons sit in a foot under the cards, so they follow the cards in the page; in rows they sit in the header, so they come first. The CSS says which (the foot is grid row 3). Nothing moves while a button has focus: the move is made when focus leaves. */
+  function _order() {
+    var t = document.querySelector('.dash-bulletins-tile');
+    if (!t) return;
+    var a = t.querySelector('.dash-bulletins-actions');
+    var l = t.querySelector('.dash-bulletins-rows, .dash-bulletins-none');
+    if (!a || !l) return;
+    var foot = getComputedStyle(a).gridRowStart === '3';
+    var placed = foot ? a.previousElementSibling === l : l.previousElementSibling === a;
+    if (placed) {
+      _again = false;
+      return;
+    }
+    if (a.contains(document.activeElement)) {
+      _again = true;
+      return;
+    }
+    _again = false;
+    if (foot) t.appendChild(a);
+    else t.insertBefore(a, l);
+  }
+
+  /** Focus left something: a move that was put off is made. */
+  function _onFocusOut() {
+    if (_again) window.setTimeout(_order, 0);
+  }
+
+  /** Watches the tile now on the page (the one just drawn), and only that one: the last tile's watch is dropped first. Sets the order once. */
+  function _watch() {
+    if (_ro) _ro.disconnect();
+    _ro = null;
+    var t = document.querySelector('.dash-bulletins-tile');
+    if (t && typeof ResizeObserver === 'function') {
+      _ro = new ResizeObserver(_order);
+      _ro.observe(t);
+    }
+    _order();
   }
 
   /** A press on Write a Bulletin or Seen by opens that address in the app. @param {any} e */
@@ -352,6 +439,7 @@
     if (!_listening) {
       document.addEventListener('fv:bulletins-changed', _onChanged);
       document.addEventListener('click', _onClick);
+      document.addEventListener('focusout', _onFocusOut);
       _listening = true;
       // Every 30 seconds while the page is showing; the data layer throttles it.
       _timer = window.setInterval(function () {
@@ -369,6 +457,8 @@
       }
     }
     _lastHtml = tileHtml(cid);
+    // The Dashboard puts the markup in its slot once this returns; the order is set then.
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(_watch);
     return _lastHtml;
   }
 
@@ -377,12 +467,16 @@
     if (_listening) {
       document.removeEventListener('fv:bulletins-changed', _onChanged);
       document.removeEventListener('click', _onClick);
+      document.removeEventListener('focusout', _onFocusOut);
     }
     if (_timer) window.clearInterval(_timer);
     if (_retry) window.clearTimeout(_retry);
     _timer = 0;
     _retry = 0;
     _wantRow = false;
+    if (_ro) _ro.disconnect();
+    _ro = null;
+    _again = false;
     _failing = {};
     _listening = false;
     _cid = '';
@@ -396,8 +490,10 @@
     _helpers: {
       pick: pick,
       kindText: kindText,
+      untilText: untilText,
       firstLine: firstLine,
       timeText: timeText,
+      timeFull: timeFull,
       rowModel: rowModel,
       rowHtml: _rowHtml,
       tileHtml: tileHtml,

@@ -39,15 +39,16 @@ test('the view menu works from the keyboard and the pick is remembered', async (
   await page.keyboard.press('ArrowDown');
   await expect(menu).toBeVisible();
   await expect(page.locator('#dash-view-menu-comp [aria-checked="true"]')).toBeFocused();
-  await page.keyboard.press('Home');
+  // Level Mix is first in the menu (board D; Colin, Nov 18 2026), Class Average next.
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(pill).toHaveText('Class Average');
   await expect(pill).toBeFocused();
   await expect(page.locator('.dash-comp-card .dash-outcome-bar-fill').first()).toBeVisible();
 
-  // Back to Level Mix with the keyboard.
+  // Back to Level Mix with the keyboard: the first item.
   await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Home');
   await page.keyboard.press('Enter');
   await expect(pill).toHaveText('Level Mix');
   await expect(page.locator('.dash-comp-card .dash-comp-ln').first()).toBeVisible();

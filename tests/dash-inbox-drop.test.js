@@ -112,15 +112,16 @@ describe('which assessment', () => {
     expect(DashInboxDrop.target(CID, { caughtUp: false }).aid).toBe(LIGHT);
     caughtUp();
     const doc = mountTile();
-    const select = doc.querySelector('[data-dash-inbox-for]');
-    expect([...select.querySelectorAll('option')].map(o => o.textContent)).toEqual([
+    // "Add Work For": one chip a piece (board E1).
+    const group = doc.querySelector('[data-dash-inbox-for]');
+    expect([...group.querySelectorAll('[data-dash-inbox-for-chip]')].map(o => o.textContent)).toEqual([
       'Light Refraction Lab',
       'Cell Microscope Lab',
     ]);
-    select.querySelectorAll('option').forEach(o => o.removeAttribute('selected'));
-    select.querySelector('option[value="' + CELL + '"]').setAttribute('selected', '');
-    expect(select.value).toBe(CELL);
-    select.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    group
+      .querySelector('[data-dash-inbox-for-chip="' + CELL + '"]')
+      .dispatchEvent(new doc.defaultView.Event('click', { bubbles: true }));
+    expect(group.querySelector('[aria-checked="true"]').getAttribute('data-dash-inbox-for-chip')).toBe(CELL);
     expect(DashInboxDrop.target(CID, { caughtUp: true }).aid).toBe(CELL);
     // Not caught up: still the newest.
     expect(DashInboxDrop.target(CID, { caughtUp: false }).aid).toBe(LIGHT);

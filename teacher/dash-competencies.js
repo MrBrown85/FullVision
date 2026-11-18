@@ -123,7 +123,7 @@ window.DashCompetencies = (function () {
       '">' +
       '<div class="dash-comp-tile-head">' +
       '<h2 class="dash-comp-tile-title" id="dash-comp-tile-title">Competencies</h2>' +
-      '<div class="seg dash-comp-seg" role="tablist" aria-label="Competencies">' +
+      '<div class="seg seg-sm dash-comp-seg" role="tablist" aria-label="Competencies">' +
       tabs +
       '</div>' +
       '</div>' +
@@ -184,9 +184,8 @@ window.DashCompetencies = (function () {
     return document.getElementById(id);
   }
 
-  /** The Curricular page's view: today's card's own (a saved pick, else the
-   * class's grading style's default: Level Mix, or Class Average in a Letter
-   * class).
+  /** The Curricular page's view: the teacher's saved pick, else Level Mix in
+   * every grading style (Colin, Nov 18 2026).
    * @param {any} opts
    * @returns {string} */
   function curricularView(opts) {
@@ -274,7 +273,7 @@ window.DashCompetencies = (function () {
    * bar under it is made of one button per level, as today's Level Mix had
    * one per count; each opens that level's students with their shared next
    * step. A competency nobody is scored on has a grey bar with no buttons.
-   * @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean, segs?: { level: number, n: number, label: string, open: boolean }[] }} r */
+   * @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean, counts?: string, segs?: { level: number, n: number, label: string, open: boolean }[] }} r */
   function _line(r) {
     if (!r.segs) return _lineButton(r);
     var segs = r.segs.length
@@ -307,17 +306,27 @@ window.DashCompetencies = (function () {
       esc(r.name + ', by level') +
       '">' +
       segs +
-      '</div></div>'
+      '</div>' +
+      _countsHtml(r) +
+      '</div>'
     );
   }
 
-  /** @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean }} r
+  /** The quiet line of counts under a row's bar, shown where the row has the
+   * room (DashCompetencies.fit). Its words are the row's accessible name's.
+   * @param {{ counts?: string }} r */
+  function _countsHtml(r) {
+    return r.counts ? '<span class="dash-comp-ln-counts" aria-hidden="true">' + esc(r.counts) + '</span>' : '';
+  }
+
+  /** @param {{ key: string, page: string, name: string, num: string, tag: string, label: string, tip: string, bar: string, picked: boolean, open: boolean, counts?: string }} r
    * @param {boolean} [split] the bar is drawn under the button, not in it */
   function _lineButton(r, split) {
     return (
       '<button type="button" class="dash-comp-ln' +
       (split ? ' is-split' : '') +
       (r.tag ? ' is-flag' : '') +
+      (r.tag === 'Lowest' ? ' is-low' : '') +
       (r.picked ? ' is-picked' : '') +
       '" data-comp-open="' +
       esc(r.key) +
@@ -329,11 +338,19 @@ window.DashCompetencies = (function () {
       esc(r.label) +
       '"><span class="dash-comp-ln-name">' +
       esc(r.name) +
-      '</span><span class="dash-comp-ln-num">' +
-      (r.tag ? '<span class="dash-comp-ln-tag">' + esc(r.tag) + '</span>' : '') +
+      '</span><span class="dash-comp-ln-num' +
+      (r.tag === 'Only' ? ' is-few' : '') +
+      '">' +
+      // As board D draws them: "Lowest" a red label beside the number, and a
+      // low Self-Assessed count said as "Only 13 of 27" in amber.
+      (r.tag === 'Only'
+        ? '<span class="dash-comp-ln-few">Only</span> '
+        : r.tag
+          ? '<span class="dash-comp-ln-tag">' + esc(r.tag) + '</span>'
+          : '') +
       esc(r.num) +
       '</span>' +
-      (split ? '' : '<span class="dash-comp-ln-bar" aria-hidden="true">' + r.bar + '</span>') +
+      (split ? '' : '<span class="dash-comp-ln-bar" aria-hidden="true">' + r.bar + '</span>' + _countsHtml(r)) +
       '<span class="dash-comp-ln-tip" aria-hidden="true">' +
       esc(r.tip) +
       '</span></button>'
@@ -395,6 +412,14 @@ window.DashCompetencies = (function () {
           tag: m.key === low ? 'Lowest' : '',
           label: label,
           tip: m.scored ? names : 'Not scored yet',
+          // competencyDistribution's own counts and band names, in level order.
+          counts: m.scored
+            ? [1, 2, 3, 4]
+                .map(function (l) {
+                  return m.counts[l - 1] + ' ' + levelName(l);
+                })
+                .join(' · ')
+            : '',
           bar: bar,
           picked: opts.naComp === m.key,
           open: !!_open && _open.page === 'curricular' && _open.key === m.key && !_open.level,
@@ -476,6 +501,12 @@ window.DashCompetencies = (function () {
           tag: few ? 'Only' : '',
           label: m.cc.label + ': ' + (few ? 'only ' : '') + m.k + ' of ' + m.n + ' self-assessed. ' + counts.join(', '),
           tip: counts.join(' · '),
+          counts: [1, 2, 3, 4]
+            .map(function (lv) {
+              return m.by[lv].length + ' ' + CONFIDENCE_LABELS[lv];
+            })
+            .concat(m.notYet.length ? [m.notYet.length + ' Not Yet'] : [])
+            .join(' · '),
           bar: bar,
           picked: false,
           open: !!_open && _open.page === 'core' && _open.key === m.cc.id,
@@ -697,6 +728,82 @@ window.DashCompetencies = (function () {
     pop.style.top = Math.round(top) + 'px';
   }
 
+  /* ── The tile's room (review of #1603) ─────────────────────
+     A tall tile gives each row more to say, not more air: above TALL px the
+     bar and name grow (is-tall), and a page whose rows have COUNTS_ROW px
+     each shows their counts line (has-counts). Needs Support shows as many
+     students as fit at SUPPORT_ROW px each, and "+N more" says how many
+     it leaves out, only when it leaves some out. Run after each draw and
+     whenever the tile changes size. */
+  var TALL = 600;
+  var COUNTS_ROW = 64;
+  var SUPPORT_ROW = 36;
+  /** @type {ResizeObserver | null} */
+  var _fitWatch = null;
+
+  /** @param {HTMLElement} pageEl */
+  function _fitSupport(pageEl) {
+    var list = /** @type {HTMLElement | null} */ (pageEl.querySelector('.dash-comp-rows:not(.is-scroll)'));
+    if (!list) return;
+    var rows = /** @type {HTMLElement[]} */ (
+      Array.prototype.slice.call(list.querySelectorAll('.dash-comp-row.is-student'))
+    );
+    var more = /** @type {HTMLElement | null} */ (list.querySelector('.dash-comp-more'));
+    if (!rows.length) return;
+    rows.forEach(function (r) {
+      r.classList.add('is-extra');
+    });
+    if (more) more.hidden = true;
+    var room = list.clientHeight;
+    var show = Math.floor(room / SUPPORT_ROW);
+    if (show < rows.length && more) {
+      more.hidden = false;
+      show = Math.floor((room - more.offsetHeight) / SUPPORT_ROW);
+    }
+    show = Math.max(1, Math.min(rows.length, show));
+    rows.forEach(function (r, i) {
+      r.classList.toggle('is-extra', i >= show);
+    });
+    if (more) {
+      more.hidden = show >= rows.length;
+      more.textContent = '+' + (rows.length - show) + ' more';
+    }
+  }
+
+  function fit() {
+    var tile = /** @type {HTMLElement | null} */ (document.querySelector('.dash-comp-tile'));
+    if (!tile || typeof tile.getBoundingClientRect !== 'function') return;
+    var box = tile;
+    box.classList.toggle('is-tall', box.getBoundingClientRect().height >= TALL);
+    Array.prototype.forEach.call(box.querySelectorAll('.dash-comp-page'), function (/** @type {HTMLElement} */ pg) {
+      _fitSupport(pg);
+      // The one-line row's number column: the widest number on the page.
+      var numW = 0;
+      pg.querySelectorAll('.dash-comp-ln-num').forEach(function (el) {
+        numW = Math.max(numW, /** @type {HTMLElement} */ (el).offsetWidth);
+      });
+      if (numW) pg.style.setProperty('--dash-comp-num-w', Math.ceil(numW) + 'px');
+      var list = /** @type {HTMLElement | null} */ (pg.querySelector('.dash-comp-lines'));
+      var n = list ? list.querySelectorAll('.dash-comp-lnbox, .dash-comp-lines > .dash-comp-ln').length : 0;
+      // A row with its counts needs COUNTS_ROW px, or the full 72 when the
+      // bar and name are the tall ones and the row is not one line.
+      var wide = box.getBoundingClientRect().width >= 440;
+      var need = box.classList.contains('is-tall') && !wide ? 72 : COUNTS_ROW;
+      pg.classList.toggle('has-counts', !!list && n > 0 && list.clientHeight / n >= need);
+    });
+    if (_fitWatch || typeof ResizeObserver === 'undefined') return;
+    var was = { w: 0, h: 0 };
+    _fitWatch = new ResizeObserver(function () {
+      var t = /** @type {HTMLElement | null} */ (document.querySelector('.dash-comp-tile'));
+      if (!t || !t.isConnected) return;
+      var r = t.getBoundingClientRect();
+      if (Math.abs(r.width - was.w) < 0.5 && Math.abs(r.height - was.h) < 0.5) return;
+      was = { w: r.width, h: r.height };
+      fit();
+    });
+    _fitWatch.observe(tile);
+  }
+
   /** After a draw: place the list, and put focus back where it was. */
   function _queuePlace() {
     var a = document.activeElement;
@@ -712,6 +819,10 @@ window.DashCompetencies = (function () {
       }
     }
     var run = function () {
+      // A new draw is a new tile: watch that one.
+      if (_fitWatch) _fitWatch.disconnect();
+      _fitWatch = null;
+      fit();
       place();
       var want = _refocus;
       _refocus = null;
@@ -972,6 +1083,7 @@ window.DashCompetencies = (function () {
     isFew: isFew,
     close: close,
     place: place,
+    fit: fit,
     toggle: _toggle,
     toggleLevel: _toggleLevel,
     showTip: showTip,
