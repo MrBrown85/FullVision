@@ -26,22 +26,22 @@ function seed(cid, o) {
 }
 
 const settle = () => new Promise(r => setTimeout(r, 0));
-const dialog = () => document.querySelector('.afc-overlay');
-const rows = () => Array.from(document.querySelectorAll('.afc-row'));
-const row = id => document.querySelector('.afc-row[data-afc-row="' + id + '"]');
-const box = id => row(id).querySelector('.afc-box');
-const titles = () => rows().map(r => r.querySelector('.afc-name').textContent);
+const dialog = () => document.querySelector('.afrom-overlay');
+const rows = () => Array.from(document.querySelectorAll('.afrom-row'));
+const row = id => document.querySelector('.afrom-row[data-afrom-row="' + id + '"]');
+const box = id => row(id).querySelector('.afrom-box');
+const titles = () => rows().map(r => r.querySelector('.afrom-name').textContent);
 /* linkedom's checked is a plain property: a box drawn ticked has only the attribute. */
 const isOn = b => (b.checked === undefined ? b.hasAttribute('checked') : !!b.checked);
 const ticked = () =>
-  Array.from(document.querySelectorAll('.afc-list .afc-box'))
+  Array.from(document.querySelectorAll('.afrom-list .afrom-box'))
     .filter(isOn)
-    .map(b => b.getAttribute('data-afc-pick'));
-const allBox = () => document.querySelector('#afc-all');
-const addBtn = () => document.querySelector('[data-afc-add]');
-const status = () => document.querySelector('#afc-status').textContent;
+    .map(b => b.getAttribute('data-afrom-pick'));
+const allBox = () => document.querySelector('#afrom-all');
+const addBtn = () => document.querySelector('[data-afrom-add]');
+const status = () => document.querySelector('#afrom-status').textContent;
 const options = sel => Array.from(document.querySelectorAll(sel + ' option')).map(o => o.textContent);
-const chip = cid => document.querySelector('[data-afc-class="' + cid + '"]');
+const chip = cid => document.querySelector('[data-afrom-class="' + cid + '"]');
 
 /* A linkedom page: real elements, events and selectors, no layout. It keeps
    no focus and its checkboxes don't tick on a click, so these helpers do
@@ -78,7 +78,7 @@ function setBox(el, on, shift) {
 const tick = (id, shift) => setBox(box(id), !isOn(box(id)), shift);
 const tickAll = () => setBox(allBox(), !isOn(allBox()));
 function type(value) {
-  const el = document.querySelector('#afc-search');
+  const el = document.querySelector('#afrom-search');
   el.value = value;
   fire(el, 'input');
 }
@@ -238,13 +238,13 @@ describe('Add From Another Class', () => {
 
     it('has a Title Case name, says what a copy holds, and offers the same course first', async () => {
       await open();
-      expect(document.querySelector('#afc-title').textContent).toBe('Add From Another Class');
+      expect(document.querySelector('#afrom-title').textContent).toBe('Add From Another Class');
       expect(dialog().getAttribute('role')).toBe('dialog');
       expect(dialog().getAttribute('aria-modal')).toBe('true');
-      expect(document.querySelector('#afc-what').textContent).toBe(
+      expect(document.querySelector('#afrom-what').textContent).toBe(
         'Into English 9 B. Each copy brings its dates, settings, rubric and competencies. Student scores are never copied.',
       );
-      const chips = Array.from(document.querySelectorAll('[data-afc-class]'));
+      const chips = Array.from(document.querySelectorAll('[data-afrom-class]'));
       expect(chips.map(c => c.textContent)).toEqual(['English 9 - Block A', 'History 12']);
       expect(chips.map(c => c.getAttribute('aria-checked'))).toEqual(['true', 'false']);
       expect(document.activeElement).toBe(chips[0]);
@@ -259,17 +259,17 @@ describe('Add From Another Class', () => {
 
     it('shows a date as the app writes it, never 2026-11-04', async () => {
       await open();
-      expect(row('a1').querySelector('.afc-date').textContent).toBe(formatShortDate('2026-11-04'));
+      expect(row('a1').querySelector('.afrom-date').textContent).toBe(formatShortDate('2026-11-04'));
       expect(dialog().textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     });
 
     it('a piece already here and refused DIBELS cannot be ticked; a same title is flagged', async () => {
       await open();
-      expect(row('a4').querySelector('.afc-chip').textContent).toBe('Already Here');
+      expect(row('a4').querySelector('.afrom-chip').textContent).toBe('Already Here');
       expect(box('a4').disabled).toBe(true);
-      expect(row('a6').querySelector('.afc-chip').textContent).toBe('DIBELS Is Only for ELA and Social Studies 8');
+      expect(row('a6').querySelector('.afrom-chip').textContent).toBe('DIBELS Is Only for ELA and Social Studies 8');
       expect(box('a6').disabled).toBe(true);
-      expect(row('a7').querySelector('.afc-chip').textContent).toBe('Same Title Here');
+      expect(row('a7').querySelector('.afrom-chip').textContent).toBe('Same Title Here');
       expect(box('a7').disabled).toBe(false);
       expect(row('a5').querySelector('.draft-badge').textContent).toBe('Draft');
     });
@@ -285,7 +285,7 @@ describe('Add From Another Class', () => {
       expect(status()).toBe('2 selected. A Draft stays a Draft until you assign it here. Clear');
       tick('a5');
       expect(addBtn().textContent).toBe('Add 1');
-      click(document.querySelector('[data-afc-clear]'));
+      click(document.querySelector('[data-afrom-clear]'));
       expect(addBtn().textContent).toBe('Add');
       expect(addBtn().disabled).toBe(true);
       expect(ticked()).toEqual([]);
@@ -309,11 +309,11 @@ describe('Add From Another Class', () => {
       expect(addBtn().textContent).toBe('Add');
 
       // Only what is shown.
-      choose('#afc-mod', 'a-mod');
+      choose('#afrom-mod', 'a-mod');
       expect(titles()).toEqual(['Point of View', 'Theme Essay']);
       tickAll();
       expect(addBtn().textContent).toBe('Add 1');
-      choose('#afc-mod', '');
+      choose('#afrom-mod', '');
       expect(ticked()).toEqual(['a1']);
     });
 
@@ -326,14 +326,14 @@ describe('Add From Another Class', () => {
       expect(status()).toBe('1 selected (1 not shown). Clear');
       type('zzz');
       expect(titles()).toEqual([]);
-      expect(document.querySelector('#afc-list').textContent).toContain('No assessments match.');
-      click(document.querySelector('[data-afc-reset]'));
+      expect(document.querySelector('#afrom-list').textContent).toContain('No assessments match.');
+      click(document.querySelector('[data-afrom-reset]'));
       expect(titles()).toHaveLength(7);
       expect(ticked()).toEqual(['a2']);
 
-      expect(options('#afc-cat')).toEqual(['All Categories', 'Essays', 'Quizzes', 'No Category']);
-      expect(options('#afc-mod')).toEqual(['All Modules', 'Short Stories', 'No Module']);
-      choose('#afc-cat', 'a-quiz');
+      expect(options('#afrom-cat')).toEqual(['All Categories', 'Essays', 'Quizzes', 'No Category']);
+      expect(options('#afrom-mod')).toEqual(['All Modules', 'Short Stories', 'No Module']);
+      choose('#afrom-cat', 'a-quiz');
       expect(titles()).toEqual(['Vocabulary Quiz']);
       expect(status()).toBe('1 selected. Clear');
     });
@@ -346,10 +346,10 @@ describe('Add From Another Class', () => {
       expect(ticked()).toEqual(['a5', 'a1', 'a7', 'a3']);
       expect(addBtn().textContent).toBe('Add 4');
 
-      const pick = () => document.activeElement.getAttribute('data-afc-pick');
+      const pick = () => document.activeElement.getAttribute('data-afrom-pick');
       const inTab = () =>
-        Array.from(document.querySelectorAll('.afc-list .afc-box[tabindex="0"]')).map(b =>
-          b.getAttribute('data-afc-pick'),
+        Array.from(document.querySelectorAll('.afrom-list .afrom-box[tabindex="0"]')).map(b =>
+          b.getAttribute('data-afrom-pick'),
         );
       box('a5').focus();
       fire(document, 'keydown', { key: 'ArrowDown' });
@@ -367,7 +367,7 @@ describe('Add From Another Class', () => {
       await settle();
       expect(document.activeElement).toBe(chip(H));
       expect(chip(H).getAttribute('aria-checked')).toBe('true');
-      expect(document.querySelector('#afc-list').textContent).toBe('History 12 has no assessments yet.');
+      expect(document.querySelector('#afrom-list').textContent).toBe('History 12 has no assessments yet.');
     });
 
     it('another class: its own list, nothing carried over, and no pickers with nothing to pick', async () => {
@@ -375,15 +375,15 @@ describe('Add From Another Class', () => {
       tick('a1');
       click(chip(H));
       await settle();
-      expect(document.querySelector('#afc-list').textContent).toBe('History 12 has no assessments yet.');
+      expect(document.querySelector('#afrom-list').textContent).toBe('History 12 has no assessments yet.');
       expect(addBtn().textContent).toBe('Add');
       expect(allBox().disabled).toBe(true);
-      expect(document.querySelector('#afc-cat').hidden).toBe(true);
-      expect(document.querySelector('#afc-mod').hidden).toBe(true);
+      expect(document.querySelector('#afrom-cat').hidden).toBe(true);
+      expect(document.querySelector('#afrom-mod').hidden).toBe(true);
       click(chip(A));
       await settle();
       expect(ticked()).toEqual([]);
-      expect(document.querySelector('#afc-cat').hidden).toBe(false);
+      expect(document.querySelector('#afrom-cat').hidden).toBe(false);
     });
 
     it('Escape and Cancel close it and add nothing', async () => {
@@ -393,7 +393,7 @@ describe('Add From Another Class', () => {
       expect(dialog()).toBeNull();
       await open();
       expect(addBtn().textContent).toBe('Add');
-      click(document.querySelector('[data-afc-cancel]'));
+      click(document.querySelector('[data-afrom-cancel]'));
       expect(dialog()).toBeNull();
       expect(getAssessments(B)).toHaveLength(2);
     });
@@ -438,8 +438,8 @@ describe('Add From Another Class', () => {
 
       // Opened again: both are marked.
       await open();
-      expect(row('a1').querySelector('.afc-chip').textContent).toBe('Already Here');
-      expect(row('a5').querySelector('.afc-chip').textContent).toBe('Already Here');
+      expect(row('a1').querySelector('.afrom-chip').textContent).toBe('Already Here');
+      expect(row('a5').querySelector('.afrom-chip').textContent).toBe('Already Here');
       expect(status()).toBe('7 assessments, 3 already here.');
     });
 
