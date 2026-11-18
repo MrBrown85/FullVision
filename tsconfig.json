@@ -68,6 +68,7 @@
     "teacher/report-print-paper.js",
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
+    "teacher-mobile/tab-bulletins.js",
     "s/question-kinds.js",
     "s/page-carousel.js",
     "teacher/cm-reflect-answers.js",

@@ -7,9 +7,9 @@
   var MC = window.MComponents;
   var APP_VERSION = '1.0';
   var _activeTab = 'students';
-  var _navStacks = { students: [], observe: [], grade: [] };
+  var _navStacks = { students: [], observe: [], grade: [], bulletins: [] };
   // Where each tab was left: scroll, card, and the screens open on it.
-  var _tabState = { students: null, observe: null, grade: null };
+  var _tabState = { students: null, observe: null, grade: null, bulletins: null };
   var _cid = null;
   var _searchTimer = null;
   // The student whose page opened the current grading screen (Grade button).
@@ -68,6 +68,9 @@
     if (typeof migrateAllStudents === 'function') migrateAllStudents();
 
     MC.setupOfflineDetection();
+    // Bulletins (B1f), the fourth tab, only with its build flag on: its posts waiting on this phone go on from where they stopped.
+    MTabBar.show();
+    if (window.MBulletins && MBulletins.on()) MBulletins.boot();
     // The tab the teacher last used on this device; Students the first time.
     _activeTab = MTabBar.saved();
     MTabBar.paint(_activeTab);
@@ -254,6 +257,7 @@
         }, 8000);
       });
       await Promise.race([retryActiveCourseLoad(), timeout]);
+      if (_activeTab === 'bulletins' && window.MBulletins) await MBulletins.refresh();
       if (courseLoadFailed(getActiveCourse())) throw new Error('could not reach the server');
     } catch (e) {
       console.warn('Pull-to-refresh error:', e);
@@ -724,6 +728,8 @@
   function _renderTab(tab) {
     // Clean up previous tab's resources
     if (MStudents.destroyCardStack) MStudents.destroyCardStack();
+    // Bulletins stops asking the server while it is not showing.
+    if (window.MBulletins) MBulletins.left();
     // The Grade tab's red count follows the class's work waiting (S7-F4).
     if (window.MGradePhotos) MGradePhotos.syncTabBadge(_cid);
 
@@ -738,9 +744,11 @@
       html = MObserve.renderFeed(_cid);
     } else if (tab === 'grade') {
       html = MGrade.renderPicker(_cid);
+    } else if (tab === 'bulletins' && window.MBulletins) {
+      html = MBulletins.render(_cid);
     }
 
-    // html-safe: html is MStudents.renderList, MObserve.renderFeed or MGrade.renderPicker, each checked to escape its text.
+    // html-safe: html is MStudents.renderList, MObserve.renderFeed, MGrade.renderPicker or MBulletins.render, each checked to escape its text.
     stack.innerHTML = html;
     _navStacks[tab].push(tab);
     _addDemoPill(stack.querySelector('.m-screen'));
@@ -759,6 +767,8 @@
     if (tab === 'students' && MStudents.initCardStack) {
       MStudents.initCardStack(_cid);
     }
+    // Bulletins reads the class when it shows, then every 15 seconds while it shows.
+    if (tab === 'bulletins' && window.MBulletins) MBulletins.shown(_cid);
     // The sync light is drawn fresh with each render; show the current state.
     if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
   }
