@@ -88,6 +88,8 @@ test('the answer comes late: no slot at first, then the row is drawn once, and n
   await page.goto('/dashboard');
   await page.locator('.dash-row').waitFor();
   // Nothing offered yet: the Inbox has the whole column and there is no slot.
+  // Read once the Inbox has drawn: on a slow runner it can still be 0 px tall (Nov 18, main 5bc26217).
+  await expect.poll(() => height(page, '.dash-row-inbox')).toBeGreaterThan(0);
   const row = await height(page, '.dash-row');
   expect(await height(page, '.dash-row-inbox')).toBe(row);
   await expect(page.locator('.dash-row-bulletins')).toHaveCount(0);
