@@ -736,12 +736,13 @@ var StudentData = (function () {
      student, kept on this device by the teacher's Demo Mode
      (shared/data-reflect.js, gb-student-page-options-<class>). The sample
      card is Cece's, st1 in the teacher's sample class sci8
-     (shared/seed-data.js). s/app.js honours them as student_submit does:
-     Hide, no overall grade; Paused, the card and the page are refused as
-     closed. { grade: 'class'|'show'|'hide', paused }. */
-  function demoOwnOptions() {
+     (shared/seed-data.js). s/app.js hands over the device's store (this
+     file touches no storage itself) and honours them as student_submit
+     does: Hide, no overall grade; Paused, the card and the page are refused
+     as closed. { grade: 'class'|'show'|'hide', paused }. */
+  function demoOwnOptions(store) {
     try {
-      var all = JSON.parse(G.localStorage.getItem('gb-student-page-options-sci8') || 'null');
+      var all = JSON.parse((store && store.getItem('gb-student-page-options-sci8')) || 'null');
       var own = all && typeof all === 'object' ? all.st1 : null;
       if (!own || typeof own !== 'object') return { grade: 'class', paused: false };
       var g = own.show_overall_grade;
@@ -752,16 +753,16 @@ var StudentData = (function () {
   }
 
   // Demo Mode: whether the sample page shows the overall grade (`classOn`, the class's switch), Cece's own first.
-  function demoShowsGrade(classOn, otherClass) {
-    var g = otherClass ? 'class' : demoOwnOptions().grade;
+  function demoShowsGrade(classOn, otherClass, store) {
+    var g = otherClass ? 'class' : demoOwnOptions(store).grade;
     return g === 'show' ? true : g === 'hide' ? false : !!classOn;
   }
 
   return {
     demoOwnOptions: demoOwnOptions,
     demoShowsGrade: demoShowsGrade,
-    demoPaused: function () {
-      return demoOwnOptions().paused;
+    demoPaused: function (store) {
+      return demoOwnOptions(store).paused;
     },
     fromServer: fromServer,
     use: use,
