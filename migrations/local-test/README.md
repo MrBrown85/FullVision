@@ -2775,4 +2775,15 @@ Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), from an empty databa
 
 The md5 of `pg_get_functiondef` depends on the search path (`fv_private.bulletin_patched` takes a `public.bulletin`): the file sets `search_path = public, pg_temp`; run the pre-check and post-check with `public` on the search path, as Supabase's SQL editor does.
 
+**Collation (Nov 18).** The first send to live was stopped by the file's own last check and changed nothing: live sorts text by ICU `en-US`, and the function fingerprint's `order by` used the server's collation, so its md5 differed from the one computed on this Mac's C cluster. Reproduced here on an ICU `en-US` database with the old file (the same message). Every fingerprint now sorts with `collate "C"`; the table grant check reads `aclexplode` instead of `information_schema` (which shows only the running role's grants); the post-check reads only M1's 18 function names. The template now mirrors live:
+
+```bash
+psql … -c "create database b1a_icu template template0 encoding 'UTF8' locale_provider icu icu_locale 'en-US' lc_collate 'en_US.UTF-8' lc_ctype 'en_US.UTF-8'"
+DATABASE_URL=postgresql://postgres@127.0.0.1:54731/b1a_icu node scripts/db-rebuild.mjs --check
+B1A_C_TEMPLATE=b1a_base PGPORT=54731 PGDATABASE=b1a_icu python3 bulletins.py        # every scenario on ICU en-US, and collations on C too
+PGPORT=54731 PGDATABASE=b1a_base python3 bulletins.py post edit … spentkey             # every other scenario on C
+```
+
+Result: **441 of 441** on ICU `en-US` (scenario `collations`: apply, fingerprints, second run, post-check, pre-check, undo, re-apply on both, identical fingerprints); on C every scenario but `collations`: **419 of 419**. `tests/db/run.mjs` makes its database with a bare `create database` (the cluster's default), and `db-rebuild.mjs` uses whatever database it is given.
+
 Not verified here: gradebook-prod itself; the Storage service's own checks (the bucket's type and size limits, refusing a second upload to a name that holds a file); the removal worker (B1b teaches it the bucket); PostgREST's schema cache.

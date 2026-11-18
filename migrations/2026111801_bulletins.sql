@@ -4,13 +4,13 @@
 -- security on, no policy, no grant), the private bucket bulletin-files with
 -- four storage policies, and seven functions for a signed-in teacher, one of
 -- which, delete_bulletin, DELETES a bulletin and what students did on it.
--- Contract: local-test/bulletins-contract.md. Tests: local-test/bulletins.py.
--- local-test/bulletins-live-precheck.sql, -postcheck.sql, -undo.sql.
--- It stops with nothing changed unless what it relies on is as tested (the
--- checks below). Adds one row, the bucket's. Locks course, enrollment,
--- assessment, storage.objects a moment; gives up after 5 s if one is held.
--- One transaction. A second run changes nothing, and is refused once a later
--- file has changed one of its functions or tables.
+-- Contract, tests, checks, undo: local-test/bulletins-*. Stops with nothing
+-- changed unless what it relies on is as tested. Adds one row, the bucket's.
+-- Locks course, enrollment, assessment, storage.objects a moment (5 s at most).
+-- One transaction. A second run changes nothing; it is refused once a later
+-- file has changed one of its functions or a column of its tables.
+-- Fingerprints sort with collate "C": live sorts text by ICU en-US, so an order
+-- by the server's collation would give another md5 there.
 -- Accepts: until B1b teaches the removal worker this bucket, a queued page is
 -- handed out on every run, the hourly call logs an error, and
 -- photo_lifecycle_nightly RAISES once one has waited six hours. A page is
@@ -40,14 +40,14 @@ begin
   perform set_config('fv.b1a', 'bulletin_file_path,bulletin_file_path_parts,bulletin_file_upload_allowed,bulletin_file_read_allowed,'
     || 'bulletin_audience,bulletin_pinned_now,bulletin_json,bulletin_patched,bulletin_drop_expired,bulletin_student_same_class,'
     || 'bulletin_file_removed,list_bulletins,post_bulletin,finish_bulletin_file,edit_bulletin,delete_bulletin,list_bulletin_seen,show_bulletin_again', true);
-  select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
+  select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
    into _c from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
     and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace);
-  if _c is distinct from null and _c is distinct from '3cdbfe6ce2a43145f01c101ef5377a7f' then -- fp:own
+  if _c is distinct from null and _c is distinct from 'f1e9a1ee924a1d33eded50b75333f810' then -- fp:own
     raise exception 'functions of this file''s names are there and are not exactly this file''s. Nothing was changed.';
   end if;
-  -- Its tables: none, or exactly this file's columns.
-  select md5(string_agg(attrelid::regclass::text || '.' || attname || ' ' || format_type(atttypid, atttypmod), ',' order by attrelid::regclass::text, attnum))
+  -- Its tables: none, or exactly these columns.
+  select md5(string_agg(attrelid::regclass::text || '.' || attname || ' ' || format_type(atttypid, atttypmod), ',' order by attrelid::regclass::text collate "C", attnum))
    into _c from pg_attribute
   where attrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace and relname in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction'))
    and attnum > 0 and not attisdropped;
@@ -64,7 +64,7 @@ begin
     ('storage.buckets', 'id text, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]'),
     ('storage.objects', 'bucket_id text, name text, metadata jsonb, archived_at timestamp with time zone, is_delete_marker boolean')
   ) as v(tbl, cols) loop
-    select string_agg(attname || ' ' || format_type(atttypid, atttypmod), ', ') into _c
+    select string_agg(attname || ' ' || format_type(atttypid, atttypmod), ', ' order by attnum) into _c
      from pg_attribute where attrelid = to_regclass(_f.tbl) and attnum > 0 and not attisdropped;
     if _c is null or not string_to_array(_f.cols, ', ') <@ string_to_array(_c, ', ') then
       raise exception '% does not have the columns this file reads (%). Nothing was changed.', _f.tbl, _f.cols;
@@ -75,7 +75,7 @@ begin
    or not (select relrowsecurity from pg_class where oid = 'storage.objects'::regclass) then
     raise exception 'submission_file_removal has no unique (bucket, path), or storage.objects has row security off. Nothing was changed.';
   end if;
-  -- Live's ten (the pre-check names them).
+  -- Live's ten.
   if (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass and polname !~ '^fv_bulletin_files_') <> 10 then
     raise exception 'storage.objects does not have the ten policies this file was tested with. Nothing was changed.';
   end if;
@@ -215,7 +215,7 @@ as $function$
   select p_pinned and (p_until is null or p_until >= (now() at time zone _fv_timezone(p_timezone))::date);
 $function$;
 
--- One bulletin, as the contract has it.
+-- One bulletin, as in the contract.
 create or replace function fv_private.bulletin_json(p_id uuid)
  returns jsonb language sql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -603,7 +603,7 @@ begin
   select b.course_id into _course from bulletin b where b.id = p_bulletin_id and fv_owns_course(b.course_id);
   if _course is not null then
     perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
-    -- Read again under the lock.
+    -- Re-read under the lock.
     select * into _b from bulletin where id = p_bulletin_id for update;
   end if;
   if _b.id is null then
@@ -646,7 +646,7 @@ begin
   for _p in select p.oid from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
                and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', _p);
-    -- The teacher's seven, and the two the storage policies call.
+    -- The seven, and the two the storage policies call.
     if _p::text ~ '^(list_bulletins|post_bulletin|finish_bulletin_file|edit_bulletin|delete_bulletin|list_bulletin_seen|show_bulletin_again)\('
      or _p::text ~ '^fv_private\.bulletin_file_(upload|read)_allowed\(' then
       execute format('grant execute on function %s to authenticated', _p);
@@ -658,10 +658,10 @@ $grants$;
 -- 9. Everything came out as written
 do $final$
 begin
-  if (select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
+  if (select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
      from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
-        and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)) is distinct from '3cdbfe6ce2a43145f01c101ef5377a7f' -- fp:own
-   or (select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname))
+        and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)) is distinct from 'f1e9a1ee924a1d33eded50b75333f810' -- fp:own
+   or (select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname collate "C"))
       from pg_policy where polrelid = 'storage.objects'::regclass and polname ~ '^fv_bulletin_files_') is distinct from 'f47bbf23863608c3e1310969de4f36ee' -- fp:policies
    or (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass) <> 14
    or not exists (select 1 from storage.buckets where id = 'bulletin-files' and public = false and file_size_limit = 2097152 and allowed_mime_types = array['image/jpeg'])
@@ -670,8 +670,8 @@ begin
    or exists (select 1 from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
           and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('service_role', p.oid, 'execute')
             or (p.prosecdef and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) s where s ~ '^search_path=(.*, )?pg_temp$'))))
-   or exists (select 1 from information_schema.role_table_grants where table_schema = 'public' and table_name in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction')
-          and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) then
+   or exists (select 1 from pg_class c, aclexplode(c.relacl) a where c.relnamespace = 'public'::regnamespace
+          and c.relname in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction') and (a.grantee = 0 or a.grantee in ('anon'::regrole, 'authenticated'::regrole, 'service_role'::regrole))) then
     raise exception 'a function, policy, grant or the bucket did not come out as written. Nothing was changed.';
   end if;
 end

@@ -1,7 +1,8 @@
 -- Read-only post-check, after the apply of migrations/2026111801_bulletins.sql (2026-11-17).
 -- SELECTs only. Every row says ok. The one count reads how many bulletin rows there are, never a row.
 -- Run it with public on the search path (as Supabase's SQL editor does).
--- It reads functions in public and fv_private only: the student side's (M2, in student_submit) are not this file's.
+-- It reads only M1's own 18 function names, in public and fv_private: the student side's (M2, in student_submit) and later files' are not M1's.
+-- Nothing in it depends on the server's collation: every comparison is an equality, every count a count.
 with want(sig, md5) as (values
     -- FINGERPRINTS-BEGIN postcheck (written by migrations/local-test/bulletins.py)
     ('delete_bulletin(uuid,uuid)', '8e7cca634add4151e773ac344b8d1331'),
@@ -21,19 +22,23 @@ with want(sig, md5) as (values
     ('list_bulletin_seen(uuid)', '7e8055f12c4300d0e16d7c884b103494'),
     ('list_bulletins(uuid)', 'fc94d54275b68e231365361c0ba2815a'),
     ('post_bulletin(uuid,jsonb,jsonb,uuid)', 'b383dee60c48bea8edf769bdfd2a4a41'),
-    ('show_bulletin_again(uuid,uuid)', '57d461e5ea790ae6a8406f8a69777298')
+    ('show_bulletin_again(uuid,uuid)', '3e7e093a0426763dfc412d1ee5fb49e6')
     -- FINGERPRINTS-END
 ),
-fns as (select p.oid::regprocedure::text sig, md5(pg_get_functiondef(p.oid)) md5 from pg_proc p where p.proname ~ 'bulletin' and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace))
+own as (select p.oid from pg_proc p where p.proname = any (array['bulletin_file_path', 'bulletin_file_path_parts', 'bulletin_file_upload_allowed', 'bulletin_file_read_allowed', 'bulletin_audience', 'bulletin_pinned_now', 'bulletin_json', 'bulletin_patched', 'bulletin_drop_expired', 'bulletin_student_same_class', 'bulletin_file_removed', 'list_bulletins', 'post_bulletin', 'finish_bulletin_file', 'edit_bulletin', 'delete_bulletin', 'list_bulletin_seen', 'show_bulletin_again'])
+                and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)),
+fns as (select p.oid::regprocedure::text sig, md5(pg_get_functiondef(p.oid)) md5 from pg_proc p where p.oid in (select oid from own))
 select 'fingerprint ' || coalesce(w.sig, f.sig) as check,
        case when w.md5 = f.md5 then 'ok' else 'NOT AS EXPECTED: ' || coalesce(f.md5, 'absent') end as value
   from want w full join fns f on f.sig = w.sig
 union all select 'the four tables, row security on, no policy, no client grant',
        case when (select count(*) from pg_class c where c.oid in ('public.bulletin'::regclass, 'public.bulletin_file'::regclass,
                         'public.bulletin_seen'::regclass, 'public.bulletin_reaction'::regclass) and c.relrowsecurity) = 4
-             and not exists (select 1 from pg_policy where polrelid::regclass::text ~ '^bulletin')
-             and not exists (select 1 from information_schema.role_table_grants where table_schema = 'public' and table_name ~ '^bulletin'
-                               and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) then 'ok' else 'NOT AS EXPECTED' end
+             and not exists (select 1 from pg_policy where polrelid in ('public.bulletin'::regclass, 'public.bulletin_file'::regclass,
+                               'public.bulletin_seen'::regclass, 'public.bulletin_reaction'::regclass))
+             and not exists (select 1 from pg_class c, aclexplode(c.relacl) a where c.oid in ('public.bulletin'::regclass, 'public.bulletin_file'::regclass,
+                               'public.bulletin_seen'::regclass, 'public.bulletin_reaction'::regclass)
+                               and (a.grantee = 0 or a.grantee in ('anon'::regrole, 'authenticated'::regrole, 'service_role'::regrole))) then 'ok' else 'NOT AS EXPECTED' end
 union all select 'every table has a primary key',
        case when (select count(*) from pg_constraint where contype = 'p' and conrelid in ('public.bulletin'::regclass, 'public.bulletin_file'::regclass,
                         'public.bulletin_seen'::regclass, 'public.bulletin_reaction'::regclass)) = 4 then 'ok' else 'NOT AS EXPECTED' end
@@ -52,8 +57,8 @@ union all select 'storage.objects: the ten policies and these four',
        case when (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass) = 14
              and (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass and polname ~ '^fv_bulletin_files_') = 4 then 'ok' else 'NOT AS EXPECTED' end
 union all select 'a teacher may run the seven and the two storage helpers; nobody else runs any',
-       case when (select count(*) from pg_proc p where p.proname ~ 'bulletin' and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) and has_function_privilege('authenticated', p.oid, 'execute')) = 9
-             and not exists (select 1 from pg_proc p where p.proname ~ 'bulletin' and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)
+       case when (select count(*) from pg_proc p where p.oid in (select oid from own) and has_function_privilege('authenticated', p.oid, 'execute')) = 9
+             and not exists (select 1 from pg_proc p where p.oid in (select oid from own)
                                and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('service_role', p.oid, 'execute')))
             then 'ok' else 'NOT AS EXPECTED' end
 union all select 'the tables start empty (' || (select count(*) from public.bulletin) + (select count(*) from public.bulletin_file)

@@ -81,9 +81,9 @@ begin
   if _c is not null then
     raise exception 'functions of a later file use the bulletin tables (%): undo that file (M2, the student side) first. Nothing was changed; if PART 1 ran, give teachers the functions back with the seven grants in this file''s header.', _c;
   end if;
-  select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
+  select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
     into _c from pg_proc p where p.oid in (select oid from b1a_own);
-  if _c is distinct from null and _c is distinct from '3cdbfe6ce2a43145f01c101ef5377a7f' then -- fp:own
+  if _c is distinct from null and _c is distinct from 'f1e9a1ee924a1d33eded50b75333f810' then -- fp:own
     raise exception 'a function of 2026111801 is not as it left it: a later change would be lost. Nothing was changed; if PART 1 ran, give teachers the functions back with the seven grants in this file''s header.';
   end if;
   if to_regclass('public.bulletin') is not null then

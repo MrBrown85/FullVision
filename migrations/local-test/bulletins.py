@@ -7,7 +7,9 @@ bulletins-contract.md.
     PGPORT=<port> PGDATABASE=<db> python3 bulletins.py post edit      or some
 
 The database named by PGDATABASE is only a template: every scenario runs on its own copy, made and dropped
-here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
+here. It must mirror live, which sorts text by ICU en-US (made with template template0 locale_provider icu
+icu_locale 'en-US' lc_collate 'en_US.UTF-8' lc_ctype 'en_US.UTF-8', then rebuilt with db-rebuild.mjs --check);
+B1A_C_TEMPLATE names a second one rebuilt under C, for scenario collations. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
 
   post      post_bulletin for each kind, with and without files, and its answer; finish_bulletin_file: missing
             and bad pages, a file ready, the bulletin visible only when its last file is; list_bulletins: order,
@@ -33,6 +35,8 @@ here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
   missing   A relied-on function that is missing stops the file.
   apply     The guards; a held lock; only the header's changes; no existing row changed; a second run; pre-
             and post-check; the size.
+  collations On ICU en-US (as live) and on C: apply, fingerprints the file carries and identical on both, a second
+            run, post-check, pre-check, full undo, apply again; the server's own order differs from C on ICU.
   m2        With a stand-in for M2's student_submit functions: M1 again, its post-check, PART 1 and the grants
             back, the full undo refusing until M2 is undone.
   locks     A delete holding the class's lock first: show again, edit, delete, finish and the seen list refuse
@@ -60,14 +64,14 @@ TEACHER = ['list_bulletins(uuid)', 'post_bulletin(uuid,jsonb,jsonb,uuid)', 'fini
            'delete_bulletin(uuid,uuid)', 'list_bulletin_seen(uuid)', 'show_bulletin_again(uuid,uuid)']
 HELPERS = ['fv_private.bulletin_audience(uuid)', 'fv_private.bulletin_json(uuid)', 'fv_private.bulletin_drop_expired(uuid)',
            'fv_private.bulletin_file_path(uuid,uuid,integer)', 'fv_private.bulletin_pinned_now(boolean,date,text)']
-OWN_SQL = """select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
+OWN_SQL = """select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text collate "C"))
                from pg_proc p where p.proname = any (string_to_array('%s', ','))
                 and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)""" % ''.join(
     re.findall(r"'([a-z_,]+)'", re.search(r"set_config\('fv\.b1a', (.*?), true\)", text_of(FILE), re.S).group(1)))
-TABLES_SQL = """select md5(string_agg(attrelid::regclass::text || '.' || attname || ' ' || format_type(atttypid, atttypmod), ',' order by attrelid::regclass::text, attnum))
+TABLES_SQL = """select md5(string_agg(attrelid::regclass::text || '.' || attname || ' ' || format_type(atttypid, atttypmod), ',' order by attrelid::regclass::text collate "C", attnum))
                   from pg_attribute where attrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace and relname ~ '^bulletin' and relkind = 'r')
                    and attnum > 0 and not attisdropped"""
-POLICIES_SQL = """select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname))
+POLICIES_SQL = """select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname collate "C"))
                     from pg_policy where polrelid = 'storage.objects'::regclass and polname ~ '^fv_bulletin_files_'"""
 
 def obj(v): return json.loads(v) if isinstance(v, str) and v[:1] in ('{', '[') else v
@@ -94,7 +98,7 @@ def scen_fingerprints():
         if r != 'ok': sys.exit('the file without its last check did not apply: ' + r)
         set_search_path(d)
         own, tables, pols = d.one(OWN_SQL), d.one(TABLES_SQL), d.one(POLICIES_SQL)
-        each = d.all("select p.oid::regprocedure::text, md5(pg_get_functiondef(p.oid)) from pg_proc p where p.proname ~ 'bulletin' and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) order by 1")
+        each = d.all("select p.oid::regprocedure::text, md5(pg_get_functiondef(p.oid)) from pg_proc p where p.proname ~ 'bulletin' and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) order by p.oid::regprocedure::text collate \"C\"")
         p = os.path.join(HERE, FILE); t = open(p).read()
         t = put_fp(put_fp(put_fp(t, 'own', own), 'tables', tables), 'policies', pols)
         open(p, 'w').write(t)
@@ -807,7 +811,7 @@ def scen_apply():
     size = os.path.getsize(os.path.join(HERE, FILE))
     ok('apply: the file is 40 KB or smaller (%d bytes)' % size, size <= 40960, size)
     h = text_of(FILE)[:1500]
-    ok('apply: the header says not applied and names its tests, undo and checks', 'Not applied' in h and 'bulletins.py' in h and 'undo' in h and 'precheck' in h)
+    ok('apply: the header says not applied and names its tests, undo and checks', 'Not applied' in h and 'local-test/bulletins-*' in h and 'undo' in h and 'collate "C"' in h)
     d.close()
 
 # ── undo ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -983,7 +987,54 @@ def scen_spentkey():
     ok('spentkey: a new key posts', fresh['bulletin']['id'] != bid and d.one('select count(*) from bulletin') == 1)
     d.close()
 
-SCENARIOS_MORE = {'m2': scen_m2, 'locks': scen_locks, 'lastcheck': scen_lastcheck, 'spentkey': scen_spentkey}
+# ── collations: live sorts text by ICU en-US; the file's fingerprints must not care ───────────────────────
+C_TEMPLATE = os.environ.get('B1A_C_TEMPLATE', '')
+def file_fps():
+    t = text_of(FILE)
+    return {tag: re.findall(r"is distinct from '([0-9a-f]{32})' (?:then )?-- fp:%s" % tag, t) for tag in ('own', 'tables', 'policies')}
+
+def scen_collations():
+    """The template (PGDATABASE) mirrors live: ICU en-US. B1A_C_TEMPLATE is a C database rebuilt from the repo. The file
+    applies, runs again, passes its post-check, undoes and applies again on both, and every fingerprint is the same on both."""
+    loc = connect(); info = loc.run('select datlocprovider, datlocale, datcollate, datctype from pg_database where datname = current_database()')[0]; loc.close()
+    ok('collations: the main template mirrors live (ICU, en-US, en_US.UTF-8)', list(info) == ['i', 'en-US', 'en_US.UTF-8', 'en_US.UTF-8'], info)
+    ok('collations: a C template is given (B1A_C_TEMPLATE)', bool(C_TEMPLATE), C_TEMPLATE)
+    if not C_TEMPLATE: return
+    seen = {}
+    for name, tpl in (('icu', None), ('c', C_TEMPLATE)):
+        d = Db('b1a_coll_' + name, template=tpl)
+        try:
+            if applied(d): d.file(UNDO)
+            d.run('alter table cron.job add column if not exists database text, add column if not exists username text, add column if not exists active boolean')
+            prov = d.one('select datlocprovider from pg_database where datname = current_database()')
+            ok('collations %s: (setup) the copy has the template\'s provider (%s)' % (name, prov), prov == ('i' if name == 'icu' else 'c'))
+            set_search_path(d)
+            sigs = [r[0] for r in d.all("select p.oid::regprocedure::text from pg_proc p where p.proname in ('bulletin_file_path', 'bulletin_file_path_parts')")]
+            base = catalog(d.c); rows0 = sums(d)
+            r = d.file(FILE); ok('collations %s: the file applies' % name, r == 'ok', r)
+            set_search_path(d)
+            got = {'own': d.one(OWN_SQL), 'tables': d.one(TABLES_SQL), 'policies': d.one(POLICIES_SQL)}
+            seen[name] = got
+            ok('collations %s: its fingerprints are the ones the file carries' % name, all(file_fps()[k] and set(file_fps()[k]) == {v} for k, v in got.items()), (got, file_fps()))
+            two = d.all("select x from unnest(array['fv_private.bulletin_file_path(uuid,uuid,integer)', 'fv_private.bulletin_file_path_parts(text)']) x order by x")
+            if name == 'icu':
+                ok('collations icu: the server\'s own text order differs from C here (what stopped the file on live)',
+                   [t[0] for t in two] == ['fv_private.bulletin_file_path_parts(text)', 'fv_private.bulletin_file_path(uuid,uuid,integer)'], two)
+            after = catalog(d.c)
+            r = d.file(FILE); ok('collations %s: a second run is ok and changes nothing' % name, r == 'ok' and catalog(d.c) == after, r)
+            set_search_path(d); r = d.statements(split(text_of(POST)))
+            ok('collations %s: the post-check says ok on every row' % name, r == 'ok' and len(d.rows) > 20 and all(x[1] == 'ok' for x in d.rows),
+               [x for x in d.rows if x[1] != 'ok'] or r)
+            set_search_path(d); r = d.statements(split(text_of(PRE)))
+            ok('collations %s: the pre-check runs' % name, r == 'ok', r)
+            r = d.file(UNDO); ok('collations %s: the full undo runs' % name, r == 'ok', r)
+            ok('collations %s: and leaves the catalog and every row as before' % name, catalog(d.c) == base and sums(d) == rows0, differences(base, catalog(d.c)))
+            r = d.file(FILE); ok('collations %s: the file applies again' % name, r == 'ok' and same(catalog(d.c), after), differences(norm(after), norm(catalog(d.c))))
+        finally:
+            d.close()
+    ok('collations: every fingerprint is identical under ICU en-US and C', seen.get('icu') == seen.get('c') and len(seen) == 2, seen)
+
+SCENARIOS_MORE = {'collations': scen_collations, 'm2': scen_m2, 'locks': scen_locks, 'lastcheck': scen_lastcheck, 'spentkey': scen_spentkey}
 
 SCENARIOS = {'post': scen_post, 'edit': scen_edit, 'delete': scen_delete, 'counts': scen_counts, 'others': scen_others,
              'storage': scen_storage, 'cascade': scen_cascade, 'limits': scen_limits, 'race': scen_race, 'defaults': scen_defaults,
