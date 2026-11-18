@@ -388,6 +388,70 @@ SCREENS.push(
   },
 );
 
+/* A quiz (docs/plans/quizzes-plan.md Q3b), behind the `quizzes` build switch: the sample
+   quiz in Demo Mode, in every state a student sees it. A copy of `main` has none (`quizzes`). */
+async function quizDemo(p, c) {
+  await p.goto('about:blank');
+  await p.goto((c.base || '') + '/s/');
+  await p.evaluate(() => localStorage.setItem('fv-build-quizzes', '1'));
+  await openDemo(p, c, 'demo-card');
+  await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
+  await expect(p.locator('.sp-quiz-q').first()).toBeVisible();
+}
+// One question answered, whatever its kind (the order is each try's own shuffle).
+async function quizAnswer(q) {
+  if (await q.locator('input[data-kind="number"]').count()) await q.locator('input').fill('10');
+  else if (await q.locator('textarea').count()) await q.locator('textarea').fill('The line goes up each week.');
+  else await q.locator('[data-act="quiz-pick"]').first().click();
+}
+async function quizAnswerAll(p) {
+  for (const q of await p.locator('.sp-quiz-q').all()) await quizAnswer(q);
+}
+SCREENS.push(
+  { name: 'quiz, taking it', quizzes: true, marker: '.sp-quiz-progress', go: quizDemo },
+  {
+    name: 'quiz, send check with questions left',
+    quizzes: true,
+    marker: '.sp-quiz-todo-list',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await p.locator('[data-act="quiz-send-ask"]').click();
+    },
+  },
+  {
+    name: 'quiz, ready to send',
+    quizzes: true,
+    marker: '.sp-quiz-check .sp-quiz-actions',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswerAll(p);
+      await p.locator('[data-act="quiz-send-ask"]').click();
+    },
+  },
+  {
+    name: 'quiz, sent',
+    quizzes: true,
+    marker: '#sp-quiz-sent',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswerAll(p);
+      await p.locator('[data-act="quiz-send-ask"]').click();
+      await p.locator('[data-act="quiz-send"]').click();
+    },
+  },
+  {
+    name: 'quiz, pick up where you left off',
+    quizzes: true,
+    marker: '#sp-quiz-resume',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswer(p.locator('.sp-quiz-q').first());
+      await p.locator('[data-act="quiz-back"]').click();
+      await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
+    },
+  },
+);
+
 // Go to `screen` and wait for its mark, and for motion (sheets slide in for about 220 ms).
 export async function reach(page, screen, ctx) {
   await screen.go(page, ctx);

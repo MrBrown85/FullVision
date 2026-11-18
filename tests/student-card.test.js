@@ -90,6 +90,9 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/student.js',
       // A teacher-built reflection's questions (docs/plans/reflect-plan.md).
       's/question-kinds.js',
+      // A quiz on a card's page (docs/plans/quizzes-plan.md Q3b): its model, then its drawing; nothing shows with the switch off.
+      's/quiz-model.js',
+      's/quiz-view.js',
       's/questionnaire.js',
       's/report.js',
       // Settings (the gear): Text Size's words and the keys over its sheets; nothing stored or sent.
@@ -112,6 +115,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/reflect.js',
       // Bulletins: asking, Seen, reactions, a file's pages; only with the build switch on.
       's/bulletins.js',
+      // A quiz: asking, saving as the student goes, Send; only with the build switch on.
+      's/quiz.js',
     ]);
     const page = openStudentPage();
     expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');

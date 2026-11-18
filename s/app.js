@@ -449,6 +449,8 @@
        revision there too. */
     // #demo-card-feed: a long list still to do, the last with a handout (s/handouts.js demoFeed).
     if (demo && demo.feed && StudentPage.demoFeed) cls.work = cls.work.concat(StudentPage.demoFeed(isoDay));
+    // The sample quiz (s/quiz.js), only with the quizzes switch on.
+    if (StudentPage.demoQuiz) cls.work = cls.work.concat(StudentPage.demoQuiz(isoDay));
     if (demo && demo.revise) {
       cls.work.unshift({
         id: 'demo-vaccine',
@@ -1023,7 +1025,7 @@
         // Missing and Excused win at once: no grade is sent under either.
         var hidden = w.status === 'NS' || w.status === 'EXC';
         var back = rows ? w.ret : null;
-        return {
+        var row = {
           id: w.id,
           title: w.title,
           date: w.date,
@@ -1051,6 +1053,9 @@
           grade: hidden ? null : copyOf(rows),
           previous: hidden || !back || !back.previous_copy ? null : copyOf(demoRows(back.previous_copy)),
         };
+        // The sample quiz is marked as the server marks a quiz (s/quiz.js).
+        if (w.quiz === true) row.quiz = true;
+        return row;
       }),
     };
   }
@@ -2302,6 +2307,10 @@
     'bulletin-seen': 1,
     'bulletin-react': 1,
     'bulletin-files': 1,
+    // Quizzes: open, save an answer, send (docs/plans/quizzes-plan.md Q3b; s/quiz.js).
+    quiz: 1,
+    'quiz-save': 1,
+    'quiz-send': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });

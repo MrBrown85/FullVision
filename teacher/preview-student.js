@@ -48,6 +48,7 @@ window.PreviewStudent = (function () {
     var built = StudentView.fromCache(cid, sid, { learning: !!(_open && _open.learning) });
     var bulletins = built && built.ready && built.view ? _bulletinsOf(cid) : null;
     if (bulletins) built.view.bulletins = bulletins;
+    if (built && built.ready) _markQuizzes(cid, built.view);
     return built;
   }
 
@@ -147,6 +148,128 @@ window.PreviewStudent = (function () {
      piece open). */
   function drawPage(view, ui) {
     return StudentPageView.html(view, ui || {});
+  }
+
+  /* ── A quiz (docs/plans/quizzes-plan.md Q3b) ───────────────── */
+
+  /* With the quizzes switch on, a piece the class has a quiz for gets Start the Quiz, as it does for the
+     student; its questions come from the teacher's own quiz, with no key, in the teacher's order. The
+     preview saves and sends nothing: answers are kept here, in the device, until it closes. */
+  function _quizzesOn(cid) {
+    return (
+      typeof BuildFlags !== 'undefined' &&
+      BuildFlags.on('quizzes') &&
+      typeof getQuiz === 'function' &&
+      typeof quizzesOffered === 'function' &&
+      quizzesOffered(cid) &&
+      typeof StudentQuizView !== 'undefined'
+    );
+  }
+
+  function _markQuizzes(cid, view) {
+    if (!view || !_quizzesOn(cid)) return;
+    (view.work || []).forEach(function (p) {
+      if (p.kind !== 'due' && p.kind !== 'missing') return;
+      var held = getQuiz(cid, p.id);
+      if (held && held.quiz && (held.questions || []).length) p.quiz = true;
+    });
+  }
+
+  // The quiz as the student's route would send it: the questions' prompts and choices, never a key.
+  function _quizModel(cid, aid) {
+    var held = getQuiz(cid, aid);
+    if (!held || !held.quiz) return null;
+    var tries = held.quiz.tries === 0 || held.quiz.tries === 2 ? held.quiz.tries : 1;
+    return StudentQuizModel.fromReply({
+      ok: true,
+      quiz: { tries: tries, tries_left: tries ? tries - 1 : null, closed: false, closes_on: null },
+      try: { number: 1, sent: false, started_at: null, sent_at: null, reopened: false },
+      sent_tries: 0,
+      can_answer: true,
+      can_try_again: false,
+      questions: (held.questions || []).map(function (q, i) {
+        return {
+          id: q.id,
+          number: i + 1,
+          kind: q.kind,
+          prompt: q.prompt,
+          points: q.points,
+          multiple: !!q.multiple,
+          choices: Array.isArray(q.choices)
+            ? q.choices.map(function (c) {
+                return { id: c.id, text: c.text };
+              })
+            : null,
+        };
+      }),
+      answers: {},
+    });
+  }
+
+  function _quizCtx(view, quiz) {
+    var piece = (view.work || []).filter(function (p) {
+      return p.id === quiz.aid;
+    })[0];
+    var course = view.course || {};
+    return {
+      mode: quiz.mode,
+      course: course.name || '',
+      title: piece ? piece.title : '',
+      m: quiz.m,
+      answers: quiz.answers,
+      message: quiz.message,
+      status: { kind: 'idle', at: 0 },
+      preview: true,
+    };
+  }
+
+  // The device's screen: the page, or the quiz open on it.
+  function _screenHtml(built) {
+    return _open.quiz && _open.quiz.m
+      ? StudentQuizView.html(_quizCtx(built.view, _open.quiz))
+      : drawPage(built.view, _open.ui);
+  }
+
+  // A press inside an open quiz. Nothing is sent.
+  function _pressQuiz(act, el, built) {
+    var quiz = _open.quiz;
+    var screen = _overlay() && _overlay().querySelector('.ps-screen');
+    if (act === 'quiz-back') {
+      var aid = quiz.aid;
+      _open.quiz = null;
+      return _drawScreen('[data-act="quiz-open"][data-piece="' + String(aid).replace(/["\\]/g, '') + '"]');
+    }
+    if (act === 'quiz-pick' && screen) {
+      var hit = StudentQuizView.pressed(quiz.m, quiz.answers, el);
+      if (!hit) return;
+      if (hit.value == null) delete quiz.answers[hit.q.id];
+      else quiz.answers[hit.q.id] = hit.value;
+      StudentQuizView.setChoices(screen, hit.q, hit.value);
+      return StudentQuizView.refresh(screen, _quizCtx(built.view, quiz));
+    }
+    if (act === 'quiz-next' && screen) {
+      var n = StudentQuizModel.counts(quiz.m, quiz.answers).next;
+      var card = screen.querySelector('[data-pos="' + n + '"]');
+      if (card && card.scrollIntoView) card.scrollIntoView({ block: 'start' });
+      return;
+    }
+    if (act === 'quiz-send-ask') {
+      quiz.message = 'This is a preview. Nothing is sent.';
+      return _drawScreen('#sp-quiz-msg');
+    }
+  }
+
+  function _typedQuiz(el) {
+    var quiz = _open && _open.quiz;
+    var built = quiz ? _fromCache(_open.cid, _open.sid) : null;
+    var screen = _overlay() && _overlay().querySelector('.ps-screen');
+    var hit = quiz && built && built.ready && screen ? StudentQuizView.typed(quiz.m, el) : null;
+    if (!hit) return;
+    if (hit.value == null) delete quiz.answers[hit.q.id];
+    else quiz.answers[hit.q.id] = hit.value;
+    var note = screen.querySelector('#q-' + String(hit.q.id).replace(/[^A-Za-z0-9-]/g, '') + '-hint');
+    if (note) note.textContent = hit.hint;
+    StudentQuizView.refresh(screen, _quizCtx(built.view, quiz));
   }
 
   /* ── The two lists ─────────────────────────────────────────── */
@@ -277,7 +400,7 @@ window.PreviewStudent = (function () {
     var screen = _pausedFor(cid, sid)
       ? '<div class="ps-closed" role="status"><p class="ps-closed-line">' + esc(CLOSED_LINE) + '</p></div>'
       : built.ready
-        ? drawPage(built.view, _open.ui)
+        ? _screenHtml(built)
         : // html-safe: fixed markup
           '<div class="ps-waiting" role="status">Loading this class…</div>';
     var device = _open.device;
@@ -387,6 +510,10 @@ window.PreviewStudent = (function () {
       var a = t.closest('.ps-screen [data-act]');
       if (a) _press(a.getAttribute('data-act'), a);
     });
+    el.addEventListener('input', function (e) {
+      var t = e.target && e.target.closest ? e.target.closest('.ps-screen [data-q]') : null;
+      if (t) _typedQuiz(t);
+    });
     _onKey = function (e) {
       if (!_open) return;
       if (e.key === 'Escape') {
@@ -402,7 +529,7 @@ window.PreviewStudent = (function () {
         close();
       } else if (e.key === 'Tab') {
         var box = _overlay();
-        var all = box ? Array.prototype.slice.call(box.querySelectorAll('button, input')) : [];
+        var all = box ? Array.prototype.slice.call(box.querySelectorAll('button, input, textarea')) : [];
         if (!all.length) return;
         var first = all[0];
         var last = all[all.length - 1];
@@ -434,9 +561,35 @@ window.PreviewStudent = (function () {
         if (_open === opened) _drawScreen();
       });
     }
+    _readQuizzes(cid);
     var start = el.querySelector('[data-ps-close]');
     if (start) start.focus();
     return true;
+  }
+
+  /* Signed in, the class's quizzes are read (the teacher's own read) so the pieces that are quizzes
+     show Start the Quiz; the device is drawn again when they are. Demo Mode has them on the device already. */
+  function _readQuizzes(cid) {
+    if (typeof BuildFlags === 'undefined' || !BuildFlags.on('quizzes') || typeof probeQuizzes !== 'function') return;
+    var opened = _open;
+    Promise.resolve(probeQuizzes(cid))
+      .then(function (ok) {
+        var built = ok && _open === opened ? _fromCache(cid, opened.sid) : null;
+        if (!built || !built.ready) return null;
+        var todo = (built.view.work || []).filter(function (p) {
+          return (p.kind === 'due' || p.kind === 'missing') && !getQuiz(cid, p.id);
+        });
+        return Promise.all(
+          todo.map(function (p) {
+            return loadQuiz(cid, p.id);
+          }),
+        ).then(function () {
+          if (_open === opened && !opened.quiz) _drawScreen();
+        });
+      })
+      .then(null, function () {
+        /* the pieces stay as they were */
+      });
   }
 
   function close() {
@@ -480,6 +633,8 @@ window.PreviewStudent = (function () {
       return;
     }
     if (act === 'handout-file') return _openFile(el);
+    if (act === 'quiz-open') return _openQuiz(el && el.getAttribute('data-piece'));
+    if (_open.quiz && /^quiz-/.test(act)) return _pressQuiz(act, el, built);
     // A bulletin's link asks first, as on the student's phone (shared/website-ask.js); a reaction sends nothing here.
     if (act === 'bulletin-link') return _askLink(built.view, el);
     var out = StudentPageView.press(_open.ui, built.view, act, el);
@@ -494,6 +649,14 @@ window.PreviewStudent = (function () {
     _drawScreen(out.focus);
     // Settings slides in on the drawing that opens it, as on the student's device.
     if (out.slide && _overlay()) StudentPageView.slideIn(_overlay());
+  }
+
+  function _openQuiz(aid) {
+    if (!aid || !_quizzesOn(_open.cid)) return;
+    var m = _quizModel(_open.cid, aid);
+    if (!m || !m.questions.length) return;
+    _open.quiz = { aid: aid, m: m, answers: {}, mode: 'take', message: '' };
+    _drawScreen('#sp-quiz-title');
   }
 
   function _askLink(view, el) {
@@ -675,7 +838,7 @@ window.PreviewStudent = (function () {
     var built = _fromCache(_open.cid, _open.sid);
     if (!built.ready) return _draw();
     // html-safe: drawPage is s/page-view.js, which escapes every title, date line and result
-    screen.innerHTML = drawPage(built.view, _open.ui);
+    screen.innerHTML = _screenHtml(built);
     _settle(screen);
     var to = focus ? screen.querySelector(focus) : null;
     if (to && typeof to.focus === 'function') to.focus();
