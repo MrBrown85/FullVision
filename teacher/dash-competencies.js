@@ -195,6 +195,7 @@ window.DashCompetencies = (function () {
     var cid = opts.cid;
     var view = DashOverview.compView(cid, opts.compView);
     if (view !== 'avg' || DashInsights.showsProficiency(cid)) return view;
+    /** @type {string | null} */
     var saved = null;
     try {
       saved = localStorage.getItem(VIEW_PREF + cid);
@@ -202,6 +203,12 @@ window.DashCompetencies = (function () {
       /* storage blocked: the default stands */
     }
     return saved === 'avg' ? view : 'mix';
+  }
+
+  /** A level's name (1 to 4), as calc.js names its bands.
+   * @param {number} level */
+  function levelName(level) {
+    return competencyDistribution('', [], {}).bands[level - 1].label;
   }
 
   /** The counts one competency's bar and number are made of, as
@@ -325,7 +332,7 @@ window.DashCompetencies = (function () {
       .map(function (m) {
         var names = m.counts
           .map(function (/** @type {number} */ n, /** @type {number} */ i) {
-            return PROF_LABELS[i + 1] + ' ' + n;
+            return levelName(i + 1) + ' ' + n;
           })
           .join(' · ');
         var bar = m.scored
@@ -362,7 +369,7 @@ window.DashCompetencies = (function () {
       .join('');
     var legend = [1, 2, 3, 4]
       .map(function (l) {
-        return _legendItem(PROF_LABELS[l], 'dash-comp-sw-' + l);
+        return _legendItem(levelName(l), 'dash-comp-sw-' + l);
       })
       .join('');
     return (
@@ -473,19 +480,19 @@ window.DashCompetencies = (function () {
         return m.counts[l - 1] > 0;
       })
       .map(function (l) {
-        return m.counts[l - 1] + ' ' + PROF_LABELS[l];
+        return m.counts[l - 1] + ' ' + levelName(l);
       });
     var summary = !m.scored
       ? 'No one is scored on this yet.'
       : below
-        ? below + ' below ' + PROF_LABELS[3] + ': ' + parts.join(', ')
-        : 'No one is below ' + PROF_LABELS[3] + '.';
+        ? below + ' below ' + levelName(3) + ': ' + parts.join(', ')
+        : 'No one is below ' + levelName(3) + '.';
     var groups = [1, 2]
       .map(function (l) {
         if (!m.counts[l - 1]) return '';
         return (
           '<div class="dash-comp-pop-level"><span>' +
-          esc(PROF_LABELS[l] + ' · ' + m.counts[l - 1]) +
+          esc(levelName(l) + ' · ' + m.counts[l - 1]) +
           '</span>' +
           _bandPeople(opts, open.key, l) +
           '</div>'
@@ -520,10 +527,11 @@ window.DashCompetencies = (function () {
 
   /** @param {any} opts @param {string} id */
   function _corePop(opts, id) {
-    var m = coreModel(opts).find(function (x) {
+    var found = coreModel(opts).find(function (x) {
       return x.cc.id === id;
     });
-    if (!m) return '';
+    if (!found) return '';
+    var m = found;
     var counts = [1, 2, 3, 4]
       .map(function (lv) {
         return CONFIDENCE_LABELS[lv] + ' ' + m.by[lv].length;

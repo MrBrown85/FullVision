@@ -384,6 +384,7 @@ test('screenshots', async ({ page }, info) => {
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
     await openDashboard(page);
+    await goCurricular(page);
     const tile = page.locator('.dash-comp-tile');
     await tile.screenshot({ path: `${dir}/curricular-${scheme}.png` });
     await page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(2).click();
