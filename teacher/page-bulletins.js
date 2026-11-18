@@ -1516,6 +1516,13 @@
     }
   }
 
+  /** Focus left an open menu for somewhere else (Tab in Safari does): the menu closes. A redraw that drops focus to nothing does not close it. @param {any} e */
+  function _onFocusout(e) {
+    var to = e.relatedTarget;
+    if (!_alive || !_menuId || !to || !to.closest) return;
+    if (!to.closest('.bulletin-more')) _closeMenu();
+  }
+
   /* ── Class switch, init, destroy ─────────────────────────────── */
 
   /** @param {string} cid */
@@ -1578,6 +1585,7 @@
     _listen('input', _onInput);
     _listen('change', _onChange);
     _listen('keydown', _onKeydown);
+    _listen('focusout', _onFocusout);
     _listen('visibilitychange', _onVisibility);
     _listen('fv:bulletins-changed', _onChanged);
 

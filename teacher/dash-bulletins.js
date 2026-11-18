@@ -248,6 +248,8 @@
     if (document.getElementById('grader-overlay')) return true;
     var row = document.querySelector('.dash-row');
     if (!row) return false;
+    // A file is being dragged over the Inbox: its cover is up (dash-inbox-drop.js shows it by clearing `hidden`).
+    if (row.querySelector('.dash-inbox-drop-cover:not([hidden])')) return true;
     // Keyboard focus on a control with an id is put back after the draw; on a text box or a control that cannot be found again, the draw waits.
     var a = /** @type {any} */ (document.activeElement);
     if (
@@ -320,12 +322,18 @@
 
   /** @param {string} cid */
   function _ask(cid) {
+    // A read dropped because the class changed or a write of this device was under way is not a failure.
+    var dropped = false;
+    var writes = typeof _bltMemory === 'function' ? _bltMemory(cid).writes : 0;
     refreshBulletins(cid, {
       stillShown: function () {
-        return _listening && _cid === cid;
+        var shown = _listening && _cid === cid;
+        if (!shown) dropped = true;
+        return shown;
       },
     }).then(function (ok) {
-      if (_listening) _failing[cid] = !ok;
+      if (typeof _bltMemory === 'function' && _bltMemory(cid).writes !== writes) dropped = true;
+      if (_listening && !dropped) _failing[cid] = !ok;
     });
   }
 

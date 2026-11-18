@@ -128,6 +128,41 @@ test('the answer comes late: no slot at first, then the row is drawn once, and n
   expect(await page.evaluate(() => window.__renders)).toBe(1);
 });
 
+test('the answer comes late while files are held over the Inbox: the cover stays, and the row is drawn once the drag ends', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await page.goto('/dashboard');
+  await page.locator('.dash-row').waitFor();
+  await page.waitForTimeout(1500);
+  // The Inbox's drop cover, as dash-inbox-drop.js leaves it during a drag (shown by clearing `hidden`).
+  await page.evaluate(() => {
+    const cover = document.createElement('div');
+    cover.className = 'dash-inbox-drop-cover';
+    cover.id = 'late-test-cover';
+    document.querySelector('.dash-row-inbox').appendChild(cover);
+    window.__renders = 0;
+    const render = PageDashboard.render;
+    PageDashboard.render = function () {
+      window.__renders++;
+      return render.apply(this, arguments);
+    };
+    window.__releaseBulletins();
+  });
+  await page.waitForTimeout(2500);
+  await expect(page.locator('.dash-bulletins-tile')).toHaveCount(0);
+  await expect(page.locator('#late-test-cover')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__renders)).toBe(0);
+  // The drag ends: the cover goes, and the row is drawn once with the tile.
+  await page.evaluate(() => {
+    document.getElementById('late-test-cover').hidden = true;
+  });
+  await expect.poll(() => page.locator('.dash-bulletins-tile').count(), { timeout: 6000 }).toBe(1);
+  expect(await page.evaluate(() => window.__renders)).toBe(1);
+  await page.waitForTimeout(2500);
+  expect(await page.evaluate(() => window.__renders)).toBe(1);
+});
+
 test('a list that was read once and then fails keeps its rows and is asked for again only on the 30-second tick', async ({
   page,
 }) => {

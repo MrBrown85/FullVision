@@ -269,7 +269,7 @@ test('with the switch off there is no Bulletins tab and the address opens the Da
   expect(kept).toEqual([]);
 });
 
-test('keyboard focus stays where it was: the menu, a redraw, Cancel and the confirm', async ({ page }) => {
+test('keyboard focus stays where it was: the menu, a redraw, Cancel and the confirm', async ({ page, browserName }) => {
   await open(page);
   const card = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
   const more = card.locator('.bulletin-more-btn');
@@ -279,6 +279,13 @@ test('keyboard focus stays where it was: the menu, a redraw, Cancel and the conf
   await expect(menu).toBeVisible();
   // Focus moves into the menu, and Escape gives it back to the ⋯ button.
   await expect(menu.getByRole('menuitem').first()).toBeFocused();
+  if (browserName === 'chromium') {
+    // Chromium's Tab also walks the items (Safari's skips buttons, which the arrow keys cover below).
+    await page.keyboard.press('Tab');
+    await expect(menu.getByRole('menuitem', { name: 'Pin' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(menu.getByRole('menuitem', { name: 'Edit' })).toBeFocused();
+  }
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(more).toBeFocused();
@@ -311,6 +318,18 @@ test('keyboard focus stays where it was: the menu, a redraw, Cancel and the conf
   await page.locator('.bulletin-bar-open').click();
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.locator('.bulletin-bar-open')).toBeFocused();
+});
+
+test('focus leaving an open menu closes it', async ({ page }) => {
+  await open(page);
+  const card = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
+  await card.locator('.bulletin-more-btn').focus();
+  await page.keyboard.press('Enter');
+  await expect(card.locator('.bulletin-menu')).toBeVisible();
+  // Focus goes elsewhere (what Tab does in Safari): the menu is not left open.
+  await page.locator('.bulletin-bar-open').focus();
+  await expect(card.locator('.bulletin-menu')).toBeHidden();
+  await expect(card.locator('.bulletin-more-btn')).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('a new bulletin glides in (not under Reduce Motion), and nothing fades', async ({ page }) => {

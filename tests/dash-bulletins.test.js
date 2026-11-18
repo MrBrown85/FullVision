@@ -216,6 +216,35 @@ describe('the tile', () => {
       }
     });
 
+    it('a read dropped because the class changed is not a failure: the next draw asks again', async () => {
+      seed('ok');
+      const real = globalThis.refreshBulletins;
+      let asked = 0;
+      globalThis.refreshBulletins = (c, o) => {
+        asked++;
+        if (asked === 1) {
+          D.html('some-other-class'); // the Dashboard moved on before the answer
+          o.stillShown();
+          return Promise.resolve(false);
+        }
+        return Promise.resolve(false);
+      };
+      try {
+        D.html(cid);
+        await Promise.resolve();
+        await Promise.resolve();
+        D.html(cid);
+        expect(asked).toBe(3); // the other class's own ask, then this class again
+        // A real failure still stops the draws asking.
+        await Promise.resolve();
+        await Promise.resolve();
+        D.html(cid);
+        expect(asked).toBe(3);
+      } finally {
+        globalThis.refreshBulletins = real;
+      }
+    });
+
     it('answers late: the row is drawn once more, once, and only when nothing is open', () => {
       const handlers = {};
       document.addEventListener = (t, h) => (handlers[t] = h);
