@@ -290,7 +290,7 @@ test('the view menu is not visible at rest, opens on the pill and closes on Esca
   expect(await hidden()).toBe(true);
   await page.locator('#dash-view-btn-inbox').click();
   expect(await hidden()).toBe(false);
-  await expect(menu.locator('[role="menuitemradio"]')).toHaveCount(1);
+  await expect(menu.locator('[role="menuitemradio"]').first()).toContainText('By Assessment');
   await expect(menu).toContainText('One row per assessment, newest work first.');
   await page.keyboard.press('Escape');
   expect(await hidden()).toBe(true);
