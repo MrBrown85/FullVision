@@ -12,14 +12,14 @@ async function enterDemo(page) {
   await page.waitForURL(/\/dashboard/);
 }
 
-/* Labels of the visible buttons and links filled with the --active blue,
+/* Labels of the visible buttons and links filled with the --active-fill blue,
    outside dialogs. Off-screen elements (the skip link) and ones drawn at
    opacity 0 until hovered (the + between the Sentences card's rows) don't
    count. */
 async function solidPrimaries(page) {
   return page.evaluate(() => {
     const probe = document.createElement('div');
-    probe.style.backgroundColor = 'var(--active)';
+    probe.style.backgroundColor = 'var(--active-fill)';
     document.body.appendChild(probe);
     const blue = getComputedStyle(probe).backgroundColor;
     probe.remove();

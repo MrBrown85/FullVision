@@ -276,10 +276,11 @@ test('clicking a competency in the tile still filters the student cards', async 
 test('with Bulletins on and built the left column splits 60 / 40', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openDashboard(page, { bulletins: true });
-  // Neither module is built yet: define the stub, then draw again.
+  // A stand-in for the tile (the real one is tried in dashboard-bulletins-tile.spec.js): define it, then draw again.
   await page.evaluate(() => {
     window.DashBulletins = {
       html: () => '<section class="dash-recent" id="stub-bulletins"><h2>Bulletins</h2></section>',
+      destroy: () => {},
     };
     PageDashboard.render();
   });
