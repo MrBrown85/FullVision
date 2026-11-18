@@ -2,14 +2,19 @@
    docs/plans/dashboard-inbox-plan.md): one button a piece, drawn as board C
    draws it, a segmented control on the app's .seg track with the chosen piece
    raised. It scrolls sideways inside itself when the pieces do not fit (the
-   switch keeps the chosen one in view). Loaded on its own, so no view depends
-   on another's stylesheet. */
+   switch keeps the chosen one in view). It is never wider than the view it
+   sits in (max-width, min-width), so in a row (Roll Call's head) it scrolls
+   rather than running out of the Inbox and over the Competencies tile, and it
+   never makes the page wider than the window (live, Nov 18: long piece names
+   in a History 12 class). Loaded on its own, so no view depends on another's
+   stylesheet. */
 .dash-inbox-pick {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-self: flex-start;
   gap: 2px;
   box-sizing: border-box;
+  min-width: 0;
   max-width: 100%;
   margin: 0 0 10px;
   padding: 2px;
