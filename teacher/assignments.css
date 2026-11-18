@@ -6820,19 +6820,25 @@ button.grader-member-name {
   background: var(--btn-hover-blue);
 }
 /* In the dialog it is tinted, as the board draws it and as Print is: Done
-   and Return stay the dialog's solid blue buttons. */
+   and Return stay the dialog's solid blue buttons. The Assignments card's
+   Return N Graded is tinted too: + New Assessment is that screen's one
+   solid button (DECISIONS, "Buttons and breadcrumbs"). */
+.assess-return-btn,
 .grader-return-all {
   background: rgba(0, 122, 255, 0.1);
   color: #0062cc;
 }
+.assess-return-btn:hover,
 .grader-return-all:hover {
   background: rgba(0, 122, 255, 0.16);
 }
 @media (prefers-color-scheme: dark) {
+  .assess-return-btn,
   .grader-return-all {
     background: rgba(10, 132, 255, 0.2);
     color: var(--active);
   }
+  .assess-return-btn:hover,
   .grader-return-all:hover {
     background: rgba(10, 132, 255, 0.28);
   }
@@ -9909,10 +9915,6 @@ button.grader-member-name {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-}
-.assess-grade-work-btn {
-  background: var(--active-fill);
-  color: #fff;
 }
 /* The work icon on a student's row (_workIconHtml): See the Work, the
    blue page icon, where work is in; + (Attach Work) where nothing is, quiet

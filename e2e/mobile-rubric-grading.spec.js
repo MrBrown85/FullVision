@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Phone grading by rubric criterion (Rubric Bank plan §5, PR 10). An
    assessment with a rubric of its own opens in Rubric view: one row per
@@ -8,6 +9,8 @@ import { test, expect } from '@playwright/test';
    box of a level writes that level. Runs in Demo Mode on Science 8: the
    Science Fair Proposal uses the Experimental Design Rubric (Standard), the
    Chemical Reactions Lab the Lab Investigation Rubric (Advanced). */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function openLab(page, makeAdvanced, title = 'Chemical Reactions Lab') {
   await page.setViewportSize({ width: 375, height: 812 });

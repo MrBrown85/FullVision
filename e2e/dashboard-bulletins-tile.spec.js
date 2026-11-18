@@ -16,16 +16,16 @@ async function open(page, { oldBulletins = null, oldDashRow = null, questions = 
     },
     [oldBulletins, oldDashRow],
   );
-  // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
-  await page.goto(questions ? '/login.html?student=1' : '/login.html?demo=1');
-  if (questions) await page.locator('#demo-mode-btn').click();
+  // Demo Mode starts the sample class with the Student Page on, however it is entered.
+  await page.goto('/login.html?demo=1');
   await page.waitForURL(/dashboard|teacher-mobile/, { timeout: 15000 });
   // A phone-width window is sent to the phone app at sign-in; the desktop page is opened by its address.
   if (page.viewportSize().width < 600) await page.goto('/dashboard');
   await page.locator('.dash-glance').waitFor();
   if (!questions) {
-    // The Student Page on, but no question waiting: the row then starts higher and is taller than its floor.
+    // The Student Page on, but no question waiting (Reflect on Feedback off): the row then starts higher and is taller than its floor.
     await page.evaluate(() => {
+      setCourseFeedbackOptions(getActiveCourse(), { reflect_on_feedback: false }, _newEntryId());
       setStudentPageSwitch(getActiveCourse(), true, 'on_return');
       PageDashboard.render();
     });

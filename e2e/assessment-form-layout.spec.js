@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { openCompPicker, closeCompPicker } from './helpers.js';
 
 // These tests use the Codes chips; List is the default since Nov 2.
@@ -11,6 +12,8 @@ test.beforeEach(async ({ page }) => {
    Students and More Options (Type; Description sits under the
    title since Nov 2). Every control keeps its id, so saving is as
    before. Demo Mode, Science 8. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function openForm(page) {
   await page.goto('/login.html?demo=1');

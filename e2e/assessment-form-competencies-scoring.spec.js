@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { openCompPicker, closeCompPicker } from './helpers.js';
 import { cardMenuItem } from './card-menu.js';
 
@@ -7,6 +8,8 @@ import { cardMenuItem } from './card-menu.js';
    and −, and no rubric. It saves what proficiency work with no rubric always
    saved (no scoreMode, no rubricId, the tags), so its scores and math are
    today's. Demo Mode, Science 8. */
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function demo(page) {

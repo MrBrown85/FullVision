@@ -351,7 +351,7 @@ window.DashOverview = (function () {
         '<blockquote class="dash-questions-text">' +
         esc(row.text) +
         '</blockquote>' +
-        '<button type="button" class="btn btn-primary dash-questions-answer" data-action="dashAnswerQuestion" data-cid="' +
+        '<button type="button" class="btn dash-questions-answer" data-action="dashAnswerQuestion" data-cid="' +
         esc(row.cid) +
         '" data-aid="' +
         esc(row.a.id) +

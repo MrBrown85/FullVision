@@ -4665,7 +4665,7 @@ function seedDemoRevisions() {
 /* ── Sample bulletins (Bulletins, behind the build switch) ─────────
    Three bulletins for the sample class, from the Bulletins board: a pinned
    reminder linked to Cell Microscope Lab, an announcement with a two-page
-   PDF and reactions, and a Photo of the Board. Who has seen each is the
+   PDF, a link and reactions, and a Photo of the Board. Who has seen each is the
    students' ids, so "Seen by 19 of 27" works; pause one student in Class
    Settings and the count follows. The pictures are drawn, in
    assets/sample-bulletins. Written once per class, the first time Bulletins is
@@ -4742,6 +4742,8 @@ function seedDemoBulletins() {
     kind: 'announcement',
     body: "Read the Cell Theory pages before Thursday's lab. Bring one question.",
     reactions_on: true,
+    link_url: 'https://www.khanacademy.org/science/biology/structure-of-a-cell',
+    link_title: 'Cell Theory Video',
     posted_at: minutesAgo(20),
     created_at: minutesAgo(20),
     updated_at: minutesAgo(20),

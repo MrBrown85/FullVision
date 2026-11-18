@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { cardMenuItem } from './card-menu.js';
 
 /* S2-F1, the review's findings, held in the browser:
@@ -13,6 +14,8 @@ import { cardMenuItem } from './card-menu.js';
    - the Assignments page draws in a holding class whose Draft and Returned
      rows have not loaded, and its Printed marks come back once they load.
    Demo Mode's Science 8; window.print is counted, not opened. */
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 test.use({ viewport: { width: 1440, height: 900 } });
 
 const HELD = { student_page_enabled: true, return_grades: 'on_return' };

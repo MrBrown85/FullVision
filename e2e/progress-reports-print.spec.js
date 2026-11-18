@@ -11,6 +11,9 @@
  * (e2e/report-studio.spec.js); the ones about that editor went with it.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.describe.configure({ mode: 'parallel' });
 

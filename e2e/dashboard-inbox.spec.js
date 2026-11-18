@@ -5,7 +5,10 @@
  * Light Refraction Lab has work waiting.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { FONTS, useFont } from './wide-font.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const LIGHT = 'sci8a21';
 const SHOTS = process.env.FV_SHOTS || '';

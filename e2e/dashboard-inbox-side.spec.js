@@ -6,7 +6,10 @@
  * assessed. There is no Compare view, so no Compare control.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { useFont, WIDE_CSS, HARSH_CSS } from './wide-font.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const LIGHT = 'sci8a21';
 const CELL = 'sci8a1';

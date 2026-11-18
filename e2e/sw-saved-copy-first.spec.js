@@ -374,6 +374,42 @@ test('offline, every page opens from the saved copy as one release', async ({ pa
   expect(errors).toEqual([]);
 });
 
+test('offline, the Demo Inbox draws its thumbnails and Bulletins draws its photo, from the saved copy', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  const errors = watch(page);
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+  // The sample class's pictures are in the install's saved copy.
+  expect(await cachedText(page, '/assets/sample-bulletins/cell-board-1.svg')).toContain('<svg');
+  const saved = await page.evaluate(async () => {
+    const hit = await caches.match('/assets/sample-work/light-lab-marcus-1-thumb.jpg');
+    return !!hit;
+  });
+  expect(saved).toBe(true);
+
+  await context.setOffline(true);
+  server.takeLog();
+  await page.goto(server.origin + '/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await appDrawn(page);
+  const drawn = sel =>
+    page.evaluate(s => [...document.querySelectorAll(s)].map(i => i.complete && i.naturalWidth > 0), sel);
+  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).every(Boolean)).toBe(true);
+
+  await page.goto(server.origin + '/bulletins');
+  await appDrawn(page);
+  await expect(page.locator('.bulletin-post', { hasText: 'Photo of the Board' })).toBeVisible();
+  await expect.poll(async () => (await drawn('.bulletin-thumb')).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('.bulletin-thumb')).every(Boolean)).toBe(true);
+  expect(server.takeLog()).toEqual([]);
+  await context.setOffline(false);
+  expect(errors).toEqual([]);
+});
+
 test('a release while a tab is open: the tab stays on one release until the quiet reload brings the new one', async ({
   page,
 }) => {

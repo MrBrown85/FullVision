@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 // S1-F1: in a class whose student page is on (the hidden build switch) and
 // that returns grades When I Return Them, the gradebook marks each draft
@@ -11,6 +12,8 @@ import { test, expect } from '@playwright/test';
 
 // A piece nobody is graded on yet, added to the Demo class. It is dated
 // today, so with Newest First it is the first column.
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 async function demoWithNewPiece(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });

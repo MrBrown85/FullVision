@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* S5-F1: the assessment form's Student Work card and Class Settings ›
    Student Page's Send Work and how long photos stay, in Demo Mode, behind the
    build switch and Send Work (docs/plans/student-page-build-plan.md S5).
    Board "Teacher: Student Work Settings on an Assessment" and "Teacher:
    Class Settings, Student Page". */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const SHOTS = process.env.NIGHT_SHOTS || '';
 

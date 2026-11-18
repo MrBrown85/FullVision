@@ -4,6 +4,9 @@
  * (evidence drawer, override, goals). Demo Mode, Cece in Science 8.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function openCece(page) {
   await page.goto('/login.html?demo=1');

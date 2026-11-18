@@ -26,6 +26,9 @@ async function openPhone(page, { on = true, clear = [] } = {}) {
     ({ on, clear, LAB }) => {
       const cid = getActiveCourse();
       const a = getAssessments(cid).find(x => x.id === LAB);
+      // Demo Mode starts with the Student Page on. It is turned off while the sample is set up, so
+      // taking a grade off is not a Draft, and turned on again below where the test asks for it.
+      setStudentPageSwitch(cid, false);
       // The sample Lab has every grade returned; the students who sent nothing
       // get theirs taken off too, so they are Not In (GraderWork's count).
       const sentNothing = getStudents(cid)
