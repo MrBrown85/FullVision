@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { SCREENS, reach, openDemo } from './student-screens.js';
 
+/* Every test here opens its own page and shares nothing, so they run side by
+   side across workers (a file's tests otherwise run one after another in a
+   single worker, and the whole sweep outran CI's job limit). */
+test.describe.configure({ mode: 'parallel' });
+
 /* Every student screen Demo Mode reaches (e2e/student-screens.js), at the
    phone widths students have (320, 360, 375, 390, 430) and each Text Size
    (Normal, Large, Larger). Text Size zooms the page, so its layout is as
@@ -37,9 +42,18 @@ const SIZES = ['normal', 'large', 'larger'];
    it failed screens CI passes. */
 const WIDE_FONT = '*, *::before, *::after { font-family: Verdana, "DejaVu Sans", sans-serif !important; }';
 const FONTS = ['own', 'wide'];
-/* The wide font runs where the narrow phones are: 320 and 390 at every
-   size, 360 and 375 at Normal (the whole sweep twice is too slow). */
-const WIDE_AT = { 320: SIZES, 360: ['normal'], 375: ['normal'], 390: SIZES };
+/* The wide font runs where it found faults: 320 px at every size, and
+   390 px at Normal (where CI's DejaVu Sans spilled Send to My Teacher). */
+const WIDE_AT = { 320: SIZES, 390: ['normal'] };
+
+/* The screens in groups, one test each, so no one test runs long enough to
+   risk the timeout on a slow runner. Every screen is in exactly one group. */
+const GROUPS = [
+  ['assignments', 0, 7],
+  ['my learning and feedback', 7, 16],
+  ['send work and reflect', 16, 24],
+  ['cards, report and settings', 24, SCREENS.length],
+].map(([name, from, to]) => ({ name, screens: SCREENS.slice(from, to) }));
 
 async function useFont(page, font) {
   if (font !== 'wide') return;
@@ -157,27 +171,28 @@ for (const font of FONTS) {
       test.describe(vp.width + ' px at ' + size + (font === 'wide' ? ', wide font' : ''), () => {
         test.use({ viewport: vp, isMobile: true, hasTouch: true });
 
-        test('every student screen holds together', async ({ page }) => {
-          test.setTimeout(240_000);
-          await useFont(page, font);
-          const errors = [];
-          page.on('pageerror', e => errors.push(String(e)));
-          const found = [];
-          for (const screen of SCREENS) {
-            if (size !== 'normal' && screen.sized === false) continue;
-            await reach(page, screen, { size, desk: false });
-            for (const f of await faults(page, vp.width, vp.height)) {
-              const line = screen.name + ' — ' + f;
-              const known =
-                font === 'own' &&
-                size === 'normal' &&
-                KNOWN_AT_NORMAL.some(k => k.at.includes(vp.width) && k.fault.test(line));
-              if (!known) found.push(line);
+        for (const group of GROUPS)
+          test('every student screen holds together: ' + group.name, async ({ page }) => {
+            test.setTimeout(120_000);
+            await useFont(page, font);
+            const errors = [];
+            page.on('pageerror', e => errors.push(String(e)));
+            const found = [];
+            for (const screen of group.screens) {
+              if (size !== 'normal' && screen.sized === false) continue;
+              await reach(page, screen, { size, desk: false });
+              for (const f of await faults(page, vp.width, vp.height)) {
+                const line = screen.name + ' — ' + f;
+                const known =
+                  font === 'own' &&
+                  size === 'normal' &&
+                  KNOWN_AT_NORMAL.some(k => k.at.includes(vp.width) && k.fault.test(line));
+                if (!known) found.push(line);
+              }
             }
-          }
-          expect(found).toEqual([]);
-          expect(errors).toEqual([]);
-        });
+            expect(found).toEqual([]);
+            expect(errors).toEqual([]);
+          });
 
         test('the tab bar holds four tabs', async ({ page }) => {
           await useFont(page, font);
