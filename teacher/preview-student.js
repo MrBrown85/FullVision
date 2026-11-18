@@ -18,8 +18,10 @@
    same kind of view. Its three tabs, Outstanding and Upcoming, My
    Learning's list and each piece's card answer presses here as they do on
    the phone (StudentPageView.press); what the student chose to look at is
-   kept while the preview is open. Nothing that would reach the network
-   (Log Out, Your Classes) does anything here.
+   kept while the preview is open. Settings (the gear) opens as it does
+   on the phone, and its Text Size draws the page bigger here too; nothing
+   that would reach the network (Log Out, Add Another Card) does anything
+   here, and Switch Class is not listed (a preview is one class).
 
    Not ready: a signed-in class whose Draft and Returned rows have not
    loaded draws "Loading this class…" in the device. When the rows load the
@@ -307,6 +309,9 @@ window.PreviewStudent = (function () {
         if (typeof HandoutViewer !== 'undefined' && HandoutViewer.isOpen()) return;
         e.preventDefault();
         e.stopPropagation();
+        // Escape over the student page's Settings or Log Out? closes that, as on the student's device.
+        var ui = _open.ui || {};
+        if (ui.logout || ui.settings) return _press(ui.logout ? 'logout-cancel' : 'settings-close', null);
         close();
       } else if (e.key === 'Tab') {
         var box = _overlay();
@@ -390,6 +395,8 @@ window.PreviewStudent = (function () {
       return _loadHandout(out.handout.resource);
     }
     _drawScreen(out.focus);
+    // Settings slides in on the drawing that opens it, as on the student's device.
+    if (out.slide && _overlay()) StudentPageView.slideIn(_overlay());
   }
 
   /* ── A handout file (a web page, a text file or an EPUB) ───── */

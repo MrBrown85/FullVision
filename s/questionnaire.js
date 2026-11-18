@@ -1150,7 +1150,11 @@
     list.querySelectorAll('li[data-rank]').forEach(function (li) {
       var was = before[li.getAttribute('data-rank')];
       if (was == null || typeof li.getBoundingClientRect !== 'function') return;
-      var dy = was - li.getBoundingClientRect().top;
+      var now = li.getBoundingClientRect();
+      /* The screen's pixels to the row's own: at a Text Size the page is
+         zoomed, and a transform is drawn at the zoom (1 when not zoomed). */
+      var scale = li.offsetHeight > 0 && now.height > 0 ? now.height / li.offsetHeight : 1;
+      var dy = (was - now.top) / scale;
       if (!dy) return;
       li.style.transition = 'none';
       li.style.transform = 'translateY(' + dy + 'px)';

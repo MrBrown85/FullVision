@@ -19,6 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CARD_ROUTES, cardReply } from '../supabase/functions/student-submit/card-routes.ts';
+import { SENT as B, makeBulletinRoutes } from '../supabase/functions/student-submit/bulletin-routes.ts';
 
 const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const SQL = ['migrations/2026110902_grade_return.sql', 'migrations/2026110904_student_sessions_page.sql']
@@ -364,5 +365,94 @@ describe('the phone is given exactly what the SQL sends', () => {
   it('seen and done say only what the SQL says', () => {
     expect(cardReply(CARD_ROUTES.seen, { ok: true, seen: 2, made_up: 'LEAK' })).toEqual({ ok: true, seen: 2 });
     expect(cardReply(CARD_ROUTES.done, { ok: true, made_up: 'LEAK' })).toEqual({ ok: true });
+  });
+});
+
+/* Bulletins (migrations/2026111803_bulletins_student.sql, not applied yet;
+   the routes are supabase/functions/student-submit/bulletin-routes.ts).
+   The same two checks: the lists the routes copy are the keys the SQL
+   builds, level by level, and a reply holding every one of them and a
+   made-up key beside each comes out as exactly the first. */
+describe('bulletins: the routes copy exactly the keys the SQL builds', () => {
+  const M2 = read('migrations/2026111803_bulletins_student.sql');
+  const m2Objects = name => {
+    const at = M2.lastIndexOf('create or replace function ' + name + '(');
+    expect(at, name).toBeGreaterThan(-1);
+    const open = M2.indexOf('$function$', at);
+    const text = M2.slice(open, M2.indexOf('$function$;', open)).replace(/--.*$/gm, '');
+    const found = [];
+    let i = -1;
+    while ((i = text.indexOf('jsonb_build_object(', i + 1)) >= 0) {
+      const list = args(text, i + 'jsonb_build_object('.length);
+      found.push(list.filter((_, n) => n % 2 === 0).map(k => /^'([a-z0-9_]+)'$/.exec(k)[1]));
+    }
+    return found;
+  };
+  const REFUSAL = ['ok', 'error'];
+
+  it('each function builds these objects, in this order, and no others', () => {
+    expect(m2Objects('student_submit.bulletins')).toEqual([REFUSAL, B.bulletins, B.bulletin, B.file, B.fresh]);
+    expect(m2Objects('student_submit.bulletin_seen')).toEqual([REFUSAL, REFUSAL, B.seen]);
+    expect(m2Objects('student_submit.bulletin_react')).toEqual([REFUSAL, REFUSAL, REFUSAL, REFUSAL, B.react]);
+    // The phone is given the links in place of the bucket and the paths.
+    const links = m2Objects('student_submit.bulletin_file_links');
+    expect(links).toHaveLength(4);
+    expect(links.slice(0, 2)).toEqual([REFUSAL, REFUSAL]);
+    expect(links[2]).toContain('bucket');
+    expect(links[2].filter(k => k !== 'bucket')).toEqual(B.fileLinks);
+    expect(links[3]).toEqual(['page', 'path']);
+    expect(B.page).toEqual(['page', 'url']);
+    // The shared rule answers a boolean and builds nothing.
+    expect(m2Objects('student_submit._bulletin_visible')).toEqual([]);
+  });
+
+  it('a reply with a made-up key at every level comes out with exactly the SQL’s keys', async () => {
+    const extra = v => {
+      if (Array.isArray(v)) return v.map(extra);
+      if (!v || typeof v !== 'object') return v;
+      const out = { made_up: 'LEAK', seen: 9, can_see: 26 };
+      for (const [k, inner] of Object.entries(v)) out[k] = extra(inner);
+      return out;
+    };
+    const FEED = {
+      ok: true,
+      bulletins: [
+        {
+          id: U(1),
+          kind: 'reminder',
+          body: 'Field trip forms are due Friday.',
+          link_url: null,
+          link_title: null,
+          pinned: true,
+          pinned_until: '2026-11-20',
+          assessment_id: U(2),
+          reactions_on: true,
+          posted_at: AT,
+          edited_at: AT,
+          files: [{ id: U(3), kind: 'pdf', title: 'Form', page_count: 2, position: 1 }],
+          seen_at: null,
+          reaction: 'done',
+        },
+      ],
+      new: [{ enrollment_id: U(4), count: 1 }],
+    };
+    const route = makeBulletinRoutes({ db: { call: async () => extra(FEED) }, store: null });
+    const r = await route('bulletins', { session: 'a'.repeat(64), enrollment_id: U(4) }, 'h');
+    expect(r.body).toEqual(FEED);
+    expect(JSON.stringify(r.body)).not.toMatch(/LEAK|made_up|can_see/);
+    for (const [name, said, want] of [
+      ['bulletin-seen', { ok: true, seen: 1 }, { ok: true, seen: 1 }],
+      ['bulletin-react', { ok: true, reaction: 'done' }, { ok: true, reaction: 'done' }],
+    ]) {
+      const one = makeBulletinRoutes({ db: { call: async () => extra(said) }, store: null });
+      const body = {
+        session: 'a'.repeat(64),
+        enrollment_id: U(4),
+        bulletin_ids: [U(1)],
+        bulletin_id: U(1),
+        word: 'done',
+      };
+      expect((await one(name, body, 'h')).body).toEqual(want);
+    }
   });
 });

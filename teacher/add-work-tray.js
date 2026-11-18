@@ -163,7 +163,7 @@
   function create(host) {
     var _seq = 0;
     /** @type {any[]} */
-    var items = []; // { id, from, pages, url, match, why, said, refused, picking, query, note }
+    var items = []; // { id, from, pages, url, match, why, said, refused, picking, query, say, note }
     var queue = [];
     /** @type {Promise<void> | null} */
     var working = null;
@@ -272,24 +272,26 @@
 
     function _one(file) {
       var name = _fileName(file);
-      var m = _match(name);
       return AddWorkFiles.prepare([file]).then(
         function (got) {
           if (!host.alive()) return;
           done++;
           if (got.said || !got.pages.length) return _refused(name, got.said);
+          // Matched once read, against the classes on the page now (a second may have come).
+          var m = _match(name);
+          // byName: placed or held by the app from its name, not by the teacher.
           if (m.kind === 'one') {
-            var res = host.place([{ sid: m.sid, from: name, pages: got.pages }])[0];
+            var res = host.place([{ sid: m.sid, from: name, pages: got.pages, byName: true }])[0];
             if (res && res.ok) return;
             hold(
               name,
               got.pages,
               m,
               res && res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '',
-            );
+            ).byName = true;
             return;
           }
-          hold(name, got.pages, m);
+          hold(name, got.pages, m).byName = true;
         },
         function () {
           if (!host.alive()) return;
@@ -447,6 +449,31 @@
       return out;
     }
 
+    /* The classes on the page changed (B6): each file waiting by its name is
+       matched again, so what it says is true. With `place` (a second class
+       came), a certain one goes on its student, as if it were dropped now,
+       unless it went back from a student (noAuto); the rest wait, saying
+       why. Without (the second class left), nothing is placed.
+       → how many were placed. */
+    function again(place) {
+      var went = 0;
+      items.slice().forEach(function (item) {
+        if (!item.byName || item.refused) return;
+        var m = _match(item.from);
+        item.match = m;
+        // A note on the old match (no room left on that student) is not this one's.
+        if (m.kind !== 'one') item.note = '';
+        if (m.kind !== 'one' || !place || item.noAuto) return;
+        var res =
+          host.place([{ sid: m.sid, from: item.from, pages: item.pages, url: item.url, byName: true }])[0] || {};
+        if (res.ok) {
+          _drop(item);
+          went++;
+        } else item.note = res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '';
+      });
+      return went;
+    }
+
     /* ── Placing from the tray ── */
     function _rect(id) {
       var el = document.querySelector('.awt-item[data-awt-item="' + id + '"]');
@@ -467,7 +494,10 @@
       if (!item || item.refused || host.busy()) return false;
       var focus = _nextKey(id);
       var before = _rect(id);
-      var res = host.place([{ sid: sid, from: item.from, pages: item.pages, url: item.url }])[0] || {};
+      var res =
+        host.place([
+          { sid: sid, from: item.from, pages: item.pages, url: item.url, forCid: item.forCid, forAid: item.forAid },
+        ])[0] || {};
       if (!res.ok) {
         item.note = res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '';
         item.picking = false;
@@ -556,8 +586,26 @@
         esc(item.id) +
         '">' +
         _optionsHtml(item) +
-        '</ul></div>'
+        '</ul>' +
+        // Said when Return found more than one student: the teacher picks.
+        '<span class="awt-why is-note" role="status" data-awt-say="' +
+        esc(item.id) +
+        '">' +
+        esc(item.say || '') +
+        '</span></div>'
       );
+    }
+
+    /* Return in Choose a Student found more than one student (the same
+       name, the same name in each class, or a surname they share): nothing
+       is placed and the list stays open (rule 9). → the plain sentence. */
+    function _sayMany(hits) {
+      var name = host.name(hits[0].id);
+      var same = hits.every(function (st) {
+        return NameMatch.plain(host.name(st.id)).toLowerCase() === NameMatch.plain(name).toLowerCase();
+      });
+      if (!same) return 'More than one student could fit. Choose one.';
+      return (hits.length === 2 ? 'Two students' : hits.length + ' students') + ' are named ' + name + '. Choose one.';
     }
 
     function _btn(cls, what, item, label, extra, lead) {
@@ -594,7 +642,10 @@
         html += _btn('awt-act is-quiet', 'else', item, 'Someone Else');
         return '<div class="awt-acts">' + html + '</div>';
       }
-      if (m.kind === 'close' && !item.picking) {
+      /* One student, but not placed (matched again when the classes changed):
+         offered as a close spelling is, never taken. A file with no room on
+         that student (its note) is not offered there again. */
+      if ((m.kind === 'close' || (m.kind === 'one' && !item.note)) && !item.picking) {
         var first = host.first(m.sid);
         return (
           '<span class="awt-ask">' +
@@ -772,12 +823,14 @@
       });
       item.picking = true;
       item.query = '';
+      item.say = '';
       host.draw({ focus: 'awt-find:' + item.id });
     }
 
     function _closePicker(item) {
       item.picking = false;
       item.query = '';
+      item.say = '';
       host.draw({ focus: 'awt-lead:' + item.id });
     }
 
@@ -823,6 +876,9 @@
       var item = id && _waitingItem(id);
       if (!item) return false;
       item.query = String(el.value || '');
+      item.say = '';
+      var say = document.querySelector('[data-awt-say="' + id + '"]');
+      if (say) say.textContent = '';
       var list = document.querySelector('.awt-options[data-awt-options="' + id + '"]');
       // html-safe: _optionsHtml escapes every name; ids are ours
       if (list) list.innerHTML = _optionsHtml(item);
@@ -846,7 +902,7 @@
     }
 
     /* Keys inside an open Choose a Student: arrows move through the list,
-       Return takes the first student found, Escape closes it. → true when
+       Return takes the student found when only one is, Escape closes it. → true when
        the tray took the key. */
     function keydown(e) {
       var el = /** @type {any} */ (document.activeElement);
@@ -881,7 +937,15 @@
       if (e.key === 'Enter' && at < 0 && el.classList.contains('awt-find')) {
         e.preventDefault();
         // An empty box lists the whole class: Return takes no one until a name is typed.
-        if (String(el.value || '').trim() && options.length) placeItem(item.id, options[0].getAttribute('data-sid'));
+        if (!String(el.value || '').trim()) return true;
+        var hits = _optionHits(item);
+        if (hits.length === 1) placeItem(item.id, hits[0].id);
+        else if (hits.length > 1) {
+          // Never the first of several (rule 9): the list stays, and says why.
+          item.say = _sayMany(hits);
+          var say = picker.querySelector('[data-awt-say]');
+          if (say) say.textContent = item.say;
+        }
         return true;
       }
       return false;
@@ -893,6 +957,13 @@
       takeDrop: takeDrop,
       hasFolder: hasFolder,
       placeOrHold: placeOrHold,
+      // Two classes (B6): a name matched as a drop is; a placed file held again.
+      match: _match,
+      // more: { byName, noAuto, forCid, forAid } (a For choice the teacher made).
+      hold: function (from, pages, m, more) {
+        Object.assign(hold(from, pages, m), more || {});
+      },
+      again: again,
       placeItem: placeItem,
       remove: remove,
       release: release,

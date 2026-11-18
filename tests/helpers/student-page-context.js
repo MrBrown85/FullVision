@@ -236,7 +236,8 @@ export function openStudentPage(opts = {}) {
   pageNow = () => vm.runInContext('Date.now()', ctx);
   const append = document.head.appendChild.bind(document.head);
   document.head.appendChild = el => {
-    const src = el && el.tagName === 'SCRIPT' ? el.getAttribute('src') : null;
+    // A retry's address (?retry=1, s/app.js) is the same file.
+    const src = el && el.tagName === 'SCRIPT' ? (el.getAttribute('src') || '').replace(/\?.*$/, '') || null : null;
     if (!src) return append(el);
     fetched.push(src);
     pending += 1;

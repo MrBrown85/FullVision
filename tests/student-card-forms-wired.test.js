@@ -251,7 +251,10 @@ describe('nothing outlasts the session', () => {
     await new Promise(r => setTimeout(r, 450)); // the draft is kept once the student pauses
     expect(Object.keys(page.tab)).toEqual(['fv-s-card-drafts']);
     await page.click('[data-act="back"]');
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     expect(page.tab).toEqual({});
     expect(page.T.state().realForms).toBeNull();
