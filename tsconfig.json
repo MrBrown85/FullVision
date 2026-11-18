@@ -51,6 +51,8 @@
     "teacher/cm-grading-bars.js",
     "teacher/dash-competencies.js",
     "teacher/dash-recent.js",
+    "teacher/dash-inbox-model.js",
+    "teacher/dash-inbox.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",
     "teacher/student-page-students.js",

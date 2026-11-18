@@ -241,8 +241,12 @@ window.DashOverview = (function () {
         parts.push('<span class="dash-glance-old dash-obs-when is-overdue">Oldest ' + days + ' Days</span>');
       if (asked) parts.push('<b>' + asked + '</b> ' + (asked === 1 ? 'Question' : 'Questions'));
     }
+    // With the Inbox on the page a click goes to it (DashInbox.click); the link stays for a new tab.
+    var toInbox = rowOn() && !!window.DashInbox;
     return (
-      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0" data-href="' +
+      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0"' +
+      (toInbox ? ' data-dash-inbox-jump="1"' : '') +
+      ' data-href="' +
       esc('/assignments?course=' + (cid || '') + '&show=tograde') +
       '" aria-label="' +
       esc(
@@ -252,7 +256,7 @@ window.DashOverview = (function () {
           c.toreturn +
           ' not returned' +
           (asked ? ', ' + asked + (asked === 1 ? ' question' : ' questions') : '') +
-          ': open Assignments',
+          (toInbox ? ': go to the Inbox' : ': open Assignments'),
       ) +
       '">' +
       '<span class="dash-glance-label">To Grade</span>' +
