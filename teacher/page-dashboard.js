@@ -64,7 +64,6 @@ window.PageDashboard = (function () {
     _writePref(COMP_VIEW_KEY + activeCourse, view);
     mixPop = null;
   };
-  // Inbox: the view, per class on this device (DashInbox has the list).
   _viewSetters.inbox = function (key) {
     if (window.DashInbox) DashInbox.setView(activeCourse, key);
   };
@@ -146,7 +145,6 @@ window.PageDashboard = (function () {
 
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
-    // The Inbox's look at the class being left is kept (the time "new" counts from).
     if (window.DashInbox && activeCourse && activeCourse !== cid) DashInbox.leave(activeCourse);
     activeCourse = cid;
     obsHighlight = null;
@@ -1052,18 +1050,12 @@ window.PageDashboard = (function () {
     });
   }
 
-  // A dialog opened from the Inbox closed: draw again if this page is still the one shown.
-  function _redrawIfShown() {
-    if (document.querySelector('#main .dash-glance')) render();
-  }
-
   function _handleClick(e) {
     // A click outside the open segment list closes it.
     if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
     // A click outside the open view menu (and not on its pill) closes it.
     if (openMenu && !e.target.closest('.dash-view-menu, .dash-view-btn')) _closeViewMenu();
-    // The Inbox's own clicks, and the top bar's To Grade cell going to it.
-    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: _redrawIfShown })) return;
+    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render })) return;
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;

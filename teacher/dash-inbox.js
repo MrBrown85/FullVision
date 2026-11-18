@@ -532,15 +532,19 @@ window.DashInbox = (function () {
     if (!el || !document.getElementById('dash-inbox')) return false;
     var cid = ctx.cid;
     var aid = el.getAttribute('data-aid');
+    // A dialog from the tile closed: draw again if the Dashboard is still the page shown.
+    var redraw = function () {
+      if (document.querySelector('#main .dash-glance')) ctx.redraw();
+    };
     if (el.getAttribute('data-dash-inbox') === 'wall') {
-      if (window.WorkWall) WorkWall.open(cid, aid, { onClose: ctx.redraw });
+      if (window.WorkWall) WorkWall.open(cid, aid, { onClose: redraw });
       return true;
     }
     if (el.getAttribute('data-dash-inbox') === 'grade') {
       var p = _piece(aid);
       var order = p ? p.gradeOrder : [];
       if (!order.length || !window.PageAssignments || !PageAssignments.openGrader) return true;
-      PageAssignments.openGrader(cid, aid, order[0], { studentIds: order, show: 'tograde', onClose: ctx.redraw });
+      PageAssignments.openGrader(cid, aid, order[0], { studentIds: order, show: 'tograde', onClose: redraw });
       return true;
     }
     return false;
