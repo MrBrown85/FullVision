@@ -69,6 +69,7 @@
     "s/question-kinds.js",
     "s/page-carousel.js",
     "teacher/cm-reflect-answers.js",
+    "teacher/question-cards.js",
     "teacher/cm-reflect-builder.js",
     "shared/add-work-files.js",
     "shared/name-match.js",

@@ -307,6 +307,7 @@ load('vendor/qrcode.js');
 load('shared/questionnaire-templates.js');
 load('shared/questionnaires.js');
 load('teacher/qr-slips.js');
+load('teacher/question-cards.js');
 load('teacher/cm-questionnaires.js');
 load('teacher/student-cards.js');
 load('teacher/student-page-students.js');
