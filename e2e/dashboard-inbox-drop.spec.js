@@ -10,6 +10,8 @@
  * call as a drop on that page; nothing is saved until Add Work is pressed.
  */
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 const LIGHT = 'sci8a21';
 const CELL = 'sci8a1';
@@ -537,4 +539,122 @@ test('dragenter accepts files at once, so a release in the first instant still d
   // Straight to the drop, with no dragover between.
   expect(await drag(page, '.dash-inbox-row', 'drop')).toBe(true);
   for (const s of two) await expect(chips(page, s.id)).toHaveText(s.name, { timeout: 20000 });
+});
+
+/* Real drops. Chromium's own drag (Input.dispatchDragEvent over CDP) carries
+   files from disk the way a drag from Finder does: the browser's own
+   protected DataTransfer, and a file box takes it with no script. */
+const SAMPLE_PHOTO = path.resolve(__dirname, '../assets/sample-work/cell-lab-cece-1.jpg');
+async function realDrop(page, locator, file) {
+  const box = await locator.boundingBox();
+  const x = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
+  const cdp = await page.context().newCDPSession(page);
+  const data = { items: [], files: [file], dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, x, y, data });
+  await cdp.detach();
+}
+
+test('a real drop of a photo on the tile opens Add Work with it placed', async ({ page }) => {
+  await open(page);
+  // A copy named for a student with nothing in for Light Refraction Lab.
+  const st = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const a = getAssessments(cid).find(x => x.id === 'sci8a21');
+    const s = AddWorkClass.students(cid, a).find(x => !getStudentSubmission(cid, x.id, 'sci8a21'));
+    return { id: s.id, name: displayNameFirst(s) + ' ' + s.lastName };
+  });
+  const dir = test.info().outputPath('drop');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, st.name + '.jpg');
+  fs.copyFileSync(SAMPLE_PHOTO, file);
+  await realDrop(page, page.locator('.dash-inbox-row').first(), file);
+  await expect(chips(page, st.id)).toHaveText(st.name + '.jpg', { timeout: 20000 });
+  expect(await coverShown(page)).toBe(false);
+});
+
+test('a real drop on the top bar is refused: the page stays', async ({ page }) => {
+  await open(page);
+  const url = page.url();
+  await realDrop(page, page.locator('.dash-glance'), SAMPLE_PHOTO);
+  await page.waitForTimeout(300);
+  expect(page.url()).toBe(url);
+  await expect(page.locator('#dash-inbox')).toBeVisible();
+});
+
+test('the grader opened over the Dashboard still takes a photo dropped on its Choose Files', async ({ page }) => {
+  await open(page);
+  const sid = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const a = getAssessments(cid).find(x => x.id === 'sci8a21');
+    const s = AddWorkClass.students(cid, a).find(x => !getStudentSubmission(cid, x.id, 'sci8a21'));
+    PageAssignments.openGrader(cid, 'sci8a21', s.id, {});
+    return s.id;
+  });
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog.locator('.grader-addwork')).toBeVisible();
+  // The tile is still on the page behind the grader.
+  await expect(page.locator('#dash-inbox')).toHaveCount(1);
+  await realDrop(page, dialog.locator('.grader-work-files'), SAMPLE_PHOTO);
+  await expect(dialog.locator('.grader-work-at')).toHaveText('Page 1 of 1', { timeout: 15000 });
+  const n = await page.evaluate(
+    sid => (getStudentSubmission(getActiveCourse(), sid, 'sci8a21') || { files: [] }).files.length,
+    sid,
+  );
+  expect(n).toBe(1);
+});
+
+// Counts the drag and drop listeners on the document, as added and taken off.
+const COUNT_LISTENERS = () => {
+  const live = new Set();
+  const add = EventTarget.prototype.addEventListener;
+  const remove = EventTarget.prototype.removeEventListener;
+  const key = (t, type, fn, o) =>
+    type + '|' + (typeof o === 'boolean' ? o : !!(o && o.capture)) + '|' + (fn && (fn.__k || (fn.__k = Math.random())));
+  EventTarget.prototype.addEventListener = function (type, fn, o) {
+    if (this === document && (type === 'dragover' || type === 'drop')) live.add(key(this, type, fn, o));
+    return add.call(this, type, fn, o);
+  };
+  EventTarget.prototype.removeEventListener = function (type, fn, o) {
+    if (this === document && (type === 'dragover' || type === 'drop')) live.delete(key(this, type, fn, o));
+    return remove.call(this, type, fn, o);
+  };
+  window.__dragListeners = () => {
+    const out = { dragover: 0, drop: 0 };
+    live.forEach(k => out[k.split('|')[0]]++);
+    return out;
+  };
+};
+
+async function classSettingsListeners(page, flag) {
+  await page.addInitScript(COUNT_LISTENERS);
+  await open(page, { flag });
+  await page.getByRole('button', { name: 'Class Settings' }).first().click();
+  await page.locator('[data-action="cmRestoreBackup"]').waitFor();
+  await page.waitForTimeout(100);
+  return page.evaluate(() => window.__dragListeners());
+}
+
+test('in Class Settings the drag and drop listeners are the same as with the switch off', async ({ browser }) => {
+  const on = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const off = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const withTile = await classSettingsListeners(on, true);
+  const without = await classSettingsListeners(off, false);
+  expect(withTile).toEqual(without);
+  await on.close();
+  await off.close();
+});
+
+test("Restore from Backup's file box still takes a dropped file with the switch on", async ({ page }) => {
+  await open(page);
+  await page.getByRole('button', { name: 'Class Settings' }).first().click();
+  await page.locator('[data-action="cmRestoreBackup"]').click();
+  const box = page.locator('#cm-restore-file');
+  await expect(box).toBeVisible();
+  const dir = test.info().outputPath('backup');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'class-backup.json');
+  fs.writeFileSync(file, '{}');
+  await realDrop(page, box, file);
+  await expect.poll(() => box.evaluate(el => el.files.length)).toBe(1);
 });

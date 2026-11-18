@@ -7,7 +7,7 @@
  * title told apart. Demo Mode, Science 8, the student page and Send Work on.
  */
 import './setup.js';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { runInThisContext } from 'vm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
@@ -221,8 +221,11 @@ describe('drags around the tile', () => {
 
   it('a file let go just outside the tile is refused, not opened by the browser', () => {
     const doc = mountTile();
+    // linkedom lays nothing out: the tile counts as on screen.
+    doc.getElementById('dash-inbox').getClientRects = () => [{}];
+    const main = doc.getElementById('main');
     const out = doc.createElement('div');
-    doc.body.appendChild(out);
+    main.appendChild(out);
     const dt = files();
     const over = dragEvent(doc, 'dragover', dt);
     out.dispatchEvent(over);
@@ -237,10 +240,35 @@ describe('drags around the tile', () => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     });
-    doc.body.appendChild(zone);
+    main.appendChild(zone);
     const dt2 = files();
     zone.dispatchEvent(dragEvent(doc, 'dragover', dt2));
     expect(dt2.dropEffect).toBe('copy');
+    // A file box takes a drop with no script: never touched, nor its label, nor a dialog or overlay.
+    const boxes = doc.createElement('div');
+    boxes.innerHTML =
+      '<input type="file" id="f1"><label id="l1">Choose Files<input type="file"></label>' +
+      '<div role="dialog"><p id="d1">x</p></div><div class="grader-overlay"><p id="o1">x</p></div>';
+    main.appendChild(boxes);
+    for (const id of ['f1', 'l1', 'd1', 'o1']) {
+      for (const type of ['dragover', 'drop']) {
+        const ev = dragEvent(doc, type, files());
+        doc.getElementById(id).dispatchEvent(ev);
+        expect(ev.defaultPrevented, id + ' ' + type).toBe(false);
+      }
+    }
+    // Outside the Dashboard's page (#main): left alone.
+    const away = doc.createElement('div');
+    doc.body.appendChild(away);
+    const ev = dragEvent(doc, 'drop', files());
+    away.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    // The tile off screen: nothing refused.
+    doc.getElementById('dash-inbox').getClientRects = () => [];
+    const hid = dragEvent(doc, 'drop', files());
+    out.dispatchEvent(hid);
+    expect(hid.defaultPrevented).toBe(false);
+    doc.getElementById('dash-inbox').getClientRects = () => [{}];
     // Once the Dashboard is left nothing of this stays on the page.
     DashInboxDrop.leave(CID);
     const after = dragEvent(doc, 'dragover', files());
@@ -264,20 +292,67 @@ describe('drags around the tile', () => {
     expect(open).toHaveBeenCalledTimes(1);
   });
 
+  it('a page drag whose end is never heard does not switch the tile off', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const doc = mountTile();
+    const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
+    const row = doc.querySelector('.dash-inbox-row');
+    // A drag from the page whose dragend never comes.
+    row.dispatchEvent(new doc.defaultView.Event('dragstart', { bubbles: true }));
+    // While it goes on its source hears `drag`, and files are not taken.
+    vi.setSystemTime(Date.now() + 400);
+    row.dispatchEvent(new doc.defaultView.Event('drag', { bubbles: true }));
+    vi.setSystemTime(Date.now() + 400);
+    const during = dragEvent(doc, 'dragenter', files());
+    row.dispatchEvent(during);
+    expect(during.defaultPrevented).toBe(false);
+    // Then nothing: the next file drag from outside the window is taken.
+    vi.setSystemTime(Date.now() + 1000);
+    const next = dragEvent(doc, 'dragenter', files());
+    row.dispatchEvent(next);
+    expect(next.defaultPrevented).toBe(true);
+    row.dispatchEvent(dragEvent(doc, 'drop', files()));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('a mouse move, a press or a new draw also ends a page drag never heard to end', () => {
+    const win = new EventTarget();
+    const was = { add: window.addEventListener, remove: window.removeEventListener };
+    window.addEventListener = win.addEventListener.bind(win);
+    window.removeEventListener = win.removeEventListener.bind(win);
+    try {
+      for (const end of ['mousemove', 'pointerdown', 'draw']) {
+        let doc = mountTile();
+        doc.querySelector('.dash-inbox-row').dispatchEvent(new doc.defaultView.Event('dragstart', { bubbles: true }));
+        if (end === 'draw') doc = mountTile();
+        else win.dispatchEvent(new Event(end));
+        const ev = dragEvent(doc, 'dragenter', files());
+        doc.querySelector('.dash-inbox-row').dispatchEvent(ev);
+        expect(ev.defaultPrevented, end).toBe(true);
+      }
+    } finally {
+      DashInboxDrop.leave(CID);
+      window.addEventListener = was.add;
+      window.removeEventListener = was.remove;
+    }
+  });
+
   it('every Inbox picture is drawn not draggable', () => {
     const html = DashInbox.html(CID);
     const imgs = html.match(/<img [^>]*>/g) || [];
     expect(imgs.length).toBeGreaterThan(0);
     imgs.forEach(i => expect(i).toContain('draggable="false"'));
-    // Every view's own pictures too: each <img written in an Inbox file says it.
-    for (const f of ['teacher/dash-inbox.js', 'teacher/dash-inbox-side.js', 'teacher/dash-inbox-pick.js']) {
-      let src = '';
-      try {
-        src = readFileSync(f, 'utf-8');
-      } catch (e) {
-        continue;
-      }
+    // Every view's own pictures too, each Inbox file in the folder (Flip
+    // Through and Roll Call included when they come): each <img says it, and
+    // so does every picture made with createElement('img').
+    const inbox = readdirSync('teacher').filter(f => /^dash-inbox.*\.js$/.test(f));
+    expect(inbox).toContain('dash-inbox.js');
+    for (const f of inbox) {
+      const src = readFileSync('teacher/' + f, 'utf-8');
       (src.match(/<img [^>]*/g) || []).forEach(i => expect(i, f).toContain('draggable="false"'));
+      const made = (src.match(/createElement\(['"]img['"]\)/g) || []).length;
+      const told = (src.match(/draggable\s*=\s*false|setAttribute\(['"]draggable['"]/g) || []).length;
+      expect(told, f).toBeGreaterThanOrEqual(made);
     }
   });
 

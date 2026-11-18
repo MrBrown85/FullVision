@@ -58,8 +58,15 @@ window.DashInboxDrop = (function () {
   var _drawn = null;
   // dragenter less dragleave on the tile: crossing a child is +1 then -1.
   var _depth = 0;
-  // A drag that began on this page (a picture, a card): never files.
+  /* A drag that began on this page (a picture, a card): never files. The
+     browser sends `drag` to its source all through such a drag, so one not
+     heard from for INNER_MS is over even if its end was never heard. */
   var _inner = false;
+  var _innerAt = 0;
+  var INNER_MS = 500;
+  // Watches #main so a page drawn without the tile (Class Settings) lets go of the listeners.
+  /** @type {MutationObserver | null} */
+  var _watch = null;
 
   /* ── Which pieces ──────────────────────────────────────── */
   /** @param {string} cid @param {any} a */
@@ -401,6 +408,7 @@ window.DashInboxDrop = (function () {
   /** Files from the computer, not a picture dragged from this page.
    * @param {any} e */
   function _fromOutside(e) {
+    if (_inner && Date.now() - _innerAt > INNER_MS) _inner = false;
     return !_inner && hasFiles(e);
   }
 
@@ -479,21 +487,42 @@ window.DashInboxDrop = (function () {
     AW.open(cid, t.aid, { drop: e.dataTransfer, onClose: _redraw });
   }
 
-  /* Elsewhere on the page: a file let go near the tile is refused rather
-     than opened by the browser in place of the app. Overlays and drop places
-     that take files say so first (preventDefault), and are left alone. */
+  /* Elsewhere on the Dashboard's own page: a file let go near the tile is
+     refused rather than opened by the browser in place of the app. Only the
+     page's surface (#main) behind everything else: a file box, its label, a
+     dialog or an overlay (the grader, Add Work, the Work Wall, Restore from
+     Backup) is never touched, and neither is a place that took the drag
+     itself first (preventDefault). Only while the tile is on screen. */
+  var LEAVE_ALONE =
+    'input[type="file"], label, dialog, [role="dialog"], [aria-modal="true"], .confirm-overlay, [class*="-overlay"]';
+  /** @param {DragEvent} e */
+  function _refuses(e) {
+    if (!_fromOutside(e) || e.defaultPrevented || !_live() || _inTile(e)) return false;
+    var t = /** @type {any} */ (e.target);
+    if (!t || !t.closest) return false;
+    var main = document.getElementById('main');
+    if (!main || !main.contains(t)) return false;
+    return !t.closest(LEAVE_ALONE);
+  }
   /** @param {DragEvent} e */
   function _pageOver(e) {
-    if (!_fromOutside(e) || e.defaultPrevented) return;
-    if (_inTile(e)) return;
+    if (!_refuses(e)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
   }
   /** @param {DragEvent} e */
   function _pageDrop(e) {
-    if (!_fromOutside(e) || e.defaultPrevented) return;
-    if (_inTile(e)) return;
-    e.preventDefault();
+    if (_refuses(e)) e.preventDefault();
+  }
+  /* The tile is in the page and on screen. Gone from the page (another
+     screen drew over #main): the listeners go now. */
+  function _live() {
+    if (!_tile) return false;
+    if (!_tile.isConnected) {
+      unmount();
+      return false;
+    }
+    return typeof _tile.getClientRects !== 'function' || _tile.getClientRects().length > 0;
   }
   /** @param {Event} e */
   function _inTile(e) {
@@ -513,9 +542,19 @@ window.DashInboxDrop = (function () {
   }
   function _dragStart() {
     _inner = true;
+    _innerAt = Date.now();
     _ended();
   }
+  // A page drag still going: its source hears `drag` all the while.
+  function _dragging() {
+    if (_inner) _innerAt = Date.now();
+  }
   function _dragDone() {
+    _inner = false;
+    _ended();
+  }
+  // A mouse move or a press: no drag is going on, of any kind.
+  function _still() {
     _inner = false;
     _ended();
   }
@@ -554,13 +593,14 @@ window.DashInboxDrop = (function () {
     [document, 'dragover', _pageOver, false],
     [document, 'drop', _pageDrop, false],
     [document, 'dragstart', _dragStart, true],
+    [document, 'drag', _dragging, true],
     [document, 'dragend', _dragDone, true],
     [document, 'drop', _ended, true],
     // After the tile's own drop has looked at it: a drag from the page ends.
     [document, 'drop', _dragDone, false],
     [document, 'dragleave', _pageLeave, true],
-    [window, 'mousemove', _ended, true],
-    [window, 'pointerdown', _ended, true],
+    [window, 'mousemove', _still, true],
+    [window, 'pointerdown', _still, true],
     [window, 'click', _ended, true],
     [window, 'keydown', _ended, true],
     [window, 'blur', _ended, false],
@@ -612,6 +652,16 @@ window.DashInboxDrop = (function () {
     tile.addEventListener('click', _click);
     tile.addEventListener('change', _change);
     _page(true);
+    // A new draw: no page drag is going on.
+    _inner = false;
+    var main = document.getElementById('main');
+    var MO = /** @type {any} */ (window).MutationObserver;
+    if (main && typeof MO === 'function') {
+      _watch = new MO(function () {
+        if (_tile && !_tile.isConnected) unmount();
+      });
+      /** @type {MutationObserver} */ (_watch).observe(main, { childList: true });
+    }
   }
 
   /* Before the next draw, and when the Dashboard is left. */
@@ -625,6 +675,8 @@ window.DashInboxDrop = (function () {
       _tile.removeEventListener('change', _change);
     }
     _page(false);
+    if (_watch) _watch.disconnect();
+    _watch = null;
     if (_cover && _cover.parentNode) _cover.parentNode.removeChild(_cover);
     _cover = null;
     _tile = null;
