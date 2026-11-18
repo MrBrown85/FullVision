@@ -7269,6 +7269,8 @@ window.PageAssignments = (function () {
         // before clearing LS. Replaces a bare saveQuickObs call that left
         // server rows orphaned with stale assignmentContext.assessmentId.
         deleteAssessmentObservations(cid, aid);
+        // Its quiz goes with it (Demo Mode's store; signed in, the server's own cascade).
+        if (window.QuizData) QuizData.forget(cid, aid);
         openAssessIds.delete(aid);
         _collapsedIds.delete(aid);
         render();

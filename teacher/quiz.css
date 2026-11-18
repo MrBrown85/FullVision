@@ -339,6 +339,30 @@
   padding: 0;
 }
 
+/* The Student Work card with a fourth answer: the answers go under the
+   question and wrap as a group, so the question never narrows to a word a line. */
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .af-work-answer {
+  align-items: flex-start;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .af-work-seg {
+  flex-wrap: wrap;
+  height: auto;
+}
+/* While the saved quiz is read, the answers wait, with nothing moving. */
+.af-card-work[aria-busy='true'] .af-work-seg,
+.quiz-work[aria-busy='true'] .af-work-seg {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.quiz-not-offered {
+  margin: 0;
+  max-width: 420px;
+}
+
 /* Can Students Send After …?: the Student Work card's own row, stacked to fit beside the questions. */
 .quiz-side .af-work-row {
   grid-template-columns: minmax(0, 1fr);

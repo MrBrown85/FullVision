@@ -182,6 +182,10 @@ function _clearCourseLocalState(id) {
     'bulletins',
     'bulletins-pending',
     'bulletins-returned',
+    // Quizzes (shared/data-quizzes.js): Demo Mode's questions and answer key, and a save waiting to be sent.
+    'quizzes',
+    'quiz-keys',
+    'quiz-unsent',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];

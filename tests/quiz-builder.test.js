@@ -4,10 +4,11 @@
  *
  * 1. With the quizzes switch off the form is byte for byte what it was:
  *    tests/fixtures/quiz-switch-off.json holds the form as origin/main drew
- *    it (commit 24c12a66, before Q2b), in its states (new, with Send Work
- *    off and on, after Yes, Photos, an edit of Points work, the Student Page
- *    off; in Demo Mode and signed in), with the localStorage keys each walk
- *    left and the server calls it made. It was written by this file's own
+ *    it (before Q2b), in its states (new, with Send Work off and on, after
+ *    Yes, Photos, an edit of Points work, the Student Page off; in Demo Mode
+ *    and signed in), what an edit and a new assessment save, the
+ *    localStorage keys each walk left, and every server call it made, by
+ *    name and in order. It was written by this file's own
  *    walk on that commit, with only this file and its fixture added:
  *      UPDATE_QUIZ_SNAPSHOT=1 npx vitest run tests/quiz-builder.test.js
  *    Run that only on code from before a change the form is meant to keep
@@ -138,6 +139,24 @@ async function walk(demo, calls) {
   }
   await openEdit(seedWith(page), ESSAY);
   take('edit, Student Page on');
+  // Saved: what is stored, and (signed in) every call it makes.
+  const titleBox = form().querySelector('#af-title');
+  titleBox.value = 'Essay Two';
+  fire(titleBox, 'input');
+  click(form().querySelector('.af-actions .btn-primary'));
+  await settled();
+  out['saved edit'] = JSON.stringify(getAssessments(CID).find(a => a.id === ESSAY));
+  out['saved edit, Student Work'] = JSON.stringify(getAssessmentStudentWork(CID, ESSAY));
+  close();
+  await openNew(seedWith(page));
+  const newTitle = form().querySelector('#af-title');
+  newTitle.value = 'Lab Two';
+  fire(newTitle, 'input');
+  tick(form().querySelector('.af-tag-cb[value="' + T1 + '"]'), true);
+  click(form().querySelector('.af-actions .btn-primary'));
+  await settled();
+  const made = getAssessments(CID).find(a => a.title === 'Lab Two');
+  out['saved new'] = made ? JSON.stringify({ ...made, id: '<id>', created: '<created>' }) : 'not saved';
   close();
   await openNew(seedWith({}));
   take('new, Student Page off');
@@ -171,7 +190,7 @@ describe('with the quizzes switch off the form is what it was', () => {
     const session = signIn();
     try {
       serverSaysStudentPageOn(CID, true);
-      return await walk(false, () => session.fake.calls.map(c => c.name).filter(n => /quiz/.test(n)));
+      return await walk(false, () => session.fake.calls.map(c => c.name));
     } finally {
       session.signOut();
     }
@@ -189,8 +208,8 @@ describe('with the quizzes switch off the form is what it was', () => {
   const before = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) : {};
 
   it('has the snapshot', () => {
-    expect(Object.keys(before.demo || {})).toHaveLength(7);
-    expect(Object.keys(before.signedIn || {})).toHaveLength(5);
+    expect(Object.keys(before.demo || {})).toHaveLength(10);
+    expect(Object.keys(before.signedIn || {})).toHaveLength(8);
   });
 
   it('in Demo Mode: every state, and the keys left', async () => {
@@ -201,8 +220,9 @@ describe('with the quizzes switch off the form is what it was', () => {
 
   it('signed in with the server’s student page on: every state, the keys, and no quiz call', async () => {
     const now = await signedInWalk();
+    // Every call by name, in order, saves included: the same as main's, and no quiz call.
     Object.keys(before.signedIn).forEach(name => expect(now[name], name).toBe(before.signedIn[name]));
-    expect(now.calls).toBe('');
+    expect(now.calls).not.toMatch(/quiz/);
   });
 
   it('the seed adds nothing to Demo Mode with the switch off', () => {
@@ -710,13 +730,13 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     const other = QuizBuilder._payload();
     other.tries = 2;
     expect(QuizData.save(CID, made.id, { ...other, updated_at: theirs.quiz.updated_at }, [T1, T2]).ok).toBe(true);
-    // This tab changes a prompt and saves from its older read.
+    // This tab changes a prompt and saves from its older read: known at once, so the form stays open.
     click(mount().querySelector('.quiz-row[data-k="' + q(0).k + '"]'));
     type(edit(q(0).k).querySelector('.quiz-prompt'), 'Which of these is a producer?');
     click(form().querySelector('.af-actions .btn-primary'));
     await settled();
     expect(QuizData.get(CID, made.id).questions[0].prompt).toBe('Which is a producer?');
-    await reopen(made.id);
+    expect(form().style.display).not.toBe('none');
     return made;
   }
 
@@ -739,19 +759,35 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     expect(getAssessments(CID)).toHaveLength(n);
   });
 
-  it('Keep Mine asks first, then saves the teacher’s questions with the updated_at the other one has', async () => {
+  it('Keep Mine asks first, then the form’s Save sends the teacher’s questions with the updated_at the other one has', async () => {
     const made = await staleQuiz();
     const theirs = QuizData.get(CID, made.id).quiz.updated_at;
     click(mount().querySelector('[data-quiz-act="keepMine"]'));
     expect(document.getElementById('confirm-title').textContent).toBe('Keep Your Questions?');
     document.getElementById('confirm-ok-btn').onclick();
+    // Nothing is saved apart from the form's Save.
+    expect(QuizData.get(CID, made.id).questions[0].prompt).toBe('Which is a producer?');
+    expect(QuizBuilder._payload().updated_at).toBe(theirs);
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
     const now = QuizData.get(CID, made.id);
     expect(now.questions[0].prompt).toBe('Which of these is a producer?');
     expect(now.quiz.tries).toBe(1);
     expect(now.quiz.updated_at).not.toBe(theirs);
     expect(QuizData.unsent(CID, made.id)).toBeNull();
+  });
+
+  it('Keep Mine then Cancel saves nothing', async () => {
+    const made = await staleQuiz();
+    click(mount().querySelector('[data-quiz-act="keepMine"]'));
+    document.getElementById('confirm-ok-btn').onclick();
     expect(mount().querySelector('#quiz-stale-msg')).toBeNull();
-    expect(QuizBuilder._payload().updated_at).toBe(now.quiz.updated_at);
+    const before = JSON.stringify(QuizData.get(CID, made.id));
+    click(form().querySelector('[data-action="cancelAssessForm"]'));
+    const ok = document.getElementById('confirm-ok-btn');
+    if (ok) ok.onclick();
+    await settled();
+    expect(JSON.stringify(QuizData.get(CID, made.id))).toBe(before);
   });
 
   it('the card sends back a microsecond updated_at exactly as it was read', async () => {

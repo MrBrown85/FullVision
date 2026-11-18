@@ -417,11 +417,16 @@ function saveDemoQuizSeed(cid, aid, payload, tagIds) {
 
 /* ── A save not yet answered ────────────────────────────────────────────── */
 
+/* Each save of a quiz is kept on this device under its own idempotency key
+   (which is also its outbox entry's id) until the server has answered it,
+   with the updated_at it was based on (its payload's). The outbox's own
+   answer clears it (_quizListen), whichever page load sends it. */
+
 /** @param {string} cid */
 function _quizUnsentKey(cid) {
   return 'gb-quiz-unsent-' + cid;
 }
-/** @typedef {{ aid: string, payload: any, message: string, at: string, stale?: boolean }} QuizUnsent */
+/** @typedef {{ aid: string, payload: any, message: string, at: string, stale?: boolean, held?: boolean }} QuizUnsent */
 /** @param {string} cid @returns {Record<string, QuizUnsent>} */
 function _quizUnsentLoad(cid) {
   var kept = _safeParseLS(_quizUnsentKey(cid), null);
@@ -437,42 +442,91 @@ function _quizUnsentSave(cid, all) {
     }
   } else _safeLSSet(_quizUnsentKey(cid), JSON.stringify(all));
 }
-/**
- * The newest save of this assessment's quiz not yet accepted by the server:
- * { payload, message } (message: why it was refused, or '' while it waits), or
- * null. A save made while the assessment had a local id is found by its
- * server id once the create has landed.
- * @param {string} cid @param {string} aid
- */
-function quizUnsent(cid, aid) {
-  var all = _quizUnsentLoad(cid);
-  /** @type {QuizUnsent | null} */
-  var best = null;
-  var keys = Object.keys(all);
-  for (var i = 0; i < keys.length; i++) {
-    var e = all[keys[i]];
-    if (!e) continue;
-    var same = e.aid === aid || _resolveKnownId('assessment', e.aid) === aid;
-    if (same && (!best || String(e.at) > String(best.at))) best = e;
-  }
-  return best ? { payload: best.payload, message: best.message || '', stale: best.stale === true } : null;
-}
-
 /** @param {QuizUnsent} e @param {string} aid */
 function _quizSamePiece(e, aid) {
   return !!e && (e.aid === aid || _resolveKnownId('assessment', e.aid) === _resolveKnownId('assessment', aid));
 }
+/* The outbox's dead letter for a save, or null. */
+/** @param {string} id */
+function _quizDeadFor(id) {
+  var q = typeof window !== 'undefined' ? /** @type {any} */ (window).v2Queue : null;
+  if (!q || typeof q.deadLetter !== 'function') return null;
+  return (
+    q.deadLetter().find(function (/** @type {any} */ e) {
+      return e && e.id === id;
+    }) || null
+  );
+}
+/* Whether the outbox still holds a save: null when there is no outbox to ask. */
+/** @param {string} id */
+function _quizQueued(id) {
+  var q = typeof window !== 'undefined' ? /** @type {any} */ (window).v2Queue : null;
+  return q && typeof q.has === 'function' ? !!q.has(id) : null;
+}
 
 /**
- * Forget what this device kept of an assessment's quiz: the teacher chose
- * Use the Other One, or saved again.
+ * The newest save of this assessment's quiz this device still holds, as the
+ * form must show it, or null:
+ * { payload, message, stale, waiting }. waiting: not answered yet (in the
+ * outbox, or held here). A save the outbox no longer holds and did not refuse
+ * was answered: it is let go here. serverAt: the updated_at the server
+ * answered just now (undefined when it could not be read). A save based on
+ * another updated_at is stale: it would be refused, and it is never sent
+ * with an updated_at it was not based on.
+ * @param {string} cid @param {string} aid @param {string | null} [serverAt]
+ */
+function quizUnsent(cid, aid, serverAt) {
+  _quizListen();
+  var all = _quizUnsentLoad(cid);
+  var n = Object.keys(all).length;
+  /** @type {QuizUnsent | null} */
+  var best = null;
+  var bestKey = '';
+  var keys = Object.keys(all);
+  for (var i = 0; i < keys.length; i++) {
+    var e = all[keys[i]];
+    if (!e || !_quizSamePiece(e, aid)) continue;
+    // The outbox sent it and the server answered it: nothing is kept.
+    if (!e.message && !e.held && _quizQueued(keys[i]) === false) {
+      var dead = _quizDeadFor(keys[i]);
+      if (!dead) {
+        delete all[keys[i]];
+        continue;
+      }
+      e.message = quizRefusalText(dead.last_error || dead.error || {});
+      e.stale = _quizIsStale(dead.last_error || dead.error || {});
+    }
+    if (!best || String(e.at) > String(best.at)) {
+      best = e;
+      bestKey = keys[i];
+    }
+  }
+  if (Object.keys(all).length !== n || best) _quizUnsentSave(cid, all);
+  if (!best) return null;
+  var waiting = !best.message && (best.held === true || _quizQueued(bestKey) !== false);
+  var stale = best.stale === true;
+  var message = best.message || '';
+  if (!stale && best.payload !== null && serverAt !== undefined && best.payload.updated_at !== serverAt) {
+    stale = true;
+    message = QUIZ_STALE;
+  }
+  return { payload: best.payload, message: message, stale: stale, waiting: waiting && !stale };
+}
+
+/**
+ * Forget what this device kept of an assessment's quiz, and take any save of
+ * it still waiting out of the outbox: the teacher chose Keep Mine or Use the
+ * Other One, the server refused it, or the piece was deleted.
  * @param {string} cid @param {string} aid
  */
 function quizDropUnsent(cid, aid) {
   var all = _quizUnsentLoad(cid);
   var n = Object.keys(all).length;
+  var q = typeof window !== 'undefined' ? /** @type {any} */ (window).v2Queue : null;
   Object.keys(all).forEach(function (k) {
-    if (_quizSamePiece(all[k], aid)) delete all[k];
+    if (!_quizSamePiece(all[k], aid)) return;
+    if (q && typeof q.has === 'function' && q.has(k) && typeof q.remove === 'function') q.remove(k);
+    delete all[k];
   });
   if (Object.keys(all).length !== n) _quizUnsentSave(cid, all);
 }
@@ -494,6 +548,109 @@ function _quizKeepUnsent(cid, aid, payload, error) {
 /** @param {any} error */
 function _quizIsStale(error) {
   return !!error && String(error.code || '') === '22023' && String(error.message || '').trim() === 'stale';
+}
+
+/* Every class's kept saves, to find one by its key. */
+/** @param {string} id @returns {{ cid: string, all: Record<string, QuizUnsent> } | null} */
+function _quizUnsentFind(id) {
+  var prefix = 'gb-quiz-unsent-';
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (!k || k.indexOf(prefix) !== 0) continue;
+    var cid = k.slice(prefix.length);
+    var all = _quizUnsentLoad(cid);
+    if (all[id]) return { cid: cid, all: all };
+  }
+  return null;
+}
+
+/* The outbox's answer to a save, whichever page load sent it. */
+var _quizListening = null;
+function _quizListen() {
+  var q = typeof window !== 'undefined' ? /** @type {any} */ (window).v2Queue : null;
+  if (!q || typeof q.subscribe !== 'function' || _quizListening === q) return;
+  _quizListening = q;
+  q.subscribe(function (/** @type {any} */ evt) {
+    var kind = evt && evt.kind;
+    var info = evt && evt.meta;
+    if (!info || info.endpoint !== 'save_quiz') {
+      if (kind === 'flush:success' || kind === 'rewrite') _quizTagsMoved();
+      return;
+    }
+    if (kind === 'flush:success') _quizLanded(info.id, info.payload, info.data);
+    else if (kind === 'flush:dead-letter') _quizRefused(info.id, info.error);
+  });
+}
+
+/** @param {string} id @param {any} params @param {any} answer */
+function _quizLanded(id, params, answer) {
+  var found = _quizUnsentFind(id);
+  var aid = params && params.p_assessment_id;
+  if (found) {
+    var kept = found.all;
+    var mine = kept[id];
+    Object.keys(kept).forEach(function (k) {
+      var e = kept[k];
+      if (_quizSamePiece(e, mine.aid) && String(e.at) <= String(mine.at) && !e.held) delete kept[k];
+    });
+    _quizUnsentSave(found.cid, kept);
+  }
+  var data = _rpcObject(answer);
+  if (aid && data && Array.isArray(data.questions)) {
+    var reply = {
+      quiz: _plainObject(data.quiz) ? data.quiz : null,
+      questions: data.questions,
+      archived: data.archived || [],
+    };
+    _quizHeld[aid] = reply;
+    // Kept exactly as answered: never read into a Date.
+    _quizAnswered[aid] = reply.quiz ? reply.quiz.updated_at || null : null;
+  }
+}
+
+/** @param {string} id @param {any} error */
+function _quizRefused(id, error) {
+  var found = _quizUnsentFind(id);
+  if (!found) return;
+  found.all[id].message = quizRefusalText(error || {});
+  found.all[id].stale = _quizIsStale(error);
+  _quizUnsentSave(found.cid, found.all);
+}
+
+/* ── Competencies still waiting for their server id ── */
+
+/** @type {(() => void)[]} */
+var _quizTagWaiters = [];
+function _quizTagsMoved() {
+  var waiting = _quizTagWaiters.splice(0);
+  waiting.forEach(function (go) {
+    go();
+  });
+}
+/* The payload's competencies as the server knows them, or null while one still has an id made on this device. */
+/** @param {any} payload */
+function _quizWire(payload) {
+  var out = JSON.parse(JSON.stringify(payload));
+  var ready = true;
+  out.questions.forEach(function (/** @type {any} */ q) {
+    if (q.tag_id == null) return;
+    var tag = _resolveKnownId('tag', q.tag_id);
+    if (_isUuid(tag)) q.tag_id = tag;
+    else ready = false;
+  });
+  return ready ? out : null;
+}
+/* Resolves with the wire payload once every competency it names has a server id. */
+/** @param {any} payload @returns {Promise<any>} */
+function _quizWhenTagsReady(payload) {
+  return new Promise(function (resolve) {
+    var check = function () {
+      var wire = _quizWire(payload);
+      if (wire) resolve(wire);
+      else _quizTagWaiters.push(check);
+    };
+    check();
+  });
 }
 
 /* ── Reading and saving ─────────────────────────────────────────────────── */
@@ -605,7 +762,14 @@ var QUIZ_STALE_DETAIL = 'This quiz was changed somewhere else. Open it again bef
  * Save one assessment's quiz whole (save_quiz). payload: p_quiz as the
  * contract sets it, or null to take the quiz off the piece. tagIds: the
  * piece's competencies as saved with it. Answers { ok } at once; Demo Mode
- * answers with the server's refusal word when it refuses.
+ * answers with the server's refusal word when it refuses, and the quiz as
+ * saved when it does not.
+ *
+ * Signed in, the save goes through the outbox keyed to the assessment
+ * ('id:' + aid), so it goes after the form's own save of the piece, and
+ * waits behind the piece's create (a local id) and behind any competency it
+ * names that has no server id yet. One new idempotency key per save; a retry
+ * of that save reuses it.
  * @param {string} cid @param {string} aid @param {any} payload @param {string[]} tagIds
  * @returns {{ ok: boolean, error?: { message: string, detail: string, code?: string }, quiz?: QuizReply }}
  */
@@ -613,10 +777,11 @@ function saveQuiz(cid, aid, payload, tagIds) {
   if (!cid || !aid) return { ok: false };
   if (_quizOnDevice(cid)) return _quizDemoSave(cid, aid, payload, tagIds || []);
   if (!quizzesOffered(cid)) return { ok: false };
+  _quizListen();
   var key = _newEntryId();
-  var held = _quizUnsentLoad(cid);
-  held[key] = { aid: aid, payload: payload, message: '', at: new Date().toISOString() };
-  _quizUnsentSave(cid, held);
+  var all = _quizUnsentLoad(cid);
+  all[key] = { aid: aid, payload: payload, message: '', at: new Date().toISOString(), held: true };
+  _quizUnsentSave(cid, all);
   var id = _resolveKnownId('assessment', aid);
   // A local id with no create waiting for it would reach the server as it is: it is held here instead.
   if (!_isUuid(id) && !_pendingCreateFor('assessment', aid)) {
@@ -628,46 +793,36 @@ function saveQuiz(cid, aid, payload, tagIds) {
   // made on already held that save's questions).
   var chain = _quizChain[aid];
   var after = !!chain;
-  var run = Promise.resolve(chain).then(function () {
-    var wire = payload === null ? null : _quizWire(payload);
-    if (wire && after && _quizAnswered[aid] !== undefined) wire.updated_at = _quizAnswered[aid];
-    return _writeRpc('save_quiz', { p_assessment_id: aid, p_quiz: wire, p_idempotency_key: key }, { entryId: key });
-  });
-  var done = run
+  var done = Promise.resolve(chain)
+    .then(function () {
+      return payload === null ? null : _quizWhenTagsReady(payload);
+    })
+    .then(function (wire) {
+      if (wire && after && _quizAnswered[aid] !== undefined) wire.updated_at = _quizAnswered[aid];
+      var kept = _quizUnsentLoad(cid);
+      if (!kept[key]) return null; // let go meanwhile (Use the Other One, Keep Mine)
+      delete kept[key].held;
+      _quizUnsentSave(cid, kept);
+      return _writeRpc(
+        'save_quiz',
+        { p_assessment_id: aid, p_quiz: wire, p_idempotency_key: key },
+        { entryId: key, key: 'id:' + aid },
+      );
+    })
     .then(function (res) {
-      var all = _quizUnsentLoad(cid);
-      if (res && res.error) {
+      if (!res) return;
+      if (res.error) {
         if (res.error.handledSessionExpired) return;
         if (_isMissingRpcError(res.error)) _reportMissingRpc('save_quiz', res.error);
         else console.warn('save_quiz failed:', res.error);
-        if (all[key]) {
-          all[key].message = quizRefusalText(res.error);
-          all[key].stale = _quizIsStale(res.error);
-          _quizUnsentSave(cid, all);
-        }
+        // Without an outbox (or before it said so) the refusal is kept here too.
+        _quizRefused(key, res.error);
         // Changed somewhere else: read what the server has, for the teacher to choose. Never sent again by itself.
         if (_quizIsStale(res.error)) return loadQuiz(cid, aid);
         return;
       }
-      // This save landed: it and every older one for the same piece go.
-      var at = all[key] ? all[key].at : '';
-      Object.keys(all).forEach(function (k) {
-        var e = all[k];
-        var same = e && (e.aid === aid || _resolveKnownId('assessment', e.aid) === _resolveKnownId('assessment', aid));
-        if (same && String(e.at) <= String(at)) delete all[k];
-      });
-      _quizUnsentSave(cid, all);
-      var data = _rpcObject(res && res.data);
-      if (data && Array.isArray(data.questions)) {
-        var reply = {
-          quiz: _plainObject(data.quiz) ? data.quiz : null,
-          questions: data.questions,
-          archived: data.archived || [],
-        };
-        _quizHeld[aid] = reply;
-        _quizHeld[_resolveKnownId('assessment', aid)] = reply;
-        _quizAnswered[aid] = reply.quiz ? reply.quiz.updated_at || null : null;
-      }
+      _quizLanded(key, { p_assessment_id: aid }, res.data);
+      _quizHeld[_resolveKnownId('assessment', aid)] = _quizHeld[aid];
     })
     .then(null, function (e) {
       console.warn('save_quiz failed:', e);
@@ -680,17 +835,26 @@ function saveQuiz(cid, aid, payload, tagIds) {
   return { ok: true };
 }
 
-/* Tags named inside p_quiz are not re-keyed by the outbox: a competency
-   still waiting for its server id counts toward none until it has one. */
-/** @param {any} payload */
-function _quizWire(payload) {
-  var out = JSON.parse(JSON.stringify(payload));
-  out.questions.forEach(function (/** @type {any} */ q) {
-    if (q.tag_id == null) return;
-    var tag = _resolveKnownId('tag', q.tag_id);
-    q.tag_id = _isUuid(tag) ? tag : null;
+/**
+ * An assessment deleted: in Demo Mode its quiz and answer key go with it; on
+ * any device, what was kept of an unsent save. (Signed in, the server takes
+ * the quiz with the assessment.)
+ * @param {string} cid @param {string} aid
+ */
+function forgetQuiz(cid, aid) {
+  if (!cid || !aid) return;
+  quizDropUnsent(cid, aid);
+  if (!_isDemoSession()) return;
+  var store = _quizDemoLoad(cid);
+  var one = store.quizzes[aid];
+  if (!one) return;
+  var keys = _quizKeysLoad(cid);
+  (Array.isArray(one.questions) ? one.questions : []).forEach(function (/** @type {any} */ q) {
+    delete keys[q.id];
   });
-  return out;
+  delete store.quizzes[aid];
+  _safeLSSet(_quizDemoKey(cid), JSON.stringify(store));
+  _safeLSSet(_quizKeysKey(cid), JSON.stringify(keys));
 }
 
 if (typeof window !== 'undefined') {
@@ -700,6 +864,7 @@ if (typeof window !== 'undefined') {
     get: getQuiz,
     load: loadQuiz,
     save: saveQuiz,
+    forget: forgetQuiz,
     unsent: quizUnsent,
     dropUnsent: quizDropUnsent,
     trim: quizTrim,
@@ -707,6 +872,8 @@ if (typeof window !== 'undefined') {
     problem: quizPayloadProblem,
     refusalText: quizRefusalText,
     newId: quizNewId,
+    STALE: QUIZ_STALE,
+    NOT_SAVED_YET: 'These questions are kept on this computer and are not saved yet.',
     LIMITS: {
       questions: QUIZ_MAX_QUESTIONS,
       prompt: QUIZ_PROMPT_MAX,

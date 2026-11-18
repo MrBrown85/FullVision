@@ -650,9 +650,9 @@ var QuizCardDraw = (function () {
           '<button type="button" class="btn btn-primary" data-quiz-act="keepMine" aria-describedby="quiz-stale-msg">Keep Mine</button>' +
           '<button type="button" class="btn btn-ghost" data-quiz-act="useOther" aria-describedby="quiz-stale-msg">Use the Other One</button>' +
           '</span></div>'
-        : S.msg
-          ? '<p class="quiz-err quiz-msg">' + esc('Your last change to this quiz was not saved. ' + S.msg) + '</p>'
-          : '';
+        : (S.msg
+            ? '<p class="quiz-err quiz-msg">' + esc('Your last change to this quiz was not saved. ' + S.msg) + '</p>'
+            : '') + (S.note ? '<p class="cm-hint quiz-note">' + esc(S.note) + '</p>' : '');
       var whyLine =
         why && (S.tried || !api.scoringOk() || api.collab() !== 'individual')
           ? '<p class="quiz-err" id="quiz-why">' + esc(why) + '</p>'
@@ -719,16 +719,28 @@ var QuizCardDraw = (function () {
         '<section class="af-card quiz-work" aria-labelledby="quiz-work-title">' +
         '<div class="af-card-head"><span class="af-card-title" id="quiz-work-title">Student Work</span></div>' +
         '<div class="af-work-list"><div class="af-work-row"><div class="af-work-ask"><span class="af-work-q" id="quiz-work-q">Do Students Send You Their Work?</span></div>' +
-        '<div class="af-work-answer"><div class="seg af-work-seg" role="radiogroup" aria-labelledby="quiz-work-q">' +
-        answer('nothing', 'No') +
-        answer('quiz', 'They Answer a Quiz') +
-        '</div></div></div></div></section>'
+        '<div class="af-work-answer">' +
+        (api.blocked()
+          ? '<p class="af-work-hint quiz-not-offered" id="quiz-not-offered">' + esc(api.blocked()) + '</p>'
+          : '<div class="seg af-work-seg" role="radiogroup" aria-labelledby="quiz-work-q">' +
+            answer('nothing', 'No') +
+            answer('quiz', 'They Answer a Quiz') +
+            '</div>') +
+        '</div></div></div></section>'
       );
     }
 
     // html-safe: built from _ownWorkHtml and _cardHtml
     function _mountInner() {
-      return (S.pageCard ? '' : _ownWorkHtml()) + (S.picked ? _cardHtml() : '');
+      var blocked = api.blocked();
+      return (
+        (S.pageCard ? '' : _ownWorkHtml()) +
+        (S.pageCard && blocked
+          ? '<p class="cm-hint quiz-not-offered" id="quiz-not-offered">' + esc(blocked) + '</p>'
+          : '') +
+        (!S.picked && S.note ? '<p class="cm-hint quiz-note">' + esc(S.note) + '</p>' : '') +
+        (S.picked ? _cardHtml() : '')
+      );
     }
 
     /** @param {() => string} fn */

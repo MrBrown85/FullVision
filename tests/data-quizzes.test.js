@@ -244,6 +244,7 @@ describe('in Demo Mode', () => {
     expect(QuizData.unsent(CID, AID)).toEqual({
       payload: mine,
       stale: true,
+      waiting: false,
       message:
         'This quiz was changed somewhere else, in another tab or on another device, so your changes below were not saved.',
     });

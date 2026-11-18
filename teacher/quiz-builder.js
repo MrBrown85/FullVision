@@ -50,6 +50,7 @@ var QuizBuilder = (function () {
   var _redrawPage = null; // the page's redraw of its Student Work card
   /** @type {any} */
   var _pageTools = null; // the page's own drawing of "Can Students Send After …?" and its Until day
+  var _switching = false; // this module is pressing a scoring button itself
   /** @type {Document | null} */
   var _wired = null; // the document the card's listeners are on
 
@@ -104,6 +105,9 @@ var QuizBuilder = (function () {
       seq: 0,
       dropOk: false,
       sig: '',
+      note: '', // a quiet line: kept on this computer and not saved yet
+      ready: null, // the save as read when the form's check passed
+      modeTouched: false, // the teacher picked a scoring on this form
       updatedAt: null, // the quiz's updated_at exactly as last answered, sent back with the next save
       stale: false, // the last save was refused: changed somewhere else
       fresh: null, // what the server has, for Use the Other One
@@ -300,6 +304,33 @@ var QuizBuilder = (function () {
     });
     return best;
   }
+  /* Any student scored or given feedback on the piece. */
+  function _scored() {
+    if (!S || !S.aid || typeof getStudents !== 'function' || typeof hasScoreOrFeedback !== 'function') return false;
+    return (getStudents(S.cid) || []).some(function (/** @type {any} */ st) {
+      return hasScoreOrFeedback(S.cid, st.id, S.aid);
+    });
+  }
+  /* Any student's work sent for the piece, or added by the teacher. */
+  function _workIn() {
+    if (!S || !S.aid || typeof getCourseSubmissions !== 'function') return false;
+    var subs = (getCourseSubmissions(S.cid) || {}).submissions || [];
+    return subs.some(function (/** @type {any} */ x) {
+      return x && x.assessment_id === S.aid;
+    });
+  }
+  /* Why "They Answer a Quiz" is not offered on this piece, as one sentence, or
+     ''. A quiz goes only on a piece with no scores and no work in: this slice
+     moves no grade. A piece that is a quiz already keeps it. */
+  function _blocked() {
+    if (!S || S.existed || S.picked) return '';
+    if (_scored())
+      return 'This assessment already has scores, so a quiz cannot be added to it. Make a new assessment for the quiz.';
+    if (_workIn()) {
+      return "This assessment already has students' work, so a quiz cannot be added to it. Make a new assessment for the quiz.";
+    }
+    return '';
+  }
   // The scoring a new quiz starts on: Points in a Letter class, else Competencies (decision 2).
   function _startMode() {
     var letter = typeof courseGradeMode === 'function' && courseGradeMode(S.cid) === 'letter';
@@ -408,6 +439,7 @@ var QuizBuilder = (function () {
     due: _due,
     untilOk: _untilOk,
     afterDueRow: _afterDueRow,
+    blocked: _blocked,
   });
 
   var _reduce =
@@ -461,12 +493,22 @@ var QuizBuilder = (function () {
     _syncPoints();
   }
 
-  /* On Points, the piece's Max Points is the quiz's total while it is a quiz. */
+  /* On Points, the piece's Max Points is the quiz's total while it is a quiz,
+     and the box says so. Never on a piece with any score: there, Max Points
+     is the teacher's and moves no grade. */
   function _syncPoints() {
     var box = /** @type {HTMLInputElement | null} */ ($('af-maxpoints'));
     if (!box || !S) return;
-    var tie = S.picked && _mode() === 'points';
+    var tie = S.picked && _mode() === 'points' && !_scored();
     box.readOnly = tie;
+    var hint = $('quiz-maxpoints-hint');
+    if (tie && !hint && box.parentNode && box.parentNode.parentNode) {
+      hint = document.createElement('p');
+      hint.id = 'quiz-maxpoints-hint';
+      hint.className = 'af-category-hint quiz-maxpoints-hint';
+      hint.textContent = "The quiz sets this: it is the total of its questions' points.";
+      box.parentNode.parentNode.appendChild(hint);
+    } else if (!tie && hint) hint.remove();
     if (!tie) return;
     var t = String(_total());
     if (box.value !== t) {
@@ -573,47 +615,23 @@ var QuizBuilder = (function () {
     _keepClear(at);
   }
 
-  /* Keep Mine: the teacher's questions saved over the other, with the updated_at the server has now. Asks first. */
+  /* Keep Mine: the teacher's questions stay, to be saved over the other one by
+     the form's own Save, with the updated_at the server has now. Asks first. */
   /** @param {{ x: number, y: number } | null} at */
   function _askKeepMine(at) {
     var go = function () {
       if (!S || !S.stale) return;
-      var bad = S.qs.some(function (/** @type {any} */ q) {
-        return _problems(q).length > 0;
-      });
-      if (bad || _quizProblem() || !_untilOk()) {
-        // Something here would be refused: said beside it first, and nothing is sent.
-        S.tried = true;
-        var first = S.qs.find(function (/** @type {any} */ q) {
-          return _problems(q).length > 0;
-        });
-        if (first && S.open && S.open !== first.k) _close(S.open);
-        if (first) S.open = first.k;
-        _draw(first ? '.quiz-edit[data-k="' + first.k + '"] .quiz-prompt' : '#quiz-head');
-        return;
-      }
-      var fresh = S.fresh && S.fresh.quiz ? S.fresh.quiz.updated_at || null : null;
-      S.updatedAt = fresh;
+      S.updatedAt = S.fresh && S.fresh.quiz ? S.fresh.quiz.updated_at || null : null;
       S.stale = false;
       S.msg = '';
+      S.note = '';
       _data().dropUnsent(S.cid, S.aid);
-      var res = _data().save(
-        S.cid,
-        S.aid,
-        _payload(),
-        _tags().map(function (t) {
-          return t.id;
-        }),
-      );
-      if (res && res.quiz && res.quiz.quiz) S.updatedAt = res.quiz.quiz.updated_at;
-      S.existed = true;
-      S.base = _state();
       _draw('#quiz-head');
     };
     if (typeof showConfirm !== 'function') return go();
     showConfirm(
       'Keep Your Questions?',
-      'Your questions are saved over the ones saved somewhere else.',
+      'Your questions are saved over the ones saved somewhere else when you save this assessment.',
       'Keep Mine',
       'primary',
       go,
@@ -633,6 +651,7 @@ var QuizBuilder = (function () {
     S.existed = !!reply.quiz;
     S.stale = false;
     S.msg = '';
+    S.note = '';
     S.open = null;
     _data().dropUnsent(S.cid, S.aid);
     S.base = _state();
@@ -875,6 +894,7 @@ var QuizBuilder = (function () {
       _mode(),
       _collab(),
       _due(),
+      /** @type {any} */ ($('af-maxpoints') || { value: '' }).value,
       _tags()
         .map(function (t) {
           return t.id;
@@ -906,6 +926,8 @@ var QuizBuilder = (function () {
         }
         return;
       }
+      // The teacher picked a scoring themselves: a quiz never picks over it.
+      if (S && !_switching && target && target.closest && target.closest('.af-scoremode-btn')) S.modeTouched = true;
       // Something outside the card moved: scoring, competencies, Individual or Pair.
       setTimeout(_formMoved, 0);
     });
@@ -930,7 +952,7 @@ var QuizBuilder = (function () {
   /* The fourth answer for the page's Student Work card: [] where a quiz is not offered. */
   /** @param {string} cid */
   function answers(cid) {
-    if (!_offered(cid)) return [];
+    if (!_offered(cid) || _blocked()) return [];
     return [{ value: 'quiz', label: 'They Answer a Quiz' }];
   }
   /* The answer the page's card shows as chosen. */
@@ -948,7 +970,10 @@ var QuizBuilder = (function () {
    */
   function takeAnswer(value, w, again) {
     if (!S || !_offered(S.cid)) return false;
+    // While the saved quiz is read, the answers wait: no mixed state.
+    if (S.loading) return true;
     if (value === 'quiz') {
+      if (_blocked()) return true;
       if (!S.picked) {
         S.picked = true;
         if (!S.qs.length) {
@@ -956,12 +981,21 @@ var QuizBuilder = (function () {
           S.qs.push(q);
           S.open = q.k;
         }
-        // A new quiz starts on Competencies, or on Points in a Letter class.
-        if (S.isNew && _mode() !== _startMode()) {
+        // A new quiz starts on Competencies, or on Points in a Letter class, unless
+        // the teacher has picked a scoring or a rubric themselves: then their choice
+        // stays, and the card says what a quiz needs.
+        var rubric = /** @type {HTMLSelectElement | null} */ ($('af-rubric'));
+        var chose = S.modeTouched || (_mode() === 'proficiency' && !!(rubric && rubric.value));
+        if (S.isNew && !chose && _mode() !== _startMode()) {
           var btn = /** @type {HTMLElement | null} */ (
             document.querySelector('.af-scoremode-btn[data-mode="' + _startMode() + '"]')
           );
-          if (btn) btn.click();
+          _switching = true;
+          try {
+            if (btn) btn.click();
+          } finally {
+            _switching = false;
+          }
         }
       }
       if (w) w.students_send = 'nothing';
@@ -1022,12 +1056,13 @@ var QuizBuilder = (function () {
       if (held) _take(held);
       else {
         S.loading = true;
+        setTimeout(_busy, 0);
         d.load(cid, assess.id).then(function (/** @type {any} */ reply) {
           if (!S || S.aid !== assess.id) return;
           S.loading = false;
-          var untouched = !S.picked || _state() === S.base;
-          if (reply && untouched) _take(reply);
-          else if (reply && reply.quiz) S.existed = true;
+          _busy();
+          // A failed read (null) still shows what this device kept.
+          _take(reply);
           _draw();
           if (_redrawPage) _redrawPage();
         });
@@ -1041,7 +1076,10 @@ var QuizBuilder = (function () {
     return '<div id="quiz-mount" class="quiz-mount">' + inner + '</div>';
   }
 
-  /* The saved quiz into the card; a save not yet accepted lays over it. */
+  /* The saved quiz into the card (reply null: it could not be read), and a
+     save this device still holds laid over it, with the updated_at that save
+     was based on, never the server's: a save from before another device's is
+     stale, and the teacher chooses. */
   /** @param {any} reply */
   function _take(reply) {
     var d = _data();
@@ -1055,22 +1093,41 @@ var QuizBuilder = (function () {
     }
     S.fresh = reply || null;
     S.base = _state();
-    var unsent = S.aid ? d.unsent(S.cid, S.aid) : null;
+    var serverAt = reply ? (reply.quiz ? reply.quiz.updated_at || null : null) : undefined;
+    var unsent = S.aid ? d.unsent(S.cid, S.aid, serverAt) : null;
     if (unsent) {
       if (unsent.payload === null) {
-        S.picked = false;
-        S.dropOk = true;
+        if (unsent.message) {
+          // Taking the quiz off was refused (a student has started): it stays on, and is not asked again.
+          S.msg = unsent.message;
+          d.dropUnsent(S.cid, S.aid);
+        } else {
+          S.picked = false;
+          S.dropOk = true;
+          S.note = d.NOT_SAVED_YET;
+        }
       } else {
         var u = _fromReply(_payloadAsReply(unsent.payload));
         S.settings = u.settings;
         S.qs = u.qs;
         S.picked = true;
+        S.updatedAt = u.updatedAt;
+        S.msg = unsent.message;
+        // Changed somewhere else: the teacher's questions stay, kept apart from what the server has until they choose.
+        S.stale = unsent.stale === true;
+        S.note = unsent.waiting ? d.NOT_SAVED_YET : '';
       }
-      S.msg = unsent.message;
-      // Changed somewhere else: the teacher's questions stay, kept apart from what the server has until they choose.
-      S.stale = unsent.stale === true;
     }
     S.sig = '';
+  }
+
+  /* The Student Work card's answers wait, quietly, while the saved quiz is read. */
+  function _busy() {
+    var cards = document.querySelectorAll('.af-card-work, #quiz-mount .quiz-work');
+    Array.from(cards).forEach(function (c) {
+      if (S && S.loading) c.setAttribute('aria-busy', 'true');
+      else c.removeAttribute('aria-busy');
+    });
   }
 
   /** @param {string} cid */
@@ -1099,6 +1156,18 @@ var QuizBuilder = (function () {
    * set to the quiz's total first.
    */
   function formOk() {
+    if (S) S.ready = null;
+    if (S && $('quiz-mount') && !S.stale && (S.picked || S.existed)) {
+      // Saved somewhere else since this form read it (Demo Mode's other tab, or what this page read since).
+      var now = S.aid ? _data().get(S.cid, S.aid) : null;
+      var nowAt = now && now.quiz ? now.quiz.updated_at || null : null;
+      if (now && nowAt !== S.updatedAt && (S.existed || nowAt)) {
+        S.stale = true;
+        S.fresh = now;
+        S.msg = _data().STALE;
+        S.note = '';
+      }
+    }
     if (S && S.stale && $('quiz-mount')) {
       S.tried = true;
       _draw('[data-quiz-act="keepMine"]');
@@ -1111,7 +1180,16 @@ var QuizBuilder = (function () {
       return _problems(q).length > 0;
     });
     var whole = _quizProblem();
-    if (!bad && !whole && _untilOk()) return true;
+    if (!bad && !whole && _untilOk()) {
+      // Read now: saving the assessment can draw the form again before the quiz is saved.
+      S.ready = {
+        payload: _payload(),
+        tags: _tags().map(function (t) {
+          return t.id;
+        }),
+      };
+      return true;
+    }
     S.preview = false;
     if (!bad && !whole) {
       // Until with no Last Day: the sentence is beside the date box.
@@ -1205,24 +1283,29 @@ var QuizBuilder = (function () {
   function save(cid, aid) {
     var d = _data();
     if (!S || !d || S.cid !== cid || !aid) return;
-    var changed = snapshot() !== '' || !!S.msg;
+    // A kept save laid over the card differs from what the server has, so it counts as a change.
+    var changed = snapshot() !== '';
     if (!S.picked) {
       if (S.existed && (changed || S.dropOk)) d.save(cid, aid, null, []);
       return;
     }
     if (!changed && S.existed) return;
-    var tags = _tags().map(function (t) {
-      return t.id;
-    });
-    var res = d.save(cid, aid, _payload(), tags);
+    var ready = S.ready || {
+      payload: _payload(),
+      tags: _tags().map(function (t) {
+        return t.id;
+      }),
+    };
+    S.ready = null;
+    var res = d.save(cid, aid, ready.payload, ready.tags);
     if (res && res.ok === false && res.error) console.warn('Quiz not saved:', res.error);
     if (res && res.quiz && res.quiz.quiz) S.updatedAt = res.quiz.quiz.updated_at;
     S.base = _state();
     S.existed = true;
     S.msg = '';
+    S.note = '';
   }
 
-  /** @param {() => void} fn */
   /** @param {() => void} fn @param {any} [tools] */
   function redrawWith(fn, tools) {
     _redrawPage = fn;

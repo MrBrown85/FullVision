@@ -429,23 +429,38 @@ const MEASURED = [
 test.describe('fit', () => {
   // The stand-in font is a style the page's own CSP would refuse.
   test.use({ bypassCSP: true });
-  test('the Quiz card fits in the page font and in a wide font, at 1280 and 769', async ({ page }) => {
+  test('the Quiz card and the Student Work card fit in the page font and in a wide font, at 1280 and 769', async ({
+    page,
+  }) => {
     await demo(page, true);
+    // Send Work on, so the Student Work card has its four answers.
+    await page.evaluate(() => setCourseSendWork('sci8', { send_work: true }));
+    await page.goto('/assignments?course=sci8');
+    await page.waitForSelector('[data-aid="sci8-quiz-data-patterns"]');
     await page.evaluate(() =>
       document.querySelector('[data-action="editAssess"][data-aid="sci8-quiz-data-patterns"]').click(),
     );
     await expect(page.locator('#quiz-head')).toBeVisible();
+    await expect(page.locator('.af-card-work [data-field="students_send"]')).toHaveCount(4);
     // A Choice question open, so its editor is measured too.
     await page.locator('.quiz-row').nth(3).click();
     await expect(page.locator('.quiz-edit')).toBeVisible();
     const overflow = () =>
-      page.evaluate(
-        sel =>
-          Array.from(document.querySelectorAll(sel))
-            .filter(el => el.scrollWidth > el.clientWidth + 1)
-            .map(el => el.className + ' ' + el.scrollWidth + ' > ' + el.clientWidth),
-        MEASURED,
-      );
+      page.evaluate(sel => {
+        const out = Array.from(document.querySelectorAll(sel))
+          .filter(el => el.scrollWidth > el.clientWidth + 1)
+          .map(el => el.className + ' ' + el.scrollWidth + ' > ' + el.clientWidth);
+        // The Student Work question reads on one or two lines, and its answers never sit on it.
+        const row = document.querySelector('.af-card-work [data-work-row="students_send"]');
+        const q = row.querySelector('.af-work-q').getBoundingClientRect();
+        const lines = q.height / parseFloat(getComputedStyle(row.querySelector('.af-work-q')).lineHeight);
+        if (lines > 2.1) out.push('the question takes ' + Math.round(lines) + ' lines');
+        const a = row.querySelector('.af-work-seg').getBoundingClientRect();
+        const apart = a.top >= q.bottom - 1 || a.left >= q.right - 1;
+        if (!apart) out.push('the answers sit on the question');
+        if (a.right > row.getBoundingClientRect().right + 1) out.push('the answers run out of the row');
+        return out;
+      }, MEASURED + ', .af-card-work .af-work-row, .af-card-work .af-work-seg');
     const wide = on =>
       page.evaluate(
         ([css, add]) => {
@@ -468,4 +483,24 @@ test.describe('fit', () => {
       expect(await overflow(), width + ' in a wide font').toEqual([]);
     }
   });
+});
+
+test('Reset Demo Data brings the sample quiz back, after it was deleted', async ({ page }) => {
+  await demo(page, true);
+  const AID = 'sci8-quiz-data-patterns';
+  await page.evaluate(aid => {
+    QuizData.forget('sci8', aid);
+    saveAssessments(
+      'sci8',
+      getAssessments('sci8').filter(a => a.id !== aid),
+    );
+  }, AID);
+  expect(await page.evaluate(aid => QuizData.get('sci8', aid).quiz, AID)).toBeNull();
+  await page.evaluate(() => resetDemoData());
+  await page.waitForFunction(aid => getAssessments('sci8').some(a => a.id === aid), AID);
+  // Reset puts the sample class's Student Page back off; the quiz is read with it on.
+  await page.evaluate(() => setStudentPageSwitch('sci8', true));
+  const back = await page.evaluate(aid => QuizData.get('sci8', aid), AID);
+  expect(back.quiz).toMatchObject({ after_due: 'stop' });
+  expect(back.questions).toHaveLength(10);
 });
