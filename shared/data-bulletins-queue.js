@@ -569,29 +569,31 @@ function _bltReleaseDevicePicture(key) {
 function resumeBulletinUploads() {
   if (_isDemoSession() || !_writesEnabled()) return;
   _bltListen();
-  var q = _bltQueue();
-  if (!q) return;
-  /** @type {string[]} */
-  var keys = [];
+  /** @type {{ cid: string, entry: BulletinWaiting }[]} */
+  var waiting = [];
   try {
     for (var i = 0; i < localStorage.length; i++) {
       var name = localStorage.key(i);
-      if (name) keys.push(name);
+      if (!name || name.indexOf('gb-bulletins-pending-') !== 0) continue;
+      var cid = name.slice('gb-bulletins-pending-'.length);
+      _bltPending(cid).forEach(function (e) {
+        if (e.queued) waiting.push({ cid: cid, entry: e });
+      });
     }
   } catch (e) {
     return;
   }
-  keys.forEach(function (k) {
-    if (k.indexOf('gb-bulletins-pending-') !== 0) return;
-    var cid = k.slice('gb-bulletins-pending-'.length);
-    _bltPending(cid).forEach(function (e) {
-      if (!e.queued) return;
-      if (e.server) _bltPlacePages(cid, e.key);
-      else if (!_bltOutboxHas(e.key) && Date.now() - Date.parse(e.at) > 120000) {
-        // Its post is not in the outbox and no answer was kept: send it again under the same key (posts once).
-        _bltQueuedSend(cid, e.key);
-      }
-    });
+  // Nothing of ours waits: the photo queue is left as the app wires it.
+  if (!waiting.length) return;
+  var q = _bltQueue();
+  if (!q) return;
+  waiting.forEach(function (w) {
+    var e = w.entry;
+    if (e.server) _bltPlacePages(w.cid, e.key);
+    else if (!_bltOutboxHas(e.key) && Date.now() - Date.parse(e.at) > 120000) {
+      // Its post is not in the outbox and no answer was kept: send it again under the same key (posts once).
+      _bltQueuedSend(w.cid, e.key);
+    }
   });
   q.send();
 }
