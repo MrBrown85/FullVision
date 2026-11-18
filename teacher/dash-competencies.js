@@ -89,9 +89,10 @@ window.DashCompetencies = (function () {
       );
     }).join('');
     _last = opts;
+    _tipRow = null;
     var cid = String(opts && opts.cid);
     var curView = curricularView(opts);
-    var coreSelfOn = coreSelfShown(opts);
+    var coreSelfOn = DashOverview.coreView(opts) === 'self';
     // A list left open on another visit to the Dashboard is not brought back.
     if (_open && !document.getElementById('dash-comp-pop')) _open = null;
     // The open row is kept only while its page still shows rows.
@@ -137,7 +138,8 @@ window.DashCompetencies = (function () {
       (popInner ? '' : ' hidden') +
       '>' +
       popInner +
-      '</div>'
+      '</div>' +
+      '<div class="dash-comp-tipbox" id="dash-comp-tipbox" role="tooltip" hidden></div>'
     );
   }
 
@@ -192,7 +194,7 @@ window.DashCompetencies = (function () {
   function curricularView(opts) {
     var cid = opts.cid;
     var view = DashOverview.compView(cid, opts.compView);
-    if (view !== 'avg') return view;
+    if (view !== 'avg' || DashInsights.showsProficiency(cid)) return view;
     var saved = null;
     try {
       saved = localStorage.getItem(VIEW_PREF + cid);
@@ -589,6 +591,7 @@ window.DashCompetencies = (function () {
       pop.hidden = true;
       return;
     }
+    if (typeof row.getBoundingClientRect !== 'function') return;
     var r = row.getBoundingClientRect();
     var pw = pop.offsetWidth;
     var ph = pop.offsetHeight;
@@ -636,12 +639,15 @@ window.DashCompetencies = (function () {
     // html-safe: popBody escapes every name, title and label; the rest is a count.
     pop.innerHTML = inner;
     pop.hidden = !inner;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-comp-open]'), function (/** @type {HTMLElement} */ r) {
-      r.setAttribute(
-        'aria-expanded',
-        String(!!_open && r.dataset.compOpen === _open.key && r.dataset.compPage === _open.page),
-      );
-    });
+    Array.prototype.forEach.call(
+      document.querySelectorAll('[data-comp-open]'),
+      function (/** @type {HTMLElement} */ r) {
+        r.setAttribute(
+          'aria-expanded',
+          String(!!_open && r.dataset.compOpen === _open.key && r.dataset.compPage === _open.page),
+        );
+      },
+    );
     place();
   }
 
@@ -721,10 +727,73 @@ window.DashCompetencies = (function () {
     e.stopImmediatePropagation();
     close(true);
   });
+  /* ── Hover tips of the other views ───────────────────────────
+     A row of Needs Support, Change or Evidence has a tip hung under it. The
+     tile clips what hangs outside it, so the tip is shown whole from here, on
+     the window, touching its row so the pointer can reach a link in it. */
+  var TIP_ROWS = '.dash-comp-tile .dash-comp-row, .dash-comp-tile .dash-core-row';
+  /** @type {any} */
+  var _tipTimer = 0;
+  /** @type {Element | null} */
+  var _tipRow = null;
+
+  function hideTip() {
+    clearTimeout(_tipTimer);
+    _tipRow = null;
+    var box = _el('dash-comp-tipbox');
+    if (box) box.hidden = true;
+  }
+
+  /** @param {Element} row */
+  function showTip(row) {
+    var box = _el('dash-comp-tipbox');
+    var tip = row.querySelector('.dist-tip');
+    if (!box || !tip) return;
+    clearTimeout(_tipTimer);
+    if (_tipRow === row && !box.hidden) return;
+    _tipRow = row;
+    // html-safe: the tip's markup was built by DashOverview, which escapes every name and title.
+    box.innerHTML = tip.innerHTML;
+    box.hidden = false;
+    var r = row.getBoundingClientRect();
+    var w = box.offsetWidth;
+    var h = box.offsetHeight;
+    var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    var top = r.bottom;
+    if (top + h > window.innerHeight - 8) top = r.top - h;
+    top = Math.max(8, Math.min(top, window.innerHeight - 8 - h));
+    box.style.left = Math.round(left) + 'px';
+    box.style.top = Math.round(top) + 'px';
+  }
+
+  function _tipLater() {
+    clearTimeout(_tipTimer);
+    _tipTimer = setTimeout(hideTip, 120);
+  }
+
+  document.addEventListener('mouseover', function (e) {
+    var t = /** @type {Element | null} */ (e.target);
+    if (!t || !t.closest) return;
+    var row = t.closest(TIP_ROWS);
+    if (row) showTip(row);
+    else if (t.closest('#dash-comp-tipbox')) clearTimeout(_tipTimer);
+    else if (_tipRow) _tipLater();
+  });
+  document.addEventListener('focusin', function (e) {
+    var t = /** @type {Element | null} */ (e.target);
+    var row = t && t.closest ? t.closest(TIP_ROWS) : null;
+    if (row) showTip(row);
+    else if (_tipRow && !(t && t.closest && t.closest('#dash-comp-tipbox'))) hideTip();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && _tipRow) hideTip();
+  });
+
   window.addEventListener('resize', place);
   document.addEventListener(
     'scroll',
     function (e) {
+      if (_tipRow) hideTip();
       var pop = _el('dash-comp-pop');
       if (_open && !(pop && e.target instanceof Node && pop.contains(e.target))) place();
     },
@@ -742,5 +811,6 @@ window.DashCompetencies = (function () {
     isFew: isFew,
     close: close,
     place: place,
+    toggle: _toggle,
   };
 })();
