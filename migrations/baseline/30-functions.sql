@@ -11023,7 +11023,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+CREATE OR REPLACE FUNCTION public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_enrollment_ids uuid[] DEFAULT NULL::uuid[])
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -11049,7 +11049,18 @@ begin
   elsif _b.posted_at is null then
     raise exception 'a bulletin students cannot see yet cannot be shown again' using errcode = '22023';
   end if;
-  update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id;
+  if p_enrollment_ids is null then
+    update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id;
+  else
+    -- 2026111809: only the students named, and only those who can see it and have not seen it.
+    insert into bulletin_reminder (bulletin_id, enrollment_id, reminded_at)
+    select p_bulletin_id, x.enrollment_id, now()
+      from fv_private.bulletin_audience(_course) x
+     where x.enrollment_id = any (p_enrollment_ids) and x.state = 'can_see'
+       and not exists (select 1 from bulletin_seen s where s.bulletin_id = p_bulletin_id and s.enrollment_id = x.enrollment_id)
+    on conflict (bulletin_id, enrollment_id) do update set reminded_at = excluded.reminded_at;
+    update bulletin set updated_at = now() where id = p_bulletin_id;
+  end if;
   _out := jsonb_build_object('bulletin', fv_private.bulletin_json(p_bulletin_id));
   perform fv_idem_store(p_idempotency_key, 'show_bulletin_again', _out);
   return _out;
@@ -13708,7 +13719,9 @@ begin
         'bulletins', coalesce((
             select jsonb_agg(x.item order by x.sort_at, x.id)
               from (select b.id,
-                           coalesce(case when b.shown_again_at is not null and s.seen_at is null then b.shown_again_at end,
+                           coalesce(case when s.seen_at is null then greatest(b.shown_again_at,
+                                        (select r.reminded_at from bulletin_reminder r
+                                          where r.bulletin_id = b.id and r.enrollment_id = p_enrollment_id)) end,
                                     b.posted_at) as sort_at,
                            jsonb_build_object(
                                'id', b.id, 'kind', b.kind, 'body', b.body,

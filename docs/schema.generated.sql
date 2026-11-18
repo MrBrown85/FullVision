@@ -204,6 +204,14 @@ table public.bulletin_reaction (rls on)
   CREATE INDEX bulletin_reaction_enrollment_idx ON public.bulletin_reaction USING btree (enrollment_id)
   CREATE UNIQUE INDEX bulletin_reaction_pkey ON public.bulletin_reaction USING btree (bulletin_id, enrollment_id)
   CREATE TRIGGER bulletin_reaction_same_class BEFORE INSERT OR UPDATE ON public.bulletin_reaction FOR EACH ROW EXECUTE FUNCTION fv_private.bulletin_student_same_class()
+table public.bulletin_reminder (rls on)
+  bulletin_id uuid not null
+  enrollment_id uuid not null
+  reminded_at timestamp with time zone not null default now()
+  constraint bulletin_reminder_bulletin_id_fkey FOREIGN KEY (bulletin_id) REFERENCES public.bulletin(id) ON DELETE CASCADE
+  constraint bulletin_reminder_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint bulletin_reminder_pkey PRIMARY KEY (bulletin_id, enrollment_id)
+  CREATE UNIQUE INDEX bulletin_reminder_pkey ON public.bulletin_reminder USING btree (bulletin_id, enrollment_id)
 table public.bulletin_seen (rls on)
   bulletin_id uuid not null
   enrollment_id uuid not null
@@ -2129,7 +2137,7 @@ function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_c
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
 function public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) returns jsonb security definer
-function public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) returns jsonb security definer
+function public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) returns jsonb security definer
 function public.soft_delete_teacher() returns void
 function public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid) returns jsonb security definer
 function public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) returns jsonb security definer
