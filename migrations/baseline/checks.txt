@@ -59,7 +59,6 @@ policy outside the app schemas: fv_student_photos_teachers_only on storage.objec
 policy outside the app schemas: fv_student_photos_upload on storage.objects
 publication supabase_realtime has public.course_sync_cursor
 publication supabase_realtime_messages_publication has realtime.messages
-publication zero_data for all tables
 schema auth
 schema cron
 schema extensions

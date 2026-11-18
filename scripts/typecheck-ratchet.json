@@ -5,6 +5,7 @@
     "shared/constants.js",
     "shared/data-rpc-wrappers.js",
     "shared/html.js",
+    "shared/build-flags.js",
     "teacher/report-qn-browse-cases.js",
     "teacher/report-qn-voice-observations.js",
     "teacher/cm-std-help.js",

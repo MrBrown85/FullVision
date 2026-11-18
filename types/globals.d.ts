@@ -1,6 +1,8 @@
 // Globals other files set with window.X = ..., which TypeScript can't see.
 declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
+  // Build flags (shared/build-flags.js): unfinished work stays behind one.
+  BuildFlags: { on(name: string): boolean };
   // The data layer's namespace (shared/data.js and the data-*.js files).
   // Only what a checked file calls is typed; the rest is unknown until
   // those files are checked.
