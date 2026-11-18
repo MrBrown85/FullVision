@@ -92,6 +92,18 @@
     );
   }
 
+  /**
+   * When a returned bulletin was written, for "Your bulletin from …": the time
+   * today, else the day with it ("yesterday at 12:17 p.m.", "Monday at 12:17 p.m.").
+   * @param {string} iso @param {Date} [now]
+   */
+  function returnedWhen(iso, now) {
+    var day = dayHeading(iso, now);
+    var t = _timeOf(iso);
+    if (!day || day === 'Today') return t;
+    return (day === 'Yesterday' ? 'yesterday' : day) + ' at ' + t;
+  }
+
   /** The time on a bulletin: the time today, else the weekday and time. @param {string} iso @param {Date} [now] */
   function timeLabel(iso, now) {
     var h = dayHeading(iso, now);
@@ -350,6 +362,7 @@
   /** The words in the box, with a link and files, as bulletinDraftProblem reads them. @param {Draft} d */
   function _asDraft(d) {
     return {
+      cid: _cid,
       kind: d.kind,
       body: d.body,
       link_url: d.linkOn ? d.linkUrl : '',
@@ -475,7 +488,7 @@
       if (canDate) {
         h +=
           '<label class="bulletin-label" for="bulletin-until">Stays Pinned Until<input class="bulletin-field" type="date" id="bulletin-until" min="' +
-          esc(getTodayStr()) +
+          esc(typeof courseToday === 'function' ? courseToday(_cid) : getTodayStr()) +
           '" value="' +
           esc(d.until) +
           '"></label>';
@@ -1329,7 +1342,7 @@
         dropReturnedBulletin(_cid, e.key);
         d.note =
           'Your bulletin from ' +
-          _timeOf(e.at) +
+          returnedWhen(e.at) +
           " wasn't posted, so its words are back in the box." +
           (e.message ? ' ' + e.message : '');
         d.open = true;
@@ -1348,7 +1361,7 @@
       .map(function (e) {
         return (
           '<div class="bulletin-card bulletin-returned-line" role="status"><span>Your bulletin from ' +
-          esc(_timeOf(e.at)) +
+          esc(returnedWhen(e.at)) +
           " wasn't posted." +
           (e.message ? ' ' + esc(e.message) : '') +
           '</span><button type="button" class="bulletin-text-btn" data-bulletin="put-back" data-key="' +
@@ -1488,6 +1501,8 @@
       case 'drop-returned':
         dropReturnedBulletin(_cid, el.dataset.key || '');
         _drawReturned();
+        // The line had focus and is gone: it goes to the words when the box is open, else to the box's bar.
+        if (_draft(_cid).open && _any('bulletin-words')) return _any('bulletin-words').focus();
         return _focusBar();
       case 'seen': {
         var st = _seen[id];
@@ -1713,6 +1728,7 @@
       dateLabel: dateLabel,
       canSeeText: canSeeText,
       headerNotes: headerNotes,
+      returnedWhen: returnedWhen,
       refusal: _refusal,
     },
   };

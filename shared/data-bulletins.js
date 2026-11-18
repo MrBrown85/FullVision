@@ -46,6 +46,8 @@ var BULLETIN_BUCKET = 'bulletin-files';
 var _bltMem = {}; // cid → what was read last
 /** @type {Record<string, boolean>} */
 var _bltFlows = {}; // key → true while this page is uploading that bulletin's files
+/** @type {Record<string, boolean>} */
+var _bltKept = {}; // key → true when a refused post's draft is still in the page's box (its words are not returned a second time)
 /** @type {Record<string, { url: string, release: () => void }>} */
 var _bltPictures = {}; // page path → its picture, held as a blob: address
 var _bltListening = false;
@@ -152,7 +154,7 @@ function bulletinDraftProblem(draft) {
     if (d.kind !== 'reminder') return 'Only a reminder can stay pinned until a date.';
     var day = _bltDay(d.pinned_until);
     if (!day) return 'Choose a date for Stays Pinned Until.';
-    if (day < getTodayStr()) return 'Stays Pinned Until cannot be before today.';
+    if (day < _bltToday(d.cid)) return 'Stays Pinned Until cannot be before today.';
   }
   if (!body && !link && !files.length) return 'Write something, add a link or add a file.';
   return '';
@@ -497,8 +499,8 @@ function _bltDemoGroups(cid) {
   return out;
 }
 
-/** @param {any} row @param {BulletinDemoStore} store @param {{ can_see: string[] }} groups @returns {Bulletin | null} */
-function _bltDemoBulletin(row, store, groups) {
+/** @param {any} row @param {BulletinDemoStore} store @param {{ can_see: string[] }} groups @param {string} cid @returns {Bulletin | null} */
+function _bltDemoBulletin(row, store, groups, cid) {
   var b = _bltFromRow(Object.assign({}, row, { visible: true }));
   if (!b) return null;
   var can = {};
@@ -518,7 +520,7 @@ function _bltDemoBulletin(row, store, groups) {
   b.can_see = groups.can_see.length;
   b.reactions = { got_it: inCan(r.got_it), done: inCan(r.done), question: inCan(r.question) };
   // As the server computes it: pinned only while its last day has not gone by.
-  if (b.pinned && b.pinned_until && b.pinned_until < getTodayStr()) b.pinned = false;
+  if (b.pinned && b.pinned_until && b.pinned_until < _bltToday(cid)) b.pinned = false;
   return b;
 }
 
@@ -533,7 +535,7 @@ function _bltDemoRead(cid) {
   var groups = _bltDemoGroups(cid);
   var list = store.bulletins
     .map(function (row) {
-      return _bltDemoBulletin(row, store, groups);
+      return _bltDemoBulletin(row, store, groups, cid);
     })
     .filter(Boolean);
   var mem = _bltMemory(cid);
@@ -879,27 +881,93 @@ function releaseBulletinPictures() {
 /* ── Writing ────────────────────────────────────────────────────────────── */
 
 /**
- * The plain sentence for a refused write. The server's own words are never
- * shown: each refusal the contract names (22023 for a value, P0002 for a
- * bulletin that is not there, PT401 for signed out) has a sentence here, and
- * anything else gets one general sentence.
- * @param {any} error
+ * Today as the class keeps it (its own time zone, as the server's date checks do:
+ * courseToday in shared/data.js), not the device's. The device's date only where
+ * the class is not known.
+ * @param {string} [cid]
  */
-function _bltMessage(error) {
+function _bltToday(cid) {
+  return cid && typeof courseToday === 'function' ? courseToday(cid) : getTodayStr();
+}
+
+var BULLETIN_GENERAL = 'Bulletins could not be saved. Try again in a moment.';
+var BULLETIN_NOT_ACCEPTED = 'This bulletin was not accepted. Check it and try again.';
+
+/**
+ * The server's refusals, each with its own plain sentence. The keys are the
+ * messages migrations/2026111801_bulletins.sql raises (B1a, commit fb3bebfa;
+ * tests/fixtures/bulletins-m1-messages.js holds the list). Each is matched
+ * whole (an anchored pattern, with the words that carry a name or a number as
+ * a wildcard), so no refusal can take another's sentence. A message not listed
+ * here gets BULLETIN_GENERAL, never a neighbour's sentence.
+ * @type {[RegExp, string][]}
+ */
+var _BLT_REFUSALS = [
+  // The shape of what was sent: nothing the page's own box can make.
+  [/^a bulletin is an object$/, BULLETIN_NOT_ACCEPTED],
+  [/^a bulletin has no [a-z_]+ that can be set$/, BULLETIN_NOT_ACCEPTED],
+  [/^[a-z_]+ must be a (boolean|string)$/, BULLETIN_NOT_ACCEPTED],
+  [/^files must be a list$/, BULLETIN_NOT_ACCEPTED],
+  // A value.
+  [/^pinned_until must be a date$/, 'Stays Pinned Until must be a date.'],
+  [/^assessment_id must be a id$/, 'The linked assessment could not be found. Choose another one, or None.'],
+  [/^a bulletin is an announcement or a reminder$/, 'Choose Announcement or Reminder.'],
+  [/^a bulletin's words can be 2000 characters at most$/, 'Words can be up to 2,000 characters.'],
+  [
+    /^a link must start with http:\/\/ or https:\/\/ and a host/,
+    'A link must start with http:// or https:// and a host, with no user name, password, spaces or hidden characters.',
+  ],
+  [/^a link's name needs a link$/, 'A link name needs a link. Add the link, or clear the name.'],
+  [/^a link's name can be 200 characters at most$/, 'A link name can be up to 200 characters.'],
+  [/^only a reminder can stay pinned until a date$/, 'Only a reminder can stay pinned until a date.'],
+  [
+    /^a date to stay pinned until needs the reminder pinned$/,
+    'A reminder has to be pinned to stay pinned until a date.',
+  ],
+  [/^the date to stay pinned until has passed$/, 'Stays Pinned Until cannot be before today.'],
+  [
+    /^the linked assessment is not in this class$/,
+    'The linked assessment is not in this class. Choose another one, or None.',
+  ],
+  [/^a bulletin needs words, a link or a file$/, 'Write something, add a link or add a file.'],
+  // Files.
+  [
+    /^a file is \{ kind: photo or pdf, title, pages \}/,
+    'A file could not be used. A photo is one page, and a PDF is 1 to 20 pages.',
+  ],
+  [/^a file's name can be 200 characters at most$/, 'A file name can be up to 200 characters.'],
+  [/^a bulletin can have 20 pages at most$/, 'A bulletin can hold up to 20 pages in all.'],
+  [
+    /^a class can hold 2000 bulletin pages at most/,
+    'This class holds as many bulletin pages as it can. Delete some bulletins with files, then try again.',
+  ],
+  // Show It Again.
+  [
+    /^a bulletin students cannot see yet cannot be shown again$/,
+    'Students cannot see that bulletin yet, so it cannot be shown again.',
+  ],
+];
+
+/**
+ * The plain sentence for a refused write. The server's own words are never
+ * shown. PT401 (signed out) and P0002 (not found) are told apart by the call
+ * they came from: for a post or a read, P0002 is the class (gone or in the
+ * trash); for any other call it is the bulletin. Everything else is looked up
+ * in _BLT_REFUSALS by its whole message.
+ * @param {any} error @param {string} [rpc] the call that was refused
+ */
+function _bltMessage(error, rpc) {
   var code = error && error.code ? String(error.code) : '';
-  var m = error && error.message ? String(error.message).toLowerCase() : '';
-  if (code === 'P0002') return 'That bulletin is no longer there.';
+  var text = error && error.message ? String(error.message).trim() : '';
   if (code === 'PT401') return 'You are signed out. Sign in again, then try again.';
-  if (code === '22023') {
-    if (/2000|characters|too long|words/.test(m) && !/no words/.test(m)) return 'Words can be up to 2,000 characters.';
-    if (/no words|nothing|empty/.test(m)) return 'Write something, add a link or add a file.';
-    if (/link|http|url/.test(m)) return 'A link must start with http:// or https://.';
-    if (/before today|pinned_until|date|pinned/.test(m)) return 'Stays Pinned Until must be a date from today on.';
-    if (/assessment/.test(m)) return 'The linked assessment could not be found. Choose another one, or None.';
-    if (/page/.test(m)) return 'A bulletin can hold up to 20 pages in all.';
-    return 'This bulletin was not accepted. Check it and try again.';
+  if (code === 'P0002') {
+    var classCall = rpc === 'post_bulletin' || rpc === 'list_bulletins' || (!rpc && text === 'course not found');
+    return classCall ? 'This class is no longer there.' : 'That bulletin is no longer there.';
   }
-  return 'Bulletins could not be saved. Try again in a moment.';
+  for (var i = 0; i < _BLT_REFUSALS.length; i++) {
+    if (_BLT_REFUSALS[i][0].test(text)) return _BLT_REFUSALS[i][1];
+  }
+  return BULLETIN_GENERAL;
 }
 
 var BULLETIN_LOST = ''; // a lost post has no reason to give: the page says it was not posted
@@ -951,6 +1019,7 @@ function dropReturnedBulletin(cid, key) {
  */
 function _bltReturn(cid, key, payload, message, at) {
   if (!cid || !payload || typeof payload !== 'object') return;
+  if (_bltKept[key]) return; // the page still holds this draft in its box
   var has = String(payload.body || '').trim() || payload.link_url;
   if (!has) return;
   var list = getReturnedBulletins(cid);
@@ -961,7 +1030,7 @@ function _bltReturn(cid, key, payload, message, at) {
   )
     return;
   list.push({ key: key, at: at || new Date().toISOString(), bulletin: payload, message: message || BULLETIN_LOST });
-  _safeLSSet(_bltReturnedKey(cid), JSON.stringify(list.slice(-5)));
+  _safeLSSet(_bltReturnedKey(cid), JSON.stringify(list.slice(-20)));
   _bltChanged(cid);
 }
 
@@ -986,7 +1055,7 @@ function _bltSweepDead(cid) {
       cid,
       key,
       e.payload.p_bulletin,
-      _bltMessage({ code: e.last_code, message: e.last_error }),
+      _bltMessage({ code: e.last_code, message: e.last_error }, 'post_bulletin'),
       pend && pend.at,
     );
     _bltDropPending(cid, key);
@@ -1046,7 +1115,13 @@ function _bltListen() {
       var pend = _bltPending(cid).filter(function (x) {
         return x.key === key;
       })[0];
-      _bltReturn(cid, key, meta.payload.p_bulletin, _bltMessage(refused || { message: meta.error }), pend && pend.at);
+      _bltReturn(
+        cid,
+        key,
+        meta.payload.p_bulletin,
+        _bltMessage(refused || { message: meta.error }, 'post_bulletin'),
+        pend && pend.at,
+      );
       _bltDropPending(cid, key);
       if (typeof window.v2Queue.dismissDeadLetter === 'function') window.v2Queue.dismissDeadLetter(key);
       _bltChanged(cid);
@@ -1076,7 +1151,7 @@ function _bltListen() {
 function postBulletin(cid, bulletin, files) {
   var list = Array.isArray(files) ? files : [];
   var problem = bulletinDraftProblem(
-    Object.assign({}, bulletin, {
+    Object.assign({ cid: cid }, bulletin, {
       files: list.map(function (f) {
         return { pages: f.pages.length };
       }),
@@ -1138,9 +1213,10 @@ function _bltSend(cid, payload, files, tries) {
       if (res && res.error) {
         // Taken back before it went: nothing to say.
         if (res.error.cancelled) return finished({ ok: false });
-        var said = _bltMessage(res.error);
+        var said = _bltMessage(res.error, 'post_bulletin');
         // No file: the draft was cleared when Post was pressed, so the words come back through the returned list.
         if (!files.length) _bltReturn(cid, key, payload, said);
+        else _bltKept[key] = true; // a post with a file keeps its draft in the box
         return finished({ ok: false, message: said });
       }
       var data = _rpcObject(res && res.data);
@@ -1167,8 +1243,9 @@ function _bltSend(cid, payload, files, tries) {
     })
     .then(null, function (e) {
       console.warn('post_bulletin failed:', e);
-      var general = _bltMessage(null);
+      var general = BULLETIN_GENERAL;
       if (!files.length) _bltReturn(cid, key, payload, general);
+      else _bltKept[key] = true;
       return finished({ ok: false, message: general });
     });
 }
@@ -1343,7 +1420,7 @@ function _bltChange(cid, id, rpc, params, lay) {
         }
         _bltChanged(cid);
         refreshBulletins(cid, { force: true });
-        return { ok: false, gone: gone, message: _bltMessage(res.error) };
+        return { ok: false, gone: gone, message: _bltMessage(res.error, rpc) };
       }
       var data = _rpcObject(res && res.data);
       if (data && data.bulletin) _bltPlace(cid, data.bulletin);
@@ -1394,7 +1471,7 @@ function editBulletin(cid, id, patch) {
   if (p.pinned_until) {
     var day = _bltDay(p.pinned_until);
     if (!day) return Promise.resolve({ ok: false, message: 'Choose a date for Stays Pinned Until.' });
-    if (day < getTodayStr())
+    if (day < _bltToday(cid))
       return Promise.resolve({ ok: false, message: 'Stays Pinned Until cannot be before today.' });
     p.pinned_until = day;
   }
