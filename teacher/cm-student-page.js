@@ -24,6 +24,10 @@
    - S13-F1: Show My Learning and See What They'd See (below), in Demo
      Mode and, since S13-W2, for a signed-in class.
    - S10 follow-up: the Reflect on Feedback switch, in Demo Mode (below).
+   - Per-student options (docs/plans/per-student-options-plan.md, Nov 17
+     2026): the card list is the Students list, with a side panel for each
+     student, and Show Overall Grade's row names its exceptions
+     (teacher/student-page-students.js).
 
    DashClassManager asks isShown(cid) before it draws the tab, opens it or
    builds its panel, and while the tab is shown hands over every sp* action,
@@ -514,7 +518,10 @@ var CmStudentPage = (function () {
       esc(
         'Students see their overall grade, from work you’ve returned, at the top of My Learning. Off, they still see each piece’s result.',
       ) +
-      '</span></span>' +
+      '</span>' +
+      // The students who see otherwise than the class (per-student options): narrows the list to Exceptions.
+      (typeof StudentPageStudents !== 'undefined' ? StudentPageStudents.exceptionsHtml(cid) : '') +
+      '</span>' +
       '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-learning-switch" data-action-change="spShowLearning" aria-describedby="sp-learning-hint"' +
       (l.on ? ' checked' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
@@ -768,6 +775,12 @@ var CmStudentPage = (function () {
       if (at && typeof ScanLabels !== 'undefined') ScanLabels.open(at);
       return true;
     }
+    // The Students list's ticks, bar and side panel (teacher/student-page-students.js).
+    if (/^spStudent/.test(action)) {
+      var at2 = _cid(el);
+      if (typeof StudentPageStudents === 'undefined' || !at2 || _settings(at2).student_page !== true) return false;
+      return StudentPageStudents.handleAction(action, el);
+    }
     if (/^spCards/.test(action)) {
       var cid = _cid(el);
       if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;
@@ -787,6 +800,11 @@ var CmStudentPage = (function () {
   }
 
   function handleChange(el) {
+    if (el && el.dataset && /^spStudent/.test(el.dataset.actionChange || '')) {
+      var at = _cid(el);
+      if (typeof StudentPageStudents === 'undefined' || !at || _settings(at).student_page !== true) return false;
+      return StudentPageStudents.handleChange(el);
+    }
     if (el && el.dataset && /^spCards/.test(el.dataset.actionChange || '')) {
       var cid = _cid(el);
       if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;

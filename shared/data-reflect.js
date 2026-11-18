@@ -558,3 +558,342 @@ function saveDemoReflections(cid, list) {
   _studentFeedbackWrite(cid, draft);
   return true;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Per-student options on the Student Page (2026-11-17)
+   ══════════════════════════════════════════════════════════════════
+   docs/plans/per-student-options-plan.md. Two settings for one student,
+   kept on the student's enrollment, with no reason kept for either:
+
+   - Show Overall Grade: 'class' (follow the class's Show Overall Grade),
+     'show' or 'hide'.
+   - Page Paused: when the student's card stopped opening their page, or
+     null. Paused, no card of theirs opens anything.
+
+   getStudentPageOptions(cid)    { student id: { show_overall_grade,
+                                 paused_at } } for each student of the class
+                                 with either set; {} where none are offered.
+   studentPageOptionsOffered(cid)  true where they can be read and changed.
+   loadStudentPageOptions(cid)   a signed-in class's read
+                                 (list_student_page_options).
+   setStudentPageOptions(cid, studentIds, change, key)  change is
+                                 { show_overall_grade: 'class'|'show'|'hide' }
+                                 and/or { paused: true|false }.
+   effectiveShowOverallGrade(cid, sid)  what one student is shown: their
+                                 own choice, else the class's switch.
+
+   Demo Mode (and a class on this device only) keeps them in
+   gb-student-page-options-<cid>, with the sample class, and sends nothing.
+   A signed-in class whose student page the server keeps reads them with
+   list_student_page_options and changes them with set_student_page_options
+   through the outbox, each change with its own idempotency key; what is
+   shown is the server's list with this device's changes not yet answered
+   laid over it. While the server has no list_student_page_options (the
+   migration not yet applied) nothing is offered and nothing is sent.
+
+   A client student id is the server's enrollment id. A student still
+   being created (a local id) waits in the outbox behind their create. */
+var _SPO_MAX_IDS = 500; // the most students set_student_page_options takes
+var _SPO_STALE_MS = 60000; // a signed-in class's list is read again after this long
+var _SPO_GRADE = { class: true, show: true, hide: true };
+var _SPO_QUIET = { suppressSessionExpiredModal: true }; // the read asks no one to sign in again
+/** @type {Record<string, Record<string, { show_overall_grade: string; paused_at: string | null }>>} */
+var _spoServer = {}; // cid → { enrollment id → options }, as the server last said
+/** @type {Record<string, { state: string; at: number; loading: Promise<unknown> | null }>} */
+var _spoRead = {}; // cid → the read: state 'ok', 'missing' (no such function yet) or 'failed'
+/** @type {Record<string, { ids: string[]; change: Record<string, unknown>; at: string }[]>} */
+var _spoHere = {}; // cid → changes on their way from this page, oldest first
+/* cid → a number moved on whenever a change is sent or answered. A list read
+   begun before the number last moved is older than a change, and is dropped
+   (as StudentCards drops a card list read begun before a press). */
+/** @type {Record<string, number>} */
+var _spoWrites = {};
+function _spoWriteMoved(cid) {
+  _spoWrites[cid] = (_spoWrites[cid] || 0) + 1;
+}
+
+function _spoOnDevice(cid) {
+  return !!cid && _gradesKept(cid) && !_writesEnabled();
+}
+function _spoOnServer(cid) {
+  return !!cid && !_isDemoSession() && _serverKeepsRows(cid);
+}
+
+/* True where a class's per-student options can be read and changed: Demo
+   Mode with the class's student page on, or a signed-in class whose
+   list_student_page_options has been read. */
+function studentPageOptionsOffered(cid) {
+  if (_spoOnDevice(cid)) return true;
+  return _spoOnServer(cid) && !!_spoRead[cid] && _spoRead[cid].state === 'ok';
+}
+
+// One student's options as kept: Show Overall Grade as a word, paused_at as a time or null.
+function _spoRow(grade, pausedAt) {
+  return {
+    show_overall_grade: grade === 'show' || grade === 'hide' ? grade : 'class',
+    paused_at: typeof pausedAt === 'string' && pausedAt ? pausedAt : null,
+  };
+}
+/* The server's row: show_overall_grade as a word ('class', 'show' or
+   'hide'). The enrollment column's own true, false or null (the class
+   bundle's) reads the same. */
+function _spoFromServer(r) {
+  var v = r.show_overall_grade;
+  var g = v === true || v === 'show' ? 'show' : v === false || v === 'hide' ? 'hide' : 'class';
+  return _spoRow(g, r.paused_at);
+}
+// A reply of either function: { ok: true, options: [...] }. A refusal is a raised error, never a reply.
+function _spoReply(data) {
+  return !!data && data.ok !== false && (data.ok === true || Array.isArray(data.options));
+}
+function _spoSet(row) {
+  return row.show_overall_grade !== 'class' || !!row.paused_at;
+}
+
+function _spoDeviceKey(cid) {
+  return 'gb-student-page-options-' + cid;
+}
+function _spoDeviceKept(cid) {
+  var kept = _safeParseLS(_spoDeviceKey(cid), null);
+  /** @type {Record<string, { show_overall_grade: string; paused_at: string | null }>} */
+  var out = {};
+  if (!_plainObject(kept)) return out;
+  Object.keys(kept).forEach(function (sid) {
+    var r = kept[sid];
+    if (!_plainObject(r)) return;
+    var row = _spoRow(r.show_overall_grade, r.paused_at);
+    if (_spoSet(row)) out[sid] = row;
+  });
+  return out;
+}
+
+// One change laid over a student's options. `at` is when a pause began.
+function _spoApply(row, change, at) {
+  var next = _spoRow(row.show_overall_grade, row.paused_at);
+  if (typeof change.show_overall_grade === 'string' && _SPO_GRADE[change.show_overall_grade]) {
+    next.show_overall_grade = change.show_overall_grade;
+  }
+  if (change.paused === true && !next.paused_at) next.paused_at = at;
+  if (change.paused === false) next.paused_at = null;
+  return next;
+}
+function _spoLay(out, ids, change, at) {
+  (ids || []).forEach(function (sid) {
+    if (typeof sid !== 'string') return;
+    var row = _spoApply(out[sid] || _spoRow('class', null), change, at);
+    if (_spoSet(row)) out[sid] = row;
+    else delete out[sid];
+  });
+}
+// A queued payload as the change it makes.
+function _spoPayloadChange(p) {
+  /** @type {Record<string, unknown>} */
+  var change = {};
+  if (typeof p.p_show_overall_grade === 'string') change.show_overall_grade = p.p_show_overall_grade;
+  if (typeof p.p_paused === 'boolean') change.paused = p.p_paused;
+  return change;
+}
+
+/* The class's options, { student id: { show_overall_grade, paused_at } },
+   for students still in the class with either set. {} where they are not
+   offered. A copy: changing it changes nothing kept. */
+function getStudentPageOptions(cid) {
+  if (!studentPageOptionsOffered(cid)) return {};
+  /** @type {Record<string, { show_overall_grade: string; paused_at: string | null }>} */
+  var out = {};
+  if (_spoOnDevice(cid)) out = _spoDeviceKept(cid);
+  else {
+    var server = _spoServer[cid] || {};
+    Object.keys(server).forEach(function (sid) {
+      out[sid] = _spoRow(server[sid].show_overall_grade, server[sid].paused_at);
+    });
+    _workQueued('set_student_page_options', function (p) {
+      return p.p_course_id === cid;
+    }).forEach(function (e) {
+      _spoLay(out, e.payload.p_enrollment_ids, _spoPayloadChange(e.payload), String(e.created_at || ''));
+    });
+    (_spoHere[cid] || []).forEach(function (h) {
+      _spoLay(out, h.ids, h.change, h.at);
+    });
+  }
+  var inClass = {};
+  (getStudents(cid) || []).forEach(function (s) {
+    if (s && s.id) inClass[s.id] = true;
+  });
+  Object.keys(out).forEach(function (sid) {
+    if (!inClass[sid]) delete out[sid];
+  });
+  return out;
+}
+
+/* Read a signed-in class's options (list_student_page_options). One read
+   at a time; a read within the last minute is not repeated unless `force`.
+   A Promise of true when the list was read. A server without the function
+   answers false, and the class's options are not offered again on this
+   page. Demo Mode reads nothing: a Promise of true. */
+function loadStudentPageOptions(cid, force) {
+  if (_spoOnDevice(cid)) return Promise.resolve(true);
+  if (!_spoOnServer(cid)) return Promise.resolve(false);
+  var read = _spoRead[cid] || (_spoRead[cid] = { state: '', at: 0, loading: null });
+  if (read.state === 'missing') return Promise.resolve(false);
+  if (read.loading) return read.loading;
+  if (!force && read.state === 'ok' && Date.now() - read.at < _SPO_STALE_MS) return Promise.resolve(true);
+  var began = _spoWrites[cid] || 0;
+  var asked = _callRpcWithAuthGuard('list_student_page_options', { p_course_id: cid }, Object.assign({}, _SPO_QUIET));
+  read.loading = asked.then(function (res) {
+    read.loading = null;
+    read.at = Date.now();
+    if (res && res.error) {
+      // Not on the server yet: nothing offered, nothing sent, and no report (the migration comes first).
+      if (_isMissingRpcError(res.error)) read.state = 'missing';
+      else {
+        if (!res.error.handledSessionExpired) console.warn('list_student_page_options failed:', res.error);
+        if (read.state !== 'ok') read.state = 'failed';
+      }
+      return false;
+    }
+    var data = _rpcObject(res && res.data);
+    if (!_spoReply(data)) {
+      if (read.state !== 'ok') read.state = 'failed';
+      return false;
+    }
+    // A change was sent or answered after this read began: its answer is newer than this list.
+    if (read.state === 'ok' && (_spoWrites[cid] || 0) !== began) return true;
+    /** @type {Record<string, { show_overall_grade: string; paused_at: string | null }>} */
+    var rows = {};
+    _rpcRows(data.options).forEach(function (r) {
+      if (!_plainObject(r) || typeof r.enrollment_id !== 'string') return;
+      var row = _spoFromServer(r);
+      if (_spoSet(row)) rows[r.enrollment_id] = row;
+    });
+    _spoServer[cid] = rows;
+    read.state = 'ok';
+    return true;
+  });
+  return read.loading;
+}
+
+/* Change the options of `studentIds` in class `cid`. `change` names
+   show_overall_grade ('class', 'show' or 'hide') and/or paused (true or
+   false). A Promise of { ok: true, options } (the class's options as now
+   shown, and signed in `skipped`: students the server left out because they
+   are no longer in the class), or { result: 'invalid' } (no students, more than 500, a student
+   not in the class, a wrong change or key), { result: 'not_available' }
+   (not offered for this class) or { result: 'failed' } (the server
+   refused it; what is shown goes back to the server's). Signed in, it
+   shows at once and goes through the outbox. */
+function setStudentPageOptions(cid, studentIds, change, key) {
+  if (!cid || !studentPageOptionsOffered(cid)) return Promise.resolve({ result: 'not_available' });
+  if (!Array.isArray(studentIds) || !studentIds.length || studentIds.length > _SPO_MAX_IDS) {
+    return Promise.resolve({ result: 'invalid' });
+  }
+  if (!_plainObject(change) || (key != null && !_idemKeyOk(key))) return Promise.resolve({ result: 'invalid' });
+  var names = Object.keys(change);
+  var ok =
+    names.length > 0 &&
+    names.every(function (k) {
+      if (k === 'show_overall_grade') return typeof change[k] === 'string' && !!_SPO_GRADE[change[k]];
+      if (k === 'paused') return typeof change[k] === 'boolean';
+      return false;
+    });
+  if (!ok) return Promise.resolve({ result: 'invalid' });
+  var inClass = {};
+  (getStudents(cid) || []).forEach(function (s) {
+    if (s && s.id) inClass[s.id] = true;
+  });
+  var ids = [];
+  var seen = {};
+  for (var i = 0; i < studentIds.length; i++) {
+    var sid = studentIds[i];
+    if (typeof sid !== 'string' || !inClass[sid]) return Promise.resolve({ result: 'invalid' });
+    if (!seen[sid]) ids.push(sid);
+    seen[sid] = true;
+  }
+  var at = new Date().toISOString();
+  var asked = {};
+  if ('show_overall_grade' in change) asked.show_overall_grade = change.show_overall_grade;
+  if ('paused' in change) asked.paused = change.paused;
+  if (_spoOnDevice(cid)) {
+    var kept = _spoDeviceKept(cid);
+    _spoLay(kept, ids, asked, at);
+    if (Object.keys(kept).length) _safeLSSet(_spoDeviceKey(cid), JSON.stringify(kept));
+    else {
+      try {
+        localStorage.removeItem(_spoDeviceKey(cid));
+      } catch (e) {
+        /* nothing kept */
+      }
+    }
+    return Promise.resolve({ ok: true, options: getStudentPageOptions(cid) });
+  }
+  return _setStudentPageOptionsLive(cid, ids, asked, key, at);
+}
+
+function _setStudentPageOptionsLive(cid, ids, change, key, at) {
+  var mine = { ids: ids.slice(), change: change, at: at };
+  (_spoHere[cid] = _spoHere[cid] || []).push(mine);
+  _spoWriteMoved(cid);
+  var sent = _writeRpc('set_student_page_options', {
+    p_course_id: cid,
+    p_enrollment_ids: ids.slice(),
+    p_show_overall_grade: typeof change.show_overall_grade === 'string' ? change.show_overall_grade : null,
+    p_paused: typeof change.paused === 'boolean' ? change.paused : null,
+    p_idempotency_key: _isUuid(key) ? key : _newEntryId(),
+  });
+  var done = Promise.resolve(sent).then(function (res) {
+    var here = _spoHere[cid] || [];
+    var at2 = here.indexOf(mine);
+    if (at2 >= 0) here.splice(at2, 1);
+    if (!here.length) delete _spoHere[cid];
+    _spoWriteMoved(cid);
+    var data = res && !res.error ? _rpcObject(res.data) : null;
+    if (_spoReply(data)) {
+      var server = _spoServer[cid] || (_spoServer[cid] = {});
+      _rpcRows(data.options).forEach(function (r) {
+        if (!_plainObject(r) || typeof r.enrollment_id !== 'string') return;
+        var row = _spoFromServer(r);
+        if (_spoSet(row)) server[r.enrollment_id] = row;
+        else delete server[r.enrollment_id];
+      });
+      /* Students the server skipped (no longer active in the class): nothing changed for them, and with
+         this change answered they show what the server has. */
+      var skipped = _rpcRows(data.skipped).filter(function (id) {
+        return typeof id === 'string';
+      });
+      return { ok: true, options: getStudentPageOptions(cid), skipped: skipped };
+    }
+    // Refused (P0002, 22023, PT401 are raised errors): the outbox's dead letter and the sync dot say so,
+    // and what is shown goes back to the server's, as set_course_feedback_options' callers do.
+    if (res && res.error && !res.error.handledSessionExpired && !res.error.refused) {
+      console.warn('set_student_page_options failed:', res.error);
+    }
+    return { result: 'failed' };
+  });
+  _trackPendingSync(done);
+  return done;
+}
+
+// The class's Show Overall Grade, as Preview and the student view read it (StudentView.learningOn).
+function _classShowsOverallGrade(cid) {
+  var cfg = getCourseConfig(cid) || {};
+  if (cfg.show_my_learning === true) return true;
+  return getCourseFeedbackOptions(cid).show_my_learning === true;
+}
+
+/* Whether student `sid` is shown their overall grade: their own Show or
+   Hide, else the class's Show Overall Grade. What Preview as Student and
+   the student view read, so Preview shows what that one student sees. */
+function effectiveShowOverallGrade(cid, sid) {
+  var own = sid ? getStudentPageOptions(cid)[sid] : null;
+  if (own && own.show_overall_grade === 'show') return true;
+  if (own && own.show_overall_grade === 'hide') return false;
+  return _classShowsOverallGrade(cid);
+}
+
+// Tests: what this page holds goes, as on a fresh page.
+function _forgetStudentPageOptions() {
+  _spoServer = {};
+  _spoRead = {};
+  _spoHere = {};
+  _spoWrites = {};
+}

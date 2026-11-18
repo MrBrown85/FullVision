@@ -96,11 +96,12 @@ function parse(html) {
   box.innerHTML = html;
   return box;
 }
-// Student, Card and Status of each row; a row's own buttons are rowButtons'.
+// Student, Card and Status of each row; a row's own buttons are rowButtons'. The Students list's other
+// columns (Feedback Opened, Work Sent, Overall Grade, the box to tick) are tests/student-page-students.test.js'.
 const rowsOf = box =>
   Array.from(box.querySelectorAll('.sc-table tbody tr')).map(tr =>
     Array.from(tr.children)
-      .filter(td => !td.classList.contains('sc-do'))
+      .filter(td => td.matches('.sc-name, .sc-which, .sc-status'))
       .map(td => td.textContent),
   );
 // The card's own buttons, above the list.
@@ -110,6 +111,16 @@ const rowButtons = box =>
   Array.from(box.querySelectorAll('.sc-table tbody tr')).map(tr =>
     Array.from(tr.querySelectorAll('.sc-do button')).map(b => b.getAttribute('aria-label')),
   );
+// The Card buttons in one student's panel (teacher/student-page-students.js): Unlock, Print New Card.
+const cardButtons = (cid, sid) => {
+  StudentPageStudents._setOpen(cid, sid);
+  try {
+    const box = parse(StudentCards.render(cid));
+    return Array.from(box.querySelectorAll('.sps-card-btns button')).map(b => b.getAttribute('aria-label'));
+  } finally {
+    StudentPageStudents._setOpen(cid, null);
+  }
+};
 // The lines under the buttons, one string each; null with none.
 const notesOf = box => {
   const lines = Array.from(box.querySelectorAll('.sc-note .sc-note-line')).map(e => e.textContent);
@@ -261,6 +272,10 @@ async function signedIn(opts = {}) {
   seedClass(LIVE, { students: opts.students || LIVE_STUDENTS, courseConfigs: ON });
   serverSaysStudentPageOn(LIVE);
   const session = signIn();
+  // The Students list reads the class's per-student options too (tests/student-page-students.test.js):
+  // the calls these tests count are the cards'.
+  const allSent = session.sent;
+  session.sent = () => allSent().filter(c => c[0] !== 'list_student_page_options');
   const tokens = [TOKEN];
   session.fake.auth = {
     getSession: async () => ({ data: { session: { access_token: tokens[0] } }, error: null }),
@@ -654,7 +669,7 @@ describe('the list in Class Settings › Student Page', () => {
     seedDemo();
     onPage = CID;
     let box = parse(StudentCards.render(CID));
-    expect(box.querySelector('h2').textContent).toBe('Student Cards');
+    expect(box.querySelector('h2').textContent).toBe('Students');
     expect(noteOf(box)).toBe('Loading cards…');
     expect(box.querySelector('.sc-table')).toBe(null);
     expect(buttons(box)).toEqual([]);
@@ -662,9 +677,12 @@ describe('the list in Class Settings › Student Page', () => {
     box = parse(StudentCards.render(CID));
     expect(noteOf(box)).toBe(null);
     expect(Array.from(box.querySelectorAll('.sc-table thead th')).map(th => th.textContent)).toEqual([
+      '',
       'Student',
       'Card',
       'Status',
+      'Work Sent',
+      'Overall Grade',
       '',
     ]);
     // No card yet: nothing on a row to press.
@@ -716,15 +734,11 @@ describe('the list in Class Settings › Student Page', () => {
       expect(sum.querySelector('button').textContent).toBe('Manage Cards');
       // Avery's never-printed card, and Fay with none; cards students hold, so New Codes for This Class.
       expect(buttons(box)).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
-      // Dee's is locked: Unlock on her row. Every card can be replaced.
-      expect(rowButtons(box)).toEqual([
-        ['Print a New Card for Jordan Abel'],
-        ['Print a New Card for Avery Byrne'],
-        ['Print a New Card for Cam Cole'],
-        ['Unlock Dee Dunn’s Card', 'Print a New Card for Dee Dunn'],
-        ['Print a New Card for Eli Eng'],
-        [],
-      ]);
+      // Dee's is locked: Unlock on her row. Every card can be replaced, from the student's panel.
+      expect(rowButtons(box)).toEqual([[], [], [], ['Unlock Dee Dunn’s Card'], [], []]);
+      expect(cardButtons(LIVE, U(14))).toEqual(['Unlock Dee Dunn’s Card', 'Print a New Card for Dee Dunn']);
+      expect(cardButtons(LIVE, U(11))).toEqual(['Print a New Card for Jordan Abel']);
+      expect(cardButtons(LIVE, U(16))).toEqual([]);
     } finally {
       vi.useRealTimers();
       t.session.signOut();
@@ -1502,7 +1516,7 @@ describe('Print New Card', () => {
     const first = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data.results[0];
     StudentCards._reset();
     await shown(CID);
-    expect(rowButtons(parse(StudentCards.render(CID)))[0]).toEqual(['Print a New Card for Jordan Abel']);
+    expect(cardButtons(CID, 's1')).toEqual(['Print a New Card for Jordan Abel']);
     press('spCardsNewCard', CID, { student: 's1' });
     await afterDraw();
     expect(asked).toEqual([]);
@@ -1539,7 +1553,7 @@ describe('Print New Card', () => {
       });
       t.fn.markPrinted([U(901)]);
       await shown(LIVE);
-      expect(rowButtons(parse(StudentCards.render(LIVE)))).toEqual([['Print a New Card for Cece Abel']]);
+      expect(cardButtons(LIVE, U(11))).toEqual(['Print a New Card for Cece Abel']);
       press('spCardsNewCard', LIVE, { student: U(11) });
       expect(asked.length).toBe(1);
       expect(asked[0].title).toBe('Print a New Card for Cece?');
@@ -1614,7 +1628,7 @@ describe('Print New Card', () => {
     expect(asked.map(q => q.title)).toEqual(['Print a New Card for Jordan?']);
     expect(storedCards()[0].id).toBe(made.card_id);
     // A student with no card has no Print New Card; asked for anyway, it is a first card, with no question.
-    expect(rowButtons(parse(StudentCards.render(CID)))[1]).toEqual([]);
+    expect(cardButtons(CID, 's2')).toEqual([]);
     expect(await StudentCards.printNewCard(CID, 's2')).toBe(1);
     expect(asked.length).toBe(1);
     expect(sheets[0].names).toEqual(['Avery Byrne']);
@@ -1728,7 +1742,7 @@ describe('Print New Card', () => {
       expect(reads()).toBe(before + 1);
       expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
         'Could not make the card. Check the connection and try again.',
-        '1 student still has their old card: Cam Cole. Use Print New Card on their row to try again.',
+        '1 student still has their old card: Cam Cole. Choose their name, then Print New Card, to try again.',
       ]);
     } finally {
       t.session.signOut();
@@ -1949,7 +1963,7 @@ describe('New Codes for This Class', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(notesOf(box)).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-        '2 students still have their old card: Avery Byrne, Cam Cole. Use Print New Card on their rows to try again.',
+        '2 students still have their old card: Avery Byrne, Cam Cole. Choose each name, then Print New Card, to try again.',
       ]);
       // Print New Card on one of them: the line names the other only.
       StudentCards._setBatch(250);
@@ -1961,7 +1975,7 @@ describe('New Codes for This Class', () => {
       await afterDraw();
       expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-        '1 student still has their old card: Cam Cole. Use Print New Card on their row to try again.',
+        '1 student still has their old card: Cam Cole. Choose their name, then Print New Card, to try again.',
       ]);
     } finally {
       t.session.signOut();
@@ -2103,14 +2117,16 @@ describe('Unlock and Unlock All', () => {
     await shown(CID);
     let box = parse(StudentCards.render(CID));
     expect(buttons(box)).toEqual(['New Codes for This Class']);
-    expect(rowButtons(box)[0]).toEqual(['Unlock Jordan Abel’s Card', 'Print a New Card for Jordan Abel']);
+    expect(rowButtons(box)[0]).toEqual(['Unlock Jordan Abel’s Card']);
+    expect(cardButtons(CID, 's1')).toEqual(['Unlock Jordan Abel’s Card', 'Print a New Card for Jordan Abel']);
     press('spCardsUnlock', CID, { card: made[0].card_id });
     await quiet(CID);
     expect(storedCards()[0].locked_at).toBe(null);
     expect(storedCards()[0].wrong_tries).toBe(0);
     box = parse(StudentCards.render(CID));
     expect(rowsOf(box)[0][2]).toMatch(/^Printed /);
-    expect(rowButtons(box)[0]).toEqual(['Print a New Card for Jordan Abel']);
+    expect(rowButtons(box)[0]).toEqual([]);
+    expect(cardButtons(CID, 's1')).toEqual(['Print a New Card for Jordan Abel']);
 
     // Two locked: Unlock All, and it clears both.
     const again = storedCards();
@@ -2435,7 +2451,11 @@ describe('an old card stopped and the new one not printed', () => {
       // Until the list read again lands, nothing is said about what became of the card, and the buttons are off.
       let box = parse(StudentCards.render(LIVE));
       expect(notesOf(box)).toEqual(['Checking which cards were made…']);
-      expect(box.querySelector('[data-action="spCardsNewCard"]').hasAttribute('disabled')).toBe(true);
+      // Print New Card is in the student's panel.
+      StudentPageStudents._setOpen(LIVE, U(11));
+      const panel = parse(StudentCards.render(LIVE));
+      StudentPageStudents._setOpen(LIVE, null);
+      expect(panel.querySelector('[data-action="spCardsNewCard"]').hasAttribute('disabled')).toBe(true);
       land({ data: t.fn.cardsListed(), error: null });
       await afterDraw();
       box = parse(StudentCards.render(LIVE));
@@ -2482,7 +2502,7 @@ describe('an old card stopped and the new one not printed', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(notesOf(box)).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-        '1 student still has their old card: Cam Cole. Use Print New Card on their row to try again.',
+        '1 student still has their old card: Cam Cole. Choose their name, then Print New Card, to try again.',
         "1 student's old card has stopped and the new one didn't print: Avery Byrne. Press Make and Print 1 Card to print it.",
       ]);
     } finally {
@@ -2798,13 +2818,14 @@ describe('the filters', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(box.querySelector('.sc-filters').getAttribute('role')).toBe('radiogroup');
       expect(box.querySelector('.sc-filters').getAttribute('aria-label')).toBe('Show');
+      // The Students list's own filters are tests/student-page-students.test.js'.
       expect(filtersOf(box)).toEqual([
         ['All 5', 'true'],
         ['Not Printed 2', 'false'],
         ['Locked 1', 'false'],
         ['Never Opened 2', 'false'],
       ]);
-      // Chips coloured by meaning: Not Printed amber, Locked red.
+      // Chips coloured by meaning: Not Printed amber, Locked red; one with nobody in it is not coloured.
       expect(Array.from(box.querySelectorAll('.sc-chip')).map(b => b.className)).toEqual([
         'sc-chip active',
         'sc-chip sc-chip-warn',
@@ -2875,7 +2896,7 @@ describe('the filters', () => {
     await StudentCards.makeAndPrint(CID);
     await afterDraw();
     const box = parse(StudentCards.render(CID));
-    expect(filtersOf(box)[1]).toEqual(['Not Printed 0', 'true']);
+    expect(filtersOf(box).find(f => f[0].startsWith('Not Printed'))).toEqual(['Not Printed 0', 'true']);
     // With nothing in it, Not Printed is not amber.
     expect(box.querySelector('.sc-chip-warn')).toBe(null);
     expect(emptyOf(box)).toBe('Every student has a printed card.');

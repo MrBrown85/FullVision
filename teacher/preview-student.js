@@ -36,6 +36,8 @@ window.PreviewStudent = (function () {
   var _onLeave = null;
 
   var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
+  // What a student reads when their card does not open their page (s/student.js, card_closed).
+  var CLOSED_LINE = 'The student page is turned off for this class. Ask your teacher.';
 
   /* The view the device draws. Opened by See What They'd See (S13-F1),
      My Learning is worked out as if the class showed it, for this preview
@@ -117,7 +119,7 @@ window.PreviewStudent = (function () {
         'Your Result',
         'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
       ) +
-      (StudentView.learningOn(cid) || (_open && _open.learning)
+      (StudentView.learningOn(cid, _open && _open.sid) || (_open && _open.learning)
         ? _item('My Learning', 'Their grade, only from work you’ve returned.')
         : '') +
       (_commentsSeen(view) ? _item('Your comment and criterion comments', 'Word for word, as you wrote them.') : '') +
@@ -131,6 +133,21 @@ window.PreviewStudent = (function () {
         : '') +
       '</ul></section>'
     );
+  }
+
+  // Why the grade is not shown: the class's switch, or this one student's Hide (per-student options).
+  function _gradeOffLine(first, cid, sid) {
+    var own = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid)[sid] : null;
+    if (own && own.show_overall_grade === 'hide') {
+      return 'Show Overall Grade is off for ' + first + '. Change it in Class Settings › Student Page.';
+    }
+    return 'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.';
+  }
+
+  // True when this student's page is paused (per-student options).
+  function _pausedFor(cid, sid) {
+    var own = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid)[sid] : null;
+    return !!(own && own.paused_at);
   }
 
   function _notSeenHtml(first, cid, sid, ready) {
@@ -149,12 +166,12 @@ window.PreviewStudent = (function () {
       _item('Grades you haven’t returned', drafts) +
       _item('Other students', 'No class average, no one else’s work.') +
       _item('Your private notes', 'Observations marked Private stay with you.') +
-      (StudentView.learningOn(cid) || (_open && _open.learning)
+      (StudentView.learningOn(cid, sid) || (_open && _open.learning)
         ? ''
-        : _item(
-            'Their grade',
-            'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.',
-          )) +
+        : _item('Their grade', _gradeOffLine(first, cid, sid))) +
+      (_pausedFor(cid, sid)
+        ? _item('Their page', 'Paused. ' + first + '’s card doesn’t open it until you choose Open.')
+        : '') +
       '</ul></section>'
     );
   }
@@ -169,10 +186,13 @@ window.PreviewStudent = (function () {
     var first = displayNameFirst(st) || 'The student';
     var full = displayNameWithLast(st) || first;
     var built = _fromCache(cid, sid);
-    var screen = built.ready
-      ? drawPage(built.view, _open.ui)
-      : // html-safe: fixed markup
-        '<div class="ps-waiting" role="status">Loading this class…</div>';
+    // A paused student's card opens nothing: the phone shows what the student reads (s/student.js, card_closed).
+    var screen = _pausedFor(cid, sid)
+      ? '<div class="ps-closed" role="status"><p class="ps-closed-line">' + esc(CLOSED_LINE) + '</p></div>'
+      : built.ready
+        ? drawPage(built.view, _open.ui)
+        : // html-safe: fixed markup
+          '<div class="ps-waiting" role="status">Loading this class…</div>';
     var device = _open.device;
     var seg = ['phone', 'chromebook']
       .map(function (d) {

@@ -1039,9 +1039,10 @@
      send is the class's id; the page needs none and gives a real class a
      key of its own. */
   function demoPage(system, enrollment) {
+    if (enrollment !== DEMO_SECOND && StudentData.demoPaused(localStorage)) return { ok: false, error: 'closed' };
     var cls = demoClassFor(enrollment);
     var seen = (demo && demo.seen) || {};
-    var learning = !(demo && demo.noLearning);
+    var learning = StudentData.demoShowsGrade(!(demo && demo.noLearning), enrollment === DEMO_SECOND, localStorage);
     return {
       ok: true,
       v: 1,
@@ -1108,6 +1109,7 @@
      class's card: any code opens it. */
   function demoCard() {
     if (demo.wrong >= DEMO.tries) return { ok: false, error: 'card_locked' };
+    if (!adding && StudentData.demoPaused(localStorage)) return { ok: false, error: 'closed' }; // paused by the teacher
     var cls = adding ? demoSecondClass() : demoClass();
     return {
       ok: true,

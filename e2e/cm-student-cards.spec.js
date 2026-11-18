@@ -88,8 +88,8 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
 
   await page.goto('/dashboard?manage=student-page');
   const card = page.locator('.sc-card');
-  await expect(card.getByRole('heading', { name: 'Student Cards' })).toBeVisible();
-  await expect(card).toContainText('One card for each student. They scan it, or type its code, to open their page.');
+  await expect(card.getByRole('heading', { name: 'Students', exact: true })).toBeVisible();
+  await expect(card).toContainText('They scan their card, or type its code, to open their page.');
   const order = await page.evaluate(() => {
     var a = document.querySelector('.sp-card').getBoundingClientRect();
     var b = document.querySelector('.sc-card').getBoundingClientRect();
@@ -100,7 +100,15 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
   // Every student, A to Z, with no card yet; one button.
   const rows = card.locator('.sc-table tbody tr');
   await expect(rows).toHaveCount(at.count);
-  await expect(card.locator('.sc-table thead th')).toHaveText(['Student', 'Card', 'Status', '']);
+  await expect(card.locator('.sc-table thead th')).toHaveText([
+    '',
+    'Student',
+    'Card',
+    'Status',
+    'Work Sent',
+    'Overall Grade',
+    '',
+  ]);
   await expect(card.locator('.sc-name')).toHaveText(at.names);
   await expect(card.locator('.sc-which')).toHaveText(at.names.map(() => 'No Card Yet'));
   await expect(card.locator('.sc-actions button')).toHaveText(['Make and Print ' + at.count + ' Cards']);
@@ -272,8 +280,9 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   const all = [(await sheets(page))[0]];
   await expect(actions).toHaveText(['Print Again', 'New Codes for This Class']);
 
-  // Print New Card for the first student: the question, in the design's words.
+  // Print New Card for the first student, from the panel their name opens: the question, in the design's words.
   const first = at.firsts[0];
+  await card.getByRole('button', { name: at.names[0], exact: true }).click();
   await card.getByRole('button', { name: 'Print a New Card for ' + at.names[0] }).click();
   let ask = page.getByRole('dialog', { name: 'Print a New Card for ' + first + '?' });
   await expect(ask).toBeVisible();
@@ -321,6 +330,9 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
     '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
   );
   await noCodeKept(page, all, keptBefore);
+  // Escape closes the panel.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sps-panel')).toHaveCount(0);
 
   // A student added later has no card: New Codes for This Class counts them as a first card.
   await page.evaluate(cid => {
@@ -407,6 +419,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
 
   // Back from the Back cache after pagehide: the list is drawn again, with no dead Print Again.
   await catchPrints(page);
+  await card.getByRole('button', { name: at.names[1], exact: true }).click();
   await card.getByRole('button', { name: 'Print a New Card for ' + at.names[1] }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Print New Card' }).click();
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
@@ -439,8 +452,10 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await page.goto('/dashboard?manage=student-page');
   const card = page.locator('.sc-card');
   const filters = card.getByRole('radiogroup', { name: 'Show' });
+  // The Students list's own filters come after All (e2e/student-page-options.spec.js has them).
   await expect(filters.getByRole('radio')).toHaveText([
     'All ' + at.count,
+    'Exceptions 0',
     'Not Printed ' + at.count,
     'Locked 0',
     'Never Opened 0',
@@ -463,6 +478,7 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await page.goto('/dashboard?manage=student-page');
   await expect(filters.getByRole('radio')).toHaveText([
     'All ' + at.count,
+    'Exceptions 0',
     'Not Printed 0',
     'Locked 1',
     'Never Opened ' + (at.count - 1),
