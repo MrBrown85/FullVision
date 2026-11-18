@@ -15,10 +15,10 @@
      quiz-send  { assessment_id }   closes the try
    Only the keys the model names are read from an answer.
 
-   Which pieces are quizzes: the page marks them (an assessment row's
-   `quiz: true`, read by SP.quizMarks below, only with the switch on). A
-   piece the server does not mark gets no button, so until the server has the
-   routes the page offers nothing (plan, rule 7).
+   Which pieces are quizzes: `quiz-list`, asked once beside `page` (below).
+   A piece it does not name gets no button, and a server without the route
+   gets none at all, so until the server has the routes the page offers
+   nothing (plan, rule 7).
 
    Saving: s/quiz-model.js's saver. An answer that does not land waits on the
    phone, is sent again, and "Saved on this phone. It'll send when you're back
@@ -44,6 +44,10 @@
   var NETWORK = 'Couldn’t reach FullVision. Check your internet and try again.';
   var DEMO_TRIES = 2;
   var DEMO_AID = 'demo-quiz-check';
+  // Demo Mode's progress: a gb- key, so Log Out, Reset Demo Data and leaving Demo Mode all clear it.
+  var DEMO_KEY = 'gb-student-quiz-demo';
+  /** @type {Record<string, any> | null} */
+  var list = null; // quiz-list's answer for the student on screen: { student, items: { assessment id: item } }
 
   /** @type {any} */
   var S = null; // the page's state (student.js)
@@ -52,7 +56,7 @@
   /** @type {Record<string, string>} */
   var known = {}; // aid -> 'part' or 'sent', as far as this tab has seen: the card's button words
   /** @type {any} */
-  var demoStore = null; // Demo Mode's tries, this tab's memory only
+  var demoStore = null; // Demo Mode's tries, kept on this device (DEMO_KEY) like the rest of Demo Mode
 
   function on() {
     return typeof BuildFlags !== 'undefined' && BuildFlags.on('quizzes');
@@ -136,7 +140,6 @@
         unit: 'Unit 1: Cells',
         category: 'Quizzes',
         about: 'Answer each question. Your answers save as you go, and you can send them when you are done.',
-        quiz: true,
       },
     ];
   };
@@ -185,8 +188,70 @@
 
   /** What the three routes would answer, from this tab's memory. @param {string} route @param {any} body */
   function demoAsk(route, body) {
-    if (!demoStore) demoStore = { attempts: [] };
-    var st = demoStore;
+    var st = demoLoad();
+    try {
+      return demoStep(st, route, body);
+    } finally {
+      demoKeep();
+    }
+  }
+
+  function demoLoad() {
+    if (demoStore) return demoStore;
+    demoStore = { attempts: [] };
+    try {
+      var kept = JSON.parse(localStorage.getItem(DEMO_KEY) || 'null');
+      if (kept && Array.isArray(kept.attempts)) demoStore = kept;
+    } catch (e) {
+      /* nothing kept: a first try */
+    }
+    return demoStore;
+  }
+  function demoKeep() {
+    try {
+      if (demoStore && demoStore.attempts.length) localStorage.setItem(DEMO_KEY, JSON.stringify(demoStore));
+    } catch (e) {
+      /* storage blocked: the page keeps it for now */
+    }
+  }
+  // Demo Mode: an answer is on the device the moment it changes, as a real one is on the tab, so a reload loses none.
+  /** @param {Record<string, { value: any }>} pending */
+  function demoTake(pending) {
+    var st = demoLoad();
+    var last = st.attempts[st.attempts.length - 1];
+    if (!last || last.sentAt) return;
+    Object.keys(pending).forEach(function (qid) {
+      var v = pending[qid].value;
+      if (v == null) delete last.answers[qid];
+      else last.answers[qid] = v;
+    });
+    demoKeep();
+  }
+  function demoWipe() {
+    demoStore = null;
+    try {
+      localStorage.removeItem(DEMO_KEY);
+    } catch (e) {
+      /* nothing kept */
+    }
+  }
+
+  /** What `quiz-list` would answer for the sample quiz. */
+  function demoItem() {
+    var st = demoLoad();
+    var last = st.attempts[st.attempts.length - 1];
+    var open = !!last && !last.sentAt;
+    return {
+      assessment_id: DEMO_AID,
+      tries_left: DEMO_TRIES - st.attempts.length,
+      can_answer: true,
+      closed: false,
+      has_open_try: open,
+    };
+  }
+
+  /** @param {any} st @param {string} route @param {any} body */
+  function demoStep(st, route, body) {
     var iso = new Date().toISOString();
     var last = st.attempts[st.attempts.length - 1];
     function fresh() {
@@ -246,28 +311,108 @@
     );
   }
 
-  /* The cards' button words, from what this tab has seen (assignments.js hands the view over), and which
-     pieces are quizzes: the ones the page's rows mark `quiz: true`, with the quizzes switch on only. */
-  SP.quizMarks = function (/** @type {any} */ v, /** @type {any} */ state) {
-    if (!on() || !v || !Array.isArray(v.work)) return;
-    var marked = {};
-    var rows = state && state.reply && Array.isArray(state.reply.assessments) ? state.reply.assessments : [];
-    rows.forEach(function (/** @type {any} */ r) {
-      if (r && r.quiz === true && typeof r.id === 'string') marked[r.id] = true;
+  /* ── Which pieces are quizzes ──────────────────────────────
+     `quiz-list` (the student's own class): { ok, quizzes: [ { assessment_id,
+     tries_left, can_answer, closed, has_open_try } ] }. Asked once beside `page`
+     when a class opens (s/app.js openPage, quizzesWith), only with the quizzes
+     switch on, never on a timer; its answer is waited for a second at most,
+     and a later one draws the cards when it comes. A route the server lacks,
+     a 404, a 500 or no answer means no quiz buttons and nothing said. A card
+     says what the list says: Start the Quiz, Carry On with the Quiz (a try is
+     open), Try Again (a try was sent here and tries are left), See Your Quiz,
+     or Closed. What this tab does to a quiz after that updates its entry
+     (touch); the server is not asked again. */
+  var WAIT_MS = 1000;
+
+  /** @param {any} res @returns {Record<string, any> | null} */
+  function itemsFrom(res) {
+    if (!res || res.ok !== true || !Array.isArray(res.quizzes)) return null;
+    /** @type {Record<string, any>} */
+    var items = {};
+    res.quizzes.forEach(function (/** @type {any} */ r) {
+      if (!r || typeof r.assessment_id !== 'string' || !r.assessment_id) return;
+      items[r.assessment_id] = {
+        assessment_id: r.assessment_id,
+        tries_left: typeof r.tries_left === 'number' && isFinite(r.tries_left) ? r.tries_left : null,
+        can_answer: r.can_answer === true,
+        closed: r.closed === true,
+        has_open_try: r.has_open_try === true,
+      };
     });
+    return items;
+  }
+
+  /** @param {any} mine the session being opened (s/app.js) @param {Promise<any>} pageAsked */
+  SP.quizzesWith = function (mine, pageAsked) {
+    if (!on() || !mine || !mine.enrollment) return pageAsked;
+    var student = String(mine.enrollment);
+    if (S && S.demo) {
+      list = { student: student, items: {} };
+      list.items[DEMO_AID] = demoItem();
+      return pageAsked;
+    }
+    /** @type {{ student: string, items: Record<string, any> | null }} */
+    var mineList = { student: student, items: null };
+    list = mineList;
+    var got = Promise.resolve(SP.askClass('quiz-list', {}, student)).then(
+      function (/** @type {any} */ res) {
+        if (list !== mineList) return;
+        if (res && M.SESSION_OVER[String(res.error)]) {
+          if (typeof SP.sessionRefused === 'function') SP.sessionRefused({ ok: false, error: String(res.error) });
+          return;
+        }
+        mineList.items = itemsFrom(res);
+        // An answer after the first draw: the cards are drawn again where the student is.
+        if (mineList.items && S && S.screen === 'assignments' && S.page && S.page.student.id === student) paint();
+      },
+      function () {
+        /* no answer: no quiz buttons */
+      },
+    );
+    return SP.whileCurrent(
+      Promise.resolve(pageAsked).then(function (res) {
+        return new Promise(function (done) {
+          var t = setTimeout(function () {
+            done(res);
+          }, WAIT_MS);
+          got.then(function () {
+            clearTimeout(t);
+            done(res);
+          });
+        });
+      }),
+    );
+  };
+
+  /* The cards' quiz buttons, from the list (assignments.js hands the view over). */
+  SP.quizMarks = function (/** @type {any} */ v, /** @type {any} */ state) {
+    if (!on() || !v || !Array.isArray(v.work) || !list || !list.items) return;
+    if (!state || !state.page || !state.page.student || list.student !== state.page.student.id) return;
+    var items = list.items;
     v.work.forEach(function (/** @type {any} */ p) {
-      if (!marked[p.id] || (p.kind !== 'due' && p.kind !== 'missing')) return;
+      var it = items[p.id];
+      if (!it || (p.kind !== 'due' && p.kind !== 'missing')) return;
       p.quiz = true;
-      if (known[p.id] === 'sent') p.quizWord = 'See Your Quiz';
-      else if (known[p.id] === 'part') p.quizWord = 'Carry On with the Quiz';
+      var more = it.tries_left == null || it.tries_left > 0;
+      // Closed before it was sent (a try is open and cannot be answered), or closed with none started.
+      if (!it.can_answer && (it.closed || it.has_open_try)) p.quizWord = 'Closed';
+      else if (it.has_open_try) p.quizWord = 'Carry On with the Quiz';
+      else if (!it.can_answer) p.quizWord = 'See Your Quiz';
+      else if (known[p.id] === 'sent') p.quizWord = more ? 'Try Again' : 'See Your Quiz';
     });
   };
 
-  /** @param {any} q */
+  /** What this tab has seen of a quiz, and its entry in the list brought up to date. @param {any} q */
   function remember(q) {
     if (!q.m) return;
     var n = M.counts(q.m, q.answers);
     known[q.aid] = q.m.sent ? 'sent' : n.done ? 'part' : '';
+    var it = list && list.items ? list.items[q.aid] : null;
+    if (!it) return;
+    it.has_open_try = !q.m.sent && q.m.tryNumber > 0;
+    it.tries_left = q.m.triesLeft;
+    it.closed = q.m.closed;
+    it.can_answer = q.m.canAnswer || q.m.canTryAgain;
   }
 
   /* ── The open quiz ─────────────────────────────────────── */
@@ -345,7 +490,8 @@
         return ask('quiz-save', { assessment_id: q.aid, question_id: qid, answer: answer });
       },
       persist: function (/** @type {Record<string, any>} */ pending) {
-        if (!(S && S.demo)) M.keepPending(q.student, q.aid, pending);
+        if (S && S.demo) demoTake(pending);
+        else M.keepPending(q.student, q.aid, pending);
       },
       onStatus: function (/** @type {any} */ s) {
         q.status = s;
@@ -638,7 +784,8 @@
         if (Q && Q.saver) Q.saver.stop();
         Q = null;
         known = {};
-        demoStore = null;
+        list = null;
+        demoWipe();
         M.wipeKept();
       }
       S = state;

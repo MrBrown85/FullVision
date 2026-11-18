@@ -1025,7 +1025,7 @@
         // Missing and Excused win at once: no grade is sent under either.
         var hidden = w.status === 'NS' || w.status === 'EXC';
         var back = rows ? w.ret : null;
-        var row = {
+        return {
           id: w.id,
           title: w.title,
           date: w.date,
@@ -1053,9 +1053,6 @@
           grade: hidden ? null : copyOf(rows),
           previous: hidden || !back || !back.previous_copy ? null : copyOf(demoRows(back.previous_copy)),
         };
-        // The sample quiz is marked as the server marks a quiz (s/quiz.js).
-        if (w.quiz === true) row.quiz = true;
-        return row;
       }),
     };
   }
@@ -2210,6 +2207,8 @@
     var asked = ask('page', { session: mine.token, enrollment_id: mine.enrollment });
     // With Bulletins on, `bulletins` is asked beside it and waited for a second at most (s/bulletins.js).
     if (StudentPage.bulletinsWith) asked = StudentPage.bulletinsWith(mine, asked);
+    // With Quizzes on, `quiz-list` is asked beside it, once (s/quiz.js).
+    if (StudentPage.quizzesWith) asked = StudentPage.quizzesWith(mine, asked);
     return asked.then(function (res) {
       S.sending = false;
       if (!(res && res.ok && typeof StudentData !== 'undefined')) {
@@ -2307,10 +2306,11 @@
     'bulletin-seen': 1,
     'bulletin-react': 1,
     'bulletin-files': 1,
-    // Quizzes: open, save an answer, send (docs/plans/quizzes-plan.md Q3b; s/quiz.js).
+    // Quizzes: which pieces are quizzes, open, save an answer, send (docs/plans/quizzes-plan.md Q3b; s/quiz.js).
     quiz: 1,
     'quiz-save': 1,
     'quiz-send': 1,
+    'quiz-list': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });

@@ -114,6 +114,7 @@ test('Log Out leaves nothing of the answers on the device', async ({ page }) => 
   await page.locator('[data-act="quiz-back"]').click();
   await page.locator('.sp-gear').click();
   await page.locator('.sp-set-out').click();
+  await page.waitForTimeout(500); // Log Out? takes no press for 400 ms
   await page
     .getByRole('button', { name: /^Log Out$/ })
     .last()
@@ -121,4 +122,31 @@ test('Log Out leaves nothing of the answers on the device', async ({ page }) => 
   const kept = await page.evaluate(() => JSON.stringify([{ ...localStorage }, { ...sessionStorage }]));
   // The build switch is the device's own; nothing else of a quiz is left.
   expect(kept.replace('fv-build-quizzes', '')).not.toMatch(/quiz/i);
+});
+
+test('Demo Mode keeps the sample progress on the device across a reload, and Log Out clears it', async ({ page }) => {
+  await demo(page);
+  await start(page).click();
+  await answer(page, page.locator('.sp-quiz-q').first());
+  await expect(page.locator('#sp-quiz-count')).toHaveText('1 of 6 answered');
+  await page.locator('[data-act="quiz-back"]').click();
+  const keys = await page.evaluate(() => Object.keys(localStorage));
+  expect(keys).toContain('gb-student-quiz-demo');
+  await openDemo(page, {}, 'demo-card');
+  await expect(start(page)).toHaveText('Carry On with the Quiz');
+  await start(page).click();
+  await page.getByRole('button', { name: /^Carry On at Question \d+$/ }).click();
+  await expect(page.locator('#sp-quiz-count')).toHaveText('1 of 6 answered');
+  await page.locator('[data-act="quiz-back"]').click();
+  await page.locator('.sp-gear').click();
+  await page.locator('.sp-set-out').click();
+  await page.waitForTimeout(500); // Log Out? takes no press for 400 ms
+  await page
+    .getByRole('button', { name: /^Log Out$/ })
+    .last()
+    .click();
+  const left = await page.evaluate(() =>
+    Object.keys(localStorage).filter(k => /quiz/.test(k) && k !== 'fv-build-quizzes'),
+  );
+  expect(left).toEqual([]);
 });

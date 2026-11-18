@@ -3,7 +3,7 @@
  * as a browser loads it (tests/helpers/student-page-context.js). The three
  * routes (quiz, quiz-save, quiz-send) are answered here as the contract
  * ("The student's side (MQ2)") says; they are not on the deployed function
- * yet. The `page` reply marks a quiz piece with `quiz: true`. No test waits
+ * yet. `quiz-list` names the pieces that are quizzes. No test waits
  * on real time.
  */
 import { readFileSync } from 'node:fs';
@@ -33,10 +33,19 @@ const Q = [
 
 function world(opts = {}) {
   const fn = fakeStudentSubmit({ cards: [sampleCard(TODAY)] });
-  const db = { answers: {}, sent: false, saves: [], missing: !!opts.missing, offline: false };
+  const db = {
+    closed: !!opts.closed,
+    answers: {},
+    sent: false,
+    started: false,
+    listed: 0,
+    saves: [],
+    missing: !!opts.missing,
+    offline: false,
+  };
   const reply = () => ({
     ok: true,
-    quiz: { tries: 1, tries_left: 0, closed: false, closes_on: null },
+    quiz: { tries: 1, tries_left: 0, closed: db.closed, closes_on: null },
     try: {
       number: 1,
       sent: db.sent,
@@ -45,16 +54,35 @@ function world(opts = {}) {
       reopened: false,
     },
     sent_tries: db.sent ? 1 : 0,
-    can_answer: !db.sent,
+    can_answer: !db.sent && !db.closed,
     can_try_again: false,
     questions: Q,
     answers: db.answers,
   });
   const server = async body => {
+    if (body.route === 'quiz-list') {
+      db.listed += 1;
+      if (db.missing || opts.unmarked) return { ok: false, error: 'bad_request' };
+      return {
+        ok: true,
+        quizzes: [
+          {
+            assessment_id: WORK.fair,
+            tries_left: 0,
+            can_answer: !db.sent && !db.closed,
+            closed: db.closed,
+            has_open_try: !db.sent && (db.started || !!opts.closed),
+          },
+        ],
+      };
+    }
     if (/^quiz/.test(body.route)) {
-      if (db.missing) return { ok: false, error: 'bad_request' };
+      if (db.missing || (opts.openMissing && body.route === 'quiz')) return { ok: false, error: 'bad_request' };
       if (db.offline) return { ok: false, error: 'network' };
-      if (body.route === 'quiz') return reply();
+      if (body.route === 'quiz') {
+        db.started = true;
+        return reply();
+      }
       if (db.sent) return { ok: false, error: 'sent' };
       if (body.route === 'quiz-save') {
         db.saves.push([body.question_id, body.answer]);
@@ -66,10 +94,8 @@ function world(opts = {}) {
       return { ok: true, try: 1, sent_at: '2026-11-18T18:00:00+00:00', tries_left: 0, can_try_again: false };
     }
     const res = await fn.handle(body);
-    if (body.route === 'page' && res.ok && !opts.unmarked) {
-      const piece = res.assessments.find(a => a.id === WORK.fair);
-      piece.quiz = true;
-      piece.due_date = TODAY; // due today: Outstanding, where a card with a button is drawn
+    if (body.route === 'page' && res.ok) {
+      res.assessments.find(a => a.id === WORK.fair).due_date = TODAY; // due today: Outstanding, where a card with a button is drawn
     }
     return res;
   };
@@ -92,23 +118,74 @@ describe('Start the Quiz', () => {
     expect(start(page).textContent).toBe('Start the Quiz');
     expect(routes(page)).not.toContain('quiz');
   });
+  it('is asked for once, beside page, and not again', async () => {
+    const w = world();
+    const page = await signIn(w);
+    await page.settle();
+    expect(routes(page).filter(r => r === 'quiz-list')).toEqual(['quiz-list']);
+    expect(routes(page).indexOf('quiz-list')).toBeGreaterThan(routes(page).indexOf('page') - 1);
+    page.runTicks();
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
+    expect(w.db.listed).toBe(1);
+  });
+  it('says Carry On once a try is open, from what this tab has seen', async () => {
+    const page = await signIn(world());
+    await page.click('[data-act="quiz-open"]');
+    await page.settle();
+    await page.click('[data-act="quiz-back"]');
+    expect(start(page).textContent).toBe('Carry On with the Quiz');
+  });
   it('is nowhere with the switch off, and nothing is asked', async () => {
     const page = await signIn(world(), {});
     expect(start(page)).toBe(null);
     expect(page.root().innerHTML).not.toMatch(/quiz/i);
     await page.settle();
-    expect(routes(page).filter(r => /^quiz/.test(r))).toEqual([]);
+    expect(routes(page).filter(r => /^quiz/.test(r))).toEqual([]); // no request of ours: the page's own are main's
+    expect(Object.keys(page.store)).toEqual(['fv-s-session']);
   });
   it('is nowhere when the server marks no piece (until the server has it, the page offers nothing)', async () => {
     const page = await signIn(world({ unmarked: true }));
     expect(start(page)).toBe(null);
   });
-  it('opening it with the routes missing says so plainly and offers no retry', async () => {
+  it('is nowhere when the server has no quiz-list (a missing route, a 404 or a 500), and nothing is said', async () => {
     const page = await signIn(world({ missing: true }));
+    expect(start(page)).toBe(null);
+    expect(page.root().innerHTML).not.toMatch(/quiz/i);
+    expect(routes(page).filter(r => /^quiz/.test(r))).toEqual(['quiz-list']);
+  });
+  it('opening a quiz the list named but the route lacks says so plainly and offers no retry', async () => {
+    const page = await signIn(world({ openMissing: true }));
     await page.click('[data-act="quiz-open"]');
     await page.settle();
     expect(page.root().textContent).toContain('This quiz can’t open right now. Ask your teacher.');
     expect(page.root().querySelector('[data-act="quiz-retry"]')).toBe(null);
+  });
+});
+
+describe('a quiz that closed before it was sent', () => {
+  it('says Closed on the card, and opens to the student’s own answers, read only, never blank', async () => {
+    const w = world({ closed: true });
+    w.db.answers = { q9: ['a'], q2: 3.5 };
+    const page = await signIn(w);
+    expect(start(page).textContent).toBe('Closed');
+    await page.click('[data-act="quiz-open"]');
+    await page.settle();
+    const text = page.root().textContent;
+    expect(text).toContain('This Quiz Is Closed');
+    expect(text).toContain('You answered 2 of 2 before it closed');
+    expect(page.root().querySelectorAll('.sp-quiz-answers li').length).toBe(2);
+    expect(text).toContain('Grass');
+    expect(text).toContain('3.5');
+    expect(page.root().querySelector('[data-act="quiz-send-ask"]')).toBe(null);
+    expect(page.root().querySelector('[data-act="quiz-pick"]')).toBe(null);
+  });
+  it('with no answers it still shows the questions, and says so', async () => {
+    const page = await signIn(world({ closed: true }));
+    await page.click('[data-act="quiz-open"]');
+    await page.settle();
+    expect(page.root().textContent).toContain('You didn’t answer any questions before it closed.');
+    expect(page.root().querySelectorAll('.sp-quiz-answers li').length).toBe(2);
   });
 });
 
@@ -178,6 +255,12 @@ describe('answering', () => {
     expect(Object.keys(page.tab).some(k => k.startsWith('fv-s-quiz-'))).toBe(true);
     page.ctx.StudentPage.reset();
     expect(Object.keys(page.tab).filter(k => k.startsWith('fv-s-quiz-'))).toEqual([]);
+  });
+});
+
+describe('Demo Mode on the teacher side', () => {
+  it('Reset Demo Data clears the sample quiz progress on the student page', () => {
+    expect(readFileSync('shared/data-demo.js', 'utf8')).toContain("localStorage.removeItem('gb-student-quiz-demo')");
   });
 });
 

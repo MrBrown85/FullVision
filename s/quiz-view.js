@@ -300,10 +300,12 @@ var StudentQuizView = (function () {
               ' of ' +
               n.total +
               ' before it closed, and they are saved. Ask your teacher to reopen it so you can finish and send.'
-          : 'You didn’t start it before it closed. Ask your teacher to reopen it.',
+          : m.tryNumber > 0
+            ? 'You didn’t answer any questions before it closed. Ask your teacher to reopen it.'
+            : 'You didn’t start it before it closed. Ask your teacher to reopen it.',
       ) +
       '</p></section>' +
-      (n.done ? mineHtml(m, c.answers || {}) : '') +
+      (m.tryNumber > 0 ? mineHtml(m, c.answers || {}) : '') +
       '</div>'
     );
   }
