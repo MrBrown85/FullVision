@@ -74,6 +74,8 @@
     "shared/data-quizzes.js",
     "teacher/quiz-card-draw.js",
     "teacher/quiz-builder.js",
+    "shared/data-quiz-tries.js",
+    "teacher/quiz-results.js",
     "teacher/cm-reflect-builder.js",
     "shared/add-work-files.js",
     "shared/name-match.js",

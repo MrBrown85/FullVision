@@ -379,7 +379,12 @@ describe('Grader: each action passes through to one data.js writer', () => {
   });
 
   it('covers every action Grader has', () => {
-    const covered = cases.concat(GRADEBOOK_CASES).map(c => c[0]);
+    // Quizzes' Confirm and its Undo write many cells, each through setLevel or
+    // setPoints above: tests/quiz-confirm.test.js holds them.
+    const covered = cases
+      .concat(GRADEBOOK_CASES)
+      .map(c => c[0])
+      .concat(['confirmQuiz', 'undoConfirmQuiz']);
     expect(Object.keys(Grader).sort()).toEqual([...new Set(covered)].sort());
   });
 
