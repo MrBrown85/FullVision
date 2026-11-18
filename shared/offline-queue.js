@@ -1418,10 +1418,9 @@
     return out;
   }
 
-  /* Let the caller change queued payloads, for example to put a server id
-     where a local id was. fn(entry) returns { payload, blockedOn } or null
-     to leave the entry alone. Entries in flight are skipped. A key that was
-     derived from the old payload is derived again from the new one. */
+  /* Let the caller change queued payloads, for example to put a server id where a local id was.
+     fn(entry) returns { payload, blockedOn, key } or null to leave the entry alone. Entries in flight
+     are skipped. A derived key is derived again from the new payload; a given one takes `key`. */
   function rewrite(fn) {
     var q = _readQueue();
     var changed = 0;
@@ -1431,7 +1430,8 @@
       if (!next) return;
       var derived = entry.key === _entryKey(entry.endpoint, entry.payload);
       if (next.payload) entry.payload = next.payload;
-      if (derived) entry.key = _entryKey(entry.endpoint, entry.payload);
+      if (derived || typeof next.key === 'string')
+        entry.key = derived ? _entryKey(entry.endpoint, entry.payload) : next.key;
       if (Array.isArray(next.blockedOn) && next.blockedOn.length) entry.blocked_on = next.blockedOn.slice();
       else delete entry.blocked_on;
       changed++;

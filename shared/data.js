@@ -2531,8 +2531,12 @@ function _rewriteQueuedIds(kind, localId, serverId) {
       return k === kind && value === localId ? serverId : value;
     });
     var waiting = Array.isArray(entry.blocked_on) && entry.blocked_on.indexOf(localId) >= 0;
-    if (!mapped.changed && !waiting) return null;
-    return { payload: mapped.payload, blockedOn: _blockedLocalIds(entry.endpoint, mapped.payload) };
+    // A key given at push (a quiz save's 'id:' + its assessment) follows the id too.
+    var keyed = entry.key === 'id:' + localId;
+    if (!mapped.changed && !waiting && !keyed) return null;
+    var next = { payload: mapped.payload, blockedOn: _blockedLocalIds(entry.endpoint, mapped.payload) };
+    if (keyed) next.key = 'id:' + serverId;
+    return next;
   });
 }
 

@@ -377,14 +377,44 @@ test('each of the three buttons opens Add Work and its file chooser', async ({ p
     await page.evaluate(() => AddWorkClass.close());
     await expect(awc).toHaveCount(0);
   }
-  // With the keyboard alone: Tab to Choose Files… and press Enter.
-  await page.locator('.dash-inbox-drop-select').focus();
-  await page.keyboard.press('Tab');
-  await expect(page.locator('.dash-inbox-drop-pick').first()).toBeFocused();
-  const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
-  await page.keyboard.press('Enter');
-  await chooser;
-  await expect(awc).toBeVisible();
+  /* With the keyboard alone: Tab to Choose Files…, then Enter or Space.
+     Each opens Add Work and clicks the page's own file box, in the page and
+     inside the key's own gesture: the browser's rule for showing a chooser,
+     checked here to its door. The chooser itself is awaited for the mouse
+     above only: on a slowed machine Playwright's keyboard gets no
+     filechooser event from a bare page with one button and one file box
+     (Enter 10 times in 20, Space 4 in 20, the mouse 0 in 20, CPU slowed six
+     times, four workers), so waiting for it after a key tests Playwright. */
+  await page.evaluate(() => {
+    window.__boxClicks = [];
+    const click = HTMLInputElement.prototype.click;
+    HTMLInputElement.prototype.click = function () {
+      window.__boxClicks.push({
+        box: this.getAttribute('data-awt-input'),
+        inAddWork: !!this.closest('#add-work-class-overlay'),
+        inPage: this.isConnected,
+        gesture: navigator.userActivation.isActive,
+      });
+      // Not passed on: no chooser is left open between the keys.
+    };
+    window.__restoreClick = () => (HTMLInputElement.prototype.click = click);
+  });
+  const pick = page.locator('.dash-inbox-drop-pick').first();
+  for (const key of ['Enter', 'Space']) {
+    await page.evaluate(() => (window.__boxClicks = []));
+    await page.locator('.dash-inbox-drop-select').focus();
+    await page.keyboard.press('Tab');
+    await expect(pick).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(awc).toBeVisible();
+    await expect(awc).toContainText('Light Refraction Lab');
+    expect(await page.evaluate(() => window.__boxClicks), key).toEqual([
+      { box: 'files', inAddWork: true, inPage: true, gesture: true },
+    ]);
+    await page.evaluate(() => AddWorkClass.close());
+    await expect(awc).toHaveCount(0);
+  }
+  await page.evaluate(() => window.__restoreClick());
 });
 
 test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrolling and its icon hidden', async ({
