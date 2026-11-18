@@ -49,6 +49,7 @@ table public.assessment (rls on)
   group_work text not null default 'each'::text
   students_see_markup boolean not null default true
   is_draft boolean not null default false
+  students_see_factored boolean not null default false
   constraint assessment_accept_until_check CHECK (((after_due = 'until'::text) = (accept_until IS NOT NULL)))
   constraint assessment_after_due_check CHECK ((after_due = ANY (ARRAY['keep'::text, 'until'::text, 'stop'::text])))
   constraint assessment_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.category(id) ON DELETE SET NULL
@@ -1969,7 +1970,7 @@ function public.clear_section_override(p_enrollment_id uuid, p_section_id uuid) 
 function public.close_phone_report(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.confirm_quiz(p_assessment_id uuid, p_marks jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.course_draft_count(p_course_id uuid) returns integer
-function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) returns uuid
+function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean, p_students_see_factored boolean) returns uuid
 function public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) returns uuid
 function public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) returns uuid
 function public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) returns uuid
