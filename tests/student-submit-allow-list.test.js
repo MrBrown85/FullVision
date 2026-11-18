@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CARD_ROUTES, cardReply } from '../supabase/functions/student-submit/card-routes.ts';
 import { SENT as B, makeBulletinRoutes } from '../supabase/functions/student-submit/bulletin-routes.ts';
+import { SENT as Q, makeQuizRoutes } from '../supabase/functions/student-submit/quiz-routes.ts';
 
 const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const SQL = ['migrations/2026110902_grade_return.sql', 'migrations/2026110904_student_sessions_page.sql']
@@ -453,6 +454,95 @@ describe('bulletins: the routes copy exactly the keys the SQL builds', () => {
         word: 'done',
       };
       expect((await one(name, body, 'h')).body).toEqual(want);
+    }
+  });
+});
+
+/* Quizzes (migrations/2026111806_quizzes_student.sql, not applied yet; the
+   routes are supabase/functions/student-submit/quiz-routes.ts). The same two
+   checks: the lists the routes copy are the keys the SQL builds, level by
+   level, and a reply holding every one of them and a made-up key beside each
+   comes out as exactly the first. */
+describe('quizzes: the routes copy exactly the keys the SQL builds', () => {
+  const MQ2 = read('migrations/2026111806_quizzes_student.sql');
+  const mq2Objects = name => {
+    const at = MQ2.lastIndexOf('create or replace function ' + name + '(');
+    expect(at, name).toBeGreaterThan(-1);
+    const open = MQ2.indexOf('$function$', at);
+    const text = MQ2.slice(open, MQ2.indexOf('$function$;', open)).replace(/--.*$/gm, '');
+    const found = [];
+    let i = -1;
+    while ((i = text.indexOf('jsonb_build_object(', i + 1)) >= 0) {
+      const list = args(text, i + 'jsonb_build_object('.length);
+      found.push(list.filter((_, n) => n % 2 === 0).map(k => /^'([a-z0-9_]+)'$/.exec(k)[1]));
+    }
+    return found;
+  };
+  const REFUSAL = ['ok', 'error'];
+
+  it('each function builds these objects, in this order, and no others', () => {
+    expect(mq2Objects('student_submit.quiz')).toEqual([REFUSAL, REFUSAL, REFUSAL, Q.quiz, Q.info, Q.try]);
+    expect(mq2Objects('student_submit._quiz_questions')).toEqual([Q.question, Q.choice]);
+    expect(mq2Objects('student_submit.quiz_save')).toEqual([
+      REFUSAL,
+      REFUSAL,
+      REFUSAL,
+      REFUSAL,
+      REFUSAL,
+      [...REFUSAL, 'question_id'],
+      Q.save,
+    ]);
+    expect(mq2Objects('student_submit.quiz_send')).toEqual([REFUSAL, REFUSAL, REFUSAL, REFUSAL, Q.send]);
+    // The helpers' own objects never reach the phone as they are: quiz reads them.
+    expect(mq2Objects('student_submit._quiz_window')).toEqual([['tries', 'open', 'closes_on']]);
+    expect(mq2Objects('student_submit._quiz_new_order')).toEqual([['questions', 'choices']]);
+  });
+
+  it('a reply with a made-up key at every level comes out with exactly the SQL’s keys', async () => {
+    const extra = v => {
+      if (Array.isArray(v)) return v.map(extra);
+      if (!v || typeof v !== 'object') return v;
+      const out = { made_up: 'LEAK', key: 'LEAK', tag_id: U(9) };
+      for (const [k, inner] of Object.entries(v)) out[k] = extra(inner);
+      return out;
+    };
+    const QUIZ = {
+      ok: true,
+      quiz: { tries: 1, tries_left: 0, closed: false, closes_on: null },
+      try: { number: 1, sent: false, started_at: AT, sent_at: null, reopened: false },
+      sent_tries: 0,
+      can_answer: true,
+      can_try_again: false,
+      questions: [
+        {
+          id: U(1),
+          number: 1,
+          kind: 'choice',
+          prompt: 'Which is a producer?',
+          points: 1,
+          multiple: false,
+          choices: [{ id: U(2), text: 'Grass' }],
+        },
+      ],
+      answers: { [U(1)]: [U(2)] },
+    };
+    const said = extra(QUIZ);
+    // answers is an object keyed by question: a made-up key there is not a question shown.
+    const route = makeQuizRoutes({ db: { call: async () => said } });
+    const body = { session: 'a'.repeat(64), enrollment_id: U(4), assessment_id: U(5) };
+    const r = await route('quiz', body, 'h');
+    expect(r.body).toEqual(QUIZ);
+    expect(JSON.stringify(r.body)).not.toMatch(/LEAK|made_up|tag_id|00000009/);
+    for (const [name, sent, want] of [
+      ['quiz-save', { ok: true, question_id: U(1), saved_at: AT }, { ok: true, question_id: U(1), saved_at: AT }],
+      [
+        'quiz-send',
+        { ok: true, try: 1, sent_at: AT, tries_left: 0, can_try_again: false },
+        { ok: true, try: 1, sent_at: AT, tries_left: 0, can_try_again: false },
+      ],
+    ]) {
+      const one = makeQuizRoutes({ db: { call: async () => extra(sent) } });
+      expect((await one(name, { ...body, question_id: U(1), answer: true }, 'h')).body).toEqual(want);
     }
   });
 });
