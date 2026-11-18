@@ -1,16 +1,59 @@
 /**
- * Text contrast check for the Playwright suite (e2e/contrast.spec.js).
+ * Text contrast check for the Playwright suite (e2e/contrast.spec.js and every
+ * spec that measures contrast).
  *
  * `findLowContrastText(page, opts)` runs in the page and returns every visible
  * text element under 18 px whose WCAG contrast against its rendered
  * background is below 4.5:1. The background is found by compositing the
  * element's ancestors' background colours down to the page. Skipped:
  * aria-hidden and disabled controls, screen-reader-only text, anything
- * inside `opts.skip` selectors, text drawn in one of `opts.textTokens` colours, and text on a
- * fill of one of `opts.fillTokens` colours that is painted by an element
- * matching `opts.fillSelectors` (tokens are custom property names, read in the
- * current colour scheme). Both must hold, so a colour match alone exempts nothing.
+ * inside `opts.skip` selectors, text drawn in a level colour (`opts.textTokens`,
+ * the LEVEL_TOKENS by default), and light text on a level fill.
+ *
+ * Level fills are exempt, here and only here: the score colours (--score-*) are
+ * kept as the gradebook has always drawn them (Colin, 2026-10-19). An element is
+ * a level fill only when BOTH hold: its background resolves to one of the
+ * LEVEL_TOKENS read from the page's computed custom properties in the current
+ * colour scheme, AND it is one of LEVEL_FILL_SELECTORS. The primary blue is
+ * never exempt, however it is spelled: in dark mode --score-4 and --active are
+ * the same value, so a colour match alone exempts nothing. A new level element
+ * goes in LEVEL_FILL_SELECTORS; a blue button never does.
  */
+
+/** The level colours, as custom property names. */
+export const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
+  `--score-${n}`,
+  `--score-${n}-bg`,
+  `--score-${n}-text`,
+  `--score-${n}-dark`,
+]);
+
+/** The elements that draw a level fill under a label. */
+export const LEVEL_FILL_SELECTORS = [
+  // The Return Grades screen: the level names and the + / - buttons.
+  '.rsg-mod',
+  '.rsg-level-name',
+  // The grader's chosen level, and the segment it shares with its - / + buttons.
+  '.grdl-level',
+  '.grdl-pick',
+  // Observation types (strength, growth, concern) are drawn in score colours.
+  '.m-obs-type',
+  '.obs-type',
+  // The rubric editor's level heads, and the score picker's chosen level.
+  '.rb-level-head',
+  '.score-opt',
+  // Chosen statuses (Missing, Late) and the Work Wall's level pills.
+  '.student-status-btn',
+  '.ww-pill-lv',
+  // The phone: the chosen score, a chosen Complete / Incomplete, a chosen status.
+  '.m-score-btn',
+  '.m-cmp-btn',
+  '.m-status',
+  '.m-status-pill',
+  // Done steps and a birthday are drawn in the "met" green.
+  '.cw-step-num',
+  '.bday-today',
+];
 
 export async function findLowContrastText(page, opts = {}) {
   return page.evaluate(
@@ -155,9 +198,9 @@ export async function findLowContrastText(page, opts = {}) {
     },
     {
       skip: opts.skip || [],
-      textTokens: opts.textTokens || [],
-      fillTokens: opts.fillTokens || [],
-      fillSelectors: opts.fillSelectors || [],
+      textTokens: opts.textTokens || LEVEL_TOKENS,
+      fillTokens: LEVEL_TOKENS,
+      fillSelectors: LEVEL_FILL_SELECTORS,
       min: opts.min || 4.5,
       maxPx: opts.maxPx || 18,
     },

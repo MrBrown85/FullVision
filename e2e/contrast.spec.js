@@ -18,21 +18,7 @@ import { TODAY, serve, signIn } from './student-card-fake.js';
      elements that draw one (fillSelectors), never by its colour value.
    - The gradebook table (.gb-grid): its tiles keep their colours, as above. */
 
-const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
-  `--score-${n}`,
-  `--score-${n}-bg`,
-  `--score-${n}-text`,
-  `--score-${n}-dark`,
-]);
-
-const OPTIONS = {
-  skip: ['.gb-grid'],
-  textTokens: LEVEL_TOKENS,
-  fillTokens: LEVEL_TOKENS,
-  // Level fills are exempt on the elements that draw them, never by colour
-  // alone: in dark mode --score-4 and --active are the same value.
-  fillSelectors: ['.rsg-mod', '.rsg-level-name', '.m-obs-type', '.obs-type'],
-};
+const OPTIONS = { skip: ['.gb-grid'] };
 
 async function enterDemo(page, { phone = false } = {}) {
   if (phone) await page.setViewportSize({ width: 390, height: 844 });
