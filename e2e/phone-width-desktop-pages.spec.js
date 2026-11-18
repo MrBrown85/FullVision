@@ -6,8 +6,10 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 375, height: 812 } });
 
-async function openDesktop(page, path) {
+async function openDesktop(page, path, flag) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  // A page behind a build switch (fv-build-<name>) is opened with its switch on.
+  if (flag) await page.addInitScript(name => localStorage.setItem('fv-build-' + name, '1'), flag);
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\/|dashboard/);
@@ -40,15 +42,16 @@ async function dockAndPage(page) {
 // Group 2 #40: the top tabs fit between the sidebar button and the sync dot
 // and account button, the open tab shows, and the Dashboard doesn't scroll
 // sideways.
-for (const [path, tab] of [
+for (const [path, tab, flag] of [
   ['/dashboard', 'Dashboard'],
   ['/assignments', 'Assignments'],
+  ['/bulletins', 'Bulletins', 'bulletins'],
   ['/observations', 'Observations'],
   ['/gradebook', 'Gradebook'],
   ['/reports', 'Reporting'],
 ]) {
   test(`top tabs fit a phone on ${tab}`, async ({ page }) => {
-    await openDesktop(page, path);
+    await openDesktop(page, path, flag);
     await expect(page.locator('.tb-seg-active')).toHaveText(tab);
     const d = await dockAndPage(page);
     expect(d.segLeft).toBeGreaterThanOrEqual(d.leftEnd - 0.5);

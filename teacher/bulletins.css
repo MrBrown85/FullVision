@@ -1,0 +1,570 @@
+/* bulletins.css — the Bulletins page (teacher/page-bulletins.js).
+   Colours are the app's tokens, so dark mode follows. Every class starts
+   with bulletin-: an ad blocker hides names like post-… and feed-…
+   (tests/adblock-names.test.js). */
+
+/* A closed menu, composer, list or file input is never drawn: this beats any
+   display rule below, as the hidden attribute alone does not. */
+.bulletin-page [hidden] {
+  display: none !important;
+}
+
+.bulletin-page {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 22px 16px 40px;
+}
+.bulletin-col {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Header ── */
+.bulletin-top {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+.bulletin-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+.bulletin-sub {
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+.bulletin-sub a,
+.bulletin-note-link {
+  color: var(--link);
+  text-decoration: none;
+}
+.bulletin-sub a:hover,
+.bulletin-note-link:hover {
+  text-decoration: underline;
+}
+
+#bulletin-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Cards ── */
+.bulletin-card {
+  background: var(--surface);
+  border: 1px solid var(--divider-medium);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Composer ── */
+.bulletin-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 10px 14px;
+}
+.bulletin-bar-open {
+  flex: 1;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.bulletin-icon-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.bulletin-icon-btn:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.bulletin-icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.bulletin-compose {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.bulletin-set {
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bulletin-set:disabled {
+  opacity: 0.7;
+}
+/* The feed slides down under the box as it opens. */
+.bulletin-compose-opening {
+  animation: bulletin-open 200ms var(--motion-ease, ease-out);
+}
+.bulletin-compose-opening .bulletin-set {
+  overflow: hidden;
+}
+@keyframes bulletin-open {
+  from {
+    grid-template-rows: 0fr;
+  }
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+/* A new bulletin glides in from just above its place: it moves, it does not fade. */
+.bulletin-glide {
+  animation: bulletin-glide 200ms var(--motion-ease, ease-out);
+}
+@keyframes bulletin-glide {
+  from {
+    transform: translateY(-14px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bulletin-compose-opening,
+  .bulletin-glide {
+    animation: none;
+  }
+}
+
+.bulletin-kinds {
+  display: flex;
+  width: 100%;
+}
+.bulletin-kinds .seg-btn {
+  flex: 1;
+}
+.bulletin-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.bulletin-field {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.bulletin-field:focus {
+  outline: 2px solid var(--active);
+  outline-offset: -1px;
+}
+textarea.bulletin-field {
+  resize: vertical;
+  min-height: 76px;
+  line-height: 1.45;
+}
+.bulletin-count {
+  align-self: flex-end;
+  margin-top: -8px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.bulletin-count.is-over {
+  color: var(--danger);
+  font-weight: 600;
+}
+.bulletin-pair {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bulletin-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 180px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  font-weight: 500;
+}
+.bulletin-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.bulletin-problem {
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+.bulletin-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bulletin-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px 6px 10px;
+  min-height: 40px;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.bulletin-chip-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bulletin-chip-pages {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.bulletin-text-btn {
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--link);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+.bulletin-text-btn:hover {
+  text-decoration: underline;
+}
+.bulletin-text-btn.is-danger {
+  color: var(--danger);
+}
+.bulletin-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.bulletin-actions-end {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.bulletin-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  cursor: pointer;
+}
+.bulletin-switch-track {
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--border-2);
+  padding: 2px;
+  display: flex;
+  justify-content: flex-start;
+  flex: none;
+}
+.bulletin-switch[aria-checked='true'] .bulletin-switch-track {
+  background: var(--active);
+  justify-content: flex-end;
+}
+.bulletin-switch-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #fff;
+  display: block;
+}
+.bulletin-page .btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* A bulletin that was not posted, offered back. */
+.bulletin-returned-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.bulletin-returned-line:empty,
+#bulletin-returned:empty {
+  display: none;
+}
+#bulletin-returned {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Feed ── */
+.bulletin-day {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.bulletin-post {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bulletin-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.bulletin-kind-label {
+  flex: 1;
+  min-width: 0;
+}
+.bulletin-body {
+  font-size: var(--text-md);
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bulletin-linkcard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.bulletin-linkcard:hover {
+  background: var(--overlay-hover);
+}
+.bulletin-linkcard-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bulletin-linkcard-host {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.bulletin-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bulletin-file-name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.bulletin-file-pages {
+  font-weight: 400;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  margin-left: 6px;
+}
+.bulletin-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bulletin-thumb-link {
+  display: block;
+  width: 84px;
+  height: 108px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.bulletin-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bulletin-thumb-more {
+  align-self: center;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.bulletin-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.bulletin-seen-btn {
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  font: inherit;
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
+}
+.bulletin-seen-btn:hover {
+  text-decoration: underline;
+}
+.bulletin-not-seen {
+  font-weight: 600;
+}
+.bulletin-foot a {
+  color: var(--link);
+  text-decoration: none;
+}
+.bulletin-foot a:hover {
+  text-decoration: underline;
+}
+.bulletin-more {
+  position: relative;
+  margin-left: auto;
+}
+.bulletin-more-btn {
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+.bulletin-more-btn:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.bulletin-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  z-index: var(--z-fab);
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.bulletin-menu-item {
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.bulletin-menu-item:hover,
+.bulletin-menu-item:focus-visible {
+  background: var(--overlay-hover);
+}
+.bulletin-menu-item.is-danger {
+  color: var(--danger);
+}
+
+/* ── Who has seen it ── */
+.bulletin-seenlist {
+  border-top: 1px solid var(--divider-medium);
+  margin: 4px -16px -14px;
+  padding: 12px 16px 14px;
+  background: var(--bg);
+  border-radius: 0 0 var(--radius) var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bulletin-seen-head {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+.bulletin-seen-names {
+  font-size: var(--text-base);
+  color: var(--text);
+  line-height: 1.5;
+}
+.bulletin-seen-aside {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.bulletin-seen-act {
+  align-self: flex-start;
+}
+
+.bulletin-empty {
+  text-align: center;
+  color: var(--text-2);
+  font-size: var(--text-md);
+  padding: 28px 0;
+}
+.bulletin-unavailable {
+  padding: 18px 16px;
+  color: var(--text-2);
+  font-size: var(--text-md);
+}
+
+@media (max-width: 700px) {
+  .bulletin-page {
+    padding: 14px 12px 32px;
+  }
+}

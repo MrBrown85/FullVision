@@ -1250,10 +1250,12 @@ function renderDock(activePage, rightHTML) {
     _reportFromUrl();
   }, 0);
   const ap = activePage === 'student' ? 'dashboard' : activePage;
-  const seg = TB_PAGES.map(
-    p =>
-      `<a role="link" tabindex="0" data-href="${p.href}" class="seg-btn tb-seg-link${p.id === ap ? ' tb-seg-active" aria-current="page' : ''}">${p.label}</a>`,
-  ).join('');
+  const seg = TB_PAGES.filter(p => !p.flag || (window.BuildFlags && window.BuildFlags.on(p.flag)))
+    .map(
+      p =>
+        `<a role="link" tabindex="0" data-href="${p.href}" class="seg-btn tb-seg-link${p.id === ap ? ' tb-seg-active" aria-current="page' : ''}">${p.label}</a>`,
+    )
+    .join('');
 
   // Reset Demo deletes every class before reseeding, so it exists only in
   // Demo Mode, never for a signed-in teacher.
