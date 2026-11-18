@@ -6565,6 +6565,7 @@ body.fv-switching-course::after {
 }
 .m-bulletin-head-btn {
   min-height: 44px;
+  min-width: 44px;
   padding: 0;
   border: none;
   background: none;
@@ -6605,7 +6606,7 @@ body.fv-switching-course::after {
   margin: 4px 0 4px;
 }
 .m-bulletin-kinds .m-seg-btn {
-  min-height: 36px;
+  min-height: 44px;
   font-size: 15px;
 }
 .m-bulletin-label {
@@ -6749,4 +6750,39 @@ body.fv-switching-course::after {
   align-items: center;
   justify-content: center;
   background: #2c2c2e;
+}
+
+/* A card's parts (drawn one by one, so a changed count changes one line). */
+.m-bulletin-part:empty {
+  display: none;
+}
+.m-bulletin-to {
+  margin: 0;
+}
+.m-bulletin-returned {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 14px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.m-bulletin-returned-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.m-bulletin-delete {
+  align-self: center;
+  margin-top: 8px;
+  color: var(--danger, #c62828);
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-bulletin-card {
+    transition: none !important;
+    transform: none !important;
+  }
 }

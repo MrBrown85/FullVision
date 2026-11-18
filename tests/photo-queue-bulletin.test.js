@@ -350,6 +350,50 @@ describe('the photo queue keeps a bulletin’s pages as a third kind of record',
     expect(store.count()).toBe(0);
   });
 
+  it('a tab that cannot send or commit a bulletin page does not wake for it: no send loop', async () => {
+    open({
+      bulletinUpload: bulletinUpload(),
+      bulletinCommit: bulletinCommit(() => ({ error: { message: 'busy', status: 503 } })),
+    });
+    await Q.addBulletin({ course: COURSE, key: KEY }, [page(1)]);
+    await place(Q, 1);
+    await Q.send({ force: true });
+    // Uploaded, its commit put off: a tab without the bulletin functions (the desktop) opens on it.
+    expect(Q.pages()[0].state).toBe('uploaded');
+    const meta = store.metas()[0];
+    await store.update(meta.id, { next_at: Date.now() - 1000 });
+    open();
+    let passes = 0;
+    Q.subscribe(e => {
+      if (e.kind === 'send:end') passes++;
+    });
+    await Q.ready();
+    await Q.send();
+    await new Promise(r => setTimeout(r, 300));
+    expect(passes).toBeLessThanOrEqual(1);
+    expect(calls.filter(c => c.to === 'work')).toEqual([]);
+  });
+
+  it('a bulletin page never reaches the work upload, even when its own upload is unwired mid-pass', async () => {
+    let unwire = null;
+    open({
+      bulletinUpload: async (path, blob, info) => {
+        calls.push({ to: 'bulletin', path });
+        if (unwire) unwire();
+        return { error: null };
+      },
+      bulletinCommit: bulletinCommit(),
+    });
+    unwire = () => Q.configure({ bulletinUpload: null });
+    await Q.addBulletin({ course: COURSE, key: KEY }, [page(1), page(2)]);
+    await place(Q, 2);
+    await Q.send({ force: true });
+    await Q.send({ force: true });
+    expect(calls.filter(c => c.to === 'work')).toEqual([]);
+    expect(calls.filter(c => c.to === 'bulletin').length).toBe(1);
+    expect(Q.pages().map(p => p.state)).toEqual(['uploaded', 'blocked']);
+  });
+
   it('a full device is reported as the other kinds report it', async () => {
     store = memoryStore({ capBytes: 1000 });
     open();

@@ -38,8 +38,7 @@ window.MBulletins = (function () {
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M9 6l1.5-2h3L15 6"/></svg>';
 
   var _cid = ''; // the class on screen, while the tab shows
-  var _drawnHead = ''; // what the head and the feed show now, so a read that changed nothing draws nothing
-  var _drawnFeed = '';
+  var _drawnHead = ''; // what the head shows now, so a read that changed nothing draws nothing
   var _timer = 0;
   var _bound = false;
   var _booted = false;
@@ -238,7 +237,6 @@ window.MBulletins = (function () {
   function render(cid) {
     _cid = cid;
     _drawnHead = _headHtml(cid);
-    _drawnFeed = _feedHtml(cid);
     var nav = MC.navBar({
       id: 'bulletins',
       title: 'Bulletins',
@@ -257,9 +255,8 @@ window.MBulletins = (function () {
       '<div id="m-bulletin-head">' +
       _drawnHead +
       '</div>' +
-      '<div id="m-bulletin-feed" class="m-bulletin-feed">' +
-      _drawnFeed +
-      '</div>' +
+      // The cards are drawn by shown() (_drawFeed), so each is known and updated in place.
+      '<div id="m-bulletin-feed" class="m-bulletin-feed" aria-live="polite"></div>' +
       '</div></div>'
     );
   }
@@ -284,16 +281,13 @@ window.MBulletins = (function () {
     );
   }
 
-  /** @param {string} cid */
-  function _feedHtml(cid) {
-    if (!_offered(cid)) return '';
-    var cards = feedModel(W.getBulletins(cid));
-    if (!cards.length) return '<p class="m-bulletin-empty">Nothing Posted Yet</p>';
-    return cards.map(_cardHtml).join('');
-  }
-
-  /** @param {any} c */
-  function _cardHtml(c) {
+  /**
+   * A card's parts, each drawn on its own, so a changed Seen count changes
+   * that line only and a photo already shown is never fetched again.
+   * html-safe: every word, title and name goes through esc; the rest is fixed markup.
+   * @param {any} c @returns {Record<string, string>}
+   */
+  function _cardParts(c) {
     var seen = c.seen.waiting
       ? '<div class="m-bulletin-seen-row"><span class="m-bulletin-seen is-waiting">Not Sent Yet</span>' +
         (c.key && W.bulletinCanTakeBack(_cid, c.key)
@@ -308,60 +302,76 @@ window.MBulletins = (function () {
         esc(c.seen.main) +
         (c.seen.rest ? ' · <span class="m-bulletin-not-seen">' + esc(c.seen.rest) + '</span>' : '') +
         '</button>';
-    var photo = c.photo
-      ? '<div class="m-bulletin-photo"><img alt="' +
-        esc(c.kind === 'Photo of the Board' ? 'Photo of the board' : 'Photo') +
-        '" data-m-bulletin-img="' +
-        esc(c.id) +
-        '" data-file="' +
-        esc(c.photo.id) +
-        '" data-key="' +
-        esc(c.key) +
-        '"></div>'
-      : '';
-    var pdfs = c.pdfs
-      .map(function (/** @type {any} */ f) {
-        return (
-          '<div class="m-bulletin-file-line">PDF · ' +
-          esc(f.title) +
-          ' · ' +
-          esc(f.pages + (f.pages === 1 ? ' Page' : ' Pages')) +
-          '</div>'
-        );
-      })
-      .join('');
-    var link = c.link
-      ? '<div class="m-bulletin-link"><span class="m-bulletin-link-title">' +
-        esc(c.link.title) +
-        '</span><span class="m-bulletin-link-host">' +
-        esc(c.link.host) +
-        '</span></div>'
-      : '';
+    return {
+      head:
+        '<div class="m-bulletin-card-head"><span class="m-bulletin-kind' +
+        (c.reminder ? ' is-reminder' : '') +
+        '">' +
+        esc(c.kind) +
+        '</span><span class="m-bulletin-time' +
+        (c.fresh ? ' is-fresh' : '') +
+        '">' +
+        esc(c.time) +
+        '</span></div>',
+      words: c.body ? '<div class="m-bulletin-words">' + esc(c.body) + '</div>' : '',
+      photo: c.photo
+        ? '<div class="m-bulletin-photo"><img alt="' +
+          esc(c.kind === 'Photo of the Board' ? 'Photo of the board' : 'Photo') +
+          '" data-m-bulletin-img="' +
+          esc(c.id) +
+          '" data-file="' +
+          esc(c.photo.id) +
+          '" data-key="' +
+          esc(c.key) +
+          '"></div>'
+        : '',
+      files: c.pdfs
+        .map(function (/** @type {any} */ f) {
+          return (
+            '<div class="m-bulletin-file-line">PDF · ' +
+            esc(f.title) +
+            ' · ' +
+            esc(f.pages + (f.pages === 1 ? ' Page' : ' Pages')) +
+            '</div>'
+          );
+        })
+        .join(''),
+      link: c.link
+        ? '<div class="m-bulletin-link"><span class="m-bulletin-link-title">' +
+          esc(c.link.title) +
+          '</span><span class="m-bulletin-link-host">' +
+          esc(c.link.host) +
+          '</span></div>'
+        : '',
+      seen: seen,
+    };
+  }
+
+  var PARTS = ['head', 'words', 'photo', 'files', 'link', 'seen'];
+
+  /** html-safe: the parts are _cardParts', escaped there. @param {any} c @param {Record<string, string>} parts */
+  function _cardHtml(c, parts) {
     return (
       '<article class="m-bulletin-card' +
       (c.waiting ? ' is-waiting' : '') +
       '" data-id="' +
       esc(c.id) +
       '">' +
-      '<div class="m-bulletin-card-head"><span class="m-bulletin-kind' +
-      (c.reminder ? ' is-reminder' : '') +
-      '">' +
-      esc(c.kind) +
-      '</span><span class="m-bulletin-time' +
-      (c.fresh ? ' is-fresh' : '') +
-      '">' +
-      esc(c.time) +
-      '</span></div>' +
-      (c.body ? '<div class="m-bulletin-words">' + esc(c.body) + '</div>' : '') +
-      photo +
-      pdfs +
-      link +
-      seen +
+      PARTS.map(function (k) {
+        return '<div class="m-bulletin-part" data-part="' + k + '">' + parts[k] + '</div>';
+      }).join('') +
       '</article>'
     );
   }
 
+  /** @type {IntersectionObserver | null} */
+  var _io = null;
+  /** @type {WeakMap<Element, Record<string, string>>} */
+  var _drawn = new WeakMap(); // card → the parts it shows
+
   function _releasePictures() {
+    if (_io) _io.disconnect();
+    _io = null;
     _pictures.forEach(function (p) {
       try {
         p.release();
@@ -370,54 +380,148 @@ window.MBulletins = (function () {
       }
     });
     _pictures = [];
+    // The server's pictures, held as blob: addresses (shared/data-bulletins.js), and the device's.
+    if (typeof W.releaseBulletinPictures === 'function') W.releaseBulletinPictures();
+    if (typeof W.releaseBulletinWaitingPictures === 'function') W.releaseBulletinWaitingPictures();
   }
 
-  /** Each card's photo, once its address is ready: from the device for one waiting, else from the server (or the device in Demo Mode). */
-  function _loadPictures() {
+  /** One card's photo: from the device for one waiting, else from the server (or the device in Demo Mode). @param {HTMLImageElement} img */
+  function _loadPicture(img) {
     var cid = _cid;
-    var list = W.getBulletins(cid);
-    document.querySelectorAll('#m-bulletin-feed img[data-m-bulletin-img]').forEach(function (node) {
-      var img = /** @type {HTMLImageElement} */ (node);
-      var id = img.getAttribute('data-m-bulletin-img') || '';
-      var b = list.filter(function (/** @type {any} */ x) {
-        return x.id === id;
+    var id = img.getAttribute('data-m-bulletin-img') || '';
+    var b = W.getBulletins(cid).filter(function (/** @type {any} */ x) {
+      return x.id === id;
+    })[0];
+    if (!b || img.getAttribute('data-asked')) return;
+    img.setAttribute('data-asked', '1');
+    var ask;
+    if (b.waiting && b.key) ask = W.getBulletinWaitingPicture(b.key);
+    else {
+      var f = (b.files || []).filter(function (/** @type {any} */ x) {
+        return x.id === img.getAttribute('data-file');
       })[0];
-      if (!b) return;
-      var ask;
-      if (b.waiting && b.key) ask = W.getBulletinWaitingPicture(b.key);
-      else {
-        var f = (b.files || []).filter(function (/** @type {any} */ x) {
-          return x.id === img.getAttribute('data-file');
-        })[0];
-        ask = f ? W.getBulletinPage(cid, f, 0) : Promise.resolve(null);
-      }
-      Promise.resolve(ask).then(function (/** @type {any} */ pic) {
-        if (!pic || cid !== _cid || !img.isConnected) return;
-        img.src = pic.url;
-        if (b.waiting) _pictures.push(pic);
-      });
+      ask = f ? W.getBulletinPage(cid, f, 0) : Promise.resolve(null);
+    }
+    Promise.resolve(ask).then(function (/** @type {any} */ pic) {
+      if (!pic || cid !== _cid || !img.isConnected) return;
+      img.src = pic.url;
+      _pictures.push(pic);
     });
   }
 
+  /** Photos are fetched as they come near the screen. */
+  function _watchPictures() {
+    var imgs = /** @type {HTMLImageElement[]} */ (
+      Array.prototype.slice.call(
+        document.querySelectorAll('#m-bulletin-feed img[data-m-bulletin-img]:not([data-asked])'),
+      )
+    );
+    if (typeof IntersectionObserver !== 'function') return imgs.forEach(_loadPicture);
+    if (!_io) {
+      _io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (en) {
+            if (!en.isIntersecting) return;
+            if (_io) _io.unobserve(en.target);
+            _loadPicture(/** @type {HTMLImageElement} */ (en.target));
+          });
+        },
+        { rootMargin: '400px 0px' },
+      );
+    }
+    imgs.forEach(function (img) {
+      if (_io) _io.observe(img);
+    });
+  }
+
+  function _motionOk() {
+    return !(typeof W.matchMedia === 'function' && W.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  /**
+   * The feed drawn again in place: a card that did not change is left as it
+   * is, a changed one changes only its changed parts, and cards that moved
+   * glide to their new places (FLIP, 200 ms); a new one glides in. Nothing
+   * fades, and nothing moves under Reduce Motion.
+   */
   function _drawFeed() {
     if (!_cid) return;
     var head = document.getElementById('m-bulletin-head');
-    var feed = document.getElementById('m-bulletin-feed');
-    // Drawn again only when something changed: a read every 15 seconds never swaps a card under a finger or blinks a photo.
+    var found = document.getElementById('m-bulletin-feed');
+    if (!found) return;
+    /** @type {HTMLElement} */
+    var feed = found;
     var headHtml = _headHtml(_cid);
-    var feedHtml = _feedHtml(_cid);
     // html-safe: _headHtml is fixed markup and one fixed sentence.
     if (head && _drawnHead !== headHtml) {
       head.innerHTML = headHtml;
       _drawnHead = headHtml;
     }
-    if (feed && _drawnFeed !== feedHtml) {
-      // html-safe: _feedHtml escapes every word, title and name; the rest is fixed markup.
-      feed.innerHTML = feedHtml;
-      _drawnFeed = feedHtml;
-      _releasePictures();
-      _loadPictures();
+    var cards = _offered(_cid) ? feedModel(W.getBulletins(_cid)) : [];
+    if (!cards.length) {
+      var none = _offered(_cid) ? '<p class="m-bulletin-empty">Nothing Posted Yet</p>' : '';
+      // html-safe: fixed markup.
+      if (feed.innerHTML !== none) feed.innerHTML = none;
+      return;
     }
+    var empty = feed.querySelector('.m-bulletin-empty');
+    if (empty) empty.remove();
+    /** @type {Record<string, HTMLElement>} */
+    var had = {};
+    /** @type {Record<string, number>} */
+    var was = {};
+    Array.prototype.forEach.call(
+      feed.querySelectorAll(':scope > .m-bulletin-card'),
+      function (/** @type {HTMLElement} */ n) {
+        had[n.getAttribute('data-id') || ''] = n;
+        was[n.getAttribute('data-id') || ''] = n.getBoundingClientRect().top;
+      },
+    );
+    var motion = _motionOk();
+    /** @type {HTMLElement[]} */
+    var fresh = [];
+    cards.forEach(function (c) {
+      var parts = _cardParts(c);
+      var node = had[c.id];
+      if (!node) {
+        var tmp = document.createElement('div');
+        // html-safe: _cardHtml's parts are escaped in _cardParts.
+        tmp.innerHTML = _cardHtml(c, parts);
+        node = /** @type {HTMLElement} */ (tmp.firstElementChild);
+        fresh.push(node);
+      } else {
+        delete had[c.id];
+        node.classList.toggle('is-waiting', !!c.waiting);
+        var before = _drawn.get(node) || {};
+        PARTS.forEach(function (k) {
+          var part = /** @type {HTMLElement | null} */ (node && node.querySelector('[data-part="' + k + '"]'));
+          // html-safe: one part from _cardParts, escaped there.
+          if (part && before[k] !== parts[k]) part.innerHTML = parts[k];
+        });
+      }
+      _drawn.set(node, parts);
+      feed.appendChild(node); // in order: a node already there moves, it is not drawn again
+    });
+    Object.keys(had).forEach(function (id) {
+      had[id].remove();
+    });
+    if (motion) {
+      Array.prototype.forEach.call(
+        feed.querySelectorAll(':scope > .m-bulletin-card'),
+        function (/** @type {HTMLElement} */ n) {
+          var id = n.getAttribute('data-id') || '';
+          var from = id in was ? was[id] - n.getBoundingClientRect().top : fresh.indexOf(n) >= 0 ? -12 : 0;
+          if (!from) return;
+          n.style.transition = 'none';
+          n.style.transform = 'translateY(' + from + 'px)';
+          requestAnimationFrame(function () {
+            n.style.transition = 'transform 200ms ease-out';
+            n.style.transform = '';
+          });
+        },
+      );
+    }
+    _watchPictures();
   }
 
   /** Read the class again; the feed draws when it changes. @param {boolean} [force] */
@@ -467,18 +571,16 @@ window.MBulletins = (function () {
     _bind();
     _cid = cid;
     _drawFeed();
-    _loadPictures();
     refresh(true);
     _startTimer();
   }
 
-  /** The tab is left: no more reads, the device's photos let go. */
+  /** The tab is left: no more reads, every picture let go. */
   function left() {
     _stopTimer();
     _releasePictures();
     _cid = '';
     _drawnHead = '';
-    _drawnFeed = '';
   }
 
   /** The app opened with the flag on: posts waiting on this phone go on. */
@@ -588,6 +690,11 @@ window.MBulletins = (function () {
             (_seen.open ? _cellsHtml(cid, d.seen) : '')
           : '');
     }
+    // A wrong photo can be removed from the phone that posted it.
+    body +=
+      '<button type="button" class="m-bulletin-text-btn m-bulletin-delete" data-m-bulletin="delete" data-id="' +
+      esc(b.id) +
+      '">Delete This Bulletin</button>';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-labelledby', 'm-bulletin-seen-title');
     // html-safe: head and body escape every word and name with esc; the rest is fixed markup.
@@ -725,7 +832,8 @@ window.MBulletins = (function () {
         } else {
           if (cam.url) URL.revokeObjectURL(cam.url);
           cam.page = p;
-          cam.url = URL.createObjectURL(p.thumb || p.blob);
+          // The whole page, as it will be posted: faces are checked on the real picture, not a small copy.
+          cam.url = URL.createObjectURL(p.blob);
         }
         _drawCamera();
       });
@@ -814,25 +922,42 @@ window.MBulletins = (function () {
     return _drafts[cid];
   }
 
+  /** @param {any} d */
+  function _draftEmpty(d) {
+    return !String(d.body || '').trim() && !(d.linkOn && String(d.linkUrl || '').trim()) && !d.files.length;
+  }
+
+  /** A returned bulletin's words into the box. @param {any} d @param {any} e */
+  function _loadReturned(d, e) {
+    var b = e.bulletin || {};
+    d.kind = b.kind === 'reminder' ? 'reminder' : 'announcement';
+    d.body = String(b.body || '');
+    d.until = String(b.pinned_until || '');
+    d.assessmentId = String(b.assessment_id || '');
+    d.linkOn = !!b.link_url;
+    d.linkUrl = String(b.link_url || '');
+    d.linkTitle = String(b.link_title || '');
+    d.reactions = b.reactions_on === true;
+  }
+
+  /** @param {string} cid */
+  function _returned(cid) {
+    return typeof W.getReturnedBulletins === 'function' ? W.getReturnedBulletins(cid) : [];
+  }
+
   function openWrite() {
     var cid = _cid;
     if (!cid) return;
     var d = _draft(cid);
-    // Words the server refused, or a post that could not go, come back here once.
-    var back = typeof W.bulletinGivenBack === 'function' ? W.bulletinGivenBack(cid) : null;
-    if (back && back.bulletin) {
-      var b = back.bulletin;
-      d.kind = b.kind === 'reminder' ? 'reminder' : 'announcement';
-      d.body = String(b.body || '');
-      d.until = String(b.pinned_until || '');
-      d.assessmentId = String(b.assessment_id || '');
-      d.linkOn = !!b.link_url;
-      d.linkUrl = String(b.link_url || '');
-      d.linkTitle = String(b.link_title || '');
-      d.reactions = b.reactions_on === true;
-      d.msg = back.message || 'This was not posted. Your words are here to post again.';
+    // A bulletin that was not posted comes back into an empty box, with one plain sentence;
+    // into a box that holds words it is only offered (Put It Back in the Box, which asks first).
+    var list = _returned(cid);
+    if (list.length && !d.busy && _draftEmpty(d)) {
+      var e = list[list.length - 1];
+      _loadReturned(d, e);
+      W.dropReturnedBulletin(cid, e.key);
+      d.msg = 'This bulletin was not posted, so its words are back in the box.' + (e.message ? ' ' + e.message : '');
     }
-    d.cid = cid;
     MC.presentSheet('<div class="m-bulletin-sheet m-bulletin-write" id="m-bulletin-write"></div>', {
       onClose: function () {
         var cur = _drafts[cid];
@@ -842,6 +967,52 @@ window.MBulletins = (function () {
     _drawWrite();
     var words = /** @type {HTMLElement | null} */ (document.getElementById('m-bulletin-words'));
     if (words) words.focus({ preventScroll: true });
+  }
+
+  /** The bulletins not posted, each offered back. html-safe: their words and sentences go through esc. @param {string} cid */
+  function _returnedHtml(cid) {
+    return _returned(cid)
+      .map(function (/** @type {any} */ e) {
+        var words = String((e.bulletin && e.bulletin.body) || '').trim();
+        return (
+          '<div class="m-bulletin-returned" role="status"><span>' +
+          esc('Not posted: “' + (words.length > 60 ? words.slice(0, 59) + '…' : words) + '”') +
+          (e.message ? ' ' + esc(e.message) : '') +
+          '</span><span class="m-bulletin-returned-acts"><button type="button" class="m-bulletin-text-btn" data-m-bulletin="put-back" data-key="' +
+          esc(e.key) +
+          '">Put It Back in the Box</button><button type="button" class="m-bulletin-text-btn" data-m-bulletin="drop-returned" data-key="' +
+          esc(e.key) +
+          '">Dismiss</button></span></div>'
+        );
+      })
+      .join('');
+  }
+
+  /** @param {string} key @param {{ x: number, y: number } | null} tap */
+  function _putBack(key, tap) {
+    var cid = _cid;
+    var e = _returned(cid).filter(function (/** @type {any} */ x) {
+      return x.key === key;
+    })[0];
+    if (!e) return;
+    _readWrite();
+    var go = function () {
+      var d = _draft(cid);
+      _loadReturned(d, e);
+      d.msg = '';
+      W.dropReturnedBulletin(cid, key);
+      if (document.getElementById('m-bulletin-write')) _drawWrite();
+      else openWrite();
+    };
+    if (_draftEmpty(_draft(cid))) return go();
+    _confirm(
+      'Put It Back in the Box?',
+      'The box holds words you have not posted. What is in the box now is replaced.',
+      'Put It Back',
+      go,
+      tap,
+      'Keep What I Have',
+    );
   }
 
   function _readWrite() {
@@ -874,7 +1045,12 @@ window.MBulletins = (function () {
     var cid = _cid;
     var d = _draft(cid);
     var reminder = d.kind === 'reminder';
-    var assessments = (typeof W.getAssessments === 'function' && W.getAssessments(cid)) || [];
+    // Only assessments the server has (a local id is never sent: B1c's _bltAssessmentOk); Demo Mode's are all local.
+    var assessments = ((typeof W.getAssessments === 'function' && W.getAssessments(cid)) || []).filter(
+      function (/** @type {any} */ a) {
+        return typeof W._bltAssessmentOk !== 'function' || W._bltAssessmentOk(a.id);
+      },
+    );
     var today = typeof W.getTodayStr === 'function' ? W.getTodayStr() : '';
     var seg = function (/** @type {string} */ kind, /** @type {string} */ label) {
       var onNow = d.kind === kind;
@@ -913,6 +1089,10 @@ window.MBulletins = (function () {
     box.innerHTML =
       '<div class="m-bulletin-sheet-head"><button type="button" class="m-bulletin-head-btn" data-m-bulletin="close">Cancel</button>' +
       '<h2 class="m-bulletin-sheet-title" id="m-bulletin-write-title">Write a Bulletin</h2><span class="m-bulletin-head-gap"></span></div>' +
+      '<p class="m-bulletin-hint m-bulletin-to">' +
+      esc('Posts to ' + _className(cid) + ': every student’s phone.') +
+      '</p>' +
+      _returnedHtml(cid) +
       '<div class="m-segmented m-bulletin-kinds" role="group" aria-label="Kind of bulletin">' +
       seg('announcement', 'Announcement') +
       seg('reminder', 'Reminder') +
@@ -1067,7 +1247,6 @@ window.MBulletins = (function () {
     var files = d.files.map(function (/** @type {any} */ f) {
       return { kind: f.kind, title: f.title, pages: f.pages };
     });
-    var snapshot = Object.assign({}, d, { files: d.files.slice() });
     if (files.length) {
       d.busy = true;
       d.msg = '';
@@ -1088,10 +1267,8 @@ window.MBulletins = (function () {
           cur.msg = (out && out.message) || 'This was not posted. Try again.';
           if (cid === _cid) _drawWrite();
         }
-      } else if (out && !out.ok && out.message) {
-        // Refused: the words come back the next time the sheet opens, with the reason.
-        _drafts[cid] = Object.assign(snapshot, { busy: false, msg: out.message });
       }
+      // Words only and refused: the data layer gives them back (getReturnedBulletins), offered when the sheet opens.
       if (cid === _cid) _drawFeed();
       return out;
     });
@@ -1100,10 +1277,13 @@ window.MBulletins = (function () {
   /* ── A confirm whose main button is never under the tap that opened it ── */
 
   /**
+   * A question in a sheet whose main button is never where the tap that
+   * opened it was: of the two orders (main button first or last), the one
+   * that keeps the tap point off the main button's resting place is drawn.
    * @param {string} title @param {string} text @param {string} okLabel
-   * @param {() => void} onOk @param {{ x: number, y: number } | null} tap
+   * @param {() => void} onOk @param {{ x: number, y: number } | null} tap @param {string} [cancelLabel]
    */
-  function _confirm(title, text, okLabel, onOk, tap) {
+  function _confirm(title, text, okLabel, onOk, tap, cancelLabel) {
     MC.presentSheet(
       '<div class="m-bulletin-sheet m-bulletin-confirm" role="dialog" aria-modal="true" aria-labelledby="m-bulletin-confirm-title">' +
         '<h2 class="m-bulletin-sheet-title" id="m-bulletin-confirm-title">' +
@@ -1114,8 +1294,9 @@ window.MBulletins = (function () {
         '<button type="button" class="m-bulletin-btn m-bulletin-confirm-ok">' +
         esc(okLabel) +
         '</button>' +
-        '<button type="button" class="m-bulletin-btn m-bulletin-confirm-cancel" data-m-bulletin="close">Cancel</button>' +
-        '</div></div>',
+        '<button type="button" class="m-bulletin-btn m-bulletin-confirm-cancel" data-m-bulletin="close">' +
+        esc(cancelLabel || 'Cancel') +
+        '</button></div></div>',
       { half: true },
     );
     var sheet = /** @type {HTMLElement | null} */ (document.querySelector('#m-sheet-container .m-sheet'));
@@ -1127,13 +1308,18 @@ window.MBulletins = (function () {
       document.querySelector('#m-sheet-container .m-bulletin-confirm-cancel')
     );
     if (!sheet || !ok || !cancel || !acts) return;
-    // Where the main button will rest once the sheet has slid up (its transform is not counted).
-    if (tap) {
-      var rect = ok.getBoundingClientRect();
-      var top = window.innerHeight - sheet.offsetHeight + (rect.top - sheet.getBoundingClientRect().top);
-      var under =
-        tap.y >= top - 12 && tap.y <= top + rect.height + 12 && tap.x >= rect.left - 12 && tap.x <= rect.right + 12;
-      if (under) acts.insertBefore(cancel, ok);
+    var box = sheet;
+    var main = ok;
+    // Where the main button rests once the sheet has slid up: the sheet sits on the bottom edge (its slide is not counted).
+    var under = function () {
+      if (!tap) return false;
+      var r = main.getBoundingClientRect();
+      var top = window.innerHeight - box.offsetHeight + (r.top - box.getBoundingClientRect().top);
+      return tap.y >= top - 4 && tap.y <= top + r.height + 4 && tap.x >= r.left - 4 && tap.x <= r.right + 4;
+    };
+    if (under()) {
+      acts.appendChild(ok); // the main button last: the two never overlap, so the tap is now off it
+      if (under()) acts.insertBefore(ok, cancel);
     }
     var done = false;
     ok.onclick = function () {
@@ -1190,18 +1376,38 @@ window.MBulletins = (function () {
       return _drawWrite();
     }
     if (what === 'post') return postWritten();
+    var tap = typeof e.clientX === 'number' && (e.clientX || e.clientY) ? { x: e.clientX, y: e.clientY } : null;
+    var cid = _cid;
+    if (what === 'put-back') return _putBack(el.getAttribute('data-key') || '', tap);
+    if (what === 'drop-returned') {
+      _readWrite();
+      W.dropReturnedBulletin(cid, el.getAttribute('data-key') || '');
+      return _drawWrite();
+    }
     if (what === 'take-back') {
-      var cid = _cid;
       var key = el.getAttribute('data-key') || '';
       return _confirm(
-        'Take It Back',
-        'It is removed from this phone and never sent.',
+        'Take It Back?',
+        'It is removed from this phone and never shown to students.',
         'Take It Back',
         function () {
           W.takeBackBulletin(cid, key);
           _drawFeed();
         },
-        typeof e.clientX === 'number' ? { x: e.clientX, y: e.clientY } : null,
+        tap,
+      );
+    }
+    if (what === 'delete') {
+      var id = el.getAttribute('data-id') || '';
+      return _confirm(
+        'Delete This Bulletin?',
+        'It is removed from every student’s phone, with who has seen it. This cannot be undone.',
+        'Delete',
+        function () {
+          W.deleteBulletin(cid, id);
+          _drawFeed();
+        },
+        tap,
       );
     }
   }
