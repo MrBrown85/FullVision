@@ -776,6 +776,12 @@ window.DashCompetencies = (function () {
     tile.classList.toggle('is-tall', tile.getBoundingClientRect().height >= TALL);
     Array.prototype.forEach.call(tile.querySelectorAll('.dash-comp-page'), function (/** @type {HTMLElement} */ pg) {
       _fitSupport(pg);
+      // The one-line row's number column: the widest number on the page.
+      var numW = 0;
+      pg.querySelectorAll('.dash-comp-ln-num').forEach(function (el) {
+        numW = Math.max(numW, /** @type {HTMLElement} */ (el).offsetWidth);
+      });
+      if (numW) pg.style.setProperty('--dash-comp-num-w', Math.ceil(numW) + 'px');
       var list = /** @type {HTMLElement | null} */ (pg.querySelector('.dash-comp-lines'));
       var n = list ? list.querySelectorAll('.dash-comp-lnbox, .dash-comp-lines > .dash-comp-ln').length : 0;
       // A row with its counts needs COUNTS_ROW px, or the full 72 when the

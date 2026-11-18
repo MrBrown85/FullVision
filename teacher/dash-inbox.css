@@ -393,16 +393,23 @@
   font-weight: 600;
   color: var(--text);
 }
+/* The line's link sits at its right end, as board E1 draws it. */
 .dash-inbox-drop-line a,
 .dash-inbox-drop-wall {
-  margin: 0;
+  float: right;
+  margin: 0 0 0 12px;
   padding: 0;
   font: inherit;
   color: var(--link);
+  text-decoration: none;
   white-space: nowrap;
   background: none;
   border: 0;
   cursor: pointer;
+}
+.dash-inbox-drop-line a:hover,
+.dash-inbox-drop-wall:hover {
+  text-decoration: underline;
 }
 /* Beside Bulletins the Inbox is 299 px: the drop area loses its icon so all of it fits. */
 @media (min-width: 901px) {

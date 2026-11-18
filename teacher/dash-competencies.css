@@ -494,7 +494,9 @@
    under them. */
 @container dash-comp (min-width: 440px) {
   .dash-comp-lines {
-    --dash-comp-ln-cols: minmax(0, 46%) minmax(0, 1fr) 104px;
+    /* The number's column is as wide as the widest number and its word
+       (DashCompetencies.fit measures it), so "Lowest" never runs into a bar. */
+    --dash-comp-ln-cols: minmax(0, 46%) minmax(0, 1fr) var(--dash-comp-num-w, 104px);
   }
   .dash-comp-ln:not(.is-split) {
     grid-template-columns: var(--dash-comp-ln-cols);
