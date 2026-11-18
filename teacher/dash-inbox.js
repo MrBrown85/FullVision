@@ -22,7 +22,11 @@ window.DashInbox = (function () {
   'use strict';
 
   var VIEW_KEY = 'fv-dash-inbox-view:';
+  // The view pill's order. A view not listed goes last, in the order it was added.
+  var VIEW_ORDER = ['assessment', 'side', 'flip', 'roll'];
   var MAX_NAMES = 2;
+  // How long the ring stays on the tile after To Grade is clicked.
+  var RING_MS = 220;
 
   /** @type {{ read: (k: string) => string | null, write: (k: string, v: string | null) => void }} */
   var _cfg = {
@@ -81,6 +85,16 @@ window.DashInbox = (function () {
     });
     if (at >= 0) _views[at] = v;
     else _views.push(v);
+    // The pill's order is fixed, whatever order the scripts load in.
+    _views.sort(function (a, b) {
+      return _rank(a.key) - _rank(b.key);
+    });
+  }
+
+  /** @param {string} key */
+  function _rank(key) {
+    var i = VIEW_ORDER.indexOf(key);
+    return i < 0 ? VIEW_ORDER.length : i;
   }
 
   /** @param {string} cid */
@@ -140,7 +154,8 @@ window.DashInbox = (function () {
         .replace(/\./g, '')
         .toLowerCase();
     var old = Date.now() - d.getTime() > 6 * 86400000;
-    return (old ? (parts.month || '') + ' ' + (parts.day || '') : parts.weekday || '') + ', ' + time;
+    // "Thu 1:05 pm"; past a week "Nov 3, 1:05 pm".
+    return old ? (parts.month || '') + ' ' + (parts.day || '') + ', ' + time : (parts.weekday || '') + ' ' + time;
   }
 
   /** "closes Fri" for a day, or ''.
@@ -164,10 +179,12 @@ window.DashInbox = (function () {
     var quiet = [];
     if (p.addedByTeacher) quiet.push('You Added ' + p.addedByTeacher);
     if (p.onPaper) quiet.push(p.onPaper + ' on paper');
+    // Late comes straight after the counts, before the quiet words, so a
+    // line too long for its box loses the quiet words first, never Late.
     var out = '<span class="dash-inbox-main">' + line + '</span>';
     // html-safe: numbers and fixed words
-    if (quiet.length) out += ' <span class="dash-inbox-quiet">· ' + quiet.join(' · ') + '</span>';
-    if (p.late) out += ' <span class="dash-inbox-late">· Late ' + p.late + '</span>';
+    if (p.late) out += '<span class="dash-inbox-late">· Late ' + p.late + '</span>';
+    if (quiet.length) out += '<span class="dash-inbox-quiet">· ' + quiet.join(' · ') + '</span>';
     return out;
   }
 
@@ -184,9 +201,11 @@ window.DashInbox = (function () {
   function picHtml(cid, aid, pg) {
     if (pg.paper) {
       return (
-        '<span class="dash-inbox-pic dash-inbox-sheet"><span class="dash-inbox-sheet-name">' +
+        '<span class="dash-inbox-pic dash-inbox-sheet" role="img" aria-label="' +
+        esc(pg.name + ': Handed In on Paper') +
+        '"><span class="dash-inbox-sheet-name">' +
         esc(pg.name) +
-        '</span><span class="dash-inbox-sheet-note">Handed In on Paper</span></span>'
+        '</span><span class="dash-inbox-sheet-note"><span>Handed In</span> <span>on Paper</span></span></span>'
       );
     }
     var key = aid + '|' + pg.sid + '|' + pg.file.id;
@@ -194,7 +213,7 @@ window.DashInbox = (function () {
     return (
       '<span class="dash-inbox-pic" data-pic-key="' +
       esc(key) +
-      '"><img class="dash-inbox-img" data-work-pic data-dash-pic="' +
+      '"><img class="dash-inbox-img" draggable="false" data-work-pic data-dash-pic="' +
       esc(key) +
       '" alt="' +
       esc(pg.name + "'s first page") +
@@ -278,7 +297,6 @@ window.DashInbox = (function () {
       );
     }
     if (!s.length && f.pieces) s.push(f.pieces + ' more pieces with work (' + f.work + ' pieces of work).');
-    if (f.taking) s.push(f.taking + ' more taking work.');
     return (
       '<li class="dash-inbox-fold"><span class="dash-inbox-fold-text">' +
       s.join(' ') +
@@ -288,9 +306,11 @@ window.DashInbox = (function () {
     );
   }
 
-  /** What D5 replaces: the drop area for a class with nothing to grade.
+  /** A class with nothing to grade: DashInboxDrop's drop area (D5), else one line.
    * @param {string} cid @param {any} model */
   function emptyHtml(cid, model) {
+    var drop = /** @type {any} */ (window).DashInboxDrop;
+    if (drop) return drop.emptyHtml(cid, model);
     return '<li class="dash-inbox-caught" id="dash-inbox-caught">All Caught Up</li>';
   }
 
@@ -298,6 +318,9 @@ window.DashInbox = (function () {
   /** @param {string} cid @param {any} m */
   function byAssessmentHtml(cid, m) {
     var rows = '';
+    // All Caught Up with D5: the drop area is the list's whole space.
+    if (m.caughtUp && /** @type {any} */ (window).DashInboxDrop)
+      return '<ul class="dash-inbox-list" id="dash-inbox-list">' + api.emptyHtml(cid, m) + '</ul>';
     if (m.caughtUp) rows += api.emptyHtml(cid, m);
     m.rows.forEach(function (/** @type {any} */ p) {
       rows += rowHtml(cid, p);
@@ -331,12 +354,16 @@ window.DashInbox = (function () {
   }
 
   /** @param {string} cid
+   * @param {{ classCounts?: (cid: string, ids: string[]) => any }} [ctx] the draw's shared count of the class's work
    * @returns {string} */
-  function html(cid) {
+  function html(cid, ctx) {
     _files = {};
     _cid = cid;
-    _model = DashInboxModel.build(cid, { seen: seenOf(cid) });
+    var seen = seenOf(cid);
+    _model = DashInboxModel.build(cid, { seen: seen, classCounts: ctx && ctx.classCounts });
     if (!_model.on) return '';
+    // A first look on this device starts the kept time: nothing is new until then.
+    if (!seen) _cfg.write(DashInboxModel.SEEN_KEY + cid, new Date().toISOString());
     var view = viewOf(cid);
     var menu = DashOverview.viewMenuHtml({
       id: 'inbox',
@@ -392,6 +419,7 @@ window.DashInbox = (function () {
       }
     }
     _mounted = null;
+    if (window.DashInboxDrop) DashInboxDrop.unmount();
     var list = document.getElementById('dash-inbox-list');
     _scroll = list ? list.scrollTop : 0;
     _snap = _drawn && document.getElementById('dash-inbox') ? { cid: _drawn, at: _positions() } : null;
@@ -443,13 +471,16 @@ window.DashInbox = (function () {
         if (_cid !== cid) return null;
         return _files[img.getAttribute('data-dash-pic') || ''] || null;
       });
-      // The new page's pictures are in; let go of any the old one held alone.
-      _pics.sweep();
     }
     _glide(cid);
     var view = viewOf(cid);
     _mounted = view;
     if (view.mount) view.mount(tile, cid, _model);
+    // The new page's pictures are in, the view's own included (it fills them
+    // from mount, through pics()); let go of any the old page held alone.
+    if (_pics) _pics.sweep();
+    // A drop of files anywhere on the tile, in every view (D5).
+    if (window.DashInboxDrop) DashInboxDrop.mount(tile, cid, _model);
     _fresh(cid);
   }
 
@@ -477,6 +508,7 @@ window.DashInbox = (function () {
       }
     }
     _mounted = null;
+    if (window.DashInboxDrop) DashInboxDrop.leave(cid);
     if (_pics) _pics.releaseAll();
     _snap = null;
     _scroll = 0;
@@ -499,19 +531,8 @@ window.DashInbox = (function () {
     clearTimeout(_ringTimer);
     _ringTimer = setTimeout(function () {
       tile.classList.remove('is-ring');
-    }, 1000);
+    }, RING_MS);
     return true;
-  }
-
-  /** @param {string} aid */
-  function _piece(aid) {
-    return (
-      (_model &&
-        _model.pieces.filter(function (/** @type {any} */ p) {
-          return p.aid === aid;
-        })[0]) ||
-      null
-    );
   }
 
   /* A click on the tile, or on the top bar's To Grade cell. ctx: { cid,
@@ -541,8 +562,7 @@ window.DashInbox = (function () {
       return true;
     }
     if (el.getAttribute('data-dash-inbox') === 'grade') {
-      var p = _piece(aid);
-      var order = p ? p.gradeOrder : [];
+      var order = DashInboxModel.gradeOrder(cid, aid);
       if (!order.length || !window.PageAssignments || !PageAssignments.openGrader) return true;
       PageAssignments.openGrader(cid, aid, order[0], { studentIds: order, show: 'tograde', onClose: redraw });
       return true;
@@ -564,7 +584,22 @@ window.DashInbox = (function () {
     jump: jump,
     click: click,
     countsText: countsText,
+    countsHtml: countsHtml,
     whenText: whenText,
+    /* The tile's picture holder, for a view that shows pictures (D6). The
+       contract every view follows:
+       - Fill your pictures synchronously inside mount(): afterRender sweeps
+         the holder right after mount, and anything no img on the page shows
+         by then is let go (and asked for again later).
+       - Key your pictures so another class's keys cannot match (the By
+         Assessment view's key is aid|student|file id; an aid is unique to
+         its class).
+       - Never keep a holder of your own: this one lives across the
+         Dashboard's redraws, which is what stops a picture being asked for
+         twice. It is null until the tile has drawn once. */
+    pics: function () {
+      return _pics;
+    },
     model: function () {
       return _model;
     },
