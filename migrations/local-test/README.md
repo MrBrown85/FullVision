@@ -2788,3 +2788,34 @@ For the student page (B1d), from how these functions behave:
 - **A write that meets a teacher's delete or a student's removal** (the bulletin or the enrolment gone between the check and the insert) fails with a server error (500); a retry gets an ordinary answer (the id skipped, or `not_found`). Treat a 500 on `bulletin-seen` and `bulletin-react` as "try again", never as signed out.
 
 Not verified here: gradebook-prod; the edge function deployed; Supabase Storage signing a `bulletin-files` link.
+
+## Bulletins (2026111801, 2026-11-17)
+
+One file, `../2026111801_bulletins.sql`, 40,829 bytes, not applied (needs Colin's OK). Bulletins slice B1a, the teacher's side of a one-way class feed (`docs/plans/bulletins-plan.md`); the contract, for the builders of B1b, B1c, B1d and B1f, is `bulletins-contract.md`. It adds four empty tables in `public` (`bulletin`, `bulletin_file`, `bulletin_seen`, `bulletin_reaction`: row security on, no policy, no grant to any role, each with a primary key, each going with its class, bulletin and student on delete cascade; a deleted file row queues its pages in `submission_file_removal`), a private bucket `bulletin-files` (JPEG only, 2 MB a page) with four policies on `storage.objects` in the shape of `handout-files'`, seven functions a signed-in teacher may run (`list_bulletins`, `post_bulletin`, `finish_bulletin_file`, `edit_bulletin`, `delete_bulletin`, `list_bulletin_seen`, `show_bulletin_again`) and eleven helpers in `fv_private` that no role runs but the two the storage policies call. It changes no existing row, table, policy or function; the one row it adds is the bucket's. `bulletins.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same function md5s as gradebook-prod:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54731/b1a_base node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54731 PGDATABASE=b1a_base python3 bulletins.py fingerprints                                  # write the md5s the file, post-check and undo carry
+PGPORT=54731 PGDATABASE=b1a_base python3 bulletins.py                                               # every scenario
+DATABASE_URL=postgresql://postgres@127.0.0.1:54731/postgres npm run test:db                         # the rule tests, without the file
+FV_DB_TEST_APPLY=migrations/2026111801_bulletins.sql DATABASE_URL=postgresql://postgres@127.0.0.1:54731/postgres npm run test:db   # and with it
+```
+
+Scenarios (the script's docstring says what each checks): `post`, `edit`, `delete`, `counts` (Seen by N of M with a paused, a withdrawn, a no-card, a stopped-card, an expired-card and a locked-card student; seen rows inserted directly, the student functions being B1b's), `others` (Teacher B, a class in the trash, ids that do not exist; signed out is PT401; a visitor and the service role run nothing; no role reads or writes the tables or runs a helper; no sync cursor moves), `storage`, `cascade` (a student deleted for good, the 30-day purge, a deleted assessment, an upload never finished), `limits`, `race` (one key twice; one key from two connections at once; two posts at the page cap at once; two files of one bulletin finished at once; three rounds each), `defaults`, `missing`, `apply` (nine guards, each named by the pre-check; a held lock gives up after five seconds; only the header's changes; no existing row changed; a second run; pre-check and post-check; the size), `m2` (with a stand-in for M2's `student_submit.bulletins`: M1 again, its post-check, PART 1 and the seven grants back, the full undo refusing until M2 is undone), `locks` (a delete holding the class's lock first: show again, edit, delete and finish refuse rightly, 5 of 5 each; an expired upload dropped while another file finishes, 20 of 20), `lastcheck` (a stop at the last check leaves nothing, the bucket row included), `spentkey` (after an expired upload the same key answers its first reply; a new key posts), `undo` (PART 1 alone; the full removal of an unused install leaves the catalog and every row as before; with use it refuses while a row, a queued page or a file is kept; a changed function stops it; a second run; the file again).
+
+Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), from an empty database rebuilt after `2026111730` (zero_data): **349 of 349**; after the independent review's fixes (Nov 18; scope to M1's own names, the way back from PART 1, dates, whole page numbers, re-reads under the lock, one class per drop, the storage helpers' grant checked, links and whitespace), on a database rebuilt from main at the merge: **419 of 419**. `npm run test:db` without the file: every rule test passed (368 functions, 84 tables); with it: every rule test passed (386 functions, 88 tables, the four new ones among them, seeded by `tests/db/seed.sql` once the file is there).
+
+The md5 of `pg_get_functiondef` depends on the search path (`fv_private.bulletin_patched` takes a `public.bulletin`): the file sets `search_path = public, pg_temp`; run the pre-check and post-check with `public` on the search path, as Supabase's SQL editor does.
+
+**Collation (Nov 18).** The first send to live was stopped by the file's own last check and changed nothing: live sorts text by ICU `en-US`, and the function fingerprint's `order by` used the server's collation, so its md5 differed from the one computed on this Mac's C cluster. Reproduced here on an ICU `en-US` database with the old file (the same message). Every fingerprint now sorts with `collate "C"`; the table grant check reads `aclexplode` instead of `information_schema` (which shows only the running role's grants); the post-check reads only M1's 18 function names. The template now mirrors live:
+
+```bash
+psql … -c "create database b1a_icu template template0 encoding 'UTF8' locale_provider icu icu_locale 'en-US' lc_collate 'en_US.UTF-8' lc_ctype 'en_US.UTF-8'"
+DATABASE_URL=postgresql://postgres@127.0.0.1:54731/b1a_icu node scripts/db-rebuild.mjs --check
+B1A_C_TEMPLATE=b1a_base PGPORT=54731 PGDATABASE=b1a_icu python3 bulletins.py        # every scenario on ICU en-US, and collations on C too
+PGPORT=54731 PGDATABASE=b1a_base python3 bulletins.py post edit … spentkey             # every other scenario on C
+```
+
+Result: **441 of 441** on ICU `en-US` (scenario `collations`: apply, fingerprints, second run, post-check, pre-check, undo, re-apply on both, identical fingerprints); on C every scenario but `collations`: **419 of 419**. `tests/db/run.mjs` makes its database with a bare `create database` (the cluster's default), and `db-rebuild.mjs` uses whatever database it is given.
+
+Not verified here: gradebook-prod itself; the Storage service's own checks (the bucket's type and size limits, refusing a second upload to a name that holds a file); the removal worker (B1b teaches it the bucket); PostgREST's schema cache.
