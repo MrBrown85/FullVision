@@ -90,6 +90,19 @@
     return h ? h.kindLabel(b) : 'Announcement';
   }
 
+  /** " · Until Thu" for a reminder that has an end day: the wide tile's card says it after Reminder. @param {any} b */
+  function untilText(b) {
+    var h = _helpers();
+    if (!b || b.kind !== 'reminder' || !b.pinned_until || !h) return '';
+    return ' \u00b7 Until ' + String(h.dateLabel(String(b.pinned_until))).split(',')[0];
+  }
+
+  /** The class's name for the wide tile's subtitle. @param {string} cid */
+  function _className(cid) {
+    var c = typeof COURSES !== 'undefined' ? COURSES[cid] : null;
+    return (c && c.name) || '';
+  }
+
   /** The first line of a bulletin's words, or what stands in for them. @param {any} b */
   function firstLine(b) {
     var lines = String(b.body || '').split(/\r?\n/);
@@ -148,6 +161,7 @@
       seenNot: split < 0 ? '' : label.slice(split + 3),
       seenFull: split < 0 ? label : label.slice(0, split) + ', ' + label.slice(split + 3),
       reminder: b.kind === 'reminder',
+      until: untilText(b),
       href: q + '&open=' + encodeURIComponent(b.id),
       seenHref: q + '&seen=' + encodeURIComponent(b.id),
     };
@@ -204,7 +218,9 @@
       (r.fresh ? ' dash-bulletins-fresh' : '') +
       '"><span class="dash-bulletins-kind' +
       (r.reminder ? ' dash-bulletins-rem' : '') +
-      '">' +
+      '"' +
+      (r.until ? ' data-until="' + esc(r.until) + '"' : '') +
+      '>' +
       (r.reminder ? PIN_ICON : '') +
       esc(r.kind) +
       '</span><a class="dash-bulletins-words" role="link" tabindex="0" data-href="' +
@@ -238,11 +254,17 @@
         esc(_link(cid)) +
         '">Open Bulletins →</a></span>'
       : '';
+    var cls = sub ? _className(cid) : '';
     var h =
       '<section class="dash-bulletins-tile" aria-labelledby="dash-bulletins-title"><div class="dash-bulletins-head"><h2 class="dash-bulletins-title" id="dash-bulletins-title">Bulletins</h2>' +
-      (sub ? '<span class="dash-bulletins-sub">' + esc(sub) + '</span>' : '') +
-      actions +
-      '</div>';
+      (sub
+        ? '<span class="dash-bulletins-sub">' +
+          (cls ? '<span class="dash-bulletins-cls">' + esc(cls) + ' &middot; </span>' : '') +
+          esc(sub) +
+          '</span>'
+        : '') +
+      '</div>' +
+      actions;
     if (m.mode === 'rows') {
       h += '<ol class="dash-bulletins-rows">' + m.rows.map(_rowHtml).join('') + '</ol>';
     } else if (m.mode === 'empty') {
@@ -417,6 +439,7 @@
     _helpers: {
       pick: pick,
       kindText: kindText,
+      untilText: untilText,
       firstLine: firstLine,
       timeText: timeText,
       timeFull: timeFull,

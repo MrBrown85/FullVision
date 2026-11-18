@@ -323,6 +323,14 @@ describe('the tile', () => {
     expect(ann).not.toContain('<svg');
   });
 
+  it('a reminder with an end day says "Until Thu" for the wide card, as an attribute', () => {
+    const r = b('r', { kind: 'reminder', pinned: true, pinned_until: '2026-11-19' });
+    expect(H.untilText(r)).toBe(' · Until Thu');
+    expect(H.rowHtml(H.rowModel(r, 'sci8', now))).toContain('data-until=" · Until Thu"');
+    expect(H.untilText(b('a'))).toBe('');
+    expect(H.rowHtml(H.rowModel(b('a'), 'sci8', now))).not.toContain('data-until');
+  });
+
   it('a row’s words are the whole post, joined, for the two-line clamp', () => {
     const out = H.rowHtml(H.rowModel(b('a', { body: 'Read the pages.\nBring a question.' }), 'sci8', now));
     expect(out).toContain('>Read the pages. Bring a question.</a>');

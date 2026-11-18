@@ -336,3 +336,78 @@ test('more bulletins than fit: as many whole rows as the height holds, at four h
     }
   }
 });
+
+/** The wide form: three cards side by side, the buttons in a foot. */
+async function cards(page) {
+  return page.evaluate(() => {
+    const q = s => document.querySelector(s);
+    const tile = q('.dash-bulletins-tile').getBoundingClientRect();
+    const shown = [...document.querySelectorAll('.dash-bulletins-row')].filter(
+      r => getComputedStyle(r).display !== 'none',
+    );
+    const rect = e => e.getBoundingClientRect();
+    const foot = q('.dash-bulletins-actions');
+    return {
+      width: tile.width,
+      count: shown.length,
+      tops: shown.map(r => Math.round(rect(r).top)),
+      widths: shown.map(r => Math.round(rect(r).width)),
+      inside: shown.every(r => rect(r).bottom <= tile.bottom && rect(r).right <= tile.right),
+      uncut: shown.map(r => r.scrollHeight <= r.clientHeight + 1 && r.scrollWidth <= r.clientWidth + 1),
+      timeRight: shown.map(
+        r => rect(r.querySelector('.dash-bulletins-time')).left > rect(r.querySelector('.dash-bulletins-kind')).right,
+      ),
+      wordsOver: shown.map(
+        r =>
+          rect(r.querySelector('.dash-bulletins-seen')).top >=
+          rect(r.querySelector('.dash-bulletins-words')).bottom - 1,
+      ),
+      seenLeft: shown.map(r => Math.abs(rect(r.querySelector('.dash-bulletins-seen')).left - rect(r).left) < 20),
+      footBelow: rect(foot).top >= Math.max(...shown.map(r => rect(r).bottom)) - 1,
+      writeLeft: rect(q('.dash-bulletins-write')).left < rect(q('.dash-bulletins-open')).left,
+      writeSameLine: Math.abs(rect(q('.dash-bulletins-write')).top - rect(q('.dash-bulletins-open')).top) < 20,
+      sub: q('.dash-bulletins-sub') ? q('.dash-bulletins-sub').innerText : '',
+      tileScroll: [
+        q('.dash-bulletins-tile').scrollHeight - q('.dash-bulletins-tile').clientHeight,
+        q('.dash-bulletins-tile').scrollWidth - q('.dash-bulletins-tile').clientWidth,
+      ],
+    };
+  });
+}
+
+for (const wide of [false, true]) {
+  test(`at 1680 x 1050 the tile is three cards and a foot${wide ? ' in a wide font' : ''}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1680, height: 1050 });
+    await open(page);
+    if (wide) await page.addStyleTag({ content: WIDE });
+    const c = await cards(page);
+    expect(c.width).toBeGreaterThanOrEqual(900);
+    expect(c.count).toBe(3);
+    expect(new Set(c.tops).size).toBe(1);
+    expect(c.widths.every(w => w >= 270)).toBe(true);
+    expect(c.inside).toBe(true);
+    expect(c.uncut.every(Boolean)).toBe(true);
+    expect(c.timeRight.every(Boolean)).toBe(true);
+    expect(c.wordsOver.every(Boolean)).toBe(true);
+    expect(c.seenLeft.every(Boolean)).toBe(true);
+    expect(c.footBelow).toBe(true);
+    expect(c.writeLeft).toBe(true);
+    expect(c.writeSameLine).toBe(true);
+    expect(c.sub).toMatch(/^Science 8 · \d+ can see it/);
+    expect(c.tileScroll).toEqual([0, 0]);
+    await expect(page.locator('.dash-bulletins-write')).toHaveText('Write a Bulletin');
+    // The reminder's card says how long it stays.
+    const until = await page
+      .locator('.dash-bulletins-rem')
+      .first()
+      .evaluate(e => getComputedStyle(e, '::after').content);
+    expect(until).toMatch(/Until [A-Z][a-z]{2}/);
+  });
+}
+
+test('at 1280 x 800 the tile is rows, with no class name in the subtitle', async ({ page }) => {
+  await open(page);
+  const c = await cards(page);
+  expect(c.width).toBeLessThan(900);
+  expect(c.sub).toMatch(/^\d+ can see it/);
+});
