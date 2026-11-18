@@ -886,6 +886,14 @@
   // Restore Class from Backup says the same, once any class takes work.
   var PHOTOS_NOT_IN_BACKUP = 'Photos of student work are not in a backup.';
 
+  /* Bulletins are never in a class backup either, as handouts are not
+     (docs/plans/bulletins-plan.md, B1g): they live on the server with their
+     files and what students did on them, and go with the class. Every file
+     says so in its `bulletins` field, and Restore Class from Backup says it
+     too. A restore reads nothing from the field. */
+  var BULLETINS_NOTE = 'Bulletins are not in this file.';
+  var BULLETINS_NOT_IN_BACKUP = 'Bulletins are not in a backup.';
+
   function anyClassTakesWork() {
     return Object.keys(typeof COURSES !== 'undefined' && COURSES ? COURSES : {}).some(function (cid) {
       return !!photosNote(cid);
@@ -895,6 +903,8 @@
   window.FVBackupRestore = {
     PHOTOS_NOTE: PHOTOS_NOTE,
     PHOTOS_NOT_IN_BACKUP: PHOTOS_NOT_IN_BACKUP,
+    BULLETINS_NOTE: BULLETINS_NOTE,
+    BULLETINS_NOT_IN_BACKUP: BULLETINS_NOT_IN_BACKUP,
     anyClassTakesWork: anyClassTakesWork,
     photosNote: photosNote,
     parseBackup: parseBackup,

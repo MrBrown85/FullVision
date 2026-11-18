@@ -53,6 +53,8 @@ async function demo(hash) {
   await page.submit('form[data-form="card"]');
   page.type('#sp-ident', page.T.DEMO.number);
   await page.click('[data-act="card-yes"]');
+  // The sample class has bulletins, so the page opens on Bulletins (B1g); these tests start on Assignments.
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
   return { page, calls };
 }
 
@@ -161,6 +163,8 @@ describe('a PDF becomes pages: the PDF reader is fetched only when a send opens'
     await page.submit('form[data-form="card"]');
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on Bulletins (B1g); these tests start on Assignments.
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     await page.click('[data-segment="upcoming"]');
     await page.click('.sp-piece[data-piece="demo-fair"] [data-act="send-open"]');
     await page.settle();

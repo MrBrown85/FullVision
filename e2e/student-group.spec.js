@@ -24,6 +24,8 @@ for (const [where, device] of [
       await page.getByRole('button', { name: 'Continue' }).click();
       await page.getByLabel('Student Number').fill('1234567');
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+      // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+      await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
       // Sent by a group-mate: not on Assignments, the first row of My Learning's Your Work.
       await expect(page.locator('.sp-piece', { hasText: 'Cell Model Project' })).toHaveCount(0);
       await page.getByRole('button', { name: /^My Learning/ }).click();

@@ -1,6 +1,5 @@
 /**
- * The Bulletins tile on the Dashboard (slice B1e), Demo Mode with both build
- * switches on: it sits under the Inbox in 40% of the left column, shows the
+ * The Bulletins tile on the Dashboard (slice B1e; on since B1g), Demo Mode: it sits under the Inbox in 40% of the left column, shows the
  * sample class's three bulletins in whole 38 px rows, and its links open the
  * Bulletins page at that bulletin, at its Seen by list, or with the box open.
  */
@@ -8,14 +7,14 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { bulletins = true, oldDashRow = null, questions = true } = {}) {
+async function open(page, { oldBulletins = null, oldDashRow = null, questions = true } = {}) {
   await page.addInitScript(
-    ([bulletins, oldDashRow]) => {
-      // What a browser that saw the row before D9 may still have kept.
+    ([oldBulletins, oldDashRow]) => {
+      // What a browser that saw the row before D9, or Bulletins before B1g, may still have kept.
       if (oldDashRow != null) localStorage.setItem('fv-build-dashRow', oldDashRow);
-      if (bulletins) localStorage.setItem('fv-build-bulletins', '1');
+      if (oldBulletins != null) localStorage.setItem('fv-build-bulletins', oldBulletins);
     },
-    [bulletins, oldDashRow],
+    [oldBulletins, oldDashRow],
   );
   // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
   await page.goto(questions ? '/login.html?student=1' : '/login.html?demo=1');
@@ -223,9 +222,11 @@ test('stacked on an iPad the tile is 300 px', async ({ page }) => {
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
 });
 
-test('with Bulletins off the Inbox has the whole column (510 px) and there is no tile', async ({ page }) => {
-  await open(page, { bulletins: false });
-  expect(Math.round((await box(page, '.dash-row-inbox')).height)).toBe(510);
-  await expect(page.locator('.dash-bulletins-tile')).toHaveCount(0);
-  await expect(page.locator('.dash-row-bulletins')).toHaveCount(0);
+test("an old 'fv-build-bulletins' of 0 changes nothing: the Inbox slot is 299 px and the tile has its rows (B1g)", async ({
+  page,
+}) => {
+  await open(page, { oldBulletins: '0' });
+  expect(Math.round((await box(page, '.dash-row-inbox')).height)).toBe(299);
+  await expect(page.locator('.dash-bulletins-tile')).toHaveCount(1);
+  await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
 });
