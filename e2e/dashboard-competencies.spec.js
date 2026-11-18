@@ -356,25 +356,169 @@ test('hover tips show whole on the first and last row of each view', async ({ pa
   await check(page.locator('#dash-comp-page-core .dash-core-row'), 'Evidence');
 });
 
-test('a 90-character competency name is cut and every row keeps one height', async ({ page }) => {
-  await openDashboard(page);
-  await page.evaluate(() => {
-    const long = 'Processing and analyzing very long competency names that run past the width of the tile!!';
+const LONG = 'Processing and analyzing very long competency names that run past the width of the tile!!';
+const injectLong = page =>
+  page.evaluate(long => {
     const was = DashInsights.columns;
     DashInsights.columns = cid => was(cid).map((c, i) => (i === 2 ? { ...c, label: long, title: long } : c));
     PageDashboard.render();
-  });
+  }, LONG);
+
+test('a name wraps to two lines, a 90-character one is cut, and every row keeps one height', async ({ page }) => {
+  await openDashboard(page);
+  await injectLong(page);
   await page.locator('.dash-comp-ln').first().waitFor();
-  const hs = await heights(page, '.dash-comp-ln[data-comp-page="curricular"]');
+  const sel = '.dash-comp-ln[data-comp-page="curricular"]';
+  const hs = await heights(page, sel);
   expect(Math.max(...hs) - Math.min(...hs)).toBeLessThanOrEqual(0.5);
-  const cut = await page
-    .locator('.dash-comp-ln[data-comp-page="curricular"] .dash-comp-ln-name')
-    .nth(2)
-    .evaluate(e => e.scrollWidth > e.clientWidth);
-  expect(cut).toBe(true);
-  const label = await page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(2).getAttribute('aria-label');
+  const names = await page
+    .locator(sel + ' .dash-comp-ln-name')
+    .evaluateAll(els =>
+      els.map(e => ({ h: e.clientHeight, cut: e.scrollHeight > e.clientHeight + 1, w: e.scrollWidth > e.clientWidth })),
+    );
+  // Two lines at most; only the 90-character name is cut; none runs sideways.
+  for (const n of names) expect(n.h).toBeLessThanOrEqual(31);
+  expect(names.map(n => n.cut)).toEqual([false, false, true, false, false, false]);
+  expect(names.some(n => n.w)).toBe(false);
+  const label = await page.locator(sel).nth(2).getAttribute('aria-label');
   expect(label).toContain('very long competency names');
   expect((await pageFit(page)).sw).toBe(0);
+  // The page still does not scroll with a name of two lines in it.
+  expect((await pageFit(page)).sh).toBeLessThanOrEqual(0);
+});
+
+test('a name that wraps sits above its bar and the Lowest tag beside the number, not under the name', async ({
+  page,
+}) => {
+  await openDashboard(page);
+  const m = await page
+    .locator('.dash-comp-ln:has(.dash-comp-ln-tag)')
+    .first()
+    .evaluate(row => {
+      const n = row.querySelector('.dash-comp-ln-name').getBoundingClientRect();
+      const t = row.querySelector('.dash-comp-ln-tag').getBoundingClientRect();
+      const num = row.querySelector('.dash-comp-ln-num').getBoundingClientRect();
+      const r = row.getBoundingClientRect();
+      return {
+        tagBesideName: t.left >= n.right - 0.5,
+        tagInNumber: t.top >= num.top - 0.5 && t.bottom <= num.bottom + 0.5,
+        inRow: t.right <= r.right + 0.5,
+      };
+    });
+  expect(m.tagBesideName).toBe(true);
+  expect(m.tagInNumber).toBe(true);
+  expect(m.inRow).toBe(true);
+});
+
+test('pointing at a row keeps its name on screen and shows the counts in the tip', async ({ page }) => {
+  await openDashboard(page);
+  const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(1);
+  await row.hover();
+  const tip = page.locator('#dash-comp-tipbox');
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText('Developing');
+  const vis = await row.locator('.dash-comp-ln-name').evaluate(e => getComputedStyle(e).visibility);
+  expect(vis).toBe('visible');
+  expect(await row.getAttribute('title')).toBeNull();
+  await page.mouse.move(5, 300);
+  await expect(tip).toBeHidden();
+});
+
+test('with 14 competencies the rows keep their height and the list scrolls inside the page', async ({ page }) => {
+  await openDashboard(page);
+  await page.evaluate(() => {
+    const was = DashInsights.columns;
+    DashInsights.columns = cid => {
+      const c = was(cid);
+      const out = [];
+      for (let i = 0; i < 14; i++) out.push({ ...c[i % c.length], key: c[i % c.length].key + ':' + i });
+      return out;
+    };
+    PageDashboard.render();
+  });
+  const sel = '.dash-comp-ln[data-comp-page="curricular"]';
+  await expect(page.locator(sel)).toHaveCount(14);
+  const hs = await heights(page, sel);
+  expect(Math.max(...hs) - Math.min(...hs)).toBeLessThanOrEqual(0.5);
+  const lines = await page
+    .locator('.dash-comp-page.is-on .dash-comp-lines')
+    .evaluate(el => ({ scrolls: el.scrollHeight > el.clientHeight + 1 }));
+  expect(lines.scrolls).toBe(true);
+  const fit = await pageFit(page);
+  expect(fit.sw).toBe(0);
+  expect(fit.sh).toBeLessThanOrEqual(0);
+});
+
+for (const [w, h] of [
+  [1280, 800],
+  [1280, 720],
+  [800, 1000],
+]) {
+  test(`the list clears the top bar and its x can be pressed, at ${w} x ${h}`, async ({ page }) => {
+    await openDashboard(page, { w, h });
+    for (const which of ['curricular', 'core']) {
+      if (which === 'core') await goCore(page);
+      const rows = page.locator(`.dash-comp-ln[data-comp-page="${which}"]`);
+      const n = await rows.count();
+      expect(n).toBeGreaterThan(0);
+      for (const i of [0, n - 1]) {
+        await rows.nth(i).scrollIntoViewIfNeeded();
+        await rows.nth(i).click();
+        const pop = page.locator('#dash-comp-pop');
+        await expect(pop).toBeVisible();
+        const m = await page.evaluate(() => {
+          const pop = document.getElementById('dash-comp-pop');
+          const r = pop.getBoundingClientRect();
+          const x = pop.querySelector('[data-comp-close]');
+          const xr = x.getBoundingClientRect();
+          const hit = document.elementFromPoint(xr.left + xr.width / 2, xr.top + xr.height / 2);
+          const dock = document.getElementById('dock-mount').getBoundingClientRect();
+          const row = document.querySelector('[aria-expanded="true"][data-comp-open]').getBoundingClientRect();
+          const tile = document.querySelector('.dash-comp-tile').getBoundingClientRect();
+          const roomBeside = tile.left - 16 >= r.width || window.innerWidth - tile.right - 16 >= r.width;
+          const overlap =
+            roomBeside && !(r.right <= row.left || r.left >= row.right || r.bottom <= row.top || r.top >= row.bottom);
+          return {
+            top: r.top,
+            bottom: r.bottom,
+            dockBottom: dock.bottom,
+            xHit: hit === x || x.contains(hit),
+            overlapsRow: overlap,
+            scrolls:
+              pop.querySelector('.dash-comp-pop-people').scrollHeight >
+              pop.querySelector('.dash-comp-pop-people').clientHeight,
+          };
+        });
+        const label = `${which} row ${i} at ${w} x ${h}`;
+        expect(m.top, label + ' is below the top bar').toBeGreaterThanOrEqual(m.dockBottom + 7.5);
+        expect(m.bottom, label + ' is inside the window').toBeLessThanOrEqual(h - 7.5);
+        expect(m.xHit, label + ': the x is the element at its own centre').toBe(true);
+        expect(m.overlapsRow, label + ' does not cover its row when there is room beside it').toBe(false);
+        // The heading and x stay in view: the heading is inside the list's box.
+        await page.keyboard.press('Escape');
+        await expect(pop).toBeHidden();
+      }
+    }
+  });
+}
+
+test('Tab past the last control of the list, or Shift+Tab before the first, closes it and returns to the row', async ({
+  page,
+}) => {
+  await openDashboard(page);
+  const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(2);
+  await row.click();
+  const pop = page.locator('#dash-comp-pop');
+  await expect(pop).toBeVisible();
+  for (let i = 0; i < 6 && (await pop.isVisible()); i++) await page.keyboard.press('Tab');
+  await expect(pop).toBeHidden();
+  await expect(row).toBeFocused();
+  await row.click();
+  await expect(pop).toBeVisible();
+  // Focus starts on the first action; Shift+Tab goes to the x, then out.
+  for (let i = 0; i < 20 && (await pop.isVisible()); i++) await page.keyboard.press('Shift+Tab');
+  await expect(pop).toBeHidden();
+  await expect(row).toBeFocused();
 });
 
 test('screenshots', async ({ page }, info) => {
@@ -393,7 +537,7 @@ test('screenshots', async ({ page }, info) => {
     await goCore(page);
     await tile.screenshot({ path: `${dir}/core-${scheme}.png` });
     if (await page.locator('.dash-comp-ln[data-comp-page="core"]').count()) {
-      await page.locator('.dash-comp-ln[data-comp-page="core"]').nth(2).click();
+      await page.locator('.dash-comp-ln[data-comp-page="core"]').nth(0).click();
       await page.screenshot({ path: `${dir}/core-list-${scheme}.png` });
     }
   }

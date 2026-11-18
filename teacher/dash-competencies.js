@@ -186,23 +186,13 @@ window.DashCompetencies = (function () {
     return document.getElementById(id);
   }
 
-  /** The Curricular page's view. Level Mix is the tile's default in every
-   * grading style; the flag-off card keeps its own default (Class Average in
-   * a Letter class). A saved pick always wins.
+  /** The Curricular page's view: today's card's own (a saved pick, else the
+   * class's grading style's default: Level Mix, or Class Average in a Letter
+   * class).
    * @param {any} opts
    * @returns {string} */
   function curricularView(opts) {
-    var cid = opts.cid;
-    var view = DashOverview.compView(cid, opts.compView);
-    if (view !== 'avg' || DashInsights.showsProficiency(cid)) return view;
-    /** @type {string | null} */
-    var saved = null;
-    try {
-      saved = localStorage.getItem(VIEW_PREF + cid);
-    } catch (e) {
-      /* storage blocked: the default stands */
-    }
-    return saved === 'avg' ? view : 'mix';
+    return DashOverview.compView(opts.cid, opts.compView);
   }
 
   /** A level's name (1 to 4), as calc.js names its bands.
@@ -248,11 +238,13 @@ window.DashCompetencies = (function () {
     return at.length === 1 ? at[0].key : '';
   }
 
-  /** Whether a Self-Assessed count is low: under half the class.
+  /** Whether a Self-Assessed count is low: under two thirds of the class.
+   * This is the test today's Core card makes (`amber: k * 3 < n * 2` in
+   * _coreSelfRow, teacher/dash-overview.js), said here as a word.
    * @param {number} k
    * @param {number} n */
   function isFew(k, n) {
-    return n > 0 && k * 2 < n;
+    return n > 0 && k * 3 < n * 2;
   }
 
   /** @param {string} label @param {string} cls */
@@ -294,8 +286,6 @@ window.DashCompetencies = (function () {
       r.open +
       '" aria-label="' +
       esc(r.label) +
-      '" title="' +
-      esc(r.label) +
       '"><span class="dash-comp-ln-name">' +
       esc(r.name) +
       '</span><span class="dash-comp-ln-num">' +
@@ -328,6 +318,8 @@ window.DashCompetencies = (function () {
       return { col: col, key: col.key, counts: m.counts, scored: m.scored, above: m.above };
     });
     var low = lowestKey(model);
+    // The class's own level order, as today's Level Mix draws it.
+    var order = levelOrderFor(cid);
     var rows = model
       .map(function (m) {
         var names = m.counts
@@ -336,9 +328,10 @@ window.DashCompetencies = (function () {
           })
           .join(' · ');
         var bar = m.scored
-          ? m.counts
-              .map(function (/** @type {number} */ n, /** @type {number} */ i) {
-                return n ? '<i style="flex:' + n + ';background:var(--score-' + (i + 1) + ')"></i>' : '';
+          ? order
+              .map(function (/** @type {number} */ l) {
+                var n = m.counts[l - 1];
+                return n ? '<i style="flex:' + n + ';background:var(--score-' + l + ')"></i>' : '';
               })
               .join('')
           : '<i class="is-none" style="flex:1"></i>';
@@ -367,8 +360,8 @@ window.DashCompetencies = (function () {
         });
       })
       .join('');
-    var legend = [1, 2, 3, 4]
-      .map(function (l) {
+    var legend = order
+      .map(function (/** @type {number} */ l) {
         return _legendItem(levelName(l), 'dash-comp-sw-' + l);
       })
       .join('');
@@ -601,12 +594,27 @@ window.DashCompetencies = (function () {
     }
     if (typeof row.getBoundingClientRect !== 'function') return;
     var r = row.getBoundingClientRect();
+    // Never under the app's top bar (z-index 1000, over this list), and never
+    // taller than the room below it: the middle of the list scrolls.
+    var dock = _el('dock-mount');
+    var minTop = Math.max(8, (dock ? dock.getBoundingClientRect().bottom : 0) + 8);
+    var maxBottom = window.innerHeight - 8;
+    pop.style.maxHeight = Math.max(120, maxBottom - minTop) + 'px';
     var pw = pop.offsetWidth;
     var ph = pop.offsetHeight;
     var left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
-    var top = r.bottom + 6;
-    if (top + ph > window.innerHeight - 8) top = r.top - ph - 6;
-    top = Math.max(8, Math.min(top, window.innerHeight - 8 - ph));
+    var top;
+    if (r.bottom + 6 + ph <= maxBottom) top = r.bottom + 6;
+    else if (r.top - 6 - ph >= minTop) top = r.top - 6 - ph;
+    else {
+      // No room above or below: beside the tile, so the row stays in view.
+      var tile = row.closest('.dash-comp-tile');
+      var t = tile ? tile.getBoundingClientRect() : r;
+      if (t.left - 8 - pw >= 8) left = t.left - 8 - pw;
+      else if (t.right + 8 + pw <= window.innerWidth - 8) left = t.right + 8;
+      top = r.top;
+    }
+    top = Math.max(minTop, Math.min(top, maxBottom - ph));
     pop.style.left = Math.round(left) + 'px';
     pop.style.top = Math.round(top) + 'px';
   }
@@ -735,11 +743,28 @@ window.DashCompetencies = (function () {
     e.stopImmediatePropagation();
     close(true);
   });
+
+  // Focus does not wander out of the open list: Tab past its last control, or
+  // Shift+Tab before its first, closes it and puts focus back on its row.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab' || !_open) return;
+    var pop = _el('dash-comp-pop');
+    var t = /** @type {Element | null} */ (e.target);
+    if (!pop || !t || !pop.contains(t)) return;
+    var items = pop.querySelectorAll('button, a[href], a[tabindex], [tabindex="0"]');
+    var first = items[0];
+    var last = items[items.length - 1];
+    if ((e.shiftKey && t === first) || (!e.shiftKey && t === last)) {
+      e.preventDefault();
+      close(true);
+    }
+  });
+
   /* ── Hover tips of the other views ───────────────────────────
      A row of Needs Support, Change or Evidence has a tip hung under it. The
      tile clips what hangs outside it, so the tip is shown whole from here, on
      the window, touching its row so the pointer can reach a link in it. */
-  var TIP_ROWS = '.dash-comp-tile .dash-comp-row, .dash-comp-tile .dash-core-row';
+  var TIP_ROWS = '.dash-comp-tile .dash-comp-row, .dash-comp-tile .dash-core-row, .dash-comp-tile .dash-comp-ln';
   /** @type {any} */
   var _tipTimer = 0;
   /** @type {Element | null} */
@@ -755,7 +780,7 @@ window.DashCompetencies = (function () {
   /** @param {Element} row */
   function showTip(row) {
     var box = _el('dash-comp-tipbox');
-    var tip = row.querySelector('.dist-tip');
+    var tip = row.querySelector('.dist-tip, .dash-comp-ln-tip');
     if (!box || !tip) return;
     clearTimeout(_tipTimer);
     if (_tipRow === row && !box.hidden) return;
