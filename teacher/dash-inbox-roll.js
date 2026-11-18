@@ -34,6 +34,10 @@ window.DashInboxRoll = (function () {
   // A page chip's name line under the picture, in pixels.
   var LABEL = 20;
   var COLS = [9, 7];
+  // A name chip: its least height and width, and the gap between chips.
+  var NAME_H = 28;
+  var NAME_W = 76;
+  var NAME_GAP = 6;
 
   /** @type {{ sid: string, aid: string } | null} */
   var _menu = null;
@@ -180,6 +184,8 @@ window.DashInboxRoll = (function () {
     var excused = 0;
     /** @type {string[]} */
     var paper = [];
+    /** @type {string[]} */
+    var lateNames = [];
     roster.forEach(function (s) {
       var isIn = !!inSet[s.id];
       var state = GW.workStateOf(cid, aid, s.id);
@@ -235,7 +241,10 @@ window.DashInboxRoll = (function () {
         said: '',
       };
       c.said = _said(c);
-      if (kind === 'in' && c.late) late++;
+      if (kind === 'in' && c.late) {
+        late++;
+        lateNames.push(c.full);
+      }
       if (kind === 'in' && c.paper) paper.push(c.full);
       if (status === 'excused') excused++;
       out.students.push(c);
@@ -268,15 +277,20 @@ window.DashInboxRoll = (function () {
       all: ids.length,
     };
     out.paperNames = paper;
-    out.foot = footText(out.counts, paper);
+    out.lateNames = lateNames;
+    out.foot = footText(out.counts, paper, lateNames);
     return out;
   }
 
-  /** "10 in · 17 not in · 2 Late · Ethan Dubois on paper".
-   * @param {{ in: number, notin: number, late: number, excused?: number }} c @param {string[]} paper */
-  function footText(c, paper) {
+  /** "10 in · 17 not in · 2 Late · Ethan Dubois on paper". Given who is late,
+   * one or two are named as the board names them ("Late: Sam Blackwood,
+   * Fatima Hassan"); the name chips do not carry the word.
+   * @param {{ in: number, notin: number, late: number, excused?: number }} c @param {string[]} paper
+   * @param {string[]} [late] */
+  function footText(c, paper, late) {
     var s = [c.in + ' in', c.notin + ' not in'];
-    if (c.late) s.push(c.late + ' Late');
+    if (late && late.length && late.length <= 2 && late.length === c.late) s.push('Late: ' + late.join(', '));
+    else if (c.late) s.push(c.late + ' Late');
     if (c.excused) s.push(c.excused + ' Excused');
     if (paper.length === 1) s.push(paper[0] + ' on paper');
     else if (paper.length === 2) s.push(paper[0] + ' and ' + paper[1] + ' on paper');
@@ -285,8 +299,9 @@ window.DashInboxRoll = (function () {
   }
 
   /* ── Drawing ───────────────────────────────────────────── */
+  // Returned work: a green tick, as on Side by Side's pages (board C4).
   var TICK =
-    '<svg class="dash-inbox-roll-tick" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.2 6.4 4.9 9 9.8 3.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    '<svg class="dash-inbox-roll-tick" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.4 8.3 6.9 10.7 11.6 5.6" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var PAPER =
     '<svg class="dash-inbox-roll-paper" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 1.5h4.2L9.5 3.8V10.5H3z M7 1.5v2.5h2.5 M4.6 6h3.4 M4.6 8h3.4" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>';
 
@@ -327,6 +342,9 @@ window.DashInboxRoll = (function () {
       '"';
     var mark = (c.state === 'returned' && c.kind === 'in' ? TICK : '') + (c.paper ? PAPER : '');
     var tag = _tag(c);
+    // A name chip says Late on the foot line, by name, as the board does; a
+    // page keeps the word on its corner.
+    if (form === 'names' && tag === 'Late') tag = '';
     var tagHtml = tag
       ? '<span class="dash-inbox-roll-tag is-' + tag.toLowerCase() + '" aria-hidden="true">' + tag + '</span>'
       : '';
@@ -418,8 +436,17 @@ window.DashInboxRoll = (function () {
       '">' +
       chips +
       '</div><div class="dash-inbox-roll-foot"><span class="dash-inbox-roll-count" role="status">' +
-      esc(m.foot) +
+      // The two counts in bold, as the board draws them.
+      esc(m.foot).replace(/^(\d+)( in · )(\d+)( not in)/, '<b>$1</b>$2<b>$3</b>$4') +
       '</span>' +
+      // What the tick means, once, where any chip has one.
+      (m.students.some(function (/** @type {any} */ c) {
+        return c.kind === 'in' && c.state === 'returned';
+      })
+        ? '<span class="dash-inbox-roll-key">' + TICK + 'Returned</span>'
+        : '') +
+      // "+N more": shown by _fitNames only when the class cannot all show.
+      '<button type="button" class="dash-inbox-roll-more" data-dash-roll="more" hidden></button>' +
       all +
       '</div></div>'
     );
@@ -530,6 +557,11 @@ window.DashInboxRoll = (function () {
       var el = t && t.closest && t.closest('[data-dash-roll]');
       if (!el || !root.contains(el) || _graderOpen()) return;
       var what = el.getAttribute('data-dash-roll');
+      if (what === 'more') {
+        var g = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-grid'));
+        if (g) g.scrollBy({ top: g.clientHeight + NAME_GAP, behavior: 'smooth' });
+        return;
+      }
       if (what === 'all') {
         var a = _piece(cid, aid);
         if (window.AddWorkClass && a && AddWorkClass.offered(cid, a)) AddWorkClass.open(cid, aid, { onClose: _redraw });
@@ -610,7 +642,16 @@ window.DashInboxRoll = (function () {
     if (!grid) return false;
     var h = tile.getBoundingClientRect().height;
     if (!h) return false;
-    var form = formFor(h);
+    var m = root.getBoundingClientRect();
+    var top = grid.getBoundingClientRect().top - m.top;
+    var foot = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-foot'));
+    var room = Math.floor(m.height - top - (foot ? foot.offsetHeight : 0) - 8);
+    var n = root.querySelectorAll('.dash-inbox-roll-chip').length;
+    var w = grid.clientWidth || 629;
+    // Pages only where the whole class fits at MIN_PAGE or more: a page the
+    // tile cannot show is never hidden under its foot (review of #1603).
+    /** @type {'names' | 'pages'} */
+    var form = formFor(h) === 'pages' && room > 0 && !layoutFor(n, w, room).scrolls ? 'pages' : 'names';
     var drawn = root.classList.contains('is-pages') ? 'pages' : 'names';
     if (form !== drawn) {
       _form = form;
@@ -619,16 +660,40 @@ window.DashInboxRoll = (function () {
     }
     _form = form;
     if (form === 'pages') {
-      var m = root.getBoundingClientRect();
-      var top = grid.getBoundingClientRect().top - m.top;
-      var foot = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-foot'));
-      var room = m.height - top - (foot ? foot.offsetHeight : 0) - 8;
-      var n = root.querySelectorAll('.dash-inbox-roll-chip').length;
-      var lay = layoutFor(n, grid.clientWidth || 629, room > 0 ? room : 120);
+      var lay = layoutFor(n, w, room > 0 ? room : 120);
       grid.style.setProperty('--dash-inbox-roll-cols', String(lay.cols));
       grid.style.setProperty('--dash-inbox-roll-pg', lay.pageH + 'px');
-    }
+    } else _fitNames(root, grid, n, w, room);
     return false;
+  }
+
+  /** The names grid: as many columns as it takes for every name to show
+   * whole in the room there is (seven at least, as board C4 draws it), each
+   * name at least NAME_W wide. Where even that cannot hold the class, the
+   * grid shows whole rows only and the foot says "+N more", which scrolls to
+   * them; no row is ever cut by the grid's edge.
+   * @param {HTMLElement} root @param {HTMLElement} grid @param {number} n
+   * @param {number} w @param {number} room */
+  function _fitNames(root, grid, n, w, room) {
+    var more = /** @type {HTMLElement | null} */ (root.querySelector('[data-dash-roll="more"]'));
+    var rowsFit = Math.max(1, Math.floor((room + NAME_GAP) / (NAME_H + NAME_GAP)));
+    var maxCols = Math.max(1, Math.floor((w + NAME_GAP) / (NAME_W + NAME_GAP)));
+    var cols = Math.min(maxCols, Math.max(Math.min(n, 7), Math.ceil(n / rowsFit)));
+    var rows = Math.max(1, Math.ceil(n / cols));
+    grid.style.setProperty('--dash-inbox-roll-cols', String(cols));
+    if (rows <= rowsFit) {
+      grid.style.removeProperty('max-height');
+      grid.classList.remove('is-clipped');
+      if (more) more.hidden = true;
+      return;
+    }
+    // Whole rows only, the rest one scroll away.
+    grid.style.maxHeight = rowsFit * (NAME_H + NAME_GAP) - NAME_GAP + 'px';
+    grid.classList.add('is-clipped');
+    if (more) {
+      more.hidden = false;
+      more.textContent = '+' + (n - rowsFit * cols) + ' more';
+    }
   }
 
   /** Draws this view again where it stands, in the other form.

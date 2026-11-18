@@ -1277,9 +1277,10 @@ describe('dash-comp-views', () => {
   });
 
   describe('the default view', () => {
-    it('is Class Average in a Letter class and Level Mix in a Proficiency or Both class', () => {
+    // Colin, Nov 18 2026: "Yes, Level Mix", in every grading style.
+    it('is Level Mix in a Letter, a Proficiency and a Both class', () => {
       setClass('letter');
-      expect(DashOverview.compView(CID, null)).toBe('avg');
+      expect(DashOverview.compView(CID, null)).toBe('mix');
       setClass('proficiency');
       expect(DashOverview.compView(CID, null)).toBe('mix');
       setClass('both');
@@ -1289,7 +1290,8 @@ describe('dash-comp-views', () => {
     it('a saved view wins; anything else falls back', () => {
       setClass('letter');
       expect(DashOverview.compView(CID, 'trend')).toBe('trend');
-      expect(DashOverview.compView(CID, 'nope')).toBe('avg');
+      expect(DashOverview.compView(CID, 'avg')).toBe('avg');
+      expect(DashOverview.compView(CID, 'nope')).toBe('mix');
     });
   });
 
@@ -1301,9 +1303,10 @@ describe('dash-comp-views', () => {
         it('draws the view menu with four views and the one in use', () => {
           const el = dom(card({ compView: 'below' }));
           expect(el.querySelector('#dash-view-btn-comp').textContent).toBe('Needs Support');
+          // Level Mix first, as board D has it (Colin, Nov 18 2026).
           expect(texts(el, '#dash-view-menu-comp .dash-view-name')).toEqual([
-            'Class Average',
             'Level Mix',
+            'Class Average',
             'Needs Support',
             'Change',
           ]);
@@ -1350,7 +1353,9 @@ describe('dash-comp-views', () => {
           const many = Array.from({ length: 9 }, (_, i) => ({ id: 'm' + i, firstName: 'M' + i, lastName: 'Z' }));
           const lists = [{ col: DashInsights.columns(CID)[0], ids: many.map(s => s.id), values: {} }];
           const el = dom(card({ compView: 'below', allStudents: many, belowLists: lists }));
-          expect(el.querySelectorAll('.dash-comp-row.is-student')).toHaveLength(7);
+          // Every student is drawn; seven show until the tile fits as many as it has room for.
+          expect(el.querySelectorAll('.dash-comp-row.is-student')).toHaveLength(9);
+          expect(el.querySelectorAll('.dash-comp-row.is-student:not(.is-extra)')).toHaveLength(7);
           const more = el.querySelector('.dash-comp-more');
           expect(more.textContent).toBe('+2 more');
           expect(more.getAttribute('data-action')).toBe('studentView');

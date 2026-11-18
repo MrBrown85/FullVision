@@ -1,47 +1,71 @@
 /* The assessment switch the Inbox's views share (D6 of
-   docs/plans/dashboard-inbox-plan.md): one button a piece, scrolling sideways
-   inside itself. Loaded on its own, so no view depends on another's stylesheet. */
-/* The switch: one button a piece, scrolling sideways inside itself. It is
-   never wider than the view it sits in (max-width, min-width), so in a row
-   (Roll Call's head) it scrolls rather than running out of the Inbox and over
-   the Competencies tile, and it never makes the page wider than the window
-   (live, Nov 18: long piece names in a History 12 class). */
+   docs/plans/dashboard-inbox-plan.md): one button a piece, drawn as board C
+   draws it, a segmented control on the app's .seg track with the chosen piece
+   raised. It scrolls sideways inside itself when the pieces do not fit (the
+   switch keeps the chosen one in view), with a thin scrollbar, a vertical
+   wheel, and a fade at an edge with pieces past it. It is never wider than the view it
+   sits in (max-width, min-width), so in a row (Roll Call's head) it scrolls
+   rather than running out of the Inbox and over the Competencies tile, and it
+   never makes the page wider than the window (live, Nov 18: long piece names
+   in a History 12 class). Loaded on its own, so no view depends on another's
+   stylesheet. */
 .dash-inbox-pick {
   display: flex;
   flex: 0 1 auto;
+  align-self: flex-start;
+  gap: 2px;
   box-sizing: border-box;
+  width: fit-content;
   min-width: 0;
   max-width: 100%;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 2px 2px 4px;
+  margin: 0 0 10px;
+  padding: 2px;
   overflow-x: auto;
   overflow-y: hidden;
+  /* A thin scrollbar, so a mouse can reach every piece and the eye sees
+     there are more; a vertical wheel scrolls it too (DashInboxPick.mount). */
   scrollbar-width: thin;
+  background: var(--seg-track);
+  border-radius: 8px;
+}
+/* Where pieces are out of sight the edge fades (set while it scrolls). */
+.dash-inbox-pick.is-more-after {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.dash-inbox-pick.is-more-before {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+}
+.dash-inbox-pick.is-more-before.is-more-after {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
 }
 .dash-inbox-pick-btn {
   flex: 0 0 auto;
-  height: 28px;
-  padding: 0 12px;
+  height: 22px;
+  padding: 0 10px;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 22px;
   color: var(--text-2);
   white-space: nowrap;
-  background: var(--surface);
-  border: 1px solid var(--divider-strong);
-  border-radius: 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
   cursor: pointer;
 }
 .dash-inbox-pick-btn:hover {
   color: var(--text);
 }
 .dash-inbox-pick-btn[aria-pressed='true'] {
+  font-weight: 600;
   color: var(--text);
-  background: var(--surface-2);
-  border-color: var(--active);
+  background: var(--seg-thumb);
+  box-shadow: var(--shadow-sm);
 }
 .dash-inbox-pick-btn:focus-visible {
   outline: 2px solid var(--active);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }

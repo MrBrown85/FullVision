@@ -387,14 +387,38 @@ test('beside a Bulletins tile the Inbox is 299 px: whole rows, pictures of 80 px
   await shot(page, 'inbox-299-light');
 });
 
-test('with no Bulletins tile the Inbox is the row tall, and a row is 109 px', async ({ page }) => {
+test('with no Bulletins tile the Inbox is the row tall, and its rows and pages grow to fill it', async ({ page }) => {
   await open(page, { tile: false });
   const tile = await box(page, '#dash-inbox');
   expect(Math.round(tile.height)).toBe(510);
-  const row = await box(page, '.dash-inbox-row');
-  expect(Math.round(row.height)).toBe(109);
-  const pic = await box(page, '.dash-inbox-img');
-  expect(pic.height).toBeGreaterThanOrEqual(80);
+  // Board A and Heights: the rows with pages share the list, and the pages
+  // grow with the row (no band of empty tile under one row).
+  for (const font of FONTS) {
+    await useFont(page, font);
+    const list = await box(page, '#dash-inbox-list');
+    const rows = await page
+      .locator('#dash-inbox .dash-inbox-row')
+      .evaluateAll(els => els.reduce((a, el) => a + el.getBoundingClientRect().height, 0));
+    expect(Math.abs(rows - list.height), font).toBeLessThanOrEqual(1.5);
+    const row = await box(page, '.dash-inbox-row:not(.is-slim)');
+    expect(row.height, font).toBeGreaterThan(109);
+    const pic = await box(page, '.dash-inbox-pic');
+    expect(pic.height, font).toBeGreaterThan(88);
+    // A page is never wider than two fifths of its row, so the words keep their room.
+    expect(pic.width, font).toBeLessThanOrEqual(row.width * 0.4 + 0.5);
+    // The words and the button stay inside the row.
+    const past = await page
+      .locator('.dash-inbox-row:not(.is-slim)')
+      .first()
+      .evaluate(r => {
+        const b = r.getBoundingClientRect();
+        return [...r.querySelectorAll('.dash-inbox-info, .dash-inbox-grade')].some(e => {
+          const x = e.getBoundingClientRect();
+          return x.right > b.right + 0.5 || x.bottom > b.bottom + 0.5;
+        });
+      });
+    expect(past, font).toBe(false);
+  }
   await shot(page, 'inbox-510-light');
 });
 
@@ -419,7 +443,9 @@ test("a browser that kept 'fv-build-dashRow' as 0 still gets the row and the Inb
   await expect(page.locator('.dash-glance-tograde')).toHaveAttribute('data-dash-inbox-jump', '1');
 });
 
-/* A row is 109 px. With Late, You Added and on paper all on its counts line
+/* A row is at least 109 px; with several pieces in, each is that tall (the
+   rows share the list and grow only when there is room). This holds a row at
+   its 109 px. With Late, You Added and on paper all on its counts line
    the line wraps to a third line where the words column is narrowest (the
    roster shown beside the row at 1100 wide; the reviewer saw it at 769):
    the row then leaves out its Newest line and nothing runs past it (D9). */
@@ -432,6 +458,8 @@ for (const [w, h] of [
   test(`at ${w} x ${h} a row with Late, You Added and on paper stays inside its 109 px`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await open(page);
+    // The row at its least, as on a busy day with four pieces in.
+    await page.addStyleTag({ content: '#dash-inbox .dash-inbox-row:not(.is-slim) { flex: 0 0 109px !important; }' });
     await page.evaluate(() => {
       const cid = getActiveCourse();
       const work = getCourseSubmissions(cid);
