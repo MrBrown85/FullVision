@@ -743,10 +743,10 @@
       }, 0);
       var font = Math.min(12, (r.width / z - (tabs.length * 4) / z) / sum);
       bar.classList.add('sp-bulletin-tabs');
-      bar.style.setProperty('--sp-bulletin-tab-font', Math.floor(font * 100) / 100 + 'px');
-      bar.style.setProperty('--sp-bulletin-tab-pad', Math.round(200 / z) / 100 + 'px');
+      bar.style.setProperty('--sp-bulletin-tab-font', font + 'px');
+      bar.style.setProperty('--sp-bulletin-tab-pad', 2 / z + 'px');
       tabs.forEach(function (t, k) {
-        t.style.flexGrow = String(Math.round(ems[k] * 100) / 100);
+        t.style.flexGrow = String(ems[k]);
       });
     });
   }
