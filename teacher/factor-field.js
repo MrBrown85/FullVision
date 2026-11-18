@@ -150,10 +150,108 @@ window.FactorField = (function () {
     );
   }
 
-  // The share bar into mount (the form's #af-counts-as).
+  // The share bar into mount (the form's #af-counts-as), and the switch under it.
   function renderBar(mount, info, selfTitle) {
     if (!mount) return;
     mount.innerHTML = barHtml(info, selfTitle);
+    refreshFactored(mount.ownerDocument);
+  }
+
+  /* Show Students the Factored Score (2026-11-18), under the share bar:
+     points work whose Factor isn't 1x. Students see the score times the
+     Factor ("20 / 24" for 5 / 6 at 4x, constants.js's factoredPoints); the
+     teacher still grades out of the Max Points and the course % is the
+     same. Hidden for anything else, its value kept until save. */
+  function factoredShown(mode, weight) {
+    return mode === 'points' && (Number(weight) > 0 ? Number(weight) : 1) !== 1;
+  }
+  function factoredHint(maxPoints, weight) {
+    var max = Number(maxPoints) || 0;
+    var f = Number(weight) > 0 ? Number(weight) : 1;
+    if (!(max > 0)) return 'Students see the score times the Factor. You still grade it as you set it.';
+    return 'Students see it out of ' + formatPoints(max * f) + '. You still grade it out of ' + formatPoints(max) + '.';
+  }
+  /* Nothing while it doesn't apply, so every other form is as it was; the
+     switch is put in (refreshFactored) once the teacher picks points and a
+     Factor other than 1x, and from then on only hidden. */
+  // html-safe: the hint goes through esc; the rest is fixed markup
+  function factoredHtml(mode, maxPoints, weight, on) {
+    if (!factoredShown(mode, weight)) return '';
+    return (
+      '<div class="af-factored" id="af-factored-wrap">' +
+      '<span class="af-factored-text"><label class="af-label" for="af-factored">Show Students the Factored Score</label>' +
+      '<span class="af-factored-hint" id="af-factored-hint">' +
+      esc(factoredHint(maxPoints, weight)) +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="af-factored" aria-describedby="af-factored-hint"' +
+      (on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>'
+    );
+  }
+  // What the form says now: its scoring, Max Points and Factor.
+  function _formNow(doc) {
+    var mode = doc.getElementById('af-scoremode');
+    var max = doc.getElementById('af-maxpoints');
+    return {
+      mode: (mode && mode.value) || 'proficiency',
+      max: max ? max.value : '',
+      weight: read(doc.getElementById('af-weight')),
+    };
+  }
+  // The switch shown or hidden, and its hint, as the form is now.
+  function refreshFactored(doc) {
+    var wrap = doc && doc.getElementById('af-factored-wrap');
+    var now = doc ? _formNow(doc) : null;
+    var bar = doc && doc.getElementById('af-counts-as');
+    if (!wrap && bar && factoredShown(now.mode, now.weight)) {
+      // html-safe: factoredHtml escapes its one text
+      bar.insertAdjacentHTML('afterend', factoredHtml(now.mode, now.max, now.weight, false));
+      wrap = doc.getElementById('af-factored-wrap');
+    }
+    if (!wrap) return;
+    wrap.hidden = !factoredShown(now.mode, now.weight);
+    var hint = doc.getElementById('af-factored-hint');
+    if (hint) hint.textContent = factoredHint(now.max, now.weight);
+  }
+  // On only where it means something: points work at a Factor other than 1x.
+  function factoredOn(doc) {
+    var el = doc && doc.getElementById('af-factored');
+    if (!el || !el.checked) return false;
+    var now = _formNow(doc);
+    return factoredShown(now.mode, now.weight);
+  }
+  function setFactored(doc, on) {
+    refreshFactored(doc);
+    var el = doc && doc.getElementById('af-factored');
+    if (el) el.checked = !!on;
+  }
+
+  /* The grader's chip beside a points score box: the score times the
+     Factor, "= 20 / 24" for 5 / 6 at 4x. Read-only: the score as entered is
+     the one saved. Only on work whose Factor isn't 1x; empty until scored. */
+  function chipText(factor, raw, max) {
+    var fp = factoredPoints({ scoreMode: 'points', weight: factor }, raw, max);
+    return fp ? '= ' + formatPoints(fp.points) + ' / ' + formatPoints(fp.outOf) : '';
+  }
+  // html-safe: the factor and text are numbers through formatPoints/formatFactor, esc'd
+  function chipHtml(a, raw, max) {
+    var factor = getAssessmentWeight(a);
+    if (factor === 1) return '';
+    return (
+      '<span class="gb-pts-factored" data-factor="' +
+      esc(String(factor)) +
+      '" title="' +
+      esc('Times its Factor, ' + formatFactor(factor)) +
+      '">' +
+      esc(chipText(factor, raw, max)) +
+      '</span>'
+    );
+  }
+  // A typed or saved score: the chip in row follows it.
+  function refreshChip(row, raw, max) {
+    var chip = row && row.querySelector('.gb-pts-factored');
+    if (chip) chip.textContent = chipText(Number(chip.dataset.factor), raw, max);
   }
 
   return {
@@ -171,5 +269,12 @@ window.FactorField = (function () {
     stepIn: stepIn,
     barHtml: barHtml,
     renderBar: renderBar,
+    factoredHtml: factoredHtml,
+    refreshFactored: refreshFactored,
+    factoredOn: factoredOn,
+    setFactored: setFactored,
+    chipText: chipText,
+    chipHtml: chipHtml,
+    refreshChip: refreshChip,
   };
 })();

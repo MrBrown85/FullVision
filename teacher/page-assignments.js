@@ -3147,6 +3147,7 @@ window.PageAssignments = (function () {
         assess ? assess.title || '' : '',
       ) +
       '</div>' +
+      FactorField.factoredHtml(scoreMode, maxPoints, weight, !!(assess && assess.studentsSeeFactored)) +
       '</section>';
 
     // Student Work (S5-F1): only in a class with Send Work on.
@@ -4370,6 +4371,7 @@ window.PageAssignments = (function () {
       mode: val('af-scoremode') || 'proficiency',
       maxPoints: val('af-maxpoints'),
       weight: val('af-weight'),
+      factored: FactorField.factoredOn(document),
       evidence: val('af-evidence'),
       rubric: val('af-rubric'),
       tags: on('.af-tag-cb:checked', function (cb) {
@@ -6652,6 +6654,7 @@ window.PageAssignments = (function () {
     }
     var assessWeight = _formAssessWeight();
     if (assessWeight !== 1) newAssess.weight = assessWeight;
+    if (FactorField.factoredOn(document)) newAssess.studentsSeeFactored = true;
     // Read before render() replaces the form.
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
@@ -6861,6 +6864,7 @@ window.PageAssignments = (function () {
     var mp = document.getElementById('af-maxpoints');
     if (mp && mode === 'points') mp.value = a.maxPoints || 100;
     FactorField.set(document.getElementById('af-weight'), getAssessmentWeight(a));
+    FactorField.setFactored(document, a.studentsSeeFactored);
     // Rubric first: it decides the competencies while it's chosen.
     _useRubricInForm('');
     var rubric = mode === 'proficiency' && a.rubricId ? getRubricById(srcCid, a.rubricId) : null;
@@ -7093,6 +7097,7 @@ window.PageAssignments = (function () {
       var assessWeight = _formAssessWeight();
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
+    if (changed('factored')) next.studentsSeeFactored = FactorField.factoredOn(document) || undefined;
     if (AssignDraft.assigning === aid && next.isDraft) AssignDraft.assignInto(activeCourse, next);
     // A change that moves grades asks first (grade-change.js).
     if (
@@ -7808,6 +7813,7 @@ window.PageAssignments = (function () {
         '<span class="gb-pts-max">/ ' +
         max +
         '</span>' +
+        FactorField.chipHtml(a, raw, max) +
         '<span class="gb-pts-live-pct">' +
         pointsPctHtml(raw, max, 0) +
         '</span>' +
@@ -7889,6 +7895,7 @@ window.PageAssignments = (function () {
     var max = parseFloat(inp.dataset.max) || 100;
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 0);
+    FactorField.refreshChip(inp.closest('.score-row'), parsePointsInput(inp.value, max), max);
   }
   function commitPointsScore(inp) {
     var cid = activeCourse;
@@ -7908,8 +7915,7 @@ window.PageAssignments = (function () {
     // second write under the assessment's own id left a stray entry and
     // sent the score twice.
     Grader.setPoints(cid, sid, aid, raw);
-    var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
-    if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
+    livePointsUpdate(inp); // the % and the factored score, from the box as saved
     refreshLedgerSummary(inp.closest('.ldg-grid'));
     if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
   }

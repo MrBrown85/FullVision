@@ -3423,7 +3423,7 @@ AS $function$
        and a.score_mode <> 'dibels';
 $function$;
 
-CREATE OR REPLACE FUNCTION public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid DEFAULT NULL::uuid, p_description text DEFAULT NULL::text, p_date_assigned date DEFAULT NULL::date, p_due_date date DEFAULT NULL::date, p_score_mode text DEFAULT 'proficiency'::text, p_max_points numeric DEFAULT NULL::numeric, p_weight numeric DEFAULT 1.0, p_evidence_type text DEFAULT NULL::text, p_rubric_id uuid DEFAULT NULL::uuid, p_module_id uuid DEFAULT NULL::uuid, p_tag_ids uuid[] DEFAULT '{}'::uuid[], p_copy_group uuid DEFAULT NULL::uuid, p_core_competency_ids text[] DEFAULT '{}'::text[], p_idempotency_key uuid DEFAULT NULL::uuid, p_is_draft boolean DEFAULT false)
+CREATE OR REPLACE FUNCTION public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid DEFAULT NULL::uuid, p_description text DEFAULT NULL::text, p_date_assigned date DEFAULT NULL::date, p_due_date date DEFAULT NULL::date, p_score_mode text DEFAULT 'proficiency'::text, p_max_points numeric DEFAULT NULL::numeric, p_weight numeric DEFAULT 1.0, p_evidence_type text DEFAULT NULL::text, p_rubric_id uuid DEFAULT NULL::uuid, p_module_id uuid DEFAULT NULL::uuid, p_tag_ids uuid[] DEFAULT '{}'::uuid[], p_copy_group uuid DEFAULT NULL::uuid, p_core_competency_ids text[] DEFAULT '{}'::text[], p_idempotency_key uuid DEFAULT NULL::uuid, p_is_draft boolean DEFAULT false, p_students_see_factored boolean DEFAULT false)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -3448,12 +3448,12 @@ begin
 
     insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
                             score_mode, max_points, weight, evidence_type,
-                            rubric_id, module_id, display_order, copy_group, core_competency_ids, is_draft)
+                            rubric_id, module_id, display_order, copy_group, core_competency_ids, is_draft, students_see_factored)
     values (p_course_id, p_category_id, p_title, p_description, p_date_assigned, p_due_date,
             p_score_mode, p_max_points, p_weight, p_evidence_type,
             p_rubric_id, p_module_id, _next_pos, p_copy_group,
             array(select distinct c from unnest(coalesce(p_core_competency_ids, '{}')) c order by c),
-            coalesce(p_is_draft, false))
+            coalesce(p_is_draft, false), coalesce(p_students_see_factored, false))
     returning id into _id;
 
     if p_tag_ids is not null then
@@ -4283,11 +4283,11 @@ begin
     insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
                             score_mode, max_points, weight, evidence_type,
                             rubric_id, module_id, collab_mode, collab_config, display_order,
-                            core_competency_ids, is_draft)
+                            core_competency_ids, is_draft, students_see_factored)
     select course_id, category_id, title || ' (copy)', description, date_assigned, due_date,
            score_mode, max_points, weight, evidence_type,
            rubric_id, module_id, collab_mode, collab_config, _next_pos,
-           core_competency_ids, is_draft
+           core_competency_ids, is_draft, students_see_factored
       from assessment
      where id = p_src_id
     returning id into _new_id;
@@ -5267,7 +5267,7 @@ begin
         return jsonb_build_object('not_modified', true, 'version', _version);
     end if;
 
-    -- ── Gradebook: get_gradebook's roster, assessments, categories and
+    -- -- Gradebook: get_gradebook's roster, assessments, categories and
     --    modules, with scores as compact rows instead of `cells`.
     with
     enr as (
@@ -5332,7 +5332,8 @@ begin
                        'copy_group', asm.copy_group,
                        'core_competency_ids', to_jsonb(asm.core_competency_ids),
                        'created_at', asm.created_at,
-                       'is_draft', asm.is_draft
+                       'is_draft', asm.is_draft,
+                       'students_see_factored', asm.students_see_factored
                    ) order by asm.ix)
               from asm left join asm_tags on asm_tags.assessment_id = asm.id), '[]'::jsonb),
         'categories', coalesce((
@@ -5384,7 +5385,7 @@ begin
               join asm on asm.id = p.assessment_id), '[]'::jsonb)
     ) into _gradebook;
 
-    -- ── Learning map: same shape as get_learning_map, without the per-tag
+    -- -- Learning map: same shape as get_learning_map, without the per-tag
     --    class_avg and coverage_count (the client computes its own).
     with
     sections_with_tags as (
@@ -5423,7 +5424,7 @@ begin
               from subjects_with_sections sws), '[]'::jsonb)
     ) into _learning_map;
 
-    -- ── Rubrics: the rows the client read from three tables.
+    -- -- Rubrics: the rows the client read from three tables.
     select jsonb_build_object(
         'rubrics', coalesce((
             select jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'created_at', r.created_at,
@@ -5463,7 +5464,7 @@ begin
              where r.course_id = p_course_id), '[]'::jsonb)
     ) into _rubrics;
 
-    -- ── Observations: the most recent 500, same row shape as
+    -- -- Observations: the most recent 500, same row shape as
     --    get_observations, plus the total so the client knows what's older.
     with
     obs as (
@@ -5507,7 +5508,7 @@ begin
               from public.observation f where f.follow_up_of in (select id from obs)), '[]'::jsonb)
     ) into _observations;
 
-    -- ── Profiles: same row shape as list_course_student_profiles, without the
+    -- -- Profiles: same row shape as list_course_student_profiles, without the
     --    computed overall_proficiency / letter / counts and override
     --    'calculated', plus the notes it never returned.
     with
@@ -5566,7 +5567,7 @@ begin
       left join nt on nt.enrollment_id = enr.id
       left join recent on recent.enrollment_id = enr.id;
 
-    -- ── Term ratings, which the client never read back before.
+    -- -- Term ratings, which the client never read back before.
     with
     tr as (
         select tr.* from public.term_rating tr
@@ -5922,6 +5923,7 @@ begin
                'core_competency_ids', to_jsonb(a.core_competency_ids),
                'created_at', a.created_at,
                'is_draft', a.is_draft,
+               'students_see_factored', a.students_see_factored,
                'tag_ids', coalesce((
                    select jsonb_agg(at.tag_id order by t.display_order, t.label)
                      from assessment_tag at
@@ -11376,6 +11378,10 @@ begin
     if p_patch ? 'is_draft' and jsonb_typeof(p_patch->'is_draft') is distinct from 'boolean' then
         raise exception 'is_draft must be true or false' using errcode = '22023';
     end if;
+    -- 2026111808: students_see_factored is true or false.
+    if p_patch ? 'students_see_factored' and jsonb_typeof(p_patch->'students_see_factored') is distinct from 'boolean' then
+        raise exception 'students_see_factored must be true or false' using errcode = '22023';
+    end if;
 
     update assessment set
         title         = coalesce(p_patch->>'title', title),
@@ -11408,6 +11414,8 @@ begin
                              else '{}' end,
         is_draft      = case when p_patch ? 'is_draft'
                              then (p_patch->>'is_draft')::boolean else is_draft end,
+        students_see_factored = case when p_patch ? 'students_see_factored'
+                             then (p_patch->>'students_see_factored')::boolean else students_see_factored end,
         updated_at    = now()
     where id = p_id;
 
@@ -14911,6 +14919,7 @@ begin
                        jsonb_build_object(
                            'id', a.id, 'title', a.title, 'date', a.date_assigned, 'due_date', a.due_date,
                            'score_mode', a.score_mode, 'max_points', a.max_points, 'weight', a.weight,
+                           'students_see_factored', a.students_see_factored,
                            'rubric_id', a.rubric_id, 'created_at', a.created_at,
                            'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
                                                   from assessment_tag x

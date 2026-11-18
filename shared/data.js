@@ -3442,6 +3442,7 @@ function _assessmentFromDetail(existing, detail) {
   if (a.module_id !== undefined) next.moduleId = a.module_id || '';
   if (a.copy_group !== undefined) next.copyGroup = a.copy_group || null;
   if (a.is_draft !== undefined) next.isDraft = !!a.is_draft;
+  if (a.students_see_factored !== undefined) next.studentsSeeFactored = !!a.students_see_factored;
   if (a.core_competency_ids !== undefined) next.coreCompetencyIds = _coreCompetencyIdsOf(a.core_competency_ids);
   if (a.evidence_type !== undefined) next.evidenceType = a.evidence_type || '';
   if (a.collab_mode !== undefined) next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
@@ -3870,6 +3871,7 @@ function _v2GradebookToCache(cid, payload) {
       copyGroup: a.copy_group || null,
       coreCompetencyIds: _coreCompetencyIdsOf(a.core_competency_ids),
       isDraft: !!a.is_draft,
+      studentsSeeFactored: !!a.students_see_factored,
       has_rubric: !!a.has_rubric,
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),

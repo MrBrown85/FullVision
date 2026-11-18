@@ -24,13 +24,11 @@ function measureBar(page, selector) {
     var visible = el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0;
     var height = el => Math.round(el.getBoundingClientRect().height);
     var all = Array.prototype.slice.call(bar.querySelectorAll('button, select, input, a.tb-action-btn, .seg'));
-    var chips = all.filter(el => visible(el) && /chip/.test(el.className));
+    // The Gradebook's To Grade / To Return / Questions pills are chips (#1120).
+    var isChip = el => /chip|gb-pill-part/.test(el.className);
+    var chips = all.filter(el => visible(el) && isChip(el));
     var controls = all.filter(
-      el =>
-        visible(el) &&
-        !/chip/.test(el.className) &&
-        !el.classList.contains('seg-btn') &&
-        !el.classList.contains('seg-sm'),
+      el => visible(el) && !isChip(el) && !el.classList.contains('seg-btn') && !el.classList.contains('seg-sm'),
     );
     return {
       inset: cs.paddingLeft,

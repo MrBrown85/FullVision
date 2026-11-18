@@ -293,6 +293,7 @@ window.AssessmentCopy = (function () {
     if (a.scoreMode && a.scoreMode !== 'proficiency') copy.scoreMode = a.scoreMode;
     if (a.maxPoints != null && a.scoreMode && a.scoreMode !== 'proficiency') copy.maxPoints = a.maxPoints;
     if (a.weight != null && a.weight !== 1) copy.weight = a.weight;
+    if (a.studentsSeeFactored) copy.studentsSeeFactored = true;
     // A Draft's copy is a Draft too; each class assigns its own.
     if (a.isDraft) copy.isDraft = true;
     return { assessment: copy, rubric: rubricToAdd };
@@ -426,6 +427,7 @@ window.AssessmentCopy = (function () {
       scoreMode: a.scoreMode || 'proficiency',
       maxPoints: a.scoreMode && a.scoreMode !== 'proficiency' ? Number(a.maxPoints) || 0 : 0,
       weight: Number(a.weight) || 1,
+      studentsSeeFactored: !!a.studentsSeeFactored,
       evidenceType: a.evidenceType || '',
       category: cat ? _norm(cat.name) : '',
       rubric: rub ? _norm(rub.name) : '',
@@ -448,6 +450,7 @@ window.AssessmentCopy = (function () {
     scoreMode: 'scoring mode',
     maxPoints: 'max points',
     weight: 'proficiency weight',
+    studentsSeeFactored: 'factored score for students',
     evidenceType: 'type',
     category: 'category',
     rubric: 'rubric',
@@ -507,6 +510,7 @@ window.AssessmentCopy = (function () {
       patch.maxPoints = after.maxPoints;
     }
     if (changes.weight) patch.weight = after.weight;
+    if (changes.studentsSeeFactored) patch.studentsSeeFactored = !!after.studentsSeeFactored;
     if (changes.evidenceType) patch.evidenceType = after.evidenceType;
     if (changes.category) {
       var cat = _categoryOf(srcCid, after);
@@ -890,6 +894,8 @@ window.AssessmentCopy = (function () {
       );
     }
     if ('weight' in patch) out.push('Factor → ' + formatFactor(patch.weight));
+    if ('studentsSeeFactored' in patch)
+      out.push(patch.studentsSeeFactored ? 'Students see the factored score' : 'Students see the score as entered');
     if ('evidenceType' in patch) out.push('Type → ' + assessmentTypeLabel(patch.evidenceType));
     if ('categoryId' in patch) {
       var cat = (getCategories(dstCid) || []).find(function (c) {

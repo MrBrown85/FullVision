@@ -69,7 +69,9 @@
   }
 
   /* The toolbar in two rows: the assignment and Done, then Print Rubrics
-     and To Grade · To Return · Returned, which scroll sideways if they must. */
+     and To Grade · To Return · Returned with Return N Graded, which wrap
+     to a further line if they must (a sideways scroll hid Return N Graded
+     past the edge on an iPad mini, Nov 18). */
   html.fv-tablet .grader-toolbar {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -98,8 +100,8 @@
   }
   html.fv-tablet .grader-toolbar-lead {
     grid-area: lead;
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-wrap: wrap;
+    row-gap: 8px;
   }
   html.fv-tablet .grader-toolbar-lead::-webkit-scrollbar {
     display: none;
