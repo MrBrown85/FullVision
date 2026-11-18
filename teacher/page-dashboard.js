@@ -64,6 +64,9 @@ window.PageDashboard = (function () {
     _writePref(COMP_VIEW_KEY + activeCourse, view);
     mixPop = null;
   };
+  _viewSetters.inbox = function (key) {
+    if (window.DashInbox) DashInbox.setView(activeCourse, key);
+  };
   // The next render slides the student cards to their new places (the
   // filter was set or cleared, or the sort changed).
   var _slideCards = false;
@@ -142,6 +145,7 @@ window.PageDashboard = (function () {
 
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
+    if (window.DashInbox && activeCourse && activeCourse !== cid) DashInbox.leave(activeCourse);
     activeCourse = cid;
     obsHighlight = null;
     mixPop = null;
@@ -323,8 +327,10 @@ window.PageDashboard = (function () {
     var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
+    if (window.DashInbox) DashInbox.beforeRender();
     document.getElementById('main').innerHTML = html;
     if (before) StudentCards.slideFrom(before);
+    if (window.DashInbox) DashInbox.afterRender(cid);
     if (_compFade) _fadeCompRows();
     _compFade = false;
     _afterObsRender(null);
@@ -1049,6 +1055,7 @@ window.PageDashboard = (function () {
     if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
     // A click outside the open view menu (and not on its pill) closes it.
     if (openMenu && !e.target.closest('.dash-view-menu, .dash-view-btn')) _closeViewMenu();
+    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render })) return;
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -1410,6 +1417,7 @@ window.PageDashboard = (function () {
     openMenu = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
+    if (window.DashInbox) DashInbox.configure({ read: _readPref, write: _writePref });
 
     // The student list, as on the other pages (_syncSidebar in render)
     document.getElementById('sidebar-mount').innerHTML = '';
@@ -1461,6 +1469,7 @@ window.PageDashboard = (function () {
   }
 
   function destroy() {
+    if (window.DashInbox) DashInbox.leave(activeCourse);
     if (typeof ObsCapture !== 'undefined') ObsCapture.closeDialog();
     _hidePop();
     window.removeEventListener('resize', _onResize);
