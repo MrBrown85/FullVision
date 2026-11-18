@@ -443,13 +443,14 @@ window.DashInbox = (function () {
         if (_cid !== cid) return null;
         return _files[img.getAttribute('data-dash-pic') || ''] || null;
       });
-      // The new page's pictures are in; let go of any the old one held alone.
-      _pics.sweep();
     }
     _glide(cid);
     var view = viewOf(cid);
     _mounted = view;
     if (view.mount) view.mount(tile, cid, _model);
+    // The new page's pictures are in, the view's own included (it fills them
+    // from mount, through pics()); let go of any the old page held alone.
+    if (_pics) _pics.sweep();
     _fresh(cid);
   }
 
@@ -565,6 +566,10 @@ window.DashInbox = (function () {
     click: click,
     countsText: countsText,
     whenText: whenText,
+    // The tile's picture holder, for a view that fills its own pictures (D6).
+    pics: function () {
+      return _pics;
+    },
     model: function () {
       return _model;
     },
