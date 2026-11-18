@@ -1,11 +1,13 @@
 // @ts-check
-/* dash-inbox-drop.js — the Inbox's All Caught Up space and a file drop on the
-   tile (D5 of docs/plans/dashboard-inbox-plan.md; boards E1 and E1b), behind
-   the dashRow build switch with the rest of the Inbox.
+/* dash-inbox-drop.js — the Inbox's space when nothing is to grade, and a file
+   drop on the tile (D5 of docs/plans/dashboard-inbox-plan.md; boards E1 and
+   E1b), behind the dashRow build switch with the rest of the Inbox.
 
-   All Caught Up: "Add Work For" with up to three pieces taking work, the
-   drop area in Add Work for the Class's own words and look, and two quiet
-   lines (work assessed but not returned; the next piece taking work).
+   Nothing to grade: "Add Work For" with up to three pieces taking work, the
+   drop area in Add Work for the Class's own words and look, and under it two
+   quiet lines (work assessed but not returned; the next piece taking work).
+   "All Caught Up" is said only when nothing is to return either, as the top
+   bar's To Grade cell says it.
 
    A drop anywhere on the tile, in any view: while files are held over it one
    cover hides the tile's body and names where they go. On the drop,
@@ -14,6 +16,15 @@
    call, as a drop on the Add Work page. This file matches, names and places
    nothing, and saves nothing: Add Work on that page does.
 
+   Every action goes to the piece the tile shows: the one in the "Add Work
+   For" box, or the one the cover names. If that piece is no longer taking
+   work when the teacher acts, nothing is opened in its place: the tile is
+   drawn again and says the list changed.
+
+   While the tile is on the page a file dropped elsewhere on the Dashboard
+   is refused (the browser would open it in the tab). A drag that started on
+   the page (a picture) is never taken as files from the computer.
+
    DashInbox calls emptyHtml (its hook), mount after each draw and unmount
    before the next draw and when the Dashboard is left. */
 window.DashInboxDrop = (function () {
@@ -21,12 +32,19 @@ window.DashInboxDrop = (function () {
 
   var MAX_CHOICES = 3;
   var HINT = 'Photos or PDFs. Files are matched to students by name.';
+  var CHANGED = {
+    drop: 'The list of assessments changed, so those files were not added. Drop them again.',
+    pick: 'The list of assessments changed. Choose again.',
+  };
   var UP_ICON =
     '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5"></path><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>';
 
   // The piece chosen in "Add Work For", per class, for this visit.
   /** @type {Record<string, string>} */
   var _chosen = {};
+  // A sentence owed to the tile after an action found the list changed.
+  /** @type {Record<string, string>} */
+  var _notice = {};
   /** @type {any} */
   var _m = null;
   /** @type {HTMLElement | null} */
@@ -35,8 +53,13 @@ window.DashInboxDrop = (function () {
   var _cover = null;
   /** @type {string | null} */
   var _cid = null;
+  // Where a drop goes, as drawn when the tile has no "Add Work For" box.
+  /** @type {{ aid: string, label: string } | null} */
+  var _drawn = null;
   // dragenter less dragleave on the tile: crossing a child is +1 then -1.
   var _depth = 0;
+  // A drag that began on this page (a picture, a card): never files.
+  var _inner = false;
 
   /* ── Which pieces ──────────────────────────────────────── */
   /** @param {string} cid @param {any} a */
@@ -44,6 +67,29 @@ window.DashInboxDrop = (function () {
     var win = /** @type {any} */ (window)._studentWorkWindow;
     if (typeof win !== 'function' || typeof getAssessmentStudentWork !== 'function') return null;
     return win(cid, a, getAssessmentStudentWork(cid, a.id));
+  }
+
+  /** @param {any} t */
+  function _norm(t) {
+    return String(t || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  /** A piece's name as the tile shows it: its title, and its date when
+   * another piece of the class has the same title (as the gradebook's
+   * column headers date a piece).
+   * @param {string} cid @param {any} a */
+  function label(cid, a) {
+    var title = String((a && a.title) || 'Untitled');
+    var same = (getAssessments(cid) || []).filter(function (/** @type {any} */ x) {
+      return x && !x.isDraft && _norm(x.title || 'Untitled') === _norm(title);
+    }).length;
+    var day = a && (a.dateAssigned || a.date);
+    if (same < 2 || !day || typeof formatShortDate !== 'function') return title;
+    var d = formatShortDate(String(day).slice(0, 10));
+    return d ? title + ' (' + d + ')' : title;
   }
 
   /** The pieces Add Work can take files for that take work now, most recently
@@ -75,6 +121,7 @@ window.DashInboxDrop = (function () {
       return {
         aid: x.a.id,
         title: String(x.a.title || 'Untitled'),
+        label: label(cid, x.a),
         due: x.a.dueDate || x.a.due_date ? String(x.a.dueDate || x.a.due_date).slice(0, 10) : '',
         closes: w.closes_on || '',
       };
@@ -95,7 +142,8 @@ window.DashInboxDrop = (function () {
     return due[0] || list[0] || null;
   }
 
-  /** The piece chosen in "Add Work For": the teacher's pick this visit, else the next one due.
+  /** The piece to show chosen in "Add Work For" when the tile is drawn: the
+   * teacher's pick this visit, else the next one due.
    * @param {string} cid @param {any[]} [list] */
   function chosen(cid, list) {
     list = list || choices(cid);
@@ -105,8 +153,8 @@ window.DashInboxDrop = (function () {
     return picked || nextDue(cid, list);
   }
 
-  /** Where a drop on the tile goes: in All Caught Up the piece chosen there,
-   * otherwise the newest piece taking work. Null when there is none.
+  /** Where a drop on the tile goes when it is drawn: with nothing to grade
+   * the piece chosen there, otherwise the newest piece taking work.
    * @param {string} cid @param {any} model */
   function target(cid, model) {
     var list = choices(cid);
@@ -114,18 +162,43 @@ window.DashInboxDrop = (function () {
     return list[0] || null;
   }
 
+  /** Whether the piece is still one the tile may add to, now.
+   * @param {string} cid @param {string} aid */
+  function stillOffered(cid, aid) {
+    return choices(cid).some(function (c) {
+      return c.aid === aid;
+    });
+  }
+
   /* ── The two quiet lines ───────────────────────────────── */
-  /** Work assessed and not returned: the piece with the newest work. Counts are GraderWork's (model.pieces).
-   * @param {any} model */
-  function notReturned(model) {
-    var list = ((model && model.pieces) || []).filter(function (/** @type {any} */ p) {
+  /** The class's work counted per piece: the draw's own count (shared with
+   * the top bar) when there is one, else GraderWork's.
+   * @param {string} cid */
+  function _counts(cid) {
+    var ids = (getStudents(cid) || []).map(function (/** @type {any} */ s) {
+      return s.id;
+    });
+    var DO = /** @type {any} */ (window).DashOverview;
+    if (DO && typeof DO.classWorkCounts === 'function') return DO.classWorkCounts(cid, ids);
+    return /** @type {any} */ (window).GraderWork.classWorkCounts(cid, ids);
+  }
+
+  /** Work assessed and not returned: the piece with the most, by GraderWork's count.
+   * @param {string} cid */
+  function notReturned(cid) {
+    var GW = /** @type {any} */ (window).GraderWork;
+    if (!cid || !GW) return null;
+    var list = (_counts(cid).pieces || []).filter(function (/** @type {any} */ p) {
       return p.toreturn > 0;
     });
-    list.sort(function (/** @type {any} */ x, /** @type {any} */ y) {
-      return x.at < y.at ? 1 : x.at > y.at ? -1 : 0;
-    });
     if (!list.length) return null;
-    return { aid: list[0].aid, title: list[0].title, n: list[0].toreturn, more: list.length - 1 };
+    list.sort(function (/** @type {any} */ x, /** @type {any} */ y) {
+      return y.toreturn - x.toreturn;
+    });
+    var a = (getAssessments(cid) || []).filter(function (/** @type {any} */ x) {
+      return x && x.id === list[0].aid;
+    })[0];
+    return { aid: list[0].aid, title: label(cid, a), n: list[0].toreturn, more: list.length - 1 };
   }
 
   /** "open until Fri", or ''.
@@ -136,35 +209,37 @@ window.DashInboxDrop = (function () {
     return 'open until ' + d.toLocaleDateString('en-CA', { weekday: 'short' });
   }
 
-  /** The next piece taking work and how many are not in (GraderWork's, through the model).
-   * @param {string} cid @param {any} model */
-  function nextTaking(cid, model) {
+  /** The next piece taking work and how many are not in (GraderWork's count).
+   * @param {string} cid */
+  function nextTaking(cid) {
     var c = nextDue(cid, choices(cid));
     if (!c) return null;
-    var p = ((model && model.pieces) || []).filter(function (/** @type {any} */ x) {
+    var p = (_counts(cid).pieces || []).filter(function (/** @type {any} */ x) {
       return x.aid === c.aid;
     })[0];
-    return { aid: c.aid, title: c.title, until: untilText(c.closes), notin: p ? p.notin : null };
+    return { aid: c.aid, title: c.label, until: untilText(c.closes), notin: p ? p.notin : null };
   }
 
-  /* ── All Caught Up ─────────────────────────────────────── */
-  /** @param {string} what @param {string} label */
-  function _pick(what, label) {
+  /* ── Nothing to grade ──────────────────────────────────── */
+  /** @param {string} what @param {string} text */
+  function _pick(what, text) {
     return (
       '<button type="button" class="awt-pick-btn dash-inbox-drop-pick" data-dash-inbox-pick="' +
       what +
       '">' +
-      esc(label) +
+      esc(text) +
       '</button>'
     );
   }
 
-  /** @param {string} cid @param {any[]} list @param {any} c */
-  function _forHtml(cid, list, c) {
+  /** @param {any[]} list @param {any} c */
+  function _forHtml(list, c) {
     if (list.length === 1) {
       return (
-        '<span class="dash-inbox-drop-for"><span class="dash-inbox-drop-for-label">Add Work For</span> <span class="dash-inbox-drop-for-one">' +
-        esc(list[0].title) +
+        '<span class="dash-inbox-drop-for"><span class="dash-inbox-drop-for-label">Add Work For</span> <span class="dash-inbox-drop-for-one" data-dash-inbox-for-aid="' +
+        esc(list[0].aid) +
+        '">' +
+        esc(list[0].label) +
         '</span></span>'
       );
     }
@@ -178,7 +253,7 @@ window.DashInboxDrop = (function () {
             '"' +
             (c && x.aid === c.aid ? ' selected' : '') +
             '>' +
-            esc(x.title) +
+            esc(x.label) +
             '</option>'
           );
         })
@@ -195,26 +270,12 @@ window.DashInboxDrop = (function () {
     var list = choices(cid);
     var c = chosen(cid, list);
     var split = /** @type {any} */ (window).AddWorkSplit;
-    /* As the top bar's To Grade cell: "All Caught Up" only when nothing is
-       to return either. Work assessed and not returned comes first instead. */
-    var back = notReturned(model);
-    var out = '<li class="dash-inbox-drop-home" id="dash-inbox-caught">';
-    if (back) {
-      out +=
-        '<p class="dash-inbox-drop-line dash-inbox-drop-back">' +
-        esc(back.title) +
-        ': ' +
-        back.n +
-        ' assessed, not returned' +
-        (back.more ? ' (and ' + back.more + (back.more === 1 ? ' more assessment' : ' more assessments') + ')' : '') +
-        ' <a role="link" tabindex="0" data-href="' +
-        esc('/assignments?course=' + encodeURIComponent(cid) + '&open=' + encodeURIComponent(back.aid)) +
-        '">Return Them →</a></p>';
-    }
-    out +=
-      '<div class="dash-inbox-drop-top">' +
+    var back = notReturned(cid);
+    var out =
+      '<li class="dash-inbox-drop-home" id="dash-inbox-caught"><div class="dash-inbox-drop-top">' +
+      // As the top bar's To Grade cell: caught up only with nothing to return either.
       (back ? '' : '<span class="dash-inbox-drop-caught">All Caught Up</span>') +
-      (list.length ? _forHtml(cid, list, c) : '') +
+      (list.length ? _forHtml(list, c) : '') +
       '</div>';
     if (list.length) {
       out +=
@@ -231,13 +292,26 @@ window.DashInboxDrop = (function () {
     } else {
       out += '<p class="dash-inbox-drop-line">No assessment is taking work.</p>';
     }
-    var next = nextTaking(cid, model);
+    // Under the drop area, as on the board: what is not returned, then what is next.
+    if (back) {
+      out +=
+        '<p class="dash-inbox-drop-line dash-inbox-drop-back">' +
+        esc(back.title) +
+        ': <b>' +
+        back.n +
+        '</b> Not Returned' +
+        (back.more ? ' (and ' + back.more + (back.more === 1 ? ' more assessment' : ' more assessments') + ')' : '') +
+        ' <a role="link" tabindex="0" data-href="' +
+        esc('/assignments?course=' + encodeURIComponent(cid) + '&open=' + encodeURIComponent(back.aid)) +
+        '">Return Them →</a></p>';
+    }
+    var next = nextTaking(cid);
     if (next) {
       out +=
         '<p class="dash-inbox-drop-line">Next taking work: ' +
         esc(next.title) +
         (next.until ? ', ' + esc(next.until) : '') +
-        (next.notin ? ' · ' + next.notin + ' not in yet' : '') +
+        (next.notin ? ' · <b>' + next.notin + '</b> not in yet' : '') +
         ' <button type="button" class="dash-inbox-drop-wall" data-dash-inbox-wall="' +
         esc(next.aid) +
         '">Work Wall →</button></p>';
@@ -245,19 +319,70 @@ window.DashInboxDrop = (function () {
     return out + '</li>';
   }
 
-  /* ── Opening Add Work ──────────────────────────────────── */
+  /* ── The piece shown ───────────────────────────────────── */
+  /** The piece the tile shows now: the "Add Work For" box as it reads, else
+   * the piece named when the tile was drawn. → { aid, label } or null. */
+  function shown() {
+    var tile = _tile;
+    if (tile) {
+      var sel = /** @type {HTMLSelectElement | null} */ (tile.querySelector('[data-dash-inbox-for]'));
+      if (sel) {
+        var opt = sel.querySelector('option[value="' + sel.value + '"]') || sel.querySelector('option[selected]');
+        return sel.value ? { aid: sel.value, label: opt ? String(opt.textContent || '') : '' } : null;
+      }
+      var one = tile.querySelector('[data-dash-inbox-for-aid]');
+      if (one) return { aid: one.getAttribute('data-dash-inbox-for-aid') || '', label: String(one.textContent || '') };
+    }
+    return _drawn;
+  }
+
   function _redraw() {
     var PD = /** @type {any} */ (window).PageDashboard;
     if (document.querySelector('#main .dash-glance') && PD && PD.render) PD.render();
   }
 
-  /** Add Work for the piece chosen, then the page's own chooser, in the
+  /** The piece shown is gone: no other is used in its place. The tile is
+   * drawn again and says why nothing happened.
+   * @param {string} cid @param {'drop' | 'pick'} why */
+  function _changed(cid, why) {
+    _notice[cid] = CHANGED[why];
+    _redraw();
+    // With no page to draw (a test, or the page gone), the tile says it now.
+    if (_tile && _tile.isConnected && !_tile.querySelector('.dash-inbox-drop-notice')) _showNotice();
+  }
+
+  function _showNotice() {
+    if (!_tile || !_cid || !_notice[_cid]) return;
+    var body = _tile.querySelector('.dash-inbox-body');
+    if (!body) return;
+    var old = body.querySelector('.dash-inbox-drop-notice');
+    if (old) old.remove();
+    var p = document.createElement('p');
+    p.className = 'dash-inbox-drop-notice';
+    p.setAttribute('role', 'status');
+    p.textContent = _notice[_cid];
+    body.insertBefore(p, body.firstChild);
+  }
+
+  function _clearNotice() {
+    if (_cid) delete _notice[_cid];
+    var old = _tile && _tile.querySelector('.dash-inbox-drop-notice');
+    if (old) old.remove();
+  }
+
+  /** Add Work for the piece shown, then the page's own chooser, in the
    * click's own turn (a browser opens a file chooser only then).
    * @param {string} cid @param {string} what */
   function choose(cid, what) {
-    var c = chosen(cid);
+    _clearNotice();
+    var t = shown();
     var AW = /** @type {any} */ (window).AddWorkClass;
-    if (!c || !AW || !AW.open(cid, c.aid, { onClose: _redraw })) return false;
+    if (!t || !AW) return false;
+    if (!stillOffered(cid, t.aid)) {
+      _changed(cid, 'pick');
+      return false;
+    }
+    if (!AW.open(cid, t.aid, { onClose: _redraw })) return false;
     var btn = /** @type {HTMLElement | null} */ (
       document.querySelector('#add-work-class-overlay [data-awt="' + what + '"]')
     );
@@ -273,16 +398,22 @@ window.DashInboxDrop = (function () {
     return !!types && Array.prototype.indexOf.call(types, 'Files') >= 0;
   }
 
+  /** Files from the computer, not a picture dragged from this page.
+   * @param {any} e */
+  function _fromOutside(e) {
+    return !_inner && hasFiles(e);
+  }
+
   /** What the cover says: [title, hint].
    * @param {any} t */
   function coverText(t) {
     if (!t) return ['No assessment is taking work, so these files have nowhere to go.', ''];
-    return ['Drop to Add to ' + t.title, HINT];
+    return ['Drop to Add to ' + (t.label || t.title), HINT];
   }
 
   function _showCover() {
     if (!_cover || !_cid) return;
-    var t = target(_cid, _m);
+    var t = shown();
     var words = coverText(t);
     var title = _cover.querySelector('.dash-inbox-drop-cover-title');
     var hint = _cover.querySelector('.dash-inbox-drop-cover-hint');
@@ -302,18 +433,25 @@ window.DashInboxDrop = (function () {
   }
 
   /** @param {DragEvent} e */
+  function _accept(e) {
+    // Accepted from the first moment, so a release at once still drops.
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = shown() ? 'copy' : 'none';
+  }
+
+  /** @param {DragEvent} e */
   function _enter(e) {
-    if (!hasFiles(e)) return;
+    if (!_fromOutside(e)) return;
+    _accept(e);
+    if (_depth === 0) _clearNotice();
     _depth++;
     _showCover();
   }
 
   /** @param {DragEvent} e */
   function _over(e) {
-    if (!hasFiles(e)) return;
-    e.preventDefault();
-    var none = !target(/** @type {string} */ (_cid), _m);
-    if (e.dataTransfer) e.dataTransfer.dropEffect = none ? 'none' : 'copy';
+    if (!_fromOutside(e)) return;
+    _accept(e);
     // A draw mid-drag gives a new tile that heard no dragenter.
     if (_depth < 1) _depth = 1;
     if (_cover && _cover.hidden) _showCover();
@@ -321,7 +459,7 @@ window.DashInboxDrop = (function () {
 
   /** @param {DragEvent} e */
   function _leave(e) {
-    if (!hasFiles(e)) return;
+    if (!_fromOutside(e)) return;
     _depth--;
     if (_depth <= 0) _hideCover();
   }
@@ -330,24 +468,56 @@ window.DashInboxDrop = (function () {
      own DataTransfer (a dropped folder is readable only now). */
   /** @param {DragEvent} e */
   function _drop(e) {
-    if (!hasFiles(e)) return;
+    if (!_fromOutside(e)) return;
     e.preventDefault();
     _hideCover();
     var cid = _cid;
-    var t = cid ? target(cid, _m) : null;
+    var t = shown();
     var AW = /** @type {any} */ (window).AddWorkClass;
     if (!cid || !t || !AW) return;
+    if (!stillOffered(cid, t.aid)) return _changed(cid, 'drop');
     AW.open(cid, t.aid, { drop: e.dataTransfer, onClose: _redraw });
   }
 
-  // The drag ended elsewhere, or was given up.
+  /* Elsewhere on the page: a file let go near the tile is refused rather
+     than opened by the browser in place of the app. Overlays and drop places
+     that take files say so first (preventDefault), and are left alone. */
+  /** @param {DragEvent} e */
+  function _pageOver(e) {
+    if (!_fromOutside(e) || e.defaultPrevented) return;
+    if (_inTile(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+  }
+  /** @param {DragEvent} e */
+  function _pageDrop(e) {
+    if (!_fromOutside(e) || e.defaultPrevented) return;
+    if (_inTile(e)) return;
+    e.preventDefault();
+  }
+  /** @param {Event} e */
+  function _inTile(e) {
+    return !!_tile && !!e.target && _tile.contains(/** @type {any} */ (e.target));
+  }
+
+  // The drag ended, or was given up, or something else happened: the cover goes.
   function _ended() {
     if (_cover && !_cover.hidden) _hideCover();
   }
-
-  /** @param {KeyboardEvent} e */
-  function _key(e) {
-    if (e.key === 'Escape') _ended();
+  /** @param {DragEvent} e */
+  function _pageLeave(e) {
+    // Out of the window: the pointer is at or past its edge.
+    var w = window.innerWidth || 0;
+    var h = window.innerHeight || 0;
+    if (e.clientX <= 0 || e.clientY <= 0 || (w && e.clientX >= w) || (h && e.clientY >= h)) _ended();
+  }
+  function _dragStart() {
+    _inner = true;
+    _ended();
+  }
+  function _dragDone() {
+    _inner = false;
+    _ended();
   }
 
   /** @param {MouseEvent} e */
@@ -378,6 +548,34 @@ window.DashInboxDrop = (function () {
     _chosen[_cid] = t.value;
   }
 
+  // The listeners on the document and window while a tile is mounted: one set.
+  /** @type {[EventTarget, string, any, boolean][]} */
+  var PAGE = [
+    [document, 'dragover', _pageOver, false],
+    [document, 'drop', _pageDrop, false],
+    [document, 'dragstart', _dragStart, true],
+    [document, 'dragend', _dragDone, true],
+    [document, 'drop', _ended, true],
+    // After the tile's own drop has looked at it: a drag from the page ends.
+    [document, 'drop', _dragDone, false],
+    [document, 'dragleave', _pageLeave, true],
+    [window, 'mousemove', _ended, true],
+    [window, 'pointerdown', _ended, true],
+    [window, 'click', _ended, true],
+    [window, 'keydown', _ended, true],
+    [window, 'blur', _ended, false],
+  ];
+  /** @param {boolean} on */
+  function _page(on) {
+    PAGE.forEach(function (l) {
+      // The document of the day (tests swap it); window stays.
+      var where = l[0] === window ? window : document;
+      if (!where) return;
+      if (on && typeof where.addEventListener === 'function') where.addEventListener(l[1], l[2], l[3]);
+      if (!on && typeof where.removeEventListener === 'function') where.removeEventListener(l[1], l[2], l[3]);
+    });
+  }
+
   /** Once the page is drawn: the cover and the listeners on this tile.
    * @param {HTMLElement} tile @param {string} cid @param {any} model */
   function mount(tile, cid, model) {
@@ -386,6 +584,8 @@ window.DashInboxDrop = (function () {
     _tile = tile;
     _cid = cid;
     _m = model;
+    var t = target(cid, model);
+    _drawn = t ? { aid: t.aid, label: t.label } : null;
     var body = tile.querySelector('.dash-inbox-body');
     if (body) {
       var cover = document.createElement('div');
@@ -404,15 +604,14 @@ window.DashInboxDrop = (function () {
       body.appendChild(cover);
       _cover = cover;
     }
+    _showNotice();
     tile.addEventListener('dragenter', _enter);
     tile.addEventListener('dragover', _over);
     tile.addEventListener('dragleave', _leave);
     tile.addEventListener('drop', _drop);
     tile.addEventListener('click', _click);
     tile.addEventListener('change', _change);
-    document.addEventListener('dragend', _ended, true);
-    document.addEventListener('drop', _ended, true);
-    document.addEventListener('keydown', _key, true);
+    _page(true);
   }
 
   /* Before the next draw, and when the Dashboard is left. */
@@ -425,12 +624,11 @@ window.DashInboxDrop = (function () {
       _tile.removeEventListener('click', _click);
       _tile.removeEventListener('change', _change);
     }
-    document.removeEventListener('dragend', _ended, true);
-    document.removeEventListener('drop', _ended, true);
-    document.removeEventListener('keydown', _key, true);
+    _page(false);
     if (_cover && _cover.parentNode) _cover.parentNode.removeChild(_cover);
     _cover = null;
     _tile = null;
+    _drawn = null;
     _depth = 0;
   }
 
@@ -440,7 +638,11 @@ window.DashInboxDrop = (function () {
     unmount();
     _m = null;
     _cid = null;
-    if (cid) delete _chosen[cid];
+    _inner = false;
+    if (cid) {
+      delete _chosen[cid];
+      delete _notice[cid];
+    }
   }
 
   return {
@@ -448,6 +650,9 @@ window.DashInboxDrop = (function () {
     choices: choices,
     chosen: chosen,
     target: target,
+    shown: shown,
+    stillOffered: stillOffered,
+    label: label,
     notReturned: notReturned,
     nextTaking: nextTaking,
     coverText: coverText,

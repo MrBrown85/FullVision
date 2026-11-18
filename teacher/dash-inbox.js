@@ -201,7 +201,7 @@ window.DashInbox = (function () {
     return (
       '<span class="dash-inbox-pic" data-pic-key="' +
       esc(key) +
-      '"><img class="dash-inbox-img" data-work-pic data-dash-pic="' +
+      '"><img class="dash-inbox-img" draggable="false" data-work-pic data-dash-pic="' +
       esc(key) +
       '" alt="' +
       esc(pg.name + "'s first page") +

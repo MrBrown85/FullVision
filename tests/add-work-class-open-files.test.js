@@ -58,7 +58,7 @@ function held() {
       files: [...r.querySelectorAll('.awc-file-name')].map(text),
     })),
     waiting: $$('.awt-item').map(el => [text(el.querySelector('.awt-file')), text(el.querySelector('.awt-why'))]),
-    tray: AddWorkClass.waiting().map(x => x.name),
+    tray: AddWorkClass.waiting().map(x => x.from),
     status: text($('.awt-status')),
     count: text($('.awc-count')),
   };
@@ -208,6 +208,26 @@ describe('open with a drop', () => {
       }),
     };
   };
+  /* As a browser hands a drop over: its items, files and types can be read
+     only while the drop is being handled, and are empty after it (the entries
+     already taken stay usable). end() closes that turn. */
+  const expiring = dt => {
+    let live = true;
+    return {
+      get types() {
+        return live ? dt.types : [];
+      },
+      get files() {
+        return live ? dt.files : [];
+      },
+      get items() {
+        return live ? dt.items : [];
+      },
+      end() {
+        live = false;
+      },
+    };
+  };
   // A fresh folder each time: a reader gives its entries once.
   const folderDrop = () => {
     const root = dirEntry('Period 2', [
@@ -217,16 +237,23 @@ describe('open with a drop', () => {
       dirEntry('__MACOSX', [fileEntry(file('._Avery Chen.pdf'))]),
       fileEntry(file('Matteo C.jpg')),
     ]);
-    return {
+    return expiring({
       types: ['Files'],
       files: [{ name: 'Period 2', type: '' }],
       items: [{ kind: 'file', webkitGetAsEntry: () => root }],
-    };
+    });
   };
   const dropOnPage = dt => {
     const ev = new doc.defaultView.Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(ev, 'dataTransfer', { value: dt });
     $('[data-awt-drop]').dispatchEvent(ev);
+    dt.end();
+  };
+  // As the Inbox calls it: inside the drop's own turn, which ends at once after.
+  const openWith = dt => {
+    const r = AddWorkClass.open(CID, PIECE, { drop: dt });
+    dt.end();
+    return r;
   };
 
   it('walks a dropped folder exactly as a drop on the page does', async () => {
@@ -236,7 +263,7 @@ describe('open with a drop', () => {
     const plain = held();
     AddWorkClass.close(true);
 
-    AddWorkClass.open(CID, PIECE, { drop: folderDrop() });
+    openWith(folderDrop());
     await tick();
     const given = held();
     expect(given).toEqual(plain);
@@ -247,22 +274,37 @@ describe('open with a drop', () => {
   });
 
   it('a drop of plain files lands as those files dropped on the page', async () => {
-    const dt = () => ({ types: ['Files'], files: PILE(), items: [] });
+    const dt = () => expiring({ types: ['Files'], files: PILE(), items: [] });
     AddWorkClass.open(CID, PIECE);
     dropOnPage(dt());
     await tick();
     const plain = held();
     AddWorkClass.close(true);
-    AddWorkClass.open(CID, PIECE, { drop: dt() });
+    openWith(dt());
     await tick();
     expect(held()).toEqual(plain);
+    expect(plain.rows.find(r => r.sid === IDS[0]).files).toEqual(['Avery Chen.pdf']);
   });
 
   it('drop wins over files when both are given', async () => {
-    AddWorkClass.open(CID, PIECE, { drop: folderDrop(), files: [file('Sam Blackwood.jpg')] });
+    const dt = folderDrop();
+    AddWorkClass.open(CID, PIECE, { drop: dt, files: [file('Sam Blackwood.jpg')] });
+    dt.end();
     await tick();
     const h = held();
     expect(h.rows.find(r => r.sid === IDS[4]).files).toEqual([]);
     expect(h.rows.find(r => r.sid === IDS[0]).files).toEqual(['Avery Chen.pdf']);
+  });
+
+  it('reads the drop in its own turn: a drop that is empty a moment later still lands every file', async () => {
+    const dt = folderDrop();
+    openWith(dt);
+    // The turn is over: the drop now reads as empty, as a browser's does.
+    expect(dt.items.length + dt.files.length).toBe(0);
+    await tick();
+    const h = held();
+    expect(h.rows.find(r => r.sid === IDS[0]).files).toEqual(['Avery Chen.pdf']);
+    expect(h.rows.find(r => r.sid === IDS[3]).files).toEqual(['Priya Kaur.jpg']);
+    expect(h.tray).toEqual(['Matteo C.jpg']);
   });
 });

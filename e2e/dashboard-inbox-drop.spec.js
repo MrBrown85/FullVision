@@ -49,6 +49,7 @@ async function open(page, { flag = true, bulletins = false, caughtUp = false } =
     },
     [flag, bulletins],
   );
+  await page.addInitScript(EXPIRING);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -102,20 +103,57 @@ async function namedFiles(page, aid) {
 // The class's work, as stored: unchanged until Add Work is pressed.
 const stored = page => page.evaluate(() => JSON.stringify(getCourseSubmissions(getActiveCourse()).submissions));
 
-// A drag event at an element, carrying window.__files (or text).
+/* A drag event at an element, carrying window.__files (or text). As a
+   browser hands a drag over, its types, files and items can be read only
+   while the event is being handled and read as empty after it: anything
+   that reads the drop late finds nothing. */
 async function drag(page, selector, type, { text = false } = {}) {
   return page.evaluate(
     ({ selector, type, text }) => {
-      const dt = new DataTransfer();
-      if (text) dt.setData('text/plain', 'Some words');
-      else window.__files.forEach(f => dt.items.add(f));
-      const ev = new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true });
-      document.querySelector(selector).dispatchEvent(ev);
+      const real = new DataTransfer();
+      if (text) real.setData('text/plain', 'Some words');
+      else window.__files.forEach(f => real.items.add(f));
+      const el = document.querySelector(selector);
+      // At the middle of the element, as a pointer would be.
+      const r = el.getBoundingClientRect();
+      const at = { clientX: Math.round(r.left + r.width / 2), clientY: Math.round(r.top + r.height / 2) };
+      const ev = new DragEvent(type, Object.assign({ bubbles: true, cancelable: true }, at));
+      Object.defineProperty(ev, 'dataTransfer', { value: window.__expiring(real) });
+      el.dispatchEvent(ev);
+      ev.dataTransfer.end();
       return ev.defaultPrevented;
     },
     { selector, type, text },
   );
 }
+// The page's helper for drops that expire once handled.
+const EXPIRING = () => {
+  window.__expiring = real => {
+    let live = true;
+    let effect = 'none';
+    return {
+      get types() {
+        return live ? real.types : [];
+      },
+      get files() {
+        return live ? real.files : [];
+      },
+      get items() {
+        return live ? real.items : [];
+      },
+      get dropEffect() {
+        return effect;
+      },
+      set dropEffect(v) {
+        effect = v;
+      },
+      getData: k => (live ? real.getData(k) : ''),
+      end() {
+        live = false;
+      },
+    };
+  };
+};
 
 const coverShown = page =>
   page.evaluate(() => {
@@ -184,13 +222,17 @@ test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Wor
   test.setTimeout(60_000);
   await open(page, { caughtUp: true });
   const home = page.locator('#dash-inbox-caught');
-  // As the top bar: work assessed and not returned is not "All Caught Up", and it comes first.
+  // As the top bar: work assessed and not returned is not "All Caught Up".
   await expect(page.locator('.dash-glance-tograde')).toContainText('7 Not Returned');
   await expect(page.locator('.dash-glance-tograde')).not.toContainText('All Caught Up');
   await expect(home).not.toContainText('All Caught Up');
-  await expect(home.locator(':scope > :first-child')).toHaveText(
-    'Light Refraction Lab: 7 assessed, not returned Return Them →',
-  );
+  // As on the board: Add Work For, the drop area, then the two lines under it.
+  expect(await home.evaluate(el => [...el.children].map(c => c.className))).toEqual([
+    'dash-inbox-drop-top',
+    'awt-drop dash-inbox-drop-area',
+    'dash-inbox-drop-line dash-inbox-drop-back',
+    'dash-inbox-drop-line',
+  ]);
   await expect(home.locator('.dash-inbox-drop-area')).toContainText('Drop the Scan, a Folder or Files');
   await expect(home.locator('.dash-inbox-drop-area')).toContainText(
     'Photos or PDFs. Files are matched to students by name.',
@@ -209,7 +251,7 @@ test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Wor
   expect(look).toEqual({ style: 'dashed', awt: true });
   await expect(home.locator('.dash-inbox-drop-area svg')).toBeVisible();
   // The two quiet lines.
-  await expect(home).toContainText(/Light Refraction Lab: \d+ assessed, not returned Return Them →/);
+  await expect(home.locator('.dash-inbox-drop-back')).toHaveText('Light Refraction Lab: 7 Not Returned Return Them →');
   await expect(home).toContainText(/Next taking work: .+ · \d+ not in yet Work Wall →/);
   // Everything fits in the 510 px tile.
   const fits = await page.evaluate(() => {
@@ -240,7 +282,7 @@ test('nothing to grade and nothing to return: All Caught Up, as the top bar says
   await expect(page.locator('.dash-glance-tograde')).toContainText('All Caught Up');
   const home = page.locator('#dash-inbox-caught');
   await expect(home.locator('.dash-inbox-drop-caught')).toHaveText('All Caught Up');
-  await expect(home).not.toContainText('not returned');
+  await expect(home).not.toContainText('Not Returned');
   await expect(home.locator('.dash-inbox-drop-area')).toBeVisible();
   await shot(page, 'inbox-caught-up-returned-510');
 });
@@ -271,21 +313,22 @@ test('a dropped folder lands its files', async ({ page }) => {
       dirEntry('more', [fileEntry(window.__files[1])]),
       fileEntry(new File(['x'], '.DS_Store')),
     ]);
-    const dt = {
+    // A folder item that, like a browser's, gives its entry only during the event.
+    const real = {
       types: ['Files'],
       files: [new File([], 'Period 2')],
       items: [{ kind: 'file', webkitGetAsEntry: () => root }],
-      dropEffect: 'none',
+      getData: () => '',
     };
-    const mk = type => {
+    const fire = type => {
       const ev = new Event(type, { bubbles: true, cancelable: true });
-      Object.defineProperty(ev, 'dataTransfer', { value: dt });
-      return ev;
+      Object.defineProperty(ev, 'dataTransfer', { value: window.__expiring(real) });
+      document.querySelector('.dash-inbox-row').dispatchEvent(ev);
+      ev.dataTransfer.end();
     };
-    const row = document.querySelector('.dash-inbox-row');
-    row.dispatchEvent(mk('dragenter'));
-    row.dispatchEvent(mk('dragover'));
-    row.dispatchEvent(mk('drop'));
+    fire('dragenter');
+    fire('dragover');
+    fire('drop');
   });
   for (const s of two) await expect(chips(page, s.id)).toHaveText(s.name, { timeout: 20000 });
   await expect(page.locator('#add-work-class-overlay .awt-item')).toHaveCount(0);
@@ -393,4 +436,105 @@ test('at 390 px the nothing-to-grade space wraps and nothing goes sideways', asy
   });
   expect(m).toEqual({ inside: true, sideways: 0 });
   await shot(page, 'inbox-caught-up-390');
+});
+
+/* The piece shown is the piece used (review item 1). The clock is pinned on
+   Cell Microscope Lab's due day; it stops taking work after it. The tile is
+   drawn, the clock moves a day on with no draw, and the teacher acts. */
+async function closesToday(page, { lightToo }) {
+  await page.evaluate(lightToo => {
+    const cid = getActiveCourse();
+    const today = courseToday(cid);
+    const later = new Date(Date.parse(today + 'T12:00:00Z') + 5 * 86400000).toISOString().slice(0, 10);
+    getAssessments(cid).find(a => a.id === 'sci8a1').dueDate = today;
+    getAssessments(cid).find(a => a.id === 'sci8a21').dueDate = lightToo ? today : later;
+    const work = getCourseSubmissions(cid);
+    work.assessments = (work.assessments || []).filter(x => x.id !== 'sci8a1');
+    work.assessments.push({ id: 'sci8a1', students_send: 'photos', after_due: 'stop', accept_until: null });
+    saveDemoStudentWork(cid, work);
+    PageDashboard.render();
+  }, lightToo);
+}
+const NOON = new Date('2026-11-18T20:00:00Z');
+const NEXT_DAY = new Date('2026-11-19T20:00:00Z');
+
+test('a button acts on the piece in the box (the default), and opens nothing once that piece stops taking work', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(NOON);
+  await open(page, { caughtUp: true });
+  await closesToday(page, { lightToo: false });
+  const select = page.locator('.dash-inbox-drop-select');
+  await expect(select).toHaveValue(CELL);
+  await page.clock.setFixedTime(NEXT_DAY);
+  // No draw since: the box still reads Cell Microscope Lab.
+  await expect(select).toHaveValue(CELL);
+  await page.locator('#dash-inbox').getByRole('button', { name: 'Choose Files…' }).click();
+  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
+  await expect(page.locator('.dash-inbox-drop-notice')).toHaveText('The list of assessments changed. Choose again.');
+  // Drawn again: Cell Microscope Lab is no longer offered.
+  await expect(page.locator('.dash-inbox-drop-for')).toContainText('Light Refraction Lab');
+  await expect(page.locator('.dash-inbox-drop-for')).not.toContainText('Cell Microscope Lab');
+});
+
+test('a drop goes to the piece picked by hand, and to no other once that piece stops taking work', async ({ page }) => {
+  await page.clock.setFixedTime(NOON);
+  await open(page, { caughtUp: true });
+  await closesToday(page, { lightToo: true });
+  const select = page.locator('.dash-inbox-drop-select');
+  await expect(select).toHaveValue(LIGHT);
+  await select.selectOption(CELL);
+  await namedFiles(page, CELL);
+  const before = await stored(page);
+  await page.clock.setFixedTime(NEXT_DAY);
+  await drag(page, '.dash-inbox-drop-area', 'dragenter');
+  await expect(page.locator('.dash-inbox-drop-cover-title')).toHaveText('Drop to Add to Cell Microscope Lab');
+  expect(await drag(page, '.dash-inbox-drop-cover', 'drop')).toBe(true);
+  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
+  await expect(page.locator('.dash-inbox-drop-notice')).toHaveText(
+    'The list of assessments changed, so those files were not added. Drop them again.',
+  );
+  expect(await coverShown(page)).toBe(false);
+  expect(await stored(page)).toBe(before);
+});
+
+test('a file let go just outside the tile is refused, so the browser does not open it', async ({ page }) => {
+  await open(page);
+  await namedFiles(page, LIGHT);
+  for (const sel of ['.dash-glance', '.dash-row-comp', '.dash-row']) {
+    expect(await drag(page, sel, 'dragover')).toBe(true);
+    expect(await drag(page, sel, 'drop')).toBe(true);
+  }
+  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
+  // Leaving the Dashboard takes its page listeners with it.
+  await page
+    .locator('a, button', { hasText: /^Assignments$/ })
+    .first()
+    .click();
+  await page.waitForURL(/\/assignments/);
+  expect(await drag(page, '#main', 'dragover')).toBe(false);
+});
+
+test('a picture dragged from the Inbox is not taken as files', async ({ page }) => {
+  await open(page);
+  await namedFiles(page, LIGHT);
+  const img = page.locator('#dash-inbox .dash-inbox-img').first();
+  await expect(img).toHaveAttribute('draggable', 'false');
+  await page.evaluate(() =>
+    document.querySelector('#dash-inbox .dash-inbox-img').dispatchEvent(new DragEvent('dragstart', { bubbles: true })),
+  );
+  // Even if the drag reports Files, as Safari's does for a picture.
+  expect(await drag(page, '.dash-inbox-row', 'dragenter')).toBe(false);
+  expect(await coverShown(page)).toBe(false);
+  expect(await drag(page, '.dash-inbox-row', 'drop')).toBe(false);
+  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
+});
+
+test('dragenter accepts files at once, so a release in the first instant still drops', async ({ page }) => {
+  await open(page);
+  const two = await namedFiles(page, LIGHT);
+  expect(await drag(page, '.dash-inbox-row', 'dragenter')).toBe(true);
+  // Straight to the drop, with no dragover between.
+  expect(await drag(page, '.dash-inbox-row', 'drop')).toBe(true);
+  for (const s of two) await expect(chips(page, s.id)).toHaveText(s.name, { timeout: 20000 });
 });

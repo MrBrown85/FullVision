@@ -327,7 +327,15 @@
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-.dash-inbox-drop-back {
+.dash-inbox-drop-line b {
+  font-weight: 600;
+  color: var(--text);
+}
+/* After an action found the list of assessments changed: one plain sentence. */
+.dash-inbox-drop-notice {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
   color: var(--text);
 }
 .dash-inbox-drop-line a,

@@ -141,7 +141,7 @@ describe('which assessment', () => {
 });
 
 describe('All Caught Up', () => {
-  it('0 to grade, 7 to return: the drop area, the not-returned line first, and not "All Caught Up"', () => {
+  it('0 to grade, 7 to return: the drop area, then the two lines under it, and not "All Caught Up"', () => {
     caughtUp();
     const html = DashInbox.html(CID);
     // As the top bar: work waits to be returned, so nothing is caught up.
@@ -159,16 +159,19 @@ describe('All Caught Up', () => {
     expect(doc.querySelector('.dash-inbox-drop-area').classList.contains('awt-drop')).toBe(true);
     const counts = GraderWork.workCounts(CID, LIGHT, ids());
     const lines = [...doc.querySelectorAll('.dash-inbox-drop-line')].map(p => p.textContent.replace(/\s+/g, ' '));
-    expect(lines[0]).toBe('Light Refraction Lab: ' + counts.toreturn + ' assessed, not returned Return Them →');
+    expect(lines[0]).toBe('Light Refraction Lab: ' + counts.toreturn + ' Not Returned Return Them →');
     expect(counts.toreturn).toBeGreaterThan(0);
     expect(lines[1]).toBe('Next taking work: Light Refraction Lab · ' + counts.notin + ' not in yet Work Wall →');
     expect(doc.querySelector('.dash-inbox-drop-line a').getAttribute('data-href')).toBe(
       '/assignments?course=' + CID + '&open=' + LIGHT,
     );
-    // The not-returned line is the first thing in the space.
-    expect(doc.querySelector('#dash-inbox-caught').firstElementChild.classList.contains('dash-inbox-drop-back')).toBe(
-      true,
-    );
+    // As on the board: Add Work For, the drop area, then the two lines.
+    expect([...doc.querySelector('#dash-inbox-caught').children].map(el => el.className)).toEqual([
+      'dash-inbox-drop-top',
+      'awt-drop dash-inbox-drop-area',
+      'dash-inbox-drop-line dash-inbox-drop-back',
+      'dash-inbox-drop-line',
+    ]);
   });
 
   it('nothing to grade and nothing to return: "All Caught Up", as the top bar says it', () => {
@@ -179,7 +182,7 @@ describe('All Caught Up', () => {
     const home = doc.querySelector('#dash-inbox-caught');
     expect(home.querySelector('.dash-inbox-drop-caught').textContent).toBe('All Caught Up');
     expect(home.querySelector('.dash-inbox-drop-back')).toBeNull();
-    expect(home.textContent).not.toContain('not returned');
+    expect(home.textContent).not.toContain('Not Returned');
     expect(home.querySelector('.dash-inbox-drop-area')).not.toBeNull();
   });
 
