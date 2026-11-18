@@ -1,0 +1,178 @@
+/* dash-bulletins.css — the Bulletins tile on the Dashboard (teacher/dash-bulletins.js,
+   slice B1e). It fills the slot the middle row gives it (40% of the left
+   column: 199 px at 1280 x 800, 300 px stacked on an iPad). The header and
+   three 38 px rows fit at 199 px; where the slot is shorter, whole rows are
+   dropped from the bottom, never cut: a container query on the tile's height.
+   Colours are the app's tokens, so dark mode follows. Every class starts
+   with dash-bulletins- (tests/adblock-names.test.js). */
+.dash-bulletins-tile {
+  container: dash-bulletins / size;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.dash-bulletins-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 28px;
+  margin-bottom: 2px;
+}
+.dash-bulletins-title {
+  margin: 0;
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-bulletins-class {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-bulletins-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  white-space: nowrap;
+}
+.dash-bulletins-write,
+.dash-bulletins-open,
+.dash-bulletins-seen {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--link);
+  cursor: pointer;
+  text-decoration: none;
+}
+.dash-bulletins-write {
+  font-weight: 600;
+}
+.dash-bulletins-write:hover,
+.dash-bulletins-open:hover,
+.dash-bulletins-seen:hover,
+.dash-bulletins-words:hover {
+  text-decoration: underline;
+}
+.dash-bulletins-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+  column-gap: 12px;
+  grid-auto-rows: 38px;
+  align-content: start;
+  overflow: hidden;
+}
+.dash-bulletins-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  height: 38px;
+  box-sizing: border-box;
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-bulletins-kind {
+  justify-self: start;
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--divider-subtle);
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.dash-bulletins-fresh .dash-bulletins-kind {
+  border-color: var(--link);
+}
+.dash-bulletins-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.dash-bulletins-time {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dash-bulletins-fresh .dash-bulletins-time {
+  font-weight: 700;
+  color: var(--text);
+}
+.dash-bulletins-seen {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dash-bulletins-pending {
+  color: var(--text-2);
+  cursor: default;
+}
+.dash-bulletins-ns {
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-bulletins-none {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-bulletins-none b {
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.dash-bulletins-none a {
+  color: var(--link);
+  white-space: nowrap;
+}
+/* Fewer whole rows when the slot is short: the content box is the tile less its padding, border and header. */
+@container dash-bulletins (max-height: 143px) {
+  .dash-bulletins-row:nth-child(3) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 105px) {
+  .dash-bulletins-row:nth-child(2) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-width: 560px) {
+  .dash-bulletins-class {
+    display: none;
+  }
+}

@@ -33,6 +33,11 @@
   /** @type {Record<string, Draft>} */
   var _drafts = {};
   var _opening = false;
+  /** Where a link from the Dashboard's Bulletins tile points: a bulletin to scroll to, outline and (seen) open its Seen by list. */
+  var _arrival = { id: '', seen: false };
+  /** The bulletin outlined for a few seconds after an arrival, or ''. */
+  var _arrivedId = '';
+  var _arrivedTimer = 0;
 
   /** @typedef {{ key: string, kind: string, title: string, pageCount: number, pages: any[] }} DraftFile */
   /** @typedef {{ open: boolean, editId: string, kind: string, body: string, linkOn: boolean, linkUrl: string, linkTitle: string, until: string, assessmentId: string, reactions: boolean, files: DraftFile[], note: string, busy: boolean, focus: string, nextFile: number }} Draft */
@@ -986,7 +991,12 @@
   /** @param {any} b */
   function _postHtml(b) {
     var when = b.posted_at || b.created_at || '';
-    var h = '<article class="bulletin-card bulletin-post" data-bulletin-id="' + esc(b.id) + '">';
+    var h =
+      '<article class="bulletin-card bulletin-post' +
+      (b.id === _arrivedId ? ' bulletin-arrived' : '') +
+      '" data-bulletin-id="' +
+      esc(b.id) +
+      '">';
     h +=
       '<div class="bulletin-meta"><span class="bulletin-kind-label">' +
       esc(kindLabel(b)) +
@@ -1095,9 +1105,40 @@
     _drawHead();
     _drawFeed();
     _syncBits();
+    _arrive();
     Object.keys(_seen).forEach(function (id) {
       if (_seen[id] && _seen[id].data !== undefined && !_seen[id].loading) _loadSeen(id, true);
     });
+  }
+
+  /** @param {string} id @returns {HTMLElement | null} */
+  function _cardOf(id) {
+    var cards = document.querySelectorAll('.bulletin-post');
+    for (var i = 0; i < cards.length; i++) {
+      var c = /** @type {HTMLElement} */ (cards[i]);
+      if (c.dataset.bulletinId === id) return c;
+    }
+    return null;
+  }
+
+  /** A link from the Dashboard's tile (?open=<id> or ?seen=<id>): scroll to that bulletin and outline it; ?seen also opens its Seen by list. Waits until the bulletin is on the page. */
+  function _arrive() {
+    var id = _arrival.id;
+    if (!id || !_alive || !_cardOf(id)) return;
+    var withSeen = _arrival.seen && id.indexOf('waiting:') !== 0;
+    _arrival = { id: '', seen: false };
+    _arrivedId = id;
+    if (withSeen && !_seen[id]) _loadSeen(id, false);
+    _drawFeed();
+    var card = _cardOf(id);
+    if (card) card.scrollIntoView({ block: 'start' });
+    if (_arrivedTimer) window.clearTimeout(_arrivedTimer);
+    _arrivedTimer = window.setTimeout(function () {
+      _arrivedTimer = 0;
+      var now = _cardOf(id);
+      _arrivedId = '';
+      if (now) now.classList.remove('bulletin-arrived');
+    }, 4000);
   }
 
   /** @param {string} id @param {boolean} [quiet] */
@@ -1332,7 +1373,7 @@
     _drawFeed();
   }
 
-  /** @param {{ course?: string }} [params] */
+  /** @param {{ course?: string, write?: string, open?: string, seen?: string }} [params] */
   function init(params) {
     _cid = (params && params.course) || getActiveCourse();
     setActiveCourse(_cid);
@@ -1340,6 +1381,7 @@
     _menuId = '';
     _seen = {};
     _opening = false;
+    _arrivedId = '';
     var side = document.getElementById('sidebar-mount');
     if (side) {
       side.style.display = '';
@@ -1358,6 +1400,18 @@
     _listen('fv:bulletins-changed', _onChanged);
 
     render();
+    // The Dashboard tile's links: ?write=1 opens the box, ?open=<id> and ?seen=<id> go to a bulletin.
+    var p = params || {};
+    _arrival = { id: p.seen || p.open || '', seen: !!p.seen };
+    if (p.write === '1') _openComposer();
+    if (p.write || p.open || p.seen) {
+      try {
+        history.replaceState(null, '', '/bulletins?course=' + encodeURIComponent(_cid));
+      } catch (e) {
+        /* the address stays as it was */
+      }
+    }
+    _arrive();
     var cid = _cid;
     _refresh(true);
     // Who is paused comes from the class's per-student options.
@@ -1376,6 +1430,9 @@
   function destroy() {
     _alive = false;
     _stopTimer();
+    if (_arrivedTimer) window.clearTimeout(_arrivedTimer);
+    _arrivedTimer = 0;
+    _arrival = { id: '', seen: false };
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });

@@ -1468,6 +1468,7 @@ window.PageDashboard = (function () {
     _aboveRowWatch = null;
     clearTimeout(_resizeTimer);
     CM.destroy();
+    if (window.DashBulletins) DashBulletins.destroy();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
