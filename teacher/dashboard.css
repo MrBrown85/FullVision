@@ -157,6 +157,10 @@ a.dash-glance-cell:hover {
 .dash-glance-change.is-down {
   color: var(--score-1-text);
 }
+/* Nothing changed: the line keeps its space and says nothing. */
+.dash-glance-change.is-none {
+  visibility: hidden;
+}
 .dash-glance-dist {
   display: flex;
   gap: 2px;

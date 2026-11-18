@@ -13,6 +13,7 @@
   "files": [
     "types/globals.d.ts",
     "shared/html.js",
+    "shared/build-flags.js",
     "shared/constants.js",
     "shared/calc.js",
     "shared/data-utilities.js",

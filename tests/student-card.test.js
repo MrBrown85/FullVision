@@ -77,6 +77,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     // What main loads for a slip, then the card's three small files.
     expect(studentPageScripts()).toEqual([
       'shared/html.js',
+      'shared/build-flags.js',
       'shared/phone-report-view.js',
       'shared/loading-screen.js',
       's/student-data.js',
