@@ -3150,7 +3150,10 @@ window.PageAssignments = (function () {
     // Student Work (S5-F1): only in a class with Send Work on.
     _formWork = _formWorkOffered(cid) ? _formWorkFor(cid, assess) : null;
     _formSeedDue = defaultDue;
+    // The Quiz card under it (teacher/quiz-builder.js): '' with the quizzes switch off.
+    var quizMount = window.QuizBuilder ? QuizBuilder.mountHtml(cid, assess, !!_formWork) : '';
     if (_formWork) html += _formWorkCardHtml(cid);
+    html += quizMount;
 
     // Actions, in a footer that stays at the bottom of the window while the
     // form is in view, with what the work counts toward beside them.
@@ -3350,8 +3353,8 @@ window.PageAssignments = (function () {
               { value: 'nothing', label: 'No' },
               { value: 'photos', label: 'Yes, Photos' },
               { value: 'photos_files', label: 'Yes, Photos or PDFs' },
-            ],
-            w.students_send,
+            ].concat(window.QuizBuilder ? QuizBuilder.answers(cid) : []),
+            window.QuizBuilder ? QuizBuilder.chosen(w.students_send) : w.students_send,
           );
         },
       ),
@@ -3514,9 +3517,16 @@ window.PageAssignments = (function () {
     var to = focusSel && document.querySelector(focusSel);
     if (to) to.focus({ preventScroll: true });
   }
+  if (window.QuizBuilder) QuizBuilder.redrawWith(_refreshFormWorkCard);
 
   function _setFormWork(field, value) {
     if (!_formWork) return;
+    var again = function () {
+      _setFormWork(field, value);
+    };
+    // They Answer a Quiz: Students Send stays Nothing (teacher/quiz-builder.js).
+    if (field === 'students_send' && window.QuizBuilder && QuizBuilder.takeAnswer(value, _formWork, again))
+      return _refreshFormWorkCard('.af-card-work [data-field="students_send"][data-value="' + value + '"]');
     if (field === 'students_send' && _hasChoice(WORK_SEND, value)) _formWork.students_send = value;
     else if (field === 'group_work' && _hasChoice(WORK_GROUP, value)) _formWork.group_work = value;
     else if (field === 'students_see_markup' && (value === 'yes' || value === 'no'))
@@ -4348,6 +4358,7 @@ window.PageAssignments = (function () {
       }),
       // Handouts and Links added or removed (_formResSnapshot).
       res: _formResSnapshot(),
+      quiz: window.QuizBuilder ? QuizBuilder.snapshot() : '',
       collab: JSON.stringify([
         newCollaboration || 'individual',
         Array.from(collabExcluded || []).sort(),
@@ -6543,6 +6554,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    if (window.QuizBuilder && !QuizBuilder.formOk()) return;
     if (!_formMaxPointsOk()) return;
     if (!_formCompetencyTagged()) return;
     if (
@@ -6627,6 +6639,7 @@ window.PageAssignments = (function () {
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
     _saveFormWork(activeCourse, id, formWork);
+    if (window.QuizBuilder) QuizBuilder.save(activeCourse, id);
     _saveFormRes(activeCourse, id, formRes);
     var keep = addAnother ? _formKeepForNext() : null;
     openAssessIds.clear();
@@ -6969,6 +6982,7 @@ window.PageAssignments = (function () {
     if (!_formCategoryChosen()) return;
     // Everything is checked before anything is written: a stopped save
     // leaves the stored assessment as it was.
+    if (window.QuizBuilder && !QuizBuilder.formOk()) return;
     if (!_formMaxPointsOk()) return;
     // Older untagged work saves as it was; a change to its scoring or its
     // competencies needs one tagged.
@@ -7073,6 +7087,7 @@ window.PageAssignments = (function () {
     if (!edited && !copyTargets.length) {
       // Only the Student Work card or Handouts and Links changed, or nothing: they are kept apart.
       _saveFormWork(activeCourse, aid, _formWork);
+      if (window.QuizBuilder) QuizBuilder.save(activeCourse, aid);
       _saveFormRes(activeCourse, aid, _formRes);
       hideNewForm();
       render();
@@ -7090,6 +7105,7 @@ window.PageAssignments = (function () {
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
     _saveFormWork(activeCourse, aid, formWork);
+    if (window.QuizBuilder) QuizBuilder.save(activeCourse, aid);
     _saveFormRes(activeCourse, aid, formRes);
     var move = _scoreMoveAfterSave;
     _scoreMoveAfterSave = null;
