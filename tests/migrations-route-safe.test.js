@@ -30,6 +30,9 @@ export const LISTED = [
   'migrations/local-test/bulletins-live-precheck.sql',
   'migrations/local-test/bulletins-live-postcheck.sql',
   'migrations/local-test/bulletins-undo.sql',
+  'migrations/local-test/bulletins-student-live-precheck.sql',
+  'migrations/local-test/bulletins-student-live-postcheck.sql',
+  'migrations/local-test/bulletins-student-undo.sql',
 ];
 
 const BS = String.fromCharCode(92);
@@ -58,6 +61,7 @@ const dated = readdirSync(migrations)
 describe('migration files reach PostgreSQL as written', () => {
   it('finds the dated files and the listed checks', () => {
     expect(dated).toContain('migrations/2026111801_bulletins.sql');
+    expect(dated).toContain('migrations/2026111803_bulletins_student.sql');
     for (const f of LISTED) expect(() => readFileSync(join(root, f))).not.toThrow();
   });
 
