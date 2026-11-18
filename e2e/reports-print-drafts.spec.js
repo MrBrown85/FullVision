@@ -260,7 +260,7 @@ for (const colorScheme of ['light', 'dark']) {
           el.style.visibility = 'hidden';
         });
       });
-      const failures = await findLowContrastText(page, { fillTokens: ['--active'] });
+      const failures = await findLowContrastText(page);
       expect(failures, JSON.stringify(failures, null, 1)).toEqual([]);
     });
   });
