@@ -49,6 +49,8 @@
     "teacher/cm-std-help.js",
     "teacher/cm-terms.js",
     "teacher/cm-grading-bars.js",
+    "teacher/dash-competencies.js",
+    "teacher/dash-recent.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",
     "teacher/student-page-students.js",

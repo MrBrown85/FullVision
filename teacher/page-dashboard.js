@@ -281,6 +281,8 @@ window.PageDashboard = (function () {
       coreSelf: coreSelf,
       coreView: _readPref(CORE_VIEW_KEY + cid) === 'evidence' ? 'evidence' : 'self',
       compView: DashOverview.compView(cid, _readPref(COMP_VIEW_KEY + cid)),
+      // The Competencies tile's open page (dashRow switch), per class on this device.
+      compPage: DashCompetencies.pageOf(_readPref(DashCompetencies.PREF_KEY + cid)),
       obs: _obsState(),
       classChange: classGradeChange(
         cid,
@@ -326,6 +328,7 @@ window.PageDashboard = (function () {
     if (_compFade) _fadeCompRows();
     _compFade = false;
     _afterObsRender(null);
+    DashOverview.sizeRow();
     _placeMixPop();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
@@ -879,6 +882,7 @@ window.PageDashboard = (function () {
   }
 
   function _onResize() {
+    DashOverview.sizeRow();
     _placeMixPop();
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(_refitObs, 150);
@@ -1090,6 +1094,9 @@ window.PageDashboard = (function () {
         var first = pop && pop.querySelector('a, button');
         if (first) first.focus();
       },
+      compPage: function () {
+        _setCompPage(el.dataset.page, false);
+      },
       viewMenu: function () {
         var id = el.dataset.menu;
         if (openMenu === id) _closeViewMenu();
@@ -1205,8 +1212,30 @@ window.PageDashboard = (function () {
     CM.handleBlur(e.target);
   }
 
+  /* The Competencies tile's Curricular | Core: arrow keys, Home and End move
+     between the two tabs and open the page, as a click does. */
+  function _compTabKeydown(e) {
+    var t = e.target;
+    var tab = t && t.closest && t.closest('.dash-comp-seg [role="tab"]');
+    if (!tab) return false;
+    var next = DashCompetencies.pageForKey(tab.dataset.page, e.key);
+    if (!next) return false;
+    e.preventDefault();
+    _setCompPage(next, true);
+    return true;
+  }
+  function _setCompPage(page, focus) {
+    var key = DashCompetencies.pageOf(page);
+    _closeViewMenu();
+    _closeMixPop();
+    _writePref(DashCompetencies.PREF_KEY + activeCourse, key);
+    var tab = DashCompetencies.show(document, key);
+    if (tab && focus) tab.focus();
+  }
+
   function _handleKeydown(e) {
     if (_viewMenuKeydown(e)) return;
+    if (_compTabKeydown(e)) return;
     if (e.key === 'Escape' && mixPop) {
       var was = _closeMixPop();
       var seg = document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
