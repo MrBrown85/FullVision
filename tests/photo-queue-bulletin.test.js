@@ -496,7 +496,8 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
           status: 'uploading',
           position: i + 1,
           bytes: null,
-          finish_by: new Date(Date.now() + server.finishIn).toISOString(),
+          // The server's own clock (the phone's may be faked ahead or behind).
+          finish_by: new Date(performance.timeOrigin + performance.now() + server.finishIn).toISOString(),
           paths: Array.from({ length: f.pages }, (_, n) => `${CID}/${fid}/${n + 1}.jpg`),
         };
       });
@@ -536,6 +537,9 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
       server.rows.delete(p.p_bulletin_id);
       return { data: { deleted: true, id: p.p_bulletin_id }, error: null };
     });
+    standInStorage();
+  }
+  function standInStorage() {
     fake.storage = {
       from: bucket => ({
         upload: async (path, blob, opts) => {
@@ -686,38 +690,88 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
   const returned = () => getReturnedBulletins(CID).map(e => ({ body: e.bulletin.body, message: e.message }));
   const noDesk = () => ({ from: () => ({ upload: async () => ({ error: { message: 'network: failed to fetch' } }) }) });
 
-  it('an upload the server dropped after its two hours (gone) is posted again once, with a new key, from the pages still held', async () => {
-    server.finishIn = -1000; // the server's finish_by has passed
-    finishAnswers.push(p => ({ file_id: p.p_bulletin_file_id, status: 'gone' }));
-    const out = await postBulletin(CID, { kind: 'announcement', body: 'Again' }, PDF(), { queue: true });
-    await quiet();
-    const keys = calls('post_bulletin').map(c => c.p_idempotency_key);
-    expect(keys.length).toBe(2);
-    expect(keys[0]).toBe(out.key);
-    expect(keys[1]).toMatch(UUID);
-    expect(keys[1]).not.toBe(out.key);
-    const second = [...server.rows.values()].find(r => r.idempotency_key === keys[1]);
-    expect(second.visible).toBe(true);
-    expect(uploads.slice(2).map(u => u[1])).toEqual(second.files[0].paths);
-    expect(store.count()).toBe(0);
-    expect(pending()).toBe(null);
+  const NOT_POSTED_PHOTO =
+    'This bulletin was not posted. Its words are here to post again; its photo needs taking again.';
+
+  /* One post, ever, per press of Post: whatever the server says later, the
+     phone never posts a bulletin again by itself (review 2, must-fix 1). */
+  describe('a file the server no longer has (gone): let go, never posted again', () => {
+    const gone = p => ({ file_id: p.p_bulletin_file_id, status: 'gone' });
+    afterEach(() => vi.useRealTimers());
+
+    for (const [name, shift] of [
+      ['the phone’s clock a day ahead', 24 * 3600 * 1000],
+      ['the phone’s clock a day behind', -24 * 3600 * 1000],
+      ['the clocks agreeing', 0],
+    ]) {
+      it(name + ': one post, its pages gone, its words back once', async () => {
+        finishAnswers.push(gone);
+        if (shift) {
+          vi.useFakeTimers({ toFake: ['Date'] });
+          vi.setSystemTime(new Date(Date.now() + shift));
+        }
+        const out = await postBulletin(CID, { kind: 'announcement', body: 'Once' }, PHOTO(), { queue: true });
+        await quiet();
+        await refreshBulletins(CID, { force: true });
+        await quiet();
+        expect(calls('post_bulletin').map(c => c.p_idempotency_key)).toEqual([out.key]);
+        expect(pending()).toBe(null);
+        expect(store.count()).toBe(0);
+        expect(returned()).toEqual([{ body: 'Once', message: NOT_POSTED_PHOTO }]);
+      });
+    }
+
+    it('with no finish_by in the server’s answer: one post, let go', async () => {
+      const post = fake.rpc.bind(fake);
+      fake.rpc = (n, params) =>
+        post(n, params).then(res => {
+          if (n === 'post_bulletin' && res && res.data) res.data.bulletin.files.forEach(f => delete f.finish_by);
+          return res;
+        });
+      finishAnswers.push(gone);
+      await postBulletin(CID, { kind: 'announcement', body: 'No finish_by' }, PHOTO(), { queue: true });
+      await quiet();
+      expect(calls('post_bulletin').length).toBe(1);
+      expect(pending()).toBe(null);
+      expect(returned().map(r => r.body)).toEqual(['No finish_by']);
+    });
+
+    it('a reload at each step: still one post, and let go once', async () => {
+      setOnline(false);
+      await postBulletin(CID, { kind: 'reminder', body: 'Reloads' }, PHOTO(), { queue: true });
+      reload();
+      setOnline(true);
+      resumeBulletinUploads();
+      fake.storage = noDesk();
+      await window.v2Queue.flush();
+      await settle(10);
+      expect(pending()[0].server).toBeTruthy();
+      reload();
+      server.rows.clear();
+      fake.storage = undefined;
+      standInStorage();
+      resumeBulletinUploads();
+      await quiet();
+      reload();
+      resumeBulletinUploads();
+      await refreshBulletins(CID, { force: true });
+      await quiet();
+      expect(calls('post_bulletin').length).toBe(1);
+      expect(pending()).toBe(null);
+      expect(store.count()).toBe(0);
+      expect(returned()).toEqual([{ body: 'Reloads', message: NOT_POSTED_PHOTO }]);
+    });
+
+    it('a photo with no words: the teacher is still told it was not posted', async () => {
+      finishAnswers.push(gone);
+      await postBulletin(CID, { kind: 'announcement', body: '' }, PHOTO(), { queue: true });
+      await quiet();
+      expect(returned()).toEqual([{ body: '', message: NOT_POSTED_PHOTO }]);
+    });
   });
 
-  it('gone a second time, it is let go and its words are given back once', async () => {
-    server.finishIn = -1000;
-    finishAnswers.push(p => ({ file_id: p.p_bulletin_file_id, status: 'gone' }));
-    finishAnswers.push(p => ({ file_id: p.p_bulletin_file_id, status: 'gone' }));
-    await postBulletin(CID, { kind: 'reminder', body: 'Lab form' }, PHOTO(), { queue: true });
-    await quiet();
-    expect(calls('post_bulletin').length).toBe(2);
-    expect(store.count()).toBe(0);
-    expect(pending()).toBe(null);
-    expect(getBulletins(CID).filter(b => b.waiting)).toEqual([]);
-    expect(returned()).toEqual([{ body: 'Lab form', message: '' }]);
-  });
-
-  /* Must-fix 2's probe: the desktop deleted it while its photo was on its way. */
-  it('deleted on the desktop before its two hours ran out: let go, never posted again, words back once', async () => {
+  /* Must-fix 2's probe (review 1): the desktop deleted it while its photo was on its way. */
+  it('deleted on the desktop while its photo was on its way: let go, never posted again, words back once', async () => {
     let fail = true;
     fake.storage = {
       from: bucket => ({
@@ -738,7 +792,7 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(server.rows.size).toBe(0);
     expect(pending()).toBe(null);
     expect(store.count()).toBe(0);
-    expect(returned()).toEqual([{ body: 'Wrong photo', message: 'It was deleted before students could see it.' }]);
+    expect(returned()).toEqual([{ body: 'Wrong photo', message: NOT_POSTED_PHOTO }]);
     await refreshBulletins(CID, { force: true });
     await quiet();
     expect(calls('post_bulletin').length).toBe(1);
@@ -956,16 +1010,72 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(pending()).toBe(null);
   });
 
-  it('a bulletin page no waiting entry holds is removed at start, so the sync dot can settle', async () => {
+  it('a bulletin page no waiting entry holds is removed at start; one queued in the last five minutes is left', async () => {
     await window.PhotoQueue.ready();
-    await window.PhotoQueue.addBulletin({ course: CID, key: crypto.randomUUID() }, [page(1)]);
-    expect(store.count()).toBe(1);
+    const old = await window.PhotoQueue.addBulletin({ course: CID, key: crypto.randomUUID() }, [page(1)]);
+    await store.update(old.ids[0], { queued_at: Date.now() - 6 * 60 * 1000 });
+    const fresh = await window.PhotoQueue.addBulletin({ course: CID, key: crypto.randomUUID() }, [page(2)]);
+    reload();
     resumeBulletinUploads();
     await settle(20);
-    expect(store.count()).toBe(0);
+    expect(store.metas().map(m => m.id)).toEqual(fresh.ids);
   });
 
-  /* Must-fix 3's probe: Take It Back while the post is on its way (a slow server). */
+  it('the sweep does nothing in a pass that cannot read the waiting entries', async () => {
+    await window.PhotoQueue.ready();
+    const old = await window.PhotoQueue.addBulletin({ course: CID, key: crypto.randomUUID() }, [page(1)]);
+    await store.update(old.ids[0], { queued_at: Date.now() - 6 * 60 * 1000 });
+    const get = localStorage.getItem;
+    localStorage.setItem('gb-bulletins-pending-' + CID, '[]');
+    localStorage.getItem = k => {
+      if (String(k).startsWith('gb-bulletins-pending-')) throw new Error('storage blocked');
+      return get.call(localStorage, k);
+    };
+    try {
+      await _bltSweepOrphans();
+    } finally {
+      localStorage.getItem = get;
+    }
+    expect(store.count()).toBe(1);
+  });
+
+  /* Review 2, must-fix 2: the post held, a list read took the server's row meanwhile, the photo went up
+     and was finished, and the waiting entry was gone by the time OK was tapped. */
+  it('Take It Back once it has reached students: it is deleted through the outbox, and the state says so', async () => {
+    let answer;
+    const slow = new Promise(r => (answer = r));
+    const rpc = fake.rpc.bind(fake);
+    fake.rpc = (name, params) => {
+      if (name !== 'post_bulletin') return rpc(name, params);
+      // The server makes it at once; its answer to the phone comes later.
+      const made = rpc(name, params);
+      return slow.then(() => made);
+    };
+    const out = await postBulletin(CID, { kind: 'announcement', body: 'Too late' }, PHOTO(), { queue: true });
+    const flushing = window.v2Queue.flush();
+    await settle(5);
+    expect(bulletinTakeBackState(CID, out.key)).toBe('waiting');
+    await refreshBulletins(CID, { force: true }); // the list read takes the server's row
+    for (let i = 0; i < 4; i++) {
+      await settle(5);
+      await window.PhotoQueue.send({ force: true });
+    }
+    expect(pending()).toBe(null); // its photo went up and was finished while the post was in flight
+    answer();
+    await flushing;
+    await quiet();
+    await refreshBulletins(CID, { force: true });
+    expect(pending()).toBe(null);
+    expect([...server.rows.values()][0].visible).toBe(true);
+    expect(bulletinTakeBackState(CID, out.key)).toBe('sent');
+    expect(takeBackBulletin(CID, out.key)).toBe(true);
+    await quiet();
+    expect(calls('delete_bulletin').length).toBe(1);
+    expect(calls('delete_bulletin')[0].p_idempotency_key).toMatch(UUID);
+    expect(server.rows.size).toBe(0);
+    expect(getBulletins(CID)).toEqual([]);
+  });
+
   it('taken back while its post is in flight: the card goes at once, nothing uploads, and the bulletin the server made is deleted', async () => {
     let answer;
     const slow = new Promise(r => (answer = r));

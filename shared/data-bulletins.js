@@ -1017,13 +1017,14 @@ function dropReturnedBulletin(cid, key) {
 
 /**
  * Keep the words of a bulletin that was not posted, once per key, and tell
- * the page. A bulletin with nothing in it is not kept.
- * @param {string} cid @param {string} key @param {any} payload @param {string} message @param {string} [at]
+ * the page. A bulletin with nothing in it is not kept, unless `always` (the
+ * phone's photo with no words: the teacher is still told it was not posted).
+ * @param {string} cid @param {string} key @param {any} payload @param {string} message @param {string} [at] @param {boolean} [always]
  */
-function _bltReturn(cid, key, payload, message, at) {
+function _bltReturn(cid, key, payload, message, at, always) {
   if (!cid || !payload || typeof payload !== 'object') return;
   if (_bltKept[key]) return; // the page still holds this draft in its box
-  var has = String(payload.body || '').trim() || payload.link_url;
+  var has = String(payload.body || '').trim() || payload.link_url || always;
   if (!has) return;
   var list = getReturnedBulletins(cid);
   if (
