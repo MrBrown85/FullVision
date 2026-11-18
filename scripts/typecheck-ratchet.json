@@ -105,7 +105,8 @@
     "shared/data-bulletins-queue.js",
     "teacher/page-bulletins.js",
     "teacher/rubric-words.js",
-    "teacher/bulletin-share.js"
+    "teacher/bulletin-share.js",
+    "teacher/bulletin-seen.js"
   ],
   "notYetChecked": [
     "s/app.js",

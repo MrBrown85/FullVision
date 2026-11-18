@@ -24,6 +24,7 @@ export const OWNERS = {
   'public.bulletin_file': 'rls_test.of_course(t.course_id)',
   'public.bulletin_reaction': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.bulletin_seen': 'rls_test.of_enrollment(t.enrollment_id)',
+  'public.bulletin_reminder': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.category': 'rls_test.of_course(t.course_id)',
   'public.comment_template': 't.teacher_id',
   'public.competency_descriptor': 't.teacher_id',

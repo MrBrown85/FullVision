@@ -22,6 +22,7 @@ grant delete, insert, select, update on table public.attendance to authenticated
 revoke all on table public.bulletin from public;
 revoke all on table public.bulletin_file from public;
 revoke all on table public.bulletin_reaction from public;
+revoke all on table public.bulletin_reminder from public;
 revoke all on table public.bulletin_seen from public;
 revoke all on table public.category from public;
 grant delete, insert, select, update on table public.category to authenticated;
@@ -845,8 +846,9 @@ grant execute on routine public.set_score_status(p_enrollment_id uuid, p_assessm
 grant execute on routine public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) to service_role;
 revoke all on routine public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) from public;
 grant execute on routine public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) to authenticated;
-revoke all on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) from public;
-grant execute on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) to authenticated;
+revoke all on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) from public;
+grant execute on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) to authenticated;
+grant execute on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) to service_role;
 revoke all on routine public.soft_delete_teacher() from public;
 grant execute on routine public.soft_delete_teacher() to authenticated;
 grant execute on routine public.soft_delete_teacher() to service_role;
