@@ -60,7 +60,6 @@ test('one student is graded with the grader inside the card', async ({ page }) =
   // One feedback box, the Overall Comment field; no Comment button.
   await expect(grader.locator('.grader-add-comment')).toHaveCount(0);
   await expect(grader.locator('.grdt-overall .grdt-note')).toBeVisible();
-  await expect(page.locator('#rsg-descriptor-bar')).toBeHidden();
 
   const hyp = grader.locator('.grdt-crit[data-critid="crit-hyp"]');
   // Descriptors stay off the scoring grid: the wording is the level's hover.

@@ -127,7 +127,11 @@ interface Window {
   MTabBar: unknown;
   MBulletins: unknown;
   MBulletinsModel: unknown;
+  // Share on a reminder (teacher/bulletin-share.js) and a Standard rubric's Words (teacher/rubric-words.js).
+  BulletinShare: { itemHtml(b: unknown): string; text(b: unknown): string };
+  RubricWords: unknown;
 }
+declare var BulletinShare: Window['BulletinShare'];
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
 declare var ReportOne: {

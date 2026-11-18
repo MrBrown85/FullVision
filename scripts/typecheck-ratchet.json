@@ -103,7 +103,9 @@
     "shared/bulletins-refusals.js",
     "shared/data-bulletins-demo.js",
     "shared/data-bulletins-queue.js",
-    "teacher/page-bulletins.js"
+    "teacher/page-bulletins.js",
+    "teacher/rubric-words.js",
+    "teacher/bulletin-share.js"
   ],
   "notYetChecked": [
     "s/app.js",
@@ -159,7 +161,6 @@
     "teacher/assessment-copy.js",
     "teacher/assign-collab.js",
     "teacher/assign-competency-picker.js",
-    "teacher/assign-descriptor-bar.js",
     "teacher/class-results.js",
     "teacher/cm-block-picker.js",
     "teacher/cm-questionnaires.js",

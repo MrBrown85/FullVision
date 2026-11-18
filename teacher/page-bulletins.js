@@ -875,7 +875,9 @@
       (open ? '' : ' hidden') +
       '><button type="button" role="menuitem" class="bulletin-menu-item" data-bulletin="edit" data-id="' +
       id +
-      '">Edit</button><button type="button" role="menuitem" class="bulletin-menu-item" data-bulletin="pin" data-id="' +
+      '">Edit</button>' +
+      (window.BulletinShare ? BulletinShare.itemHtml(b) : '') +
+      '<button type="button" role="menuitem" class="bulletin-menu-item" data-bulletin="pin" data-id="' +
       id +
       '" data-pinned="' +
       b.pinned +

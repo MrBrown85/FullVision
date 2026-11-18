@@ -5021,108 +5021,8 @@ body.af-comp-open #gb-tooltip {
   gap: 4px;
 }
 
-/* ── Descriptor bar — slim frosted glass toolbar ─────────── */
-.rsg-descriptor-bar {
-  position: fixed;
-  bottom: 8px;
-  /* Over the page beside the student list, never over the list. */
-  left: calc(var(--sidebar-w) + 16px);
-  right: 16px;
-  margin: 0 auto;
-  z-index: 10000;
-  max-width: 1400px;
-  background: var(--surface);
-  border: 1px solid var(--overlay-pressed);
-  border-radius: var(--radius);
-  padding: 6px 16px;
-  display: none;
-  align-items: center;
-  gap: 14px;
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.1),
-    0 1px 4px rgba(0, 0, 0, 0.05);
-  font-family: inherit;
-  color: var(--text);
-  animation: slide-up 0.15s var(--ease-spring);
-}
-.rsg-descriptor-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.rsg-descriptor-label {
-  font-family: inherit;
-  font-size: var(--text-base);
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--text);
-}
-.rsg-descriptor-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-}
-.rsg-descriptor-tag {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  padding: 1px 8px;
-  border-radius: var(--radius-xl);
-  border: 1px solid;
-  background: rgba(0, 0, 0, 0.03);
-  white-space: nowrap;
-}
-.rsg-descriptor-tag-overall {
-  border-color: var(--text-3);
-  color: var(--text-3);
-}
-.rsg-descriptor-text {
-  font-size: var(--text-base);
-  line-height: 1.35;
-  color: var(--text-2);
-  font-weight: 400;
-  border-left: 1.5px solid var(--border);
-  padding-left: 14px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* A competency level's three lines (CompetencyWording): the level and its
-   descriptor, what Proficient means, the next step. */
-.rsg-descriptor-bar.is-lines {
-  align-items: flex-start;
-  /* Shown on every hover: no slide, which would also replace the bar's
-     centring transform while it runs. */
-  animation: none;
-}
-.rsg-descriptor-text.is-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  white-space: normal;
-  overflow: visible;
-  color: var(--text);
-}
 .cw-line b {
   font-weight: 600;
-}
-.rsg-descriptor-bar.is-idle {
-  visibility: hidden;
-}
-.rsg-descriptor-bar.bar-wide {
-  left: 16px;
-}
-@media (max-width: 1024px) {
-  .rsg-descriptor-bar {
-    left: 16px;
-  }
-  /* The student list open over the page covers the bar's place. */
-  .rsg-descriptor-bar.bar-covered {
-    display: none !important;
-  }
 }
 
 /* ── Keyboard Navigation Focus ──────────────────────────── */
@@ -5706,6 +5606,43 @@ body.af-comp-open #gb-tooltip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+/* Words (teacher/rubric-words.js): like Comment, pressed while the words show. */
+.rsg-words-btn {
+  height: 26px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 7px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.rsg-words-btn[aria-pressed='true'] {
+  background: rgba(0, 122, 255, 0.12);
+  color: #0058d0;
+}
+/* A Standard rubric's words, each under its level button (the row's padding and flex). */
+.rsg-words {
+  display: flex;
+  gap: 0;
+  padding: 2px;
+  margin-top: 4px;
+}
+.rsg-words-col {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.rsg-words-col.is-chosen {
+  color: var(--text);
+  font-weight: 600;
 }
 .rsg-crit-comment svg {
   width: 13px;
