@@ -1,7 +1,8 @@
 -- Read-only pre-check, before the apply for migrations/2026111803_bulletins_student.sql (2026-11-17).
 -- Run it after 2026111801_bulletins.sql (M1) is applied: before that, the M1 rows below are named.
 -- SELECTs only, catalog facts only (no row of any table is read). It returns ONLY the rows that differ
--- from what the file was written and tested against: no rows means ready.
+-- from what the file was written and tested against: no rows means ready. Run it with public on the
+-- search path (as Supabase's SQL editor does): an md5 of pg_get_functiondef depends on it.
 with want(sig, md5) as (values
     -- What the file relies on, unchanged.
     ('student_submit._session_class(text,uuid)', '1ae94981ff32f804d12079a24bd7b41a'),
@@ -31,7 +32,7 @@ checks(check_name, value) as (
      where md5(pg_get_functiondef(to_regprocedure(w.sig))) is distinct from w.md5
     union all
     select 'already there: function ' || p.oid::regprocedure::text, 'present'
-      from pg_proc p where p.proname in ('_bulletin_visible', 'bulletins', 'bulletin_seen', 'bulletin_react', 'bulletin_file_links')
+      from pg_proc p where p.proname in ('_bulletin_visible', '_bulletin_session_enrollments', 'bulletins', 'bulletin_seen', 'bulletin_react', 'bulletin_file_links')
     union all
     select 'student_submit.write_log checks', coalesce(string_agg(pg_get_constraintdef(c.oid) || ' ' || c.conname || ' ' || c.convalidated::text, ' | '), 'none')
       from pg_constraint c where c.conrelid = to_regclass('student_submit.write_log') and c.contype = 'c'

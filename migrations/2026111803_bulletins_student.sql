@@ -25,13 +25,21 @@
 --   (posted_at not null: every file finished), and it is in the student's
 --   class. Every function below asks it; none repeats its test. No role may
 --   call it.
+-- _bulletin_session_enrollments(p_session_id) → uuid[]: the enrolments a
+--   device's session holds whose class it may name, in the order they were
+--   added. It mirrors the tests of _session_classes exactly (card not
+--   stopped, student not withdrawn and not paused, class not in the trash
+--   and its Student Page on; an expired card's class is still named, as
+--   _session_classes names it), without its to-do counts and names, which
+--   the feed does not need. No role may call it.
 -- bulletins(p_session_token, p_enrollment_id, p_ip_hash) → { ok, bulletins,
 --   new }: the session's class's visible bulletins, oldest first (one shown
 --   again and not yet seen by this student sits at the new end), the newest
 --   100 of that order, each with its ready files and this student's own
---   seen_at and reaction; and for every class the device's session lists
---   (_session_classes), that student's count of visible bulletins not yet
---   seen. Read-only.
+--   seen_at and reaction; and for each enrolment
+--   _bulletin_session_enrollments names (this device's own classes, an
+--   expired card's included), that student's count of visible bulletins not
+--   yet seen. Read-only.
 -- bulletin_seen(p_session_token, p_enrollment_id, p_bulletin_ids,
 --   p_ip_hash) → { ok, seen }: up to 100 ids; each one the student may see
 --   is marked seen, the first time kept; any other id is skipped.
@@ -43,11 +51,18 @@
 --   p_ip_hash) → { ok, bucket, file_id, bulletin_id, kind, title,
 --   page_count, pages: [{ page, path }] }: a ready file of a bulletin the
 --   student may see; the edge function signs 60-second links. Read-only.
--- The four are for service_role only (the edge function). Each begins with
+-- Who runs the four: they are granted to service_role and to no other role;
+--   a visitor (anon), a teacher (authenticated) and everyone (public) may
+--   run none of them. The student-submit edge function signs in to the
+--   database as its owner (docs/ROADMAP.md), which may run every function it
+--   owns, grant or not: so the way to stop the four is to drop them (the
+--   undo's PART 1), not to revoke a grant. Each begins with
 --   _session_class, which refuses a signed-out session, a paused or
 --   withdrawn student, a class with its page off or in the trash, and a
---   stopped or expired card, in the middle of a session too; only that
---   class (its course_id) is ever read. A student is sent only their own
+--   stopped or expired card, in the middle of a session too. The bulletins
+--   read are the session's class's (its course_id); the counts in new also
+--   read the bulletins of the device's other classes, and only that
+--   device's own enrolments' seen marks. A student is sent only their own
 --   class's bulletins and only their own seen and reaction: never a count
 --   about other students, never a name, never another student's anything.
 --   The two that write share the hourly limit per card: 120 (write_log kind
@@ -56,7 +71,8 @@
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   student_submit._bulletin_visible(uuid,uuid) (new)                     cab9dc514218ac1839b112895e2baa11
---   student_submit.bulletins(text,uuid,text) (new)                        e055c811b42aec87be4124ca3ae93f87
+--   student_submit._bulletin_session_enrollments(uuid) (new)              dae16e59257af2443d0aeab273a71243
+--   student_submit.bulletins(text,uuid,text) (new)                        634789519b2b2fdf18550c92691618e7
 --   student_submit.bulletin_seen(text,uuid,uuid[],text) (new)             96185b2e8173c90ccd40f2a054ad5cc7
 --   student_submit.bulletin_react(text,uuid,uuid,text,text) (new)         e86e2c4c9454186390ad1fe9a845d8c1
 --   student_submit.bulletin_file_links(text,uuid,uuid,text) (new)         5e93daec794c4f5f5b936c385e4905ca
@@ -70,13 +86,16 @@
 --   public._fv_timezone(text)                                             8dbcb5716f155e2441f47416a0b28527
 --   fv_private.bulletin_file_path(uuid,uuid,integer)                      382dc77b5c162295891790d42fb13763
 --   fv_private.bulletin_pinned_now(boolean,date,text)                     3d68484d7051fd8f380fe2a84c401546
+-- (_session_classes is not called: _bulletin_session_enrollments mirrors its
+-- tests, so a change to it stops this file until the mirror is checked.)
+-- Each md5 is taken with public on the search path; the file sets its own.
 -- Changed: the constraint student_submit.write_log.write_log_kind_check,
 --   from  CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text])))
 --   to    CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text])))
 --
 -- ── The checks it makes first ──────────────────────────────────────────────
 -- It stops with nothing changed unless: the nine functions it relies on are
--- the definitions it was tested against; its own five are missing or this
+-- the definitions it was tested against; its own six are missing or this
 -- file's (a second run); no function of those names exists with other
 -- arguments or in another schema; write_log_kind_check is exactly the
 -- 'from' above (or the 'to', a second run) and is write_log's only check;
@@ -111,6 +130,9 @@
 begin;
 
 set local lock_timeout = '5s';
+-- pg_get_functiondef names a type by its schema unless that schema is on the path, so every md5 below
+-- is taken with public on it, whatever path the session sending this file has.
+set local search_path = public, pg_temp;
 
 -- ── 1. The checks, before anything changes ─────────────────────────────────
 do $guard$
@@ -134,7 +156,8 @@ begin
         ('fv_private.bulletin_file_path(uuid,uuid,integer)', '382dc77b5c162295891790d42fb13763', null),
         ('fv_private.bulletin_pinned_now(boolean,date,text)', '3d68484d7051fd8f380fe2a84c401546', null),
         ('student_submit._bulletin_visible(uuid,uuid)', null, 'cab9dc514218ac1839b112895e2baa11'),
-        ('student_submit.bulletins(text,uuid,text)', null, 'e055c811b42aec87be4124ca3ae93f87'),
+        ('student_submit._bulletin_session_enrollments(uuid)', null, 'dae16e59257af2443d0aeab273a71243'),
+        ('student_submit.bulletins(text,uuid,text)', null, '634789519b2b2fdf18550c92691618e7'),
         ('student_submit.bulletin_seen(text,uuid,uuid[],text)', null, '96185b2e8173c90ccd40f2a054ad5cc7'),
         ('student_submit.bulletin_react(text,uuid,uuid,text,text)', null, 'e86e2c4c9454186390ad1fe9a845d8c1'),
         ('student_submit.bulletin_file_links(text,uuid,uuid,text)', null, '5e93daec794c4f5f5b936c385e4905ca')
@@ -146,8 +169,9 @@ begin
         end if;
     end loop;
     if exists (select 1 from pg_proc
-                where proname in ('_bulletin_visible', 'bulletins', 'bulletin_seen', 'bulletin_react', 'bulletin_file_links')
+                where proname in ('_bulletin_visible', '_bulletin_session_enrollments', 'bulletins', 'bulletin_seen', 'bulletin_react', 'bulletin_file_links')
                   and oid not in (coalesce(to_regprocedure('student_submit._bulletin_visible(uuid,uuid)'), 0),
+                                  coalesce(to_regprocedure('student_submit._bulletin_session_enrollments(uuid)'), 0),
                                   coalesce(to_regprocedure('student_submit.bulletins(text,uuid,text)'), 0),
                                   coalesce(to_regprocedure('student_submit.bulletin_seen(text,uuid,uuid[],text)'), 0),
                                   coalesce(to_regprocedure('student_submit.bulletin_react(text,uuid,uuid,text,text)'), 0),
@@ -226,6 +250,30 @@ $function$;
 
 revoke all on function student_submit._bulletin_visible(uuid, uuid) from public, anon, authenticated, service_role;
 
+-- The enrolments of a device's session whose class it may name, in the order they were added.
+-- MIRRORS student_submit._session_classes (2026110904, as 2026111720 patched it): its joins and its
+-- where clause, test for test, and its order. It leaves out what the feed does not need (the to-do
+-- counts and the names). A change to _session_classes stops this file (its md5 is in the guard);
+-- bulletins_student.py, scenario "mirror", proves both name the same enrolments.
+create or replace function student_submit._bulletin_session_enrollments(p_session_id uuid)
+ returns uuid[]
+ language sql
+ stable security definer
+ set search_path to 'public', 'student_submit', 'pg_temp'
+as $function$
+    select coalesce(array_agg(e.id order by x.added_at, e.id), '{}')
+      from device_session_enrollment x
+      join student_card k on k.id = x.card_id
+      join enrollment e on e.id = x.enrollment_id
+      join student s on s.id = e.student_id
+      join course c on c.id = e.course_id
+     where x.session_id = p_session_id
+       and k.stopped_at is null and e.withdrawn_at is null and c.deleted_at is null and c.student_page_enabled
+       and e.page_paused_at is null;
+$function$;
+
+revoke all on function student_submit._bulletin_session_enrollments(uuid) from public, anon, authenticated, service_role;
+
 -- ── 4. The feed ────────────────────────────────────────────────────────────
 create or replace function student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
  returns jsonb
@@ -290,9 +338,8 @@ begin
                                     and not exists (select 1 from public.bulletin_seen s
                                                      where s.bulletin_id = b.id and s.enrollment_id = k.enrollment_id)))
                        order by k.n)
-              from (select (c->>'enrollment_id')::uuid as enrollment_id, n
-                      from jsonb_array_elements(student_submit._session_classes((_in->>'session_id')::uuid))
-                           with ordinality as l(c, n)) k), '[]'::jsonb));
+              from unnest(student_submit._bulletin_session_enrollments((_in->>'session_id')::uuid))
+                   with ordinality as k(enrollment_id, n)), '[]'::jsonb));
 end;
 $function$;
 
@@ -412,7 +459,8 @@ declare
 begin
     for _f in select * from (values
         ('student_submit._bulletin_visible(uuid,uuid)', 'cab9dc514218ac1839b112895e2baa11'),
-        ('student_submit.bulletins(text,uuid,text)', 'e055c811b42aec87be4124ca3ae93f87'),
+        ('student_submit._bulletin_session_enrollments(uuid)', 'dae16e59257af2443d0aeab273a71243'),
+        ('student_submit.bulletins(text,uuid,text)', '634789519b2b2fdf18550c92691618e7'),
         ('student_submit.bulletin_seen(text,uuid,uuid[],text)', '96185b2e8173c90ccd40f2a054ad5cc7'),
         ('student_submit.bulletin_react(text,uuid,uuid,text,text)', 'e86e2c4c9454186390ad1fe9a845d8c1'),
         ('student_submit.bulletin_file_links(text,uuid,uuid,text)', '5e93daec794c4f5f5b936c385e4905ca')

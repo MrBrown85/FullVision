@@ -47,10 +47,16 @@ as the owner, so these scenarios test M2 alone, not the teacher's functions.
            changed or a second check added, an M1 column missing, a function of these names elsewhere); the
            pre-check names each; the lock timeout; the file changes only what its header says and no row; the
            header's md5s; post-check; a second run changes nothing; the file's size.
-  undo     PART 1 alone takes the four from the edge function and keeps every row; the file again gives them
-           back; a changed function stops the full undo with everything kept; the full undo puts write_log's
-           check back exactly (validated) and leaves the catalog as before; a second run; on a database without
-           the file it changes nothing; the file applies again.
+  undo     A revoke would stop nothing (the edge function signs in as the owner, which still runs them); PART 1
+           drops the four, so the owner can no longer run them, and keeps every row, both helpers and the check;
+           the file again gives them back; a changed function stops both parts with everything kept; the full
+           undo puts write_log's check back exactly (validated) and leaves the catalog as before; a second run;
+           on a database without the file it changes nothing; the file applies again.
+  mirror   _bulletin_session_enrollments names exactly the enrolments _session_classes lists, in its order, for a
+           device with a class whose page is off, one in the trash, a paused one, a withdrawn enrolment, an
+           expired card and a stopped card; an expired card's class is named and gets its count.
+  undolock The full undo takes write_log before it deletes: a student's write arriving between waits and goes
+           through (the old order, delete then lock, is shown to deadlock, so the race is real).
 """
 import json, os, re, sys, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -67,7 +73,8 @@ A = '11111111-1111-1111-1111-111111111111'; B = '22222222-2222-2222-2222-2222222
 VIS = 'student_submit._bulletin_visible(uuid,uuid)'
 FEED = 'student_submit.bulletins(text,uuid,text)'; SEEN = 'student_submit.bulletin_seen(text,uuid,uuid[],text)'
 REACT = 'student_submit.bulletin_react(text,uuid,uuid,text,text)'; LINKS = 'student_submit.bulletin_file_links(text,uuid,uuid,text)'
-ROUTES = [FEED, SEEN, REACT, LINKS]; OURS = [VIS] + ROUTES
+ENROL = 'student_submit._bulletin_session_enrollments(uuid)'
+ROUTES = [FEED, SEEN, REACT, LINKS]; OURS = [VIS, ENROL] + ROUTES
 RELIED = ['student_submit._session_class(text,uuid)', 'student_submit._card_refusal(uuid)', 'student_submit._device_session(text)',
           'student_submit._session_classes(uuid)', 'student_submit._write_limit(uuid,text,integer)',
           'student_submit._listed(public.assessment,date)', 'public._fv_timezone(text)', 'fv_private.bulletin_file_path(uuid,uuid,integer)',
@@ -381,12 +388,20 @@ def scen_refused():
         ok('refused: (setup) %s put back: Dev reads again' % label, calls['bulletins'](w.dev, w.tok[w.dev]).get('ok') is True)
     for label, e, t, want in (('an unknown session', w.dev, 'f' * 64, 'signed_out'), ('a token of the wrong shape', w.dev, 'x', 'signed_out'),
                               ('no token', w.dev, None, 'signed_out'), ("an enrolment not on this session (a classmate's)", w.eli, w.tok[w.dev], 'not_found'),
-                              ('an enrolment that is not there', nid(), w.tok[w.dev], 'not_found')):
+                              ('an enrolment that is not there', nid(), w.tok[w.dev], 'not_found'),
+                              ('a null enrolment', None, w.tok[w.dev], 'not_found')):
         n = log_rows(d)
         for name, call in calls.items():
             r = call(e, t)
             ok('refused: %s on %s is %s' % (label, name, want), r == {'ok': False, 'error': want}, r)
-        ok('refused: %s: nothing written' % label, log_rows(d) == n and d.one('select count(*) from public.bulletin_seen') == 0)
+        ok('refused: %s: nothing written (no seen mark, no reaction, not the write limit)' % label,
+           log_rows(d) == n and d.one('select count(*) from public.bulletin_seen') == 0 and d.one('select count(*) from public.bulletin_reaction') == 0)
+    # A locked card (too many wrong tries) is not refused: _card_refusal does not refuse it and an open
+    # session keeps working, as the contract says.
+    d.run('update student_card set locked_at = now() where enrollment_id = :e', e=w.dev)
+    for name, call in calls.items():
+        r = call(w.dev, w.tok[w.dev])
+        ok('refused: a locked card still works on %s' % name, r.get('ok') is True, r)
     d.close()
 
 def scen_limit():
@@ -471,9 +486,11 @@ def scen_others():
         uid = A if role == 'authenticated' else None
         for sig, call in ((FEED, "select student_submit.bulletins(:t, :e, 'ip')"), (SEEN, "select student_submit.bulletin_seen(:t, :e, array[:b]::uuid[], 'ip')"),
                           (REACT, "select student_submit.bulletin_react(:t, :e, :b, 'done', 'ip')"), (LINKS, "select student_submit.bulletin_file_links(:t, :e, :b, 'ip')"),
-                          (VIS, 'select student_submit._bulletin_visible(:b, :e)')):
+                          (VIS, 'select student_submit._bulletin_visible(:b, :e)'),
+                          (ENROL, 'select student_submit._bulletin_session_enrollments(:b)')):
             kw = dict(t=w.tok[w.cece], e=w.cece, b=b)
             if sig == VIS: kw = dict(b=b, e=w.cece)
+            if sig == ENROL: kw = dict(b=b)
             r = refusal(lambda: d.role(role, call, uid=uid, **kw))
             ok('others: %s may not run %s' % (role, sig.split('(')[0]), r and r[0] == '42501', r)
     for sig in OURS:
@@ -481,10 +498,17 @@ def scen_others():
            d.one('select count(*) from pg_proc p, aclexplode(coalesce(p.proacl, acldefault(\'f\', p.proowner))) x where p.oid = to_regprocedure(:s) and x.grantee = 0', s=sig) == 0)
         ok('others: %s runs as its owner with the path pinned' % sig.split('(')[0],
            d.one("select prosecdef and proconfig = array['search_path=public, student_submit, pg_temp'] from pg_proc where oid = to_regprocedure(:s)", s=sig) is True)
+    owner = d.one("select proowner::regrole::text from pg_proc where oid = to_regprocedure('student_submit._session_class(text,uuid)')")
     for sig in ROUTES:
-        ok('others: the edge function may run %s' % sig.split('(')[0], d.one("select has_function_privilege('service_role', :s, 'execute')", s=sig) is True)
-    r = refusal(lambda: d.role('service_role', 'select student_submit._bulletin_visible(:b, :e)', b=b, e=w.cece))
-    ok('others: not even the edge function may call the shared rule directly', r and r[0] == '42501', r)
+        ok('others: service_role is granted %s, and the owner (the role the edge function signs in as) alone besides' % sig.split('(')[0],
+           d.one('select proacl::text from pg_proc where oid = to_regprocedure(:s)', s=sig) == '{%s=X/%s,service_role=X/%s}' % (owner, owner, owner))
+    for sig, call, kw in ((VIS, 'select student_submit._bulletin_visible(:b, :e)', dict(b=b, e=w.cece)),
+                          (ENROL, 'select student_submit._bulletin_session_enrollments(:b)', dict(b=b))):
+        r = refusal(lambda: d.role('service_role', call, **kw))
+        ok('others: service_role may not call %s directly' % sig.split('(')[0], r and r[0] == '42501', r)
+        ok('others: %s is granted to its owner alone' % sig.split('(')[0],
+           d.one('select proacl::text from pg_proc where oid = to_regprocedure(:s)', s=sig) == '{%s=X/%s}' % (owner, owner))
+    ok('others: the six are owned by the owner of _session_class', all(d.one('select proowner::regrole::text from pg_proc where oid = to_regprocedure(:s)', s=s) == owner for s in OURS))
     for role in ('anon', 'authenticated', 'service_role'):
         for t in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction'):
             ok('others: %s cannot read or write public.%s' % (role, t), d.one("select has_table_privilege(:r, :t, 'select,insert,update,delete')", r=role, t='public.' + t) is False)
@@ -620,7 +644,7 @@ def scen_apply():
     ok('apply: the new functions are the header\'s', all(md5(d, s) == new[s] for s in OURS), {s: md5(d, s) for s in OURS})
     post_ = split(text_of(POST)); r = d.statements(post_)
     ok('apply: the post-check says ok on every row', r == 'ok' and d.rows and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or r)
-    ok('apply: the pre-check now names what is there', d.statements(pre) == 'ok' and len(d.rows) == 6, d.rows)
+    ok('apply: the pre-check now names what is there', d.statements(pre) == 'ok' and len(d.rows) == 7, d.rows)
     b = post(w, reactions_on=True); react(w, b, 'done'); rows_now = row_checksums(d.c, table_columns(d.c))
     r = d.file(FILE); ok('apply: a second run is ok', r == 'ok', r)
     ok('apply: a second run changes nothing', catalog(d.c) == after and row_checksums(d.c, table_columns(d.c)) == rows_now, differences(after, catalog(d.c)))
@@ -650,17 +674,29 @@ def scen_undo():
     b = post(w, reactions_on=True); seen(w, [b]); react(w, b, 'done'); seen(w, [b], w.dev)
     kept = d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction')
     marks = d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by 2')
+    # The edge function signs in as the database's owner. This connection is that owner: every call below
+    # is made as the edge function really makes it.
+    calls = ((FEED, "select student_submit.bulletins(:t, :e, 'ip')"), (SEEN, "select student_submit.bulletin_seen(:t, :e, array[:b]::uuid[], 'ip')"),
+             (REACT, "select student_submit.bulletin_react(:t, :e, :b, 'done', 'ip')"), (LINKS, "select student_submit.bulletin_file_links(:t, :e, :b, 'ip')"))
+    owner = d.one("select proowner::regrole::text from pg_proc where oid = to_regprocedure(:s)", s=FEED)
+    ok('undo: (setup) this connection is the functions\' owner', d.one('select current_user') == owner, owner)
+    # Why PART 1 drops rather than revokes: with service_role's grant taken away, the owner still runs them.
+    with tx(d):
+        d.run('revoke execute on function %s from service_role' % ', '.join(ROUTES))
+        ok('undo: a revoke would stop nothing: the owner still runs bulletins', d.one(calls[0][1], t=w.tok[w.cece], e=w.cece, b=b)['ok'] is True)
     # PART 1: the stop.
     r = d.statements(split(part1())); ok('undo PART 1: runs', r == 'ok', r)
-    for sig, call in ((FEED, "select student_submit.bulletins(:t, :e, 'ip')"), (SEEN, "select student_submit.bulletin_seen(:t, :e, array[:b]::uuid[], 'ip')"),
-                      (REACT, "select student_submit.bulletin_react(:t, :e, :b, 'done', 'ip')"), (LINKS, "select student_submit.bulletin_file_links(:t, :e, :b, 'ip')")):
-        x = refusal(lambda: d.role('service_role', call, t=w.tok[w.cece], e=w.cece, b=b))
-        ok('undo PART 1: the edge function can no longer run %s' % sig.split('(')[0], x and x[0] == '42501', x)
+    for sig, call in calls:
+        x = refusal(lambda: d.one(call, t=w.tok[w.cece], e=w.cece, b=b))
+        ok('undo PART 1: the owner (the edge function) can no longer run %s: it is gone' % sig.split('(')[0], x and x[0] == '42883', x)
     ok('undo PART 1: every seen mark and reaction is kept',
        d.all('select bulletin_id::text, enrollment_id::text, word from public.bulletin_reaction') == kept
        and d.all('select bulletin_id::text, enrollment_id::text from public.bulletin_seen order by 2') == marks)
+    ok('undo PART 1: the two helpers and write_log\'s check are kept',
+       md5(d, VIS) is not None and md5(d, ENROL) is not None and kind_check(d) == [[NEW_CHECK, True]])
     gone, came = differences(withfile, catalog(d.c))
-    ok('undo PART 1: only the four grants changed', all('bulletin' in l for l in gone + came) and len(gone) == 4, (gone, came))
+    four = re.compile(r'bulletins\(|bulletin_seen\(|bulletin_react\(|bulletin_file_links\(|^depends |pg_depend|^comments on ')
+    ok('undo PART 1: only the four functions went', gone and all(four.search(l) for l in gone) and all(re.search(r'^depends |pg_depend|^comments on ', l) for l in came), (gone[:4], came))
     r = d.statements(split(part1())); ok('undo PART 1: a second run is ok', r == 'ok', r)
     r = d.file(FILE); ok('undo: the file again gives them back', r == 'ok' and same(catalog(d.c), withfile), differences(norm(withfile), norm(catalog(d.c))))
     ok('undo: and Cece reads her feed again', feed(w)['bulletins'][0]['reaction'] == 'done')
@@ -671,7 +707,6 @@ def scen_undo():
     ok('undo: a function changed since stops the removal', r.startswith('STOPPED') and 'is not the definition 2026111803 left' in r, r)
     ok('undo: and the functions and the check are still there', applied(d) and kind_check(d) == [[NEW_CHECK, True]])
     d.run("do $$ begin execute (select def from kept); end $$"); d.run('drop table kept')
-    d.run('grant execute on function %s to service_role' % ', '.join(ROUTES))
     ok("undo: (setup) back to the file's state", same(catalog(d.c), withfile), differences(norm(withfile), norm(catalog(d.c))))
     # The full undo, with bulletin rate-limit rows in write_log and rows of every other kind.
     card = d.one('select id from student_card where enrollment_id = :e', e=w.cece)
@@ -692,9 +727,96 @@ def scen_undo():
     ok('undo: and the feed answers', feed(w)['ok'] is True)
     d.close()
 
+def scen_mirror():
+    """_bulletin_session_enrollments names exactly the enrolments _session_classes lists, in its order."""
+    w = world('mirror'); d = w.d
+    sid = d.one('select session_id from student_submit.device_session_enrollment where enrollment_id = :e', e=w.cece)
+    def lists(): return [x['enrollment_id'] for x in d.one('select student_submit._session_classes(:s)', s=sid)]
+    def mine(): return [str(x) for x in d.one('select student_submit._bulletin_session_enrollments(:s)', s=sid)]
+    # Six more classes on Cece's device, each added while it could still be (Add Another Card), then each
+    # put in one state.
+    extra = {}
+    for state in ('page off', 'in the trash', 'paused', 'withdrawn', 'card expired', 'card stopped'):
+        c = str(T(d, "create_course(p_name => :n, p_subjects => array['X'], p_idempotency_key => gen_random_uuid())", n='Class ' + state))
+        d.run('update course set student_page_enabled = true where id = :c', c=c)
+        e = str(T(d, "create_student_and_enroll(:c, 'Cece', 'Tester', p_date_of_birth => date '2012-05-15', p_idempotency_key => gen_random_uuid())", c=c)['enrollment_id'])
+        code, _pw, _row = d.make(e, c, A)
+        r = d.verify(code, birthday='2012-05-15', token=w.tok[w.cece], add=True); assert r['ok'], r
+        post(w, course=c)
+        extra[state] = (c, e)
+    ok('mirror: (setup) eight classes on the device, all listed', len(lists()) == 8 and mine() == lists(), (lists(), mine()))
+    for state, sql in (('page off', 'update course set student_page_enabled = false where id = :c'),
+                       ('in the trash', 'update course set deleted_at = now() where id = :c'),
+                       ('paused', 'update enrollment set page_paused_at = now() where id = :e'),
+                       ('withdrawn', 'update enrollment set withdrawn_at = now() where id = :e'),
+                       ('card expired', 'update student_card set works_until = current_date - 3 where enrollment_id = :e'),
+                       ('card stopped', 'update student_card set stopped_at = now() where enrollment_id = :e')):
+        c, e = extra[state]
+        d.run(sql, c=c, e=e)
+        ok('mirror: with a class %s, the helper names exactly what _session_classes lists, in its order' % state, mine() == lists(), (mine(), lists()))
+    got = mine()
+    ok('mirror: left out: page off, in the trash, paused, withdrawn, card stopped',
+       not any(extra[s][1] in got for s in ('page off', 'in the trash', 'paused', 'withdrawn', 'card stopped')), got)
+    ok("mirror: an expired card's class is still named, as _session_classes names it", extra['card expired'][1] in got, got)
+    r = feed(w)
+    ok('mirror: the feed counts exactly those, in that order', [x['enrollment_id'] for x in r['new']] == got, r['new'])
+    ok("mirror: the expired card's class still gets its own count", {'enrollment_id': extra['card expired'][1], 'count': 1} in r['new'], r['new'])
+    ok('mirror: an unknown session names nothing', d.one('select student_submit._bulletin_session_enrollments(:s)', s=nid()) == [])
+    d.close()
+
+def part2(): return text_of(UNDO).split('-- PART 1 ends')[1]
+
+def scen_undolock():
+    """The full undo takes write_log before it deletes, so a student's write that arrives between waits."""
+    w = world('undolock'); d = w.d
+    card = d.one('select id from student_card where enrollment_id = :e', e=w.cece)
+    # A pause between the undo's delete and its next step, only in the undo's own session.
+    d.run("""create function public.b1b_test_pause() returns trigger language plpgsql as $$
+             begin if current_setting('b1b.pause', true) = 'on' then perform pg_sleep(1.5); end if; return null; end $$""")
+    d.run('create trigger b1b_test_pause after delete on student_submit.write_log for each statement execute function public.b1b_test_pause()')
+    def old_rows():
+        d.run("delete from student_submit.write_log")
+        # A day old: the student's own call deletes them too, so the two meet on the same rows.
+        d.run("insert into student_submit.write_log (card_id, kind, at) select :c, 'bulletin', now() - interval '2 days' from generate_series(1, 5)", c=card)
+    def race(undo_sql):
+        out = {}
+        def undo():
+            d.run("select set_config('b1b.pause', 'on', false)")
+            out['undo'] = d.statements(split(undo_sql))
+            d.run("select set_config('b1b.pause', '', false)")
+        t = threading.Thread(target=undo); t.start(); time.sleep(0.5)
+        s = Conn(d)
+        t0 = time.time()
+        try: out['student'] = s.run("select student_submit._write_limit(:c, 'seen', 60)", c=card)[0][0] or 'ok'
+        except Exception as e: out['student'] = 'ERROR %s %s' % (sqlstate(e), message(e))
+        out['waited'] = time.time() - t0
+        s.close(); t.join()
+        return out
+    # The order before the fix (delete, then lock): shown to deadlock, so the race below is a real one.
+    old_rows()
+    bad = race("""do $x$ begin
+        delete from student_submit.write_log where kind = 'bulletin';
+        alter table student_submit.write_log drop constraint write_log_kind_check,
+            add constraint write_log_kind_check check (kind = any (array['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text]));
+        end $x$""")
+    ok('undolock: (the old order) deleting first and locking after deadlocks with a student write',
+       '40P01' in str(bad.get('student')) or 'deadlock' in str(bad.get('undo')), bad)
+    if kind_check(d) != [[NEW_CHECK, True]]:
+        d.run("alter table student_submit.write_log drop constraint write_log_kind_check, add constraint write_log_kind_check check (kind = any (array['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text]))")
+    # The undo as written.
+    old_rows()
+    good = race(part2())
+    ok('undolock: the full undo runs', good.get('undo') == 'ok', good)
+    ok("undolock: the student's write arriving between waited and went through, no deadlock", good.get('student') == 'ok' and good.get('waited') > 0.5, good)
+    ok('undolock: the check is back as before', kind_check(d) == [[OLD_CHECK, True]], kind_check(d))
+    ok("undolock: the student's write is counted; the bulletin rows are gone",
+       d.all("select kind from student_submit.write_log order by id") == [['seen']], d.all('select kind from student_submit.write_log'))
+    d.run('drop trigger b1b_test_pause on student_submit.write_log'); d.run('drop function public.b1b_test_pause()')
+    d.close()
+
 SCENARIOS = {'feed': scen_feed, 'new': scen_new, 'seen': scen_seen, 'react': scen_react, 'links': scen_links, 'refused': scen_refused,
              'limit': scen_limit, 'leak': scen_leak, 'others': scen_others, 'race': scen_race, 'defaults': scen_defaults,
-             'apply': scen_apply, 'missing': scen_missing, 'undo': scen_undo}
+             'apply': scen_apply, 'missing': scen_missing, 'undo': scen_undo, 'mirror': scen_mirror, 'undolock': scen_undolock}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or SCENARIOS):
         SCENARIOS[name]()

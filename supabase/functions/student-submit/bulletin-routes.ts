@@ -21,8 +21,10 @@
 // The rules are handout-routes.ts's: the session checked by the database
 // first, and who the student is taken only from that; the statement named
 // here, every value a parameter; the request's shape checked before the
-// database is asked; a reply rebuilt field by field from the lists below, so
-// a key the database adds later is left behind until it is named here; a
+// database is asked; a reply rebuilt field by field by the builders below,
+// from the lists in SENT (tests/student-submit-allow-list.test.js holds them
+// to the SQL), so a key the database adds later is left behind until it is
+// named there; a
 // refusal passed on by its code, any other answered not_found; a log line
 // with nothing about the student (handler.ts).
 //
@@ -120,16 +122,26 @@ const wordOrNull = (v: unknown): string | null => (typeof v === 'string' && WORD
 
 /* One bulletin, rebuilt: the scalars copied as plain values, the two ids as ids, the files each rebuilt, the
    student's own reaction one of the three words or null. */
+const BULLETIN_TYPED = ['id', 'assessment_id', 'files', 'reaction'];
 function bulletin(b: unknown): Json {
   const x = isObject(b) ? b : {};
   return {
-    ...pick(x, ['kind', 'body', 'link_url', 'link_title', 'pinned', 'pinned_until', 'reactions_on']),
-    ...pick(x, ['posted_at', 'edited_at', 'seen_at']),
+    // Every other key on SENT.bulletin, as a plain value; a key on no list is never read.
+    ...pick(
+      x,
+      SENT.bulletin.filter(k => !BULLETIN_TYPED.includes(k)),
+    ),
     id: idOrNull(x.id),
     assessment_id: idOrNull(x.assessment_id),
     files: list(x.files).map(f => {
       const y = isObject(f) ? f : {};
-      return { ...pick(y, ['kind', 'title', 'page_count', 'position']), id: idOrNull(y.id) };
+      return {
+        ...pick(
+          y,
+          SENT.file.filter(k => k !== 'id'),
+        ),
+        id: idOrNull(y.id),
+      };
     }),
     reaction: wordOrNull(x.reaction),
   };
