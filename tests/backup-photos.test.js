@@ -73,6 +73,32 @@ describe('Download Class Backup and photos of student work', () => {
     expect('photos' in download()).toBe(false);
   });
 
+  it('says in every file that bulletins are not in it, and puts none of them in (B1g)', () => {
+    window.isDemoMode = () => true;
+    localStorage.setItem(
+      'gb-bulletins-' + CID,
+      JSON.stringify({
+        bulletins: [
+          {
+            id: 'blt-zz1',
+            kind: 'announcement',
+            body: 'ZZBULLETIN words',
+            posted_at: '2026-11-10T16:00:00Z',
+            files: [],
+          },
+        ],
+        seen: { 'blt-zz1': ['s1'] },
+        reactions: { 'blt-zz1': { got_it: ['s1'] } },
+      }),
+    );
+    expect(FVBackupRestore.BULLETINS_NOTE).toBe('Bulletins are not in this file.');
+    expect(download().bulletins).toBe('Bulletins are not in this file.');
+    ['ZZBULLETIN', 'blt-zz1', 'got_it'].forEach(v => expect(written).not.toContain(v));
+    // A backup carrying the line restores as any other.
+    const backup = FVBackupRestore.parseBackup(JSON.stringify(Object.assign({ learningMap: {} }, download())));
+    expect(backup.bulletins).toBe('Bulletins are not in this file.');
+  });
+
   it('puts nothing of the work sent in the file', () => {
     window.isDemoMode = () => true;
     saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { student_page_enabled: true }));
@@ -131,6 +157,15 @@ describe('Restore Class from Backup and photos of student work', () => {
     expect(at).toBeGreaterThan(0);
     expect(src.slice(at, at + 600)).toMatch(
       /FVBackupRestore\.anyClassTakesWork\(\)\s*\?\s*esc\(FVBackupRestore\.PHOTOS_NOT_IN_BACKUP\) \+ ' '\s*:\s*''\)\s*\+\s*'Your other classes are not changed\./,
+    );
+  });
+
+  it('says Bulletins are not in a backup, every time, before the photos line', () => {
+    expect(FVBackupRestore.BULLETINS_NOT_IN_BACKUP).toBe('Bulletins are not in a backup.');
+    const src = readFileSync('teacher/dash-class-manager.js', 'utf-8');
+    const at = src.indexOf('scores and reports. ');
+    expect(src.slice(at, at + 600)).toMatch(
+      /scores and reports\. ' \+\s*\/\/[^\n]*\n\s*\(typeof FVBackupRestore !== 'undefined' \? esc\(FVBackupRestore\.BULLETINS_NOT_IN_BACKUP\) \+ ' ' : ''\) \+\s*\/\/[^\n]*\n\s*\(typeof FVBackupRestore !== 'undefined' && FVBackupRestore\.anyClassTakesWork\(\)/,
     );
   });
 

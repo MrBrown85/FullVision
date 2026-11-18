@@ -1,9 +1,7 @@
 /**
- * Bulletins, the teacher's page (slice B1c), Demo Mode.
+ * Bulletins, the teacher's page (slice B1c; on since B1g), Demo Mode.
  *
- * The page and its tab draw only with the build switch on
- * (localStorage fv-build-bulletins = 1). Each test starts on the sample
- * class's three sample bulletins.
+ * Each test starts on the sample class's three sample bulletins.
  */
 import { test, expect } from '@playwright/test';
 
@@ -13,9 +11,10 @@ test.use({ viewport: { width: 1280, height: 800 } });
 // always the same word whatever time the test runs.
 const NOW = new Date('2026-11-18T13:00:00');
 
-async function open(page, { on = true, studentPage = true } = {}) {
+async function open(page, { oldKey = null, studentPage = true } = {}) {
   await page.clock.install({ time: NOW });
-  if (on) await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
+  // What a browser that saw Bulletins before B1g may still have kept.
+  if (oldKey != null) await page.addInitScript(v => localStorage.setItem('fv-build-bulletins', v), oldKey);
   // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
   await page.goto(studentPage ? '/login.html?student=1' : '/login.html');
   await page.locator('#demo-mode-btn').click();
@@ -257,16 +256,15 @@ test('a class whose Student Page is off says students cannot see Bulletins, and 
   await expect(feed(page)).toContainText('Posting still works.');
 });
 
-test('with the switch off there is no Bulletins tab and the address opens the Dashboard', async ({ page }) => {
-  await open(page, { on: false });
-  await expect(page.locator('.tb-seg-active')).toHaveText('Dashboard');
+test("an old 'fv-build-bulletins' of 0 changes nothing: the tab is after Assignments and the address opens the page", async ({
+  page,
+}) => {
+  await open(page, { oldKey: '0' });
+  await expect(page.locator('.tb-seg-active')).toHaveText('Bulletins');
   const tabs = await page.locator('.tb-seg-link').allTextContents();
-  expect(tabs).toEqual(['Dashboard', 'Assignments', 'Observations', 'Gradebook', 'Reporting']);
-  await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.locator('.bulletin-page')).toHaveCount(0);
-  // With the switch off Demo Mode writes no bulletins at all.
-  const kept = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('gb-bulletins')));
-  expect(kept).toEqual([]);
+  expect(tabs).toEqual(['Dashboard', 'Assignments', 'Bulletins', 'Observations', 'Gradebook', 'Reporting']);
+  await expect(page).toHaveURL(/\/bulletins/);
+  await expect(cards(page)).toHaveCount(3);
 });
 
 test('keyboard focus stays where it was: the menu, a redraw, Cancel and the confirm', async ({ page, browserName }) => {

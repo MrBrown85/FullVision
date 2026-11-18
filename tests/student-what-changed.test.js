@@ -80,6 +80,7 @@ describe('the count on My Learning', () => {
       'card',
       'verify',
       'page',
+      'bulletins',
       'work',
       'forms',
     ]);

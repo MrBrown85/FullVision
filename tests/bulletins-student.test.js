@@ -3,9 +3,10 @@
  * s/bulletins.js and s/bulletins-view.js, on the page as a browser loads it
  * (tests/helpers/student-page-context.js), against the student-submit
  * function's real handler over a stand-in database, with the four bulletin
- * routes answered here as bulletin-routes.ts answers them (they are not on
- * the deployed function yet; an unknown route is the real handler's
- * bad_request). Demo Mode too. No test waits on real time.
+ * routes answered here as bulletin-routes.ts answers them (the shared
+ * stand-in answers `bulletins` only with nothing posted; a function from
+ * before B1b answered an unknown route with bad_request). Demo Mode too.
+ * No test waits on real time.
  */
 import { readFileSync } from 'node:fs';
 import { runInThisContext } from 'node:vm';
@@ -14,7 +15,6 @@ import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
-const ON = { 'fv-build-bulletins': '1' };
 const routes = page => page.calls.map(c => c.body.route);
 const tabs = page => [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')].map(t => t.getAttribute('data-tab'));
 const current = page =>
@@ -52,8 +52,8 @@ function bulletin(n, more) {
 
 /* The class's bulletins as bulletin-routes.ts answers them; db.fail[route]
    answers a route with a refusal instead; db.hold holds `bulletins` until it
-   is let go; db.missing makes every bulletin route the real handler's (an
-   unknown route: bad_request). */
+   is let go; db.missing answers every bulletin route as a function from
+   before B1b did (an unknown route: bad_request). */
 function world(opts = {}) {
   const fn = fakeStudentSubmit({ cards: [sampleCard(TODAY)].concat(opts.more || []) });
   const db = {
@@ -67,7 +67,8 @@ function world(opts = {}) {
     missing: !!opts.missing,
   };
   const server = async body => {
-    if (/^bulletin/.test(body.route) && !db.missing) {
+    if (/^bulletin/.test(body.route) && db.missing) return { ok: false, error: 'bad_request' };
+    if (/^bulletin/.test(body.route)) {
       if (db.fail[body.route])
         return typeof db.fail[body.route] === 'function' ? db.fail[body.route]() : db.fail[body.route];
       if (body.route === 'bulletins') {
@@ -107,7 +108,7 @@ function world(opts = {}) {
 }
 
 async function signIn(w, opts = {}) {
-  const page = openStudentPage(Object.assign({ store: opts.store || Object.assign({}, ON) }, opts.page));
+  const page = openStudentPage(Object.assign({ store: opts.store || {} }, opts.page));
   // The page context has no URL of its own: a browser's, for the link card.
   if (!opts.page || !opts.page.objectUrls) page.ctx.URL = URL;
   page.server = w.server;
@@ -117,35 +118,27 @@ async function signIn(w, opts = {}) {
   return page;
 }
 
-describe('with the switch off, the page is the page it was', () => {
-  it('three tabs, the same requests, nothing more kept on the device', async () => {
-    const w = world({ list: [bulletin(B1)] });
-    const page = await signIn(w, { store: {} });
-    expect(tabs(page)).toEqual(['assignments', 'learning', 'questionnaires']);
-    expect(current(page)).toBe('assignments');
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
-    expect(Object.keys(page.store)).toEqual(['fv-s-session']);
-    expect(page.root().innerHTML).not.toMatch(/bulletin/i);
-    await page.click('.sp-tabs-bottom [data-tab="questionnaires"]');
-    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
-    page.runTicks();
-    await page.settle();
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
-  });
-
-  it('a tab named bulletins opens nothing', async () => {
-    const w = world({ list: [bulletin(B1)] });
-    const page = await signIn(w, { store: {} });
-    page.root().querySelector('.sp-tabs-bottom [data-tab="learning"]').setAttribute('data-tab', 'bulletins');
-    await page.click('.sp-tabs-bottom [data-tab="bulletins"]');
-    expect(current(page)).toBe('assignments');
-    expect(page.root().querySelector('.sp-bulletin-tab')).toBeNull();
-  });
+describe('Bulletins is on by default (B1g)', () => {
+  /* The switch is on in every build. A browser that still has the old
+     'fv-build-bulletins' key, set to '0' or '1', sees the same page. */
+  for (const store of [{}, { 'fv-build-bulletins': '0' }, { 'fv-build-bulletins': '1' }]) {
+    it(
+      'four tabs, Bulletins first, with ' +
+        (JSON.stringify(store) === '{}' ? 'no key' : 'the old key ' + JSON.stringify(store)),
+      async () => {
+        const w = world({ list: [bulletin(B1)] });
+        const page = await signIn(w, { store });
+        expect(tabs(page)).toEqual(['bulletins', 'assignments', 'learning', 'questionnaires']);
+        expect(current(page)).toBe('bulletins');
+        expect(routes(page).slice(0, 4)).toEqual(['card', 'verify', 'page', 'bulletins']);
+      },
+    );
+  }
 });
 
 describe('until the server has the route, the page offers nothing (plan rule 7)', () => {
   for (const [what, set] of [
-    ['an unknown route (the deployed function today)', db => (db.missing = true)],
+    ['an unknown route (a function from before B1b)', db => (db.missing = true)],
     ['a 500', db => (db.fail.bulletins = { ok: false, error: 'server' })],
     ['no answer', db => (db.fail.bulletins = { ok: false, error: 'network' })],
     ['an answer that is not a list', db => (db.fail.bulletins = { ok: true, bulletins: 'x' })],
@@ -229,7 +222,7 @@ describe('the opening rule', () => {
         });
         let release;
         w.db.hold = new Promise(r => (release = r));
-        const page = openStudentPage({ store: Object.assign({}, ON) });
+        const page = openStudentPage({ store: {} });
         page.ctx.URL = URL;
         page.server = w.server;
         await page.start('#P3R8-WDK4');
@@ -668,7 +661,7 @@ describe('a file’s pages', () => {
 
 describe('Demo Mode', () => {
   async function demo(store) {
-    const page = openStudentPage({ store: Object.assign({}, ON, store || {}) });
+    const page = openStudentPage({ store: Object.assign({}, store || {}) });
     page.ctx.URL = URL;
     await page.start('#demo-card');
     await page.submit('form[data-form="card"]');
@@ -691,7 +684,7 @@ describe('Demo Mode', () => {
     expect(page.calls).toEqual([]);
     expect(badge(page, 'bulletins')).toBe('');
     // Nothing kept on the device either.
-    expect(Object.keys(page.store).sort()).toEqual(['fv-build-bulletins']);
+    expect(Object.keys(page.store).sort()).toEqual([]);
   });
 
   it('reads the demo teacher’s bulletins from this device, read only, with Cece’s own Seen', async () => {
@@ -766,9 +759,12 @@ describe('Demo Mode', () => {
 
   it('a paused student: the card says it is closed, as today', async () => {
     const page = openStudentPage({
-      store: Object.assign({}, ON, {
-        'gb-student-page-options-sci8': JSON.stringify({ st1: { paused_at: '2026-11-01T00:00:00Z' } }),
-      }),
+      store: Object.assign(
+        {},
+        {
+          'gb-student-page-options-sci8': JSON.stringify({ st1: { paused_at: '2026-11-01T00:00:00Z' } }),
+        },
+      ),
     });
     await page.start('#demo-card');
     await page.submit('form[data-form="card"]');

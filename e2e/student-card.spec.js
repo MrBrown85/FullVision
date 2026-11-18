@@ -79,6 +79,9 @@ for (const size of SIZES) {
       expect(await page.evaluate(() => typeof assessmentCellValue)).toBe('undefined');
       await press('Yes, That’s Me');
 
+      // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+      await expect(page.getByRole('heading', { name: 'Bulletins' })).toBeAttached();
+      await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
       // Assignments: both arrive, once, before the list is drawn.
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
       // Outstanding: a draft never returned is a card like work not graded, with no result.
@@ -199,7 +202,8 @@ test.describe('student card: the card’s password and the lock', () => {
     await page.getByRole('button', { name: 'Continue' }).tap();
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    // The sample class has bulletins, so the page opens on them (B1g).
+    await expect(page.getByRole('heading', { name: 'Bulletins' })).toBeAttached();
     await openLearning(page);
     const row = title => page.locator('.sp-ml-work .sp-ml-row', { hasText: title });
     // My Learning, where the results would be, says they didn't load.

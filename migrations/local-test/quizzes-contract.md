@@ -591,7 +591,7 @@ It sends anything about right and wrong **only when all hold**:
 
 1. **Returned to this student**: `student_submit._returned_grade(p_enrollment_id, p_assessment_id)` has `returned_at` not null and `grade` not null (a Draft grade is never sent; Missing or Excused sends nothing).
 2. **The student can no longer answer**: no unsent try, and the quiz is closed or no tries are left.
-3. **One try is confirmed**: the attempt with `marked` not null, and its `marked_at <= returned_at` (a marking confirmed after the last return is a draft until returned again). Q5a checks how `returned_at` moves under As Soon As I Save before relying on this.
+3. **One try is confirmed**: the attempt with `marked` not null, and its `marked_at <= returned_at` (a marking confirmed after the last return is a draft until returned again). Q5a checks how `returned_at` moves under As Soon As I Save before relying on this. **And it must not rely on `marked_at` alone** (Q4's note): Undo of a Confirm sends the earlier marking back through `confirm_quiz`, which sets `marked_at` to the time of the Undo, not the time that marking was first confirmed. So after an Undo a marking can carry a `marked_at` later than a return that already showed it, or a return can follow an Undo that put back an older marking. Q5a checks the grade's own state too (the piece returned and not a draft for that student), not the time alone.
 4. **`shows`** allows it.
 
 Otherwise: `{ "ok": true, "returned": false }` and nothing else. When all hold:

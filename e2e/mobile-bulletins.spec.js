@@ -1,11 +1,10 @@
 /**
  * Bulletins on the phone (slice B1f, docs/plans/bulletins-plan.md; boards
- * T1 to T4): Demo Mode, Science 8, 390 x 844, with the build flag
- * `bulletins` set on this browser (fv-build-bulletins). Post a Photo takes a
- * made-up picture through the camera's file input (shared/photo-shrink.js
- * makes it smaller in the browser) and it shows first in the feed; nothing
- * is sent. With the flag off the phone has its three tabs as before. One
- * run has motion on. The last three run signed in against a stand-in server
+ * T1 to T4; on since B1g): Demo Mode, Science 8, 390 x 844. Post a Photo
+ * takes a made-up picture through the camera's file input
+ * (shared/photo-shrink.js makes it smaller in the browser) and it shows
+ * first in the feed; nothing is sent. A browser that still has
+ * fv-build-bulletins set to 0 has the four tabs too. One run has motion on. The last three run signed in against a stand-in server
  * (the review's must-fixes 1 to 3: posted once, a desktop delete let go,
  * Take It Back while the post is on its way).
  */
@@ -14,18 +13,18 @@ import { mockAuth } from './helpers.js';
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-async function openPhone(page, { flag = true, tab = '', motion = false } = {}) {
+async function openPhone(page, { oldKey = null, tab = '', motion = false } = {}) {
   await page.emulateMedia({ reducedMotion: motion ? 'no-preference' : 'reduce' });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.evaluate(
-    ({ flag, tab }) => {
-      if (flag) localStorage.setItem('fv-build-bulletins', '1');
-      else localStorage.removeItem('fv-build-bulletins');
+    ({ oldKey, tab }) => {
+      // What a phone that saw Bulletins before B1g may still have kept.
+      if (oldKey != null) localStorage.setItem('fv-build-bulletins', oldKey);
       if (tab) localStorage.setItem('td-mobile-tab', tab);
     },
-    { flag, tab },
+    { oldKey, tab },
   );
   await page.reload();
   await expect(page.locator('#m-tab-bar')).toBeVisible();
@@ -263,19 +262,14 @@ for (const width of [320, 390, 430]) {
   });
 }
 
-test('with the flag off: three tabs, no Bulletins anywhere, and a remembered Bulletins opens on Students', async ({
+test("an old 'fv-build-bulletins' of 0 changes nothing: four tabs, and a remembered Bulletins opens on Bulletins", async ({
   page,
 }) => {
-  await openPhone(page, { flag: false, tab: 'bulletins' });
-  await expect(page.locator('#m-tab-bar .m-tab-item:visible')).toHaveCount(3);
-  // The page holds no fourth button at all with the flag off.
-  await expect(page.locator('.m-tab-item[data-tab="bulletins"]')).toHaveCount(0);
-  await expect(page.locator('.m-tab-item[data-tab="students"]')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#m-screen-bulletins')).toHaveCount(0);
-  await expect(page.locator('[class*="m-bulletin-"]:not(.m-bulletin-tab), [id^="m-bulletin-"]')).toHaveCount(0);
-  // Nothing of Bulletins is written to the device with the flag off (no Demo Mode samples either).
-  for (const t of ['observe', 'grade', 'students']) await page.locator('.m-tab-item[data-tab="' + t + '"]').click();
-  expect(await page.evaluate(() => Object.keys(localStorage).filter(k => /bulletin/i.test(k)))).toEqual([]);
+  await openPhone(page, { oldKey: '0', tab: 'bulletins' });
+  await expect(page.locator('#m-tab-bar .m-tab-item:visible')).toHaveCount(4);
+  await expect(page.locator('#m-tab-bar .m-tab-item:visible').last()).toHaveAttribute('data-tab', 'bulletins');
+  await expect(page.locator('.m-tab-item[data-tab="bulletins"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#m-screen-bulletins')).toBeVisible();
 });
 
 test('with motion on: a new photo glides in at the top, and the feed is not drawn again for a read that changed nothing', async ({
@@ -336,7 +330,6 @@ async function signedIn(page) {
       localStorage.setItem('gb-lastActiveCourse', cid);
       localStorage.setItem('gb-students-' + cid, JSON.stringify([st(11, 'Alice'), st(12, 'Bob')]));
       localStorage.setItem('gb-assessments-' + cid, JSON.stringify([]));
-      localStorage.setItem('fv-build-bulletins', '1');
       localStorage.setItem('td-mobile-tab', 'bulletins');
       localStorage.setItem(KEY, JSON.stringify({ rows: {}, byKey: {}, stored: [], n: 0 }));
     }

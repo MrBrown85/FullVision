@@ -290,6 +290,8 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     expect(Object.keys(backup)).toEqual([
       'course',
       'savedAt',
+      // "Bulletins are not in this file." (B1g); `photos` only once the class takes work.
+      'bulletins',
       'courseInfo',
       'students',
       'categories',

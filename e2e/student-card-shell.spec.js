@@ -16,6 +16,8 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+  // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+  await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
   await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
   return posts;
 }
@@ -30,7 +32,7 @@ for (const size of [
     test('the tabs, Outstanding and Upcoming, My Learning, Reflect and Log Out', async ({ page }) => {
       const posts = await demo(page);
       const nav = page.getByRole('navigation', { name: 'Your Page' }).locator('visible=true');
-      await expect(nav.locator('.sp-tab-label')).toHaveText(['Assignments', 'My Learning', 'Reflect']);
+      await expect(nav.locator('.sp-tab-label')).toHaveText(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
       await expect(nav.getByRole('button', { name: 'Assignments' })).toHaveAttribute('aria-current', 'page');
       // What came back is new on My Learning: its badge says how many.
       await expect(nav.locator('[data-tab="learning"] .sp-tab-badge')).toHaveText('6');
@@ -128,11 +130,10 @@ for (const size of [
   { tag: 'phone', use: PHONE },
   { tag: 'chromebook', use: CHROMEBOOK },
 ]) {
-  test.describe('the shell with Bulletins on, on a ' + size.tag, () => {
+  test.describe('the shell opening on Bulletins, on a ' + size.tag, () => {
     test.use(size.use);
 
-    test('four tabs, Bulletins first and open; the others as they were', async ({ page }) => {
-      await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
+    test('four tabs, Bulletins first and open (on since B1g); the others as they were', async ({ page }) => {
       const posts = [];
       page.on('request', req => {
         if (/functions\/v1\//.test(req.url())) posts.push(req.url());

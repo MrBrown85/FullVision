@@ -289,6 +289,8 @@ load('shared/markup-draw.js');
 load('s/page-view.js');
 // A handout's pages on a card still to do, to swipe through.
 load('s/page-carousel.js');
+// Bulletins on the student's page, as teacher/app.html loads it for Preview as Student (B1d).
+load('s/bulletins-view.js');
 load('teacher/ui.js');
 load('teacher/markup.js');
 load('teacher/report-scores.js');
@@ -315,8 +317,10 @@ load('shared/questionnaires.js');
 load('teacher/qr-slips.js');
 load('teacher/question-cards.js');
 load('shared/data-quizzes.js');
+load('shared/data-quiz-tries.js');
 load('teacher/quiz-card-draw.js');
 load('teacher/quiz-builder.js');
+load('teacher/quiz-results.js');
 load('teacher/cm-questionnaires.js');
 load('teacher/student-cards.js');
 load('teacher/student-page-students.js');

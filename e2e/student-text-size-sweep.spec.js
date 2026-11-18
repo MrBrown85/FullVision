@@ -187,37 +187,34 @@ for (const font of FONTS) {
             expect(errors).toEqual([]);
           });
 
-        /* Every bar the page can show: three tabs (Bulletins off, or no route on the
-           server), and four with Bulletins on (docs/plans/bulletins-plan.md B1d). */
-        for (const bulletins of [false, true])
-          test('the tab bar holds ' + (bulletins ? 'four tabs, Bulletins on' : 'three tabs'), async ({ page }) => {
-            await useFont(page, font);
-            if (bulletins) await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
-            await openDemo(page, { size }, 'demo-card');
-            /* Where the words are drawn (a range over the label's text), inside
+        /* The bar with its four tabs, Bulletins first (docs/plans/bulletins-plan.md
+           B1d; on since B1g). Three tabs is the bar from before Bulletins, drawn
+           now only for a class whose server does not answer `bulletins`. */
+        test('the tab bar holds four tabs', async ({ page }) => {
+          await useFont(page, font);
+          await openDemo(page, { size, onBulletins: true }, 'demo-card');
+          /* Where the words are drawn (a range over the label's text), inside
            the tab's own box: a label's box can grow past its tab with the
            words in it, so its own scroll width proves nothing. */
-            const labels = await page.locator('.sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
-              els.map(el => {
-                const tab = el.closest('.sp-tab').getBoundingClientRect();
-                const range = document.createRange();
-                range.selectNodeContents(el);
-                const words = [...range.getClientRects()].filter(r => r.width > 0);
-                const fits = words.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1);
-                return { text: el.textContent, fits };
-              }),
-            );
-            expect(labels.map(l => l.text)).toEqual(
-              (bulletins ? ['Bulletins'] : []).concat(['Assignments', 'My Learning', 'Reflect']),
-            );
-            expect(labels.filter(l => !l.fits)).toEqual([]);
-            // The icons in one row, however the labels wrap.
-            const icons = await page
-              .locator('.sp-tabs-bottom .sp-tab-icon')
-              .evaluateAll(els => [...new Set(els.map(el => Math.round(el.getBoundingClientRect().top)))]);
-            expect(icons).toHaveLength(1);
-            expect((await faults(page, vp.width, vp.height)).filter(f => /tab/.test(f))).toEqual([]);
-          });
+          const labels = await page.locator('.sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
+            els.map(el => {
+              const tab = el.closest('.sp-tab').getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              const words = [...range.getClientRects()].filter(r => r.width > 0);
+              const fits = words.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1);
+              return { text: el.textContent, fits };
+            }),
+          );
+          expect(labels.map(l => l.text)).toEqual(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
+          expect(labels.filter(l => !l.fits)).toEqual([]);
+          // The icons in one row, however the labels wrap.
+          const icons = await page
+            .locator('.sp-tabs-bottom .sp-tab-icon')
+            .evaluateAll(els => [...new Set(els.map(el => Math.round(el.getBoundingClientRect().top)))]);
+          expect(icons).toHaveLength(1);
+          expect((await faults(page, vp.width, vp.height)).filter(f => /tab/.test(f))).toEqual([]);
+        });
       });
     }
   }
