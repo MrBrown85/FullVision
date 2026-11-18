@@ -64,6 +64,11 @@ test('By Competency: dashed suggestions, a step marked Changed, Best of 2 Tries,
   const ceceRow = page.locator('table.quiz-rt tbody tr').filter({ hasText: 'Cece Adeyemi' }).first();
   await expect(ceceRow.locator('[data-tag="' + pa3 + '"] .quiz-lv')).toHaveText('Extending');
   await expect(ceceRow.locator('[data-tag="' + pa3 + '"] .quiz-lv')).toHaveClass(/is-suggested/);
+  // A screen reader hears the competency's name, never its id.
+  await expect(ceceRow.locator('[data-tag="' + pa3 + '"]')).toHaveAttribute(
+    'aria-label',
+    /^Data Representation for Cece Adeyemi: suggested Extending\. Pick to step it$/,
+  );
   await expect(ceceRow.locator('.quiz-of').first()).toHaveText('4 / 4');
   await ceceRow.locator('[data-tag="' + pa3 + '"]').click();
   await page.locator('[data-quiz-act="step"][data-by="-1"]').click();
@@ -102,8 +107,25 @@ test('By Question assesses short answers down one column; By Student shows one s
   const q8 = page.locator('.quiz-q').nth(7);
   await expect(q8.locator('.quiz-col-row')).toHaveCount(19);
   const waiting = q8.locator('.quiz-col-row').filter({ hasText: 'Mateo' });
-  await waiting.locator('[data-points="1"]').click();
-  await expect(waiting.locator('[data-points="1"]')).toHaveAttribute('aria-pressed', 'true');
+  // Half points: a 2-point answer takes 0, ½, 1, 1½ or 2.
+  await expect(waiting.locator('[data-quiz-act="assess"]')).toHaveText(['0', '0.5', '1', '1.5', '2']);
+  await waiting.locator('[data-points="1.5"]').click();
+  await expect(waiting.locator('[data-points="1.5"]')).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    await page.evaluate(aid => {
+      const t = QuizTries.get('sci8', aid).students.find(
+        s => getStudents('sci8').find(x => x.id === s.enrollment_id).firstName === 'Mateo',
+      );
+      return t.tries[0].answers.find(a => a.given_points === 1.5) ? 1.5 : null;
+    }, AID),
+  ).toBe(1.5);
+  // Every target is 44 px tall at least.
+  const short = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.quiz-results button, .quiz-results input'))
+      .filter(b => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 43.5)
+      .map(b => b.className + ' ' + b.textContent.trim() + ' ' + b.getBoundingClientRect().height),
+  );
+  expect(short).toEqual([]);
   await shot(page, 'results-question');
   await page.locator('[data-quiz-view="student"]').click();
   await page.locator('.quiz-who-list [data-sid]').filter({ hasText: 'Sam Blackwood' }).click();
@@ -143,6 +165,7 @@ test('Confirm asks first, naming what moves; Cancel sends nothing; Undo puts bac
   await page.locator('#confirm-ok-btn').click();
   await expect(page.locator('.quiz-undo')).toBeVisible();
   await expect(page.locator('.quiz-undo span')).toHaveText(n + ' levels confirmed as drafts.');
+  expect((await page.locator('[data-quiz-act="undo"]').boundingBox()).height).toBeGreaterThanOrEqual(44);
   await expect(confirm).toBeDisabled();
   await expect(confirm).toHaveText('Nothing to Confirm Yet');
   // Solid now: the confirmed cells hold scores and are no longer suggestions to step.
@@ -173,6 +196,25 @@ test('Confirm asks first, naming what moves; Cancel sends nothing; Undo puts bac
   // Escape closes the screen and the page is drawn again.
   await page.keyboard.press('Escape');
   await expect(page.locator('.quiz-results-overlay')).toHaveCount(0);
+});
+
+test('at 769 a confirm never draws its primary button where the click that opened it was', async ({ page }) => {
+  await page.setViewportSize({ width: 769, height: 800 });
+  await demo(page, true);
+  await openResults(page);
+  for (const sel of ['[data-quiz-act="confirm"]', 'table.quiz-rt [data-quiz-act="reopen"]']) {
+    const opener = page.locator(sel).first();
+    await opener.scrollIntoViewIfNeeded();
+    const b = await opener.boundingBox();
+    const at = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    await page.mouse.click(at.x, at.y);
+    await expect(page.locator('.confirm-card')).toBeVisible();
+    const ok = await page.locator('#confirm-ok-btn').boundingBox();
+    const under = at.x >= ok.x && at.x <= ok.x + ok.width && at.y >= ok.y && at.y <= ok.y + ok.height;
+    expect(under, sel).toBe(false);
+    await page.locator('#confirm-cancel-btn').click();
+    await expect(page.locator('.confirm-overlay')).toHaveCount(0);
+  }
 });
 
 test('Reopen for One Student asks first', async ({ page }) => {

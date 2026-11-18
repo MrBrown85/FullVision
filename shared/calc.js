@@ -793,10 +793,10 @@ function quizSuggestions(questions, key, tries, settings, scale) {
   var state = !last ? 'not_sent' : !counted || counted.waiting ? 'waiting' : 'level';
   var total = { earned: counted ? counted.earned : 0, possible, state, level: 0 };
   if (counted && state === 'level') total.level = pointsToProf(counted.earned, +set.maxPoints || possible, scale);
-  // Competencies: each one's questions give a whole level by the table, from three questions (decision 4).
-  // Points: every competency reads the level the total reaches.
+  // Competencies: each one's questions give a whole level by the table, from three questions (decision 4);
+  // a 0-point question carries no evidence and counts toward none. Points: every competency reads the total's level.
   var competencies = (set.tagIds || []).map((/** @type {string} */ tagId) => {
-    var mine = qs.filter(q => q.tag_id === tagId);
+    var mine = qs.filter(q => q.tag_id === tagId && worth(q) > 0);
     var earned = counted ? sum(mine, q => counted.questions[q.id].earned) : 0;
     var c = { tagId, questions: mine.length, earned, possible: sum(mine, worth), state: '', level: 0 };
     var waits = held || (!!counted && mine.some(q => counted.questions[q.id].result === 'waiting'));

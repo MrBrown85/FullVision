@@ -39,6 +39,12 @@
   align-items: center;
   flex-wrap: wrap;
 }
+/* 44 px targets on this screen (the plan's rule 11), the app's own controls included. */
+.quiz-results-tools .seg-btn,
+.quiz-results-tools .btn,
+.quiz-results .btn {
+  min-height: 44px;
+}
 .quiz-hint {
   font-size: var(--text-sm);
   color: var(--text-2);
@@ -224,7 +230,7 @@ table.quiz-rt tr.is-selected > * {
   background: none;
   cursor: pointer;
   border-radius: 8px;
-  min-height: 32px;
+  min-height: 44px;
   color: inherit;
   text-align: left;
 }
@@ -280,7 +286,8 @@ table.quiz-rt tr.is-selected > * {
 .quiz-undo button {
   font: inherit;
   font-weight: 600;
-  min-height: 32px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0 6px;
   border: 0;
   background: none;
@@ -295,7 +302,7 @@ table.quiz-rt tr.is-selected > * {
   flex-wrap: wrap;
 }
 .quiz-btn-sm {
-  min-height: 32px;
+  min-height: 44px;
   padding: 6px 10px;
   font-size: 13px;
 }
@@ -378,8 +385,14 @@ table.quiz-rt tr.is-selected > * {
   align-items: center;
 }
 .quiz-assess .seg-btn {
-  min-width: 36px;
-  min-height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+}
+.quiz-assess-num {
+  width: 88px;
+  min-height: 44px;
+  box-sizing: border-box;
 }
 .quiz-assess-label {
   font-size: 12px;

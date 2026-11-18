@@ -255,6 +255,35 @@ function confirmQuizMarks(cid, aid, marks) {
   return _qtWrite('confirm_quiz', { p_assessment_id: aid, p_marks: marks }, aid);
 }
 
+/* What Confirm wrote, cell by cell, so a later Confirm of the same quiz can
+   tell its own score (which it may replace) from one the teacher set or
+   changed by hand (which it never does). Kept on this device in
+   gb-quiz-written-<cid>: { aid: { "sid|competency id" or "sid|points":
+   { score, mod } } }. A device without the record treats every score as the
+   teacher's, so the worst it does is keep one. Signed in and in Demo Mode
+   alike; it holds no answer and no key. */
+/** @param {string} cid */
+function _qwKey(cid) {
+  return 'gb-quiz-written-' + cid;
+}
+/** @param {string} cid @param {string} aid @returns {Record<string, { score: number, mod: number }>} */
+function quizWritten(cid, aid) {
+  var all = _safeParseLS(_qwKey(cid), null);
+  var one = _plainObject(all) ? all[aid] : null;
+  return _plainObject(one) ? JSON.parse(JSON.stringify(one)) : {};
+}
+/** @param {string} cid @param {string} aid @param {Record<string, any>} cells */
+function setQuizWritten(cid, aid, cells) {
+  var all = _safeParseLS(_qwKey(cid), null);
+  var next = _plainObject(all) ? all : {};
+  var some = !!cells && Object.keys(cells).length > 0;
+  // Nothing kept and nothing to keep: nothing is written (a class with no quiz gets no key).
+  if (!some && !(aid in next)) return;
+  if (some) next[aid] = cells;
+  else delete next[aid];
+  _safeLSSet(_qwKey(cid), JSON.stringify(next));
+}
+
 /**
  * Demo Mode's sample tries (shared/seed-data.js): written once, never over
  * tries already kept. tries: { sid: { tries: [...], open } }.
@@ -276,5 +305,7 @@ if (typeof window !== 'undefined') {
     mark: markQuizAnswer,
     reopen: reopenQuiz,
     confirm: confirmQuizMarks,
+    written: quizWritten,
+    setWritten: setQuizWritten,
   };
 }

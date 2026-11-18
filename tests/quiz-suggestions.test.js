@@ -145,6 +145,18 @@ describe('how many questions a competency needs (decision 4)', () => {
     expect(out.competencies.map(c => c.tagId)).toEqual([T1, T2, T3]);
   });
 
+  it('a 0-point question carries no evidence: it is not one of the three, and feeds no suggestion', () => {
+    const qs = [choice('a', T1), choice('b', T1), choice('z', T1, 0)];
+    const answers = [ans('a', ['a-a']), ans('b', ['b-a']), ans('z', ['z-a'])];
+    const out = quizSuggestions(qs, null, [sent(answers)], SETTINGS);
+    expect(comp(out, T1)).toMatchObject({ questions: 2, state: 'too_few', level: 0, earned: 2, possible: 2 });
+    // Its own marking is still kept: right, worth nothing.
+    expect(out.marked.questions.z).toEqual({ earned: 0, result: 'right' });
+    // With a third question that carries points, the 0-point one changes nothing.
+    const more = quizSuggestions(qs.concat(choice('c', T1)), null, [sent(answers.concat(ans('c', ['c-b'])))], SETTINGS);
+    expect(comp(more, T1)).toMatchObject({ questions: 3, state: 'level', earned: 2, possible: 3, level: 2 });
+  });
+
   it('an archived question counts toward nothing', () => {
     const { qs, answers } = onT1(3, 3);
     const gone = { ...choice('gone', T1, 9), archived_at: '2026-11-18T00:00:00Z' };

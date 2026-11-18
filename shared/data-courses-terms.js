@@ -188,6 +188,8 @@ function _clearCourseLocalState(id) {
     'quiz-unsent',
     // Quiz results (shared/data-quiz-tries.js): Demo Mode's sent tries.
     'quiz-tries',
+    // What Confirm wrote (shared/data-quiz-tries.js), so a later Confirm keeps the teacher's own.
+    'quiz-written',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];

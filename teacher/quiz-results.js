@@ -139,6 +139,7 @@ var QuizResults = (function () {
     });
     var scores = getScores(cid);
     var ch = changes || {};
+    var written = G.QuizTries && G.QuizTries.written ? G.QuizTries.written(cid, aid) : {};
     var students = sortStudents((getStudents(cid) || []).slice(), 'lastName', cid).map(
       function (/** @type {any} */ st) {
         var row = rows[st.id] || { sent: 0, tries: [], in_progress: false, reopened: false };
@@ -155,14 +156,32 @@ var QuizResults = (function () {
         entries.forEach(function (/** @type {any} */ e) {
           if (Number(e.score) > 0) held[e.tagId] = { level: Number(e.score), mod: e.mod || 0 };
         });
+        // On Points scoring each competency reads the piece's points as calc.js reads them.
+        var pointsHeld = points ? getPointsScore(cid, st.id, aid) : null;
+        var pointsCell = pointsHeld != null ? assessmentCellValue(cid, st.id, a) : null;
         var cells = sug.competencies.map(function (/** @type {any} */ c) {
           var mine = ch[st.id + '|' + c.tagId];
           var sugg = c.state === 'level' || c.state === 'total' ? { level: c.level, mod: 0 } : null;
+          var hold = points
+            ? pointsCell && pointsCell.level
+              ? { level: pointsCell.level, mod: 0 }
+              : null
+            : held[c.tagId] || null;
+          // A score an earlier Confirm wrote, which a new suggestion now differs from.
+          var key = st.id + '|' + (points ? 'points' : c.tagId);
+          var ours =
+            !!hold &&
+            !!written[key] &&
+            Number(written[key].score) === Number(points ? pointsHeld : hold.level) &&
+            (written[key].mod || 0) === (points ? 0 : hold.mod || 0);
+          var now = points ? (sug.total.state === 'level' ? sug.total.earned : null) : sugg ? sugg.level : null;
+          var newer = now != null && ours && Number(written[key].sugg) !== Number(now);
           return Object.assign({}, c, {
-            held: points ? null : held[c.tagId] || null,
+            held: hold,
             suggested: sugg,
             shown: mine && !points ? mine : sugg,
             changed: !!mine && !points,
+            newer: newer,
           });
         });
         return {
@@ -216,7 +235,7 @@ var QuizResults = (function () {
             return c.state === 'level';
           })
           .map(function (/** @type {any} */ c) {
-            return { tagId: c.tagId, level: c.shown.level, mod: c.shown.mod || 0 };
+            return { tagId: c.tagId, level: c.shown.level, mod: c.shown.mod || 0, suggested: c.level };
           });
         var waiting = m.points
           ? s.sug.total.state === 'waiting'
@@ -260,7 +279,18 @@ var QuizResults = (function () {
   function _cellHtml(m, s, c) {
     var figure = '<span class="quiz-of">' + esc(_pts(c.earned) + ' / ' + _pts(c.possible)) + '</span>';
     if (s.locked) return '<span class="quiz-none">' + (s.status === 'EXC' ? 'Excused' : 'Missing') + '</span>';
-    if (c.held) return '<span class="quiz-cell">' + _chip(c.held) + (s.sug.tries.length ? figure : '') + '</span>';
+    if (c.held)
+      return (
+        '<span class="quiz-cell">' +
+        _chip(c.held) +
+        (s.sug.tries.length ? figure : '') +
+        (c.newer
+          ? '<span class="quiz-sub">' +
+            esc(m.points ? 'Now ' + _pts(s.sug.total.earned) + ' points' : 'Now ' + _word(c.suggested)) +
+            '</span>'
+          : '') +
+        '</span>'
+      );
     if (c.state === 'not_sent') return '';
     if (c.state === 'too_few')
       return '<span class="quiz-cell"><span class="quiz-none">Too Few Questions</span>' + figure + '</span>';
@@ -273,8 +303,11 @@ var QuizResults = (function () {
         '</button>'
       );
     var on = R && R.sel && R.sel.sid === s.sid && R.sel.tagId === c.tagId;
+    var tag = m.tags.find(function (/** @type {any} */ x) {
+      return x.id === c.tagId;
+    });
     var label =
-      c.tagId +
+      (tag ? tag.name : 'Competency') +
       ' for ' +
       s.name +
       ': suggested ' +
@@ -508,31 +541,49 @@ var QuizResults = (function () {
     var worth = Number(q.points) || 0;
     var given = a && a.given_points != null ? Number(a.given_points) : null;
     var over = given != null && given > worth;
-    var steps = [];
-    for (var p = 0; p <= worth && steps.length < 21; p += worth > 10 ? Math.ceil(worth / 10) : 1) steps.push(p);
-    if (steps[steps.length - 1] !== worth) steps.push(worth);
+    var attrs = ' data-attempt="' + esc(t.attempt_id) + '" data-q="' + esc(q.id) + '"';
+    var control;
+    // Half points are allowed (mark_quiz_answer takes any amount from 0 to the question's points):
+    // a button for each half up to 4 points, a box above that.
+    if (worth <= 4 && worth * 2 === Math.round(worth * 2)) {
+      var steps = [];
+      for (var h = 0; h <= worth * 2; h++) steps.push(h / 2);
+      control =
+        '<span class="seg seg-sm" role="group" aria-label="' +
+        esc(label) +
+        '">' +
+        steps
+          .map(function (n) {
+            return (
+              '<button type="button" class="seg-btn" data-quiz-act="assess"' +
+              attrs +
+              ' data-points="' +
+              n +
+              '" aria-pressed="' +
+              (!over && given === n) +
+              '">' +
+              esc(_pts(n)) +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</span>';
+    } else
+      control =
+        '<input type="number" class="af-input quiz-assess-num" min="0" step="0.5" max="' +
+        worth +
+        '"' +
+        attrs +
+        ' value="' +
+        (given == null || over ? '' : given) +
+        '" aria-label="' +
+        esc(label) +
+        '"><span class="quiz-assess-label">' +
+        esc('of ' + _pts(worth)) +
+        '</span>';
     return (
-      '<div class="quiz-assess"><span class="quiz-assess-label">Points</span><span class="seg seg-sm" role="group" aria-label="' +
-      esc(label) +
-      '">' +
-      steps
-        .map(function (n) {
-          return (
-            '<button type="button" class="seg-btn" data-quiz-act="assess" data-attempt="' +
-            esc(t.attempt_id) +
-            '" data-q="' +
-            esc(q.id) +
-            '" data-points="' +
-            n +
-            '" aria-pressed="' +
-            (!over && given === n) +
-            '">' +
-            esc(_pts(n)) +
-            '</button>'
-          );
-        })
-        .join('') +
-      '</span>' +
+      '<div class="quiz-assess"><span class="quiz-assess-label">Points</span>' +
+      control +
       (over
         ? '<span class="quiz-hint">Assessed ' +
           esc(_pts(given || 0)) +
@@ -946,7 +997,25 @@ var QuizResults = (function () {
     if (el && el.focus) el.focus();
   }
 
-  function _confirm() {
+  /* A confirm never draws its primary button where the click that opened it
+     was: the card moves up out of the way when it would, as the Quiz card's
+     Delete does (teacher/quiz-builder.js, _keepClear). showConfirm itself is
+     not changed. */
+  /** @param {{ x: number, y: number } | null} at */
+  function _keepClear(at) {
+    if (!at) return;
+    var cards = document.querySelectorAll('.confirm-overlay .confirm-card');
+    var card = /** @type {HTMLElement | null} */ (cards[cards.length - 1] || null);
+    var ok = card && card.querySelector('.confirm-ok');
+    if (!card || !ok) return;
+    var r = ok.getBoundingClientRect();
+    if (at.x >= r.left - 8 && at.x <= r.right + 8 && at.y >= r.top - 8 && at.y <= r.bottom + 8) {
+      card.style.transform = 'translateY(' + -Math.ceil(card.getBoundingClientRect().height + 24) + 'px)';
+    }
+  }
+
+  /** @param {{ x: number, y: number } | null} at */
+  function _confirm(at) {
     var m = model(R.cid, R.aid, R.changes);
     if (!m || m.a.isDraft) return;
     var plan = G.GraderWork.quizConfirmPlan(R.cid, R.aid, confirmRows(m));
@@ -962,6 +1031,7 @@ var QuizResults = (function () {
       _draw();
       _focus('[data-quiz-act="undo"]');
     });
+    _keepClear(at);
   }
 
   function _undo() {
@@ -972,8 +1042,8 @@ var QuizResults = (function () {
     _focus('[data-quiz-act="confirm"]');
   }
 
-  /** @param {string} sid */
-  function _reopen(sid) {
+  /** @param {string} sid @param {{ x: number, y: number } | null} at */
+  function _reopen(sid, at) {
     var m = model(R.cid, R.aid, R.changes);
     if (!m || m.a.isDraft) return;
     var s = m.students.find(function (/** @type {any} */ x) {
@@ -1001,6 +1071,30 @@ var QuizResults = (function () {
         _draw();
       },
     );
+    _keepClear(at);
+  }
+
+  /* A Text answer's points typed in the box (above 4 points). Blank takes them away. */
+  /** @param {Event} e */
+  function _change(e) {
+    var el = /** @type {HTMLInputElement} */ (e.target);
+    if (!R || !el.classList || !el.classList.contains('quiz-assess-num')) return;
+    var max = Number(el.getAttribute('max')) || 0;
+    var text = String(el.value).trim();
+    var given = text === '' ? null : Number(text);
+    if (given != null && !(given >= 0 && given <= max)) {
+      el.setCustomValidity('Points are 0 to ' + max + ' on this question.');
+      el.reportValidity();
+      return;
+    }
+    el.setCustomValidity('');
+    var at = { attempt: el.getAttribute('data-attempt'), q: el.getAttribute('data-q') };
+    var mine = R;
+    G.QuizTries.mark(R.cid, R.aid, at.attempt, at.q, given, null).then(function () {
+      if (R !== mine) return;
+      _draw();
+      _focus('.quiz-assess-num[data-attempt="' + at.attempt + '"][data-q="' + at.q + '"]');
+    });
   }
 
   /** @param {MouseEvent} e */
@@ -1088,9 +1182,10 @@ var QuizResults = (function () {
       });
       return;
     }
-    if (act === 'confirm') return _confirm();
+    var point = e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : null;
+    if (act === 'confirm') return _confirm(point);
     if (act === 'undo') return _undo();
-    if (act === 'reopen') return _reopen(sid);
+    if (act === 'reopen') return _reopen(sid, point);
   }
 
   /** @param {KeyboardEvent} e */
@@ -1154,6 +1249,7 @@ var QuizResults = (function () {
       loading: true,
     };
     overlay.addEventListener('click', _click);
+    overlay.addEventListener('change', _change);
     document.addEventListener('keydown', _keydown);
     _draw();
     _focus('[data-quiz-view="competency"]');

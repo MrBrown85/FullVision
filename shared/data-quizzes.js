@@ -883,6 +883,8 @@ function quizLoadFacts(cid) {
 function forgetQuiz(cid, aid) {
   if (!cid || !aid) return;
   quizDropUnsent(cid, aid);
+  // What Confirm wrote on it (shared/data-quiz-tries.js), on any device.
+  if (typeof setQuizWritten === 'function') setQuizWritten(cid, aid, {});
   if (!_isDemoSession()) return;
   // Demo Mode's sent tries of it (shared/data-quiz-tries.js) go too.
   var tries = _safeParseLS('gb-quiz-tries-' + cid, null);

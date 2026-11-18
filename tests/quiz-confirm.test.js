@@ -373,7 +373,7 @@ describe('Confirm, one quiz at a time', () => {
     expect(plan.ask).toEqual({
       title: 'Confirm 7 Levels',
       message:
-        'Confirm 7 levels for 4 students on Light Check? They count toward each student’s grade. They stay drafts until you return them. 1 level already on this piece stays as it is. 2 students are marked Missing or Excused and left out.',
+        'Confirm 7 levels for 4 students on Light Check? They count toward each student’s grade. They stay drafts until you return them. 1 level you set on this piece stays as it is. 2 students are marked Missing or Excused and left out.',
       button: 'Confirm 7 Levels',
     });
     const done = Grader.confirmQuiz(CID, QC, plan);
@@ -443,6 +443,189 @@ describe('Confirm, one quiz at a time', () => {
     const m = QuizResults.model(CID, QC);
     expect(m.students.filter(s => s.changedSince).map(s => s.first)).toEqual(['Ava', 'Ben', 'Eli', 'Fay']);
     expect(grades()).toEqual(before);
+  });
+});
+
+/* A later try for one student, sent now, as the student page would send it. */
+function addTry(aid, name, row) {
+  const qs = QuizData.get(CID, aid).questions;
+  const all = JSON.parse(localStorage.getItem('gb-quiz-tries-' + CID));
+  const mine = all[aid][sid(name)];
+  mine.tries.push({
+    attempt_id: uuid(),
+    try: mine.tries.length + 1,
+    started_at: '2026-11-17T18:00:00.000Z',
+    sent_at: '2026-11-17T18:20:00.000Z',
+    reopened_at: null,
+    question_order: { questions: qs.map(x => x.id), choices: {} },
+    marked: null,
+    marked_at: null,
+    answers: qs.map((x, i) =>
+      Object.assign(
+        { question_id: x.id, saved_at: '2026-11-17T18:10:00.000Z', given_points: null, note: null },
+        answerOf(x, row[i]),
+      ),
+    ),
+  });
+  localStorage.setItem('gb-quiz-tries-' + CID, JSON.stringify(all));
+}
+const triesOf = (aid, name) => QuizTries.get(CID, aid).students.find(s => s.enrollment_id === sid(name)).tries;
+const markedOf = (aid, name) =>
+  triesOf(aid, name)
+    .filter(t => t.marked)
+    .map(t => 'try ' + t.try + ': ' + t.marked.earned + ' / ' + t.marked.possible);
+const planOf = (aid, changes) =>
+  GraderWork.quizConfirmPlan(CID, aid, QuizResults.confirmRows(QuizResults.model(CID, aid, changes)));
+
+describe('a student’s marking is stored only beside a score it agrees with (review, must fix 1)', () => {
+  it('Best: a better try after Confirm, a score the teacher changed by hand: the score and the marking both stay', () => {
+    seed('proficiency');
+    confirmOn(QP);
+    expect(getPointsScore(CID, sid('Fay'), QP)).toBe(6);
+    expect(markedOf(QP, 'Fay')).toEqual(['try 1: 6 / 8']);
+    // The teacher changes Fay's points by hand, then she sends a better try.
+    Grader.setPoints(CID, sid('Fay'), QP, 7);
+    addTry(QP, 'Fay', [1, 1, 2, 1]);
+    const plan = planOf(QP);
+    expect(plan.cells.filter(c => c.sid === sid('Fay'))).toEqual([]);
+    Grader.confirmQuiz(CID, QP, plan);
+    expect(getPointsScore(CID, sid('Fay'), QP)).toBe(7);
+    expect(markedOf(QP, 'Fay')).toEqual(['try 1: 6 / 8']);
+    expect(QuizResults.model(CID, QP).students.find(s => s.sid === sid('Fay')).changedSince).toBe(true);
+  });
+
+  it('a student whose total still waits gets no score and no marking', () => {
+    seed('proficiency');
+    confirmOn(QP);
+    expect(getPointsScore(CID, sid('Eli'), QP)).toBe(null);
+    expect(markedOf(QP, 'Eli')).toEqual([]);
+    // On the Competencies quiz, where his short answer is assessed, his levels and his marking are set together.
+    confirmOn(QC);
+    expect(levels(sid('Eli'), QC, T1)).not.toBe(null);
+    expect(markedOf(QC, 'Eli')).toEqual(['try 1: 6 / 10']);
+  });
+
+  it('a student whose every score is the teacher’s own gets their first marking only when nothing waits', () => {
+    seed('proficiency');
+    // Ava's levels set by hand before any Confirm.
+    Grader.setLevel(CID, sid('Ava'), QL, T1, 2, 0);
+    Grader.setLevel(CID, sid('Ava'), QL, T2, 4, 0);
+    const plan = planOf(QL);
+    expect(plan.cells.filter(c => c.sid === sid('Ava'))).toEqual([]);
+    Grader.confirmQuiz(CID, QL, plan);
+    expect(levels(sid('Ava'), QL, T1)).toEqual([2, 0]);
+    expect(markedOf(QL, 'Ava')).toEqual(['try 1: 5 / 6']);
+  });
+});
+
+describe('Confirm again (decision 14)', () => {
+  it('replaces what the earlier Confirm wrote when the suggestion moved, and asks in those words', () => {
+    seed('proficiency');
+    confirmOn(QP);
+    addTry(QP, 'Fay', [1, 1, 2, 1]);
+    const plan = planOf(QP);
+    expect(plan.cells.map(c => [c.sid.slice(3), c.points, c.replaces])).toEqual([['fay', 8, { score: 6, mod: 0 }]]);
+    expect(plan.ask.message).toBe(
+      'Confirm 1 score for 1 student on Growth Points Check, replacing what you confirmed before? It counts toward the student’s grade. It stays a draft until you return it. 1 score you set on this piece stays as it is. 2 students are marked Missing or Excused and left out. 1 score waits for a short answer to be assessed and is not included.',
+    );
+    const done = Grader.confirmQuiz(CID, QP, plan);
+    expect([done.set, done.replaced]).toEqual([1, 1]);
+    expect(getPointsScore(CID, sid('Fay'), QP)).toBe(8);
+    expect(markedOf(QP, 'Fay')).toEqual(['try 3: 8 / 8']);
+    expect(QuizResults.model(CID, QP).students.find(s => s.sid === sid('Fay')).changedSince).toBe(false);
+    // Undo: back to 6 and the first marking.
+    Grader.undoConfirmQuiz(CID, QP, done);
+    expect(getPointsScore(CID, sid('Fay'), QP)).toBe(6);
+    expect(markedOf(QP, 'Fay')).toEqual(['try 1: 6 / 8']);
+  });
+
+  it('counts the new and the replaced together, and Undo puts back both kinds', () => {
+    seed('proficiency');
+    const first = confirmOn(QL);
+    expect(first.done.set).toBe(8);
+    const before = grades();
+    // Ben sends again (Latest counts): his T2 moves from Emerging to Extending; Gus sends for the first time.
+    addTry(QL, 'Ben', [1, 1, 1, 1, 1, 1]);
+    const all = JSON.parse(localStorage.getItem('gb-quiz-tries-' + CID));
+    all[QL][sid('Gus')] = { tries: [] };
+    localStorage.setItem('gb-quiz-tries-' + CID, JSON.stringify(all));
+    addTry(QL, 'Gus', [1, 1, 1, 0, 0, 0]);
+    const plan = planOf(QL);
+    expect(plan.cells.map(c => c.sid.slice(3) + ' ' + c.key + (c.replaces ? ' replaces' : ''))).toEqual([
+      'ben qg-t2 replaces',
+      'gus qg-t1',
+      'gus qg-t2',
+    ]);
+    expect(
+      plan.ask.message.startsWith('Confirm 3 levels for 2 students on Patterns Practice, 1 of them replacing'),
+    ).toBe(true);
+    const done = Grader.confirmQuiz(CID, QL, plan);
+    expect(levels(sid('Ben'), QL, T2)).toEqual([4, 0]);
+    expect(levels(sid('Gus'), QL, T1)).toEqual([4, 0]);
+    Grader.undoConfirmQuiz(CID, QL, done);
+    expect(levels(sid('Ben'), QL, T2)).toEqual([1, 0]);
+    expect(levels(sid('Gus'), QL, T1) || [0, 0]).toEqual([0, 0]);
+    const undone = grades();
+    STUDENTS.forEach(st => expect(undone[st.id], st.firstName).toBe(before[st.id]));
+  });
+
+  it('never replaces a level the teacher changed by hand, and keeps a level stepped before confirming', () => {
+    seed('proficiency');
+    // Ava's T1 stepped from Extending down to Proficient + before the first Confirm.
+    const stepped = { [sid('Ava') + '|' + T1]: { level: 3, mod: 1 } };
+    Grader.confirmQuiz(CID, QL, planOf(QL, stepped));
+    expect(levels(sid('Ava'), QL, T1)).toEqual([3, 1]);
+    // Eli's T1 changed by hand after it.
+    Grader.setLevel(CID, sid('Eli'), QL, T1, 1, 0);
+    const again = planOf(QL);
+    expect(again.cells).toEqual([]);
+    expect(again.ask.title).toBe('Nothing to Confirm');
+    // Eli then sends again with T1 all right: his own level still stays.
+    addTry(QL, 'Eli', [1, 1, 1, 1, 1, 1]);
+    const plan = planOf(QL);
+    expect(plan.cells.filter(c => c.sid === sid('Eli') && c.key === T1)).toEqual([]);
+    expect(plan.cells.filter(c => c.sid === sid('Eli')).map(c => c.key)).toEqual([T2]);
+    Grader.confirmQuiz(CID, QL, plan);
+    expect(levels(sid('Eli'), QL, T1)).toEqual([1, 0]);
+    expect(levels(sid('Ava'), QL, T1)).toEqual([3, 1]);
+  });
+
+  it('the record of what Confirm wrote goes with Undo, so an undone score is not Confirm’s any more', () => {
+    seed('proficiency');
+    const { done } = confirmOn(QL);
+    expect(Object.keys(QuizTries.written(CID, QL))).toHaveLength(8);
+    Grader.undoConfirmQuiz(CID, QL, done);
+    expect(QuizTries.written(CID, QL)).toEqual({});
+  });
+});
+
+describe('the screen draws what the gradebook holds', () => {
+  it('on Points scoring, a confirmed or a teacher’s own score reads as calc.js reads the piece’s points', () => {
+    seed('proficiency');
+    const cellOf = (m, name) => m.students.find(s => s.sid === sid(name)).cells[0];
+    const before = QuizResults.model(CID, QP);
+    // Ben's own 5 points: solid, at the level calc.js gives 5 of 8, not the quiz total's.
+    const ben = cellOf(before, 'Ben');
+    expect(ben.held).toEqual({
+      level: assessmentCellValue(
+        CID,
+        sid('Ben'),
+        getAssessments(CID).find(a => a.id === QP),
+      ).level,
+      mod: 0,
+    });
+    expect(cellOf(before, 'Ava').held).toBe(null);
+    confirmOn(QP);
+    const after = QuizResults.model(CID, QP);
+    expect(cellOf(after, 'Ava').held).toEqual({ level: 4, mod: 0 });
+    // A better try after Confirm: still solid, with what it would now be.
+    addTry(QP, 'Fay', [1, 1, 2, 1]);
+    const fayLevel = assessmentCellValue(
+      CID,
+      sid('Fay'),
+      getAssessments(CID).find(a => a.id === QP),
+    ).level;
+    expect(cellOf(QuizResults.model(CID, QP), 'Fay')).toMatchObject({ held: { level: fayLevel, mod: 0 }, newer: true });
   });
 });
 
