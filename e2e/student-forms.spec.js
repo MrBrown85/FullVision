@@ -23,6 +23,8 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+  // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+  await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
   await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
   return posts;
 }
@@ -37,8 +39,8 @@ for (const size of [
     test('Reflect: Start opens the questions, and the page is one press away', async ({ page }) => {
       const posts = await demo(page);
       const tabs = page.locator(size.tag === 'phone' ? '.sp-tabs-bottom' : '.sp-tabs-top');
-      // Three tabs: no Reports.
-      await expect(tabs.locator('.sp-tab-label')).toHaveText(['Assignments', 'My Learning', 'Reflect']);
+      // Four tabs, Bulletins first (B1g): no Reports.
+      await expect(tabs.locator('.sp-tab-label')).toHaveText(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
       await tabs.getByRole('button', { name: 'Reflect' }).click();
       await expect(page.getByRole('heading', { level: 1, name: 'Reflect' })).toBeVisible();
       await expect(

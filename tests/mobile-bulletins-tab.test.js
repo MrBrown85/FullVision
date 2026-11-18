@@ -1,8 +1,7 @@
 /**
  * Bulletins on the phone (teacher-mobile/tab-bulletins.js, slice B1f): the
  * feed's model (kind, time, the Seen line, newest first), and the fourth tab,
- * present only with the build flag `bulletins` on, with a remembered
- * Bulletins falling back to Students when it is off.
+ * on since B1g whatever an old `fv-build-bulletins` key on the device says.
  */
 import './setup-mobile.js';
 import { readFileSync } from 'fs';
@@ -138,26 +137,24 @@ describe('the fourth tab', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
 
-  it('is in the bar, last, only with the build flag on', () => {
-    expect(MTabBar.tabs()).toEqual(['students', 'observe', 'grade']);
-    expect(MB.on()).toBe(false);
-    localStorage.setItem('fv-build-bulletins', '1');
-    expect(MTabBar.tabs()).toEqual(['students', 'observe', 'grade', 'bulletins']);
-    expect(MB.on()).toBe(true);
+  it('is in the bar, last (on since B1g), whatever an old fv-build-bulletins key says', () => {
+    for (const v of [null, '0', '1']) {
+      if (v === null) localStorage.removeItem('fv-build-bulletins');
+      else localStorage.setItem('fv-build-bulletins', v);
+      expect(MTabBar.tabs()).toEqual(['students', 'observe', 'grade', 'bulletins']);
+      expect(MB.on()).toBe(true);
+    }
   });
 
-  it('is remembered with the flag on, and a remembered Bulletins opens on Students with it off', () => {
-    localStorage.setItem('fv-build-bulletins', '1');
+  it('is remembered, and an old fv-build-bulletins key of 0 changes nothing', () => {
     MTabBar.remember('bulletins');
-    expect(MTabBar.saved()).toBe('bulletins');
-    localStorage.removeItem('fv-build-bulletins');
     expect(localStorage.getItem('td-mobile-tab')).toBe('bulletins');
-    expect(MTabBar.saved()).toBe('students');
-    MTabBar.remember('bulletins');
-    expect(MTabBar.saved()).toBe('students');
+    expect(MTabBar.saved()).toBe('bulletins');
+    localStorage.setItem('fv-build-bulletins', '0');
+    expect(MTabBar.saved()).toBe('bulletins');
   });
 
-  it('its button is in the bar only with the flag on: the page holds none, tab-bar.js adds it last', () => {
+  it('its button: the page holds none, tab-bar.js adds it last, once', () => {
     const html = readFileSync(resolve(root, 'teacher-mobile/index.html'), 'utf-8');
     const { document } = parseHTML(html);
     const tabs = () => [...document.querySelectorAll('#m-tab-bar .m-tab-item')].map(b => b.getAttribute('data-tab'));
@@ -166,14 +163,12 @@ describe('the fourth tab', () => {
     globalThis.document = document;
     try {
       MTabBar.paint('students');
-      expect(tabs()).toEqual(['students', 'observe', 'grade']);
-      localStorage.setItem('fv-build-bulletins', '1');
-      MTabBar.paint('students');
+      expect(tabs()).toEqual(['students', 'observe', 'grade', 'bulletins']);
       MTabBar.paint('students');
       expect(tabs()).toEqual(['students', 'observe', 'grade', 'bulletins']);
-      localStorage.removeItem('fv-build-bulletins');
+      localStorage.setItem('fv-build-bulletins', '0');
       MTabBar.paint('students');
-      expect(tabs()).toEqual(['students', 'observe', 'grade']);
+      expect(tabs()).toEqual(['students', 'observe', 'grade', 'bulletins']);
     } finally {
       globalThis.document = saved;
     }

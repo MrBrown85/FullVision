@@ -232,6 +232,8 @@ describe('Switching Classes: Settings', () => {
     await page.click('.sp-class[data-enrollment="' + CECE + '"]');
     expect(page.calls.map(c => c.body)).toEqual([
       { route: 'page', session: token, enrollment_id: CECE },
+      // Its bulletins, asked with its page (B1d).
+      { route: 'bulletins', session: token, enrollment_id: CECE },
       // What the class takes (s/send.js), once its page is in.
       { route: 'work', session: token, enrollment_id: CECE },
       // Its questionnaires, for Reflections (S4-F4).

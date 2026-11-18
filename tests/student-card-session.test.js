@@ -1028,7 +1028,8 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     page.fire('pointerdown');
     page.hide();
     page.show();
-    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(PAGE_UP);
+    // Still on the tab it opened on: the sample class has bulletins (B1g).
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
     expect(page.calls).toEqual([]);
     expect(page.store).toEqual({});
   });
@@ -1135,7 +1136,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
   it('drawing the list tells the server nothing; a row that comes on screen is told, once', async () => {
     const dev = school();
     const page = await signIn(dev);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
     // The rows that could be opened: returned, with a result drawn, not opened since they came back.
     expect(unseenRows(page)).toEqual([WORK.energy, WORK.quiz, WORK.lab, WORK.essay, WORK.kmt, WORK.contract]);
 
@@ -1187,7 +1188,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     // The browser reports the rows in view, but nobody is looking.
     page.onScreen(() => true);
     await readFor(page, 2000);
-    expect(routes(page)).toEqual(['page', 'work', 'forms']);
+    expect(routes(page)).toEqual(['page', 'bulletins', 'work', 'forms']);
     page.show();
     await readFor(page, 700);
     expect(seenCalls(page)).toEqual([[WORK.energy, WORK.quiz, WORK.lab, WORK.essay, WORK.kmt, WORK.contract]]);
@@ -1226,7 +1227,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     expect((await rowSubs(third))['Lab Safety Contract']).not.toMatch(/Updated/);
     expect(third.root().querySelectorAll('[data-unseen]')).toHaveLength(0);
     await scrollThroughAll(third);
-    expect(routes(third)).toEqual(['page', 'work', 'forms']);
+    expect(routes(third)).toEqual(['page', 'bulletins', 'work', 'forms']);
   });
 
   it('a piece is sent once per session, whatever the answer', async () => {
@@ -1253,7 +1254,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     expect(page.root().querySelector('.sp-no-results')).toBeTruthy();
     expect(unseenRows(page)).toEqual([]);
     await scrollThroughAll(page);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
     page.net.fail = () => false;
     await page.click('[data-act="grades-retry"]');
     await page.click(LEARNING);
@@ -1331,7 +1332,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     await readFor(page, 2000);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
     expect((await rowSubs(page))['Lab Safety Contract']).toMatch(/^Updated /);
   });
 
@@ -1360,7 +1361,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     page.advance(800);
     page.runTimers(); // any timer left behind
     await readFor(page, 2000);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'done']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'done']);
     expect(page.observers).toEqual([]);
   });
 });
@@ -1444,7 +1445,7 @@ describe('a DIBELS benchmark on a student’s page', () => {
     expect(page.root().querySelector('.sp-caught-up button')).toBeNull();
     expect(text(page)).not.toContain('Benchmark');
     await scrollThroughAll(page);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
   });
 });
 

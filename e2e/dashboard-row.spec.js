@@ -7,22 +7,28 @@
 import { test, expect } from '@playwright/test';
 import { FONTS, useFont } from './wide-font.js';
 
-async function openDashboard(page, { oldFlag = null, bulletins = false } = {}) {
+async function openDashboard(page, { oldFlag = null, tile = true } = {}) {
   await page.addInitScript(
-    ([oldFlag, bulletins]) => {
+    ([oldFlag]) => {
       try {
         // What a browser that saw the row before D9 may still have kept.
         if (oldFlag != null) localStorage.setItem('fv-build-dashRow', oldFlag);
-        if (bulletins) localStorage.setItem('fv-build-bulletins', '1');
       } catch (e) {
         /* storage blocked */
       }
     },
-    [oldFlag, bulletins],
+    [oldFlag],
   );
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
 }
 
 const box = (page, sel) =>
@@ -113,7 +119,9 @@ test('at 800 wide the tiles stack and nothing scrolls sideways', async ({ page }
   const left = await box(page, '.dash-row-left');
   const comp = await box(page, '.dash-comp-tile');
   expect(comp.top).toBeGreaterThanOrEqual(left.bottom + 11);
-  expect(Math.round(left.height)).toBe(450);
+  // The Inbox, then the Bulletins tile under it (300 px, dashboard-bulletins-tile.spec.js), 12 px apart.
+  expect(Math.round((await box(page, '.dash-row-inbox')).height)).toBe(450);
+  expect(Math.round(left.height)).toBe(450 + 12 + 300);
   expect(Math.round(comp.height)).toBe(520);
   const over = await page.evaluate(() => {
     const main = document.getElementById('main');
@@ -276,9 +284,9 @@ test('clicking a competency in the tile still filters the student cards', async 
   await expect(page.locator('#dash-comp-page-curricular')).toBeVisible();
 });
 
-test('with Bulletins on and built the left column splits 60 / 40', async ({ page }) => {
+test('with Bulletins built the left column splits 60 / 40', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await openDashboard(page, { bulletins: true });
+  await openDashboard(page);
   // A stand-in for the tile (the real one is tried in dashboard-bulletins-tile.spec.js): define it, then draw again.
   await page.evaluate(() => {
     window.DashBulletins = {
@@ -294,9 +302,9 @@ test('with Bulletins on and built the left column splits 60 / 40', async ({ page
   expect(Math.round(bull.top - inbox.bottom)).toBe(12);
 });
 
-test('without Bulletins the Inbox slot has the whole column', async ({ page }) => {
+test('with no Bulletins tile the Inbox slot has the whole column', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await openDashboard(page);
+  await openDashboard(page, { tile: false });
   await expect(page.locator('.dash-row-bulletins')).toHaveCount(0);
   const inbox = await box(page, '.dash-row-inbox');
   const left = await box(page, '.dash-row-left');
@@ -357,7 +365,7 @@ test('with a question waiting the row starts lower, the page scrolls to its foot
   await page.waitForTimeout(200);
   const m = await page.evaluate(() => {
     const row = document.querySelector('.dash-row').getBoundingClientRect();
-    const tiles = ['#dash-inbox', '.dash-comp-tile'].map(s =>
+    const tiles = ['#dash-inbox', '.dash-bulletins-tile', '.dash-comp-tile'].map(s =>
       Math.round(document.querySelector(s).getBoundingClientRect().height),
     );
     const main = document.getElementById('main');
@@ -372,10 +380,11 @@ test('with a question waiting the row starts lower, the page scrolls to its foot
       ],
     };
   });
-  // The whole row can be brought into view, and both tiles are the row's full height.
+  // The whole row can be brought into view: the Inbox and the Bulletins tile under it share the left column
+  // (299 and 199 px, 12 apart), and Competencies is the row's full height.
   expect(m.rowBottom).toBeLessThanOrEqual(m.winH + 0.5);
   expect(m.rowTop).toBeGreaterThanOrEqual(0);
-  expect(m.tiles).toEqual([510, 510]);
+  expect(m.tiles).toEqual([299, 199, 510]);
   expect(m.sideways).toEqual([0, 0]);
   // The Students heading follows the row, 12 px under it.
   const heading = await box(page, '.dash-students-head');
