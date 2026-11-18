@@ -397,7 +397,10 @@ window.DashOverview = (function () {
     { key: 'below', label: 'Needs Support', hint: 'Students below {level} most often, and where' },
     { key: 'trend', label: 'Change', hint: 'The class average month by month' },
   ];
+  // Needs Support shows seven students with no script; the Competencies tile
+  // shows as many as fit (DashCompetencies.fit), from up to COMP_SUPPORT_MAX.
   var COMP_SUPPORT_ROWS = 7;
+  var COMP_SUPPORT_MAX = 40;
   // Past this many rows the list scrolls inside the card (plan F.1).
   var COMP_MAX_ROWS = 12;
   // With this many rows or fewer the card is roomier (plan F.2).
@@ -561,7 +564,7 @@ window.DashOverview = (function () {
   // dashboard.css swaps in the chips below 14 px a column).
   function _compSupportRows(cid, cols, people, level, codes, cells) {
     var html = '';
-    people.slice(0, COMP_SUPPORT_ROWS).forEach(function (p) {
+    people.slice(0, COMP_SUPPORT_MAX).forEach(function (p, i) {
       var st = p.student;
       var name = DashObservations.rowName(st);
       var full = displayNameWithLast(st);
@@ -594,7 +597,9 @@ window.DashOverview = (function () {
           '</span>'
         : '';
       html +=
-        '<a class="dash-comp-row is-student" role="link" tabindex="0" data-href="/student?id=' +
+        '<a class="dash-comp-row is-student' +
+        (i >= COMP_SUPPORT_ROWS ? ' is-extra' : '') +
+        '" role="link" tabindex="0" data-href="/student?id=' +
         esc(st.id) +
         '&course=' +
         esc(cid) +
@@ -620,10 +625,12 @@ window.DashOverview = (function () {
         '</span></span></a>';
     });
     var more = people.length - COMP_SUPPORT_ROWS;
-    if (more > 0)
+    if (people.length)
       html +=
-        '<button type="button" class="dash-comp-more" data-action="studentView" data-view="grid">+' +
-        more +
+        '<button type="button" class="dash-comp-more" data-action="studentView" data-view="grid"' +
+        (more > 0 ? '' : ' hidden') +
+        '>+' +
+        Math.max(0, more) +
         ' more</button>';
     if (!people.length)
       html +=

@@ -380,17 +380,18 @@ window.DashInboxSide = (function () {
     return left + _h * RATIO > row.scrollLeft - w / 2 && left < row.scrollLeft + w * 1.5;
   }
 
-  // A thumbnail's long side is 400 px (shared/photo-shrink.js): past this
-  // height a page asks for the whole page, the thumbnail standing in until
-  // it is in, so a tall row's pages are sharp.
-  var SHARP_AT = 300;
+  // A thumbnail's long side is 400 px (shared/photo-shrink.js): only where a
+  // page is drawn with more device pixels than that does it ask for the whole
+  // page, the thumbnail standing in until it is in. A normal-density screen
+  // keeps the thumbnails (review of #1603: a class's whole pages are MBs).
+  var THUMB_PX = 400;
 
   /** @param {Element} root @param {string} cid */
   function _fill(root, cid) {
     var row = _row(root);
     var pics = window.DashInbox && DashInbox.pics();
     if (!row || !pics) return;
-    if (_h > SHARP_AT)
+    if (_h * (window.devicePixelRatio || 1) > THUMB_PX)
       row.querySelectorAll('img[data-dash-side-pic]:not([src])').forEach(function (img) {
         img.setAttribute('data-work-which', 'page');
         img.setAttribute('data-work-first', 'thumb');

@@ -94,7 +94,9 @@
   min-height: 52px;
 }
 .dash-inbox-pics {
-  --dash-inbox-pic-h: clamp(88px, 100cqh, calc((40cqw - 48px) / 0.75));
+  /* Never taller than about two rows' worth (196 px), so one piece alone is
+     not one large, soft thumbnail (a thumbnail's long side is 400 px). */
+  --dash-inbox-pic-h: clamp(88px, 100cqh, min(196px, calc((40cqw - 48px) / 0.75)));
   position: relative;
   width: calc(var(--dash-inbox-pic-h) * 0.75 + 48px);
   height: var(--dash-inbox-pic-h);
@@ -308,22 +310,24 @@
   box-sizing: border-box;
   padding: 2px 0 0;
 }
+/* As board E1: "All Caught Up" on its line, then "Add Work For" and a chip
+   a piece, the chosen one blue. */
 .dash-inbox-drop-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.dash-inbox-drop-caught {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-inbox-drop-for {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px 12px;
-}
-.dash-inbox-drop-caught {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-2);
-}
-.dash-inbox-drop-for {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   min-width: 0;
   max-width: 100%;
   font-size: var(--text-sm);
@@ -337,18 +341,30 @@
   font-weight: 600;
   color: var(--text);
 }
-.dash-inbox-drop-select {
+.dash-inbox-drop-chip {
   min-width: 0;
   max-width: 260px;
-  height: 30px;
-  padding: 0 8px;
+  height: 26px;
+  padding: 0 10px;
+  overflow: hidden;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
   color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 13px;
+  cursor: pointer;
+}
+.dash-inbox-drop-chip:hover {
+  background: var(--overlay-hover);
+}
+.dash-inbox-drop-chip[aria-checked='true'] {
+  font-weight: 600;
+  color: var(--link);
+  background: var(--active-light);
+  border-color: var(--active);
 }
 .dash-inbox-drop-area {
   flex: 1 1 auto;
@@ -356,7 +372,7 @@
   cursor: pointer;
 }
 .dash-inbox-drop-pick:focus-visible,
-.dash-inbox-drop-select:focus-visible,
+.dash-inbox-drop-chip:focus-visible,
 .dash-inbox-drop-wall:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;

@@ -1353,7 +1353,9 @@ describe('dash-comp-views', () => {
           const many = Array.from({ length: 9 }, (_, i) => ({ id: 'm' + i, firstName: 'M' + i, lastName: 'Z' }));
           const lists = [{ col: DashInsights.columns(CID)[0], ids: many.map(s => s.id), values: {} }];
           const el = dom(card({ compView: 'below', allStudents: many, belowLists: lists }));
-          expect(el.querySelectorAll('.dash-comp-row.is-student')).toHaveLength(7);
+          // Every student is drawn; seven show until the tile fits as many as it has room for.
+          expect(el.querySelectorAll('.dash-comp-row.is-student')).toHaveLength(9);
+          expect(el.querySelectorAll('.dash-comp-row.is-student:not(.is-extra)')).toHaveLength(7);
           const more = el.querySelector('.dash-comp-more');
           expect(more.textContent).toBe('+2 more');
           expect(more.getAttribute('data-action')).toBe('studentView');

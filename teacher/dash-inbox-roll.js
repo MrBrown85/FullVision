@@ -34,6 +34,10 @@ window.DashInboxRoll = (function () {
   // A page chip's name line under the picture, in pixels.
   var LABEL = 20;
   var COLS = [9, 7];
+  // A name chip: its least height and width, and the gap between chips.
+  var NAME_H = 28;
+  var NAME_W = 76;
+  var NAME_GAP = 6;
 
   /** @type {{ sid: string, aid: string } | null} */
   var _menu = null;
@@ -441,6 +445,8 @@ window.DashInboxRoll = (function () {
       })
         ? '<span class="dash-inbox-roll-key">' + TICK + 'Returned</span>'
         : '') +
+      // "+N more": shown by _fitNames only when the class cannot all show.
+      '<button type="button" class="dash-inbox-roll-more" data-dash-roll="more" hidden></button>' +
       all +
       '</div></div>'
     );
@@ -551,6 +557,11 @@ window.DashInboxRoll = (function () {
       var el = t && t.closest && t.closest('[data-dash-roll]');
       if (!el || !root.contains(el) || _graderOpen()) return;
       var what = el.getAttribute('data-dash-roll');
+      if (what === 'more') {
+        var g = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-grid'));
+        if (g) g.scrollBy({ top: g.clientHeight + NAME_GAP, behavior: 'smooth' });
+        return;
+      }
       if (what === 'all') {
         var a = _piece(cid, aid);
         if (window.AddWorkClass && a && AddWorkClass.offered(cid, a)) AddWorkClass.open(cid, aid, { onClose: _redraw });
@@ -631,7 +642,15 @@ window.DashInboxRoll = (function () {
     if (!grid) return false;
     var h = tile.getBoundingClientRect().height;
     if (!h) return false;
-    var form = formFor(h);
+    var m = root.getBoundingClientRect();
+    var top = grid.getBoundingClientRect().top - m.top;
+    var foot = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-foot'));
+    var room = Math.floor(m.height - top - (foot ? foot.offsetHeight : 0) - 8);
+    var n = root.querySelectorAll('.dash-inbox-roll-chip').length;
+    var w = grid.clientWidth || 629;
+    // Pages only where the whole class fits at MIN_PAGE or more: a page the
+    // tile cannot show is never hidden under its foot (review of #1603).
+    var form = formFor(h) === 'pages' && room > 0 && !layoutFor(n, w, room).scrolls ? 'pages' : 'names';
     var drawn = root.classList.contains('is-pages') ? 'pages' : 'names';
     if (form !== drawn) {
       _form = form;
@@ -640,16 +659,40 @@ window.DashInboxRoll = (function () {
     }
     _form = form;
     if (form === 'pages') {
-      var m = root.getBoundingClientRect();
-      var top = grid.getBoundingClientRect().top - m.top;
-      var foot = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-foot'));
-      var room = m.height - top - (foot ? foot.offsetHeight : 0) - 8;
-      var n = root.querySelectorAll('.dash-inbox-roll-chip').length;
-      var lay = layoutFor(n, grid.clientWidth || 629, room > 0 ? room : 120);
+      var lay = layoutFor(n, w, room > 0 ? room : 120);
       grid.style.setProperty('--dash-inbox-roll-cols', String(lay.cols));
       grid.style.setProperty('--dash-inbox-roll-pg', lay.pageH + 'px');
-    }
+    } else _fitNames(root, grid, n, w, room);
     return false;
+  }
+
+  /** The names grid: as many columns as it takes for every name to show
+   * whole in the room there is (seven at least, as board C4 draws it), each
+   * name at least NAME_W wide. Where even that cannot hold the class, the
+   * grid shows whole rows only and the foot says "+N more", which scrolls to
+   * them; no row is ever cut by the grid's edge.
+   * @param {HTMLElement} root @param {HTMLElement} grid @param {number} n
+   * @param {number} w @param {number} room */
+  function _fitNames(root, grid, n, w, room) {
+    var more = /** @type {HTMLElement | null} */ (root.querySelector('[data-dash-roll="more"]'));
+    var rowsFit = Math.max(1, Math.floor((room + NAME_GAP) / (NAME_H + NAME_GAP)));
+    var maxCols = Math.max(1, Math.floor((w + NAME_GAP) / (NAME_W + NAME_GAP)));
+    var cols = Math.min(maxCols, Math.max(Math.min(n, 7), Math.ceil(n / rowsFit)));
+    var rows = Math.max(1, Math.ceil(n / cols));
+    grid.style.setProperty('--dash-inbox-roll-cols', String(cols));
+    if (rows <= rowsFit) {
+      grid.style.removeProperty('max-height');
+      grid.classList.remove('is-clipped');
+      if (more) more.hidden = true;
+      return;
+    }
+    // Whole rows only, the rest one scroll away.
+    grid.style.maxHeight = rowsFit * (NAME_H + NAME_GAP) - NAME_GAP + 'px';
+    grid.classList.add('is-clipped');
+    if (more) {
+      more.hidden = false;
+      more.textContent = '+' + (n - rowsFit * cols) + ' more';
+    }
   }
 
   /** Draws this view again where it stands, in the other form.

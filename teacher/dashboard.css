@@ -930,6 +930,10 @@ a.dash-glance-cell:hover {
   color: var(--link);
   cursor: pointer;
 }
+.dash-comp-row.is-extra,
+.dash-comp-more[hidden] {
+  display: none;
+}
 .dash-comp-more:hover {
   text-decoration: underline;
 }
@@ -8886,17 +8890,17 @@ button.rb-v-prompt {
   border-radius: 0;
   box-shadow: none;
 }
-/* In the tile every view's rows share the page's whole height, as Level Mix's
-   do (board D; "each fills the tile's height"), so no view leaves a band of
-   empty tile under its list. The old cards' 44 and 64 px tops held two cards
-   to one height; the tile is as tall as the row. */
+/* In the tile every view's rows share the page's height, as Level Mix's do
+   (board D), never more than 72 px apart (review of #1603: spreading the
+   rows is the empty space moved between them). Needs Support shows as many
+   students as fit instead (DashCompetencies.fit). */
 .dash-comp-tile .dash-comp-row,
 .dash-comp-tile .dash-comp-card.is-roomy .dash-comp-row,
 .dash-comp-tile .dash-core-row {
-  max-height: none;
+  max-height: 72px;
 }
 .dash-comp-tile .dash-core-group {
-  max-height: none;
+  max-height: calc(var(--core-rows, 1) * 72px);
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-comp-track,

@@ -426,19 +426,52 @@ window.DashInbox = (function () {
   }
 
   /* ── A row's words fit its height ──────────────────────────
-     A row is 109 px. Where its words column is narrow (the window's
+     A row is at least 109 px. Where its words column is narrow (the window's
      narrowest desktop widths, the roster shown beside it) and the counts
      line wraps to a third line (Late, You Added and on paper all at once),
      the words ran 3 to 17 px past the row. Then the row leaves out its
      "Newest:" line, the one line that says nothing the counts and the
      pictures do not; in a wider font, if that is not enough, the quiet words
-     go too. The counts and Late are never cut. Fitted after each draw and
-     whenever the tile changes width. */
+     go too. The counts and Late are never cut. Fitted, and the rows shared
+     out (shareRows), after each draw and whenever the tile changes size. */
   /** @type {ResizeObserver | null} */
   var _fitWatch = null;
 
+  /* ── The rows share the list's height ─────────────────────
+     As many whole rows as fit at their least (109 px for a row with pages,
+     a slim row and the fold line at their own height) share the list's
+     height; the rest keep their least and scroll. So the last row in view
+     ends on the list's edge, never cut through its words (review of #1603),
+     and one or two pieces still fill the tile as board A draws them. */
+  /** @param {ParentNode} root */
+  function shareRows(root) {
+    var list = /** @type {HTMLElement | null} */ (root.querySelector('#dash-inbox-list'));
+    if (!list || typeof getComputedStyle !== 'function') return;
+    var items = /** @type {HTMLElement[]} */ (Array.prototype.slice.call(list.children));
+    var page = function (/** @type {HTMLElement} */ el) {
+      return el.classList.contains('dash-inbox-row') && !el.classList.contains('is-slim');
+    };
+    items.forEach(function (el) {
+      if (page(el)) el.style.flex = '';
+    });
+    var room = list.clientHeight;
+    if (!room) return;
+    var least = items.map(function (el) {
+      return page(el) ? parseFloat(getComputedStyle(el).minHeight) || 109 : el.offsetHeight;
+    });
+    var used = 0;
+    var fit = 0;
+    while (fit < items.length && used + least[fit] <= room + 0.5) used += least[fit++];
+    var shared = items.slice(0, fit).filter(page).length;
+    var each = shared ? (room - used) / shared : 0;
+    items.forEach(function (el, i) {
+      if (page(el)) el.style.flex = '0 0 ' + (least[i] + (i < fit ? each : 0)) + 'px';
+    });
+  }
+
   /** @param {ParentNode} root */
   function fitRows(root) {
+    shareRows(root);
     root.querySelectorAll('.dash-inbox-row:not(.is-slim)').forEach(function (/** @type {any} */ row) {
       row.classList.remove('is-tight', 'is-tighter');
       var info = row.querySelector('.dash-inbox-info');
@@ -487,11 +520,11 @@ window.DashInbox = (function () {
     fitRows(tile);
     // Only By Assessment has rows; another view needs no watch.
     if (typeof ResizeObserver === 'undefined' || !tile.querySelector('.dash-inbox-row:not(.is-slim)')) return;
-    var width = tile.getBoundingClientRect().width;
+    var was = tile.getBoundingClientRect();
     _fitWatch = new ResizeObserver(function () {
-      var now = tile.getBoundingClientRect().width;
-      if (Math.abs(now - width) < 0.5) return;
-      width = now;
+      var now = tile.getBoundingClientRect();
+      if (Math.abs(now.width - was.width) < 0.5 && Math.abs(now.height - was.height) < 0.5) return;
+      was = now;
       fitRows(tile);
     });
     _fitWatch.observe(tile);
@@ -669,6 +702,7 @@ window.DashInbox = (function () {
 
   var api = {
     fitRows: fitRows,
+    shareRows: shareRows,
     configure: configure,
     addView: addView,
     setView: setView,

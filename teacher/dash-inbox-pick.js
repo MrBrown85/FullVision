@@ -244,10 +244,37 @@ window.DashInboxPick = (function () {
       e.preventDefault();
       next.focus();
     };
+    var box = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-pick'));
+    /* A mouse wheel turned over the switch scrolls it sideways: most mice
+       have no sideways wheel, and the pieces past the edge are reached. A
+       wheel at either end, or one the switch cannot use, scrolls the page. */
+    /** @param {WheelEvent} e */
+    var wheel = function (e) {
+      if (!box || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      var max = box.scrollWidth - box.clientWidth;
+      if (max <= 0) return;
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * box.clientWidth : e.deltaY;
+      var to = Math.max(0, Math.min(max, box.scrollLeft + dy));
+      if (to === box.scrollLeft) return;
+      e.preventDefault();
+      box.scrollLeft = to;
+    };
+    // The edges fade where more pieces are out of sight.
+    var edges = function () {
+      if (!box) return;
+      var max = box.scrollWidth - box.clientWidth;
+      box.classList.toggle('is-more-before', max > 1 && box.scrollLeft > 1);
+      box.classList.toggle('is-more-after', max > 1 && box.scrollLeft < max - 1);
+    };
     root.addEventListener('click', click);
     root.addEventListener('keydown', /** @type {any} */ (key));
-    _bound.set(root, { click: click, key: key });
+    if (box) {
+      box.addEventListener('wheel', wheel, { passive: false });
+      box.addEventListener('scroll', edges, { passive: true });
+    }
+    _bound.set(root, { click: click, key: key, box: box, wheel: wheel, edges: edges });
     _showCurrent(root);
+    edges();
     if (_refocus) {
       _refocus = false;
       var on = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-pick-btn[aria-pressed="true"]'));
@@ -261,6 +288,10 @@ window.DashInboxPick = (function () {
     if (!h) return;
     root.removeEventListener('click', h.click);
     root.removeEventListener('keydown', h.key);
+    if (h.box) {
+      h.box.removeEventListener('wheel', h.wheel);
+      h.box.removeEventListener('scroll', h.edges);
+    }
     _bound.delete(root);
   }
 

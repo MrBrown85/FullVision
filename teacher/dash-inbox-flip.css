@@ -188,7 +188,7 @@
   flex: 0 0 auto;
 }
 /* The board's caption reads as one line of words: "Sat 3:30 pm · 1 page". */
-.dash-inbox-flip-meta > span + span::before {
+.dash-inbox-flip-meta > span:not(.dash-inbox-flip-pager) + span:not(.dash-inbox-flip-pager)::before {
   content: '·';
   margin-right: 5px;
   font-weight: 400;
