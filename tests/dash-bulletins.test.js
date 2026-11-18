@@ -168,7 +168,7 @@ describe('the tile', () => {
     expect(out).toContain('data-dash-bulletins-go="/bulletins?course=sci8&amp;write=1">Write a Bulletin');
     expect(out).toContain('data-href="/bulletins?course=sci8">Open Bulletins →');
     // The row's accessible name holds the full words.
-    expect(out).toMatch(/aria-label="Reminder: Lab safety form/);
+    expect(out).toMatch(/aria-label="Reminder( · Until [A-Z][a-z]{2})?: Lab safety form/);
   });
 
   it('empty: Nothing Posted Yet and one sentence; no rows', () => {
@@ -327,6 +327,8 @@ describe('the tile', () => {
     const r = b('r', { kind: 'reminder', pinned: true, pinned_until: '2026-11-19' });
     expect(H.untilText(r)).toBe(' · Until Thu');
     expect(H.rowHtml(H.rowModel(r, 'sci8', now))).toContain('data-until=" · Until Thu"');
+    // The end day is in the words link's accessible name, not only in generated text.
+    expect(H.rowHtml(H.rowModel(r, 'sci8', now))).toContain('aria-label="Reminder · Until Thu: Words r');
     expect(H.untilText(b('a'))).toBe('');
     expect(H.rowHtml(H.rowModel(b('a'), 'sci8', now))).not.toContain('data-until');
   });

@@ -12,7 +12,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  padding: 12px 16px;
+  padding: 16px 20px;
   background: var(--surface);
   border: 1px solid var(--divider-strong);
   border-radius: 12px;
@@ -29,13 +29,16 @@
   align-items: center;
   gap: 8px;
   height: 32px;
+  margin-bottom: 8px;
 }
 .dash-bulletins-title {
   margin: 0;
   font: inherit;
-  font-size: var(--text-md);
+  font-size: 16px;
+  line-height: 26px;
   font-weight: 600;
   color: var(--text);
+  white-space: nowrap;
 }
 .dash-bulletins-sub {
   min-width: 0;
@@ -60,19 +63,24 @@
   padding: 0;
   font: inherit;
   font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--link);
   cursor: pointer;
   text-decoration: none;
 }
+/* Seen by is 16 px tall on the artboard; 4 px of padding above and below, taken back by the margin, answers a press too: the target is 24 px or more and nothing moves. */
+.dash-bulletins-seen:not(.dash-bulletins-pending) {
+  padding: 4px 0;
+  margin: -4px 0;
+}
 /* Write a Bulletin is the app's secondary button (btn btn-ghost), in the link colour as on the artboard. */
 .dash-bulletins-tile .dash-bulletins-write {
   color: var(--link);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 500;
   min-height: 32px;
-  padding: 6px 14px;
+  padding: 8px 16px;
 }
-.dash-bulletins-open:hover,
 .dash-bulletins-open:hover,
 .dash-bulletins-seen:hover,
 .dash-bulletins-words:hover {
@@ -102,13 +110,18 @@
   box-sizing: border-box;
   min-height: 0;
   border-top: 1px solid var(--divider-subtle);
+  border-radius: 6px;
+}
+.dash-bulletins-row:first-child {
+  border-top-color: transparent;
 }
 .dash-bulletins-kind {
   justify-self: start;
-  padding: 1px 7px;
+  padding: 0 6px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: var(--divider-subtle);
+  line-height: 1.45;
   font-size: var(--text-xs, 12px);
   font-weight: 600;
   color: var(--text-2);
@@ -185,27 +198,27 @@
   white-space: nowrap;
 }
 /* Rows share the height under the header, each at least 40 px (48 on an iPad) so two lines of words fit; a row that would be thinner is not drawn, so none is ever cut and the spare is under one row's share. The container's height is the tile less its padding and border; the header is 32 px (44 on an iPad). */
-@container dash-bulletins (max-height: 231.99px) {
+@container dash-bulletins (max-height: 239.99px) {
   .dash-bulletins-row:nth-child(5) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 191.99px) {
+@container dash-bulletins (max-height: 199.99px) {
   .dash-bulletins-row:nth-child(4) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 151.99px) {
+@container dash-bulletins (max-height: 159.99px) {
   .dash-bulletins-row:nth-child(3) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 111.99px) {
+@container dash-bulletins (max-height: 119.99px) {
   .dash-bulletins-row:nth-child(2) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 71.99px) {
+@container dash-bulletins (max-height: 79.99px) {
   .dash-bulletins-row:nth-child(1) {
     display: none;
   }
@@ -221,6 +234,8 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-write {
 html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-open,
 html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-seen {
   min-height: 44px;
+  padding: 0;
+  margin: 0;
 }
 html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-words {
   display: -webkit-box;
@@ -236,27 +251,27 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-rows {
 html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
   height: auto;
 }
-@container dash-bulletins (max-height: 283.99px) {
+@container dash-bulletins (max-height: 291.99px) {
   html.fv-tablet .dash-bulletins-row:nth-child(5) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 235.99px) {
+@container dash-bulletins (max-height: 243.99px) {
   html.fv-tablet .dash-bulletins-row:nth-child(4) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 187.99px) {
+@container dash-bulletins (max-height: 195.99px) {
   html.fv-tablet .dash-bulletins-row:nth-child(3) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 139.99px) {
+@container dash-bulletins (max-height: 147.99px) {
   html.fv-tablet .dash-bulletins-row:nth-child(2) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 91.99px) {
+@container dash-bulletins (max-height: 99.99px) {
   html.fv-tablet .dash-bulletins-row:nth-child(1) {
     display: none;
   }
@@ -283,12 +298,12 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     display: none;
   }
 }
-/* Wide: three cards side by side (label and time on top, two lines of words, Seen by), the buttons in a foot, the class's name in the subtitle. A card needs about 280 px across and 98 px down, so under 900 px, or under 175 px of height, the tile stays in rows. On an iPad every control is 44 px, so a card needs 250 px of height. */
-@container dash-bulletins (min-width: 900px) and (min-height: 175px) {
+/* Wide: three cards side by side (label and time on top, two lines of words, Seen by), the buttons in a foot, the class's name in the subtitle. A card needs about 280 px across and 92 px down, so under 860 px, or under 168 px of height, the tile stays in rows. On an iPad every control is 44 px, so a card needs 250 px of height. */
+@container dash-bulletins (min-width: 860px) and (min-height: 168px) {
   html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-head {
     grid-column: 1 / -1;
-    height: 24px;
-    margin-bottom: 6px;
+    height: 26px;
+    margin-bottom: 8px;
   }
   html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-cls {
     display: inline;
@@ -301,7 +316,6 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     border-top: 1px solid var(--divider-subtle);
   }
   html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-rows {
-    margin-bottom: 6px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     column-gap: 12px;
     grid-auto-rows: minmax(0, 1fr);
@@ -310,7 +324,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     grid-column: auto;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    row-gap: 4px;
+    row-gap: 3px;
     box-sizing: border-box;
     padding: 6px 12px;
     border: 1px solid var(--divider-subtle);
@@ -344,13 +358,14 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     grid-row: 3;
     justify-self: start;
     text-align: left;
+    line-height: 16px;
   }
 }
-@container dash-bulletins (min-width: 900px) and (min-height: 250px) {
+@container dash-bulletins (min-width: 860px) and (min-height: 250px) {
   html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-head {
     grid-column: 1 / -1;
-    height: 24px;
-    margin-bottom: 6px;
+    height: 26px;
+    margin-bottom: 8px;
   }
   html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-cls {
     display: inline;
@@ -363,7 +378,6 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     border-top: 1px solid var(--divider-subtle);
   }
   html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-rows {
-    margin-bottom: 6px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     column-gap: 12px;
     grid-auto-rows: minmax(0, 1fr);
@@ -372,7 +386,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     grid-column: auto;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    row-gap: 4px;
+    row-gap: 3px;
     box-sizing: border-box;
     padding: 6px 12px;
     border: 1px solid var(--divider-subtle);
@@ -406,6 +420,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     grid-row: 3;
     justify-self: start;
     text-align: left;
+    line-height: 16px;
   }
   html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-seen {
     justify-content: flex-start;

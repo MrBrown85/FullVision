@@ -32,6 +32,10 @@
   var _drawing = false;
   var _lastHtml = '';
   var _timer = 0;
+  /** Watches the drawn tile's size so the buttons' place in the page follows the form it is in. @type {any} */
+  var _ro = null;
+  /** A move of the buttons was put off because one had focus: it is made when focus leaves. */
+  var _again = false;
   /** The tile has become available while there is no slot for it: the row is drawn once more when nothing is open. */
   var _wantRow = false;
   var _retry = 0;
@@ -201,7 +205,7 @@
 
   /** @param {ReturnType<typeof rowModel>} r */
   function _rowHtml(r) {
-    var aria = r.kind + ': ' + (r.allWords || r.words) + (r.timeFull ? ', ' + r.timeFull : '');
+    var aria = r.kind + r.until + ': ' + (r.allWords || r.words) + (r.timeFull ? ', ' + r.timeFull : '');
     var seen = r.stalled
       ? '<span class="dash-bulletins-seen dash-bulletins-pending">Didn&#39;t Finish Uploading</span>'
       : r.waiting
@@ -351,19 +355,46 @@
     _lastHtml = next;
     // html-safe: tileHtml escapes every word, name and address; the rest is fixed markup.
     slot.innerHTML = next;
-    _order();
+    _watch();
   }
 
-  /** Keeps the keyboard and screen-reader order the same as the screen: in the wide form the two buttons sit in a foot under the cards, so they follow the cards in the page; in rows they sit in the header, so they come first. The CSS says which (the foot is grid row 3). Nothing moves while a button has focus. */
+  /** Keeps the keyboard and screen-reader order the same as the screen: in the wide form the two buttons sit in a foot under the cards, so they follow the cards in the page; in rows they sit in the header, so they come first. The CSS says which (the foot is grid row 3). Nothing moves while a button has focus: the move is made when focus leaves. */
   function _order() {
     var t = document.querySelector('.dash-bulletins-tile');
     if (!t) return;
     var a = t.querySelector('.dash-bulletins-actions');
     var l = t.querySelector('.dash-bulletins-rows, .dash-bulletins-none');
-    if (!a || !l || a.contains(document.activeElement)) return;
+    if (!a || !l) return;
     var foot = getComputedStyle(a).gridRowStart === '3';
-    if (foot && a.previousElementSibling !== l) t.appendChild(a);
-    else if (!foot && l.previousElementSibling !== a) t.insertBefore(a, l);
+    var placed = foot ? a.previousElementSibling === l : l.previousElementSibling === a;
+    if (placed) {
+      _again = false;
+      return;
+    }
+    if (a.contains(document.activeElement)) {
+      _again = true;
+      return;
+    }
+    _again = false;
+    if (foot) t.appendChild(a);
+    else t.insertBefore(a, l);
+  }
+
+  /** Focus left something: a move that was put off is made. */
+  function _onFocusOut() {
+    if (_again) window.setTimeout(_order, 0);
+  }
+
+  /** Watches the tile now on the page (the one just drawn), and only that one: the last tile's watch is dropped first. Sets the order once. */
+  function _watch() {
+    if (_ro) _ro.disconnect();
+    _ro = null;
+    var t = document.querySelector('.dash-bulletins-tile');
+    if (t && typeof ResizeObserver === 'function') {
+      _ro = new ResizeObserver(_order);
+      _ro.observe(t);
+    }
+    _order();
   }
 
   /** A press on Write a Bulletin or Seen by opens that address in the app. @param {any} e */
@@ -408,7 +439,7 @@
     if (!_listening) {
       document.addEventListener('fv:bulletins-changed', _onChanged);
       document.addEventListener('click', _onClick);
-      if (typeof window.addEventListener === 'function') window.addEventListener('resize', _order);
+      document.addEventListener('focusout', _onFocusOut);
       _listening = true;
       // Every 30 seconds while the page is showing; the data layer throttles it.
       _timer = window.setInterval(function () {
@@ -427,7 +458,7 @@
     }
     _lastHtml = tileHtml(cid);
     // The Dashboard puts the markup in its slot once this returns; the order is set then.
-    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(_order);
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(_watch);
     return _lastHtml;
   }
 
@@ -436,13 +467,16 @@
     if (_listening) {
       document.removeEventListener('fv:bulletins-changed', _onChanged);
       document.removeEventListener('click', _onClick);
-      if (typeof window.removeEventListener === 'function') window.removeEventListener('resize', _order);
+      document.removeEventListener('focusout', _onFocusOut);
     }
     if (_timer) window.clearInterval(_timer);
     if (_retry) window.clearTimeout(_retry);
     _timer = 0;
     _retry = 0;
     _wantRow = false;
+    if (_ro) _ro.disconnect();
+    _ro = null;
+    _again = false;
     _failing = {};
     _listening = false;
     _cid = '';

@@ -74,8 +74,8 @@ test('the Inbox slot is 299 px and the tile 199 px, with three whole rows that f
   // Every row at least 40 px; together they fill the tile to its padding: no empty band.
   expect(inside.heights.every(h => h >= 40)).toBe(true);
   expect(inside.shown).toEqual([true, true, true]);
-  expect(inside.tileBottom - inside.lastBottom).toBeGreaterThanOrEqual(12);
-  expect(inside.tileBottom - inside.lastBottom).toBeLessThanOrEqual(14);
+  expect(inside.tileBottom - inside.lastBottom).toBeGreaterThanOrEqual(16);
+  expect(inside.tileBottom - inside.lastBottom).toBeLessThanOrEqual(18);
   expect(inside.scrolls).toEqual([0, 0]);
   expect(inside.words).toEqual([true, true, true]);
 
@@ -328,7 +328,7 @@ test('more bulletins than fit: as many whole rows as the height holds, at four h
         document.querySelector('.dash-bulletins-tile').style.height = px + 'px';
       }, px);
       const f = await fit(page);
-      expect(f.shown).toBe(Math.min(5, Math.max(0, Math.floor((px - 2 - 24 - 32) / 40))));
+      expect(f.shown).toBe(Math.min(5, Math.max(0, Math.floor((px - 2 - 32 - 40) / 40))));
       expect(f.min).toBeGreaterThanOrEqual(40);
       expect(f.spare).toBeLessThan(1);
       expect(f.inside).toBe(true);
@@ -458,3 +458,79 @@ test('rows: the buttons in the header come first, as on screen, and the order fo
     .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-rows').previousElementSibling.className))
     .toContain('dash-bulletins-actions');
 });
+
+test('the tile crossing 860 px without a window resize reorders the buttons; a move put off by focus is made on blur', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await open(page);
+  const before = () =>
+    page.evaluate(() => {
+      const t = document.querySelector('.dash-bulletins-tile');
+      return [...t.children].map(e => e.className.replace('dash-bulletins-', ''));
+    });
+  await expect.poll(before).toEqual(['head', 'rows', 'actions']);
+  // The tile's parent shrinks to 700 px: the window does not change.
+  await page.evaluate(() => {
+    document.querySelector('.dash-row-bulletins').style.width = '700px';
+  });
+  await expect.poll(before).toEqual(['head', 'actions', 'rows']);
+  await page.locator('.dash-bulletins-write').focus();
+  const order = [];
+  for (let i = 0; i < 8; i++) {
+    order.push(
+      await page.evaluate(
+        () => (document.activeElement.className.match(/dash-bulletins-(words|seen|write|open)/) || [])[1],
+      ),
+    );
+    await page.keyboard.press('Tab');
+  }
+  expect(order).toEqual(['write', 'open', 'words', 'seen', 'words', 'seen', 'words', 'seen']);
+  // Back to wide while Write a Bulletin has focus: nothing moves under the keyboard, then it moves when focus leaves.
+  await page.locator('.dash-bulletins-write').focus();
+  await page.evaluate(() => {
+    document.querySelector('.dash-row-bulletins').style.width = '';
+  });
+  await page.waitForTimeout(300);
+  expect(await before()).toEqual(['head', 'actions', 'rows']);
+  await page.keyboard.press('Tab'); // Open Bulletins: still in the foot
+  await page.keyboard.press('Tab'); // out of the buttons
+  await expect.poll(before).toEqual(['head', 'rows', 'actions']);
+});
+
+test('the Reminder card names its end day in the words link, not only in generated text', async ({ page }) => {
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await open(page);
+  const label = await page
+    .locator('.dash-bulletins-row')
+    .first()
+    .locator('.dash-bulletins-words')
+    .getAttribute('aria-label');
+  expect(label).toMatch(/^Reminder · Until [A-Z][a-z]{2}: /);
+});
+
+for (const [w, h] of [
+  [1680, 1050],
+  [1280, 800],
+]) {
+  test(`Seen by answers a press within 24 px or more of height at ${w} x ${h}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await open(page);
+    const t = await page.evaluate(() => {
+      const b = document.querySelector('.dash-bulletins-seen:not(.dash-bulletins-pending)');
+      const r = b.getBoundingClientRect();
+      const x = r.left + Math.min(10, r.width / 2);
+      const hit = y => {
+        const e = document.elementFromPoint(x, y);
+        return !!(e && e.closest('.dash-bulletins-seen') === b);
+      };
+      // The target runs from the highest to the lowest point that reaches the button.
+      let top = r.top;
+      while (hit(top - 1)) top -= 1;
+      let bottom = r.bottom;
+      while (hit(bottom + 1)) bottom += 1;
+      return bottom - top;
+    });
+    expect(t).toBeGreaterThanOrEqual(24);
+  });
+}
