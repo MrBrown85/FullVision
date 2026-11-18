@@ -353,6 +353,9 @@ student_submit._norm(p text) 276ee00aa8e488d789af9e2016714c94 214
 student_submit._part(p_id uuid) b008fc4bee310de623de95e0296678f7 973
 student_submit._payload(p_code_id uuid) 7382a387265a87a32c6e4f22f0b1a898 1947
 student_submit._preview(p_code_id uuid) 336c6ed6f0b914a04ca678fa24137333 861
+student_submit._quiz_new_order(p_assessment_id uuid) 60094583822902bdafa8b0623942e9ef 1263
+student_submit._quiz_questions(p_assessment_id uuid, p_order jsonb) 774274b707ad660b1d3f2d023edf13be 1717
+student_submit._quiz_window(p_assessment_id uuid, p_course_id uuid) 2eb5a1c0652415e1cd3923b79c22b101 1451
 student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid) 21706ae9eec783107d9da24e52e1855a 1814
 student_submit._send_begin(p_intent text, p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid) 6cad6dd40eb1c33451a5dcf4f60e7624 8921
 student_submit._send_session(p_session_token text, p_enrollment_id uuid) c39242f54850eeeada19945ac8123644 587
@@ -383,6 +386,9 @@ student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_i
 student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) 2296aefc4e38f67aad5722a2637c2fb4 2297
 student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) 1b0862066e6d8c546f3944f12248be26 11393
 student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 9e16e8aaa8f1379beca4f64d4111fa1d 14821
+student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) 0746b4af4f1cadd75b86cc20f49931d3 4989
+student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) 106de8942ce40ccc9d51c35d2e4e328a 4655
+student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) ebd17424915013d30d69e83c50f1f7de 2398
 student_submit.reflect(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_reflection jsonb, p_ip_hash text) 5f65a3ff02460ea810372d172b988b39 5163
 student_submit.removal_batch(p_limit integer) 964eef99a747dc7180d4ad61bd19b1db 1215
 student_submit.removal_done(p_ids bigint[]) 0414f8b4f5b2429c1799dde1a68179d3 1214

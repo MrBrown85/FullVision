@@ -111,6 +111,8 @@ export const WRITERS = {
   'Grader.returnGrades': ['return', 'Return and Return to All'],
   'Grader.returnForRevision': ['return', 'Return for Revision'],
   'Grader.cancelRevision': ['return', 'Take Back'],
+  'Grader.confirmQuiz': ['score', "Confirm on a quiz's results (Q4)"],
+  'Grader.undoConfirmQuiz': ['score', 'its Undo'],
 };
 
 /* Exported names that looksLikeWriter matches but write no mark. */

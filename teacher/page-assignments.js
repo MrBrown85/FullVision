@@ -1780,6 +1780,8 @@ window.PageAssignments = (function () {
             })()
           : '') +
         _cardScoringBadges(a) +
+        // A quiz's results (teacher/quiz-results.js): '' with the quizzes switch off.
+        (window.QuizResults ? QuizResults.cardLine(cid, a) : '') +
         (a.coreCompetencyIds || [])
           .map(function (ccId) {
             var cc = getCoreCompetency(ccId);
@@ -11583,6 +11585,16 @@ window.PageAssignments = (function () {
             if (more) more.focus({ preventScroll: true });
           },
         });
+      },
+      openQuizResults: function () {
+        var cid = activeCourse;
+        // The page behind is drawn again as it closes, so confirmed levels show.
+        if (window.QuizResults && cid)
+          QuizResults.open(cid, el.dataset.aid, {
+            onClose: function () {
+              if (activeCourse === cid) render();
+            },
+          });
       },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
