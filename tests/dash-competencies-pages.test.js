@@ -129,12 +129,24 @@ describe('Level Mix, one row per competency', () => {
     const rows = rowsOf(tile(), 'curricular');
     expect(rows.map(r => r.querySelector('.dash-comp-ln-name').textContent)).toEqual(['Name IN', 'Name EV', 'Name PL']);
     const segs = Array.from(rows[0].querySelectorAll('.dash-comp-ln-bar i')).map(i => i.getAttribute('style'));
+    // The class's own level order (Extending first by default), as today's Level Mix.
     expect(segs).toEqual([
-      'flex:1;background:var(--score-2)',
-      'flex:1;background:var(--score-3)',
       'flex:2;background:var(--score-4)',
+      'flex:1;background:var(--score-3)',
+      'flex:1;background:var(--score-2)',
     ]);
+    expect(tile().querySelector('.dash-comp-legend').textContent).toBe('ExtendingProficientDevelopingEmerging');
+    COURSES[CID].levelOrder = 'asc';
+    const asc = rowsOf(tile(), 'curricular')[0];
+    expect(Array.from(asc.querySelectorAll('.dash-comp-ln-bar i')).map(i => i.getAttribute('style'))[0]).toBe(
+      'flex:1;background:var(--score-2)',
+    );
     expect(tile().querySelector('.dash-comp-legend').textContent).toBe('EmergingDevelopingProficientExtending');
+  });
+
+  it('has no native tooltip on a row: its own tip is the only one', () => {
+    setClass('proficiency', THREE);
+    for (const r of rowsOf(tile(), 'curricular')) expect(r.hasAttribute('title')).toBe(false);
   });
 
   it('marks Lowest on exactly one row, none on a tie, none when nobody is scored', () => {
@@ -190,21 +202,18 @@ describe('Level Mix, one row per competency', () => {
     expect(r[0].getAttribute('aria-haspopup')).toBe('dialog');
   });
 
-  it('bands by the four levels in a Letter class and a Both class too', () => {
-    for (const mode of ['letter', 'both']) {
-      setClass(mode, THREE);
-      const rows = rowsOf(tile({ compView: mode === 'letter' ? 'avg' : 'mix' }), 'curricular');
-      // A Letter class has no saved pick: the tile still opens on Level Mix.
-      expect(rows).toHaveLength(3);
-      expect(numOf(rows[0])).toBe('3 of 4');
-      expect(rows[0].getAttribute('aria-label')).toContain('Emerging 0, Developing 1, Proficient 1, Extending 2');
-    }
-  });
-
-  it('keeps a saved Class Average in a Letter class', () => {
+  it("opens on today's card's default for the class, and bands by the four levels in every style", () => {
+    // A Letter class with no saved view opens on Class Average, as the flag-off card does.
     setClass('letter', THREE);
-    localStorage.setItem('fv-dash-comp-view:' + CID, 'avg');
-    expect(rowsOf(tile({ compView: 'avg' }), 'curricular')).toHaveLength(0);
+    expect(DashOverview.compView(CID, null)).toBe('avg');
+    expect(rowsOf(tile({ compView: DashOverview.compView(CID, null) }), 'curricular')).toHaveLength(0);
+    // Picked, Level Mix bands by the four levels in a Letter class too.
+    const letter = rowsOf(tile({ compView: 'mix' }), 'curricular');
+    expect(numOf(letter[0])).toBe('3 of 4');
+    expect(letter[0].getAttribute('aria-label')).toContain('Emerging 0, Developing 1, Proficient 1, Extending 2');
+    // A Both class opens on Level Mix.
+    setClass('both', THREE);
+    expect(rowsOf(tile({ compView: DashOverview.compView(CID, null) }), 'curricular')).toHaveLength(3);
   });
 
   it("the other views are today's card, untouched", () => {
@@ -291,6 +300,23 @@ describe("a row's list", () => {
     expect(pop.querySelector('[data-comp-scroll]')).toBeNull();
   });
 
+  it('shows no hover tip for the row whose list is open, and takes a showing tip down when it opens', () => {
+    const d = mount(opts());
+    const box = d.getElementById('dash-comp-tipbox');
+    const rowOf = key => d.querySelector('[data-comp-open="' + key + '"]');
+    // A tip showing on a row comes down when that row's list opens.
+    DashCompetencies.showTip(rowOf('s:EV'));
+    expect(box.hidden).toBe(false);
+    openRow(d, 's:EV');
+    expect(box.hidden).toBe(true);
+    // Pointing within the open row shows nothing.
+    DashCompetencies.showTip(rowOf('s:EV'));
+    expect(box.hidden).toBe(true);
+    // Another row's tip still shows.
+    DashCompetencies.showTip(rowOf('s:IN'));
+    expect(box.hidden).toBe(false);
+  });
+
   it('is hidden at rest', () => {
     const d = mount(opts());
     expect(d.getElementById('dash-comp-pop').hasAttribute('hidden')).toBe(true);
@@ -305,7 +331,7 @@ describe('Self-Assessment, one row per Core Competency', () => {
   }
   beforeEach(() => setClass('proficiency', THREE));
 
-  it('counts who has self-assessed, says Only under half and names its counts', () => {
+  it('counts who has self-assessed, says Only under two thirds and names its counts', () => {
     const o = withSelf({
       [CORE_COMPETENCIES[0].id]: { s1: 1, s2: 2, s3: 4 },
       [CORE_COMPETENCIES[1].id]: { s1: 3 },
@@ -324,9 +350,19 @@ describe('Self-Assessment, one row per Core Competency', () => {
     expect(few.querySelector('.dash-comp-ln-num').textContent).toBe('Only1 of 4');
     expect(few.getAttribute('aria-label')).toContain(': only 1 of 4 self-assessed.');
     expect(el.textContent).toContain('Self-Assessed');
-    // Exactly half is not "only".
-    expect(DashCompetencies.isFew(2, 4)).toBe(false);
-    expect(DashCompetencies.isFew(1, 4)).toBe(true);
+    // Today's Core card's own test (k * 3 < n * 2): exactly two thirds is not "only".
+    expect(DashCompetencies.isFew(2, 4)).toBe(true);
+    expect(DashCompetencies.isFew(3, 4)).toBe(false);
+    expect(DashCompetencies.isFew(2, 3)).toBe(false);
+    // The sample class: 13, 16 and 11 of 27 are marked, 19 and 21 are not.
+    expect([11, 13, 16, 18, 19, 21].map(k => DashCompetencies.isFew(k, 27))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it('draws the bar in the self-assessment blues, never the level colours', () => {
@@ -365,25 +401,28 @@ describe('Self-Assessment, one row per Core Competency', () => {
   });
 });
 
+describe("each Core view's link is the one today's card uses for that view", () => {
+  const head = html => dom(html).querySelector('.dash-core-head a');
+  beforeEach(() => setClass('proficiency', THREE));
+  it('Self-Assessment: Questionnaires; Evidence: Assignments; nothing self-assessed: Set Up a Reflection', () => {
+    const self = opts({ coreSelf: { any: true, byCore: {} }, coreView: 'self' });
+    expect(head(DashCompetencies.html(self)).textContent).toBe('Questionnaires →');
+    const ev = opts({ coreSelf: { any: true, byCore: {} }, coreView: 'evidence' });
+    expect(head(DashCompetencies.html(ev)).textContent).toBe('Assignments →');
+    expect(head(DashCompetencies.html(opts())).textContent).toBe('Set Up a Reflection →');
+    // And the tile adds none of its own: the head is today's card's.
+    expect(DashCompetencies.html(ev)).toContain(head(DashOverview.coreCardHtml(ev)).outerHTML);
+  });
+});
+
 describe('with the dashRow switch off', () => {
-  it("draws today's two cards for every view, exactly", () => {
+  it('draws no tile and no row of the new pages', () => {
     setClass('proficiency', THREE);
     localStorage.clear();
-    for (const compView of ['avg', 'mix', 'below', 'trend']) {
-      for (const coreView of ['self', 'evidence']) {
-        const o = opts({ compView, coreView });
-        const missing = DashInsights.missingItems(CID, STUDENTS);
-        const expected =
-          '<div class="dash-section dash-overview">' +
-          DashOverview.glanceHtml(Object.assign({}, o, { missing })) +
-          '<div class="dash-overview-row dash-overview-cards">' +
-          DashOverview.competenciesCardHtml(o) +
-          DashOverview.coreCardHtml(o) +
-          '</div></div>';
-        expect(DashOverview.renderOverviewPanel(o)).toBe(expected);
-        expect(expected).not.toContain('dash-comp-ln');
-        expect(expected).not.toContain('dash-comp-tile');
-      }
-    }
+    const html = DashOverview.renderOverviewPanel(opts());
+    expect(html).not.toContain('dash-comp-ln');
+    expect(html).not.toContain('dash-comp-tile');
+    // The bytes themselves are held by tests/dash-overview-flag-off.test.js
+    // against tests/fixtures/dash-overview-flag-off.json, recorded before D2.
   });
 });

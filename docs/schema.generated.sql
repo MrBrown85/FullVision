@@ -133,6 +133,83 @@ table public.attendance (rls on)
   CREATE UNIQUE INDEX attendance_pkey ON public.attendance USING btree (id)
   CREATE TRIGGER course_sync_cursor_attendance_student_records AFTER INSERT OR DELETE OR UPDATE ON public.attendance FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'enrollment')
   policy attendance_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+table public.bulletin (rls on)
+  id uuid not null default gen_random_uuid()
+  course_id uuid not null
+  kind text not null
+  body text not null default ''::text
+  link_url text
+  link_title text
+  pinned boolean not null default false
+  pinned_until date
+  assessment_id uuid
+  reactions_on boolean not null default false
+  shown_again_at timestamp with time zone
+  posted_at timestamp with time zone
+  edited_at timestamp with time zone
+  created_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now()
+  idempotency_key uuid
+  constraint bulletin_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE SET NULL
+  constraint bulletin_body_check CHECK ((char_length(body) <= 2000))
+  constraint bulletin_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint bulletin_course_key_key UNIQUE (course_id, idempotency_key)
+  constraint bulletin_id_course_key UNIQUE (id, course_id)
+  constraint bulletin_kind_check CHECK ((kind = ANY (ARRAY['announcement'::text, 'reminder'::text])))
+  constraint bulletin_link_check CHECK (((link_url IS NULL) OR ((char_length(link_url) <= 2000) AND (link_url ~* '^https?://[^[:space:][:cntrl:]/?#@\\]+([/?#][^[:space:][:cntrl:]]*)?$'::text))))
+  constraint bulletin_link_title_check CHECK (((link_title IS NULL) OR ((link_url IS NOT NULL) AND ((char_length(link_title) >= 1) AND (char_length(link_title) <= 200)))))
+  constraint bulletin_pinned_until_check CHECK (((pinned_until IS NULL) OR (pinned AND (kind = 'reminder'::text) AND isfinite(pinned_until))))
+  constraint bulletin_pkey PRIMARY KEY (id)
+  CREATE INDEX bulletin_assessment_idx ON public.bulletin USING btree (assessment_id) WHERE (assessment_id IS NOT NULL)
+  CREATE INDEX bulletin_course_idx ON public.bulletin USING btree (course_id, posted_at)
+  CREATE UNIQUE INDEX bulletin_course_key_key ON public.bulletin USING btree (course_id, idempotency_key)
+  CREATE UNIQUE INDEX bulletin_id_course_key ON public.bulletin USING btree (id, course_id)
+  CREATE UNIQUE INDEX bulletin_pkey ON public.bulletin USING btree (id)
+table public.bulletin_file (rls on)
+  id uuid not null default gen_random_uuid()
+  course_id uuid not null
+  bulletin_id uuid not null
+  kind text not null
+  title text not null
+  page_count integer not null
+  bytes bigint
+  status text not null default 'uploading'::text
+  position integer not null
+  created_at timestamp with time zone not null default now()
+  constraint bulletin_file_bulletin_fkey FOREIGN KEY (bulletin_id, course_id) REFERENCES public.bulletin(id, course_id) ON DELETE CASCADE
+  constraint bulletin_file_bytes_check CHECK ((((status = 'uploading'::text) AND (bytes IS NULL)) OR ((status = 'ready'::text) AND (bytes IS NOT NULL) AND ((bytes >= 1) AND (bytes <= (page_count * (2097152)::bigint))))))
+  constraint bulletin_file_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint bulletin_file_kind_check CHECK ((kind = ANY (ARRAY['photo'::text, 'pdf'::text])))
+  constraint bulletin_file_page_count_check CHECK ((((page_count >= 1) AND (page_count <= 20)) AND ((kind = 'pdf'::text) OR (page_count = 1))))
+  constraint bulletin_file_pkey PRIMARY KEY (id)
+  constraint bulletin_file_status_check CHECK ((status = ANY (ARRAY['uploading'::text, 'ready'::text])))
+  constraint bulletin_file_title_check CHECK (((char_length(title) >= 1) AND (char_length(title) <= 200)))
+  CREATE INDEX bulletin_file_bulletin_idx ON public.bulletin_file USING btree (bulletin_id, "position")
+  CREATE INDEX bulletin_file_course_idx ON public.bulletin_file USING btree (course_id)
+  CREATE UNIQUE INDEX bulletin_file_pkey ON public.bulletin_file USING btree (id)
+  CREATE TRIGGER bulletin_file_removed AFTER DELETE ON public.bulletin_file FOR EACH ROW EXECUTE FUNCTION fv_private.bulletin_file_removed()
+table public.bulletin_reaction (rls on)
+  bulletin_id uuid not null
+  enrollment_id uuid not null
+  word text not null
+  updated_at timestamp with time zone not null default now()
+  constraint bulletin_reaction_bulletin_id_fkey FOREIGN KEY (bulletin_id) REFERENCES public.bulletin(id) ON DELETE CASCADE
+  constraint bulletin_reaction_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint bulletin_reaction_pkey PRIMARY KEY (bulletin_id, enrollment_id)
+  constraint bulletin_reaction_word_check CHECK ((word = ANY (ARRAY['got_it'::text, 'done'::text, 'question'::text])))
+  CREATE INDEX bulletin_reaction_enrollment_idx ON public.bulletin_reaction USING btree (enrollment_id)
+  CREATE UNIQUE INDEX bulletin_reaction_pkey ON public.bulletin_reaction USING btree (bulletin_id, enrollment_id)
+  CREATE TRIGGER bulletin_reaction_same_class BEFORE INSERT OR UPDATE ON public.bulletin_reaction FOR EACH ROW EXECUTE FUNCTION fv_private.bulletin_student_same_class()
+table public.bulletin_seen (rls on)
+  bulletin_id uuid not null
+  enrollment_id uuid not null
+  seen_at timestamp with time zone not null default now()
+  constraint bulletin_seen_bulletin_id_fkey FOREIGN KEY (bulletin_id) REFERENCES public.bulletin(id) ON DELETE CASCADE
+  constraint bulletin_seen_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint bulletin_seen_pkey PRIMARY KEY (bulletin_id, enrollment_id)
+  CREATE INDEX bulletin_seen_enrollment_idx ON public.bulletin_seen USING btree (enrollment_id)
+  CREATE UNIQUE INDEX bulletin_seen_pkey ON public.bulletin_seen USING btree (bulletin_id, enrollment_id)
+  CREATE TRIGGER bulletin_seen_same_class BEFORE INSERT OR UPDATE ON public.bulletin_seen FOR EACH ROW EXECUTE FUNCTION fv_private.bulletin_student_same_class()
 table public.category (rls on)
   id uuid not null default gen_random_uuid()
   course_id uuid not null
@@ -1670,7 +1747,7 @@ table student_submit.write_log (rls on)
   card_id uuid not null
   kind text not null
   at timestamp with time zone not null default now()
-  constraint write_log_kind_check CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text])))
+  constraint write_log_kind_check CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text])))
   constraint write_log_pkey PRIMARY KEY (id)
   CREATE INDEX write_log_at ON student_submit.write_log USING btree (at)
   CREATE INDEX write_log_card_kind_at ON student_submit.write_log USING btree (card_id, kind, at)
@@ -1790,6 +1867,7 @@ function public.create_phone_report(p_course_id uuid, p_term integer, p_term_lab
 function public.create_report_issue(p_course_id uuid, p_term integer, p_term_label text, p_paper text, p_form jsonb, p_students jsonb, p_idempotency_key uuid) returns jsonb
 function public.create_student_and_enroll(p_course_id uuid, p_first_name text, p_last_name text, p_preferred_name text, p_pronouns text, p_student_number text, p_email text, p_date_of_birth date, p_designations text[], p_existing_student_id uuid, p_idempotency_key uuid) returns jsonb
 function public.delete_assessment(p_id uuid) returns void
+function public.delete_bulletin(p_bulletin_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.delete_category(p_id uuid) returns void
 function public.delete_comment_template(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.delete_competency_group(p_id uuid) returns void
@@ -1812,7 +1890,9 @@ function public.delete_tag(p_id uuid) returns void
 function public.delete_withdrawn_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function public.duplicate_assessment(p_src_id uuid, p_idempotency_key uuid) returns uuid
 function public.duplicate_course(p_src_id uuid, p_idempotency_key uuid) returns uuid
+function public.edit_bulletin(p_bulletin_id uuid, p_patch jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer, p_modifier smallint) returns integer
+function public.finish_bulletin_file(p_bulletin_file_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.finish_handout_file(p_resource_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.finish_handout_upload(p_resource_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.finish_work_upload(p_submission_id uuid, p_files jsonb, p_idempotency_key uuid) returns jsonb security definer
@@ -1853,6 +1933,8 @@ function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) retu
 function public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.list_assessment_copies(p_copy_group uuid) returns TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
 function public.list_assessment_markup(p_assessment_id uuid) returns jsonb security definer
+function public.list_bulletin_seen(p_bulletin_id uuid) returns jsonb security definer
+function public.list_bulletins(p_course_id uuid) returns jsonb security definer
 function public.list_categories(p_course_id uuid) returns TABLE(id uuid, course_id uuid, name text, weight numeric, display_order integer, calc_mode text, created_at timestamp with time zone, updated_at timestamp with time zone)
 function public.list_comment_templates() returns jsonb
 function public.list_competency_descriptors() returns TABLE(competency_key text, level smallint, text text, updated_at timestamp with time zone)
@@ -1887,6 +1969,7 @@ function public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) ret
 procedure public.photo_lifecycle_nightly()
 function public.photo_removal_call() returns bigint
 function public.photo_removal_due() returns boolean security definer
+function public.post_bulletin(p_course_id uuid, p_bulletin jsonb, p_files jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function public.reissue_scan_label(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
@@ -1929,6 +2012,7 @@ function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_c
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
 function public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) returns jsonb security definer
+function public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.soft_delete_teacher() returns void
 function public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid) returns jsonb security definer
 function public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) returns jsonb security definer
@@ -1965,6 +2049,8 @@ function public.upsert_tag(p_id uuid, p_section_id uuid, p_label text, p_code te
 function public.upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid, p_value integer, p_modifier smallint, p_comment text) returns uuid
 function public.withdraw_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function student_submit._as_teacher(p_teacher_id uuid) returns void security definer
+function student_submit._bulletin_session_enrollments(p_session_id uuid) returns uuid[] security definer
+function student_submit._bulletin_visible(p_bulletin_id uuid, p_enrollment_id uuid) returns boolean security definer
 function student_submit._card_key_seen(p_key_id text) returns void security definer
 function student_submit._card_listed(p_questionnaire_id uuid, p_enrollment_id uuid) returns boolean security definer
 function student_submit._card_lookup(p_code_hmac text, p_key_id text, p_ip_hash text) returns jsonb security definer
@@ -1991,6 +2077,10 @@ function student_submit._work_window(p_assessment_id uuid) returns jsonb securit
 function student_submit._write_limit(p_card_id uuid, p_kind text, p_per_hour integer) returns jsonb security definer
 function student_submit.answer(p_session_token text, p_enrollment_id uuid, p_questionnaire_id uuid, p_answers jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.answer_seen(p_session_token text, p_enrollment_id uuid, p_assessment_ids uuid[], p_ip_hash text) returns jsonb security definer
+function student_submit.bulletin_file_links(p_session_token text, p_enrollment_id uuid, p_bulletin_file_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.bulletin_react(p_session_token text, p_enrollment_id uuid, p_bulletin_id uuid, p_word text, p_ip_hash text) returns jsonb security definer
+function student_submit.bulletin_seen(p_session_token text, p_enrollment_id uuid, p_bulletin_ids uuid[], p_ip_hash text) returns jsonb security definer
+function student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.card(p_code_hmac text, p_key_id text, p_ip_hash text) returns jsonb security definer
 function student_submit.check(p_token text, p_birthday text, p_ip_hash text) returns jsonb security definer
 function student_submit.done(p_session_token text, p_ip_hash text) returns jsonb security definer
