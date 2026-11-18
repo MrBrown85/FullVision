@@ -9597,6 +9597,30 @@ button.grader-member-name {
   .grader-toolbar .grader-draft-still {
     display: none;
   }
+  /* A narrow window: the iPad's two rows (tablet.css), so the title, Show
+     and Return N Graded never sit on top of each other (Nov 18). */
+  .grader-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title end'
+      'lead lead';
+    row-gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .grader-title-wrap {
+    grid-area: title;
+    min-width: 0;
+    text-align: left;
+  }
+  .grader-toolbar-end {
+    grid-area: end;
+  }
+  .grader-toolbar-lead {
+    grid-area: lead;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
 }
 
 /* The pages. Each page's number, Rotate and Mark Up sit on its top
