@@ -130,10 +130,6 @@
     }
     return 'A student';
   }
-  /** @param {string[]} ids */
-  function _names(ids) {
-    return (ids || []).map(_nameOf).join(', ');
-  }
 
   function _className() {
     var c = typeof COURSES !== 'undefined' && COURSES[_cid];
@@ -901,67 +897,7 @@
       if (st.loading && !data) h += '<span class="bulletin-seen-aside">Reading…</span>';
       else if (!data || !data.ok)
         h += '<span class="bulletin-seen-aside">Who has seen it could not be read. Try again in a moment.</span>';
-      else {
-        var n = data.not_seen.length;
-        if (n) {
-          h +=
-            '<span class="bulletin-seen-head">Not Seen Yet · ' +
-            n +
-            '</span><span class="bulletin-seen-names">' +
-            esc(_names(data.not_seen)) +
-            '</span>';
-          if (st.again === 'done')
-            h +=
-              '<span class="bulletin-seen-aside">Shown again on ' + n + (n === 1 ? ' phone.' : ' phones.') + '</span>';
-          else
-            h +=
-              '<button type="button" class="btn btn-ghost bulletin-seen-act" data-bulletin="again" data-id="' +
-              esc(b.id) +
-              '"' +
-              (st.again === 'busy' ? ' disabled' : '') +
-              '>Show It Again on ' +
-              (n === 1 ? 'This 1 Phone' : 'These ' + n + ' Phones') +
-              '</button>';
-        } else if (b.can_see > 0) h += '<span class="bulletin-seen-aside">Everyone who can see it has seen it.</span>';
-        if (data.paused.length) {
-          h +=
-            '<span class="bulletin-seen-aside">' +
-            esc(
-              data.paused.length <= 2
-                ? _names(data.paused).replace(/, /g, ' and ') + ' Not Counted (Page Paused)'
-                : data.paused.length + ' Not Counted (Page Paused)',
-            ) +
-            '</span>';
-        }
-        if (data.no_card.length) {
-          h +=
-            '<span class="bulletin-seen-aside"><a href="' +
-            esc(_manageHref()) +
-            '" class="bulletin-note-link">' +
-            esc(data.no_card.length + ' Have No Card Yet') +
-            '</a></span>';
-        }
-        // Names only where they are for acting on (board B3): who has a question. Got It and Done are counts on the facts line.
-        if (b.reactions_on && data.reactions.question && data.reactions.question.length) {
-          h +=
-            '<span class="bulletin-seen-head">' +
-            esc(BULLETIN_REACTION_WORDS.question) +
-            ' · ' +
-            data.reactions.question.length +
-            '</span><span class="bulletin-seen-names">' +
-            esc(_names(data.reactions.question)) +
-            '</span>';
-        }
-        if (data.seen.length) {
-          h +=
-            '<button type="button" class="bulletin-text-btn bulletin-seen-act" data-bulletin="seen-names" data-id="' +
-            esc(b.id) +
-            '">' +
-            (st.names ? 'Hide Who Has Seen It' : 'Show Who Has Seen It (' + data.seen.length + ')') +
-            '</button>';
-          if (st.names) h += '<span class="bulletin-seen-names">' + esc(_names(data.seen)) + '</span>';
-        }
-      }
+      else h += BulletinSeen.bodyHtml(b, st, _nameOf, _manageHref());
     }
     return h + '</div>';
   }
@@ -1396,11 +1332,8 @@
         _drawFeed();
         return void _loadSeen(id, false);
       }
-      case 'seen-names':
-        if (_seen[id]) _seen[id].names = !_seen[id].names;
-        return _drawFeed();
       case 'again':
-        return _showAgain(id);
+        return _showAgain(id, el.dataset.ids ? el.dataset.ids.split(',') : null);
       case 'take-back':
         takeBackBulletin(_cid, el.dataset.key || '');
         _drawFeed();
@@ -1439,13 +1372,14 @@
   }
 
   /** @param {string} id */
-  function _showAgain(id) {
+  /** @param {string} id @param {string[] | null} ids only these students, or all who have not seen it */
+  function _showAgain(id, ids) {
     var st = _seen[id];
     if (!st || st.again === 'busy') return;
     st.again = 'busy';
     _drawFeed();
     var cid = _cid;
-    showBulletinAgain(cid, id).then(function (out) {
+    showBulletinAgain(cid, id, ids).then(function (out) {
       if (!_alive || cid !== _cid) return;
       if (out.gone) {
         // Deleted a moment before: it is gone, so it leaves the page.

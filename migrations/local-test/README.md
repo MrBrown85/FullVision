@@ -2923,3 +2923,7 @@ Run on PostgreSQL 17.11 (embedded-postgres), rebuilt from the repo and proved eq
 - As a seeded teacher: create with it on (true) and without (false); update off, on, another key (kept), and a non-boolean (refused, 22023); `get_class_bundle`, `get_gradebook` and Duplicate carry it; `student_submit.page` through a device session as `service_role` sends it on all 12 pieces, true on the one switched on.
 
 Not verified here: PostgREST's schema cache, the edge functions, gradebook-prod itself.
+
+## Bulletin reminders (2026111809, 2026-11-18)
+
+Applied to gradebook-prod on Nov 18 with Colin's OK; live then read both "after" md5s. Tested on PostgreSQL 17.11 rebuilt from the repo: apply, a second run, undo (`bulletin-reminders-undo.sql`, both fingerprints back to live's, the table gone), apply again; `test:db` with it loaded, every security rule test passed (the seed gains a reminder row); as a seeded teacher, a reminder reaches a named student who can see it and has not seen it, a made-up id is ignored, and the call without names sets `shown_again_at` as before.

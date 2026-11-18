@@ -130,7 +130,9 @@ interface Window {
   // Share on a reminder (teacher/bulletin-share.js) and a Standard rubric's Words (teacher/rubric-words.js).
   BulletinShare: { itemHtml(b: unknown): string; text(b: unknown): string };
   RubricWords: unknown;
+  BulletinSeen: { bodyHtml(b: unknown, st: unknown, nameOf: (id: string) => string, manageHref: string): string };
 }
+declare var BulletinSeen: Window['BulletinSeen'];
 declare var BulletinShare: Window['BulletinShare'];
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.

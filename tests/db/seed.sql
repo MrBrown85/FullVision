@@ -204,6 +204,9 @@ begin
            into blf using c, bl, p_mark || ' Bulletin File';
         execute 'insert into public.bulletin_seen (bulletin_id, enrollment_id) values ($1, $2)' using bl, e1;
         execute 'insert into public.bulletin_reaction (bulletin_id, enrollment_id, word) values ($1, $2, ''got_it'')' using bl, e1;
+        if to_regclass('public.bulletin_reminder') is not null then
+            execute 'insert into public.bulletin_reminder (bulletin_id, enrollment_id) values ($1, $2)' using bl, e2;
+        end if;
         _ids := _ids || jsonb_build_object('bulletin', bl, 'bulletin_file', blf);
     end if;
     insert into public.submission_file_removal (bucket, path, course_id, reason, link_dies_at)

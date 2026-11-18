@@ -1298,12 +1298,15 @@ function deleteBulletin(cid, id) {
   });
 }
 
-/** Put a bulletin back at the top of the phones that have not seen it. @param {string} cid @param {string} id @returns {Promise<BulletinWriteResult>} */
-function showBulletinAgain(cid, id) {
+/** Put a bulletin back at the top of the student pages that have not seen it: every
+    such student's, or only those in ids (migration 2026111809). @param {string} cid
+    @param {string} id @param {string[] | null} [ids] @returns {Promise<BulletinWriteResult>} */
+function showBulletinAgain(cid, id, ids) {
   if (!cid || !id) return Promise.resolve({ ok: false, message: 'That bulletin is not there.' });
-  if (_isDemoSession()) return _bltDemoAgain(cid, id);
+  if (_isDemoSession()) return _bltDemoAgain(cid, id, ids);
   if (!_bltOnServer(cid) || !_isUuid(id)) return Promise.resolve({ ok: false, message: 'That bulletin is not there.' });
-  return _bltChange(cid, id, 'show_bulletin_again', {}, function (b) {
-    return Object.assign({}, b, { shown_again_at: new Date().toISOString() });
+  var some = (ids || []).filter(_isUuid);
+  return _bltChange(cid, id, 'show_bulletin_again', some.length ? { p_enrollment_ids: some } : {}, function (b) {
+    return some.length ? b : Object.assign({}, b, { shown_again_at: new Date().toISOString() });
   });
 }
