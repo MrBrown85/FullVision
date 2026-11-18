@@ -252,6 +252,16 @@ alter table student_submit.send_log alter column id add generated always as iden
 alter table student_submit.write_log alter column id add generated always as identity (sequence name student_submit.write_log_id_seq start with 1 increment by 1 minvalue 1 maxvalue 9223372036854775807 cache 1);
 alter publication supabase_realtime add table public.course_sync_cursor;
 CREATE TRIGGER fv_teacher_sign_in_deleted AFTER DELETE ON auth.users FOR EACH ROW EXECUTE FUNCTION public._fv_teacher_sign_in_deleted();
+create policy fv_bulletin_files_fence on storage.objects as restrictive for all to authenticated
+  using (((bucket_id IS DISTINCT FROM 'bulletin-files'::text) OR fv_private.bulletin_file_read_allowed(name)))
+  with check (((bucket_id IS DISTINCT FROM 'bulletin-files'::text) OR fv_private.bulletin_file_upload_allowed(name)));
+create policy fv_bulletin_files_read on storage.objects as permissive for select to authenticated
+  using (((bucket_id = 'bulletin-files'::text) AND fv_private.bulletin_file_read_allowed(name)));
+create policy fv_bulletin_files_teachers_only on storage.objects as restrictive for all to public
+  using (((bucket_id IS DISTINCT FROM 'bulletin-files'::text) OR (CURRENT_USER = 'authenticated'::name)))
+  with check (((bucket_id IS DISTINCT FROM 'bulletin-files'::text) OR (CURRENT_USER = 'authenticated'::name)));
+create policy fv_bulletin_files_upload on storage.objects as permissive for insert to authenticated
+  with check (((bucket_id = 'bulletin-files'::text) AND fv_private.bulletin_file_upload_allowed(name)));
 create policy fv_handout_files_fence on storage.objects as restrictive for all to authenticated
   using (((bucket_id IS DISTINCT FROM 'handout-files'::text) OR fv_private.handout_file_read_allowed(name)))
   with check (((bucket_id IS DISTINCT FROM 'handout-files'::text) OR fv_private.handout_file_upload_allowed(name)));

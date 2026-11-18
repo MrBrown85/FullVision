@@ -139,7 +139,7 @@ describe('Demo Mode sends nothing to Supabase', () => {
    which answers on the device and returns before the call whenever the
    page is in Demo Mode. The other two files still hold no way to ask. */
 describe('Demo Mode sends nothing from the student page', () => {
-  const CARD_FILES = ['s/app.js', 's/assignments.js', 's/student-data.js'];
+  const CARD_FILES = ['s/app.js', 's/assignments.js', 's/student-data.js', 's/settings.js'];
   const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
 
   it.each(CARD_FILES)('%s has no way of its own to reach a server', file => {

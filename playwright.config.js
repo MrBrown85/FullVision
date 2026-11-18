@@ -19,7 +19,31 @@ export default defineConfig({
     headless: true,
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    // Everything but the WebKit-only run below.
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    /* The student page in WebKit (Safari's engine), shaped like an iPhone:
+       most students open it on an iPhone. Only with FV_WEBKIT=1, because CI
+       installs Chromium alone (`npx playwright install webkit` first).
+       Run: FV_WEBKIT=1 npx playwright test --project=webkit-student
+       Playwright's WebKit is not iOS Safari: no address bar that collapses,
+       no real safe areas, no iOS text-size setting. */
+    ...(process.env.FV_WEBKIT
+      ? [
+          {
+            name: 'webkit-student',
+            testMatch: /(student-settings|student-card-[\w-]+|student-carousel|student-text-size-sweep)\.spec\.js$/,
+            use: {
+              browserName: 'webkit',
+              viewport: { width: 390, height: 844 },
+              deviceScaleFactor: 3,
+              isMobile: true,
+              hasTouch: true,
+            },
+          },
+        ]
+      : []),
+  ],
   webServer: {
     // Build dist/ with dummy credentials, then serve it through the
     // production edge function (scripts/e2e-server.mjs) so every page gets

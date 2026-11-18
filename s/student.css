@@ -31,6 +31,27 @@
   --sp-red-text: #c62828;
   --sp-said-text: #0058d0;
   --sp-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  /* Text Size (Settings): how much the page is zoomed, and the screen's
+     height in the zoomed page's own pixels. Every sheet, menu and
+     full-screen length uses --sp-screen-h, never vh: a zoomed vh is
+     taller than the screen. */
+  --sp-zoom: 1;
+  --sp-screen-h: calc(100vh / var(--sp-zoom));
+  /* The same in steady vh, for lengths in the page itself (the carousel's
+     cap, a report's height): they must not follow iOS Safari's toolbar as
+     it hides and shows while the student scrolls. */
+  --sp-steady-h: calc(100vh / var(--sp-zoom));
+}
+@supports (height: 100dvh) {
+  :root {
+    --sp-screen-h: calc(100dvh / var(--sp-zoom));
+  }
+}
+html.sp-size-large {
+  --sp-zoom: 1.15;
+}
+html.sp-size-larger {
+  --sp-zoom: 1.3;
 }
 
 * {
@@ -59,12 +80,21 @@ button {
 }
 
 .sp-app {
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: var(--sp-screen-h);
   max-width: 560px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+}
+/* Text Size, chosen in Settings (s/page-view.js; app.js sets the class):
+   every screen of a card's page drawn bigger, the layout reflowing to the
+   narrower width as the browser's own zoom does. */
+html.sp-size-large .sp-app,
+html.sp-size-larger .sp-app,
+html.sp-size-large .hv-layer.hv-whole,
+html.sp-size-larger .hv-layer.hv-whole {
+  /* The handout viewer (shared/handout-viewer.js) opens on <body>, outside #app: it takes the size too. */
+  zoom: var(--sp-zoom);
 }
 .sp-noscript {
   padding: 24px;
@@ -328,6 +358,18 @@ button {
 .sp-grid4 .sp-opt {
   font-size: 13px;
 }
+/* At Large and Larger, the four steps two by two where four across would
+   cut "Beginning" and "Confident". Normal is as it was. */
+html.sp-size-large .sp-core,
+html.sp-size-larger .sp-core {
+  container: sp-core / inline-size;
+}
+@container sp-core (max-width: 299.98px) {
+  .sp-grid4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
 .sp-grid4 .sp-opt[aria-checked='true'][data-step='1'] {
   border-color: #b91c1c;
   background: #fee2e2;
@@ -553,6 +595,15 @@ button {
   padding: 0 10px;
   white-space: nowrap;
 }
+/* At Large and Larger a long label ("Send to My Teacher", "Next: My
+   Goals") takes two lines rather than being cut. Normal is as it was. */
+html.sp-size-large .sp-foot .sp-btn,
+html.sp-size-larger .sp-foot .sp-btn {
+  padding: 4px 10px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 .sp-foot .sp-msg {
   text-align: center;
 }
@@ -610,7 +661,7 @@ button {
   text-align: center;
 }
 .pr-view {
-  min-height: 100vh;
+  min-height: var(--sp-steady-h, 100vh);
 }
 
 /* A student card (app.js): Scan or Type Your Card, Is This You?, and the
@@ -763,7 +814,7 @@ button {
   bottom: 0;
   z-index: 6;
   max-width: 560px;
-  max-height: 85vh;
+  max-height: calc(var(--sp-screen-h, 100vh) * 0.85);
   margin: 0 auto;
   overflow-y: auto;
   background: var(--sp-card);
@@ -1462,7 +1513,7 @@ label.sp-btn:focus-within {
 }
 .sp-send-blurry-img {
   max-width: 100%;
-  max-height: 52vh;
+  max-height: calc(var(--sp-steady-h, 100vh) * 0.52);
   object-fit: contain;
   border-radius: 6px;
   background: #fff;

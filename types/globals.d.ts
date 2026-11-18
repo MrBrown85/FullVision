@@ -112,6 +112,11 @@ interface Window {
   DashRecent: unknown;
   DashInboxModel: unknown;
   DashInbox: unknown;
+  DashInboxDrop: unknown;
+  DashInboxPick: unknown;
+  DashInboxSide: unknown;
+  PageDashboard: unknown;
+  DashInboxRoll: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
@@ -360,6 +365,11 @@ declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
 declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
+declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
+declare var DashInbox: any; // teacher/dash-inbox.js
+declare var DashInboxPick: any; // teacher/dash-inbox-pick.js
+declare var DashInboxSide: any; // teacher/dash-inbox-side.js
+declare var PageDashboard: any; // teacher/page-dashboard.js
 declare var BuildFlags: { on(name: string): boolean };
 declare var WorkThumbs: any;
 declare var WorkWall: any;
@@ -371,3 +381,8 @@ declare var StudentView: any;
 declare var PreviewStudent: any;
 declare var Questionnaires: any;
 declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: () => void, durationMs?: number): void;
+// The student page's Settings helpers (s/settings.js): Text Size's words and
+// classes, and the keys for Settings and Log Out? over the page.
+interface Window {
+  StudentSettings: unknown;
+}

@@ -83,16 +83,18 @@ test.describe('on a phone', () => {
 
   test('Log Out asks first; Cancel keeps the page', async ({ page }) => {
     const posts = await demo(page);
-    await page.getByRole('button', { name: 'Log Out' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Log Out' }).click();
     const sheet = page.getByRole('alertdialog', { name: 'Log Out?' });
     await expect(sheet).toBeVisible();
     await expect(sheet).toContainText('You’ll need your card to open your page again.');
     await expect(page.locator('#sp-logout-title')).toBeFocused();
     await named(page);
     await contrast(page);
+    await page.waitForTimeout(450); // Log Out? takes a press once it has been up a moment.
     await sheet.getByRole('button', { name: 'Cancel' }).click();
     await expect(sheet).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Log Out' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();
     await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
     expect(posts).toEqual([]);
   });

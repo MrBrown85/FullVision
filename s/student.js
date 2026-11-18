@@ -118,7 +118,8 @@ var StudentPage = (function () {
       heading: '', // the loading screen's title when it is not a slip's: a card's page, or a code not yet known
       again: false, // a card's page couldn't be reached: offer Try Again
       from: '', // 'card' when the code was typed on one of the card's screens
-      sheet: false, // a card's page: Your Classes is open over it (app.js)
+      settings: false, // a card's page: Settings (the gear) is open over it (page-view.js)
+      textSize: '', // a card's page: the Text Size chosen in Settings, 'large' or 'larger' ('' is Normal)
       reply: null, // a card's page: the server's `page` reply, which student-view.js draws from
       tab: 'assignments', // a card's page: assignments | learning | questionnaires (Reflections)
       segment: 'outstanding', // the Assignments tab: outstanding | upcoming
