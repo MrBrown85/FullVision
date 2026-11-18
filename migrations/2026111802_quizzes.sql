@@ -55,7 +55,9 @@
 -- and assessment_tag; after five seconds it gives up, nothing applied. Every
 -- quiz writer locks in one order (the contract, "Locks, in order"), and no
 -- quiz table has a sync-cursor trigger, so a cascade never meets the class's
--- lock the other way.
+-- lock the other way. What it costs a teacher who never makes a quiz: each
+-- competency row a form save deletes runs one indexed update at commit that
+-- finds nothing, and each Unassign one more trigger that reads one index.
 --
 -- After 2026111730, before the app that calls these. Tested on PostgreSQL 17
 -- rebuilt equal to live: migrations/local-test/quizzes.py (README.md,

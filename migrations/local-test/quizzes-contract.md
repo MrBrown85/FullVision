@@ -172,7 +172,7 @@ Primary key `(attempt_id, question_id)`: one row per question per try, replaced 
 ### Locks, in order (every quiz writer, MQ2's included)
 
 1. `fv_idem_check`'s key lock (teacher writes with a key).
-2. The assessment's row: `for key share` (teacher writes); `for share` (MQ2's start of a try, so an Unassign waits for it or it waits for the Unassign and then sees the Draft).
+2. The assessment's row: `for key share` (teacher writes); `for share` (MQ2's start of a try and `reopen_quiz`, which make a try: an Unassign waits for them, or they wait for the Unassign and then see the Draft).
 3. The quiz's row: `for update` (`save_quiz`, which may delete questions); `for key share` (everything else).
 4. `save_quiz` only: the piece's `assessment_tag` rows, `for key share`.
 5. One student's tries: `pg_advisory_xact_lock(hashtext('fv.quiz'), hashtext(assessment_id::text || ':' || enrollment_id::text))` (`reopen_quiz`, `confirm_quiz` per student in input order sorted by enrollment id, MQ2's `quiz`, `quiz_save`, `quiz_send`).

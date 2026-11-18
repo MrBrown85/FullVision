@@ -19,7 +19,7 @@
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new)   77bd2789ea9f46790f6eef639a605c24
---   public.reopen_quiz(uuid,uuid,uuid) (new)                     012bb9a8cb2a7034b90b14e2f5c20c87
+--   public.reopen_quiz(uuid,uuid,uuid) (new)                     daabc9bbdd81761d4ddfd72b773eca78
 --   public.confirm_quiz(uuid,jsonb,uuid) (new)                   8380e8fa33795295b97e17623376414f
 -- Relied on, unchanged (function, live, and 2026111802's):
 --   public.fv_owns_assessment(uuid)                              9f4c680c35f9f3ac32e8290824707673
@@ -54,7 +54,7 @@ begin
         ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626', null),
         ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f', null),
         ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', null, '77bd2789ea9f46790f6eef639a605c24'),
-        ('public.reopen_quiz(uuid,uuid,uuid)', null, '012bb9a8cb2a7034b90b14e2f5c20c87'),
+        ('public.reopen_quiz(uuid,uuid,uuid)', null, 'daabc9bbdd81761d4ddfd72b773eca78'),
         ('public.confirm_quiz(uuid,jsonb,uuid)', null, '8380e8fa33795295b97e17623376414f')
     ) as v(fn, was, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
@@ -148,7 +148,8 @@ begin
         return _cached;
     end if;
     if not fv_owns_assessment(p_assessment_id) then raise exception 'not found' using errcode = 'P0002'; end if;
-    select a.course_id, a.is_draft into _a from assessment a where a.id = p_assessment_id for key share;
+    -- For share, as a student's start of a try: an Unassign waits for this try, or this sees the Draft.
+    select a.course_id, a.is_draft into _a from assessment a where a.id = p_assessment_id for share;
     perform 1 from quiz where assessment_id = p_assessment_id for key share;
     if not found or not exists (select 1 from enrollment e where e.id = p_enrollment_id and e.course_id = _a.course_id and e.withdrawn_at is null) then
         raise exception 'not found' using errcode = 'P0002';
@@ -279,7 +280,7 @@ declare
 begin
     for _f in select * from (values
         ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),
-        ('public.reopen_quiz(uuid,uuid,uuid)', '012bb9a8cb2a7034b90b14e2f5c20c87'),
+        ('public.reopen_quiz(uuid,uuid,uuid)', 'daabc9bbdd81761d4ddfd72b773eca78'),
         ('public.confirm_quiz(uuid,jsonb,uuid)', '8380e8fa33795295b97e17623376414f')
     ) as v(fn, now) loop
         if md5(pg_get_functiondef(to_regprocedure(_f.fn))) is distinct from _f.now then

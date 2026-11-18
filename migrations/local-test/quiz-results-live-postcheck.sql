@@ -2,7 +2,7 @@
 -- SELECTs only. Every row says ok.
 with want(sig, after_md5) as (values
     ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),
-    ('public.reopen_quiz(uuid,uuid,uuid)', '012bb9a8cb2a7034b90b14e2f5c20c87'),
+    ('public.reopen_quiz(uuid,uuid,uuid)', 'daabc9bbdd81761d4ddfd72b773eca78'),
     ('public.confirm_quiz(uuid,jsonb,uuid)', '8380e8fa33795295b97e17623376414f'),
     ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f'),
     ('public.fv_owns_assessment(uuid)', '9f4c680c35f9f3ac32e8290824707673'),

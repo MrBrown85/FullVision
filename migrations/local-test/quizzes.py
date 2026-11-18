@@ -21,7 +21,8 @@ locks the contract tells MQ2 to take.
   confirm   confirm_quiz: marked stored, one confirmed try per student, null clears, refusals; NO row of score,
             tag_score, rubric_score or grade_return changes (counts and md5 before and after).
   draft     Unassign allowed before any try, refused (draft_has_work, P0001) once one exists, a restore let
-            through, Assign never refused; both orders of a start racing an Unassign on two connections.
+            through, Assign never refused; both orders of a start, and of reopen_quiz, racing an Unassign on two
+            connections.
   others    Teacher B reads and changes nothing through any function; a class in the trash; signed out is
             PT401; a visitor and the edge functions' role run none; no role reads or writes the five tables
             or calls the helper or trigger functions; no student_submit function names quiz_key.
@@ -599,6 +600,27 @@ def scen_draft():
         u.run('commit'); u.close(); th.join()
         ok('draft race %d: then it finds a Draft and starts no try' % rnd, out.get('rows') == [] and d.one('select count(*) from quiz_attempt') == 0 and is_draft(d, w.a) is True, out)
         d.run('update assessment set is_draft = false where id = :a', a=w.a)
+    # reopen_quiz makes a try too: it waits for an Unassign in progress and then sees the Draft.
+    d.run('delete from quiz_attempt')
+    u = Conn(d); u.as_teacher(); u.run('begin'); u.run("select update_assessment(:a, '{\"is_draft\": true}'::jsonb)", a=w.a)
+    out = {}
+    def ro():
+        c = Conn(d); c.as_teacher()
+        try: out['r'] = c.run('select reopen_quiz(:a, :e, null)', a=w.a, e=w.here[0])[0][0]
+        except Exception as e: out['r'] = (sqlstate(e), message(e))
+        c.close()
+    th = threading.Thread(target=ro); th.start(); time.sleep(0.5)
+    ok('draft race: a reopen waits for an Unassign in progress', out == {}, out)
+    u.run('commit'); u.close(); th.join()
+    ok('draft race: then it is refused as a Draft and makes no try', out.get('r') == ('22023', 'draft') and d.one('select count(*) from quiz_attempt') == 0, out)
+    d.run('update assessment set is_draft = false where id = :a', a=w.a)
+    send(d, start(d, w.a, w.here[0]))
+    r = Conn(d); r.as_teacher(); r.run('begin'); r.run('select reopen_quiz(:a, :e, null)', a=w.a, e=w.here[0])
+    out = {}
+    th = threading.Thread(target=un); th.start(); time.sleep(0.5)
+    ok('draft race: an Unassign waits for a reopen in progress', 'r' not in out, out)
+    r.run('commit'); r.close(); th.join()
+    ok('draft race: then it is refused, the try seen', out.get('r') == ('P0001', 'draft_has_work') and is_draft(d, w.a) is False, out)
     d.close()
 
 def scen_others():
