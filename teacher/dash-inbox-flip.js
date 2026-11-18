@@ -198,6 +198,18 @@
   // The most pages of one student kept fetched while they are the centre: the
   // largest pile on file is 13, so turning down and back up asks for nothing again.
   var KEEP_PAGES = 13;
+  // On a touch device (an iPad, a phone-sized window) a whole page is a large
+  // picture: the centre page and the 6 of that student's pages nearest it.
+  var KEEP_NEAR_TOUCH = 6;
+
+  /** A touch device: the pointer is a finger. */
+  function _touch() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    } catch (e) {
+      return false;
+    }
+  }
 
   /** @param {string} key @param {string} which @param {string} id */
   function imgHtml(key, which, id) {
@@ -250,7 +262,8 @@
     if (dist <= WINDOW + 1 || (has(tid) && dist <= WINDOW + 2)) out.push([tid, imgHtml(key, 'thumb', tid), false]);
     if (dist <= 1 || (has(pid) && dist <= 2)) out.push([pid, imgHtml(key, 'page', pid), false]);
     if (dist === 0 && face) {
-      // Other pages already fetched, oldest first, the newest KEEP_PAGES - 1 of them.
+      // Other pages already fetched, oldest first, the newest KEEP_PAGES - 1 of
+      // them; on a touch device the KEEP_NEAR_TOUCH nearest the centre page.
       /** @type {string[]} */
       var fids = [];
       face.querySelectorAll('[data-flip-id]').forEach(function (el) {
@@ -258,7 +271,25 @@
         var fid = id.slice(id.indexOf(':') + 1);
         if (id !== 'sheet' && fid !== f.id && fids.indexOf(fid) < 0) fids.push(fid);
       });
-      fids.slice(-(KEEP_PAGES - 1)).forEach(function (fid) {
+      if (_touch()) {
+        var at = pageShown(st, e);
+        /** @param {string} fid */
+        var away = function (fid) {
+          var i = e.files.findIndex(function (/** @type {any} */ x) {
+            return x && x.id === fid;
+          });
+          return i < 0 ? Infinity : Math.abs(i - at);
+        };
+        fids = fids
+          .filter(function (fid) {
+            return away(fid) !== Infinity;
+          })
+          .sort(function (x, y) {
+            return away(x) - away(y);
+          })
+          .slice(0, KEEP_NEAR_TOUCH);
+      } else fids = fids.slice(-(KEEP_PAGES - 1));
+      fids.forEach(function (fid) {
         ['thumb:', 'page:'].forEach(function (w) {
           if (has(w + fid)) out.push([w + fid, null, true]);
         });

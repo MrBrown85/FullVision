@@ -326,7 +326,16 @@ window.DashInboxSide = (function () {
   /** The page's height from the room the tile gives the row.
    * @param {HTMLElement} row */
   function _size(row) {
-    var h = Math.max(MIN_H, Math.min(MAX_H, Math.floor(row.clientHeight - PAD - CAPTION)));
+    // The captions as drawn, in whatever font the computer has; never less than CAPTION.
+    var cap = CAPTION;
+    var name = /** @type {HTMLElement | null} */ (row.querySelector('.dash-inbox-side-name'));
+    var line = /** @type {HTMLElement | null} */ (row.querySelector('.dash-inbox-side-line'));
+    if (name && line && typeof getComputedStyle === 'function')
+      cap = Math.max(
+        CAPTION,
+        Math.ceil(name.offsetHeight + (parseFloat(getComputedStyle(name).marginTop) || 0) + line.offsetHeight + 2),
+      );
+    var h = Math.max(MIN_H, Math.min(MAX_H, Math.floor(row.clientHeight - PAD - cap)));
     _h = h;
     row.style.setProperty('--dash-inbox-side-h', h + 'px');
   }

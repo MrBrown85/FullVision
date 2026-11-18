@@ -41,7 +41,7 @@ window.loadSeedIfNeeded = function () {
   if (typeof seedIfNeeded === 'function') {
     return bank.then(function () {
       seedIfNeeded();
-      applyDemoStudentPage();
+      _applyDemoStudentPageAndDrafts();
     });
   }
   // User deliberately wiped all data — never auto-seed
@@ -49,9 +49,20 @@ window.loadSeedIfNeeded = function () {
   // Lazy-load the script, then seed
   return Promise.all([_loadSeedScript(), bank]).then(function () {
     if (typeof seedIfNeeded === 'function') seedIfNeeded();
-    applyDemoStudentPage();
+    _applyDemoStudentPageAndDrafts();
   });
 };
+
+/* The sample drafts (seedDemoDrafts, Maya's and Liv's Light Refraction Lab)
+   are made only while Send Work is on, and seedIfNeeded runs before the
+   front page's Demo Mode turns it on. Without this the first load showed
+   their work as To Grade (6 To Grade, 0 Not Returned) on the Dashboard and
+   in Assignments alike, and the next full page load made the drafts and
+   showed 4 and 2. So the drafts are made the moment Send Work comes on.
+   seedDemoDrafts leaves a student the teacher has already graded alone. */
+function _applyDemoStudentPageAndDrafts() {
+  if (applyDemoStudentPage() && typeof seedDemoDrafts === 'function') seedDemoDrafts();
+}
 
 /* The front page's Try Demo Mode link starts Demo Mode with the student
    features showing (login-auth.js sets DEMO_STUDENT_KEY to 'pending'). Once

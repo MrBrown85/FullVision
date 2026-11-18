@@ -169,11 +169,12 @@
   font-weight: 600;
   color: var(--text);
 }
+/* One line each, cut with an ellipsis: the full words are in the title and
+   in the page's accessible name. Two lines spilled past the row's foot at the
+   Inbox's 299 px beside Bulletins in a wider font (D9). */
 .dash-inbox-side-line {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--text-xs);
   line-height: 1.3;
   color: var(--text-3);

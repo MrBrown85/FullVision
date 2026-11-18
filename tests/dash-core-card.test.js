@@ -1,7 +1,8 @@
 /**
  * The dashboard's Core Competencies card (docs/plans/dashboard-cards-plan.md,
- * part C): Self-Assessment, one blue square per student for the step they
- * gave this term, and Evidence, one square per tagged assessment and
+ * part C), the Core page of the Competencies tile: Self-Assessment's head
+ * (its rows are the tile's own, tests/dash-competencies-pages.test.js), and
+ * Evidence, one square per tagged assessment and
  * observation; with no self-assessment in the class this term, Evidence only
  * and a link to set up a reflection. The term comes from
  * shared/core-self.js, which the student page reads too.
@@ -92,47 +93,15 @@ describe('Core Competencies card', () => {
     expect(html).toContain('dash-core-list dash-core-evidence');
   });
 
-  it('Self-Assessment: one square per student, Leading first, then grey; "k of N"', () => {
+  it('Self-Assessment: the card gives its head, menu and link; the Competencies tile draws the rows', () => {
+    // One bar a row in the self-assessment blues, "k of N" and "Only":
+    // tests/dash-competencies-pages.test.js.
     setSelf({ s1: { T2: { COM: { level: 2 } } }, s2: { T2: { COM: { level: 4 }, CT: { level: 1 } } } });
     const html = card();
     expect(html).toContain('data-action="viewMenu" data-menu="core"');
     expect(html).toContain('data-href="/dashboard?course=core-card&amp;manage=questionnaires">Questionnaires →</a>');
-    const com = row(html, 'COM');
-    expect(count(com, /class="dash-core-sq /g)).toBe(3);
-    const titles = [...com.matchAll(/class="dash-core-sq ([^"]+)" title="([^"]+)"/g)].map(m => [m[1], m[2]]);
-    expect(titles).toEqual([
-      ['is-self-4', 'Ben Diaz: Leading'],
-      ['is-self-2', 'Ava Chan: Growing'],
-      ['is-none', 'Cy Eng: not yet'],
-    ]);
-    expect(com).toContain('<span class="dash-core-val">2 of 3</span>');
-    expect(com).toContain('Leading 1 · Confident 0 · Growing 1 · Beginning 0');
-    expect(com).toContain('Not yet: Cy Eng');
-  });
-
-  it('is amber under two thirds of the class', () => {
-    setSelf({ s1: { T2: { COM: { level: 3 }, CT: { level: 3 } } }, s2: { T2: { COM: { level: 3 } } } });
-    const html = card();
-    expect(row(html, 'COM')).toContain('<span class="dash-core-val">2 of 3</span>');
-    expect(row(html, 'CT')).toContain('<span class="dash-core-val is-amber">1 of 3</span>');
-    expect(row(html, 'SAR')).toContain('<span class="dash-core-val is-amber">0 of 3</span>');
-  });
-
-  it("lists the first 8 who haven't, then +N more", () => {
-    const many = Array.from({ length: 12 }, (_, i) => ({ id: 'm' + i, firstName: 'P' + i, lastName: 'Q' + i }));
-    setSelf({ m0: { T2: { COM: { level: 3 } } } });
-    const html = DashOverview.coreCardHtml({
-      cid: CID,
-      allStudents: many,
-      coreSelf: coreSelfRatings(
-        CID,
-        many.map(s => s.id),
-      ),
-      coreView: 'self',
-    });
-    const line = row(html, 'COM').match(/Not yet: ([^<]+)</)[1];
-    expect(line.split(', ').length).toBe(9);
-    expect(line).toMatch(/, \+3 more$/);
+    expect(html).toContain('<div class="dash-core-list dash-core-self"></div></section>');
+    expect(html).not.toContain('dash-core-sq');
   });
 
   it("the teacher's entry wins over the student's own; the student's counts where there is none", () => {
@@ -151,9 +120,6 @@ describe('Core Competencies card', () => {
     const ratings = coreSelfRatings(CID, IDS);
     expect(ratings.byCore.COM).toEqual({ s1: 4 });
     expect(ratings.byCore.COL).toEqual({ s3: 3 });
-    const html = card({ coreSelf: ratings });
-    expect(row(html, 'COM')).toContain('title="Ava Chan: Leading"');
-    expect(row(html, 'COL')).toContain('title="Cy Eng: Confident"');
     // Last term's reflection doesn't count this term.
     StudentVoice.entries = () => reflection({ COM: 2 }).map(e => Object.assign(e, { period: 1 }));
     setSelf({});
@@ -197,7 +163,8 @@ describe('Core Competencies card', () => {
 
   it('groups the rows beside a bar per group, with no headings', () => {
     setSelf({ s1: { T2: { COM: { level: 3 } } } });
-    for (const view of ['self', 'evidence']) {
+    // Evidence's rows; Self-Assessment's are the Competencies tile's.
+    for (const view of ['evidence']) {
       const html = card({ coreView: view });
       const bars = [...html.matchAll(/<span class="dash-core-gbar" title="([^"]+)" aria-hidden="true">/g)].map(
         m => m[1],
@@ -216,23 +183,6 @@ describe('Core Competencies card', () => {
     expect(count(html, /class="dash-core-gap"/g)).toBe(2);
     // Every name keeps its full text in a title.
     expect(html).toContain('<span class="dash-core-name" title="Personal Awareness &amp; Responsibility">');
-  });
-
-  it("the Self-Assessment tip ends with the questionnaire while anyone hasn't (plan F.7b)", () => {
-    setSelf({
-      s1: { T2: { COM: { level: 3 } } },
-      s2: { T2: { COM: { level: 2 } } },
-      s3: { T2: { COM: { level: 4 } } },
-    });
-    const html = card({ coreView: 'self' });
-    expect(row(html, 'COM')).not.toContain('Open the Questionnaire');
-    const ct = row(html, 'CT');
-    expect(ct).toContain(
-      '<a class="dash-core-tip-link" role="link" tabindex="0" data-href="/dashboard?course=' +
-        CID +
-        '&amp;manage=questionnaires">Open the Questionnaire →</a>',
-    );
-    expect(ct.indexOf('Not yet:')).toBeLessThan(ct.indexOf('Open the Questionnaire'));
   });
 
   it('escapes names and titles', () => {

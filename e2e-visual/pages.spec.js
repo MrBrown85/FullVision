@@ -203,7 +203,7 @@ const STATES = [
     sheets: DESKTOP_APP,
     go: async page => {
       await enterDemo(page);
-      await page.locator('.dash-comp-card .dash-comp-row').first().waitFor();
+      await page.locator('.dash-comp-tile .dash-comp-ln').first().waitFor();
     },
   },
   {
@@ -377,7 +377,7 @@ const STATES = [
     sheets: DESKTOP_APP,
     go: async page => {
       await enterDemo(page);
-      await page.locator('.dash-comp-card .dash-comp-row').first().waitFor();
+      await page.locator('.dash-comp-tile .dash-comp-ln').first().waitFor();
       await page.getByRole('button', { name: 'Help' }).click();
       const panel = page.locator('#help-panel');
       await expect(panel).toBeVisible();

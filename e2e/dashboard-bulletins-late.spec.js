@@ -31,7 +31,6 @@ async function signedIn(page, { hold = true } = {}) {
     localStorage.setItem('gb-courses', JSON.stringify(courses));
     localStorage.setItem('gb-config', JSON.stringify({ activeCourse: cid }));
     localStorage.setItem('gb-lastActiveCourse', cid);
-    localStorage.setItem('fv-build-dashRow', '1');
     localStorage.setItem('fv-build-bulletins', '1');
   }, CID);
   // The server's answer to list_bulletins: held until the spec lets it go, then failing on demand.
