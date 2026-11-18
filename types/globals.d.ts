@@ -112,6 +112,7 @@ interface Window {
   DashRecent: unknown;
   DashInboxModel: unknown;
   DashInbox: unknown;
+  DashInboxDrop: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
@@ -359,6 +360,7 @@ declare var MGradePhotos: any;
 declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
+declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
 declare var BuildFlags: { on(name: string): boolean };
 declare var WorkThumbs: any;
 declare var WorkWall: any;
