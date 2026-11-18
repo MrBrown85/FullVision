@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { SCREENS, reach, openDemo } from './student-screens.js';
 
+/* Every test here opens its own page and shares nothing, so they run side by
+   side across workers (a file's tests otherwise run one after another in a
+   single worker, and the whole sweep outran CI's job limit). */
+test.describe.configure({ mode: 'parallel' });
+
 /* Every student screen Demo Mode reaches (e2e/student-screens.js), at the
    phone widths students have (320, 360, 375, 390, 430) and each Text Size
    (Normal, Large, Larger). Text Size zooms the page, so its layout is as
@@ -13,9 +18,12 @@ import { SCREENS, reach, openDemo } from './student-screens.js';
      - a sheet or menu reaching past the top or bottom of the screen.
    Each screen is checked only once its own mark is on screen.
 
-   Normal must draw exactly as `main` did before Text Size, so a fault
-   `main` already had at Normal is listed in KNOWN_AT_NORMAL and allowed
-   there only; Large and Larger allow nothing.
+   A fault `main` already had at Normal may be listed in KNOWN_AT_NORMAL
+   and is allowed there only, in the page's own font; Large, Larger and
+   the wide font allow nothing.
+
+   Each check runs in the page's own font, and again in a wide one
+   (WIDE_FONT) as a Chromebook, Android, Windows or CI's Linux draws it.
 
    Runs in Chromium, and in WebKit with FV_WEBKIT=1 (playwright.config.js). */
 
@@ -27,21 +35,49 @@ const WIDTHS = [
   { width: 430, height: 932 },
 ];
 const SIZES = ['normal', 'large', 'larger'];
+/* A wide face, forced on every element of the student page before its own
+   scripts run: the Mac's font is narrow, and CI's Linux Chromium falls back
+   to DejaVu Sans, which is not. Verdana's letters are DejaVu Sans's widths
+   to within a percent or two, so no extra letter-spacing: with 0.04em more
+   it failed screens CI passes. */
+const WIDE_FONT = '*, *::before, *::after { font-family: Verdana, "DejaVu Sans", sans-serif !important; }';
+const FONTS = ['own', 'wide'];
+/* The wide font runs where it found faults: 320 px at every size, and
+   390 px at Normal (where CI's DejaVu Sans spilled Send to My Teacher). */
+const WIDE_AT = { 320: SIZES, 390: ['normal'] };
+
+/* The screens in groups, one test each, so no one test runs long enough to
+   risk the timeout on a slow runner. Every screen is in exactly one group. */
+const GROUPS = [
+  ['assignments', 0, 7],
+  ['my learning and feedback', 7, 16],
+  ['send work and reflect', 16, 24],
+  ['cards, report and settings', 24, SCREENS.length],
+].map(([name, from, to]) => ({ name, screens: SCREENS.slice(from, to) }));
+
+async function useFont(page, font) {
+  if (font !== 'wide') return;
+  await page.addInitScript(css => {
+    const put = () => {
+      const t = document.createElement('style');
+      t.id = '__wide-font';
+      t.textContent = css;
+      document.documentElement.appendChild(t);
+    };
+    if (document.documentElement) put();
+    else document.addEventListener('DOMContentLoaded', put);
+  }, WIDE_FONT);
+}
+
 // The only boxes that may scroll sideways: the carousel's strip of pages.
 const SIDEWAYS = '.sp-car-track';
 
-/* What `main` already draws at Normal on narrow phones (checked on main on
-   2026-11-18, both engines): left as they are, since Normal must not
-   change. Each is "screen — fault", and holds at the widths listed. */
-const KNOWN_AT_NORMAL = [
-  {
-    at: [320],
-    fault:
-      /^my learning, letter and proficiency — word broken: "(Investigation|Microscope|Ecosystem|Connections)" in span\.sp-row-title$/,
-  },
-  { at: [320], fault: /^reflection, step 1 — spills: button\.sp-opt "(Beginning|Confident)"$/ },
-  { at: [320], fault: /^reflection, step 2 — spills: button\.sp-btn "Send to My Teacher"$/ },
-];
+/* What `main` drew at Normal on narrow phones before Text Size, allowed in
+   the page's own font at the widths listed: "screen — fault". Empty since
+   Nov 18: the three it held (My Learning's titles cut in two, the
+   reflection's steps and its Send to My Teacher spilling at 320 px) now
+   hold in both fonts. */
+const KNOWN_AT_NORMAL = [];
 
 // What is wrong with the screen as it is now, in words. `vw` and `vh` are the screen the test set.
 function faults(page, vw, vh) {
@@ -128,49 +164,58 @@ async function addFourthTab(page) {
   });
 }
 
-for (const vp of WIDTHS) {
-  for (const size of SIZES) {
-    test.describe(vp.width + ' px at ' + size, () => {
-      test.use({ viewport: vp, isMobile: true, hasTouch: true });
+for (const font of FONTS) {
+  for (const vp of WIDTHS) {
+    for (const size of SIZES) {
+      if (font === 'wide' && !(WIDE_AT[vp.width] || []).includes(size)) continue;
+      test.describe(vp.width + ' px at ' + size + (font === 'wide' ? ', wide font' : ''), () => {
+        test.use({ viewport: vp, isMobile: true, hasTouch: true });
 
-      test('every student screen holds together', async ({ page }) => {
-        test.setTimeout(240_000);
-        const errors = [];
-        page.on('pageerror', e => errors.push(String(e)));
-        const found = [];
-        for (const screen of SCREENS) {
-          if (size !== 'normal' && screen.sized === false) continue;
-          await reach(page, screen, { size, desk: false });
-          for (const f of await faults(page, vp.width, vp.height)) {
-            const line = screen.name + ' — ' + f;
-            const known = size === 'normal' && KNOWN_AT_NORMAL.some(k => k.at.includes(vp.width) && k.fault.test(line));
-            if (!known) found.push(line);
-          }
-        }
-        expect(found).toEqual([]);
-        expect(errors).toEqual([]);
-      });
+        for (const group of GROUPS)
+          test('every student screen holds together: ' + group.name, async ({ page }) => {
+            test.setTimeout(120_000);
+            await useFont(page, font);
+            const errors = [];
+            page.on('pageerror', e => errors.push(String(e)));
+            const found = [];
+            for (const screen of group.screens) {
+              if (size !== 'normal' && screen.sized === false) continue;
+              await reach(page, screen, { size, desk: false });
+              for (const f of await faults(page, vp.width, vp.height)) {
+                const line = screen.name + ' — ' + f;
+                const known =
+                  font === 'own' &&
+                  size === 'normal' &&
+                  KNOWN_AT_NORMAL.some(k => k.at.includes(vp.width) && k.fault.test(line));
+                if (!known) found.push(line);
+              }
+            }
+            expect(found).toEqual([]);
+            expect(errors).toEqual([]);
+          });
 
-      test('the tab bar holds four tabs', async ({ page }) => {
-        await openDemo(page, { size }, 'demo-card');
-        await addFourthTab(page);
-        /* Where the words are drawn (a range over the label's text), inside
+        test('the tab bar holds four tabs', async ({ page }) => {
+          await useFont(page, font);
+          await openDemo(page, { size }, 'demo-card');
+          await addFourthTab(page);
+          /* Where the words are drawn (a range over the label's text), inside
            the tab's own box: a label's box can grow past its tab with the
            words in it, so its own scroll width proves nothing. */
-        const labels = await page.locator('.sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
-          els.map(el => {
-            const tab = el.closest('.sp-tab').getBoundingClientRect();
-            const range = document.createRange();
-            range.selectNodeContents(el);
-            const words = [...range.getClientRects()].filter(r => r.width > 0);
-            const fits = words.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1);
-            return { text: el.textContent, fits };
-          }),
-        );
-        expect(labels.map(l => l.text)).toEqual(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
-        expect(labels.filter(l => !l.fits)).toEqual([]);
-        expect((await faults(page, vp.width, vp.height)).filter(f => /tab/.test(f))).toEqual([]);
+          const labels = await page.locator('.sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
+            els.map(el => {
+              const tab = el.closest('.sp-tab').getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              const words = [...range.getClientRects()].filter(r => r.width > 0);
+              const fits = words.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1);
+              return { text: el.textContent, fits };
+            }),
+          );
+          expect(labels.map(l => l.text)).toEqual(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
+          expect(labels.filter(l => !l.fits)).toEqual([]);
+          expect((await faults(page, vp.width, vp.height)).filter(f => /tab/.test(f))).toEqual([]);
+        });
       });
-    });
+    }
   }
 }
