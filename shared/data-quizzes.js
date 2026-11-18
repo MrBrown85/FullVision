@@ -838,14 +838,19 @@ function saveQuiz(cid, aid, payload, tagIds) {
 /**
  * Whether this device knows the class's scores and its students' work, so
  * "no scores and no work on this piece" can be trusted: Demo Mode keeps both
- * here; signed in, the class has loaded (isClassLoaded) and, where its work
- * is the server's, the work has been read at least once. Fails closed.
+ * here; signed in, the class's copy came from (or was confirmed by) the
+ * server this session and, where its work is the server's, the work has been
+ * read at least once. Fails closed: after a failed load, not known.
  * @param {string} cid
  */
 function quizFactsKnown(cid) {
   if (!cid) return false;
   if (_isDemoSession()) return true;
+  // Loaded is not enough: a failed load keeps this device's saved copy and still counts as loaded
+  // (isClassLoaded). Only a copy the server confirmed or replaced this session
+  // (_classFresh, shared/data.js) tells that a piece has no scores.
   if (typeof isClassLoaded !== 'function' || !isClassLoaded(cid)) return false;
+  if (typeof _classFresh === 'undefined' || _classFresh[cid] !== true) return false;
   if (typeof _workOnServer === 'function' && _workOnServer(cid)) {
     return !!(typeof _workRead !== 'undefined' && _workRead[cid] && _workRead[cid].at);
   }

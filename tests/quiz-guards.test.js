@@ -330,9 +330,11 @@ describe('signed in', () => {
   function plant(entries) {
     localStorage.setItem('gb-quiz-unsent-' + CID, JSON.stringify(entries));
   }
+  // A class loaded from the server this session (shared/data.js _classFresh), as a load that worked leaves it.
   const S0 = (extra, after) => () => {
     seed(extra)();
     serverSaysStudentPageOn(CID, true);
+    _classFresh[CID] = true;
     if (after) after();
   };
 
@@ -349,6 +351,7 @@ describe('signed in', () => {
     serverSaysStudentPageOn(CID, false);
     session.signOut();
     _teacherId = teacher;
+    delete _classFresh[CID];
   });
 
   it('a save left by an earlier load, answered since: let go, and never sent with the server’s updated_at', async () => {
@@ -606,6 +609,7 @@ describe('signed in', () => {
       S0({ scores: {} }, () => {
         // The class's load still out.
         _classLoads[CID] = new Promise(r => (arrive = r));
+        _classFresh[CID] = false;
       }),
       CID,
     );
@@ -626,6 +630,7 @@ describe('signed in', () => {
     expect(sent()).toEqual([]);
     // The load lands: the answer appears.
     _classLoads[CID] = true;
+    _classFresh[CID] = true;
     arrive();
     for (let i = 0; i < 4; i++) await settle();
     expect(offeredHere()).toBe(true);
@@ -670,6 +675,78 @@ describe('signed in', () => {
     expect(mount().querySelector('#quiz-not-offered').textContent).toBe(
       'This assessment already has scores, so a quiz cannot be added to it. Make a new assessment for the quiz.',
     );
+  });
+
+  /* The "no scores" fact must come from the server: a failed load keeps this
+     device's saved copy, and the class still counts as loaded. */
+  async function pointsForm(fresh) {
+    session.fake.on('list_quiz', p =>
+      p.p_assessment_id === PTS ? { data: { quiz: null, questions: [], archived: [] }, error: null } : notFound,
+    );
+    openAssignments(
+      S0({ scores: {} }, () => {
+        _classFresh[CID] = fresh;
+      }),
+      CID,
+    );
+    await settled();
+    await probeQuizzes(CID);
+    expect(isClassLoaded(CID)).toBe(true);
+    edit(PTS);
+    for (let i = 0; i < 4; i++) await settle();
+  }
+
+  it('a failed load with a saved copy that has no scores: not offered, and Max Points is not written', async () => {
+    await pointsForm(false);
+    expect(QuizData.factsKnown(CID)).toBe(false);
+    expect(offeredHere()).toBe(false);
+    QuizBuilder.takeAnswer('quiz', null, () => {});
+    expect(QuizBuilder.picked()).toBe(false);
+    expect(form().querySelector('#af-maxpoints').value).toBe('10');
+    expect(form().querySelector('#af-maxpoints').readOnly).toBe(false);
+  });
+
+  it('a load from the server with no scores: offered, and Max Points is tied to the quiz', async () => {
+    await pointsForm(true);
+    expect(offeredHere()).toBe(true);
+    click(mount().querySelector('[data-quiz-act="answer"][data-value="quiz"]'));
+    await settled();
+    const box = form().querySelector('#af-maxpoints');
+    expect(box.value).toBe('1');
+    expect(box.readOnly).toBe(true);
+  });
+
+  it('scores arriving from the server let the tie go: Max Points goes back and is saved as it was', async () => {
+    await pointsForm(true);
+    click(mount().querySelector('[data-quiz-act="answer"][data-value="quiz"]'));
+    await settled();
+    const box = form().querySelector('#af-maxpoints');
+    expect(box.value).toBe('1');
+    // A refresh brings a score entered on another device.
+    const scores = getScores(CID);
+    scores[STUDENTS[0].id] = [
+      { id: U(250), assessmentId: PTS, tagId: T1, score: 8, type: 'summative', date: '2026-10-11' },
+    ];
+    _cache.scores[CID] = scores;
+    const S = QuizBuilder._model();
+    Object.assign(S.qs[0], { prompt: 'Which?' });
+    S.qs[0].choices[0].text = 'A';
+    S.qs[0].choices[1].text = 'B';
+    S.qs[0].answer = [S.qs[0].choices[0].id];
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    expect(box.value).toBe('10');
+    expect(box.readOnly).toBe(false);
+    expect(mount().querySelector('.quiz-note').textContent).toBe(
+      'This assessment already has scores, so a quiz cannot be added to it. Make a new assessment for the quiz.',
+    );
+    await flush();
+    // The piece keeps 10; the quiz is not saved onto a piece that now has a score.
+    expect(getAssessments(CID).find(a => a.id === PTS).maxPoints).toBe(10);
+    expect(sent()).toEqual([]);
+    expect(
+      session.fake.calls.filter(c => c.name === 'update_assessment').map(c => c.params.p_patch.max_points),
+    ).not.toContain('1');
   });
 
   it('while the saved quiz is read the Student Work answers wait', async () => {

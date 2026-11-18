@@ -108,6 +108,7 @@ var QuizBuilder = (function () {
       note: '', // a quiet line: kept on this computer and not saved yet
       ready: null, // the save as read when the form's check passed
       modeTouched: false, // the teacher picked a scoring on this form
+      maxBefore: null, // Max Points as it was before the quiz set it, put back if the tie lets go
       updatedAt: null, // the quiz's updated_at exactly as last answered, sent back with the next save
       stale: false, // the last save was refused: changed somewhere else
       fresh: null, // what the server has, for Use the Other One
@@ -324,6 +325,10 @@ var QuizBuilder = (function () {
      moves no grade. A piece that is a quiz already keeps it. */
   function _blocked() {
     if (!S || S.existed || S.picked) return '';
+    return _whyNot();
+  }
+  /* The sentence for a piece a quiz cannot go on, picked or not; '' while the facts are not known. */
+  function _whyNot() {
     // Scores or work not known yet: not offered at all (no sentence), until they arrive.
     if (!_known()) return '';
     if (_scored())
@@ -513,8 +518,18 @@ var QuizBuilder = (function () {
   function _syncPoints() {
     var box = /** @type {HTMLInputElement | null} */ ($('af-maxpoints'));
     if (!box || !S) return;
-    var tie = S.picked && _mode() === 'points' && !_scored();
+    // Tied only while the server's copy of the class says the piece has no score, at this moment.
+    var tie = S.picked && _mode() === 'points' && _known() && !_scored();
     box.readOnly = tie;
+    var win = box.ownerDocument && box.ownerDocument.defaultView;
+    var Ev = (win && /** @type {any} */ (win).Event) || Event;
+    if (!tie && S.maxBefore != null) {
+      // The tie let go (a score arrived, or the class's scores are no longer known): Max Points goes back.
+      box.value = S.maxBefore;
+      S.maxBefore = null;
+      box.dispatchEvent(new Ev('input', { bubbles: true }));
+    }
+    _watchTie(tie);
     var hint = $('quiz-maxpoints-hint');
     if (tie && !hint && box.parentNode && box.parentNode.parentNode) {
       hint = document.createElement('p');
@@ -526,10 +541,30 @@ var QuizBuilder = (function () {
     if (!tie) return;
     var t = String(_total());
     if (box.value !== t) {
+      if (S.maxBefore == null) S.maxBefore = box.value;
       box.value = t;
-      var win = box.ownerDocument && box.ownerDocument.defaultView;
-      var Ev = (win && /** @type {any} */ (win).Event) || Event;
       box.dispatchEvent(new Ev('input', { bubbles: true }));
+    }
+  }
+
+  /* While tied, the "no scores" fact is checked again every two seconds: a
+     score that arrives from the server lets the tie go before any Save. */
+  /** @type {any} */
+  var _tieTimer = null;
+  /** @param {boolean} on */
+  function _watchTie(on) {
+    if (on && !_tieTimer) {
+      _tieTimer = setInterval(function () {
+        if (!S || !$('quiz-mount')) {
+          clearInterval(_tieTimer);
+          _tieTimer = null;
+          return;
+        }
+        _syncPoints();
+      }, 2000);
+    } else if (!on && _tieTimer) {
+      clearInterval(_tieTimer);
+      _tieTimer = null;
     }
   }
 
@@ -1198,7 +1233,7 @@ var QuizBuilder = (function () {
     if (!S || !S.picked || !$('quiz-mount')) return true;
     if (!_canAdd()) {
       S.msg = '';
-      S.note = "This class's scores are still loading. Save again in a moment.";
+      S.note = _whyNot() || "This class's scores are still loading. Save again in a moment.";
       _draw('#quiz-head');
       return false;
     }
