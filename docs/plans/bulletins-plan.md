@@ -1,12 +1,14 @@
 # Bulletins build plan (2026-11-17)
 
-**Status (Nov 17, night).** A plan. Nothing is built. No builder starts until Colin says the plan is good. His eight decisions of Nov 17 are settled and are not reopened here. Seven more are open (see "Decisions that are Colin's"); no slice that rests on one starts before it is settled.
+**Status (Nov 17, late night).** A plan. Nothing is built. Colin's eight decisions of Nov 17 are settled and are not reopened here. The choices left after them were chosen by the orchestrating session under Colin's delegation, Nov 17 ("make whatever choices you think is best"); three found while tracing the code are this plan's own picks under the same delegation and are listed for him. No builder starts until the orchestrating session has reviewed this plan. Three things stay Colin's whatever is delegated: every migration is shown to him and applied only on his OK; nothing is released without his word; and the district privacy officer's view is his to get.
 
-**What it is.** A one-way class feed. The teacher posts a bulletin; students read it on the first tab of their page; the teacher sees who has seen it. A Quick Poll and a Whiteboard are two kinds of bulletin, and either opens full screen on the classroom TV with Present. Students cannot post or reply, apart from Whiteboard sentences, every one of which reaches the teacher first.
+**What it is.** A one-way class feed. The teacher posts a bulletin; students read it on the first tab of their page; the teacher sees who has seen it. A Quick Poll and a Whiteboard are two kinds of bulletin, and either opens full screen on the classroom TV. Students cannot post or reply, apart from Whiteboard sentences, every one of which reaches the teacher first.
 
 **The name** (Colin, Nov 17: "Let's call it Bulletins, then."). Bulletins is the teacher's top tab, the student's first tab, the phone app's tab and the Dashboard tile. One post is a bulletin; Post is the verb. Whiteboard and Photo of the Board keep their names. Tables, functions, routes and classes are named from "bulletin".
 
-**Board.** "Bulletin Board Artboard" (https://claude.ai/artifact/FjK3VcG1A6M31nn8vVVB38): A1 to A3 (the Dashboard tile), B1 to B3 (the teacher's page, writing a bulletin, who has seen it), C1 to C3 (the student's tab), D (Quick Poll), E1 and E2 (Whiteboard), F (Learner Profile). An independent review is still running; the designer will republish it with the new name and with boards for the teacher's phone. **Every builder's brief is written from the board as it stands that day, not from this plan's summary of it.**
+**Board.** "Bulletins Artboard" (https://claude.ai/artifact/FjK3VcG1A6M31nn8vVVB38), version 5, final for planning after an independent review and a fix pass: A1 to A3 (the Dashboard tile), B1 to B3 (the teacher's page, writing a bulletin, who has seen it), C1 to C3 (the student's tab), T1 to T5 (the teacher's phone), D1 and D2 (Quick Poll, open and closed), E1 to E3 (Whiteboard; shown, and no connection), F (Learner Profile). **Every builder's brief is written from the board as it stands that day, not from this plan's summary of it.**
+
+Where this plan differs from the board, on purpose, each with its reason further down: a bulletin's files go in a bucket of their own, not with handouts; a web page, text file or EPUB on a bulletin is not in the first stage; the TV does not use Realtime; the phone's Whiteboard queue comes with the Whiteboard (stage 3), not after it, because a teacher whose laptop mirrors to the TV approves from the phone.
 
 ## Rules every slice follows
 
@@ -63,7 +65,7 @@ Traced on `main` at `68cf3dd8` on Nov 17. File and line as they stand there.
 - **Students' phones cannot use Realtime.** `s/index.html` loads no Supabase library and holds no key, only the project's address (`:23-25`); a card sign-in is not a Supabase sign-in. The board assumed this; it is right.
 - **Links.** A link on an assignment card opens at once (`s/page-view.js:741-751`). "Open this website in a new tab?" exists only inside the handout viewer, as a private function (`shared/handout-viewer.js:379-413`).
 - **Pages to swipe through**: `s/page-carousel.js` is written for handouts (`kind === 'handout'`, `:48-75`).
-- **Groups.** A group exists only on an assessment (`assessment.collab_config`), read by `student_submit._group_members` (`migrations/2026111120_markup_reflect_revise.sql:1391-1411`). The student page shows a group as counts only: "no name of anyone in the group" (`shared/student-view.js:963`). The board's Whiteboard shows "for Cece, Noor and Sam" on a student's phone, which that rule forbids today (decision 8).
+- **Groups.** A group exists only on an assessment (`assessment.collab_config`), read by `student_submit._group_members` (`migrations/2026111120_markup_reflect_revise.sql:1391-1411`). The student page shows a group as counts only: "no name of anyone in the group" (`shared/student-view.js:963`). The board's Whiteboard shows "with Noor and Sam" on a student's phone, which that rule forbids today; this plan keeps the rule.
 - **Demo Mode** on the student page is its own world: hand-written sample data in `s/app.js` (`demoPage`, `:1041-1075`; `DEMO_ANSWERS`, `:1150`). It shares one thing with the teacher's Demo Mode, read-only: the per-student options kept in `localStorage` (`s/student-data.js:743-753`).
 - **Preview as Student** draws the student's page from the teacher's own data with the student page's own code (`teacher/preview-student.js:45-63`) and sends nothing.
 
@@ -82,16 +84,21 @@ gradebook-prod, read only, counts only, Nov 17.
 | Assessments with groups set                                   | 4 of 149                 |
 | Tables Realtime publishes                                     | 1 (`course_sync_cursor`) |
 
-What they decide: 22 of 106 students have no card, so a "Seen by 18 of 26" that counts them would never reach 26 (decision 6). About 66 phones a day is the load any refresh timer is sized for. Groups are rare, so My Group is the last piece of the Whiteboard, not the first.
+What they decide: 22 of 106 students have no card, so a "Seen by 18 of 26" that counts them would never reach 26; the count leaves them out and names them apart. About 66 phones a day is the load any refresh timer is sized for. Groups are rare, so My Group is the last piece of the Whiteboard, not the first.
 
 ## How it is built
 
-- **A bulletin is posted while online; nothing is queued.** Posting, editing and deleting call the server directly and show the answer where the teacher pressed ("Posting…", then the bulletin, or "That didn't post. Try again."), as sticker codes do. The server's id comes back in the answer, so no local id is ever made (CLAUDE.md rule 6 cannot be broken) and `shared/data.js` is not touched. A bulletin that went out an hour after it was written, when the Wi-Fi came back, would be worse than one that says it did not post. The words being written are kept on the device until the post lands.
-- **A bulletin's files** (a photo, a PDF's pages) are JPEG pages made in the browser by `PhotoShrink.prepare`, uploaded before Post is pressed, in a private bucket of their own, `bulletin-files` (JPEG only, 2 MB a page), as handout files got `handout-files`. A bucket of its own means the fence and the nightly sweep on `student-photos` are not changed. Same project and region; no new party or key. A web page, a text file or an EPUB on a bulletin is not in the first stage (see "Not in this plan").
-- **The teacher's screens ask on a timer, and only while they are showing.** The Bulletins page: when it opens, after each of the teacher's own writes, and every 15 seconds while its tab is the one being looked at. The Dashboard tile: when the Dashboard draws, at most every 30 seconds. Present and the Whiteboard queue: every 2 seconds, for that one bulletin. One teacher's screen asking every 2 seconds is 30 small reads a minute. Nothing rides Realtime, so no student's answer is ever on a channel.
+- **Post works with no connection, and a bulletin that is waiting shows only on the sync dot** (board T1 to T4 and E3; CLAUDE.md rule 5). A teacher in a classroom with poor Wi-Fi takes the photo, presses Post and walks on. So a bulletin goes through the outbox (`window.v2Queue`, by `_writeRpc`), as every other write does, and a photo's pages wait in the photo queue.
+  - **No local id is ever made.** The device makes the bulletin's idempotency key when Post is pressed. Until the server answers, the teacher's own feed shows the bulletin from the device as "Not Sent Yet", known by that key; the server's row replaces it. No other write can name a bulletin that has not landed (Edit, Pin and Delete are not offered on one; taking it back removes it from the outbox), so nothing is re-keyed and CLAUDE.md rule 6 cannot be broken.
+  - **Checked in the code:** the phone's camera is a file input with `capture="environment"` (`teacher-mobile/add-work.js:254`); `PhotoShrink.prepare` redraws the photo, which drops location and camera details, then checks the bytes for any left (`shared/photo-shrink.js:24-27`); the photo queue feeds the sync dot (`shared/photo-queue.js:60`, `:483`). **Not true as the board says it:** the photo queue knows two kinds of record, a student's work and a handout (`:66-76`, `:682-687`), and refuses anything else. A bulletin's pages are a third kind, added in B1f. That is a change to the queue every student's photo goes through, so B1f has an Opus builder and a Fable review.
+  - **Students never see half a bulletin.** `post_bulletin` makes the bulletin and its file rows together; a bulletin with a file still on its way is not sent to students, and the server shows it when the last page is finished.
+  - A bulletin written with no connection goes out when the connection returns, and its time is when the server got it. The feed says Not Sent Yet until then.
+- **A bulletin's files** (a photo, a PDF's pages) are JPEG pages made in the browser by `PhotoShrink.prepare`, in a private bucket of their own, `bulletin-files` (JPEG only, 2 MB a page), as handout files got `handout-files`. The board says "stored as handouts are"; a bucket of its own means the fence and the nightly sweep on `student-photos`, which name every allowed path, are not changed. Same project and region; no new party or key. A web page, a text file or an EPUB on a bulletin is not in the first stage (see "Not in this plan").
+- **A student's own writes wait on the phone when there is no connection** (board E3: "Saved on this phone. It'll send when you're back online."), as Send Work's pages do (`s/send.js`'s `online` retry): a reaction in stage 1, a poll answer in stage 2, a sentence in stage 3.
+- **The teacher's screens ask on a timer, and only while they are showing.** The Bulletins page: when it opens, after each of the teacher's own writes, and every 15 seconds while its tab is the one being looked at. The Dashboard tile: when the Dashboard draws, at most every 30 seconds. The TV screen and the Whiteboard queue: every 2 seconds, for that one bulletin. One teacher's screen asking every 2 seconds is 30 small reads a minute. Nothing rides Realtime, so no student's answer is ever on a channel.
 - **The student's page asks the `bulletins` route**: when the class opens, when the Bulletins tab is pressed and its copy is over 20 seconds old (Reflect's rule), when the student comes back to the tab from elsewhere, and every 30 seconds while the Bulletins tab is showing in a tab someone is looking at. Thirty phones in one room is one read a second. The answer carries the open class's bulletins and, for every class on the device, how many are new, for the red count and for "2 new" in Your Classes.
 - **The opening rule needs that answer before the first draw.** `openPage` asks `page` and `bulletins` together. If `bulletins` has not answered within one second of `page`, the class opens on Assignments and the tab fills in when it arrives.
-- **Nothing existing is patched for stage 1 except three small things**: the `write_log.kind` check gains `bulletin`; the removal worker learns the new bucket's path pattern; `tests/db/table-owners.mjs` gains the new tables. `student_submit.page` and `_session_classes` are not changed: the counts come from the new route.
+- **Nothing existing is patched for stage 1 except four small things**: the `write_log.kind` check gains `bulletin`; the removal worker learns the new bucket's path pattern; the photo queue learns a third kind of record (B1f); `tests/db/table-owners.mjs` gains the new tables. `student_submit.page` and `_session_classes` are not changed: the counts come from the new route.
 - **A contract first.** B1a's first commit is `migrations/local-test/bulletins-contract.md` (as handouts have `handouts-links-contract.md`): every table, column, function, argument and answer below, exact. B1b, B1c, B1d and B1f build to it.
 
 ### The contract in outline
@@ -145,30 +152,30 @@ One PR per slice. A migration's PR is pushed once, after it is applied, with the
 | Slice       | What                                                                    | Waits for                                  | Builder | Review     |
 | ----------- | ----------------------------------------------------------------------- | ------------------------------------------ | ------- | ---------- |
 | **Stage 1** | **Bulletins, Seen and reactions**                                       |                                            |         |            |
-| B1a         | The contract; M1 (the teacher's side of the database)                   | Colin's go; decision 6                     | Opus    | Fable high |
+| B1a         | The contract; M1 (the teacher's side of the database)                   | The orchestrator's go                      | Opus    | Fable high |
 | B1b         | M2 (the student's side); the edge routes; the removal worker            | The contract                               | Opus    | Fable high |
 | B1c         | The data layer and the teacher's Bulletins page                         | The contract to build; M1 applied to merge | Sonnet  | Opus       |
-| B1d         | The student's first tab                                                 | The contract; the gear-menu PR; decision 2 | Sonnet  | Opus       |
-| B1e         | The Dashboard tile                                                      | B1c; the Dashboard plan's D2; decision 1   | Sonnet  | Opus       |
-| B1f         | The phone app: the feed, Seen by, write a bulletin, a photo on the spot | B1c                                        | Sonnet  | Opus       |
-| B1g         | Turn it on: the flag, the privacy page, Download All My Data, help      | B1a to B1f; decision 9; Colin's look       | Sonnet  | Fable      |
-| **Stage 2** | **Quick Polls and Present**                                             |                                            |         |            |
+| B1d         | The student's first tab                                                 | The contract; the gear-menu PR             | Sonnet  | Opus       |
+| B1e         | The Dashboard tile                                                      | B1c; the Dashboard plan's D2               | Sonnet  | Opus       |
+| B1f         | The phone app: the feed, Seen by, write a bulletin, a photo on the spot | B1c                                        | Opus    | Fable      |
+| B1g         | Turn it on: the flag, the privacy page, Download All My Data, help      | B1a to B1f                                 | Sonnet  | Fable      |
+| **Stage 2** | **Quick Polls and the TV Screen**                                       |                                            |         |            |
 | B2a         | M3; the `bulletin-answer` route                                         | Stage 1 on                                 | Opus    | Fable high |
-| B2b         | The teacher: make a poll, names and totals, Close, Present; the phone   | B2a's contract                             | Sonnet  | Opus       |
+| B2b         | The teacher: make a poll, names, Close Poll, the TV screen; the phone   | B2a's contract                             | Sonnet  | Opus       |
 | B2c         | The student: answer a poll                                              | B2a's contract                             | Sonnet  | Opus       |
 | **Stage 3** | **Whiteboard**                                                          |                                            |         |            |
-| B3a         | M4; the `bulletin-sentence` route; the clean-up                         | Stage 2; decisions 3 and 7                 | Opus    | Fable high |
+| B3a         | M4; the `bulletin-sentence` route; the clean-up                         | Stage 2                                    | Opus    | Fable high |
 | B3b         | The teacher: the queue, Show These N, Undo, the TV                      | B3a's contract                             | Sonnet  | Opus       |
 | B3c         | The student: write a sentence                                           | B3a's contract                             | Sonnet  | Opus       |
 | B3d         | The phone: the queue                                                    | B3b                                        | Sonnet  | Opus       |
-| B3e         | My Group                                                                | B3c; decision 8                            | Opus    | Fable      |
+| B3e         | My Group                                                                | B3c                                        | Opus    | Fable      |
 | **Stage 4** | **Learner Profile**                                                     |                                            |         |            |
 | B4a         | M5                                                                      | Stage 3                                    | Opus    | Fable high |
 | B4b         | The Learner Profile section; Add as Observation                         | B4a                                        | Sonnet  | Opus       |
 
 ### B1a. The contract and the teacher's side of the database
 
-**Build.** `migrations/local-test/bulletins-contract.md`, then M1 as in "Migrations". Seen by N of M is counted in the database: N is the students who have seen it, M is the students who can (decision 6); both leave out a withdrawn student and a paused one. `delete_bulletin` deletes the bulletin and everything students did on it, and queues its files; **it deletes data, so its PR says so for Colin's review** (CLAUDE.md rule 2). A file started and never posted is dropped after two hours, as an unfinished handout is.
+**Build.** `migrations/local-test/bulletins-contract.md`, then M1 as in "Migrations". Seen by N of M is counted in the database: N is the students who have seen it, M is the students who can open the page (enrolled, not paused, with a working card); both leave out a withdrawn student and a paused one, and the answer says how many have no card yet. `delete_bulletin` deletes the bulletin and everything students did on it, and queues its files; **it deletes data, so its PR says so for Colin's review** (CLAUDE.md rule 2). A file started and never posted is dropped after two hours, as an unfinished handout is.
 
 **Tests** (a script of scenarios, `migrations/local-test/bulletins.py`, in the shape of `scan_labels.py`): post, edit, delete; another teacher can read and change nothing; a paused and a withdrawn student are in neither N nor M; a student deleted for good takes their rows; a purged class takes everything and queues every file; the same key twice posts once; two posts at once; the defaults; apply; undo. `npm run test:db` with the migration loaded.
 
@@ -186,14 +193,14 @@ What a student is sent for a bulletin: its kind, words, link, files, times, whet
 
 **Build.**
 
-- `shared/data-bulletins.js`: reads and writes as in "How it is built"; Demo Mode keeps bulletins on the device in `gb-bulletins-<class>` (added to the keys Reset Demo Data and deleting a class clear, `shared/data-courses-terms.js:144-202`), with the sample class's bulletins from the board in `shared/seed-data.js`.
-- `teacher/page-bulletins.js` and `teacher/bulletins.css`: the page at `/bulletins`, the tab after Assignments (boards B1 to B3). The box at the top opens in place; four kinds in one choice, with Quick Poll and Whiteboard not offered until their stages; a reminder's Until date and its linked assessment (it unpins itself after the date); a link with its name; + Add a File and a photo; Let Students React, off by default; Post the only blue button. The feed: pinned first, then newest first, one grey line of facts on each. "Seen by 18 of 26" opens the list under the bulletin, not seen first, with Show It Again on These N Phones. The ⋯ menu: Edit, Pin or Unpin, Delete (asks first and says what goes).
+- `shared/data-bulletins.js`: reads and writes as in "How it is built" (the outbox, the device's key, Not Sent Yet); Demo Mode keeps bulletins on the device in `gb-bulletins-<class>` (added to the keys Reset Demo Data and deleting a class clear, `shared/data-courses-terms.js:144-202`), with the sample class's bulletins from the board in `shared/seed-data.js`.
+- `teacher/page-bulletins.js` and `teacher/bulletins.css`: the page at `/bulletins`, the tab after Assignments (boards B1 to B3). The box at the top opens in place; four kinds in one choice, with Quick Poll and Whiteboard not offered until their stages; a reminder's Until date and its linked assessment (it unpins itself after the date); a link with its name; + Add a File and a photo; Let Students React, off by default; Post the only blue button. The feed: pinned first, then newest first, one grey line of facts on each. "Seen by 18 of 26 · 8 Not Seen" (or "Seen by All 26", or "Not Seen Yet") opens the list under the bulletin, not seen first, with Show It Again on These N Phones and "Jordan Kim Not Counted (Page Paused)". The ⋯ menu: Edit, Pin or Unpin, Delete (asks first and says what goes).
 - A class with its Student Page off: the page says so in a sentence with a link to Class Settings, and Post still works.
 - The eight places a new page is named.
 
 **Files.** `shared/data-bulletins.js`, `teacher/page-bulletins.js`, `teacher/bulletins.css` (new); `shared/constants.js` (`TB_PAGES`), `teacher/router.js`, `teacher/app.html`, `sw.js`, `netlify.toml`, `serve.json`, `scripts/e2e-server.mjs`, `scripts/dev-local.mjs`, `shared/seed-data.js`, `shared/data-courses-terms.js`, `e2e/phone-width-desktop-pages.spec.js` (a line or a few each).
 
-**Tests.** Unit: the data layer in Demo Mode and against stand-in server answers (posted, refused, no server function yet, a late answer for another class). Browser (`e2e/bulletins-teacher.spec.js`, Demo Mode, flag on): write each kind, pin, edit, delete, the Seen list; the composer and the confirm are not on screen at rest; flag off, no tab.
+**Tests.** Unit: the data layer in Demo Mode and against stand-in server answers (posted, waiting with no connection and then landed once, refused, no server function yet, a late answer for another class). Browser (`e2e/bulletins-teacher.spec.js`, Demo Mode, flag on): write each kind, pin, edit, delete, the Seen list; the composer and the confirm are not on screen at rest; flag off, no tab.
 
 ### B1d. The student's first tab
 
@@ -204,8 +211,9 @@ What a student is sent for a bulletin: its kind, words, link, files, times, whet
 - Seen by the rule returned work uses. Reactions: three words, one tap, their own choice shown, nothing about classmates.
 - A file's pages swipe sideways in the bubble; a tap opens the page full size. `s/page-carousel.js` is written for handouts, so the slice either teaches it a second kind of source or draws its own from the same parts; the builder says which in the PR.
 - A link is a card with the site's name. A tap asks "Open this website in a new tab?" with the address; the question moves out of the handout viewer into one shared function both use. Links on assignment cards keep opening at once; that is a separate question for Colin, listed under "Found on the way".
-- A reminder linked to an assignment carries that card's status band and opens the card.
-- **The opening rule** as Colin settles it (decision 2).
+- A reminder linked to an assignment carries that card's status band and opens the card. The active reminder also stays as a slim bar under the header; a tap scrolls to it.
+- **Large text.** The tab bar holds four tabs at text sizes from 12 to 18 px; from 16 px "Assignments" breaks onto two lines on the board. The slice tests the real bar at those sizes, with the icons in one row.
+- **The opening rule.** A class with a bulletin opens on Bulletins, at the New line; a class with none opens on Assignments, exactly as today. Coming back to an open class keeps the tab. It is one place in the code (`s/app.js:2278-2289`). The Assignments tab keeps its own red count.
 - Demo Mode: the demo card reads the demo teacher's bulletins from the device, read-only, as it reads the per-student options; with none, the board's samples. Preview as Student shows the tab and sends nothing, a Seen mark included.
 - Built on top of the gear-menu PR (it replaces Log Out and the class picker in `s/page-view.js`, `s/app.js` and `s/student.css`), which lands first.
 
@@ -215,19 +223,21 @@ What a student is sent for a bulletin: its kind, words, link, files, times, whet
 
 ### B1e. The Dashboard tile
 
-Boards A1 to A3: the pinned reminder and the latest bulletins, one line each with Seen by; Write a Bulletin; Open Bulletins →. A row opens that bulletin on the page, scrolled to and outlined. Empty: "Nothing Posted Yet" at the filled height. Where it sits is decision 1; the tile is built for the place Colin picks, and mounts in the Dashboard plan's row (D2). Files: `teacher/dash-bulletins.js`, `.css` (new); one mount line each in `teacher/dash-overview.js` and `teacher/page-dashboard.js`.
+Boards A1 to A3: the pinned reminder and the latest bulletins, one 38 px row each with Seen By; Write a Bulletin; Open Bulletins →. A row's words open that bulletin on the page; Seen By is its own button. Empty: "Nothing Posted Yet" at the filled height. A bulletin just posted says Just Now in bold, so it reads as new without colour.
+
+**Where it sits is settled: stacked under the Inbox** in the Dashboard's left two thirds (Colin, Nov 17, on the stacked board; see `dashboard-inbox-plan.md`). The board measured the tile at 224 px at 669 wide; in the stacked row its height is its share of the left column (about 40%), by the rule on the redrawn Dashboard board, and the tile is built to that. **It lands with this stage, not with the Dashboard**: until Bulletins is on, the Inbox has the whole column, so no teacher sees an empty slot, and either build can be turned on first. Files: `teacher/dash-bulletins.js`, `.css` (new); one mount line each in `teacher/dash-overview.js` and `teacher/page-dashboard.js`.
 
 ### B1f. The phone app
 
 Colin, Nov 17: "add the bulletin board to the teacher app as well, so that they can post from their phone".
 
-**Where it lives: a fourth tab, Bulletins.** The three tabs are each one job about students (find one, observe one, grade one); a bulletin is about the class, and belongs under none of them. Four tabs fit the bar. `MTabBar`'s list, `index.html`'s buttons and `_renderTab` each gain one entry.
+**Where it lives: a fourth tab, Bulletins, last in the bar** (boards T1 to T4). The three tabs are each about one student (find one, observe one, grade one); a bulletin goes to every student's phone. It is kept out of Observe on purpose: Observe's camera files a private note about one student, and a class-wide bulletin started from there is the mistake that would hurt most. `MTabBar`'s list, `index.html`'s buttons and `_renderTab` each gain one entry.
 
-**Build.** `teacher-mobile/tab-bulletins.js`: the feed and Seen by (the same list, not seen first); Write a Bulletin with an announcement, a reminder, a link, a file, and **Photo of the Board**: the camera opens, the photo is made smaller by `PhotoShrink.prepare` as every photo is, the composer reminds the teacher once to check for students' faces, and Post sends it. It uses `shared/data-bulletins.js`: the same functions as the desktop page, no second write path. Demo Mode works.
+**Build.** `teacher-mobile/tab-bulletins.js`: the feed with Seen By (T1); who has and has not seen a bulletin, as a sheet, with Show It Again (T2); **Post a Photo** (T3): Add Work's camera screen as it is, the photo made smaller and its location removed by `PhotoShrink.prepare`, "Check the photo for students' faces before you post.", a caption, Retake and Post; **Write a Bulletin** (T4), a sheet with an announcement or a reminder, Stays Pinned Until, Linked To, Add a Link, Add a File and Let Students React. The screen says where it posts ("Posts to Science 8: every student's phone."). It uses `shared/data-bulletins.js`: the same functions as the desktop page, no second write path. Post works with no connection: the photo waits in the photo queue as a third kind of record (`shared/photo-queue.js`, "How it is built"). Demo Mode works.
 
-**What waits.** Making a Quick Poll and reading its totals come to the phone in B2b. The Whiteboard queue comes in B3d, where it matters most (decision 7): on touch, the first tap crosses a sentence out and shows Delete and Keep; the second deletes.
+**What waits.** T5 is later: a poll's result with Show Names and Close Poll comes to the phone in B2b; the Whiteboard queue comes in B3d, with the Whiteboard and not after it: a teacher whose laptop mirrors to the TV approves from the phone. On touch the first tap crosses a sentence out and shows Keep and Delete; Delete removes it, with the same Undo line. Taps, not a swipe: a swipe is hidden and fires by accident in a long list.
 
-**Tests.** Unit on the tab's model; browser at 390 px in Demo Mode: write a bulletin with a made-up photo and see it in the feed; the tab is absent with the flag off.
+**Tests.** Unit on the tab's model. The photo queue: a bulletin's pages are kept, sent in order and committed once; a student's work and a handout queued beside them go exactly as before (every existing photo-queue test passes untouched); a bulletin taken back before it sent leaves nothing behind. Browser at 390 px in Demo Mode: Post a Photo with a made-up photo and see it in the feed; the tab is absent with the flag off.
 
 ### B1g. Turn it on
 
@@ -236,66 +246,71 @@ Colin, Nov 17: "add the bulletin board to the teacher app as well, so that they 
 - Download All My Data gains a Bulletins sheet. The class backup does not hold bulletins, as it does not hold handouts; its note says so.
 - A help article for the page, with pictures (`scripts/help-shots.mjs`).
 - DECISIONS and CLAUDE.md's Current state.
-- **The check before it merges**, by someone who built none of it: every board in a real browser, the teacher's page at 1280 × 800, the student's tab and the phone app at 390 px, light and dark, ad-block rules on, against the board; then a signed-in pass in Colin's test class: post, open the card on a phone, watch Seen by rise, pause that student and see them leave the count and lose the tab. Then Colin looks at it with the flag set on his own devices before the default changes.
+- **The check before it merges**, by someone who built none of it: every board in a real browser, the teacher's page at 1280 × 800, the student's tab and the phone app at 390 px, light and dark, ad-block rules on, against the board; then a signed-in pass in Colin's test class: post, open the card on a phone, watch Seen by rise, pause that student and see them leave the count and lose the tab. Colin is sent pictures and can try it with the flag set on his own devices; the release is his word.
 
-### Stage 2. Quick Polls and Present
+### Stage 2. Quick Polls and the TV Screen
 
-Board D. A poll is a bulletin with choices (the teacher's own, Scale 1 to 5, or the class's groups). A student taps once and can change it until Close. The teacher's page shows totals and, on opening it, names; **Present** shows totals only, full screen, building as answers arrive (asked every 2 seconds). Present opens full screen in place and can also open in a window of its own to drag to a second screen. Students see their own answer and "Your teacher sees your answer. The class sees totals only." The server refuses an answer on a closed poll and a choice that is not one of the bulletin's. A poll is not a reflection: it is not kept on reports and feeds nothing. "A groups poll becomes the groups" (the board's pleasant surprise) is the last item of the stage and is dropped from it if it would touch the assessment form.
+Boards D1 and D2. A poll is a bulletin with choices (the teacher's own, Scale 1 to 5, or Our Groups). A student taps once and can change it until the teacher presses Close Poll. The teacher's page shows totals, and names under each choice with Show Names; **the TV screen** (Post and Open the TV Screen) shows totals only, full screen, building as answers arrive (asked every 2 seconds), and "Closed" with the final totals afterwards; a long question steps down in size and holds two lines. The TV screen opens full screen in place and can also open in a window of its own to drag to a second screen. Students see their own answer and "Your teacher sees your answer. The class sees totals only. It isn't part of your grade."; a closed poll keeps their answer and says it is closed. The server refuses an answer on a closed poll and a choice that is not one of the bulletin's. **A poll's answers never reach reports or grades**; the Learner Profile counts only that a student answered. "A groups poll becomes the groups" (the board's pleasant surprise) is the last item of the stage and is dropped from it if it would touch the assessment form.
 
 ### Stage 3. Whiteboard
 
 Boards E1 and E2, with Colin's rule (Nov 17): "the whiteboard messages from students should filter first to the teacher before being 'approved' when the teacher hovers it- it crosses out, and when clicked, it deletes."
 
 - Every sentence lands in the teacher's queue. Nothing reaches the TV until the teacher presses Show These N on the TV, and that press shows exactly the sentences the queue listed: one that arrived since waits.
-- Pointing at a sentence crosses it out; a click deletes it. The server marks it deleted at once, so it can never be shown; Undo is offered (how long is decision 3); after that it is removed for good, and the clean-up removes any a closed laptop left behind. A deleted sentence counts for nothing and is kept nowhere.
+- Pointing at a sentence crosses it out; a click deletes it. The server marks it deleted at once, so it can never be shown; Undo is offered for 8 seconds; after that it is removed for good, and the clean-up removes any a closed laptop left behind. A deleted sentence counts for nothing and is kept nowhere.
+- **Nothing moves under the pointer.** A deleted row collapses in place to "Deleted Tyler's sentence · Undo". After a delete, the pointer must move 4 px before another row crosses out, so a double click deletes one sentence, not two. Each delete has its own Undo, and Show clears any Undo still waiting. A sentence that arrives after a batch has gone up carries "New" and waits.
+- The TV says how many are up ("6 of 9 on the Board"), pages through them, and caps each sentence at 4 lines.
 - Keyboard: Tab or the arrow keys move a focus ring without crossing anything out; Delete or Backspace deletes the one in focus. Touch: the first tap crosses out and shows Delete and Keep.
 - The student's phone says "Sent to your teacher" for every sentence and never changes, so a deleted one looks like any other. A student never sees another student's sentence on a phone, only on the TV.
 - The TV shows sentences without names unless Names on Screen is on for that bulletin.
-- The server refuses a sentence on a closed bulletin, caps its length, and allows a set number per student per bulletin (decision 3).
-- **Where the teacher approves** when the laptop is mirrored to the TV is decision 7, and it shapes B3b and B3d.
-- **My Group** (B3e) reads an assessment's groups, and is last. Whether a student's phone may name their group-mates is decision 8.
+- The server refuses a sentence on a closed bulletin, caps its length, and allows three per student per bulletin.
+- **Where the teacher approves.** The TV screen is its own window for the second screen; a teacher whose laptop only mirrors approves from the phone (B3d, in this stage).
+- **My Group** (B3e) reads an assessment's groups, and is last. A student's phone shows a group as a count, never names.
 
 ### Stage 4. Learner Profile
 
-Board F. A section in the Learner Profile tab (the board calls it "On the Bulletin Board"; it takes the new name): bulletins seen, polls answered, sentences shown on the TV and how many of those with a group; then the student's own shown sentences. Counts and the student's words; no percent, no level, nothing that feeds a grade. **Add as Observation** opens the observation dialog with the sentence filled in (`ObsCapture.openDialog` gains an option for the words) and saves through the observation call that exists. A participation grade is not in this design: it would be grade math and runs against BC's reporting policy.
+Board F. A section in the Learner Profile tab, "In Bulletins": bulletins seen, polls answered (that the student answered, never what), sentences shown on the TV and how many of those with a group; then the student's own shown sentences. Counts and the student's words; no percent, no level, nothing that feeds a grade. **Add as Observation** opens the observation dialog with the sentence filled in (`ObsCapture.openDialog` gains an option for the words) and saves through the observation call that exists. A participation grade is not in this design: it would be grade math and runs against BC's reporting policy.
 
 ## Critical path, and what runs side by side
 
-Stage 1's path is: Colin's go and decision 6 → the contract → M1 written, reviewed and **shown to Colin** → applied → M2 and the edge routes shown to Colin → applied and deployed → B1c, B1d and B1f merge → B1g.
+Stage 1's path is: the orchestrator's go → the contract → M1 written, reviewed and **shown to Colin** → applied → M2 and the edge routes shown to Colin → applied and deployed → B1c, B1d and B1f merge → B1g.
 
 - **Colin's two OKs on SQL are the narrowest points.** CI's database check fails any app code that calls a function the live database does not have (`scripts/check-db-drift.mjs` reads `shared`, `teacher` and `teacher-mobile`), so B1c and B1f cannot merge before M1 is applied. The SQL is brought to him as soon as it is reviewed, not when the screens are ready.
 - **While the database is in review, three builders work in Demo Mode**: B1c (the teacher's page), B1d (the student's tab), and, once B1c's data layer has merged or settled, B1f (the phone). B1a and B1b are two builders with two test databases, both building to the contract.
-- B1e waits for the Dashboard's row and decision 1; it is not on the path to turning Bulletins on, which can happen with the tile to follow.
+- B1e waits for the Dashboard's row (D2); it is not on the path to turning Bulletins on, which can happen with the tile to follow.
+- How this build sits beside the Dashboard and Quizzes is in `docs/plans/quizzes-plan.md`, "Order across the three plans".
 - Stages 2, 3 and 4 follow in order. Each stage's migration is brought to Colin early in the same way.
 
 ## One writer per file
 
-| File                                                                                             | Writers, in order                                                                  |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `s/page-view.js`, `s/app.js`, `s/student.css`                                                    | The gear-menu PR (in flight), then B1d. Later stages write `s/bulletins*.js` only. |
-| `s/bulletins.js`, `s/bulletins-view.js`, `s/bulletins.css`                                       | B1d, B2c, B3c, B3e                                                                 |
-| `supabase/functions/student-submit/handler.ts`                                                   | B1b (one registration)                                                             |
-| `supabase/functions/student-submit/bulletin-routes.ts`                                           | B1b, B2a, B3a                                                                      |
-| `supabase/functions/_shared/storage-rest.ts`, `send-routes.ts`                                   | B1b                                                                                |
-| `shared/data-bulletins.js`                                                                       | B1c, B2b, B3b, B4b                                                                 |
-| `teacher/page-bulletins.js`, `teacher/bulletins.css`                                             | B1c, B2b, B3b                                                                      |
-| `teacher/bulletins-present.js`                                                                   | B2b makes it, then B3b                                                             |
-| `teacher-mobile/tab-bulletins.js`                                                                | B1f, B2b, B3d                                                                      |
-| `teacher-mobile/index.html`, `tab-bar.js`, `shell.js`                                            | B1f                                                                                |
-| `teacher/dash-overview.js`, `teacher/page-dashboard.js`                                          | The Dashboard plan's D1, D2 and D4, then B1e (one mount line each)                 |
-| `teacher/dashboard.css`                                                                          | The Dashboard plan only. The tile has its own stylesheet.                          |
-| `shared/handout-viewer.js`, `shared/student-view.js`, `teacher/preview-student.js`               | B1d                                                                                |
-| `teacher/page-student.js`, `teacher/learner-profile.js`, `shared/obs-capture.js`                 | B4b                                                                                |
-| `shared/constants.js`, `teacher/router.js`, `netlify.toml`, `serve.json`, the two server scripts | B1c                                                                                |
-| `teacher/app.html`, `sw.js`                                                                      | A line or two from each slice; merged one at a time                                |
-| `shared/build-flags.js`                                                                          | The Dashboard plan's D1 makes it; B1g and each later stage change one line         |
-| `privacy.html`, `teacher/export-all.js`                                                          | B1g                                                                                |
+| File                                                                                             | Writers, in order                                                                                 |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `s/page-view.js`, `s/app.js`, `s/student.css`                                                    | The gear-menu PR (in flight), then B1d. Later stages write `s/bulletins*.js` only.                |
+| `s/bulletins.js`, `s/bulletins-view.js`, `s/bulletins.css`                                       | B1d, B2c, B3c, B3e                                                                                |
+| `supabase/functions/student-submit/handler.ts`                                                   | B1b (one registration)                                                                            |
+| `supabase/functions/student-submit/bulletin-routes.ts`                                           | B1b, B2a, B3a                                                                                     |
+| `supabase/functions/_shared/storage-rest.ts`, `send-routes.ts`                                   | B1b                                                                                               |
+| `shared/data-bulletins.js`                                                                       | B1c, B2b, B3b, B4b                                                                                |
+| `teacher/page-bulletins.js`, `teacher/bulletins.css`                                             | B1c, B2b, B3b                                                                                     |
+| `teacher/bulletins-tv.js`                                                                        | B2b makes it, then B3b                                                                            |
+| `teacher-mobile/tab-bulletins.js`                                                                | B1f, B2b, B3d                                                                                     |
+| `teacher-mobile/index.html`, `tab-bar.js`, `shell.js`                                            | B1f                                                                                               |
+| `shared/photo-queue.js`                                                                          | B1f (a third kind of record; nothing else in it changes)                                          |
+| `shared/data.js`                                                                                 | B1c, and only if the outbox has no other way to tell the feed a bulletin landed; then a few lines |
+| `teacher/dash-overview.js`, `teacher/page-dashboard.js`                                          | The Dashboard plan's D1, D2 and D4, then B1e (one mount line each)                                |
+| `teacher/dashboard.css`                                                                          | The Dashboard plan only. The tile has its own stylesheet.                                         |
+| `shared/handout-viewer.js`, `shared/student-view.js`, `teacher/preview-student.js`               | B1d                                                                                               |
+| `teacher/page-student.js`, `teacher/learner-profile.js`, `shared/obs-capture.js`                 | B4b                                                                                               |
+| `shared/constants.js`, `teacher/router.js`, `netlify.toml`, `serve.json`, the two server scripts | B1c                                                                                               |
+| `teacher/app.html`, `sw.js`                                                                      | A line or two from each slice; merged one at a time                                               |
+| `shared/build-flags.js`                                                                          | The Dashboard plan's D1 makes it; B1g and each later stage change one line                        |
+| `privacy.html`, `teacher/export-all.js`                                                          | B1g                                                                                               |
 
-**Not touched:** `shared/calc.js`, `shared/data.js`, `shared/offline-queue.js`, `shared/photo-queue.js`, `teacher/page-assignments.js`, `student_submit.page`, `_session_class`, `_card_refusal`, `fv_retention_cleanup`, the `student-photos` bucket and its rules, and every handout table and function.
+**Not touched:** `shared/calc.js`, `shared/offline-queue.js`, `teacher/page-assignments.js`, `student_submit.page`, `_session_class`, `_card_refusal`, `fv_retention_cleanup`, the `student-photos` bucket and its rules, and every handout table and function.
 
 ## Privacy
 
-Student privacy is the first test of every choice here. The lines about what a privacy officer would say are readings of published guidance; the real people have to be asked (decision 9).
+Student privacy is the first test of every choice here. The lines about what a privacy officer would say are readings of published guidance; the real people have to be asked, and that is Colin's to do.
 
 **What is stored about a student.**
 
@@ -339,21 +354,28 @@ Settled on Nov 17, not reopened:
 7. Whiteboard sentences anonymous on the TV by default, Names on Screen per bulletin; every sentence reaches the teacher first; pointing crosses out, clicking deletes; one button shows the rest.
 8. Learner Profile: counts and the student's own sentences; no grade, no percent.
 
-And: the name is Bulletins; the teacher's phone app gets it too, with a photo on the spot.
+And: the name is Bulletins; the teacher's phone app gets it too, with a photo on the spot; the Dashboard tile is stacked under the Inbox, and the Dashboard's row takes the whole first view (Nov 17, on the stacked board: "the 'students' row at the bottom can also be below the fold, to increase the size fo the above the fold boxes."; stacked is the orchestrating session's reading, told to him).
 
-Open. Each goes to him one at a time, with what the council would say and a pick. Numbers 1 to 5 follow the session brief; 6 to 9 were found while tracing.
+Chosen by the orchestrating session under Colin's delegation, Nov 17 ("make whatever choices you think is best"). Told to him, not asked again:
 
-1. **Where the Bulletins tile sits on the Dashboard**: tabs with the Inbox, a row of its own, or stacked in the left two thirds. He chose a full tile; the Dashboard designer's pick (tabs) puts the bulletins one click away. Gates B1e.
-2. **What the student page opens on.** The designer's pick: Bulletins whenever the class has one, else Assignments. Gates B1d.
-3. **The designer's numbers**: three Whiteboard sentences per student per bulletin, and an 8-second Undo. The app's other Undo is 5 seconds (Per-student options 6). Gates B3a.
-4. (Dashboard: is the drop area blue at rest. `dashboard-inbox-plan.md`.)
-5. (Dashboard: the designer's four picks. `dashboard-inbox-plan.md`.)
-6. **Who counts in "Seen by N of M".** 22 of the 106 students in classes with the student page on have no working card. If M counts them, a bulletin never reaches "26 of 26" and Not Seen Yet always names students who cannot sign in. Gates B1a.
-7. **Where the teacher approves Whiteboard sentences when the laptop is mirrored to the TV.** The queue with names would itself be on the TV. The ways out: approve from the phone app; a TV window dragged to a second screen; or a queue that hides words until pointed at. Gates B3b and B3d.
-8. **May a student's phone name their group-mates?** The board's Whiteboard says "for Cece, Noor and Sam". Today's student page never names anyone in a group. Gates B3e.
-9. **Go ahead before the district privacy officer has been asked?** Bulletins record what each student has seen and, later, what they answered and wrote. On sticker codes Colin chose to go ahead; this holds more. Gates B1g, not the building.
+- **The opening tab.** A class with a bulletin opens on Bulletins; a class with none opens on Assignments. Coming back to an open class keeps the tab the student was on. The Assignments tab keeps its own red count, so missing work is still signalled. (Was decision 2.)
+- **Whiteboard numbers.** Three sentences per student per bulletin; Undo lasts 8 seconds; one "Show These N on the TV" button; two taps to delete on touch. (3.)
+- **The phone.** A fourth tab; the phone's Whiteboard queue and live poll come in later slices.
+- **The Learner Profile section is "In Bulletins".**
 
-Taken from the board as drawn unless Colin says otherwise, and listed for him afterwards: Show It Again on These N Phones; a reminder that unpins itself after its date; no push; the author's limits under "The contract in outline"; a fourth tab on the phone; posting needs a connection.
+This plan's own picks on three things the tracing found, taken under the same delegation, each the choice that shows the least about a student and each easy to change. They are listed for Colin; the orchestrating session confirms them before the slice that rests on each.
+
+- **Who counts in "Seen by N of M"** (was 6; gates B1a). M is the students who can open the page: enrolled, page not paused, with a working card. 22 of the 106 students in classes with the student page on have no working card; counted, no bulletin would ever read "Seen by All 26", and Not Seen Yet would always name students who cannot sign in. The list says "4 Have No Card Yet" apart, with a link to Manage Cards.
+- **Approving sentences with the laptop mirrored to the TV** (was 7; gates B3b and B3d). The TV screen is a window of its own, made to sit on the second screen, and the queue stays on the teacher's. A teacher whose laptop only mirrors approves from the phone, so the phone's queue (B3d) ships in the same stage as the Whiteboard. The queue's page says so once, in a sentence, the first time a Whiteboard is posted.
+- **Group-mates' names on a student's phone** (was 8; gates B3e). Not shown. The phone says "With Your Group (3)", as the student page already shows a group as a count and never a name. The teacher's queue and the Learner Profile, which only the teacher sees, name them.
+
+Still Colin's, whatever is delegated:
+
+- His OK on each migration, and on each deploy of the student function that goes with one.
+- The release, and the email to teachers the privacy page promises before it.
+- **The district privacy officer** (was 9). Bulletins record what each student has seen and, later, what they answered and wrote. Whether to ask before real classes use it is his; it does not hold up building.
+
+Taken from the board as drawn, and listed for him afterwards: Show It Again on These N Phones; a reminder that unpins itself after its date; no push; the author's limits under "The contract in outline"; a bulletin written with no connection goes out when it returns.
 
 ## Not in this plan
 
@@ -374,16 +396,19 @@ Taken from the board as drawn unless Colin says otherwise, and listed for him af
 3. **`student_submit.seen` has no hourly limit and does not check that a piece was returned** (`migrations/2026110904_student_sessions_page.sql:657-683`): a signed-in student can mark any piece of their own class as seen. It shows nothing to anyone and only that student's own row changes. Worth tightening when that function is next opened.
 4. **The Dashboard board's "Compare 2"** is a view the app does not have (`dashboard-inbox-plan.md`).
 5. Two header comments say the Work Wall and its pictures are "Demo Mode only" (`shared/work-wall.js:20`, `shared/work-thumbs.js`); both work signed in.
+6. **The app's blue button is under the contrast line.** The board's reviewer measured main's primary button (#007aff with white words) at 4.02 to 1; the standard is 4.5 to 1. The boards use #0066cc. Changing the app's button colour is its own small change for every screen, not something a feature slice does on the side.
 
 ## Risks
 
 - **A student sees what they should not.** Another student's name, a sentence not shown, a bulletin of another class. Every such rule is in the database, each has a test that asks the server directly, and both database slices get a Fable review at high effort, given the code and the contract.
 - **The first tab changes every student's page**, in every class with the student page on, the other teacher's too, on the day stage 1 is released. A class with nothing posted opens on Assignments exactly as today, with one more tab in the bar. The opening rule is one place in the code and has a test for each case.
-- **A sentence on the TV that should not be there.** The server never sends the TV view an unshown or deleted sentence; Show is for the listed sentences only; and decision 7 settles where the queue is looked at.
+- **A sentence on the TV that should not be there.** The server never sends the TV view an unshown or deleted sentence; Show is for the listed sentences only; and the TV screen is a window of its own.
 - **Load from refresh timers.** Sized for today (about 66 phones a day, 30 in a room: one read a second). At a school's scale the timers need measuring first; the plan does not claim more.
 - **The edge function is the live path for every student, every day.** Each deploy adds routes and changes none; the version before is kept to put back; the handler's tests run before every deploy.
 - **The removal worker deletes files.** It learns one new pattern and still deletes nothing it cannot match. A wrong pattern means files are left, not lost.
 - **Half a feature in a release.** The flag is off until a stage is whole, on every surface.
+- **The photo queue.** Every student's photo and every handout goes through it. B1f adds a third kind of record beside the two; the existing queue tests run untouched, and the slice has an Opus builder and a Fable review.
+- **A bulletin that goes out late.** Written with no connection at 8:40, it reaches students when the phone next has one. The feed says Not Sent Yet, and the sync dot shows it waiting; nothing else warns the teacher.
 - **CI and the live database.** App code that calls a new function cannot merge until the migration is applied. The SQL goes to Colin early so screens do not sit finished and waiting.
 - **The board changes after this plan.** Reviews are still running and phone boards are coming. Briefs are written from the board on the day.
 

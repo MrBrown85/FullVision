@@ -1,10 +1,12 @@
 # The Dashboard's middle row: Inbox and Competencies (2026-11-17)
 
-**Status (Nov 17, night).** A plan. Nothing is built. No builder starts until Colin says the plan is good. Five of his decisions are still open (see "Decisions that are Colin's"); no slice that rests on one starts before it is settled.
+**Status (Nov 17, late night).** A plan. Nothing is built. Every design choice is now settled: Colin's own are quoted below, and the rest were chosen by the orchestrating session under Colin's delegation, Nov 17 ("make whatever choices you think is best"). No builder starts until the orchestrating session has reviewed this plan. **The row's sizes are not final:** the designer is redrawing the lead boards for the stacked row, and D2's sizes are written from that version when it is published. Nothing here needs SQL or changes a grade, so nothing in this build waits on Colin; a release still needs his word.
 
-**What it is for.** Teachers told Colin the Dashboard is "overwhelming". The top bar and the student cards stay as they are. The calm comes from the row between them: an Inbox of the work that has come in, at two thirds of the row, and one Competencies tile at one third. The row is as tall as the window allows, so the student cards start just below the first view.
+**What it is for.** Teachers told Colin the Dashboard is "overwhelming". The top bar and the student cards stay as they are. The calm comes from the row between them: on the left two thirds, an Inbox of the work that has come in with the Bulletins tile under it; on the right third, one Competencies tile as tall as both. The row fills the rest of the first view, so the Students heading and the cards start below it.
 
-**Board.** "Dashboard Inbox Artboard", version 3 (https://claude.ai/artifact/8rcZpmvi8tbjcid8KrPCGf): Board A and A2 (the page in a Proficiency and a Letter class), Top Bar (changes a and b), Board C (the four Inbox views), Board D (the Competencies tile), Board E (All Caught Up, a busy day, Send Work off), Board F (an iPad held upright), Board G (what each click does). An independent review of the board is still running and the designer will republish. **Every builder's brief is written from the board as it stands that day, not from this plan's summary of it.**
+**Board.** "Dashboard Inbox Artboard" (https://claude.ai/artifact/8rcZpmvi8tbjcid8KrPCGf), version 9 after an independent review and a fix pass: Board A and A2 (the page in a Proficiency and a Letter class), Top Bar (changes a and b), Board C (the view menu and the four Inbox views), Board D (the Competencies tile), Board E (All Caught Up, a busy day, Send Work off), Board F (an iPad held upright), Board G (what each click does). A further version is coming with the stacked row Colin chose. **Every builder's brief is written from the board as it stands that day, not from this plan's summary of it.**
+
+What version 9 changed from the version this plan was first written from, taken into the slices below: the assessment's name is the link to the Work Wall (no separate Work Wall button); the row's button reads "Grade Submissions", the label Assignments already uses (`teacher/page-assignments.js:13716`); counts read "6 in · 4 to grade · 20 not in"; the view pill is a real menu; every view has one "Assignments →" link; Roll Call ticks returned work and draws a student with nothing in as a dashed outline; files held over a full Inbox get one opaque overlay with one message. Three gaps the reviewer left for the real build: every Competencies row is one height (the board's "Lowest" tag and "Proficient or Above" wrap); "Gradebook →" does not fit beside the title at 335 px; Send Work off and Roll Call leave 26 to 33 px empty at the tallest size.
 
 ## Rules every slice follows
 
@@ -41,23 +43,23 @@ Traced on `main` at `68cf3dd8` on Nov 17. File and line as they stand there.
 
 **Live numbers** (gradebook-prod, read only, counts only, Nov 17): 1,584 pieces of work, 1,583 added by a teacher and 1 sent by a student; 3,352 pages, 13 the most in one piece; 2 handed in on paper; none late; 7 classes, 4 with the student page and Send Work on. They match the board's own counts. They are why work the teacher added must not show as "new".
 
-**No database change: verified.** Every figure on the board comes from data the app holds: who sent a piece (`sent_by`), paper (`on_paper`), late (`is_late`), pages (`files`), the states (`GraderWork`), the level mix (`competencyDistribution`, `calc.js:3570`), self-assessments (the Core card's own data). "New since you last looked" is a time kept on the device (decision 5c). If Colin wants that to follow him between computers, that one thing needs a column and a migration, and becomes its own slice.
+**No database change: verified.** Every figure on the board comes from data the app holds: who sent a piece (`sent_by`), paper (`on_paper`), late (`is_late`), pages (`files`), the states (`GraderWork`), the level mix (`competencyDistribution`, `calc.js:3570`), self-assessments (the Core card's own data). "New since you last looked" is a time kept on the device. Following the teacher between computers would need a column and a migration; it is not in this plan.
 
 ## Slices
 
 One PR per slice. D2 to D8 are behind the flag, so each can merge when it is right and nothing shows until D9.
 
-| Slice | What                                                              | Waits for                   | Builder | Review |
-| ----- | ----------------------------------------------------------------- | --------------------------- | ------- | ------ |
-| D1    | Top bar changes a and b; the build flags file                     | Colin's go on the plan      | Sonnet  | Opus   |
-| D2    | The row: two thirds and one third, sized to the window; one tile  | D1                          | Sonnet  | Opus   |
-| D3    | The Competencies tile's two pages as drawn                        | D2                          | Sonnet  | Opus   |
-| D4    | The Inbox: By Assessment, and To Grade jumping to it              | D2; decisions 5b, 5c, 5d    | Sonnet  | Opus   |
-| D5    | All Caught Up and a file drop on the tile                         | D4; decision 4              | Opus    | Fable  |
-| D6    | Side by Side                                                      | D4; decision 5a             | Sonnet  | Opus   |
-| D7    | Flip Through                                                      | D4; decision 5a             | Sonnet  | Opus   |
-| D8    | Roll Call                                                         | D4                          | Sonnet  | Opus   |
-| D9    | Turn it on: the flag, the iPad, the old row's code and tests gone | D3, D4, D5 and Colin's look | Sonnet  | Fable  |
+| Slice | What                                                              | Waits for             | Builder | Review |
+| ----- | ----------------------------------------------------------------- | --------------------- | ------- | ------ |
+| D1    | Top bar changes a and b; the build flags file                     | The orchestrator's go | Sonnet  | Opus   |
+| D2    | The row: two thirds and one third, sized to the window; one tile  | D1                    | Sonnet  | Opus   |
+| D3    | The Competencies tile's two pages as drawn                        | D2                    | Sonnet  | Opus   |
+| D4    | The Inbox: By Assessment, and To Grade jumping to it              | D2                    | Sonnet  | Opus   |
+| D5    | All Caught Up and a file drop on the tile                         | D4                    | Opus    | Fable  |
+| D6    | Side by Side                                                      | D4                    | Sonnet  | Opus   |
+| D7    | Flip Through                                                      | D4                    | Sonnet  | Opus   |
+| D8    | Roll Call                                                         | D4                    | Sonnet  | Opus   |
+| D9    | Turn it on: the flag, the iPad, the old row's code and tests gone | D3, D4, D5            | Sonnet  | Fable  |
 
 D5 is on Opus with a Fable review because a file that lands under the wrong student, once returned, shows one student's work to another. Every fault the Add Work reviews caught was of that kind.
 
@@ -82,17 +84,18 @@ D5 is on Opus with a Fable review because a file that lands under the wrong stud
 **Build.**
 
 - `renderOverviewPanel` draws the new row when the flag is on and today's row when it is off. Today's code is left alone until D9.
-- **Height.** The row is the window's height, less where the row starts, less the 12 px gap and the 54 px Students heading; never under 375 px, never over 520 px (456 at 1280 × 800, 520 at 1440 × 900, 376 at 1280 × 720). Measured from the row's own place on each draw and on resize, so the photo-expiry line above it is counted. Set as one CSS variable; the listener goes when the page is left. With no script the row is 375 px. Under 900 px the two stack at 375 px each, as the two cards stack today.
-- **The left slot** is Recent Assessments in this slice: the six latest assessments with their date and how many are assessed, from the gradebook the app holds, and a link to Assignments. It is what the slot shows with Send Work off (decision 5d), and it holds the slot until D4.
+- **Height.** Colin, Nov 17, on the stacked board: "the 'students' row at the bottom can also be below the fold, to increase the size fo the above the fold boxes." So the row runs from where it starts to the bottom of the window, less one 12 px gap, and the Students heading starts below the first view. The smallest and tallest it may be, and the Inbox's and Bulletins' shares of the left column (about 60 and 40), come from the redrawn board; **this slice's numbers are written from that version, not from this plan.** Measured from the row's own place on each draw and on resize, so the photo-expiry line above it is counted. Set as CSS variables; the listener goes when the page is left. With no script the row has the board's smallest height. Under 900 px the tiles stack, as the two cards stack today.
+- **The left column** holds the Inbox and, under it, the Bulletins tile (`docs/plans/bulletins-plan.md`, slice B1e). **Until Bulletins is turned on, the Inbox has the whole column**: no empty placeholder is shown to teachers. When the `bulletins` flag is on, the column splits by the board's rule. Every Inbox view is built and tested at both heights, and no page picture is ever under 80 px tall.
+- **The left slot** is Recent Assessments in this slice: the six latest assessments with their date and how many are assessed, from the gradebook the app holds, and a link to Assignments. It is what the slot shows with Send Work off, and it holds the slot until D4.
 - **The Competencies tile**: a segmented control, Curricular | Core, with the arrow keys moving between the two and the page sliding sideways (220 ms). Each page keeps today's views and view menu exactly (Curricular: Class Average, Level Mix, Needs Support, Change; Core: Self-Assessment, Evidence). Only the housing changes in this slice. Which page is open is kept per class on the device (`fv-dash-comp-page:<class>`).
 - The tile's code moves to `teacher/dash-competencies.js` so D3 and D4 never write the same file.
 - A mount point for the Inbox: `DashInbox.html(cid)` when that module exists and the class has Send Work on, else Recent Assessments.
 
 **Files.** `teacher/dash-overview.js`, `teacher/page-dashboard.js`, `teacher/dashboard.css`, `teacher/dash-competencies.js` (new), `teacher/dash-recent.js` (new), `teacher/app.html`, `sw.js`.
 
-**Tests.** Unit: the height rule at the four window sizes on the board, and at 200% zoom (the minimum, scrolling inside). Browser (`e2e/dashboard-row.spec.js`, flag on): at 1280 × 800 the row is 456 px and the Students heading ends at the window's bottom edge; at 800 wide the two stack; nothing scrolls sideways; every box is 12 px from the next; the two pages switch by click and by arrow key; flag off, `e2e/dashboard-layout.spec.js` passes untouched.
+**Tests.** Unit: the height rule at each window size on the board, and at 200% zoom (the smallest height, scrolling inside); the left column with and without Bulletins. Browser (`e2e/dashboard-row.spec.js`, flag on): at 1280 × 800 the tiles end 12 px above the window's bottom edge and the Students heading is below it; at 800 wide the tiles stack; nothing scrolls sideways; every box is 12 px from the next; the two pages switch by click and by arrow key; flag off, `e2e/dashboard-layout.spec.js` passes untouched.
 
-**Done when.** With the flag on, the first view at 1280 × 800 ends on the Students heading, and with it off the Dashboard is pixel for pixel today's.
+**Done when.** With the flag on, the first view at 1280 × 800 ends at the bottom of the tiles, and with it off the Dashboard is pixel for pixel today's.
 
 ### D3. The Competencies tile as drawn
 
@@ -100,15 +103,15 @@ D5 is on Opus with a Fable review because a file that lands under the wrong stud
 
 **Build.**
 
-- **Curricular, Level Mix:** one bar per competency in the Class Average bar's solid level colours with its 2 px gaps, a legend naming the four levels, and the column headed "Proficient or Above" over "21 of 27". The counts are `competencyDistribution`'s bands, as today's Level Mix reads them. The rows stay in the gradebook's order. One row is marked "Lowest" when it alone has the fewest at Proficient or above; a tie marks none.
-- **Core, Self-Assessment:** one bar per competency in the self-assessment blues (`--self-1..4`, never the level colours: DECISIONS, "Dashboard cards" 4), the two lightest with a dark edge, a legend, the column headed "Self-Assessed", and "Few" beside a row under half the class.
+- **Curricular, Level Mix:** one bar per competency in the Class Average bar's solid level colours with its 2 px gaps, a legend naming the four levels, and the column headed "Proficient or Above" over "21 of 27". The counts are `competencyDistribution`'s bands, as today's Level Mix reads them. The rows stay in the gradebook's order. One row is marked "Lowest" when it alone has the fewest at Proficient or above; a tie marks none. **Every row is the same height**: the tag and the column heading never wrap a row taller than its neighbours (the board's own lead picture does; the reviewer flagged it).
+- **Core, Self-Assessment:** one bar per competency in the self-assessment blues (`--self-1..4`, never the level colours: DECISIONS, "Dashboard cards" 4), the two lightest with a dark edge, a legend, the column headed "Self-Assessed", and a low row said in a word as well as a colour (the board's "Only 11 of 27").
 - Each row is a button that names its counts. A click opens a small list in place: the students at each level (as today's pop-up lists them), "Show These N in Student Cards ↓" (filters and sorts the cards weakest first and scrolls to them, as a click on a competency does today) and "Open in Gradebook →".
 - The other views (Class Average, Needs Support, Change, Evidence) keep their content and take the tile's width.
 - In a Letter class the tile still bands by the four levels (`calc.js:3570-3589` bands by level in every grading style); the pop-up gives each student's level as the class shows it, through `calc.js`.
 
 **Files.** `teacher/dash-competencies.js`, `teacher/dash-competencies.css` (new).
 
-**Tests.** Unit: the "Proficient or Above" count against `competencyDistribution` for the sample class; Lowest on one row, none on a tie; Few; a Letter class. Browser: Board D's two pages at 335 × 456, light and dark; a row's list opens, filters the cards, and Escape closes it with the focus back on the row.
+**Tests.** Unit: the "Proficient or Above" count against `competencyDistribution` for the sample class; Lowest on one row, none on a tie; a low Self-Assessed row; a Letter class. Browser: Board D's two pages at the board's sizes, light and dark; a row's list opens, filters the cards, and Escape closes it with the focus back on the row.
 
 ### D4. The Inbox, By Assessment
 
@@ -117,9 +120,9 @@ D5 is on Opus with a Fable review because a file that lands under the wrong stud
 **Build.**
 
 - `teacher/dash-inbox-model.js`, no HTML in it. From `getCourseSubmissions` and `GraderWork` it gives, for each piece with work shown: to grade, to return, returned, not in, the newest arrivals (name, time, pages, Late), how many are on paper, how many the teacher added, how many are new since the teacher last looked, and the students to grade in the order their work came in. It also gives the class's state: rows (four at most, the rest folded into one line), All Caught Up, or nothing taking work.
-- **Work the teacher added** counts in To Grade and is never "new": one quiet "You Added" line (decision 5b). The +N on a row counts students' own sends since the time kept on this device (`fv-dash-inbox-seen:<class>`, decision 5c). The time moves when the teacher leaves the Dashboard or changes class, so the counts hold still during a visit.
-- `teacher/dash-inbox.js` and `.css`: the tile. Its header is "Inbox", the view pill and "Assignments →", and **no count** (the top bar's To Grade owns it). A row: up to three page pictures, growing with the row; the title; "4 to grade · 2 to return · 21 not in"; the newest line; "Assess 4"; "Work Wall". A paper hand-in with no scan draws as a lined sheet with the student's name. Amber only on the word "Late".
-- **Clicks**, as Board G: the row opens the Work Wall; Assess N opens the grader on the students to grade, in the order their work came in, with Show on To Grade; "Assignments →" opens Assignments.
+- **Work the teacher added** is never "new": one quiet "You Added" line. What To Grade counts is `GraderWork`'s, unchanged. The +N on a row counts students' own sends since the time kept on this device (`fv-dash-inbox-seen:<class>`). The time moves when the teacher leaves the Dashboard or changes class, so the counts hold still during a visit.
+- `teacher/dash-inbox.js` and `.css`: the tile. Its header is "Inbox", the view pill and "Assignments →", and **no count** (the top bar's To Grade owns it). A row: page pictures, growing with the row and never under 80 px tall; the title, which is the link to the Work Wall; "6 in · 4 to grade · 20 not in"; the newest line; "Grade Submissions". Rows never overlap. A paper hand-in with no scan draws as a lined sheet with the student's name. Amber only on the word "Late".
+- **Clicks**, as Board G: the title opens the Work Wall; Grade Submissions opens the grader on the students to grade, in the order their work came in, with Show on To Grade; "Assignments →" opens Assignments.
 - **Views.** `DashInbox.addView({ key, label, hint, html, mount, unmount })`, so D6, D7 and D8 each add a file and never edit this one. The pill uses `DashOverview.viewMenuHtml`; the choice is kept per class (`fv-dash-inbox-view:<class>`), By Assessment first.
 - **Fresh work.** The Dashboard calls `refreshStudentWork(cid)` when it draws, as Assignments does. When a piece is unsubmitted or deleted its page leaves the row, the others glide together and the count changes in place.
 - **To Grade in the top bar.** With the Inbox on the page, a click or Enter scrolls it into view and gives it a 200 ms ring. With no Inbox (Send Work off, or the flag off) it opens Assignments on To Grade, as today.
@@ -127,7 +130,7 @@ D5 is on Opus with a Fable review because a file that lands under the wrong stud
 
 **Files.** `teacher/dash-inbox-model.js`, `teacher/dash-inbox.js`, `teacher/dash-inbox.css` (new); `teacher/dash-overview.js` (the To Grade cell: a few lines); `teacher/page-dashboard.js` (the click, the refresh, the leave time: a few lines); `teacher/app.html`, `sw.js`.
 
-**Tests.** Unit, on the model: each count against `GraderWork` for the sample class; arrival order; teacher-added work never new; paper; four rows and the fold at 38 assessments; All Caught Up; a class with Send Work off; the "seen" time. `tests/work-lookups-fast.test.js` gains the model, so a class of 680 pieces stays fast. Browser (`e2e/dashboard-inbox.spec.js`, Demo Mode): the rows match the sample class; Assess opens the grader on the right student; To Grade scrolls to the Inbox; a redraw keeps the view; no picture is asked for twice.
+**Tests.** Unit, on the model: each count against `GraderWork` for the sample class; arrival order; teacher-added work never new; paper; four rows and the fold at 38 assessments; All Caught Up; a class with Send Work off; the "seen" time. `tests/work-lookups-fast.test.js` gains the model, so a class of 680 pieces stays fast. Browser (`e2e/dashboard-inbox.spec.js`, Demo Mode): the rows match the sample class; Grade Submissions opens the grader on the right student; the tile at the full column and at the split height; To Grade scrolls to the Inbox; a redraw keeps the view; no picture is asked for twice.
 
 **Done when.** In Demo Mode and in Colin's test class the Inbox's "to grade" for every row adds up to the top bar's To Grade.
 
@@ -139,8 +142,8 @@ D5 is on Opus with a Fable review because a file that lands under the wrong stud
 
 - `AddWorkClass.open(cid, aid, opts)` learns two options: `files` (a list of files) and `drop` (the drop's own `DataTransfer`). After the page is drawn it hands them to the tray, exactly where a drop on the page hands them: `tray.takeDrop(drop)` or `tray.take(files)`. Nothing about matching, the Waiting tray or Split the Scan changes; a single PDF still opens Split the Scan. **`open` is called inside the drop handler itself**, with no wait before it, because a dropped folder can only be read then.
 - The Inbox's empty state: "Add Work For" with the three assessments most recently taking work, the next one due chosen; the drop area in Add Work's own words ("Drop the Scan, a Folder or Files", Choose Files…, Choose a Folder…, Split a Scan…); and under it two lines: work assessed but not returned ("Return Them →" opens Assignments at that piece, where Return N Graded and its question already live) and the next piece taking work with how many are not in ("Work Wall →").
-- Whether the area is blue at rest or grey at rest and blue while files are held over it is decision 4.
-- **The whole tile takes a drop** in every view. While files are held over it the drop look covers the list with the same For choice, the newest assessment chosen.
+- The area is Add Work's own: grey and dashed at rest, blue while files are held over it.
+- **The whole tile takes a drop** in every view. While files are held over it one opaque overlay covers the list with one message ("Drop to Add to Light Refraction Lab"), for the newest assessment taking work; a file dropped for the wrong one is moved on the Add Work page with For.
 - A drop of something that is not files does nothing. Add Work's own rules hold: nothing is saved until Add Work is pressed there.
 
 **Files.** `teacher/add-work-class.js` (the two options), `teacher/dash-inbox-drop.js` (new), `teacher/dash-inbox.css`.
@@ -155,25 +158,28 @@ Board C2. One assessment's work in a row that scrolls sideways, the pages as tal
 
 ### D7. Flip Through
 
-Board C3. One assessment at a time; the centre page faces the teacher at the stage's full height with its caption and Assess; the others stand to each side. Arrow keys, a click on a side page, a sideways scroll or swipe, and the strip under it all move the pile; up and down page through one student's pages. With Reduce Motion the pages swap without turning. Every page is also a button with the student's name, so the turned pages carry nothing a screen reader misses. Files: `teacher/dash-inbox-flip.js`, `.css`. Tests at 669 × 376, 456 and 520 and at 796 × 375.
+Board C3. One assessment at a time; the centre page faces the teacher at the stage's full height with its caption and Assess; the others stand to each side. Arrow keys, a click on a side page, a sideways scroll or swipe, and the strip under it all move the pile; up and down page through one student's pages. With Reduce Motion the pages swap without turning. Every page is also a button with the student's name, so the turned pages carry nothing a screen reader misses. Files: `teacher/dash-inbox-flip.js`, `.css`. Tests at each size the redrawn board gives, the split height included.
 
 ### D8. Roll Call
 
-Board C4. The whole class in class-list order: a page if it came in, an empty outline if not; nine across in three rows or seven across in four, whichever fills the tile. A click on a page opens the grader. A click on an empty outline offers Add Work (that student, through the grader's own Add Work) and Mark Missing; "Add Work for the Class" opens the class page. **Mark Missing sets a status that can count as zero** (a Letter or Both class). It calls `Grader.setStatus`, the call the grader and gradebook already use, and adds no new rule; the PR says so for Colin's review, and follows whatever asking and Undo the gradebook's own Missing does. Files: `teacher/dash-inbox-roll.js`, `.css`.
+Board C4. The whole class in class-list order: a page if it came in, with a tick once it is returned, and a dashed outline with no initials if not; nine across in three rows or seven across in four, whichever fills the tile. A click on a page opens the grader. A click on an empty outline offers Add Work (that student, through the grader's own Add Work) and Mark Missing; "Add Work for the Class" opens the class page. **Mark Missing sets a status that can count as zero** (a Letter or Both class). It calls `Grader.setStatus`, the call the grader and gradebook already use, and adds no new rule; the PR says so for Colin's review, and follows whatever asking and Undo the gradebook's own Missing does. Files: `teacher/dash-inbox-roll.js`, `.css`.
 
 ### D9. Turn it on
 
 - `dashRow` on by default; the old two-card row, its CSS and the tests that held it (`e2e/dashboard-layout.spec.js`'s equal-height tests) go, replaced by D2's.
 - The iPad held upright: every rule in `teacher/tablet.css` (DECISIONS, "The desktop app on an iPad held upright"); `e2e/ipad-portrait.spec.js` passes at 744, 820 and 1024 with the row in place.
 - `e2e-visual/pages.spec.js`'s Dashboard picture retaken; the help article's pictures retaken (`scripts/help-shots.mjs`) and its words checked against the page.
-- A DECISIONS entry for what Colin chose on the open decisions; CLAUDE.md's Current state.
-- **The check before it merges**, by someone who built none of it: every board, in a real browser, at 1280 × 800 and 390 px wide, light and dark, with the ad-block rules on, in a Proficiency, a Letter and a Both class, with Send Work on and off, against the board. Then Colin looks at it on `main` with the flag set on his own computer before the flag's default changes.
+- The three gaps the board's reviewer left (equal row heights in Competencies, "Gradebook →" at 335 px, the empty strip in Roll Call and with Send Work off) are checked closed.
+- DECISIONS and CLAUDE.md's Current state say it is on.
+- **The check before it merges**, by someone who built none of it: every board, in a real browser, at 1280 × 800 and 390 px wide, light and dark, with the ad-block rules on, in a Proficiency, a Letter and a Both class, with Send Work on and off, against the board. Colin is sent pictures of the finished Dashboard beside today's, and can see it on `main` with the flag set on his own computer; a release is his word.
 
 ## Critical path, and what runs side by side
 
-D1 → D2 → D4 → D5 → D9 is the path. D3 runs beside D4 (different files once D2 has moved the tile out). D6, D7 and D8 run beside D5, three builders at most, each in its own files. Colin's open decisions gate D4 (5b, 5c, 5d), D5 (4) and D6 and D7 (5a): they are brought to him before D2 is finished, so no builder waits on one.
+D1 → D2 → D4 → D5 → D9 is the path. D3 runs beside D4 (different files once D2 has moved the tile out). D6, D7 and D8 run beside D5, three builders at most, each in its own files. No slice waits on a decision.
 
-The Bulletins tile (`docs/plans/bulletins-plan.md`, slice B1e) mounts in this row. It needs D2 merged and Colin's decision on where it sits.
+The Bulletins tile (`docs/plans/bulletins-plan.md`, slice B1e) sits under the Inbox. It needs D2 merged; it lands with Bulletins' first stage, and until then the Inbox has the column (D2). Either build can be turned on first.
+
+How this build sits beside Bulletins and Quizzes is in `docs/plans/quizzes-plan.md`, "Order across the three plans".
 
 ## One writer per file
 
@@ -200,25 +206,23 @@ Settled:
 - The top bar and the student cards keep their look; the cards may start below the fold (Nov 17, quoted in rule 1).
 - Changes a and b to the top bar, and To Grade jumping to the Inbox (Nov 17).
 - The Inbox at two thirds, one Competencies tile at one third, the row taller, the Inbox header with no count (Nov 17).
+- **Bulletins is stacked under the Inbox** in the left two thirds, with Competencies beside both, and the row takes the whole first view: Colin sent the stacked board and said "the 'students' row at the bottom can also be below the fold, to increase the size fo the above the fold boxes." Stacked is the orchestrating session's reading of that, told to him; it was decision 1.
 
-Open. Each goes to him one at a time, with what the council would say and a pick. The numbers follow the session brief.
+Chosen by the orchestrating session under Colin's delegation, Nov 17 ("make whatever choices you think is best"). Told to him, not asked again:
 
-1. **Where the Bulletins tile sits on the Dashboard**: tabs with the Inbox, a row of its own, or stacked in the left two thirds. Kept in `bulletins-plan.md`; it gates B1e, not this plan.
-2. (Bulletins: what the student page opens on.)
-3. (Bulletins: the designer's numbers.)
-4. **Is the drop area blue at rest?** Colin said "the blue area"; the real Add Work page is grey at rest and blue while files are held over it. Gates D5.
-5. **The designer's picks he has not been asked about one by one:**
-   - a. Side by Side and Flip Through both stay. Gates D6 and D7.
-   - b. Work the teacher added shows as one "You Added" line, not as new arrivals. Gates D4.
-   - c. "New since you last looked" is kept on the device, not on the server. Gates D4. On the server means a migration.
-   - d. With Send Work off the slot shows Recent Assessments. Gates D4. One thing to add when it is put to him: Add Work for the Class is offered in every class, so a paper-only class has nowhere on the Dashboard to drop a scan unless Recent Assessments keeps a drop line.
-
-Taken from the board as drawn unless Colin says otherwise, and listed for him afterwards: the row fits the window (375 to 520 px); the two tiles merge behind a segmented control; "Lowest" is marked, not sorted to the top; the roster keeps its level badges.
+- **The drop area matches the Add Work page**: grey and dashed at rest, blue while files are held over it. One drop style across the app. (Was decision 4.)
+- **Side by Side and Flip Through both stay**; the Inbox opens on By Assessment. (5a.)
+- **Work the teacher added shows as one quiet "You Added" line.** To Grade keeps exactly the meaning it has on `main`; nothing in this build changes what that number counts. (5b.)
+- **"New since you last looked" is kept on the device.** No database change. (5c.)
+- **With Send Work off, the slot shows Recent Assessments.** (5d.)
+- The row's height fits the window; the left roster keeps its level badges; Competencies has a named Curricular | Core switch, marks the lowest row without re-sorting, and a row opens its students in place with "Show These in Student Cards" and "Open in Gradebook".
+- **The Bulletins slot is never shipped empty**: until Bulletins' first stage lands, the Inbox takes the whole left column by the same sizing rule.
 
 ## Not in this plan
 
 - **Compare 2** (the board's Side by Side). No Compare view exists in the app. It needs its own short design and its own decision.
-- **"New since you last looked" on every computer.** Only if Colin picks it in 5c.
+- **"New since you last looked" on every computer.** It is kept on the device. On every computer would need a column and a migration.
+- **A drop line for a class with Send Work off.** Add Work for the Class is offered in every class, but the Inbox, and so its drop area, shows only with Send Work on. A paper-only class opens Add Work from Assignments, as today. Worth a look once the row is on.
 - **Return Them from the Dashboard.** The line opens Assignments, where the question already is. A second place that returns grades would be a second place that shows grades to students.
 - **Any change to the top bar beyond a and b, to the student cards, or to the roster.** A "Today" strip is not re-proposed.
 - **Quizzes.** No decisions have been made on it.
@@ -229,7 +233,8 @@ Taken from the board as drawn unless Colin says otherwise, and listed for him af
 - **A file under the wrong student** (D5). The drop goes into the same tray, by the same call, as a drop on the Add Work page; no matching code is written. Nothing is saved until Add Work.
 - **A dropped folder read too late.** If `open` is not called inside the drop, a folder arrives empty in some browsers. The browser test drops a folder; the reviewer does a real drag.
 - **Pictures.** Roll Call and Side by Side show a class's worth at once (27 to 30). They are signed in one call and held for the visit; the holder is released when the Dashboard is left. A slow connection shows the waiting grey at the same size, so nothing jumps.
-- **The row's height on odd windows.** Very short windows fall to 375 px and scroll inside; 200% zoom is a test case.
+- **The row's height on odd windows.** Very short windows fall to the smallest height and scroll inside; 200% zoom is a test case.
+- **A squeezed Inbox.** With Bulletins under it the Inbox has about 60% of the column. The earlier board estimated pages of 80 to 105 px in Side by Side and Flip Through at that height. Giving the row the whole first view is what buys the room; the redrawn board has to show each view readable at the split height before D6 and D7 are briefed.
 - **Two sources for one number.** The Inbox's "to grade" and the top bar's To Grade must agree always; both read `GraderWork`, and a test adds the rows up.
 - **The board changes after this plan.** The review is still running. Briefs are written from the board on the day.
 

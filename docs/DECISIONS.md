@@ -1369,7 +1369,8 @@ Teachers told Colin the Dashboard is "overwhelming". A designer proposed a Today
 2. **Two small changes to the top bar**, taken later the same night ("update it base on the council's suggestions"): Missing and Late never repeats its own number ("All Missing" or "All Late" when the other part is zero); "No Change Since Report N" is hidden when nothing changed, keeping its space. "2.9 Proficient" stays.
 3. **The middle row is an Inbox at two thirds and one Competencies tile at one third**, both taller than today's cards. The Inbox's header carries no count: the top bar's To Grade owns that number. A click on To Grade jumps to the Inbox when it is on the page, and opens Assignments on To Grade as today when it is not.
 4. **This will replace "Dashboard cards" 7's two cards side by side at one height** when it is turned on, and not before. Until then that entry stands.
-5. **Still Colin's to decide**, each before the slice that rests on it (the plan, "Decisions that are Colin's"): whether the drop area is blue at rest; whether Side by Side and Flip Through both stay; whether work the teacher added shows as one "You Added" line; whether "new since you last looked" is kept on the device; what the slot shows with Send Work off.
+5. **Bulletins sits under the Inbox, and the row takes the whole first view.** Colin sent the stacked board (Inbox over Bulletins in the left two thirds, Competencies beside both) and said: "the 'students' row at the bottom can also be below the fold, to increase the size fo the above the fold boxes." Stacked is the orchestrating session's reading of that, told to him. The Students heading and the cards start below the first view.
+6. **The rest was delegated.** Colin, Nov 17: "make whatever choices you think is best". Chosen by the orchestrating session under that, and told to him: the drop area matches the Add Work page (grey and dashed at rest, blue while files are held); Side by Side and Flip Through both stay and the Inbox opens on By Assessment; work the teacher added shows as one quiet "You Added" line, and To Grade keeps the meaning it has; "new since you last looked" is kept on the device; with Send Work off the slot shows Recent Assessments; the roster keeps its level badges; until Bulletins is on, the Inbox has the whole left column.
 
 ## Bulletins (2026-11-17)
 
@@ -1379,7 +1380,7 @@ This narrows Product shape again. "No LMS features: no … content pages, discus
 
 1. **One way.** The teacher posts; students read, react and answer polls. No replies and no posts by students, apart from Whiteboard sentences the teacher approves.
 2. **Its own page, and the first tab on the student page**, before Assignments (the recommendation was the last place). On the teacher's side, a top tab after Assignments.
-3. **A full tile on the teacher Dashboard**, with the latest few and their Seen counts (the recommendation was no tile). Where it sits in the Dashboard's row is still open.
+3. **A full tile on the teacher Dashboard**, with the latest few and their Seen counts (the recommendation was no tile). It sits under the Inbox in the left two thirds ("The Dashboard's middle row" 5).
 4. **Seen and reactions are for the teacher only.** Seen is always recorded. Reactions is a switch on each bulletin, off by default: Got It, Done, I Have a Question. This settles Seen for bulletins only; whether a teacher sees which returned feedback a student opened ("Per-student options" 4) stays open.
 5. **Link cards only, no embedded players.** No outside site sees a student until the student chooses to open it.
 6. **A Quick Poll is a bulletin.** Names on the teacher's screen, totals only on the TV.
@@ -1387,4 +1388,26 @@ This narrows Product shape again. "No LMS features: no … content pages, discus
 8. **Learner Profile shows counts and the student's own sentences.** No grade, no percent, nothing that feeds a grade.
 9. **The name is Bulletins** everywhere: the teacher's tab, the student's tab, the phone app, the Dashboard tile. One post is a bulletin; Post is the verb. Whiteboard and Photo of the Board keep their names.
 10. **The teacher's phone app has it too** (Colin: "add the bulletin board to the teacher app as well, so that they can post from their phone"), with a photo taken on the spot.
-11. **Still Colin's to decide** (the plan, "Decisions that are Colin's"): where the tile sits; what the student page opens on; how many sentences a student may send and how long Undo lasts; who counts in "Seen by N of M" when a student has no card; where the teacher approves sentences when the laptop is mirrored to the TV; whether a student's phone may name their group-mates; and whether to go ahead before the district privacy officer has been asked.
+11. **The rest was delegated** (Colin, Nov 17: "make whatever choices you think is best"). Chosen by the orchestrating session under that, and told to him: a class with a bulletin opens on Bulletins and a class with none on Assignments, and coming back to an open class keeps the tab; three Whiteboard sentences per student per bulletin, an 8-second Undo, one "Show These N on the TV" button, two taps to delete on touch; the phone's Whiteboard queue and live poll come after its first slice; the Learner Profile section is "In Bulletins".
+12. **Three picks the plan made from the code, under the same delegation, each the choice that shows the least about a student**: "Seen by N of M" counts the students who can open the page (enrolled, not paused, with a working card) and names those with no card apart; the TV screen is a window of its own and a teacher whose laptop only mirrors approves sentences from the phone; a student's phone shows a group as a count, never group-mates' names.
+13. **Still Colin's**: his OK on each migration; the release, and the email to teachers the privacy page promises before it; and whether the district privacy officer is asked before real classes use it.
+
+## Quizzes (2026-11-17)
+
+Colin's idea: teachers make their own quizzes in Assignments, with a deep tie to curricular competencies. The board is the "Quizzes Artboard" (https://claude.ai/artifact/55nAacfpnbwSgrEhEGktS3). He decided its ten questions on Nov 17, eight as recommended and two his own way (7 and 9), and said: "add quizzes to the build plan too". The plan is `docs/plans/quizzes-plan.md`. Nothing is built yet.
+
+This narrows Product shape once more: "No LMS features: no … quizzes." A quiz here is a way students do an assessment the teacher already made, answered on the student page; it is not a quiz service, and nothing is imported from one.
+
+1. **A quiz is a Student Work answer on the assessment form**, "They Answer a Quiz". Not a new Scoring kind and not a page of its own.
+2. **It feeds whatever scoring the teacher picks.** It starts on Competencies in Proficiency and Both classes and on Points in Letter classes.
+3. **The first question types**: Choice (one or several right), True or False, Number with a tolerance, Text assessed by hand.
+4. **A competency needs at least three questions** before a level is suggested for it.
+5. **A quiz can suggest Extending.** The class's Points to Proficiency table decides, as it does for points work ("Points work's level"). The council split (Guskey and O'Connor would cap a quiz at Proficient); Colin chose the table knowingly.
+6. **A suggested level counts nowhere until the teacher confirms it**, in every class, even under As Soon As I Save. Confirming moves grades, so it asks first, naming what moves, and offers Undo.
+7. **What students see when it comes back: "Teacher chooses".** A setting on each quiz. It starts on the grade in the class's style, which questions were right, and the answers; the teacher can switch a quiz to Grade Only, or to the grade and which were right, and can add a total. The starting point is the orchestrating session's reading, taken under his delegation.
+8. **A question may count toward no competency**, labelled "Counts Toward No Competency".
+9. **Tries: "Teacher sets tries".** One, two or unlimited, with Best or Latest counting. It starts at one try; shuffle is on by default; Reopen for One Student stays.
+10. **Unfinished answers save to the class on the server as the student goes**, so another device can carry on.
+11. **Chosen under his delegation** ("make whatever choices you think is best"): with more than one try and Best counting, the whole try with the higher total counts, never a mix of two; on a tie, the later try.
+12. **The answer key never reaches a student's device before the work is returned to that student.**
+13. **Still Colin's**: his OK on each migration; his review of the slice that turns a quiz into grades, which adds one function to `calc.js` and stops at "ready for Colin's review"; and the release.
