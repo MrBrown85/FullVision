@@ -108,6 +108,15 @@ interface Window {
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
   CmTerms: unknown;
+  DashCompetencies: unknown;
+  DashRecent: unknown;
+  DashInboxModel: unknown;
+  DashInbox: unknown;
+  DashInboxDrop: unknown;
+  DashInboxPick: unknown;
+  DashInboxSide: unknown;
+  PageDashboard: unknown;
+  DashInboxRoll: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
@@ -353,6 +362,19 @@ declare var MGradePhotos: any;
 // Class Settings and the modules the Students list calls
 // (teacher/student-page-students.js), which are not typed.
 declare var DashClassManager: any;
+declare var DashOverview: any; // teacher/dash-overview.js
+declare var DashInsights: any; // teacher/dash-insights.js
+declare var DashInboxModel: any; // teacher/dash-inbox-model.js
+declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
+declare var DashInbox: any; // teacher/dash-inbox.js
+declare var DashInboxPick: any; // teacher/dash-inbox-pick.js
+declare var DashInboxSide: any; // teacher/dash-inbox-side.js
+declare var PageDashboard: any; // teacher/page-dashboard.js
+declare var BuildFlags: { on(name: string): boolean };
+declare var WorkThumbs: any;
+declare var WorkWall: any;
+declare var PageAssignments: any;
+declare function segSelect(btn: Element): void; // teacher/ui.js
 declare var StudentCards: any;
 declare var CmStudentPage: any;
 declare var StudentView: any;
