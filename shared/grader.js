@@ -288,6 +288,150 @@ window.Grader = (function () {
     return _saved(cid, null, null, 'undo', restoreScoreCells(cid, before, after));
   }
 
+  /* ── Quizzes: Confirm (Q4) ─────────────────────────────────────────
+     The only place a quiz becomes scores (docs/plans/quizzes-plan.md,
+     "Confirm"). The results screen (teacher/quiz-results.js) hands what the
+     teacher is confirming, one row a student: { sid, attemptId, marked
+     (calc.js's marking of the try that counts), prior (the
+     student's try confirmed before and its marking, or null), levels:
+     [{ tagId, level, mod }] on Competencies scoring, points on Points
+     scoring, waiting (levels still waiting for a Text answer) }.
+     quizConfirmPlan (a read, on GraderWork) works out the cells and the
+     question; confirmQuiz writes them through setLevel and setPoints and
+     nothing else, as Set Everyone To does: only a cell with no score yet,
+     never a student marked Missing or Excused; then confirm_quiz stores
+     each counted try's marking (QuizTries.confirm). undoConfirmQuiz puts
+     back exactly the cells Confirm set (a cell scored again since keeps its
+     new score) and the marking each student had before. */
+  function _quizCellOpen(cid, a, sid, key) {
+    if (isScoreLocked(cid, sid, a.id)) return false;
+    if (isPointsScored(a)) return getPointsScore(cid, sid, a.id) == null;
+    return !isScoreEntered(
+      a,
+      (getScores(cid)[sid] || []).find(function (e) {
+        return e && e.assessmentId === a.id && e.tagId === key;
+      }),
+    );
+  }
+
+  function quizConfirmPlan(cid, aid, rows) {
+    var a = _piece(cid, aid);
+    var plan = { aid: aid, points: !!a && isPointsScored(a), cells: [], students: 0, kept: 0, locked: 0, waiting: 0 };
+    plan.marks = [];
+    plan.undoMarks = [];
+    if (!a) return plan;
+    var keys = scoreTagIds(a, cid);
+    (rows || []).forEach(function (row) {
+      if (isScoreLocked(cid, row.sid, aid)) {
+        plan.locked++;
+        return;
+      }
+      var cells = plan.points
+        ? row.points == null
+          ? []
+          : [{ sid: row.sid, points: row.points }]
+        : (row.levels || [])
+            .filter(function (l) {
+              return keys.indexOf(l.tagId) >= 0 && l.level >= 1 && l.level <= 4;
+            })
+            .map(function (l) {
+              return { sid: row.sid, key: l.tagId, level: l.level, mod: l.mod || 0 };
+            });
+      var open = cells.filter(function (c) {
+        return _quizCellOpen(cid, a, c.sid, c.key);
+      });
+      plan.kept += cells.length - open.length;
+      plan.waiting += row.waiting || 0;
+      plan.cells = plan.cells.concat(open);
+      if (open.length) plan.students++;
+      if (!row.attemptId || !row.marked) return;
+      plan.marks.push({ attempt_id: row.attemptId, marked: row.marked });
+      plan.undoMarks.push(
+        row.prior && row.prior.attempt_id
+          ? { attempt_id: row.prior.attempt_id, marked: row.prior.marked }
+          : { attempt_id: row.attemptId, marked: null },
+      );
+    });
+    plan.ask = _quizAsk(cid, a, plan);
+    return plan;
+  }
+
+  // "1 level", "3 students"
+  function _n(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  /* What Confirm asks: { title, message, button }. */
+  function _quizAsk(cid, a, plan) {
+    var n = plan.cells.length;
+    var title = a.title || 'this quiz';
+    var unit = plan.points ? ['score', 'scores', 'Score', 'Scores'] : ['level', 'levels', 'Level', 'Levels'];
+    if (!n)
+      return {
+        title: 'Nothing to Confirm',
+        message: plan.points
+          ? 'Every student who sent this quiz already has a score on it, is waiting for a short answer to be assessed, or is marked Missing or Excused.'
+          : 'Every suggested level is already set, is waiting for a short answer to be assessed, or is for a student marked Missing or Excused.',
+        button: 'OK',
+        none: true,
+      };
+    var held = typeof GradeState !== 'undefined' && GradeState.holds(getReturnSettings(cid));
+    var parts = [
+      'Confirm ' + _n(n, unit[0], unit[1]) + ' for ' + _n(plan.students, 'student', 'students') + ' on ' + title + '?',
+      n === 1 ? 'It counts toward the student’s grade.' : 'They count toward each student’s grade.',
+      held
+        ? (n === 1 ? 'It stays a draft' : 'They stay drafts') + ' until you return ' + (n === 1 ? 'it.' : 'them.')
+        : 'Students see ' + (n === 1 ? 'it' : 'them') + ' at once.',
+    ];
+    if (plan.kept)
+      parts.push(
+        (plan.points ? _n(plan.kept, 'score', 'scores') : _n(plan.kept, 'level', 'levels')) +
+          ' already on this piece ' +
+          (plan.kept === 1 ? 'stays as it is.' : 'stay as they are.'),
+      );
+    if (plan.locked)
+      parts.push(
+        (plan.locked === 1 ? '1 student is' : plan.locked + ' students are') +
+          ' marked Missing or Excused and left out.',
+      );
+    if (plan.waiting)
+      parts.push(
+        _n(plan.waiting, plan.points ? 'score waits' : 'level waits', plan.points ? 'scores wait' : 'levels wait') +
+          ' for a short answer to be assessed and ' +
+          (plan.waiting === 1 ? 'is' : 'are') +
+          ' not included.',
+      );
+    return {
+      title: 'Confirm ' + _n(n, unit[2], unit[3]),
+      message: parts.join(' '),
+      button: 'Confirm ' + _n(n, unit[2], unit[3]),
+    };
+  }
+
+  /* Confirm: the plan's cells, each looked at again just before it is
+     written. Answers { set, before, after, undoMarks } for undoConfirmQuiz. */
+  function confirmQuiz(cid, aid, plan) {
+    var a = _piece(cid, aid);
+    var done = { set: 0, before: structuredClone(getScores(cid)), after: null, undoMarks: plan.undoMarks || [] };
+    if (!a) return done;
+    (plan.cells || []).forEach(function (c) {
+      if (!_quizCellOpen(cid, a, c.sid, c.key)) return;
+      if (plan.points) setPoints(cid, c.sid, aid, c.points);
+      else setLevel(cid, c.sid, aid, c.key, c.level, c.mod);
+      done.set++;
+    });
+    done.after = structuredClone(getScores(cid));
+    if (typeof QuizTries !== 'undefined') QuizTries.confirm(cid, aid, plan.marks || []);
+    return done;
+  }
+
+  /* Its Undo: exactly the cells Confirm set, and the marking before it. */
+  function undoConfirmQuiz(cid, aid, done) {
+    var out = undo(cid, done.before, done.after);
+    if (typeof QuizTries !== 'undefined') QuizTries.confirm(cid, aid, done.undoMarks || []);
+    return out;
+  }
+
   /* Return: the students in `studentIds` (one id or a list) are given
      their grade on `aid`, and the marks on their pages (S9-F1): data.js's
      returnWork is returnGrades, then each student is given the working
@@ -885,6 +1029,7 @@ window.Grader = (function () {
     setToFromPaper: setToFromPaper,
     deleteWork: deleteWork,
     unsubmitAsk: unsubmitAsk,
+    quizConfirmPlan: quizConfirmPlan,
   };
 
   return {
@@ -921,6 +1066,9 @@ window.Grader = (function () {
     setPlusMinusOnPhone: setPlusMinusOnPhone,
     undoOnPhone: undoOnPhone,
     undo: undo,
+    // Quizzes (Q4)
+    confirmQuiz: confirmQuiz,
+    undoConfirmQuiz: undoConfirmQuiz,
     returnGrades: returnTo,
     // Revisions (S11)
     returnForRevision: returnForRevisionAction,

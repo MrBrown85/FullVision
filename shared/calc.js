@@ -731,6 +731,85 @@ function pointsToProf(rawScore, maxPoints, scale) {
   }
   return 1;
 }
+
+/* A quiz's suggestions for one student, by the plan's rules (docs/plans/
+   quizzes-plan.md, "Grade math"). Never a grade: only the quiz results
+   screen reads them, nothing is written, and only Grader.confirmQuiz makes
+   one a score. questions (list_quiz's active ones), key (by question id, or
+   each question's own), tries (the student's sent ones, list_quiz_tries),
+   settings { tries, counts, scoring, tagIds, maxPoints }, scale (the
+   class's Points to Proficiency table).
+   @param {any[]} questions @param {any} key @param {any[]} tries @param {any} settings @param {any} [scale] */
+function quizSuggestions(questions, key, tries, settings, scale) {
+  var qs = (questions || []).filter(q => q && q.id && !q.archived_at);
+  var set = settings || {};
+  var sum = (/** @type {any[]} */ l, /** @type {Function} */ f) => l.reduce((n, x) => _onPaper(n + f(x)), 0);
+  var worth = (/** @type {any} */ q) => Number(q.points) || 0;
+  var r = (/** @type {number} */ earned, /** @type {string} */ result) => ({ earned, result });
+  var possible = sum(qs, worth);
+  // Right: a Choice's exact set of choices, the True or False, a Number within the tolerance, ends in, on paper.
+  function right(q, ans, k) {
+    var sorted = (/** @type {any} */ x) => (Array.isArray(x) ? JSON.stringify(x.slice().sort()) : null);
+    if (q.kind === 'choice') return sorted(ans) !== null && sorted(ans) === sorted(k.answer);
+    if (q.kind === 'true_false') return typeof ans === 'boolean' && ans === k.answer;
+    if (q.kind !== 'number' || typeof ans !== 'number' || typeof k.answer !== 'number') return false;
+    return _onPaper(Math.abs(ans - k.answer)) <= _onPaper(Number(k.tolerance) || 0);
+  }
+  // No answer earns 0; a Text answer, the points given, never more than the question is worth now.
+  function mark(q, a) {
+    var k = (key && key[q.id]) || q.key || {};
+    if (!a) return r(0, 'wrong');
+    if (q.kind !== 'text') return right(q, a.answer, k) ? r(worth(q), 'right') : r(0, 'wrong');
+    if (a.given_points == null) return r(0, 'waiting');
+    var e = Math.min(Number(a.given_points), worth(q));
+    return r(e, e >= worth(q) ? 'right' : e > 0 ? 'partly' : 'wrong');
+  }
+  var marks = (tries || [])
+    .filter(t => t && t.sent_at)
+    .sort((a, b) => a.try - b.try)
+    .map(t => {
+      var by = /** @type {Record<string, any>} */ ({});
+      var got = /** @type {Record<string, any>} */ ({});
+      (t.answers || []).forEach((/** @type {any} */ a) => (by[a.question_id] = a));
+      qs.forEach(q => (got[q.id] = mark(q, by[q.id])));
+      var m = /** @type {any} */ ({
+        attempt_id: t.attempt_id,
+        try: t.try,
+        sent_at: t.sent_at,
+        possible,
+        questions: got,
+      });
+      m.earned = sum(qs, q => got[q.id].earned);
+      m.waiting = qs.filter(q => got[q.id].result === 'waiting').length;
+      return m;
+    });
+  // One whole try counts: the last sent (Latest, and a one-try quiz), or the higher total, the later on a tie (Best,
+  // which waits while any try has a Text answer waiting).
+  var mode = set.tries !== 1 && set.counts === 'best' ? 'best' : 'latest';
+  var held = mode === 'best' && marks.length > 1 && marks.some(m => m.waiting);
+  var last = marks[marks.length - 1];
+  var best = () => marks.reduce((b, m) => (m.earned >= b.earned ? m : b));
+  var counted = held || !last ? null : mode === 'latest' ? last : best();
+  var state = !last ? 'not_sent' : !counted || counted.waiting ? 'waiting' : 'level';
+  var total = { earned: counted ? counted.earned : 0, possible, state, level: 0 };
+  if (counted && state === 'level') total.level = pointsToProf(counted.earned, +set.maxPoints || possible, scale);
+  // Competencies: each one's questions give a whole level by the table, from three questions (decision 4).
+  // Points: every competency reads the level the total reaches.
+  var competencies = (set.tagIds || []).map((/** @type {string} */ tagId) => {
+    var mine = qs.filter(q => q.tag_id === tagId);
+    var earned = counted ? sum(mine, q => counted.questions[q.id].earned) : 0;
+    var c = { tagId, questions: mine.length, earned, possible: sum(mine, worth), state: '', level: 0 };
+    var waits = held || (!!counted && mine.some(q => counted.questions[q.id].result === 'waiting'));
+    if (set.scoring === 'points') c.state = state === 'level' ? 'total' : state;
+    else c.state = !last ? 'not_sent' : mine.length < 3 || !(c.possible > 0) ? 'too_few' : waits ? 'waiting' : 'level';
+    c.level = c.state === 'total' ? total.level : c.state === 'level' ? pointsToProf(earned, c.possible, scale) : 0;
+    return c;
+  });
+  var waiting = held ? sum(marks, m => m.waiting) : counted ? counted.waiting : 0;
+  // marked: what confirm_quiz stores for the try that counts, and what a returned student is shown.
+  var marked = counted ? { earned: counted.earned, possible, questions: counted.questions } : null;
+  return { mode, tries: marks, counted, waiting, total, competencies, marked };
+}
 /** Get the summative/formative category weights for a course.
  * @param {string} cid - Course ID
  * @returns {{summative: number, formative: number}} Category weight object
@@ -4499,6 +4578,7 @@ window.Calc = {
   isScoreOutOfRange,
   courseShowsLetterGrades,
   pointsToProf,
+  quizSuggestions,
   getCategoryWeights,
   getAssessmentWeight,
   getAssessmentOverallScore,

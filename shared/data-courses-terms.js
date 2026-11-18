@@ -186,6 +186,8 @@ function _clearCourseLocalState(id) {
     'quizzes',
     'quiz-keys',
     'quiz-unsent',
+    // Quiz results (shared/data-quiz-tries.js): Demo Mode's sent tries.
+    'quiz-tries',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];

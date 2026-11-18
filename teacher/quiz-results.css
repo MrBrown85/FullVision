@@ -1,0 +1,478 @@
+/* A quiz's results and Confirm (teacher/quiz-results.js, slice Q4; board
+   "Quizzes Artboard", Board 3). The app's tokens only, so it follows light
+   and dark. Nothing here sets display on an element that carries `hidden`.
+   A suggested level is dashed; a confirmed one is solid, as the gradebook
+   draws a score. */
+
+.quiz-results-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3800;
+  background: var(--bg);
+  overflow: auto;
+}
+.quiz-results {
+  box-sizing: border-box;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+  color: var(--text);
+}
+.quiz-results-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.quiz-results-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.quiz-results-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.quiz-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.quiz-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  background: var(--surface);
+}
+.quiz-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 14px;
+  align-items: start;
+}
+.quiz-aside,
+.quiz-top {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.quiz-top {
+  max-width: 520px;
+  margin-bottom: 12px;
+}
+.quiz-aside .quiz-top {
+  max-width: none;
+  margin-bottom: 0;
+}
+.quiz-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--divider-subtle);
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.quiz-panel-flush {
+  padding: 0;
+  overflow: hidden;
+}
+.quiz-h3 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.quiz-table-wrap {
+  overflow-x: auto;
+}
+table.quiz-rt {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+table.quiz-rt th,
+table.quiz-rt td {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--divider-subtle);
+  text-align: left;
+  vertical-align: middle;
+  min-height: 44px;
+  height: 44px;
+}
+table.quiz-rt thead th {
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+  min-width: 120px;
+}
+table.quiz-rt tr.is-selected > * {
+  background: var(--active-light);
+}
+.quiz-name {
+  font-weight: 400;
+  min-width: 150px;
+}
+.quiz-fig {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.quiz-try-row td {
+  height: 36px;
+  min-height: 36px;
+  font-size: 12px;
+}
+.quiz-try-name {
+  padding-left: 24px !important;
+  color: var(--text-2);
+}
+.quiz-sub {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.quiz-tag {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  white-space: nowrap;
+}
+.quiz-tag.is-changed {
+  background: var(--active-light);
+  color: var(--active);
+}
+.quiz-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.quiz-of {
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.quiz-none {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* A level: solid once it is a score, dashed while it is only suggested. */
+.quiz-lv {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  border: 1.5px solid transparent;
+}
+.quiz-lv1 {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.quiz-lv2 {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.quiz-lv3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.quiz-lv4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.quiz-lv.is-suggested {
+  background: var(--surface);
+  border-style: dashed;
+  border-color: currentColor;
+}
+.quiz-lv-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.quiz-total.is-suggested {
+  border: 1.5px dashed currentColor;
+  border-radius: 6px;
+  padding: 1px 6px;
+  color: var(--text);
+}
+.quiz-lvb,
+.quiz-rowbtn,
+.quiz-link {
+  font: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 8px;
+  min-height: 32px;
+  color: inherit;
+  text-align: left;
+}
+.quiz-lvb {
+  padding: 4px 2px;
+}
+.quiz-lvb:hover .quiz-lv {
+  box-shadow:
+    0 0 0 2px var(--active-light),
+    0 0 0 1px var(--active);
+}
+.quiz-lvb[aria-pressed='true'] .quiz-lv {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.quiz-rowbtn {
+  padding: 4px 2px;
+  overflow-wrap: anywhere;
+}
+.quiz-rowbtn:hover,
+.quiz-link {
+  color: var(--active);
+}
+.quiz-link {
+  padding: 4px;
+  font-size: 12px;
+}
+.quiz-wait {
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: underline;
+}
+:is(.quiz-lvb, .quiz-rowbtn, .quiz-link, .quiz-card-line, .quiz-undo button):focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* Confirm, and its Undo. */
+.quiz-confirm .btn {
+  width: 100%;
+  min-height: 44px;
+}
+.quiz-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  background: var(--text);
+  color: var(--bg);
+}
+.quiz-undo button {
+  font: inherit;
+  font-weight: 600;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.quiz-stepper {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.quiz-btn-sm {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* One student's answers. */
+.quiz-who-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.quiz-tries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.quiz-tries .quiz-sub {
+  margin-left: 0;
+}
+.quiz-ans-list,
+.quiz-q-list,
+.quiz-col,
+.quiz-who-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.quiz-ans {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-size: 13px;
+}
+.quiz-ans-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.quiz-mk {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+.quiz-mk.is-right {
+  background: var(--score-3);
+}
+.quiz-mk.is-wrong {
+  background: var(--score-1);
+}
+.quiz-mk.is-partly {
+  background: var(--score-2);
+}
+.quiz-mk.is-waiting {
+  background: var(--text-3);
+}
+.quiz-yours {
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.quiz-right {
+  display: block;
+  color: var(--text-2);
+}
+.quiz-assess {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.quiz-assess .seg-btn {
+  min-width: 36px;
+  min-height: 32px;
+}
+.quiz-assess-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* By Question. */
+.quiz-q {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--divider-subtle);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.quiz-q:last-child {
+  border-bottom: 0;
+}
+.quiz-q-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.quiz-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.quiz-fill {
+  display: block;
+  height: 100%;
+  background: var(--active);
+}
+.quiz-col-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.quiz-col-who {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* By Student. */
+.quiz-who-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.quiz-who-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: center;
+}
+.quiz-who-list .quiz-rowbtn[aria-current='true'] {
+  font-weight: 700;
+  color: var(--active);
+}
+
+/* The line on the piece's card in Assignments. */
+.quiz-card-line {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 8px;
+  min-height: 24px;
+  background: var(--active-light);
+  color: var(--active);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .quiz-grid,
+  .quiz-who-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .quiz-results {
+    padding: 16px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .quiz-lv {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+}

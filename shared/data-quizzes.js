@@ -884,6 +884,12 @@ function forgetQuiz(cid, aid) {
   if (!cid || !aid) return;
   quizDropUnsent(cid, aid);
   if (!_isDemoSession()) return;
+  // Demo Mode's sent tries of it (shared/data-quiz-tries.js) go too.
+  var tries = _safeParseLS('gb-quiz-tries-' + cid, null);
+  if (_plainObject(tries) && tries[aid]) {
+    delete tries[aid];
+    _safeLSSet('gb-quiz-tries-' + cid, JSON.stringify(tries));
+  }
   var store = _quizDemoLoad(cid);
   var one = store.quizzes[aid];
   if (!one) return;
