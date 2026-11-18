@@ -22,7 +22,8 @@ export const TODAY = new Date().toISOString().slice(0, 10);
 export const KEY = 'fv-s-session';
 export const SHOTS = process.env.S0W1S_SHOTS || '';
 export const PHONE = { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true };
-export const CHROMEBOOK = { viewport: { width: 1366, height: 768 } };
+// No touch and no phone: also where a project's own default is a phone (webkit-student, playwright.config.js).
+export const CHROMEBOOK = { viewport: { width: 1366, height: 768 }, isMobile: false, hasTouch: false };
 export const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'content-type',
@@ -257,5 +258,7 @@ export async function logOut(page) {
   await page.locator('.sp-head [data-act="settings-open"]').click();
   await page.locator('.sp-set [data-act="logout-ask"]').click();
   await expect(page.getByRole('alertdialog', { name: 'Log Out?' })).toBeVisible();
+  // Log Out? takes a press once it has been up a moment (a double tap is not a yes).
+  await page.waitForTimeout(450);
   await page.locator('.sp-logout [data-act="card-done"]').click();
 }

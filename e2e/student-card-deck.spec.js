@@ -91,6 +91,7 @@ test.describe('on a phone', () => {
     await expect(page.locator('#sp-logout-title')).toBeFocused();
     await named(page);
     await contrast(page);
+    await page.waitForTimeout(450); // Log Out? takes a press once it has been up a moment.
     await sheet.getByRole('button', { name: 'Cancel' }).click();
     await expect(sheet).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();

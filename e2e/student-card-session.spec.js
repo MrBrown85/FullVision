@@ -635,7 +635,11 @@ test.describe('"opened" means the row was on screen', () => {
     return posts.filter(p => p.body.route === 'seen').map(p => p.body.assessment_ids.map(a => titles[a]));
   };
 
-  test('39 rows at 375 px: only the rows on screen are sent, then more as the page scrolls', async ({ page }) => {
+  test('39 rows at 375 px: only the rows on screen are sent, then more as the page scrolls', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName === 'webkit', 'Playwright has no mouse wheel in mobile WebKit');
     const fn = school({ page: longPage() });
     const posts = await serve(page, fn);
     await signIn(page);
@@ -670,7 +674,11 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(page.getByRole('button', { name: 'Settings' })).toBeInViewport();
   });
 
-  test('a flick to the bottom: the rows that flew past are not sent, the ones it rests on are', async ({ page }) => {
+  test('a flick to the bottom: the rows that flew past are not sent, the ones it rests on are', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName === 'webkit', 'Playwright has no mouse wheel in mobile WebKit');
     const fn = school({ page: longPage() });
     const posts = await serve(page, fn);
     await signIn(page);

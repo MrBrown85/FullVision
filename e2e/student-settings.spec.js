@@ -183,6 +183,8 @@ for (const size of [
       expect((await stored(page)).local[KEY]).toBeTruthy();
       await gear.click();
       await sheet.getByRole('button', { name: 'Log Out' }).click();
+      // Log Out? takes a press once it has been up a moment (a double tap is not a yes).
+      await page.waitForTimeout(450);
       await ask.getByRole('button', { name: 'Log Out' }).click();
       await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
       // Nothing of the session or of Settings is left on the device, and the page is back at Normal.
@@ -204,5 +206,176 @@ test.describe('Settings with reduced motion', () => {
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
     expect(await page.locator('.sp-set').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  });
+});
+
+/* Demo Mode's sample card, at a Text Size, with a second class added (so
+   Switch Class is listed and Settings is at its tallest), Settings open. */
+async function demoTwoClasses(page, size) {
+  await page.goto('/s/#demo-card');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Student Number').fill('1234567');
+  await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.locator('.sp-set [data-act="card-add"]').click();
+  await page.locator('#sp-code').fill('ABCD-EFGH');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Student Number').fill('1234567');
+  await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  if (size !== 'normal') await page.locator('.sp-set-size[data-size="' + size + '"]').click();
+  await page.waitForTimeout(300);
+}
+
+/* The review's fault 1: a zoomed vh made Settings taller than the screen
+   (Log Out below the window on a 657 px Chromebook; the title above the
+   top on small phones). Settings now fits the screen and scrolls inside. */
+for (const vp of [
+  { width: 1366, height: 657, phone: false },
+  { width: 320, height: 568, phone: true },
+  { width: 375, height: 667, phone: true },
+  { width: 390, height: 844, phone: true },
+]) {
+  for (const size of ['normal', 'large', 'larger']) {
+    test.describe('Settings fits ' + vp.width + ' × ' + vp.height + ' at ' + size, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.phone, hasTouch: vp.phone });
+
+      test('the whole sheet is on the screen, and Log Out can be reached', async ({ page }) => {
+        await demoTwoClasses(page, size);
+        const box = await page.locator('.sp-set').boundingBox();
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height).toBeLessThanOrEqual(vp.height + 1);
+        await expect(page.getByRole('heading', { name: 'Settings' })).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('.sp-set-done')).toBeInViewport({ ratio: 1 });
+        const out = page.locator('.sp-set-out');
+        await out.scrollIntoViewIfNeeded();
+        await expect(out).toBeInViewport({ ratio: 1 });
+        await out.click();
+        await expect(page.getByRole('alertdialog', { name: 'Log Out?' })).toBeVisible();
+        const ask = await page.locator('.sp-logout').boundingBox();
+        expect(ask.y).toBeGreaterThanOrEqual(0);
+        expect(ask.y + ask.height).toBeLessThanOrEqual(vp.height + 1);
+      });
+    });
+  }
+}
+
+/* The review's fault 2: a double tap on Settings' Log Out landed its second
+   tap on the confirm's Log Out. Now Cancel is where the first tap was, and
+   Log Out? takes no press for its first 400 ms. */
+for (const width of [320, 390, 430]) {
+  for (const size of ['normal', 'large', 'larger']) {
+    test.describe('a double tap on Log Out at ' + width + ' px, ' + size, () => {
+      test.use({ viewport: { width, height: width === 320 ? 568 : 844 }, isMobile: true, hasTouch: true });
+
+      test('leaves the student signed in, 150 ms and 300 ms apart', async ({ page }) => {
+        await demoTwoClasses(page, size);
+        for (const gap of [150, 300]) {
+          if (!(await page.locator('.sp-set').count())) {
+            await page.getByRole('button', { name: 'Settings', exact: true }).click();
+            await page.waitForTimeout(300);
+          }
+          const out = page.locator('.sp-set-out');
+          await out.scrollIntoViewIfNeeded();
+          const b = await out.boundingBox();
+          const x = b.x + b.width / 2;
+          const y = b.y + b.height / 2;
+          await page.touchscreen.tap(x, y);
+          await page.waitForTimeout(gap);
+          await page.touchscreen.tap(x, y);
+          await page.waitForTimeout(600);
+          await expect(page.getByRole('heading', { name: 'You’re signed out' })).toHaveCount(0);
+          await expect(page.locator('.sp-head-class')).toBeVisible();
+          // What the second tap found under it was never the confirm's Log Out.
+          const under = await page.evaluate(
+            ([px, py]) => {
+              const el = document.elementFromPoint(px, py);
+              const act = el && el.closest('[data-act]');
+              return act ? act.getAttribute('data-act') : '';
+            },
+            [x, y],
+          );
+          expect(under).not.toBe('card-done');
+          // Back to the page for the next pair.
+          if (await page.locator('.sp-logout').count()) await page.keyboard.press('Escape');
+        }
+      });
+    });
+  }
+}
+
+/* Two tabs of one session: a size chosen in one reaches the other, and the
+   other's activity never writes it away. */
+test.describe('Text Size in two tabs of one session', () => {
+  test.use(PHONE_390);
+
+  test('Larger in one tab shows in the other and stays on the device', async ({ page, context }) => {
+    const fn = twoClasses();
+    await serve(page, fn);
+    await signIn(page);
+    const other = await context.newPage();
+    await serve(other, fn);
+    await other.goto('/s/');
+    await expect(other.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.locator('.sp-set-size[data-size="larger"]').click();
+    await expect.poll(() => drawnAt(other)).toEqual({ zoom: '1.3', html: 'sp-size-larger' });
+    // The other tab is used for a while: its writes keep the size.
+    for (let i = 0; i < 7; i += 1) {
+      await other.mouse.move(100 + i * 5, 300);
+      await other.waitForTimeout(1000);
+    }
+    expect(JSON.parse((await stored(page)).local[KEY]).z).toBe('larger');
+    expect(await drawnAt(page)).toEqual({ zoom: '1.3', html: 'sp-size-larger' });
+  });
+});
+
+/* Preview as Student on a Chromebook: Settings is the small menu under the
+   gear, inside the device, as on the student's Chromebook (the review found
+   it pinned to the left and stretched to the bottom). */
+test.describe('Preview as Student: Settings on the Chromebook', () => {
+  test.use({ viewport: { width: 1440, height: 1000 } });
+
+  test('a small menu under the gear, inside the device, at each Text Size', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e)));
+    await page.goto('/login.html?demo=1');
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    await page.waitForFunction(() => {
+      const cid = typeof getActiveCourse === 'function' && getActiveCourse();
+      return !!cid && getStudents(cid).length > 0;
+    });
+    await page.evaluate(() => setStudentPageSwitch(getActiveCourse(), true));
+    await page.goto('/dashboard?manage=student-page');
+    await page.getByRole('button', { name: 'Open Preview' }).click();
+    await page.locator('[data-ps-device="chromebook"]').click();
+    const screen = page.locator('.ps-screen');
+    for (const size of ['normal', 'large', 'larger']) {
+      await screen.locator('[data-act="settings-open"]').click();
+      if (size !== 'normal') {
+        await screen.locator('.sp-set-size[data-size="' + size + '"]').click();
+        await screen.locator('.sp-set-done').click();
+        await screen.locator('[data-act="settings-open"]').click();
+      }
+      await page.waitForTimeout(300);
+      const set = await screen.locator('.sp-set').boundingBox();
+      const gear = await screen.locator('.sp-gear').boundingBox();
+      const dev = await screen.boundingBox();
+      // Inside the device's screen, always.
+      expect(set.x).toBeGreaterThanOrEqual(dev.x - 1);
+      expect(set.x + set.width).toBeLessThanOrEqual(dev.x + dev.width + 1);
+      expect(set.y + set.height).toBeLessThanOrEqual(dev.y + dev.height + 1);
+      // The preview's Chromebook is 820 px: zoomed to Large or Larger the page is under 760 px
+      // and takes the phone's layout, as a Chromebook that narrow would. At Normal, the menu.
+      if (size === 'normal') {
+        expect(set.width).toBeLessThan(500);
+        expect(set.y).toBeGreaterThanOrEqual(gear.y + gear.height - 1);
+        expect(Math.abs(set.x + set.width - (gear.x + gear.width))).toBeLessThanOrEqual(4);
+        expect(set.height).toBeLessThan(dev.height - 60);
+      }
+      await page.keyboard.press('Escape');
+      await expect(screen.locator('.sp-set')).toHaveCount(0);
+    }
+    expect(errors).toEqual([]);
   });
 });

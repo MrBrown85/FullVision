@@ -245,7 +245,12 @@ async function fakeCamera(page) {
 }
 
 test.describe('Scan the Code With the Camera', () => {
-  test('on a Chromebook: the camera reads the card and Is This You? opens; the camera is off', async ({ browser }) => {
+  test('on a Chromebook: the camera reads the card and Is This You? opens; the camera is off', async ({
+    browser,
+    browserName,
+  }) => {
+    // A Chromebook's camera is Chrome's: this page offers it only with Chrome's code reader.
+    test.skip(browserName === 'webkit', 'the camera path is a Chromebook’s (Chrome) only');
     const ctx = await browser.newContext(CHROMEBOOK);
     const page = await ctx.newPage();
     await fakeCamera(page);

@@ -2331,9 +2331,12 @@ window.StudentPageView = (function () {
       '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
       '<h2 class="sp-sheet-title sp-set-title" id="sp-logout-title" tabindex="-1">Log Out?</h2>' +
       '<p class="sp-lead" id="sp-logout-line">You’ll need your card to open your page again.</p>' +
+      /* One under the other, Cancel last: at the foot of the sheet, where
+         Settings' Log Out was under the finger, so a double tap cancels
+         (s/app.js also ignores presses here for a moment after it opens). */
       '<div class="sp-logout-buttons">' +
-      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
       '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">Log Out</button>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
       '</div></div>'
     );
   }

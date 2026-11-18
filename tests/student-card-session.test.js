@@ -396,6 +396,8 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     const first = await signIn(dev);
     await first.click('[data-act="settings-open"]');
     await first.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    first.advance(500);
     await first.click('[data-act="card-done"]');
     await first.click('[data-act="card-restart"]');
     first.server = body => (body.route === 'card' ? { ok: false, error: 'server' } : dev.fn.handle(body));
@@ -645,6 +647,8 @@ describe('a reply for a card or a session that is no longer the current one is d
     // Log Out, and Log Out on its sheet, before the results are in.
     page.tap('[data-act="settings-open"]');
     page.tap('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     page.tap('[data-act="card-done"]');
     const shown = page.root().firstElementChild;
     await page.settle();
@@ -769,6 +773,8 @@ describe('a session’s end is checked before the list can be drawn again', () =
     const page = await signIn(dev);
     await page.click('[data-act="settings-open"]');
     await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     page.advance(60 * MIN);
     page.runTicks();
@@ -1348,6 +1354,8 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     page.onScreen(() => true);
     await page.click('[data-act="settings-open"]');
     await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     page.advance(800);
     page.runTimers(); // any timer left behind

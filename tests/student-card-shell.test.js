@@ -280,13 +280,16 @@ describe('the frame', () => {
     const asked = page.calls.length;
     await page.click('[data-act="settings-open"]');
     await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     const sheet = page.root().querySelector('.sp-logout');
     expect(sheet.getAttribute('role')).toBe('alertdialog');
     expect(sheet.querySelector('#sp-logout-title').textContent).toBe('Log Out?');
     expect(sheet.querySelector('.sp-lead').textContent).toBe('You’ll need your card to open your page again.');
+    // One under the other, Cancel last: where Settings' Log Out was, so a double tap cancels.
     expect([...sheet.querySelectorAll('button')].map(b => [b.textContent, b.getAttribute('data-act')])).toEqual([
-      ['Cancel', 'logout-cancel'],
       ['Log Out', 'card-done'],
+      ['Cancel', 'logout-cancel'],
     ]);
     // Log Out? stands in for Settings, and Cancel goes back to the page.
     expect(page.root().querySelector('.sp-set')).toBeNull();
@@ -296,6 +299,8 @@ describe('the frame', () => {
     expect(pressed(page)).toBe('Outstanding 2');
     await page.click('[data-act="settings-open"]');
     await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('.sp-sheet-back[data-act="logout-cancel"]');
     expect(page.root().querySelector('.sp-logout')).toBeNull();
     expect(page.calls.length).toBe(asked);

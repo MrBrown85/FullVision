@@ -163,41 +163,59 @@
 }
 /* The student page's sheets (Settings, Log Out?) are fixed to the
    student's screen. Here the device is that screen: the transform makes
-   it what they are fixed to, and they sit inside its 12 px bezel. */
+   it what they are fixed to, and they sit inside its 12 px bezel. Lengths
+   inside the page are divided by its Text Size zoom (--sp-zoom), as on the
+   student page (s/student.css). */
 .ps-device {
   transform: translateZ(0);
 }
+.ps-screen > .sp-view {
+  --sp-zoom: 1;
+  --sp-bezel: calc(12px / var(--sp-zoom));
+}
+.ps-device-phone .ps-screen > .sp-view {
+  --sp-screen-h: calc(780px / var(--sp-zoom));
+}
+.ps-device-chromebook .ps-screen > .sp-view {
+  --sp-screen-h: calc(540px / var(--sp-zoom));
+}
 .ps-screen .sp-view .sp-set-back {
-  inset: 12px;
+  inset: var(--sp-bezel);
   border-radius: 4px;
 }
 .ps-device-phone .ps-screen .sp-view .sp-set-back {
   border-radius: 34px;
 }
-.ps-screen .sp-view .sp-set,
-.ps-screen .sp-view .sp-logout {
-  right: 12px;
-  bottom: 12px;
-  left: 12px;
-}
-.ps-device-phone .ps-screen .sp-view .sp-set,
-.ps-device-phone .ps-screen .sp-view .sp-logout {
-  border-radius: 22px 22px 34px 34px;
+@container sp-view (max-width: 759.98px) {
+  .ps-screen .sp-view .sp-set,
+  .ps-screen .sp-view .sp-logout {
+    right: var(--sp-bezel);
+    bottom: var(--sp-bezel);
+    left: var(--sp-bezel);
+  }
+  .ps-device-phone .ps-screen .sp-view .sp-set,
+  .ps-device-phone .ps-screen .sp-view .sp-logout {
+    border-radius: 22px 22px 34px 34px;
+  }
 }
 @container sp-view (min-width: 760px) {
   .ps-screen .sp-view .sp-set,
   .ps-screen .sp-view .sp-logout {
-    top: 70px;
-    right: 22px;
+    top: calc(var(--sp-bezel) + 58px);
+    right: calc(var(--sp-bezel) + 10px);
+    bottom: auto;
+    left: auto;
   }
 }
 /* The student page's Text Size (its Settings), drawn inside the device as
    s/student.css draws it on the student's own. */
 .ps-screen > .sp-view.sp-text-large {
-  zoom: 1.15;
+  --sp-zoom: 1.15;
+  zoom: var(--sp-zoom);
 }
 .ps-screen > .sp-view.sp-text-larger {
-  zoom: 1.3;
+  --sp-zoom: 1.3;
+  zoom: var(--sp-zoom);
 }
 .ps-waiting {
   padding: 24px 20px;

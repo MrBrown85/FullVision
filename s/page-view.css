@@ -87,13 +87,22 @@
 /* At Large and Larger on a narrow phone the class's name takes two lines
    rather than being cut short: it is how a student knows which class this is. */
 .sp-view.sp-text-large .sp-head-title,
-.sp-view.sp-text-larger .sp-head-title {
+.sp-view.sp-text-larger .sp-head-title,
+html.sp-size-large .sp-view .sp-head-title,
+html.sp-size-larger .sp-view .sp-head-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: normal;
-  overflow-wrap: anywhere;
   line-height: 1.2;
+}
+/* …and the block goes under the name rather than squeezing it. */
+.sp-view.sp-text-large .sp-head-class,
+.sp-view.sp-text-larger .sp-head-class,
+html.sp-size-large .sp-view .sp-head-class,
+html.sp-size-larger .sp-view .sp-head-class {
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 .sp-view .sp-pill {
   flex: none;
@@ -714,16 +723,17 @@
 }
 .sp-view .sp-fb-crit-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 10px;
 }
 .sp-view .sp-fb-crit-name {
-  flex: 1;
+  flex: 1 1 8em;
   min-width: 0;
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .sp-view .sp-fb-part {
   display: flex;
@@ -779,7 +789,7 @@
 }
 .sp-view .sp-fb-words {
   font-size: 15px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .sp-view .sp-fb-check {
   display: flex;
@@ -816,6 +826,7 @@
 }
 .sp-view .sp-fb-whole-level {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
@@ -833,7 +844,7 @@
   color: #58585d;
 }
 .sp-view .sp-fb-whole-words {
-  flex: 1;
+  flex: 1 1 9em;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1007,6 +1018,19 @@
 .sp-view .sp-tab-on {
   color: var(--sp-blue-text);
   font-weight: 600;
+}
+/* Along the bottom, a label's one long word ("Assignments") always fits its
+   tab: the label is 12 px, or less where the bar is too narrow for that (a
+   narrow phone, a Text Size, four tabs). Sized from the bar's width (cqi),
+   about six letter-widths to the word, less the tab's padding. */
+.sp-view .sp-tabs-bottom {
+  container-type: inline-size;
+}
+.sp-view .sp-tabs-bottom .sp-tab-label {
+  font-size: min(12px, calc(5.4cqi - 1.4px));
+}
+.sp-view .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab-label {
+  font-size: min(12px, calc(4cqi - 1.4px));
 }
 
 @container sp-view (min-width: 760px) {
@@ -1404,10 +1428,14 @@
 .sp-view .sp-ml-rows > li:first-child {
   border-top: 0;
 }
+/* A row's result goes under its title when the two don't fit side by side
+   (a narrow phone, a Text Size, a long Letter and Proficiency result), so
+   a title is never squeezed into a word a line. */
 .sp-view .sp-ml-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 4px 10px;
   width: 100%;
   min-height: 44px;
   margin: 0;
@@ -1965,6 +1993,8 @@
 }
 .sp-view .sp-ba-move {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
 }
@@ -2432,12 +2462,16 @@
 
 /* My Learning's list: a dot for feedback not opened, the title and its
    line, what it got. */
-.sp-view .sp-ml-work .sp-row-text {
-  flex: 1;
+.sp-view .sp-ml-row > .sp-row-text {
+  flex: 1 1 9em;
   min-width: 0;
 }
+.sp-view .sp-ml-row > .sp-level {
+  margin-left: auto;
+  max-width: 100%;
+}
 .sp-view .sp-ml-work .sp-row-title {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .sp-view .sp-ml-new {
   flex: none;
@@ -2501,7 +2535,7 @@
 }
 .sp-logout-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 .sp-view .sp-btn-danger {
@@ -2534,7 +2568,7 @@
   z-index: 6;
   width: auto;
   max-width: 560px;
-  max-height: 85vh;
+  max-height: calc(var(--sp-screen-h, 100vh) * 0.85);
   margin: 0 auto;
   overflow-y: auto;
   transform: none;
@@ -2575,7 +2609,7 @@
   flex: none;
   min-width: 44px;
   min-height: 44px;
-  margin: 0 -6px 0 0;
+  margin: 0;
   padding: 0 12px;
   border: 0;
   border-radius: 22px;
@@ -2702,7 +2736,7 @@
     left: auto;
     width: 340px;
     max-width: calc(100% - 20px);
-    max-height: calc(100vh - 80px);
+    max-height: calc(var(--sp-screen-h, 100vh) - 74px);
     margin: 0;
     padding: 12px 14px 16px;
     border: 1px solid var(--sp-line);
@@ -2748,7 +2782,7 @@
   display: flex;
   width: 100%;
   aspect-ratio: var(--sp-car-ratio, 8.5 / 11);
-  max-height: 70vh;
+  max-height: calc(var(--sp-screen-h, 100vh) * 0.7);
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;

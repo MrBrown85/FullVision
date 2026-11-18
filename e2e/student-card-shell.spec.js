@@ -113,6 +113,7 @@ for (const size of [
       await expect(page.locator('#sp-logout-title')).toBeFocused();
       await contrast(page);
       await shot(page, size.tag + '-s4f1-log-out');
+      await page.waitForTimeout(450); // Log Out? takes a press once it has been up a moment.
       await sheet.getByRole('button', { name: 'Cancel' }).click();
       await expect(sheet).toHaveCount(0);
       await expect(page.getByRole('heading', { level: 1, name: 'Reflect', exact: true })).toBeVisible();

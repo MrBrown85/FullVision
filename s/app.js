@@ -61,6 +61,9 @@
   var identityFields = StudentPage.identityFields;
   var verifyIdentity = StudentPage.verifyIdentity;
   var paint = StudentPage.paint;
+  // Text Size's words, and the classes that draw the page at a size (s/settings.js).
+  var sizeOf = StudentSettings.sizeOf;
+  var sizeClasses = StudentSettings.apply;
 
   // The page's state: student.js's own, handed over by share.
   var S = null;
@@ -1188,14 +1191,10 @@
 
   /* ── The session on this device ────────────────────────────── */
 
-  /* { token, expires, enrollment, active, size, kept }: the session this
-     tab is showing. `active` is when the student last touched the page.
-     `size` is the Text Size chosen in Settings ('large', 'larger', or
-     nothing for Normal): kept with the session, so it goes with Log Out,
-     midnight and the idle limit, and the next student starts at Normal.
-     `kept` is true once it is in localStorage, where the next visit and
-     the device's other tabs read it. Nothing else of the card path is
-     stored. */
+  /* { token, expires, enrollment, active, size, kept }: the session this tab is showing. `active`
+     is when the student last touched the page; `size` the Text Size chosen in Settings, which goes
+     with the session. `kept` is true once it is in localStorage, where the next visit and the
+     device's other tabs read it. Nothing else of the card path is stored. */
   var SESSION_KEY = 'fv-s-session';
   // No touch, key, pointer or scroll for this long ends the session, as Done does (Colin, Nov 10).
   var IDLE_MS = 15 * 60 * 1000;
@@ -1227,14 +1226,8 @@
     try {
       var v = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if (!v || !/^[0-9a-f]{64}$/.test(String(v.t || '')) || typeof v.e !== 'string' || !v.e) return null;
-      var stored = {
-        token: v.t,
-        expires: String(v.x || ''),
-        enrollment: v.e,
-        active: Number(v.a) || 0,
-        size: sizeOf(v.z),
-        kept: true,
-      };
+      var stored = { token: v.t, expires: String(v.x || ''), enrollment: v.e, active: Number(v.a) || 0, kept: true };
+      stored.size = sizeOf(v.z);
       return endsAt(stored) == null ? null : stored;
     } catch (e) {
       return null; // no storage (a private window): the session lasts while this tab is open
@@ -1282,11 +1275,6 @@
     }
   }
 
-  // A Text Size this page knows, or '' (Normal) for anything else.
-  function sizeOf(z) {
-    return z === 'large' || z === 'larger' ? z : '';
-  }
-
   // The one thing this page writes to the device, and the one place it does.
   function write(s) {
     // Normal is no entry at all: a session at Normal is kept exactly as before Text Size.
@@ -1301,6 +1289,9 @@
     StudentPage.wipeCardDrafts();
     session = null;
     adding = null;
+    // The Text Size went with the session: the page is at Normal again, whatever is drawn next.
+    if (S) S.textSize = '';
+    sizeClasses('');
     stopCamera();
     stopClocks();
     stopWatchingRows();
@@ -1423,6 +1414,8 @@
       // Done in another tab, or another student signed in there.
       if (!stored) return leave(MESSAGES.signed_out);
       if (stored.token !== session.token) return leave(MESSAGES.signed_out, false);
+      // A Text Size chosen in another tab of this session.
+      adoptSize(stored);
     }
     var why = over(session, now);
     if (why === 'ended') return leave(MESSAGES.signed_out);
@@ -1475,6 +1468,8 @@
     if (!session.kept || at - wrote < 5000) return;
     var stored = readStored();
     if (!stored || stored.token !== session.token) return;
+    // The size as the device has it now: another tab may have chosen one since this tab read it.
+    adoptSize(stored);
     try {
       write(session);
     } catch (e) {
@@ -1542,13 +1537,15 @@
     if (!rows.length) return;
     var w = { page: S.page, observer: null, since: {}, timer: 0 };
     // The header stays over the top of the list: a row under it is not on screen.
+    // Heights as drawn on the screen (getBoundingClientRect), so a Text Size's zoom is counted.
     var head = document.querySelector('.sp-head');
-    var under = (head && head.offsetHeight) || 0;
+    var headRect = head && typeof head.getBoundingClientRect === 'function' ? head.getBoundingClientRect() : null;
+    var under = (headRect && headRect.height) || 0;
     // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
     var bar = document.querySelector('.sp-tabs-bottom');
     var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
     var over =
-      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? bar.offsetHeight || 0 : 0;
+      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? rect.height || 0 : 0;
     w.observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
@@ -1876,6 +1873,22 @@
     }
   }
 
+  /* A Text Size chosen in another tab of this session (the device's copy says so):
+     this tab takes it, so neither tab writes the other's choice away. */
+  function adoptSize(stored) {
+    if (!session || !stored || stored.token !== session.token) return;
+    session.size = stored.size;
+    if (sizeOf(S.textSize) === stored.size) return;
+    S.textSize = stored.size;
+    sizeClasses(stored.size);
+    if (S.screen === 'assignments' && S.settings) paint('.sp-set-size[aria-checked="true"]');
+  }
+
+  /* Log Out? ignores presses for a moment after it opens: a double tap on Settings' Log Out
+     is not a yes (the second tap lands where the first was). */
+  var LOGOUT_SETTLE_MS = 400;
+  var logoutAt = 0;
+
   /* A tab, one of To Do, Sent and Back, All Assignments, a filter, or a
      piece's card. s/page-view.js says what each press changes (the preview
      answers the same presses the same way); the page's data is already
@@ -1890,6 +1903,7 @@
       S[k] = out.ui[k];
     });
     if (act === 'text-size') keepSize();
+    if (act === 'logout-ask') logoutAt = Date.now();
     stopWatchingRows();
     paint(out.focus);
     // Settings slides in on the drawing that opens it (page-view.js).
@@ -2507,6 +2521,9 @@
   }
 
   function onClick(act, el) {
+    var since = Date.now() - logoutAt;
+    var settling = S.logout && S.screen === 'assignments' && since >= 0 && since < LOGOUT_SETTLE_MS;
+    if (settling && (act === 'card-done' || act === 'logout-cancel')) return;
     if (act === 'card-yes') {
       checkCard();
     } else if (act === 'card-notme') {
@@ -2596,26 +2613,15 @@
     window.addEventListener('storage', function () {
       checkSession();
     });
-    /* Settings, and Log Out? from it: Escape closes it (Log Out? as Cancel
-       does) and gives the focus back to the gear, and Tab goes round inside
-       it. A set of choices is one Tab stop (student.js). */
-    window.addEventListener('keydown', function (e) {
-      if (!S || S.screen !== 'assignments' || typeof document === 'undefined') return;
-      var open = S.logout ? '.sp-logout' : S.settings ? '.sp-set' : '';
-      if (!open) return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        showPart(S.logout ? 'logout-cancel' : 'settings-close', null);
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      var inside = Array.prototype.slice.call(document.querySelectorAll(open + ' button:not([tabindex="-1"])'));
-      if (!inside.length) return;
-      var at = inside.indexOf(document.activeElement);
-      var next = e.shiftKey ? (at <= 0 ? inside.length - 1 : at - 1) : at < 0 || at === inside.length - 1 ? 0 : at + 1;
-      e.preventDefault();
-      inside[next].focus();
-    });
+    // Escape and Tab over Settings and Log Out? (s/settings.js).
+    StudentSettings.keys(
+      function () {
+        return S;
+      },
+      function (act) {
+        showPart(act, null);
+      },
+    );
     // What counts as activity: a touch, a key, the pointer, a scroll.
     ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(function (name) {
       window.addEventListener(
@@ -2654,11 +2660,7 @@
     /* Every screen of a card's page at the Text Size chosen in Settings (student.css,
        html.sp-size-large and html.sp-size-larger). Signed out, the state is new: Normal. */
     drawn: function (root, state) {
-      if (typeof document === 'undefined' || !document.documentElement) return;
-      var size = sizeOf(state && state.textSize);
-      var html = document.documentElement.classList;
-      html.toggle('sp-size-large', size === 'large');
-      html.toggle('sp-size-larger', size === 'larger');
+      sizeClasses(sizeOf(state && state.textSize));
     },
     start: function (hash) {
       demo = null;

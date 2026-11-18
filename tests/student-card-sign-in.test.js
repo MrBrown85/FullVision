@@ -103,6 +103,8 @@ describe('After Done', () => {
     const page = await signIn(dev);
     await page.click('[data-act="settings-open"]');
     await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     expect(page.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     // A phone and a Chromebook each say what they are; the stylesheet shows one.
@@ -135,6 +137,8 @@ describe('After Done', () => {
     await demo.click('[data-act="card-yes"]');
     await demo.click('[data-act="settings-open"]');
     await demo.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    demo.advance(500);
     await demo.click('[data-act="card-done"]');
     expect(demo.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     await demo.click('[data-act="card-restart"]');
@@ -735,6 +739,8 @@ describe('Settings: Text Size and Log Out (Colin, 2026-11-17: the gear)', () => 
     // Log Out takes the session and the size with it.
     await page.click('[data-act="settings-open"]');
     await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     expect(dev.store).toEqual({});
     expect(page.T.state().textSize).toBe('');
@@ -750,6 +756,70 @@ describe('Settings: Text Size and Log Out (Colin, 2026-11-17: the gear)', () => 
     dev.store[KEY] = JSON.stringify(Object.assign(JSON.parse(dev.store[KEY]), { z: 'huge' }));
     const again = await dev.open('');
     expect(viewSize(again)).toBe('normal');
+  });
+
+  const chooseSize = async (page, size) => {
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set-size[data-size="' + size + '"]');
+    await page.click('.sp-set-done');
+  };
+
+  it('midnight and fifteen idle minutes take the size with the session', async () => {
+    const dev = school({ lasts: 10 * 60 * 1000 });
+    const page = await signIn(dev);
+    await chooseSize(page, 'larger');
+    const ends = Date.parse(JSON.parse(dev.store[KEY]).x);
+    page.T.checkSession(ends);
+    expect(dev.store).toEqual({});
+    expect(page.T.state().textSize).toBe('');
+    const idle = school();
+    const two = await signIn(idle);
+    await chooseSize(two, 'large');
+    expect(JSON.parse(idle.store[KEY]).z).toBe('large');
+    two.advance(16 * 60 * 1000);
+    two.runTicks();
+    expect(idle.store).toEqual({});
+    expect(two.T.state().textSize).toBe('');
+    expect(viewSize(await signIn(idle))).toBe('normal');
+  });
+
+  it('a page refused when it opens (the class’s page turned off) takes the size with the session', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    await chooseSize(page, 'larger');
+    dev.fn.state.cards.P3R8WDK4.closed = true;
+    const again = await dev.open('');
+    expect(has(again, '.sp-view')).toBe(false);
+    expect(again.T.state().textSize).toBe('');
+    expect(dev.store).toEqual({});
+  });
+
+  it('two tabs of one session: a size chosen in one is taken by the other, and its activity keeps it', async () => {
+    const dev = school();
+    const first = await signIn(dev);
+    const second = await dev.open('');
+    await chooseSize(first, 'larger');
+    second.fire('storage');
+    expect(second.T.state().textSize).toBe('larger');
+    // The second tab is used: it writes the device's copy, size and all.
+    second.advance(10 * 1000);
+    second.fire('pointerdown');
+    expect(JSON.parse(dev.store[KEY]).z).toBe('larger');
+  });
+
+  it('Log Out? takes no press for its first moment: a double tap on Log Out is not a yes', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // The second tap, at once: on Log Out or on Cancel, it does nothing.
+    await page.click('[data-act="card-done"]');
+    await page.click('.sp-logout [data-act="logout-cancel"]');
+    expect(has(page, '.sp-logout')).toBe(true);
+    expect(dev.store[KEY]).toBeTruthy();
+    page.advance(500);
+    await page.click('[data-act="card-done"]');
+    expect(dev.store).toEqual({});
   });
 
   it('Demo Mode: a Text Size works while the page is open and keeps nothing on the device', async () => {
