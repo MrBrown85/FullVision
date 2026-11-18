@@ -329,6 +329,7 @@ window.PageDashboard = (function () {
     _compFade = false;
     _afterObsRender(null);
     DashOverview.sizeRow();
+    _watchAboveRow();
     _placeMixPop();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
@@ -879,6 +880,22 @@ window.PageDashboard = (function () {
     var pop = document.getElementById('dash-mix-pop');
     if (pop && e.target && pop.contains && pop.contains(e.target)) return;
     _closeMixPop();
+  }
+
+  /* The middle row is as tall as the window leaves below where it starts, so
+     it is measured again whenever what sits above it changes height (the
+     photo-expiry line arriving after the first draw). */
+  var _aboveRowWatch = null;
+  function _watchAboveRow() {
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
+    if (typeof ResizeObserver === 'undefined' || !document.querySelector('.dash-row')) return;
+    _aboveRowWatch = new ResizeObserver(function () {
+      DashOverview.sizeRow();
+    });
+    document.querySelectorAll('.page-dashboard .photo-expiry, .page-dashboard .dash-glance').forEach(function (el) {
+      _aboveRowWatch.observe(el);
+    });
   }
 
   function _onResize() {
@@ -1447,6 +1464,8 @@ window.PageDashboard = (function () {
     if (typeof ObsCapture !== 'undefined') ObsCapture.closeDialog();
     _hidePop();
     window.removeEventListener('resize', _onResize);
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
     clearTimeout(_resizeTimer);
     CM.destroy();
     _listeners.forEach(function (l) {
