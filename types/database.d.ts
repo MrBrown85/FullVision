@@ -2086,6 +2086,238 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz: {
+        Row: {
+          accept_until: string | null
+          add_total: boolean
+          after_due: string
+          assessment_id: string
+          counts: string
+          created_at: string
+          shows: string
+          shuffle_choices: boolean
+          shuffle_questions: boolean
+          tries: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          accept_until?: string | null
+          add_total?: boolean
+          after_due?: string
+          assessment_id: string
+          counts?: string
+          created_at?: string
+          shows?: string
+          shuffle_choices?: boolean
+          shuffle_questions?: boolean
+          tries?: number
+          updated_at?: string
+        }
+        Update: {
+          accept_until?: string | null
+          add_total?: boolean
+          after_due?: string
+          assessment_id?: string
+          counts?: string
+          created_at?: string
+          shows?: string
+          shuffle_choices?: boolean
+          shuffle_questions?: boolean
+          tries?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_assessment_id_fkey"
+            columns: ["assessment_id"]
+            referencedRelation: "assessment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_answer: {
+        Row: {
+          answer: NonNullable<Json>
+          assessment_id: string
+          attempt_id: string
+          given_points: number | null
+          note: string | null
+          question_id: string
+          saved_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          answer: NonNullable<Json>
+          assessment_id: string
+          attempt_id: string
+          given_points?: number | null
+          note?: string | null
+          question_id: string
+          saved_at?: string
+        }
+        Update: {
+          answer?: NonNullable<Json>
+          assessment_id?: string
+          attempt_id?: string
+          given_points?: number | null
+          note?: string | null
+          question_id?: string
+          saved_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_answer_attempt_fkey"
+            columns: ["attempt_id", "assessment_id"]
+            referencedRelation: "quiz_attempt"
+            referencedColumns: ["id", "assessment_id"]
+          },
+          {
+            foreignKeyName: "quiz_answer_question_fkey"
+            columns: ["question_id", "assessment_id"]
+            referencedRelation: "quiz_question"
+            referencedColumns: ["id", "assessment_id"]
+          },
+        ]
+      }
+      quiz_attempt: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          enrollment_id: string
+          id: string
+          marked: Json | null
+          marked_at: string | null
+          question_order: Json | null
+          reopened_at: string | null
+          sent_at: string | null
+          started_at: string | null
+          try: number
+        }
+        ComputedFields: never
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          enrollment_id: string
+          id?: string
+          marked?: Json | null
+          marked_at?: string | null
+          question_order?: Json | null
+          reopened_at?: string | null
+          sent_at?: string | null
+          started_at?: string | null
+          try: number
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          enrollment_id?: string
+          id?: string
+          marked?: Json | null
+          marked_at?: string | null
+          question_order?: Json | null
+          reopened_at?: string | null
+          sent_at?: string | null
+          started_at?: string | null
+          try?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempt_assessment_id_fkey"
+            columns: ["assessment_id"]
+            referencedRelation: "quiz"
+            referencedColumns: ["assessment_id"]
+          },
+          {
+            foreignKeyName: "quiz_attempt_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            referencedRelation: "enrollment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_key: {
+        Row: {
+          answer: Json | null
+          question_id: string
+          tolerance: number | null
+          why: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          answer?: Json | null
+          question_id: string
+          tolerance?: number | null
+          why?: string | null
+        }
+        Update: {
+          answer?: Json | null
+          question_id?: string
+          tolerance?: number | null
+          why?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_key_question_id_fkey"
+            columns: ["question_id"]
+            referencedRelation: "quiz_question"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_question: {
+        Row: {
+          archived_at: string | null
+          assessment_id: string
+          choices: Json | null
+          created_at: string
+          id: string
+          kind: string
+          multiple: boolean
+          points: number
+          position: number | null
+          prompt: string
+          tag_id: string | null
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          archived_at?: string | null
+          assessment_id: string
+          choices?: Json | null
+          created_at?: string
+          id?: string
+          kind: string
+          multiple?: boolean
+          points?: number
+          position?: number | null
+          prompt: string
+          tag_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          assessment_id?: string
+          choices?: Json | null
+          created_at?: string
+          id?: string
+          kind?: string
+          multiple?: boolean
+          points?: number
+          position?: number | null
+          prompt?: string
+          tag_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_question_assessment_id_fkey"
+            columns: ["assessment_id"]
+            referencedRelation: "quiz"
+            referencedColumns: ["assessment_id"]
+          },
+        ]
+      }
       reflection: {
         Row: {
           body: string | null
@@ -4028,6 +4260,14 @@ export type Database = {
         Args: { p_id: string; p_idempotency_key?: string }
         Returns: Json
       }
+      confirm_quiz: {
+        Args: {
+          p_assessment_id: string
+          p_idempotency_key?: string
+          p_marks: Json
+        }
+        Returns: Json
+      }
       course_draft_count: { Args: { p_course_id: string }; Returns: number }
       create_assessment: {
         Args: {
@@ -4442,6 +4682,8 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      list_quiz: { Args: { p_assessment_id: string }; Returns: Json }
+      list_quiz_tries: { Args: { p_assessment_id: string }; Returns: Json }
       list_removed_sections: { Args: { p_course_id: string }; Returns: Json }
       list_report_issues: {
         Args: { p_course_id: string; p_term?: number }
@@ -4492,6 +4734,16 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_quiz_answer: {
+        Args: {
+          p_attempt_id: string
+          p_idempotency_key?: string
+          p_note: string
+          p_points: number
+          p_question_id: string
+        }
+        Returns: Json
+      }
       mark_student_cards_printed: {
         Args: { p_card_ids: string[]; p_idempotency_key?: string }
         Returns: Json
@@ -4539,6 +4791,14 @@ export type Database = {
       }
       remove_section: {
         Args: { p_id: string; p_idempotency_key?: string }
+        Returns: Json
+      }
+      reopen_quiz: {
+        Args: {
+          p_assessment_id: string
+          p_enrollment_id: string
+          p_idempotency_key?: string
+        }
         Returns: Json
       }
       reorder_categories: { Args: { p_ids: string[] }; Returns: undefined }
@@ -4622,6 +4882,14 @@ export type Database = {
           p_file_id: string
           p_idempotency_key?: string
           p_marks: Json
+        }
+        Returns: Json
+      }
+      save_quiz: {
+        Args: {
+          p_assessment_id: string
+          p_idempotency_key?: string
+          p_quiz: Json
         }
         Returns: Json
       }

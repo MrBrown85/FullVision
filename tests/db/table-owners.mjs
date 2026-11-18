@@ -58,6 +58,12 @@ export const OWNERS = {
   'public.photo_check_log': 'rls_test.of_course(t.course_id)',
   'public.photo_keep_check': 'rls_test.of_course(t.course_id)',
   'public.question': 'rls_test.of_questionnaire(t.questionnaire_id)',
+  'public.quiz': 'rls_test.of_assessment(t.assessment_id)',
+  'public.quiz_answer': 'rls_test.of_assessment(t.assessment_id)',
+  'public.quiz_attempt': 'rls_test.of_enrollment(t.enrollment_id)',
+  'public.quiz_key':
+    '(select rls_test.of_assessment(q.assessment_id) from public.quiz_question q where q.id = t.question_id)',
+  'public.quiz_question': 'rls_test.of_assessment(t.assessment_id)',
   'public.questionnaire': 'rls_test.of_course(t.course_id)',
   'public.reflection': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.report_config': 'rls_test.of_course(t.course_id)',
