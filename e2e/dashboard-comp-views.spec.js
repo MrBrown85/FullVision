@@ -64,7 +64,15 @@ test('every view keeps the tile one height', async ({ page }) => {
     await page.locator(`#dash-view-menu-comp [data-view="${view}"]`).click();
     await expect(page.locator('.dash-comp-card')).toHaveAttribute('data-view', view);
     heights.push(Math.round((await page.locator('.dash-comp-tile').boundingBox()).height));
-    heights.push(Math.round((await page.locator('.dash-students-head').boundingBox()).y));
+    /* Where the Students heading stands on the page, not in the window: on a
+       slow machine Playwright retries a click on a menu item still gliding
+       in and scrolls the page to reach it (by 37 px on a CPU slowed six
+       times), which moves everything in the window and nothing on the page. */
+    heights.push(
+      await page
+        .locator('.dash-students-head')
+        .evaluate(el => Math.round(el.getBoundingClientRect().top + document.getElementById('main').scrollTop)),
+    );
   }
   expect(new Set(heights.filter((_, i) => i % 2 === 0)).size).toBe(1);
   expect(new Set(heights.filter((_, i) => i % 2 === 1)).size).toBe(1);
