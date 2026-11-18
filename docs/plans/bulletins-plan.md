@@ -363,7 +363,7 @@ Chosen by the orchestrating session under Colin's delegation, Nov 17 ("make what
 - **The phone.** A fourth tab; the phone's Whiteboard queue and live poll come in later slices.
 - **The Learner Profile section is "In Bulletins".**
 
-This plan's own picks on three things the tracing found, taken under the same delegation, each the choice that shows the least about a student and each easy to change. They are listed for Colin; the orchestrating session confirms them before the slice that rests on each.
+This plan's own picks on three things the tracing found, taken under the same delegation and **confirmed by the orchestrating session on Nov 17**. Each is the choice that shows the least about a student, and each is easy to change. They are listed for Colin.
 
 - **Who counts in "Seen by N of M"** (was 6; gates B1a). M is the students who can open the page: enrolled, page not paused, with a working card. 22 of the 106 students in classes with the student page on have no working card; counted, no bulletin would ever read "Seen by All 26", and Not Seen Yet would always name students who cannot sign in. The list says "4 Have No Card Yet" apart, with a link to Manage Cards.
 - **Approving sentences with the laptop mirrored to the TV** (was 7; gates B3b and B3d). The TV screen is a window of its own, made to sit on the second screen, and the queue stays on the teacher's. A teacher whose laptop only mirrors approves from the phone, so the phone's queue (B3d) ships in the same stage as the Whiteboard. The queue's page says so once, in a sentence, the first time a Whiteboard is posted.
@@ -379,7 +379,7 @@ Taken from the board as drawn, and listed for him afterwards: Show It Again on T
 
 ## Not in this plan
 
-- **Quizzes.** Its board has no decisions.
+- **Quizzes.** It has a plan of its own, `docs/plans/quizzes-plan.md`, with ten settled decisions; nothing of it is built here.
 - **A web page, a text file or an EPUB on a bulletin.** The board lists them. They need the sealed frame's storage rules for a second kind of owner; a photo or a PDF covers the first stage. Its own slice after stage 1, if Colin wants it.
 - **Web Push**, or any notice outside the page.
 - **Replies, comments or a student's own posts.**

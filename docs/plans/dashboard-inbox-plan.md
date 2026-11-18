@@ -236,7 +236,7 @@ Chosen by the orchestrating session under Colin's delegation, Nov 17 ("make what
 - **A drop line for a class with Send Work off.** Add Work for the Class is offered in every class, but the Inbox, and so its drop area, shows only with Send Work on. A paper-only class opens Add Work from Assignments, as today. Worth a look once the row is on.
 - **Return Them from the Dashboard.** The line opens Assignments, where the question already is. A second place that returns grades would be a second place that shows grades to students.
 - **Any change to the top bar beyond a and b, to the student cards, or to the roster.** A "Today" strip is not re-proposed.
-- **Quizzes.** No decisions have been made on it.
+- **Quizzes.** It has a plan of its own, `docs/plans/quizzes-plan.md`, with ten settled decisions; nothing of it is built here.
 
 ## Risks
 
