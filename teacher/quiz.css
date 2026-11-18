@@ -352,6 +352,21 @@
   flex-wrap: wrap;
   height: auto;
 }
+/* When the four answers do not fit on one line they wrap as whole answers,
+   each its own segment on the track's colour, never one track broken across
+   two lines. */
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .af-work-seg {
+  background: transparent;
+  padding: 0;
+  gap: 6px;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .seg-btn {
+  background: var(--seg-track);
+  padding: 7px 14px;
+}
+.af-card-work .af-work-row[data-work-row='students_send']:has([data-value='quiz']) .seg-btn[aria-checked='true'] {
+  background: var(--seg-thumb);
+}
 /* While the saved quiz is read, the answers wait, with nothing moving. */
 .af-card-work[aria-busy='true'] .af-work-seg,
 .quiz-work[aria-busy='true'] .af-work-seg {

@@ -836,6 +836,42 @@ function saveQuiz(cid, aid, payload, tagIds) {
 }
 
 /**
+ * Whether this device knows the class's scores and its students' work, so
+ * "no scores and no work on this piece" can be trusted: Demo Mode keeps both
+ * here; signed in, the class has loaded (isClassLoaded) and, where its work
+ * is the server's, the work has been read at least once. Fails closed.
+ * @param {string} cid
+ */
+function quizFactsKnown(cid) {
+  if (!cid) return false;
+  if (_isDemoSession()) return true;
+  if (typeof isClassLoaded !== 'function' || !isClassLoaded(cid)) return false;
+  if (typeof _workOnServer === 'function' && _workOnServer(cid)) {
+    return !!(typeof _workRead !== 'undefined' && _workRead[cid] && _workRead[cid].at);
+  }
+  return true;
+}
+
+/**
+ * Ask for what quizFactsKnown waits on: the class's load and its work's read.
+ * A Promise that resolves (never rejects) once both have answered.
+ * @param {string} cid @returns {Promise<boolean>}
+ */
+function quizLoadFacts(cid) {
+  var loads = [];
+  if (typeof loadClass === 'function') loads.push(Promise.resolve(loadClass(cid)));
+  if (typeof refreshStudentWork === 'function') loads.push(Promise.resolve(refreshStudentWork(cid, { anyway: true })));
+  return Promise.all(loads).then(
+    function () {
+      return quizFactsKnown(cid);
+    },
+    function () {
+      return quizFactsKnown(cid);
+    },
+  );
+}
+
+/**
  * An assessment deleted: in Demo Mode its quiz and answer key go with it; on
  * any device, what was kept of an unsent save. (Signed in, the server takes
  * the quiz with the assessment.)
@@ -865,6 +901,8 @@ if (typeof window !== 'undefined') {
     load: loadQuiz,
     save: saveQuiz,
     forget: forgetQuiz,
+    factsKnown: quizFactsKnown,
+    loadFacts: quizLoadFacts,
     unsent: quizUnsent,
     dropUnsent: quizDropUnsent,
     trim: quizTrim,

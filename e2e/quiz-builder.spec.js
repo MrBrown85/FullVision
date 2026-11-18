@@ -459,6 +459,21 @@ test.describe('fit', () => {
         const apart = a.top >= q.bottom - 1 || a.left >= q.right - 1;
         if (!apart) out.push('the answers sit on the question');
         if (a.right > row.getBoundingClientRect().right + 1) out.push('the answers run out of the row');
+        // Answers on more than one line wrap as whole segments, never one track broken in two.
+        const seg = row.querySelector('.af-work-seg');
+        const tops = new Set(
+          Array.from(row.querySelectorAll('.seg-btn')).map(b => Math.round(b.getBoundingClientRect().top)),
+        );
+        const track = getComputedStyle(seg).backgroundColor;
+        if (tops.size > 1 && track !== 'rgba(0, 0, 0, 0)' && track !== 'transparent') {
+          out.push('the answers break one track across ' + tops.size + ' lines');
+        }
+        // Each answer on one line: the group wraps by whole answers.
+        row.querySelectorAll('.seg-btn').forEach(b => {
+          const lh = parseFloat(getComputedStyle(b).lineHeight) || 18;
+          const pad = parseFloat(getComputedStyle(b).paddingTop) + parseFloat(getComputedStyle(b).paddingBottom);
+          if (b.getBoundingClientRect().height - pad > lh * 1.5) out.push(b.textContent + ' wraps inside its answer');
+        });
         return out;
       }, MEASURED + ', .af-card-work .af-work-row, .af-card-work .af-work-seg');
     const wide = on =>

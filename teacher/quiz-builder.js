@@ -324,12 +324,25 @@ var QuizBuilder = (function () {
      moves no grade. A piece that is a quiz already keeps it. */
   function _blocked() {
     if (!S || S.existed || S.picked) return '';
+    // Scores or work not known yet: not offered at all (no sentence), until they arrive.
+    if (!_known()) return '';
     if (_scored())
       return 'This assessment already has scores, so a quiz cannot be added to it. Make a new assessment for the quiz.';
     if (_workIn()) {
       return "This assessment already has students' work, so a quiz cannot be added to it. Make a new assessment for the quiz.";
     }
     return '';
+  }
+  /* The class's scores and work are known on this device: a quiz can be offered on a fact. */
+  function _known() {
+    var d = _data();
+    return !!S && !!d && d.factsKnown(S.cid);
+  }
+  /* A quiz may be added here: known to have no scores and no work (or a quiz already). */
+  function _canAdd() {
+    if (!S) return false;
+    if (S.existed) return true;
+    return _known() && !_scored() && !_workIn();
   }
   // The scoring a new quiz starts on: Points in a Letter class, else Competencies (decision 2).
   function _startMode() {
@@ -440,6 +453,7 @@ var QuizBuilder = (function () {
     untilOk: _untilOk,
     afterDueRow: _afterDueRow,
     blocked: _blocked,
+    canAdd: _canAdd,
   });
 
   var _reduce =
@@ -952,7 +966,7 @@ var QuizBuilder = (function () {
   /* The fourth answer for the page's Student Work card: [] where a quiz is not offered. */
   /** @param {string} cid */
   function answers(cid) {
-    if (!_offered(cid) || _blocked()) return [];
+    if (!_offered(cid) || (S && !S.picked && !_canAdd())) return [];
     return [{ value: 'quiz', label: 'They Answer a Quiz' }];
   }
   /* The answer the page's card shows as chosen. */
@@ -973,7 +987,7 @@ var QuizBuilder = (function () {
     // While the saved quiz is read, the answers wait: no mixed state.
     if (S.loading) return true;
     if (value === 'quiz') {
-      if (_blocked()) return true;
+      if (!S.picked && !_canAdd()) return true;
       if (!S.picked) {
         S.picked = true;
         if (!S.qs.length) {
@@ -1051,6 +1065,14 @@ var QuizBuilder = (function () {
     S.startCollab = (assess && assess.collaboration) || 'individual';
     S.startDue = (assess && assess.dueDate) || '';
     S.pageCard = !!pageCard;
+    if (!d.factsKnown(cid)) {
+      var waitFor = S;
+      d.loadFacts(cid).then(function () {
+        if (S !== waitFor || !$('quiz-mount')) return;
+        _draw();
+        if (_redrawPage) _redrawPage();
+      });
+    }
     if (assess) {
       var held = d.get(cid, assess.id);
       if (held) _take(held);
@@ -1174,6 +1196,12 @@ var QuizBuilder = (function () {
       return false;
     }
     if (!S || !S.picked || !$('quiz-mount')) return true;
+    if (!_canAdd()) {
+      S.msg = '';
+      S.note = "This class's scores are still loading. Save again in a moment.";
+      _draw('#quiz-head');
+      return false;
+    }
     _syncPoints();
     S.tried = true;
     var bad = S.qs.find(function (/** @type {any} */ q) {
@@ -1290,6 +1318,8 @@ var QuizBuilder = (function () {
       return;
     }
     if (!changed && S.existed) return;
+    // Never a quiz onto a piece whose scores are not known to be none.
+    if (!_canAdd()) return;
     var ready = S.ready || {
       payload: _payload(),
       tags: _tags().map(function (t) {

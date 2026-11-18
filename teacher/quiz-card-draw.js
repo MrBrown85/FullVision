@@ -724,7 +724,7 @@ var QuizCardDraw = (function () {
           ? '<p class="af-work-hint quiz-not-offered" id="quiz-not-offered">' + esc(api.blocked()) + '</p>'
           : '<div class="seg af-work-seg" role="radiogroup" aria-labelledby="quiz-work-q">' +
             answer('nothing', 'No') +
-            answer('quiz', 'They Answer a Quiz') +
+            (S.picked || api.canAdd() ? answer('quiz', 'They Answer a Quiz') : '') +
             '</div>') +
         '</div></div></div></section>'
       );

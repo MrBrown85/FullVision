@@ -594,6 +594,84 @@ describe('signed in', () => {
     delete _learningMapIdRemap[CID];
   });
 
+  /* Offered only on a fact: the class's scores (and work) known to be loaded. */
+  const offeredHere = () => !!mount() && !!mount().querySelector('[data-quiz-act="answer"][data-value="quiz"]');
+
+  it('scores not loaded yet: not offered, nothing said; offered when they arrive', async () => {
+    session.fake.on('list_quiz', p =>
+      p.p_assessment_id === LAB ? { data: { quiz: null, questions: [], archived: [] }, error: null } : notFound,
+    );
+    let arrive;
+    openAssignments(
+      S0({ scores: {} }, () => {
+        // The class's load still out.
+        _classLoads[CID] = new Promise(r => (arrive = r));
+      }),
+      CID,
+    );
+    await settled();
+    await probeQuizzes(CID);
+    edit(LAB);
+    for (let i = 0; i < 4; i++) await settle();
+    expect(QuizData.factsKnown(CID)).toBe(false);
+    expect(offeredHere()).toBe(false);
+    expect(mount().querySelector('#quiz-not-offered')).toBeNull();
+    // Asked directly: refused, and a save sends nothing.
+    QuizBuilder.takeAnswer('quiz', null, () => {});
+    expect(QuizBuilder.picked()).toBe(false);
+    QuizBuilder._model().picked = true;
+    QuizBuilder.save(CID, LAB);
+    QuizBuilder._model().picked = false;
+    await flush();
+    expect(sent()).toEqual([]);
+    // The load lands: the answer appears.
+    _classLoads[CID] = true;
+    arrive();
+    for (let i = 0; i < 4; i++) await settle();
+    expect(offeredHere()).toBe(true);
+  });
+
+  it('student work not read yet: not offered', async () => {
+    session.fake.on('list_quiz', p =>
+      p.p_assessment_id === LAB ? { data: { quiz: null, questions: [], archived: [] }, error: null } : notFound,
+    );
+    openAssignments(S0({ scores: {} }), CID);
+    await settled();
+    await probeQuizzes(CID);
+    delete _workRead[CID];
+    expect(QuizData.factsKnown(CID)).toBe(false);
+    _workRead[CID] = { at: Date.now() };
+    expect(QuizData.factsKnown(CID)).toBe(true);
+  });
+
+  it('scores loaded and none on the piece: offered', async () => {
+    session.fake.on('list_quiz', p =>
+      p.p_assessment_id === LAB ? { data: { quiz: null, questions: [], archived: [] }, error: null } : notFound,
+    );
+    openAssignments(S0({ scores: {} }), CID);
+    await settled();
+    await probeQuizzes(CID);
+    edit(LAB);
+    for (let i = 0; i < 4; i++) await settle();
+    expect(QuizData.factsKnown(CID)).toBe(true);
+    expect(offeredHere()).toBe(true);
+  });
+
+  it('scores loaded and one on the piece: the sentence', async () => {
+    session.fake.on('list_quiz', p =>
+      p.p_assessment_id === PTS ? { data: { quiz: null, questions: [], archived: [] }, error: null } : notFound,
+    );
+    openAssignments(S0(), CID);
+    await settled();
+    await probeQuizzes(CID);
+    edit(PTS);
+    for (let i = 0; i < 4; i++) await settle();
+    expect(offeredHere()).toBe(false);
+    expect(mount().querySelector('#quiz-not-offered').textContent).toBe(
+      'This assessment already has scores, so a quiz cannot be added to it. Make a new assessment for the quiz.',
+    );
+  });
+
   it('while the saved quiz is read the Student Work answers wait', async () => {
     let answer;
     session.fake.on('list_quiz', p => (p.p_assessment_id === NEWQ ? new Promise(r => (answer = r)) : notFound));
