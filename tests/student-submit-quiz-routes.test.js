@@ -94,13 +94,14 @@ const SAVE = { route: 'quiz-save', session: PHONE, enrollment_id: ME, assessment
 const SEND = { route: 'quiz-send', session: PHONE, enrollment_id: ME, assessment_id: QZ };
 
 describe('the routes', () => {
-  it('are the three the contract names, and each names one statement, typed as the SQL takes it', () => {
-    expect(Object.keys(QUIZ_ROUTES).sort()).toEqual(['quiz', 'quiz-save', 'quiz-send']);
+  it('are the four the contract names, and each names one statement, typed as the SQL takes it', () => {
+    expect(Object.keys(QUIZ_ROUTES).sort()).toEqual(['quiz', 'quiz-list', 'quiz-save', 'quiz-send']);
     expect(SQL).toEqual({
       quiz: 'select student_submit.quiz($1::text, $2::uuid, $3::uuid, $4::text, $5::text::boolean) as r',
       quizSave:
         'select student_submit.quiz_save($1::text, $2::uuid, $3::uuid, $4::uuid, $5::text::jsonb, $6::text) as r',
       quizSend: 'select student_submit.quiz_send($1::text, $2::uuid, $3::uuid, $4::text) as r',
+      quizList: 'select student_submit.quiz_list($1::text, $2::uuid, $3::text) as r',
     });
   });
 
@@ -113,6 +114,8 @@ describe('the routes', () => {
       choice: ['id', 'text'],
       save: ['ok', 'question_id', 'saved_at'],
       send: ['ok', 'try', 'sent_at', 'tries_left', 'can_try_again'],
+      list: ['ok', 'quizzes'],
+      listed: ['assessment_id', 'tries_left', 'can_answer', 'closed', 'has_open_try'],
     });
   });
 
@@ -122,6 +125,7 @@ describe('the routes', () => {
       quiz: [...SESSION, 'quiz_closed', 'no_tries_left', 'too_many'],
       'quiz-save': [...SESSION, 'quiz_closed', 'sent', 'bad_answer', 'too_many'],
       'quiz-send': [...SESSION, 'quiz_closed', 'sent', 'too_many'],
+      'quiz-list': SESSION,
     });
   });
 });
@@ -445,5 +449,100 @@ describe('quiz-send', () => {
     });
     expect(await t.send(SEND)).toEqual({ status: 500, body: { ok: false, error: 'server' } });
     expect(JSON.stringify(t.logs)).not.toMatch(/duplicate|e1e1/);
+  });
+});
+
+describe('quiz-list', () => {
+  const ASK = { route: 'quiz-list', session: PHONE, enrollment_id: ME };
+  const QZ2 = 'a2a2a2a2-0000-4000-8000-000000000002';
+  const LISTED = {
+    ok: true,
+    quizzes: [
+      { assessment_id: QZ, tries_left: 0, can_answer: true, closed: false, has_open_try: true },
+      { assessment_id: QZ2, tries_left: null, can_answer: false, closed: true, has_open_try: false },
+    ],
+  };
+
+  it('asks student_submit.quiz_list with the session, the enrolment and the hashed address, and passes the list on', async () => {
+    const t = setup(() => LISTED);
+    const r = await t.send(ASK);
+    expect(r).toEqual({ status: 200, body: LISTED });
+    expect(t.calls).toHaveLength(1);
+    expect(t.calls[0][0]).toBe(SQL.quizList);
+    expect(t.calls[0][1].slice(0, 2)).toEqual([PHONE, ME]);
+    expect(t.calls[0][1][2]).toMatch(/^[0-9a-f]{64}$/);
+    expect(t.calls[0][1]).toHaveLength(3);
+    expect(t.logs).toEqual([{ route: 'quiz-list', outcome: 'ok', ms: expect.any(Number) }]);
+    expect(JSON.stringify(t.logs)).not.toMatch(/[0-9a-f]{8}-0000/);
+    expect(Object.keys(r.body)).toEqual(SENT.list);
+    for (const q of r.body.quizzes) expect(Object.keys(q)).toEqual(SENT.listed);
+  });
+
+  it('an assessment_id it does not need is not sent, and an empty class answers an empty list', async () => {
+    const t = setup(() => ({ ok: true, quizzes: [] }));
+    expect((await t.send({ ...ASK, assessment_id: QZ })).body).toEqual({ ok: true, quizzes: [] });
+    expect(t.calls[0][1]).toHaveLength(3);
+  });
+
+  it('a request of the wrong shape is bad_request and the database is not asked', async () => {
+    for (const body of [
+      { ...ASK, session: undefined },
+      { ...ASK, session: 'x'.repeat(129) },
+      { ...ASK, enrollment_id: 'me' },
+    ]) {
+      const t = setup(() => LISTED);
+      expect(await t.send(body)).toEqual({ status: 400, body: { ok: false, error: 'bad_request' } });
+      expect(t.calls).toEqual([]);
+    }
+  });
+
+  it('the key, a competency, another student or any key the database might add never reaches the phone', async () => {
+    const leaky = {
+      ...LISTED,
+      key: KEY_MARK,
+      enrollment_ids: [OTHER_KID],
+      quizzes: LISTED.quizzes.map(q => ({
+        ...q,
+        why: KEY_MARK,
+        tag_id: TAG,
+        questions: [Q1],
+        marked: { earned: 1 },
+        attempt_id: OTHER_KID,
+      })),
+    };
+    const r = await setup(() => leaky).send(ASK);
+    expect(r.body).toEqual(LISTED);
+    expect(JSON.stringify(r.body)).not.toMatch(/ZQX|tag_id|questions|marked|7a7a7a7a|e9e9e9e9|91919191/);
+  });
+
+  it('values are copied only as their kind; an entry with no id is a server error', async () => {
+    const odd = {
+      ok: true,
+      quizzes: [{ assessment_id: QZ.toUpperCase(), tries_left: -1, can_answer: 'yes', closed: 1, has_open_try: null }],
+    };
+    expect((await setup(() => odd).send(ASK)).body).toEqual({
+      ok: true,
+      quizzes: [{ assessment_id: QZ, tries_left: null, can_answer: false, closed: false, has_open_try: false }],
+    });
+    expect((await setup(() => ({ ok: true, quizzes: [{ tries_left: 1 }] })).send(ASK)).status).toBe(500);
+    const many = Array.from({ length: 1001 }, () => LISTED.quizzes[0]);
+    expect((await setup(() => ({ ok: true, quizzes: many })).send(ASK)).status).toBe(500);
+  });
+
+  it('the session refusals pass on by their code; any other is not_found', async () => {
+    for (const [error, said] of [
+      ['signed_out', 'signed_out'],
+      ['not_found', 'not_found'],
+      ['closed', 'closed'],
+      ['card_stopped', 'card_stopped'],
+      ['card_expired', 'card_expired'],
+      ['quiz_closed', 'not_found'],
+      ['too_many', 'not_found'],
+    ]) {
+      expect((await setup(() => ({ ok: false, error, retry_after_s: 5 })).send(ASK)).body).toEqual({
+        ok: false,
+        error: said,
+      });
+    }
   });
 });
