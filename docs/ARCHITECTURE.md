@@ -107,26 +107,28 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 25. `shared/data-feedback-live.js` (Mark Up and Reflect on Feedback for a signed-in teacher: the server's marks, reflections and revision requests, laid over with this device's writes not yet answered)
 26. `shared/data-markup.js` (Mark Up: the teacher's marks on a page of student work as Demo Mode keeps them, the readers both kinds of class share, and Return with the marks)
 27. `shared/data-reflect.js` (Reflect on Feedback: a student's reflection on returned work, the class's Reflect on Feedback and Show My Learning switches, and Send Answer)
-28. `shared/data-bulletins.js` (Bulletins, behind the build switch: the class's bulletins read and written, a waiting bulletin kept as Not Sent Yet, a photo or PDF uploaded to its own bucket, who has seen it; Demo Mode keeps them on the device)
-29. `shared/data-revisions.js` (Revisions: returning work for another try, its edit and Take Back, the student's revision in Demo Mode, and Before and After)
-30. `shared/data-roster.js` (the class list: students, enrolment, adding and editing a student, and the roster helpers)
-31. `shared/data-withdrawn.js` (withdrawn students: withdrawing and re-enrolling, the Withdrawn list, permanent delete, and putting a withdrawn student's marks aside)
-32. `shared/data-overrides.js` (hand-set levels: the teacher's section overrides with their reasons, and the calculated level shown beside one)
-33. `shared/data-profile-summaries.js` (student profile summaries: each student's flags, goals, reflections, hand-set levels and notes as a class loads)
-34. `shared/data-courses-terms.js` (classes and reporting terms: create, rename, archive and delete a class, the grading scale, reporting terms, switching class and blocks)
-35. `shared/photo-expiry.js` (the warning before a class's photos are deleted for going a year unopened: one line per class on the Dashboard and the phone's Students screen)
-36. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
-37. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
-38. `shared/offline-queue.js`
-39. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
-40. `shared/auto-update.js`
-41. `shared/calc.js`
-42. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-43. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-44. `shared/rubric-draft.js`
-45. `shared/rubric-checks.js`
+28. `shared/data-bulletins.js` (Bulletins, behind the build switch: the class's bulletins read and written, a waiting bulletin kept as Not Sent Yet, a photo or PDF uploaded to its own bucket, who has seen it)
+29. `shared/bulletins-refusals.js` (Bulletins: the server's refusals in plain sentences, and the class's date)
+30. `shared/data-bulletins-demo.js` (Bulletins in Demo Mode, kept on the device)
+31. `shared/data-revisions.js` (Revisions: returning work for another try, its edit and Take Back, the student's revision in Demo Mode, and Before and After)
+32. `shared/data-roster.js` (the class list: students, enrolment, adding and editing a student, and the roster helpers)
+33. `shared/data-withdrawn.js` (withdrawn students: withdrawing and re-enrolling, the Withdrawn list, permanent delete, and putting a withdrawn student's marks aside)
+34. `shared/data-overrides.js` (hand-set levels: the teacher's section overrides with their reasons, and the calculated level shown beside one)
+35. `shared/data-profile-summaries.js` (student profile summaries: each student's flags, goals, reflections, hand-set levels and notes as a class loads)
+36. `shared/data-courses-terms.js` (classes and reporting terms: create, rename, archive and delete a class, the grading scale, reporting terms, switching class and blocks)
+37. `shared/photo-expiry.js` (the warning before a class's photos are deleted for going a year unopened: one line per class on the Dashboard and the phone's Students screen)
+38. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
+39. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
+40. `shared/offline-queue.js`
+41. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
+42. `shared/auto-update.js`
+43. `shared/calc.js`
+44. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+45. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+46. `shared/rubric-draft.js`
+47. `shared/rubric-checks.js`
 
-The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`. It does not yet load `shared/data-bulletins.js` (the phone's Bulletins tab, slice B1f, adds it).
+The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`. It also loads `shared/data-bulletins-queue.js` after the Bulletins files (the phone's Bulletins tab, slice B1f: a post with a photo waits in the photo queue).
 
 Desktop or mobile modules then layer on top of that shared runtime.
 

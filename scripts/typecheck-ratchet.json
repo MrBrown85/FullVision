@@ -88,6 +88,8 @@
     "teacher-mobile/split-scan-model.js",
     "teacher-mobile/split-scan.js",
     "shared/data-bulletins.js",
+    "shared/bulletins-refusals.js",
+    "shared/data-bulletins-demo.js",
     "shared/data-bulletins-queue.js",
     "teacher/page-bulletins.js"
   ],

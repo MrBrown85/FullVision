@@ -47,6 +47,8 @@ const PRECACHE_URLS = [
   '/shared/data-markup.js',
   '/shared/data-reflect.js',
   '/shared/data-bulletins.js',
+  '/shared/bulletins-refusals.js',
+  '/shared/data-bulletins-demo.js',
   '/shared/data-bulletins-queue.js',
   '/shared/data-revisions.js',
   '/shared/data-roster.js',
