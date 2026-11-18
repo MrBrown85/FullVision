@@ -79,6 +79,8 @@ function seedWith(config, extra) {
 let SWITCH_ON = false;
 
 const settled = () => new Promise(r => setTimeout(r, 10));
+// A week after a day, as the Student Work card's Until starts.
+const _weekAfterForTest = day => new Date(Date.parse(day + 'T12:00:00Z') + 7 * 86400000).toISOString().slice(0, 10);
 const form = () => document.getElementById('new-assess-form');
 
 async function openNew(seed) {
@@ -342,7 +344,7 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     expect(document.activeElement).toBe(on);
     expect(mount().querySelector('.quiz-card')).not.toBeNull();
     // The photo questions go: a quiz piece takes no photos.
-    expect(form().querySelectorAll('[data-work-row]')).toHaveLength(1);
+    expect(form().querySelectorAll('.af-card-work [data-work-row]').length).toBe(1);
     const title = form().querySelector('#af-title');
     title.value = 'Quick Check';
     fire(title, 'input');
@@ -397,7 +399,8 @@ describe('with the quizzes switch on, in Demo Mode', () => {
       counts: 'best',
       shows: 'answers',
       add_total: false,
-      after_due: 'keep',
+      // A new quiz closes on the due date (the board).
+      after_due: 'stop',
       accept_until: null,
     });
     const [choice, tf, num, text] = p.questions;
@@ -506,6 +509,87 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     expect(back).toEqual(sent);
     expect(back).toMatchObject({ tries: 2, counts: 'latest', shuffle_choices: false, add_total: true, shows: 'right' });
     expect(mount().querySelector('#quiz-head').textContent).toBe('Quiz · 4 Questions · 5 Points');
+  });
+
+  it('When It Closes: the Student Work card’s own question, and the line under it follows the choice', async () => {
+    await newQuiz();
+    writeQuiz();
+    const settings = () => mount().querySelector('#quiz-settings');
+    const due = form().querySelector('#af-due').value;
+    expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const row = settings().querySelector('[data-work-row="quiz_after_due"]');
+    expect(row.querySelector('.af-work-q').textContent).toBe('Can Students Send After ' + formatShortDate(due) + '?');
+    const choices = Array.from(row.querySelectorAll('[data-action="quizAfterDue"]'));
+    expect(choices.map(b => b.textContent)).toEqual([
+      'Yes, Marked Late',
+      'Until ' + formatShortDate(_weekAfterForTest(due)),
+      'No',
+    ]);
+    expect(row.querySelector('[aria-checked="true"]').dataset.value).toBe('stop');
+    const line = () => settings().querySelector('#quiz-closes').textContent;
+    expect(line()).toBe('Students see it once you assign it. It closes on the due date unless you keep it open.');
+    click(settings().querySelector('[data-action="quizAfterDue"][data-value="keep"]'));
+    expect(line()).toBe('Students see it once you assign it. It stays open after the due date.');
+    expect(QuizBuilder._payload()).toMatchObject({ after_due: 'keep', accept_until: null });
+    click(settings().querySelector('[data-action="quizAfterDue"][data-value="until"]'));
+    const last = _weekAfterForTest(due);
+    expect(settings().querySelector('#quiz-accept-until').value).toBe(last);
+    expect(line()).toBe('Students see it once you assign it. It stays open until ' + formatShortDate(last) + '.');
+    expect(QuizBuilder._payload()).toMatchObject({ after_due: 'until', accept_until: last });
+    // The Student Work card's own question is untouched by the quiz's.
+    expect(form().querySelector('#af-accept-until')).toBeNull();
+  });
+
+  it.each([
+    ['stop', null],
+    ['keep', null],
+    ['until', '2026-12-04'],
+  ])('%s round-trips through save and reopen', async (when, day) => {
+    await newQuiz();
+    writeQuiz();
+    click(mount().querySelector('[data-action="quizAfterDue"][data-value="' + when + '"]'));
+    if (day) {
+      const box = mount().querySelector('#quiz-accept-until');
+      box.value = day;
+      fire(box, 'change');
+    }
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    const made = getAssessments(CID).find(a => a.title === 'Food Webs Check');
+    expect(QuizData.get(CID, made.id).quiz).toMatchObject({ after_due: when, accept_until: day });
+    await reopen(made.id);
+    expect(QuizBuilder._payload()).toMatchObject({ after_due: when, accept_until: day });
+    expect(mount().querySelector('[data-action="quizAfterDue"][aria-checked="true"]').dataset.value).toBe(when);
+  });
+
+  it('Until with no Last Day is stopped by the form, with a sentence beside the date box', async () => {
+    await newQuiz();
+    writeQuiz();
+    click(mount().querySelector('[data-action="quizAfterDue"][data-value="until"]'));
+    const box = mount().querySelector('#quiz-accept-until');
+    box.value = '';
+    fire(box, 'change');
+    const n = getAssessments(CID).length;
+    click(form().querySelector('.af-actions .btn-primary'));
+    await settled();
+    expect(getAssessments(CID)).toHaveLength(n);
+    expect(mount().querySelector('#quiz-until-err').textContent).toBe('Choose the last day it stays open.');
+    expect(document.activeElement).toBe(mount().querySelector('#quiz-accept-until'));
+  });
+
+  it('with no due date the question is not asked, as on the Student Work card, and the line says it stays open', async () => {
+    await newQuiz();
+    writeQuiz();
+    const due = form().querySelector('#af-due');
+    due.value = '';
+    fire(due, 'change');
+    await settled();
+    expect(mount().querySelector('[data-work-row="quiz_after_due"]')).toBeNull();
+    expect(mount().querySelector('#quiz-closes').textContent).toBe(
+      'Students see it once you assign it. It has no due date, so it stays open.',
+    );
+    // The choice is kept and sent as it stands: the contract reads Stop with no due date as open.
+    expect(QuizBuilder._payload()).toMatchObject({ after_due: 'stop', accept_until: null });
   });
 
   it('on Points the piece’s Max Points is the quiz’s total, and follows the questions', async () => {

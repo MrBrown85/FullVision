@@ -325,6 +325,19 @@
   padding: 0;
 }
 
+/* Can Students Send After …?: the Student Work card's own row, stacked to fit beside the questions. */
+.quiz-side .af-work-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+}
+.quiz-side .af-work-answer {
+  align-items: flex-start;
+}
+.quiz-side .af-work-seg .seg-btn {
+  padding: 0 10px;
+}
+
 /* Preview as a Student: a phone's width, nothing to press. */
 .quiz-preview {
   display: grid;

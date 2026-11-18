@@ -4942,7 +4942,8 @@ function seedDemoQuiz() {
     }
     return q;
   });
-  var settings = quizDefaults();
+  // Closes on the due date, a week from today, so the sample is open.
+  var settings = Object.assign(quizDefaults(), { after_due: 'stop' });
   return saveDemoQuizSeed('sci8', DEMO_QUIZ_AID, Object.assign(settings, { questions: questions }), [
     tags.PA3,
     tags.PA4,

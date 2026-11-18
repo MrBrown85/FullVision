@@ -3280,7 +3280,7 @@ window.PageAssignments = (function () {
   }
 
   // html-safe: fixed labels and values
-  function _formWorkSegHtml(field, labelId, choices, chosen) {
+  function _formWorkSegHtml(field, labelId, choices, chosen, action) {
     return (
       '<div class="seg af-work-seg" role="radiogroup" aria-labelledby="' +
       labelId +
@@ -3293,7 +3293,9 @@ window.PageAssignments = (function () {
             (on ? ' active' : '') +
             '" role="radio" aria-checked="' +
             on +
-            '" data-action="setFormWork" data-field="' +
+            '" data-action="' +
+            (action || 'setFormWork') +
+            '" data-field="' +
             field +
             '" data-value="' +
             c.value +
@@ -3360,32 +3362,7 @@ window.PageAssignments = (function () {
       ),
     );
     // With no due date there is nothing to be late for.
-    if (sending && due)
-      rows.push(
-        _formWorkRowHtml(
-          'after_due',
-          'Can Students Send After ' + formatShortDate(due) + '?',
-          '',
-          function (id) {
-            return _formWorkSegHtml(
-              'after_due',
-              id,
-              [
-                { value: 'keep', label: 'Yes, Marked Late' },
-                { value: 'until', label: 'Until ' + formatShortDate(until) },
-                { value: 'stop', label: 'No' },
-              ],
-              w.after_due,
-            );
-          },
-          w.after_due === 'until'
-            ? '<span class="af-work-until"><label class="af-work-until-label" for="af-accept-until">Last Day</label>' +
-                '<input type="date" class="af-input af-work-date" id="af-accept-until" data-action-change="setFormWorkUntil" value="' +
-                esc(until) +
-                '"></span>'
-            : '',
-        ),
-      );
+    if (sending && due) rows.push(_afterDueRowHtml(due, w.after_due, until));
     if (sending && collab !== 'individual' && (_formWorkDemo() || _formWorkLive()))
       rows.push(
         _formWorkRowHtml('group_work', 'Who Sends the Work?', '', function (id) {
@@ -3431,6 +3408,45 @@ window.PageAssignments = (function () {
       '</div>' +
       '</div>' +
       '</section>'
+    );
+  }
+
+  /* Can Students Send After <due>?: Keep Accepting, Until a last day, or
+     No. `to` names where a press goes; the Quiz card asks the same question
+     through it (teacher/quiz-builder.js), with its own field, actions and
+     date box. */
+  // html-safe: fixed labels; the dates are esc'd or formatted
+  function _afterDueRowHtml(due, chosen, until, to) {
+    var t = to || { field: 'after_due', action: 'setFormWork', change: 'setFormWorkUntil', dateId: 'af-accept-until' };
+    return _formWorkRowHtml(
+      t.field,
+      'Can Students Send After ' + formatShortDate(due) + '?',
+      '',
+      function (id) {
+        return _formWorkSegHtml(
+          t.field,
+          id,
+          [
+            { value: 'keep', label: 'Yes, Marked Late' },
+            { value: 'until', label: 'Until ' + formatShortDate(until) },
+            { value: 'stop', label: 'No' },
+          ],
+          chosen,
+          t.action,
+        );
+      },
+      chosen === 'until'
+        ? '<span class="af-work-until"><label class="af-work-until-label" for="' +
+            t.dateId +
+            '">Last Day</label>' +
+            '<input type="date" class="af-input af-work-date" id="' +
+            t.dateId +
+            '" data-action-change="' +
+            t.change +
+            '" value="' +
+            esc(until) +
+            '"></span>'
+        : '',
     );
   }
 
@@ -3517,7 +3533,11 @@ window.PageAssignments = (function () {
     var to = focusSel && document.querySelector(focusSel);
     if (to) to.focus({ preventScroll: true });
   }
-  if (window.QuizBuilder) QuizBuilder.redrawWith(_refreshFormWorkCard);
+  if (window.QuizBuilder)
+    QuizBuilder.redrawWith(_refreshFormWorkCard, {
+      afterDueRow: _afterDueRowHtml,
+      untilDefault: _formWorkUntilDefault,
+    });
 
   function _setFormWork(field, value) {
     if (!_formWork) return;

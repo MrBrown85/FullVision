@@ -48,6 +48,8 @@ var QuizBuilder = (function () {
   var S = null; // the open form's quiz: see _fresh
   /** @type {(() => void) | null} */
   var _redrawPage = null; // the page's redraw of its Student Work card
+  /** @type {any} */
+  var _pageTools = null; // the page's own drawing of "Can Students Send After …?" and its Until day
   /** @type {Document | null} */
   var _wired = null; // the document the card's listeners are on
 
@@ -84,7 +86,8 @@ var QuizBuilder = (function () {
       existed: false,
       loading: false,
       base: '',
-      settings: d ? d.defaults() : {},
+      // A new quiz closes on the due date (the board); a saved one keeps its own.
+      settings: d ? Object.assign(d.defaults(), { after_due: 'stop' }) : {},
       qs: [],
       open: null,
       tried: false,
@@ -212,6 +215,28 @@ var QuizBuilder = (function () {
     if (S && S.firstPass) return S.startMode;
     var el = /** @type {HTMLInputElement | null} */ ($('af-scoremode'));
     return (el && el.value) || 'proficiency';
+  }
+  // The form's due date, 'YYYY-MM-DD' or ''.
+  function _due() {
+    if (S && S.firstPass) return S.startDue;
+    var el = /** @type {HTMLInputElement | null} */ ($('af-due'));
+    return (el && el.value) || '';
+  }
+  /* A Last Day that is a real date. */
+  function _untilOk() {
+    return S.settings.after_due !== 'until' || /^\d{4}-\d{2}-\d{2}$/.test(String(S.settings.accept_until || ''));
+  }
+  /* Can Students Send After …?, drawn by the page's own Student Work row. '' with no due date, as there. */
+  function _afterDueRow() {
+    var due = _due();
+    if (!due || !_pageTools) return '';
+    var until = S.settings.accept_until || _pageTools.untilDefault(S.cid);
+    return _pageTools.afterDueRow(due, S.settings.after_due, until, {
+      field: 'quiz_after_due',
+      action: 'quizAfterDue',
+      change: 'quizAfterDueUntil',
+      dateId: 'quiz-accept-until',
+    });
   }
   function _collab() {
     if (S && S.firstPass) return S.startCollab;
@@ -363,6 +388,9 @@ var QuizBuilder = (function () {
     },
     act: ACT,
     minForSuggestion: MIN_FOR_SUGGESTION,
+    due: _due,
+    untilOk: _untilOk,
+    afterDueRow: _afterDueRow,
   });
 
   var _reduce =
@@ -612,6 +640,15 @@ var QuizBuilder = (function () {
         q.multiple = !q.multiple;
         if (!q.multiple) q.answer = q.answer.slice(0, 1);
         return _draw('.quiz-edit[data-k="' + k + '"] [data-quiz-act="multiple"]');
+      case 'quizAfterDue': {
+        var when = String(el.dataset.value || '');
+        if (['keep', 'until', 'stop'].indexOf(when) < 0) return;
+        S.settings.after_due = when;
+        if (when === 'until' && !S.settings.accept_until && _pageTools) {
+          S.settings.accept_until = _pageTools.untilDefault(S.cid);
+        }
+        return _draw('[data-action="quizAfterDue"][data-value="' + when + '"]');
+      }
       case 'toggle': {
         var f = String(el.dataset.quizSet || '');
         if (['shuffle_questions', 'shuffle_choices', 'add_total'].indexOf(f) < 0) return;
@@ -686,6 +723,10 @@ var QuizBuilder = (function () {
 
   /** @param {HTMLElement} t */
   function _onChange(t) {
+    if (t.dataset.actionChange === 'quizAfterDueUntil') {
+      S.settings.accept_until = String(/** @type {HTMLInputElement} */ (t).value || '');
+      return _draw('#quiz-accept-until');
+    }
     if (t.dataset.actionChange === ACT.type) {
       var byI = S.qs[Number(t.dataset.i)];
       if (!byI || byI.answered) return;
@@ -745,6 +786,7 @@ var QuizBuilder = (function () {
     return [
       _mode(),
       _collab(),
+      _due(),
       _tags()
         .map(function (t) {
           return t.id;
@@ -885,6 +927,7 @@ var QuizBuilder = (function () {
     var m = (assess && assess.scoreMode) || 'proficiency';
     S.startMode = m === 'proficiency' && !(assess && assess.rubricId) ? 'competencies' : m;
     S.startCollab = (assess && assess.collaboration) || 'individual';
+    S.startDue = (assess && assess.dueDate) || '';
     S.pageCard = !!pageCard;
     if (assess) {
       var held = d.get(cid, assess.id);
@@ -971,8 +1014,13 @@ var QuizBuilder = (function () {
       return _problems(q).length > 0;
     });
     var whole = _quizProblem();
-    if (!bad && !whole) return true;
+    if (!bad && !whole && _untilOk()) return true;
     S.preview = false;
+    if (!bad && !whole) {
+      // Until with no Last Day: the sentence is beside the date box.
+      _draw($('quiz-accept-until') ? '#quiz-accept-until' : '#quiz-until-err');
+      return false;
+    }
     if (bad) {
       if (S.open && S.open !== bad.k) _close(S.open);
       S.open = bad.k;
@@ -1013,7 +1061,7 @@ var QuizBuilder = (function () {
       shows: ['grade', 'right'].indexOf(s.shows) >= 0 ? s.shows : 'answers',
       add_total: !!s.add_total,
       after_due: s.after_due || 'keep',
-      accept_until: s.after_due === 'until' ? s.accept_until : null,
+      accept_until: s.after_due === 'until' ? s.accept_until || null : null,
       questions: S.qs.map(function (/** @type {any} */ q) {
         /** @type {Record<string, any>} */
         var out = {
@@ -1076,8 +1124,10 @@ var QuizBuilder = (function () {
   }
 
   /** @param {() => void} fn */
-  function redrawWith(fn) {
+  /** @param {() => void} fn @param {any} [tools] */
+  function redrawWith(fn, tools) {
     _redrawPage = fn;
+    _pageTools = tools || null;
   }
 
   /** Whether the open form's piece is a quiz, as the card stands. */

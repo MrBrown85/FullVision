@@ -32,6 +32,17 @@ var QuizCardDraw = (function () {
   function make(api) {
     /** @type {any} */
     var S = null;
+    /* When the quiz closes, as the setting shown says it. */
+    function _closesText() {
+      var s = S.settings;
+      if (s.after_due === 'until') {
+        var day = s.accept_until && typeof formatShortDate === 'function' ? formatShortDate(s.accept_until) : '';
+        return day ? 'It stays open until ' + day + '.' : 'It stays open until the last day you choose.';
+      }
+      if (!api.due()) return 'It has no due date, so it stays open.';
+      if (s.after_due === 'keep') return 'It stays open after the due date.';
+      return 'It closes on the due date unless you keep it open.';
+    }
     /** @param {any} q */
     function _shows(q) {
       return S.tried || q.left;
@@ -486,7 +497,7 @@ var QuizCardDraw = (function () {
       answers: 'Students see their grade, your comment, which were right and the right answers.',
     };
 
-    // html-safe: fixed labels
+    // html-safe: fixed labels and esc'd text; the page's own Student Work row escapes its dates
     function _settingsHtml() {
       var s = S.settings;
       var tries = s.tries === 0 ? 'u' : String(s.tries);
@@ -544,7 +555,13 @@ var QuizCardDraw = (function () {
             (s.add_total ? ' A total in points shows beside it.' : ''),
         ) +
         '</p>' +
-        '<p class="cm-hint">Students see it once you assign it.</p>'
+        api.afterDueRow() +
+        (S.tried && !api.untilOk()
+          ? '<p class="quiz-err" id="quiz-until-err" tabindex="-1">Choose the last day it stays open.</p>'
+          : '') +
+        '<p class="cm-hint" id="quiz-closes">' +
+        esc('Students see it once you assign it. ' + _closesText()) +
+        '</p>'
       );
     }
 

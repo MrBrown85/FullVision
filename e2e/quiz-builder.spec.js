@@ -366,6 +366,17 @@ test('the sample quiz opens on its Draft piece, with the board’s ten questions
   );
   await expect(page.locator('#quiz-head')).toHaveText('Quiz · 10 Questions · 13 Points');
   await expect(page.locator('#quiz-mount [data-value="quiz"]')).toHaveAttribute('aria-checked', 'true');
+  // It closes on its due date, which is still to come, so the sample is open.
+  const sample = await page.evaluate(() => ({
+    quiz: QuizData.get('sci8', 'sci8-quiz-data-patterns').quiz,
+    due: getAssessments('sci8').find(a => a.id === 'sci8-quiz-data-patterns').dueDate,
+    today: courseToday('sci8'),
+  }));
+  expect(sample.quiz).toMatchObject({ after_due: 'stop', accept_until: null });
+  expect(sample.due > sample.today).toBe(true);
+  await expect(page.locator('#quiz-closes')).toHaveText(
+    'Students see it once you assign it. It closes on the due date unless you keep it open.',
+  );
   // A Delete on a question with words asks first, and its button is not under the click.
   await page.locator('.quiz-row').first().click();
   const del = page.locator(open + ' [data-action="quizDelete"]');
