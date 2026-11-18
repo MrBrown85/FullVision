@@ -198,7 +198,15 @@ function asBefore(view) {
     out[k] = view[k];
     if (k === 'questionnaires') out.reports = [];
   });
-  return out;
+  // A piece's `pages` (Nov 18), how many pages See Your Work can show: a count of pages, not a grade.
+  return JSON.parse(
+    JSON.stringify(out, (key, v) => {
+      if (!v || typeof v !== 'object' || Array.isArray(v) || !('marks' in v) || typeof v.pages !== 'number') return v;
+      const piece = Object.assign({}, v);
+      delete piece.pages;
+      return piece;
+    }),
+  );
 }
 
 /* The student-facing surfaces of the class as it is graded now. */

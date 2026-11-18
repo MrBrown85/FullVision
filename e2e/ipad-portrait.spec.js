@@ -114,6 +114,14 @@ function audit() {
       const a = leaves[i];
       const b = leaves[j];
       if (a.contains(b) || b.contains(a) || layer(a) !== layer(b)) continue;
+      // A rubric box scrolled under the grader's foot bar is covered by it (the bar is opaque and sits above the
+      // pane). That is not an overlap of two controls: it counts only if the box's own centre is not under the bar.
+      if (!!a.closest('.grader-foot') !== !!b.closest('.grader-foot')) {
+        const under = a.closest('.grader-foot') ? b : a;
+        const u = under.getBoundingClientRect();
+        const top = document.elementFromPoint(u.left + u.width / 2, u.top + u.height / 2);
+        if (top && top.closest('.grader-foot')) continue;
+      }
       const ra = shown(a);
       const rb = shown(b);
       const ix = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);

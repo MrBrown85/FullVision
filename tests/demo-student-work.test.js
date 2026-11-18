@@ -180,6 +180,8 @@ describe('the sample work, in the shape of list_course_submissions', () => {
         expect(f.thumb_path).toBe(f.path.replace(/\.jpg$/, '-thumb.jpg'));
       }),
     );
+    // The student page's Demo Mode pages (s/feedback.js's DEMO_MARKUP) are Cece's own, with no thumbnail.
+    for (const m of readFileSync('s/feedback.js', 'utf8').matchAll(/image: '([\w-]+\.jpg)'/g)) named.add(m[1]);
     // Nothing in the folder that the sample does not use.
     expect(readdirSync('assets/sample-work').sort()).toEqual([...named].sort());
   });

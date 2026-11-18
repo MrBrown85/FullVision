@@ -7,7 +7,10 @@
  * the phone shown in the desktop gradebook. Tests only.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { gotoApp, clickAction, getText } from './helpers.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
 

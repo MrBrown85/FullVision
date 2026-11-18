@@ -5,6 +5,7 @@
    colour alone. */
 .dash-inbox-roll {
   position: relative;
+  container: dash-inbox-roll / inline-size;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -61,12 +62,62 @@
   cursor: pointer;
 }
 .dash-inbox-roll-chip.is-in {
-  background: var(--surface-2);
   border: 1px solid var(--divider-heavy);
 }
 .dash-inbox-roll-chip.is-tograde {
   font-weight: 700;
-  border-color: var(--text-2);
+}
+/* Names, as board C4 draws them in a short tile: a grid of one cell per
+   student across the tile's width, the rows sharing its height; solid when
+   in, dashed when not, bold to grade, a green tick when returned. */
+/* The columns are set by DashInboxRoll so every name shows whole (seven at
+   least); where the class cannot all show, the grid holds whole rows only
+   (is-clipped, 28 px each) and the foot's "+N more" scrolls to the rest. */
+.dash-inbox-roll.is-names .dash-inbox-roll-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--dash-inbox-roll-cols, 7), minmax(0, 1fr));
+  /* Rows share the room up to 44 px: a name is not a big button on a tall tile. */
+  grid-auto-rows: minmax(28px, 44px);
+  align-content: safe center;
+  gap: 6px;
+}
+.dash-inbox-roll.is-names .dash-inbox-roll-grid.is-clipped {
+  flex: 0 0 auto;
+  grid-auto-rows: 28px;
+  align-content: start;
+}
+.dash-inbox-roll-more {
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--link);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.dash-inbox-roll-more[hidden] {
+  display: none;
+}
+.dash-inbox-roll-more:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.dash-inbox-roll.is-names .dash-inbox-roll-chip {
+  justify-content: center;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  min-height: 28px;
+  padding: 0 6px;
+  border-width: 1.5px;
+  border-radius: 8px;
+}
+.dash-inbox-roll.is-names .dash-inbox-roll-chip.is-in {
+  border-color: var(--divider-strong);
+}
+.dash-inbox-roll.is-names .dash-inbox-roll-chip.is-excused {
+  border-color: transparent;
 }
 .dash-inbox-roll-chip:hover {
   border-color: var(--active);
@@ -107,28 +158,24 @@
   gap: 3px;
   flex: 0 0 auto;
 }
-.dash-inbox-roll-tick,
 .dash-inbox-roll-paper {
   width: 12px;
   height: 12px;
   color: var(--text-2);
 }
-/* Late: a small amber rule under the name, beside the word in its name. */
-.dash-inbox-roll-chip.is-late .dash-inbox-roll-name {
-  text-decoration: underline;
-  text-decoration-color: var(--score-2-text);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+.dash-inbox-roll-tick {
+  width: 14px;
+  height: 14px;
+  color: var(--ok-text);
 }
 
 /* A taller tile: the chip carries its page. */
 .dash-inbox-roll-grid {
-  --dash-inbox-roll-cols: 9;
   --dash-inbox-roll-pg: 80px;
 }
 .dash-inbox-roll.is-pages .dash-inbox-roll-grid {
   display: grid;
-  grid-template-columns: repeat(var(--dash-inbox-roll-cols), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--dash-inbox-roll-cols, 9), minmax(0, 1fr));
   gap: 8px;
   align-content: start;
 }
@@ -195,7 +242,6 @@
   background: #fbfaf6;
   border-radius: 8px;
 }
-.dash-inbox-roll-chip.is-page .dash-inbox-roll-tick,
 .dash-inbox-roll-chip.is-page .dash-inbox-roll-paper {
   color: #3b3b3f;
 }
@@ -211,31 +257,42 @@
   flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: 4px 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--divider-subtle);
+  padding-top: 4px;
+}
+.dash-inbox-roll-count b {
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-inbox-roll-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
 }
 .dash-inbox-roll-count {
   min-width: 0;
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+/* Add Work for the Class: the app's .btn-ghost look, as the board draws it. */
 .dash-inbox-roll-all {
-  height: 28px;
-  padding: 0 12px;
+  min-height: 32px;
+  margin-left: auto;
+  padding: 0 16px;
   font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--link);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text);
   white-space: nowrap;
-  background: none;
-  border: 1px solid var(--active);
+  background: var(--divider-subtle);
+  border: 0;
   border-radius: 8px;
   cursor: pointer;
 }
 .dash-inbox-roll-all:hover {
-  background: var(--surface-2);
+  background: var(--overlay-hover);
 }
 
 /* The one-item menu: out of the page until opened. It is built when a chip

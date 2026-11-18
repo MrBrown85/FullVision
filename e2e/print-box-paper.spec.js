@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* The Print Reports box asks which paper (teacher/report-print-paper.js,
    page-reports.js _issuePaper). A teacher's class had been left on Legal
@@ -10,6 +11,8 @@ import { test, expect } from '@playwright/test';
 /* Every switch lays the whole class out again, and a GitHub runner is
    several times slower than a teacher's machine. */
 test.setTimeout(120_000);
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const LETTER = 'Letter paper (8.5 × 11 in).';
 const LEGAL = 'Load Legal paper (8.5 × 14 in). On Letter paper these pages print shrunken.';

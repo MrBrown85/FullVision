@@ -387,6 +387,7 @@ student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_i
 student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) 1b0862066e6d8c546f3944f12248be26 11393
 student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 9e16e8aaa8f1379beca4f64d4111fa1d 14821
 student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) 0746b4af4f1cadd75b86cc20f49931d3 4989
+student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 51453e03b4293ff17eb598ab653dc0f2 2203
 student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) 106de8942ce40ccc9d51c35d2e4e328a 4655
 student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) ebd17424915013d30d69e83c50f1f7de 2398
 student_submit.reflect(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_reflection jsonb, p_ip_hash text) 5f65a3ff02460ea810372d172b988b39 5163

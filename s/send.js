@@ -89,16 +89,19 @@
     var sentFor = state.demoSent || {};
     // #demo-card-revise (S11-F2): the pieces returned for revision (s/feedback.js).
     var revs = typeof StudentPage.demoRevisions === 'function' ? StudentPage.demoRevisions(state) : null;
+    // Returned pieces with pages in (s/feedback.js), as the server's `work` lists a returned piece's work.
+    var handed = typeof StudentPage.demoHandedIn === 'function' ? StudentPage.demoHandedIn(state) : {};
     return {
       ok: true,
       v: 1,
       send_work: true,
       assessments: (state.reply.assessments || [])
         .filter(function (a) {
-          return a && (DEMO_TAKES[a.id] || sentFor[a.id] || (revs && revs[a.id]));
+          return a && (DEMO_TAKES[a.id] || sentFor[a.id] || (revs && revs[a.id]) || handed[a.id]);
         })
         .map(function (a) {
           if (revs && revs[a.id]) return revisionWork(a, revs[a.id], day);
+          if (handed[a.id] && !DEMO_TAKES[a.id] && !sentFor[a.id]) return handedWork(a, handed[a.id]);
           var takes = DEMO_TAKES[a.id] || {};
           var due = a.due_date ? String(a.due_date).slice(0, 10) : '';
           var closes = takes.after === 'stop' && due ? due : null;
@@ -131,6 +134,33 @@
             sending: null,
           };
         }),
+    };
+  }
+
+  /* A returned piece whose pages are in, in `work`'s shape: it takes no
+     more work, and its work in is being graded (it came back), so nothing
+     of it can be changed. */
+  function handedWork(a, h) {
+    return {
+      id: a.id,
+      students_send: 'nothing',
+      open: false,
+      closes_on: null,
+      late_now: false,
+      sent: {
+        submission_id: 'demo-in-' + a.id,
+        sent_at: h.sent_at,
+        sent_by: h.sent_by,
+        on_paper: false,
+        is_late: false,
+        note: null,
+        pages: h.pages,
+        grading: true,
+        can_change: false,
+        thumbs: [],
+        teacher_pages: h.sent_by === 'teacher' ? h.pages : 0,
+      },
+      sending: null,
     };
   }
 
@@ -671,9 +701,20 @@
       // Whether the class has Reflect on Feedback on (Batch E, E1): s/feedback.js asks `feedback` then too.
       S.reflectOn = res && res.ok === true && res.reflect_on_feedback === true ? student : null;
       var on = !!(res && res.ok === true && res.send_work === true);
+      /* With Send Work off the reply is kept only when it says pages are in
+         (added by the teacher, or sent before it was turned off): My
+         Learning opens them (See Your Work), and nothing of sending shows
+         (shared/student-view.js reads only the page counts from it). */
+      var pagesIn =
+        !on &&
+        !!(res && res.ok === true) &&
+        list(res.assessments).some(function (a) {
+          var sent = a && a.sent && typeof a.sent === 'object' ? a.sent : null;
+          return !!sent && sent.on_paper !== true && sent.pages > 0;
+        });
       var had = !!(S.realWork && S.realWork.student === student);
-      S.realWork = on ? { student: student, reply: res } : null;
-      if (!on && !had) return;
+      S.realWork = on || pagesIn ? { student: student, reply: res } : null;
+      if (!on && !pagesIn && !had) return;
       repaint();
       if (!on) return;
       loadThumbs(res, student);

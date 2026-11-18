@@ -10,8 +10,11 @@
  * call as a drop on that page; nothing is saved until Add Work is pressed.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import fs from 'fs';
 import path from 'path';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const LIGHT = 'sci8a21';
 const CELL = 'sci8a1';
@@ -258,7 +261,8 @@ test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Wor
   expect(await coverShown(page)).toBe(false);
   await shot(page, 'inbox-caught-up-510');
 
-  await page.locator('.dash-inbox-drop-select').selectOption(CELL);
+  // "Add Work For" is a chip a piece (board E1).
+  await page.locator('[data-dash-inbox-for-chip="' + CELL + '"]').click();
   const two = await namedFiles(page, CELL);
   const before = await stored(page);
   await drag(page, '.dash-inbox-drop-area', 'dragenter');
@@ -397,7 +401,7 @@ test('each of the three buttons opens Add Work and its file chooser', async ({ p
   const pick = page.locator('.dash-inbox-drop-pick').first();
   for (const key of ['Enter', 'Space']) {
     await page.evaluate(() => (window.__boxClicks = []));
-    await page.locator('.dash-inbox-drop-select').focus();
+    await page.locator('.dash-inbox-drop-chip[aria-checked="true"]').focus();
     await page.keyboard.press('Tab');
     await expect(pick).toBeFocused();
     await page.keyboard.press(key);
@@ -524,11 +528,11 @@ test('a button acts on the piece in the box (the default), and opens nothing onc
   await page.clock.setFixedTime(NOON);
   await open(page, { caughtUp: true });
   await closesToday(page, { lightToo: false });
-  const select = page.locator('.dash-inbox-drop-select');
-  await expect(select).toHaveValue(CELL);
+  const chosen = page.locator('.dash-inbox-drop-chip[aria-checked="true"]');
+  await expect(chosen).toHaveAttribute('data-dash-inbox-for-chip', CELL);
   await page.clock.setFixedTime(NEXT_DAY);
   // No draw since: the box still reads Cell Microscope Lab.
-  await expect(select).toHaveValue(CELL);
+  await expect(chosen).toHaveAttribute('data-dash-inbox-for-chip', CELL);
   await page.locator('#dash-inbox').getByRole('button', { name: 'Choose Files…' }).click();
   await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
   await expect(page.locator('.dash-inbox-drop-notice')).toHaveText('The list of assessments changed. Choose again.');
@@ -541,9 +545,11 @@ test('a drop goes to the piece picked by hand, and to no other once that piece s
   await page.clock.setFixedTime(NOON);
   await open(page, { caughtUp: true });
   await closesToday(page, { lightToo: true });
-  const select = page.locator('.dash-inbox-drop-select');
-  await expect(select).toHaveValue(LIGHT);
-  await select.selectOption(CELL);
+  await expect(page.locator('.dash-inbox-drop-chip[aria-checked="true"]')).toHaveAttribute(
+    'data-dash-inbox-for-chip',
+    LIGHT,
+  );
+  await page.locator('[data-dash-inbox-for-chip="' + CELL + '"]').click();
   await namedFiles(page, CELL);
   const before = await stored(page);
   await page.clock.setFixedTime(NEXT_DAY);

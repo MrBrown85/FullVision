@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { findLowContrastText } from './contrast-check.js';
 import { cardMenuItem } from './card-menu.js';
 
@@ -10,6 +11,8 @@ import { cardMenuItem } from './card-menu.js';
    Then Print / Print Without Them / Cancel (Return It / Print Without It on
    a rubric handout). Demo Mode's Science 8; window.print is counted, not
    opened. */
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 test.use({ viewport: { width: 1440, height: 900 } });
 
 /* Demo Mode, the class holding grades (or `config`), and two drafts on

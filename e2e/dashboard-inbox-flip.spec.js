@@ -6,6 +6,9 @@
  * Mateo Cruz added by the teacher, Ethan Dubois on paper.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const SHOTS = process.env.FV_SHOTS || '';
 const shot = async (page, name) => {
@@ -366,8 +369,15 @@ test('the only non-passive wheel listener is the stage, and a sideways wheel is 
 }) => {
   await open(page);
   const got = await page.evaluate(() => window.__wheelListeners.filter(l => !l.passive).map(l => String(l.el)));
-  // The tile and everything else of the Inbox add no listener that can hold a scroll; the stage's does.
-  expect(got.filter(el => el.includes('dash-inbox') && !el.includes('dash-inbox-flip-stage'))).toEqual([]);
+  // The tile and everything else of the Inbox add no listener that can hold a
+  // scroll; the stage's does, and so does the assessment switch's, which turns
+  // a vertical wheel into its own sideways scroll and lets the page have it at
+  // either end (review of #1603; e2e/dashboard-row-fit.spec.js).
+  expect(
+    got.filter(
+      el => el.includes('dash-inbox') && !el.includes('dash-inbox-flip-stage') && !el.includes('dash-inbox-pick'),
+    ),
+  ).toEqual([]);
   const prevented = await page.evaluate(() => {
     const stage = document.querySelector('.dash-inbox-flip-stage');
     const fire = (dx, dy) => {

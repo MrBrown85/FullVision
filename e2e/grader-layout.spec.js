@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Grading layout in Demo Mode's Science 8 (sci8a3 plain rubric, sci8a19
    Advanced rubric, sci8a18 single-point, sci8a2 competencies):
@@ -7,6 +8,8 @@ import { test, expect } from '@playwright/test';
    - single-point controls stay inside their column;
    - Missing | Excused | Late in one order everywhere;
    - one hover prompt, and the descriptor bar beside the student list. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function demo(page, route) {
   await page.setViewportSize({ width: 1440, height: 900 });

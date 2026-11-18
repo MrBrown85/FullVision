@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { findLowContrastText } from './contrast-check.js';
 
 // S1-F2: in a class whose student page is on (the hidden build switch) and
@@ -9,6 +10,8 @@ import { findLowContrastText } from './contrast-check.js';
 // What stays here needs a real browser: the apostrophe click, the button's
 // fit and place on screen, and the text contrast in each state. Demo Mode
 // only: no server knows the rule yet.
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const AID = 'e2e-draft';
 

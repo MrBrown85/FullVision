@@ -48,10 +48,15 @@
 .dash-comp-lines-body {
   min-height: 0;
 }
+/* The legend as board D draws it: two by two in the tile's third, one line
+   of four where the tile is wide (1680 wide, or stacked on an iPad). */
+.dash-comp-lines-body {
+  container-type: inline-size;
+}
 .dash-comp-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 2px 14px;
   flex: none;
   padding: 0 4px;
   font-size: var(--text-xs);
@@ -68,6 +73,11 @@
   width: 10px;
   height: 10px;
   border-radius: 2px;
+}
+@container (min-width: 400px) {
+  .dash-comp-legend {
+    grid-template-columns: repeat(4, max-content);
+  }
 }
 /* The top bar's own colours, so one scale looks the same on the page. */
 .dash-comp-sw-1 {
@@ -119,19 +129,21 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* Every row is one height, the height a two-line name needs. A name wraps to
-   two lines and only a longer one is cut with an ellipsis (its full name is
-   in the row's accessible name); the number and its word sit beside it and
-   never wrap. Rows share the height between 45 and 64 px; with more than
-   fit, the list scrolls inside the page. */
+/* Every row is one height, at least the height a two-line name needs. A
+   name wraps to two lines and only a longer one is cut with an ellipsis (its
+   full name is in the row's accessible name); the number and its word sit
+   beside it and never wrap. The rows share the page's height, as board D
+   draws them, but never stand more than 72 px apart: a taller tile gives the
+   row more to say instead (is-tall, has-counts, below), not more air (review
+   of #1603). With more than fit at 45 px, the list scrolls inside the page. */
 .dash-comp-ln {
   position: relative;
   box-sizing: border-box;
   flex: 1 0 45px;
-  max-height: 64px;
+  max-height: 72px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto 8px;
+  grid-template-rows: auto auto;
   align-content: center;
   column-gap: 8px;
   row-gap: 3px;
@@ -165,28 +177,33 @@
   overflow-wrap: anywhere;
   line-height: 15px;
 }
-.dash-comp-ln.is-flag .dash-comp-ln-name {
+.dash-comp-ln.is-low .dash-comp-ln-name {
   font-weight: 600;
 }
 .dash-comp-ln-num {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   align-self: start;
   white-space: nowrap;
   font-weight: 600;
   line-height: 15px;
   font-variant-numeric: tabular-nums;
 }
-/* Lowest and Only are words; the tag has no meaning in its colour. */
+/* Lowest and Only are words, so neither is said by colour alone. Lowest is
+   a label in the Emerging badge's pair; a low Self-Assessed count is amber,
+   in the Developing badge's text colour (board D). */
 .dash-comp-ln-tag {
   padding: 0 5px;
-  border: 1px solid var(--divider-strong);
   border-radius: 4px;
-  background: var(--overlay-hover);
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
   font-size: var(--text-xs);
   font-weight: 700;
-  line-height: 14px;
+  line-height: 16px;
+}
+.dash-comp-ln-num.is-few {
+  color: var(--score-2-text);
 }
 .dash-comp-ln-bar {
   grid-column: 1 / -1;
@@ -214,14 +231,15 @@
 }
 /* Level Mix: the row's button holds the name and number, and the bar under
    it is one button per level (today's Level Mix had one per count). The box
-   is the row: one height for every row, as before; the bar keeps its place
-   at the foot. A level's button answers a pointer 4 px above and below its
-   8 px. */
+   is the row: one height for every row, its name and bar together in the
+   middle of its share of the page, as board D draws them. A level's button
+   answers a pointer 4 px above and below its 8 px. */
 .dash-comp-lnbox {
   display: flex;
   flex: 1 0 45px;
+  max-height: 72px;
   flex-direction: column;
-  max-height: 64px;
+  justify-content: center;
   padding-bottom: 10px;
   box-sizing: border-box;
   border-radius: 6px;
@@ -229,9 +247,11 @@
 .dash-comp-lnbox:hover {
   background: var(--overlay-hover);
 }
+/* The name's button is as tall as a two-line name in every row, so the rows
+   stay one height and their bars line up. */
 .dash-comp-lnbox > .dash-comp-ln.is-split {
-  flex: 1 1 auto;
-  max-height: none;
+  flex: 0 0 auto;
+  min-height: 33px;
   grid-template-rows: auto;
   align-content: end;
   padding-bottom: 3px;
@@ -418,5 +438,121 @@
   .dash-comp-tipbox {
     animation: none;
     transition: none;
+  }
+}
+
+/* ── A tall tile, and a wide one (review of #1603) ─────────────────
+   Above about 600 px of tile (DashCompetencies.fit sets is-tall) the bar is
+   12 px and the name 14 px. Where each row has the room (has-counts, set per
+   page), a quiet line under the bar gives its counts, as competencyDistribution
+   bands them ("1 Emerging · 8 Developing · 15 Proficient · 3 Extending"):
+   counts only, no level is written here. */
+.dash-comp-ln-counts {
+  display: none;
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 15px;
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-comp-lnbox > .dash-comp-ln-counts {
+  margin: 3px 4px 0;
+}
+.dash-comp-page.has-counts .dash-comp-ln-counts {
+  display: block;
+}
+/* A row with its counts line is never shorter than what it holds. */
+.dash-comp-page.has-counts .dash-comp-lnbox {
+  flex-basis: 64px;
+  padding-bottom: 4px;
+}
+.dash-comp-tile.is-tall .dash-comp-page.has-counts .dash-comp-lnbox {
+  flex-basis: 72px;
+}
+.dash-comp-tile.is-tall .dash-comp-ln-name {
+  font-size: var(--text-base);
+  line-height: 17px;
+}
+.dash-comp-tile.is-tall .dash-comp-lnbox > .dash-comp-ln.is-split {
+  min-height: 37px;
+}
+.dash-comp-tile.is-tall .dash-comp-ln-bar,
+.dash-comp-tile.is-tall .dash-comp-ln-seg {
+  height: 12px;
+}
+
+/* The tile is the container the next rule measures. */
+.dash-comp-tile {
+  container: dash-comp / inline-size;
+}
+/* A tile 440 px wide or more (1680 wide, or stacked on an iPad) draws the
+   board's iPad row: the name, the bar and the number on one line, the counts
+   under them. */
+@container dash-comp (min-width: 440px) {
+  .dash-comp-lines {
+    /* The number's column is as wide as the widest number and its word
+       (DashCompetencies.fit measures it), so "Lowest" never runs into a bar. */
+    --dash-comp-ln-cols: minmax(0, 46%) minmax(0, 1fr) var(--dash-comp-num-w, 104px);
+  }
+  .dash-comp-ln:not(.is-split) {
+    grid-template-columns: var(--dash-comp-ln-cols);
+    grid-template-rows: auto auto;
+  }
+  .dash-comp-ln:not(.is-split) > .dash-comp-ln-bar {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+  .dash-comp-ln > .dash-comp-ln-num {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    align-self: center;
+  }
+  .dash-comp-ln > .dash-comp-ln-name {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+  .dash-comp-ln:not(.is-split) > .dash-comp-ln-counts {
+    grid-row: 2;
+  }
+  .dash-comp-lnbox {
+    display: grid;
+    grid-template-columns: var(--dash-comp-ln-cols);
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: 8px;
+    padding: 0 4px;
+  }
+  .dash-comp-lnbox > .dash-comp-ln.is-split {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    grid-template-columns: var(--dash-comp-ln-cols);
+    margin: 0 -4px;
+    padding: 0 4px;
+    min-height: 32px;
+    align-content: center;
+    border-radius: 6px;
+  }
+  .dash-comp-tile.is-tall .dash-comp-lnbox > .dash-comp-ln.is-split {
+    min-height: 34px;
+  }
+  .dash-comp-lnbox > .dash-comp-ln-segs {
+    position: relative;
+    z-index: 1;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    margin: 0;
+  }
+  .dash-comp-lnbox > .dash-comp-ln-counts {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 2px 0 0;
   }
 }
