@@ -4252,7 +4252,6 @@ function seedIfNeeded() {
   seedDemoReflections();
   seedDemoRevisions();
   seedDemoDrafts();
-  seedDemoBulletins();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
@@ -4667,8 +4666,10 @@ function seedDemoRevisions() {
    PDF and reactions, and a Photo of the Board. Who has seen each is the
    students' ids, so "Seen by 19 of 27" works; pause one student in Class
    Settings and the count follows. The pictures are drawn, in
-   assets/sample-bulletins. Seeded once per class (shared/data-bulletins.js
-   writes it, and writes nothing where the class already has bulletins). */
+   assets/sample-bulletins. Written once per class, the first time Bulletins is
+   read in Demo Mode (shared/data-bulletins.js _bltDemoRead), so with the build
+   switch off nothing is written; it writes nothing where the class already has
+   bulletins. */
 function seedDemoBulletins() {
   if (typeof saveDemoBulletinsSeed !== 'function' || !COURSES.sci8) return false;
   var ids = getStudents('sci8').map(function (s) {

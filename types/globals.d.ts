@@ -147,6 +147,8 @@ interface Window {
     dropBlockedOn(localId: string, opts?: unknown): number;
     remove(id: string): boolean;
     has(id: string): boolean;
+    deadLetter(): any[];
+    dismissDeadLetter(id: string): void;
     subscribe(listener: (evt: { kind: string; meta: any }) => void): () => void;
     markReloaded(classId: string): number;
   };
@@ -201,6 +203,8 @@ interface Window {
 }
 // The sync toast (teacher/ui.js, not checked yet).
 declare function showSyncToast(message: string, type?: string): void;
+// The sample class's bulletins (shared/seed-data.js, loaded in Demo Mode only).
+declare function seedDemoBulletins(): boolean;
 // The desktop sidebar and the confirm dialog (teacher/ui.js, not checked yet).
 declare function renderSidebar(activeCourse: string, selectedStudentId?: string, onStudentClick?: string): string;
 declare function initSidebarToggle(): void;

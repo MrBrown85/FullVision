@@ -71,3 +71,21 @@ describe('the header', () => {
     expect(H.headerNotes({ no_card: 0, paused: 0 }, [])).toEqual({ noCard: '', paused: '' });
   });
 });
+
+describe('a file that cannot be used', () => {
+  const R = window.PhotoShrink.REASONS;
+
+  it('says what Add Work says for a photo the browser cannot read (HEIC) and for a PDF reader that did not load', () => {
+    expect(H.refusal({ ok: false, kind: 'heic', reason: R.NO_DECODER })).toBe(
+      'Save that photo as a JPEG first, then add it.',
+    );
+    expect(H.refusal({ ok: false, kind: 'pdf', reason: R.NO_DECODER })).toBe(
+      "The PDF reader couldn't load. Check the connection and try again.",
+    );
+    expect(H.refusal({ ok: false, reason: R.OFFICE })).toBe('Save it as a PDF first.');
+    expect(H.refusal({ ok: false, kind: 'pdf', locked: true })).toBe(
+      'That PDF has a password. Save a copy without one, then add it.',
+    );
+    expect(H.refusal({ ok: false, reason: R.TOO_MANY_PAGES })).toMatch(/more than 20 pages/);
+  });
+});
