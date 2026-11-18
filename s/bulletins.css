@@ -394,7 +394,9 @@
   display: block;
   width: 100%;
   height: auto;
-  max-height: calc(var(--sp-steady-h, 100vh) - 220px);
+  /* At most the screen's height; StudentBulletinsView.fitViewer then sets the
+     real room, measured, between the header and the tab bar. */
+  max-height: var(--sp-steady-h, 100vh);
   object-fit: contain;
   background: #eceef2;
 }
@@ -441,8 +443,10 @@
 }
 
 /* "Open this website in a new tab?" over the page (shared/website-ask.js),
-   in the half of the screen away from the card that was tapped. On <body>,
-   outside the page, so it takes the Text Size itself. */
+   wholly above or wholly below the card that was tapped
+   (StudentBulletinsView.placeAsk sets its top from the card's box). On
+   <body>, outside the page and not zoomed, so its top is in the screen's own
+   pixels; it takes the Text Size through --sp-zoom on each of its lengths. */
 .sp-bulletin-ask-back {
   position: fixed;
   inset: 0;
@@ -453,58 +457,56 @@
   background: rgba(0, 0, 0, 0.32);
 }
 .sp-bulletin-ask {
+  --sp-ask-z: var(--sp-zoom, 1);
   position: fixed;
-  left: 16px;
-  right: 16px;
+  top: 12px;
+  left: 12px;
+  right: 12px;
   z-index: 71;
-  max-width: 420px;
+  max-width: calc(420px * var(--sp-ask-z));
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 18px;
+  gap: calc(6px * var(--sp-ask-z));
+  padding: calc(14px * var(--sp-ask-z)) calc(16px * var(--sp-ask-z));
   border-radius: 16px;
   background: #fff;
   color: #1d1d1f;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.4;
-}
-.sp-bulletin-ask-top {
-  top: calc(16px + env(safe-area-inset-top));
-}
-.sp-bulletin-ask-bottom {
-  bottom: calc(24px + env(safe-area-inset-bottom));
+  font-size: calc(15px * var(--sp-ask-z));
+  line-height: 1.35;
 }
 .sp-bulletin-ask-words {
   margin: 0;
-  font-size: 16px;
+  font-size: calc(16px * var(--sp-ask-z));
   font-weight: 700;
 }
 .sp-bulletin-ask-url {
   margin: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--sp-ask-z));
   color: #636366;
   overflow-wrap: anywhere;
 }
+/* Side by side, each taking half; a label wraps at its space rather than the
+   buttons going one under the other, so the question stays short. */
 .sp-bulletin-ask-buttons {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+  gap: calc(8px * var(--sp-ask-z));
 }
 .sp-bulletin-ask-go,
 .sp-bulletin-ask-no {
-  min-height: 44px;
-  min-width: 88px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: calc(44px * var(--sp-ask-z));
   margin: 0;
-  padding: 0 14px;
+  padding: calc(4px * var(--sp-ask-z)) calc(8px * var(--sp-ask-z));
   border: 0;
   border-radius: 12px;
   font: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--sp-ask-z));
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
 }
 .sp-bulletin-ask-no {
@@ -514,10 +516,6 @@
 .sp-bulletin-ask-go {
   background: #0066cc;
   color: #fff;
-}
-html.sp-size-large .sp-bulletin-ask,
-html.sp-size-larger .sp-bulletin-ask {
-  zoom: var(--sp-zoom);
 }
 
 @media (prefers-reduced-motion: reduce) {

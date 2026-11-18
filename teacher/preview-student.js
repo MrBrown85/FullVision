@@ -503,7 +503,7 @@ window.PreviewStudent = (function () {
     })[0];
     var l = b && typeof StudentBulletinsView !== 'undefined' ? StudentBulletinsView.linkOf(b.link_url) : null;
     if (!l || typeof WebsiteAsk === 'undefined') return;
-    WebsiteAsk.open({
+    var box = WebsiteAsk.open({
       host: document.body,
       url: l.href,
       cls: 'sp-bulletin-ask',
@@ -512,6 +512,7 @@ window.PreviewStudent = (function () {
       focus: 'no',
       returnTo: el,
     });
+    if (box) StudentBulletinsView.placeAsk(box, el);
   }
 
   /* ── A handout file (a web page, a text file or an EPUB) ───── */
@@ -689,6 +690,7 @@ window.PreviewStudent = (function () {
     }
     if (typeof StudentBulletinsView !== 'undefined') {
       StudentBulletinsView.attach(screen, _bltSource, { scrollRoot: screen });
+      StudentBulletinsView.fitViewer(screen, { scrollRoot: screen });
       // A bulletin's page open full size: drawn again once its picture is here.
       var ui = _open.ui || {};
       if (ui.bulletinFile && !screen.querySelector('.sp-bulletin-viewer-img')) {

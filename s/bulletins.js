@@ -64,6 +64,12 @@
   /** @type {any} */
   var B = null; // what is held for the class open; see blank()
   var asked = 0; // each `bulletins` ask, so an older answer never replaces a newer one
+  /* An answer that came after its class was drawn (the one-second wait was over): the bar is not
+     changed while the class is open (the tab would move under the student's finger), and the answer
+     is kept here, by student, so the next open of that class draws Bulletins at once.
+     { student: { res, told } } */
+  /** @type {Record<string, { res: any, told: Record<string, boolean> }>} */
+  var kept = {};
   var ticking = 0;
   /** @type {any} */
   var answerFn = null; // tests answer the routes themselves
@@ -126,6 +132,13 @@
     letGo(B);
     B = null;
     if (w.WebsiteAsk) w.WebsiteAsk.close();
+  }
+  /* Log Out, or a new state (a sign-out): nothing of this student stays in this tab, Demo Mode's
+     sample Seen and reactions included, nor an answer kept for the next open. */
+  function forgetAll() {
+    forget();
+    demoMemory = { seen: {}, reactions: {} };
+    kept = {};
   }
 
   /* ── Demo Mode: answered on this device ────────────────────── */
@@ -359,6 +372,12 @@
       }
       return;
     }
+    // The class was drawn without it (it came after the wait): kept for the next open, the bar left alone.
+    if (B.decided && B.state !== 'ok') {
+      kept[student] = { res: res, told: Object.assign({}, B.told) };
+      return;
+    }
+    kept[student] = { res: res, told: B.told };
     var list = res.bulletins.slice(0, 100).map(readBulletin).filter(Boolean);
     var wanted = {};
     list.forEach(function (b) {
@@ -755,8 +774,9 @@
   /* ── A link ────────────────────────────────────────────────── */
 
   /* The card asks before anything opens (shared/website-ask.js), over the
-     page, in the half of the screen away from the card that was tapped, so
-     Open Website is never under the finger that opened the question. */
+     page, wholly above or wholly below the card that was tapped (where there
+     is room; the larger side when neither has), so Open Website is never
+     under the finger that opened the question (StudentBulletinsView.placeAsk). */
   function askLink(el) {
     if (!showing() || !w.WebsiteAsk || !w.StudentBulletinsView) return;
     var id = (el && el.getAttribute('data-bulletin')) || '';
@@ -765,19 +785,16 @@
     })[0];
     var l = b && b.link_url ? w.StudentBulletinsView.linkOf(b.link_url) : null;
     if (!l) return;
-    var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-    var mid = r ? r.top + r.height / 2 : 0;
-    var h = typeof window.innerHeight === 'number' ? window.innerHeight : 0;
-    w.WebsiteAsk.open({
+    var box = w.WebsiteAsk.open({
       host: document.body,
       url: l.href,
       cls: 'sp-bulletin-ask',
       backdrop: true,
       cancelFirst: true,
       focus: 'no',
-      place: h && mid > h / 2 ? 'top' : 'bottom',
       returnTo: el,
     });
+    if (box) w.StudentBulletinsView.placeAsk(box, el);
   }
 
   /* ── The page's hooks ──────────────────────────────────────── */
@@ -788,8 +805,16 @@
   SP.bulletinsWith = function (mine, pageAsked) {
     if (!on() || !mine || !mine.enrollment) return pageAsked;
     forget();
-    B = blank(mine.enrollment);
-    var got = read(mine.enrollment);
+    var student = mine.enrollment;
+    B = blank(student);
+    var had = kept[student];
+    var got = read(student);
+    // Kept from a late answer or an earlier open: drawn from it at once, and refreshed by the ask above.
+    if (had) {
+      B.told = had.told;
+      apply(student, had.res);
+      return pageAsked;
+    }
     return SP.whileCurrent(
       Promise.resolve(pageAsked).then(function (res) {
         return new Promise(function (done) {
@@ -813,7 +838,9 @@
      already be touching the page. Coming back to an open class keeps the tab
      (app.js never asks again then). */
   SP.openingTab = function (student) {
-    return on() && B && B.student === student && B.state === 'ok' && B.list.length ? 'bulletins' : 'assignments';
+    if (!on() || !B || B.student !== student) return 'assignments';
+    B.decided = true;
+    return B.state === 'ok' && B.list.length ? 'bulletins' : 'assignments';
   };
 
   // s/app.js, once the class's page is drawn: Bulletins opens at its New line.
@@ -849,7 +876,7 @@
     if (!S) return;
     /* Log Out: the student's bulletins go. Another class (Switch Class, a card added) opens through
        s/app.js openPage, which starts its own (bulletinsWith) before this runs: nothing to drop here. */
-    if (act === 'card-done') return forget();
+    if (act === 'card-done') return forgetAll();
     if (!on()) return;
     if (act === 'bulletin-link') return askLink(el);
     if (act === 'bulletin-react') return react(el);
@@ -867,6 +894,12 @@
     });
   }
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    // The screen turned or resized: a page open full size is fitted again.
+    window.addEventListener('resize', function () {
+      if (showing() && S.bulletinFile && w.StudentBulletinsView && typeof document !== 'undefined') {
+        w.StudentBulletinsView.fitViewer(document.getElementById('app'));
+      }
+    });
     window.addEventListener('online', function () {
       if (!B || B.state !== 'ok' || !on()) return;
       sendSeen([]);
@@ -894,13 +927,16 @@
       var head = root.querySelector('.sp-head');
       var view = root.querySelector('.sp-view');
       if (head && view && head.offsetHeight) view.style.setProperty('--sp-bulletin-under', head.offsetHeight + 'px');
-      if (w.StudentBulletinsView) w.StudentBulletinsView.attach(root, source);
+      if (w.StudentBulletinsView) {
+        w.StudentBulletinsView.attach(root, source);
+        w.StudentBulletinsView.fitViewer(root);
+      }
       watch();
       fillViewer();
     },
     share: function (state) {
       // A new state is a sign-out: the last student's bulletins go with it.
-      if (state !== S) forget();
+      if (state !== S) forgetAll();
       S = state;
     },
     test: {

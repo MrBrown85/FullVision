@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { runInThisContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
-import { CECE, OMAR, fakeStudentSubmit, id, sampleCard } from './helpers/fake-student-submit.js';
+import { CECE, OMAR, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const ON = { 'fv-build-bulletins': '1' };
@@ -72,6 +72,8 @@ function world(opts = {}) {
         return typeof db.fail[body.route] === 'function' ? db.fail[body.route]() : db.fail[body.route];
       if (body.route === 'bulletins') {
         if (db.hold) await db.hold;
+        // The second class (OMAR's enrolment) has nothing posted.
+        if (body.enrollment_id === OMAR) return { ok: true, bulletins: [], new: [] };
         const count = db.list.filter(b => !b.seen_at).length;
         return { ok: true, bulletins: db.list, new: db.news || [{ enrollment_id: body.enrollment_id, count }] };
       }
@@ -204,34 +206,77 @@ describe('the opening rule', () => {
     expect(page.root().querySelector('.sp-empty').textContent).toBe('Bulletins from your teacher will show here.');
   });
 
-  it('an answer later than a second: opens on Assignments, the tab fills in, and the tab never moves', async () => {
-    const w = world({ list: [bulletin(B1)] });
-    let release;
-    w.db.hold = new Promise(r => (release = r));
-    const page = openStudentPage({ store: Object.assign({}, ON) });
-    page.ctx.URL = URL;
-    page.server = w.server;
-    await page.start('#P3R8-WDK4');
-    page.type('#sp-ident', '0123456');
-    page.tap('[data-act="card-yes"]');
-    for (let i = 0; i < 40 && !routes(page).includes('bulletins'); i++) await page.tick();
-    for (let i = 0; i < 40; i++) await page.tick();
-    expect(page.T.state().screen).not.toBe('assignments');
-    // A second after `page`: the class opens, on Assignments, with no Bulletins tab yet.
-    page.advance(1000);
-    page.runTimers();
-    for (let i = 0; i < 40 && page.T.state().screen !== 'assignments'; i++) await page.tick();
-    expect(current(page)).toBe('assignments');
-    expect(tabs(page)).toEqual(['assignments', 'learning', 'questionnaires']);
-    // The student is touching the page; the answer comes: the tab appears, the page stays where it is.
-    page.tap('[data-segment="upcoming"]');
-    await page.tick();
-    release();
-    await page.settle();
-    expect(tabs(page)).toEqual(['bulletins', 'assignments', 'learning', 'questionnaires']);
-    expect(current(page)).toBe('assignments');
-    expect(page.root().querySelector('.sp-segment[aria-pressed="true"]').getAttribute('data-segment')).toBe('upcoming');
-  });
+  /* Decided (review of PR 1589): an answer that comes after the class is drawn never changes the
+     bar while the class is open; it is kept, and the class's next open shows Bulletins at once. */
+  for (const late of [1500, 5000]) {
+    it(
+      'an answer ' + late / 1000 + ' s late: Assignments, three tabs, nothing moves; the next open has Bulletins',
+      async () => {
+        const omar = samplePage(TODAY);
+        omar.student = { enrollment_id: OMAR, first_name: 'Cece' };
+        const w = world({
+          list: [bulletin(B1)],
+          more: [
+            sampleCard(TODAY, {
+              code: 'ABCDEFGH',
+              enrollment: OMAR,
+              first: 'Cece',
+              birthday: null,
+              number: '7654321',
+              page: omar,
+            }),
+          ],
+        });
+        let release;
+        w.db.hold = new Promise(r => (release = r));
+        const page = openStudentPage({ store: Object.assign({}, ON) });
+        page.ctx.URL = URL;
+        page.server = w.server;
+        await page.start('#P3R8-WDK4');
+        page.type('#sp-ident', '0123456');
+        page.tap('[data-act="card-yes"]');
+        for (let i = 0; i < 40 && !routes(page).includes('bulletins'); i++) await page.tick();
+        for (let i = 0; i < 40; i++) await page.tick();
+        expect(page.T.state().screen).not.toBe('assignments');
+        // A second after `page`: the class opens, on Assignments, with no Bulletins tab.
+        page.advance(1000);
+        page.runTimers();
+        for (let i = 0; i < 40 && page.T.state().screen !== 'assignments'; i++) await page.tick();
+        expect(current(page)).toBe('assignments');
+        expect(tabs(page)).toEqual(['assignments', 'learning', 'questionnaires']);
+        const bar = page.root().querySelector('.sp-tabs-bottom').outerHTML;
+        // The student is touching the page; the answer comes late: the bar is the same bar.
+        page.tap('[data-segment="upcoming"]');
+        await page.tick();
+        page.advance(late - 1000);
+        release();
+        await page.settle();
+        expect(tabs(page)).toEqual(['assignments', 'learning', 'questionnaires']);
+        expect(page.root().querySelector('.sp-tabs-bottom').outerHTML).toBe(bar);
+        expect(page.root().querySelector('.sp-segment[aria-pressed="true"]').getAttribute('data-segment')).toBe(
+          'upcoming',
+        );
+        // Nothing is watched or asked for a tab that is not there.
+        page.runTicks();
+        await page.settle();
+        expect(routes(page).filter(r => /bulletin/.test(r))).toEqual(['bulletins']);
+        // Another class, then back: this class opened afresh, from what was kept, by the opening rule.
+        w.db.hold = null;
+        await page.click('[data-act="settings-open"]');
+        await page.click('.sp-set [data-act="card-add"]');
+        page.type('#sp-code', 'ABCD-EFGH');
+        await page.submit('form[data-form="card"]');
+        page.type('#sp-ident', '7654321');
+        await page.click('[data-act="card-yes"]');
+        await page.click('[data-act="settings-open"]');
+        w.db.hold = new Promise(() => {}); // the fresh ask never answers: the kept answer alone opens it
+        await page.tap('.sp-set-classes .sp-class[data-enrollment="' + CECE + '"]');
+        for (let i = 0; i < 40 && !page.root().querySelector('.sp-tabs-bottom .sp-tab-on'); i++) await page.tick();
+        expect(tabs(page)).toEqual(['bulletins', 'assignments', 'learning', 'questionnaires']);
+        expect(current(page)).toBe('bulletins');
+      },
+    );
+  }
 
   it('coming back to an open class keeps the tab; another class decides again', async () => {
     const w = world({ list: [bulletin(B1)] });
@@ -697,6 +742,26 @@ describe('Demo Mode', () => {
     expect(current(page)).toBe('bulletins');
     expect(page.T.bulletins().student).toBe('demo-cece');
     expect(page.calls).toEqual([]);
+  });
+
+  it('Log Out leaves nothing of the sample Seen and reactions in this tab', async () => {
+    const page = await demo();
+    page.onScreen(() => true);
+    page.advance(700);
+    await page.T.tellBulletinsSeen();
+    await page.click('.sp-bulletin-react[data-word="got_it"]');
+    expect(badge(page, 'bulletins')).toBe('');
+    await page.click('[data-act="settings-open"]');
+    await page.click('[data-act="logout-ask"]');
+    page.advance(500);
+    await page.click('[data-act="card-done"]');
+    // The next student on this device signs in to the sample card: everything as new.
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    expect(badge(page, 'bulletins')).toBe('2');
+    expect(page.root().querySelectorAll('.sp-bulletin-react[aria-pressed="true"]')).toHaveLength(0);
   });
 
   it('a paused student: the card says it is closed, as today', async () => {

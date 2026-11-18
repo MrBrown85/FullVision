@@ -25,8 +25,62 @@ async function open(page, opts = {}) {
   });
   await page.clock.install({ time: NOW });
   await page.addInitScript(
-    ([css, flag]) => {
+    ([css, flag, own]) => {
       if (flag) localStorage.setItem('fv-build-bulletins', '1');
+      // The class's own bulletins, as the teacher's Demo Mode keeps them on this device (OWN_BULLETINS).
+      if (own) {
+        const tall = document.createElement('canvas');
+        tall.width = 120;
+        tall.height = 600;
+        const g = tall.getContext('2d');
+        g.fillStyle = '#eef';
+        g.fillRect(0, 0, 120, 600);
+        g.fillStyle = '#336';
+        g.fillRect(10, 10, 100, 20);
+        const page = tall.toDataURL('image/png');
+        const at = m => new Date(Date.now() - m * 60000).toISOString();
+        const b = (id, m, more) =>
+          Object.assign(
+            { id, kind: 'announcement', body: 'Notes for today, ' + id + '.', posted_at: at(m), files: [] },
+            more,
+          );
+        const long = 'https://www.example.org/' + 'a-very-long-address/'.repeat(80) + '?q=' + 'x'.repeat(200);
+        localStorage.setItem(
+          'gb-bulletins-sci8',
+          JSON.stringify({
+            bulletins: [
+              b('own-1', 600),
+              b('own-2', 590),
+              b('own-3', 580),
+              b('own-link', 570, {
+                link_url: 'https://www.youtube.com/watch?v=inside-a-cell',
+                link_title: 'Inside a Cell (video)',
+              }),
+              b('own-4', 560),
+              b('own-long', 550, { link_url: long, link_title: 'A Long Address' }),
+              b('own-5', 540),
+              b('own-tall', 530, {
+                files: [
+                  {
+                    id: 'own-tall-file',
+                    kind: 'pdf',
+                    title: 'A Tall Page',
+                    page_count: 2,
+                    position: 1,
+                    status: 'ready',
+                    paths: [page, page],
+                  },
+                ],
+              }),
+              b('own-6', 520),
+              b('own-7', 510),
+              b('own-8', 500),
+            ],
+            seen: {},
+            reactions: {},
+          }),
+        );
+      }
       const add = () => {
         const st = document.createElement('style');
         st.textContent = css + ' { display: none !important; }';
@@ -35,7 +89,7 @@ async function open(page, opts = {}) {
       if (document.documentElement) add();
       else document.addEventListener('DOMContentLoaded', add);
     },
-    [ADBLOCK, opts.flag !== false],
+    [ADBLOCK, opts.flag !== false, !!opts.own],
   );
   await page.goto('/s/#' + (opts.hash || 'demo-card'));
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -51,6 +105,32 @@ async function open(page, opts = {}) {
 }
 
 const bar = page => page.locator('.sp-tabs').locator('visible=true');
+
+/* A page open full size, measured: Back below the header, and the picture and Previous/Next above
+   the tab bar. Returns what does not hold, in words. */
+function viewerFaults(page) {
+  return page.evaluate(() => {
+    const out = [];
+    const r = sel => {
+      const el = [...document.querySelectorAll(sel)].find(e => e.getBoundingClientRect().height > 0);
+      return el ? el.getBoundingClientRect() : null;
+    };
+    const head = r('#app .sp-head');
+    const tabs = r('#app .sp-tabs-bottom');
+    const floor = tabs ? tabs.top : window.innerHeight;
+    const back = r('.sp-bulletin-viewer-back');
+    const img = r('.sp-bulletin-viewer-img');
+    if (back && head && back.top < head.bottom - 0.5) out.push('Back under the header');
+    if (img && img.bottom > floor + 0.5)
+      out.push('picture under the tab bar: ' + Math.round(img.bottom) + ' > ' + Math.round(floor));
+    for (const sel of ['.sp-bulletin-viewer-turn:not(.sp-bulletin-viewer-next)', '.sp-bulletin-viewer-next']) {
+      const b = r(sel);
+      if (b && b.bottom > floor + 0.5)
+        out.push(sel + ' under the tab bar: ' + Math.round(b.bottom) + ' > ' + Math.round(floor));
+    }
+    return out;
+  });
+}
 
 test.describe('on a phone, 390 px', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -331,13 +411,67 @@ for (const width of WIDTHS) {
             await page.locator('.sp-bulletin-file-slide[data-page="0"]').last().click();
             await expect(page.locator('.sp-bulletin-viewer-img')).toBeVisible();
             await look('a page full size');
-            const img = await page.locator('.sp-bulletin-viewer-img').boundingBox();
-            const vh = page.viewportSize().height;
-            expect(img.y + img.height).toBeLessThanOrEqual(vh);
+            for (const f of await viewerFaults(page)) found.push('a page full size — ' + f);
             expect(found).toEqual([]);
           },
         );
       }
+    });
+  }
+}
+
+/* The link's question is never over the card that opened it, so Open Website is never under the
+   finger: at every phone width and Text Size, in the page's font and a wide one, for a plain link and
+   a very long one, with the card near the top, the middle and the bottom of the screen. And a page
+   opened full size (a tall portrait page too) keeps Back, the picture and Previous/Next between the
+   header and the tab bar. */
+for (const width of WIDTHS) {
+  for (const size of SIZES) {
+    test.describe(width + ' px at ' + size + ', placing', () => {
+      test.use({ viewport: { width, height: width < 360 ? 568 : 760 }, isMobile: true, hasTouch: true });
+
+      test('the link question beside the card, and a tall page full size above the tab bar', async ({ page }) => {
+        test.setTimeout(90_000);
+        await open(page, { size, own: true });
+        const found = [];
+        for (const font of ['own', 'wide']) {
+          if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
+          for (const which of ['own-link', 'own-long']) {
+            const card = page.locator('[data-bulletin="' + which + '"] .sp-bulletin-link');
+            for (const at of [0.2, 0.5, 0.8]) {
+              await card.evaluate((el, f) => {
+                const r = el.getBoundingClientRect();
+                window.scrollBy(0, r.top + r.height / 2 - f * window.innerHeight);
+              }, at);
+              const tap = await card.boundingBox();
+              await card.click();
+              const ask = page.locator('.sp-bulletin-ask');
+              await expect(ask).toBeVisible();
+              const go = await page.locator('.sp-bulletin-ask-go').boundingBox();
+              const box = await ask.boundingBox();
+              const H = page.viewportSize().height;
+              const x = tap.x + tap.width / 2;
+              const y = tap.y + tap.height / 2;
+              const tag = font + ' font, ' + which + ' at ' + at + ': ';
+              if (x >= go.x && x <= go.x + go.width && y >= go.y && y <= go.y + go.height)
+                found.push(tag + 'Open Website under the tap');
+              if (box.y < tap.y + tap.height - 0.5 && box.y + box.height > tap.y + 0.5)
+                found.push(tag + 'the question over the card');
+              if (box.y < -0.5 || box.y + box.height > H + 0.5) found.push(tag + 'the question past the screen');
+              await page.locator('.sp-bulletin-ask-no').click();
+              await expect(ask).toHaveCount(0);
+            }
+          }
+          // A tall portrait page, full size, then back.
+          await page.locator('[data-bulletin-file="own-tall-file"] .sp-bulletin-file-slide[data-page="0"]').click();
+          await expect(page.locator('.sp-bulletin-viewer-img')).toBeVisible();
+          await expect(page.locator('.sp-bulletin-viewer-next')).toBeVisible();
+          for (const f of await viewerFaults(page)) found.push(font + ' font, a tall page: ' + f);
+          await page.locator('.sp-bulletin-viewer-back').click();
+          await expect(page.locator('.sp-bulletin-viewer')).toHaveCount(0);
+        }
+        expect(found).toEqual([]);
+      });
     });
   }
 }

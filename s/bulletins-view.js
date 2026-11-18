@@ -633,8 +633,77 @@
     watching.set(root, near);
   }
 
+  /* ── The link's question, placed ───────────────────────────── */
+
+  /* Puts the question (shared/website-ask.js's box) wholly below the card
+     that was tapped, or wholly above it, whichever has room for it; when
+     neither has, on the larger side with the address shortened to fit (it
+     scrolls inside). So the card, and the finger on it, are never under the
+     question, Open Website included. Lengths in the screen's own pixels: the
+     question is on <body>, outside the zoomed page. */
+  function placeAsk(box, card) {
+    if (!box || !card || !card.getBoundingClientRect || typeof window === 'undefined') return;
+    var H = window.innerHeight || (document.documentElement && document.documentElement.clientHeight) || 0;
+    if (!H) return;
+    var GAP = 8;
+    var EDGE = 8;
+    var r = card.getBoundingClientRect();
+    var top = Math.max(0, r.top);
+    var bottom = Math.min(H, r.bottom);
+    var url = box.querySelector('.sp-bulletin-ask-url');
+    box.style.bottom = 'auto';
+    box.style.top = EDGE + 'px';
+    if (url) {
+      url.style.maxHeight = '';
+      url.style.overflowY = '';
+    }
+    var h = box.getBoundingClientRect().height;
+    var above = top - GAP - EDGE;
+    var below = H - bottom - GAP - EDGE;
+    var down = below >= h ? true : above >= h ? false : below >= above;
+    var room = down ? below : above;
+    if (h > room && url) {
+      var uh = url.getBoundingClientRect().height;
+      url.style.maxHeight = Math.max(16, uh - (h - room)) + 'px';
+      url.style.overflowY = 'auto';
+      h = box.getBoundingClientRect().height;
+    }
+    box.style.top = Math.round(down ? bottom + GAP : Math.max(EDGE, top - GAP - h)) + 'px';
+  }
+
+  /* ── The page full size, fitted ────────────────────────────── */
+
+  /* The picture as tall as the room between where it starts (the page
+     scrolled to its top, as it is when the page opens) and the tab bar, less
+     the way between pages under it: measured, at this width, Text Size and
+     font. opts.scrollRoot: the box the page scrolls in, when it is not the
+     window (the preview's device). */
+  function fitViewer(root, opts) {
+    var img = root && root.querySelector ? root.querySelector('.sp-bulletin-viewer-img') : null;
+    if (!img || typeof window === 'undefined') return;
+    var fig = img.parentElement;
+    if (!fig || !fig.getBoundingClientRect || !fig.offsetWidth) return;
+    var box = opts && opts.scrollRoot;
+    var frame = box ? box.getBoundingClientRect() : { top: 0, bottom: window.innerHeight || 0 };
+    var scrolled = box ? box.scrollTop : window.scrollY || window.pageYOffset || 0;
+    var fr = fig.getBoundingClientRect();
+    // The zoom the page is drawn at (Text Size): screen pixels per CSS pixel of the picture.
+    var z = fr.width / fig.offsetWidth || 1;
+    var floor = frame.bottom;
+    var tabs = root.querySelector('.sp-tabs-bottom');
+    var tr = tabs && tabs.getBoundingClientRect ? tabs.getBoundingClientRect() : null;
+    if (tr && tr.height && tr.top > frame.top + (frame.bottom - frame.top) / 2) floor = Math.min(floor, tr.top);
+    var bar = root.querySelector('.sp-bulletin-viewer-bar');
+    var under = bar ? bar.getBoundingClientRect().height + 10 * z : 0;
+    var start = fr.top + scrolled;
+    var room = floor - 8 * z - under - start;
+    img.style.maxHeight = Math.max(80, Math.floor(room / z)) + 'px';
+  }
+
   return {
     body: body,
+    placeAsk: placeAsk,
+    fitViewer: fitViewer,
     press: press,
     attach: attach,
     count: count,
