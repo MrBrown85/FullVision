@@ -2756,3 +2756,23 @@ Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), from an empty databa
 Since the apply, `docs/schema.generated.sql` (its md5 equal to live's snapshot, read read-only), `migrations/baseline/` (the Database baseline workflow's output) and `types/database.d.ts` have the file, and a rebuild with `--check` matches (368 functions). `per_student.py` then takes each scenario's copy back to before the file with the full undo and goes on from there: **149 of 149** on that baseline; `npm run test:db`: every security rule test passed.
 
 Not verified here: PostgREST's schema cache and the app's calls through it, the edge function (not changed: `closed` is already in its whitelist).
+
+## Bulletins (2026111801, 2026-11-17)
+
+One file, `../2026111801_bulletins.sql`, 40,560 bytes, not applied (needs Colin's OK). Bulletins slice B1a, the teacher's side of a one-way class feed (`docs/plans/bulletins-plan.md`); the contract, for the builders of B1b, B1c, B1d and B1f, is `bulletins-contract.md`. It adds four empty tables in `public` (`bulletin`, `bulletin_file`, `bulletin_seen`, `bulletin_reaction`: row security on, no policy, no grant to any role, each with a primary key, each going with its class, bulletin and student on delete cascade; a deleted file row queues its pages in `submission_file_removal`), a private bucket `bulletin-files` (JPEG only, 2 MB a page) with four policies on `storage.objects` in the shape of `handout-files'`, seven functions a signed-in teacher may run (`list_bulletins`, `post_bulletin`, `finish_bulletin_file`, `edit_bulletin`, `delete_bulletin`, `list_bulletin_seen`, `show_bulletin_again`) and eleven helpers in `fv_private` that no role runs but the two the storage policies call. It changes no existing row, table, policy or function; the one row it adds is the bucket's. `bulletins.py` runs on a database rebuilt from the repo (`scripts/db-rebuild.mjs --check`), which has the same function md5s as gradebook-prod:
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:54731/b1a_base node scripts/db-rebuild.mjs --check   # an empty database
+PGPORT=54731 PGDATABASE=b1a_base python3 bulletins.py fingerprints                                  # write the md5s the file, post-check and undo carry
+PGPORT=54731 PGDATABASE=b1a_base python3 bulletins.py                                               # every scenario
+DATABASE_URL=postgresql://postgres@127.0.0.1:54731/postgres npm run test:db                         # the rule tests, without the file
+FV_DB_TEST_APPLY=migrations/2026111801_bulletins.sql DATABASE_URL=postgresql://postgres@127.0.0.1:54731/postgres npm run test:db   # and with it
+```
+
+Scenarios (the script's docstring says what each checks): `post`, `edit`, `delete`, `counts` (Seen by N of M with a paused, a withdrawn, a no-card, a stopped-card, an expired-card and a locked-card student; seen rows inserted directly, the student functions being B1b's), `others` (Teacher B, a class in the trash, ids that do not exist; signed out is PT401; a visitor and the service role run nothing; no role reads or writes the tables or runs a helper; no sync cursor moves), `storage`, `cascade` (a student deleted for good, the 30-day purge, a deleted assessment, an upload never finished), `limits`, `race` (one key twice; one key from two connections at once; two posts at the page cap at once; two files of one bulletin finished at once; three rounds each), `defaults`, `missing`, `apply` (nine guards, each named by the pre-check; a held lock gives up after five seconds; only the header's changes; no existing row changed; a second run; pre-check and post-check; the size), `undo` (PART 1 alone; the full removal of an unused install leaves the catalog and every row as before; with use it refuses while a row, a queued page or a file is kept; a changed function stops it; a second run; the file again).
+
+Result on 2026-11-17, PostgreSQL 17.11 (embedded-postgres), from an empty database rebuilt after `2026111730` (zero_data): **349 of 349**. `npm run test:db` without the file: every rule test passed (368 functions, 84 tables); with it: every rule test passed (386 functions, 88 tables, the four new ones among them, seeded by `tests/db/seed.sql` once the file is there).
+
+The md5 of `pg_get_functiondef` depends on the search path (`fv_private.bulletin_patched` takes a `public.bulletin`): the file sets `search_path = public, pg_temp`; run the pre-check and post-check with `public` on the search path, as Supabase's SQL editor does.
+
+Not verified here: gradebook-prod itself; the Storage service's own checks (the bucket's type and size limits, refusing a second upload to a name that holds a file); the removal worker (B1b teaches it the bucket); PostgREST's schema cache.

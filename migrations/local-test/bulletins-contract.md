@@ -6,6 +6,8 @@ Not in M1: any `student_submit` function, any change to `student_submit.write_lo
 
 ## Where this differs from the plan or the brief
 
+0. **The functions' helpers** are in `fv_private`, run by no role: `bulletin_file_path`, `bulletin_file_path_parts`, `bulletin_audience`, `bulletin_pinned_now`, `bulletin_json`, `bulletin_patched` (post's and edit's one set of rules), `bulletin_drop_expired`, and the two trigger functions. B1b may call `bulletin_file_path` and `bulletin_pinned_now` from its own `security definer` functions.
+
 1. **No `start_bulletin_file`.** `post_bulletin` makes the bulletin and its file rows in one call and answers the paths to upload to, so a bulletin and its files can never be half-made. The plan listed `start_bulletin_file` separately; the brief folded it into `post_bulletin`.
 2. **`finish_bulletin_file` takes `p_bulletin_file_id`**, not `p_file_id`: the security rule tests (`tests/db/function-args.mjs`) read `p_file_id` as a student's submitted file in every function.
 3. **A photo is one page.** `kind = 'photo'` has `page_count = 1`; several photos are several files. A PDF has 1 to 20.
@@ -29,7 +31,7 @@ All four are in `public`, row security on, **no policy**, and `revoke all` from 
 | `link_title`      | `text`        | yes  |                     | `bulletin_link_title_check`: null, or 1 to 200 characters and `link_url` not null                                                        |
 | `pinned`          | `boolean`     | no   | `false`             |                                                                                                                                          |
 | `pinned_until`    | `date`        | yes  |                     | `bulletin_pinned_until_check`: null, or `pinned` and `kind = 'reminder'`. The last day it is pinned, in the class's time zone.           |
-| `assessment_id`   | `uuid`        | yes  |                     | references `assessment(id)` on delete set null; trigger `bulletin_same_class`: the assessment is in this class (`23514` otherwise)       |
+| `assessment_id`   | `uuid`        | yes  |                     | references `assessment(id)` on delete set null; `post_bulletin` and `edit_bulletin` refuse an assessment of another class (`22023`)      |
 | `reactions_on`    | `boolean`     | no   | `false`             |                                                                                                                                          |
 | `shown_again_at`  | `timestamptz` | yes  |                     | the last Show It Again                                                                                                                   |
 | `posted_at`       | `timestamptz` | yes  |                     | when students could first see it. Null: not yet visible (a file still uploading).                                                        |
@@ -255,7 +257,7 @@ M2 also widens `student_submit.write_log`'s `write_log_kind_check` to add `bulle
 
 **The one shared rule**: `student_submit._bulletin_visible(p_bulletin_id uuid, p_enrollment_id uuid) → boolean`, true only when the bulletin exists, `posted_at is not null`, and it is in the enrolment's class. Every student function that names a bulletin or file asks it; none copies its test. (`_session_class` has already refused the student who may see nothing.)
 
-**What a student is sent**: the bulletin's kind, words, link, pinned (as computed for the teacher), `pinned_until`, files, `posted_at`, `edited_at`, whether reactions are on, the linked assessment's id only when `student_submit._listed(assessment, today)` would list it (else null), and their own `seen_at` and reaction. **Never a count about other students, never a name, never another student's anything.** `bulletin_file.bytes`, `idempotency_key`, `created_at`, `updated_at` and `shown_again_at` are not sent.
+**What a student is sent**: the bulletin's kind, words, link, pinned (as computed for the teacher, by `fv_private.bulletin_pinned_now(pinned, pinned_until, course.timezone)`), `pinned_until`, files, `posted_at`, `edited_at`, whether reactions are on, the linked assessment's id only when `student_submit._listed(assessment, today)` would list it (else null), and their own `seen_at` and reaction. **Never a count about other students, never a name, never another student's anything.** `bulletin_file.bytes`, `idempotency_key`, `created_at`, `updated_at` and `shown_again_at` are not sent.
 
 ### `student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text) → jsonb` (route `bulletins`)
 
