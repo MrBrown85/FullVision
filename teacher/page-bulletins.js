@@ -1506,6 +1506,13 @@
       var was = _menuId;
       _closeMenu();
       _focusMenuButton(was);
+      return;
+    }
+    // A menu is walked with the arrow keys (Safari's Tab skips buttons unless Full Keyboard Access is on).
+    var step = _menuId ? F.menuStep(document.activeElement, e.key) : null;
+    if (step) {
+      e.preventDefault();
+      step.focus();
     }
   }
 

@@ -288,16 +288,17 @@ test('keyboard focus stays where it was: the menu, a redraw, Cancel and the conf
   );
   await expect(more).toBeFocused();
   // A redraw that does happen keeps focus on the same control (a menu opened by the keyboard, then Pin).
+  // (The arrow keys walk the menu: Safari's Tab skips buttons unless Full Keyboard Access is on.)
   await page.keyboard.press('Enter');
+  await expect(menu.getByRole('menuitem', { name: 'Edit' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Tab');
   await expect(menu.getByRole('menuitem', { name: 'Pin' })).toBeFocused();
   await page.keyboard.press('Enter');
   const pinned = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
   await expect(pinned.locator('.bulletin-more-btn')).toBeFocused();
   await page.keyboard.press('Enter');
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab'); // Edit, Unpin, Delete
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown'); // Edit, Unpin, Delete
   await expect(pinned.locator('.bulletin-menu').getByRole('menuitem', { name: 'Delete' })).toBeFocused();
   await page.keyboard.press('Enter');
   const confirm = page.locator('.confirm-overlay');

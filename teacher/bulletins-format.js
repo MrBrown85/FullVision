@@ -181,7 +181,34 @@
     return false;
   }
 
+  /**
+   * The menu item an arrow key moves to from the one with focus (ArrowDown and
+   * ArrowUp wrap; Home and End go to the ends), or null when the key is not
+   * one of those or focus is not in a menu.
+   * @param {Element | null} from @param {string} key @returns {any}
+   */
+  function menuStep(from, key) {
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(key) < 0) return null;
+    var menu = from && from.closest ? from.closest('.bulletin-menu') : null;
+    if (!menu) return null;
+    var items = [].slice.call(menu.querySelectorAll('[role="menuitem"]')).filter(function (/** @type {any} */ n) {
+      return !n.disabled;
+    });
+    if (!items.length) return null;
+    var at = items.indexOf(from);
+    var to =
+      key === 'Home'
+        ? 0
+        : key === 'End'
+          ? items.length - 1
+          : key === 'ArrowDown'
+            ? (at + 1) % items.length
+            : (at - 1 + items.length) % items.length;
+    return items[to];
+  }
+
   return {
+    menuStep: menuStep,
     dateLabel: dateLabel,
     dayHeading: dayHeading,
     returnedWhen: returnedWhen,

@@ -30,6 +30,8 @@
   /** The tile has become available while there is no slot for it: the row is drawn once more when nothing is open. */
   var _wantRow = false;
   var _retry = 0;
+  /** Classes whose last read failed: a draw does not ask for them again, so reads that keep failing are not tried on every draw; the 30-second tick does. @type {Record<string, boolean>} */
+  var _failing = {};
   var REFRESH_MS = 30000;
 
   /* ── Pure helpers ─────────────────────────────────────────── */
@@ -246,8 +248,15 @@
     if (document.getElementById('grader-overlay')) return true;
     var row = document.querySelector('.dash-row');
     if (!row) return false;
-    var a = document.activeElement;
-    if (a && a !== document.body && row.contains(a)) return true;
+    // Keyboard focus on a control with an id is put back after the draw; on a text box or a control that cannot be found again, the draw waits.
+    var a = /** @type {any} */ (document.activeElement);
+    if (
+      a &&
+      a !== document.body &&
+      row.contains(a) &&
+      (!a.id || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)
+    )
+      return true;
     return !!row.querySelector('[aria-expanded="true"], .dash-view-menu:not([hidden]), .is-open');
   }
 
@@ -266,7 +275,15 @@
     }
     _wantRow = false;
     var page = /** @type {any} */ (window).PageDashboard;
-    if (page && typeof page.render === 'function') page.render();
+    if (!page || typeof page.render !== 'function') return;
+    var held = /** @type {any} */ (document.activeElement);
+    var heldId = held && held !== document.body && held.id ? held.id : '';
+    var main = document.getElementById('main');
+    var top = main ? main.scrollTop : 0;
+    page.render();
+    if (main) main.scrollTop = top;
+    var back = heldId ? document.getElementById(heldId) : null;
+    if (back && typeof back.focus === 'function') back.focus({ preventScroll: true });
   }
 
   /** The class's bulletins changed: draw the tile again, only if what it shows is different and only for the class it is showing. With no slot, a class that has become available asks for the row once. @param {any} e */
@@ -307,6 +324,8 @@
       stillShown: function () {
         return _listening && _cid === cid;
       },
+    }).then(function (ok) {
+      if (_listening) _failing[cid] = !ok;
     });
   }
 
@@ -314,8 +333,9 @@
    * The tile's markup for the middle row, or '' when the app offers no
    * Bulletins for the class yet (a signed-in class whose server has not
    * answered, or has no Bulletins functions): then there is no slot and the
-   * Inbox keeps the whole column. Asks for fresh bulletins on a draw, except
-   * after a failed read: that waits for the 30-second tick.
+   * Inbox keeps the whole column. Asks for fresh bulletins on a draw, but not
+   * for a class whose last read failed: that is tried again only by the
+   * 30-second tick.
    * @param {string} cid
    */
   function html(cid) {
@@ -332,7 +352,7 @@
       }, REFRESH_MS);
     }
     _cid = cid;
-    if (bulletinsState(cid) !== 'failed') {
+    if (bulletinsState(cid) !== 'failed' && !_failing[cid]) {
       _drawing = true;
       try {
         _ask(cid);
@@ -355,6 +375,7 @@
     _timer = 0;
     _retry = 0;
     _wantRow = false;
+    _failing = {};
     _listening = false;
     _cid = '';
     _lastHtml = '';
