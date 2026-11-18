@@ -33,24 +33,19 @@ const shot = async (page, name) => {
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { sendWork = true, bulletins = false, caughtUp = false } = {}) {
-  await page.addInitScript(
-    ([bulletins]) => {
-      try {
-        if (bulletins) {
-          localStorage.setItem('fv-build-bulletins', '1');
-        }
-      } catch (e) {
-        /* storage blocked */
-      }
-    },
-    [bulletins],
-  );
+async function open(page, { sendWork = true, tile = true, caughtUp = false } = {}) {
   await page.addInitScript(EXPIRING);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
   await page.evaluate(
     ([caughtUp, sendWork]) => {
       if (!sendWork) return;
@@ -221,7 +216,7 @@ test('files dropped on the tile while By Assessment shows open Add Work with eac
 
 test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Work For', async ({ page }) => {
   test.setTimeout(60_000);
-  await open(page, { caughtUp: true });
+  await open(page, { caughtUp: true, tile: false });
   const home = page.locator('#dash-inbox-caught');
   // As the top bar: work assessed and not returned is not "All Caught Up".
   await expect(page.locator('.dash-glance-tograde')).toContainText('7 Not Returned');
@@ -420,7 +415,7 @@ test('each of the three buttons opens Add Work and its file chooser', async ({ p
 test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrolling and its icon hidden', async ({
   page,
 }) => {
-  await open(page, { bulletins: true, caughtUp: true });
+  await open(page, { caughtUp: true });
   expect(Math.round(await page.locator('#dash-inbox').evaluate(el => el.getBoundingClientRect().height))).toBe(299);
   const m = await page.evaluate(() => {
     const list = document.getElementById('dash-inbox-list');
@@ -441,7 +436,7 @@ test('with the Bulletins tile showing a file over it is refused, the cover is as
   page,
 }) => {
   await page.clock.install();
-  await open(page, { bulletins: true });
+  await open(page);
   await expect(page.locator('.dash-bulletins-tile')).toBeVisible();
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
   await namedFiles(page, LIGHT);

@@ -1770,6 +1770,9 @@ describe('the grader’s gradebook, phone and Assignments page actions follow th
       // Return for Revision and Take Back (S11): tests/grader-revision.test.js walks them.
       'returnForRevision',
       'cancelRevision',
+      // Quizzes' Confirm and its Undo (Q4): tests/quiz-confirm.test.js walks them, drafts included.
+      'confirmQuiz',
+      'undoConfirmQuiz',
     ];
     expect(Object.keys(Grader).sort()).toEqual(names.concat(dialog).sort());
   });

@@ -16,18 +16,23 @@
 @media (max-width: 1099px) {
   /* ── The top bar ────────────────────────────────────────────────── */
 
-  /* Dashboard to Reporting all in view: tighter tabs, nothing cut off. */
+  /* Dashboard to Reporting all in view: tighter tabs, nothing cut off.
+     Six tabs since Bulletins (B1g): a size smaller, with 6 px sides, they
+     fit an iPad Air (820 wide, about 560 points) in the wide stand-in for
+     CI's fonts (e2e/wide-font.js). */
   html.fv-tablet .tb-seg .tb-seg-link {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: var(--text-sm);
   }
-  /* An iPad mini (744 wide) has about 516 points for the five tabs: the
-     narrower sides keep about 60 spare, room for a wider font than an
-     iPad's (CI's Linux font cut Reporting off with 10 px sides). */
+  /* An iPad mini (744 wide) has about 508 points for the six tabs: 12 px
+     words with 5 px sides fit in the wide stand-in too (CI's Linux font cut
+     Reporting off with 10 px sides when there were five). */
   @media (max-width: 799px) {
     html.fv-tablet .tb-seg .tb-seg-link {
-      padding-left: 6px;
-      padding-right: 6px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: var(--text-xs);
     }
   }
 
@@ -369,6 +374,35 @@
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+
+  /* The Bulletins tile (on since B1g): its head's two links and each row's
+     words and Seen By answer a tap 44 px high. Rows grow to 48 px; the head
+     and three rows still fit the 300 px tile. */
+  html.fv-tablet .dash-row .dash-bulletins-head {
+    height: 44px;
+    align-items: center;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-actions {
+    align-items: center;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-write,
+  html.fv-tablet .dash-row .dash-bulletins-open,
+  html.fv-tablet .dash-row .dash-bulletins-seen {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 44px;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-words {
+    display: block;
+    line-height: 44px;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-rows {
+    grid-auto-rows: 48px;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-row {
+    height: 48px;
   }
 
   @media (max-width: 799px) {

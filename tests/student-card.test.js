@@ -221,6 +221,9 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     expect(yes.hasAttribute('disabled')).toBe(true);
     expect(page.root().querySelector('#sp-ident').getAttribute('value')).toBe(page.T.DEMO.number);
     await page.settle();
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect((await row(page, 'Cell Microscope Lab')).result).toBe('Proficient −');
   });
@@ -232,6 +235,9 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     await page.submit('form[data-form="card"]');
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     // Every piece is listed, with its date; none that came back has a result or a level.
     const all = await rows(page);
@@ -340,6 +346,9 @@ describe('student card: the demo walk', () => {
     page.choose('#sp-bd', d);
     page.choose('#sp-by', y);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
     expect(page.root().querySelector('.sp-pill').textContent).toBe('Block B');
@@ -375,6 +384,9 @@ describe('student card: the demo walk', () => {
     );
     page.type('#sp-ident', page.T.DEMO.password);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     expect(page.calls).toHaveLength(0);
   });
@@ -437,6 +449,9 @@ describe('student card: wrong tries', () => {
     expect(page.root().querySelector('.sp-msg').textContent).toContain('4 tries left.');
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Bulletins');
+    await page.click('.sp-tabs-bottom [data-tab="assignments"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
   });
 });
