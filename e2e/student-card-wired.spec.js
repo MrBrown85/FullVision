@@ -423,11 +423,8 @@ test.describe('a real card: what stops it, and what each one says', () => {
 
   test('when calc.js can’t be fetched the real list opens without results, and tells the server nothing yet', async ({
     page,
-    browserName,
   }) => {
-    // In Playwright's WebKit, Try Again after the aborted calc.js never gets it; the cause is not found
-    // yet (removing its failed preload did not help). Open: it may be WebKit's or Playwright's.
-    test.fixme(browserName === 'webkit', 'Try Again after a failed calc.js does not load it in WebKit (open)');
+    // WebKit reuses a failed load of the same address, so Try Again asks for calc.js?retry=1 (s/app.js).
     const fn = school();
     const posts = await serve(page, fn);
     await page.route('**/shared/calc.js', route => route.abort());

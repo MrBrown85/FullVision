@@ -209,6 +209,26 @@ test.describe('Settings with reduced motion', () => {
   });
 });
 
+/* A row of Settings, scrolled to: whole (no box between it and the sheet
+   cuts any of it, so nothing has squashed it), at least 44 px tall, on the
+   screen, and the thing a tap at its middle reaches. '' when all hold. */
+async function wholeAndTappable(row) {
+  await row.scrollIntoViewIfNeeded();
+  return row.evaluate(el => {
+    const r = el.getBoundingClientRect();
+    if (r.height < 44) return 'only ' + Math.round(r.height) + ' px tall';
+    if (r.top < 0 || r.bottom > window.innerHeight) return 'off the screen';
+    for (let p = el.parentElement; p && !p.matches('body'); p = p.parentElement) {
+      if (getComputedStyle(p).overflow === 'visible') continue;
+      const b = p.getBoundingClientRect();
+      if (r.top < b.top - 1 || r.bottom > b.bottom + 1) return 'cut by ' + p.className;
+      if (p.matches('.sp-set')) break;
+    }
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return hit && el.contains(hit) ? '' : 'not what a tap reaches';
+  });
+}
+
 /* Demo Mode's sample card, at a Text Size, with a second class added (so
    Switch Class is listed and Settings is at its tallest), Settings open. */
 async function demoTwoClasses(page, size) {
@@ -240,13 +260,21 @@ for (const vp of [
     test.describe('Settings fits ' + vp.width + ' × ' + vp.height + ' at ' + size, () => {
       test.use({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.phone, hasTouch: vp.phone });
 
-      test('the whole sheet is on the screen, and Log Out can be reached', async ({ page }) => {
+      test('the whole sheet is on the screen, every class can be seen and tapped, and Log Out reached', async ({
+        page,
+      }) => {
         await demoTwoClasses(page, size);
         const box = await page.locator('.sp-set').boundingBox();
         expect(box.y).toBeGreaterThanOrEqual(0);
         expect(box.y + box.height).toBeLessThanOrEqual(vp.height + 1);
+        // Choosing a size scrolled Settings to it; at its top, the title and Done.
+        await page.locator('.sp-set').evaluate(el => (el.scrollTop = 0));
         await expect(page.getByRole('heading', { name: 'Settings' })).toBeInViewport({ ratio: 1 });
         await expect(page.locator('.sp-set-done')).toBeInViewport({ ratio: 1 });
+        // Each class row whole (nothing squashes it), once scrolled to, and the one under the finger.
+        const rows = page.locator('.sp-set .sp-class');
+        await expect(rows).toHaveCount(2);
+        for (let i = 0; i < 2; i += 1) expect(await wholeAndTappable(rows.nth(i))).toBe('');
         const out = page.locator('.sp-set-out');
         await out.scrollIntoViewIfNeeded();
         await expect(out).toBeInViewport({ ratio: 1 });
@@ -258,6 +286,62 @@ for (const vp of [
       });
     });
   }
+}
+
+/* Five classes on one device, on the smallest phone at each size: Settings
+   scrolls, and every class stays whole and opens. */
+const FIVE = [
+  ['Humanities 8', 'A', 'K7M4QX2P'],
+  ['Math 8', 'C', 'H3JX7KQ2'],
+  ['French 8', 'D', 'M4PW9TQ7'],
+  ['Art 8', 'E', 'R8VK2HX4'],
+].map(([name, block, code], i) => {
+  const base = samplePage(TODAY);
+  const enrollment = id(40 + i);
+  return sampleCard(TODAY, {
+    code,
+    enrollment,
+    course: { name, block },
+    page: Object.assign(base, {
+      student: { enrollment_id: enrollment, first_name: 'Cece' },
+      course: Object.assign({}, base.course, { name, block }),
+    }),
+  });
+});
+
+for (const size of ['normal', 'large', 'larger']) {
+  test.describe('Switch Class with five classes at 320 × 568, ' + size, () => {
+    test.use({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
+
+    test('every class row is whole, can be scrolled to, and opens its class', async ({ page }) => {
+      await serve(page, fakeStudentSubmit({ cards: [sampleCard(TODAY), ...FIVE] }));
+      await signIn(page);
+      const gear = page.getByRole('button', { name: 'Settings', exact: true });
+      if (size !== 'normal') {
+        await gear.click();
+        await page.locator('.sp-set-size[data-size="' + size + '"]').click();
+        await page.locator('.sp-set-done').click();
+      }
+      for (const { code } of FIVE) {
+        await gear.click();
+        await page.locator('.sp-set [data-act="card-add"]').click();
+        await page.getByLabel('Card Code').fill(code);
+        await page.getByRole('button', { name: 'Continue' }).click();
+        await page.getByLabel('Student Number').fill('0123456');
+        await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+        await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+      }
+      await gear.click();
+      await page.waitForTimeout(300);
+      const rows = page.locator('.sp-set .sp-class');
+      await expect(rows).toHaveCount(5);
+      for (let i = 0; i < 5; i += 1) expect(await wholeAndTappable(rows.nth(i)), 'row ' + (i + 1)).toBe('');
+      // The first class, from the top of the list: it opens.
+      await rows.nth(0).scrollIntoViewIfNeeded();
+      await rows.nth(0).click();
+      await expect(page.locator('.sp-head-class')).toHaveText('Science 8Block B');
+    });
+  });
 }
 
 /* The review's fault 2: a double tap on Settings' Log Out landed its second

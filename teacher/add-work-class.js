@@ -763,6 +763,10 @@
   function _move(s, from, to, pid, focusKey) {
     var res = s.stage.move(from, to, pid);
     s.moveMenu = null;
+    // Moved by the teacher: no longer the app's match by name.
+    (res.moved || []).forEach(function (p) {
+      delete s.byName[p.id];
+    });
     if (!res.ok) {
       if (res.reason === 'too_many_pages') s.stage.note(to, 'A piece of work can have 30 pages at most.');
       _draw({ focus: focusKey || null });
@@ -783,8 +787,12 @@
       if (!given || s.busy || s.view !== 'stage') return { ok: false, reason: 'busy' };
       var placed = s.stage.place(given.sid, { from: given.from, pages: given.pages });
       if (!placed.ok) return placed;
+      // A For choice the teacher made, kept while the file waited (B6).
+      if (given.forAid && _two()) placed = AddWorkTwoClasses.carryFor(s, given, placed);
       // Off a scan: its place in the pile, for Grade in Scan Order.
       if (given.scan && s.scanOrder.indexOf(given.sid) < 0) s.scanOrder.push(given.sid);
+      // Placed by the app from the file's name (the tray), not by the teacher's hand.
+      if (given.byName) s.byName[placed.piece.id] = true;
       var url = given.url || _thumbUrl(placed.piece.pages[0]);
       if (url) s.urls[placed.piece.id] = url;
       s.headNote = '';
@@ -1273,6 +1281,19 @@
     e.returnValue = '';
   }
 
+  /* Opens the page for one piece. → false when the piece is not offered
+     (nothing is taken then). opts:
+       onClose  called when the page closes
+       drop     a drop's own DataTransfer: once the page is drawn it goes to
+                the tray exactly as a drop off a student does
+                (tray.takeDrop), folders and all. A browser gives up a
+                dropped folder's contents only while the drop is handled, so
+                a caller passing this calls open synchronously inside its
+                drop handler, with no wait before it.
+       files    File objects (an array or FileList), used when drop is not
+                given: they go to the tray as files chosen there do
+                (tray.take), so a single PDF opens Split the Scan.
+     Nothing is saved until Add Work is pressed on the page. */
   function open(cid, aid, opts) {
     var a = _piece(cid, aid);
     if (!offered(cid, a)) return false;
@@ -1310,6 +1331,7 @@
       leftAlone: {},
       paperDone: {},
       scanOrder: [],
+      byName: {},
       addedSids: [],
       addedAny: {},
       overlay: overlay,
@@ -1386,6 +1408,8 @@
     _draw();
     var back = /** @type {HTMLElement | null} */ (overlay.querySelector('.awc-back'));
     if (back) back.focus();
+    if (opts.drop) s.tray.takeDrop(opts.drop);
+    else if (opts.files) s.tray.take(opts.files);
     return true;
   }
 

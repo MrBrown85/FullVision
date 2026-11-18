@@ -216,7 +216,8 @@ describe('the tile', () => {
     GraderWork.workCounts(CID, LIGHT, ids()).ids.tograde.forEach(sid =>
       Grader.setOverallComment(CID, sid, LIGHT, 'Seen.'),
     );
-    expect(DashInbox.html(CID)).toContain('All Caught Up');
+    // D5 draws this space; with graded work not yet returned it does not say All Caught Up (the top bar's rule).
+    expect(DashInbox.html(CID)).toContain('id="dash-inbox-caught"');
     expect(DashInbox.html(CID)).not.toContain('Grade Submissions');
     const was = DashInbox.emptyHtml;
     DashInbox.emptyHtml = () => '<li id="d5-drop"></li>';

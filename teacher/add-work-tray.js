@@ -272,24 +272,26 @@
 
     function _one(file) {
       var name = _fileName(file);
-      var m = _match(name);
       return AddWorkFiles.prepare([file]).then(
         function (got) {
           if (!host.alive()) return;
           done++;
           if (got.said || !got.pages.length) return _refused(name, got.said);
+          // Matched once read, against the classes on the page now (a second may have come).
+          var m = _match(name);
+          // byName: placed or held by the app from its name, not by the teacher.
           if (m.kind === 'one') {
-            var res = host.place([{ sid: m.sid, from: name, pages: got.pages }])[0];
+            var res = host.place([{ sid: m.sid, from: name, pages: got.pages, byName: true }])[0];
             if (res && res.ok) return;
             hold(
               name,
               got.pages,
               m,
               res && res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '',
-            );
+            ).byName = true;
             return;
           }
-          hold(name, got.pages, m);
+          hold(name, got.pages, m).byName = true;
         },
         function () {
           if (!host.alive()) return;
@@ -447,6 +449,31 @@
       return out;
     }
 
+    /* The classes on the page changed (B6): each file waiting by its name is
+       matched again, so what it says is true. With `place` (a second class
+       came), a certain one goes on its student, as if it were dropped now,
+       unless it went back from a student (noAuto); the rest wait, saying
+       why. Without (the second class left), nothing is placed.
+       → how many were placed. */
+    function again(place) {
+      var went = 0;
+      items.slice().forEach(function (item) {
+        if (!item.byName || item.refused) return;
+        var m = _match(item.from);
+        item.match = m;
+        // A note on the old match (no room left on that student) is not this one's.
+        if (m.kind !== 'one') item.note = '';
+        if (m.kind !== 'one' || !place || item.noAuto) return;
+        var res =
+          host.place([{ sid: m.sid, from: item.from, pages: item.pages, url: item.url, byName: true }])[0] || {};
+        if (res.ok) {
+          _drop(item);
+          went++;
+        } else item.note = res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '';
+      });
+      return went;
+    }
+
     /* ── Placing from the tray ── */
     function _rect(id) {
       var el = document.querySelector('.awt-item[data-awt-item="' + id + '"]');
@@ -467,7 +494,10 @@
       if (!item || item.refused || host.busy()) return false;
       var focus = _nextKey(id);
       var before = _rect(id);
-      var res = host.place([{ sid: sid, from: item.from, pages: item.pages, url: item.url }])[0] || {};
+      var res =
+        host.place([
+          { sid: sid, from: item.from, pages: item.pages, url: item.url, forCid: item.forCid, forAid: item.forAid },
+        ])[0] || {};
       if (!res.ok) {
         item.note = res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '';
         item.picking = false;
@@ -612,7 +642,10 @@
         html += _btn('awt-act is-quiet', 'else', item, 'Someone Else');
         return '<div class="awt-acts">' + html + '</div>';
       }
-      if (m.kind === 'close' && !item.picking) {
+      /* One student, but not placed (matched again when the classes changed):
+         offered as a close spelling is, never taken. A file with no room on
+         that student (its note) is not offered there again. */
+      if ((m.kind === 'close' || (m.kind === 'one' && !item.note)) && !item.picking) {
         var first = host.first(m.sid);
         return (
           '<span class="awt-ask">' +
@@ -924,6 +957,13 @@
       takeDrop: takeDrop,
       hasFolder: hasFolder,
       placeOrHold: placeOrHold,
+      // Two classes (B6): a name matched as a drop is; a placed file held again.
+      match: _match,
+      // more: { byName, noAuto, forCid, forAid } (a For choice the teacher made).
+      hold: function (from, pages, m, more) {
+        Object.assign(hold(from, pages, m), more || {});
+      },
+      again: again,
       placeItem: placeItem,
       remove: remove,
       release: release,
