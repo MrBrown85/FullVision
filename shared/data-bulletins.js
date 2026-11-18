@@ -18,21 +18,12 @@
    server's row (its idempotency_key) takes its place. Edit, Pin, Delete
    and Show It Again only ever name a real server id.
 
-   A file (a photo, or a PDF made into JPEG pages by PhotoShrink) goes up,
-   on the desktop page, while online, right after post_bulletin answers with
-   the paths: with no connection the post is refused up front (offline) and
-   the draft stays with the teacher.
-
-   The phone (teacher-mobile/tab-bulletins.js, slice B1f) posts with
-   { queue: true }: the pages wait in the photo queue (shared/photo-queue.js,
-   kind 'bulletin') under the bulletin's device key, the bulletin shows as Not
-   Sent Yet with its photo from the device, post_bulletin goes through the
-   outbox, its answer names each page's path (placeBulletin), the queue
-   uploads them and its commit finishes each file (finish_bulletin_file).
-   The waiting entry keeps what the server answered, so each step is taken
-   up again after a reload (resumeBulletinUploads). Trouble shows only on
-   the sync dot; words the server refused are given back to the composer
-   (bulletinGivenBack). That part is shared/data-bulletins-queue.js.
+   A file (a photo, or a PDF made into JPEG pages by PhotoShrink) goes up
+   while online, right after post_bulletin answers with the paths: with no
+   connection the post is refused up front and the draft stays with the
+   teacher. The phone posts with { queue: true }: its pages wait in the photo
+   queue (shared/data-bulletins-queue.js, B1f; the hooks below call into it
+   only where it is loaded).
 
    Demo Mode keeps everything on this device in gb-bulletins-<cid>, in the
    shapes the server answers, and never calls the server. */
@@ -50,7 +41,7 @@ var BULLETIN_BUCKET = 'bulletin-files';
 /** @typedef {{ ok: boolean, message?: string, gone?: boolean }} BulletinWriteResult */
 /** @typedef {{ id: string, kind: string, body: string, link_url: string | null, link_title: string | null, pinned: boolean, pinned_until: string | null, assessment_id: string | null, reactions_on: boolean, visible: boolean, waiting: boolean, stalled: boolean, key: string | null, posted_at: string | null, shown_again_at: string | null, edited_at: string | null, created_at: string | null, updated_at: string | null, idempotency_key: string | null, files: BulletinFile[], seen: number, can_see: number, reactions: BulletinReactions }} Bulletin */
 /** @typedef {{ can_see: number, no_card: number, paused: number, page_on: boolean, more: boolean }} BulletinsMeta */
-/** @typedef {{ key: string, at: string, bulletin: Record<string, any>, files: { kind: string, title: string, pages: number }[], queued?: boolean, tries?: number, old?: string[], server?: { id: string, files: { id: string, paths: string[] }[] }, placed?: boolean }} BulletinWaiting */
+/** @typedef {{ key: string, at: string, bulletin: Record<string, any>, files: { kind: string, title: string, pages: number }[], queued?: boolean, takenBack?: boolean, old?: string[], [more: string]: any }} BulletinWaiting */
 /** @typedef {{ state: string, list: Bulletin[], meta: BulletinsMeta, at: number, loading: Promise<boolean> | null, writes: number }} BulletinMemory */
 
 /** @type {Record<string, BulletinMemory>} */
@@ -702,22 +693,14 @@ function refreshBulletins(cid, opts) {
 function _bltLandedKeys(cid, list) {
   /** @type {Record<string, boolean>} */
   var onServer = {};
-  /** @type {Record<string, Bulletin>} */
-  var rows = {};
   list.forEach(function (b) {
-    if (b.idempotency_key) {
-      onServer[b.idempotency_key] = true;
-      rows[b.idempotency_key] = b;
-    }
+    if (b.idempotency_key) onServer[b.idempotency_key] = true;
   });
   var q = window.v2Queue;
+  if (typeof _bltQueuedSeenAll === 'function') _bltQueuedSeenAll(cid, list);
   _bltSweepDead(cid);
-  // A post whose pages wait in the photo queue is done only once students can see it (shared/data-bulletins-queue.js).
-  _bltPending(cid).forEach(function (e) {
-    if (e.queued && typeof _bltQueuedSeen === 'function') _bltQueuedSeen(cid, e, rows[e.key] || null);
-  });
   var keep = _bltPending(cid).filter(function (e) {
-    if (e.queued) return true; // _bltQueuedSeen lets it go
+    if (e.queued) return true; // the phone's queued post: shared/data-bulletins-queue.js lets it go
     if (onServer[e.key]) return false;
     if (_bltFlows[e.key]) return true;
     if (q && typeof q.has === 'function' && q.has(e.key)) return true;
@@ -735,28 +718,15 @@ function getBulletins(cid) {
   var mem = _bltMemory(cid);
   var list = mem.list.slice();
   if (_isDemoSession()) return bulletinsSorted(list);
-  var pending = _bltPending(cid);
-  // A post whose pages are still on this device shows from the device (its photo is here), not as the server's empty row.
-  /** @type {Record<string, boolean>} */
-  var mine = {};
-  pending.forEach(function (e) {
-    if (!e.queued) return;
-    mine[e.key] = true;
-    (e.old || []).forEach(function (k) {
-      mine[k] = true;
-    });
-  });
-  list = list.filter(function (b) {
-    return !(b.idempotency_key && mine[b.idempotency_key] && !b.visible);
-  });
+  if (typeof _bltQueuedView === 'function') list = _bltQueuedView(cid, list);
   /** @type {Record<string, boolean>} */
   var onServer = {};
   list.forEach(function (b) {
     if (b.idempotency_key) onServer[b.idempotency_key] = true;
   });
-  var waiting = pending
+  var waiting = _bltPending(cid)
     .filter(function (e) {
-      return !onServer[e.key];
+      return !onServer[e.key] && !e.takenBack;
     })
     .map(_bltWaitingBulletin);
   // A bulletin the server holds that students are not sent, whose files this
@@ -1143,22 +1113,7 @@ function _bltListen() {
     if (!meta || meta.endpoint !== 'post_bulletin') return;
     var cid = meta.payload && meta.payload.p_course_id;
     var key = String(meta.id || '');
-    // A post whose pages wait in the photo queue: its answer, or its refusal, names the pages' paths or lets them go.
-    if (cid && key && (evt.kind === 'flush:success' || evt.kind === 'flush:dead-letter')) {
-      var held = _bltPending(cid).filter(function (e) {
-        return e.key === key && e.queued;
-      })[0];
-      if (held && typeof _bltQueuedAnswered === 'function') {
-        _bltQueuedAnswered(
-          cid,
-          key,
-          evt.kind === 'flush:success'
-            ? { data: meta.data, error: null }
-            : { data: null, error: (meta.result && meta.result.error) || { message: meta.error || 'refused' } },
-        );
-        return;
-      }
-    }
+    if (typeof _bltQueuedEvent === 'function' && _bltQueuedEvent(evt.kind, cid, key, meta)) return;
     if (!cid || !key || _bltFlows[key]) return; // this page's own post is handled where it was sent
     if (evt.kind === 'flush:dead-letter') {
       // Refused after a reload (or by another tab): the words come back, with a plain sentence.
@@ -1194,14 +1149,10 @@ function _bltListen() {
  * Resolves { ok: true, bulletin } once the server has it (and its files),
  * or { ok: false, message, offline? } with nothing posted: the draft is the
  * caller's to keep. Until then the bulletin shows as Not Sent Yet.
- * opts.queue (the phone): a post with files keeps its pages in the photo
- * queue and resolves { ok: true, waiting: true, key } as soon as they are
- * kept, with or without a connection; the rest happens on its own (see the
- * top of this file).
  * @param {string} cid
  * @param {Record<string, any>} bulletin
  * @param {{ kind: string, title: string, pages: { blob: Blob, thumb?: Blob }[] }[]} [files]
- * @param {{ queue?: boolean }} [opts]
+ * @param {{ queue?: boolean }} [opts] the phone: files wait in the photo queue (shared/data-bulletins-queue.js)
  * @returns {Promise<{ ok: boolean, message?: string, offline?: boolean, waiting?: boolean, key?: string, bulletin?: Bulletin }>}
  */
 function postBulletin(cid, bulletin, files, opts) {
@@ -1219,10 +1170,8 @@ function postBulletin(cid, bulletin, files, opts) {
   if (!_bltOnServer(cid) || bulletinsState(cid) === 'missing') {
     return Promise.resolve({ ok: false, message: 'Bulletins are not available yet.' });
   }
-  if (list.length && opts && opts.queue && typeof _bltQueuedPost === 'function') {
-    _bltListen();
+  if (list.length && opts && opts.queue && typeof _bltQueuedPost === 'function')
     return _bltQueuedPost(cid, bulletinPayload(bulletin), list);
-  }
   if (list.length && typeof navigator !== 'undefined' && navigator.onLine === false) {
     return Promise.resolve({
       ok: false,
@@ -1425,12 +1374,12 @@ function _bltUploadFiles(cid, posted, files) {
  */
 function takeBackBulletin(cid, key) {
   if (!cid || !key || _bltFlows[key]) return false;
+  var queued = typeof _bltQueuedTakeBack === 'function' ? _bltQueuedTakeBack(cid, key) : null;
+  if (queued !== null) return queued;
   var q = window.v2Queue;
-  var entry = _bltPending(cid).filter(function (e) {
+  var mine = _bltPending(cid).some(function (e) {
     return e.key === key;
-  })[0];
-  var mine = !!entry;
-  if (entry && entry.queued) return typeof _bltQueuedTakeBack === 'function' && _bltQueuedTakeBack(cid, entry);
+  });
   if (!mine || !q || typeof q.remove !== 'function') return false;
   if (!q.remove(key)) return false;
   _bltDropPending(cid, key);
@@ -1441,11 +1390,10 @@ function takeBackBulletin(cid, key) {
 /** Whether a waiting bulletin can still be taken back. @param {string} cid @param {string} key */
 function bulletinCanTakeBack(cid, key) {
   if (!cid || !key || _bltFlows[key] || _isDemoSession()) return false;
-  var entry = _bltPending(cid).filter(function (e) {
+  var held = _bltPending(cid).filter(function (e) {
     return e.key === key;
   })[0];
-  // Pages on this device: until students can see it, it can be taken back (from the outbox, or from the server).
-  if (entry && entry.queued) return typeof _bltOutboxHas === 'function' && (!!entry.server || _bltOutboxHas(key));
+  if (held && held.queued) return !held.takenBack; // a queued post can be taken back until students see it
   var q = window.v2Queue;
   return !!q && typeof q.has === 'function' && typeof q.remove === 'function' && q.has(key);
 }

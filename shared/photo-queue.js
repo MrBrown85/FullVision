@@ -1050,9 +1050,8 @@ window.PhotoQueue = (function () {
     return _status(res) === 409 || /already exists|duplicate/i.test(_errorText(res));
   }
 
-  // `fn`: the upload to use; a student's work and a handout use the configured one.
-  function _callUpload(path, blob, info, fn) {
-    var send = fn || _upload;
+  // `send`: the upload to use (a bulletin's own, never the work upload).
+  function _callUpload(path, blob, info, send) {
     return Promise.resolve()
       .then(function () {
         return send(path, blob, info);
@@ -1117,6 +1116,7 @@ window.PhotoQueue = (function () {
       var handout = _isHandout(meta);
       // A bulletin's page is one picture, like a handout's, and goes by its own upload.
       var bulletin = _isBulletin(meta);
+      if (bulletin && !_bulletinUpload) return null; // never by another kind's upload
       var paths = { photo: _pathOf(meta), thumb: handout || bulletin ? null : thumbPathFor(meta.ids) };
       meta.sent = meta.sent || { photo: false, thumb: handout || bulletin };
       var parts = handout || bulletin ? ['photo'] : ['photo', 'thumb'];
@@ -1133,7 +1133,7 @@ window.PhotoQueue = (function () {
             order: meta.order,
             hash: meta.hash,
           },
-          bulletin ? _bulletinUpload : null,
+          bulletin ? _bulletinUpload : _upload,
         );
         if (epoch !== _epoch) return null;
         if (res.error && !_alreadyThere(res)) {
@@ -1299,7 +1299,8 @@ window.PhotoQueue = (function () {
     var soonest = null;
     (_metas || []).forEach(function (m) {
       if (!_mine(m, owner) || m.state === 'failed' || !m.next_at) return;
-      if (m.state === 'waiting' && _blocked(m)) return;
+      // A page this tab cannot send or commit (a bulletin's, unwired here) is no reason to wake.
+      if ((m.state === 'waiting' && _blocked(m)) || (_isBulletin(m) && !(_bulletinUpload && _bulletinCommit))) return;
       if (soonest == null || m.next_at < soonest) soonest = m.next_at;
     });
     if (soonest != null) _retryIn(Math.max(0, soonest - Date.now()));
