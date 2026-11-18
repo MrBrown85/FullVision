@@ -176,3 +176,20 @@
     display: none;
   }
 }
+/* Narrow: the kind label goes first, then the time, so the words keep room and Seen by is never cut. */
+@container dash-bulletins (max-width: 560px) {
+  .dash-bulletins-rows {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+  }
+  .dash-bulletins-kind {
+    display: none;
+  }
+}
+@container dash-bulletins (max-width: 430px) {
+  .dash-bulletins-rows {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+  .dash-bulletins-time {
+    display: none;
+  }
+}

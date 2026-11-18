@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { bulletins = true, dashRow = true } = {}) {
+async function open(page, { bulletins = true, dashRow = true, questions = true } = {}) {
   await page.addInitScript(
     ([bulletins, dashRow]) => {
       if (dashRow) localStorage.setItem('fv-build-dashRow', '1');
@@ -17,10 +17,19 @@ async function open(page, { bulletins = true, dashRow = true } = {}) {
     [bulletins, dashRow],
   );
   // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
-  await page.goto('/login.html?student=1');
-  await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/dashboard/);
+  await page.goto(questions ? '/login.html?student=1' : '/login.html?demo=1');
+  if (questions) await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/dashboard|teacher-mobile/, { timeout: 15000 });
+  // A phone-width window is sent to the phone app at sign-in; the desktop page is opened by its address.
+  if (page.viewportSize().width < 600) await page.goto('/dashboard');
   await page.locator('.dash-glance').waitFor();
+  if (!questions) {
+    // The Student Page on, but no question waiting: the row then starts higher and is taller than its floor.
+    await page.evaluate(() => {
+      setStudentPageSwitch(getActiveCourse(), true, 'on_return');
+      PageDashboard.render();
+    });
+  }
 }
 
 const box = (page, sel) =>
@@ -155,6 +164,52 @@ test('empty: Nothing Posted Yet at the same height', async ({ page }) => {
   );
   const tile = await box(page, '.dash-bulletins-tile');
   expect(Math.abs(tile.height - 199)).toBeLessThanOrEqual(1);
+});
+
+test('at 1440 x 900 the Inbox slot is 359 px and the tile 239 px, three whole rows', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, { questions: false });
+  expect(Math.round((await box(page, '.dash-row')).height)).toBe(610);
+  expect(Math.abs((await box(page, '.dash-row-inbox')).height - 359)).toBeLessThanOrEqual(1);
+  expect(Math.abs((await box(page, '.dash-bulletins-tile')).height - 239)).toBeLessThanOrEqual(1);
+  await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
+});
+
+test('at 390 px wide the tile does not scroll the page sideways and no row is cut off', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await open(page);
+  await page.locator('.dash-bulletins-tile').waitFor();
+  const m = await page.evaluate(() => {
+    const t = document.querySelector('.dash-bulletins-tile');
+    const main = document.getElementById('main');
+    return {
+      over: [
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        main.scrollWidth - main.clientWidth,
+      ],
+      tile: [t.scrollWidth - t.clientWidth, t.scrollHeight - t.clientHeight],
+    };
+  });
+  expect(m.over).toEqual([0, 0]);
+  expect(m.tile).toEqual([0, 0]);
+  // Seen by is whole (its box is as wide as its words) and the words keep room.
+  const parts = await page.evaluate(() => ({
+    seen: [...document.querySelectorAll('.dash-bulletins-seen')].map(e => e.scrollWidth - e.clientWidth),
+    seenRight: [...document.querySelectorAll('.dash-bulletins-seen')].map(
+      e =>
+        e.getBoundingClientRect().right <= document.querySelector('.dash-bulletins-tile').getBoundingClientRect().right,
+    ),
+    words: [...document.querySelectorAll('.dash-bulletins-words')].map(e => e.getBoundingClientRect().width >= 90),
+  }));
+  expect(parts.seen.every(n => n === 0)).toBe(true);
+  expect(parts.seenRight).toEqual([true, true, true]);
+  expect(parts.words).toEqual([true, true, true]);
+});
+
+test('with the Dashboard row off nothing of the tile draws, whatever Bulletins says', async ({ page }) => {
+  await open(page, { dashRow: false });
+  await expect(page.locator('.dash-row')).toHaveCount(0);
+  await expect(page.locator('[class*="dash-bulletins-"]')).toHaveCount(0);
 });
 
 test('stacked on an iPad the tile is 300 px', async ({ page }) => {

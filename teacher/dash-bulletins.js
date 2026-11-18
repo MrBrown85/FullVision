@@ -28,6 +28,8 @@
   var _listening = false;
   var _drawing = false;
   var _lastHtml = '';
+  var _timer = 0;
+  var REFRESH_MS = 30000;
 
   /* ── Pure helpers ─────────────────────────────────────────── */
 
@@ -158,7 +160,8 @@
     out.offered = bulletinsOffered(cid);
     if (!out.offered) return Object.assign(out, { mode: 'unavailable' });
     if (!getBulletinsMeta(cid).page_on) return Object.assign(out, { mode: 'pageoff' });
-    var today = typeof getTodayStr === 'function' ? getTodayStr() : '';
+    var today =
+      typeof courseToday === 'function' ? courseToday(cid) : typeof getTodayStr === 'function' ? getTodayStr() : '';
     out.rows = pick(getBulletins(cid), today).map(function (b) {
       return rowModel(b, cid, at);
     });
@@ -254,6 +257,8 @@
     if (cid && cid !== _cid) return;
     var slot = _slot();
     if (!slot) return;
+    // A press or a focus inside the tile is never taken away: the next change draws it.
+    if (document.activeElement && slot.contains(document.activeElement)) return;
     var next = tileHtml(_cid);
     if (next === _lastHtml) return;
     _lastHtml = next;
@@ -279,6 +284,16 @@
       document.addEventListener('fv:bulletins-changed', _onChanged);
       document.addEventListener('click', _onClick);
       _listening = true;
+      // Every 30 seconds while the page is showing; the data layer throttles it.
+      _timer = window.setInterval(function () {
+        var shown = _cid;
+        if (!shown || !_slot() || document.visibilityState === 'hidden') return;
+        refreshBulletins(shown, {
+          stillShown: function () {
+            return _listening && _cid === shown;
+          },
+        });
+      }, REFRESH_MS);
     }
     _cid = cid;
     _drawing = true;
@@ -301,6 +316,8 @@
       document.removeEventListener('fv:bulletins-changed', _onChanged);
       document.removeEventListener('click', _onClick);
     }
+    if (_timer) window.clearInterval(_timer);
+    _timer = 0;
     _listening = false;
     _cid = '';
     _lastHtml = '';
