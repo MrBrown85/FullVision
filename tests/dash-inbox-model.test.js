@@ -105,13 +105,23 @@ describe('the sample class (Science 8) with Send Work on', () => {
 
   it('counts a student send after the kept time as new, and one before it as not', () => {
     sendWorkOn();
-    // Marcus sent Light Refraction on Nov 14 at 20:05 UTC; the others sent before.
-    let m = DashInboxModel.build(CID, { seen: '2026-11-14T00:00:00.000Z' });
-    expect(piece(m, LIGHT).newCount).toBe(1);
-    m = DashInboxModel.build(CID, { seen: '2026-11-15T00:00:00.000Z' });
-    expect(piece(m, LIGHT).newCount).toBe(0);
-    m = DashInboxModel.build(CID, { seen: '2026-11-01T00:00:00.000Z' });
-    expect(piece(m, LIGHT).newCount).toBe(6);
+    // The sample's dates follow today's, so the kept times are taken from the work itself.
+    const light = () => DashInboxModel.build(CID, { seen: null }).pieces.find(p => p.aid === LIGHT);
+    const sends = getCourseSubmissions(CID)
+      .submissions.filter(s => s.assessment_id === LIGHT && s.sent_by === 'student')
+      .map(s => Date.parse(s.sent_at))
+      .sort((x, y) => x - y);
+    expect(sends.length).toBe(light().fromStudents);
+    const iso = t => new Date(t).toISOString();
+    const newCount = seen => DashInboxModel.build(CID, { seen }).pieces.find(p => p.aid === LIGHT).newCount;
+    const newest = sends[sends.length - 1];
+    const oldest = sends[0];
+    // Just before the newest send: only it is new. At it, or after: none (the kept time is an instant).
+    expect(newCount(iso(newest - 1))).toBe(1);
+    expect(newCount(iso(newest))).toBe(0);
+    expect(newCount(iso(newest + 86400000))).toBe(0);
+    // Before the oldest: all of them.
+    expect(newCount(iso(oldest - 1))).toBe(sends.length);
   });
 
   it('never counts work the teacher added as new: it is "You Added"', () => {
@@ -262,6 +272,18 @@ describe('built classes', { timeout: 120000 }, () => {
     expect(DashInboxModel.build(CID, { seen: '2026-11-13T00:00:00Z' }).pieces[0].newCount).toBe(0);
     // Never looked: every student's own send is new; the teacher's still is not.
     expect(DashInboxModel.build(CID, { seen: null }).pieces[0].newCount).toBe(2);
+  });
+
+  it('compares instants, whatever offset the kept time is written in', () => {
+    const aid = AIDS[0];
+    seed([aid], [sub(1, aid, IDS[0], { sent_by: 'student', sent_at: '2026-11-12T10:00:00Z' })]);
+    const at = seen => DashInboxModel.build(CID, { seen }).pieces[0].newCount;
+    // 10:00 UTC is 02:00 in Vancouver and 23:00 in Auckland.
+    expect(at('2026-11-12T02:00:00-08:00')).toBe(0);
+    expect(at('2026-11-12T01:59:59-08:00')).toBe(1);
+    expect(at('2026-11-12T23:00:00+13:00')).toBe(0);
+    expect(at('2026-11-12T22:59:59+13:00')).toBe(1);
+    expect(at('2026-11-12T10:00:00.001Z')).toBe(0);
   });
 
   it('orders what came in oldest first, whatever the class list says', () => {
