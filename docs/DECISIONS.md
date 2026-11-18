@@ -818,6 +818,10 @@ Context: a teacher with two sections of a course (English 9 in blocks A and B) w
 8. **The form's Classes row** (2026-10-18 follow-up) sits under the title as chips: this class fixed, the other sections of the course as toggles, other classes behind "More classes". A new assessment starts with the classes ticked last time in that class (remembered per class on this device); an edit starts with none. Dates are "Same for every class" unless "Set per class" is chosen.
 9. **Linked copies are visible where the teacher works:** an "Also in …" chip on the assessment card opens that copy in its class; a section toggle beside the course picker switches between sections of the same course; the delete confirmation says a copy stays elsewhere; the "Update the other classes too?" dialog lists exactly what will change in each class.
 
+## Assignments: Grade and Bulk Edit (2026-11-18)
+
+Colin, on the toolbar's Cards | List switch: "List is confusing- this should be Grade and Bulk Edit." The switch now reads **Grade | Bulk Edit**: the cards are where work is graded, the list where settings are changed for many pieces at once. Only the words change; the views, what each holds and what is remembered are as before.
+
 ## Add From Another Class, the dialog (2026-11-17)
 
 Colin, on a screenshot of the dialog: "add from another class looks janky- redesign this so it's cleaner and more intuitive." It was a class drop-down over one long run of ticks, each a title with a raw date and category after it ("2026-11-04 · Projects & Papers"), no way to find a piece, and the buttons under the whole list. He was away and wanted it released by morning, so these are the council's calls (Krug and Nielsen on screens, per "Student page build rulings (2026-11-10)"), not his. He can reverse any of them. `teacher/add-from-class.js`; what a copy holds is unchanged (`planCopy`, `buildCopy` and `addFrom` in `teacher/assessment-copy.js`).
