@@ -87,16 +87,17 @@
 -- Every function that writes enrollment names its columns (restore, Teams
 -- and roster import, create_student_and_enroll, update_enrollment,
 -- withdraw, reenrol, relink, reorder): a restored or imported student starts
--- with both null. Withdraw and re-enrol keep the options. get_class_bundle
--- names the columns it sends, so the bundle is unchanged. Two teacher
--- functions send the whole enrollment row (get_student_profile,
--- list_course_student_profiles, both run as the teacher under row security)
--- and so also carry the two values to their own teacher. No student_submit
--- function sends an enrollment row. An option change is an update of
--- enrollment, so the trigger course_sync_cursor_enrollment_gradebook moves
--- the class's sync cursor (gradebook): the teacher's other device sees the
--- class changed and reloads; the options themselves come from
--- list_student_page_options, which the app reads on its own.
+-- with both null. Withdraw and re-enrol keep the options. Three teacher
+-- functions send the whole enrollment row and so also carry the two values
+-- to the class's own teacher: get_class_bundle (each profiles[].enrollment;
+-- its roster names its columns and is unchanged), get_student_profile and
+-- list_course_student_profiles (both run as the teacher under row security).
+-- No student_submit function sends or copies an enrollment row. An option
+-- change is an update of enrollment, so the trigger
+-- course_sync_cursor_enrollment_gradebook moves the class's sync cursor
+-- (gradebook): the teacher's other device sees the class changed and reloads
+-- its bundle, which carries the values; the app reads the options from
+-- list_student_page_options on its own.
 --
 -- ── The checks it makes first ──────────────────────────────────────────────
 -- It stops with nothing changed unless the four patched functions are the
