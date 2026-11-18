@@ -23,17 +23,21 @@
 -- stored for either (a reason would hold sensitive notes).
 -- public.set_student_page_options(p_course_id, p_enrollment_ids,
 --   p_show_overall_grade, p_paused, p_idempotency_key) returns
---   { ok: true, options: [ { enrollment_id, show_overall_grade, paused_at } ] }
---   for the students given, in class-list order. p_show_overall_grade:
---   'class' (null), 'show' (true), 'hide' (false), or null for no change.
---   p_paused: true pauses (page_paused_at stays when already set), false
---   opens, null no change. Refused with nothing changed (an error, as
---   set_course_feedback_options does): signed out (PT401); a class the
---   caller does not own, in the trash or gone (P0002); an id that is not a
---   student of that class who is not withdrawn, null included (P0002); no
---   ids, more than 500, both changes null, an unknown word (22023). The same
---   key again answers what the first call answered and writes nothing.
--- public.list_student_page_options(p_course_id) returns the same shape for
+--   { ok: true, options: [ { enrollment_id, show_overall_grade, paused_at } ],
+--   skipped: [ enrollment_id ] }. p_show_overall_grade: 'class' (null),
+--   'show' (true), 'hide' (false), or null for no change. p_paused: true
+--   pauses (page_paused_at stays when already set), false opens, null no
+--   change. options: the students of the class who are not withdrawn, in
+--   class-list order. skipped: every other id given (withdrawn, gone,
+--   another class's or another teacher's), once each in the order given;
+--   nothing changes for it and nothing more is said about it, so one stale
+--   id in a bulk change does not drop the rest. Refused with nothing changed
+--   (an error, as set_course_feedback_options does): signed out (PT401); a
+--   class the caller does not own, in the trash or gone, or no id left once
+--   the skipped are taken out (P0002); no ids, a null id, more than 500,
+--   both changes null, an unknown word (22023). The same key again answers
+--   what the first call answered and writes nothing.
+-- public.list_student_page_options(p_course_id) returns { ok, options } for
 --   every student of the class who is not withdrawn and has either option
 --   set. Owner only, as above.
 -- In both replies show_overall_grade is the word, 'class', 'show' or 'hide',
@@ -59,21 +63,24 @@
 --     value, coalesce(enrollment.show_overall_grade, course.show_my_learning),
 --     so every read below it (page: the pieces' category_id and the whole
 --     My Learning block; feedback: the key it sends) is this student's. The
---     key sent stays show_my_learning. Hidden means the overall grade's
---     inputs never leave the database for that student; each piece's result
---     and feedback still go, as with the class switch off.
+--     key sent stays show_my_learning. Hide sends exactly what the class
+--     switch off sends: the overall grade is not sent (no My Learning
+--     block, no piece's category_id); each piece's result, weight and
+--     category_percent still go, as they do today with the class switch off.
 -- No other function reads show_my_learning for a student (live, Nov 17:
 -- only page and feedback in student_submit; list_course_feedback and
--- set_course_feedback_options are the teacher's). Printed questionnaire
--- slips (open, check, submit, done) never asked about the student page and
--- still do not, as for a class with its page off.
+-- set_course_feedback_options are the teacher's). What a paused student can
+-- still reach, as for a class whose page is off: a questionnaire slip
+-- already printed (open, verify, submit) and a phone report's single-use
+-- code (open, check); neither asks about the student page. Live on Nov 17:
+-- 1 live slip, 0 live report codes.
 -- md5 of pg_get_functiondef on PostgreSQL 17 (function, live, as this file
 -- leaves it):
 --   student_submit._card_refusal(uuid)        cb88af0a6bf62c22ff6c636b291b1a25  4b982e451dbd5c9c68916c99d29d2d37
 --   student_submit._session_classes(uuid)     35e766379278258651709e73b9f05940  92eb84de662304124deb198baa75111e
 --   student_submit.page(text,uuid,text)       b2781abd6d579e3dc72b3f5f801bb917  9e16e8aaa8f1379beca4f64d4111fa1d
 --   student_submit.feedback(text,uuid,text)   e093fd549255e5f938491066a5e2ea1c  73b78adc4b6661bc99ca0eaebf2e81bb
---   public.set_student_page_options(uuid,uuid[],text,boolean,uuid) (new)  7df8e6d622e1bf944e41cb703d361471
+--   public.set_student_page_options(uuid,uuid[],text,boolean,uuid) (new)  1578d29d0af1a5cf25818878d811e5c1
 --   public.list_student_page_options(uuid) (new)                          6913c1c295727391000044c2f7098b88
 -- Relied on, unchanged (function, live):
 --   public.fv_owns_course(uuid)                       e3afeca06043a6e907e6f4ae777c85da
@@ -87,11 +94,12 @@
 -- Every function that writes enrollment names its columns (restore, Teams
 -- and roster import, create_student_and_enroll, update_enrollment,
 -- withdraw, reenrol, relink, reorder): a restored or imported student starts
--- with both null. Withdraw and re-enrol keep the options. Three teacher
+-- with both null. Withdraw and re-enrol keep the options. Four teacher
 -- functions send the whole enrollment row and so also carry the two values
 -- to the class's own teacher: get_class_bundle (each profiles[].enrollment;
--- its roster names its columns and is unchanged), get_student_profile and
--- list_course_student_profiles (both run as the teacher under row security).
+-- its roster names its columns and is unchanged), get_student_profile,
+-- list_course_student_profiles and get_term_rating (the last three run as
+-- the teacher under row security).
 -- No student_submit function sends or copies an enrollment row. An option
 -- change is an update of enrollment, so the trigger
 -- course_sync_cursor_enrollment_gradebook moves the class's sync cursor
@@ -153,7 +161,7 @@ begin
         _done := _done + (_md5 = _f.now and _f.now <> _f.was)::int;
     end loop;
     for _f in select * from (values
-        ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', 'set_student_page_options', '7df8e6d622e1bf944e41cb703d361471'),
+        ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', 'set_student_page_options', '1578d29d0af1a5cf25818878d811e5c1'),
         ('public.list_student_page_options(uuid)', 'list_student_page_options', '6913c1c295727391000044c2f7098b88')
     ) as v(fn, name, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
@@ -263,9 +271,10 @@ create or replace function public.set_student_page_options(p_course_id uuid, p_e
  set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _cached jsonb;
-    _ids    uuid[];
-    _out    jsonb;
+    _cached  jsonb;
+    _ids     uuid[];
+    _skipped jsonb;
+    _out     jsonb;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_course(p_course_id) then
@@ -285,13 +294,19 @@ begin
     if cardinality(p_enrollment_ids) > 500 then
         raise exception 'at most 500 students at a time' using errcode = '22023';
     end if;
-    _ids := array(select distinct x from unnest(p_enrollment_ids) x);
-    -- Every id a student of this class who is not withdrawn, or nothing changes.
-    if exists (select 1 from unnest(_ids) x
-                where x is null
-                   or not exists (select 1 from enrollment e
-                                   where e.id = x and e.course_id = p_course_id and e.withdrawn_at is null)) then
-        raise exception 'student not found in this class' using errcode = 'P0002';
+    if array_position(p_enrollment_ids, null) is not null then
+        raise exception 'a student id is missing' using errcode = '22023';
+    end if;
+    -- The students of this class who are not withdrawn. Any other id (withdrawn, gone, another class's or
+    -- another teacher's) is skipped: nothing changes for it, and it comes back in skipped as it was sent,
+    -- with nothing said about why.
+    _ids := array(select e.id from enrollment e
+                   where e.id = any (p_enrollment_ids) and e.course_id = p_course_id and e.withdrawn_at is null);
+    _skipped := coalesce((select jsonb_agg(x.id order by x.n)
+                            from (select u.id, min(u.n) as n from unnest(p_enrollment_ids) with ordinality u(id, n)
+                                   where u.id <> all (_ids) group by u.id) x), '[]'::jsonb);
+    if cardinality(_ids) = 0 then
+        raise exception 'no student of this class given' using errcode = 'P0002';
     end if;
     -- Only the rows that change are written (a pause keeps the time it began).
     update enrollment e
@@ -300,7 +315,7 @@ begin
            page_paused_at = case when p_paused then coalesce(e.page_paused_at, now())
                                  when not p_paused then null else e.page_paused_at end,
            updated_at = now()
-     where e.id = any (_ids) and e.course_id = p_course_id
+     where e.id = any (_ids) and e.course_id = p_course_id and e.withdrawn_at is null
        and (e.show_overall_grade is distinct from case p_show_overall_grade when 'class' then null when 'show' then true
                                                                             when 'hide' then false else e.show_overall_grade end
             or e.page_paused_at is distinct from case when p_paused then coalesce(e.page_paused_at, now())
@@ -310,7 +325,8 @@ begin
                    'enrollment_id', e.id,
                    'show_overall_grade', case e.show_overall_grade when true then 'show' when false then 'hide' else 'class' end,
                    'paused_at', e.page_paused_at) order by e.roster_position, e.id)
-          from enrollment e where e.id = any (_ids)), '[]'::jsonb));
+          from enrollment e where e.id = any (_ids)), '[]'::jsonb),
+        'skipped', _skipped);
     perform fv_idem_store(p_idempotency_key, 'set_student_page_options', _out);
     return _out;
 end;
@@ -349,7 +365,7 @@ declare
     _f record;
 begin
     for _f in select * from (values
-        ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', '7df8e6d622e1bf944e41cb703d361471'),
+        ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', '1578d29d0af1a5cf25818878d811e5c1'),
         ('public.list_student_page_options(uuid)', '6913c1c295727391000044c2f7098b88')
     ) as v(fn, now) loop
         if md5(pg_get_functiondef(to_regprocedure(_f.fn))) is distinct from _f.now then

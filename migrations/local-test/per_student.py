@@ -19,11 +19,12 @@ here. Never against gradebook-prod: a throwaway PostgreSQL 17 only. It uses the 
            page that student gets with the class switch off. Show overrides a class that is off; class follows
            the class either way; each piece's result still goes.
   rpc      set_student_page_options and list_student_page_options: what each answers; every refusal (signed
-           out, another teacher's class, a class in the trash, another class's or teacher's student, a
-           withdrawn student, a null id, no ids, 501 ids, both changes null, an unknown word) changes no row;
-           duplicates; a key sent twice answers the first reply and writes nothing; only rows that change are
-           written, and a change moves the class's sync cursor while a no-op does not; a visitor, public and
-           service_role cannot run them.
+           out, another teacher's class, a class in the trash, ids all skipped, a null id, no ids, 501 ids, both
+           changes null, an unknown word) changes no row; duplicates; an id that is not an active student of the
+           class (another teacher's, another class's, withdrawn, in the trash, never existed) is skipped, changes
+           nothing and gets the same reply whatever it is; a key sent twice answers the first reply and writes
+           nothing; only rows that change are written, and a change moves the class's sync cursor while a no-op
+           does not; a visitor, public and service_role cannot run them.
   leak     No student route's answer names the columns; no student_submit function but the four patched reads
            them; the class bundle is the same with options set; withdraw, re-enrol, update_enrollment keep
            working; the two teacher functions that send the whole row (profiles) are the teacher's only.
@@ -34,7 +35,8 @@ here. Never against gradebook-prod: a throwaway PostgreSQL 17 only. It uses the 
            and public) in place, the grants still come out exact.
   apply    The guards stop with the catalog unchanged; the file changes only what its header says, no row; the
            header's md5s; pre-check and post-check; a second run; the lock timeout; the file's size.
-  undo     PART 1 alone puts the four functions back (students see what they saw before) and keeps the
+  undo     (also: the full removal's lock cannot deadlock a transaction that read enrollment and then writes it;
+           the weaker lock it replaced is shown to.) PART 1 alone puts the four functions back (students see what they saw before) and keeps the
            choices; the full undo stops while a choice is set; once cleared, it leaves the catalog as before
            but two dropped-column slots, and every row; a changed function stops it; a second run; without
            the file it changes nothing; the file applies again.
@@ -277,7 +279,7 @@ def scen_rpc():
         r = setopt(w, [w.e2, w.e1, w.e1], grade='hide')
         ok('rpc: hide two (one id twice): both in class-list order, each once',
            [o['enrollment_id'] for o in r['options']] == [w.e1, w.e2] and all(o['show_overall_grade'] == 'hide' and o['paused_at'] is None for o in r['options']), r)
-        ok('rpc: the reply is { ok, options } with three keys an option', sorted(r) == ['ok', 'options']
+        ok('rpc: the reply is { ok, options, skipped: [] } with three keys an option', sorted(r) == ['ok', 'options', 'skipped'] and r['skipped'] == []
            and all(sorted(o) == ['enrollment_id', 'paused_at', 'show_overall_grade'] for o in r['options']))
         ok('rpc: the columns hold false', d.all('select show_overall_grade from enrollment where id = any (:i::uuid[]) order by id', i=[w.e1, w.e2]) == [[False], [False]])
         r = setopt(w, [w.e1], grade='show', paused=True)
@@ -299,20 +301,47 @@ def scen_rpc():
         refuses('list, signed out', lambda: T(d, 'list_student_page_options(:c)', '', c=w.c), 'PT401')
         refuses("another teacher's class", lambda: setopt(w, [w.e1], 'hide', uid=B), 'P0002')
         refuses("list, another teacher's class", lambda: listopt(w, uid=B), 'P0002')
-        refuses("another teacher's student in my class's call", lambda: setopt(w, [w.e1, w.eb], 'hide'), 'P0002')
-        refuses('a student of my other class', lambda: setopt(w, [w.e_other], 'hide'), 'P0002')
-        refuses('a withdrawn student', lambda: setopt(w, [w.e2, w.e_gone], paused=True), 'P0002')
+        refuses("only another teacher's student", lambda: setopt(w, [w.eb], 'hide'), 'P0002')
+        refuses('only a student of my other class', lambda: setopt(w, [w.e_other], 'hide'), 'P0002')
+        refuses('only a withdrawn student', lambda: setopt(w, [w.e_gone], paused=True), 'P0002')
+        refuses('only ids that do not exist', lambda: setopt(w, [nid(), nid()], 'hide'), 'P0002')
+        refuses('only foreign ids of every kind', lambda: setopt(w, [w.eb, w.e_other, w.e_gone, w.e_trash, nid()], 'hide'), 'P0002')
         refuses('a class in the trash', lambda: setopt(w, [w.e_trash], 'hide', c=w.trash), 'P0002')
         refuses('list, a class in the trash', lambda: listopt(w, c=w.trash), 'P0002')
         refuses('a class that does not exist', lambda: setopt(w, [w.e1], 'hide', c=nid()), 'P0002')
-        refuses('an id that does not exist', lambda: setopt(w, [w.e2, nid()], 'hide'), 'P0002')
-        refuses('a null id', lambda: T(d, "set_student_page_options(:c, array[:e::uuid, null], 'hide', null, null)", c=w.c, e=w.e2), 'P0002')
+        refuses('a null id', lambda: T(d, "set_student_page_options(:c, array[:e::uuid, null], 'hide', null, null)", c=w.c, e=w.e2), '22023')
         refuses('no ids', lambda: setopt(w, [], 'hide'), '22023')
         refuses('null ids', lambda: T(d, "set_student_page_options(:c, null, 'hide', null, null)", c=w.c), '22023')
         refuses('501 ids', lambda: setopt(w, [w.e2] * 501, 'hide'), '22023')
         refuses('both changes null', lambda: setopt(w, [w.e2]), '22023')
         refuses("an unknown word ('Hide')", lambda: setopt(w, [w.e2], 'Hide'), '22023')
         refuses("an unknown word ('')", lambda: setopt(w, [w.e2], ''), '22023')
+        # skipped: a foreign id changes nothing and comes back as sent
+        setopt(w, [w.e1, w.e2, w.e3], 'class', paused=False)
+        ghost = nid()
+        rows0 = {r[0]: r for r in enr_rows(d)}
+        r = setopt(w, [w.eb, w.e2, w.e_other, w.e_gone, w.e2, ghost, w.e_trash, w.eb], 'hide', paused=True)
+        rows1 = {r[0]: r for r in enr_rows(d)}
+        ok('rpc: a call with foreign ids changes the one student of the class (Dev)', [o['enrollment_id'] for o in r['options']] == [w.e2]
+           and r['options'][0]['show_overall_grade'] == 'hide' and r['options'][0]['paused_at'] is not None, r)
+        ok('rpc: ... and skips every other id once each, in the order sent', r['skipped'] == [w.eb, w.e_other, w.e_gone, ghost, w.e_trash], r['skipped'])
+        ok("rpc: ... no foreign student's row changes (another teacher's, my other class's, withdrawn, in the trash)",
+           all(rows0[e] == rows1[e] for e in (w.eb, w.e_other, w.e_gone, w.e_trash)) and ghost not in rows1)
+        ok('rpc: ... the skipped list carries ids only, nothing about them', all(isinstance(x, str) for x in r['skipped']))
+        kinds = []
+        for x in (w.eb, w.e_other, w.e_gone, w.e_trash, nid()):
+            q = setopt(w, [w.e3, x], 'class')
+            kinds.append(json.dumps(dict(q, skipped=['X' for _ in q['skipped']]), sort_keys=True))
+        ok("rpc: another teacher's student, my other class's, a withdrawn one, one in the trash and one that never existed get the same reply",
+           len(set(kinds)) == 1, kinds[:2])
+        k3 = nid()
+        r1 = setopt(w, [w.e3, w.eb], 'hide', key=k3)
+        setopt(w, [w.e3], 'class')
+        rows0 = enr_rows(d)
+        r2 = setopt(w, [w.e3, w.eb], 'hide', key=k3)
+        ok('rpc: a key sent twice with a skipped id answers the first reply, skipped included, and writes nothing',
+           r1 == r2 and r1['skipped'] == [w.eb] and enr_rows(d) == rows0, (r1, r2))
+        setopt(w, [w.e1, w.e2, w.e3], 'class', paused=False)
         ok('rpc: 500 ids (one student 500 times) is accepted', setopt(w, [w.e2] * 500, 'hide')['options'][0]['enrollment_id'] == w.e2)
         # idempotency
         k = nid()
@@ -326,7 +355,7 @@ def scen_rpc():
         ok('rpc: a new key writes', r3['options'][0]['paused_at'] is not None)
         k2 = nid()
         ok('rpc: a refused call stores no answer under its key (the key works once fixed)',
-           refused(d, lambda: setopt(w, [w.e3, nid()], 'hide', key=k2)) is not None and setopt(w, [w.e3], 'hide', key=k2)['options'][0]['show_overall_grade'] == 'hide')
+           refused(d, lambda: setopt(w, [w.e3, None], 'hide', key=k2)) is not None and setopt(w, [w.e3], 'hide', key=k2)['options'][0]['show_overall_grade'] == 'hide')
         # writes only what changes; the sync cursor
         c0 = cursor(d, w.c); u0 = d.one('select updated_at from enrollment where id = :e', e=w.e3)
         setopt(w, [w.e3], 'hide', paused=True)
@@ -575,6 +604,32 @@ def scen_undo():
         cat3 = catalog(d.c)
         ok('undo: a second run changes nothing', d.file(UNDO) == 'ok' and differences(cat3, catalog(d.c)) == ([], []))
         ok('undo: the file applies again afterwards', d.file(FILE) == 'ok' and has_file(d))
+        # the lock: a transaction that read enrollment and then writes it while the undo waits
+        weak = text_of(UNDO).replace('in access exclusive mode', 'in share row exclusive mode')
+        assert weak != text_of(UNDO)
+        def reads_then_writes(undo_text):
+            from assessment_drafts import in_thread
+            x = Side(d); mon = connect(d.name)
+            x.c.run('begin'); x.c.run('select count(*) from enrollment')
+            t, box = in_thread(lambda: d.statements(split(undo_text)))
+            end = time.time() + 10
+            while time.time() < end and not mon.run("select count(*) from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'")[0][0]:
+                time.sleep(0.05)
+            x_err = None
+            try:
+                x.c.run('update enrollment set is_flagged = is_flagged where id = :e', e=w.e1); x.c.run('commit')
+            except Exception as e:
+                x_err = message(e); x.c.run('rollback')
+            t.join(30); x.close(); mon.close()
+            return x_err, box.get('r'), box.get('e')
+        x_err, r, e = reads_then_writes(weak)
+        ok('undo: (the deadlock, reproduced) with the weaker lock first, a transaction that read enrollment and then writes it, or the undo, dies with deadlock detected',
+           'deadlock detected' in ' '.join(str(v) for v in (x_err, r, e)), (x_err, r, e))
+        ok('undo: (setup) the file is applied again', d.file(FILE) == 'ok' and has_file(d))
+        x_err, r, e = reads_then_writes(text_of(UNDO))
+        ok('undo: with the access exclusive lock, the same transaction writes and commits, and the undo then runs: no deadlock',
+           x_err is None and r == 'ok' and e is None and not has_file(d), (x_err, r, e))
+        ok('undo: (the file applies again)', d.file(FILE) == 'ok')
     finally:
         d.close()
 

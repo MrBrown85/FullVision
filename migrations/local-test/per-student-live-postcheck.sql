@@ -5,7 +5,7 @@ with want(sig, after_md5) as (values
     ('student_submit._session_classes(uuid)', '92eb84de662304124deb198baa75111e'),
     ('student_submit.page(text,uuid,text)', '9e16e8aaa8f1379beca4f64d4111fa1d'),
     ('student_submit.feedback(text,uuid,text)', '73b78adc4b6661bc99ca0eaebf2e81bb'),
-    ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', '7df8e6d622e1bf944e41cb703d361471'),
+    ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', '1578d29d0af1a5cf25818878d811e5c1'),
     ('public.list_student_page_options(uuid)', '6913c1c295727391000044c2f7098b88'),
     ('public.fv_owns_course(uuid)', 'e3afeca06043a6e907e6f4ae777c85da'),
     ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f'),

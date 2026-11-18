@@ -34,7 +34,7 @@
 --   student_submit._session_classes(uuid)     35e766379278258651709e73b9f05940  92eb84de662304124deb198baa75111e
 --   student_submit.page(text,uuid,text)       b2781abd6d579e3dc72b3f5f801bb917  9e16e8aaa8f1379beca4f64d4111fa1d
 --   student_submit.feedback(text,uuid,text)   e093fd549255e5f938491066a5e2ea1c  73b78adc4b6661bc99ca0eaebf2e81bb
---   public.set_student_page_options(uuid,uuid[],text,boolean,uuid)   7df8e6d622e1bf944e41cb703d361471
+--   public.set_student_page_options(uuid,uuid[],text,boolean,uuid)   1578d29d0af1a5cf25818878d811e5c1
 --   public.list_student_page_options(uuid)                           6913c1c295727391000044c2f7098b88
 
 -- PART 1 begins
@@ -144,7 +144,7 @@ begin
         end if;
     end loop;
     for _f in select * from (values
-        ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', '7df8e6d622e1bf944e41cb703d361471'),
+        ('public.set_student_page_options(uuid,uuid[],text,boolean,uuid)', '1578d29d0af1a5cf25818878d811e5c1'),
         ('public.list_student_page_options(uuid)', '6913c1c295727391000044c2f7098b88')
     ) as v(fn, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
@@ -154,8 +154,10 @@ begin
     end loop;
     if exists (select 1 from pg_attribute where attrelid = 'public.enrollment'::regclass and not attisdropped
                 and attname in ('show_overall_grade', 'page_paused_at')) then
-        -- the table's lock first, so no option is set between the count and the drop
-        lock table public.enrollment in share row exclusive mode;
+        -- the lock the drop needs, taken first, so no option is set between the count and the drop and
+        -- nothing is upgraded later (a weaker lock here, then the drop's, can deadlock a transaction that
+        -- read enrollment and then writes it)
+        lock table public.enrollment in access exclusive mode;
         execute 'select count(*) from public.enrollment where show_overall_grade is not null or page_paused_at is not null' into _set;
         if _set > 0 then
             raise exception '% student(s) have an option set; dropping the columns would delete those choices. Nothing was changed (PART 1 stays done).', _set;
