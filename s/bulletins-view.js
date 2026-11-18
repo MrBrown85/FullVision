@@ -32,6 +32,8 @@
 /** @type {any} */ (window).StudentBulletinsView = (function () {
   'use strict';
 
+  /** @type {any} */
+  var w = window;
   var SEP = ' · ';
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -154,6 +156,7 @@
     return String(id).replace(/[^A-Za-z0-9_-]/g, '');
   }
   function fileIn(model, fid) {
+    /** @type {any} */
     var out = null;
     listOf(model).forEach(function (b) {
       (b.files || []).forEach(function (f) {
@@ -178,9 +181,9 @@
       return x && x.id === b.assessment_id;
     })[0];
     if (!p) return '';
-    var band =
-      typeof StudentPageView !== 'undefined' && StudentPageView.bandHtml ? StudentPageView.bandHtml(p, view) : '';
-    var opens = !!(StudentPageView.segmentOf && StudentPageView.segmentOf(p, view)) || p.kind === 'sent';
+    var band = w.StudentPageView && w.StudentPageView.bandHtml ? w.StudentPageView.bandHtml(p, view) : '';
+    var opens =
+      !!(w.StudentPageView && w.StudentPageView.segmentOf && w.StudentPageView.segmentOf(p, view)) || p.kind === 'sent';
     var inner = band + '<span class="sp-bulletin-piece-title">' + esc(p.title) + '</span>';
     return opens
       ? '<button type="button" class="sp-bulletin-piece" data-act="pick" data-piece="' +
@@ -419,13 +422,14 @@
     var feed = list
       .map(function (b) {
         var out = '';
-        var day = dayHeading(b.posted_at, now);
-        if (day && day !== lastDay) out += '<h2 class="sp-bulletin-day">' + esc(day) + '</h2>';
-        lastDay = day;
+        // The New line first, so the day under it shows when the tab opens there.
         if (b.fresh && !newDrawn) {
           newDrawn = true;
           out += '<p class="sp-bulletin-new" id="sp-bulletin-new"><span>New</span></p>';
         }
+        var day = dayHeading(b.posted_at, now);
+        if (day && day !== lastDay) out += '<h2 class="sp-bulletin-day">' + esc(day) + '</h2>';
+        lastDay = day;
         return out + bubbleHtml(view, model, b);
       })
       .join('');

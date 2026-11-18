@@ -488,10 +488,9 @@
     }
 
     function onKey(e) {
-      if (e.key === 'Escape' && ask) {
+      if (e.key === 'Escape' && layer.querySelector('.hv-ask')) {
         e.preventDefault();
-        ask.parentNode.removeChild(ask);
-        ask = null;
+        if (w.WebsiteAsk) w.WebsiteAsk.close();
       } else if (e.key === 'Escape') {
         e.preventDefault();
         finish();

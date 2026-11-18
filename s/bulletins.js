@@ -8,7 +8,7 @@
 
    The routes (supabase/functions/student-submit/bulletin-routes.ts; the
    contract is migrations/local-test/bulletins-contract.md, "For B1b"), each
-   through StudentPage.askClass, which adds the device's session:
+   through SP.askClass, which adds the device's session:
      bulletins       { ok, bulletins: [...], new: [ { enrollment_id, count } ] }
      bulletin-seen   { bulletin_ids } -> { ok, seen }
      bulletin-react  { bulletin_id, word: got_it | done | question | null } -> { ok, reaction }
@@ -24,13 +24,13 @@
    seconds old (Reflect's rule); when the student comes back to this browser
    tab while Bulletins shows; and every 30 seconds while Bulletins is the tab
    showing in a browser tab someone is looking at. Never in Demo Mode, whose
-   answers come from this device (StudentData.demoBulletins, read only, or
+   answers come from this device (w.StudentData.demoBulletins, read only, or
    the board's samples).
 
    Until the server has the route, the page offers nothing (plan rule 7): an
    answer that is not a list (an unknown route's bad_request, a 404, a 500,
    no answer) leaves the page with no Bulletins tab. A refusal that says the
-   session or the class is over is the page's own (StudentPage.sessionRefused).
+   session or the class is over is the page's own (SP.sessionRefused).
 
    Seen is s/seen-watch.js's rule, the one returned work uses: a bulletin the
    server said this student has not seen (seen_at null), on screen in a tab
@@ -44,7 +44,10 @@
 (function () {
   'use strict';
 
-  if (typeof StudentPage === 'undefined' || !StudentPage.addScreens) return;
+  /** @type {any} */
+  var w = window;
+  var SP = w.StudentPage;
+  if (!SP || !SP.addScreens) return;
 
   var FRESH_MS = 20000; // the tab pressed: asked again when what is here is older
   var EVERY_MS = 30000; // while the tab is showing
@@ -56,12 +59,17 @@
   var WORD_IDS = { got_it: 1, done: 1, question: 1 };
   var UUIDISH = /^[A-Za-z0-9-]{1,64}$/;
 
+  /** @type {any} */
   var S = null; // the page's state (student.js)
+  /** @type {any} */
   var B = null; // what is held for the class open; see blank()
   var asked = 0; // each `bulletins` ask, so an older answer never replaces a newer one
   var ticking = 0;
+  /** @type {any} */
   var answerFn = null; // tests answer the routes themselves
+  /** @type {any} */
   var watcher = null; // StudentSeenWatch's, on the Bulletins tab
+  /** @type {{ seen: Record<string, string>, reactions: Record<string, any> }} */
   var demoMemory = { seen: {}, reactions: {} }; // Demo Mode's Seen and reactions: this tab's memory only
 
   function on() {
@@ -117,7 +125,7 @@
     watcher = null;
     letGo(B);
     B = null;
-    if (typeof WebsiteAsk !== 'undefined') WebsiteAsk.close();
+    if (w.WebsiteAsk) w.WebsiteAsk.close();
   }
 
   /* ── Demo Mode: answered on this device ────────────────────── */
@@ -164,7 +172,7 @@
     return [
       sample(1, {
         kind: 'reminder',
-        body: 'Science Fair Proposal is due on Saturday. Bring the question you want to test.',
+        body: 'Your Science Fair Proposal is due soon. Bring the question you want to test.',
         pinned: true,
         pinned_until: isoDay(4),
         assessment_id: 'demo-fair',
@@ -211,12 +219,10 @@
   // The sample class's bulletins (the second sample class has none, so it opens on Assignments).
   function demoList(student) {
     if (student !== 'demo-cece') return [];
+    /** @type {any} */
     var kept = null;
     try {
-      kept =
-        typeof StudentData !== 'undefined' && StudentData.demoBulletins
-          ? StudentData.demoBulletins(localStorage)
-          : null;
+      kept = w.StudentData && w.StudentData.demoBulletins ? w.StudentData.demoBulletins(localStorage) : null;
     } catch (e) {
       kept = null;
     }
@@ -228,6 +234,7 @@
     });
   }
   function demoFile(student, fid) {
+    /** @type {any} */
     var f = null;
     demoList(student).forEach(function (b) {
       (b.files || []).forEach(function (x) {
@@ -263,7 +270,7 @@
     if (answerFn) return Promise.resolve(answerFn(route, body)).then(null, network);
     if (!S || S.demo)
       return Promise.resolve(S && S.demo ? demoAnswer(route, body, student) : { ok: false, error: 'signed_out' });
-    return Promise.resolve(StudentPage.askClass(route, body, student)).then(null, network);
+    return Promise.resolve(SP.askClass(route, body, student)).then(null, network);
   }
   function network() {
     return { ok: false, error: 'network' };
@@ -333,13 +340,8 @@
     if (!forThis(student)) return;
     if (!(res && res.ok === true && Array.isArray(res.bulletins))) {
       var e = errorOf(res);
-      if (
-        has(SESSION_OVER, e) &&
-        S.page &&
-        S.screen === 'assignments' &&
-        typeof StudentPage.sessionRefused === 'function'
-      ) {
-        StudentPage.sessionRefused({ ok: false, error: e });
+      if (has(SESSION_OVER, e) && S.page && S.screen === 'assignments' && typeof SP.sessionRefused === 'function') {
+        SP.sessionRefused({ ok: false, error: e });
         return;
       }
       // No list yet: the page offers nothing. A list already here stays as it was, quietly.
@@ -434,6 +436,7 @@
   function redraw() {
     if (!S || S.screen !== 'assignments' || S.sendAsk || S.settings || S.logout || typeof document === 'undefined')
       return;
+    /** @type {any} */
     var el = document.activeElement;
     var sel = '';
     if (el && el.getAttribute && el.getAttribute('data-act')) {
@@ -447,7 +450,8 @@
         })
         .join('');
     }
-    StudentPage.paint();
+    SP.paint();
+    /** @type {any} */
     var back = sel ? document.querySelector('#app ' + sel) : null;
     if (back && back.focus) back.focus({ preventScroll: true });
   }
@@ -497,11 +501,11 @@
   function watch() {
     if (watcher) watcher.stop();
     watcher = null;
-    if (!showing() || S.bulletinFile || typeof StudentSeenWatch === 'undefined') return;
+    if (!showing() || S.bulletinFile || !w.StudentSeenWatch) return;
     var state = S;
     var page = S.page;
     var held = B;
-    watcher = StudentSeenWatch.watch({
+    watcher = w.StudentSeenWatch.watch({
       attr: 'data-bulletin-unseen',
       max: MAX_SEEN,
       live: function () {
@@ -554,8 +558,8 @@
       if (B !== held) return;
       if (res && res.ok === true) return;
       var e = errorOf(res);
-      if (has(SESSION_OVER, e) && S && S.page && typeof StudentPage.sessionRefused === 'function') {
-        StudentPage.sessionRefused({ ok: false, error: e });
+      if (has(SESSION_OVER, e) && S && S.page && typeof SP.sessionRefused === 'function') {
+        SP.sessionRefused({ ok: false, error: e });
         return;
       }
       // A request the server could not read is not sent again; anything else is, later.
@@ -618,8 +622,8 @@
         return;
       }
       var e = errorOf(res);
-      if (has(SESSION_OVER, e) && S && S.page && typeof StudentPage.sessionRefused === 'function') {
-        StudentPage.sessionRefused({ ok: false, error: e });
+      if (has(SESSION_OVER, e) && S && S.page && typeof SP.sessionRefused === 'function') {
+        SP.sessionRefused({ ok: false, error: e });
         return;
       }
       // Reactions turned off, the bulletin gone, a word not taken: back to what the server holds.
@@ -637,6 +641,7 @@
   /* ── A file's pages ────────────────────────────────────────── */
 
   function fileOf(fid) {
+    /** @type {any} */
     var f = null;
     (B ? B.list : []).forEach(function (b) {
       (b.files || []).forEach(function (x) {
@@ -697,7 +702,7 @@
     if (!f || i < 0 || i >= f.page_count) return Promise.resolve('');
     if (S && S.demo) {
       var path = (demoFile(held.student, fid) || f).paths[i] || '';
-      return Promise.resolve(StudentBulletinsView.PAGE_URL.test(path) ? keep(held, fid, i, path) : '');
+      return Promise.resolve(w.StudentBulletinsView.PAGE_URL.test(path) ? keep(held, fid, i, path) : '');
     }
     return linksOf(fid, false)
       .then(function (urls) {
@@ -734,7 +739,7 @@
     var page = Number(S.bulletinPage) || 0;
     load(fid, page).then(function (url) {
       if (url && showing() && S.bulletinFile === fid && Number(S.bulletinPage) === page) {
-        StudentPage.paint('#sp-bulletin-viewer-title');
+        SP.paint('#sp-bulletin-viewer-title');
       }
     });
   }
@@ -745,17 +750,17 @@
      page, in the half of the screen away from the card that was tapped, so
      Open Website is never under the finger that opened the question. */
   function askLink(el) {
-    if (!showing() || typeof WebsiteAsk === 'undefined' || typeof StudentBulletinsView === 'undefined') return;
+    if (!showing() || !w.WebsiteAsk || !w.StudentBulletinsView) return;
     var id = (el && el.getAttribute('data-bulletin')) || '';
     var b = B.list.filter(function (x) {
       return x.id === id;
     })[0];
-    var l = b && b.link_url ? StudentBulletinsView.linkOf(b.link_url) : null;
+    var l = b && b.link_url ? w.StudentBulletinsView.linkOf(b.link_url) : null;
     if (!l) return;
     var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
     var mid = r ? r.top + r.height / 2 : 0;
     var h = typeof window.innerHeight === 'number' ? window.innerHeight : 0;
-    WebsiteAsk.open({
+    w.WebsiteAsk.open({
       host: document.body,
       url: l.href,
       cls: 'sp-bulletin-ask',
@@ -772,12 +777,12 @@
   /* s/app.js openPage: `bulletins` asked beside `page`, and the page's first
      draw waits for it one second at most after `page` has answered. Off,
      the page's own ask is handed back as it came. */
-  StudentPage.bulletinsWith = function (mine, pageAsked) {
+  SP.bulletinsWith = function (mine, pageAsked) {
     if (!on() || !mine || !mine.enrollment) return pageAsked;
     forget();
     B = blank(mine.enrollment);
     var got = read(mine.enrollment);
-    return StudentPage.whileCurrent(
+    return SP.whileCurrent(
       Promise.resolve(pageAsked).then(function (res) {
         return new Promise(function (done) {
           var t = setTimeout(function () {
@@ -799,17 +804,17 @@
      answer that comes after this never moves the tab: the student may
      already be touching the page. Coming back to an open class keeps the tab
      (app.js never asks again then). */
-  StudentPage.openingTab = function (student) {
+  SP.openingTab = function (student) {
     return on() && B && B.student === student && B.state === 'ok' && B.list.length ? 'bulletins' : 'assignments';
   };
 
   // s/app.js, once the class's page is drawn: Bulletins opens at its New line.
-  StudentPage.bulletinsPlace = function () {
+  SP.bulletinsPlace = function () {
     if (showing()) place();
   };
 
   // What s/bulletins-view.js draws from (s/assignments.js puts it on the view), or null: no tab.
-  StudentPage.bulletinsOf = function (state) {
+  SP.bulletinsOf = function (state) {
     if (!on() || !state || !state.page || !B || B.student !== state.page.student.id || B.state !== 'ok') return null;
     var drawn = B.drawn;
     return {
@@ -823,8 +828,8 @@
   };
 
   // "2 new" beside each class in Switch Class: the server's count, this class's as it stands here.
-  StudentPage.bulletinNews = function (state) {
-    if (!StudentPage.bulletinsOf(state)) return null;
+  SP.bulletinNews = function (state) {
+    if (!SP.bulletinsOf(state)) return null;
     var out = Object.assign({}, B.news);
     out[B.student] = B.list.filter(function (b) {
       return !b.seen;
@@ -859,7 +864,7 @@
     });
   }
 
-  StudentPage.addScreens({
+  SP.addScreens({
     file: 'bulletins',
     render: {},
     click: onClick,
@@ -875,7 +880,11 @@
       B.list.forEach(function (b) {
         B.drawn[b.id] = true;
       });
-      if (typeof StudentBulletinsView !== 'undefined') StudentBulletinsView.attach(root, source);
+      // The reminder's bar sticks just under the header, however tall the header is at this Text Size.
+      var head = root.querySelector('.sp-head');
+      var view = root.querySelector('.sp-view');
+      if (head && view && head.offsetHeight) view.style.setProperty('--sp-bulletin-under', head.offsetHeight + 'px');
+      if (w.StudentBulletinsView) w.StudentBulletinsView.attach(root, source);
       watch();
       fillViewer();
     },

@@ -86,6 +86,32 @@ describe('the three tabs', () => {
     expect(page.calls.length).toBe(asked);
   });
 
+  it('with the Bulletins switch on, four: Bulletins first (docs/plans/bulletins-plan.md B1d)', async () => {
+    const page = openStudentPage({ store: { 'fv-build-bulletins': '1' } });
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    const tabs = [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')];
+    expect(tabs.map(t => t.querySelector('.sp-tab-label').textContent)).toEqual([
+      'Bulletins',
+      'Assignments',
+      'My Learning',
+      'Reflect',
+    ]);
+    expect(tabs.map(t => t.getAttribute('data-tab'))).toEqual([
+      'bulletins',
+      'assignments',
+      'learning',
+      'questionnaires',
+    ]);
+    // The sample class has bulletins: it opens on them.
+    expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual(['page', null, null, null]);
+    expect(page.root().querySelector('.sp-tabs-top').innerHTML.replace('sp-tabs-top', '')).toBe(
+      page.root().querySelector('.sp-tabs-bottom').innerHTML.replace('sp-tabs-bottom', ''),
+    );
+  });
+
   it('a tab that is not one of the three opens nothing, not even the old Reports', async () => {
     const page = await demo();
     const tab = page.root().querySelector('[data-tab="questionnaires"]');

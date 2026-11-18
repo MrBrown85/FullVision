@@ -12,6 +12,24 @@
    colour changes in 150 ms; nothing fades in; nothing moves under Reduce
    Motion. */
 
+/* With Bulletins the bar has four tabs: each icon held at the top of its tab, so the
+   icons stay in one row when a label such as My Learning takes two lines (the
+   board's tray; WebKit wraps it at Larger on a narrow phone). The three-tab bar is
+   not touched. */
+.sp-view .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab {
+  justify-content: flex-start;
+  padding-top: 4px;
+}
+/* Safari's engine measures cqi before the Text Size's zoom, so at Large and
+   Larger the bar's own rule (s/page-view.css, 4cqi) sizes "Assignments" for a
+   wider bar than it has and the word spills out of its tab (320 px at Larger:
+   by 4 px). The screen's width over the zoom is the bar's width in both
+   engines; the smaller of the two is used. */
+html.sp-size-large .sp-view .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab-label,
+html.sp-size-larger .sp-view .sp-tabs-bottom:has(> .sp-tab:nth-child(4)) .sp-tab-label {
+  font-size: min(12px, calc(4cqi - 1.4px), calc(4vw / var(--sp-zoom) - 1.4px));
+}
+
 .sp-view .sp-bulletin-tab {
   display: flex;
   flex-direction: column;

@@ -124,7 +124,8 @@
     host.appendChild(box);
     if (o.backdrop) document.addEventListener('keydown', onKey, true);
     openNow = me;
-    (o.focus === 'no' ? no : go).focus();
+    var first = o.focus === 'no' ? no : go;
+    if (typeof first.focus === 'function') first.focus();
     return box;
   }
 
