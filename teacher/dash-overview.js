@@ -376,13 +376,12 @@ window.DashOverview = (function () {
        below  Needs Support: the students below Proficient (the Who Needs
               Help rule) on the most competencies, and where
        trend  Change: the class average month by month
-     A Letter class starts on Class Average, a Proficiency or Both class on
-     Level Mix; the pick is remembered per class on this device
+     Every class starts on Level Mix, whatever its grading style (Colin, Nov
+     18 2026); the pick is remembered per class on this device
      (page-dashboard.js). Every view has the same 16 px label row. The card
      is a page of the Competencies tile (dash-competencies.js): its rows
-     share the tile's height between a minimum and a maximum, roomier with
-     four rows or fewer (is-roomy), and past 12 rows the list scrolls inside
-     the card. A competency row (and a Needs Support column code) sets the
+     share the tile's height, roomier with four rows or fewer (is-roomy), and
+     past 12 rows the list scrolls inside the card. A competency row (and a Needs Support column code) sets the
      page's competency filter (data-action naComp; the same key again
      clears it) and, while pointed at, lights its chip on every student
      card; a Needs Support row opens the student.
@@ -390,9 +389,10 @@ window.DashOverview = (function () {
      opts: cid, allStudents, compView, naComp, helpRule, belowLists
      (DashInsights.belowLists under the rule, when the caller has them),
      todayStr (tests). */
+  // Level Mix first, as board D's menu has it (Colin, Nov 18 2026).
   var COMP_VIEWS = [
-    { key: 'avg', label: 'Class Average', hint: 'The class average on each competency' },
     { key: 'mix', label: 'Level Mix', hint: 'How many students are at each level' },
+    { key: 'avg', label: 'Class Average', hint: 'The class average on each competency' },
     // The hint names the Who Needs Help rule's level (_compViews).
     { key: 'below', label: 'Needs Support', hint: 'Students below {level} most often, and where' },
     { key: 'trend', label: 'Change', hint: 'The class average month by month' },
@@ -415,13 +415,15 @@ window.DashOverview = (function () {
     });
   }
 
-  /** The view a class's card shows: the saved one, else its grading style's. */
+  /** The view a class's card shows: the one the teacher picked, else Level
+   * Mix in every grading style (Colin, Nov 18 2026: "Yes, Level Mix"; DECISIONS,
+   * "The Dashboard's middle row" 7). */
   function compView(cid, saved) {
     var keys = COMP_VIEWS.map(function (v) {
       return v.key;
     });
     if (keys.indexOf(saved) >= 0) return saved;
-    return DashInsights.showsProficiency(cid) ? 'mix' : 'avg';
+    return 'mix';
   }
 
   function _monthName(ym) {

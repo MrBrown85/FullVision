@@ -184,9 +184,8 @@ window.DashCompetencies = (function () {
     return document.getElementById(id);
   }
 
-  /** The Curricular page's view: today's card's own (a saved pick, else the
-   * class's grading style's default: Level Mix, or Class Average in a Letter
-   * class).
+  /** The Curricular page's view: the teacher's saved pick, else Level Mix in
+   * every grading style (Colin, Nov 18 2026).
    * @param {any} opts
    * @returns {string} */
   function curricularView(opts) {

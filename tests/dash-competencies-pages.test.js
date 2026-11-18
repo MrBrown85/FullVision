@@ -200,12 +200,14 @@ describe('Level Mix, one row per competency', () => {
     expect(r[0].getAttribute('aria-haspopup')).toBe('dialog');
   });
 
-  it("opens on today's card's default for the class, and bands by the four levels in every style", () => {
-    // A Letter class with no saved view opens on Class Average, as the flag-off card does.
+  it('opens on Level Mix in every grading style, and bands by the four levels in every style', () => {
+    // A Letter class with no saved view opens on Level Mix too (Colin, Nov 18 2026).
     setClass('letter', THREE);
-    expect(DashOverview.compView(CID, null)).toBe('avg');
-    expect(rowsOf(tile({ compView: DashOverview.compView(CID, null) }), 'curricular')).toHaveLength(0);
-    // Picked, Level Mix bands by the four levels in a Letter class too.
+    expect(DashOverview.compView(CID, null)).toBe('mix');
+    expect(rowsOf(tile({ compView: DashOverview.compView(CID, null) }), 'curricular')).toHaveLength(3);
+    // A saved pick still wins.
+    expect(rowsOf(tile({ compView: DashOverview.compView(CID, 'avg') }), 'curricular')).toHaveLength(0);
+    // Level Mix bands by the four levels in a Letter class too.
     const letter = rowsOf(tile({ compView: 'mix' }), 'curricular');
     expect(numOf(letter[0])).toBe('3 of 4');
     expect(letter[0].getAttribute('aria-label')).toContain('Emerging 0, Developing 1, Proficient 1, Extending 2');

@@ -1277,9 +1277,10 @@ describe('dash-comp-views', () => {
   });
 
   describe('the default view', () => {
-    it('is Class Average in a Letter class and Level Mix in a Proficiency or Both class', () => {
+    // Colin, Nov 18 2026: "Yes, Level Mix", in every grading style.
+    it('is Level Mix in a Letter, a Proficiency and a Both class', () => {
       setClass('letter');
-      expect(DashOverview.compView(CID, null)).toBe('avg');
+      expect(DashOverview.compView(CID, null)).toBe('mix');
       setClass('proficiency');
       expect(DashOverview.compView(CID, null)).toBe('mix');
       setClass('both');
@@ -1289,7 +1290,8 @@ describe('dash-comp-views', () => {
     it('a saved view wins; anything else falls back', () => {
       setClass('letter');
       expect(DashOverview.compView(CID, 'trend')).toBe('trend');
-      expect(DashOverview.compView(CID, 'nope')).toBe('avg');
+      expect(DashOverview.compView(CID, 'avg')).toBe('avg');
+      expect(DashOverview.compView(CID, 'nope')).toBe('mix');
     });
   });
 
@@ -1301,9 +1303,10 @@ describe('dash-comp-views', () => {
         it('draws the view menu with four views and the one in use', () => {
           const el = dom(card({ compView: 'below' }));
           expect(el.querySelector('#dash-view-btn-comp').textContent).toBe('Needs Support');
+          // Level Mix first, as board D has it (Colin, Nov 18 2026).
           expect(texts(el, '#dash-view-menu-comp .dash-view-name')).toEqual([
-            'Class Average',
             'Level Mix',
+            'Class Average',
             'Needs Support',
             'Change',
           ]);
