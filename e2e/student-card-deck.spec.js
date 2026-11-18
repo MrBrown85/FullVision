@@ -31,11 +31,36 @@ test.describe('on a phone', () => {
     const [a, b] = await cards.evaluateAll(els => els.map(e => e.getBoundingClientRect().toJSON()));
     expect(b.top).toBeGreaterThanOrEqual(a.bottom - 1);
     expect(Math.abs(b.left - a.left)).toBeLessThan(2);
-    // Past its day: the due pill in red says how long ago.
-    await expect(cards.nth(1).locator('.sp-piece-head .sp-flag-overdue')).toHaveText(
-      /^Due \w{3}, \w{3} \d+ · (yesterday|\d+ days ago)$/,
-    );
-    await expect(cards.nth(0).getByText('Missing', { exact: true })).toBeVisible();
+    // Past its day and not Missing: a grey band, Not Assessed Yet, never red (Colin, 2026-11-17).
+    const waiting = cards.nth(1).locator('.sp-band.sp-band-waiting');
+    await expect(waiting.locator('.sp-flag')).toHaveText('Not Assessed Yet');
+    await expect(waiting.locator('.sp-band-when')).toHaveText(/^Was due \w{3} \d+$/);
+    await expect(cards.nth(1)).not.toContainText(/days ago|yesterday/);
+    // Missing is the one solid band: white on red.
+    const missing = cards.nth(0).locator('.sp-band.sp-band-missing');
+    await expect(missing.locator('.sp-flag')).toHaveText('Missing');
+    expect(await missing.evaluate(el => getComputedStyle(el).color)).toBe('rgb(255, 255, 255)');
+    // The band runs across the top of the card, edge to edge.
+    const [band, box] = await Promise.all([
+      missing.boundingBox(),
+      cards.nth(0).locator('.sp-piece-card').boundingBox(),
+    ]);
+    expect(Math.abs(band.x - box.x)).toBeLessThan(1);
+    expect(Math.abs(band.y - box.y)).toBeLessThan(1);
+    expect(Math.abs(band.width - box.width)).toBeLessThan(1);
+    // Each status has its icon, and the unit is not in capitals.
+    for (const c of [cards.nth(0), cards.nth(1)]) await expect(c.locator('.sp-band svg')).toHaveCount(1);
+    expect(
+      await cards
+        .nth(0)
+        .locator('.sp-piece-unit')
+        .evaluate(el => getComputedStyle(el).textTransform),
+    ).toBe('none');
+    // Outstanding and Upcoming are big enough to tap.
+    for (const box of await page
+      .locator('.sp-segment')
+      .evaluateAll(els => els.map(e => e.getBoundingClientRect().height)))
+      expect(box).toBeGreaterThanOrEqual(40);
     // No category, What You’re Graded On or Core Competencies on a card.
     await expect(page.locator('.sp-deck')).not.toContainText('Graded On');
     await expect(page.locator('.sp-category-pill, .sp-core')).toHaveCount(0);
@@ -49,7 +74,8 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: 'Upcoming 1' }).click();
     await expect(page.getByRole('button', { name: 'Upcoming 1' })).toHaveAttribute('aria-pressed', 'true');
     await expect(cards.locator('.sp-piece-title')).toHaveText(['Science Fair Proposal']);
-    await expect(cards.locator('.sp-piece-head .sp-flag-due')).toHaveText(/^Due \w{3}, \w{3} \d+ · in \d+ days$/);
+    await expect(cards.locator('.sp-band-later .sp-flag')).toHaveText(/^In \d+ Days$/);
+    await expect(cards.locator('.sp-band-later .sp-band-when')).toHaveText(/^\w{3}, \w{3} \d+$/);
     await fits(page);
     await contrast(page);
     expect(posts).toEqual([]);
