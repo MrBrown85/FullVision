@@ -1959,6 +1959,12 @@ body.fv-switching-course::after {
   color: var(--text);
   line-height: 1.2;
 }
+.m-pts-factored {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  line-height: 1.2;
+}
 .m-pts-pct .gb-pts-bonus {
   margin-top: 0;
   font-size: 12px;

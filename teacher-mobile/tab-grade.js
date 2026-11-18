@@ -2206,7 +2206,9 @@ window.MGrade = (function () {
           assessment.id +
           '">' +
           pointsPctHtml(rawScore, assessment.maxPoints, 0) +
-          '</span></div></div>' +
+          '</span>' +
+          _factoredHtml(assessment, rawScore, 'm-pts-fac-' + st.id + '-' + assessment.id) +
+          '</div></div>' +
           '<button class="m-score-btn" data-action="m-grade-points-inc" data-sid="' +
           st.id +
           '" data-aid="' +
@@ -3371,6 +3373,22 @@ window.MGrade = (function () {
     function _updatePointsPct(sid, aid, value, max) {
       var el = document.getElementById('m-pts-pct-' + sid + '-' + aid);
       if (el) el.innerHTML = pointsPctHtml(value, max, 0);
+      var fac = document.getElementById('m-pts-fac-' + sid + '-' + aid);
+      if (fac && fac.dataset)
+        fac.textContent = _factoredText({ scoreMode: 'points', weight: fac.dataset.factor }, value, max);
+    }
+
+    /* Under the %, the score times its Factor, as the desktop grader shows it: "= 20 / 24"
+       for 5 / 6 at 4× (constants.js's factoredPoints). Read-only; points work not at 1× only. */
+    function _factoredText(a, value, max) {
+      var fp = factoredPoints(a, value, max);
+      return fp ? '= ' + formatPoints(fp.points) + ' / ' + formatPoints(fp.outOf) : '';
+    }
+    // html-safe: the id is ours, the factor a number and the text esc'd
+    function _factoredHtml(a, value, id) {
+      if (!factoredPoints(a, 0)) return '';
+      var attrs = ' id="' + id + '" data-factor="' + MC.esc(String(a.weight)) + '"';
+      return '<span class="m-pts-factored"' + attrs + '>' + MC.esc(_factoredText(a, value)) + '</span>';
     }
 
     /* Typed points save like the desktop points box: the same clamp
