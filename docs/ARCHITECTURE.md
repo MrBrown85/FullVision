@@ -57,7 +57,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js`
   - `tab-observe.js`
-  - `tab-bulletins.js`: Bulletins, the fourth tab, shown only with the build flag `bulletins` on (Post a Photo on Add Work's camera screen, Write a Bulletin, who has seen each one); a post with a photo or a file waits in the photo queue through `shared/data-bulletins-queue.js`
+  - `tab-bulletins.js` with `bulletins-model.js` (the feed as data): Bulletins, the fourth tab, shown only with the build flag `bulletins` on (Post a Photo on Add Work's camera screen, Write a Bulletin, who has seen each one); a post with a photo or a file waits in the photo queue through `shared/data-bulletins-queue.js`
   - `tab-grade.js`: the list of assessments and the speed grader, with `sweep.js` and `grade-photos.js` (the student's work on a grading card and a student's To Grade list), `add-work.js` (Add Work: photographing a student's paper work), `split-scan.js` with `split-scan-model.js` (Split a Scan: one PDF of the class's pages cut into each student's work, on the desktop's Add Work for the Class modules, which the phone loads too) and `markup.js` (Mark Up: drawing on a page of the work)
 - It also loads `shared/obs-capture.js`, `shared/obs-card.js`, `shared/obs-follow-ups.js` (follow-ups under an observation, as the desktop's Observations page also shows them) and `shared/work-wall.js` (the Work Wall, from the Grade tab's row menu) from the desktop.
 

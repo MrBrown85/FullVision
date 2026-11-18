@@ -191,9 +191,8 @@ test('with the flag off: three tabs, no Bulletins anywhere, and a remembered Bul
 }) => {
   await openPhone(page, { flag: false, tab: 'bulletins' });
   await expect(page.locator('#m-tab-bar .m-tab-item:visible')).toHaveCount(3);
-  const button = page.locator('.m-tab-item[data-tab="bulletins"]');
-  await expect(button).toBeHidden();
-  expect(await button.evaluate(el => getComputedStyle(el).display)).toBe('none');
+  // The page holds no fourth button at all with the flag off.
+  await expect(page.locator('.m-tab-item[data-tab="bulletins"]')).toHaveCount(0);
   await expect(page.locator('.m-tab-item[data-tab="students"]')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#m-screen-bulletins')).toHaveCount(0);
   await expect(page.locator('[class*="m-bulletin-"]:not(.m-bulletin-tab), [id^="m-bulletin-"]')).toHaveCount(0);

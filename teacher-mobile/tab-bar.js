@@ -8,8 +8,9 @@
 
    A fourth tab, Bulletins, is last in the bar only while the build flag
    `bulletins` is on (shared/build-flags.js; docs/plans/bulletins-plan.md,
-   B1f). With it off the bar has the three tabs as before, its button stays
-   hidden, and a remembered Bulletins opens on Students. */
+   B1f): its button is added to the bar here, the one place it is made. With
+   the flag off the page holds no fourth button, the bar has its three tabs as
+   before, and a remembered Bulletins opens on Students. */
 window.MTabBar = (function () {
   'use strict';
 
@@ -26,17 +27,26 @@ window.MTabBar = (function () {
     return _bulletinsOn() ? BASE.concat('bulletins') : BASE.slice();
   }
 
-  // The Bulletins button shows only with the flag on.
+  var BULLETINS_BUTTON =
+    '<button class="m-tab-item m-bulletin-tab" role="tab" aria-selected="false" data-tab="bulletins">' +
+    '<svg class="m-tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="4" y="4" width="16" height="16" rx="3" /><path class="m-tab-mark" d="M9 4v5l1.5-1 1.5 1V4" /></svg>' +
+    '<span class="m-tab-label">Bulletins</span></button>';
+
+  // The Bulletins button, last in the bar, is there only with the flag on.
   function show() {
-    var on = _bulletinsOn();
-    document.querySelectorAll('.m-tab-item[data-tab="bulletins"]').forEach(function (t) {
-      /** @type {HTMLElement} */ (t).hidden = !on;
-    });
+    var bar = document.getElementById('m-tab-bar');
+    var has = bar && bar.querySelector('.m-tab-item[data-tab="bulletins"]');
+    if (!bar || !!has === _bulletinsOn()) return;
+    if (has) has.remove();
+    // html-safe: fixed markup.
+    else bar.insertAdjacentHTML('beforeend', BULLETINS_BUTTON);
   }
 
   // The tab bar shows `tab` as the open one.
   /** @param {string} tab */
   function paint(tab) {
+    show();
     document.querySelectorAll('.m-tab-item').forEach(function (t) {
       var isActive = t.getAttribute('data-tab') === tab;
       t.classList.toggle('m-tab-active', isActive);

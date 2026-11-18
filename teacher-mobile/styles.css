@@ -6359,12 +6359,7 @@ body.fv-switching-course::after {
   opacity: 0.6;
 }
 
-/* ── Bulletins (B1f): the fourth tab, its sheets and Post a Photo ───────
-   The tab's button stays out of the bar unless the build flag is on: a
-   class's display rule would beat the hidden attribute. */
-.m-tab-item.m-bulletin-tab[hidden] {
-  display: none;
-}
+/* ── Bulletins (B1f): the fourth tab, its sheets and Post a Photo ─────── */
 .m-bulletin-content {
   background: var(--bg);
 }

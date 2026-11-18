@@ -68,9 +68,6 @@
     if (typeof migrateAllStudents === 'function') migrateAllStudents();
 
     MC.setupOfflineDetection();
-    // Bulletins (B1f), the fourth tab, only with its build flag on: its posts waiting on this phone go on from where they stopped.
-    MTabBar.show();
-    if (window.MBulletins && MBulletins.on()) MBulletins.boot();
     // The tab the teacher last used on this device; Students the first time.
     _activeTab = MTabBar.saved();
     MTabBar.paint(_activeTab);
@@ -256,8 +253,7 @@
           reject(new Error('timeout'));
         }, 8000);
       });
-      await Promise.race([retryActiveCourseLoad(), timeout]);
-      if (_activeTab === 'bulletins' && window.MBulletins) await MBulletins.refresh();
+      await Promise.race([Promise.all([retryActiveCourseLoad(), window.MBulletins && MBulletins.refresh()]), timeout]);
       if (courseLoadFailed(getActiveCourse())) throw new Error('could not reach the server');
     } catch (e) {
       console.warn('Pull-to-refresh error:', e);
@@ -728,8 +724,6 @@
   function _renderTab(tab) {
     // Clean up previous tab's resources
     if (MStudents.destroyCardStack) MStudents.destroyCardStack();
-    // Bulletins stops asking the server while it is not showing.
-    if (window.MBulletins) MBulletins.left();
     // The Grade tab's red count follows the class's work waiting (S7-F4).
     if (window.MGradePhotos) MGradePhotos.syncTabBadge(_cid);
 
@@ -744,10 +738,8 @@
       html = MObserve.renderFeed(_cid);
     } else if (tab === 'grade') {
       html = MGrade.renderPicker(_cid);
-    } else if (tab === 'bulletins' && window.MBulletins) {
-      html = MBulletins.render(_cid);
     }
-
+    if (window.MBulletins) html = MBulletins.tab(tab, _cid, html); // the fourth tab (B1f), behind its build flag
     // html-safe: html is MStudents.renderList, MObserve.renderFeed, MGrade.renderPicker or MBulletins.render, each checked to escape its text.
     stack.innerHTML = html;
     _navStacks[tab].push(tab);
@@ -767,8 +759,6 @@
     if (tab === 'students' && MStudents.initCardStack) {
       MStudents.initCardStack(_cid);
     }
-    // Bulletins reads the class when it shows, then every 15 seconds while it shows.
-    if (tab === 'bulletins' && window.MBulletins) MBulletins.shown(_cid);
     // The sync light is drawn fresh with each render; show the current state.
     if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
   }

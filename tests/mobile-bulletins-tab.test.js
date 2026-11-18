@@ -157,35 +157,38 @@ describe('the fourth tab', () => {
     expect(MTabBar.saved()).toBe('students');
   });
 
-  it('its button is hidden unless the flag is on, and the hidden attribute wins over the bar’s display rule', () => {
+  it('its button is in the bar only with the flag on: the page holds none, tab-bar.js adds it last', () => {
     const html = readFileSync(resolve(root, 'teacher-mobile/index.html'), 'utf-8');
     const { document } = parseHTML(html);
-    const buttons = [...document.querySelectorAll('#m-tab-bar .m-tab-item')];
-    expect(buttons.map(b => b.getAttribute('data-tab'))).toEqual(['students', 'observe', 'grade', 'bulletins']);
-    expect(buttons[3].hasAttribute('hidden')).toBe(true);
+    const tabs = () => [...document.querySelectorAll('#m-tab-bar .m-tab-item')].map(b => b.getAttribute('data-tab'));
+    expect(tabs()).toEqual(['students', 'observe', 'grade']);
     const saved = globalThis.document;
     globalThis.document = document;
     try {
-      MTabBar.show();
-      expect(buttons[3].hidden).toBe(true);
+      MTabBar.paint('students');
+      expect(tabs()).toEqual(['students', 'observe', 'grade']);
       localStorage.setItem('fv-build-bulletins', '1');
-      MTabBar.show();
-      expect(buttons[3].hidden).toBe(false);
+      MTabBar.paint('students');
+      MTabBar.paint('students');
+      expect(tabs()).toEqual(['students', 'observe', 'grade', 'bulletins']);
+      localStorage.removeItem('fv-build-bulletins');
+      MTabBar.paint('students');
+      expect(tabs()).toEqual(['students', 'observe', 'grade']);
     } finally {
       globalThis.document = saved;
     }
-    const css = readFileSync(resolve(root, 'teacher-mobile/styles.css'), 'utf-8');
-    expect(css).toMatch(/\.m-tab-item\.m-bulletin-tab\[hidden\]\s*\{\s*display:\s*none;/);
   });
 
-  it('the shell draws it, reads it while it shows and stops when it is left', () => {
+  it('the shell draws it through one call, and the phone loads the Bulletins files before the shell', () => {
     const shell = readFileSync(resolve(root, 'teacher-mobile/shell.js'), 'utf-8');
-    expect(shell).toContain("tab === 'bulletins' && window.MBulletins");
-    expect(shell).toContain('MBulletins.render(_cid)');
-    expect(shell).toContain('MBulletins.shown(_cid)');
-    expect(shell).toContain('MBulletins.left()');
+    expect(shell).toContain('if (window.MBulletins) html = MBulletins.tab(tab, _cid, html);');
     const html = readFileSync(resolve(root, 'teacher-mobile/index.html'), 'utf-8');
-    expect(html.indexOf('shared/data-bulletins.js')).toBeGreaterThan(-1);
+    for (const f of ['data-bulletins.js', 'bulletins-refusals.js', 'data-bulletins-demo.js', 'data-bulletins-queue.js'])
+      expect(html.indexOf('shared/' + f)).toBeGreaterThan(-1);
     expect(html.indexOf('teacher-mobile/tab-bulletins.js')).toBeLessThan(html.indexOf('teacher-mobile/shell.js'));
+  });
+
+  it('a tab draw leaves Bulletins, and with the flag off returns the shell’s own screen untouched', () => {
+    expect(MB.tab('students', 'c1', '<div>students</div>')).toBe('<div>students</div>');
   });
 });
