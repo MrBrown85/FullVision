@@ -84,7 +84,6 @@
 .dash-inbox-roll-chip.is-excused {
   color: var(--text-3);
   font-style: italic;
-  cursor: default;
   background: none;
   border: 1px solid transparent;
 }
@@ -266,4 +265,37 @@
 }
 .dash-inbox-roll-item:hover {
   background: var(--surface-2);
+}
+
+/* A word in the chip where a colour or a line would not be enough: Late,
+   Missing, Excused. In a page chip it sits on the page's top edge. */
+.dash-inbox-roll-tag {
+  flex: 0 0 auto;
+  font-size: var(--text-2xs);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-2);
+}
+.dash-inbox-roll-tag.is-late {
+  color: var(--score-2-text);
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-tag {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  padding: 2px 4px;
+  background: #fbfaf6;
+  color: #3b3b3f;
+  border-radius: 4px;
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-tag.is-late {
+  color: #92400e;
+}
+.dash-inbox-roll-chip.is-excused-in {
+  font-style: italic;
+}
+.dash-inbox-roll-img {
+  -webkit-user-drag: none;
+  user-select: none;
 }

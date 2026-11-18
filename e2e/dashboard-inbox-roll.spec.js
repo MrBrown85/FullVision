@@ -365,12 +365,12 @@ test('at 299 px the menu is whole, inside the window and the tile, and not clipp
   await expect(menu).toHaveCount(0);
 });
 
-test('an Excused student is quiet and offers no menu; a Missing one is said', async ({ page }) => {
+test('an Excused student is quiet and opens the grader; a Missing one is said in a word', async ({ page }) => {
   await open(page, { bulletins: true });
   await page.evaluate(() => {
     const cid = getActiveCourse();
     const m = DashInboxRoll.model(cid, 'sci8a21');
-    const outs = m.students.filter(c => !c.in);
+    const outs = m.students.filter(c => c.kind === 'out');
     setAssignmentStatus(cid, outs[0].sid, 'sci8a21', 'EXC');
     setAssignmentStatus(cid, outs[1].sid, 'sci8a21', 'NS');
     window.__ex = [outs[0].sid, outs[1].sid];
@@ -382,13 +382,162 @@ test('an Excused student is quiet and offers no menu; a Missing one is said', as
   await expect(exc).toHaveAttribute('aria-label', /: Excused$/);
   await expect(exc).toHaveAttribute('title', /: Excused$/);
   await expect(exc).toHaveClass(/is-excused/);
+  await expect(exc).toContainText('Excused');
   expect(await exc.evaluate(n => getComputedStyle(n).borderTopStyle)).not.toBe('dashed');
+  const miss = page.locator('.dash-inbox-roll-chip[data-sid="' + ms + '"]');
+  await expect(miss).toHaveAttribute('aria-label', /: Missing$/);
+  await expect(miss).toContainText('Missing');
+  expect(await miss.evaluate(n => getComputedStyle(n).borderTopStyle)).toBe('dashed');
+  // Excused is a chip like the rest: the grader opens on that student.
   await exc.click();
-  await expect(page.locator('.dash-inbox-roll-menu')).toHaveCount(0);
-  await expect(page.locator('.dash-inbox-roll-chip[data-sid="' + ms + '"]')).toHaveAttribute(
-    'aria-label',
-    /: Missing$/,
-  );
-  await page.locator('.dash-inbox-roll-chip[data-sid="' + ms + '"]').click();
+  await expect(page.locator('.grader-student')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#grader-overlay')).toHaveCount(0);
+  await miss.click();
   await expect(page.locator('.dash-inbox-roll-menu')).toBeVisible();
+  // The open menu's own chip again closes it.
+  await miss.click();
+  await expect(page.locator('.dash-inbox-roll-menu')).toHaveCount(0);
+});
+
+test('Late has a word in the chip, and no picture can be dragged', async ({ page }) => {
+  await open(page);
+  await chooseRoll(page);
+  await expect(page.locator('.dash-inbox-roll-chip[aria-label^="Marcus Lee"] .dash-inbox-roll-tag')).toHaveText('Late');
+  await expect(page.locator('.dash-inbox-roll-img').first()).toHaveAttribute('src', /.+/);
+  const drag = await page.evaluate(() =>
+    [...document.querySelectorAll('.dash-inbox-roll-img')].every(i => i.draggable === false),
+  );
+  expect(drag).toBe(true);
+});
+
+test('one Tab stop; arrows, Home and End move inside the grid; focus survives a redraw', async ({ page }) => {
+  await open(page, { bulletins: true });
+  await chooseRoll(page);
+  expect(await page.locator('.dash-inbox-roll-chip[tabindex="0"]').count()).toBe(1);
+  expect(await page.locator('.dash-inbox-roll-chip[tabindex="-1"]').count()).toBe(26);
+  const sids = await page.evaluate(() =>
+    [...document.querySelectorAll('.dash-inbox-roll-chip')].map(c => c.dataset.sid),
+  );
+  await page.locator('.dash-inbox-roll-chip').first().focus();
+  // Right visits every chip in order, across every wrap.
+  const seen = [sids[0]];
+  for (let i = 1; i < sids.length; i++) {
+    await page.keyboard.press('ArrowRight');
+    seen.push(await page.evaluate(() => document.activeElement.dataset.sid));
+  }
+  expect(seen).toEqual(sids);
+  // Down and up cross the wraps.
+  await page.keyboard.press('Home');
+  expect(await page.evaluate(() => document.activeElement.dataset.sid)).toBe(sids[0]);
+  await page.keyboard.press('ArrowDown');
+  const row2 = await page.evaluate(() => document.activeElement.dataset.sid);
+  expect(sids.indexOf(row2)).toBeGreaterThan(0);
+  await page.keyboard.press('ArrowUp');
+  expect(await page.evaluate(() => document.activeElement.dataset.sid)).toBe(sids[0]);
+  await page.keyboard.press('End');
+  expect(await page.evaluate(() => document.activeElement.dataset.sid)).toBe(sids[sids.length - 1]);
+  // The one Tab stop follows the focus.
+  expect(await page.evaluate(() => document.querySelector('.dash-inbox-roll-chip[tabindex="0"]').dataset.sid)).toBe(
+    sids[sids.length - 1],
+  );
+  // A redraw keeps the focused student.
+  await page.evaluate(() => PageDashboard.render());
+  expect(await page.evaluate(() => document.activeElement.dataset.sid)).toBe(sids[sids.length - 1]);
+});
+
+for (const [w, h] of [
+  [800, 800],
+  [769, 700],
+]) {
+  test('at ' + w + 'x' + h + ' the first draw is one render, and a redraw keeps the scroll', async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.addInitScript(() => localStorage.setItem('fv-build-dashRow', '1'));
+    await page.goto('/login.html?demo=1');
+    await page.waitForURL(/\/dashboard/);
+    await page.locator('.dash-glance').waitFor();
+    await page.evaluate(() => {
+      const cid = getActiveCourse();
+      setStudentPageSwitch(cid, true, 'on_return');
+      const work = getCourseSubmissions(cid);
+      work.course.send_work = true;
+      saveDemoStudentWork(cid, work);
+      localStorage.setItem('fv-dash-inbox-view:' + cid, 'roll');
+      window.__renders = 0;
+      const was = PageDashboard.render;
+      PageDashboard.render = function () {
+        window.__renders++;
+        return was.apply(this, arguments);
+      };
+    });
+    // Count only the renders the roll itself asks for: none beyond the one we make.
+    await page.evaluate(() => {
+      window.__renders = 0;
+      DashInboxRoll.reset();
+      PageDashboard.render();
+    });
+    await page.locator('.dash-inbox-roll').waitFor();
+    await page.waitForTimeout(500);
+    const first = await page.evaluate(() => ({
+      renders: window.__renders,
+      form: document.querySelector('.dash-inbox-roll').className,
+      tile: Math.round(document.getElementById('dash-inbox').getBoundingClientRect().height),
+      scrolls: (g => g.scrollHeight > g.clientHeight)(document.getElementById('dash-inbox-roll-grid')),
+    }));
+    expect(first.renders).toBe(1);
+    // The grid scrolls only where the pages cannot fit; set a scroll and draw again.
+    await page.evaluate(() => {
+      const g = document.getElementById('dash-inbox-roll-grid');
+      g.scrollTop = 25;
+      window.__top = g.scrollTop;
+    });
+    await page.evaluate(() => PageDashboard.render());
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => ({
+      top: document.getElementById('dash-inbox-roll-grid').scrollTop,
+      want: window.__top,
+      renders: window.__renders,
+    }));
+    expect(after.top).toBe(after.want);
+    expect(after.renders).toBe(2);
+    test.info().annotations.push({ type: w + 'x' + h, description: JSON.stringify(first) });
+  });
+}
+
+test('one live observer after ten redraws, none after leaving the Dashboard', async ({ page }) => {
+  // Count the ResizeObservers that observe a node and have not disconnected.
+  await page.addInitScript(() => {
+    const Real = window.ResizeObserver;
+    window.__liveRO = new Set();
+    window.ResizeObserver = class extends Real {
+      observe(...a) {
+        window.__liveRO.add(this);
+        return super.observe(...a);
+      }
+      disconnect() {
+        window.__liveRO.delete(this);
+        return super.disconnect();
+      }
+    };
+  });
+  await open(page);
+  await chooseRoll(page);
+  const count = () => page.evaluate(() => window.__liveRO.size);
+  await page.evaluate(() => PageDashboard.render());
+  const one = await count();
+  for (let i = 0; i < 10; i++) await page.evaluate(() => PageDashboard.render());
+  // Ten more draws leave no more observers than one, and the roll holds one of them.
+  expect(await count()).toBe(one);
+  expect(await page.evaluate(() => DashInboxRoll.live())).toMatchObject({
+    observer: true,
+    undo: true,
+    menuListener: false,
+  });
+  await page.evaluate(() => DashInbox.leave(getActiveCourse()));
+  expect(await count()).toBe(one - 1);
+  expect(await page.evaluate(() => DashInboxRoll.live())).toMatchObject({
+    observer: false,
+    undo: false,
+    menuListener: false,
+  });
 });

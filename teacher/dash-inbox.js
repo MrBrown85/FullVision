@@ -22,6 +22,8 @@ window.DashInbox = (function () {
   'use strict';
 
   var VIEW_KEY = 'fv-dash-inbox-view:';
+  // The view pill's order. A view not listed goes last, in the order it was added.
+  var VIEW_ORDER = ['assessment', 'side', 'flip', 'roll'];
   var MAX_NAMES = 2;
   // How long the ring stays on the tile after To Grade is clicked.
   var RING_MS = 220;
@@ -83,6 +85,16 @@ window.DashInbox = (function () {
     });
     if (at >= 0) _views[at] = v;
     else _views.push(v);
+    // The pill's order is fixed, whatever order the scripts load in.
+    _views.sort(function (a, b) {
+      return _rank(a.key) - _rank(b.key);
+    });
+  }
+
+  /** @param {string} key */
+  function _rank(key) {
+    var i = VIEW_ORDER.indexOf(key);
+    return i < 0 ? VIEW_ORDER.length : i;
   }
 
   /** @param {string} cid */

@@ -392,3 +392,16 @@ test('with Send Work off the slot keeps Recent Assessments', async ({ page }) =>
   await expect(page.locator('#dash-inbox')).toHaveCount(0);
   await expect(page.locator('.dash-recent')).toBeVisible();
 });
+
+test('the view menu keeps one fixed order, whatever order the scripts load in', async ({ page }) => {
+  await open(page);
+  await page.locator('#dash-view-btn-inbox').click();
+  const keys = await page.locator('#dash-view-menu-inbox [data-view]').evaluateAll(els => els.map(e => e.dataset.view));
+  const want = ['assessment', 'side', 'flip', 'roll'];
+  expect(keys).toContain('roll');
+  expect(keys[0]).toBe('assessment');
+  // An ordered match: each shown view comes in the fixed order.
+  const ranks = keys.map(k => want.indexOf(k));
+  expect(ranks.every(r => r >= 0)).toBe(true);
+  expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
+});

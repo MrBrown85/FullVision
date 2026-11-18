@@ -4,22 +4,25 @@
    order for one piece of work, like taking attendance.
 
    A tile under 380 px tall draws each student as a name chip: solid when work
-   is in, dashed when not, a tick when returned, bold when it waits to be
-   graded. A taller tile draws small pages, each at least 80 px tall, in nine
-   or seven columns, and the grid scrolls inside the tile when they cannot all
-   fit. A click on a student with work in opens the grader on them; a click on
-   one with nothing in opens a one-item menu, Add Work, which opens the
-   grader on that student, where the grader's own Add Work is. There is no
-   Mark Missing: setting Missing can change a grade, and this view changes none.
+   is in (or has been assessed), dashed when not, a tick when returned, bold
+   when it waits to be graded. A taller tile draws small pages, each at least
+   80 px tall, in nine or seven columns, and the grid scrolls inside the tile
+   when they cannot all fit. A click on a solid chip opens the grader on that
+   student; a click on a dashed one opens a one-item menu, Add Work, which
+   opens the grader on that student, where the grader's own Add Work is. There
+   is no Mark Missing: setting Missing can change a grade, and this view
+   changes none.
 
-   Every state and count is GraderWork's: workStateOf, workCounts, workInIds.
-   This file writes nothing and decides no rule of its own.
+   Every state is GraderWork's (workStateOf, workInIds) and the app's own
+   Missing and Excused reading (getAssignmentStatus). When workStateOf says
+   nothing for work that is in, the chip reads as Side by Side words it. The
+   foot line counts the chips as drawn. This file writes nothing.
 
-   The piece comes from the assessment switch (DashInboxPick, built apart)
-   when it is on the page; without it, the first piece the Inbox lists.
-   What must outlast a draw (the piece when there is no switch, the open menu,
-   the form last drawn) is kept here, because the Dashboard draws its whole
-   page as one string. */
+   The piece is the teacher's one choice, from DashInboxPick, shared with Side
+   by Side and Flip Through. The form (names or pages) is read from the tile's
+   real height in mount; when it differs from the one drawn, this view alone
+   is drawn again in place, never the whole page. What must outlast a draw
+   (the open menu, the scroll, the focused student) is kept here. */
 window.DashInboxRoll = (function () {
   'use strict';
 
@@ -34,15 +37,16 @@ window.DashInboxRoll = (function () {
 
   /** @type {{ sid: string, aid: string } | null} */
   var _menu = null;
-  /** The form last drawn, and the piece when there is no switch.
+  /** The form last drawn.
    * @type {'names' | 'pages' | null} */
   var _form = null;
   /** The files of the pictures drawn: data-dash-pic key (class id first) → file.
    * @type {Record<string, any>} */
   var _files = {};
-  /** The grid's scroll, and the student whose chip opened the grader or the menu.
-   * @type {{ key: string, scroll: number, refocus: string | null }} */
-  var _st = { key: '', scroll: 0, refocus: null };
+  /** The grid's scroll; the student to focus once the grader closes (refocus);
+   * the student focused when a draw began (keep, with its time); the one Tab stop (cur).
+   * @type {{ key: string, scroll: number, refocus: string | null, keep: string | null, keepAt: number, cur: string | null }} */
+  var _st = { key: '', scroll: 0, refocus: null, keep: null, keepAt: 0, cur: null };
   /** @type {(() => void) | null} */
   var _undo = null;
   /** @type {any} */
@@ -50,6 +54,8 @@ window.DashInboxRoll = (function () {
   /** @type {any} */
   var _off = null;
   var _openedAt = 0;
+  // How many times this view has been drawn in place, for tests.
+  var _swaps = 0;
 
   /** The grader is over the tile: what happens under it is not ours.
    * @returns {boolean} */
@@ -124,20 +130,29 @@ window.DashInboxRoll = (function () {
     );
   }
 
-  /** One chip's accessible name and tooltip: "Ethan Dubois: Returned, On Paper".
-   * @param {{ full: string, in: boolean, status: string, state: string | null, paper: boolean, late: boolean, mates: string[] }} c */
+  /** The words for a student whose work is in, as Side by Side writes them:
+   * "To Grade" when GraderWork says it waits, else "Assessed".
+   * @param {string | null} state */
+  function _inWord(state) {
+    var S = /** @type {any} */ (window).DashInboxSide;
+    if (S && S.stateWord) return S.stateWord(state === 'tograde');
+    return state === 'tograde' ? 'To Grade' : 'Assessed';
+  }
+
+  /** One chip's accessible name and tooltip, "Ethan Dubois: Assessed, returned, On Paper".
+   * @param {any} c */
   function _said(c) {
-    if (!c.in)
-      return c.full + ': ' + (c.status === 'excused' ? 'Excused' : c.status === 'missing' ? 'Missing' : 'Not in');
-    var bits = [c.state === 'returned' ? 'Returned' : c.state === 'toreturn' ? 'Graded, not returned' : 'To grade'];
+    var bits = [c.word];
+    if (c.state === 'returned' && c.status !== 'excused') bits[0] += ', returned';
     if (c.paper) bits.push('On Paper');
     if (c.late) bits.push('Late');
     if (c.mates.length) bits.push('with ' + c.mates.join(' and '));
     return c.full + ': ' + bits.join(', ');
   }
 
-  /** The Roll Call for one piece: the whole class in class-list order, and
-   * the foot line's counts. Each state is GraderWork's.
+  /** The Roll Call for one piece: the whole class in class-list order. Each
+   * chip's kind is worked from GraderWork's state and the student's status:
+   * solid is work in or assessed; excused is quiet; the rest are dashed.
    * @param {string} cid @param {string} aid
    * @returns {any} */
   function model(cid, aid) {
@@ -151,12 +166,10 @@ window.DashInboxRoll = (function () {
     var ids = roster.map(function (s) {
       return s.id;
     });
-    var inIds = GW.workInIds(cid, aid, ids);
     var inSet = /** @type {Record<string, boolean>} */ ({});
-    inIds.forEach(function (/** @type {string} */ id) {
+    GW.workInIds(cid, aid, ids).forEach(function (/** @type {string} */ id) {
       inSet[id] = true;
     });
-    var counts = GW.workCounts(cid, aid, ids);
     var names = shortNames(roster);
     /** @type {Record<string, any>} */
     var byId = {};
@@ -164,10 +177,14 @@ window.DashInboxRoll = (function () {
       byId[s.id] = s;
     });
     var late = 0;
+    var excused = 0;
     /** @type {string[]} */
     var paper = [];
     roster.forEach(function (s) {
       var isIn = !!inSet[s.id];
+      var state = GW.workStateOf(cid, aid, s.id);
+      var st = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, s.id, aid) : '';
+      var status = st === 'EXC' ? 'excused' : st === 'NS' && !isIn ? 'missing' : '';
       var subs = isIn && typeof getGroupSubmissions === 'function' ? getGroupSubmissions(cid, s.id, aid) : [];
       var own = subs.filter(function (/** @type {any} */ x) {
         return x.enrollment_id === s.id;
@@ -197,50 +214,65 @@ window.DashInboxRoll = (function () {
               return displayName(byId[m]);
             })
         : [];
+      // Solid: work is in, or the piece was assessed with none (to return or returned).
+      var solid = isIn || state === 'toreturn' || state === 'returned';
+      var kind = solid ? 'in' : status === 'excused' ? 'excused' : 'out';
+      var word =
+        status === 'excused' ? 'Excused' : solid ? _inWord(state) : status === 'missing' ? 'Missing' : 'Not In Yet';
       var c = {
         sid: s.id,
         name: names[s.id],
         full: displayName(s),
         in: isIn,
-        // Marked Excused or Missing with nothing in: the status workStateOf reads.
-        status: isIn
-          ? ''
-          : (function () {
-              var st = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, s.id, aid) : '';
-              return st === 'EXC' ? 'excused' : st === 'NS' ? 'missing' : '';
-            })(),
-        state: isIn ? GW.workStateOf(cid, aid, s.id) : null,
+        kind: kind,
+        status: status,
+        state: state,
+        word: word,
         paper: !!(mine && mine.on_paper),
         late: !!(mine && mine.is_late),
         file: file,
         mates: mates,
         said: '',
       };
-      if (c.in && !c.state) c.state = 'tograde';
       c.said = _said(c);
-      if (c.in && c.late) late++;
-      if (c.in && c.paper) paper.push(c.full);
+      if (kind === 'in' && c.late) late++;
+      if (kind === 'in' && c.paper) paper.push(c.full);
+      if (status === 'excused') excused++;
       out.students.push(c);
     });
-    out.order = inIds.slice();
-    out.notIn = out.students
+    out.order = out.students
       .filter(function (/** @type {any} */ c) {
-        return !c.in && c.status !== 'excused';
+        return c.kind === 'in';
       })
       .map(function (/** @type {any} */ c) {
         return c.sid;
       });
-    out.counts = { in: inIds.length, notin: counts.notin, late: late, paper: paper.length, all: ids.length };
+    out.notIn = out.students
+      .filter(function (/** @type {any} */ c) {
+        return c.kind === 'out';
+      })
+      .map(function (/** @type {any} */ c) {
+        return c.sid;
+      });
+    out.counts = {
+      in: out.order.length,
+      notin: out.notIn.length,
+      late: late,
+      excused: excused,
+      paper: paper.length,
+      all: ids.length,
+    };
     out.paperNames = paper;
     out.foot = footText(out.counts, paper);
     return out;
   }
 
   /** "10 in · 17 not in · 2 Late · Ethan Dubois on paper".
-   * @param {{ in: number, notin: number, late: number }} c @param {string[]} paper */
+   * @param {{ in: number, notin: number, late: number, excused?: number }} c @param {string[]} paper */
   function footText(c, paper) {
     var s = [c.in + ' in', c.notin + ' not in'];
     if (c.late) s.push(c.late + ' Late');
+    if (c.excused) s.push(c.excused + ' Excused');
     if (paper.length === 1) s.push(paper[0] + ' on paper');
     else if (paper.length === 2) s.push(paper[0] + ' and ' + paper[1] + ' on paper');
     else if (paper.length) s.push(paper.length + ' on paper');
@@ -255,28 +287,44 @@ window.DashInboxRoll = (function () {
 
   /** @param {any} c */
   function _stateClass(c) {
-    if (!c.in) return c.status === 'excused' ? ' is-excused' : ' is-out';
+    if (c.kind === 'excused') return ' is-excused';
+    if (c.kind === 'out') return c.status === 'missing' ? ' is-out is-missing' : ' is-out';
     var k = ' is-in';
     if (c.state === 'returned') k += ' is-returned';
-    else if (c.state === 'tograde') k += ' is-tograde';
+    else if (c.state === 'tograde' && c.status !== 'excused') k += ' is-tograde';
+    if (c.status === 'excused') k += ' is-excused-in';
     if (c.late) k += ' is-late';
     return k;
   }
 
-  /** @param {any} c @param {string} cid @param {string} aid @param {string} form */
-  function chipHtml(c, cid, aid, form) {
+  /** The word shown in the chip itself where a colour or a line is not enough.
+   * @param {any} c */
+  function _tag(c) {
+    if (c.status === 'excused') return 'Excused';
+    if (c.status === 'missing') return 'Missing';
+    if (c.late && c.kind === 'in') return 'Late';
+    return '';
+  }
+
+  /** @param {any} c @param {string} cid @param {string} aid @param {string} form @param {boolean} stop */
+  function chipHtml(c, cid, aid, form, stop) {
     var attrs =
       ' data-dash-roll="chip" data-sid="' +
       esc(c.sid) +
-      '" data-in="' +
-      (c.in ? '1' : '0') +
-      (c.status === 'excused' ? '" data-excused="1' : '') +
+      '" data-kind="' +
+      c.kind +
       '" aria-label="' +
       esc(c.said) +
       '" title="' +
       esc(c.said) +
+      '" tabindex="' +
+      (stop ? '0' : '-1') +
       '"';
-    var mark = (c.state === 'returned' && c.in ? TICK : '') + (c.paper ? PAPER : '');
+    var mark = (c.state === 'returned' && c.kind === 'in' ? TICK : '') + (c.paper ? PAPER : '');
+    var tag = _tag(c);
+    var tagHtml = tag
+      ? '<span class="dash-inbox-roll-tag is-' + tag.toLowerCase() + '" aria-hidden="true">' + tag + '</span>'
+      : '';
     if (form === 'names') {
       return (
         '<button type="button" class="dash-inbox-roll-chip' +
@@ -286,17 +334,20 @@ window.DashInboxRoll = (function () {
         '><span class="dash-inbox-roll-name">' +
         esc(c.name) +
         '</span>' +
+        tagHtml +
         (mark ? '<span class="dash-inbox-roll-marks">' + mark + '</span>' : '') +
         '</button>'
       );
     }
     var page = '';
-    if (c.in) {
+    if (c.kind === 'in') {
       if (c.file) {
         var key = cid + '|' + aid + '|' + c.sid + '|' + c.file.id;
         _files[key] = c.file;
         page =
-          '<img class="dash-inbox-roll-img" data-work-pic data-dash-pic="' + esc(key) + '" alt="" decoding="async">';
+          '<img class="dash-inbox-roll-img" draggable="false" data-work-pic data-dash-pic="' +
+          esc(key) +
+          '" alt="" decoding="async">';
       } else {
         page = '<span class="dash-inbox-roll-sheet"></span>';
       }
@@ -308,28 +359,12 @@ window.DashInboxRoll = (function () {
       attrs +
       '><span class="dash-inbox-roll-pg">' +
       page +
+      tagHtml +
       (mark ? '<span class="dash-inbox-roll-marks">' + mark + '</span>' : '') +
       '</span><span class="dash-inbox-roll-name">' +
       esc(c.name) +
       '</span></button>'
     );
-  }
-
-  /** What the tile's height most likely is before the page is laid out: the
-   * row's rule (the window less 290, never under 510), 60% beside Bulletins.
-   * mount measures it, and draws again if the guess was wrong.
-   * @returns {{ w: number, h: number }} */
-  function _guess() {
-    var row = Math.max(510, (window.innerHeight || 800) - 278 - 12);
-    var bulletins = !!(window.BuildFlags && BuildFlags.on('bulletins') && /** @type {any} */ (window).DashBulletins);
-    return { w: 629, h: bulletins ? Math.round((row - 12) * 0.6) : row };
-  }
-
-  /** The grid's room inside a tile of this height: the head, the switch and
-   * the foot take about 150 px.
-   * @param {number} tileH */
-  function _room(tileH) {
-    return Math.max(120, tileH - 150);
   }
 
   /** @param {string} cid */
@@ -339,20 +374,26 @@ window.DashInboxRoll = (function () {
     var drawn = DashInboxPick.draw(cid);
     var aid = drawn.current ? drawn.current.aid : null;
     var key = cid + '|' + aid;
-    if (_st.key !== key) _st = { key: key, scroll: 0, refocus: null };
+    if (_st.key !== key) _st = { key: key, scroll: 0, refocus: null, keep: null, keepAt: 0, cur: null };
     if (!aid) {
       return '<div class="dash-inbox-roll"><p class="dash-inbox-roll-empty">Nothing is taking work yet.</p></div>';
     }
     var m = model(cid, aid);
     var head = '<div class="dash-inbox-roll-pick" id="dash-inbox-roll-pick">' + DashInboxPick.html(cid) + '</div>';
-    var g = _guess();
-    var form = _form || formFor(g.h);
+    var form = _form || 'names';
+    // The one Tab stop: the student last focused, else the first.
+    var cur = m.students.some(function (/** @type {any} */ c) {
+      return c.sid === _st.cur;
+    })
+      ? _st.cur
+      : m.students.length
+        ? m.students[0].sid
+        : null;
     var chips = m.students
       .map(function (/** @type {any} */ c) {
-        return chipHtml(c, cid, aid, form);
+        return chipHtml(c, cid, aid, form, c.sid === cur);
       })
       .join('');
-    var lay = layoutFor(m.students.length, g.w, _room(g.h));
     var a = _piece(cid, aid);
     var all =
       window.AddWorkClass && a && AddWorkClass.offered(cid, a)
@@ -369,11 +410,7 @@ window.DashInboxRoll = (function () {
       head +
       '<div class="dash-inbox-roll-grid" id="dash-inbox-roll-grid" role="group" aria-label="' +
       esc(m.title + ': the whole class') +
-      '" style="--dash-inbox-roll-cols:' +
-      lay.cols +
-      ';--dash-inbox-roll-pg:' +
-      lay.pageH +
-      'px">' +
+      '">' +
       chips +
       '</div><div class="dash-inbox-roll-foot"><span class="dash-inbox-roll-count" role="status">' +
       esc(m.foot) +
@@ -409,7 +446,7 @@ window.DashInboxRoll = (function () {
     var chip = /** @type {HTMLElement | null} */ (
       root.querySelector('.dash-inbox-roll-chip[data-sid="' + CSS.escape(menu.sid) + '"]')
     );
-    if (!chip || chip.getAttribute('data-in') === '1' || chip.hasAttribute('data-excused')) {
+    if (!chip || chip.getAttribute('data-kind') !== 'out') {
       _menu = null;
       return;
     }
@@ -467,9 +504,22 @@ window.DashInboxRoll = (function () {
     if (document.querySelector('#main .dash-glance') && D && D.render) D.render();
   }
 
+  /** Makes `chip` the grid's one Tab stop.
+   * @param {HTMLElement} root @param {Element | null} chip */
+  function _rove(root, chip) {
+    root.querySelectorAll('.dash-inbox-roll-chip').forEach(function (c) {
+      c.setAttribute('tabindex', c === chip ? '0' : '-1');
+    });
+    if (chip) _st.cur = chip.getAttribute('data-sid');
+  }
+
   /** @param {HTMLElement} root @param {string} cid */
   function _bind(root, cid) {
     var aid = root.getAttribute('data-aid') || '';
+    root.addEventListener('focusin', function (e) {
+      var t = /** @type {any} */ (e.target);
+      if (t && t.matches && t.matches('.dash-inbox-roll-chip')) _rove(root, t);
+    });
     root.addEventListener('click', function (e) {
       var t = /** @type {any} */ (e.target);
       var el = t && t.closest && t.closest('[data-dash-roll]');
@@ -482,22 +532,25 @@ window.DashInboxRoll = (function () {
       }
       var sid = el.getAttribute('data-sid') || '';
       if (what === 'chip') {
-        if (el.getAttribute('data-in') === '1') {
+        if (el.getAttribute('data-kind') !== 'out') {
+          // Work in, assessed or excused: the grader, on that student.
           _menu = null;
           _closeMenu(root);
           _st.refocus = sid;
-          _grader(cid, aid, sid, model(cid, aid).order, _redraw);
-        } else if (el.hasAttribute('data-excused')) {
-          return;
-        } else if (!(_menu && _menu.sid === sid)) {
+          _grader(cid, aid, sid, model(cid, aid).order.indexOf(sid) >= 0 ? model(cid, aid).order : [sid], _redraw);
+        } else if (_menu && _menu.sid === sid) {
+          // The open menu's own chip again closes it.
+          _menu = null;
+          _closeMenu(root);
+        } else {
           _menu = { sid: sid, aid: aid };
           _showMenu(root, cid, el.detail === 0);
         }
         return;
       }
       if (what === 'add') {
-        // A second click of a double click lands here only if it was fast and
-        // on the item; the menu opens below the chip, so it does not.
+        // The menu opens below the chip, so a double click lands on the chip,
+        // never on the item; a fast mouse click on the item is still refused.
         if (el.detail > 0 && Date.now() - _openedAt < 250) return;
         var notIn = model(cid, aid).notIn;
         _menu = null;
@@ -509,7 +562,7 @@ window.DashInboxRoll = (function () {
     root.addEventListener('keydown', function (e) {
       var k = e.key;
       if (_graderOpen()) return;
-      if (k !== 'ArrowLeft' && k !== 'ArrowRight' && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].indexOf(k) < 0) return;
       var t = /** @type {any} */ (e.target);
       if (!t || !t.matches || !t.matches('.dash-inbox-roll-chip')) return;
       var chips = Array.prototype.slice.call(root.querySelectorAll('.dash-inbox-roll-chip'));
@@ -517,8 +570,10 @@ window.DashInboxRoll = (function () {
       var to = at;
       if (k === 'ArrowLeft') to = at - 1;
       else if (k === 'ArrowRight') to = at + 1;
+      else if (k === 'Home') to = 0;
+      else if (k === 'End') to = chips.length - 1;
       else {
-        // Up and down: the chip nearest above or below, by position.
+        // Up and down: the chip in the nearest row above or below, nearest across.
         var r = t.getBoundingClientRect();
         var best = Infinity;
         chips.forEach(function (/** @type {HTMLElement} */ c, /** @type {number} */ i) {
@@ -534,26 +589,28 @@ window.DashInboxRoll = (function () {
       }
       if (to < 0 || to >= chips.length || to === at) return;
       e.preventDefault();
+      _rove(root, chips[to]);
       chips[to].focus();
     });
   }
 
   /* ── Mount ─────────────────────────────────────────────── */
-  /** The tile is laid out only after the page is set, so the form is read
-   * here; when it is not the one drawn, the page is drawn once more.
-   * @param {HTMLElement} root */
-  function _measure(root) {
-    var tile = document.getElementById('dash-inbox');
+  /** Reads the tile's real height. When it is not the form drawn, this view
+   * alone is drawn again in place and true comes back: the caller carries on
+   * with nothing more. Otherwise the pages grid is sized.
+   * @param {HTMLElement} root @param {HTMLElement} tile @param {string} cid
+   * @returns {boolean} */
+  function _measure(root, tile, cid) {
     var grid = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-grid'));
-    if (!tile || !grid) return;
+    if (!grid) return false;
     var h = tile.getBoundingClientRect().height;
-    if (!h) return;
+    if (!h) return false;
     var form = formFor(h);
     var drawn = root.classList.contains('is-pages') ? 'pages' : 'names';
     if (form !== drawn) {
       _form = form;
-      _redraw();
-      return;
+      _swap(root, tile, cid);
+      return true;
     }
     _form = form;
     if (form === 'pages') {
@@ -562,10 +619,30 @@ window.DashInboxRoll = (function () {
       var foot = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-foot'));
       var room = m.height - top - (foot ? foot.offsetHeight : 0) - 8;
       var n = root.querySelectorAll('.dash-inbox-roll-chip').length;
-      var lay = layoutFor(n, grid.clientWidth || 629, room > 0 ? room : _room(h));
+      var lay = layoutFor(n, grid.clientWidth || 629, room > 0 ? room : 120);
       grid.style.setProperty('--dash-inbox-roll-cols', String(lay.cols));
       grid.style.setProperty('--dash-inbox-roll-pg', lay.pageH + 'px');
     }
+    return false;
+  }
+
+  /** Draws this view again where it stands, in the other form.
+   * @param {HTMLElement} root @param {HTMLElement} tile @param {string} cid */
+  function _swap(root, tile, cid) {
+    _swaps++;
+    if (_undo) _undo();
+    _undo = null;
+    _closeMenu(root);
+    var fresh = document.createElement('div');
+    // html-safe: html() builds the view; every name and title goes through esc
+    fresh.innerHTML = html(cid);
+    var next = /** @type {HTMLElement | null} */ (fresh.querySelector('.dash-inbox-roll[data-aid]'));
+    if (!next) return;
+    root.replaceWith(next);
+    _attach(next, tile, cid);
+    // Pictures the old form held and this one does not show are let go.
+    var pics = window.DashInbox && DashInbox.pics();
+    if (pics) pics.sweep();
   }
 
   /** Fills the pictures through the tile's holder, inside mount: the sweep
@@ -579,46 +656,63 @@ window.DashInboxRoll = (function () {
     });
   }
 
+  /** Everything a drawn root needs: its listeners, the switch, the scroll,
+   * the menu, the form, the pictures, the focus.
+   * @param {HTMLElement} root @param {HTMLElement} tile @param {string} cid */
+  function _attach(root, tile, cid) {
+    var aid = root.getAttribute('data-aid') || '';
+    _bind(root, cid);
+    // A pick calls set, redraws, and the pressed button keeps the focus.
+    DashInboxPick.mount(root, cid, _redraw);
+    if (_measure(root, tile, cid)) return;
+    var grid = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-grid'));
+    if (grid) grid.scrollTop = _st.scroll;
+    if (_menu && _menu.aid === aid) _showMenu(root, cid, false);
+    else _menu = null;
+    _fill(root, cid);
+    // The student who opened the grader, or who had the focus when the draw began.
+    var want = _st.refocus || (Date.now() - _st.keepAt < 2000 ? _st.keep : null);
+    _st.refocus = null;
+    _st.keep = null;
+    if (want) {
+      var back = /** @type {HTMLElement | null} */ (
+        root.querySelector('.dash-inbox-roll-chip[data-sid="' + CSS.escape(want) + '"]')
+      );
+      if (back) {
+        _rove(root, back);
+        back.focus({ preventScroll: true });
+      }
+    }
+    var mine = _st.key;
+    _undo = function () {
+      // The scroll and the focus as they stand, before the page is drawn again.
+      if (grid && grid.isConnected && _st.key === mine) _st.scroll = grid.scrollTop;
+      var on = document.activeElement;
+      if (on && root.contains(on) && on.classList && on.classList.contains('dash-inbox-roll-chip')) {
+        _st.keep = on.getAttribute('data-sid');
+        _st.keepAt = Date.now();
+      }
+      DashInboxPick.unmount(root);
+    };
+  }
+
   /** @param {HTMLElement} tile @param {string} cid */
   function mount(tile, cid) {
     unmount();
     var found = /** @type {HTMLElement | null} */ (tile.querySelector('.dash-inbox-roll[data-aid]'));
     if (!found) return;
-    var root = found;
-    var aid = root.getAttribute('data-aid') || '';
-    _bind(root, cid);
-    // A pick calls set, redraws, and the pressed button keeps the focus.
-    DashInboxPick.mount(root, cid, _redraw);
-    var grid = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-grid'));
-    if (grid) grid.scrollTop = _st.scroll;
-    if (_menu && _menu.aid === aid) _showMenu(root, cid, false);
-    else _menu = null;
-    _measure(root);
-    _fill(root, cid);
-    if (_st.refocus) {
-      // The student who opened the grader takes the focus back.
-      var back = /** @type {HTMLElement | null} */ (
-        root.querySelector('.dash-inbox-roll-chip[data-sid="' + CSS.escape(_st.refocus) + '"]')
-      );
-      _st.refocus = null;
-      if (back) back.focus({ preventScroll: true });
-    }
+    _attach(found, tile, cid);
     if (window.ResizeObserver) {
       var tick = 0;
       _watch = new ResizeObserver(function () {
         clearTimeout(tick);
         tick = window.setTimeout(function () {
-          if (document.getElementById('dash-inbox') === tile && tile.contains(root)) _measure(root);
+          var root = /** @type {HTMLElement | null} */ (tile.querySelector('.dash-inbox-roll[data-aid]'));
+          if (root && document.getElementById('dash-inbox') === tile) _measure(root, tile, cid);
         }, 60);
       });
       _watch.observe(tile);
     }
-    var mine = _st.key;
-    _undo = function () {
-      // The scroll as it stands, before the page is drawn again.
-      if (grid && grid.isConnected && _st.key === mine) _st.scroll = grid.scrollTop;
-      DashInboxPick.unmount(root);
-    };
   }
 
   function unmount() {
@@ -655,11 +749,20 @@ window.DashInboxRoll = (function () {
     footText: footText,
     html: html,
     TALL: TALL,
+    /** Test hooks: what is live, and how often this view was drawn in place. */
+    live: function () {
+      return { observer: !!_watch, undo: !!_undo, menuListener: !!_off, swaps: _swaps };
+    },
+    /** Test hook: the form the next draw starts in. @param {'names' | 'pages' | null} f */
+    setForm: function (f) {
+      _form = f;
+    },
     /** Test hook: forget the module's state. */
     reset: function () {
       _menu = null;
       _form = null;
-      _st = { key: '', scroll: 0, refocus: null };
+      _swaps = 0;
+      _st = { key: '', scroll: 0, refocus: null, keep: null, keepAt: 0, cur: null };
     },
   };
 })();
