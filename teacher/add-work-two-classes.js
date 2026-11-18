@@ -258,10 +258,15 @@
     return out;
   }
 
+  function _find(cid, aid) {
+    return (
+      (getAssessments(cid) || []).find(function (x) {
+        return x && x.id === aid;
+      }) || null
+    );
+  }
   function _title(cid, aid) {
-    var a = (getAssessments(cid) || []).find(function (x) {
-      return x && x.id === aid;
-    });
+    var a = _find(cid, aid);
     return (a && a.title) || 'that assessment';
   }
 
@@ -272,24 +277,38 @@
   function carryFor(s, given, placed) {
     var home = s.stage.home(given.sid);
     if (!placed.ok || !given.forAid || !home) return placed;
-    var title = _title(given.forCid, given.forAid);
-    if (home.cid === given.forCid) {
-      var res = s.stage.setFor(given.sid, placed.piece.id, given.forAid);
-      if (res.ok) return { ok: true, piece: res.piece };
-      s.stage.note(given.sid, (given.from || 'That file') + ' couldn’t go to ' + title + '.');
+    var file = given.from || 'This file';
+    var now = ' It is for ' + ((home.a && home.a.title) || 'this assessment') + '.';
+    if (home.cid !== given.forCid) {
+      s.stage.note(
+        given.sid,
+        file +
+          ' was for ' +
+          _title(given.forCid, given.forAid) +
+          ' in ' +
+          _name(given.forCid) +
+          '.' +
+          now.replace(' It is', ' Here it is'),
+      );
       return placed;
     }
-    s.stage.note(
-      given.sid,
-      title +
-        ' isn’t in ' +
-        (home.name || 'this class') +
-        ', so ' +
-        (given.from || 'this file') +
-        ' is for ' +
-        ((home.a && home.a.title) || 'this assessment') +
-        '.',
-    );
+    var res = s.stage.setFor(given.sid, placed.piece.id, given.forAid);
+    if (res.ok) return { ok: true, piece: res.piece };
+    var a = _find(given.forCid, given.forAid);
+    var st = s.byId[given.sid];
+    var who = st && typeof displayNameWithLast === 'function' ? displayNameWithLast(st) : 'this student';
+    var said =
+      !a || (res.reason !== 'not_found' && res.reason !== 'too_many_pages')
+        ? // The assessment is gone, or something else: as before.
+          (given.from || 'That file') + ' couldn’t go to ' + ((a && a.title) || 'that assessment') + '.'
+        : file +
+          ' was for ' +
+          (a.title || 'Untitled') +
+          (res.reason === 'too_many_pages'
+            ? ', where ' + who + ' has no room for more pages.'
+            : ', which ' + who + ' is not part of.') +
+          now;
+    s.stage.note(given.sid, said);
     return placed;
   }
 

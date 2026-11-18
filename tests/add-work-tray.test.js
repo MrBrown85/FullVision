@@ -1020,6 +1020,9 @@ describe('one pile, two classes: turned on after the files', () => {
     expect(a.waiting).toContain('Kaur.jpg: Choose where it goes.');
     expect(a.waiting).toContain('Chen.pdf: Two students are named Chen.');
     expect([...itemNamed('Kaur.jpg').querySelectorAll('.awt-act')].map(text).join(' ')).not.toMatch(/Hana|Block C/);
+    // The one student it fits is offered, never taken.
+    expect([...itemNamed('Kaur.jpg').querySelectorAll('.awt-act')].map(text)).toEqual(['Yes, Priya', 'Someone Else']);
+    expect(text(itemNamed('Kaur.jpg').querySelector('.awt-ask'))).toBe('Is this Priya?');
   });
 
   it('one line names both what went back and what was placed, or either alone', async () => {
@@ -1085,6 +1088,11 @@ describe('one pile, two classes: turned on after the files', () => {
   });
 
   it('placed on a student of the other class, the choice can’t apply, and the row says so', async () => {
+    // Block C has an Essay One of its own: the sentence is still true.
+    saveAssessments(
+      CID2,
+      getAssessments(CID2).concat([{ id: U(35), title: 'Essay One', tagIds: [], date: '2026-10-25' }]),
+    );
     AddWorkClass.open(CID, PIECE);
     await AddWorkClass.takeFiles([file('Kaur.jpg')]);
     setFor(PRIYA, ESSAY);
@@ -1092,7 +1100,29 @@ describe('one pile, two classes: turned on after the files', () => {
     click(itemNamed('Kaur.jpg').querySelector('[data-sid="' + HANA + '"]'));
     expect(chipsOf(HANA)).toEqual(['Kaur.jpg']);
     expect($$('.awc-chip.is-late').length).toBe(0);
-    expect(noteOf(HANA)).toEqual(['Essay One isn’t in Block C, so Kaur.jpg is for Conscription.']);
+    expect(noteOf(HANA)).toEqual(['Kaur.jpg was for Essay One in Socials 10. Here it is for Conscription.']);
+  });
+
+  it('placed on a classmate the chosen assessment does not list, the row says why', async () => {
+    // Essay One is graded with a group for Avery and Jordan: not on their rows.
+    saveAssessments(
+      CID,
+      getAssessments(CID).map(a =>
+        a.id === ESSAY ? Object.assign({}, a, { collaboration: 'group', groups: [[AVERY, JORDAN]] }) : a,
+      ),
+    );
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles([file('Kaur.jpg')]);
+    setFor(PRIYA, ESSAY);
+    await flip();
+    const item = itemNamed('Kaur.jpg');
+    click(item.querySelector('[data-awt="else"]'));
+    click(itemNamed('Kaur.jpg').querySelector('[data-awt="to"][data-sid="' + AVERY + '"]'));
+    expect(chipsOf(AVERY)).toEqual(['Kaur.jpg']);
+    expect(forOf(AVERY)).toEqual([PIECE]);
+    expect(noteOf(AVERY)).toEqual([
+      'Kaur.jpg was for Essay One, which Avery Chen is not part of. It is for Conscription.',
+    ]);
   });
 
   it('a file left on its default assessment carries nothing', async () => {

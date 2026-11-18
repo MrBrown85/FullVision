@@ -624,7 +624,10 @@
         html += _btn('awt-act is-quiet', 'else', item, 'Someone Else');
         return '<div class="awt-acts">' + html + '</div>';
       }
-      if (m.kind === 'close' && !item.picking) {
+      /* One student, but not placed (matched again when the classes changed):
+         offered as a close spelling is, never taken. A file with no room on
+         that student (its note) is not offered there again. */
+      if ((m.kind === 'close' || (m.kind === 'one' && !item.note)) && !item.picking) {
         var first = host.first(m.sid);
         return (
           '<span class="awt-ask">' +
