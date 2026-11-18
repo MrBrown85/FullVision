@@ -33,6 +33,12 @@ here. Never against gradebook-prod: a throwaway PostgreSQL 17 only.
   missing   A relied-on function that is missing stops the file.
   apply     The guards; a held lock; only the header's changes; no existing row changed; a second run; pre-
             and post-check; the size.
+  m2        With a stand-in for M2's student_submit functions: M1 again, its post-check, PART 1 and the grants
+            back, the full undo refusing until M2 is undone.
+  locks     A delete holding the class's lock first: show again, edit, delete, finish and the seen list refuse
+            rightly; an expired upload dropped while a file finishes, 20 of 20.
+  lastcheck The last check confirms the storage helpers' grant; a stop there leaves nothing, the bucket included.
+  spentkey  After an expired upload is dropped the same key answers its first reply; a new key posts.
   undo      PART 1 alone; the full removal refuses while a row, a queued page or a file is kept; then leaves the
             catalog and every row as before; a changed function stops it; a second run; the file again.
 """
@@ -55,7 +61,9 @@ TEACHER = ['list_bulletins(uuid)', 'post_bulletin(uuid,jsonb,jsonb,uuid)', 'fini
 HELPERS = ['fv_private.bulletin_audience(uuid)', 'fv_private.bulletin_json(uuid)', 'fv_private.bulletin_drop_expired(uuid)',
            'fv_private.bulletin_file_path(uuid,uuid,integer)', 'fv_private.bulletin_pinned_now(boolean,date,text)']
 OWN_SQL = """select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
-               from pg_proc p where p.proname ~ 'bulletin'"""
+               from pg_proc p where p.proname = any (string_to_array('%s', ','))
+                and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)""" % ''.join(
+    re.findall(r"'([a-z_,]+)'", re.search(r"set_config\('fv\.b1a', (.*?), true\)", text_of(FILE), re.S).group(1)))
 TABLES_SQL = """select md5(string_agg(attrelid::regclass::text || '.' || attname || ' ' || format_type(atttypid, atttypmod), ',' order by attrelid::regclass::text, attnum))
                   from pg_attribute where attrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace and relname ~ '^bulletin' and relkind = 'r')
                    and attnum > 0 and not attisdropped"""
@@ -86,7 +94,7 @@ def scen_fingerprints():
         if r != 'ok': sys.exit('the file without its last check did not apply: ' + r)
         set_search_path(d)
         own, tables, pols = d.one(OWN_SQL), d.one(TABLES_SQL), d.one(POLICIES_SQL)
-        each = d.all("select p.oid::regprocedure::text, md5(pg_get_functiondef(p.oid)) from pg_proc p where p.proname ~ 'bulletin' order by 1")
+        each = d.all("select p.oid::regprocedure::text, md5(pg_get_functiondef(p.oid)) from pg_proc p where p.proname ~ 'bulletin' and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) order by 1")
         p = os.path.join(HERE, FILE); t = open(p).read()
         t = put_fp(put_fp(put_fp(t, 'own', own), 'tables', tables), 'policies', pols)
         open(p, 'w').write(t)
@@ -246,9 +254,21 @@ def scen_post():
     mine = [x for x in ls['bulletins'] if x['id'] == r['id']][0]
     ok('list: a reminder past its last day reads as not pinned, and loses its place', mine['pinned'] is False and ls['bulletins'][0]['id'] != r['id'], (mine, ls['bulletins'][0]['id']))
     ok('list: the row itself is not changed', d.one('select pinned from bulletin where id = :b', b=r['id']) is True)
-    d.run("update course set timezone = 'Pacific/Kiritimati' where id = :c", c=w.c)
-    ok('list: "today" is the class\'s own day', isinstance(listed(w)['bulletins'], list))
+    # "Today" is the class's own day: two zones 25 hours apart, so one is always a day ahead of the other.
+    d.run("update student_card set works_until = (now() at time zone 'Pacific/Pago_Pago')::date where enrollment_id = :e", e=w.e['can2'])
+    d.run("update bulletin set pinned_until = (now() at time zone 'Pacific/Pago_Pago')::date where id = :b", b=r['id'])
+    card = d.one('select id::text from student_card where enrollment_id = :e and stopped_at is null', e=w.e['can2'])
+    for tz, works in (('Pacific/Pago_Pago', True), ('Pacific/Kiritimati', False), ('', None), ('Not/A_Zone', None)):
+        d.run('update course set timezone = :t where id = :c', t=tz, c=w.c)
+        refusal = d.one('select student_submit._card_refusal(:k)', k=card)
+        ls = listed(w); mine = [x for x in ls['bulletins'] if x['id'] == r['id']][0]
+        want_can = 2 if refusal is None else 1
+        ok('list: in zone %r the counts follow _card_refusal (%s)' % (tz, refusal), ls['can_see'] == want_can and ls['no_card'] == 5 - want_can
+           and (works is None or (refusal is None) == works), (ls['can_see'], ls['no_card'], refusal))
+        ok('list: in zone %r the reminder is pinned exactly while its last day has not passed there' % tz,
+           mine['pinned'] == (refusal is None), (mine['pinned'], refusal))
     d.run("update course set timezone = 'America/Vancouver' where id = :c", c=w.c)
+    d.run("update student_card set works_until = current_date + 365 where enrollment_id = :e", e=w.e['can2'])
     d.run("insert into bulletin (course_id, kind, body, posted_at) select :c, 'announcement', 'n' || g, now() - g * interval '1 minute' from generate_series(1, 100) g", c=w.c)
     ls = listed(w)
     ok('list: at most 100, and more says there are others', len(ls['bulletins']) == 100 and ls['more'] is True, (len(ls['bulletins']), ls['more']))
@@ -522,10 +542,26 @@ def scen_cascade():
        == [['bulletin_removed', 3]], d.all("select path, reason from submission_file_removal"))
     ok('cascade: the other class keeps everything', d.one('select count(*) from bulletin where id = :b', b=other) == 1
        and d.one('select count(*) from bulletin_seen where bulletin_id = :b', b=other) == 1)
-    T(d, 'delete_bulletin(:b, null)', b=other)
-    n = d.one("select count(*) from submission_file_removal where bucket = :b and path like :p", b=BUCKET, p=w.c2 + '/%')
-    d.run('select fv_private.bulletin_drop_expired(null)')
-    ok('cascade: the drop for every class runs (for a later job)', n == 1)
+    x = post(w, {'kind': 'announcement', 'body': 'z'}, [{'kind': 'photo', 'pages': 1}], c=w.c2)['bulletin']['id']
+    d.run("update bulletin set created_at = now() - interval '3 hours' where id = :b", b=x)
+    n0 = d.one('select count(*) from bulletin'); r = d.one('select fv_private.bulletin_drop_expired(null)')
+    ok('cascade: the drop takes one class only: given none, it drops nothing', r == 0 and d.one('select count(*) from bulletin') == n0, (r, n0))
+    ok('cascade: given the class, it drops the expired one', d.one('select fv_private.bulletin_drop_expired(:c)', c=w.c2) == 1
+       and d.one('select count(*) from bulletin where id = :b', b=x) == 0)
+    # A purge with an assessment still linked to a bulletin, and a teacher's account purge.
+    lb = post(w, {'kind': 'reminder', 'body': 'linked', 'assessment_id': w.a2}, c=w.c2)['bulletin']['id']
+    d.run("update course set deleted_at = now() - interval '31 days' where id = :c", c=w.c2)
+    d.run('select public.fv_retention_cleanup()')
+    ok('cascade: a class purged with an assessment still linked takes the bulletin, the assessment and everything',
+       d.one('select count(*) from bulletin where id = any (:b)', b=[lb, other]) == 0 and d.one('select count(*) from assessment where id = :a', a=w.a2) == 0)
+    pb = post(w, {'kind': 'announcement', 'body': 'bravo'}, [{'kind': 'pdf', 'pages': 2}], uid=B, c=w.cb)['bulletin']
+    d.run("insert into bulletin_seen (bulletin_id, enrollment_id) values (:b, :e)", b=pb['id'], e=w.eb)
+    d.run("update teacher set deleted_at = now() - interval '31 days' where id = :b", b=B)
+    d.run('select public.fv_retention_cleanup()')
+    ok('cascade: a teacher\'s account purge takes their bulletins and queues every page',
+       d.one('select count(*) from bulletin where course_id = :c', c=w.cb) == 0 and d.one('select count(*) from bulletin_seen where enrollment_id = :e', e=w.eb) == 0
+       and sorted(r[0] for r in d.all("select path from submission_file_removal where bucket = :k and course_id = :c", k=BUCKET, c=w.cb)) == sorted(pb['files'][0]['paths']),
+       d.all("select path from submission_file_removal where course_id = :c", c=w.cb))
     d.close()
 
 # ── limits ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -551,13 +587,38 @@ def scen_limits():
              ('a last day that has passed', {'kind': 'reminder', 'body': 'x', 'pinned': True, 'pinned_until': yesterday}, None),
              ('a date that is not a date', {'kind': 'reminder', 'body': 'x', 'pinned': True, 'pinned_until': 'Friday'}, None),
              ('an unknown key', an(colour='red'), None), ('words that are a number', {'kind': 'announcement', 'body': 7}, None),
-             ('nothing in it', {'kind': 'announcement', 'body': '   '}, None), ('a bulletin that is a list', [1], None)]
+             ('nothing in it', {'kind': 'announcement', 'body': '   '}, None), ('a bulletin that is a list', [1], None),
+             ('words of only newlines and tabs', {'kind': 'announcement', 'body': '\n\t \r\n'}, None),
+             ('a link with a name and password', an(link_url='https://user:pass@example.org/'), None),
+             ('a link with a backslash before @', an(link_url='https://example.org\\@evil.example/'), None),
+             ('a link with a right-to-left override', an(link_url='https://example.org/\u202egpj.exe'), None),
+             ('a link with a zero-width space', an(link_url='https://exa\u200bmple.org/'), None),
+             ('a PDF of 1.0 pages', an(), [{'kind': 'pdf', 'pages': 1.0}]), ('a PDF of 3.50 pages', an(), [{'kind': 'pdf', 'pages': 3.5}]),
+             ('a photo of 1.0 pages', an(), [{'kind': 'photo', 'pages': 1.0}])]
+    for bad in ('infinity', '-infinity', 'tomorrow', 'today', '12/31/2099', '20990101', '2099-01-01T00:00:00', '2099-01-01 00:00', '2026-02-30', ' 2099-1-1'):
+        cases.append(('a last day of %r' % bad, {'kind': 'reminder', 'body': 'x', 'pinned': True, 'pinned_until': bad}, None))
     for name, b, files in cases:
         if isinstance(b, dict) and b.get('assessment_id') == 'A2': b['assessment_id'] = w.a2
         if isinstance(b, dict) and b.get('assessment_id') == 'AB': b['assessment_id'] = w.ab
-        r = err(d, lambda: post(w, b, files))
+        if files == 'RAW2E0':
+            r = err(d, lambda: T(d, "post_bulletin(:c, cast(:b as jsonb), '[{\"kind\": \"pdf\", \"pages\": 2e0}]'::jsonb, null)", c=w.c, b=json.dumps(b)))
+        else:
+            r = err(d, lambda: post(w, b, files))
         ok('limits: post refuses %s (22023)' % name, code(r) == '22023', r)
-    ok('limits: the refusals added nothing', sums(d) == before)
+    ok('limits: the post refusals added nothing', sums(d) == before, [k for k in before if sums(d).get(k) != before[k]])
+    tid = post(w, {'kind': 'reminder', 'body': 'x', 'pinned': True})['bulletin']['id']
+    before = sums(d)
+    for bad in ('infinity', 'tomorrow', '20990101', '2099-01-01T10:00:00'):
+        r = err(d, lambda: edit(w, tid, {'pinned_until': bad}))
+        ok('limits: edit refuses a last day of %r (22023)' % bad, code(r) == '22023', r)
+    ok('limits: edit refuses a pin given as a number', code(err(d, lambda: edit(w, tid, {'pinned': 1}))) == '22023')
+    ok('limits: the edit refusals changed nothing', sums(d) == before, [k for k in before if sums(d).get(k) != before[k]])
+    ok('limits: words padded with newlines and tabs are trimmed', post(w, an(body='\n\t Hello \r\n'))['bulletin']['body'] == 'Hello')
+    ok('limits: a link with @ after the host is taken', post(w, an(link_url='https://example.org/@someone'))['bulletin']['link_url'] == 'https://example.org/@someone')
+    r = err(d, lambda: d.run("insert into bulletin (course_id, kind, body, pinned, pinned_until) values (:c, 'reminder', 'x', true, 'infinity')", c=w.c))
+    ok('limits: the table refuses a last day of infinity', code(r) == '23514', r)
+    r = err(d, lambda: d.run("insert into bulletin (course_id, kind, link_url) values (:c, 'announcement', 'https://u:p@x.org')", c=w.c))
+    ok('limits: the table refuses a link with a name and password', code(r) == '23514', r)
     ok('limits: 2000 characters are taken', len(post(w, an(body='y' * 2000))['bulletin']['body']) == 2000)
     ok('limits: a link of 2000 is taken', len(post(w, an(link_url='https://e.org/' + 'a' * 1986))['bulletin']['link_url']) == 2000)
     ok('limits: 20 pages on one bulletin are taken', len(post(w, an(), [{'kind': 'pdf', 'pages': 19}, {'kind': 'photo', 'pages': 1}])['bulletin']['files']) == 2)
@@ -704,8 +765,8 @@ def scen_apply():
               else "do $$ begin execute replace((select def from kept), 'select exists', 'select  exists'); end $$",
               "do $$ begin execute (select def from kept); end $$", sig.split('(')[0].split('.')[1])
         d.run('drop table kept')
-    guard('a function named like this file\'s', 'create function public.my_bulletin_helper() returns int language sql as $$ select 1 $$',
-          'drop function public.my_bulletin_helper()', 'are not exactly this file')
+    guard('a helper of this file\'s name with other arguments', 'create function fv_private.bulletin_json(text) returns int language sql as $$ select 1 $$',
+          'drop function fv_private.bulletin_json(text)', 'are not exactly this file')
     guard('a post_bulletin with other arguments', 'create function public.post_bulletin(text) returns int language sql as $$ select 1 $$',
           'drop function public.post_bulletin(text)', 'are not exactly this file')
     guard('a bulletin table that is not this file\'s', 'create table public.bulletin (id uuid primary key, words text)', 'drop table public.bulletin', 'are not exactly this file')
@@ -789,16 +850,145 @@ def scen_undo():
     d.run("create temp table kept as select pg_get_functiondef(to_regprocedure('public.list_bulletins(uuid)')) as def")
     d.run("do $$ begin execute replace((select def from kept), 'begin', 'begin -- changed later'); end $$")
     r = d.file(UNDO)
-    ok('undo: a function changed since stops the removal', r.startswith('STOPPED') and 'not as 2026111801 left it' in r and applied(d), r)
+    ok('undo: a function changed since stops the removal', r.startswith('STOPPED') and 'is not as it left it' in r and applied(d), r)
     d.run("do $$ begin execute (select def from kept); end $$"); d.run('drop table kept')
     r = d.file(UNDO); ok('undo: once nothing is kept, the full removal runs', r == 'ok' and not applied(d), r)
     gone, came = differences(base, catalog(d.c))
     ok('undo: after use, the catalog is as before', (gone, came) == ([], []), (gone, came))
     d.close()
 
+# ── m2: the student side's functions present ───────────────────────────────────────────────────────────
+STAND_IN = """create function student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb
+               language plpgsql security definer set search_path to 'public', 'student_submit', 'pg_temp'
+               as $$ begin return jsonb_build_object('n', (select count(*) from public.bulletin)); end $$"""
+def way_back():
+    return [l[4:] for l in text_of(UNDO).splitlines() if l.startswith('--   grant execute')]
+
+def scen_m2():
+    """M2 (functions in student_submit that read the bulletin tables) changes nothing for M1, in each order."""
+    w = world('m2'); d = w.d
+    d.run(STAND_IN); d.run('grant execute on function student_submit.bulletins(text, uuid, text) to service_role')
+    withm2 = catalog(d.c)
+    r = d.file(FILE); ok('m2: with M2 present, M1 runs again cleanly', r == 'ok', r)
+    ok('m2: and that second run changes nothing', catalog(d.c) == withm2, differences(withm2, catalog(d.c)))
+    set_search_path(d); r = d.statements(split(text_of(POST)))
+    ok('m2: the post-check says ok on every row', r == 'ok' and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or r)
+    r = d.statements(split(part1())); ok('m2: undo PART 1 runs', r == 'ok', r)
+    ok('m2: the undo header gives the seven grants back', len(way_back()) == 7, way_back())
+    r = d.statements(way_back()); ok('m2: the seven grants run', r == 'ok', r)
+    ok('m2: and give back exactly what PART 1 took', same(catalog(d.c), withm2), differences(norm(withm2), norm(catalog(d.c))))
+    post(w, {'kind': 'announcement', 'body': 'x'})
+    ok('m2: (setup) the stand-in reads the table', obj(d.service('student_submit.bulletins(null, null, null)'))['n'] == 1)
+    d.run('delete from bulletin')
+    before = catalog(d.c)
+    r = d.file(UNDO)
+    ok('m2: the full undo refuses while M2 uses the tables, and says to undo M2 first', r.startswith('STOPPED') and 'undo that file (M2' in r, r)
+    ok('m2: and the tables are there (only PART 1 ran)', applied(d))
+    d.statements(way_back())
+    ok('m2: the grants put back, the catalog is as before', same(catalog(d.c), before), differences(norm(before), norm(catalog(d.c))))
+    d.run('drop function student_submit.bulletins(text, uuid, text)')
+    r = d.file(UNDO); ok('m2: once M2 is undone, the full undo runs', r == 'ok' and not applied(d), r)
+    d.close()
+
+# ── locks: a delete taking the class's lock first; the drop and a finish at once ─────────────────────────
+def scen_locks():
+    """E: each function that finds the row and then takes the lock gives the right refusal when a delete held
+    the lock first. F: an expired upload dropped while another file finishes, 20 of 20 with no deadlock."""
+    w = world('locks'); d = w.d
+    def arranged(make, call, want, rounds=5):
+        good = 0
+        for _ in range(rounds):
+            bid, fid = make()
+            out = {}
+            gate = Conn(d); gate.run('begin'); gate.run("select pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(:c))", c=w.c)
+            def go():
+                c = Conn(d); c.as_teacher()
+                try: out['r'] = obj(c.run(call, b=bid, f=fid)[0][0])
+                except Exception as e: out['r'] = 'ERROR ' + sqlstate(e)
+                c.close()
+            t = threading.Thread(target=go); t.start(); time.sleep(0.4)
+            gate.run('delete from bulletin where id = :b', b=bid); gate.run('commit'); gate.close(); t.join()
+            good += want(out.get('r'))
+        return good
+    def make_visible():
+        b = post(w, {'kind': 'announcement', 'body': 'x'})['bulletin']; return b['id'], nid()
+    def make_file():
+        b = post(w, {'kind': 'announcement', 'body': 'x'}, [{'kind': 'photo', 'pages': 1}])['bulletin']
+        put_page(d, b['files'][0]['paths'][0]); return b['id'], b['files'][0]['id']
+    p2 = lambda r: r == 'ERROR P0002'
+    for name, make, call, want in [
+            ('show again', make_visible, 'select show_bulletin_again(:b, null) where :f::uuid is not null', p2),
+            ('edit', make_visible, "select edit_bulletin(:b, '{\"body\": \"y\"}'::jsonb, null) where :f::uuid is not null", p2),
+            ('delete', make_visible, 'select delete_bulletin(:b, null) where :f::uuid is not null', p2),
+            ('finish', make_file, 'select finish_bulletin_file(:f, null) where :b::uuid is not null', lambda r: isinstance(r, dict) and r.get('status') == 'gone')]:
+        n = arranged(make, call, want)
+        ok('locks: %s after a delete that took the class\'s lock first gives the right refusal, 5 of 5' % name, n == 5, n)
+    bid = post(w, {'kind': 'announcement', 'body': 'x'})['bulletin']['id']; delete(w, bid)
+    ok('locks: the seen list of a bulletin just deleted is P0002', code(err(d, lambda: seen_list(w, bid))) == 'P0002')
+    # F: an expired upload dropped by a list while another bulletin's file finishes, both queued on the class's lock.
+    good = 0
+    for _ in range(20):
+        old = post(w, {'kind': 'announcement', 'body': 'old'}, [{'kind': 'photo', 'pages': 1}])['bulletin']['id']
+        d.run("update bulletin set created_at = now() - interval '3 hours' where id = :b", b=old)
+        d.run("update bulletin_file set created_at = now() - interval '3 hours' where bulletin_id = :b", b=old)
+        b = post(w, {'kind': 'announcement', 'body': 'new'}, [{'kind': 'photo', 'pages': 1}])['bulletin']
+        put_page(d, b['files'][0]['paths'][0])
+        out = {}
+        gate = Conn(d); gate.run('begin'); gate.run("select pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(:c))", c=w.c)
+        def call(name, sql, **kw):
+            c = Conn(d); c.as_teacher()
+            try: out[name] = obj(c.run(sql, **kw)[0][0])
+            except Exception as e: out[name] = 'ERROR ' + sqlstate(e)
+            c.close()
+        ts = [threading.Thread(target=call, args=('finish', 'select finish_bulletin_file(:f, null)'), kwargs={'f': b['files'][0]['id']}),
+              threading.Thread(target=call, args=('list', 'select list_bulletins(:c)'), kwargs={'c': w.c})]
+        [t.start() for t in ts]; time.sleep(0.3); gate.run('commit'); gate.close(); [t.join() for t in ts]
+        good += (isinstance(out.get('finish'), dict) and out['finish']['bulletin']['visible'] is True and isinstance(out.get('list'), dict)
+                 and d.one('select count(*) from bulletin where id = :b', b=old) == 0)
+    ok('locks: an expired upload dropped while another file finishes: 20 of 20, no deadlock', good == 20, good)
+    d.close()
+
+# ── lastcheck: a failure at the last check leaves nothing behind ───────────────────────────────────────
+def scen_lastcheck():
+    """G: the last check confirms the storage helpers' grant; any failure there leaves nothing, the bucket row included."""
+    w = world('lastcheck', with_file=False); d = w.d
+    base = catalog(d.c); rows0 = sums(d)
+    text = text_of(FILE)
+    broken = text.replace("     or _p::text ~ '^fv_private\\.bulletin_file_(upload|read)_allowed\\(' then", "     or _p::text ~ '^fv_private\\.bulletin_file_upload_allowed\\(' then")
+    ok('lastcheck: (setup) the grant of the read helper is taken out of the copy', broken != text)
+    r = d.statements(split(broken))
+    ok('lastcheck: without the read helper\'s grant the last check stops the file', r.startswith('STOPPED') and 'did not come out as written' in r, r)
+    ok('lastcheck: and nothing is left: the catalog as before', catalog(d.c) == base, differences(base, catalog(d.c)))
+    ok('lastcheck: and every row as before, the bucket row included', sums(d) == rows0 and d.one("select count(*) from storage.buckets where id = :b", b=BUCKET) == 0)
+    r = d.file(FILE); ok('lastcheck: the file itself then applies', r == 'ok', r)
+    ok('lastcheck: and the teacher may run both storage helpers', all(d.one("select has_function_privilege('authenticated', :s, 'execute')", s=s)
+       for s in ('fv_private.bulletin_file_read_allowed(text)', 'fv_private.bulletin_file_upload_allowed(text)')))
+    d.close()
+
+# ── spentkey: an expired upload, then the same key again ───────────────────────────────────────────────
+def scen_spentkey():
+    """J: after an upload is dropped the key is spent: the same key answers the stored first reply (the dead id), a new key posts."""
+    w = world('spentkey'); d = w.d
+    key = nid()
+    first = post(w, {'kind': 'announcement', 'body': 'x'}, [{'kind': 'photo', 'pages': 1}], key=key)
+    bid, fid = first['bulletin']['id'], first['bulletin']['files'][0]['id']
+    d.run("update bulletin set created_at = now() - interval '3 hours' where id = :b", b=bid)
+    d.run("update bulletin_file set created_at = now() - interval '3 hours' where bulletin_id = :b", b=bid)
+    ok('spentkey: finishing the expired file answers gone', finish_(w, fid) == {'file_id': fid, 'status': 'gone'})
+    ok('spentkey: the bulletin is dropped', d.one('select count(*) from bulletin where id = :b', b=bid) == 0)
+    again_ = post(w, {'kind': 'announcement', 'body': 'x'}, [{'kind': 'photo', 'pages': 1}], key=key)
+    ok('spentkey: the same key answers the stored first reply: the dead id, not visible', again_ == first and again_['bulletin']['visible'] is False, again_)
+    ok('spentkey: and makes nothing', d.one('select count(*) from bulletin') == 0)
+    fresh = post(w, {'kind': 'announcement', 'body': 'x'}, [{'kind': 'photo', 'pages': 1}], key=nid())
+    ok('spentkey: a new key posts', fresh['bulletin']['id'] != bid and d.one('select count(*) from bulletin') == 1)
+    d.close()
+
+SCENARIOS_MORE = {'m2': scen_m2, 'locks': scen_locks, 'lastcheck': scen_lastcheck, 'spentkey': scen_spentkey}
+
 SCENARIOS = {'post': scen_post, 'edit': scen_edit, 'delete': scen_delete, 'counts': scen_counts, 'others': scen_others,
              'storage': scen_storage, 'cascade': scen_cascade, 'limits': scen_limits, 'race': scen_race, 'defaults': scen_defaults,
              'missing': scen_missing, 'apply': scen_apply, 'undo': scen_undo}
+SCENARIOS.update(SCENARIOS_MORE)
 if __name__ == '__main__':
     if sys.argv[1:] == ['fingerprints']:
         scen_fingerprints(); sys.exit(0)

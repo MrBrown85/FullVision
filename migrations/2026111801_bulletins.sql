@@ -4,15 +4,17 @@
 -- security on, no policy, no grant), the private bucket bulletin-files with
 -- four storage policies, and seven functions for a signed-in teacher, one of
 -- which, delete_bulletin, DELETES a bulletin and what students did on it.
--- Contract, reasons and limits: local-test/bulletins-contract.md. Tests:
--- local-test/bulletins.py (README.md, "Bulletins"). Pre-check, post-check and
--- undo: local-test/bulletins-live-precheck.sql, -postcheck.sql, -undo.sql.
+-- Contract: local-test/bulletins-contract.md. Tests: local-test/bulletins.py.
+-- local-test/bulletins-live-precheck.sql, -postcheck.sql, -undo.sql.
 -- It stops with nothing changed unless what it relies on is as tested (the
--- checks below say what). One row is added: the bucket's. Locks course,
--- enrollment, assessment and storage.objects for a moment; gives up after
--- five seconds if one is held. One transaction; can be run again.
--- Accepts: until B1b, a deleted bulletin's pages wait in the removal queue
--- (the nightly job calls them stuck after six hours). No app posts one yet.
+-- checks below). Adds one row, the bucket's. Locks course, enrollment,
+-- assessment, storage.objects a moment; gives up after 5 s if one is held.
+-- One transaction. A second run changes nothing, and is refused once a later
+-- file has changed one of its functions or tables.
+-- Accepts: until B1b teaches the removal worker this bucket, a queued page is
+-- handed out on every run, the hourly call logs an error, and
+-- photo_lifecycle_nightly RAISES once one has waited six hours. A page is
+-- queued only when a bulletin with a file is deleted, which no released app does.
 
 begin;
 
@@ -34,20 +36,23 @@ begin
       raise exception '% is missing or not the definition this file was tested against. Nothing was changed.', _f.fn;
     end if;
   end loop;
-  -- Functions named *bulletin*: none, or exactly this file's (a second run). One md5 over each signature
-  -- and md5 of pg_get_functiondef, written by local-test/bulletins.py; the pre-check lists each.
+  -- Its function names in public and fv_private: none, or exactly this file's (one md5, bulletins.py writes it).
+  perform set_config('fv.b1a', 'bulletin_file_path,bulletin_file_path_parts,bulletin_file_upload_allowed,bulletin_file_read_allowed,'
+    || 'bulletin_audience,bulletin_pinned_now,bulletin_json,bulletin_patched,bulletin_drop_expired,bulletin_student_same_class,'
+    || 'bulletin_file_removed,list_bulletins,post_bulletin,finish_bulletin_file,edit_bulletin,delete_bulletin,list_bulletin_seen,show_bulletin_again', true);
   select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
-   into _c from pg_proc p where p.proname ~ 'bulletin';
-  if _c is distinct from null and _c is distinct from '3acb30ba3a77020c73686a1bc0ef7ba4' then -- fp:own
-    raise exception 'functions with "bulletin" in their name are there and are not exactly this file''s. Nothing was changed.';
+   into _c from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
+    and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace);
+  if _c is distinct from null and _c is distinct from '3cdbfe6ce2a43145f01c101ef5377a7f' then -- fp:own
+    raise exception 'functions of this file''s names are there and are not exactly this file''s. Nothing was changed.';
   end if;
   -- Its tables: none, or exactly this file's columns.
   select md5(string_agg(attrelid::regclass::text || '.' || attname || ' ' || format_type(atttypid, atttypmod), ',' order by attrelid::regclass::text, attnum))
    into _c from pg_attribute
-  where attrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace and relname ~ '^bulletin' and relkind = 'r')
+  where attrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace and relname in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction'))
    and attnum > 0 and not attisdropped;
   if _c is distinct from null and _c is distinct from '55a7166be4a1bb643f1d1c02f4c80447' then -- fp:tables
-    raise exception 'tables named bulletin... are there and are not exactly this file''s. Nothing was changed.';
+    raise exception 'tables of this file''s names are there and are not exactly this file''s. Nothing was changed.';
   end if;
   -- The columns it reads.
   for _f in select * from (values
@@ -70,7 +75,7 @@ begin
    or not (select relrowsecurity from pg_class where oid = 'storage.objects'::regclass) then
     raise exception 'submission_file_removal has no unique (bucket, path), or storage.objects has row security off. Nothing was changed.';
   end if;
-  -- Live's ten (the pre-check names them), and on a second run this file's four.
+  -- Live's ten (the pre-check names them).
   if (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass and polname !~ '^fv_bulletin_files_') <> 10 then
     raise exception 'storage.objects does not have the ten policies this file was tested with. Nothing was changed.';
   end if;
@@ -92,22 +97,21 @@ create table if not exists public.bulletin (
   kind text not null constraint bulletin_kind_check check (kind in ('announcement', 'reminder')),
   body text not null default '' constraint bulletin_body_check check (char_length(body) <= 2000),
   link_url text constraint bulletin_link_check check (link_url is null or (char_length(link_url) <= 2000
-            and link_url ~* '^https?://[^[:space:][:cntrl:]/?#]+[^[:space:][:cntrl:]]*$')),
+            and link_url ~* '^https?://[^[:space:][:cntrl:]/?#@\\]+([/?#][^[:space:][:cntrl:]]*)?$')),
   link_title text,
   pinned boolean not null default false,
   pinned_until date,
-  -- Deleting the assessment unlinks it; the bulletin stays.
   assessment_id uuid references public.assessment(id) on delete set null,
   reactions_on boolean not null default false,
   shown_again_at timestamptz,
-  -- Null until every file is ready: students are not sent it.
+  -- Null until every file is ready.
   posted_at timestamptz,
   edited_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   idempotency_key uuid,
   constraint bulletin_link_title_check check (link_title is null or (link_url is not null and char_length(link_title) between 1 and 200)),
-  constraint bulletin_pinned_until_check check (pinned_until is null or (pinned and kind = 'reminder')),
+  constraint bulletin_pinned_until_check check (pinned_until is null or (pinned and kind = 'reminder' and isfinite(pinned_until))),
   constraint bulletin_id_course_key unique (id, course_id),
   constraint bulletin_course_key_key unique (course_id, idempotency_key)
 );
@@ -127,7 +131,6 @@ create table if not exists public.bulletin_file (
   created_at timestamptz not null default now(),
   constraint bulletin_file_bytes_check check ((status = 'uploading' and bytes is null)
                       or (status = 'ready' and bytes is not null and bytes between 1 and page_count * 2097152::bigint)),
-  -- A file is in its bulletin's class.
   constraint bulletin_file_bulletin_fkey foreign key (bulletin_id, course_id) references public.bulletin (id, course_id) on delete cascade
 );
 create index if not exists bulletin_file_bulletin_idx on public.bulletin_file (bulletin_id, position);
@@ -164,7 +167,7 @@ as $function$
   select p_course_id::text || '/' || p_file_id::text || '/' || p_page::text || '.jpg';
 $function$;
 
--- A name's parts when it is exactly a page's (lower-case ids, page 1 to 20), else no row.
+-- A page's name's parts, or no row.
 create or replace function fv_private.bulletin_file_path_parts(p_name text)
  returns table (course_id uuid, file_id uuid, page integer) language sql immutable set search_path to 'public', 'pg_temp'
 as $function$
@@ -173,7 +176,7 @@ as $function$
   where m is not null;
 $function$;
 
--- Upload: a page of the teacher's own class's file, still uploading, within two hours of its post.
+-- Upload: the teacher's own file, uploading, within two hours.
 create or replace function fv_private.bulletin_file_upload_allowed(p_name text)
  returns boolean language sql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -183,7 +186,6 @@ as $function$
            and f.created_at >= now() - interval '2 hours' and fv_owns_course(f.course_id));
 $function$;
 
--- Read: a page of the teacher's own class's file.
 create or replace function fv_private.bulletin_file_read_allowed(p_name text)
  returns boolean language sql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -193,9 +195,7 @@ as $function$
 $function$;
 
 -- 4. Helpers
--- Each student of the class not withdrawn, in one group: paused; can_see (a
--- working card: not stopped and not past works_until in the class's time
--- zone, _card_refusal's own tests); or no_card.
+-- Each student not withdrawn: paused, can_see (a card not stopped or expired, _card_refusal's tests) or no_card.
 create or replace function fv_private.bulletin_audience(p_course_id uuid)
  returns table (enrollment_id uuid, roster_position integer, state text) language sql stable set search_path to 'public', 'pg_temp'
 as $function$
@@ -209,14 +209,13 @@ as $function$
   where e.course_id = p_course_id and e.withdrawn_at is null;
 $function$;
 
--- Pinned as students see it now: a reminder unpins itself after its last day.
 create or replace function fv_private.bulletin_pinned_now(p_pinned boolean, p_until date, p_timezone text)
  returns boolean language sql stable set search_path to 'public', 'pg_temp'
 as $function$
   select p_pinned and (p_until is null or p_until >= (now() at time zone _fv_timezone(p_timezone))::date);
 $function$;
 
--- One bulletin as the teacher's functions answer it (the contract, "The bulletin").
+-- One bulletin, as the contract has it.
 create or replace function fv_private.bulletin_json(p_id uuid)
  returns jsonb language sql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -244,9 +243,7 @@ as $function$
   where b.id = p_id;
 $function$;
 
--- A bulletin with a change applied, after every rule (each refusal a plain
--- sentence, 22023). Post (a row with no id yet, which takes kind too) and
--- edit both come here.
+-- A change applied, after every rule (22023). For post (no id yet: takes kind) and edit.
 create or replace function fv_private.bulletin_patched(p_b public.bulletin, p_patch jsonb, p_has_files boolean)
  returns public.bulletin language plpgsql stable set search_path to 'public', 'pg_temp'
 as $function$
@@ -268,7 +265,7 @@ begin
     if jsonb_typeof(_v) not in (_t, 'null') then
       raise exception '% must be a %', _k, _t using errcode = '22023';
     end if;
-    _t := nullif(btrim(_v #>> '{}'), '');
+    _t := nullif(regexp_replace(_v #>> '{}', '^[[:space:]]+|[[:space:]]+$', '', 'g'), '');
     begin
       case _k
         when 'kind' then p_b.kind := _t;
@@ -277,21 +274,23 @@ begin
         when 'link_title' then p_b.link_title := _t;
         when 'pinned' then p_b.pinned := coalesce(_t::boolean, false);
         when 'reactions_on' then p_b.reactions_on := coalesce(_t::boolean, false);
-        when 'pinned_until' then p_b.pinned_until := _t::date;
+        when 'pinned_until' then
+          if _t !~ '^\d{4}-\d\d-\d\d$' then raise exception using errcode = '22007'; end if;
+          p_b.pinned_until := _t::date;
         else p_b.assessment_id := _t::uuid;
       end case;
     exception when invalid_datetime_format or datetime_field_overflow or invalid_text_representation then
       raise exception '% must be a %', _k, case _k when 'pinned_until' then 'date' else 'id' end using errcode = '22023';
     end;
   end loop;
-  -- Clearing the link clears its name, and unpinning its last day (unless the change names one: refused below).
   if p_b.link_url is null and not (_p ? 'link_title' and p_b.link_title is not null) then p_b.link_title := null; end if;
   if _p ? 'pinned' and not p_b.pinned and not (_p ? 'pinned_until' and p_b.pinned_until is not null) then p_b.pinned_until := null; end if;
   _why := case
     when p_b.kind is null or p_b.kind not in ('announcement', 'reminder') then 'a bulletin is an announcement or a reminder'
     when char_length(p_b.body) > 2000 then 'a bulletin''s words can be 2000 characters at most'
-    when char_length(p_b.link_url) > 2000 or p_b.link_url !~* '^https?://[^[:space:][:cntrl:]/?#]+[^[:space:][:cntrl:]]*$'
-      then 'a link must start with http:// or https://, with no spaces, and be 2000 characters at most'
+    when char_length(p_b.link_url) > 2000 or p_b.link_url !~* '^https?://[^[:space:][:cntrl:]/?#@\\]+([/?#][^[:space:][:cntrl:]]*)?$'
+       or p_b.link_url ~ '[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]'
+      then 'a link must start with http:// or https:// and a host (no name or password), with no spaces or hidden characters, 2000 characters at most'
     when p_b.link_title is not null and p_b.link_url is null then 'a link''s name needs a link'
     when char_length(p_b.link_title) > 200 then 'a link''s name can be 200 characters at most'
     when p_b.pinned_until is not null and p_b.kind <> 'reminder' then 'only a reminder can stay pinned until a date'
@@ -310,9 +309,7 @@ begin
 end;
 $function$;
 
--- Bulletins never made visible two hours after their post go, with their
--- files (the trigger queues the pages). One class, under its lock, or (null)
--- every class, for a scheduled job. How many.
+-- A class's bulletins not visible two hours after their post go, under its lock.
 create or replace function fv_private.bulletin_drop_expired(p_course_id uuid)
  returns integer language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -320,11 +317,8 @@ declare
   _n int;
 begin
   perform set_config('fv.bulletin_removal_reason', 'bulletin_expired', true);
-  if p_course_id is not null then
-    perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(p_course_id::text));
-  end if;
-  delete from bulletin b
-   where (p_course_id is null or b.course_id = p_course_id) and b.posted_at is null and b.created_at < now() - interval '2 hours';
+  perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(p_course_id::text));
+  delete from bulletin b where b.course_id = p_course_id and b.posted_at is null and b.created_at < now() - interval '2 hours';
   get diagnostics _n = row_count;
   perform set_config('fv.bulletin_removal_reason', '', true);
   return _n;
@@ -343,8 +337,7 @@ begin
 end;
 $function$;
 
--- A file row going, by any path, queues its pages (looked for again ten
--- minutes on, for an upload already let through).
+-- A file row going, by any path, queues its pages.
 create or replace function fv_private.bulletin_file_removed()
  returns trigger language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -366,8 +359,7 @@ create or replace trigger bulletin_file_removed after delete on public.bulletin_
   for each row execute function fv_private.bulletin_file_removed();
 
 -- 6. The teacher's functions
--- Writes for one class wait on each other (the advisory lock 'fv.bulletin',
--- class), always after the idempotency key's own lock.
+-- A class's writes take its lock, after the idempotency key's.
 create or replace function public.list_bulletins(p_course_id uuid)
  returns jsonb language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -378,7 +370,6 @@ begin
   if not fv_owns_course(p_course_id) then
     raise exception 'course not found' using errcode = 'P0002';
   end if;
-  -- An upload never finished goes here too, unless the transaction cannot write.
   if current_setting('transaction_read_only') = 'off' then
     perform fv_private.bulletin_drop_expired(p_course_id);
   end if;
@@ -418,7 +409,7 @@ begin
     raise exception 'course not found' using errcode = 'P0002';
   end if;
   perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(p_course_id::text));
-  -- Posted with this key before and the stored reply since cleared: the row as it is now.
+  -- Posted with this key, its stored reply since cleared: the row now.
   select b.id into _id from bulletin b where b.course_id = p_course_id and b.idempotency_key = p_idempotency_key;
   if _id is not null then
     return jsonb_build_object('bulletin', fv_private.bulletin_json(_id), 'bucket', 'bulletin-files');
@@ -431,10 +422,10 @@ begin
     if exists (select 1 from jsonb_object_keys(_f) k where k not in ('kind', 'title', 'pages'))
      or coalesce(_f->>'kind', '') not in ('photo', 'pdf') or jsonb_typeof(_f->'pages') is distinct from 'number'
      or jsonb_typeof(coalesce(_f->'title', '""')) not in ('string', 'null')
-     or (_f->>'pages')::numeric not in (select generate_series(1, case when _f->>'kind' = 'photo' then 1 else 20 end)) then
+     or _f->>'pages' !~ (case when _f->>'kind' = 'photo' then '^1$' else '^([1-9]|1[0-9]|20)$' end) then
       raise exception 'a file is { kind: photo or pdf, title, pages }: a photo is 1 page, a PDF 1 to 20' using errcode = '22023';
     end if;
-    if char_length(btrim(coalesce(_f->>'title', ''))) > 200 then
+    if char_length(regexp_replace(coalesce(_f->>'title', ''), '^[[:space:]]+|[[:space:]]+$', '', 'g')) > 200 then
       raise exception 'a file''s name can be 200 characters at most' using errcode = '22023';
     end if;
     _pages := _pages + (_f->>'pages')::int;
@@ -453,7 +444,7 @@ begin
   returning id into _id;
   insert into bulletin_file (course_id, bulletin_id, kind, title, page_count, position)
   select p_course_id, _id, e.value->>'kind',
-     coalesce(nullif(btrim(coalesce(e.value->>'title', '')), ''), case when e.value->>'kind' = 'photo' then 'Photo' else 'PDF' end),
+     coalesce(nullif(regexp_replace(coalesce(e.value->>'title', ''), '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), case when e.value->>'kind' = 'photo' then 'Photo' else 'PDF' end),
      (e.value->>'pages')::int, e.n
    from jsonb_array_elements(_fs) with ordinality e(value, n);
   _out := jsonb_build_object('bulletin', fv_private.bulletin_json(_id), 'bucket', 'bulletin-files');
@@ -462,8 +453,7 @@ begin
 end;
 $function$;
 
--- Ready when every page is stored, a JPEG within 2 MB; the last ready makes
--- the bulletin visible. Not there: an answer, so an expired upload's drop is kept.
+-- Not there: an answer, not an error, so an expired upload's drop is kept.
 create or replace function public.finish_bulletin_file(p_bulletin_file_id uuid, p_idempotency_key uuid default null)
  returns jsonb language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -547,8 +537,7 @@ begin
 end;
 $function$;
 
--- DELETES the bulletin, its files and every student's seen and reaction rows
--- for it; the trigger queues the pages.
+-- DELETES the bulletin and every row under it.
 create or replace function public.delete_bulletin(p_bulletin_id uuid, p_idempotency_key uuid default null)
  returns jsonb language plpgsql security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -574,7 +563,6 @@ begin
 end;
 $function$;
 
--- Who has and has not seen it, for the teacher only: enrolment ids in class-list order.
 create or replace function public.list_bulletin_seen(p_bulletin_id uuid)
  returns jsonb language plpgsql stable security definer set search_path to 'public', 'pg_temp'
 as $function$
@@ -606,20 +594,24 @@ as $function$
 declare
   _cached jsonb;
   _course uuid;
+  _b bulletin%rowtype;
   _out jsonb;
 begin
   if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
   _cached := fv_idem_check(p_idempotency_key, 'show_bulletin_again');
   if _cached is not null then return _cached; end if;
   select b.course_id into _course from bulletin b where b.id = p_bulletin_id and fv_owns_course(b.course_id);
-  if _course is null then
-    raise exception 'bulletin not found' using errcode = 'P0002';
+  if _course is not null then
+    perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
+    -- Read again under the lock.
+    select * into _b from bulletin where id = p_bulletin_id for update;
   end if;
-  perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
-  update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id and posted_at is not null;
-  if not found then
+  if _b.id is null then
+    raise exception 'bulletin not found' using errcode = 'P0002';
+  elsif _b.posted_at is null then
     raise exception 'a bulletin students cannot see yet cannot be shown again' using errcode = '22023';
   end if;
+  update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id;
   _out := jsonb_build_object('bulletin', fv_private.bulletin_json(p_bulletin_id));
   perform fv_idem_store(p_idempotency_key, 'show_bulletin_again', _out);
   return _out;
@@ -646,14 +638,15 @@ create policy fv_bulletin_files_fence on storage.objects as restrictive for all 
   using (bucket_id is distinct from 'bulletin-files' or fv_private.bulletin_file_read_allowed(name))
   with check (bucket_id is distinct from 'bulletin-files' or fv_private.bulletin_file_upload_allowed(name));
 
--- 8. Who can run what: the guard proved every "bulletin" function is this file's
+-- 8. Who can run what
 do $grants$
 declare
   _p regprocedure;
 begin
-  for _p in select p.oid from pg_proc p where p.proname ~ 'bulletin' loop
+  for _p in select p.oid from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
+               and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace) loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', _p);
-    -- The teacher's seven, and the two the storage policies call as the signed-in teacher.
+    -- The teacher's seven, and the two the storage policies call.
     if _p::text ~ '^(list_bulletins|post_bulletin|finish_bulletin_file|edit_bulletin|delete_bulletin|list_bulletin_seen|show_bulletin_again)\('
      or _p::text ~ '^fv_private\.bulletin_file_(upload|read)_allowed\(' then
       execute format('grant execute on function %s to authenticated', _p);
@@ -666,15 +659,18 @@ $grants$;
 do $final$
 begin
   if (select md5(string_agg(p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text))
-     from pg_proc p where p.proname ~ 'bulletin') is distinct from '3acb30ba3a77020c73686a1bc0ef7ba4' -- fp:own
+     from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
+        and p.pronamespace in ('public'::regnamespace, 'fv_private'::regnamespace)) is distinct from '3cdbfe6ce2a43145f01c101ef5377a7f' -- fp:own
    or (select md5(string_agg(polname || polcmd::text || polpermissive::text || coalesce(pg_get_expr(polqual, polrelid), '') || coalesce(pg_get_expr(polwithcheck, polrelid), ''), ',' order by polname))
       from pg_policy where polrelid = 'storage.objects'::regclass and polname ~ '^fv_bulletin_files_') is distinct from 'f47bbf23863608c3e1310969de4f36ee' -- fp:policies
    or (select count(*) from pg_policy where polrelid = 'storage.objects'::regclass) <> 14
    or not exists (select 1 from storage.buckets where id = 'bulletin-files' and public = false and file_size_limit = 2097152 and allowed_mime_types = array['image/jpeg'])
-   or exists (select 1 from pg_proc p where p.proname ~ 'bulletin'
+   or not has_function_privilege('authenticated', 'fv_private.bulletin_file_read_allowed(text)', 'execute')
+   or not has_function_privilege('authenticated', 'fv_private.bulletin_file_upload_allowed(text)', 'execute')
+   or exists (select 1 from pg_proc p where p.proname = any (string_to_array(current_setting('fv.b1a'), ','))
           and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('service_role', p.oid, 'execute')
             or (p.prosecdef and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) s where s ~ '^search_path=(.*, )?pg_temp$'))))
-   or exists (select 1 from information_schema.role_table_grants where table_schema = 'public' and table_name ~ '^bulletin'
+   or exists (select 1 from information_schema.role_table_grants where table_schema = 'public' and table_name in ('bulletin', 'bulletin_file', 'bulletin_seen', 'bulletin_reaction')
           and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) then
     raise exception 'a function, policy, grant or the bucket did not come out as written. Nothing was changed.';
   end if;

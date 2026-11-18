@@ -21,26 +21,28 @@ All four are in `public`, row security on, **no policy**, and `revoke all` from 
 
 ### `bulletin`
 
-| Column            | Type          | Null | Default             | Rule                                                                                                                                     |
-| ----------------- | ------------- | ---- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`              | `uuid`        | no   | `gen_random_uuid()` | primary key                                                                                                                              |
-| `course_id`       | `uuid`        | no   |                     | references `course(id)` on delete cascade                                                                                                |
-| `kind`            | `text`        | no   |                     | `bulletin_kind_check`: `kind in ('announcement', 'reminder')`                                                                            |
-| `body`            | `text`        | no   | `''`                | `bulletin_body_check`: `char_length(body) <= 2000`                                                                                       |
-| `link_url`        | `text`        | yes  |                     | `bulletin_link_check`: null, or 2000 characters at most matching `^https?://[^[:space:][:cntrl:]/?#]+[^[:space:][:cntrl:]]*$` (any case) |
-| `link_title`      | `text`        | yes  |                     | `bulletin_link_title_check`: null, or 1 to 200 characters and `link_url` not null                                                        |
-| `pinned`          | `boolean`     | no   | `false`             |                                                                                                                                          |
-| `pinned_until`    | `date`        | yes  |                     | `bulletin_pinned_until_check`: null, or `pinned` and `kind = 'reminder'`. The last day it is pinned, in the class's time zone.           |
-| `assessment_id`   | `uuid`        | yes  |                     | references `assessment(id)` on delete set null; `post_bulletin` and `edit_bulletin` refuse an assessment of another class (`22023`)      |
-| `reactions_on`    | `boolean`     | no   | `false`             |                                                                                                                                          |
-| `shown_again_at`  | `timestamptz` | yes  |                     | the last Show It Again                                                                                                                   |
-| `posted_at`       | `timestamptz` | yes  |                     | when students could first see it. Null: not yet visible (a file still uploading).                                                        |
-| `edited_at`       | `timestamptz` | yes  |                     | the last change to `body`, `link_url` or `link_title`                                                                                    |
-| `created_at`      | `timestamptz` | no   | `now()`             |                                                                                                                                          |
-| `updated_at`      | `timestamptz` | no   | `now()`             | the last change of any kind                                                                                                              |
-| `idempotency_key` | `uuid`        | yes  |                     | the `p_idempotency_key` it was posted with                                                                                               |
+| Column            | Type          | Null | Default             | Rule                                                                                                                                                                                   |
+| ----------------- | ------------- | ---- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | `uuid`        | no   | `gen_random_uuid()` | primary key                                                                                                                                                                            |
+| `course_id`       | `uuid`        | no   |                     | references `course(id)` on delete cascade                                                                                                                                              |
+| `kind`            | `text`        | no   |                     | `bulletin_kind_check`: `kind in ('announcement', 'reminder')`                                                                                                                          |
+| `body`            | `text`        | no   | `''`                | `bulletin_body_check`: `char_length(body) <= 2000`                                                                                                                                     |
+| `link_url`        | `text`        | yes  |                     | `bulletin_link_check`: null, or 2000 characters at most matching `^https?://[^[:space:][:cntrl:]/?#@\\]+([/?#][^[:space:][:cntrl:]]*)?$` (any case: the host runs to `/`, `?`, `#` or the end, with no `@` or backslash in it) |
+| `link_title`      | `text`        | yes  |                     | `bulletin_link_title_check`: null, or 1 to 200 characters and `link_url` not null                                                                                                      |
+| `pinned`          | `boolean`     | no   | `false`             |                                                                                                                                                                                        |
+| `pinned_until`    | `date`        | yes  |                     | `bulletin_pinned_until_check`: null, or `pinned`, `kind = 'reminder'` and `isfinite(pinned_until)`. The last day it is pinned, in the class's time zone.                               |
+| `assessment_id`   | `uuid`        | yes  |                     | references `assessment(id)` on delete set null; `post_bulletin` and `edit_bulletin` refuse an assessment of another class (`22023`)                                                    |
+| `reactions_on`    | `boolean`     | no   | `false`             |                                                                                                                                                                                        |
+| `shown_again_at`  | `timestamptz` | yes  |                     | the last Show It Again                                                                                                                                                                 |
+| `posted_at`       | `timestamptz` | yes  |                     | when students could first see it. Null: not yet visible (a file still uploading).                                                                                                      |
+| `edited_at`       | `timestamptz` | yes  |                     | the last change to `body`, `link_url` or `link_title`                                                                                                                                  |
+| `created_at`      | `timestamptz` | no   | `now()`             |                                                                                                                                                                                        |
+| `updated_at`      | `timestamptz` | no   | `now()`             | the last change of any kind                                                                                                                                                            |
+| `idempotency_key` | `uuid`        | yes  |                     | the `p_idempotency_key` it was posted with                                                                                                                                             |
 
 Constraints and indexes: `bulletin_pkey (id)`; `bulletin_id_course_key unique (id, course_id)` (for `bulletin_file`'s key); `bulletin_course_key_key unique (course_id, idempotency_key)` (nulls distinct); `bulletin_course_idx (course_id, posted_at)`; `bulletin_assessment_idx (assessment_id) where assessment_id is not null`.
+
+**For M3 and M4, which replace `post_bulletin` and `edit_bulletin`:** the rule that a linked assessment is in the bulletin's class lives only in those two functions (in `fv_private.bulletin_patched`); no trigger holds it, so a replacement must keep calling `bulletin_patched` or repeat the rule. M1's guard, post-check and undo look only at their own function names in `public` and `fv_private` and their own four tables, so M2's `student_submit` functions change nothing for them; M1's full undo refuses while another file's function names the tables.
 
 **Adding `poll` and `whiteboard` later (M3, M4)** needs no row rewritten and no table rewrite: in one transaction, `alter table bulletin drop constraint bulletin_kind_check, add constraint bulletin_kind_check check (kind in ('announcement', 'reminder', 'poll')) not valid;` then `alter table bulletin validate constraint bulletin_kind_check;` (the validate reads the rows under a lock that lets reads and writes go on). A check constraint never rewrites rows.
 
@@ -169,22 +171,24 @@ The class's bulletins, **pinned first, then newest first** (`coalesce(posted_at,
 
 `p_bulletin`: an object with only these keys, each optional except `kind`:
 
-| Key             | Type                         | Default | Refused (`22023`) when                                                              |
-| --------------- | ---------------------------- | ------- | ----------------------------------------------------------------------------------- |
-| `kind`          | `announcement` or `reminder` |         | missing or another word                                                             |
-| `body`          | string                       | `''`    | over 2000 characters after trimming                                                 |
-| `link_url`      | string or null               | null    | not `http://` or `https://` with a host and no spaces, or over 2000 (trimmed first) |
-| `link_title`    | string or null               | null    | over 200 (trimmed; blank is null), or given with no `link_url`                      |
-| `pinned`        | boolean                      | false   |                                                                                     |
-| `pinned_until`  | date string or null          | null    | not a date; given on an announcement or with `pinned` false; before today           |
-| `assessment_id` | uuid or null                 | null    | not an assessment of this class                                                     |
-| `reactions_on`  | boolean                      | false   |                                                                                     |
+| Key             | Type                         | Default | Refused (`22023`) when                                                                                                                                                                                                                                                                |
+| --------------- | ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`          | `announcement` or `reminder` |         | missing or another word                                                                                                                                                                                                                                                               |
+| `body`          | string                       | `''`    | over 2000 characters after trimming (all whitespace, newlines and tabs too)                                                                                                                                                                                                           |
+| `link_url`      | string or null               | null    | not `http://` or `https://` with a host and no spaces, or over 2000 (trimmed first); a name or password before the host (`https://user:pass@host/`), a backslash before the host's end, or a hidden character (U+200B to U+200F, U+202A to U+202E, U+2060 to U+2069, U+FEFF) anywhere |
+| `link_title`    | string or null               | null    | over 200 (trimmed; blank is null), or given with no `link_url`                                                                                                                                                                                                                        |
+| `pinned`        | boolean                      | false   |                                                                                                                                                                                                                                                                                       |
+| `pinned_until`  | date string or null          | null    | not exactly `YYYY-MM-DD` and a real date (`infinity`, `tomorrow`, `12/31/2099`, `20990101` and timestamps are refused); given on an announcement or with `pinned` false; before today                                                                                                 |
+| `assessment_id` | uuid or null                 | null    | not an assessment of this class                                                                                                                                                                                                                                                       |
+| `reactions_on`  | boolean                      | false   |                                                                                                                                                                                                                                                                                       |
 
 Any other key, a value of the wrong JSON type, or a `p_bulletin` that is not an object is `22023`.
 
-`p_files`: null or `[]` for none, or an array of `{ "kind": "photo | pdf", "title": "text", "pages": n }` (only those keys). `title` is trimmed; blank is `Photo` or `PDF`; over 200 is `22023`. `pages` is an integer, 1 for a photo, 1 to 20 for a PDF. Refused (`22023`): more than 20 pages on the bulletin in all; more than 2000 pages in the class's bulletins counting these; a bulletin with no words, no link and no file.
+`p_files`: null or `[]` for none, or an array of `{ "kind": "photo | pdf", "title": "text", "pages": n }` (only those keys). `title` is trimmed; blank is `Photo` or `PDF`; over 200 is `22023`. `pages` is a JSON number that reads as a whole number (`1.0` is refused; `2e0` reads as `2`, as JSON keeps it), 1 for a photo, 1 to 20 for a PDF. Every refusal here is `22023`. Refused (`22023`): more than 20 pages on the bulletin in all; more than 2000 pages in the class's bulletins counting these; a bulletin with no words, no link and no file.
 
 Answers `{ "bulletin": <the bulletin>, "bucket": "bulletin-files" }`. With no files it is `visible: true` and `posted_at` is now. With files it is `visible: false`, each file `uploading` with its `paths`: upload each page there, then call `finish_bulletin_file` for each file. The bulletin carries `idempotency_key`: a device that posted with a key and missed the answer finds the row in `list_bulletins` by it. The same key again answers the first reply; a key whose stored reply has been cleared away answers the bulletin as it is now.
+
+**After `status: 'gone'` (an upload dropped after two hours) the key is spent:** the bulletin is gone, and the same key answers the stored first reply (the dead id, `visible: false`) for as long as the reply is kept (24 hours). **The device must post again with a new key.**
 
 ### `finish_bulletin_file(p_bulletin_file_id uuid, p_idempotency_key uuid default null) → jsonb`
 
@@ -192,7 +196,7 @@ Checks that every page `1 … page_count` is in the bucket `bulletin-files` at i
 
 - All there: the file becomes `ready` with `bytes` the pages' total; when it was the bulletin's last `uploading` file, the bulletin's `posted_at` becomes now (visible to students from that moment). Answers `{ "file_id": "uuid", "bulletin": <the bulletin> }`, remembered under the key. Finishing a file already `ready` answers the same and changes nothing.
 - Some missing or wrong: answers `{ "file_id": "uuid", "bulletin": <the bulletin>, "missing": [page numbers], "bad": [page numbers] }` (`bad`: there but not a JPEG of that size; such a page cannot be replaced, so delete the bulletin). Nothing is changed or remembered, so call again after uploading.
-- Not there (never was, not yours, deleted, its class in the trash, or dropped after two hours): `{ "file_id": "uuid", "status": "gone" }`, not remembered.
+- Not there (never was, not yours, deleted, its class in the trash, or dropped after two hours): `{ "file_id": "uuid", "status": "gone" }`, not remembered. Its bulletin is gone with it and the post's key is spent: post again with a new key.
 
 ### `edit_bulletin(p_bulletin_id uuid, p_patch jsonb, p_idempotency_key uuid default null) → jsonb`
 
@@ -219,11 +223,11 @@ Enrolment ids only, each list in class-list order (`roster_position`, then `id`)
 
 ### `show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid default null) → jsonb`
 
-Sets `shown_again_at` (and `updated_at`) to now. Answers `{ "bulletin": <the bulletin> }`. A bulletin not yet visible is `22023`. On the student's page it moves to the new end for every student who has not seen it (see `student_submit.bulletins`).
+Sets `shown_again_at` (and `updated_at`) to now. Answers `{ "bulletin": <the bulletin> }`. A bulletin not yet visible is `22023`; one deleted a moment before (even while this call waited for the class's lock) is `P0002`. Every function that finds the row and then takes the class's lock reads it again under the lock, so a delete that came first gives `P0002` (`finish_bulletin_file`: `status: 'gone'`). On the student's page it moves to the new end for every student who has not seen it (see `student_submit.bulletins`).
 
 ### Uploads never finished: `fv_private.bulletin_drop_expired(p_course_id uuid) → integer`
 
-Deletes every bulletin of the class with `posted_at is null` and `created_at` more than two hours ago (its files go with it, and the trigger queues their pages with reason `bulletin_expired`), under the class's lock; answers how many. `p_course_id` null does every class, for a scheduled job a later slice may add. No role may run it. It is called at the start of `post_bulletin`, `finish_bulletin_file` and `list_bulletins` (the last only when the transaction may write). **The nightly `photo_lifecycle_nightly` does not call it** and is not changed: a class whose teacher never opens Bulletins again keeps an expired upload's rows (at most 20 pages, never shown to anyone) until that teacher's next visit or the class's purge.
+Deletes every bulletin of the class with `posted_at is null` and `created_at` more than two hours ago (its files go with it, and the trigger queues their pages with reason `bulletin_expired`), under the class's lock; answers how many. It does one class only: given null it does nothing. (An every-class form without the class's lock could deadlock with a finish, and nothing calls one; a scheduled job, if one is ever added, must take each class's lock in turn.) No role may run it. It is called at the start of `post_bulletin`, `finish_bulletin_file` and `list_bulletins` (the last only when the transaction may write). **The nightly `photo_lifecycle_nightly` does not call it** and is not changed: a class whose teacher never opens Bulletins again keeps an expired upload's rows (at most 20 pages, never shown to anyone) until that teacher's next visit or the class's purge.
 
 ## Storage
 
