@@ -14,6 +14,12 @@
 //   {route: 'quiz-send', session, enrollment_id, assessment_id}
 //        -> student_submit.quiz_send: the try is sent.
 //           { ok, try, sent_at, tries_left, can_try_again }.
+//   {route: 'quiz-list', session, enrollment_id}
+//        -> student_submit.quiz_list (2026111807): which pieces of the class
+//           are quizzes the student may open, and how each stands for them,
+//           without starting or writing anything.
+//           { ok, quizzes: [{ assessment_id, tries_left, can_answer, closed,
+//           has_open_try }] }.
 //
 // The rules are bulletin-routes.ts's: the session checked by the database
 // first, and who the student is taken only from that; the statement named
@@ -53,7 +59,11 @@ export const QUIZ_ROUTES: Record<string, true> = {
   quiz: true,
   'quiz-save': true,
   'quiz-send': true,
+  'quiz-list': true,
 };
+
+/** The most quizzes one quiz-list answer holds: more is a server error (a class has far fewer pieces). */
+export const MAX_LISTED = 1000;
 
 /** A quiz has at most 100 questions (the contract's limits). */
 export const MAX_QUESTIONS = 100;
@@ -74,6 +84,7 @@ export const SQL = {
   quiz: 'select student_submit.quiz($1::text, $2::uuid, $3::uuid, $4::text, $5::text::boolean) as r',
   quizSave: 'select student_submit.quiz_save($1::text, $2::uuid, $3::uuid, $4::uuid, $5::text::jsonb, $6::text) as r',
   quizSend: 'select student_submit.quiz_send($1::text, $2::uuid, $3::uuid, $4::text) as r',
+  quizList: 'select student_submit.quiz_list($1::text, $2::uuid, $3::text) as r',
 };
 
 /* The keys passed on, level by level: exactly the contract's
@@ -86,6 +97,8 @@ export const SENT = {
   choice: ['id', 'text'],
   save: ['ok', 'question_id', 'saved_at'],
   send: ['ok', 'try', 'sent_at', 'tries_left', 'can_try_again'],
+  list: ['ok', 'quizzes'],
+  listed: ['assessment_id', 'tries_left', 'can_answer', 'closed', 'has_open_try'],
 };
 
 // Refusals each route passes on by name; any other is not_found. bad_answer carries its question_id.
@@ -93,6 +106,7 @@ export const ERRORS = {
   quiz: [...SESSION_ERRORS, 'quiz_closed', 'no_tries_left', 'too_many'],
   'quiz-save': [...SESSION_ERRORS, 'quiz_closed', 'sent', 'bad_answer', 'too_many'],
   'quiz-send': [...SESSION_ERRORS, 'quiz_closed', 'sent', 'too_many'],
+  'quiz-list': SESSION_ERRORS,
 } as const;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -257,8 +271,34 @@ export function makeQuizRoutes(opts: { db: { call: (sql: string, params: Param[]
     });
   }
 
+  async function listed(body: Json, hash: string): Promise<SendAnswer> {
+    const s = session(body);
+    const e = uuid(body.enrollment_id);
+    if (!s || !e) return bad();
+    const r = await opts.db.call(SQL.quizList, [s, e, hash]);
+    if (!good(r)) return ok(refusal(r, ERRORS['quiz-list']));
+    const all = list(r.quizzes);
+    if (all.length > MAX_LISTED) throw new TypeError('quizzes');
+    return ok({
+      ok: true,
+      quizzes: all.map(q => {
+        const x = isObject(q) ? q : {};
+        const id = uuid(x.assessment_id);
+        if (!id) throw new TypeError('assessment_id');
+        return {
+          assessment_id: id,
+          tries_left: count(x.tries_left, 2),
+          can_answer: bool(x.can_answer),
+          closed: bool(x.closed),
+          has_open_try: bool(x.has_open_try),
+        };
+      }),
+    });
+  }
+
   return async function run(route: string, body: Json, hash: string): Promise<SendAnswer> {
     if (route === 'quiz') return open(body, hash);
+    if (route === 'quiz-list') return listed(body, hash);
     if (route === 'quiz-save') return save(body, hash);
     if (route === 'quiz-send') return send(body, hash);
     return bad();

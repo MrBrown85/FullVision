@@ -136,9 +136,10 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(page.calls[2].body).toEqual({ route: 'page', session: token, enrollment_id: CECE });
     // Every request passed the handler's own checks.
     expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
-    // `bulletins` goes with `page` (B1d); `work` and `forms` are asked at once, so the server may finish either first.
+    // `bulletins` is asked at once with `page` (B1d), and `work` with `forms`, so the server may finish either of each pair first.
     const fns = dev.fn.sql.map(q => q.fn);
-    expect(fns.slice(0, 4)).toEqual(['card', 'verify_card', 'page', 'bulletins']);
+    expect(fns.slice(0, 2)).toEqual(['card', 'verify_card']);
+    expect(fns.slice(2, 4).sort()).toEqual(['bulletins', 'page']);
     expect(fns.slice(4, 6).sort()).toEqual(['forms', 'work']);
     expect(fns[6]).toBe('seen');
     expect(dev.fn.sql[1].add).toBe(false);

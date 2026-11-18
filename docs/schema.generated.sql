@@ -2217,6 +2217,7 @@ function student_submit.markup(p_session_token text, p_enrollment_id uuid, p_ass
 function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) returns jsonb security definer
 function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) returns jsonb security definer
+function student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.reflect(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_reflection jsonb, p_ip_hash text) returns jsonb security definer

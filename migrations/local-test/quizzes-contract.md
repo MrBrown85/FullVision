@@ -549,6 +549,30 @@ In order, after rules 1, 2 and 5: no open try or one not yet opened: `sent` (wit
 
 Answer: `{ "ok": true, "try": 1, "sent_at": "timestamptz", "tries_left": 0, "can_try_again": false }` (`tries_left` and `can_try_again` as `quiz` would now answer them).
 
+### `student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) → jsonb`: which pieces are quizzes
+
+File `migrations/2026111807_quizzes_student_list.sql` (after 2026111806). Read-only (`stable`), `service_role` only, `security definer`, `search_path` `public, student_submit, pg_temp`. `student_submit.page` and its reply are not changed: the student page asks this beside it to know which of its pieces are quizzes, because opening one with `quiz` starts a try.
+
+After rule 1 (the session; the same five refusals, `{ "ok": false, "error" }`), it answers:
+
+```json
+{
+  "ok": true,
+  "quizzes": [{ "assessment_id": "uuid", "tries_left": 1, "can_answer": true, "closed": false, "has_open_try": false }]
+}
+```
+
+`quizzes` is every piece of the session's class that `quiz` would open (rule 2, by the same `_quiz_window`: listed today, not a Draft, not DIBELS, not a pair or group piece, a quiz row), in `assessment_id` order; `[]` with none. For each, as `quiz` would count it for this student:
+
+| Key            | Value                                                                                                                                                                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tries_left`   | null when unlimited, else ordinary tries left (rule 4)                                                                                                                                                                                                               |
+| `can_answer`   | true when opening it now lets the student answer: an open try they can answer (reopened, or ordinary while the quiz is open), or no open try and they can start one (the first try, or Try Again). It is `quiz`'s `can_answer` or `can_try_again` after it is opened |
+| `closed`       | true when the quiz is closed today (rule 3)                                                                                                                                                                                                                          |
+| `has_open_try` | true when the student has an unsent try, a reopened one not yet opened included (Continue, not Start)                                                                                                                                                                |
+
+It reads no question, no key and no answer, and nothing of another student. It writes nothing (no try, no `write_log` row, so it spends none of the 600 writes), and it takes no lock on the quiz row: rule 5's key share is for a function that writes an answer, and a `stable` function cannot take a row lock. A quiz the teacher is saving at that moment is listed as it was before the save.
+
 ### The access rule for unfinished answers
 
 Only the student's own session (a session holding that enrolment, through `_session_class`) reads or writes an unsent try. The teacher's `list_quiz_tries` answers only sent tries (two booleans of an unsent one); another student's session is `not_found` (their enrolment is not on it); a classmate's session naming this student's enrolment is `not_found`.
@@ -562,21 +586,24 @@ The phone posts JSON to the `student-submit` edge function, as every route does.
 | `quiz`      | `{ "route": "quiz", "session", "enrollment_id", "assessment_id", "new_try"? }`                   | `student_submit.quiz`      |
 | `quiz-save` | `{ "route": "quiz-save", "session", "enrollment_id", "assessment_id", "question_id", "answer" }` | `student_submit.quiz_save` |
 | `quiz-send` | `{ "route": "quiz-send", "session", "enrollment_id", "assessment_id" }`                          | `student_submit.quiz_send` |
+| `quiz-list` | `{ "route": "quiz-list", "session", "enrollment_id" }`                                           | `student_submit.quiz_list` |
 
 Shapes: `session` a string of 1 to 128 characters; each id a UUID; `new_try` absent (false) or a boolean; `answer` required (the key present): null, a boolean, a finite number, a string of at most 20,000 characters as sent, with no NUL and no lone surrogate, which the route trims of ASCII white space at both ends (as the database does) and refuses when more than 5000 characters (as PostgreSQL counts them) are left; the trimmed text is what is sent on, or an array of 0 to 20 UUID strings. Anything else is `bad_request`. The database checks the rest (`bad_answer`).
 
-Replies: `quiz` as above, `quiz-save` and `quiz-send` as above, refusals `{ "ok": false, "error" }`, plus `question_id` on `bad_answer` and `retry_after_s` on `too_many`.
+Replies: `quiz`, `quiz-save`, `quiz-send` and `quiz-list` as above (a `quiz-list` entry carries only its five keys), refusals `{ "ok": false, "error" }`, plus `question_id` on `bad_answer` and `retry_after_s` on `too_many`.
 
 | Route       | Refusals passed on                                                                                              |
 | ----------- | --------------------------------------------------------------------------------------------------------------- |
 | `quiz`      | `signed_out`, `not_found`, `card_stopped`, `card_expired`, `closed`, `quiz_closed`, `no_tries_left`, `too_many` |
 | `quiz-save` | the session's five, `quiz_closed`, `sent`, `bad_answer`, `too_many`                                             |
 | `quiz-send` | the session's five, `quiz_closed`, `sent`, `too_many`                                                           |
+| `quiz-list` | the session's five                                                                                              |
 
 The edge function is the second look: a key the database might add later is dropped until it is named in `SENT`; a question carries only `id`, `number`, `kind`, `prompt`, `points`, `multiple`, `choices`; a choice only `id` and `text`; an answer only a raw answer's shape, under a question id that is in `questions`.
 
 ### For the student's screen (Q3b)
 
+- To know which pieces on the page are quizzes, ask `quiz-list` (it starts nothing and spends no write): Start the Quiz where `can_answer` and not `has_open_try`, Continue where `has_open_try` and `can_answer`, the sent view otherwise.
 - Open the screen with `quiz` (`new_try` false). Show `questions` in the order given and number them by `number`. Show `answers`. When `can_answer` is false, show the answers read-only.
 - Save each answer as it changes with `quiz-save`; a cleared answer sends `answer: null` (a blank text box too: an empty string is `bad_answer`). Send with `quiz-send`. "Try Again" is `quiz` with `new_try: true`, offered only when `can_try_again`.
 - `sent` on a save means the try was sent elsewhere (another phone) or a Reopen is waiting: call `quiz` again and show what it answers. `quiz_closed` on a save: the quiz closed while it was open; call `quiz`.
