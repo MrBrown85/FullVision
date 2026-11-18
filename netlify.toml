@@ -80,6 +80,11 @@
     Cache-Control = "no-cache"
 
 [[headers]]
+  for = "/bulletins"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
   for = "/observations"
   [headers.values]
     Cache-Control = "no-cache"
@@ -163,6 +168,11 @@
 
 [[redirects]]
   from = "/gradebook"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/bulletins"
   to = "/teacher/app.html"
   status = 200
 

@@ -4659,3 +4659,139 @@ function seedDemoRevisions() {
     },
   ]);
 }
+
+/* ── Sample bulletins (Bulletins, behind the build switch) ─────────
+   Three bulletins for the sample class, from the Bulletins board: a pinned
+   reminder linked to Cell Microscope Lab, an announcement with a two-page
+   PDF and reactions, and a Photo of the Board. Who has seen each is the
+   students' ids, so "Seen by 19 of 27" works; pause one student in Class
+   Settings and the count follows. The pictures are drawn, in
+   assets/sample-bulletins. Written once per class, the first time Bulletins is
+   read in Demo Mode (shared/data-bulletins.js _bltDemoRead), so with the build
+   switch off nothing is written; it writes nothing where the class already has
+   bulletins. */
+function seedDemoBulletins() {
+  if (typeof saveDemoBulletinsSeed !== 'function' || !COURSES.sci8) return false;
+  var ids = getStudents('sci8').map(function (s) {
+    return s.id;
+  });
+  if (!ids.length) return false;
+  var has = function (id) {
+    return ids.indexOf(id) >= 0;
+  };
+  var except = function (out) {
+    return ids.filter(function (id) {
+      return out.indexOf(id) < 0;
+    });
+  };
+  // A time on a day this many days back, never in the future.
+  var at = function (daysBack, hour, minute) {
+    var d = new Date();
+    d.setDate(d.getDate() - daysBack);
+    d.setHours(hour, minute, 0, 0);
+    var latest = Date.now() - 5 * 60000;
+    return new Date(Math.min(d.getTime(), latest)).toISOString();
+  };
+  var day = function (daysAhead) {
+    var d = new Date();
+    d.setDate(d.getDate() + daysAhead);
+    return (
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    );
+  };
+  var base = function (n) {
+    return {
+      link_url: null,
+      link_title: null,
+      pinned: false,
+      pinned_until: null,
+      assessment_id: null,
+      reactions_on: false,
+      shown_again_at: null,
+      edited_at: null,
+      idempotency_key: null,
+      files: [],
+      id: '00000000-0000-4000-8000-00000000b00' + n,
+    };
+  };
+  var reminder = Object.assign(base(1), {
+    kind: 'reminder',
+    body: 'Lab safety form signed and back by Thursday. No form, no lab.',
+    pinned: true,
+    pinned_until: day(2),
+    assessment_id:
+      has('st1') &&
+      (getAssessments('sci8') || []).some(function (a) {
+        return a.id === 'sci8a1';
+      })
+        ? 'sci8a1'
+        : null,
+    posted_at: at(2, 8, 42),
+    created_at: at(2, 8, 42),
+    updated_at: at(2, 8, 42),
+    // Everyone but two.
+    seen: except(['st22', 'st24']),
+  });
+  var pdf = Object.assign(base(2), {
+    kind: 'announcement',
+    body: "Read the Cell Theory pages before Thursday's lab. Bring one question.",
+    reactions_on: true,
+    posted_at: at(0, 10, 15),
+    created_at: at(0, 10, 15),
+    updated_at: at(0, 10, 15),
+    files: [
+      {
+        id: '00000000-0000-4000-8000-00000000f001',
+        kind: 'pdf',
+        title: 'Cell Theory Reading',
+        page_count: 2,
+        bytes: 142000,
+        status: 'ready',
+        position: 1,
+        paths: ['/assets/sample-bulletins/cell-theory-1.svg', '/assets/sample-bulletins/cell-theory-2.svg'],
+      },
+    ],
+    // Eight students have not opened it.
+    seen: except(['st3', 'st6', 'st7', 'st12', 'st15', 'st18', 'st22', 'st24']),
+    reactions: {
+      got_it: [
+        'st1',
+        'st5',
+        'st8',
+        'st9',
+        'st11',
+        'st13',
+        'st14',
+        'st16',
+        'st17',
+        'st19',
+        'st20',
+        'st21',
+        'st23',
+        'st25',
+      ].filter(has),
+      question: ['st2', 'st4'].filter(has),
+    },
+  });
+  var board = Object.assign(base(3), {
+    kind: 'announcement',
+    body: '',
+    posted_at: at(0, 9, 58),
+    created_at: at(0, 9, 58),
+    updated_at: at(0, 9, 58),
+    files: [
+      {
+        id: '00000000-0000-4000-8000-00000000f002',
+        kind: 'photo',
+        title: 'Photo',
+        page_count: 1,
+        bytes: 98000,
+        status: 'ready',
+        position: 1,
+        paths: ['/assets/sample-bulletins/cell-board-1.svg'],
+      },
+    ],
+    seen: ids.slice(),
+  });
+  return saveDemoBulletinsSeed('sci8', [reminder, pdf, board]);
+}
