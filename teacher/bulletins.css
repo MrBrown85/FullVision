@@ -615,31 +615,189 @@ textarea.bulletin-field {
 
 /* ── Who has seen it ── */
 .bulletin-seenlist {
+  margin: 6px -20px -14px -24px;
+  padding: 18px 20px 20px 24px;
   border-top: 1px solid var(--divider-medium);
-  margin: 4px -16px -14px;
-  padding: 12px 16px 14px;
-  background: var(--bg);
-  border-radius: 0 0 var(--radius) var(--radius);
+  background: linear-gradient(var(--surface), var(--bg));
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
-.bulletin-seen-head {
+.bulletin-seen-aside,
+.bsl-aside {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+/* Who has seen it (teacher/bulletin-seen.js): the count large, a bar of the
+   class, then the two groups side by side as name chips. */
+.bsl-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 8px;
+}
+.bsl-big {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1;
+}
+.bsl-of {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0;
+}
+.bsl-sum-text {
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+.bsl-bar {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 4px;
+  background:
+    linear-gradient(#34a853, #34a853) 0 0 / var(--seen, 0%) 100% no-repeat,
+    rgba(255, 159, 10, 0.28);
+}
+.bsl-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.bsl-group {
+  --tone: #8e8e93;
+  --tone-tint: rgba(142, 142, 147, 0.14);
+  padding: 12px 14px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--divider-medium);
+  box-shadow: inset 0 3px 0 var(--tone);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bsl-group.is-not {
+  --tone: #e08a00;
+  --tone-tint: rgba(255, 159, 10, 0.16);
+}
+.bsl-group.is-seen {
+  --tone: #34a853;
+  --tone-tint: rgba(52, 168, 83, 0.14);
+}
+.bsl-group.is-got,
+.bsl-group.is-done {
+  --tone: var(--active);
+  --tone-tint: rgba(0, 122, 255, 0.12);
+}
+.bsl-group.is-question {
+  --tone: #af52de;
+  --tone-tint: rgba(175, 82, 222, 0.14);
+}
+.bsl-head {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--text-sm);
   font-weight: 700;
   color: var(--text);
 }
-.bulletin-seen-names {
-  font-size: var(--text-base);
+.bsl-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--tone-tint);
   color: var(--text);
-  line-height: 1.5;
+  font-size: var(--text-xs);
+  text-align: center;
 }
-.bulletin-seen-aside {
+.bsl-sub {
+  margin: 0;
   font-size: var(--text-sm);
+  font-weight: 700;
   color: var(--text-2);
 }
-.bulletin-seen-act {
-  align-self: flex-start;
+.bsl-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bsl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  background: var(--tone-tint);
+  font-size: var(--text-sm);
+  color: var(--text);
+  white-space: nowrap;
+}
+button.bsl-chip {
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+button.bsl-chip:hover {
+  border-color: var(--tone);
+}
+button.bsl-chip[aria-pressed='true'] {
+  background: var(--tone);
+  color: #fff;
+}
+button.bsl-chip[aria-pressed='true'] .bsl-av {
+  background: #fff;
+  color: var(--tone);
+}
+.bsl-av {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tone);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.bsl-again-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.bsl-again {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--tone);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bsl-again:hover {
+  filter: brightness(0.94);
+}
+.bsl-again:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.bsl-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
 }
 
 .bulletin-empty {

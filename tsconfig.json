@@ -119,6 +119,7 @@
     "teacher-mobile/split-scan-model.js",
     "teacher-mobile/split-scan.js",
     "teacher/rubric-words.js",
-    "teacher/bulletin-share.js"
+    "teacher/bulletin-share.js",
+    "teacher/bulletin-seen.js"
   ]
 }

@@ -289,13 +289,14 @@ function _bltDemoDelete(cid, id) {
   return Promise.resolve({ ok: true });
 }
 
-/** @param {string} cid @param {string} id @returns {Promise<BulletinWriteResult>} */
-function _bltDemoAgain(cid, id) {
+/** Demo Mode keeps no per-student reminders: a pick of names is taken as done. @param {string} cid @param {string} id @param {string[] | null} [ids] @returns {Promise<BulletinWriteResult>} */
+function _bltDemoAgain(cid, id, ids) {
   var store = _bltDemoLoad(cid);
   var row = store.bulletins.filter(function (b) {
     return b.id === id;
   })[0];
   if (!row) return Promise.resolve({ ok: false, message: 'That bulletin is not there.' });
+  if (ids && ids.length) return Promise.resolve({ ok: true });
   row.shown_again_at = new Date().toISOString();
   row.updated_at = row.shown_again_at;
   _bltDemoSave(cid, store);

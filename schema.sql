@@ -283,6 +283,15 @@ create table assessment (
   updated_at     timestamptz not null default now()
 );
 
+-- A teacher's reminder to one student about one bulletin (2026111809, applied Nov 18): the student page
+-- sorts the bulletin at reminded_at while that student has not seen it. RLS on, no policy or grant.
+create table bulletin_reminder (
+  bulletin_id   uuid        not null references bulletin(id) on delete cascade,
+  enrollment_id uuid        not null references enrollment(id) on delete cascade,
+  reminded_at   timestamptz not null default now(),
+  primary key (bulletin_id, enrollment_id)
+);
+
 create table assessment_tag (
   assessment_id uuid not null references assessment(id) on delete cascade,
   tag_id        uuid not null references tag(id)        on delete cascade,
