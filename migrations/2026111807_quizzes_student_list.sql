@@ -1,4 +1,4 @@
--- Quizzes, MQ2b: the student page lists which pieces are quizzes (2026-11-18). NOT APPLIED.
+-- Quizzes, MQ2b: the student page lists which pieces are quizzes (2026-11-18). APPLIED Nov 18 2026.
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
 -- It adds one read-only function, student_submit.quiz_list, for the
