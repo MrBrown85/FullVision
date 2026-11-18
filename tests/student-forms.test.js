@@ -88,7 +88,12 @@ describe('the view reads the lists the server’s page will send', () => {
 
   it('a real card shows the plain line on Reflect, has no Reports tab, and Start or See Your Report pressed anyway opens nothing', async () => {
     const page = await real();
-    expect(qa(page, '.sp-tabs-bottom .sp-tab-label').map(words)).toEqual(['Assignments', 'My Learning', 'Reflect']);
+    expect(qa(page, '.sp-tabs-bottom .sp-tab-label').map(words)).toEqual([
+      'Bulletins',
+      'Assignments',
+      'My Learning',
+      'Reflect',
+    ]);
     expect(q(page, '[data-tab="reports"]')).toBeNull();
     await page.click('[data-tab="questionnaires"]');
     expect(words(q(page, '.sp-page-title'))).toBe('Reflect');

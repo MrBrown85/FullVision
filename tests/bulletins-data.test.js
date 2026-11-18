@@ -947,16 +947,13 @@ describe('the Bulletins tab', () => {
   const tabs = () => [...renderDock('dashboard').matchAll(/tb-seg-link[^>]*>([^<]+)</g)].map(m => m[1]);
   afterEach(() => localStorage.removeItem('fv-build-bulletins'));
 
-  it('is not in the top bar with the switch off', () => {
-    expect(tabs()).toEqual(['Dashboard', 'Assignments', 'Observations', 'Gradebook', 'Reporting']);
-    expect(TB_PAGES.map(p => p.label)).toContain('Bulletins');
-    expect(Router.isRoute('/bulletins')).toBe(false);
-  });
-
-  it('is after Assignments with the switch on', () => {
-    localStorage.setItem('fv-build-bulletins', '1');
-    expect(tabs()).toEqual(['Dashboard', 'Assignments', 'Bulletins', 'Observations', 'Gradebook', 'Reporting']);
-    expect(Router.isRoute('/bulletins')).toBe(true);
+  it('is after Assignments (on since B1g), whatever an old fv-build-bulletins key says', () => {
+    for (const v of [null, '0', '1']) {
+      if (v === null) localStorage.removeItem('fv-build-bulletins');
+      else localStorage.setItem('fv-build-bulletins', v);
+      expect(tabs()).toEqual(['Dashboard', 'Assignments', 'Bulletins', 'Observations', 'Gradebook', 'Reporting']);
+      expect(Router.isRoute('/bulletins')).toBe(true);
+    }
   });
 });
 

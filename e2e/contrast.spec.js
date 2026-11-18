@@ -160,7 +160,6 @@ for (const colorScheme of ['light', 'dark']) {
 
     // The phone's Bulletins tab (B1f): the feed with its blue Post a Photo, Write a Bulletin, and a delete's red confirm.
     test('phone Bulletins: the feed, Write a Bulletin and the confirm', async ({ page }) => {
-      await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await enterDemo(page, { phone: true });
       await page.locator('.m-tab-item[data-tab="bulletins"]').click();

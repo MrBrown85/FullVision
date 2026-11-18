@@ -56,6 +56,9 @@ function page(prep, open) {
     '<!DOCTYPE html><html><body><div id="page-toolbar-mount"></div><div id="page-layout"><div id="sidebar-mount"></div><main id="main"></main></div></body></html>',
   ).document;
   globalThis.document = doc;
+  // Bulletins' change event (shared/data-bulletins.js), made by this document's window, as a browser makes it.
+  const realEvent = globalThis.CustomEvent;
+  globalThis.CustomEvent = doc.defaultView.CustomEvent;
   globalThis.getComputedStyle = () => ({ paddingLeft: '0', paddingRight: '0' });
   globalThis.CSS = { escape: s => String(s) };
   globalThis.requestAnimationFrame = fn => fn();
@@ -76,6 +79,7 @@ function page(prep, open) {
     return open(doc);
   } finally {
     globalThis.document = stub.document;
+    globalThis.CustomEvent = realEvent;
     globalThis.getComputedStyle = stub.getComputedStyle;
     globalThis.CSS = stub.CSS;
     Router.setUrl = stub.setUrl;

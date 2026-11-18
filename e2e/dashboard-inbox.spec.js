@@ -25,25 +25,29 @@ const shot = async (page, name) => {
   await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { oldFlag = null, bulletins = false, sendWork = true, dark = false } = {}) {
+async function open(page, { oldFlag = null, tile = true, sendWork = true, dark = false } = {}) {
   await page.addInitScript(
-    ([oldFlag, bulletins]) => {
+    ([oldFlag]) => {
       try {
         // What a browser that saw the row before D9 may still have kept.
         if (oldFlag != null) localStorage.setItem('fv-build-dashRow', oldFlag);
-        if (bulletins) {
-          localStorage.setItem('fv-build-bulletins', '1');
-        }
       } catch (e) {
         /* storage blocked */
       }
     },
-    [oldFlag, bulletins],
+    [oldFlag],
   );
   if (dark) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
   if (sendWork) {
     await page.evaluate(() => {
       const cid = getActiveCourse();
@@ -339,7 +343,7 @@ test('the view menu is not visible at rest, opens on the pill and closes on Esca
 test('beside a Bulletins tile the Inbox is 299 px: whole rows, pictures of 80 px or more, nothing sideways', async ({
   page,
 }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   const tile = await box(page, '#dash-inbox');
   expect(Math.round(tile.height)).toBe(299);
   const m = await page.evaluate(() => {
@@ -383,8 +387,8 @@ test('beside a Bulletins tile the Inbox is 299 px: whole rows, pictures of 80 px
   await shot(page, 'inbox-299-light');
 });
 
-test('with the whole column the Inbox is the row tall, and a row is 109 px', async ({ page }) => {
-  await open(page);
+test('with no Bulletins tile the Inbox is the row tall, and a row is 109 px', async ({ page }) => {
+  await open(page, { tile: false });
   const tile = await box(page, '#dash-inbox');
   expect(Math.round(tile.height)).toBe(510);
   const row = await box(page, '.dash-inbox-row');
@@ -395,7 +399,7 @@ test('with the whole column the Inbox is the row tall, and a row is 109 px', asy
 });
 
 test('dark: the tile draws on the dark surface', async ({ page }) => {
-  await open(page, { dark: true });
+  await open(page, { dark: true, tile: false });
   await shot(page, 'inbox-510-dark');
   await expect(page.locator('#dash-inbox')).toBeVisible();
   const bg = await page.locator('#dash-inbox').evaluate(el => getComputedStyle(el).backgroundColor);
@@ -403,7 +407,7 @@ test('dark: the tile draws on the dark surface', async ({ page }) => {
 });
 
 test('dark beside Bulletins', async ({ page }) => {
-  await open(page, { dark: true, bulletins: true });
+  await open(page, { dark: true });
   await shot(page, 'inbox-299-dark');
   expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(299);
 });

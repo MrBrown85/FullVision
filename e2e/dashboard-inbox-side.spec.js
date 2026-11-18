@@ -21,24 +21,28 @@ const shot = async (page, name) => {
   await page.locator('#dash-inbox').screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { bulletins = false, dark = false, side = true } = {}) {
+async function open(page, { tile = true, dark = false, side = true } = {}) {
   await page.addInitScript(
-    ([bulletins, side]) => {
+    ([side]) => {
       try {
         if (side) localStorage.setItem('fv-dash-inbox-view:sci8', 'side');
-        if (bulletins) {
-          localStorage.setItem('fv-build-bulletins', '1');
-        }
       } catch (e) {
         /* storage blocked */
       }
     },
-    [bulletins, side],
+    [side],
   );
   if (dark) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
   await page.evaluate(() => {
     const cid = getActiveCourse();
     setStudentPageSwitch(cid, true, 'on_return');
@@ -168,7 +172,7 @@ test('the switch changes the piece, is kept, and a pressed button says so', asyn
 test('after the grader closes the focus returns to the page that was clicked, and a pile gathers if the pointer is away', async ({
   page,
 }) => {
-  await open(page);
+  await open(page, { tile: false });
   await page
     .locator(PILE + ' .dash-inbox-side-page')
     .first()
@@ -194,7 +198,7 @@ test('after the grader closes the focus returns to the page that was clicked, an
 test('after a mouse click on a page and Escape in the grader, a pile with the pointer away gathers', async ({
   page,
 }) => {
-  await open(page);
+  await open(page, { tile: false });
   await page
     .locator(PILE + ' .dash-inbox-side-page')
     .first()
@@ -247,7 +251,7 @@ test('the default piece is the first with work to grade', async ({ page }) => {
 });
 
 test('a pile spreads on hover and pushes the others along, and gathers when left', async ({ page }) => {
-  await open(page);
+  await open(page, { tile: false });
   await expect(page.locator(PILE + ' .dash-inbox-side-count')).toHaveText('2 pages');
   expect(await lowerHidden(page)).toBe(true);
   const w0 = (await box(page, PILE)).width;
@@ -370,7 +374,7 @@ test('a 13-page pile spreads, scrolls with the row, and asks only for pictures n
 });
 
 test('a redraw keeps the open pile and the scroll, and asks for no picture twice', async ({ page }) => {
-  await open(page);
+  await open(page, { tile: false });
   await page
     .locator(PILE + ' .dash-inbox-side-page')
     .first()
@@ -400,7 +404,7 @@ test('a redraw keeps the open pile and the scroll, and asks for no picture twice
 test('at the full column and at 299 px every picture is 80 px or more and nothing scrolls the page sideways', async ({
   page,
 }) => {
-  await open(page);
+  await open(page, { tile: false });
   const measure = () =>
     page.evaluate(() => {
       const row = document.getElementById('dash-inbox-side-row');
@@ -439,7 +443,7 @@ test('at the full column and at 299 px every picture is 80 px or more and nothin
 });
 
 test('beside Bulletins the Inbox is 299 px and the pictures are 80 px or more', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   // In the page's font, the wide stand-in for CI's fonts, and a harsher one
   // (13.3 px text, 1.37 lines): the captions hold on one line each, inside the row.
   for (const [font, css] of [

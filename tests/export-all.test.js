@@ -457,6 +457,10 @@ describe('the export stays complete', () => {
     getStudentRevision: 'the student page’s view of its own revision',
     getSubmissionVersions: 'student work, kept out with its photos',
     getRevisionFirstCell: 'the first version’s result, read through assessmentCellValue',
+    // Bulletins (B1g): the bulletins and who has seen them are on the Bulletins sheets.
+    getBulletinsMeta: 'how many students can open the page, for the Seen line; not a record',
+    getBulletinPage: 'a page of a bulletin’s file, kept out as a handout’s pages are',
+    getReturnedBulletins: 'drafts this device could not post, kept to write again; never posted',
   };
 
   it('uses every per-class reader in shared/data.js, or says why not', () => {
@@ -480,7 +484,8 @@ describe('the export stays complete', () => {
       readFileSync(resolve(root, 'shared/data-student-work.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-markup.js'), 'utf-8') +
       readFileSync(resolve(root, 'shared/data-feedback-live.js'), 'utf-8') +
-      readFileSync(resolve(root, 'shared/data-revisions.js'), 'utf-8');
+      readFileSync(resolve(root, 'shared/data-revisions.js'), 'utf-8') +
+      readFileSync(resolve(root, 'shared/data-bulletins.js'), 'utf-8');
     const readers = [...data.matchAll(/^function (get\w+)\(cid\b/gm)].map(m => m[1]);
     expect(readers.length).toBeGreaterThan(40);
     const used = readers.filter(name => new RegExp('\\b' + name + '\\(').test(SOURCE));
@@ -574,5 +579,108 @@ describe('Handouts and Links', () => {
     } finally {
       globalThis.getAssessmentResources = was;
     }
+  });
+});
+
+describe('Bulletins (B1g)', () => {
+  const B = (id, over) =>
+    Object.assign(
+      {
+        id,
+        kind: 'announcement',
+        body: 'Words ' + id,
+        link_url: null,
+        link_title: null,
+        pinned: false,
+        visible: true,
+        posted_at: '2026-11-10T16:00:00Z',
+        files: [],
+        seen: 0,
+        can_see: 3,
+      },
+      over,
+    );
+  const real = {};
+  const stand = (list, offered = true) => {
+    for (const k of ['getBulletins', 'bulletinsOffered']) real[k] = globalThis[k];
+    globalThis.getBulletins = () => list;
+    globalThis.bulletinsOffered = () => offered;
+  };
+  afterEach(() => {
+    for (const k of Object.keys(real)) globalThis[k] = real[k];
+  });
+
+  it('one row per bulletin posted, oldest first: posted, kind, words, link, files, pinned, Seen by N of M', () => {
+    seed({ assessments: [level('Lab')] });
+    stand([
+      B('b2', {
+        kind: 'reminder',
+        posted_at: '2026-11-12T16:00:00Z',
+        link_url: 'https://example.org/lab',
+        link_title: 'Lab Safety',
+        pinned: true,
+        files: [{ title: 'Lab Sheet' }, { title: 'Photo of the Board' }],
+        seen: 2,
+      }),
+      B('b1', { seen: 3, link_url: 'https://example.org/x' }),
+      B('w', { visible: false, posted_at: null }),
+    ]);
+    const s = sheet(rows(), 'Bulletins');
+    expect(s.columns.map(c => c.header)).toEqual([
+      'Class',
+      'Posted',
+      'Kind',
+      'Words',
+      'Link',
+      'Files',
+      'Pinned',
+      'Seen By',
+    ]);
+    expect(s.rows).toEqual([
+      ['Science 9', '2026-11-10', 'Announcement', 'Words b1', 'https://example.org/x', '', '', '3 of 3'],
+      [
+        'Science 9',
+        '2026-11-12',
+        'Reminder',
+        'Words b2',
+        'Lab Safety (https://example.org/lab)',
+        'Lab Sheet; Photo of the Board',
+        'Yes',
+        '2 of 3',
+      ],
+    ]);
+    // Who saw it is a sheet of its own, only with the server's answer.
+    expect(sheet(rows(), 'Bulletins Seen')).toBeUndefined();
+  });
+
+  it('one row per student who saw it or reacted, in class-list order, with the reaction as the student pressed it', () => {
+    seed({ assessments: [level('Lab')] });
+    stand([B('b1', { seen: 2 })]);
+    const who = {
+      ok: true,
+      seen: ['s1', 's3'],
+      not_seen: ['s2'],
+      reactions: { got_it: ['s3'], done: [], question: ['s1'] },
+    };
+    const s = sheet(rows({ bulletinSeen: (cid, id) => (cid === CID && id === 'b1' ? who : null) }), 'Bulletins Seen');
+    expect(s.columns.map(c => c.header)).toEqual(['Class', 'Posted', 'Bulletin', 'Student', 'Seen', 'Reaction']);
+    expect(s.rows).toEqual([
+      ['Science 9', '2026-11-10', 'Words b1', 'Teddy Okafor', 'Yes', 'I Have a Question'],
+      ['Science 9', '2026-11-10', 'Words b1', 'Sam Zhou', 'Yes', 'Got It'],
+    ]);
+    // A read that failed lists no student; the bulletin is still there.
+    const failed = rows({ bulletinSeen: () => ({ ok: false, seen: ['s1'], reactions: {} }) });
+    expect(sheet(failed, 'Bulletins Seen')).toBeUndefined();
+    expect(sheet(failed, 'Bulletins').rows).toHaveLength(1);
+  });
+
+  it('a class that offers no Bulletins (its server has none yet) has no sheet, and nothing is asked', () => {
+    seed({ assessments: [level('Lab')] });
+    stand([B('b1')], false);
+    let asked = 0;
+    const out = rows({ bulletinSeen: () => (asked++, null) });
+    expect(sheet(out, 'Bulletins')).toBeUndefined();
+    expect(sheet(out, 'Bulletins Seen')).toBeUndefined();
+    expect(asked).toBe(0);
   });
 });

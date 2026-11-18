@@ -778,7 +778,7 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
     // Only the page's reads (its questionnaires come in `forms`); no "opened" mark yet.
-    expect(routes(posts)).toEqual(['page', 'work', 'forms']);
+    expect(routes(posts)).toEqual(['page', 'bulletins', 'work', 'forms']);
     // It is switched to.
     await page.evaluate(() => {
       window.__hidden = false;
@@ -800,6 +800,8 @@ test.describe('"opened" means the row was on screen', () => {
     await page.getByRole('button', { name: 'Continue' }).tap();
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
+    // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
+    await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().tap();
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
     await openLearning(page);
     await page.waitForTimeout(1200);

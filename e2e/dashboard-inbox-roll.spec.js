@@ -17,24 +17,18 @@ const shot = async (page, name) => {
   await page.locator('#dash-inbox').screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { bulletins = false, dark = false } = {}) {
-  await page.addInitScript(bulletins => {
-    try {
-      if (bulletins) {
-        localStorage.setItem('fv-build-bulletins', '1');
-        window.DashBulletins = {
-          html: () =>
-            '<section class="dash-bulletins-stub" style="flex:1;background:var(--surface);border-radius:12px"></section>',
-        };
-      }
-    } catch (e) {
-      /* storage blocked */
-    }
-  }, bulletins);
+async function open(page, { tile = true, dark = false } = {}) {
   if (dark) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
+  // With no tile (Bulletins is on since B1g): a signed-in class whose server has not answered list_bulletins, or
+  // whose read failed, draws no Bulletins slot (e2e/dashboard-bulletins-late.spec.js); Demo Mode always has one.
+  if (!tile)
+    await page.evaluate(() => {
+      DashBulletins.html = () => '';
+      PageDashboard.render();
+    });
   await page.evaluate(() => {
     const cid = getActiveCourse();
     setStudentPageSwitch(cid, true, 'on_return');
@@ -74,7 +68,7 @@ test('Roll Call is in the view pill, switches the tile in place and survives a r
 });
 
 test('at 299 px every student is a name chip, all inside the tile, in the model states', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await chooseRoll(page);
   const tile = await page.locator('#dash-inbox').boundingBox();
   expect(Math.round(tile.height)).toBe(299);
@@ -132,7 +126,7 @@ test('at 299 px every student is a name chip, all inside the tile, in the model 
 });
 
 test('a paper hand-in says On Paper, and the shared piece switch changes the piece', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await page.evaluate(() => {
     localStorage.setItem('fv-dash-inbox-view:' + getActiveCourse(), 'roll');
     PageDashboard.render();
@@ -180,7 +174,7 @@ test('the grader closes and the focus is back on the student who opened it; a re
 });
 
 test('at the full column the chips carry pages, each at least 80 px tall', async ({ page }) => {
-  await open(page);
+  await open(page, { tile: false });
   await chooseRoll(page);
   await expect(page.locator('.dash-inbox-roll')).toHaveClass(/is-pages/);
   const tile = await page.locator('#dash-inbox').boundingBox();
@@ -294,7 +288,7 @@ test('Add Work for the Class opens the class page', async ({ page }) => {
 });
 
 test('a keyboard reaches every chip in class-list order, and focus is visible', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await chooseRoll(page);
   await page.locator('.dash-inbox-roll-chip').first().focus();
   await page.keyboard.press('ArrowRight');
@@ -315,21 +309,21 @@ test('a keyboard reaches every chip in class-list order, and focus is visible', 
 });
 
 test('dark mode, 299 px', async ({ page }) => {
-  await open(page, { bulletins: true, dark: true });
+  await open(page, { dark: true });
   await chooseRoll(page);
   await shot(page, 'roll-names-299-dark');
   await expect(page.locator('.dash-inbox-roll')).toBeVisible();
 });
 
 test('dark mode, full column', async ({ page }) => {
-  await open(page, { dark: true });
+  await open(page, { dark: true, tile: false });
   await chooseRoll(page);
   await expect(page.locator('.dash-inbox-roll-img').first()).toHaveAttribute('src', /.+/);
   await shot(page, 'roll-pages-510-dark');
 });
 
 test('at 299 px the menu is whole, inside the window and the tile, and not clipped', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await chooseRoll(page);
   const menu = page.locator('.dash-inbox-roll-menu');
   await expect(menu).toHaveCount(0);
@@ -365,7 +359,7 @@ test('at 299 px the menu is whole, inside the window and the tile, and not clipp
 });
 
 test('an Excused student is quiet and opens the grader; a Missing one is said in a word', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await page.evaluate(() => {
     const cid = getActiveCourse();
     const m = DashInboxRoll.model(cid, 'sci8a21');
@@ -400,7 +394,7 @@ test('an Excused student is quiet and opens the grader; a Missing one is said in
 });
 
 test('Late has a word in the chip, and no picture can be dragged', async ({ page }) => {
-  await open(page);
+  await open(page, { tile: false });
   await chooseRoll(page);
   await expect(page.locator('.dash-inbox-roll-chip[aria-label^="Marcus Lee"] .dash-inbox-roll-tag')).toHaveText('Late');
   await expect(page.locator('.dash-inbox-roll-img').first()).toHaveAttribute('src', /.+/);
@@ -411,7 +405,7 @@ test('Late has a word in the chip, and no picture can be dragged', async ({ page
 });
 
 test('one Tab stop; arrows, Home and End move inside the grid; focus survives a redraw', async ({ page }) => {
-  await open(page, { bulletins: true });
+  await open(page);
   await chooseRoll(page);
   expect(await page.locator('.dash-inbox-roll-chip[tabindex="0"]').count()).toBe(1);
   expect(await page.locator('.dash-inbox-roll-chip[tabindex="-1"]').count()).toBe(26);

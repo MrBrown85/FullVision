@@ -20,6 +20,8 @@ async function openSend() {
   await page.submit('form[data-form="card"]');
   page.type('#sp-ident', page.T.DEMO.number);
   await page.click('[data-act="card-yes"]');
+  // The sample class has bulletins, so the page opens on Bulletins (B1g); these tests start on Assignments.
+  await page.click('.sp-tabs-bottom [data-tab="assignments"]');
   const id = page.T.state().reply.assessments.find(a => a.title === 'Science Fair Proposal').id;
   // It is due in four days: its card is in Upcoming.
   await page.click('[data-segment="upcoming"]');

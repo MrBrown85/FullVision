@@ -92,7 +92,6 @@ describe('the tile', () => {
     globalThis.getBulletinsMeta = () => ({ can_see: 27, no_card: 0, paused: 0, page_on: on, more: false });
   };
   beforeEach(() => {
-    localStorage.setItem('fv-build-bulletins', '1');
     document.removeEventListener = () => {};
     pageOn(true);
   });
@@ -121,10 +120,14 @@ describe('the tile', () => {
     expect(out).toContain('dash-bulletins-time">Just Now');
   });
 
-  it('draws nothing with the bulletins switch off; the row is on whatever an old dashRow key says (D9)', () => {
-    localStorage.removeItem('fv-build-bulletins');
-    expect(D.html('sci8')).toBe('');
-    localStorage.setItem('fv-build-bulletins', '1');
+  it('on since B1g, a signed-in class whose server has not answered draws nothing (rule 7), whatever an old key says; so is the row (D9)', () => {
+    for (const v of [null, '0', '1']) {
+      if (v === null) localStorage.removeItem('fv-build-bulletins');
+      else localStorage.setItem('fv-build-bulletins', v);
+      expect(BuildFlags.on('bulletins')).toBe(true);
+      expect(bulletinsOffered('sci8')).toBe(false);
+      expect(D.html('sci8')).toBe('');
+    }
     expect(BuildFlags.on('dashRow')).toBe(true);
     localStorage.setItem('fv-build-dashRow', '0');
     expect(BuildFlags.on('dashRow')).toBe(true);

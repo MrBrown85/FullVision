@@ -35,6 +35,11 @@
   // A handout file's kind as the form names it (2026111706).
   /** @type {Record<string, string>} */
   var RESOURCE_KIND_WORDS = { html: 'Web Page', txt: 'Text File', epub: 'EPUB' };
+  // Bulletins (B1g): a bulletin's kind and a student's reaction as the screens name them.
+  /** @type {Record<string, string>} */
+  var BULLETIN_KIND_WORDS = { announcement: 'Announcement', reminder: 'Reminder' };
+  /** @type {Record<string, string>} */
+  var BULLETIN_REACTION_NAMES = { got_it: 'Got It', done: 'Done', question: 'I Have a Question' };
   /** @param {unknown} bytes */
   function sizeWords(bytes) {
     var n = Number(bytes) || 0;
@@ -248,7 +253,8 @@
   /* opts.cids: the classes (default: every class that isn't deleted);
      opts.teacher: the teacher's name; opts.date: 'YYYY-MM-DD';
      opts.entries(cid, sid): a student's questionnaire answers
-     (StudentVoice.entries), or left out. */
+     (StudentVoice.entries), or left out; opts.bulletinSeen(cid, id): who has
+     seen a bulletin and reacted (getBulletinSeen's answer), or left out. */
   /* Photos of student work never go in this file, and nor do the records of
      what was sent (Colin, Q22; S8-F2). Where a class could hold any, the
      Contents sheet says so: a class whose student page is on (the build
@@ -268,6 +274,7 @@
     opts = opts || {};
     var cids = opts.cids || classIds();
     var entries = typeof opts.entries === 'function' ? opts.entries : null;
+    var bulletinSeen = typeof opts.bulletinSeen === 'function' ? opts.bulletinSeen : null;
 
     var summary = [];
     var grids = [];
@@ -279,6 +286,8 @@
     var goals = [];
     var overrides = [];
     var resources = [];
+    var bulletins = [];
+    var bulletinMarks = [];
     var taken = { contents: true, summary: true };
 
     cids.forEach(function (cid) {
@@ -311,6 +320,64 @@
             ]);
           });
         });
+
+      // Bulletins (B1g): one row per bulletin posted, oldest first, and one
+      // per student who has seen it or reacted to it, in class-list order.
+      // A bulletin's files are named here; the files themselves are kept
+      // out, like a handout's pages.
+      if (typeof getBulletins === 'function' && typeof bulletinsOffered === 'function' && bulletinsOffered(cid)) {
+        getBulletins(cid)
+          .filter(function (b) {
+            return b && b.visible && b.posted_at;
+          })
+          .sort(function (x, y) {
+            return String(x.posted_at).localeCompare(String(y.posted_at));
+          })
+          .forEach(function (b) {
+            var words = text(b.body);
+            var link = b.link_url
+              ? b.link_title
+                ? text(b.link_title) + ' (' + text(b.link_url) + ')'
+                : text(b.link_url)
+              : '';
+            bulletins.push([
+              cname,
+              day(b.posted_at),
+              BULLETIN_KIND_WORDS[b.kind] || 'Announcement',
+              words,
+              link,
+              (b.files || [])
+                .map(function (f) {
+                  return text(f && f.title);
+                })
+                .filter(Boolean)
+                .join('; '),
+              b.pinned ? 'Yes' : '',
+              (Number(b.seen) || 0) + ' of ' + (Number(b.can_see) || 0),
+            ]);
+            var who = bulletinSeen ? bulletinSeen(cid, b.id) : null;
+            if (!who || !who.ok) return;
+            var seenIds = who.seen || [];
+            var reaction = {};
+            Object.keys(BULLETIN_REACTION_NAMES).forEach(function (w) {
+              ((who.reactions && who.reactions[w]) || []).forEach(function (sid) {
+                reaction[sid] = BULLETIN_REACTION_NAMES[w];
+              });
+            });
+            students.forEach(function (st) {
+              var saw = seenIds.indexOf(st.id) >= 0;
+              if (!saw && !reaction[st.id]) return;
+              bulletinMarks.push([
+                cname,
+                day(b.posted_at),
+                words,
+                studentName(st),
+                saw ? 'Yes' : '',
+                reaction[st.id] || '',
+              ]);
+            });
+          });
+      }
 
       // Summary
       students.forEach(function (st) {
@@ -685,6 +752,35 @@
         ],
         rows: resources,
       },
+      {
+        name: 'Bulletins',
+        about:
+          'Each bulletin posted, oldest first, with its link, the names of its files and how many students have seen it. A bulletin’s files are not in this file.',
+        columns: [
+          COL.classCol,
+          { header: 'Posted', width: 12, date: true },
+          COL.short('Kind', 14),
+          COL.long('Words'),
+          COL.long('Link'),
+          COL.short('Files', 28),
+          COL.short('Pinned', 8),
+          COL.short('Seen By', 10),
+        ],
+        rows: bulletins,
+      },
+      {
+        name: 'Bulletins Seen',
+        about: 'Each student who has seen a bulletin, and their reaction where reactions are on.',
+        columns: [
+          COL.classCol,
+          { header: 'Posted', width: 12, date: true },
+          COL.long('Bulletin'),
+          COL.student,
+          COL.short('Seen', 8),
+          COL.short('Reaction', 18),
+        ],
+        rows: bulletinMarks,
+      },
     ];
     list.forEach(function (s) {
       if (s.rows.length) sheets.push(s);
@@ -899,6 +995,31 @@
     }, 60000);
   }
 
+  /* Who has seen each posted bulletin of a class, read once for the file
+     (getBulletinSeen). A class that offers no Bulletins, or a read that
+     fails, leaves its students' rows out; the bulletins are still listed. */
+  var _seen = {};
+  function readBulletinSeen(cid) {
+    _seen[cid] = {};
+    if (typeof refreshBulletins !== 'function' || typeof getBulletinSeen !== 'function') return Promise.resolve();
+    return refreshBulletins(cid, { force: true })
+      .then(function () {
+        if (!bulletinsOffered(cid)) return null;
+        return Promise.all(
+          getBulletins(cid)
+            .filter(function (b) {
+              return b && b.visible && b.posted_at;
+            })
+            .map(function (b) {
+              return getBulletinSeen(cid, b.id).then(function (who) {
+                _seen[cid][b.id] = who;
+              });
+            }),
+        );
+      })
+      .catch(function () {});
+  }
+
   var _running = false;
   function run() {
     if (_running) return Promise.resolve();
@@ -914,6 +1035,9 @@
           return loadClass(cid)
             .then(function () {
               return voice && voice.load ? voice.load(cid).catch(function () {}) : null;
+            })
+            .then(function () {
+              return readBulletinSeen(cid);
             })
             .then(function () {
               return lib;
@@ -939,6 +1063,9 @@
           teacher: name,
           date: date,
           entries: voice && voice.entries ? voice.entries : null,
+          bulletinSeen: function (cid, id) {
+            return (_seen[cid] || {})[id] || null;
+          },
         });
         return workbook(sheets, lib)
           .xlsx.writeBuffer()

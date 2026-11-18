@@ -1061,6 +1061,7 @@ describe('cm-student-page-my-learning', () => {
   let doc;
   let stub;
   let original;
+  let realEvent;
 
   function seed(config, gradingSystem) {
     localStorage.clear();
@@ -1145,6 +1146,9 @@ describe('cm-student-page-my-learning', () => {
     };
     if (!proto.scrollIntoView) proto.scrollIntoView = function () {};
     globalThis.document = doc;
+    // Bulletins' change event (shared/data-bulletins.js), made by this document's window, as a browser makes it.
+    realEvent = globalThis.CustomEvent;
+    globalThis.CustomEvent = doc.defaultView.CustomEvent;
     globalThis.CSS = globalThis.CSS || { escape: s => String(s) };
     original = {
       setUrl: Router.setUrl,
@@ -1166,6 +1170,7 @@ describe('cm-student-page-my-learning', () => {
     _useSupabase = original.useSupabase;
     window.isDemoMode = original.isDemoMode;
     globalThis.document = stub;
+    globalThis.CustomEvent = realEvent;
     clearClass(CID);
     vi.useRealTimers();
   });
@@ -1419,6 +1424,7 @@ describe('cm-student-page-reflect', () => {
   let doc;
   let stub;
   let original;
+  let realEvent;
   let fetches;
 
   function seedDemo({ on = true } = {}) {
@@ -1470,6 +1476,9 @@ describe('cm-student-page-reflect', () => {
       active = this;
     };
     globalThis.document = doc;
+    // Bulletins' change event (shared/data-bulletins.js), made by this document's window, as a browser makes it.
+    realEvent = globalThis.CustomEvent;
+    globalThis.CustomEvent = doc.defaultView.CustomEvent;
     globalThis.CSS = globalThis.CSS || { escape: s => String(s) };
     original = {
       setUrl: Router.setUrl,
@@ -1496,6 +1505,7 @@ describe('cm-student-page-reflect', () => {
     _useSupabase = original.useSupabase;
     globalThis.fetch = original.fetch;
     globalThis.document = stub;
+    globalThis.CustomEvent = realEvent;
     Object.keys(COURSES).forEach(cid => _clearCourseLocalState(cid));
     localStorage.clear();
     vi.useRealTimers();

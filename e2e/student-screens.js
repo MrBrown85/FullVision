@@ -10,7 +10,12 @@ import { resolve } from 'node:path';
 
    go(page, { base, desk, size }): base is '' under Playwright's own server;
    desk is true at Chromebook width; size is the Text Size to choose
-   ('normal' chooses none). `gear` screens exist only with Settings. */
+   ('normal' chooses none). `gear` screens exist only with Settings.
+
+   The sample class has bulletins, so the demo card opens on Bulletins
+   (B1g); openDemo then presses Assignments, where every screen but the
+   Bulletins ones starts, as it did before Bulletins. ctx.onBulletins
+   leaves it there. */
 
 const PHOTO = resolve('assets/sample-work/cell-lab-cece-1.jpg');
 
@@ -23,6 +28,8 @@ export async function openDemo(page, ctx, hash) {
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   await page.locator('.sp-view').first().waitFor();
+  if (!ctx.onBulletins && (await page.locator('.sp-tab-on[data-tab="bulletins"]').locator('visible=true').count()))
+    await tab(page, 'assignments');
   if (ctx.size && ctx.size !== 'normal') {
     await page.locator('.sp-gear').click();
     await page.locator('.sp-set-size[data-size="' + ctx.size + '"]').click();
@@ -332,14 +339,11 @@ export const SCREENS = [
   },
 ];
 
-/* Bulletins (docs/plans/bulletins-plan.md B1d), behind the `bulletins` build
-   switch: these turn it on for the rest of the test's page, so they come
-   last. A copy of `main` before Bulletins has none of them (`bulletins`). */
+/* Bulletins (docs/plans/bulletins-plan.md B1d; on since B1g): the demo card
+   opens on them. They come last, and a copy of `main` from before Bulletins
+   has none of them (`bulletins`). */
 async function bulletinsDemo(p, c) {
-  await p.goto('about:blank');
-  await p.goto((c.base || '') + '/s/');
-  await p.evaluate(() => localStorage.setItem('fv-build-bulletins', '1'));
-  await openDemo(p, c, 'demo-card');
+  await openDemo(p, Object.assign({}, c, { onBulletins: true }), 'demo-card');
   await expect(p.locator('.sp-tab-on[data-tab="bulletins"]').locator('visible=true')).toBeVisible();
 }
 

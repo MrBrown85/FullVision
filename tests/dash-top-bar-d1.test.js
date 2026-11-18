@@ -81,20 +81,25 @@ describe('the class change line', () => {
 
 describe('BuildFlags', () => {
   beforeEach(() => localStorage.clear());
-  it('has the unfinished work off by default, and the middle row on (D9)', () => {
+  it('has the unfinished work off by default, and the middle row (D9) and Bulletins (B1g) on', () => {
     expect(BuildFlags.on('dashRow')).toBe(true);
-    expect(BuildFlags.on('bulletins')).toBe(false);
+    expect(BuildFlags.on('bulletins')).toBe(true);
     expect(BuildFlags.on('quizzes')).toBe(false);
   });
   it('turns on with the localStorage key', () => {
-    localStorage.setItem('fv-build-bulletins', '1');
-    expect(BuildFlags.on('bulletins')).toBe(true);
-    expect(BuildFlags.on('quizzes')).toBe(false);
+    localStorage.setItem('fv-build-quizzes', '1');
+    expect(BuildFlags.on('quizzes')).toBe(true);
   });
   it("keeps the middle row on whatever an old 'fv-build-dashRow' says", () => {
     for (const v of ['1', '0', '']) {
       localStorage.setItem('fv-build-dashRow', v);
       expect(BuildFlags.on('dashRow')).toBe(true);
+    }
+  });
+  it("keeps Bulletins on whatever an old 'fv-build-bulletins' says", () => {
+    for (const v of ['1', '0', '']) {
+      localStorage.setItem('fv-build-bulletins', v);
+      expect(BuildFlags.on('bulletins')).toBe(true);
     }
   });
   it('stays off when storage throws, and a flag on by default stays on', () => {
@@ -103,8 +108,9 @@ describe('BuildFlags', () => {
       throw new Error('blocked');
     };
     try {
-      expect(BuildFlags.on('bulletins')).toBe(false);
+      expect(BuildFlags.on('quizzes')).toBe(false);
       expect(BuildFlags.on('dashRow')).toBe(true);
+      expect(BuildFlags.on('bulletins')).toBe(true);
     } finally {
       localStorage.getItem = real;
     }

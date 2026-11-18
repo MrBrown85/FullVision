@@ -2,8 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 /* Bulletins on the student's page (docs/plans/bulletins-plan.md, slice B1d;
-   the Bulletins Artboard, C1 to C3), in Demo Mode with the `bulletins`
-   build switch on, against the built site with the live site's CSP and
+   the Bulletins Artboard, C1 to C3; on since B1g), in Demo Mode, against the built site with the live site's CSP and
    every ad blocker name hidden as a blocker would hide it
    (tests/fixtures/adblock-hidden-names.txt). The clock is pinned before the
    page loads (Wednesday, Nov 18, 2026, 7 p.m. in Vancouver), so the day
@@ -25,8 +24,7 @@ async function open(page, opts = {}) {
   });
   await page.clock.install({ time: NOW });
   await page.addInitScript(
-    ([css, flag, own]) => {
-      if (flag) localStorage.setItem('fv-build-bulletins', '1');
+    ([css, own]) => {
       // The class's own bulletins, as the teacher's Demo Mode keeps them on this device (OWN_BULLETINS).
       if (own) {
         const tall = document.createElement('canvas');
@@ -94,7 +92,7 @@ async function open(page, opts = {}) {
       if (document.documentElement) add();
       else document.addEventListener('DOMContentLoaded', add);
     },
-    [ADBLOCK, opts.flag !== false, !!opts.own],
+    [ADBLOCK, !!opts.own],
   );
   await page.goto('/s/#' + (opts.hash || 'demo-card'));
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -268,14 +266,6 @@ test.describe('on a phone, 390 px', () => {
     await expect(page.locator('.sp-head-title')).toHaveText('Science 8');
     await expect(bar(page).locator('[data-tab="bulletins"]')).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#sp-bulletin-new')).toBeVisible();
-  });
-
-  test('with the switch off: three tabs, nothing of Bulletins, nothing sent', async ({ page }) => {
-    const posts = await open(page, { flag: false });
-    await expect(bar(page).locator('.sp-tab-label')).toHaveText(['Assignments', 'My Learning', 'Reflect']);
-    await expect(page.locator('[class*="sp-bulletin"]')).toHaveCount(0);
-    expect(await page.evaluate(() => Object.keys(localStorage).filter(k => /bulletin/.test(k)))).toEqual([]);
-    expect(posts).toEqual([]);
   });
 });
 
@@ -565,7 +555,6 @@ test.describe('Preview as Student, a desktop window', () => {
   test('the bar in the phone frame holds four tabs at every Text Size, in both fonts', async ({ page }) => {
     test.setTimeout(90_000);
     await page.clock.install({ time: NOW });
-    await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
     await page.goto('/login.html?demo=1');
     await page.waitForFunction(
       () =>
@@ -601,52 +590,50 @@ test.describe('Preview as Student, a desktop window', () => {
 
 /* Switch Class (gear review, should-fix): at every Text Size, the current class's tick stays on its
    name's line, and its counts ("3 to do", and "2 new" with Bulletins on) stay whole inside the row. */
-for (const flag of [false, true]) {
-  test.describe('Switch Class at 320 px, Bulletins ' + (flag ? 'on' : 'off'), () => {
-    test.use({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
+test.describe('Switch Class at 320 px', () => {
+  test.use({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
 
-    test('the tick beside the name, the counts whole, at every Text Size and in both fonts', async ({ page }) => {
-      test.setTimeout(90_000);
-      for (const font of ['own', 'wide']) {
-        for (const size of SIZES) {
-          await page.goto('about:blank');
-          await open(page, { flag, size });
-          if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
-          await page.getByRole('button', { name: 'Settings', exact: true }).click();
-          await page.locator('.sp-set [data-act="card-add"]').click();
-          await page.locator('#sp-code').fill('ABCD-EFGH');
-          await page.getByRole('button', { name: 'Continue' }).click();
-          await page.getByLabel('Student Number').fill('1234567');
-          await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-          await expect(page.locator('.sp-head-title')).toHaveText('Humanities 8');
-          await page.getByRole('button', { name: 'Settings', exact: true }).click();
-          await page.locator('.sp-set .sp-class', { hasText: 'Science 8' }).click();
-          await expect(page.locator('.sp-head-title')).toHaveText('Science 8');
-          await page.getByRole('button', { name: 'Settings', exact: true }).click();
-          await page.waitForTimeout(300);
-          const rows = await page.locator('.sp-set .sp-class').evaluateAll(els =>
-            els.map(el => {
-              const r = el.getBoundingClientRect();
-              const name = el.querySelector('.sp-class-name').getBoundingClientRect();
-              const tick = el.querySelector('.sp-class-tick');
-              const t = tick ? tick.getBoundingClientRect() : null;
-              return {
-                name: el.querySelector('.sp-class-name').textContent,
-                tick: !t || (t.top < name.bottom && t.bottom > name.top),
-                counts: [...el.querySelectorAll('.sp-class-todo, .sp-bulletin-class-new')].every(x => {
-                  const q = x.getBoundingClientRect();
-                  return q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && x.scrollWidth <= x.clientWidth + 1;
-                }),
-              };
-            }),
-          );
-          expect(
-            rows.filter(x => !x.tick || !x.counts),
-            font + ' ' + size,
-          ).toEqual([]);
-          if (flag) await expect(page.locator('.sp-set .sp-bulletin-class-new')).toHaveText('2 new');
-        }
+  test('the tick beside the name, the counts whole, at every Text Size and in both fonts', async ({ page }) => {
+    test.setTimeout(90_000);
+    for (const font of ['own', 'wide']) {
+      for (const size of SIZES) {
+        await page.goto('about:blank');
+        await open(page, { size });
+        if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
+        await page.getByRole('button', { name: 'Settings', exact: true }).click();
+        await page.locator('.sp-set [data-act="card-add"]').click();
+        await page.locator('#sp-code').fill('ABCD-EFGH');
+        await page.getByRole('button', { name: 'Continue' }).click();
+        await page.getByLabel('Student Number').fill('1234567');
+        await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+        await expect(page.locator('.sp-head-title')).toHaveText('Humanities 8');
+        await page.getByRole('button', { name: 'Settings', exact: true }).click();
+        await page.locator('.sp-set .sp-class', { hasText: 'Science 8' }).click();
+        await expect(page.locator('.sp-head-title')).toHaveText('Science 8');
+        await page.getByRole('button', { name: 'Settings', exact: true }).click();
+        await page.waitForTimeout(300);
+        const rows = await page.locator('.sp-set .sp-class').evaluateAll(els =>
+          els.map(el => {
+            const r = el.getBoundingClientRect();
+            const name = el.querySelector('.sp-class-name').getBoundingClientRect();
+            const tick = el.querySelector('.sp-class-tick');
+            const t = tick ? tick.getBoundingClientRect() : null;
+            return {
+              name: el.querySelector('.sp-class-name').textContent,
+              tick: !t || (t.top < name.bottom && t.bottom > name.top),
+              counts: [...el.querySelectorAll('.sp-class-todo, .sp-bulletin-class-new')].every(x => {
+                const q = x.getBoundingClientRect();
+                return q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && x.scrollWidth <= x.clientWidth + 1;
+              }),
+            };
+          }),
+        );
+        expect(
+          rows.filter(x => !x.tick || !x.counts),
+          font + ' ' + size,
+        ).toEqual([]);
+        await expect(page.locator('.sp-set .sp-bulletin-class-new')).toHaveText('2 new');
       }
-    });
+    }
   });
-}
+});
