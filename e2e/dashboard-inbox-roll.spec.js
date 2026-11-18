@@ -132,27 +132,52 @@ test('at 299 px every student is a name chip, all inside the tile, in the model 
   await shot(page, 'roll-names-299-light');
 });
 
-test('a paper hand-in says On Paper, and the switch shows when there is one', async ({ page }) => {
+test('a paper hand-in says On Paper, and the shared piece switch changes the piece', async ({ page }) => {
   await open(page, { bulletins: true });
   await page.evaluate(() => {
-    DashInboxRoll.reset();
     localStorage.setItem('fv-dash-inbox-view:' + getActiveCourse(), 'roll');
-    // A stand-in for the assessment switch, built apart: Cell Microscope Lab has Ethan on paper.
-    window.DashInboxPick = {
-      pieces: () => [{ aid: 'sci8a1', title: 'Cell Microscope Lab', inCount: 10 }],
-      current: () => 'sci8a1',
-      set() {},
-      html: () => '<span class="dash-inbox-pick-stub">Cell Microscope Lab · 10 In</span>',
-      mount() {},
-      unmount() {},
-    };
     PageDashboard.render();
   });
+  // The switch is the shared one; picking Cell Microscope Lab keeps the focus on the pressed button.
+  const lab = page.locator('.dash-inbox-pick-btn', { hasText: 'Cell Microscope Lab' });
+  await lab.focus();
+  await lab.press('Enter');
+  await expect(page.locator('.dash-inbox-roll')).toHaveAttribute('data-aid', 'sci8a1');
+  await expect(page.locator('.dash-inbox-pick-btn[aria-pressed="true"]')).toContainText('Cell Microscope Lab');
+  expect(await page.evaluate(() => document.activeElement.className)).toContain('dash-inbox-pick-btn');
   const ethan = page.locator('.dash-inbox-roll-chip', { hasText: 'Ethan' });
   await expect(ethan).toHaveAttribute('aria-label', /On Paper/);
   await expect(ethan.locator('.dash-inbox-roll-paper')).toBeVisible();
   await expect(page.locator('.dash-inbox-roll-count')).toContainText('Ethan Dubois on paper');
-  await expect(page.locator('.dash-inbox-pick-stub')).toBeVisible();
+});
+
+test('the grader closes and the focus is back on the student who opened it; a redraw keeps the scroll', async ({
+  page,
+}) => {
+  await open(page);
+  await chooseRoll(page);
+  const sid = await page.evaluate(aid => {
+    const m = DashInboxRoll.model(getActiveCourse(), aid);
+    return m.students.filter(c => c.in)[1].sid;
+  }, LIGHT);
+  const chip = page.locator('.dash-inbox-roll-chip[data-sid="' + sid + '"]');
+  await chip.click();
+  await expect(page.locator('#grader-overlay')).toBeVisible();
+  // Events from under the open grader are ignored: no menu opens.
+  await page.evaluate(() => document.querySelector('.dash-inbox-roll-chip.is-out').click());
+  await expect(page.locator('.dash-inbox-roll-menu')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#grader-overlay')).toHaveCount(0);
+  await expect(chip).toBeFocused();
+  // A redraw keeps the grid's scroll place.
+  await page.evaluate(() => {
+    const g = document.getElementById('dash-inbox-roll-grid');
+    g.scrollTop = 20;
+    window.__top = g.scrollTop;
+    PageDashboard.render();
+  });
+  const top = await page.evaluate(() => document.getElementById('dash-inbox-roll-grid').scrollTop);
+  expect(top).toBe(await page.evaluate(() => window.__top));
 });
 
 test('at the full column the chips carry pages, each at least 80 px tall', async ({ page }) => {

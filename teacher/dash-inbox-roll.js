@@ -37,17 +37,24 @@ window.DashInboxRoll = (function () {
   /** The form last drawn, and the piece when there is no switch.
    * @type {'names' | 'pages' | null} */
   var _form = null;
-  /** @type {string | null} */
-  var _own = null;
+  /** The files of the pictures drawn: data-dash-pic key (class id first) → file.
+   * @type {Record<string, any>} */
+  var _files = {};
+  /** The grid's scroll, and the student whose chip opened the grader or the menu.
+   * @type {{ key: string, scroll: number, refocus: string | null }} */
+  var _st = { key: '', scroll: 0, refocus: null };
+  /** @type {(() => void) | null} */
+  var _undo = null;
   /** @type {any} */
   var _watch = null;
   /** @type {any} */
   var _off = null;
   var _openedAt = 0;
 
-  /** @returns {any} */
-  function _pick() {
-    return /** @type {any} */ (window).DashInboxPick || null;
+  /** The grader is over the tile: what happens under it is not ours.
+   * @returns {boolean} */
+  function _graderOpen() {
+    return !!document.getElementById('grader-overlay');
   }
   /** @returns {any} */
   function _gw() {
@@ -256,9 +263,8 @@ window.DashInboxRoll = (function () {
     return k;
   }
 
-  /** @param {any} c @param {string} aid @param {string} form
-   * @param {(key: string, file: any) => void} give */
-  function chipHtml(c, aid, form, give) {
+  /** @param {any} c @param {string} cid @param {string} aid @param {string} form */
+  function chipHtml(c, cid, aid, form) {
     var attrs =
       ' data-dash-roll="chip" data-sid="' +
       esc(c.sid) +
@@ -287,8 +293,8 @@ window.DashInboxRoll = (function () {
     var page = '';
     if (c.in) {
       if (c.file) {
-        var key = aid + '|' + c.sid + '|' + c.file.id;
-        give(key, c.file);
+        var key = cid + '|' + aid + '|' + c.sid + '|' + c.file.id;
+        _files[key] = c.file;
         page =
           '<img class="dash-inbox-roll-img" data-work-pic data-dash-pic="' + esc(key) + '" alt="" decoding="async">';
       } else {
@@ -326,45 +332,24 @@ window.DashInboxRoll = (function () {
     return Math.max(120, tileH - 150);
   }
 
-  /** @param {string} cid
-   * @returns {string | null} */
-  function _aid(cid) {
-    var P = _pick();
-    var aid = P && P.current ? P.current(cid) : null;
-    return aid || null;
-  }
-
-  /** @param {string} cid @param {any} inbox the Inbox's own model */
-  function _chosen(cid, inbox) {
-    var P = _pick();
-    if (P) return _aid(cid);
-    var list = (inbox && inbox.rows && inbox.rows.length ? inbox.rows : inbox && inbox.pieces) || [];
-    var own = list.filter(function (/** @type {any} */ p) {
-      return p.aid === _own;
-    })[0];
-    return (own || list[0] || {}).aid || null;
-  }
-
-  /** @param {string} cid @param {any} inbox */
-  function html(cid, inbox) {
-    var aid = _chosen(cid, inbox);
+  /** @param {string} cid */
+  function html(cid) {
+    _files = {};
+    // The piece is the teacher's one choice, shared with Side by Side and Flip Through.
+    var drawn = DashInboxPick.draw(cid);
+    var aid = drawn.current ? drawn.current.aid : null;
+    var key = cid + '|' + aid;
+    if (_st.key !== key) _st = { key: key, scroll: 0, refocus: null };
     if (!aid) {
       return '<div class="dash-inbox-roll"><p class="dash-inbox-roll-empty">Nothing is taking work yet.</p></div>';
     }
     var m = model(cid, aid);
-    var P = _pick();
-    var head = P
-      ? '<div class="dash-inbox-roll-pick" id="dash-inbox-roll-pick">' + P.html(cid) + '</div>'
-      : '<div class="dash-inbox-roll-pick"><span class="dash-inbox-roll-piece">' + esc(m.title) + '</span></div>';
+    var head = '<div class="dash-inbox-roll-pick" id="dash-inbox-roll-pick">' + DashInboxPick.html(cid) + '</div>';
     var g = _guess();
     var form = _form || formFor(g.h);
     var chips = m.students
       .map(function (/** @type {any} */ c) {
-        return chipHtml(c, aid, form, function (key, file) {
-          var f = /** @type {Record<string, any>} */ ({});
-          f[key] = file;
-          /** @type {any} */ (window).DashInbox.fillPics(null, f);
-        });
+        return chipHtml(c, cid, aid, form);
       })
       .join('');
     var lay = layoutFor(m.students.length, g.w, _room(g.h));
@@ -451,6 +436,7 @@ window.DashInboxRoll = (function () {
       if (item) item.focus();
     }
     _off = function (/** @type {Event} */ e) {
+      if (_graderOpen()) return;
       if (e.type === 'keydown') {
         if (/** @type {KeyboardEvent} */ (e).key !== 'Escape') return;
         e.stopPropagation();
@@ -476,8 +462,9 @@ window.DashInboxRoll = (function () {
   }
 
   function _redraw() {
+    // Draw again only if the Dashboard is what is shown.
     var D = /** @type {any} */ (window).PageDashboard;
-    if (D && D.render) D.render();
+    if (document.querySelector('#main .dash-glance') && D && D.render) D.render();
   }
 
   /** @param {HTMLElement} root @param {string} cid */
@@ -486,7 +473,7 @@ window.DashInboxRoll = (function () {
     root.addEventListener('click', function (e) {
       var t = /** @type {any} */ (e.target);
       var el = t && t.closest && t.closest('[data-dash-roll]');
-      if (!el || !root.contains(el)) return;
+      if (!el || !root.contains(el) || _graderOpen()) return;
       var what = el.getAttribute('data-dash-roll');
       if (what === 'all') {
         var a = _piece(cid, aid);
@@ -498,6 +485,7 @@ window.DashInboxRoll = (function () {
         if (el.getAttribute('data-in') === '1') {
           _menu = null;
           _closeMenu(root);
+          _st.refocus = sid;
           _grader(cid, aid, sid, model(cid, aid).order, _redraw);
         } else if (el.hasAttribute('data-excused')) {
           return;
@@ -514,11 +502,13 @@ window.DashInboxRoll = (function () {
         var notIn = model(cid, aid).notIn;
         _menu = null;
         _closeMenu(root);
+        _st.refocus = sid;
         _grader(cid, aid, sid, notIn.indexOf(sid) >= 0 ? notIn : [sid], _redraw);
       }
     });
     root.addEventListener('keydown', function (e) {
       var k = e.key;
+      if (_graderOpen()) return;
       if (k !== 'ArrowLeft' && k !== 'ArrowRight' && k !== 'ArrowUp' && k !== 'ArrowDown') return;
       var t = /** @type {any} */ (e.target);
       if (!t || !t.matches || !t.matches('.dash-inbox-roll-chip')) return;
@@ -578,20 +568,41 @@ window.DashInboxRoll = (function () {
     }
   }
 
-  /** @param {HTMLElement} tile @param {string} cid @param {any} inbox */
-  function mount(tile, cid, inbox) {
+  /** Fills the pictures through the tile's holder, inside mount: the sweep
+   * runs right after it. Keys start with the class id.
+   * @param {HTMLElement} root @param {string} cid */
+  function _fill(root, cid) {
+    var pics = window.DashInbox && DashInbox.pics();
+    if (!pics) return;
+    pics.fill(root, cid, function (/** @type {HTMLElement} */ img) {
+      return _files[img.getAttribute('data-dash-pic') || ''] || null;
+    });
+  }
+
+  /** @param {HTMLElement} tile @param {string} cid */
+  function mount(tile, cid) {
+    unmount();
     var found = /** @type {HTMLElement | null} */ (tile.querySelector('.dash-inbox-roll[data-aid]'));
     if (!found) return;
     var root = found;
     var aid = root.getAttribute('data-aid') || '';
-    _own = aid;
     _bind(root, cid);
-    var P = _pick();
-    var pick = root.querySelector('#dash-inbox-roll-pick');
-    if (P && P.mount && pick) P.mount(pick, cid, _redraw);
+    // A pick calls set, redraws, and the pressed button keeps the focus.
+    DashInboxPick.mount(root, cid, _redraw);
+    var grid = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-roll-grid'));
+    if (grid) grid.scrollTop = _st.scroll;
     if (_menu && _menu.aid === aid) _showMenu(root, cid, false);
     else _menu = null;
     _measure(root);
+    _fill(root, cid);
+    if (_st.refocus) {
+      // The student who opened the grader takes the focus back.
+      var back = /** @type {HTMLElement | null} */ (
+        root.querySelector('.dash-inbox-roll-chip[data-sid="' + CSS.escape(_st.refocus) + '"]')
+      );
+      _st.refocus = null;
+      if (back) back.focus({ preventScroll: true });
+    }
     if (window.ResizeObserver) {
       var tick = 0;
       _watch = new ResizeObserver(function () {
@@ -602,23 +613,26 @@ window.DashInboxRoll = (function () {
       });
       _watch.observe(tile);
     }
+    var mine = _st.key;
+    _undo = function () {
+      // The scroll as it stands, before the page is drawn again.
+      if (grid && grid.isConnected && _st.key === mine) _st.scroll = grid.scrollTop;
+      DashInboxPick.unmount(root);
+    };
   }
 
   function unmount() {
+    if (_undo) _undo();
+    _undo = null;
     if (_watch) {
       _watch.disconnect();
       _watch = null;
     }
-    var root = document.querySelector('.dash-inbox-roll');
     if (_off) {
       document.removeEventListener('click', _off, true);
       document.removeEventListener('keydown', _off, true);
       _off = null;
     }
-    var P = _pick();
-    var pick = document.getElementById('dash-inbox-roll-pick');
-    if (P && P.unmount && pick) P.unmount(pick);
-    void root;
   }
 
   var inbox = /** @type {any} */ (window).DashInbox;
@@ -645,7 +659,7 @@ window.DashInboxRoll = (function () {
     reset: function () {
       _menu = null;
       _form = null;
-      _own = null;
+      _st = { key: '', scroll: 0, refocus: null };
     },
   };
 })();
