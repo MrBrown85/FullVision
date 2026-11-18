@@ -2800,6 +2800,28 @@ html.sp-size-larger .sp-view .sp-head-class {
   right: 0;
   margin-top: -7px;
 }
+/* Switch Class at Large and Larger: the name and the current class's tick
+   hold one line, and the "3 to do" goes under the name, so the tick never
+   drops to a line of its own. Normal is as it was. */
+.sp-view.sp-text-large .sp-set .sp-class,
+.sp-view.sp-text-larger .sp-set .sp-class {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+.sp-view.sp-text-large .sp-set .sp-class > .sp-class-words,
+.sp-view.sp-text-larger .sp-set .sp-class > .sp-class-words,
+.sp-view.sp-text-large .sp-set .sp-class > .sp-class-tick,
+.sp-view.sp-text-larger .sp-set .sp-class > .sp-class-tick {
+  grid-row: 1;
+}
+.sp-view.sp-text-large .sp-set .sp-class > .sp-class-todo,
+.sp-view.sp-text-larger .sp-set .sp-class > .sp-class-todo {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: start;
+}
 @keyframes sp-set-up {
   from {
     transform: translateY(100%);

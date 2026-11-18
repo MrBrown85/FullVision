@@ -332,6 +332,62 @@ export const SCREENS = [
   },
 ];
 
+/* Bulletins (docs/plans/bulletins-plan.md B1d), behind the `bulletins` build
+   switch: these turn it on for the rest of the test's page, so they come
+   last. A copy of `main` before Bulletins has none of them (`bulletins`). */
+async function bulletinsDemo(p, c) {
+  await p.goto('about:blank');
+  await p.goto((c.base || '') + '/s/');
+  await p.evaluate(() => localStorage.setItem('fv-build-bulletins', '1'));
+  await openDemo(p, c, 'demo-card');
+  await expect(p.locator('.sp-tab-on[data-tab="bulletins"]').locator('visible=true')).toBeVisible();
+}
+
+SCREENS.push(
+  { name: 'bulletins, the new line', bulletins: true, marker: '#sp-bulletin-new', go: bulletinsDemo },
+  {
+    name: 'bulletins, a file’s pages',
+    bulletins: true,
+    marker: '.sp-bulletin-file-pdf .sp-bulletin-file-count',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      const track = p.locator('.sp-bulletin-file-pdf .sp-bulletin-file-track');
+      await track.scrollIntoViewIfNeeded();
+      await track.evaluate(el => el.scrollTo({ left: el.clientWidth, behavior: 'auto' }));
+      await expect(p.locator('.sp-bulletin-file-pdf .sp-bulletin-file-count')).toHaveText('2 / 2');
+    },
+  },
+  {
+    name: 'bulletins, a page full size',
+    bulletins: true,
+    marker: '.sp-bulletin-viewer-img',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      await p.locator('.sp-bulletin-file-pdf .sp-bulletin-file-slide[data-page="0"]').click();
+    },
+  },
+  {
+    name: 'bulletins, the link question',
+    bulletins: true,
+    marker: '.sp-bulletin-ask',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      await p.locator('.sp-bulletin-link').click();
+    },
+  },
+  {
+    name: 'bulletins, the reminder bar',
+    bulletins: true,
+    marker: '.sp-bulletin-reminder',
+    go: async (p, c) => {
+      await bulletinsDemo(p, c);
+      await p.locator('.sp-bulletin-pinbar').click();
+      await expect(p.locator('.sp-bulletin-pinbar')).toBeInViewport();
+      await expect(p.locator('.sp-bulletin-reminder')).toBeInViewport();
+    },
+  },
+);
+
 // Go to `screen` and wait for its mark, and for motion (sheets slide in for about 220 ms).
 export async function reach(page, screen, ctx) {
   await screen.go(page, ctx);

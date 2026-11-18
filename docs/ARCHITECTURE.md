@@ -138,6 +138,7 @@ Desktop or mobile modules then layer on top of that shared runtime.
 Modules in `shared/` that are not in the boot list above, each loaded by the page that needs it:
 
 - `shared/handout-files.js`: a teacher's web page, text file or EPUB made ready to attach as a handout, its pictures put inside it (the assessment form's + Add a File).
+- `shared/website-ask.js`: "Open this website in a new tab?", the one question asked before a web address leaves FullVision (a link in a handout, a link on a bulletin); it opens the site in a new tab with no referrer only on Open Website.
 - `shared/data-quizzes.js`: a quiz's questions, settings and answer key for the teacher (`list_quiz`, `save_quiz`; Demo Mode keeps the key apart from the questions), behind the `quizzes` build switch. The assessment form's Quiz card is `teacher/quiz-builder.js` (its drawing in `teacher/quiz-card-draw.js`, its styles in `teacher/quiz.css`), drawn from `teacher/question-cards.js`'s pieces.
 - `shared/handout-viewer.js`: a handout file opened over the page, a web page or a book only in the sealed frame `shared/handout-frame.html` (the student page and Preview as Student).
 - `shared/sign-in.js`: what the two sign-in screens (`login.html` and the phone's sign-in card) share: Try Demo Mode, the Restore Account prompt, where a password reset link lands, Check Your Inbox after Create Account.

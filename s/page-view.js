@@ -1646,6 +1646,8 @@ window.StudentPageView = (function () {
      Reflect altogether") lists what the view holds; with nothing there it
      says so plainly. */
   var TAB_BODIES = {
+    // Bulletins (docs/plans/bulletins-plan.md B1d): drawn by s/bulletins-view.js, only when the view has them.
+    bulletins: { title: 'Bulletins', line: '' },
     learning: { title: 'My Learning', line: '' },
     questionnaires: { title: 'Reflect', line: 'Reflections from your teacher will show here.' },
   };
@@ -2116,9 +2118,21 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* Bulletins is a tab only when the view holds them: the build switch is on and the server has the
+     route (s/bulletins.js; the preview's own). Without them the page is the three tabs it was. */
+  function hasBulletins(view) {
+    return !!(view && view.bulletins && typeof StudentBulletinsView !== 'undefined');
+  }
+  // The tab showing: the one chosen when there is such a tab, else Assignments.
+  function tabOf(ui, view) {
+    if (ui.tab === 'bulletins') return hasBulletins(view) ? 'bulletins' : 'assignments';
+    return TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+  }
+
   function bodyHtml(view, ui) {
     if (ui.waiting || !view) return '<p class="sp-lead sp-empty" role="status">' + esc(WAITING) + '</p>';
-    var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    var tab = tabOf(ui, view);
+    if (tab === 'bulletins') return StudentBulletinsView.body(view, ui);
     if (tab === 'questionnaires') {
       if ((view.questionnaires || []).length) return questionnairesBody(view, ui);
       return (
@@ -2150,6 +2164,12 @@ window.StudentPageView = (function () {
   var PLUS =
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
   var TABS = [
+    // First in the bar (Colin, Nov 17), when the view has bulletins (hasBulletins).
+    {
+      id: 'bulletins',
+      label: 'Bulletins',
+      icon: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v5l1.5-1 1.5 1V4"/>',
+    },
     {
       id: 'assignments',
       label: 'Assignments',
@@ -2168,8 +2188,10 @@ window.StudentPageView = (function () {
      My Learning. Reflect counts the reflections open and not yet answered
      (docs/plans/reflect-plan.md, "What changes" 6). */
   function newsOf(view, ui) {
-    var n = { assignments: 0, learning: 0, questionnaires: 0 };
+    var n = { bulletins: 0, assignments: 0, learning: 0, questionnaires: 0 };
     if (!view || ui.waiting) return n;
+    // Bulletins: the ones this student has not seen yet (s/bulletins-view.js).
+    if (hasBulletins(view)) n.bulletins = StudentBulletinsView.count(view.bulletins);
     (view.changes || []).forEach(function (c) {
       n[c.why === 'revise' ? 'assignments' : 'learning'] += 1;
     });
@@ -2186,32 +2208,37 @@ window.StudentPageView = (function () {
   /* The three tabs. Drawn twice, once in the header for a Chromebook and
      once along the bottom for a phone; page-view.css shows one. */
   function tabBarHtml(ui, where, view) {
-    var on = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    var on = tabOf(ui, view);
     var news = newsOf(view, ui);
+    var bulletins = hasBulletins(view) && !ui.waiting;
     return (
       '<nav class="sp-tabs sp-tabs-' +
       where +
       '" aria-label="Your Page">' +
-      TABS.map(function (t) {
-        var n = news[t.id];
-        return (
-          '<button type="button" class="sp-tab' +
-          (t.id === on ? ' sp-tab-on' : '') +
-          '" data-act="tab" data-tab="' +
-          t.id +
-          '"' +
-          (t.id === on ? ' aria-current="page"' : '') +
-          '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-          t.icon +
-          '</svg>' +
-          (n ? '<span class="sp-tab-badge" aria-hidden="true">' + n + '</span>' : '') +
-          '<span class="sp-tab-label">' +
-          esc(t.label) +
-          '</span>' +
-          (n ? '<span class="sp-hidden-title">' + esc(badgeWords(t.id, n)) + '</span>' : '') +
-          '</button>'
-        );
-      }).join('') +
+      TABS.filter(function (t) {
+        return t.id !== 'bulletins' || bulletins;
+      })
+        .map(function (t) {
+          var n = news[t.id];
+          return (
+            '<button type="button" class="sp-tab' +
+            (t.id === on ? ' sp-tab-on' : '') +
+            '" data-act="tab" data-tab="' +
+            t.id +
+            '"' +
+            (t.id === on ? ' aria-current="page"' : '') +
+            '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+            t.icon +
+            '</svg>' +
+            (n ? '<span class="sp-tab-badge" aria-hidden="true">' + n + '</span>' : '') +
+            '<span class="sp-tab-label">' +
+            esc(t.label) +
+            '</span>' +
+            (n ? '<span class="sp-hidden-title">' + esc(badgeWords(t.id, n)) + '</span>' : '') +
+            '</button>'
+          );
+        })
+        .join('') +
       '</nav>'
     );
   }
@@ -2241,6 +2268,23 @@ window.StudentPageView = (function () {
      `ui.classes` is the classes this device's session has opened
      ({ enrollmentId, name, block, toDo }, s/assignments.js), and
      `ui.classOn` the one showing; the preview has neither. */
+  /* A class's counts in Switch Class: how many pieces wait there ("3 to do"), once the server says,
+     and bulletins not seen there yet ("2 new", s/bulletins.js); nothing at 0. A class with "2 new"
+     holds its counts together, so they go under the name and the tick stays beside it
+     (s/bulletins.css); without it the row is drawn exactly as before. */
+  function countsHtml(c, ui) {
+    var news = ui.classNews && ui.classNews[c.enrollmentId] > 0 ? ui.classNews[c.enrollmentId] : 0;
+    var todo = c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '';
+    if (!news) return todo;
+    return (
+      '<span class="sp-class-counts">' +
+      todo +
+      '<span class="sp-bulletin-class-new">' +
+      esc(news + ' new') +
+      '</span></span>'
+    );
+  }
+
   function settingsSheetHtml(view, ui) {
     var first = String((view && view.student && view.student.firstName) || '').trim();
     var classes = (Array.isArray(ui.classes) ? ui.classes : []).filter(function (c) {
@@ -2266,8 +2310,7 @@ window.StudentPageView = (function () {
                 '</span>' +
                 (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
                 '</span>' +
-                // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
-                (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
+                countsHtml(c, ui) +
                 (on ? '<span class="sp-class-tick">' + TICK + '</span>' : '') +
                 '</button></li>'
               );
@@ -2348,10 +2391,12 @@ window.StudentPageView = (function () {
     ui = ui || {};
     var course = (view && view.course) || ui.course || {};
     var block = String(course.block || '').trim();
-    var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    var tab = tabOf(ui, view);
     var ready = !ui.waiting && view;
     var open =
-      ready && (handoutOpen(view, ui) || feedbackPiece(view, ui) || (tab === 'learning' && cardOpen(view, ui)));
+      ready &&
+      tab !== 'bulletins' &&
+      (handoutOpen(view, ui) || feedbackPiece(view, ui) || (tab === 'learning' && cardOpen(view, ui)));
     return (
       '<div class="sp-view' +
       (open ? ' sp-on-feedback' : '') +
@@ -2393,7 +2438,7 @@ window.StudentPageView = (function () {
 
   /* ── What a press changes ──────────────────────────────────── */
 
-  var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1 };
+  var TAB_IDS = { bulletins: 1, assignments: 1, learning: 1, questionnaires: 1 };
   var SEGMENT_IDS = { outstanding: 1, upcoming: 1 };
   var FEEDBACK_ACTS = {
     feedback: 1,
@@ -2482,6 +2527,16 @@ window.StudentPageView = (function () {
       next.handout = '';
       next.handoutPiece = '';
       next.handoutPage = 0;
+    }
+    // A bulletin's file open full size goes with any press but its own (s/bulletins-view.js).
+    if (!/^bulletin-(page|turn)$/.test(act)) {
+      next.bulletinFile = '';
+      next.bulletinPage = 0;
+    }
+    if (/^bulletin-/.test(act)) {
+      return typeof StudentBulletinsView !== 'undefined'
+        ? StudentBulletinsView.press(next, view, act, el, ui || {})
+        : null;
     }
     if (act === 'handout') {
       var hp = view && pieceIn(view.work, attr('data-piece'));
@@ -2674,5 +2729,7 @@ window.StudentPageView = (function () {
     thumbsHtml: thumbsHtml,
     marksLine: marksLine,
     planHtml: planHtml,
+    // A reminder linked to a piece carries that card's band (s/bulletins-view.js).
+    bandHtml: bandHtml,
   };
 })();

@@ -218,6 +218,8 @@ function load(file) {
 
 load('shared/html.js');
 load('shared/build-flags.js');
+// "Open this website in a new tab?" (a handout's link and a bulletin's ask it).
+load('shared/website-ask.js');
 load('shared/constants.js');
 // Demo Mode's class (DEFAULT_COURSES, LEARNING_MAP) lives in seed-data.js.
 // Only those two are taken from it here, run inside a function so nothing

@@ -121,3 +121,37 @@ for (const size of [
     });
   });
 }
+
+/* With the Bulletins switch on (docs/plans/bulletins-plan.md B1d), four tabs, Bulletins first, in
+   the same bar on a phone and on a Chromebook; with it off, the three above. */
+for (const size of [
+  { tag: 'phone', use: PHONE },
+  { tag: 'chromebook', use: CHROMEBOOK },
+]) {
+  test.describe('the shell with Bulletins on, on a ' + size.tag, () => {
+    test.use(size.use);
+
+    test('four tabs, Bulletins first and open; the others as they were', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('fv-build-bulletins', '1'));
+      const posts = [];
+      page.on('request', req => {
+        if (/functions\/v1\//.test(req.url())) posts.push(req.url());
+      });
+      await page.goto('/s/#demo-card');
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByLabel('Student Number').fill('1234567');
+      await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
+      const nav = page.getByRole('navigation', { name: 'Your Page' }).locator('visible=true');
+      await expect(nav.locator('.sp-tab-label')).toHaveText(['Bulletins', 'Assignments', 'My Learning', 'Reflect']);
+      await expect(nav.locator('[data-tab="bulletins"]')).toHaveAttribute('aria-current', 'page');
+      await expect(nav.locator('[data-tab="learning"] .sp-tab-badge')).toHaveText('6');
+      await expect(nav.locator('[data-tab="questionnaires"] .sp-tab-badge')).toHaveText('2');
+      await fits(page);
+      await named(page);
+      await nav.getByRole('button', { name: 'Assignments' }).click();
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
+      await fits(page);
+      expect(posts).toEqual([]);
+    });
+  });
+}

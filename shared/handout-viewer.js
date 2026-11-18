@@ -378,41 +378,10 @@
     /* A web link the student clicked in the handout (or so the frame says:
        a handout's script could say it too). Nothing opens until the student
        presses Open Website, here in FullVision's own page, with the address
-       in front of them; then it opens in a new tab, with no way back. */
-    /** @type {any} */
-    var ask = null;
+       in front of them; then it opens in a new tab, with no way back. The
+       question is the one Bulletins asks too (shared/website-ask.js). */
     function askToOpen(url) {
-      var u;
-      try {
-        u = new URL(String(url || ''));
-      } catch (e) {
-        return;
-      }
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
-      if (ask && ask.parentNode) ask.parentNode.removeChild(ask);
-      ask = el('div', 'hv-ask');
-      ask.setAttribute('role', 'alertdialog');
-      ask.setAttribute('aria-label', 'Open a Website');
-      var line = el('p', 'hv-ask-words', 'Open this website in a new tab?');
-      var where = el('p', 'hv-ask-url', u.href.length > 300 ? u.href.slice(0, 300) + '…' : u.href);
-      var go = el('button', 'hv-ask-go', 'Open Website');
-      var no = el('button', 'hv-ask-no', 'Cancel');
-      go.type = no.type = 'button';
-      var shut = function () {
-        if (ask && ask.parentNode) ask.parentNode.removeChild(ask);
-        ask = null;
-      };
-      go.addEventListener('click', function () {
-        shut();
-        window.open(u.href, '_blank', 'noopener,noreferrer');
-      });
-      no.addEventListener('click', shut);
-      ask.appendChild(line);
-      ask.appendChild(where);
-      ask.appendChild(go);
-      ask.appendChild(no);
-      layer.appendChild(ask);
-      go.focus();
+      if (w.WebsiteAsk) w.WebsiteAsk.open({ host: layer, url: url, cls: 'hv-ask' });
     }
 
     // Only the frame's own messages: its page numbers, and a link to ask about.
@@ -519,10 +488,9 @@
     }
 
     function onKey(e) {
-      if (e.key === 'Escape' && ask) {
+      if (e.key === 'Escape' && layer.querySelector('.hv-ask')) {
         e.preventDefault();
-        ask.parentNode.removeChild(ask);
-        ask = null;
+        if (w.WebsiteAsk) w.WebsiteAsk.close();
       } else if (e.key === 'Escape') {
         e.preventDefault();
         finish();
