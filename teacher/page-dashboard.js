@@ -281,6 +281,8 @@ window.PageDashboard = (function () {
       coreSelf: coreSelf,
       coreView: _readPref(CORE_VIEW_KEY + cid) === 'evidence' ? 'evidence' : 'self',
       compView: DashOverview.compView(cid, _readPref(COMP_VIEW_KEY + cid)),
+      // The Competencies tile's open page (dashRow switch), per class on this device.
+      compPage: DashCompetencies.pageOf(_readPref(DashCompetencies.PREF_KEY + cid)),
       obs: _obsState(),
       classChange: classGradeChange(
         cid,
@@ -326,6 +328,8 @@ window.PageDashboard = (function () {
     if (_compFade) _fadeCompRows();
     _compFade = false;
     _afterObsRender(null);
+    DashOverview.sizeRow();
+    _watchAboveRow();
     _placeMixPop();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
@@ -878,7 +882,24 @@ window.PageDashboard = (function () {
     _closeMixPop();
   }
 
+  /* The middle row is as tall as the window leaves below where it starts, so
+     it is measured again whenever what sits above it changes height (the
+     photo-expiry line arriving after the first draw). */
+  var _aboveRowWatch = null;
+  function _watchAboveRow() {
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
+    if (typeof ResizeObserver === 'undefined' || !document.querySelector('.dash-row')) return;
+    _aboveRowWatch = new ResizeObserver(function () {
+      DashOverview.sizeRow();
+    });
+    document.querySelectorAll('.page-dashboard .photo-expiry, .page-dashboard .dash-glance').forEach(function (el) {
+      _aboveRowWatch.observe(el);
+    });
+  }
+
   function _onResize() {
+    DashOverview.sizeRow();
     _placeMixPop();
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(_refitObs, 150);
@@ -1090,6 +1111,9 @@ window.PageDashboard = (function () {
         var first = pop && pop.querySelector('a, button');
         if (first) first.focus();
       },
+      compPage: function () {
+        _setCompPage(el.dataset.page, false);
+      },
       viewMenu: function () {
         var id = el.dataset.menu;
         if (openMenu === id) _closeViewMenu();
@@ -1205,8 +1229,30 @@ window.PageDashboard = (function () {
     CM.handleBlur(e.target);
   }
 
+  /* The Competencies tile's Curricular | Core: arrow keys, Home and End move
+     between the two tabs and open the page, as a click does. */
+  function _compTabKeydown(e) {
+    var t = e.target;
+    var tab = t && t.closest && t.closest('.dash-comp-seg [role="tab"]');
+    if (!tab) return false;
+    var next = DashCompetencies.pageForKey(tab.dataset.page, e.key);
+    if (!next) return false;
+    e.preventDefault();
+    _setCompPage(next, true);
+    return true;
+  }
+  function _setCompPage(page, focus) {
+    var key = DashCompetencies.pageOf(page);
+    _closeViewMenu();
+    _closeMixPop();
+    _writePref(DashCompetencies.PREF_KEY + activeCourse, key);
+    var tab = DashCompetencies.show(document, key);
+    if (tab && focus) tab.focus();
+  }
+
   function _handleKeydown(e) {
     if (_viewMenuKeydown(e)) return;
+    if (_compTabKeydown(e)) return;
     if (e.key === 'Escape' && mixPop) {
       var was = _closeMixPop();
       var seg = document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
@@ -1418,6 +1464,8 @@ window.PageDashboard = (function () {
     if (typeof ObsCapture !== 'undefined') ObsCapture.closeDialog();
     _hidePop();
     window.removeEventListener('resize', _onResize);
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
     clearTimeout(_resizeTimer);
     CM.destroy();
     _listeners.forEach(function (l) {

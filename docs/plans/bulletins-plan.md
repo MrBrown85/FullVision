@@ -26,6 +26,7 @@ Where this plan differs from the board, on purpose, each with its reason further
 12. Text reaches HTML only through `esc`. A student's sentence is always text, never HTML. Labels in Title Case, hints in plain sentences.
 13. Motion 150 to 250 ms; a new bulletin glides in; nothing fades in; nothing moves under Reduce Motion.
 14. **Nothing here is a grade.** No count, reaction, answer or sentence reaches `calc.js`, a report, the Comment Bank or Generate.
+15. **Student screens are checked in Safari's engine and at every Text Size.** Most students are on iPhones. Every slice that draws on the student page (`s/`) is tried by its builder and again by its reviewer in Playwright's WebKit (`FV_WEBKIT=1`, the `webkit-student` project) as well as Chromium, from 320 to 430 px wide, light and dark, with the ad-block rules on. WebKit on a Mac is not iOS Safari (no collapsing address bar, no safe areas, no iOS text-size setting), and a review says "checked in WebKit", never "tested on iPhone". The student page's Text Size setting scales the page with CSS `zoom` (1.15 and 1.3), so a 390 px phone lays out at 300 px at Larger, and a 320 px phone at 246: every new student screen holds at those widths and is added to the Text Size sweep (every student screen, five widths, three sizes; it fails on clipped text, overflow and a word broken in the middle) in the slice that builds it. Viewport units are multiplied by the zoom, so a sheet uses the zoom-corrected height variable, never raw `vh`. A confirm never draws its primary button where the tap that opened it was.
 
 ## What exists already
 
@@ -392,11 +393,10 @@ Taken from the board as drawn, and listed for him afterwards: Show It Again on T
 ## Found on the way, for Colin, not started
 
 1. **Assignment-card links open at once**; only links inside a handout ask first. Bulletins will ask. Making assignment cards ask too is a one-line change in behaviour for every student, so it is his call.
-2. **A publication named `zero_data` on the live database** lists 142 tables across every schema, the sign-in and vault schemas included. Nothing subscribes to it (the only two replication slots are Supabase Realtime's own), so nothing is being sent anywhere. It looks left over from an earlier tool. Removing it is one statement, on his OK.
-3. **`student_submit.seen` has no hourly limit and does not check that a piece was returned** (`migrations/2026110904_student_sessions_page.sql:657-683`): a signed-in student can mark any piece of their own class as seen. It shows nothing to anyone and only that student's own row changes. Worth tightening when that function is next opened.
-4. **The Dashboard board's "Compare 2"** is a view the app does not have (`dashboard-inbox-plan.md`).
-5. Two header comments say the Work Wall and its pictures are "Demo Mode only" (`shared/work-wall.js:20`, `shared/work-thumbs.js`); both work signed in.
-6. **The app's blue button is under the contrast line.** The board's reviewer measured main's primary button (#007aff with white words) at 4.02 to 1; the standard is 4.5 to 1. The boards use #0066cc. Changing the app's button colour is its own small change for every screen, not something a feature slice does on the side.
+2. **`student_submit.seen` has no hourly limit and does not check that a piece was returned** (`migrations/2026110904_student_sessions_page.sql:657-683`): a signed-in student can mark any piece of their own class as seen. It shows nothing to anyone and only that student's own row changes. Worth tightening when that function is next opened.
+3. **The Dashboard board's "Compare 2"** is a view the app does not have (`dashboard-inbox-plan.md`).
+4. Two header comments say the Work Wall and its pictures are "Demo Mode only" (`shared/work-wall.js:20`, `shared/work-thumbs.js`); both work signed in.
+5. **The app's blue button is under the contrast line.** The board's reviewer measured main's primary button (#007aff with white words) at 4.02 to 1; the standard is 4.5 to 1. The boards use #0066cc. Changing the app's button colour is its own small change for every screen, not something a feature slice does on the side.
 
 ## Risks
 
