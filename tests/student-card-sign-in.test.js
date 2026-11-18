@@ -91,7 +91,7 @@ async function signIn(dev, hash) {
 
 // From the signed-in page: Your Classes, Add Another Card, the code typed.
 async function addCard(page, code) {
-  await page.click('[data-act="classes-open"]');
+  await page.click('[data-act="settings-open"]');
   await page.click('.sp-sheet [data-act="card-add"]');
   page.type('#sp-code', code);
   await page.submit('form[data-form="card"]');
@@ -101,7 +101,8 @@ describe('After Done', () => {
   it('Log Out, then Log Out on its sheet, shows After Done: the board’s words, nothing of the student, and Scan a Card', async () => {
     const dev = school();
     const page = await signIn(dev);
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
     await page.click('[data-act="card-done"]');
     expect(page.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     // A phone and a Chromebook each say what they are; the stylesheet shows one.
@@ -132,7 +133,8 @@ describe('After Done', () => {
     await demo.submit('form[data-form="card"]');
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
-    await demo.click('[data-act="logout-ask"]');
+    await demo.click('[data-act="settings-open"]');
+    await demo.click('.sp-set [data-act="logout-ask"]');
     await demo.click('[data-act="card-done"]');
     expect(demo.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     await demo.click('[data-act="card-restart"]');
@@ -141,26 +143,31 @@ describe('After Done', () => {
   });
 });
 
-describe('Switching Classes: Your Classes', () => {
-  it('the class’s name opens Your Classes, which lists the session’s classes with this one ticked', async () => {
+describe('Switching Classes: Settings', () => {
+  it('the class’s name is plain text; the gear opens Settings, with no Switch Class for one class', async () => {
     const dev = school();
     const page = await signIn(dev);
-    const button = page.root().querySelector('.sp-head-switch');
-    expect(button.tagName).toBe('BUTTON');
-    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
-    expect(button.textContent).toBe('Science 8Block B');
-    await page.click('[data-act="classes-open"]');
-    const sheet = page.root().querySelector('.sp-sheet');
+    const name = page.root().querySelector('.sp-head-class');
+    expect(name.tagName).toBe('DIV');
+    expect(name.textContent).toBe('Science 8Block B');
+    expect(page.root().querySelector('.sp-head [data-act="class-open"]')).toBeNull();
+    const gear = page.root().querySelector('.sp-head .sp-gear');
+    expect(gear.getAttribute('aria-label')).toBe('Settings');
+    expect(gear.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(gear.getAttribute('aria-expanded')).toBe('false');
+    await page.click('[data-act="settings-open"]');
+    const sheet = page.root().querySelector('.sp-set');
     expect(sheet.getAttribute('role')).toBe('dialog');
-    expect(sheet.querySelector('.sp-sheet-title').textContent).toBe('Your Classes');
-    const classes = [...sheet.querySelectorAll('.sp-class')];
-    expect(classes.map(b => b.textContent)).toEqual(['Science 8Block B']);
-    expect(classes[0].getAttribute('aria-current')).toBe('true');
+    expect(sheet.querySelector('#sp-set-title').textContent).toBe('Settings');
+    expect(page.root().querySelector('.sp-gear').getAttribute('aria-expanded')).toBe('true');
+    // One class: Switch Class is not there at all, and Add Another Card is.
+    expect(sheet.querySelector('.sp-class')).toBeNull();
+    expect(sheet.textContent).not.toContain('Switch Class');
     expect(sheet.querySelector('[data-act="card-add"]').textContent).toBe('Add Another Card');
     // Escape closes it; nothing was asked.
     const before = page.calls.length;
     page.fire('keydown', { key: 'Escape', preventDefault() {} });
-    expect(has(page, '.sp-sheet')).toBe(false);
+    expect(has(page, '.sp-set')).toBe(false);
     expect(page.calls.length).toBe(before);
   });
 
@@ -212,9 +219,10 @@ describe('Switching Classes: Your Classes', () => {
     await addCard(page, 'K7M4-QX2P');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
-    await page.click('[data-act="classes-open"]');
+    await page.click('[data-act="settings-open"]');
     const names = [...page.root().querySelectorAll('.sp-class-name')].map(el => el.textContent);
     expect(names.sort()).toEqual(['Humanities 8', 'Science 8']);
+    expect(page.root().querySelector('.sp-set .sp-set-label').textContent).toBe('Switch Class');
     expect(page.root().querySelector('.sp-class[aria-current="true"] .sp-class-name').textContent).toBe('Humanities 8');
     page.calls.length = 0;
     await page.click('.sp-class[data-enrollment="' + CECE + '"]');
@@ -236,12 +244,16 @@ describe('Switching Classes: Your Classes', () => {
   it('a class not in the list opens nothing', async () => {
     const dev = school();
     const page = await signIn(dev);
-    await page.click('[data-act="classes-open"]');
+    await addCard(page, 'K7M4-QX2P');
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="card-yes"]');
+    await page.click('[data-act="settings-open"]');
+    const was = JSON.parse(dev.store[KEY]).e;
     page.root().querySelector('.sp-class').setAttribute('data-enrollment', OMAR);
     page.calls.length = 0;
     await page.click('.sp-class');
     expect(page.calls).toEqual([]);
-    expect(JSON.parse(dev.store[KEY]).e).toBe(CECE);
+    expect(JSON.parse(dev.store[KEY]).e).toBe(was);
   });
 
   it('a class’s page that lands after the student was signed out is not drawn', async () => {
@@ -260,7 +272,7 @@ describe('Switching Classes: Your Classes', () => {
       }
       return dev.fn.handle(body);
     };
-    await page.click('[data-act="classes-open"]');
+    await page.click('[data-act="settings-open"]');
     page.tap('.sp-class[data-enrollment="' + CECE + '"]');
     await until(() => asked, 'Science 8 asked for');
     // Science 8 is still loading when fifteen idle minutes pass.
@@ -364,7 +376,7 @@ describe('Switching Classes: what stops Add Another Card', () => {
       }
       return dev.fn.handle(body);
     };
-    await page.click('[data-act="classes-open"]');
+    await page.click('[data-act="settings-open"]');
     await page.click('.sp-sheet [data-act="card-add"]');
     page.type('#sp-code', 'K7M4-QX2P');
     page.send('form[data-form="card"]');
@@ -396,7 +408,7 @@ describe('Switching Classes: what stops Add Another Card', () => {
   it('fifteen idle minutes on the add screen sign the student out, as on the page', async () => {
     const dev = school();
     const page = await signIn(dev);
-    await page.click('[data-act="classes-open"]');
+    await page.click('[data-act="settings-open"]');
     await page.click('.sp-sheet [data-act="card-add"]');
     page.advance(16 * 60 * 1000);
     page.runTicks();
@@ -614,7 +626,7 @@ describe('Demo Mode: Switching Classes on the device', () => {
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
     expect(head(demo)).toBe('Science 8 · Block B');
-    await demo.click('[data-act="classes-open"]');
+    await demo.click('[data-act="settings-open"]');
     await demo.click('.sp-sheet [data-act="card-add"]');
     expect(text(demo)).toContain('This is Demo Mode. Any code adds a second sample class.');
     demo.type('#sp-code', 'ABCD-EFGH');
@@ -626,7 +638,7 @@ describe('Demo Mode: Switching Classes on the device', () => {
     expect(await titles(demo)).toContain('Medieval Europe Map');
     // The draft in the second class is nowhere.
     expect(demo.root().innerHTML).not.toContain('one more piece of evidence');
-    await demo.click('[data-act="classes-open"]');
+    await demo.click('[data-act="settings-open"]');
     expect([...demo.root().querySelectorAll('.sp-class-name')].map(el => el.textContent)).toEqual([
       'Science 8',
       'Humanities 8',
@@ -635,5 +647,121 @@ describe('Demo Mode: Switching Classes on the device', () => {
     expect(head(demo)).toBe('Science 8 · Block B');
     expect(demo.calls).toEqual([]);
     expect(demo.store).toEqual({});
+  });
+});
+
+describe('Settings: Text Size and Log Out (Colin, 2026-11-17: the gear)', () => {
+  const sizeOn = page => page.root().querySelector('.sp-set-size[aria-checked="true"]').getAttribute('data-size');
+  const viewSize = page => {
+    const v = page.root().querySelector('.sp-view').classList;
+    return v.contains('sp-text-larger') ? 'larger' : v.contains('sp-text-large') ? 'large' : 'normal';
+  };
+
+  it('Settings names the student, holds Text Size and Add Another Card, and Log Out last', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    await page.click('[data-act="settings-open"]');
+    const set = page.root().querySelector('.sp-set');
+    expect(set.getAttribute('aria-modal')).toBe('true');
+    expect(set.getAttribute('aria-labelledby')).toBe('sp-set-title');
+    expect(set.querySelector('.sp-set-who').textContent).toBe('Signed in as Cece');
+    // Done, and a tap outside it, each close it.
+    expect(set.querySelector('.sp-set-done').getAttribute('data-act')).toBe('settings-close');
+    expect(page.root().querySelector('.sp-set-back').getAttribute('data-act')).toBe('settings-close');
+    // Text Size is one set of three choices, Normal chosen.
+    const group = set.querySelector('[role="radiogroup"]');
+    expect([...group.querySelectorAll('[role="radio"]')].map(r => r.textContent)).toEqual([
+      'Normal',
+      'Large',
+      'Larger',
+    ]);
+    expect(sizeOn(page)).toBe('normal');
+    // Log Out is the last button, and only asks.
+    const buttons = [...set.querySelectorAll('button')];
+    expect(buttons[buttons.length - 1].getAttribute('data-act')).toBe('logout-ask');
+    expect(buttons[buttons.length - 1].textContent).toBe('Log Out');
+    const asked = page.calls.length;
+    await page.click('.sp-set-done');
+    expect(has(page, '.sp-set')).toBe(false);
+    expect(page.calls.length).toBe(asked);
+  });
+
+  it('a Text Size takes effect at once, is kept with the session, and opens the page at that size again', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    const before = JSON.parse(dev.store[KEY]);
+    expect(before.z).toBeUndefined();
+    await page.click('[data-act="settings-open"]');
+    page.calls.length = 0;
+    await page.click('.sp-set-size[data-size="larger"]');
+    // Settings stays open on it, the page is drawn bigger, and the server is told nothing.
+    expect(has(page, '.sp-set')).toBe(true);
+    expect(sizeOn(page)).toBe('larger');
+    expect(viewSize(page)).toBe('larger');
+    expect(page.calls).toEqual([]);
+    // Kept beside the token, and nothing else changed.
+    const kept = JSON.parse(dev.store[KEY]);
+    expect(kept).toMatchObject({ t: before.t, x: before.x, e: before.e, z: 'larger' });
+    expect(Object.keys(kept).sort()).toEqual(['a', 'e', 't', 'x', 'z']);
+    await page.click('.sp-set-done');
+    expect(viewSize(page)).toBe('larger');
+    // Opened again on this device: the same size.
+    const again = await dev.open('');
+    expect(viewSize(again)).toBe('larger');
+    // Normal leaves no trace of the choice.
+    await again.click('[data-act="settings-open"]');
+    await again.click('.sp-set-size[data-size="large"]');
+    expect(JSON.parse(dev.store[KEY]).z).toBe('large');
+    await again.click('.sp-set-size[data-size="normal"]');
+    expect(viewSize(again)).toBe('normal');
+    expect(JSON.parse(dev.store[KEY]).z).toBeUndefined();
+  });
+
+  it('a Text Size stays when the student switches class, and goes with Log Out: the next student starts at Normal', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set-size[data-size="large"]');
+    await addCard(page, 'K7M4-QX2P');
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="card-yes"]');
+    expect(head(page)).toBe('Humanities 8 · Block A');
+    expect(viewSize(page)).toBe('large');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-class[data-enrollment="' + CECE + '"]');
+    expect(head(page)).toBe('Science 8 · Block B');
+    expect(viewSize(page)).toBe('large');
+    expect(JSON.parse(dev.store[KEY]).z).toBe('large');
+    // Log Out takes the session and the size with it.
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    await page.click('[data-act="card-done"]');
+    expect(dev.store).toEqual({});
+    expect(page.T.state().textSize).toBe('');
+    const next = await signIn(dev);
+    expect(viewSize(next)).toBe('normal');
+    await next.click('[data-act="settings-open"]');
+    expect(sizeOn(next)).toBe('normal');
+  });
+
+  it('a value the page does not know is Normal', async () => {
+    const dev = school();
+    await signIn(dev);
+    dev.store[KEY] = JSON.stringify(Object.assign(JSON.parse(dev.store[KEY]), { z: 'huge' }));
+    const again = await dev.open('');
+    expect(viewSize(again)).toBe('normal');
+  });
+
+  it('Demo Mode: a Text Size works while the page is open and keeps nothing on the device', async () => {
+    const demo = openStudentPage();
+    await demo.start('#demo-card');
+    await demo.submit('form[data-form="card"]');
+    demo.type('#sp-ident', demo.T.DEMO.number);
+    await demo.click('[data-act="card-yes"]');
+    await demo.click('[data-act="settings-open"]');
+    await demo.click('.sp-set-size[data-size="larger"]');
+    expect(viewSize(demo)).toBe('larger');
+    expect(demo.store).toEqual({});
+    expect(demo.calls).toEqual([]);
   });
 });

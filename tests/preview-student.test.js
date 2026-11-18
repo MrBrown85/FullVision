@@ -307,12 +307,33 @@ describe('the preview', () => {
     tab(el, 'questionnaires');
     expect(text(screen().querySelector('.sp-page-title'))).toBe('Reflect');
     expect(text(screen().querySelector('.sp-empty'))).toBe('Reflections from your teacher will show here.');
-    // Log Out asks first; its Log Out and Your Classes reach for the student's session: here they do nothing.
-    click(screen().querySelector('[data-act="logout-ask"]'));
+    // The gear opens Settings, as on the phone: Jordan's first name, no Switch Class (one class here).
+    expect(screen().querySelector('.sp-head [data-act="logout-ask"]')).toBeNull();
+    click(screen().querySelector('[data-act="settings-open"]'));
+    const set = screen().querySelector('.sp-set');
+    expect(set.getAttribute('role')).toBe('dialog');
+    expect(text(set.querySelector('.sp-set-who'))).toBe('Signed in as Jordan');
+    expect(set.querySelector('.sp-class')).toBeNull();
+    // Add Another Card reaches for the student's session: here it does nothing.
+    const open = screen().innerHTML;
+    click(set.querySelector('[data-act="card-add"]'));
+    expect(screen().innerHTML).toBe(open);
+    // Text Size draws the page inside the device bigger, and Settings stays open on it.
+    click(screen().querySelector('.sp-set-size[data-size="larger"]'));
+    expect(screen().querySelector('.sp-view').classList.contains('sp-text-larger')).toBe(true);
+    expect(screen().querySelector('.sp-set-size[aria-checked="true"]').getAttribute('data-size')).toBe('larger');
+    // Escape closes Settings, not the preview.
+    key(doc.body, 'Escape');
+    expect(screen().querySelector('.sp-set')).toBeNull();
+    expect(overlay()).toBeTruthy();
+    expect(screen().querySelector('.sp-view').classList.contains('sp-text-larger')).toBe(true);
+    // Log Out asks first; its Log Out reaches for the student's session: here it does nothing.
+    click(screen().querySelector('[data-act="settings-open"]'));
+    click(screen().querySelector('.sp-set [data-act="logout-ask"]'));
     expect(text(screen().querySelector('#sp-logout-title'))).toBe('Log Out?');
+    expect(screen().querySelector('.sp-set')).toBeNull();
     const before = screen().innerHTML;
     click(screen().querySelector('.sp-logout [data-act="card-done"]'));
-    click(screen().querySelector('[data-act="classes-open"]'));
     expect(screen().innerHTML).toBe(before);
     expect(overlay()).toBeTruthy();
     click(screen().querySelector('.sp-logout [data-act="logout-cancel"]'));

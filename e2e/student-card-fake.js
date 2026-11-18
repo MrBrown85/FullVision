@@ -252,9 +252,10 @@ export async function openLearning(page) {
   await expect(page.locator('.sp-tab[data-tab="learning"][aria-current="page"]').locator('visible=true')).toBeVisible();
 }
 
-/* Log Out, then Log Out on the sheet that asks first (the old Done). */
+/* Log Out, from Settings (the gear), then Log Out on the sheet that asks first (the old Done). */
 export async function logOut(page) {
-  await page.locator('.sp-head [data-act="logout-ask"]').click();
+  await page.locator('.sp-head [data-act="settings-open"]').click();
+  await page.locator('.sp-set [data-act="logout-ask"]').click();
   await expect(page.getByRole('alertdialog', { name: 'Log Out?' })).toBeVisible();
   await page.locator('.sp-logout [data-act="card-done"]').click();
 }

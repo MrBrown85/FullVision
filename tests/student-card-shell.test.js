@@ -254,14 +254,21 @@ describe('the page draws from student-view.js, and never throws into a draw', ()
 });
 
 describe('the frame', () => {
-  it('the class’s name with its block, and Log Out, as the board draws them', async () => {
+  it('the class’s name with its block, and the gear (Settings) where Log Out was', async () => {
     const { page } = await real();
     const head = page.root().querySelector('.sp-view .sp-head');
     expect(head.querySelector('.sp-head-title').textContent).toBe('Science 8');
     expect(head.querySelector('.sp-pill').textContent).toBe('Block B');
-    const out = head.querySelector('[data-act="logout-ask"]');
-    expect(out.textContent).toBe('Log Out');
-    expect(out.getAttribute('aria-haspopup')).toBe('dialog');
+    // The header holds no Log Out and no class picker: one gear, the header's last button.
+    expect(head.querySelector('[data-act="logout-ask"]')).toBeNull();
+    expect(head.querySelector('[data-act="classes-open"]')).toBeNull();
+    const gear = [...head.querySelectorAll('button')].pop();
+    expect(gear.getAttribute('data-act')).toBe('settings-open');
+    expect(gear.getAttribute('aria-label')).toBe('Settings');
+    expect(gear.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(gear.querySelector('svg').getAttribute('aria-hidden')).toBe('true');
+    // Settings is not drawn until the gear is pressed.
+    expect(page.root().querySelector('.sp-set')).toBeNull();
     // The session ends only from the sheet, and no list button or search is left.
     expect(head.querySelector('[data-act="card-done"]')).toBeNull();
     expect(page.root().querySelector('[data-act="all-open"]')).toBeNull();
@@ -271,7 +278,8 @@ describe('the frame', () => {
   it('Log Out asks first; Cancel, or a tap off the sheet, leaves the page as it was', async () => {
     const { page } = await real();
     const asked = page.calls.length;
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
     const sheet = page.root().querySelector('.sp-logout');
     expect(sheet.getAttribute('role')).toBe('alertdialog');
     expect(sheet.querySelector('#sp-logout-title').textContent).toBe('Log Out?');
@@ -280,10 +288,14 @@ describe('the frame', () => {
       ['Cancel', 'logout-cancel'],
       ['Log Out', 'card-done'],
     ]);
+    // Log Out? stands in for Settings, and Cancel goes back to the page.
+    expect(page.root().querySelector('.sp-set')).toBeNull();
     await page.click('.sp-logout [data-act="logout-cancel"]');
     expect(page.root().querySelector('.sp-logout')).toBeNull();
+    expect(page.root().querySelector('.sp-set')).toBeNull();
     expect(pressed(page)).toBe('Outstanding 2');
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
     await page.click('.sp-sheet-back[data-act="logout-cancel"]');
     expect(page.root().querySelector('.sp-logout')).toBeNull();
     expect(page.calls.length).toBe(asked);
@@ -293,7 +305,7 @@ describe('the frame', () => {
   it('opening another class starts it on Assignments, Outstanding', async () => {
     const page = await demo();
     await page.click('[data-tab="questionnaires"]');
-    await page.click('[data-act="classes-open"]');
+    await page.click('[data-act="settings-open"]');
     await page.click('.sp-sheet [data-act="card-add"]');
     page.type('#sp-code', 'ABCD-EFGH');
     await page.submit('form[data-form="card"]');

@@ -79,7 +79,8 @@ async function openSent(page, title) {
 }
 // Log Out, then Log Out again on the sheet that asks.
 async function logOut(page) {
-  await page.click('[data-act="logout-ask"]');
+  await page.click('[data-act="settings-open"]');
+  await page.click('.sp-set [data-act="logout-ask"]');
   expect(text(page, '#sp-logout-title')).toBe('Log Out?');
   await page.click('.sp-logout [data-act="card-done"]');
 }

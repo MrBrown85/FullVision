@@ -666,8 +666,8 @@ test.describe('"opened" means the row was on screen', () => {
     await expect.poll(() => sent(fn, posts).flat()).toContain('Piece 39');
     const done = sent(fn, posts).flat();
     expect(new Set(done).size).toBe(done.length);
-    // Log Out stays in reach all the way down.
-    await expect(page.getByRole('button', { name: 'Log Out' })).toBeInViewport();
+    // Settings, with Log Out in it, stays in reach all the way down.
+    await expect(page.getByRole('button', { name: 'Settings' })).toBeInViewport();
   });
 
   test('a flick to the bottom: the rows that flew past are not sent, the ones it rests on are', async ({ page }) => {

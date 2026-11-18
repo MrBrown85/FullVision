@@ -82,7 +82,7 @@ for (const size of [
         'Disease Research Poster',
       ]);
       await expect(page.locator('.sp-deck .sp-level')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Log Out' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
       await fits(page);
       await named(page);
       await contrast(page);
@@ -222,9 +222,13 @@ test.describe('a real card: the keyboard alone', () => {
     await page.keyboard.type('0123456');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
-    // Back up the header: Log Out is its last button.
+    // Back up the header: the gear (Settings) is its last button, and Log Out is Settings' last.
     await page.keyboard.press('Shift+Tab');
-    await expect(page.getByRole('button', { name: 'Log Out' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('.sp-set [data-act="logout-ask"]')).toBeFocused();
     await page.keyboard.press('Enter');
     // Log Out? asks first, with the focus on its question; Cancel, then Log Out.
     await expect(page.getByRole('heading', { name: 'Log Out?' })).toBeFocused();

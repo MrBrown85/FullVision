@@ -312,7 +312,8 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     const page = await demo();
     await sendRevision(page);
     await page.click('[data-act="send-done"]');
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
     expect(text(page, '#sp-logout-title')).toBe('Log Out?');
     await page.click('[data-act="card-done"]');
     expect(page.T.state().demoRevisions).toBeNull();

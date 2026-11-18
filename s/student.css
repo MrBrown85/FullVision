@@ -64,6 +64,20 @@ button {
   display: flex;
   flex-direction: column;
 }
+/* Text Size, chosen in Settings (s/page-view.js; app.js sets the class):
+   every screen of a card's page drawn bigger, the layout reflowing to the
+   narrower width as the browser's own zoom does. The page is still at
+   least the screen's height. */
+html.sp-size-large .sp-app {
+  zoom: 1.15;
+  min-height: calc(100vh / 1.15);
+  min-height: calc(100dvh / 1.15);
+}
+html.sp-size-larger .sp-app {
+  zoom: 1.3;
+  min-height: calc(100vh / 1.3);
+  min-height: calc(100dvh / 1.3);
+}
 .sp-noscript {
   padding: 24px;
   font-size: 17px;
