@@ -59,6 +59,29 @@ describe('DashInboxPick', () => {
     expect(DashInboxPick.current('some-other-class')).toBe(null);
   });
 
+  it('defaults to the first piece with work to grade, not just the newest work', () => {
+    // Cell Microscope Lab (all assessed) now has the newest work; Light Refraction Lab still waits.
+    const work = getCourseSubmissions(CID);
+    work.submissions.forEach(s => {
+      if (s.assessment_id === LAB) s.sent_at = '2030-01-01T10:00:00Z';
+    });
+    saveDemoStudentWork(CID, work);
+    const list = DashInboxPick.pieces(CID);
+    expect(list.map(p => p.aid)).toEqual([LAB, LIGHT]);
+    expect(GraderWork.workCounts(CID, LAB, ids()).tograde).toBe(0);
+    expect(GraderWork.workCounts(CID, LIGHT, ids()).tograde).toBeGreaterThan(0);
+    expect(DashInboxPick.current(CID)).toBe(LIGHT);
+    // A kept piece that still exists stays the kept one.
+    DashInboxPick.set(CID, LAB);
+    expect(DashInboxPick.current(CID)).toBe(LAB);
+    // With nothing to grade anywhere, the first piece with work in.
+    GraderWork.workCounts(CID, LIGHT, ids()).ids.tograde.forEach(sid =>
+      Grader.setOverallComment(CID, sid, LIGHT, 'Seen.'),
+    );
+    DashInboxPick.set(CID, 'gone');
+    expect(DashInboxPick.current(CID)).toBe(LAB);
+  });
+
   it('has no pieces and no current with nothing in', () => {
     const work = getCourseSubmissions(CID);
     work.submissions = [];
@@ -88,7 +111,7 @@ describe('DashInboxPick', () => {
       querySelectorAll: () => [],
     };
     const click = aid => ({
-      target: { closest: () => ({ getAttribute: () => aid }) },
+      target: { closest: () => ({ getAttribute: () => aid, closest: () => null }) },
     });
     const got = [];
     DashInboxPick.mount(root, CID, aid => got.push(aid));
@@ -104,7 +127,7 @@ describe('DashInboxPick', () => {
 describe('DashInboxSide model', () => {
   it('lists every student with work in, to grade first by arrival, then assessed', () => {
     const m = DashInboxSide.model(CID, LIGHT);
-    expect(m.items.map(i => i.sid).sort()).toEqual(GraderWork.workInIds(CID, LIGHT, ids()).sort());
+    expect(m.items.flatMap(i => i.members).sort()).toEqual(GraderWork.workInIds(CID, LIGHT, ids()).sort());
     expect(m.items.length).toBeGreaterThan(3);
     const states = m.items.map(i => i.tograde);
     // Every to-grade piece of work before any assessed one.
@@ -156,10 +179,22 @@ describe('DashInboxSide model', () => {
     expect(DashInboxSide.footText({ notIn: 0 })).toBe('To grade first, then assessed.');
   });
 
-  it('puts a group-mate on a One per Group piece with the work, saying whose it is', () => {
+  it("shows a pair as one item: the sender's page, captioned with both names, one stop for the grader", () => {
     const m = DashInboxSide.model(CID, LIGHT);
-    const olivia = m.items.find(i => i.name === 'Olivia Tam');
-    if (olivia) expect(olivia.line).toContain('With Aiden Singh');
+    const names = m.items.map(i => i.name);
+    // Aiden sent the work; Olivia is his pair, so she is not an item of her own.
+    const pair = m.items.find(i => i.name === 'Aiden Singh and Olivia Tam');
+    expect(pair).toBeTruthy();
+    expect(pair.fullName).toBe('Aiden Singh, Olivia Tam');
+    expect(pair.members.length).toBe(2);
+    expect(names).not.toContain('Olivia Tam');
+    expect(names).not.toContain('Aiden Singh');
+    expect(m.order.filter(sid => pair.members.includes(sid))).toEqual([pair.sid]);
+    // The switch's count is still GraderWork's: both students are in.
+    expect(DashInboxPick.pieces(CID).find(p => p.aid === LIGHT).inCount).toBe(
+      GraderWork.workInIds(CID, LIGHT, ids()).length,
+    );
+    expect(m.items.length).toBe(GraderWork.workInIds(CID, LIGHT, ids()).length - 1);
   });
 
   it('is empty with no piece', () => {

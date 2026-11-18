@@ -65,6 +65,7 @@ window.DashInboxSide = (function () {
    * @returns {any} */
   function model(cid, aid) {
     var GW = _gw();
+    /** @type {any} */
     var out = { aid: aid, title: '', items: [], order: [], notIn: 0 };
     if (!cid || !aid || !GW) return out;
     var piece = (getAssessments(cid) || []).filter(function (/** @type {any} */ a) {
@@ -83,13 +84,56 @@ window.DashInboxSide = (function () {
     });
     var counts = GW.workCounts(cid, aid, ids);
     out.notIn = counts.notin;
-    var items = GW.workInIds(cid, aid, ids).map(function (/** @type {string} */ sid) {
-      var subs = getGroupSubmissions(cid, sid, aid) || [];
-      var own =
-        subs.filter(function (/** @type {any} */ s) {
-          return s.enrollment_id === sid;
-        })[0] || subs[0];
-      var state = GW.workStateOf(cid, aid, sid);
+    var inIds = GW.workInIds(cid, aid, ids);
+    /** @type {Record<string, boolean>} */
+    var isIn = {};
+    inIds.forEach(function (/** @type {string} */ sid) {
+      isIn[sid] = true;
+    });
+    // One item for a pair or group handed in together (a student graded apart
+    // stands alone), shown as the sender's page.
+    /** @type {Record<string, boolean>} */
+    var done = {};
+    /** @type {any[]} */
+    var items = [];
+    inIds.forEach(function (/** @type {string} */ sid) {
+      var g = getStudentWorkGroup(cid, sid, aid);
+      var members =
+        g && !g.separate
+          ? g.members.filter(function (/** @type {string} */ m) {
+              return isIn[m];
+            })
+          : [sid];
+      if (!members.length) members = [sid];
+      var key = members.slice().sort().join(',');
+      if (done[key]) return;
+      done[key] = true;
+      var subs = (getGroupSubmissions(cid, members[0], aid) || []).filter(function (/** @type {any} */ s) {
+        return members.indexOf(s.enrollment_id) >= 0;
+      });
+      subs.sort(function (/** @type {any} */ x, /** @type {any} */ y) {
+        return (Date.parse(_at(x)) || 0) - (Date.parse(_at(y)) || 0);
+      });
+      var own = subs[0];
+      var sender = own ? own.enrollment_id : members[0];
+      var mates = members.filter(function (/** @type {string} */ m) {
+        return m !== sender;
+      });
+      var names = [displayName(byId[sender])].concat(
+        mates.map(function (/** @type {string} */ m) {
+          return displayName(byId[m]);
+        }),
+      );
+      var name =
+        names.length === 1
+          ? names[0]
+          : names.length === 2
+            ? names[0] + ' and ' + names[1]
+            : names[0] + ' and ' + (names.length - 1) + ' more';
+      var tograde = members.some(function (/** @type {string} */ m) {
+        return GW.workStateOf(cid, aid, m) === 'tograde';
+      });
+      var state = tograde ? 'tograde' : GW.workStateOf(cid, aid, sender);
       var files = (Array.isArray(own && own.files) ? own.files : [])
         .filter(function (/** @type {any} */ f) {
           return !!f;
@@ -98,22 +142,21 @@ window.DashInboxSide = (function () {
         .sort(function (/** @type {any} */ x, /** @type {any} */ y) {
           return (x.page || 0) - (y.page || 0);
         });
-      var mate = own && own.enrollment_id !== sid ? displayName(byId[own.enrollment_id]) : '';
       var at = _at(own);
       var late = !!(own && own.is_late);
       var added = !!(own && own.sent_by === 'teacher');
       var paper = !!(own && own.on_paper);
-      var tograde = state === 'tograde';
       var parts = [];
       if (late) parts.push('Late');
       if (added) parts.push('Added by You');
       if (paper) parts.push('On Paper');
       if (at) parts.push(_when(cid, at));
       parts.push(tograde ? 'To Grade' : 'Assessed');
-      if (mate) parts.push('With ' + mate);
-      return {
-        sid: sid,
-        name: displayName(byId[sid]),
+      items.push({
+        sid: sender,
+        members: members,
+        name: name,
+        fullName: names.join(', '),
         state: state,
         tograde: tograde,
         returned: state === 'returned',
@@ -121,12 +164,11 @@ window.DashInboxSide = (function () {
         late: late,
         added: added,
         paper: paper,
-        mate: mate,
         pages: files,
         // A hand-in on paper with no scan is a lined sheet.
         sheet: !files.length,
         line: parts.join(' · '),
-      };
+      });
     });
     items.sort(function (/** @type {any} */ x, /** @type {any} */ y) {
       if (x.tograde !== y.tograde) return x.tograde ? -1 : 1;
@@ -152,7 +194,7 @@ window.DashInboxSide = (function () {
   function _pageHtml(cid, m, it, pg, i) {
     var n = it.sheet ? 1 : it.pages.length;
     var label =
-      it.name +
+      it.fullName +
       (n > 1 ? ', page ' + (i + 1) + ' of ' + n : '') +
       ': ' +
       it.line +
@@ -167,7 +209,7 @@ window.DashInboxSide = (function () {
         (it.paper ? 'Handed In on Paper' : 'No Pages') +
         '</span></span>';
     } else {
-      var key = m.aid + '|' + it.sid + '|' + pg.id;
+      var key = cid + '|' + m.aid + '|' + it.sid + '|' + pg.id;
       _files[key] = pg;
       inner =
         '<img class="dash-inbox-side-img" data-work-pic data-dash-side-pic="' + esc(key) + '" alt="" decoding="async">';
@@ -237,6 +279,14 @@ window.DashInboxSide = (function () {
       return '<div class="dash-inbox-side"><p class="dash-inbox-side-empty">No work is in yet.</p></div>';
     }
     var m = (_model = model(cid, aid));
+    // An open pile whose student no longer has several pages is let go.
+    if (_st.open) {
+      var open = _st.open;
+      var still = m.items.some(function (/** @type {any} */ i) {
+        return i.sid === open && i.pages.length > 1;
+      });
+      if (!still) _st.open = null;
+    }
     return (
       '<div class="dash-inbox-side" data-aid="' +
       esc(aid) +
@@ -324,6 +374,12 @@ window.DashInboxSide = (function () {
     _fill(root, cid);
   }
 
+  /** The grader is over the tile: what happens under it (the pointer leaving, a
+   * key meant for it) must not gather the pile the teacher came from. */
+  function _graderOpen() {
+    return !!document.getElementById('grader-overlay');
+  }
+
   /** @param {Element} root @param {string} cid @param {() => void} redraw */
   function _bind(root, cid, redraw) {
     var row = _row(root);
@@ -342,6 +398,7 @@ window.DashInboxSide = (function () {
     }
     /** @param {Event} e */
     function out(e) {
+      if (_graderOpen()) return;
       if (/** @type {PointerEvent} */ (e).pointerType === 'touch') return;
       var li = _itemOf(root, e.target);
       if (!li || li.getAttribute('data-sid') !== _st.open) return;
@@ -359,6 +416,7 @@ window.DashInboxSide = (function () {
     }
     /** @param {Event} e */
     function focusout(e) {
+      if (_graderOpen()) return;
       var li = _itemOf(root, e.target);
       if (!li || li.getAttribute('data-sid') !== _st.open) return;
       var to = /** @type {any} */ (e).relatedTarget;
@@ -392,7 +450,7 @@ window.DashInboxSide = (function () {
         return;
       }
       if (!_model || !window.PageAssignments || !PageAssignments.openGrader) return;
-      _st.refocus = sid;
+      _st.refocus = sid + '|' + (btn.getAttribute('data-pg') || '0');
       PageAssignments.openGrader(cid, _model.aid, sid, { studentIds: _model.order, onClose: redraw });
     }
     function scroll() {
@@ -406,14 +464,16 @@ window.DashInboxSide = (function () {
     /** A tap or click elsewhere gathers the pile.
      * @param {Event} e */
     function docClick(e) {
-      if (!_st.open) return;
+      if (!_st.open || _graderOpen()) return;
+      // A click on something the click itself removed (the grader's Done) is not a tap elsewhere.
+      if (!(e.target instanceof Node) || !e.target.isConnected) return;
       var li = _itemOf(root, e.target);
       if (li && li.getAttribute('data-sid') === _st.open) return;
       _setOpen(root, null, cid);
     }
     /** @param {KeyboardEvent} e */
     function docKey(e) {
-      if (e.key !== 'Escape' || !_st.open) return;
+      if (e.key !== 'Escape' || !_st.open || _graderOpen()) return;
       // The focus goes to the pile's top page before the rest hide.
       var li = rowEl.querySelector('.dash-inbox-side-item[data-sid="' + _st.open + '"]');
       var top = li && /** @type {HTMLElement | null} */ (li.querySelector('.dash-inbox-side-page'));
@@ -475,11 +535,27 @@ window.DashInboxSide = (function () {
       undoBind = _bind(root, cid, _redraw);
       _fill(root, cid);
       if (_st.refocus) {
-        var back = /** @type {HTMLElement | null} */ (
-          row.querySelector('[data-dash-inbox-side-page="' + _st.refocus + '"]')
-        );
+        var at = _st.refocus.split('|');
         _st.refocus = null;
+        var back = /** @type {HTMLElement | null} */ (
+          row.querySelector('[data-dash-inbox-side-page="' + at[0] + '"][data-pg="' + (at[1] || '0') + '"]')
+        );
+        // The page that was clicked takes the focus back. A pile left open
+        // by the click gathers unless the pointer is on it or the keyboard is
+        // in it: no pointerout comes after a redraw to do it.
         if (back) back.focus({ preventScroll: true });
+        var rowRef = row;
+        requestAnimationFrame(function () {
+          var open = _st.open;
+          if (!open || !rowRef.isConnected) return;
+          var li = rowRef.querySelector('.dash-inbox-side-item[data-sid="' + open + '"]');
+          if (!li || li.matches(':hover') || li.querySelector(':focus-visible')) return;
+          var top = /** @type {HTMLElement | null} */ (li.querySelector('.dash-inbox-side-page'));
+          if (top && li.contains(document.activeElement) && document.activeElement !== top) {
+            top.focus({ preventScroll: true });
+          }
+          _setOpen(root, null, cid);
+        });
       }
     }
     var mine = _st.key;

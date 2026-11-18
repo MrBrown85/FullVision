@@ -7,9 +7,10 @@
                    the teacher's screens show (GraderWork.workShown) and that
                    have work in, the newest work first. inCount is
                    GraderWork.workInIds(cid, aid, studentIds).length.
-     current(cid)  the aid kept for this class on this device, or the first
-                   of pieces(cid) when none is kept or the kept one is gone;
-                   null with nothing in.
+     current(cid)  the aid kept for this class on this device; with none kept
+                   (or the kept one gone), the first piece with work to grade
+                   (GraderWork's count), newest work first, and only then the
+                   first piece with work in; null with nothing in.
      set(cid, aid) keeps the choice.
      html(cid)     the switch: one button a piece, the current one pressed.
      mount(root, cid, onChange) / unmount(root)
@@ -85,7 +86,15 @@ window.DashInboxPick = (function () {
           return p.aid === kept;
         })[0]
       : null;
-    return (found || list[0]).aid;
+    if (found) return found.aid;
+    var GW = _gw();
+    var ids = (getStudents(cid) || []).map(function (s) {
+      return s.id;
+    });
+    var waiting = list.filter(function (p) {
+      return GW.workCounts(cid, p.aid, ids).tograde > 0;
+    })[0];
+    return (waiting || list[0]).aid;
   }
 
   /** @param {string} cid @param {string} aid */
@@ -124,6 +133,10 @@ window.DashInboxPick = (function () {
     );
   }
 
+  // The switch had the focus when a piece was picked: the redraw gives it back
+  // to the pressed button (the whole Dashboard is drawn again).
+  var _refocus = false;
+
   /** @type {WeakMap<Element, { click: any, key: any }>} */
   var _bound = new WeakMap();
 
@@ -152,6 +165,8 @@ window.DashInboxPick = (function () {
       var aid = btn.getAttribute('data-dash-inbox-pick');
       if (!aid) return;
       set(cid, aid);
+      var inSwitch = btn.closest('.dash-inbox-pick');
+      _refocus = !!inSwitch && inSwitch.contains(document.activeElement);
       if (typeof onChange === 'function') onChange(aid);
     };
     /** @param {KeyboardEvent} e */
@@ -171,6 +186,11 @@ window.DashInboxPick = (function () {
     root.addEventListener('keydown', /** @type {any} */ (key));
     _bound.set(root, { click: click, key: key });
     _showCurrent(root);
+    if (_refocus) {
+      _refocus = false;
+      var on = /** @type {HTMLElement | null} */ (root.querySelector('.dash-inbox-pick-btn[aria-pressed="true"]'));
+      if (on) on.focus({ preventScroll: true });
+    }
   }
 
   /** @param {Element} root */

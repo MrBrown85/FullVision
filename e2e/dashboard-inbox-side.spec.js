@@ -123,13 +123,17 @@ test('the row lists every student with work in: to grade first by arrival, then 
           line: li.querySelector('.dash-inbox-side-line').textContent,
         })),
         inIds: GraderWork.workInIds(cid, aid, ids),
+        members: DashInboxSide.model(cid, aid).items.flatMap(i => i.members),
         notIn: c.notin,
         foot: document.querySelector('.dash-inbox-side-foot').textContent,
       };
     },
     [LIGHT],
   );
-  expect(got.shown.map(s => s.sid).sort()).toEqual([...got.inIds].sort());
+  // A pair is one item; every student with work in is a member of one.
+  expect([...got.members].sort()).toEqual([...got.inIds].sort());
+  expect(got.shown.length).toBe(got.inIds.length - 1);
+  await expect(page.locator('.dash-inbox-side-name', { hasText: 'Aiden Singh and Olivia Tam' })).toHaveCount(1);
   got.shown.forEach(s => expect(s.line).toMatch(/ · (To Grade|Assessed)/));
   expect(got.foot).toBe('To grade first, then assessed. ' + got.notIn + ' not in yet.');
   await expect(page.locator('.dash-inbox-side-line', { hasText: /^Late · / })).toHaveCount(1);
@@ -158,6 +162,70 @@ test('the switch changes the piece, is kept, and a pressed button says so', asyn
   await expect(page.locator('.dash-inbox-pick-btn').nth(0)).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('.dash-inbox-pick-btn').nth(0)).toHaveAttribute('aria-pressed', 'true');
+  // The redraw gives the focus back to the pressed button (Enter, then a click).
+  await expect(page.locator('.dash-inbox-pick-btn').nth(0)).toBeFocused();
+  await page.locator('.dash-inbox-pick-btn').nth(1).click();
+  await expect(page.locator('.dash-inbox-pick-btn').nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.dash-inbox-pick-btn').nth(1)).toBeFocused();
+});
+
+test('after the grader closes the focus returns to the page that was clicked, and a pile gathers if the pointer is away', async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .locator(PILE + ' .dash-inbox-side-page')
+    .first()
+    .hover();
+  await expect(page.locator(PILE)).toHaveClass(/is-open/);
+  await expect.poll(async () => (await box(page, PILE)).width).toBeGreaterThan(200);
+  await page
+    .locator(PILE + ' .dash-inbox-side-page')
+    .nth(1)
+    .click();
+  await expect(page.locator('.grader-dialog')).toBeVisible();
+  // The pointer leaves while the grader is open; it is closed with a click on Done.
+  await page.mouse.move(5, 5);
+  await page.locator('.grader-done').click();
+  await expect(page.locator('.grader-dialog')).toHaveCount(0);
+  await page.mouse.move(5, 5);
+  await expect(page.locator(PILE)).not.toHaveClass(/is-open/);
+  await expect.poll(() => lowerHidden(page)).toBe(true);
+  // The focus is not lost to the page body.
+  expect(await page.evaluate(() => document.activeElement.tagName)).not.toBe('BODY');
+});
+
+test('the focus returns to the second page of a pile when the grader closes from the keyboard', async ({ page }) => {
+  await open(page);
+  await page
+    .locator(PILE + ' .dash-inbox-side-page')
+    .first()
+    .focus();
+  await page.keyboard.press('Tab');
+  await expect(page.locator(PILE + ' .dash-inbox-side-page').nth(1)).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.grader-dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.grader-dialog')).toHaveCount(0);
+  await expect(page.locator(PILE + ' .dash-inbox-side-page').nth(1)).toBeFocused();
+  await expect(page.locator(PILE)).toHaveClass(/is-open/);
+});
+
+test('the default piece is the first with work to grade', async ({ page }) => {
+  await open(page);
+  // Cell Microscope Lab gets the newest work, all assessed: the switch still opens on Light Refraction Lab.
+  await page.evaluate(() => {
+    localStorage.removeItem('fv-dash-inbox-piece:' + getActiveCourse());
+    const cid = getActiveCourse();
+    const work = getCourseSubmissions(cid);
+    work.submissions.forEach(s => {
+      if (s.assessment_id === 'sci8a1') s.sent_at = '2030-01-01T10:00:00Z';
+    });
+    saveDemoStudentWork(cid, work);
+    PageDashboard.render();
+  });
+  await expect(page.locator('.dash-inbox-pick-btn').nth(0)).toHaveText(/^Cell Microscope Lab/);
+  await expect(page.locator('.dash-inbox-pick-btn[aria-pressed="true"]')).toHaveText(/^Light Refraction Lab/);
 });
 
 test('a pile spreads on hover and pushes the others along, and gathers when left', async ({ page }) => {
@@ -178,8 +246,9 @@ test('a pile spreads on hover and pushes the others along, and gathers when left
   await page.mouse.move(5, 5);
   await expect(page.locator(PILE)).not.toHaveClass(/is-open/);
   await expect.poll(() => lowerHidden(page)).toBe(true);
-  await expect.poll(async () => Math.round((await box(page, PILE)).width)).toBe(Math.round(w0));
-  await expect.poll(async () => Math.round(await nextLeft(page))).toBe(Math.round(next0));
+  // Back to a closed pile's width, within the 2 px the row's own sizing may move it.
+  await expect.poll(async () => Math.abs((await box(page, PILE)).width - w0)).toBeLessThanOrEqual(4);
+  await expect.poll(async () => Math.abs((await nextLeft(page)) - next0)).toBeLessThanOrEqual(6);
 });
 
 test('a pile spreads on focus and gathers on Escape and when the focus leaves', async ({ page }) => {
@@ -260,10 +329,11 @@ test('a 13-page pile spreads, scrolls with the row, and asks only for pictures n
   });
   await expect(page.locator(PILE + ' .dash-inbox-side-count')).toHaveText('13 pages');
   const row = page.locator('#dash-inbox-side-row');
+  // Focus keeps the pile open while the row scrolls from under the pointer.
   await page
     .locator(PILE + ' .dash-inbox-side-page')
     .first()
-    .hover();
+    .focus();
   await expect(page.locator(PILE)).toHaveClass(/is-open/);
   await expect.poll(async () => (await box(page, PILE)).width).toBeGreaterThan(1000);
   // The row scrolls; the page does not.

@@ -5,44 +5,6 @@
    A pile's lower pages are out of sight until it is open: visibility, not
    the hidden attribute, so no display rule can show them. */
 
-/* The switch: one button a piece, scrolling sideways inside itself. */
-.dash-inbox-pick {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 2px 2px 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-}
-.dash-inbox-pick-btn {
-  flex: 0 0 auto;
-  height: 28px;
-  padding: 0 12px;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-2);
-  white-space: nowrap;
-  background: var(--surface);
-  border: 1px solid var(--divider-strong);
-  border-radius: 14px;
-  cursor: pointer;
-}
-.dash-inbox-pick-btn:hover {
-  color: var(--text);
-}
-.dash-inbox-pick-btn[aria-pressed='true'] {
-  color: var(--text);
-  background: var(--surface-2);
-  border-color: var(--active);
-}
-.dash-inbox-pick-btn:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 1px;
-}
-
 /* The view. */
 .dash-inbox-side {
   display: flex;

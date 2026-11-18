@@ -98,6 +98,7 @@ const PRECACHE_URLS = [
   '/teacher/dashboard.css',
   '/teacher/dash-competencies.css',
   '/teacher/dash-inbox.css',
+  '/teacher/dash-inbox-pick.css',
   '/teacher/dash-inbox-side.css',
   '/teacher/assignments.css',
   '/teacher/tablet.css',

@@ -566,7 +566,17 @@ window.DashInbox = (function () {
     click: click,
     countsText: countsText,
     whenText: whenText,
-    // The tile's picture holder, for a view that fills its own pictures (D6).
+    /* The tile's picture holder, for a view that shows pictures (D6). The
+       contract every view follows:
+       - Fill your pictures synchronously inside mount(): afterRender sweeps
+         the holder right after mount, and anything no img on the page shows
+         by then is let go (and asked for again later).
+       - Key your pictures so another class's keys cannot match (the By
+         Assessment view's key is aid|student|file id; an aid is unique to
+         its class).
+       - Never keep a holder of your own: this one lives across the
+         Dashboard's redraws, which is what stops a picture being asked for
+         twice. It is null until the tile has drawn once. */
     pics: function () {
       return _pics;
     },
