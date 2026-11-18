@@ -291,6 +291,73 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     }
   });
 
+  it('the Dashboard draw with Roll Call counts the class once and reads only the chosen piece', () => {
+    seed();
+    const ids = getStudents(CID).map(s => s.id);
+    const calls = { workCounts: 0, classWorkCounts: 0, workInIds: 0, workStateOf: 0 };
+    const ws = GraderWork.workStateOf;
+    GraderWork.workStateOf = (...a) => (calls.workStateOf++, ws.apply(GraderWork, a));
+    const wc = GraderWork.workCounts;
+    const cwc = GraderWork.classWorkCounts;
+    const wi = GraderWork.workInIds;
+    GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
+    GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
+    GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
+    try {
+      localStorage.setItem('fv-build-dashRow', '1');
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'roll');
+      const draw = () =>
+        DashOverview.renderOverviewPanel({
+          cid: CID,
+          sections: [],
+          allStudents: getStudents(CID),
+          assessments: [],
+          classAvg: 0,
+          classR: 0,
+          ccCounts: {},
+          ccAssessments: {},
+          ccObs: {},
+          coreSelf: coreSelfRatings(CID, ids),
+          coreView: 'self',
+          compView: 'mix',
+          obs: {},
+          classChange: null,
+          mixPop: null,
+          helpRule: null,
+          naComp: null,
+        });
+      // The tile's own By Assessment model is built in every view: that is the baseline.
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'assessment');
+      draw();
+      const base = { ...calls };
+      expect(base.classWorkCounts).toBe(1);
+      calls.workCounts = calls.classWorkCounts = calls.workInIds = calls.workStateOf = 0;
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'roll');
+      const html = draw();
+      expect(html).toContain('dash-inbox-roll-grid');
+      expect(html).toContain('dash-inbox-pick-btn');
+      // One count of the class, shared with the top bar; the switch counts no piece again.
+      expect(calls.classWorkCounts).toBe(1);
+      // Over the baseline only the chosen piece's own row asks: its counts, and who is in.
+      expect(calls.workCounts).toBeLessThanOrEqual(base.workCounts + 1);
+      expect(calls.workInIds).toBeLessThanOrEqual(base.workInIds + 1);
+      // Each student of the one piece is asked once for a state, and no other piece's students are.
+      expect(calls.workStateOf).toBeLessThanOrEqual(base.workStateOf + ids.length + 1);
+      // The next draw counts afresh (a new send shows), and no more than the first.
+      const first = { ...calls };
+      calls.workCounts = calls.classWorkCounts = calls.workInIds = calls.workStateOf = 0;
+      draw();
+      expect(calls).toEqual(first);
+    } finally {
+      GraderWork.workCounts = wc;
+      GraderWork.classWorkCounts = cwc;
+      GraderWork.workInIds = wi;
+      GraderWork.workStateOf = ws;
+      localStorage.removeItem('fv-build-dashRow');
+      localStorage.removeItem('fv-dash-inbox-view:' + CID);
+    }
+  });
+
   it('the Assignments page: every card closed, one open, and one student', () => {
     openAssignments(seed, CID, {});
     closePages();

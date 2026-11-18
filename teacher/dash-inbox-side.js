@@ -153,7 +153,7 @@ window.DashInboxSide = (function () {
       if (added) parts.push('Added by You');
       if (paper) parts.push('On Paper');
       if (at) parts.push(_when(cid, at));
-      parts.push(tograde ? 'To Grade' : 'Assessed');
+      parts.push(stateWord(tograde));
       items.push({
         sid: sender,
         members: members,
@@ -183,6 +183,13 @@ window.DashInboxSide = (function () {
       return i.sid;
     });
     return out;
+  }
+
+  /** The word for a student's work: To Grade while it waits, else Assessed.
+   * Roll Call words its chips the same way.
+   * @param {boolean} tograde */
+  function stateWord(tograde) {
+    return tograde ? 'To Grade' : 'Assessed';
   }
 
   /** The line under the row.
@@ -591,6 +598,7 @@ window.DashInboxSide = (function () {
   return {
     model: model,
     footText: footText,
+    stateWord: stateWord,
     html: html,
     mount: mount,
     unmount: unmount,

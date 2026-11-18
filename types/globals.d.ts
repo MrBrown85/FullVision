@@ -115,6 +115,7 @@ interface Window {
   DashInboxPick: unknown;
   DashInboxSide: unknown;
   PageDashboard: unknown;
+  DashInboxRoll: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
