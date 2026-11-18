@@ -163,7 +163,7 @@
   function create(host) {
     var _seq = 0;
     /** @type {any[]} */
-    var items = []; // { id, from, pages, url, match, why, said, refused, picking, query, note }
+    var items = []; // { id, from, pages, url, match, why, said, refused, picking, query, say, note }
     var queue = [];
     /** @type {Promise<void> | null} */
     var working = null;
@@ -556,8 +556,26 @@
         esc(item.id) +
         '">' +
         _optionsHtml(item) +
-        '</ul></div>'
+        '</ul>' +
+        // Said when Return found more than one student: the teacher picks.
+        '<span class="awt-why is-note" role="status" data-awt-say="' +
+        esc(item.id) +
+        '">' +
+        esc(item.say || '') +
+        '</span></div>'
       );
+    }
+
+    /* Return in Choose a Student found more than one student (the same
+       name, the same name in each class, or a surname they share): nothing
+       is placed and the list stays open (rule 9). → the plain sentence. */
+    function _sayMany(hits) {
+      var name = host.name(hits[0].id);
+      var same = hits.every(function (st) {
+        return NameMatch.plain(host.name(st.id)).toLowerCase() === NameMatch.plain(name).toLowerCase();
+      });
+      if (!same) return 'More than one student could fit. Choose one.';
+      return (hits.length === 2 ? 'Two students' : hits.length + ' students') + ' are named ' + name + '. Choose one.';
     }
 
     function _btn(cls, what, item, label, extra, lead) {
@@ -772,12 +790,14 @@
       });
       item.picking = true;
       item.query = '';
+      item.say = '';
       host.draw({ focus: 'awt-find:' + item.id });
     }
 
     function _closePicker(item) {
       item.picking = false;
       item.query = '';
+      item.say = '';
       host.draw({ focus: 'awt-lead:' + item.id });
     }
 
@@ -823,6 +843,9 @@
       var item = id && _waitingItem(id);
       if (!item) return false;
       item.query = String(el.value || '');
+      item.say = '';
+      var say = document.querySelector('[data-awt-say="' + id + '"]');
+      if (say) say.textContent = '';
       var list = document.querySelector('.awt-options[data-awt-options="' + id + '"]');
       // html-safe: _optionsHtml escapes every name; ids are ours
       if (list) list.innerHTML = _optionsHtml(item);
@@ -846,7 +869,7 @@
     }
 
     /* Keys inside an open Choose a Student: arrows move through the list,
-       Return takes the first student found, Escape closes it. → true when
+       Return takes the student found when only one is, Escape closes it. → true when
        the tray took the key. */
     function keydown(e) {
       var el = /** @type {any} */ (document.activeElement);
@@ -881,7 +904,15 @@
       if (e.key === 'Enter' && at < 0 && el.classList.contains('awt-find')) {
         e.preventDefault();
         // An empty box lists the whole class: Return takes no one until a name is typed.
-        if (String(el.value || '').trim() && options.length) placeItem(item.id, options[0].getAttribute('data-sid'));
+        if (!String(el.value || '').trim()) return true;
+        var hits = _optionHits(item);
+        if (hits.length === 1) placeItem(item.id, hits[0].id);
+        else if (hits.length > 1) {
+          // Never the first of several (rule 9): the list stays, and says why.
+          item.say = _sayMany(hits);
+          var say = picker.querySelector('[data-awt-say]');
+          if (say) say.textContent = item.say;
+        }
         return true;
       }
       return false;

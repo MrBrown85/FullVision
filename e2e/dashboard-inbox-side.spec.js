@@ -94,7 +94,7 @@ test('Side by Side comes from the view pill, switches the tile in place and surv
   await open(page, { side: false });
   await expect(page.locator('.dash-inbox-row').first()).toBeVisible();
   await page.locator('#dash-view-btn-inbox').click();
-  await expect(page.locator('#dash-view-menu-inbox [data-view="side"]')).toHaveCount(1);
+  await expect(page.locator('#dash-view-menu-inbox [data-view="side"]')).toHaveCount(1); // later slices add their own views
   await expect(page.locator('#dash-view-menu-inbox')).toContainText("Each student's pages in a row, to compare.");
   await page.locator('#dash-view-menu-inbox [role="menuitemradio"]', { hasText: 'Side by Side' }).click();
   await expect(page.locator('.dash-inbox-side-row')).toBeVisible();
