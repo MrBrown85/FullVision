@@ -403,6 +403,8 @@ table public.enrollment (rls on)
   withdrawn_at timestamp with time zone
   enrolled_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
+  show_overall_grade boolean
+  page_paused_at timestamp with time zone
   constraint enrollment_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
   constraint enrollment_pkey PRIMARY KEY (id)
   constraint enrollment_student_id_course_id_key UNIQUE (student_id, course_id)
@@ -1876,6 +1878,7 @@ function public.list_report_templates() returns jsonb
 function public.list_rubric_copies(p_copy_group uuid) returns TABLE(rubric_id uuid, course_id uuid, course_name text, name text)
 function public.list_scan_labels(p_course_id uuid) returns jsonb security definer
 function public.list_student_cards(p_course_id uuid) returns jsonb security definer
+function public.list_student_page_options(p_course_id uuid) returns jsonb security definer
 function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
 function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
@@ -1925,6 +1928,7 @@ function public.set_revision_request(p_request_id uuid, p_patch jsonb, p_idempot
 function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_check_id uuid, p_on boolean) returns boolean
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
+function public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) returns jsonb security definer
 function public.soft_delete_teacher() returns void
 function public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid) returns jsonb security definer
 function public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) returns jsonb security definer

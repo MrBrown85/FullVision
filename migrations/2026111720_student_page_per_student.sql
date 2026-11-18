@@ -1,5 +1,6 @@
--- Per-student options on the Student Page tab (2026-11-17). NOT APPLIED:
--- needs Colin's OK (CLAUDE.md rule 1).
+-- Per-student options on the Student Page tab (2026-11-17). APPLIED to
+-- gradebook-prod on 2026-11-17 on Colin's OK ("Apply it"), through
+-- apply_migration as student_page_per_student; post-check all ok.
 --
 -- THIS FILE CHANGES NO EXISTING ROW. It adds two empty columns to
 -- enrollment, two functions for the teacher, and patches four student_submit

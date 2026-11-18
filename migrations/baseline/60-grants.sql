@@ -651,6 +651,8 @@ grant execute on routine public.list_scan_labels(p_course_id uuid) to service_ro
 revoke all on routine public.list_student_cards(p_course_id uuid) from public;
 grant execute on routine public.list_student_cards(p_course_id uuid) to authenticated;
 grant execute on routine public.list_student_cards(p_course_id uuid) to service_role;
+revoke all on routine public.list_student_page_options(p_course_id uuid) from public;
+grant execute on routine public.list_student_page_options(p_course_id uuid) to authenticated;
 revoke all on routine public.list_teacher_courses() from public;
 grant execute on routine public.list_teacher_courses() to authenticated;
 grant execute on routine public.list_teacher_courses() to service_role;
@@ -791,6 +793,8 @@ grant execute on routine public.set_rubric_printed(p_enrollment_id uuid, p_asses
 revoke all on routine public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) from public;
 grant execute on routine public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) to authenticated;
 grant execute on routine public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) to service_role;
+revoke all on routine public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) from public;
+grant execute on routine public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) to authenticated;
 revoke all on routine public.soft_delete_teacher() from public;
 grant execute on routine public.soft_delete_teacher() to authenticated;
 grant execute on routine public.soft_delete_teacher() to service_role;

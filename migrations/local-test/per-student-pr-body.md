@@ -1,6 +1,8 @@
-## Per-student options: the database half (not applied)
+## Per-student options: the database half (applied)
 
-Colin's ask, Nov 17: "i should be able to show/hide grades for individual students, thiings like that." This PR is the database part of `docs/plans/per-student-options-plan.md`. The app part (Class Settings › Student Page, Layout A) is a separate PR that merges after this is applied.
+**APPLIED to gradebook-prod on 2026-11-17 on Colin's OK; post-check all ok.** Applied through Supabase's `apply_migration` as `student_page_per_student`. This PR records it: the migration, its tests, and the schema snapshot, baseline and types refreshed from live.
+
+Colin's ask, Nov 17: "i should be able to show/hide grades for individual students, thiings like that." This PR is the database part of `docs/plans/per-student-options-plan.md`. The app part (Class Settings › Student Page, Layout A) is a separate PR that can merge now that this is applied.
 
 **Nothing changes for any student until a teacher sets an option.** No existing row is changed.
 
@@ -35,14 +37,14 @@ Nothing. Both columns start empty on every row, which is how every student page 
 - The undo leaves the database as it was (apart from two empty dropped-column slots, which PostgreSQL keeps). The review found its first lock could deadlock a save running at the same moment; the test reproduces that with the old lock and shows the new one does not.
 - The pre-check, run read-only on gradebook-prod on Nov 17, returned no rows.
 
-### How to apply
+### How it was applied
 
-1. Run `per-student-live-precheck.sql` read-only. It must return no rows.
-2. Apply `migrations/2026111720_student_page_per_student.sql` whole through Supabase's `apply_migration`. It is one transaction: it applies completely or not at all, and if live is not what it was tested against it stops with nothing changed.
-3. Run `per-student-live-postcheck.sql`. Every row should say ok.
-4. Refresh `docs/schema.generated.sql` and the baseline from live, then merge the app PR.
+1. `per-student-live-precheck.sql`, run read-only: no rows.
+2. The file applied whole through Supabase's `apply_migration` (one transaction).
+3. `per-student-live-postcheck.sql`: all 17 rows ok.
+4. `docs/schema.generated.sql`, `migrations/baseline/` and `types/database.d.ts` refreshed from live in this PR. The app PR can merge after this one.
 
-### What you accept by applying this
+### What you accepted by applying this
 
 - When a teacher pauses a student, that student's card stops working at once for that class, mid-session too, until the teacher opens it again. What a paused student can still reach is what a class whose page is off already allows: a questionnaire slip already printed, and a phone report's single-use code (on Nov 17 live had 1 live slip and 0 live report codes).
 - Hide takes away the overall grade, not the pieces behind it: in a Letter or Both class each assignment still shows its result, weight and category percent, as with the class switch off today, so a student could still work the percent out by hand. Hiding those too would be a separate change.

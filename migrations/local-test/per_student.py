@@ -593,8 +593,12 @@ def scen_undo():
         setopt(w, [w.e1], 'class', paused=False)
         ok('undo: once no option is set, it runs', d.file(UNDO) == 'ok')
         gone, extra = differences(cat0, catalog(d.c))
-        ok('undo: the catalog is as before the file, but two dropped-column slots on enrollment',
-           gone == [] and extra == ['dropped columns public.enrollment | 2'], (gone[:3], extra[:3]))
+        # two more dropped-column slots on enrollment than before (on a baseline that has the file, the
+        # template was taken back with this undo too, so it already has two)
+        slots = lambda ls: [int(l.rsplit('| ', 1)[1]) for l in ls if l.startswith('dropped columns public.enrollment |')]
+        ok('undo: the catalog is as before the file, but two more dropped-column slots on enrollment',
+           [l for l in gone + extra if not l.startswith('dropped columns public.enrollment |')] == []
+           and (slots(gone) or [0])[0] + 2 == slots(extra)[0], (gone[:3], extra[:3]))
         rows1 = row_checksums(d.c)
         changed = sorted(t for t in rows0 if rows0[t] != rows1.get(t))
         ok("undo: every row is as before but enrollment's updated_at for Cece, fv_idempotency's stored replies and the sync cursor",
