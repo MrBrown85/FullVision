@@ -300,6 +300,23 @@ describe("a row's list", () => {
     expect(pop.querySelector('[data-comp-scroll]')).toBeNull();
   });
 
+  it('shows no hover tip for the row whose list is open, and takes a showing tip down when it opens', () => {
+    const d = mount(opts());
+    const box = d.getElementById('dash-comp-tipbox');
+    const rowOf = key => d.querySelector('[data-comp-open="' + key + '"]');
+    // A tip showing on a row comes down when that row's list opens.
+    DashCompetencies.showTip(rowOf('s:EV'));
+    expect(box.hidden).toBe(false);
+    openRow(d, 's:EV');
+    expect(box.hidden).toBe(true);
+    // Pointing within the open row shows nothing.
+    DashCompetencies.showTip(rowOf('s:EV'));
+    expect(box.hidden).toBe(true);
+    // Another row's tip still shows.
+    DashCompetencies.showTip(rowOf('s:IN'));
+    expect(box.hidden).toBe(false);
+  });
+
   it('is hidden at rest', () => {
     const d = mount(opts());
     expect(d.getElementById('dash-comp-pop').hasAttribute('hidden')).toBe(true);

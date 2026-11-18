@@ -20,8 +20,6 @@ window.DashCompetencies = (function () {
   'use strict';
 
   var PREF_KEY = 'fv-dash-comp-page:';
-  var VIEW_PREF = 'fv-dash-comp-view:';
-  var VIEW_KEYS = ['avg', 'mix', 'below', 'trend'];
   /** @type {{ key: string, label: string }[]} */
   var PAGES = [
     { key: 'curricular', label: 'Curricular' },
@@ -655,6 +653,8 @@ window.DashCompetencies = (function () {
     // html-safe: popBody escapes every name, title and label; the rest is a count.
     pop.innerHTML = inner;
     pop.hidden = !inner;
+    // A list opening takes a showing tip down with it.
+    if (inner) hideTip();
     Array.prototype.forEach.call(
       document.querySelectorAll('[data-comp-open]'),
       function (/** @type {HTMLElement} */ r) {
@@ -783,11 +783,17 @@ window.DashCompetencies = (function () {
     var tip = row.querySelector('.dist-tip, .dash-comp-ln-tip');
     if (!box || !tip) return;
     clearTimeout(_tipTimer);
+    // A row whose list is open shows no tip: it would sit over the list.
+    if (row.getAttribute('aria-expanded') === 'true') {
+      hideTip();
+      return;
+    }
     if (_tipRow === row && !box.hidden) return;
     _tipRow = row;
     // html-safe: the tip's markup was built by DashOverview, which escapes every name and title.
     box.innerHTML = tip.innerHTML;
     box.hidden = false;
+    if (typeof row.getBoundingClientRect !== 'function') return;
     var r = row.getBoundingClientRect();
     var w = box.offsetWidth;
     var h = box.offsetHeight;
@@ -845,5 +851,6 @@ window.DashCompetencies = (function () {
     close: close,
     place: place,
     toggle: _toggle,
+    showTip: showTip,
   };
 })();

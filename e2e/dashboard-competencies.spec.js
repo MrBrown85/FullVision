@@ -221,6 +221,26 @@ test("a row's list opens by click and by Enter, filters the cards and closes wit
   await expect(page.locator('.dash-comp-filter')).toHaveCount(0);
 });
 
+for (const i of [0, 1]) {
+  test(`a row's tip does not cover its own open list (row ${i})`, async ({ page }) => {
+    await openDashboard(page);
+    const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(i);
+    await row.click();
+    await expect(page.locator('#dash-comp-pop')).toBeVisible();
+    const b = await box(row);
+    await page.mouse.move(b.left + 20, b.top + 10);
+    await page.mouse.move(b.left + 60, b.top + 20);
+    await page.waitForTimeout(250);
+    await expect(page.locator('#dash-comp-tipbox')).toBeHidden();
+    const ok = await page.evaluate(() => {
+      const h = document.querySelector('#dash-comp-pop .dash-mix-pop-head > span');
+      const r = h.getBoundingClientRect();
+      return h.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    });
+    expect(ok).toBe(true);
+  });
+}
+
 test('the open row survives a redraw', async ({ page }) => {
   await openDashboard(page);
   const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').first();
