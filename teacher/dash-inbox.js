@@ -205,7 +205,7 @@ window.DashInbox = (function () {
         esc(pg.name + ': Handed In on Paper') +
         '"><span class="dash-inbox-sheet-name">' +
         esc(pg.name) +
-        '</span><span class="dash-inbox-sheet-note">Handed In on Paper</span></span>'
+        '</span><span class="dash-inbox-sheet-note"><span>Handed In</span> <span>on Paper</span></span></span>'
       );
     }
     var key = aid + '|' + pg.sid + '|' + pg.file.id;

@@ -111,17 +111,29 @@
   object-fit: cover;
   object-position: top;
 }
-/* A paper hand-in with no scan: a lined sheet with the name on it. */
+/* A paper hand-in with no scan: a lined sheet with the name on it. It is
+   wider than a page (84 px, not 66) so its words hold in any system font:
+   the note is two fixed lines, "Handed In" and "on Paper", each of which
+   fits the sheet with a font a fifth wider than the Mac's, and the name
+   takes at most two. */
 .dash-inbox-sheet {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  width: 84px;
   padding: 5px 3px;
   color: #3b3b3f;
   background-color: #fbfaf6;
   background-image: repeating-linear-gradient(to bottom, transparent 0 11px, rgba(60, 100, 170, 0.28) 11px 12px);
   font-size: 11px;
   line-height: 1.2;
+}
+/* Wider than a page, it still ends inside the picture column. */
+.dash-inbox-sheet:nth-of-type(2) {
+  left: 24px;
+}
+.dash-inbox-sheet:nth-of-type(3) {
+  left: 36px;
 }
 .dash-inbox-sheet-name {
   display: -webkit-box;
@@ -133,8 +145,12 @@
   overflow-wrap: anywhere;
 }
 .dash-inbox-sheet-note {
-  font-weight: 600;
+  font-weight: 500;
   background: #fbfaf6;
+}
+.dash-inbox-sheet-note > span {
+  display: block;
+  white-space: nowrap;
 }
 /* +N: students' own sends since the last look. */
 .dash-inbox-new {
