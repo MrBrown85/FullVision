@@ -66,9 +66,9 @@ describe('white on the primary blue fill', () => {
     expect((a + 0.05) / (b + 0.05)).toBeGreaterThanOrEqual(3.0);
   });
 
-  it('the Dashboard Inbox buttons use the fill token', () => {
+  it('the Dashboard Inbox badge uses the fill token (Grade Submissions is tinted: the Dashboard has no solid button)', () => {
     const css = read('teacher/dash-inbox.css');
-    for (const sel of ['dash-inbox-new', 'dash-inbox-grade']) {
+    for (const sel of ['dash-inbox-new']) {
       expect(css).toMatch(new RegExp(`\\.${sel}\\s*\\{[^}]*background:\\s*var\\(--active-fill\\)`));
     }
   });

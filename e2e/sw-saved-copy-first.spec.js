@@ -83,10 +83,7 @@ function watch(page) {
 
 /* A log without the looks for sw.js: the browser makes its own a moment
    after each page load, when it likes, so one may land in any log. */
-// The sample class's work pictures (Inbox thumbnails) are pictures, not the app's files: the saved copy
-// holds the app, and a thumbnail is fetched like any other picture.
-const isSamplePicture = url => new URL(url, 'http://x').pathname.startsWith('/assets/sample-work/');
-const notSw = log => log.filter(u => u !== '/sw.js' && !u.startsWith('/assets/sample-work/'));
+const notSw = log => log.filter(u => u !== '/sw.js');
 
 /* Wait for the browser's own look for sw.js after the page load just made
    (the log was emptied before it), so a release made next is found only when
@@ -354,7 +351,7 @@ test('offline, every page opens from the saved copy as one release', async ({ pa
   test.setTimeout(90_000);
   const errors = watch(page);
   const failed = [];
-  page.on('response', r => r.status() >= 500 && !isSamplePicture(r.url()) && failed.push(r.status() + ' ' + r.url()));
+  page.on('response', r => r.status() >= 500 && failed.push(r.status() + ' ' + r.url()));
   server.release('a', filesOf('a'));
   await firstVisit(page, 'a');
 
@@ -373,6 +370,42 @@ test('offline, every page opens from the saved copy as one release', async ({ pa
   await expectOneRelease(page, 'a');
   expect(server.takeLog()).toEqual([]);
   expect(failed).toEqual([]);
+  await context.setOffline(false);
+  expect(errors).toEqual([]);
+});
+
+test('offline, the Demo Inbox draws its thumbnails and Bulletins draws its photo, from the saved copy', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  const errors = watch(page);
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+  // The sample class's pictures are in the install's saved copy.
+  expect(await cachedText(page, '/assets/sample-bulletins/cell-board-1.svg')).toContain('<svg');
+  const saved = await page.evaluate(async () => {
+    const hit = await caches.match('/assets/sample-work/light-lab-marcus-1-thumb.jpg');
+    return !!hit;
+  });
+  expect(saved).toBe(true);
+
+  await context.setOffline(true);
+  server.takeLog();
+  await page.goto(server.origin + '/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await appDrawn(page);
+  const drawn = sel =>
+    page.evaluate(s => [...document.querySelectorAll(s)].map(i => i.complete && i.naturalWidth > 0), sel);
+  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).every(Boolean)).toBe(true);
+
+  await page.goto(server.origin + '/bulletins');
+  await appDrawn(page);
+  await expect(page.locator('.bulletin-post', { hasText: 'Photo of the Board' })).toBeVisible();
+  await expect.poll(async () => (await drawn('.bulletin-thumb')).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('.bulletin-thumb')).every(Boolean)).toBe(true);
+  expect(server.takeLog()).toEqual([]);
   await context.setOffline(false);
   expect(errors).toEqual([]);
 });
@@ -648,7 +681,7 @@ test('after Sign Out the worker installs again: the next visits come from the sa
   test.setTimeout(120_000);
   const errors = watch(page);
   const failed = [];
-  page.on('response', r => r.status() >= 500 && !isSamplePicture(r.url()) && failed.push(r.status() + ' ' + r.url()));
+  page.on('response', r => r.status() >= 500 && failed.push(r.status() + ' ' + r.url()));
   server.release('a', filesOf('a'));
   await firstVisit(page, 'a');
   expect(await missingFromInstall(page, 'a')).toEqual([]);

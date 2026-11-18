@@ -249,15 +249,24 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: #fff;
+  color: #0062cc;
   white-space: nowrap;
-  background: var(--active-fill);
+  background: rgba(0, 122, 255, 0.1);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
 }
 .dash-inbox-grade:hover {
-  filter: brightness(0.92);
+  background: rgba(0, 122, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  .dash-inbox-grade {
+    color: var(--active);
+    background: rgba(10, 132, 255, 0.2);
+  }
+  .dash-inbox-grade:hover {
+    background: rgba(10, 132, 255, 0.28);
+  }
 }
 
 /* All Caught Up, and the busy day's folded line. */
