@@ -8818,3 +8818,208 @@ button.rb-v-prompt {
   font-size: var(--text-xs);
   color: var(--text-3);
 }
+
+/* ── The middle row, behind the dashRow switch (D2, docs/plans/dashboard-inbox-plan.md) ──
+   A left column at two thirds and one Competencies tile at one third, as
+   tall as the window leaves (--dash-row-h, set by DashOverview.sizeRow;
+   510 px with no script), so the Students heading starts below the first
+   view. The left column holds the Inbox slot and, when Bulletins is on and
+   built, Bulletins under it at 60 / 40. */
+.dash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  height: var(--dash-row-h, 510px);
+}
+.dash-row-left {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+.dash-row-left.has-bulletins {
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+.dash-row-slot,
+.dash-row-comp {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.dash-row-slot > *,
+.dash-row-comp > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Under 900 px the tiles stack: the Inbox, Bulletins, then Competencies, at
+   the heights on the board (an iPad held upright: teacher/tablet.css). */
+@media (max-width: 900px) {
+  .dash-row {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .dash-row-left,
+  .dash-row-left.has-bulletins {
+    grid-template-rows: none;
+  }
+  .dash-row-inbox {
+    height: 450px;
+  }
+  .dash-row-bulletins {
+    height: 300px;
+  }
+  .dash-row-comp {
+    height: 520px;
+  }
+}
+
+/* A tile: one white box like the cards. */
+.dash-recent,
+.dash-comp-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Recent Assessments. */
+.dash-recent-head {
+  flex: 0 0 auto;
+}
+.dash-recent-title,
+.dash-comp-tile-title {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+.dash-recent-head a {
+  margin-left: auto;
+}
+.dash-recent-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.dash-recent-row + .dash-recent-row {
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-recent-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.dash-recent-link:hover .dash-recent-name {
+  text-decoration: underline;
+}
+.dash-recent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.dash-recent-count {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-recent-none,
+.dash-recent-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-recent-none {
+  flex: 1 1 auto;
+}
+.dash-recent-hint {
+  padding-top: 10px;
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-recent-hint a {
+  color: var(--link);
+  white-space: nowrap;
+}
+
+/* The Competencies tile: Curricular | Core over two pages that slide
+   sideways in 220 ms. Each page is today's card with its box taken off, so
+   the tile's is the only one. A page that is not shown is hidden (not just
+   moved), so nothing in it takes focus. */
+.dash-comp-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-comp-seg {
+  margin-left: auto;
+}
+.dash-comp-pages {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.dash-comp-track {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transition: transform 220ms var(--ease-out);
+}
+.dash-comp-tile[data-page='core'] .dash-comp-track {
+  transform: translateX(-50%);
+}
+.dash-comp-page {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 50%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  visibility: hidden;
+  transition: visibility 0s linear 220ms;
+}
+.dash-comp-page.is-on {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.dash-comp-tile .dash-section-title {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.dash-comp-tile .dash-overview-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-comp-track,
+  .dash-comp-page {
+    transition: none;
+  }
+}

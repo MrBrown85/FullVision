@@ -217,6 +217,7 @@ function load(file) {
 }
 
 load('shared/html.js');
+load('shared/build-flags.js');
 load('shared/constants.js');
 // Demo Mode's class (DEFAULT_COURSES, LEARNING_MAP) lives in seed-data.js.
 // Only those two are taken from it here, run inside a function so nothing
@@ -323,6 +324,8 @@ load('teacher/cm-terms.js');
 load('teacher/cm-grading-bars.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
+load('teacher/dash-competencies.js');
+load('teacher/dash-recent.js');
 load('teacher/dash-observations.js');
 load('teacher/dash-student-cards.js');
 load('teacher/dash-insights.js');
