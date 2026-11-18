@@ -1,29 +1,20 @@
 -- Quizzes, MQ1: the tables and the teacher's functions (2026-11-17). NOT APPLIED.
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
--- It adds five empty tables, three functions a teacher may run, a private
--- helper, three trigger functions and three triggers. The results functions
--- (mark_quiz_answer, reopen_quiz, confirm_quiz) are 2026111805_quiz_results.sql,
--- split off to keep each file under 40 KB.
---
--- Why: docs/plans/quizzes-plan.md, slice Q1. The contract every later slice
--- builds to: migrations/local-test/quizzes-contract.md.
---
--- Tables quiz, quiz_question, quiz_key (THE ANSWER KEY, kept only here),
--- quiz_attempt, quiz_answer: row security on, no policy, no grant; keys
--- cascade with the assessment and the student. list_quiz (with the key),
--- save_quiz, list_quiz_tries (sent tries only): the class's teacher only.
--- fv_private.quiz_json: no role may call it. Triggers:
--- assessment_quiz_draft_guard (Unassign refused once a try exists; the
--- existing guard is not changed), quiz_tag_gone on assessment_tag (at commit
--- a competency off the piece is off its questions), quiz_attempt_same_class.
--- No grade math.
+-- It adds five empty tables, list_quiz (with the key) and save_quiz for the
+-- class's teacher, fv_private.quiz_json (no role may call it), and three
+-- triggers: assessment_quiz_draft_guard (Unassign refused once a try exists),
+-- quiz_tag_gone on assessment_tag (at commit, a competency off the piece is
+-- off its questions), quiz_attempt_same_class. The rest of the teacher's
+-- functions are 2026111805_quiz_results.sql. No grade math. Contract:
+-- migrations/local-test/quizzes-contract.md (plan: docs/plans/quizzes-plan.md).
+-- THE ANSWER KEY is kept only in quiz_key: save_quiz stores no copy of its
+-- reply in fv_idempotency, only that the key was used.
 --
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   public.list_quiz(uuid) (new) 4b5a877bdade0126970b90acbfa613d7
---   public.save_quiz(uuid,jsonb,uuid) (new) 514d96e7fe70d09121d1068e7e7f70d1
---   public.list_quiz_tries(uuid) (new) e929cbfe0aa1130741bd2b3af1615a2d
+--   public.save_quiz(uuid,jsonb,uuid) (new) 0bd413e5fa6ac1ddeaec29673c791be8
 --   fv_private.quiz_json(uuid) (new) c1d41659890c23cb02d0f517cd5c037d
 --   public._quiz_draft_guard() (new) 9e6ed6b0336305322b22c309161472f9
 --   public._quiz_tag_gone() (new) 3cd4fba9441edaec432cc3322c654826
@@ -34,21 +25,23 @@
 --   public.fv_idem_store(uuid,text,jsonb) 6d0b48c458d273a332db39e1a4b68626
 --
 -- Checks first: nothing changes unless the three it relies on are as tested,
--- its own seven, five tables and two triggers on existing tables are missing
+-- its own six, five tables and two triggers on existing tables are missing
 -- or its, and no function of those names is elsewhere. Read-only pre-check:
 -- migrations/local-test/quizzes-live-precheck.sql.
 --
 -- Rows: none changes and none is added. Unassign is refused only on a piece
 -- with a quiz try, and none has one until MQ2 is applied.
 --
--- Locks: brief ones on assessment, enrollment and assessment_tag; after five
--- seconds it gives up, nothing applied. Quiz writers lock in one order (the
--- contract, "Locks, in order"); no quiz table has a sync-cursor trigger. Cost
--- to a teacher with no quiz: one empty indexed update at commit per
--- competency row a form save deletes; one more trigger on Unassign.
+-- Locks: first, share row exclusive on enrollment, assessment and
+-- assessment_tag, in that order; the triggers on those two go in before any
+-- quiz table is touched, so a second run cannot hold a quiz table while it
+-- waits for a teacher's save. Five seconds, then it gives up with nothing
+-- applied. Cost to a teacher with no quiz: one empty indexed update at
+-- commit per competency row a form save deletes; one trigger on Unassign.
 --
--- The last check names each part not as tested: a function's md5, a grant
--- (read from proacl and relacl), a table, a trigger.
+-- The last check names each part not as tested: a function's md5 or grant,
+-- a table's grants (relacl, attacl), row security or policy, a key's
+-- cascade, a trigger's function, events, columns or condition.
 --
 -- After 2026111730 (needs nothing of Bulletins' 2026111801 to 03), before
 -- the app that calls these. Tested on PostgreSQL 17, ICU en-US and C:
@@ -59,6 +52,8 @@
 begin;
 
 set local lock_timeout = '5s';
+-- Existing tables first, always in this order (no deadlock with an import).
+lock table public.enrollment, public.assessment, public.assessment_tag in share row exclusive mode;
 
 -- == 1. The checks, before anything changes ==
 do $guard$
@@ -72,8 +67,7 @@ begin
         ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f', null),
         ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626', null),
         ('public.list_quiz(uuid)', null, '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', null, '514d96e7fe70d09121d1068e7e7f70d1'),
-        ('public.list_quiz_tries(uuid)', null, 'e929cbfe0aa1130741bd2b3af1615a2d'),
+        ('public.save_quiz(uuid,jsonb,uuid)', null, '0bd413e5fa6ac1ddeaec29673c791be8'),
         ('fv_private.quiz_json(uuid)', null, 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', null, '9e6ed6b0336305322b22c309161472f9'),
         ('public._quiz_tag_gone()', null, '3cd4fba9441edaec432cc3322c654826'),
@@ -85,10 +79,10 @@ begin
                 _f.fn, coalesce(_md5, 'none: the function is missing'), coalesce(_f.was, 'none');
         end if;
     end loop;
-    if exists (select 1 from pg_proc where proname in ('list_quiz', 'save_quiz', 'list_quiz_tries', 'quiz_json', '_quiz_draft_guard',
+    if exists (select 1 from pg_proc where proname in ('list_quiz', 'save_quiz', 'quiz_json', '_quiz_draft_guard',
                                                         '_quiz_tag_gone', '_quiz_attempt_same_class')
                  and oid not in (select coalesce(to_regprocedure(x), 0) from unnest(array['public.list_quiz(uuid)', 'public.save_quiz(uuid,jsonb,uuid)',
-                     'public.list_quiz_tries(uuid)', 'fv_private.quiz_json(uuid)', 'public._quiz_draft_guard()', 'public._quiz_tag_gone()',
+                     'fv_private.quiz_json(uuid)', 'public._quiz_draft_guard()', 'public._quiz_tag_gone()',
                      'public._quiz_attempt_same_class()']) x)) then
         raise exception 'A quiz function exists with other arguments or in another schema. Nothing was changed.';
     end if;
@@ -117,7 +111,63 @@ begin
 end
 $guard$;
 
--- == 2. The tables ==
+-- == 2. The triggers on existing tables, before any quiz table ==
+-- Unassign is refused once any student has a try, with the existing guard's
+-- word. A start of a try (MQ2) holds the assessment's row for share, so an
+-- Unassign waits for it and then sees the try.
+create or replace function public._quiz_draft_guard()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    if coalesce(current_setting('fv.restoring', true), '') = 'on' then
+        return new;
+    end if;
+    if exists (select 1 from quiz_attempt t where t.assessment_id = new.id) then
+        raise exception 'draft_has_work' using errcode = 'P0001',
+            detail = 'A student has started the quiz on this assessment, so it cannot go back to a Draft.';
+    end if;
+    return new;
+end;
+$function$;
+
+-- At commit: a competency no longer on the piece is taken off its questions.
+-- The form deletes and re-inserts every competency on each save; a pair that
+-- is back by commit is left as it was.
+create or replace function public._quiz_tag_gone()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    update quiz_question q set tag_id = null, updated_at = now()
+     where q.assessment_id = old.assessment_id and q.tag_id = old.tag_id
+       and not exists (select 1 from assessment_tag x where x.assessment_id = old.assessment_id and x.tag_id = old.tag_id);
+    return null;
+end;
+$function$;
+
+revoke all on function public._quiz_draft_guard(), public._quiz_tag_gone() from public, anon, authenticated, service_role;
+
+create or replace trigger assessment_quiz_draft_guard
+    before update of is_draft on public.assessment
+    for each row when (new.is_draft and not old.is_draft)
+    execute function public._quiz_draft_guard();
+do $t$
+begin
+    if not exists (select 1 from pg_trigger where tgname = 'quiz_tag_gone' and tgrelid = 'public.assessment_tag'::regclass) then
+        create constraint trigger quiz_tag_gone
+            after delete or update of assessment_id, tag_id on public.assessment_tag
+            deferrable initially deferred
+            for each row execute function public._quiz_tag_gone();
+    end if;
+end
+$t$;
+
+-- == 3. The tables ==
 create table if not exists public.quiz (
     assessment_id     uuid primary key references public.assessment(id) on delete cascade,
     shuffle_questions boolean not null default true,
@@ -211,47 +261,8 @@ revoke all on table public.quiz, public.quiz_question, public.quiz_key, public.q
     from public, anon, authenticated, service_role;
 
 comment on table public.quiz is 'A quiz on an assessment (Quizzes, MQ1): its settings. Read and written only through the quiz functions.';
-comment on table public.quiz_key is 'The answer key, kept apart from the questions. No student_submit function reads it but the returned view (MQ3).';
+comment on table public.quiz_key is 'The answer key, kept only here (not in fv_idempotency). No student_submit function reads it but the returned view (MQ3).';
 comment on table public.quiz_attempt is 'One student''s try at a quiz. Until sent, only that student''s own session reads it; the teacher''s functions answer sent tries only.';
-
--- == 3. Triggers ==
--- Unassign is refused once any student has a try, with the existing guard's
--- word. A start of a try (MQ2) holds the assessment's row for share, so an
--- Unassign waits for it and then sees the try.
-create or replace function public._quiz_draft_guard()
- returns trigger
- language plpgsql
- security definer
- set search_path to 'public', 'pg_temp'
-as $function$
-begin
-    if coalesce(current_setting('fv.restoring', true), '') = 'on' then
-        return new;
-    end if;
-    if exists (select 1 from quiz_attempt t where t.assessment_id = new.id) then
-        raise exception 'draft_has_work' using errcode = 'P0001',
-            detail = 'A student has started the quiz on this assessment, so it cannot go back to a Draft.';
-    end if;
-    return new;
-end;
-$function$;
-
--- At commit: a competency no longer on the piece is taken off its questions.
--- The form deletes and re-inserts every competency on each save; a pair that
--- is back by commit is left as it was.
-create or replace function public._quiz_tag_gone()
- returns trigger
- language plpgsql
- security definer
- set search_path to 'public', 'pg_temp'
-as $function$
-begin
-    update quiz_question q set tag_id = null, updated_at = now()
-     where q.assessment_id = old.assessment_id and q.tag_id = old.tag_id
-       and not exists (select 1 from assessment_tag x where x.assessment_id = old.assessment_id and x.tag_id = old.tag_id);
-    return null;
-end;
-$function$;
 
 create or replace function public._quiz_attempt_same_class()
  returns trigger
@@ -268,23 +279,11 @@ begin
 end;
 $function$;
 
-revoke all on function public._quiz_draft_guard(), public._quiz_tag_gone(), public._quiz_attempt_same_class()
-    from public, anon, authenticated, service_role;
+revoke all on function public._quiz_attempt_same_class() from public, anon, authenticated, service_role;
 
-drop trigger if exists assessment_quiz_draft_guard on public.assessment;
-create trigger assessment_quiz_draft_guard
-    before update of is_draft on public.assessment
-    for each row when (new.is_draft and not old.is_draft)
-    execute function public._quiz_draft_guard();
-drop trigger if exists quiz_attempt_same_class on public.quiz_attempt;
-create trigger quiz_attempt_same_class
+create or replace trigger quiz_attempt_same_class
     before insert or update of assessment_id, enrollment_id on public.quiz_attempt
     for each row execute function public._quiz_attempt_same_class();
-drop trigger if exists quiz_tag_gone on public.assessment_tag;
-create constraint trigger quiz_tag_gone
-    after delete or update of assessment_id, tag_id on public.assessment_tag
-    deferrable initially deferred
-    for each row execute function public._quiz_tag_gone();
 
 -- == 4. The quiz as the teacher's functions answer it ==
 create or replace function fv_private.quiz_json(p_assessment_id uuid)
@@ -330,7 +329,12 @@ create or replace function public.save_quiz(p_assessment_id uuid, p_quiz jsonb, 
 as $function$
 declare
     _uuid4    constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+    -- White space at either end (ASCII's, the same under every collation).
+    _ws       constant text := '^[[:space:]]+|[[:space:]]+$';
     _cached   jsonb;
+    _made     int;
+    _was      timestamptz;
+    _prompt   text;
     _a        record;
     _answered boolean;
     _old_kind text;
@@ -349,14 +353,14 @@ declare
     _why      text;
     _tags     uuid[];
     _keep     uuid[] := '{}';
-    _out      jsonb;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     _cached := fv_idem_check(p_idempotency_key, 'save_quiz');
-    if _cached is not null then
-        return _cached;
-    end if;
     if not fv_owns_assessment(p_assessment_id) then raise exception 'not found' using errcode = 'P0002'; end if;
+    -- The stored reply holds no question or key: the same key again answers the quiz as it is now.
+    if _cached is not null then
+        return fv_private.quiz_json(p_assessment_id);
+    end if;
     select a.score_mode, a.collab_mode into _a from assessment a where a.id = p_assessment_id for key share;
     if not found then raise exception 'not found' using errcode = 'P0002'; end if;
 
@@ -367,9 +371,8 @@ begin
             raise exception 'has_tries' using errcode = '22023', detail = 'A student has started this quiz, so it cannot be removed.';
         end if;
         delete from quiz where assessment_id = p_assessment_id;
-        _out := fv_private.quiz_json(p_assessment_id);
-        perform fv_idem_store(p_idempotency_key, 'save_quiz', _out);
-        return _out;
+        perform fv_idem_store(p_idempotency_key, 'save_quiz', '{"saved": true}'::jsonb);
+        return fv_private.quiz_json(p_assessment_id);
     end if;
 
     if _a.score_mode = 'dibels' or _a.collab_mode <> 'none' then
@@ -377,8 +380,13 @@ begin
     end if;
     if (case when jsonb_typeof(p_quiz) <> 'object' then true
              else (select array_agg(k order by k collate "C") from jsonb_object_keys(p_quiz) k) is distinct from
-                  array['accept_until', 'add_total', 'after_due', 'counts', 'questions', 'shows', 'shuffle_choices', 'shuffle_questions', 'tries'] end) then
-        _bad := 'The quiz must have exactly its nine settings and questions.';
+                  array['accept_until', 'add_total', 'after_due', 'counts', 'questions', 'shows', 'shuffle_choices', 'shuffle_questions',
+                        'tries', 'updated_at'] end) then
+        _bad := 'The quiz must have exactly its settings, updated_at and questions.';
+    elsif coalesce(jsonb_typeof(p_quiz->'updated_at'), 'null') not in ('string', 'null')
+       or (jsonb_typeof(p_quiz->'updated_at') = 'string' and (not pg_input_is_valid(p_quiz->>'updated_at', 'timestamptz')
+           or p_quiz->>'updated_at' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+([+-][0-9:]+|Z)$')) then
+        _bad := 'updated_at must be the quiz''s updated_at as last read, or null for a new quiz.';
     elsif jsonb_typeof(p_quiz->'shuffle_questions') <> 'boolean' or jsonb_typeof(p_quiz->'shuffle_choices') <> 'boolean'
        or jsonb_typeof(p_quiz->'add_total') <> 'boolean' then
         _bad := 'Shuffle and Add a Total must be true or false.';
@@ -407,7 +415,13 @@ begin
 
     -- Locks, in the contract's order: the quiz's row, then the piece's competencies.
     insert into quiz (assessment_id) values (p_assessment_id) on conflict (assessment_id) do nothing;
-    perform 1 from quiz where assessment_id = p_assessment_id for update;
+    get diagnostics _made = row_count;
+    select z.updated_at into _was from quiz z where z.assessment_id = p_assessment_id for update;
+    -- Saved somewhere else since this was read (another tab, an old payload): nothing is written.
+    if (case when _made = 1 then jsonb_typeof(p_quiz->'updated_at') = 'string'
+             else (p_quiz->>'updated_at')::timestamptz is distinct from _was end) then
+        raise exception 'stale' using errcode = '22023', detail = 'This quiz was changed somewhere else. Open it again before saving.';
+    end if;
     perform 1 from assessment_tag where assessment_id = p_assessment_id for key share;
     select coalesce(array_agg(tag_id order by tag_id), '{}') into _tags
       from (select x.tag_id from assessment_tag x where x.assessment_id = p_assessment_id for key share) x;
@@ -442,7 +456,8 @@ begin
             null;
         elsif jsonb_typeof(_q->'kind') is distinct from 'string' or _q->>'kind' not in ('choice', 'true_false', 'number', 'text') then
             _bad := 'its kind';
-        elsif jsonb_typeof(_q->'prompt') is distinct from 'string' or char_length(btrim(_q->>'prompt')) not between 1 and 1000 then
+        elsif jsonb_typeof(_q->'prompt') is distinct from 'string'
+              or char_length(regexp_replace((_q->>'prompt') collate "C", _ws, '', 'g')) not between 1 and 1000 then
             _bad := 'its question (1 to 1000 characters)';
         elsif coalesce(jsonb_typeof(_q->'multiple'), 'null') not in ('boolean', 'null') or (_multiple and _q->>'kind' <> 'choice') then
             _bad := 'Several Right (only on a choice question)';
@@ -459,11 +474,12 @@ begin
                            where case when jsonb_typeof(e) <> 'object' or e - 'id' - 'text' <> '{}'::jsonb then true
                                       when jsonb_typeof(e->'id') is distinct from 'string' or e->>'id' !~ _uuid4 then true
                                       when jsonb_typeof(e->'text') is distinct from 'string' then true
-                                      else char_length(btrim(e->>'text')) not between 1 and 300 end)
+                                      else char_length(regexp_replace((e->>'text') collate "C", _ws, '', 'g')) not between 1 and 300 end)
                or (select count(distinct (e->>'id') collate "C") from jsonb_array_elements(_q->'choices') e) <> jsonb_array_length(_q->'choices') then
                 _bad := 'its choices (each an id, a random version-4 UUID used once, and 1 to 300 characters)';
             else
-                select jsonb_agg(jsonb_build_object('id', e->>'id', 'text', btrim(e->>'text')) order by o) into _choices
+                select jsonb_agg(jsonb_build_object('id', e->>'id', 'text', regexp_replace((e->>'text') collate "C", _ws, '', 'g')) order by o)
+                  into _choices
                   from jsonb_array_elements(_q->'choices') with ordinality c(e, o);
             end if;
         elsif coalesce(jsonb_typeof(_q->'choices'), 'null') <> 'null' then
@@ -473,7 +489,8 @@ begin
         if _bad is null then
             if (case when jsonb_typeof(_k) is distinct from 'object' then true else _k - 'answer' - 'tolerance' - 'why' <> '{}'::jsonb end) then
                 _bad := 'its answer key';
-            elsif coalesce(jsonb_typeof(_k->'why'), 'null') not in ('string', 'null') or char_length(btrim(_k->>'why')) > 500 then
+            elsif coalesce(jsonb_typeof(_k->'why'), 'null') not in ('string', 'null')
+                  or char_length(regexp_replace((_k->>'why') collate "C", _ws, '', 'g')) > 500 then
                 _bad := 'its why line (500 characters at most)';
             elsif coalesce(jsonb_typeof(_k->'tolerance'), 'null') <> 'null' and (_q->>'kind' <> 'number'
                   or jsonb_typeof(_k->'tolerance') <> 'number' or (_k->>'tolerance')::numeric not between 0 and 1e12) then
@@ -505,7 +522,8 @@ begin
         end if;
         _tag := case when jsonb_typeof(_q->'tag_id') = 'string' then (_q->>'tag_id')::uuid end;
         _tol := case when jsonb_typeof(_k->'tolerance') = 'number' then (_k->>'tolerance')::numeric end;
-        _why := nullif(btrim(_k->>'why'), '');
+        _why := nullif(regexp_replace((_k->>'why') collate "C", _ws, '', 'g'), '');
+        _prompt := regexp_replace((_q->>'prompt') collate "C", _ws, '', 'g');
         -- What may not change once a question has answers.
         if _answered then
             if _old_kind <> _q->>'kind' or _old_mult <> _multiple then
@@ -520,10 +538,10 @@ begin
         end if;
         if _id is null then
             insert into quiz_question (assessment_id, position, kind, prompt, choices, multiple, points, tag_id)
-            values (p_assessment_id, _n, _q->>'kind', btrim(_q->>'prompt'), _choices, _multiple, (_q->>'points')::numeric, _tag)
+            values (p_assessment_id, _n, _q->>'kind', _prompt, _choices, _multiple, (_q->>'points')::numeric, _tag)
             returning id into _id;
         else
-            update quiz_question set position = _n, kind = _q->>'kind', prompt = btrim(_q->>'prompt'), choices = _choices,
+            update quiz_question set position = _n, kind = _q->>'kind', prompt = _prompt, choices = _choices,
                                      multiple = _multiple, points = (_q->>'points')::numeric, tag_id = _tag,
                                      archived_at = null, updated_at = now()
              where id = _id;
@@ -539,53 +557,13 @@ begin
        and exists (select 1 from quiz_answer a where a.question_id = q.id);
     delete from quiz_question q where q.assessment_id = p_assessment_id and q.archived_at is null and q.id <> all(_keep);
 
-    _out := fv_private.quiz_json(p_assessment_id);
-    perform fv_idem_store(p_idempotency_key, 'save_quiz', _out);
-    return _out;
+    perform fv_idem_store(p_idempotency_key, 'save_quiz', '{"saved": true}'::jsonb);
+    return fv_private.quiz_json(p_assessment_id);
 end;
 $function$;
 
-create or replace function public.list_quiz_tries(p_assessment_id uuid)
- returns jsonb
- language plpgsql
- stable security definer
- set search_path to 'public', 'pg_temp'
-as $function$
-begin
-    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-    if not fv_owns_assessment(p_assessment_id) then raise exception 'not found' using errcode = 'P0002'; end if;
-    -- Sent tries only. Of an unsent try, two booleans and nothing else.
-    return jsonb_build_object('students', coalesce((
-        select jsonb_agg(jsonb_build_object(
-                   'enrollment_id', e.id,
-                   'sent', (select count(*) from quiz_attempt t where t.assessment_id = x.id and t.enrollment_id = e.id and t.sent_at is not null),
-                   'in_progress', exists (select 1 from quiz_attempt t where t.assessment_id = x.id and t.enrollment_id = e.id
-                                             and t.sent_at is null and t.started_at is not null),
-                   'reopened', exists (select 1 from quiz_attempt t where t.assessment_id = x.id and t.enrollment_id = e.id
-                                          and t.sent_at is null and t.reopened_at is not null),
-                   'tries', coalesce((
-                       select jsonb_agg(jsonb_build_object(
-                                  'attempt_id', t.id, 'try', t.try, 'started_at', t.started_at, 'sent_at', t.sent_at,
-                                  'reopened_at', t.reopened_at, 'question_order', t.question_order,
-                                  'marked', t.marked, 'marked_at', t.marked_at,
-                                  'answers', coalesce((
-                                      select jsonb_agg(jsonb_build_object('question_id', a.question_id, 'answer', a.answer, 'saved_at', a.saved_at,
-                                                                          'given_points', a.given_points, 'note', a.note) order by a.question_id)
-                                        from quiz_answer a where a.attempt_id = t.id), '[]'::jsonb))
-                              order by t.try)
-                         from quiz_attempt t
-                        where t.assessment_id = x.id and t.enrollment_id = e.id and t.sent_at is not null), '[]'::jsonb))
-               order by e.roster_position, e.id)
-          from assessment x
-          join quiz z on z.assessment_id = x.id
-          join enrollment e on e.course_id = x.course_id
-         where x.id = p_assessment_id and e.withdrawn_at is null), '[]'::jsonb));
-end;
-$function$;
-
-revoke all on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid), public.list_quiz_tries(uuid)
-    from public, anon, service_role;
-grant execute on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid), public.list_quiz_tries(uuid) to authenticated;
+revoke all on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid) from public, anon, service_role;
+grant execute on function public.list_quiz(uuid), public.save_quiz(uuid, jsonb, uuid) to authenticated;
 
 -- == 6. The last check: each part that is not as tested is named ==
 do $after$
@@ -597,8 +575,7 @@ declare
 begin
     for _f in select * from (values
         ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7', 'authenticated'),
-        ('public.save_quiz(uuid,jsonb,uuid)', '514d96e7fe70d09121d1068e7e7f70d1', 'authenticated'),
-        ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d', 'authenticated'),
+        ('public.save_quiz(uuid,jsonb,uuid)', '0bd413e5fa6ac1ddeaec29673c791be8', 'authenticated'),
         ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d', null),
         ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9', null),
         ('public._quiz_tag_gone()', '3cd4fba9441edaec432cc3322c654826', null),
@@ -632,15 +609,31 @@ begin
         if _got is not null then
             _bad := _bad || format('grant: table %s may be read or written by %s, not its owner only', _f.t, _got);
         end if;
+        if exists (select 1 from pg_attribute where attrelid = to_regclass(_f.t) and attacl is not null) then
+            _bad := _bad || format('grant: table %s has a column grant', _f.t);
+        end if;
     end loop;
+    for _f in select * from (values ('public.quiz', 'public.assessment'), ('public.quiz_question', 'public.quiz'),
+        ('public.quiz_key', 'public.quiz_question'), ('public.quiz_attempt', 'public.quiz'), ('public.quiz_attempt', 'public.enrollment'),
+        ('public.quiz_answer', 'public.quiz_attempt'), ('public.quiz_answer', 'public.quiz_question')) as v(t, p) loop
+        if not exists (select 1 from pg_constraint where conrelid = to_regclass(_f.t) and confrelid = to_regclass(_f.p)
+                          and contype = 'f' and confdeltype = 'c' and convalidated) then
+            _bad := _bad || format('key: %s to %s is missing or does not cascade', _f.t, _f.p);
+        end if;
+    end loop;
+    -- Each trigger: its function, events (tgtype), columns and condition.
     for _f in select * from (values
-        ('assessment_quiz_draft_guard', 'public.assessment', 'public._quiz_draft_guard()', false),
-        ('quiz_tag_gone', 'public.assessment_tag', 'public._quiz_tag_gone()', true),
-        ('quiz_attempt_same_class', 'public.quiz_attempt', 'public._quiz_attempt_same_class()', false)
-    ) as v(t, tbl, fn, deferred) loop
-        if not exists (select 1 from pg_trigger where tgname = _f.t and tgrelid = to_regclass(_f.tbl) and tgfoid = to_regprocedure(_f.fn)
-                          and tgenabled = 'O' and tgdeferrable = _f.deferred and tginitdeferred = _f.deferred) then
-            _bad := _bad || format('trigger %s on %s is missing or not this file''s', _f.t, _f.tbl);
+        ('assessment_quiz_draft_guard', 'public.assessment', 'public._quiz_draft_guard()', false, 19, 'is_draft',
+         '((new.is_draft AND (NOT old.is_draft)))'),
+        ('quiz_tag_gone', 'public.assessment_tag', 'public._quiz_tag_gone()', true, 25, 'assessment_id,tag_id', ''),
+        ('quiz_attempt_same_class', 'public.quiz_attempt', 'public._quiz_attempt_same_class()', false, 23, 'assessment_id,enrollment_id', '')
+    ) as v(t, tbl, fn, deferred, ty, cols, qual) loop
+        if not exists (select 1 from pg_trigger g where g.tgname = _f.t and g.tgrelid = to_regclass(_f.tbl) and g.tgfoid = to_regprocedure(_f.fn)
+                          and g.tgenabled = 'O' and g.tgdeferrable = _f.deferred and g.tginitdeferred = _f.deferred and g.tgtype = _f.ty
+                          and (select string_agg(a.attname, ',' order by a.attname collate "C") from pg_attribute a
+                                where a.attrelid = g.tgrelid and a.attnum = any (g.tgattr)) = _f.cols
+                          and split_part(split_part(pg_get_triggerdef(g.oid), ' WHEN ', 2), ' EXECUTE ', 1) = _f.qual) then
+            _bad := _bad || format('trigger %s on %s is missing or not this file''s (function, events, columns or condition)', _f.t, _f.tbl);
         end if;
     end loop;
     if cardinality(_bad) > 0 then

@@ -1,10 +1,13 @@
 -- Quizzes, MQ1 part 2: the results functions (2026-11-17). NOT APPLIED.
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
--- It adds three functions a teacher may run, on the tables of
+-- It adds four functions a teacher may run, on the tables of
 -- 2026111804_quizzes.sql, which must be applied first. Split from it to keep
 -- each file under 40 KB. The contract: migrations/local-test/quizzes-contract.md.
 --
+-- public.list_quiz_tries   every sent try of every active student; of an
+--                          unsent try only two booleans (moved here from
+--                          2026111804, which needed the room).
 -- public.mark_quiz_answer  the teacher's points for a Text answer (0 to the
 --                          question's points) and a note, on a sent try only.
 -- public.reopen_quiz       one more try for one student: beyond the quiz's
@@ -18,9 +21,10 @@
 --
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
---   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new) 77bd2789ea9f46790f6eef639a605c24
+--   public.list_quiz_tries(uuid) (new) e929cbfe0aa1130741bd2b3af1615a2d
+--   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new) 1222e55ae9915bc81c6194abb8b9050e
 --   public.reopen_quiz(uuid,uuid,uuid) (new) daabc9bbdd81761d4ddfd72b773eca78
---   public.confirm_quiz(uuid,jsonb,uuid) (new) 8380e8fa33795295b97e17623376414f
+--   public.confirm_quiz(uuid,jsonb,uuid) (new) ee23f2910b1484f18a41ea76b08f0846
 -- Relied on, unchanged (function, live, and 2026111804's):
 --   public.fv_owns_assessment(uuid) 9f4c680c35f9f3ac32e8290824707673
 --   public.fv_idem_check(uuid,text) 1c7b546434bee4b774557e0e6b16024f
@@ -29,7 +33,7 @@
 --
 -- Checks first: it stops with nothing changed unless the four functions it
 -- relies on are as tested (the last says 2026111804 is applied), its own
--- three are missing or this file's, no function of those names is elsewhere,
+-- four are missing or this file's, no function of those names is elsewhere,
 -- and the three tables it writes have 2026111804's columns. Read-only
 -- pre-check: migrations/local-test/quiz-results-live-precheck.sql.
 --
@@ -54,9 +58,10 @@ begin
         ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f', null),
         ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626', null),
         ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f', null),
-        ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', null, '77bd2789ea9f46790f6eef639a605c24'),
+        ('public.list_quiz_tries(uuid)', null, 'e929cbfe0aa1130741bd2b3af1615a2d'),
+        ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', null, '1222e55ae9915bc81c6194abb8b9050e'),
         ('public.reopen_quiz(uuid,uuid,uuid)', null, 'daabc9bbdd81761d4ddfd72b773eca78'),
-        ('public.confirm_quiz(uuid,jsonb,uuid)', null, '8380e8fa33795295b97e17623376414f')
+        ('public.confirm_quiz(uuid,jsonb,uuid)', null, 'ee23f2910b1484f18a41ea76b08f0846')
     ) as v(fn, was, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
         if _md5 is distinct from _f.was and (_f.now is null or _md5 is distinct from _f.now) then
@@ -64,8 +69,9 @@ begin
                 _f.fn, coalesce(_md5, 'none: the function is missing'), coalesce(_f.was, 'none');
         end if;
     end loop;
-    if exists (select 1 from pg_proc where proname in ('mark_quiz_answer', 'reopen_quiz', 'confirm_quiz')
-                 and oid not in (select coalesce(to_regprocedure(x), 0) from unnest(array['public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)',
+    if exists (select 1 from pg_proc where proname in ('list_quiz_tries', 'mark_quiz_answer', 'reopen_quiz', 'confirm_quiz')
+                 and oid not in (select coalesce(to_regprocedure(x), 0) from unnest(array['public.list_quiz_tries(uuid)',
+                     'public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)',
                      'public.reopen_quiz(uuid,uuid,uuid)', 'public.confirm_quiz(uuid,jsonb,uuid)']) x)) then
         raise exception 'A quiz results function exists with other arguments or in another schema. Nothing was changed.';
     end if;
@@ -83,6 +89,44 @@ begin
 end
 $guard$;
 
+create or replace function public.list_quiz_tries(p_assessment_id uuid)
+ returns jsonb
+ language plpgsql
+ stable security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_assessment(p_assessment_id) then raise exception 'not found' using errcode = 'P0002'; end if;
+    -- Sent tries only. Of an unsent try, two booleans and nothing else.
+    return jsonb_build_object('students', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                   'enrollment_id', e.id,
+                   'sent', (select count(*) from quiz_attempt t where t.assessment_id = x.id and t.enrollment_id = e.id and t.sent_at is not null),
+                   'in_progress', exists (select 1 from quiz_attempt t where t.assessment_id = x.id and t.enrollment_id = e.id
+                                             and t.sent_at is null and t.started_at is not null),
+                   'reopened', exists (select 1 from quiz_attempt t where t.assessment_id = x.id and t.enrollment_id = e.id
+                                          and t.sent_at is null and t.reopened_at is not null),
+                   'tries', coalesce((
+                       select jsonb_agg(jsonb_build_object(
+                                  'attempt_id', t.id, 'try', t.try, 'started_at', t.started_at, 'sent_at', t.sent_at,
+                                  'reopened_at', t.reopened_at, 'question_order', t.question_order,
+                                  'marked', t.marked, 'marked_at', t.marked_at,
+                                  'answers', coalesce((
+                                      select jsonb_agg(jsonb_build_object('question_id', a.question_id, 'answer', a.answer, 'saved_at', a.saved_at,
+                                                                          'given_points', a.given_points, 'note', a.note) order by a.question_id)
+                                        from quiz_answer a where a.attempt_id = t.id), '[]'::jsonb))
+                              order by t.try)
+                         from quiz_attempt t
+                        where t.assessment_id = x.id and t.enrollment_id = e.id and t.sent_at is not null), '[]'::jsonb))
+               order by e.roster_position, e.id)
+          from assessment x
+          join quiz z on z.assessment_id = x.id
+          join enrollment e on e.course_id = x.course_id
+         where x.id = p_assessment_id and e.withdrawn_at is null), '[]'::jsonb));
+end;
+$function$;
+
 create or replace function public.mark_quiz_answer(p_attempt_id uuid, p_question_id uuid, p_points numeric, p_note text, p_idempotency_key uuid DEFAULT NULL::uuid)
  returns jsonb
  language plpgsql
@@ -93,7 +137,8 @@ declare
     _cached jsonb;
     _t      record;
     _q      record;
-    _note   text := nullif(btrim(p_note), '');
+    -- White space at either end trimmed (ASCII's, the same under every collation).
+    _note   text := nullif(regexp_replace(p_note collate "C", '^[[:space:]]+|[[:space:]]+$', '', 'g'), '');
     _out    jsonb;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
@@ -254,6 +299,10 @@ begin
     if exists (select 1 from quiz_attempt t where t.id = any(_ids) and t.sent_at is null) then
         raise exception 'not_sent' using errcode = '22023', detail = 'Only a sent try can be confirmed.';
     end if;
+    if exists (select 1 from jsonb_array_elements(p_marks) v join quiz_attempt t on t.id = (v->>'attempt_id')::uuid
+                where jsonb_typeof(v->'marked') = 'object' group by t.enrollment_id having count(*) > 1) then
+        raise exception 'bad_marks' using errcode = '22023', detail = 'Each student is confirmed on one try.';
+    end if;
     for _it in select v from jsonb_array_elements(p_marks) v loop
         _m := nullif(_it->'marked', 'null'::jsonb);
         select * into _t from quiz_attempt where id = (_it->>'attempt_id')::uuid;
@@ -270,9 +319,9 @@ begin
 end;
 $function$;
 
-revoke all on function public.mark_quiz_answer(uuid, uuid, numeric, text, uuid), public.reopen_quiz(uuid, uuid, uuid),
+revoke all on function public.list_quiz_tries(uuid), public.mark_quiz_answer(uuid, uuid, numeric, text, uuid), public.reopen_quiz(uuid, uuid, uuid),
     public.confirm_quiz(uuid, jsonb, uuid) from public, anon, service_role;
-grant execute on function public.mark_quiz_answer(uuid, uuid, numeric, text, uuid), public.reopen_quiz(uuid, uuid, uuid),
+grant execute on function public.list_quiz_tries(uuid), public.mark_quiz_answer(uuid, uuid, numeric, text, uuid), public.reopen_quiz(uuid, uuid, uuid),
     public.confirm_quiz(uuid, jsonb, uuid) to authenticated;
 
 -- == The last check: each part that is not as tested is named ==
@@ -284,9 +333,10 @@ declare
     _got text;
 begin
     for _f in select * from (values
-        ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),
+        ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
+        ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '1222e55ae9915bc81c6194abb8b9050e'),
         ('public.reopen_quiz(uuid,uuid,uuid)', 'daabc9bbdd81761d4ddfd72b773eca78'),
-        ('public.confirm_quiz(uuid,jsonb,uuid)', '8380e8fa33795295b97e17623376414f')
+        ('public.confirm_quiz(uuid,jsonb,uuid)', 'ee23f2910b1484f18a41ea76b08f0846')
     ) as v(fn, now) loop
         _got := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
         if _got is distinct from _f.now then

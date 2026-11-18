@@ -6,14 +6,14 @@ with want(sig, md5) as (values
     ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626'),
     -- 2026111804's, as that file leaves them.
     ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f'),
-    ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d')),
+    ('public.save_quiz(uuid,jsonb,uuid)', '0bd413e5fa6ac1ddeaec29673c791be8')),
 checks(check_name, value) as (
     select 'fingerprint ' || w.sig, coalesce(md5(pg_get_functiondef(to_regprocedure(w.sig))), 'absent')
       from want w
      where md5(pg_get_functiondef(to_regprocedure(w.sig))) is distinct from w.md5
     union all
     select 'already there: function ' || p.oid::regprocedure::text, 'present'
-      from pg_proc p where p.proname in ('mark_quiz_answer', 'reopen_quiz', 'confirm_quiz')
+      from pg_proc p where p.proname in ('list_quiz_tries', 'mark_quiz_answer', 'reopen_quiz', 'confirm_quiz')
     union all
     select 'table ' || t, 'absent'
       from unnest(array['public.quiz', 'public.quiz_question', 'public.quiz_attempt', 'public.quiz_answer']) t

@@ -36,6 +36,8 @@ locks the contract tells MQ2 to take.
             the tables start empty; md5s; pre-check, post-check; a second run; lock timeout; sizes.
   collation on ICU en-US (live's) and on C: apply, post-check, a second run, undo, apply again; fingerprints and
             the stored key identical under both.
+  undowhole each undo sent whole as one string: PART 1 commits first; when PART 2 refuses its stop stays.
+  rerun     a second run of file one while a teacher is mid-save, three shapes: no deadlock, reads under 0.2 s.
   undo      PART 1 alone; the full removal refuses while a quiz exists or 2026111805 is there; a changed
             function stops it; catalog and rows as before; a second run; the files apply again.
 """
@@ -96,6 +98,7 @@ def from_reply(r):
     """A reply's quiz back into a save_quiz payload, unchanged (a copy: changing it changes nothing in r)."""
     r = json.loads(json.dumps(r))
     out = {k: r['quiz'][k] for k in SETTINGS}
+    out['updated_at'] = r['quiz']['updated_at']
     out['questions'] = [{'id': q['id'], 'kind': q['kind'], 'prompt': q['prompt'], 'choices': q['choices'], 'multiple': q['multiple'],
                          'points': q['points'], 'tag_id': q['tag_id'], 'key': q['key']} for q in r['questions']]
     for q in out['questions']:
@@ -155,7 +158,13 @@ def world(tag, with_file=True, template=None):
         w.tryb = start(d, w.ab, w.eb); answer(d, w.tryb, w.qb[1], 'Bravo answer'); send(d, w.tryb)
     return w
 
-def save(w, a, q, uid=A, key=None):
+def last_read(d, a):
+    """The quiz's updated_at exactly as the teacher's functions answer it (null with no quiz)."""
+    return d.one('select to_jsonb(updated_at) #>> \'{}\' from quiz where assessment_id = :a', a=a)
+def save(w, a, q, uid=A, key=None, as_read=True):
+    """save_quiz, sent with the updated_at stored now, as an app that has just read the quiz (as_read=False sends
+    the payload's own)."""
+    if isinstance(q, dict) and as_read: q = dict(q, updated_at=last_read(w.d, a))
     return T(w.d, 'save_quiz(:a, cast(:q as jsonb), :k)', uid, a=a, q=None if q is None else json.dumps(q), k=key)
 def listed(w, a, uid=A): return T(w.d, 'list_quiz(:a)', uid, a=a)
 def tries(w, a, uid=A): return T(w.d, 'list_quiz_tries(:a)', uid, a=a)
@@ -346,6 +355,41 @@ def scen_save():
        and d.one('select count(*) from quiz_question where assessment_id = :a', a=w.pts) == 0)
     x = refusal(lambda: save(w, w.a, None))
     ok('save: null is refused once a student has a try (has_tries)', x == ('22023', 'has_tries') and listed(w, w.a)['quiz'] is not None, x)
+    def refused_with(fn):
+        try: fn(); return None
+        except Exception as e: return (sqlstate(e), message(e), e.args[0].get('D') if e.args and isinstance(e.args[0], dict) else None)
+    STALE = ('22023', 'stale', 'This quiz was changed somewhere else. Open it again before saving.')
+    # Stale: another tab, or an old payload sent again after its key was cleared away.
+    old = from_reply(listed(w, w.a))
+    save(w, w.a, dict(from_reply(listed(w, w.a)), add_total=not old['add_total']))
+    before = listed(w, w.a); sm = sums(d, TABLES)
+    x = refused_with(lambda: save(w, w.a, old, as_read=False))
+    ok('save refused: a payload read before another save is stale', x == STALE, x)
+    x = refused_with(lambda: save(w, w.a, dict(from_reply(before), updated_at=None), as_read=False))
+    ok('save refused: null updated_at on a quiz that exists is stale', x == STALE, x)
+    x = refused_with(lambda: save(w, w.a, dict(from_reply(before), updated_at='yesterday'), as_read=False))
+    ok("save refused: updated_at that is not a time is bad_quiz", x is not None and x[:2] == ('22023', 'bad_quiz'), x)
+    ok('save: the stale saves changed nothing, the newer questions and keys are all there', listed(w, w.a) == before and sums(d, TABLES) == sm)
+    fresh = str(T(d, "create_assessment(:c, 'Fresh Quiz', p_tag_ids => cast(:g as uuid[]))", c=w.c, g=w.t[:1]))
+    x = refused_with(lambda: save(w, fresh, dict(quiz([tf()]), updated_at=before['quiz']['updated_at']), as_read=False))
+    ok('save refused: a new quiz sent with an updated_at (it was removed elsewhere) is stale', x == STALE and listed(w, fresh)['quiz'] is None, x)
+    ok('save: a new quiz sent with updated_at null is made', save(w, fresh, dict(quiz([tf()]), updated_at=None), as_read=False)['quiz'] is not None)
+    key = nid(); payload = from_reply(listed(w, fresh)); first = save(w, fresh, payload, key=key)
+    newer = save(w, fresh, dict(from_reply(first), shows='grade'))
+    again = save(w, fresh, payload, key=key, as_read=False)
+    ok('save: the same key again is not stale and answers the quiz as it is now', again == newer == listed(w, fresh), (again, newer))
+    ok('save: fv_idempotency holds no question or key, only that the key was used',
+       d.all("select result::text from fv_idempotency where endpoint = 'save_quiz'") and
+       all(r[0] == '{"saved": true}' for r in d.all("select result::text from fv_idempotency where endpoint = 'save_quiz'")))
+    # White space: ASCII's, trimmed at both ends, the same under every collation.
+    ws = '\n\t \r\n'
+    x = refused_with(lambda: save(w, fresh, quiz([tf(prompt=ws)])))
+    ok('save refused: a prompt of only white space (newline, tab) is bad_quiz', x is not None and x[:2] == ('22023', 'bad_quiz'), x)
+    q = choice(prompt='\t Explain\n ', texts=('\tGrass\n', 'Hawk'), why='\n\t')
+    r = save(w, fresh, quiz([q, tf(prompt=chr(160) + 'Spaced' + chr(160))]))
+    ok('save: tabs and newlines at either end are trimmed; a why of white space is none', r['questions'][0]['prompt'] == 'Explain'
+       and r['questions'][0]['choices'][0]['text'] == 'Grass' and r['questions'][0]['key']['why'] is None, r['questions'][0])
+    ok('save: a no-break space is not ASCII white space and is kept', r['questions'][1]['prompt'] == chr(160) + 'Spaced' + chr(160), r['questions'][1]['prompt'])
     d.close()
 
 def scen_list():
@@ -527,6 +571,9 @@ def scen_confirm():
                               ('questions that is a list', one(dict(m1, questions=[1])), ('22023', 'bad_marks'))):
         x = refusal(lambda: confirm(w, w.a, marks)); ok('confirm refused: %s %s' % (name, want), x == want, x)
     x = refusal(lambda: confirm(w, w.a2, one())); ok('confirm refused: a piece with no quiz is not found', x == ('P0002', 'not found'), x)
+    try: confirm(w, w.a, [{'attempt_id': t1, 'marked': m1}, {'attempt_id': t1b, 'marked': m2}]); x = None
+    except Exception as e: x = (sqlstate(e), message(e), e.args[0].get('D'))
+    ok('confirm refused: two tries of one student both confirmed in one call', x == ('22023', 'bad_marks', 'Each student is confirmed on one try.'), x)
     ok('confirm: the refusals changed nothing', quiz_rows(d) == before)
     key = nid(); c1 = confirm(w, w.a, one(m2), key=key); c2 = confirm(w, w.a, one(m1), key=key)
     ok('confirm: the same key again answers the first reply and writes nothing', c1 == c2 and d.one('select marked from quiz_attempt where id = :t', t=t1) == m2)
@@ -797,8 +844,8 @@ def scen_apply():
     w = world('apply', with_file=False); d = w.d
     base = catalog_of(d); s0 = sums(d)
     new1, relied1 = header_md5s(H1); new2, relied2 = header_md5s(H2)
-    ok('apply: the first header names its seven new functions and three relied on', len(new1) == 7 and sorted(relied1) == ['public.fv_idem_check(uuid,text)', 'public.fv_idem_store(uuid,text,jsonb)', 'public.fv_owns_assessment(uuid)'], (new1, relied1))
-    ok('apply: the second names its three and four relied on', len(new2) == 3 and len(relied2) == 4 and relied2['public._quiz_attempt_same_class()'] == new1['public._quiz_attempt_same_class()'], (new2, relied2))
+    ok('apply: the first header names its six new functions and three relied on', len(new1) == 6 and sorted(relied1) == ['public.fv_idem_check(uuid,text)', 'public.fv_idem_store(uuid,text,jsonb)', 'public.fv_owns_assessment(uuid)'], (new1, relied1))
+    ok('apply: the second names its four and four relied on', len(new2) == 4 and len(relied2) == 4 and relied2['public._quiz_attempt_same_class()'] == new1['public._quiz_attempt_same_class()'], (new2, relied2))
     ok("apply: the relied-on functions are the headers' on this database", all(md5(d, s) == relied1[s] for s in relied1), {s: md5(d, s) for s in relied1})
     pre = split(text_of(PRE))
     ok('apply: the pre-check returns no rows before', d.statements(pre) == 'ok' and d.rows == [], d.rows)
@@ -823,8 +870,8 @@ def scen_apply():
           'drop function public.list_quiz(text)', 'other arguments or in another schema')
     guard('a save_quiz in another schema', 'create function fv_private.save_quiz(uuid, jsonb, uuid) returns int language sql as $$ select 1 $$',
           'drop function fv_private.save_quiz(uuid, jsonb, uuid)', 'other arguments or in another schema')
-    guard("a list_quiz_tries that is not this file's", 'create function public.list_quiz_tries(uuid) returns jsonb language sql as $$ select null::jsonb $$',
-          'drop function public.list_quiz_tries(uuid)', 'is not the definition this file was written against')
+    guard("a save_quiz that is not this file's", 'create function public.save_quiz(uuid, jsonb, uuid) returns jsonb language sql as $$ select null::jsonb $$',
+          'drop function public.save_quiz(uuid, jsonb, uuid)', 'is not the definition this file was written against')
     guard("a quiz table that is not this file's", 'create table public.quiz (assessment_id uuid)', 'drop table public.quiz', 'exists and is not this file')
     guard("a quiz_answer table that is not this file's", 'create table public.quiz_answer (attempt_id uuid, answer text)', 'drop table public.quiz_answer', 'exists and is not this file')
     guard("a trigger named assessment_quiz_draft_guard that is not this file's",
@@ -901,6 +948,83 @@ def scen_defaults():
     x = refusal(lambda: d.role('service_role', 'select confirm_quiz(:a, null, null)', a=w.a)); ok("defaults: the edge functions' role still may not run confirm_quiz", x and x[0] == '42501', x)
     x = refusal(lambda: d.role('authenticated', 'select count(*) from public.quiz_key', uid=A)); ok('defaults: a teacher still cannot read the key', x and x[0] == '42501', x)
     x = refusal(lambda: d.role('authenticated', 'select fv_private.quiz_json(:a)', uid=A, a=w.a)); ok('defaults: a teacher still cannot call the helper', x and x[0] == '42501', x)
+    d.close()
+
+def run_whole(d, rel):
+    """The file sent WHOLE as one query string, as a tool that sends a file at once would: 'ok' or the error's message."""
+    try:
+        d.c.execute_simple(text_of(rel)); return 'ok'
+    except Exception as e:
+        try: d.c.run('rollback')
+        except Exception: pass
+        return 'STOPPED: ' + message(e)
+
+def scen_undowhole():
+    """Each undo sent whole as one string: PART 1 is its own transaction and commits first; when PART 2 refuses,
+    PART 1's stop stays and nothing else changes."""
+    w = world('undowhole', template=ICU_TEMPLATE); d = w.d
+    save(w, w.a, quiz([tf(), text()])); kept = quiz_rows(d)
+    can = lambda sig: d.one("select has_function_privilege('authenticated', :s, 'execute')", s=sig)
+    r = run_whole(d, UNDO)
+    ok('undo whole: quizzes-undo.sql with the results file there stops in PART 2', r.startswith('STOPPED') and 'quiz-results-undo.sql first' in r, r)
+    ok('undo whole: and PART 1 stayed: teachers can no longer run any of the six', not any(can(f) for f in FUNCS if re.match(r'public\.[a-z]', f)),
+       {f: can(f) for f in FUNCS})
+    ok('undo whole: every function, table and row is still there', quiz_rows(d) == kept and all(md5(d, f) for f in FUNCS))
+    for f in (FILE, FILE2): d.file(f)
+    ok('undo whole: the files again give the functions back', all(can(f) for f in FUNCS if re.match(r'public\.[a-z]', f)))
+    r = run_whole(d, UNDO2)
+    ok('undo whole: quiz-results-undo.sql runs whole', r == 'ok' and md5(d, 'public.confirm_quiz(uuid,jsonb,uuid)') is None
+       and md5(d, 'public.list_quiz_tries(uuid)') is None, r)
+    ok('undo whole: and deletes no row', quiz_rows(d) == kept)
+    r = run_whole(d, UNDO)
+    ok('undo whole: quizzes-undo.sql with a quiz there stops in PART 2', r.startswith('STOPPED') and 'quizzes: the full removal would delete them' in r, r)
+    ok('undo whole: PART 1 stayed (list_quiz and save_quiz taken away), every row kept',
+       not can('public.list_quiz(uuid)') and not can('public.save_quiz(uuid,jsonb,uuid)') and quiz_rows(d) == kept)
+    d.run('delete from quiz')
+    r = run_whole(d, UNDO)
+    ok('undo whole: with no quiz it runs whole and removes everything', r == 'ok' and not applied(d), r)
+    for f in (FILE, FILE2): r = d.file(f); ok('undo whole: %s applies again' % f, r == 'ok', r)
+    d.close()
+
+def scen_rerun():
+    """A second run of file one while a teacher is mid-save (save_assessment_tags, the form's own write), in three
+    shapes: the teacher commits after 0.3 s, after 2.5 s, and after 6 s (when the file has given up). No deadlock
+    and the teacher's save commits each time; reads started meanwhile take under 0.2 s."""
+    w = world('rerun', template=ICU_TEMPLATE); d = w.d
+    save(w, w.a, quiz([tf(tag=w.t[0]), text(tag=w.t[1])]))
+    for after, file_ok in ((0.3, True), (2.5, True), (6.0, False)):
+        out = {}
+        t1 = Conn(d); t1.as_teacher(); t1.run('begin')
+        t1.run('select save_assessment_tags(:a, cast(:g as uuid[]))', a=w.a, g=w.t[:2])
+        def apply_file():
+            c = Conn(d); t0 = time.time()
+            try:
+                for st in split(text_of(FILE)): c.run(st)
+                out['file'] = 'ok'
+            except Exception as e:
+                out['file'] = 'STOPPED: ' + message(e)
+                try: c.run('rollback')
+                except Exception: pass
+            out['file_s'] = time.time() - t0; c.close()
+        def reader():
+            time.sleep(0.5); c = Conn(d); c.as_teacher()
+            t0 = time.time(); c.run('select get_gradebook(:c)', c=w.c); out['gradebook_s'] = time.time() - t0
+            t0 = time.time(); c.run('select list_quiz(:a)', a=w.a); out['list_quiz_s'] = time.time() - t0
+            c.close()
+        th = [threading.Thread(target=apply_file), threading.Thread(target=reader)]
+        [t.start() for t in th]; time.sleep(after)
+        try: t1.run('commit'); out['teacher'] = 'ok'
+        except Exception as e:
+            out['teacher'] = (sqlstate(e), message(e))
+            try: t1.run('rollback')
+            except Exception: pass
+        [t.join() for t in th]; t1.close()
+        ok('rerun, teacher commits after %.1f s: the teacher\'s save commits (no 40P01)' % after, out.get('teacher') == 'ok', out)
+        ok('rerun, teacher commits after %.1f s: reads take under 0.2 s' % after, out.get('gradebook_s', 9) < 0.2 and out.get('list_quiz_s', 9) < 0.2, out)
+        ok('rerun, teacher commits after %.1f s: the file %s' % (after, 'applies once the save is done' if file_ok else 'gives up at its lock timeout, nothing applied'),
+           (out.get('file') == 'ok') if file_ok else ('lock timeout' in out.get('file', '')), out)
+        ok('rerun, teacher commits after %.1f s: the quiz and its competencies are intact' % after,
+           [q['tag_id'] for q in listed(w, w.a)['questions']] == [w.t[0], w.t[1]], listed(w, w.a)['questions'])
     d.close()
 
 def scen_undo():
@@ -1007,6 +1131,8 @@ def mutant(rel, before_marker, extra=None, replace=None):
         i = t.index(before_marker); t = t[:i] + extra + '\n' + t[i:]
     return t
 
+TRIG = "trigger %s on %s is missing or not this file's (function, events, columns or condition)"
+
 def scen_lastcheck():
     """Each part the last checks read, tripped alone and two at once: the file stops naming exactly that part (and
     how many), and nothing is left behind. On the ICU database (PG_ICU_TEMPLATE)."""
@@ -1016,8 +1142,22 @@ def scen_lastcheck():
     cases = [
         ('a function body', None, ('    return fv_private.quiz_json(p_assessment_id);\nend;', '    return  fv_private.quiz_json(p_assessment_id);\nend;'),
          ['function public.list_quiz(uuid) has md5 ']),
-        ('a function granted to anon', 'grant execute on function public.list_quiz_tries(uuid) to anon;', None,
-         ['grant: function public.list_quiz_tries(uuid) may be run by anon, authenticated, not authenticated']),
+        ('a function granted to anon', 'grant execute on function public.save_quiz(uuid, jsonb, uuid) to anon;', None,
+         ['grant: function public.save_quiz(uuid,jsonb,uuid) may be run by anon, authenticated, not authenticated']),
+        ('a table granted to authenticator', 'grant select on public.quiz_attempt to authenticator;', None,
+         ['grant: table public.quiz_attempt may be read or written by authenticator, not its owner only']),
+        ('a column grant on the key', 'grant select (answer) on public.quiz_key to authenticated;', None,
+         ['grant: table public.quiz_key has a column grant']),
+        ('a key that does not cascade', None, ('enrollment_id  uuid not null references public.enrollment(id) on delete cascade,',
+                                               'enrollment_id  uuid not null references public.enrollment(id),'),
+         ['key: public.quiz_attempt to public.enrollment is missing or does not cascade']),
+        ('a trigger on other columns', None, ('    before update of is_draft on public.assessment\n', '    before update of is_draft, title on public.assessment\n'),
+         [TRIG % ('assessment_quiz_draft_guard', 'public.assessment')]),
+        ('a trigger on other events', None, ('    before insert or update of assessment_id, enrollment_id on public.quiz_attempt',
+                                             '    before update of assessment_id, enrollment_id on public.quiz_attempt'),
+         [TRIG % ('quiz_attempt_same_class', 'public.quiz_attempt')]),
+        ('a trigger with another condition', None, ('for each row when (new.is_draft and not old.is_draft)', 'for each row when (new.is_draft)'),
+         [TRIG % ('assessment_quiz_draft_guard', 'public.assessment')]),
         ('a private function granted to a teacher', 'grant execute on function fv_private.quiz_json(uuid) to authenticated;', None,
          ['grant: function fv_private.quiz_json(uuid) may be run by authenticated, not its owner only']),
         ('a table granted to a teacher', 'grant select on public.quiz_key to authenticated;', None,
@@ -1026,19 +1166,21 @@ def scen_lastcheck():
          ['table public.quiz_answer has row security off']),
         ('a table with a policy', 'create policy p on public.quiz using (true);', None, ['table public.quiz has a policy']),
         ('a trigger missing', 'drop trigger quiz_tag_gone on public.assessment_tag;', None,
-         ["trigger quiz_tag_gone on public.assessment_tag is missing or not this file's"]),
+         [TRIG % ('quiz_tag_gone', 'public.assessment_tag')]),
         ('a trigger disabled', 'alter table public.assessment disable trigger assessment_quiz_draft_guard;', None,
-         ["trigger assessment_quiz_draft_guard on public.assessment is missing or not this file's"]),
+         [TRIG % ('assessment_quiz_draft_guard', 'public.assessment')]),
         ('two at once: a table grant and a missing trigger',
          'grant select on public.quiz_key to authenticated; drop trigger quiz_attempt_same_class on public.quiz_attempt;', None,
          ['grant: table public.quiz_key may be read or written by authenticated, not its owner only',
-          "trigger quiz_attempt_same_class on public.quiz_attempt is missing or not this file's"]),
+          TRIG % ('quiz_attempt_same_class', 'public.quiz_attempt')]),
     ]
-    PART = r'(function \S+ has md5|grant: |table \S+ has|trigger \S+ on)'
+    def parts(r):
+        """How many parts the message names: they are joined by '; '."""
+        return r.split('found): ', 1)[1].count('; ') + 1 if 'found): ' in r else 0
     for name, extra, rep, want in cases:
         r = d.statements(split(mutant(FILE, M1, extra, rep)))
         ok('last check, file 1, %s: stops' % name, r.startswith('STOPPED: Not as tested (%d found): ' % len(want)), r)
-        ok('last check, file 1, %s: names that part and nothing else' % name, all(x in r for x in want) and len(re.findall(PART, r)) == len(want), r)
+        ok('last check, file 1, %s: names that part and nothing else' % name, all(x in r for x in want) and parts(r) == len(want), r)
         ok('last check, file 1, %s: nothing is left behind' % name, catalog_of(d) == base, differences(base, catalog_of(d)))
     r = d.file(FILE); ok('last check: the file as written applies', r == 'ok', r)
     mid = catalog_of(d)
@@ -1054,9 +1196,19 @@ def scen_lastcheck():
     for name, extra, rep, want in cases2:
         r = d.statements(split(mutant(FILE2, M2, extra, rep)))
         ok('last check, file 2, %s: stops naming that part and nothing else (%d found)' % (name, len(want)),
-           r.startswith('STOPPED: Not as tested (%d found): ' % len(want)) and all(x in r for x in want) and len(re.findall(PART, r)) == len(want), r)
+           r.startswith('STOPPED: Not as tested (%d found): ' % len(want)) and all(x in r for x in want) and parts(r) == len(want), r)
         ok('last check, file 2, %s: nothing is left behind' % name, catalog_of(d) == mid, differences(mid, catalog_of(d)))
     r = d.file(FILE2); ok('last check: the second file as written applies', r == 'ok', r)
+    # The post-check is as strict: a table grant to authenticator and a column grant on the key are named.
+    d.run('grant select on public.quiz to authenticator'); d.run('grant select (answer) on public.quiz_key to authenticated')
+    r = d.statements(split(text_of(POST))); bad = [x[0] for x in d.rows if x[1] != 'ok']
+    ok('post-check: names a table grant to authenticator and a column grant on quiz_key.answer, and nothing else',
+       r == 'ok' and sorted(bad) == ['grant: table public.quiz: no role but its owner (relacl)', 'grant: table public.quiz_key: no column grant (attacl)'], bad)
+    d.run('revoke select on public.quiz from authenticator'); d.run('revoke select (answer) on public.quiz_key from authenticated')
+    d.run('grant execute on function public.reopen_quiz(uuid, uuid, uuid) to authenticator')
+    r = d.statements(split(text_of(POST2))); bad = [x[0] for x in d.rows if x[1] != 'ok']
+    ok('post-check 2: names a function grant to authenticator', r == 'ok' and len(bad) == 1 and 'reopen_quiz' in bad[0], bad)
+    d.run('revoke execute on function public.reopen_quiz(uuid, uuid, uuid) from authenticator')
     # The route row: if the route turned an escape into its character, the pre-check says so in one row.
     for pre in (PRE, PRE2):
         t = text_of(pre).replace("length('\\x41')", "length('A')")
@@ -1148,7 +1300,7 @@ def scen_nonsuper():
     ok("nonsuper: and the grants are the contract's again", acls(d) == want)
     d.close()
 
-SCENARIOS = {'collation': scen_collation, 'lastcheck': scen_lastcheck, 'nonsuper': scen_nonsuper,'save': scen_save, 'list': scen_list, 'tries': scen_tries, 'mark': scen_mark, 'reopen': scen_reopen, 'confirm': scen_confirm,
+SCENARIOS = {'collation': scen_collation, 'lastcheck': scen_lastcheck, 'nonsuper': scen_nonsuper, 'undowhole': scen_undowhole, 'rerun': scen_rerun,'save': scen_save, 'list': scen_list, 'tries': scen_tries, 'mark': scen_mark, 'reopen': scen_reopen, 'confirm': scen_confirm,
              'draft': scen_draft, 'others': scen_others, 'cascade': scen_cascade, 'race': scen_race, 'missing': scen_missing,
              'defaults': scen_defaults, 'apply': scen_apply, 'undo': scen_undo}
 if __name__ == '__main__':
