@@ -20,6 +20,10 @@ export const OWNERS = {
   'public.assessment_resource': 'rls_test.of_course(t.course_id)',
   'public.assessment_tag': 'rls_test.of_assessment(t.assessment_id)',
   'public.attendance': 'rls_test.of_enrollment(t.enrollment_id)',
+  'public.bulletin': 'rls_test.of_course(t.course_id)',
+  'public.bulletin_file': 'rls_test.of_course(t.course_id)',
+  'public.bulletin_reaction': 'rls_test.of_enrollment(t.enrollment_id)',
+  'public.bulletin_seen': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.category': 'rls_test.of_course(t.course_id)',
   'public.comment_template': 't.teacher_id',
   'public.competency_descriptor': 't.teacher_id',
@@ -113,4 +117,9 @@ export const NO_TEACHER = {
 /* Tables that a file in migrations/ adds and live does not have yet. Each is tested only when it is
    there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
    out once the file is applied and migrations/baseline/ is refreshed. */
-export const NOT_YET_APPLIED = {};
+export const NOT_YET_APPLIED = {
+  'public.bulletin': 'migrations/2026111801_bulletins.sql',
+  'public.bulletin_file': 'migrations/2026111801_bulletins.sql',
+  'public.bulletin_reaction': 'migrations/2026111801_bulletins.sql',
+  'public.bulletin_seen': 'migrations/2026111801_bulletins.sql',
+};
