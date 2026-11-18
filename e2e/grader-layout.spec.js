@@ -164,20 +164,6 @@ test('Missing | Excused | Late everywhere; the dialog prints Print Rubrics', asy
   await expect(ptsDialog.locator('.grader-print')).toHaveText('Print Scores');
 });
 
-test('rubric class view: no hover prompt; the bar starts after the student list', async ({ page }) => {
-  await demo(page, '/assignments?course=sci8');
-  const card = await openCard(page, 'sci8a3');
-  await expect(card.locator('.rsg-header-hint')).toHaveCount(0);
-  const bar = page.locator('#rsg-descriptor-bar');
-  await expect(bar).toBeHidden();
-  await expect(page.getByText('Hover a rubric level to see its descriptor')).toHaveCount(0);
-  const level = card.locator('.rsg-criterion-row .rsg-level.l3').first();
-  await level.hover();
-  await expect(bar).toBeVisible();
-  const sidebar = await box(page.locator('#gb-sidebar'));
-  expect((await box(bar)).left).toBeGreaterThanOrEqual(sidebar.right);
-});
-
 // S0-F2 (Demo Mode only, switch on): the row is in the dialog's footer (Nov 13), outside the part that scrolls: on a
 // long rubric piece Return and the Draft line are in view with no scrolling.
 test('Return and the Draft line are in view without scrolling on a rubric piece at 1280×720', async ({ page }) => {

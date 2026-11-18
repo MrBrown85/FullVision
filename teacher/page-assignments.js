@@ -2616,7 +2616,6 @@ window.PageAssignments = (function () {
     }
     _afterCardsDrawn(document.getElementById('main'));
     AssignList.afterDraw(document.getElementById('main'));
-    _syncDescriptorBar(cid, AssignList.on() ? [] : assessments);
   }
 
   /* After a draw of the list or of cards: the ledgers' counts, the Class
@@ -2630,37 +2629,6 @@ window.PageAssignments = (function () {
     _refreshClassResultsSoon();
     _seedReturns(root);
     _drawnReturns = null;
-  }
-
-  // The rubric's hover bar shows while an open card shows a rubric.
-  function _syncDescriptorBar(cid, assessments) {
-    var hasActiveRubricView = false;
-    if (openAssessIds.size > 0 || (focusStudentId && _allExpanded)) {
-      var checkIds =
-        focusStudentId && _allExpanded
-          ? assessments.map(function (a) {
-              return a.id;
-            })
-          : Array.from(openAssessIds);
-      hasActiveRubricView = checkIds.some(function (aid) {
-        if (focusStudentId && _allExpanded && _collapsedIds.has(aid)) return false;
-        var a = assessments.find(function (x) {
-          return x.id === aid;
-        });
-        // A single-point rubric has only the Proficient wording to show.
-        return (
-          a &&
-          a.rubricId &&
-          getRubricById(cid, a.rubricId) &&
-          rubricStyle(getRubricById(cid, a.rubricId)) !== 'single_point' &&
-          (rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true)
-        );
-      });
-    }
-    // One student's tiles show every level's wording, so the hover bar is
-    // only for the whole class.
-    if (hasActiveRubricView && !focusStudentId) showDescriptorBar();
-    else hideDescriptorBar();
   }
 
   /* ── Assessment Form ────────────────────────────────────── */
@@ -7377,14 +7345,6 @@ window.PageAssignments = (function () {
     document.querySelectorAll('.assess-seg-control .seg-btn').forEach(function (btn, i) {
       btn.setAttribute('aria-pressed', on[i] ? 'true' : 'false');
     });
-    _syncDescriptorBar(
-      cid,
-      Array.prototype.map
-        .call(main.querySelectorAll('.assess-card'), function (el) {
-          return byId[el.id.slice(3)];
-        })
-        .filter(Boolean),
-    );
     return true;
   }
 
@@ -7442,8 +7402,6 @@ window.PageAssignments = (function () {
   function setRubricView(aid, isRubric) {
     rubricViewStates[aid] = isRubric;
     render();
-    if (isRubric && !focusStudentId) showDescriptorBar();
-    else hideDescriptorBar();
   }
 
   /* ── Scoring Functions ──────────────────────────────────── */
@@ -9330,7 +9288,11 @@ window.PageAssignments = (function () {
       '</span></div>' +
       (advanced || commentBtn
         ? '<div class="rsg-crit-tools">' +
-          (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>' : '') +
+          (advanced
+            ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>'
+            : single
+              ? ''
+              : RubricWords.buttonHtml(crit, levelOrderFor(cid))) +
           commentBtn +
           '</div>'
         : '') +
@@ -9370,44 +9332,10 @@ window.PageAssignments = (function () {
       '</div>' +
       (note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '') +
       (open ? _checklistPanelHtml(cid, aid, sid, crit, displayScore) : '') +
+      (advanced || single ? '' : RubricWords.panelHtml(crit, levelOrderFor(cid), displayScore)) +
       (single ? _rsgSinglePointNotesHtml(cid, aid, sid, crit) : '') +
       '</div></div>'
     );
-  }
-
-  /* ── The descriptor bar: teacher/assign-descriptor-bar.js ──
-     Moved on 2026-11-12. Each call hands it the class on screen and the
-     two rubric helpers it uses. */
-  function _db() {
-    AssignDescriptorBar.configure({
-      activeCourse: activeCourse,
-      _rubricTagName: _rubricTagName,
-      getRubricCriterion: getRubricCriterion,
-    });
-    return AssignDescriptorBar;
-  }
-  function showDescriptorBar() {
-    return _db().showDescriptorBar();
-  }
-  function hideDescriptorBar() {
-    return _db().hideDescriptorBar();
-  }
-  function resetDescriptorBar() {
-    return _db().resetDescriptorBar();
-  }
-  // A competency level on the class grid or in the grader dialog.
-  var TAG_LEVEL_SEL = '.rsg-level[data-action="selectTagLevel"], .grdl-level[data-action="graderTagLevel"]';
-  function showTagLevelBar(el) {
-    return _db().showTagLevelBar(el);
-  }
-  function hideTagLevelBar() {
-    return _db().hideTagLevelBar();
-  }
-  function _clearTagLevelBar(bar) {
-    return _db()._clearTagLevelBar(bar);
-  }
-  function showCritTooltip(event, aid, critId, level) {
-    return _db().showCritTooltip(event, aid, critId, level);
   }
 
   /* ── Rubric Select in Assessment Form ───────────────────── */
@@ -12548,16 +12476,6 @@ window.PageAssignments = (function () {
     if (chip && chip !== _chipTipSource) _showChipTip(chip);
     var nameLabel = e.target.closest('.rsg-criterion-label');
     if (nameLabel && nameLabel !== _chipTipSource && Date.now() - _lastTouch > 800) _queueNameTip(nameLabel);
-    var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
-    if (lvl) {
-      var aid = lvl.dataset.aid;
-      var critid = lvl.dataset.critid;
-      var level = parseInt(lvl.dataset.level, 10);
-      if (aid && critid && level) showCritTooltip(e, aid, critid, level);
-    }
-    var tagLvl = e.target.closest(TAG_LEVEL_SEL);
-    // A tap's emulated mouseover is not a hover: on touch, holding shows the lines.
-    if (tagLvl && tagLvl !== _db().tagBarLevel() && Date.now() - _lastTouch > 800) showTagLevelBar(tagLvl);
   }
   function _handleMouseOut(e) {
     var chip = e.target.closest('[data-chip-tip]');
@@ -12569,13 +12487,8 @@ window.PageAssignments = (function () {
       // the finger leaving: the tip a tap showed stays until the next tap.
       if (nameLabel === _chipTipSource && Date.now() - _lastTouch > 800) _hideChipTip();
     }
-    var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
-    if (lvl) resetDescriptorBar();
-    var tagLvl = e.target.closest(TAG_LEVEL_SEL);
-    if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
   }
 
-  // A competency level reached by Tab shows its lines too.
   /* "New Rubric" and "Criterion 2" are real names, so a rubric or criterion
      saved untouched still has one. Typing used to go in front of them ("Lab
      Report RubricNew Rubric"); the default name is now selected when its box
@@ -12595,63 +12508,14 @@ window.PageAssignments = (function () {
       t.removeEventListener('mouseup', keep);
     }, 500);
   }
-  function _handleFocusIn(e) {
-    var tagLvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
-    if (tagLvl) showTagLevelBar(tagLvl);
-  }
-  function _handleFocusOut(e) {
-    var tagLvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
-    if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
-  }
 
-  /* Press and hold a competency level on a touch screen (iPad), in the
-     grader or on the class grid: its lines show while the finger stays
-     down, and letting go doesn't pick the level. A quick tap still picks
-     it; moving the finger off first cancels the hold. */
-  var HOLD_MS = 450;
-  var _hold = null;
+  // The last touch, so a tap's emulated mouse events are not read as a hover.
   var _lastTouch = 0;
   function _handlePointerDown(e) {
     var nameLabel = e.target.closest && e.target.closest('.rsg-criterion-label');
     if (_chipTipSource && _chipTipSource.classList.contains('rsg-criterion-label')) _hideChipTip();
     else if (nameLabel && e.pointerType === 'touch' && _hasNameTip(nameLabel)) _showChipTip(nameLabel);
-    if (e.pointerType !== 'touch') return;
-    _lastTouch = Date.now();
-    var lvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
-    if (!lvl) return;
-    clearTimeout(_hold && _hold.timer);
-    _hold = {
-      el: lvl,
-      x: e.clientX,
-      y: e.clientY,
-      shown: false,
-      timer: setTimeout(function () {
-        _hold.shown = true;
-        showTagLevelBar(lvl);
-      }, HOLD_MS),
-    };
-  }
-  function _handlePointerMove(e) {
-    if (!_hold || _hold.shown || e.pointerType !== 'touch') return;
-    if (Math.abs(e.clientX - _hold.x) + Math.abs(e.clientY - _hold.y) > 10) {
-      clearTimeout(_hold.timer);
-      _hold = null;
-    }
-  }
-  function _handlePointerUp() {
-    if (!_hold) return;
-    clearTimeout(_hold.timer);
-    if (_hold.shown) hideTagLevelBar();
-    else _hold = null;
-  }
-  // The click that ends a hold is swallowed, so the level isn't picked.
-  function _handleHoldClick(e) {
-    if (!_hold) return;
-    var held = _hold.shown && _hold.el.contains(e.target);
-    _hold = null;
-    if (!held) return;
-    e.preventDefault();
-    e.stopPropagation();
+    if (e.pointerType === 'touch') _lastTouch = Date.now();
   }
 
   /* ── Grader dialog ───────────────────────────────────────
@@ -12797,13 +12661,7 @@ window.PageAssignments = (function () {
     });
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
-    _addDocListener('focusin', _handleFocusIn);
-    _addDocListener('focusout', _handleFocusOut);
     _addDocListener('pointerdown', _handlePointerDown);
-    _addDocListener('pointermove', _handlePointerMove);
-    _addDocListener('pointerup', _handlePointerUp);
-    _addDocListener('pointercancel', _handlePointerUp);
-    _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     render();
     // Kept straight after the draw, so the first key is the dialog's; it no
@@ -12931,8 +12789,6 @@ window.PageAssignments = (function () {
   }
 
   function _renderGrader() {
-    // A level's lines belong to the student drawn before.
-    _clearTagLevelBar(null);
     var cid = activeCourse;
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     var a = getAssessments(cid).find(function (x) {
@@ -16868,7 +16724,7 @@ window.PageAssignments = (function () {
     Object.keys(_statusDebounce).forEach(function (k) {
       delete _statusDebounce[k];
     });
-    ['rsg-descriptor-bar', 'rubric-modal', 'comment-popover-overlay', 'crit-comment-overlay'].forEach(function (id) {
+    ['rubric-modal', 'comment-popover-overlay', 'crit-comment-overlay'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.remove();
     });
@@ -16989,14 +16845,8 @@ window.PageAssignments = (function () {
     _addDocListener('drop', _handleDrop);
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
-    _addDocListener('focusin', _handleFocusIn);
     _addDocListener('focusin', _selectDefaultName);
-    _addDocListener('focusout', _handleFocusOut);
     _addDocListener('pointerdown', _handlePointerDown);
-    _addDocListener('pointermove', _handlePointerMove);
-    _addDocListener('pointerup', _handlePointerUp);
-    _addDocListener('pointercancel', _handlePointerUp);
-    _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
     AssignList.listen(_addDocListener);
@@ -17119,10 +16969,6 @@ window.PageAssignments = (function () {
     });
 
     document.body.classList.remove('af-comp-open');
-
-    // Clean up descriptor bar (appended to body)
-    var bar = document.getElementById('rsg-descriptor-bar');
-    if (bar) bar.remove();
 
     // Clean up rubric modal (appended to body)
     var modal = document.getElementById('rubric-modal');
