@@ -14,6 +14,20 @@
    colour changes in 150 ms; nothing fades in; nothing moves under Reduce
    Motion. */
 
+/* The bottom bar with Bulletins in it (four tabs): each label's one long word
+   ("Assignments") fits its tab in the page's font and in a wider one (Verdana
+   or DejaVu Sans with a little letter-spacing, as a Linux CI runner or a
+   Windows laptop draws it). Measured: "Assignments" is 6.81 times its font
+   size wide in that wide font (5.46 in the page's), so the label is the tab's
+   width less its 4 px padding, over 7, and never more than 12 px. The tab's
+   width is a quarter of the bar: cqi where the engine measures it after the
+   Text Size's zoom (Chromium), the screen's width over the zoom where it does
+   not (WebKit); the smaller is used. Only this bar: the three-tab bar is
+   s/page-view.css's. */
+.sp-view .sp-tabs-bottom:has(> .sp-tab[data-tab='bulletins']):has(> .sp-tab:nth-child(4)) .sp-tab-label {
+  font-size: min(12px, calc((25cqi - 4px) / 7), calc((25vw / var(--sp-zoom, 1) - 4px) / 7));
+}
+
 .sp-view .sp-bulletin-tab {
   display: flex;
   flex-direction: column;

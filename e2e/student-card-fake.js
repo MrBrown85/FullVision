@@ -110,14 +110,12 @@ export async function shot(page, name) {
 }
 
 /* Every word on the screen is readable (4.5 to 1), in light and in dark.
-   One thing is left out, and it is not new here: the student page's blue
-   button (white on #007aff, 4.02 to 1), which the questionnaire and report
-   slips have had since they shipped. It is reported in this PR, not
-   restyled by it. */
+   The student page's blue button is held to it too (white on --sp-blue-fill,
+   5.57 to 1). */
 export async function contrast(page) {
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
-    expect(await findLowContrastText(page, { skip: ['.sp-btn-primary'] }), scheme).toEqual([]);
+    expect(await findLowContrastText(page), scheme).toEqual([]);
   }
   await page.emulateMedia({ colorScheme: 'light' });
 }

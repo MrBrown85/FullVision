@@ -201,6 +201,8 @@ test.describe('on a phone, 390 px', () => {
    the question included, and each screen checked to have opened before it
    is looked at. */
 const WIDTHS = [320, 360, 375, 390, 430];
+const WIDE_FONT =
+  '#app, #app *, .sp-bulletin-ask, .sp-bulletin-ask * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }';
 const SIZES = ['normal', 'large', 'larger'];
 
 function faults(page, scope) {
@@ -275,52 +277,67 @@ for (const width of WIDTHS) {
     test.describe(width + ' px at ' + size, () => {
       test.use({ viewport: { width, height: width < 360 ? 568 : 760 }, isMobile: true, hasTouch: true });
 
-      test('every Bulletins screen holds together, and the bar holds four tabs', async ({ page }) => {
-        await open(page, { size });
-        // The sample class opens on Bulletins (Settings changes nothing of that).
-        await expect(bar(page).locator('[data-tab="bulletins"]')).toHaveAttribute('aria-current', 'page');
-        await expect(page.locator('.sp-bulletin-feed')).toBeVisible();
-        const found = [];
-        const look = async (screen, scope) => {
-          await page.waitForTimeout(260); // motion settles (200 ms)
-          for (const f of await faults(page, scope || '#app *')) found.push(screen + ' — ' + f);
-        };
-        await look('the feed');
-        await page.evaluate(() => window.scrollTo(0, 0));
-        await look('the feed, top');
-        // The four tabs: icons in one row, every label whole.
-        const tabs = await bar(page)
-          .locator('.sp-tab')
-          .evaluateAll(els =>
-            els.map(t => ({
-              icon: Math.round(t.querySelector('.sp-tab-icon').getBoundingClientRect().top),
-              // The label whole, and inside its own button.
-              fits: (() => {
-                const l = t.querySelector('.sp-tab-label');
-                const r = l.getBoundingClientRect();
-                const b = t.getBoundingClientRect();
-                return l.scrollWidth <= l.clientWidth + 1 && r.left >= b.left - 0.5 && r.right <= b.right + 0.5;
-              })(),
-            })),
-          );
-        expect(tabs).toHaveLength(4);
-        expect(new Set(tabs.map(t => t.icon)).size).toBe(1);
-        expect(tabs.filter(t => !t.fits)).toEqual([]);
-        // The link's question.
-        await page.locator('.sp-bulletin-link').click();
-        await expect(page.locator('.sp-bulletin-ask')).toBeVisible();
-        await look('the link question', '#app *, .sp-bulletin-ask, .sp-bulletin-ask *');
-        await page.locator('.sp-bulletin-ask-no').click();
-        await expect(page.locator('.sp-bulletin-ask')).toHaveCount(0);
-        // A page full size.
-        await page.locator('.sp-bulletin-file-slide[data-page="0"]').last().click();
-        await expect(page.locator('.sp-bulletin-viewer-img')).toBeVisible();
-        await look('a page full size');
-        const img = await page.locator('.sp-bulletin-viewer-img').boundingBox();
-        const vh = page.viewportSize().height;
-        expect(img.y + img.height).toBeLessThanOrEqual(vh);
-        expect(found).toEqual([]);
-      });
+      /* Twice: in the page's own font, and in a wider one (Verdana or DejaVu Sans with a little
+         letter-spacing), as a Linux CI runner or a Windows laptop draws it. Both must hold. */
+      for (const font of ['own', 'wide']) {
+        test(
+          'every Bulletins screen holds together, and the bar holds four tabs, ' + font + ' font',
+          async ({ page }) => {
+            await open(page, { size });
+            if (font === 'wide') await page.addStyleTag({ content: WIDE_FONT });
+            // The sample class opens on Bulletins (Settings changes nothing of that).
+            await expect(bar(page).locator('[data-tab="bulletins"]')).toHaveAttribute('aria-current', 'page');
+            await expect(page.locator('.sp-bulletin-feed')).toBeVisible();
+            const found = [];
+            const look = async (screen, scope) => {
+              await page.waitForTimeout(260); // motion settles (200 ms)
+              for (const f of await faults(page, scope || '#app *')) found.push(screen + ' — ' + f);
+            };
+            await look('the feed');
+            await page.evaluate(() => window.scrollTo(0, 0));
+            await look('the feed, top');
+            // The four tabs: icons in one row, every label whole.
+            const tabs = await bar(page)
+              .locator('.sp-tab')
+              .evaluateAll(els =>
+                els.map(t => ({
+                  icon: Math.round(t.querySelector('.sp-tab-icon').getBoundingClientRect().top),
+                  /* Where the words are drawn (a range over the label's text), inside the tab's own
+                 box, and no word drawn on two lines: a label's box can grow past its tab. */
+                  fits: (() => {
+                    const l = t.querySelector('.sp-tab-label');
+                    const b = t.getBoundingClientRect();
+                    const range = document.createRange();
+                    range.selectNodeContents(l);
+                    const rects = [...range.getClientRects()].filter(r => r.width > 0);
+                    const lines = new Set(rects.map(r => Math.round(r.top))).size;
+                    return (
+                      rects.every(r => r.left >= b.left - 1 && r.right <= b.right + 1) &&
+                      lines <= l.textContent.split(' ').length
+                    );
+                  })(),
+                })),
+              );
+            expect(tabs).toHaveLength(4);
+            expect(new Set(tabs.map(t => t.icon)).size).toBe(1);
+            expect(tabs.filter(t => !t.fits)).toEqual([]);
+            // The link's question.
+            await page.locator('.sp-bulletin-link').click();
+            await expect(page.locator('.sp-bulletin-ask')).toBeVisible();
+            await look('the link question', '#app *, .sp-bulletin-ask, .sp-bulletin-ask *');
+            await page.locator('.sp-bulletin-ask-no').click();
+            await expect(page.locator('.sp-bulletin-ask')).toHaveCount(0);
+            // A page full size.
+            await page.locator('.sp-bulletin-file-slide[data-page="0"]').last().click();
+            await expect(page.locator('.sp-bulletin-viewer-img')).toBeVisible();
+            await look('a page full size');
+            const img = await page.locator('.sp-bulletin-viewer-img').boundingBox();
+            const vh = page.viewportSize().height;
+            expect(img.y + img.height).toBeLessThanOrEqual(vh);
+            expect(found).toEqual([]);
+          },
+        );
+      }
     });
   }
 }

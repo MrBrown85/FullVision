@@ -2269,14 +2269,20 @@ window.StudentPageView = (function () {
      ({ enrollmentId, name, block, toDo }, s/assignments.js), and
      `ui.classOn` the one showing; the preview has neither. */
   /* A class's counts in Switch Class: how many pieces wait there ("3 to do"), once the server says,
-     and bulletins not seen there yet ("2 new", s/bulletins.js); nothing at 0. Held together, so at
-     Large and Larger they go under the name while the tick stays beside it (page-view.css). */
+     and bulletins not seen there yet ("2 new", s/bulletins.js); nothing at 0. A class with "2 new"
+     holds its counts together, so they go under the name and the tick stays beside it
+     (s/bulletins.css); without it the row is drawn exactly as before. */
   function countsHtml(c, ui) {
     var news = ui.classNews && ui.classNews[c.enrollmentId] > 0 ? ui.classNews[c.enrollmentId] : 0;
-    var html =
-      (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
-      (news ? '<span class="sp-bulletin-class-new">' + esc(news + ' new') + '</span>' : '');
-    return html ? '<span class="sp-class-counts">' + html + '</span>' : '';
+    var todo = c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '';
+    if (!news) return todo;
+    return (
+      '<span class="sp-class-counts">' +
+      todo +
+      '<span class="sp-bulletin-class-new">' +
+      esc(news + ' new') +
+      '</span></span>'
+    );
   }
 
   function settingsSheetHtml(view, ui) {

@@ -148,7 +148,7 @@
   line-height: 18px;
   text-align: center;
   color: #fff;
-  background: var(--active);
+  background: var(--active-fill);
   border-radius: 50%;
 }
 

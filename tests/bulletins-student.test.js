@@ -405,8 +405,8 @@ describe('what the page reads from an answer', () => {
 
   it('says days as the teacher’s page says them', () => {
     const V = window.StudentBulletinsView || runView();
-    runInThisContext(readFileSync('teacher/page-bulletins.js', 'utf-8'), { filename: 'teacher/page-bulletins.js' });
-    const H = window.PageBulletins._helpers;
+    runInThisContext(readFileSync('teacher/bulletins-format.js', 'utf-8'), { filename: 'teacher/bulletins-format.js' });
+    const H = window.BulletinsFormat;
     const now = new Date(2026, 10, 18, 12, 0);
     for (const d of [
       new Date(2026, 10, 18, 9, 58),

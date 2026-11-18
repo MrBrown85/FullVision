@@ -258,7 +258,7 @@
 .one-dlg-done {
   font: 600 13px var(--font-base);
   color: #fff;
-  background: var(--active);
+  background: var(--active-fill);
   border: 0;
   border-radius: var(--radius-sm, 8px);
   padding: 6px 14px;
@@ -696,8 +696,8 @@
   cursor: pointer;
 }
 .one-cp-btns button.primary {
-  background: var(--active);
-  border-color: var(--active);
+  background: var(--active-fill);
+  border-color: var(--active-fill);
   color: #fff;
 }
 @media (prefers-reduced-motion: reduce) {
