@@ -35,36 +35,14 @@ body.cm-open #app-dock [data-action='toggleSidebar'] {
 }
 
 /* ── Class Overview Panel ──────────────────────────────────── */
-/* The top bar (Class Average, Missing and Late, Upcoming Birthdays); then
-   Curricular and Core Competencies side by side; then the students; then
-   Observations across the page. */
-.dash-overview-row {
-  display: grid;
-  gap: 12px;
-  align-items: stretch;
-}
-/* Curricular and Core Competencies side by side, always one height: the
-   grid row stretches both to the taller (Colin, Nov 5). Below 900px they
-   stack. */
-.dash-overview-cards {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  margin-top: 12px;
-}
-/* Both cards are at least 300 px; the taller sets the row (plan F.1), and
-   each card's rows share what it has (F.2). */
-.dash-overview-cards > .dash-overview-section {
-  min-height: 300px;
-}
+/* The top bar (Class Average, To Grade, Missing and Late, Upcoming
+   Birthdays); then the middle row (.dash-row, below); then the students;
+   then Observations across the page. */
 /* Observations, last on the page: #main is a flex column, so the card
    must not shrink to fit it (its grid would be squeezed to nothing). */
 .page-dashboard .dash-ob2 {
   flex-shrink: 0;
   margin-top: 12px;
-}
-@media (max-width: 900px) {
-  .dash-overview-cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* The top bar: one white box, its cells split by hairlines. */
@@ -156,6 +134,10 @@ a.dash-glance-cell:hover {
 }
 .dash-glance-change.is-down {
   color: var(--score-1-text);
+}
+/* Nothing changed: the line keeps its space and says nothing. */
+.dash-glance-change.is-none {
+  visibility: hidden;
 }
 .dash-glance-dist {
   display: flex;
@@ -521,18 +503,6 @@ a.dash-glance-cell:hover {
   border-radius: 1.5px;
   background: var(--divider-medium);
 }
-.dash-core-sq.is-self-1 {
-  background: var(--self-1);
-}
-.dash-core-sq.is-self-2 {
-  background: var(--self-2);
-}
-.dash-core-sq.is-self-3 {
-  background: var(--self-3);
-}
-.dash-core-sq.is-self-4 {
-  background: var(--self-4);
-}
 .dash-core-sq.is-work {
   background: var(--text-2);
 }
@@ -654,27 +624,9 @@ a.dash-glance-cell:hover {
 .dash-comp-lab-val {
   text-align: right;
 }
-.dash-comp-lab-mid.is-cells {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3px;
-  text-align: center;
-}
 .dash-comp-lab-mid.is-ends {
   display: flex;
   justify-content: space-between;
-}
-/* Level Mix's headings: the level's code, or one letter on a narrow card. */
-.dash-comp-lv-short {
-  display: none;
-}
-@container (max-width: 340px) {
-  .dash-comp-lv-long {
-    display: none;
-  }
-  .dash-comp-lv-short {
-    display: inline;
-  }
 }
 .dash-comp-codes,
 .dash-comp-squares {
@@ -737,7 +689,6 @@ a.dash-glance-cell:hover {
   background: var(--active-light);
 }
 .dash-comp-row:focus-visible,
-.dash-comp-pick:focus-visible,
 .dash-comp-code:focus-visible,
 .dash-comp-more:focus-visible,
 .dash-comp-moreline:focus-visible,
@@ -751,17 +702,6 @@ a.dash-glance-cell:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.dash-comp-pick {
-  align-self: stretch;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
 }
 .dash-comp-val {
   text-align: right;
@@ -780,49 +720,6 @@ a.dash-glance-cell:hover {
 }
 .dash-comp-row .dash-outcome-bar-fill {
   display: block;
-}
-/* Level Mix: a count per level, tinted by it; the row's largest is bold. */
-.dash-comp-cells {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3px;
-  height: 18px;
-}
-.dash-comp-cell {
-  display: grid;
-  place-items: center;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: var(--cell-bg);
-  color: var(--cell-fg);
-  font-family: var(--font-base);
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-.dash-comp-cell.is-top {
-  font-weight: 700;
-}
-.dash-comp-cell.is-empty {
-  background: var(--overlay-hover);
-  /* --text-2, not --text-3: the dark theme's --text-3 on this cell is 4.0:1
-     (e2e/contrast.spec.js wants 4.5). */
-  color: var(--text-2);
-  cursor: default;
-}
-button.dash-comp-cell:hover {
-  box-shadow: inset 0 0 0 1px var(--cell-fg);
-}
-.dash-comp-cell.active {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
-}
-.dash-comp-cell:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 1px;
 }
 /* Needs Support: a cell per competency in the student's level colour, or
    (past 8 columns, or below 14 px a column) the codes of the columns the
@@ -1150,18 +1047,9 @@ button.dash-comp-cell:hover {
   max-height: 64px;
   font-size: var(--text-base);
 }
-.dash-comp-card.is-roomy .dash-comp-pick {
-  font-size: var(--text-base);
-}
 .dash-comp-card.is-roomy .dash-outcome-bar-track {
   height: 10px;
   border-radius: 5px;
-}
-.dash-comp-card.is-roomy .dash-comp-cells {
-  height: 22px;
-}
-.dash-comp-card.is-roomy .dash-comp-cell {
-  font-size: var(--text-sm);
 }
 .dash-comp-card.is-roomy .dash-comp-squares {
   height: 18px;
@@ -1252,28 +1140,8 @@ button.dash-comp-cell:hover {
   text-decoration: underline;
 }
 
-/* The students at one level on a competency (a Level Mix count). */
-.dash-mix-pop {
-  position: fixed;
-  z-index: var(--z-fab);
-  width: 340px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--divider-strong);
-  border-radius: 10px;
-  box-shadow: var(--shadow-md);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text);
-}
-.dash-mix-pop[hidden] {
-  display: none;
-}
+/* The head of a competency row's list of students (the Competencies tile's
+   .dash-comp-pop), and the shared next step under it. */
 .dash-mix-pop-head {
   display: flex;
   align-items: center;
@@ -2817,7 +2685,7 @@ a.dash-ins-name:hover {
   flex-shrink: 0;
 }
 .cm-class-avatar-new {
-  background: var(--active);
+  background: var(--active-fill);
   font-size: var(--text-base);
 }
 .cm-class-text {
@@ -3786,8 +3654,8 @@ a.dash-ins-name:hover {
   color: var(--text-3);
 }
 .cw-step.active .cw-step-num {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .cw-step.done .cw-step-num {
@@ -3826,9 +3694,9 @@ a.dash-ins-name:hover {
   color: var(--link);
 }
 .cw-grade-btn.active {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
-  border-color: var(--active);
+  border-color: var(--active-fill);
 }
 
 .cw-subject-row {
@@ -4118,7 +3986,7 @@ a.dash-ins-name:hover {
   bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: var(--text-sm);
   font-weight: 600;
@@ -4741,7 +4609,7 @@ a.dash-ins-name:hover {
     color 0.12s;
 }
 .cm-relink-btn:hover {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .cm-relink-actions {
@@ -7401,6 +7269,276 @@ label.cm-cr-row {
   background: var(--score-1-bg);
 }
 
+/* ── Students (teacher/student-page-students.js): the Student Cards list
+   with what each student has done, their Overall Grade, boxes to tick, the
+   bar for ticked rows and the side panel a name opens. ── */
+.sps-table-wrap {
+  overflow-x: auto;
+}
+.sc-table .sps-pick {
+  width: 28px;
+  padding-right: 6px;
+}
+.sps-pick-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.sps-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--active);
+  cursor: pointer;
+}
+.sps-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.sps-name:hover {
+  color: var(--link);
+  text-decoration: underline;
+}
+.sps-name:focus-visible,
+.sps-except:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.sc-table .sps-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sc-table .sps-muted {
+  color: var(--text-3);
+}
+.sc-table tr.sps-picked {
+  background: var(--active-light);
+}
+.sc-table tr.sps-open-row {
+  box-shadow: inset 3px 0 0 var(--active);
+}
+/* Overall Grade: a word as well as a colour for a student's own choice. */
+.sps-grade {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sps-grade-hidden {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.sps-grade-paused {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.sps-grade-shown {
+  background: var(--active-light);
+  color: var(--link);
+}
+.sps-grade-class {
+  padding-left: 0;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.sc-chip-info {
+  background: var(--active-light);
+  color: var(--link);
+}
+/* Show Overall Grade's exceptions, under its hint. */
+.sp-row .sps-except {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+/* The bar the ticked rows get. */
+.sps-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--surface);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+}
+.sps-bar-count {
+  font-weight: 600;
+  margin-right: 4px;
+}
+.sps-bar .sps-bar-btn {
+  background: transparent;
+  color: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--surface) 40%, transparent);
+}
+.sps-bar .sps-bar-btn:hover {
+  background: color-mix(in srgb, var(--surface) 14%, transparent);
+}
+.sps-bar .sps-bar-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sps-bar .sps-bar-clear {
+  margin-left: auto;
+}
+/* The side panel: from the right, over Class Settings, under any question. */
+.sps-panel {
+  position: fixed;
+  top: var(--toolbar-h);
+  right: 0;
+  bottom: 0;
+  z-index: calc(var(--z-fab) - 1);
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 0.5px solid var(--divider-strong);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-base);
+}
+.sps-panel-in {
+  animation: sps-slide-in 200ms var(--motion-ease);
+}
+@keyframes sps-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sps-panel-in {
+    animation: none;
+  }
+}
+.sps-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 12px;
+  border-bottom: 0.5px solid var(--divider-strong);
+}
+.sps-head .cm-hint {
+  margin: 0;
+}
+.sps-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sps-name-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.sps-name-title:focus {
+  outline: none;
+}
+.sps-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 14px 16px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sps-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sps-sec-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-2);
+}
+.sps-ctl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.sps-ctl .cm-hint {
+  margin: 0;
+}
+.sps-seg {
+  flex-wrap: wrap;
+}
+.sps-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.sps-facts li {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 8px;
+}
+.sps-fact-label {
+  color: var(--text-3);
+}
+.sps-unopened {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  color: var(--text-2);
+}
+.sps-question {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.sps-question .cm-hint {
+  margin: 0;
+}
+.sps-card-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Preview as a student whose page is paused: what their card shows instead of the page. */
+.ps-closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+.ps-closed-line {
+  margin: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  color: var(--text);
+}
+
 /* ── Reflect tab (teacher/cm-questionnaires.js; reflect plan, board 1) ── */
 .sq-section {
   display: flex;
@@ -8401,7 +8539,7 @@ button.rb-v-prompt {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -8543,4 +8681,214 @@ button.rb-v-prompt {
   padding: 4px 8px 6px;
   font-size: var(--text-xs);
   color: var(--text-3);
+}
+
+/* ── The middle row (D2, docs/plans/dashboard-inbox-plan.md; on since D9) ──
+   A left column at two thirds and one Competencies tile at one third, as
+   tall as the window leaves (--dash-row-h, set by DashOverview.sizeRow;
+   510 px with no script), so the Students heading starts below the first
+   view. The left column holds the Inbox slot and, when Bulletins is on and
+   built, Bulletins under it at 60 / 40. */
+.dash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  height: var(--dash-row-h, 510px);
+}
+.dash-row-left {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+.dash-row-left.has-bulletins {
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+.dash-row-slot,
+.dash-row-comp {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.dash-row-slot > *,
+.dash-row-comp > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Under 900 px the tiles stack: the Inbox, Bulletins, then Competencies, at
+   the heights on the board (an iPad held upright: teacher/tablet.css). */
+@media (max-width: 900px) {
+  .dash-row {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .dash-row-left,
+  .dash-row-left.has-bulletins {
+    grid-template-rows: none;
+  }
+  .dash-row-inbox {
+    height: 450px;
+  }
+  .dash-row-bulletins {
+    height: 300px;
+  }
+  .dash-row-comp {
+    height: 520px;
+  }
+}
+
+/* A tile: one white box like the cards. */
+.dash-recent,
+.dash-comp-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Recent Assessments. */
+.dash-recent-head {
+  flex: 0 0 auto;
+}
+.dash-recent-title,
+.dash-comp-tile-title {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+.dash-recent-head a {
+  margin-left: auto;
+}
+.dash-recent-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.dash-recent-row + .dash-recent-row {
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-recent-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.dash-recent-link:hover .dash-recent-name {
+  text-decoration: underline;
+}
+.dash-recent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.dash-recent-count {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-recent-none,
+.dash-recent-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-recent-none {
+  flex: 1 1 auto;
+}
+.dash-recent-hint {
+  padding-top: 10px;
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-recent-hint a {
+  color: var(--link);
+  white-space: nowrap;
+}
+
+/* The Competencies tile: Curricular | Core over two pages that slide
+   sideways in 220 ms. Each page is today's card with its box taken off, so
+   the tile's is the only one. A page that is not shown is hidden (not just
+   moved), so nothing in it takes focus. */
+/* The title and Curricular | Core on one line when they fit; when the tile
+   is too narrow for both (1100 wide with the roster shown, or a wider font)
+   the switch goes under the title, at the right, whole. */
+.dash-comp-tile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  flex: 0 0 auto;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-comp-seg {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.dash-comp-pages {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.dash-comp-track {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transition: transform 220ms var(--ease-out);
+}
+.dash-comp-tile[data-page='core'] .dash-comp-track {
+  transform: translateX(-50%);
+}
+.dash-comp-page {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 50%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  visibility: hidden;
+  transition: visibility 0s linear 220ms;
+}
+.dash-comp-page.is-on {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.dash-comp-tile .dash-section-title {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.dash-comp-tile .dash-overview-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-comp-track,
+  .dash-comp-page {
+    transition: none;
+  }
 }

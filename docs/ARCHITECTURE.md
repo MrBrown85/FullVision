@@ -37,10 +37,12 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 - Entry point: `teacher/app.html`
 - Router: `teacher/router.js`
 - Main page modules:
-  - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`, and draws the block picker and the first screen for a teacher with no classes through `cm-block-picker.js`, and draws its Where These Appear help panel through `cm-std-help.js`, and its Reporting Terms section through `cm-terms.js`, and the Grading tab's preset sentences and draggable Course Percentage bar through `cm-grading-bars.js`
+  - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`, and draws the block picker and the first screen for a teacher with no classes through `cm-block-picker.js`, and draws its Where These Appear help panel through `cm-std-help.js`, and its Reporting Terms section through `cm-terms.js`, and the Grading tab's preset sentences and draggable Course Percentage bar through `cm-grading-bars.js`. Its middle row is `rowHtml` in `dash-overview.js`: the Competencies tile (Curricular | Core) is `dash-competencies.js` and the left tile is the Inbox (`dash-inbox.js`, its model `dash-inbox-model.js`, its views and file drop `dash-inbox-side.js`, `dash-inbox-flip.js`, `dash-inbox-roll.js`, `dash-inbox-pick.js` and `dash-inbox-drop.js`) where the class takes work, else Recent Assessments (`dash-recent.js`)
   - `page-assignments.js`; its assessment form's competency picker (Choose Competencies, the Codes and List views, the focus box and type to narrow) is `assign-competency-picker.js`; the descriptor bar (a rubric level's or a competency level's wording while it is hovered, focused or held, on the class grid and in the grader) is `assign-descriptor-bar.js`
   - `page-student.js`; its Overview's picture of the grade (Over the Year, Your Competencies) and each piece's feedback in All Your Work are `student-overview.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`; the Grades tab's Group By (which assessments fall in each category, unit, type or rubric) is `student-groups.js`; the Edit Student dialog (also opened from the Term Questionnaire) is `student-edit-dialog.js`
   - `page-gradebook.js`; its Export CSV is `gradebook-csv.js`, and the grid's hover, scroll sync, sticky Overall column, header height and slanted headers are `gradebook-chrome.js`
+  - `bulletins-format.js`: the Bulletins words (day headings, times, kind label, header notes) and the focus keepers, shared by the page and the Dashboard tile
+  - `page-bulletins.js`: Bulletins (`/bulletins`), a one-way class feed behind the `bulletins` build switch: the tab, the address and the page draw only while it is on; its data is `shared/data-bulletins.js` and its styles `bulletins.css`
   - `page-observations.js`
   - `page-starters.js`: Observations › Starters (`/observations/starters`)
   - `page-reports.js`: Reporting, with two tabs (Term Questionnaire and Print Reports). The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment; it is being split into `report-qn-*.js` pieces, `report-qn-browse-cases.js` holds Browse Sentences' cases and `report-qn-voice-observations.js` holds the Observations card, the student's Voice card and the class's report parts, the split plan being `docs/plans/questionnaire-file-map.md`); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are One Report (docs/DECISIONS.md, "One Report"): `report-one.js` (`ReportOne`: the parts, the four Setups, the model saved as `reportConfig.one`, the readers that turn a class's saved Quick Report choices or built form into a model without rewriting either, and `layoutStudent`, which answers `page-reports.js`'s layout seam for the preview, the fit line, Everyone, Print Reports and the printed copies), `report-one-panel.js` (the panel: Setup, Changes Apply To, the parts in print order with a switch each, options, Feedback Pages, Add a Part), `report-one-page.js` (what the pages do on screen: Hide, leave a row off, rename a heading, Choose Assessments, Edit Questions and Edit Wording; everything it adds is `no-print`) and `report-one-comment.js` (the Teacher Comment edited where it prints, tracked, saved to the Term Questionnaire; unsaved changes never print). `report-sheets.js` reads the saved form model and is the placing engine (`pack`: rows fill a side, a table splits between its rows under "(continued)", the Parent / Guardian Response docks at the foot of the last side); `report-blocks.js` draws each block; `grade-report.js` draws the Assessments table, the Categories summary, the grade line and the Feedback Pages; `report-issues.js` keeps the printed copies. Nothing in these computes a grade. Every report surface (these, Print Grades, Export) reads grades through `report-scores.js` (`ReportScores`): one table says which set of scores each surface uses (all work today), `withReportScores` runs a report in it, and its readers are the only way a report file reads a score, comment, note, tick or status from the data layer. `tests/report-score-seam.test.js` holds that.
@@ -56,6 +58,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js`
   - `tab-observe.js`
+  - `tab-bulletins.js` with `bulletins-model.js` (the feed as data): Bulletins, the fourth tab, shown only with the build flag `bulletins` on (Post a Photo on Add Work's camera screen, Write a Bulletin, who has seen each one); a post with a photo or a file waits in the photo queue through `shared/data-bulletins-queue.js`
   - `tab-grade.js`: the list of assessments and the speed grader, with `sweep.js` and `grade-photos.js` (the student's work on a grading card and a student's To Grade list), `add-work.js` (Add Work: photographing a student's paper work), `split-scan.js` with `split-scan-model.js` (Split a Scan: one PDF of the class's pages cut into each student's work, on the desktop's Add Work for the Class modules, which the phone loads too) and `markup.js` (Mark Up: drawing on a page of the work)
 - It also loads `shared/obs-capture.js`, `shared/obs-card.js`, `shared/obs-follow-ups.js` (follow-ups under an observation, as the desktop's Observations page also shows them) and `shared/work-wall.js` (the Work Wall, from the Grade tab's row menu) from the desktop.
 
@@ -81,48 +84,52 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 1. `shared/sentry-init.js`
 2. `shared/device.js` (phone or desktop; on an iPad it sets `html.fv-tablet`, which `teacher/tablet.css` styles while the iPad is upright)
 3. `shared/html.js` (`esc`, the one escape helper)
-4. `shared/link-nav.js`
-5. `shared/loading-screen.js` (the loading screen, right after its empty `#app-loading`; the phone and the student page load it too)
-6. Supabase SDK (`vendor/supabase.min.js`)
-7. `shared/supabase.js`
-8. `shared/constants.js`
-9. `shared/reporting-term-presets.js`
-10. `shared/data-utilities.js` (the small helpers every file uses: student names, dates, colours, ids and RPC results)
-11. `shared/data.js`
-12. `shared/data-rpc-wrappers.js` (the `window.v2` server calls: one small wrapper per RPC, from subjects and categories to reports, slips, phone reports and the assessment detail; `shared/data.js` makes `window.v2` and the plumbing they call)
-13. `shared/data-learning-map.js` (the learning map: its sections, tags and competency groups, removed sections, and its save to the server)
-14. `shared/data-categories.js` (categories: an assessment's category, the save to the server, the category write guard and Class Settings' category draft)
-15. `shared/data-rubrics.js` (rubrics: the save to the server, Advanced Rubric checkboxes, printed rubrics and competency descriptors)
-16. `shared/data-assessments.js` (assessments: the save to the server, duplicate, tags and collab, and clearing the marks of deleted work)
-17. `shared/data-config-settings.js` (class settings: saveConfig, getCourseConfig and saveCourseConfig, the changed-only settings patch and the old-settings write guard)
-18. `shared/data-observations.js` (observations: quick observations, sentence starters, custom tags and the tag resolver)
-19. `shared/data-term-ratings.js` (term ratings and report preferences: the Term Questionnaire's ratings, comments and attendance, the report setup, and the teacher's card, dashboard and view settings)
-20. `shared/data-student-records.js` (student records: flags, goals and goal dates, Core Competency self-assessments, reflections and notes; and the class's modules)
-21. `shared/data-student-cards.js` (student cards: the printed cards that open a student's page, and Cards Work Until)
-22. `shared/data-student-work.js` (student work: what students sent and the settings that let them send, group work's reader, work a teacher adds, and the same for a signed-in teacher from the server)
-23. `shared/data-handout-files.js` (handouts on an assessment: a handout file, a web page, a text file or an EPUB, added, uploaded to its own bucket and opened; and a PDF handout's page opened)
-24. `shared/data-feedback-live.js` (Mark Up and Reflect on Feedback for a signed-in teacher: the server's marks, reflections and revision requests, laid over with this device's writes not yet answered)
-25. `shared/data-markup.js` (Mark Up: the teacher's marks on a page of student work as Demo Mode keeps them, the readers both kinds of class share, and Return with the marks)
-26. `shared/data-reflect.js` (Reflect on Feedback: a student's reflection on returned work, the class's Reflect on Feedback and Show My Learning switches, and Send Answer)
-27. `shared/data-revisions.js` (Revisions: returning work for another try, its edit and Take Back, the student's revision in Demo Mode, and Before and After)
-28. `shared/data-roster.js` (the class list: students, enrolment, adding and editing a student, and the roster helpers)
-29. `shared/data-withdrawn.js` (withdrawn students: withdrawing and re-enrolling, the Withdrawn list, permanent delete, and putting a withdrawn student's marks aside)
-30. `shared/data-overrides.js` (hand-set levels: the teacher's section overrides with their reasons, and the calculated level shown beside one)
-31. `shared/data-profile-summaries.js` (student profile summaries: each student's flags, goals, reflections, hand-set levels and notes as a class loads)
-32. `shared/data-courses-terms.js` (classes and reporting terms: create, rename, archive and delete a class, the grading scale, reporting terms, switching class and blocks)
-33. `shared/photo-expiry.js` (the warning before a class's photos are deleted for going a year unopened: one line per class on the Dashboard and the phone's Students screen)
-34. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
-35. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
-36. `shared/offline-queue.js`
-37. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
-38. `shared/auto-update.js`
-39. `shared/calc.js`
-40. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-41. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-42. `shared/rubric-draft.js`
-43. `shared/rubric-checks.js`
+4. `shared/build-flags.js` (`BuildFlags.on`: unfinished work stays behind a flag, off until a test or reviewer sets its localStorage key; the phone and the student page load it too)
+5. `shared/link-nav.js`
+6. `shared/loading-screen.js` (the loading screen, right after its empty `#app-loading`; the phone and the student page load it too)
+7. Supabase SDK (`vendor/supabase.min.js`)
+8. `shared/supabase.js`
+9. `shared/constants.js`
+10. `shared/reporting-term-presets.js`
+11. `shared/data-utilities.js` (the small helpers every file uses: student names, dates, colours, ids and RPC results)
+12. `shared/data.js`
+13. `shared/data-rpc-wrappers.js` (the `window.v2` server calls: one small wrapper per RPC, from subjects and categories to reports, slips, phone reports and the assessment detail; `shared/data.js` makes `window.v2` and the plumbing they call)
+14. `shared/data-learning-map.js` (the learning map: its sections, tags and competency groups, removed sections, and its save to the server)
+15. `shared/data-categories.js` (categories: an assessment's category, the save to the server, the category write guard and Class Settings' category draft)
+16. `shared/data-rubrics.js` (rubrics: the save to the server, Advanced Rubric checkboxes, printed rubrics and competency descriptors)
+17. `shared/data-assessments.js` (assessments: the save to the server, duplicate, tags and collab, and clearing the marks of deleted work)
+18. `shared/data-config-settings.js` (class settings: saveConfig, getCourseConfig and saveCourseConfig, the changed-only settings patch and the old-settings write guard)
+19. `shared/data-observations.js` (observations: quick observations, sentence starters, custom tags and the tag resolver)
+20. `shared/data-term-ratings.js` (term ratings and report preferences: the Term Questionnaire's ratings, comments and attendance, the report setup, and the teacher's card, dashboard and view settings)
+21. `shared/data-student-records.js` (student records: flags, goals and goal dates, Core Competency self-assessments, reflections and notes; and the class's modules)
+22. `shared/data-student-cards.js` (student cards: the printed cards that open a student's page, and Cards Work Until)
+23. `shared/data-student-work.js` (student work: what students sent and the settings that let them send, group work's reader, work a teacher adds, and the same for a signed-in teacher from the server)
+24. `shared/data-handout-files.js` (handouts on an assessment: a handout file, a web page, a text file or an EPUB, added, uploaded to its own bucket and opened; and a PDF handout's page opened)
+25. `shared/data-feedback-live.js` (Mark Up and Reflect on Feedback for a signed-in teacher: the server's marks, reflections and revision requests, laid over with this device's writes not yet answered)
+26. `shared/data-markup.js` (Mark Up: the teacher's marks on a page of student work as Demo Mode keeps them, the readers both kinds of class share, and Return with the marks)
+27. `shared/data-reflect.js` (Reflect on Feedback: a student's reflection on returned work, the class's Reflect on Feedback and Show My Learning switches, and Send Answer)
+28. `shared/data-bulletins.js` (Bulletins, behind the build switch: the class's bulletins read and written, a waiting bulletin kept as Not Sent Yet, a photo or PDF uploaded to its own bucket, who has seen it)
+29. `shared/bulletins-refusals.js` (Bulletins: the server's refusals in plain sentences, and the class's date)
+30. `shared/data-bulletins-demo.js` (Bulletins in Demo Mode, kept on the device)
+31. `shared/data-revisions.js` (Revisions: returning work for another try, its edit and Take Back, the student's revision in Demo Mode, and Before and After)
+32. `shared/data-roster.js` (the class list: students, enrolment, adding and editing a student, and the roster helpers)
+33. `shared/data-withdrawn.js` (withdrawn students: withdrawing and re-enrolling, the Withdrawn list, permanent delete, and putting a withdrawn student's marks aside)
+34. `shared/data-overrides.js` (hand-set levels: the teacher's section overrides with their reasons, and the calculated level shown beside one)
+35. `shared/data-profile-summaries.js` (student profile summaries: each student's flags, goals, reflections, hand-set levels and notes as a class loads)
+36. `shared/data-courses-terms.js` (classes and reporting terms: create, rename, archive and delete a class, the grading scale, reporting terms, switching class and blocks)
+37. `shared/photo-expiry.js` (the warning before a class's photos are deleted for going a year unopened: one line per class on the Dashboard and the phone's Students screen)
+38. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
+39. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
+40. `shared/offline-queue.js`
+41. `shared/overwrite-count.js` (counts, for Sentry only, how often a score that waited in the outbox meets a newer one on the server; reads, never writes)
+42. `shared/auto-update.js`
+43. `shared/calc.js`
+44. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+45. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+46. `shared/rubric-draft.js`
+47. `shared/rubric-checks.js`
 
-The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
+The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`. It also loads `shared/data-bulletins-queue.js` after the Bulletins files (the phone's Bulletins tab, slice B1f: a post with a photo waits in the photo queue).
 
 Desktop or mobile modules then layer on top of that shared runtime.
 

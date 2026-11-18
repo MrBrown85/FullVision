@@ -22,7 +22,8 @@ export const TODAY = new Date().toISOString().slice(0, 10);
 export const KEY = 'fv-s-session';
 export const SHOTS = process.env.S0W1S_SHOTS || '';
 export const PHONE = { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true };
-export const CHROMEBOOK = { viewport: { width: 1366, height: 768 } };
+// No touch and no phone: also where a project's own default is a phone (webkit-student, playwright.config.js).
+export const CHROMEBOOK = { viewport: { width: 1366, height: 768 }, isMobile: false, hasTouch: false };
 export const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'content-type',
@@ -109,14 +110,12 @@ export async function shot(page, name) {
 }
 
 /* Every word on the screen is readable (4.5 to 1), in light and in dark.
-   One thing is left out, and it is not new here: the student page's blue
-   button (white on #007aff, 4.02 to 1), which the questionnaire and report
-   slips have had since they shipped. It is reported in this PR, not
-   restyled by it. */
+   The student page's blue button is held to it too (white on --sp-blue-fill,
+   5.57 to 1). */
 export async function contrast(page) {
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
-    expect(await findLowContrastText(page, { skip: ['.sp-btn-primary'] }), scheme).toEqual([]);
+    expect(await findLowContrastText(page), scheme).toEqual([]);
   }
   await page.emulateMedia({ colorScheme: 'light' });
 }
@@ -252,9 +251,12 @@ export async function openLearning(page) {
   await expect(page.locator('.sp-tab[data-tab="learning"][aria-current="page"]').locator('visible=true')).toBeVisible();
 }
 
-/* Log Out, then Log Out on the sheet that asks first (the old Done). */
+/* Log Out, from Settings (the gear), then Log Out on the sheet that asks first (the old Done). */
 export async function logOut(page) {
-  await page.locator('.sp-head [data-act="logout-ask"]').click();
+  await page.locator('.sp-head [data-act="settings-open"]').click();
+  await page.locator('.sp-set [data-act="logout-ask"]').click();
   await expect(page.getByRole('alertdialog', { name: 'Log Out?' })).toBeVisible();
+  // Log Out? takes a press once it has been up a moment (a double tap is not a yes).
+  await page.waitForTimeout(450);
   await page.locator('.sp-logout [data-act="card-done"]').click();
 }

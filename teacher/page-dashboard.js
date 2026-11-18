@@ -27,13 +27,11 @@ window.PageDashboard = (function () {
   var _popFor = null;
 
   /* Class insights (dash-insights.js): Cards or Grid and the Who Needs Help
-     rule follow the teacher to any device (getDashboardPrefs); an open
-     segment list does not. The rule has no editor since the Needs
+     rule follow the teacher to any device (getDashboardPrefs). The rule has no editor since the Needs
      Attention card went (plan F.8): it stays at its saved value or the
      default. */
   var studentView = 'cards';
   var helpRule = null;
-  var mixPop = null; // { key, level } of the open proficiency segment
   // The page's competency filter (a Curricular Competencies row). Not
   // remembered. The name is the old Needs Attention one; other code and
   // the data-action use it.
@@ -62,7 +60,9 @@ window.PageDashboard = (function () {
     var view = DashOverview.compView(activeCourse, key);
     if (view !== DashOverview.compView(activeCourse, _readPref(COMP_VIEW_KEY + activeCourse))) _compFade = true;
     _writePref(COMP_VIEW_KEY + activeCourse, view);
-    mixPop = null;
+  };
+  _viewSetters.inbox = function (key) {
+    if (window.DashInbox) DashInbox.setView(activeCourse, key);
   };
   // The next render slides the student cards to their new places (the
   // filter was set or cleared, or the sort changed).
@@ -142,9 +142,9 @@ window.PageDashboard = (function () {
 
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
+    if (window.DashInbox && activeCourse && activeCourse !== cid) DashInbox.leave(activeCourse);
     activeCourse = cid;
     obsHighlight = null;
-    mixPop = null;
     naComp = null;
     _litKey = null;
     _obsNavKey = null;
@@ -281,6 +281,8 @@ window.PageDashboard = (function () {
       coreSelf: coreSelf,
       coreView: _readPref(CORE_VIEW_KEY + cid) === 'evidence' ? 'evidence' : 'self',
       compView: DashOverview.compView(cid, _readPref(COMP_VIEW_KEY + cid)),
+      // The Competencies tile's open page, per class on this device.
+      compPage: DashCompetencies.pageOf(_readPref(DashCompetencies.PREF_KEY + cid)),
       obs: _obsState(),
       classChange: classGradeChange(
         cid,
@@ -288,7 +290,6 @@ window.PageDashboard = (function () {
           return s.id;
         }),
       ),
-      mixPop: mixPop,
       helpRule: helpRule,
       naComp: naComp,
     });
@@ -306,27 +307,20 @@ window.PageDashboard = (function () {
     // Observations goes last, under the students (Colin, Nov 5).
     html += Overview.obsCardHtml({ cid: cid, allStudents: allStudents, obs: _lastObsState });
 
-    // The open segment's students, placed under it once it is drawn.
-    var popHtml = DashInsights.popHtml(cid, allStudents, mixPop);
-    if (!popHtml) mixPop = null;
-    html +=
-      '<div class="dash-mix-pop" id="dash-mix-pop" role="dialog" aria-label="Students"' +
-      (popHtml ? '' : ' hidden') +
-      '>' +
-      popHtml +
-      '</div>';
-
     _hidePop();
     openMenu = null;
     var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
+    if (window.DashInbox) DashInbox.beforeRender();
     document.getElementById('main').innerHTML = html;
     if (before) StudentCards.slideFrom(before);
+    if (window.DashInbox) DashInbox.afterRender(cid);
     if (_compFade) _fadeCompRows();
     _compFade = false;
     _afterObsRender(null);
-    _placeMixPop();
+    DashOverview.sizeRow();
+    _watchAboveRow();
     _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
     // still on a competency.
@@ -660,41 +654,6 @@ window.PageDashboard = (function () {
     renderObsCard('tab-' + tab);
   }
 
-  /* The open proficiency segment's list sits under the segment, inside the
-     window. */
-  function _placeMixPop() {
-    var pop = document.getElementById('dash-mix-pop');
-    if (!pop || pop.hidden) return;
-    var seg = document.querySelector('.dash-mix-seg.active');
-    if (!seg) {
-      pop.hidden = true;
-      return;
-    }
-    var r = seg.getBoundingClientRect();
-    var pw = pop.offsetWidth;
-    var ph = pop.offsetHeight;
-    var left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
-    var top = r.bottom + 6;
-    if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
-    pop.style.left = Math.round(left) + 'px';
-    pop.style.top = Math.round(top) + 'px';
-  }
-
-  function _closeMixPop() {
-    if (!mixPop) return;
-    var key = mixPop.key;
-    var level = mixPop.level;
-    mixPop = null;
-    var pop = document.getElementById('dash-mix-pop');
-    if (pop) pop.hidden = true;
-    var seg = document.querySelector('.dash-mix-seg.active');
-    if (seg) {
-      seg.classList.remove('active');
-      seg.setAttribute('aria-expanded', 'false');
-    }
-    return { key: key, level: level };
-  }
-
   function _obsKeydown(e) {
     var t = e.target;
     var inCard = t && t.closest && t.closest('#dash-obs-card');
@@ -870,16 +829,29 @@ window.PageDashboard = (function () {
     if (_popFor && e.target === _popFor) _hidePop();
   }
 
+  // A scroll inside a long competency list keeps its "+N more" line true.
   function _onScrollClose(e) {
     if (e.target && e.target.classList && e.target.classList.contains('dash-comp-rows')) _syncCompScroll(e.target);
-    if (!mixPop) return;
-    var pop = document.getElementById('dash-mix-pop');
-    if (pop && e.target && pop.contains && pop.contains(e.target)) return;
-    _closeMixPop();
+  }
+
+  /* The middle row is as tall as the window leaves below where it starts, so
+     it is measured again whenever what sits above it changes height (the
+     photo-expiry line arriving after the first draw). */
+  var _aboveRowWatch = null;
+  function _watchAboveRow() {
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
+    if (typeof ResizeObserver === 'undefined' || !document.querySelector('.dash-row')) return;
+    _aboveRowWatch = new ResizeObserver(function () {
+      DashOverview.sizeRow();
+    });
+    document.querySelectorAll('.page-dashboard .photo-expiry, .page-dashboard .dash-glance').forEach(function (el) {
+      _aboveRowWatch.observe(el);
+    });
   }
 
   function _onResize() {
-    _placeMixPop();
+    DashOverview.sizeRow();
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(_refitObs, 150);
   }
@@ -1024,10 +996,9 @@ window.PageDashboard = (function () {
   }
 
   function _handleClick(e) {
-    // A click outside the open segment list closes it.
-    if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
     // A click outside the open view menu (and not on its pill) closes it.
     if (openMenu && !e.target.closest('.dash-view-menu, .dash-view-btn')) _closeViewMenu();
+    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render })) return;
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -1079,16 +1050,8 @@ window.PageDashboard = (function () {
       obsAdd: function () {
         openObsDialog(el.dataset.sid);
       },
-      mixSeg: function () {
-        var key = el.dataset.key;
-        var level = Number(el.dataset.level);
-        var was = _closeMixPop();
-        if (was && was.key === key && was.level === level) return;
-        mixPop = { key: key, level: level };
-        render();
-        var pop = document.getElementById('dash-mix-pop');
-        var first = pop && pop.querySelector('a, button');
-        if (first) first.focus();
+      compPage: function () {
+        _setCompPage(el.dataset.page, false);
       },
       viewMenu: function () {
         var id = el.dataset.menu;
@@ -1097,12 +1060,6 @@ window.PageDashboard = (function () {
       },
       viewPick: function () {
         _pickView(el.dataset.menu, el.dataset.view);
-      },
-      mixClose: function () {
-        var was = _closeMixPop();
-        var seg =
-          was && document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
-        if (seg) seg.focus();
       },
       // A competency picked on Curricular Competencies (a row, or a Needs
       // Support column code), or cleared there or by the filter chip. Focus
@@ -1115,11 +1072,7 @@ window.PageDashboard = (function () {
         if (naComp !== was) _slideCards = true;
         var inCard = !!el.closest('.dash-comp-card');
         var fromBar = !!el.closest('.dash-comp-filter');
-        var ctl = el.classList.contains('dash-comp-code')
-          ? '.dash-comp-code'
-          : el.classList.contains('dash-comp-row') && !el.classList.contains('is-mix')
-            ? '.dash-comp-row'
-            : '.dash-comp-pick';
+        var ctl = el.classList.contains('dash-comp-code') ? '.dash-comp-code' : '.dash-comp-row';
         render();
         if (inCard) _focusSel('.dash-comp-card ' + ctl + '[data-key="' + _cssKey(key) + '"]');
         else if (fromBar && was) _focusComp(was);
@@ -1205,14 +1158,29 @@ window.PageDashboard = (function () {
     CM.handleBlur(e.target);
   }
 
+  /* The Competencies tile's Curricular | Core: arrow keys, Home and End move
+     between the two tabs and open the page, as a click does. */
+  function _compTabKeydown(e) {
+    var t = e.target;
+    var tab = t && t.closest && t.closest('.dash-comp-seg [role="tab"]');
+    if (!tab) return false;
+    var next = DashCompetencies.pageForKey(tab.dataset.page, e.key);
+    if (!next) return false;
+    e.preventDefault();
+    _setCompPage(next, true);
+    return true;
+  }
+  function _setCompPage(page, focus) {
+    var key = DashCompetencies.pageOf(page);
+    _closeViewMenu();
+    _writePref(DashCompetencies.PREF_KEY + activeCourse, key);
+    var tab = DashCompetencies.show(document, key);
+    if (tab && focus) tab.focus();
+  }
+
   function _handleKeydown(e) {
     if (_viewMenuKeydown(e)) return;
-    if (e.key === 'Escape' && mixPop) {
-      var was = _closeMixPop();
-      var seg = document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
-      if (seg) seg.focus();
-      return;
-    }
+    if (_compTabKeydown(e)) return;
     var popOpen = !!_popFor;
     if (_obsKeydown(e)) return;
     // Escape with nothing else open clears the competency filter.
@@ -1358,12 +1326,12 @@ window.PageDashboard = (function () {
     var dashPrefs = getDashboardPrefs();
     studentView = dashPrefs.studentView === 'grid' ? 'grid' : 'cards';
     helpRule = DashInsights.readRule(dashPrefs.helpRule);
-    mixPop = null;
     naComp = null;
     _litKey = null;
     openMenu = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
+    if (window.DashInbox) DashInbox.configure({ read: _readPref, write: _writePref });
 
     // The student list, as on the other pages (_syncSidebar in render)
     document.getElementById('sidebar-mount').innerHTML = '';
@@ -1415,11 +1383,15 @@ window.PageDashboard = (function () {
   }
 
   function destroy() {
+    if (window.DashInbox) DashInbox.leave(activeCourse);
     if (typeof ObsCapture !== 'undefined') ObsCapture.closeDialog();
     _hidePop();
     window.removeEventListener('resize', _onResize);
+    if (_aboveRowWatch) _aboveRowWatch.disconnect();
+    _aboveRowWatch = null;
     clearTimeout(_resizeTimer);
     CM.destroy();
+    if (window.DashBulletins && typeof DashBulletins.destroy === 'function') DashBulletins.destroy();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });

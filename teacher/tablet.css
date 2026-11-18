@@ -288,4 +288,92 @@
   html.fv-tablet .afrom-search .assess-search-input {
     height: 40px;
   }
+
+  /* ── Class Settings › Student Page: Students ───────────────────── */
+
+  /* A finger-sized box to tick, name to open, and panel and bar buttons
+     (teacher/student-page-students.js). The panel takes the full width of
+     an iPad mini. */
+  html.fv-tablet .sps-pick-box {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  html.fv-tablet .sps-check {
+    width: 20px;
+    height: 20px;
+  }
+  html.fv-tablet .sps-name {
+    min-height: 44px;
+  }
+  html.fv-tablet .sps-bar .sps-bar-btn,
+  html.fv-tablet .sps-panel .cm-action-btn,
+  html.fv-tablet .sps-panel .btn,
+  html.fv-tablet .sps-panel .seg-btn,
+  html.fv-tablet .sp-row .sps-except {
+    min-height: 44px;
+  }
+  /* ── The Dashboard's middle row ─────────────────────────────────── */
+
+  /* The row stacks at every upright width, not only under 900 px: Inbox 450,
+     Bulletins 300, then Competencies 520, as on the board (an iPad is far
+     too tall for the row's window-height rule). */
+  html.fv-tablet .dash-row {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  html.fv-tablet .dash-row-left,
+  html.fv-tablet .dash-row-left.has-bulletins {
+    grid-template-rows: none;
+  }
+  html.fv-tablet .dash-row-inbox {
+    height: 450px;
+  }
+  html.fv-tablet .dash-row-bulletins {
+    height: 300px;
+  }
+  html.fv-tablet .dash-row-comp {
+    height: 520px;
+  }
+  /* Every control in the row is a finger's size, 44 px (board F): the view
+     pills, Curricular | Core, the piece switch, the buttons, and the links
+     in the tiles' heads. A link keeps its look; only the place it answers a
+     tap grows. */
+  html.fv-tablet .dash-row .dash-view-btn,
+  html.fv-tablet .dash-row .dash-comp-seg .seg-btn,
+  html.fv-tablet .dash-row .dash-inbox-pick-btn,
+  html.fv-tablet .dash-row .dash-inbox-grade,
+  html.fv-tablet .dash-row .dash-inbox-flip-open,
+  html.fv-tablet .dash-row .dash-inbox-roll-all,
+  html.fv-tablet .dash-row .dash-inbox-flip-slider,
+  html.fv-tablet .dash-row .dash-comp-ln.is-split {
+    min-height: 44px;
+  }
+  /* A Level Mix row: its button 44 px, its bar under it. */
+  html.fv-tablet .dash-row .dash-comp-lnbox {
+    flex-basis: 62px;
+    max-height: none;
+  }
+  /* A row's title keeps the row's 109 px: it answers a tap 10 px above and
+     below its line (padding the margin gives back), where nothing else takes
+     one. */
+  html.fv-tablet .dash-row .dash-inbox-name {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    margin-top: -10px;
+    margin-bottom: -10px;
+  }
+  html.fv-tablet .dash-row .dash-comp-head > a,
+  html.fv-tablet .dash-row .dash-core-head > a,
+  html.fv-tablet .dash-row .dash-inbox-head a,
+  html.fv-tablet .dash-row .dash-recent-head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  @media (max-width: 799px) {
+    html.fv-tablet .sps-panel {
+      width: 100%;
+    }
+  }
 }

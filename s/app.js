@@ -61,6 +61,9 @@
   var identityFields = StudentPage.identityFields;
   var verifyIdentity = StudentPage.verifyIdentity;
   var paint = StudentPage.paint;
+  // Text Size's words, and the classes that draw the page at a size (s/settings.js).
+  var sizeOf = StudentSettings.sizeOf;
+  var sizeClasses = StudentSettings.apply;
 
   // The page's state: student.js's own, handed over by share.
   var S = null;
@@ -389,61 +392,16 @@
 
   /* ── The student's page for one class ──────────────────────── */
 
-  /* The frame every tab of the page sits in: the class and Done, which
-     stay in reach as the page scrolls, then the tab's own body.
-     assignments.js draws the first tab. */
-  var PLUS =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
+  /* The frame every tab of the page sits in: the class and the gear
+     (Settings), which stay in reach as the page scrolls, then the tab's
+     own body. assignments.js draws the first tab.
 
-  /* Your Classes (the artboard's "Switching Classes"): the classes this
-     device's session has opened, the one showing ticked, then Add Another
-     Card. The server sends the list with the page; it holds each class's
-     name and block, the student's first name and, since S4-M1, how many
-     pieces wait there (to_do), nothing else. */
-  function classesSheet(page) {
-    var here = page && page.student ? page.student.id : '';
-    var list = (page && page.classes) || [];
-    return (
-      '<button type="button" class="sp-sheet-back" data-act="classes-close" aria-label="Close" tabindex="-1"></button>' +
-      '<div class="sp-sheet" role="dialog" aria-modal="true" aria-labelledby="sp-classes-title">' +
-      '<span class="sp-sheet-grip" aria-hidden="true"></span>' +
-      '<h2 class="sp-sheet-title" id="sp-classes-title" tabindex="-1">Your Classes</h2>' +
-      '<ul class="sp-classes">' +
-      list
-        .map(function (c) {
-          var on = c.enrollmentId === here;
-          return (
-            '<li><button type="button" class="sp-class' +
-            (on ? ' sp-class-on' : '') +
-            '" data-act="class-open" data-enrollment="' +
-            esc(c.enrollmentId) +
-            '"' +
-            (on ? ' aria-current="true"' : '') +
-            '><span class="sp-class-words"><span class="sp-class-name">' +
-            esc(c.name) +
-            '</span>' +
-            (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
-            '</span>' +
-            // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
-            (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
-            (on ? '<span class="sp-class-tick">' + CHECK_MARK + '</span>' : '') +
-            '</button></li>'
-          );
-        })
-        .join('') +
-      '</ul>' +
-      '<button type="button" class="sp-btn sp-btn-tint" data-act="card-add">' +
-      PLUS +
-      'Add Another Card</button>' +
-      '</div>'
-    );
-  }
-
-  // "Block A", as the class's name shows it.
-  function blockLabel(block) {
-    var b = String(block || '').trim();
-    return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
-  }
+     Switch Class and Add Another Card (the artboard's "Switching Classes")
+     are in Settings, the gear in the page's header (s/page-view.js): the
+     classes this device's session has opened, the one showing ticked. The
+     server sends the list with the page; it holds each class's name and
+     block, the student's first name and, since S4-M1, how many pieces
+     wait there (to_do), nothing else. */
 
   /* ── Demo Mode: the three answers, built on the device ─────── */
 
@@ -1039,9 +997,10 @@
      send is the class's id; the page needs none and gives a real class a
      key of its own. */
   function demoPage(system, enrollment) {
+    if (enrollment !== DEMO_SECOND && StudentData.demoPaused(localStorage)) return { ok: false, error: 'closed' };
     var cls = demoClassFor(enrollment);
     var seen = (demo && demo.seen) || {};
-    var learning = !(demo && demo.noLearning);
+    var learning = StudentData.demoShowsGrade(!(demo && demo.noLearning), enrollment === DEMO_SECOND, localStorage);
     return {
       ok: true,
       v: 1,
@@ -1108,6 +1067,7 @@
      class's card: any code opens it. */
   function demoCard() {
     if (demo.wrong >= DEMO.tries) return { ok: false, error: 'card_locked' };
+    if (!adding && StudentData.demoPaused(localStorage)) return { ok: false, error: 'closed' }; // paused by the teacher
     var cls = adding ? demoSecondClass() : demoClass();
     return {
       ok: true,
@@ -1231,10 +1191,10 @@
 
   /* ── The session on this device ────────────────────────────── */
 
-  /* { token, expires, enrollment, active, kept }: the session this tab is
-     showing. `active` is when the student last touched the page. `kept` is
-     true once it is in localStorage, where the next visit and the device's
-     other tabs read it. Nothing else of the card path is stored. */
+  /* { token, expires, enrollment, active, size, kept }: the session this tab is showing. `active`
+     is when the student last touched the page; `size` the Text Size chosen in Settings, which goes
+     with the session. `kept` is true once it is in localStorage, where the next visit and the
+     device's other tabs read it. Nothing else of the card path is stored. */
   var SESSION_KEY = 'fv-s-session';
   // No touch, key, pointer or scroll for this long ends the session, as Done does (Colin, Nov 10).
   var IDLE_MS = 15 * 60 * 1000;
@@ -1267,6 +1227,7 @@
       var v = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if (!v || !/^[0-9a-f]{64}$/.test(String(v.t || '')) || typeof v.e !== 'string' || !v.e) return null;
       var stored = { token: v.t, expires: String(v.x || ''), enrollment: v.e, active: Number(v.a) || 0, kept: true };
+      stored.size = sizeOf(v.z);
       return endsAt(stored) == null ? null : stored;
     } catch (e) {
       return null; // no storage (a private window): the session lasts while this tab is open
@@ -1316,7 +1277,9 @@
 
   // The one thing this page writes to the device, and the one place it does.
   function write(s) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment, a: s.active }));
+    // Normal is no entry at all: a session at Normal is kept exactly as before Text Size.
+    var z = sizeOf(s.size) || undefined;
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment, a: s.active, z: z }));
     wrote = s.active || 0;
   }
 
@@ -1326,6 +1289,9 @@
     StudentPage.wipeCardDrafts();
     session = null;
     adding = null;
+    // The Text Size went with the session: the page is at Normal again, whatever is drawn next.
+    if (S) S.textSize = '';
+    sizeClasses('');
     stopCamera();
     stopClocks();
     stopWatchingRows();
@@ -1448,6 +1414,8 @@
       // Done in another tab, or another student signed in there.
       if (!stored) return leave(MESSAGES.signed_out);
       if (stored.token !== session.token) return leave(MESSAGES.signed_out, false);
+      // A Text Size chosen in another tab of this session.
+      adoptSize(stored);
     }
     var why = over(session, now);
     if (why === 'ended') return leave(MESSAGES.signed_out);
@@ -1500,6 +1468,8 @@
     if (!session.kept || at - wrote < 5000) return;
     var stored = readStored();
     if (!stored || stored.token !== session.token) return;
+    // The size as the device has it now: another tab may have chosen one since this tab read it.
+    adoptSize(stored);
     try {
       write(session);
     } catch (e) {
@@ -1567,13 +1537,15 @@
     if (!rows.length) return;
     var w = { page: S.page, observer: null, since: {}, timer: 0 };
     // The header stays over the top of the list: a row under it is not on screen.
+    // Heights as drawn on the screen (getBoundingClientRect), so a Text Size's zoom is counted.
     var head = document.querySelector('.sp-head');
-    var under = (head && head.offsetHeight) || 0;
+    var headRect = head && typeof head.getBoundingClientRect === 'function' ? head.getBoundingClientRect() : null;
+    var under = (headRect && headRect.height) || 0;
     // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
     var bar = document.querySelector('.sp-tabs-bottom');
     var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
     var over =
-      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? bar.offsetHeight || 0 : 0;
+      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? rect.height || 0 : 0;
     w.observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
@@ -1790,7 +1762,7 @@
     StudentPage.newTurn();
     stopWatchingRows();
     adding = { from: session.enrollment };
-    S.sheet = false;
+    S.settings = false;
     S.data = null;
     S.typed = '';
     S.message = '';
@@ -1823,16 +1795,17 @@
     return Promise.resolve();
   }
 
-  /* Another class from Your Classes. The device's session stays as it is;
-     only which class it opens changes, here and in what the device keeps. */
+  /* Another class from Switch Class, in Settings. The device's session
+     stays as it is; only which class it opens changes, here and in what
+     the device keeps. The class showing closes Settings and nothing else. */
   function openClass(enrollment) {
     var known = ((S.page && S.page.classes) || []).some(function (c) {
       return c.enrollmentId === enrollment;
     });
     if (!session || !known) return Promise.resolve();
-    S.sheet = false;
+    S.settings = false;
     if (enrollment === session.enrollment) {
-      paint('.sp-head-switch');
+      paint('.sp-gear');
       return Promise.resolve();
     }
     StudentPage.newTurn();
@@ -1873,6 +1846,9 @@
     'handoutPiece',
     'handoutPage',
     'handoutPages',
+    // Settings (the gear) open, and the Text Size chosen there.
+    'settings',
+    'textSize',
   ];
   function uiOf() {
     var ui = {};
@@ -1881,6 +1857,34 @@
     });
     return ui;
   }
+
+  // The Text Size goes beside the session's token (write). Demo Mode keeps nothing on the device.
+  function keepSize() {
+    if (!session) return;
+    session.size = sizeOf(S.textSize);
+    if (S.demo || !session.kept) return;
+    var stored = readStored();
+    if (!stored || stored.token !== session.token) return;
+    try {
+      write(session);
+    } catch (e) {
+      /* this tab only */
+    }
+  }
+
+  // A Text Size chosen in another tab of this session: taken here, so neither tab writes it away.
+  function adoptSize(stored) {
+    if (!session || !stored || stored.token !== session.token) return;
+    session.size = stored.size;
+    if (sizeOf(S.textSize) === stored.size) return;
+    S.textSize = stored.size;
+    sizeClasses(stored.size);
+    if (S.screen === 'assignments' && S.settings) paint('.sp-set-size[aria-checked="true"]');
+  }
+
+  // Log Out? ignores presses at first: a double tap on Settings' Log Out is not a yes.
+  var LOGOUT_SETTLE_MS = 400;
+  var logoutAt = 0;
 
   /* A tab, one of To Do, Sent and Back, All Assignments, a filter, or a
      piece's card. s/page-view.js says what each press changes (the preview
@@ -1895,10 +1899,14 @@
     UI_KEYS.forEach(function (k) {
       S[k] = out.ui[k];
     });
-    S.sheet = false;
+    if (act === 'text-size') keepSize();
+    if (act === 'logout-ask') logoutAt = Date.now();
     stopWatchingRows();
     paint(out.focus);
-    if (!out.piece && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    // Settings slides in on the drawing that opens it (page-view.js).
+    if (out.slide && typeof document !== 'undefined') StudentPageView.slideIn(document);
+    var scroll = !out.piece && !out.stay;
+    if (scroll && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     watchRows();
     // Reflect opened: its list asked again (at most every 20 s), so one turned on mid-class shows.
     if (act === 'tab' && S.tab === 'questionnaires' && Date.now() - formsAt >= 20000) loadForms();
@@ -1927,7 +1935,7 @@
     StudentPage.newTurn();
     stopWatchingRows();
     S.back = S.tab;
-    S.sheet = false;
+    S.settings = false;
     S.screen = 'loading';
     paint();
     var mine = S;
@@ -2068,7 +2076,7 @@
     var mine = ++formAsked;
     stopWatchingRows();
     S.back = S.tab;
-    S.sheet = false;
+    S.settings = false;
     S.message = '';
     S.heading = TITLE;
     S.screen = 'loading';
@@ -2126,18 +2134,6 @@
     watchRows();
   }
 
-  function openSheet() {
-    if (!S.page || S.screen !== 'assignments') return;
-    S.sheet = true;
-    paint('#sp-classes-title');
-  }
-
-  function closeSheet() {
-    if (!S.sheet) return;
-    S.sheet = false;
-    paint('.sp-head-switch');
-  }
-
   /* shared/constants.js and shared/calc.js work out and word a result. They
      are fetched here, when a screen that shows a grade is about to open, so
      a questionnaire or report slip never loads them (plan, section 5: the
@@ -2182,6 +2178,8 @@
     ],
   ];
   var fetching = null;
+  // Each try after the first asks for a new address (?retry=1): WebKit reuses a failed load of the same one.
+  var gradeTries = 0;
 
   function whenGradesAreIn(warm) {
     if (fetching) return fetching;
@@ -2190,11 +2188,12 @@
     });
     if (!need.length || typeof document === 'undefined') return Promise.resolve();
     if (warm) return Promise.resolve(need.forEach(preload));
+    var tries = gradeTries++;
     fetching = new Promise(function (done) {
       var left = need.length;
       need.forEach(function (f) {
         var s = document.createElement('script');
-        s.src = f[0];
+        s.src = f[0] + (tries ? '?retry=' + tries : '');
         s.async = false; // run in this order
         s.onload = s.onerror = function () {
           left -= 1;
@@ -2382,6 +2381,8 @@
       active: Date.now(),
       kept: false,
     };
+    // A new session starts at Normal: a Text Size chosen before is the last student's.
+    S.textSize = '';
     if (!session.token || !session.enrollment) {
       session = null;
       pageRefused({ ok: false, error: 'network' });
@@ -2404,7 +2405,10 @@
     }
     adding = null;
     if (res.session_token) {
+      // The same student, so the Text Size they chose stays.
+      var size = session.size;
       session = { token: String(res.session_token), expires: '', enrollment: e, active: Date.now(), kept: false };
+      session.size = size;
     }
     session.enrollment = e;
     if (res.expires_at) session.expires = String(res.expires_at);
@@ -2494,6 +2498,8 @@
       return true;
     }
     session = stored;
+    // The Text Size the student chose, kept with the session.
+    S.textSize = stored.size;
     S.heading = TITLE;
     S.screen = 'loading';
     openPage();
@@ -2515,6 +2521,9 @@
   }
 
   function onClick(act, el) {
+    var since = Date.now() - logoutAt;
+    var settling = S.logout && S.screen === 'assignments' && since >= 0 && since < LOGOUT_SETTLE_MS;
+    if (settling && (act === 'card-done' || act === 'logout-cancel')) return;
     if (act === 'card-yes') {
       checkCard();
     } else if (act === 'card-notme') {
@@ -2540,10 +2549,6 @@
       startCamera();
     } else if (act === 'card-type') {
       cameraOff('');
-    } else if (act === 'classes-open') {
-      openSheet();
-    } else if (act === 'classes-close') {
-      closeSheet();
     } else if (act === 'class-open') {
       openClass(el.getAttribute('data-enrollment') || '');
     } else if (act === 'card-add') {
@@ -2561,7 +2566,7 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|pick|open-piece|card-close|logout-ask|logout-cancel|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page)$/.test(
+      /^(tab|segment|pick|open-piece|card-close|settings-open|settings-close|text-size|logout-ask|logout-cancel|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare|handout|handout-close|handout-page)$/.test(
         act,
       )
     ) {
@@ -2608,22 +2613,15 @@
     window.addEventListener('storage', function () {
       checkSession();
     });
-    // Your Classes: Escape closes it, and Tab goes round inside it.
-    window.addEventListener('keydown', function (e) {
-      if (!S || !S.sheet || typeof document === 'undefined') return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        closeSheet();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      var inside = Array.prototype.slice.call(document.querySelectorAll('.sp-sheet button'));
-      if (!inside.length) return;
-      var at = inside.indexOf(document.activeElement);
-      var next = e.shiftKey ? (at <= 0 ? inside.length - 1 : at - 1) : at < 0 || at === inside.length - 1 ? 0 : at + 1;
-      e.preventDefault();
-      inside[next].focus();
-    });
+    // Escape and Tab over Settings and Log Out? (s/settings.js).
+    StudentSettings.keys(
+      function () {
+        return S;
+      },
+      function (act) {
+        showPart(act, null);
+      },
+    );
     // What counts as activity: a touch, a key, the pointer, a scroll.
     ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(function (name) {
       window.addEventListener(
@@ -2636,7 +2634,6 @@
     });
   }
 
-  StudentPage.classesSheet = classesSheet;
   StudentPage.demoForms = demoForms;
   StudentPage.pageBack = pageBack;
   StudentPage.askClass = askClass;
@@ -2660,6 +2657,11 @@
     },
     click: onClick,
     submit: onSubmit,
+    /* Every screen of a card's page at the Text Size chosen in Settings (student.css,
+       html.sp-size-large and html.sp-size-larger). Signed out, the state is new: Normal. */
+    drawn: function (root, state) {
+      sizeClasses(sizeOf(state && state.textSize));
+    },
     start: function (hash) {
       demo = null;
       /* The page is starting over. Whatever this tab was showing, it is not

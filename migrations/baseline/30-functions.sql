@@ -4,6 +4,220 @@
 -- below (by name) needs nothing else to exist first.
 set check_function_bodies = off;
 
+CREATE OR REPLACE FUNCTION fv_private.bulletin_audience(p_course_id uuid)
+ RETURNS TABLE(enrollment_id uuid, roster_position integer, state text)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select e.id, e.roster_position,
+     case when e.page_paused_at is not null then 'paused'
+        when exists (select 1 from student_card k
+               where k.enrollment_id = e.id and k.stopped_at is null
+                and k.works_until >= (now() at time zone _fv_timezone(c.timezone))::date) then 'can_see'
+        else 'no_card' end
+   from enrollment e join course c on c.id = e.course_id
+  where e.course_id = p_course_id and e.withdrawn_at is null;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_drop_expired(p_course_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _n int;
+begin
+  perform set_config('fv.bulletin_removal_reason', 'bulletin_expired', true);
+  perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(p_course_id::text));
+  delete from bulletin b where b.course_id = p_course_id and b.posted_at is null and b.created_at < now() - interval '2 hours';
+  get diagnostics _n = row_count;
+  perform set_config('fv.bulletin_removal_reason', '', true);
+  return _n;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_file_path(p_course_id uuid, p_file_id uuid, p_page integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select p_course_id::text || '/' || p_file_id::text || '/' || p_page::text || '.jpg';
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_file_path_parts(p_name text)
+ RETURNS TABLE(course_id uuid, file_id uuid, page integer)
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select m[1]::uuid, m[2]::uuid, m[3]::integer
+   from regexp_match(p_name, '^([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})/([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})/([1-9]|1[0-9]|20)\.jpg$') m
+  where m is not null;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_file_read_allowed(p_name text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select (select auth.uid()) is not null
+   and exists (select 1 from fv_private.bulletin_file_path_parts(p_name) h join bulletin_file f on f.id = h.file_id
+          where f.course_id = h.course_id and h.page <= f.page_count and fv_owns_course(f.course_id));
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_file_removed()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+  insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
+  select 'bulletin-files', fv_private.bulletin_file_path(old.course_id, old.id, n), old.course_id,
+     coalesce(nullif(current_setting('fv.bulletin_removal_reason', true), ''), 'bulletin_removed'), now() + interval '10 minutes'
+   from generate_series(1, old.page_count) n
+  on conflict (bucket, path) do nothing;
+  return null;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_file_upload_allowed(p_name text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select (select auth.uid()) is not null
+   and exists (select 1 from fv_private.bulletin_file_path_parts(p_name) h join bulletin_file f on f.id = h.file_id
+          where f.course_id = h.course_id and h.page <= f.page_count and f.status = 'uploading'
+           and f.created_at >= now() - interval '2 hours' and fv_owns_course(f.course_id));
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_json(p_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  with a as (select * from fv_private.bulletin_audience((select course_id from bulletin where id = p_id)) where state = 'can_see')
+  select jsonb_build_object(
+       'id', b.id, 'kind', b.kind, 'body', b.body, 'link_url', b.link_url, 'link_title', b.link_title,
+       'pinned', fv_private.bulletin_pinned_now(b.pinned, b.pinned_until, c.timezone), 'pinned_until', b.pinned_until,
+       'assessment_id', b.assessment_id, 'reactions_on', b.reactions_on, 'visible', b.posted_at is not null,
+       'posted_at', b.posted_at, 'shown_again_at', b.shown_again_at, 'edited_at', b.edited_at,
+       'created_at', b.created_at, 'updated_at', b.updated_at, 'idempotency_key', b.idempotency_key,
+       'files', coalesce((select jsonb_agg(jsonb_build_object(
+              'id', f.id, 'kind', f.kind, 'title', f.title, 'page_count', f.page_count, 'bytes', f.bytes,
+              'status', f.status, 'position', f.position, 'created_at', f.created_at,
+              'paths', (select jsonb_agg(fv_private.bulletin_file_path(f.course_id, f.id, n) order by n) from generate_series(1, f.page_count) n))
+             || case when f.status = 'uploading' then jsonb_build_object('finish_by', f.created_at + interval '2 hours') else '{}'::jsonb end
+             order by f.position, f.id)
+          from bulletin_file f where f.bulletin_id = b.id), '[]'::jsonb),
+       'seen', (select count(*) from bulletin_seen s join a on a.enrollment_id = s.enrollment_id where s.bulletin_id = b.id),
+       'can_see', (select count(*) from a),
+       'reactions', (select jsonb_build_object('got_it', count(*) filter (where r.word = 'got_it'),
+                           'done', count(*) filter (where r.word = 'done'),
+                           'question', count(*) filter (where r.word = 'question'))
+               from bulletin_reaction r join a on a.enrollment_id = r.enrollment_id where r.bulletin_id = b.id))
+   from bulletin b join course c on c.id = b.course_id
+  where b.id = p_id;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_patched(p_b public.bulletin, p_patch jsonb, p_has_files boolean)
+ RETURNS public.bulletin
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _p jsonb := coalesce(p_patch, 'null'::jsonb);
+  _k text;
+  _v jsonb;
+  _t text;
+  _why text;
+begin
+  if jsonb_typeof(_p) <> 'object' then
+    raise exception 'a bulletin is an object' using errcode = '22023';
+  end if;
+  for _k, _v in select key, value from jsonb_each(_p) loop
+    _t := case when _k in ('pinned', 'reactions_on') then 'boolean' else 'string' end;
+    if _k not in ('body', 'link_url', 'link_title', 'pinned', 'pinned_until', 'assessment_id', 'reactions_on') and not (_k = 'kind' and p_b.id is null) then
+      raise exception 'a bulletin has no % that can be set', _k using errcode = '22023';
+    end if;
+    if jsonb_typeof(_v) not in (_t, 'null') then
+      raise exception '% must be a %', _k, _t using errcode = '22023';
+    end if;
+    _t := nullif(regexp_replace(_v #>> '{}', '^[[:space:]]+|[[:space:]]+$', '', 'g'), '');
+    begin
+      case _k
+        when 'kind' then p_b.kind := _t;
+        when 'body' then p_b.body := coalesce(_t, '');
+        when 'link_url' then p_b.link_url := _t;
+        when 'link_title' then p_b.link_title := _t;
+        when 'pinned' then p_b.pinned := coalesce(_t::boolean, false);
+        when 'reactions_on' then p_b.reactions_on := coalesce(_t::boolean, false);
+        when 'pinned_until' then
+          if _t !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then raise exception using errcode = '22007'; end if;
+          p_b.pinned_until := _t::date;
+        else p_b.assessment_id := _t::uuid;
+      end case;
+    exception when invalid_datetime_format or datetime_field_overflow or invalid_text_representation then
+      raise exception '% must be a %', _k, case _k when 'pinned_until' then 'date' else 'id' end using errcode = '22023';
+    end;
+  end loop;
+  if p_b.link_url is null and not (_p ? 'link_title' and p_b.link_title is not null) then p_b.link_title := null; end if;
+  if _p ? 'pinned' and not p_b.pinned and not (_p ? 'pinned_until' and p_b.pinned_until is not null) then p_b.pinned_until := null; end if;
+  _why := case
+    when p_b.kind is null or p_b.kind not in ('announcement', 'reminder') then 'a bulletin is an announcement or a reminder'
+    when char_length(p_b.body) > 2000 then 'a bulletin''s words can be 2000 characters at most'
+    when char_length(p_b.link_url) > 2000 or p_b.link_url !~* '^https?://[^[:space:][:cntrl:]/?#@\\]+([/?#][^[:space:][:cntrl:]]*)?$'
+       or p_b.link_url ~ ('[' || chr(8203) || '-' || chr(8207) || chr(8234) || '-' || chr(8238) || chr(8288) || '-' || chr(8297) || chr(65279) || ']')
+      then 'a link must start with http:// or https:// and a host (no name or password), with no spaces or hidden characters, 2000 characters at most'
+    when p_b.link_title is not null and p_b.link_url is null then 'a link''s name needs a link'
+    when char_length(p_b.link_title) > 200 then 'a link''s name can be 200 characters at most'
+    when p_b.pinned_until is not null and p_b.kind <> 'reminder' then 'only a reminder can stay pinned until a date'
+    when p_b.pinned_until is not null and not p_b.pinned then 'a date to stay pinned until needs the reminder pinned'
+    when (_p ? 'pinned' or _p ? 'pinned_until')
+      and p_b.pinned_until < (select (now() at time zone _fv_timezone(c.timezone))::date from course c where c.id = p_b.course_id)
+      then 'the date to stay pinned until has passed'
+    when p_b.assessment_id is not null and not exists (select 1 from assessment a where a.id = p_b.assessment_id and a.course_id = p_b.course_id)
+      then 'the linked assessment is not in this class'
+    when p_b.body = '' and p_b.link_url is null and not p_has_files then 'a bulletin needs words, a link or a file'
+  end;
+  if _why is not null then
+    raise exception '%', _why using errcode = '22023';
+  end if;
+  return p_b;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_pinned_now(p_pinned boolean, p_until date, p_timezone text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select p_pinned and (p_until is null or p_until >= (now() at time zone _fv_timezone(p_timezone))::date);
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.bulletin_student_same_class()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+  if not exists (select 1 from bulletin b join enrollment e on e.course_id = b.course_id where b.id = new.bulletin_id and e.id = new.enrollment_id) then
+    raise exception '%: the student is not in the bulletin''s class', tg_table_name using errcode = '23514';
+  end if;
+  return new;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION fv_private.grade_return_remap(p_assessment_id uuid, p_criterion_map jsonb, p_check_map jsonb)
  RETURNS void
  LANGUAGE plpgsql
@@ -3393,6 +3607,34 @@ begin
     if not found then raise exception 'assessment not found' using errcode = 'P0002'; end if;
 end; $function$;
 
+CREATE OR REPLACE FUNCTION public.delete_bulletin(p_bulletin_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _cached jsonb;
+  _course uuid;
+  _out jsonb;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  _cached := fv_idem_check(p_idempotency_key, 'delete_bulletin');
+  if _cached is not null then return _cached; end if;
+  select b.course_id into _course from bulletin b where b.id = p_bulletin_id and fv_owns_course(b.course_id);
+  if _course is not null then
+    perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
+    delete from bulletin where id = p_bulletin_id;
+  end if;
+  if _course is null or not found then
+    raise exception 'bulletin not found' using errcode = 'P0002';
+  end if;
+  _out := jsonb_build_object('deleted', true, 'id', p_bulletin_id);
+  perform fv_idem_store(p_idempotency_key, 'delete_bulletin', _out);
+  return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.delete_category(p_id uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -4029,6 +4271,45 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.edit_bulletin(p_bulletin_id uuid, p_patch jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _cached jsonb;
+  _course uuid;
+  _o bulletin%rowtype;
+  _n bulletin%rowtype;
+  _out jsonb;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  _cached := fv_idem_check(p_idempotency_key, 'edit_bulletin');
+  if _cached is not null then return _cached; end if;
+  select b.course_id into _course from bulletin b where b.id = p_bulletin_id and fv_owns_course(b.course_id);
+  if _course is not null then
+    perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
+    select * into _o from bulletin where id = p_bulletin_id for update;
+  end if;
+  if _o.id is null then
+    raise exception 'bulletin not found' using errcode = 'P0002';
+  end if;
+  _n := fv_private.bulletin_patched(_o, p_patch, exists (select 1 from bulletin_file f where f.bulletin_id = _o.id));
+  if (_n.body, _n.link_url, _n.link_title, _n.pinned, _n.pinned_until, _n.assessment_id, _n.reactions_on)
+   is distinct from (_o.body, _o.link_url, _o.link_title, _o.pinned, _o.pinned_until, _o.assessment_id, _o.reactions_on) then
+    update bulletin
+     set body = _n.body, link_url = _n.link_url, link_title = _n.link_title, pinned = _n.pinned, pinned_until = _n.pinned_until,
+       assessment_id = _n.assessment_id, reactions_on = _n.reactions_on, updated_at = now(),
+       edited_at = case when (_n.body, _n.link_url, _n.link_title) is distinct from (_o.body, _o.link_url, _o.link_title) then now() else edited_at end
+    where id = _o.id;
+  end if;
+  _out := jsonb_build_object('bulletin', fv_private.bulletin_json(_o.id));
+  perform fv_idem_store(p_idempotency_key, 'edit_bulletin', _out);
+  return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer, p_modifier smallint DEFAULT 0)
  RETURNS integer
  LANGUAGE plpgsql
@@ -4049,6 +4330,56 @@ begin
     end loop;
     return _n;
 end; $function$;
+
+CREATE OR REPLACE FUNCTION public.finish_bulletin_file(p_bulletin_file_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _cached jsonb;
+  _course uuid;
+  _f bulletin_file%rowtype;
+  _missing jsonb;
+  _bad jsonb;
+  _bytes bigint;
+  _out jsonb;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  _cached := fv_idem_check(p_idempotency_key, 'finish_bulletin_file');
+  if _cached is not null then return _cached; end if;
+  select f.course_id into _course from bulletin_file f where f.id = p_bulletin_file_id and fv_owns_course(f.course_id);
+  if _course is not null then
+    perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
+    perform fv_private.bulletin_drop_expired(_course);
+    select * into _f from bulletin_file where id = p_bulletin_file_id for update;
+  end if;
+  if _f.id is null then
+    return jsonb_build_object('file_id', p_bulletin_file_id, 'status', 'gone');
+  end if;
+  if _f.status = 'uploading' then
+    select coalesce(jsonb_agg(g.n order by g.n) filter (where o.n is null), '[]'::jsonb),
+       coalesce(jsonb_agg(g.n order by g.n) filter (where o.n is not null and (o.mimetype = 'image/jpeg' and o.bytes between 1 and 2097152) is not true), '[]'::jsonb),
+       sum(o.bytes)
+     into _missing, _bad, _bytes
+     from generate_series(1, _f.page_count) g(n)
+     left join lateral (select g.n, nullif(x.metadata->>'size', '')::bigint bytes, x.metadata->>'mimetype' mimetype
+               from storage.objects x where x.bucket_id = 'bulletin-files' and x.name = fv_private.bulletin_file_path(_f.course_id, _f.id, g.n) collate "C"
+                and x.archived_at is null and not x.is_delete_marker limit 1) o on true;
+    if _missing <> '[]'::jsonb or _bad <> '[]'::jsonb then
+      return jsonb_build_object('file_id', _f.id, 'bulletin', fv_private.bulletin_json(_f.bulletin_id), 'missing', _missing, 'bad', _bad);
+    end if;
+    update bulletin_file set status = 'ready', bytes = _bytes where id = _f.id;
+    if not exists (select 1 from bulletin_file x where x.bulletin_id = _f.bulletin_id and x.status = 'uploading') then
+      update bulletin set posted_at = now(), updated_at = now() where id = _f.bulletin_id and posted_at is null;
+    end if;
+  end if;
+  _out := jsonb_build_object('file_id', _f.id, 'bulletin', fv_private.bulletin_json(_f.bulletin_id));
+  perform fv_idem_store(p_idempotency_key, 'finish_bulletin_file', _out);
+  return _out;
+end;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.finish_handout_file(p_resource_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -7346,6 +7677,67 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.list_bulletin_seen(p_bulletin_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _course uuid;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  select b.course_id into _course from bulletin b where b.id = p_bulletin_id and fv_owns_course(b.course_id);
+  if _course is null then
+    raise exception 'bulletin not found' using errcode = 'P0002';
+  end if;
+  return (
+    with a as (select x.enrollment_id id, x.roster_position, r.word,
+             case when x.state <> 'can_see' then x.state when s.enrollment_id is null then 'not_seen' else 'seen' end k
+          from fv_private.bulletin_audience(_course) x
+          left join bulletin_seen s on s.bulletin_id = p_bulletin_id and s.enrollment_id = x.enrollment_id
+          left join bulletin_reaction r on r.bulletin_id = p_bulletin_id and r.enrollment_id = x.enrollment_id)
+    select jsonb_build_object('bulletin_id', p_bulletin_id, 'reactions',
+             (select jsonb_object_agg(g, coalesce((select jsonb_agg(id order by roster_position, id) from a where word = g and k like '%seen'), '[]'))
+                from unnest(array['got_it', 'done', 'question']) g))
+        || (select jsonb_object_agg(g, coalesce((select jsonb_agg(id order by roster_position, id) from a where k = g), '[]'))
+              from unnest(array['not_seen', 'seen', 'paused', 'no_card']) g));
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.list_bulletins(p_course_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _c course%rowtype;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  if not fv_owns_course(p_course_id) then
+    raise exception 'course not found' using errcode = 'P0002';
+  end if;
+  if current_setting('transaction_read_only') = 'off' then
+    perform fv_private.bulletin_drop_expired(p_course_id);
+  end if;
+  select * into _c from course where id = p_course_id;
+  return (
+    with b as (select b.id, fv_private.bulletin_pinned_now(b.pinned, b.pinned_until, _c.timezone) pin, coalesce(b.posted_at, b.created_at) at
+          from bulletin b
+          where b.course_id = p_course_id and not (b.posted_at is null and b.created_at < now() - interval '2 hours')),
+      a as (select state, count(*) n from fv_private.bulletin_audience(p_course_id) group by state)
+    select jsonb_build_object(
+      'bulletins', coalesce((select jsonb_agg(fv_private.bulletin_json(x.id) order by x.pin desc, x.at desc, x.id desc)
+                  from (select * from b order by pin desc, at desc, id desc limit 100) x), '[]'::jsonb),
+      'more', (select count(*) > 100 from b),
+      'can_see', coalesce((select n from a where state = 'can_see'), 0),
+      'no_card', coalesce((select n from a where state = 'no_card'), 0),
+      'paused', coalesce((select n from a where state = 'paused'), 0),
+      'page_on', _c.student_page_enabled));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_categories(p_course_id uuid)
  RETURNS TABLE(id uuid, course_id uuid, name text, weight numeric, display_order integer, calc_mode text, created_at timestamp with time zone, updated_at timestamp with time zone)
  LANGUAGE sql
@@ -7892,6 +8284,28 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.list_student_page_options(p_course_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    return jsonb_build_object('ok', true, 'options', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                   'enrollment_id', e.id,
+                   'show_overall_grade', case e.show_overall_grade when true then 'show' when false then 'hide' else 'class' end,
+                   'paused_at', e.page_paused_at) order by e.roster_position, e.id)
+          from enrollment e
+         where e.course_id = p_course_id and e.withdrawn_at is null
+           and (e.show_overall_grade is not null or e.page_paused_at is not null)), '[]'::jsonb));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.list_teacher_courses()
  RETURNS TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
  LANGUAGE sql
@@ -8199,6 +8613,72 @@ AS $function$
                     where not r.done and (r.removed_at is null or r.link_dies_at <= now()))
        and not exists (select 1 from submission_file_removal r
                         where not r.done and r.last_try_at > now() - interval '5 minutes');
+$function$;
+
+CREATE OR REPLACE FUNCTION public.post_bulletin(p_course_id uuid, p_bulletin jsonb, p_files jsonb DEFAULT NULL::jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _cached jsonb;
+  _fs jsonb := coalesce(p_files, '[]'::jsonb);
+  _f jsonb;
+  _n bulletin%rowtype;
+  _pages int := 0;
+  _id uuid;
+  _out jsonb;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  _cached := fv_idem_check(p_idempotency_key, 'post_bulletin');
+  if _cached is not null then return _cached; end if;
+  if not fv_owns_course(p_course_id) then
+    raise exception 'course not found' using errcode = 'P0002';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(p_course_id::text));
+  -- Posted with this key, its stored reply since cleared: the row now.
+  select b.id into _id from bulletin b where b.course_id = p_course_id and b.idempotency_key = p_idempotency_key;
+  if _id is not null then
+    return jsonb_build_object('bulletin', fv_private.bulletin_json(_id), 'bucket', 'bulletin-files');
+  end if;
+  perform fv_private.bulletin_drop_expired(p_course_id);
+  if jsonb_typeof(_fs) <> 'array' then
+    raise exception 'files must be a list' using errcode = '22023';
+  end if;
+  for _f in select case when jsonb_typeof(value) = 'object' then value else '{}'::jsonb end from jsonb_array_elements(_fs) loop
+    if exists (select 1 from jsonb_object_keys(_f) k where k not in ('kind', 'title', 'pages'))
+     or coalesce(_f->>'kind', '') not in ('photo', 'pdf') or jsonb_typeof(_f->'pages') is distinct from 'number'
+     or jsonb_typeof(coalesce(_f->'title', '""')) not in ('string', 'null')
+     or _f->>'pages' !~ (case when _f->>'kind' = 'photo' then '^1$' else '^([1-9]|1[0-9]|20)$' end) then
+      raise exception 'a file is { kind: photo or pdf, title, pages }: a photo is 1 page, a PDF 1 to 20' using errcode = '22023';
+    end if;
+    if char_length(regexp_replace(coalesce(_f->>'title', ''), '^[[:space:]]+|[[:space:]]+$', '', 'g')) > 200 then
+      raise exception 'a file''s name can be 200 characters at most' using errcode = '22023';
+    end if;
+    _pages := _pages + (_f->>'pages')::int;
+  end loop;
+  if _pages > 20 then
+    raise exception 'a bulletin can have 20 pages at most' using errcode = '22023';
+  end if;
+  if _pages + (select coalesce(sum(f.page_count), 0) from bulletin_file f where f.course_id = p_course_id) > 2000 then
+    raise exception 'a class can hold 2000 bulletin pages at most: delete some bulletins with files first' using errcode = '22023';
+  end if;
+  _n.course_id := p_course_id; _n.body := ''; _n.pinned := false; _n.reactions_on := false;
+  _n := fv_private.bulletin_patched(_n, p_bulletin, _pages > 0);
+  insert into bulletin (course_id, kind, body, link_url, link_title, pinned, pinned_until, assessment_id, reactions_on, posted_at, idempotency_key)
+  values (p_course_id, _n.kind, _n.body, _n.link_url, _n.link_title, _n.pinned, _n.pinned_until, _n.assessment_id, _n.reactions_on,
+      case when _pages = 0 then now() end, p_idempotency_key)
+  returning id into _id;
+  insert into bulletin_file (course_id, bulletin_id, kind, title, page_count, position)
+  select p_course_id, _id, e.value->>'kind',
+     coalesce(nullif(regexp_replace(coalesce(e.value->>'title', ''), '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), case when e.value->>'kind' = 'photo' then 'Photo' else 'PDF' end),
+     (e.value->>'pages')::int, e.n
+   from jsonb_array_elements(_fs) with ordinality e(value, n);
+  _out := jsonb_build_object('bulletin', fv_private.bulletin_json(_id), 'bucket', 'bulletin-files');
+  perform fv_idem_store(p_idempotency_key, 'post_bulletin', _out);
+  return _out;
+end;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
@@ -9923,6 +10403,107 @@ begin
     return _id;
 end; $function$;
 
+CREATE OR REPLACE FUNCTION public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached  jsonb;
+    _ids     uuid[];
+    _skipped jsonb;
+    _out     jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'set_student_page_options');
+    if _cached is not null then return _cached; end if;
+    if p_show_overall_grade is null and p_paused is null then
+        raise exception 'nothing to change' using errcode = '22023';
+    end if;
+    if p_show_overall_grade not in ('class', 'show', 'hide') then
+        raise exception 'show_overall_grade must be class, show or hide' using errcode = '22023';
+    end if;
+    if coalesce(cardinality(p_enrollment_ids), 0) = 0 then
+        raise exception 'no students given' using errcode = '22023';
+    end if;
+    if cardinality(p_enrollment_ids) > 500 then
+        raise exception 'at most 500 students at a time' using errcode = '22023';
+    end if;
+    if array_position(p_enrollment_ids, null) is not null then
+        raise exception 'a student id is missing' using errcode = '22023';
+    end if;
+    -- The students of this class who are not withdrawn. Any other id (withdrawn, gone, another class's or
+    -- another teacher's) is skipped: nothing changes for it, and it comes back in skipped as it was sent,
+    -- with nothing said about why.
+    _ids := array(select e.id from enrollment e
+                   where e.id = any (p_enrollment_ids) and e.course_id = p_course_id and e.withdrawn_at is null);
+    _skipped := coalesce((select jsonb_agg(x.id order by x.n)
+                            from (select u.id, min(u.n) as n from unnest(p_enrollment_ids) with ordinality u(id, n)
+                                   where u.id <> all (_ids) group by u.id) x), '[]'::jsonb);
+    if cardinality(_ids) = 0 then
+        raise exception 'no student of this class given' using errcode = 'P0002';
+    end if;
+    -- Only the rows that change are written (a pause keeps the time it began).
+    update enrollment e
+       set show_overall_grade = case p_show_overall_grade when 'class' then null when 'show' then true
+                                                          when 'hide' then false else e.show_overall_grade end,
+           page_paused_at = case when p_paused then coalesce(e.page_paused_at, now())
+                                 when not p_paused then null else e.page_paused_at end,
+           updated_at = now()
+     where e.id = any (_ids) and e.course_id = p_course_id and e.withdrawn_at is null
+       and (e.show_overall_grade is distinct from case p_show_overall_grade when 'class' then null when 'show' then true
+                                                                            when 'hide' then false else e.show_overall_grade end
+            or e.page_paused_at is distinct from case when p_paused then coalesce(e.page_paused_at, now())
+                                                      when not p_paused then null else e.page_paused_at end);
+    _out := jsonb_build_object('ok', true, 'options', coalesce((
+        select jsonb_agg(jsonb_build_object(
+                   'enrollment_id', e.id,
+                   'show_overall_grade', case e.show_overall_grade when true then 'show' when false then 'hide' else 'class' end,
+                   'paused_at', e.page_paused_at) order by e.roster_position, e.id)
+          from enrollment e where e.id = any (_ids)), '[]'::jsonb),
+        'skipped', _skipped);
+    perform fv_idem_store(p_idempotency_key, 'set_student_page_options', _out);
+    return _out;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _cached jsonb;
+  _course uuid;
+  _b bulletin%rowtype;
+  _out jsonb;
+begin
+  if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+  _cached := fv_idem_check(p_idempotency_key, 'show_bulletin_again');
+  if _cached is not null then return _cached; end if;
+  select b.course_id into _course from bulletin b where b.id = p_bulletin_id and fv_owns_course(b.course_id);
+  if _course is not null then
+    perform pg_advisory_xact_lock(hashtext('fv.bulletin'), hashtext(_course::text));
+    -- Re-read under the lock.
+    select * into _b from bulletin where id = p_bulletin_id for update;
+  end if;
+  if _b.id is null then
+    raise exception 'bulletin not found' using errcode = 'P0002';
+  elsif _b.posted_at is null then
+    raise exception 'a bulletin students cannot see yet cannot be shown again' using errcode = '22023';
+  end if;
+  update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id;
+  _out := jsonb_build_object('bulletin', fv_private.bulletin_json(p_bulletin_id));
+  perform fv_idem_store(p_idempotency_key, 'show_bulletin_again', _out);
+  return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.soft_delete_teacher()
  RETURNS void
  LANGUAGE plpgsql
@@ -11379,6 +11960,36 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit._bulletin_session_enrollments(p_session_id uuid)
+ RETURNS uuid[]
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+    select coalesce(array_agg(e.id order by x.added_at, e.id), '{}')
+      from device_session_enrollment x
+      join student_card k on k.id = x.card_id
+      join enrollment e on e.id = x.enrollment_id
+      join student s on s.id = e.student_id
+      join course c on c.id = e.course_id
+     where x.session_id = p_session_id
+       and k.stopped_at is null and e.withdrawn_at is null and c.deleted_at is null and c.student_page_enabled
+       and e.page_paused_at is null;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit._bulletin_visible(p_bulletin_id uuid, p_enrollment_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+    -- It exists, it is posted (every file finished), and it is in the student's class.
+    -- _session_class has already refused a student who may see nothing.
+    select exists (select 1 from public.bulletin b
+                     join public.enrollment e on e.course_id = b.course_id
+                    where b.id = p_bulletin_id and e.id = p_enrollment_id and b.posted_at is not null);
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit._card_key_seen(p_key_id text)
  RETURNS void
  LANGUAGE plpgsql
@@ -11476,7 +12087,8 @@ AS $function$
     select case
                when k.stopped_at is not null then 'card_stopped'
                when c.deleted_at is not null or e.withdrawn_at is not null then 'not_found'
-               when not c.student_page_enabled then 'closed'
+               -- 2026111720: a student whose page the teacher paused is refused as a class with its page off
+               when not c.student_page_enabled or e.page_paused_at is not null then 'closed'
                when (now() at time zone public._fv_timezone(c.timezone))::date > k.works_until then 'card_expired'
            end
       from student_card k
@@ -12136,7 +12748,8 @@ AS $function$
       join student s on s.id = e.student_id
       join course c on c.id = e.course_id
      where x.session_id = p_session_id
-       and k.stopped_at is null and e.withdrawn_at is null and c.deleted_at is null and c.student_page_enabled;
+       and k.stopped_at is null and e.withdrawn_at is null and c.deleted_at is null and c.student_page_enabled
+       and e.page_paused_at is null;  -- 2026111720: a class whose page the teacher paused for this student is left out
 $function$;
 
 CREATE OR REPLACE FUNCTION student_submit._slip_old_until()
@@ -12348,6 +12961,171 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit.bulletin_file_links(p_session_token text, p_enrollment_id uuid, p_bulletin_file_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _f  public.bulletin_file%rowtype;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    select f.* into _f from public.bulletin_file f
+     where f.id = p_bulletin_file_id and f.status = 'ready'
+       and student_submit._bulletin_visible(f.bulletin_id, p_enrollment_id);
+    if not found then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    return jsonb_build_object(
+        'ok', true, 'bucket', 'bulletin-files',
+        'file_id', _f.id, 'bulletin_id', _f.bulletin_id, 'kind', _f.kind, 'title', _f.title, 'page_count', _f.page_count,
+        'pages', (select jsonb_agg(jsonb_build_object('page', n, 'path', fv_private.bulletin_file_path(_f.course_id, _f.id, n)) order by n)
+                    from generate_series(1, _f.page_count) n));
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.bulletin_react(p_session_token text, p_enrollment_id uuid, p_bulletin_id uuid, p_word text, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _no jsonb;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    if p_word is not null and p_word not in ('got_it', 'done', 'question') then
+        return jsonb_build_object('ok', false, 'error', 'bad_request');
+    end if;
+    if not student_submit._bulletin_visible(p_bulletin_id, p_enrollment_id) then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    if not (select b.reactions_on from public.bulletin b where b.id = p_bulletin_id) then
+        return jsonb_build_object('ok', false, 'error', 'reactions_off');
+    end if;
+    _no := student_submit._write_limit((_in->>'card_id')::uuid, 'bulletin', 120);
+    if _no is not null then
+        return _no;
+    end if;
+    if p_word is null then
+        delete from public.bulletin_reaction where bulletin_id = p_bulletin_id and enrollment_id = p_enrollment_id;
+    else
+        insert into public.bulletin_reaction (bulletin_id, enrollment_id, word, updated_at)
+        values (p_bulletin_id, p_enrollment_id, p_word, now())
+        on conflict (bulletin_id, enrollment_id) do update set word = excluded.word, updated_at = excluded.updated_at;
+    end if;
+    return jsonb_build_object('ok', true, 'reaction', p_word);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.bulletin_seen(p_session_token text, p_enrollment_id uuid, p_bulletin_ids uuid[], p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _no jsonb;
+    _n  int;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    if coalesce(cardinality(p_bulletin_ids), 0) > 100 then
+        return jsonb_build_object('ok', false, 'error', 'bad_request');
+    end if;
+    _no := student_submit._write_limit((_in->>'card_id')::uuid, 'bulletin', 120);
+    if _no is not null then
+        return _no;
+    end if;
+    -- The first time is kept: a second mark changes nothing. An id the student may not see is skipped.
+    insert into public.bulletin_seen (bulletin_id, enrollment_id, seen_at)
+    select d.id, p_enrollment_id, clock_timestamp()
+      from (select distinct x.id from unnest(coalesce(p_bulletin_ids, '{}')) as x(id) where x.id is not null) d
+     where student_submit._bulletin_visible(d.id, p_enrollment_id)
+     order by d.id
+    on conflict (bulletin_id, enrollment_id) do nothing;
+    get diagnostics _n = row_count;
+    return jsonb_build_object('ok', true, 'seen', _n);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in     jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _course uuid;
+    _tz     text;
+    _today  date;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    _course := (_in->>'course_id')::uuid;
+    select c.timezone, (now() at time zone public._fv_timezone(c.timezone))::date into _tz, _today from public.course c where c.id = _course;
+    return jsonb_build_object(
+        'ok', true,
+        -- Oldest first; one shown again that this student has not seen sorts at its Show It Again time.
+        -- The newest 100 of that order.
+        'bulletins', coalesce((
+            select jsonb_agg(x.item order by x.sort_at, x.id)
+              from (select b.id,
+                           coalesce(case when b.shown_again_at is not null and s.seen_at is null then b.shown_again_at end,
+                                    b.posted_at) as sort_at,
+                           jsonb_build_object(
+                               'id', b.id, 'kind', b.kind, 'body', b.body,
+                               'link_url', b.link_url, 'link_title', b.link_title,
+                               -- Pinned as the teacher's list shows it (M1's rule): off once its last day has passed.
+                               'pinned', fv_private.bulletin_pinned_now(b.pinned, b.pinned_until, _tz),
+                               'pinned_until', b.pinned_until,
+                               -- The linked piece only when the student's page lists it (not a draft, assigned).
+                               'assessment_id', (select a.id from public.assessment a
+                                                  where a.id = b.assessment_id and a.course_id = b.course_id
+                                                    and student_submit._listed(a, _today)),
+                               'reactions_on', b.reactions_on,
+                               'posted_at', b.posted_at, 'edited_at', b.edited_at,
+                               'files', coalesce((select jsonb_agg(jsonb_build_object(
+                                                         'id', f.id, 'kind', f.kind, 'title', f.title,
+                                                         'page_count', f.page_count, 'position', f.position)
+                                                         order by f.position, f.id)
+                                                    from public.bulletin_file f
+                                                   where f.bulletin_id = b.id and f.status = 'ready'), '[]'::jsonb),
+                               -- This student's own, and no one else's.
+                               'seen_at', s.seen_at,
+                               'reaction', r.word) as item
+                      from public.bulletin b
+                      left join public.bulletin_seen s on s.bulletin_id = b.id and s.enrollment_id = p_enrollment_id
+                      left join public.bulletin_reaction r on r.bulletin_id = b.id and r.enrollment_id = p_enrollment_id
+                     where b.course_id = _course and student_submit._bulletin_visible(b.id, p_enrollment_id)
+                     order by sort_at desc, b.id desc
+                     limit 100) x), '[]'::jsonb),
+        -- For each class on this device, that student's own count of bulletins not yet seen.
+        'new', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                       'enrollment_id', k.enrollment_id,
+                       'count', (select count(*) from public.bulletin b
+                                   join public.enrollment e on e.id = k.enrollment_id and e.course_id = b.course_id
+                                  where student_submit._bulletin_visible(b.id, k.enrollment_id)
+                                    and not exists (select 1 from public.bulletin_seen s
+                                                     where s.bulletin_id = b.id and s.enrollment_id = k.enrollment_id)))
+                       order by k.n)
+              from unnest(student_submit._bulletin_session_enrollments((_in->>'session_id')::uuid))
+                   with ordinality as k(enrollment_id, n)), '[]'::jsonb));
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit.card(p_code_hmac text, p_key_id text, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -12491,6 +13269,9 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
+    -- 2026111720: Show Overall Grade as this student has it (their own, or the class's when they have none).
+    _course.show_my_learning := coalesce((select e.show_overall_grade from enrollment e where e.id = p_enrollment_id),
+                                         _course.show_my_learning);
     _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
     return jsonb_build_object(
         'ok', true, 'v', 1,
@@ -13454,6 +14235,10 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
+    -- 2026111720: Show Overall Grade as this student has it (their own, or the class's when they have none).
+    -- Every read of _course.show_my_learning below is this student's value.
+    _course.show_my_learning := coalesce((select e.show_overall_grade from enrollment e where e.id = p_enrollment_id),
+                                         _course.show_my_learning);
     _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
     -- What the class's category weights total: 100, or null with no categories.
     select sum(k.weight) into _weights from category k where k.course_id = _course.id;

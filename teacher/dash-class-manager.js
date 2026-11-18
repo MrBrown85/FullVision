@@ -1855,6 +1855,7 @@ window.DashClassManager = (function () {
     var cid = cmSelectedCourse;
     if (!cid || !sid) return;
     classManagerOpen = false;
+    if (typeof StudentPageStudents !== 'undefined') StudentPageStudents.closeAll();
     _cmNoteOpened(cid);
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
     Router.navigate('/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid));
@@ -3475,6 +3476,8 @@ window.DashClassManager = (function () {
 
   function closeClassManager() {
     classManagerOpen = false;
+    // A student's panel on the Student Page tab closes with Class Settings.
+    if (typeof StudentPageStudents !== 'undefined') StudentPageStudents.closeAll();
     // The Done panel and its New marks last until Class Settings closes.
     cmImportDone = null;
     cmRosterOnly = null;

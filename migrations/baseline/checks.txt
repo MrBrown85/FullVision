@@ -47,6 +47,10 @@ identity column (made in 50-table-extras.sql): student_submit.send_log.id identi
 identity column (made in 50-table-extras.sql): student_submit.write_log.id identity=a generated=
 policy outside the app schemas: cron_job_policy on cron.job
 policy outside the app schemas: cron_job_run_details_policy on cron.job_run_details
+policy outside the app schemas: fv_bulletin_files_fence on storage.objects
+policy outside the app schemas: fv_bulletin_files_read on storage.objects
+policy outside the app schemas: fv_bulletin_files_teachers_only on storage.objects
+policy outside the app schemas: fv_bulletin_files_upload on storage.objects
 policy outside the app schemas: fv_handout_files_fence on storage.objects
 policy outside the app schemas: fv_handout_files_read on storage.objects
 policy outside the app schemas: fv_handout_files_teachers_only on storage.objects
@@ -59,7 +63,6 @@ policy outside the app schemas: fv_student_photos_teachers_only on storage.objec
 policy outside the app schemas: fv_student_photos_upload on storage.objects
 publication supabase_realtime has public.course_sync_cursor
 publication supabase_realtime_messages_publication has realtime.messages
-publication zero_data for all tables
 schema auth
 schema cron
 schema extensions

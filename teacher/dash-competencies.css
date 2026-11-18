@@ -1,0 +1,422 @@
+/* The Competencies tile's two pages at one third of the row (D3 of
+   docs/plans/dashboard-inbox-plan.md). Everything here sits inside
+   .dash-comp-tile. The tile's own box and sliding pages are in dashboard.css
+   (D2). */
+
+/* ── Housing ────────────────────────────────────────────────── */
+/* The tile's side padding is shared with the cards' own, so the rows'
+   negative margins (-6 px, -8 px) land in padding, not past the page's edge:
+   a page never scrolls sideways. */
+.dash-comp-tile {
+  padding-inline: 12px;
+}
+.dash-comp-tile .dash-overview-section {
+  position: relative;
+  padding: 0 8px;
+}
+/* The tile's own title says "Competencies"; the page does not repeat its
+   name. What is left on the line is the view pill and the link. */
+.dash-comp-tile #dash-comp-title,
+.dash-comp-tile #dash-core-title {
+  display: none;
+}
+.dash-comp-tile .dash-section-title {
+  flex-wrap: nowrap;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+.dash-comp-tile .dash-comp-head a,
+.dash-comp-tile .dash-core-head a {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The view menu opens under the pill and across the page, so the tile and
+   the page never cut it: it hangs from the card, not from the pill. */
+.dash-comp-tile .dash-view-wrap {
+  position: static;
+}
+.dash-comp-tile .dash-view-menu {
+  top: 32px;
+  left: 0;
+  width: min(290px, 100%);
+}
+
+/* ── Rows: a legend, a column heading, then one row per competency ── */
+.dash-comp-lines-body {
+  min-height: 0;
+}
+.dash-comp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  flex: none;
+  padding: 0 4px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--text-2);
+}
+.dash-comp-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.dash-comp-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+/* The top bar's own colours, so one scale looks the same on the page. */
+.dash-comp-sw-1 {
+  background: var(--score-1);
+}
+.dash-comp-sw-2 {
+  background: var(--score-2);
+}
+.dash-comp-sw-3 {
+  background: var(--score-3);
+}
+.dash-comp-sw-4 {
+  background: var(--score-4);
+}
+/* The self-assessment blues, never the level colours. The two lightest in
+   light mode (and the two darkest in dark mode) carry an edge in --self-4,
+   the strongest blue in either, so every step stands out from the tile. */
+.dash-comp-st-1 {
+  background: var(--self-1);
+  box-shadow: inset 0 0 0 1px var(--self-4);
+}
+.dash-comp-st-2 {
+  background: var(--self-2);
+  box-shadow: inset 0 0 0 1px var(--self-4);
+}
+.dash-comp-st-3 {
+  background: var(--self-3);
+}
+.dash-comp-st-4 {
+  background: var(--self-4);
+}
+.dash-comp-colhead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  margin: 6px 0 2px;
+  padding: 0 4px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.dash-comp-lines {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Every row is one height, the height a two-line name needs. A name wraps to
+   two lines and only a longer one is cut with an ellipsis (its full name is
+   in the row's accessible name); the number and its word sit beside it and
+   never wrap. Rows share the height between 45 and 64 px; with more than
+   fit, the list scrolls inside the page. */
+.dash-comp-ln {
+  position: relative;
+  box-sizing: border-box;
+  flex: 1 0 45px;
+  max-height: 64px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 8px;
+  align-content: center;
+  column-gap: 8px;
+  row-gap: 3px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.dash-comp-ln:hover {
+  background: var(--overlay-hover);
+}
+.dash-comp-ln.is-picked {
+  background: var(--active-light);
+}
+.dash-comp-ln:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.dash-comp-ln-name {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 15px;
+}
+.dash-comp-ln.is-flag .dash-comp-ln-name {
+  font-weight: 600;
+}
+.dash-comp-ln-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: start;
+  white-space: nowrap;
+  font-weight: 600;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+}
+/* Lowest and Only are words; the tag has no meaning in its colour. */
+.dash-comp-ln-tag {
+  padding: 0 5px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 4px;
+  background: var(--overlay-hover);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 14px;
+}
+.dash-comp-ln-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.dash-comp-ln-bar i {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: 2px;
+}
+.dash-comp-ln-bar i:first-child {
+  border-radius: 4px 2px 2px 4px;
+}
+.dash-comp-ln-bar i:last-child {
+  border-radius: 2px 4px 4px 2px;
+}
+.dash-comp-ln-bar i:only-child {
+  border-radius: 4px;
+}
+.dash-comp-ln-bar i.is-none {
+  background: var(--divider-subtle);
+}
+/* Level Mix: the row's button holds the name and number, and the bar under
+   it is one button per level (today's Level Mix had one per count). The box
+   is the row: one height for every row, as before; the bar keeps its place
+   at the foot. A level's button answers a pointer 4 px above and below its
+   8 px. */
+.dash-comp-lnbox {
+  display: flex;
+  flex: 1 0 45px;
+  flex-direction: column;
+  max-height: 64px;
+  padding-bottom: 10px;
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+.dash-comp-lnbox:hover {
+  background: var(--overlay-hover);
+}
+.dash-comp-lnbox > .dash-comp-ln.is-split {
+  flex: 1 1 auto;
+  max-height: none;
+  grid-template-rows: auto;
+  align-content: end;
+  padding-bottom: 3px;
+  border-radius: 6px 6px 0 0;
+}
+.dash-comp-lnbox > .dash-comp-ln.is-split:hover {
+  background: none;
+}
+.dash-comp-ln-segs {
+  flex: none;
+  margin: 0 4px;
+}
+.dash-comp-ln-seg {
+  position: relative;
+  display: block;
+  min-width: 3px;
+  height: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.dash-comp-ln-seg::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+.dash-comp-ln-seg:first-child {
+  border-radius: 4px 2px 2px 4px;
+}
+.dash-comp-ln-seg:last-child {
+  border-radius: 2px 4px 4px 2px;
+}
+.dash-comp-ln-seg:only-child {
+  border-radius: 4px;
+}
+.dash-comp-ln-seg:hover,
+.dash-comp-ln-seg[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.dash-comp-ln-seg:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* The row's counts as text show in the tip box on the window (the name stays
+   on screen). The copy inside the row is only what the box reads from. */
+.dash-comp-ln-tip {
+  display: none;
+}
+
+/* ── The row's list and the other views' tips: on the window, outside the
+   tile, which clips. Hidden at rest. ───────────────────────────────── */
+.dash-comp-pop,
+.dash-comp-tipbox {
+  position: fixed;
+  z-index: var(--z-fab);
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.dash-comp-pop {
+  top: 8px;
+  left: 8px;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 10px;
+}
+.dash-comp-pop[hidden],
+.dash-comp-tipbox[hidden] {
+  display: none;
+}
+.dash-comp-pop .dash-mix-pop-head,
+.dash-comp-pop-sum,
+.dash-comp-pop-links {
+  flex: none;
+}
+.dash-comp-pop-sum {
+  line-height: 1.4;
+}
+.dash-comp-pop-people {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.dash-comp-pop-level {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-comp-pop-level > span {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-comp-pop-name {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-weight: 600;
+}
+.dash-comp-pop-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.dash-comp-pop-act {
+  padding: 4px 10px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 6px;
+  background: var(--overlay-hover);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.dash-comp-pop-act:hover {
+  background: var(--pressed);
+}
+.dash-comp-pop button:focus-visible,
+.dash-comp-pop a:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+/* A hover tip, shown here from the row it belongs to (the tile's own
+   overflow would cut it), touching the row so the pointer can reach a link
+   in it. The in-row copies stay hidden. */
+.dash-comp-tile .dist-tip {
+  display: none !important;
+}
+.dash-comp-tipbox {
+  width: max-content;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 8px 12px;
+  border-radius: 8px;
+  white-space: normal;
+}
+.dash-comp-tipbox .dist-tip-title,
+.dash-comp-tipbox .dash-comp-tip-line,
+.dash-comp-tipbox .dash-core-tip-line {
+  display: block;
+}
+.dash-comp-tipbox .dist-tip-name {
+  line-height: 1.4;
+  padding: 1px 0;
+}
+.dash-comp-tipbox .dash-core-tip-line {
+  line-height: 1.45;
+}
+.dash-comp-tipbox .dash-core-tip-line.is-quiet {
+  margin-top: 2px;
+  color: var(--text-2);
+}
+.dash-comp-tipbox .dash-core-tip-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-weight: 500;
+  color: var(--link);
+  cursor: pointer;
+}
+.dash-comp-tipbox .dash-comp-tip-line {
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-comp-pop,
+  .dash-comp-tipbox {
+    animation: none;
+    transition: none;
+  }
+}

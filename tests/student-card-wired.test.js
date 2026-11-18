@@ -179,7 +179,10 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     const dev = school();
     const page = await signIn(dev);
     await scrollThroughAll(page);
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen', 'done']);
     page.calls.forEach(c => {
@@ -477,7 +480,10 @@ describe('a card that won’t open says why', () => {
   it('a code typed on the card’s screen that opens nothing gets the card’s words, and stays there', async () => {
     const dev = school();
     const page = await signIn(dev);
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     await page.click('[data-act="card-restart"]');
     page.calls.length = 0;
@@ -515,7 +521,10 @@ describe('a card that won’t open says why', () => {
       },
     });
     const page = await signIn(dev);
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     await page.click('[data-act="card-restart"]');
     page.type('#sp-code', 'K7M-4QX');
@@ -665,8 +674,13 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const dev = school();
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
-    expect(page.root().querySelector('[data-act="logout-ask"]').textContent).toBe('Log Out');
-    await page.click('[data-act="logout-ask"]');
+    // Log Out is in Settings, behind the gear, not in the header.
+    expect(page.root().querySelector('[data-act="logout-ask"]')).toBeNull();
+    await page.click('[data-act="settings-open"]');
+    expect(page.root().querySelector('.sp-set [data-act="logout-ask"]').textContent).toBe('Log Out');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     expect(page.calls[page.calls.length - 1].body).toEqual({ route: 'done', session: token });
     expect(dev.fn.state.sessions).toEqual({});
@@ -701,7 +715,10 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     page.server = () => {
       throw new Error('offline');
     };
-    await page.click('[data-act="logout-ask"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    page.advance(500);
     await page.click('[data-act="card-done"]');
     expect(dev.store).toEqual({});
     expect(page.root().querySelector(LIST)).toBeNull();
@@ -746,7 +763,10 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const first = await signIn(dev);
     const second = await dev.open('');
     expect(second.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    await second.click('[data-act="logout-ask"]');
+    await second.click('[data-act="settings-open"]');
+    await second.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    second.advance(500);
     await second.click('[data-act="card-done"]');
     first.T.checkSession();
     expect(first.root().querySelector(LIST)).toBeNull();
@@ -776,7 +796,10 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     await again.start('#P3R8-WDK4');
     again.type('#sp-ident', '0123456');
     await again.click('[data-act="card-yes"]');
-    await again.click('[data-act="logout-ask"]');
+    await again.click('[data-act="settings-open"]');
+    await again.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    again.advance(500);
     await again.click('[data-act="card-done"]');
     expect(again.calls[again.calls.length - 1].body.route).toBe('done');
     expect(again.root().querySelector('.sp-signed-out')).toBeTruthy();
@@ -1373,7 +1396,10 @@ describe('Demo Mode and a real card cannot drift', () => {
       'value',
     ]);
     // Done shows After Done, and Scan a Card starts the sample again; nothing is kept.
-    await demo.click('[data-act="logout-ask"]');
+    await demo.click('[data-act="settings-open"]');
+    await demo.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    demo.advance(500);
     await demo.click('[data-act="card-done"]');
     expect(demo.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
     await demo.click('[data-act="card-restart"]');
@@ -1394,7 +1420,10 @@ describe('Demo Mode and a real card cannot drift', () => {
     await demo.submit('form[data-form="card"]');
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
-    await demo.click('[data-act="logout-ask"]');
+    await demo.click('[data-act="settings-open"]');
+    await demo.click('.sp-set [data-act="logout-ask"]');
+    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
+    demo.advance(500);
     await demo.click('[data-act="card-done"]');
     expect(demo.calls).toEqual([]);
     expect(dev.store[KEY]).toBe(kept);
@@ -1409,7 +1438,7 @@ describe('the page sends nothing anywhere else', () => {
     expect(html).not.toMatch(/sentry/i);
     expect(html).not.toMatch(/<script[^>]+src="https?:/i);
     expect(html).toContain('<meta name="referrer" content="no-referrer" />');
-    for (const f of ['s/app.js', 's/assignments.js', 's/student-data.js']) {
+    for (const f of ['s/app.js', 's/assignments.js', 's/student-data.js', 's/settings.js']) {
       const src = read(f);
       // The two things asked of `navigator`: the browser's lock that keeps Done
       // to one tab, and on a Chromebook the camera (Scan the Code With the
@@ -1419,13 +1448,16 @@ describe('the page sends nothing anywhere else', () => {
       );
       expect(src, f).not.toMatch(/https?:\/\//);
     }
-    // One key in localStorage, written in one place.
+    // One key in localStorage, written in one place: the session, and the Text Size chosen in
+    // Settings beside it (`z`, one of two words), so Log Out takes both.
     const app = read('s/app.js');
     expect(app.match(/localStorage\.setItem\(/g)).toHaveLength(1);
     expect(app).toContain(
-      'localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment, a: s.active }))',
+      'localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment, a: s.active, z: z }))',
     );
-    expect(read('s/assignments.js') + read('s/student-data.js')).not.toMatch(/localStorage/);
+    expect(app).toContain('var z = sizeOf(s.size) || undefined;');
+    expect(read('s/settings.js')).toContain("return z === 'large' || z === 'larger' ? z : '';");
+    expect(read('s/assignments.js') + read('s/student-data.js') + read('s/settings.js')).not.toMatch(/localStorage/);
     // The address is only ever set to the page's own path.
     expect(app.match(/replaceState\(/g)).toHaveLength(1);
     expect(app).toContain("history.replaceState(null, '', location.pathname)");

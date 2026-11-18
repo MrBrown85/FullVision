@@ -243,7 +243,7 @@ window.DashInsights = (function () {
     return (
       '<div class="dash-mix-pop-head"><span>' +
       esc(col.label + ' · ' + band.label + ' · ' + band.ids.length) +
-      '</span><button type="button" class="dash-mix-pop-close" data-action="mixClose" aria-label="Close">×</button></div>' +
+      '</span><button type="button" class="dash-mix-pop-close" data-comp-close aria-label="Close">×</button></div>' +
       (next
         ? '<div class="dash-mix-pop-next">' + _nextHead('Shared next step', next) + esc(next.text) + '</div>'
         : '') +
@@ -333,6 +333,18 @@ window.DashInsights = (function () {
     return counts;
   }
 
+  /* The second line under the big number never repeats it: both parts when
+     both are above zero, otherwise "All Missing" or "All Late". */
+  function missingSubLine(c) {
+    if (c.ns && !c.late) return 'All ' + MISSING_KINDS.ns.label;
+    if (c.late && !c.ns) return 'All ' + MISSING_KINDS.late.label;
+    return ['ns', 'late']
+      .map(function (k) {
+        return '<b>' + c[k] + '</b> ' + MISSING_KINDS[k].label;
+      })
+      .join(' · ');
+  }
+
   /* The top bar's Missing and Late cell. Zero says so in a line; otherwise
      the two counts, and a click opens the class's gradebook (plan F.8). */
   function missingGlanceHtml(items, cid) {
@@ -356,11 +368,7 @@ window.DashInsights = (function () {
       '">' +
       inner +
       '<span class="dash-glance-sub">' +
-      ['ns', 'late']
-        .map(function (k) {
-          return '<b>' + c[k] + '</b> ' + MISSING_KINDS[k].label;
-        })
-        .join(' · ') +
+      missingSubLine(c) +
       '</span></a>'
     );
   }

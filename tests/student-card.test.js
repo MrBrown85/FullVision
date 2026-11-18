@@ -77,6 +77,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     // What main loads for a slip, then the card's three small files.
     expect(studentPageScripts()).toEqual([
       'shared/html.js',
+      'shared/build-flags.js',
       'shared/phone-report-view.js',
       'shared/loading-screen.js',
       's/student-data.js',
@@ -89,6 +90,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/question-kinds.js',
       's/questionnaire.js',
       's/report.js',
+      // Settings (the gear): Text Size's words and the keys over its sheets; nothing stored or sent.
+      's/settings.js',
       's/app.js',
       's/assignments.js',
       // Sending work (S5-F2); it fetches shared/photo-shrink.js only when a send opens.

@@ -706,6 +706,61 @@ var StudentCards = (function () {
     });
   }
 
+  // The question Print New Cards asks for ticked students: `stop` cards stop, `first` students get their first.
+  function newCardsQuestion(stop, first) {
+    var all = stop + first;
+    return {
+      title: all === 1 ? 'Print a New Card for 1 Student?' : 'Print New Cards for ' + all + ' Students?',
+      message:
+        (stop ? (stop === 1 ? '1 card stops working now. ' : stop + ' cards stop working now. ') : '') +
+        (first
+          ? first === 1
+            ? '1 student gets their first card. '
+            : first + ' students get their first card. '
+          : '') +
+        'Everything they have sent stays.',
+      ok: all === 1 ? 'Print 1 New Card' : 'Print ' + all + ' New Cards',
+    };
+  }
+
+  /* Print New Cards for the students ticked on the list (the Students
+     list's bar): asks first, then one press for just those students, each
+     card in place of the one the list shows for them. */
+  function printNewCards(cid, ids, onYes) {
+    var st = _st(cid);
+    if (st.making || st.loading || st.cards === null) return;
+    var byStudent = _byStudent(st.cards);
+    var want = {};
+    (ids || []).forEach(function (id) {
+      want[id] = true;
+    });
+    var asked = _roster(cid)
+      .filter(function (s) {
+        return want[s.id];
+      })
+      .map(function (s) {
+        var c = byStudent[s.id];
+        return { enrollment_id: s.id, replaces: c ? c.id : null };
+      });
+    if (!asked.length) return;
+    var stop = asked.filter(function (it) {
+      return !!it.replaces;
+    }).length;
+    _ask(cid, newCardsQuestion(stop, asked.length - stop), function () {
+      if (onYes) onYes();
+      _makeAndPrint(cid, asked, true);
+    });
+  }
+
+  /* Show one filter (the line under Show Overall Grade shows Exceptions).
+     A different filter clears the Students list's ticks, so its bar acts only
+     on students the teacher can see. */
+  function setFilter(cid, value) {
+    var st = _st(cid);
+    if (st.filter !== value && _sps()) _sps().clearPicked(cid);
+    st.filter = value;
+  }
+
   // Print the held codes again. Returns how many were printed.
   function printAgain(cid) {
     _check();
@@ -796,15 +851,25 @@ var StudentCards = (function () {
     return 'Not Printed';
   }
 
-  function _rowHtml(cid, st, card, off) {
+  /* One student's row: the box to tick, their name (the button that opens
+     their panel, teacher/student-page-students.js), Card and Status, what
+     they have done and their Overall Grade, and Unlock on a locked card.
+     Print New Card is in the student's panel. */
+  function _rowHtml(cid, st, card, off, facts) {
     var status = _status(cid, card);
     var name = _name(st);
     var dis = off ? ' disabled' : '';
+    var sps = _sps();
+    var open = !!sps && sps.openStudent(cid) === st.id;
     return (
       '<tr class="sc-row' +
       (card ? '' : ' sc-none') +
-      '"><th scope="row" class="sc-name">' +
-      esc(name) +
+      (sps && sps.picked(cid).indexOf(st.id) >= 0 ? ' sps-picked' : '') +
+      (open ? ' sps-open-row' : '') +
+      '">' +
+      (sps ? sps.pickHtml(cid, st) : '') +
+      '<th scope="row" class="sc-name">' +
+      (sps ? sps.nameHtml(cid, st) : esc(name)) +
       '</th><td class="sc-which' +
       (_reissued(card) ? ' sc-reissued' : '') +
       '">' +
@@ -816,7 +881,9 @@ var StudentCards = (function () {
         : status === 'Not Printed'
           ? '<span class="sc-unprinted">' + esc(status) + '</span>'
           : esc(status)) +
-      '</td><td class="sc-do">' +
+      '</td>' +
+      (sps && facts ? sps.cellsHtml(cid, st, facts) : '') +
+      '<td class="sc-do">' +
       (card && card.locked_at
         ? '<button type="button" class="cm-action-btn sc-row-btn" data-action="spCardsUnlock" data-card="' +
           esc(card.id) +
@@ -826,7 +893,8 @@ var StudentCards = (function () {
           dis +
           '>Unlock</button>'
         : '') +
-      (card
+      // Without the Students panel (it is not loaded), Print New Card stays on the row.
+      (card && !sps
         ? '<button type="button" class="cm-action-btn sc-row-btn" data-action="spCardsNewCard" data-student="' +
           esc(st.id) +
           '" aria-label="' +
@@ -839,6 +907,10 @@ var StudentCards = (function () {
     );
   }
 
+  // The Students list's additions (teacher/student-page-students.js), when that file is loaded.
+  function _sps() {
+    return typeof StudentPageStudents !== 'undefined' ? StudentPageStudents : null;
+  }
   /* ── Filters ───────────────────────────────────────────────── */
 
   /* Which students each filter shows, and what it says when it shows none.
@@ -875,41 +947,52 @@ var StudentCards = (function () {
     },
   ];
 
-  function _filter(st) {
+  /* The class's filters: All, then the Students list's own (Feedback Not
+     Opened, Questions, Exceptions; teacher/student-page-students.js), then
+     the cards'. Each `shows(card, student, facts)`. */
+  function _filters(cid) {
+    var sps = _sps();
+    return [FILTERS[0]].concat(sps ? sps.filters(cid) : [], FILTERS.slice(1));
+  }
+
+  function _filter(st, cid) {
+    var all = cid ? _filters(cid) : FILTERS;
     return (
-      FILTERS.filter(function (f) {
+      all.filter(function (f) {
         return f.value === st.filter;
-      })[0] || FILTERS[0]
+      })[0] || all[0]
     );
   }
 
-  function _filterHtml(st, students, byStudent) {
-    var on = _filter(st).value;
+  function _filterHtml(st, students, byStudent, cid, facts) {
+    var on = _filter(st, cid).value;
     return (
       '<div class="sc-filters" role="radiogroup" aria-label="Show">' +
-      FILTERS.map(function (f) {
-        var n = f.shows
-          ? students.filter(function (s) {
-              return f.shows(byStudent[s.id]);
-            }).length
-          : students.length;
-        var chosen = f.value === on;
-        return (
-          '<button type="button" class="sc-chip' +
-          // The colour says what it means only when there is something in it.
-          (f.tone && n ? ' sc-chip-' + f.tone : '') +
-          (chosen ? ' active' : '') +
-          '" role="radio" aria-checked="' +
-          chosen +
-          '" data-action="spCardsFilter" data-value="' +
-          f.value +
-          '">' +
-          esc(f.label) +
-          ' <span class="sc-count">' +
-          n +
-          '</span></button>'
-        );
-      }).join('') +
+      _filters(cid)
+        .map(function (f) {
+          var n = f.shows
+            ? students.filter(function (s) {
+                return f.shows(byStudent[s.id], s, facts[s.id]);
+              }).length
+            : students.length;
+          var chosen = f.value === on;
+          return (
+            '<button type="button" class="sc-chip' +
+            // The colour says what it means only when there is something in it.
+            (f.tone && n ? ' sc-chip-' + f.tone : '') +
+            (chosen ? ' active' : '') +
+            '" role="radio" aria-checked="' +
+            chosen +
+            '" data-action="spCardsFilter" data-value="' +
+            f.value +
+            '">' +
+            esc(f.label) +
+            ' <span class="sc-count">' +
+            n +
+            '</span></button>'
+          );
+        })
+        .join('') +
       '</div>'
     );
   }
@@ -1076,12 +1159,17 @@ var StudentCards = (function () {
   }
 
   function _stillOldLine(names) {
+    // With the Students panel, Print New Card is in the panel a name opens.
+    var how = _sps()
+      ? names.length === 1
+        ? '. Choose their name, then Print New Card, to try again.'
+        : '. Choose each name, then Print New Card, to try again.'
+      : names.length === 1
+        ? '. Use Print New Card on their row to try again.'
+        : '. Use Print New Card on their rows to try again.';
     return names.length === 1
-      ? '1 student still has their old card: ' + names[0] + '. Use Print New Card on their row to try again.'
-      : names.length +
-          ' students still have their old card: ' +
-          names.join(', ') +
-          '. Use Print New Card on their rows to try again.';
+      ? '1 student still has their old card: ' + names[0] + how
+      : names.length + ' students still have their old card: ' + names.join(', ') + how;
   }
 
   // `n` is the number on the Make and Print button.
@@ -1190,17 +1278,34 @@ var StudentCards = (function () {
       else if (!students.length) notes.push('No students to make cards for.');
     }
     var dis = off ? ' disabled' : '';
-    var filter = _filter(st);
+    var sps = _sps();
+    if (sps) sps.leave(cid);
+    var facts = known && sps ? sps.classFacts(cid, students) : {};
+    var filter = _filter(st, cid);
     var shown = students.filter(function (s) {
-      return !filter.shows || filter.shows(byStudent[s.id]);
+      return !filter.shows || filter.shows(byStudent[s.id], s, facts[s.id]);
     });
+    var head = sps
+      ? sps.headHtml(
+          cid,
+          shown.map(function (s) {
+            return s.id;
+          }),
+        )
+      : { pick: '', rest: '' };
+    var panelFor = sps ? sps.openStudent(cid) : null;
+    var panelCard = panelFor ? byStudent[panelFor] || null : null;
     return (
       '<div class="cm-section sc-card" data-cid="' +
       esc(cid) +
       '">' +
-      '<div class="sc-head"><div class="sc-titles"><h2 class="cm-grade-title" id="sc-title" tabindex="-1">Student Cards</h2>' +
+      '<div class="sc-head"><div class="sc-titles"><h2 class="cm-grade-title" id="sc-title" tabindex="-1">Students</h2>' +
       '<div class="cm-hint">' +
-      esc('One card for each student. They scan it, or type its code, to open their page.') +
+      esc(
+        sps
+          ? 'Each student’s card, the work they’ve sent, and what their page shows. They scan their card, or type its code, to open their page.'
+          : 'One card for each student. They scan it, or type its code, to open their page.',
+      ) +
       '</div></div>' +
       '<div class="sc-actions">' +
       (failed ? '<button type="button" class="cm-action-btn" data-action="spCardsRetry">Try Again</button>' : '') +
@@ -1234,19 +1339,34 @@ var StudentCards = (function () {
       // Sticker Sheets for Scanning (teacher/scan-labels.js): a row of its own
       // under the cards' own buttons, since a sticker is not a card.
       stickersHtml(cid) +
-      (known && students.length ? _filterHtml(st, students, byStudent) : '') +
+      (known && students.length ? _filterHtml(st, students, byStudent, cid, facts) : '') +
+      (known && sps ? sps.barHtml(cid, off) : '') +
       (known && students.length && !shown.length
         ? '<div class="cm-hint sc-empty" role="status">' + esc(filter.empty) + '</div>'
         : '') +
       (known && shown.length
-        ? '<table class="sc-table"><thead><tr><th scope="col">Student</th><th scope="col">Card</th>' +
-          '<th scope="col">Status</th><th scope="col" class="sc-do" aria-label="Actions"></th></tr></thead><tbody>' +
+        ? '<div class="sps-table-wrap"><table class="sc-table"><thead><tr>' +
+          head.pick +
+          '<th scope="col">Student</th><th scope="col">Card</th>' +
+          '<th scope="col">Status</th>' +
+          head.rest +
+          '<th scope="col" class="sc-do" aria-label="Actions"></th></tr></thead><tbody>' +
           shown
             .map(function (s) {
-              return _rowHtml(cid, s, byStudent[s.id], off);
+              return _rowHtml(cid, s, byStudent[s.id], off, facts[s.id]);
             })
             .join('') +
-          '</tbody></table>'
+          '</tbody></table></div>'
+        : '') +
+      // The student's panel, beside the list (teacher/student-page-students.js).
+      (sps && known
+        ? sps.panelHtml(cid, {
+            card: panelCard,
+            cardText: _cardText(panelCard),
+            status: _status(cid, panelCard),
+            until: panelCard && panelCard.works_until ? _fmtDay(String(panelCard.works_until).slice(0, 10)) : '',
+            off: off,
+          })
         : '') +
       '</div>'
     );
@@ -1350,7 +1470,7 @@ var StudentCards = (function () {
     }
     if (action === 'spCardsFilter') {
       if (cid && data.value) {
-        _st(cid).filter = data.value;
+        setFilter(cid, data.value);
         _rerender();
         // The redraw makes the chosen filter a new button: the focus goes back to it.
         _focus('.sc-filters [data-value="' + data.value + '"]');
@@ -1394,6 +1514,7 @@ var StudentCards = (function () {
   function _reset() {
     _left();
     _state = {};
+    if (_sps()) _sps()._reset();
   }
 
   return {
@@ -1408,6 +1529,9 @@ var StudentCards = (function () {
     makeAndPrint: makeAndPrint,
     printNewCard: printNewCard,
     newCodes: newCodes,
+    printNewCards: printNewCards,
+    newCardsQuestion: newCardsQuestion,
+    setFilter: setFilter,
     unlock: unlock,
     unlockAll: unlockAll,
     printAgain: printAgain,

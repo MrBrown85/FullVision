@@ -159,6 +159,8 @@ function _clearCourseLocalState(id) {
     'grade-returns',
     'category-draft',
     'student-cards',
+    // Per-student options on the Student Page (shared/data-reflect.js), kept on the device in Demo Mode.
+    'student-page-options',
     'student-work',
     'student-feedback',
     'statuses',
@@ -176,6 +178,10 @@ function _clearCourseLocalState(id) {
     'withdrawn',
     'bundle-meta',
     'assessment-resources',
+    // Bulletins (shared/data-bulletins.js): Demo Mode's, and a post waiting to be sent.
+    'bulletins',
+    'bulletins-pending',
+    'bulletins-returned',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];

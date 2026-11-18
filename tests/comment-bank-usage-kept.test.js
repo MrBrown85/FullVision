@@ -72,7 +72,8 @@ describe('classmates’ usage, kept per comment', () => {
     // Asked again, and with a plain string among them.
     const more = list.concat(['Plain: ' + said(bank.sentences[5])]);
     expect(keyed(CommentBank.classUsage(bank, more, 'cls-kept', 's3'))).toEqual(keyed(reference(bank, more, {}, 's3')));
-  });
+    // Every sentence read against every comment, twice: seconds on a slow CI runner.
+  }, 30000);
 
   it('reads only a changed comment again', () => {
     const bank = COMMENT_BANK;

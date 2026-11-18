@@ -1,0 +1,301 @@
+/* The Inbox's Roll Call view (D8 of docs/plans/dashboard-inbox-plan.md; board
+   C4). The whole class: name chips in a short tile, small pages in a tall one.
+   Solid is work in, dashed is not in, a tick is returned, bold waits to be
+   graded; Late and On Paper are said in words in each chip's name, never by
+   colour alone. */
+.dash-inbox-roll {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.dash-inbox-roll-empty {
+  margin: 0;
+  padding: 10px 4px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-inbox-roll-pick {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+.dash-inbox-roll-piece {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-inbox-roll-grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* One student. */
+.dash-inbox-roll-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 28px;
+  max-width: 128px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px dashed var(--text-3);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.dash-inbox-roll-chip.is-in {
+  background: var(--surface-2);
+  border: 1px solid var(--divider-heavy);
+}
+.dash-inbox-roll-chip.is-tograde {
+  font-weight: 700;
+  border-color: var(--text-2);
+}
+.dash-inbox-roll-chip:hover {
+  border-color: var(--active);
+}
+.dash-inbox-roll-chip:focus-visible,
+.dash-inbox-roll-item:focus-visible,
+.dash-inbox-roll-all:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.dash-inbox-roll-chip.is-menu:not(.is-page) {
+  border: 2px solid var(--active);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--active) 25%, transparent);
+}
+/* Excused: quiet, neither solid nor a dashed "not in" outline. */
+.dash-inbox-roll-chip.is-excused {
+  color: var(--text-3);
+  font-style: italic;
+  background: none;
+  border: 1px solid transparent;
+}
+.dash-inbox-roll-chip.is-excused:hover {
+  border-color: transparent;
+}
+.dash-inbox-roll-chip.is-page.is-excused .dash-inbox-roll-pg {
+  border: 1px solid var(--divider-subtle);
+  background: none;
+}
+.dash-inbox-roll-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-inbox-roll-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+.dash-inbox-roll-tick,
+.dash-inbox-roll-paper {
+  width: 12px;
+  height: 12px;
+  color: var(--text-2);
+}
+/* Late: a small amber rule under the name, beside the word in its name. */
+.dash-inbox-roll-chip.is-late .dash-inbox-roll-name {
+  text-decoration: underline;
+  text-decoration-color: var(--score-2-text);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* A taller tile: the chip carries its page. */
+.dash-inbox-roll-grid {
+  --dash-inbox-roll-cols: 9;
+  --dash-inbox-roll-pg: 80px;
+}
+.dash-inbox-roll.is-pages .dash-inbox-roll-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--dash-inbox-roll-cols), minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+.dash-inbox-roll-chip.is-page {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  padding: 0;
+  text-align: center;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+}
+.dash-inbox-roll-chip.is-page.is-in,
+.dash-inbox-roll-chip.is-page.is-tograde {
+  background: none;
+}
+.dash-inbox-roll-pg {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--dash-inbox-roll-pg);
+  min-height: 80px;
+  overflow: hidden;
+  background: transparent;
+  border: 1px dashed var(--text-3);
+  border-radius: 4px;
+}
+.dash-inbox-roll-chip.is-in .dash-inbox-roll-pg {
+  background: #f4f1ea;
+  border: 1px solid var(--divider-strong);
+  box-shadow: var(--shadow-sm);
+}
+.dash-inbox-roll-chip.is-page:not(.is-excused):hover .dash-inbox-roll-pg {
+  border-color: var(--active);
+}
+.dash-inbox-roll-chip.is-page.is-menu .dash-inbox-roll-pg {
+  border: 2px solid var(--active);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--active) 25%, transparent);
+}
+.dash-inbox-roll-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.dash-inbox-roll-sheet {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: #fbfaf6;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 11px, rgba(60, 100, 170, 0.28) 11px 12px);
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-marks {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 3px;
+  background: #fbfaf6;
+  border-radius: 8px;
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-tick,
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-paper {
+  color: #3b3b3f;
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-name {
+  display: block;
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+
+/* The foot: the counts, and the class page. */
+.dash-inbox-roll-foot {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-inbox-roll-count {
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-inbox-roll-all {
+  height: 28px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--link);
+  white-space: nowrap;
+  background: none;
+  border: 1px solid var(--active);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dash-inbox-roll-all:hover {
+  background: var(--surface-2);
+}
+
+/* The one-item menu: out of the page until opened. It is built when a chip
+   opens it and removed when it closes, so it is never merely hidden. */
+.dash-inbox-roll-menu {
+  position: absolute;
+  z-index: 5;
+  min-width: 120px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--divider-heavy);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 6px 20px rgba(0, 0, 0, 0.18));
+}
+.dash-inbox-roll-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dash-inbox-roll-item:hover {
+  background: var(--surface-2);
+}
+
+/* A word in the chip where a colour or a line would not be enough: Late,
+   Missing, Excused. In a page chip it sits on the page's top edge. */
+.dash-inbox-roll-tag {
+  flex: 0 0 auto;
+  font-size: var(--text-2xs);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-2);
+}
+.dash-inbox-roll-tag.is-late {
+  color: var(--score-2-text);
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-tag {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  padding: 2px 4px;
+  background: #fbfaf6;
+  color: #3b3b3f;
+  border-radius: 4px;
+}
+.dash-inbox-roll-chip.is-page .dash-inbox-roll-tag.is-late {
+  color: #92400e;
+}
+.dash-inbox-roll-chip.is-excused-in {
+  font-style: italic;
+}
+.dash-inbox-roll-img {
+  -webkit-user-drag: none;
+  user-select: none;
+}

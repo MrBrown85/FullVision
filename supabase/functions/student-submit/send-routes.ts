@@ -60,7 +60,9 @@
 import { inspectJpeg, sha256Hex, type JpegOk } from '../_shared/jpeg-check.ts';
 import {
   BUCKET,
+  BULLETIN_BUCKET,
   FILE_BUCKET,
+  bulletinPathParts,
   handoutFilePathParts,
   handoutPathParts,
   pathParts,
@@ -452,6 +454,7 @@ export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'no
         left = whole(r.left, 0, Number.MAX_SAFE_INTEGER) ? r.left : 0;
         const items: { id: string; path: string }[] = [];
         const files: { id: string; path: string }[] = [];
+        const bulletinPages: { id: string; path: string }[] = [];
         for (const it of list(r.items)) {
           const x = isObject(it) ? it : {};
           const id = typeof x.id === 'number' && Number.isSafeInteger(x.id) && x.id > 0 ? String(x.id) : null;
@@ -461,6 +464,9 @@ export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'no
             items.push({ id, path: x.path as string });
           } else if (id && x.bucket === FILE_BUCKET && handoutFilePathParts(x.path)) {
             files.push({ id, path: x.path as string });
+          } else if (id && x.bucket === BULLETIN_BUCKET && bulletinPathParts(x.path)) {
+            // A bulletin file's page, in its own bucket (Bulletins, 2026111801).
+            bulletinPages.push({ id, path: x.path as string });
           } else skipped++;
         }
         // Each bucket's files deleted, then reported done, before the next bucket is
@@ -468,6 +474,7 @@ export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'no
         for (const [batch, bucket] of [
           [items, null],
           [files, FILE_BUCKET],
+          [bulletinPages, BULLETIN_BUCKET],
         ] as const) {
           if (!batch.length) continue;
           if (bucket)

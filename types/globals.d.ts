@@ -1,6 +1,8 @@
 // Globals other files set with window.X = ..., which TypeScript can't see.
 declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
+  // Build flags (shared/build-flags.js): unfinished work stays behind one.
+  BuildFlags: { on(name: string): boolean };
   // The data layer's namespace (shared/data.js and the data-*.js files).
   // Only what a checked file calls is typed; the rest is unknown until
   // those files are checked.
@@ -106,6 +108,15 @@ interface Window {
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
   CmTerms: unknown;
+  DashCompetencies: unknown;
+  DashRecent: unknown;
+  DashInboxModel: unknown;
+  DashInbox: unknown;
+  DashInboxDrop: unknown;
+  DashInboxPick: unknown;
+  DashInboxSide: unknown;
+  PageDashboard: unknown;
+  DashInboxRoll: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
@@ -114,6 +125,8 @@ interface Window {
   StudentOverview: unknown;
   // The phone's tab bar and last tab (teacher-mobile/tab-bar.js).
   MTabBar: unknown;
+  MBulletins: unknown;
+  MBulletinsModel: unknown;
 }
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
@@ -142,6 +155,10 @@ interface Window {
   v2Queue: {
     dropBlockedOn(localId: string, opts?: unknown): number;
     remove(id: string): boolean;
+    has(id: string): boolean;
+    deadLetter(): any[];
+    dismissDeadLetter(id: string): void;
+    subscribe(listener: (evt: { kind: string; meta: any }) => void): () => void;
     markReloaded(classId: string): number;
   };
   __fvPerf: unknown[];
@@ -195,6 +212,19 @@ interface Window {
 }
 // The sync toast (teacher/ui.js, not checked yet).
 declare function showSyncToast(message: string, type?: string): void;
+// The sample class's bulletins (shared/seed-data.js, loaded in Demo Mode only).
+declare function seedDemoBulletins(): boolean;
+// The desktop sidebar and the confirm dialog (teacher/ui.js, not checked yet).
+declare function renderSidebar(activeCourse: string, selectedStudentId?: string, onStudentClick?: string): string;
+declare function initSidebarToggle(): void;
+declare function showConfirm(
+  title: string,
+  message: string,
+  okLabel?: string,
+  okStyle?: string,
+  onConfirm?: () => void,
+  cancelLabel?: string,
+): void;
 // What each window.v2.upsert* call reads from its params (shared/data-rpc-wrappers.js).
 type V2UpsertSubjectParams = {
   id: string | null;
@@ -282,6 +312,7 @@ declare function signOut(opts?: { force?: boolean; redirect?: string }): Promise
 // seed-data.js (loaded in Demo Mode only): the sample class and its seeder.
 declare var DEFAULT_COURSES: Record<string, unknown>;
 declare function seedIfNeeded(): void;
+declare function seedDemoDrafts(): boolean;
 interface Window {
   // Set by the Netlify edge function (inject-env.js).
   __ENV?: { SUPABASE_URL?: string; SUPABASE_KEY?: string };
@@ -348,3 +379,30 @@ declare var MSplitScanModel: any;
 declare var MComponents: any;
 declare var MGrade: any;
 declare var MGradePhotos: any;
+// Class Settings and the modules the Students list calls
+// (teacher/student-page-students.js), which are not typed.
+declare var DashClassManager: any;
+declare var DashOverview: any; // teacher/dash-overview.js
+declare var DashInsights: any; // teacher/dash-insights.js
+declare var DashInboxModel: any; // teacher/dash-inbox-model.js
+declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
+declare var DashInbox: any; // teacher/dash-inbox.js
+declare var DashInboxPick: any; // teacher/dash-inbox-pick.js
+declare var DashInboxSide: any; // teacher/dash-inbox-side.js
+declare var PageDashboard: any; // teacher/page-dashboard.js
+declare var BuildFlags: { on(name: string): boolean };
+declare var WorkThumbs: any;
+declare var WorkWall: any;
+declare var PageAssignments: any;
+declare function segSelect(btn: Element): void; // teacher/ui.js
+declare var StudentCards: any;
+declare var CmStudentPage: any;
+declare var StudentView: any;
+declare var PreviewStudent: any;
+declare var Questionnaires: any;
+declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: () => void, durationMs?: number): void;
+// The student page's Settings helpers (s/settings.js): Text Size's words and
+// classes, and the keys for Settings and Log Out? over the page.
+interface Window {
+  StudentSettings: unknown;
+}

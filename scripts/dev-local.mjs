@@ -67,6 +67,7 @@ const APP_ROUTES = [
   '/assignments',
   '/student',
   '/gradebook',
+  '/bulletins',
   '/observations',
   '/observations/starters',
   '/reports',
