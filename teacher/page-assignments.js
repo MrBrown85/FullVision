@@ -7184,15 +7184,15 @@ window.PageAssignments = (function () {
       return a.id === aid;
     });
     if (!orig) return;
-    var id = uid();
     var dupe = structuredClone(orig);
-    dupe.id = id;
+    var id = (dupe.id = uid());
     // A duplicate in the same class is new work, not a linked copy.
     delete dupe.copyGroup;
     dupe.title = orig.title + ' (Copy)';
     dupe.created = new Date().toISOString();
     assessments.push(dupe);
     saveAssessments(cid, assessments);
+    if (window.AssessmentCopy) AssessmentCopy.carryQuiz(cid, orig, cid, dupe); // its quiz too (Q7)
     openAssessIds.add(id);
     render();
   }

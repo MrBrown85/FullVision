@@ -309,7 +309,68 @@ window.AssessmentCopy = (function () {
     var list = (getAssessments(plan.dstCid) || []).slice();
     list.push(built.assessment);
     saveAssessments(plan.dstCid, list);
+    // Its quiz goes with it (Q7), behind the quizzes switch; saved after the copy's own create.
+    var quiz = carryQuiz(plan.srcCid, a, plan.dstCid, built.assessment);
+    if (quiz) plan.quiz = quiz;
     return built.assessment;
+  }
+
+  /* The quiz of `a` (in srcCid) onto its copy (in dstCid, the same class for
+     Duplicate): questions, key and settings, never a student's tries. Each
+     question's competency is matched by name as the assessment's own are
+     (mapTags); none found counts toward no competency. A Promise, or null
+     when the quizzes switch is off (nothing is read or sent then). */
+  function carryQuiz(srcCid, a, dstCid, copy) {
+    if (!window.QuizData || !a || !copy) return null;
+    var same = srcCid === dstCid;
+    var seen = {};
+    return QuizData.copy(
+      srcCid,
+      a.id,
+      dstCid,
+      copy.id,
+      function (id) {
+        if (same) return id;
+        if (!(id in seen)) seen[id] = mapTags(srcCid, dstCid, [id]).ids[0] || null;
+        return seen[id];
+      },
+      copy.tagIds || [],
+    );
+  }
+
+  /* Says, once the quizzes are saved, what did not come across: a competency
+     the other class does not have, or a class that takes no quizzes. */
+  function _quizNote(plans) {
+    var runs = plans.filter(function (p) {
+      return p.quiz;
+    });
+    if (!runs.length) return;
+    Promise.all(
+      runs.map(function (p) {
+        return p.quiz;
+      }),
+    ).then(function (results) {
+      var said = [];
+      results.forEach(function (r, i) {
+        var name = runs[i].dstName;
+        if (!r) return;
+        if (r.notOffered) said.push('The quiz did not come along because the Student Page is off in ' + name + '.');
+        else if (r.unmatched === 1)
+          said.push(
+            '1 quiz question is set to Counts Toward No Competency in ' +
+              name +
+              ', because its competency isn’t there.',
+          );
+        else if (r.unmatched > 1)
+          said.push(
+            r.unmatched +
+              ' quiz questions are set to Counts Toward No Competency in ' +
+              name +
+              ', because their competencies aren’t there.',
+          );
+      });
+      if (said.length) _toast(said.join(' '));
+    });
   }
 
   /* ── Linked copies ─────────────────────────────────────────── */
@@ -712,6 +773,7 @@ window.AssessmentCopy = (function () {
             '.' +
             (refused.length ? ' ' + _dibelsRefusedText(refused) : ''),
         );
+        _quizNote(plans);
         return plans;
       });
   }
@@ -1213,6 +1275,7 @@ window.AssessmentCopy = (function () {
             _className(srcCid) +
             '.',
         );
+        _quizNote(ok);
         return true;
       });
     });
@@ -1225,6 +1288,7 @@ window.AssessmentCopy = (function () {
     planCopy: planCopy,
     buildCopy: buildCopy,
     applyCopy: applyCopy,
+    carryQuiz: carryQuiz,
     findCopies: findCopies,
     planLinkedEdit: planLinkedEdit,
     applyLinkedEdit: applyLinkedEdit,

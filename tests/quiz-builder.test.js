@@ -701,7 +701,7 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     expect(QuizBuilder._payload().tries).toBe(0);
   });
 
-  it('Duplicate makes a plain copy: no quiz goes with it', async () => {
+  it('Duplicate carries the quiz (Q7): questions, key and settings, as new questions of its own', async () => {
     await newQuiz();
     writeQuiz();
     click(form().querySelector('.af-actions .btn-primary'));
@@ -711,7 +711,15 @@ describe('with the quizzes switch on, in Demo Mode', () => {
     await settled();
     const dupe = getAssessments(CID).find(a => a.title === 'Food Webs Check (Copy)');
     expect(dupe).toBeTruthy();
-    expect(QuizData.get(CID, dupe.id).quiz).toBeNull();
+    const was = QuizData.get(CID, made.id);
+    const got = QuizData.get(CID, dupe.id);
+    expect(got.quiz).toMatchObject({ tries: was.quiz.tries, shows: was.quiz.shows, counts: was.quiz.counts });
+    expect(got.questions.map(q => [q.kind, q.prompt, q.points, q.key])).toEqual(
+      was.questions.map(q => [q.kind, q.prompt, q.points, q.key]),
+    );
+    expect(got.questions.length).toBeGreaterThan(0);
+    got.questions.forEach(q => expect(was.questions.map(w => w.id)).not.toContain(q.id));
+    // Student Work is not carried: the copy starts at Nothing.
     expect(getAssessmentStudentWork(CID, dupe.id).students_send).toBe('nothing');
   });
 
