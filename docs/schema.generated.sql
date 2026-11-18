@@ -1854,7 +1854,7 @@ table student_submit.write_log (rls on)
   card_id uuid not null
   kind text not null
   at timestamp with time zone not null default now()
-  constraint write_log_kind_check CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text])))
+  constraint write_log_kind_check CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text, 'quiz'::text])))
   constraint write_log_pkey PRIMARY KEY (id)
   CREATE INDEX write_log_at ON student_submit.write_log USING btree (at)
   CREATE INDEX write_log_card_kind_at ON student_submit.write_log USING btree (card_id, kind, at)
@@ -2183,6 +2183,9 @@ function student_submit._norm(p text) returns text
 function student_submit._part(p_id uuid) returns jsonb security definer
 function student_submit._payload(p_code_id uuid) returns jsonb security definer
 function student_submit._preview(p_code_id uuid) returns jsonb security definer
+function student_submit._quiz_new_order(p_assessment_id uuid) returns jsonb security definer
+function student_submit._quiz_questions(p_assessment_id uuid, p_order jsonb) returns jsonb security definer
+function student_submit._quiz_window(p_assessment_id uuid, p_course_id uuid) returns jsonb security definer
 function student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid) returns jsonb security definer
 function student_submit._send_begin(p_intent text, p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid) returns jsonb security definer
 function student_submit._send_session(p_session_token text, p_enrollment_id uuid) returns jsonb security definer
@@ -2213,6 +2216,10 @@ function student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id 
 function student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) returns jsonb security definer
 function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) returns jsonb security definer
+function student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) returns jsonb security definer
+function student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.reflect(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_reflection jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.removal_batch(p_limit integer) returns jsonb security definer
 function student_submit.removal_done(p_ids bigint[]) returns jsonb security definer
