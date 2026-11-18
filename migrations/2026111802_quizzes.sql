@@ -31,7 +31,7 @@
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   public.list_quiz(uuid) (new)                                 4b5a877bdade0126970b90acbfa613d7
---   public.save_quiz(uuid,jsonb,uuid) (new)                      8e7130eb52a5db2c25d8180f50a24b4a
+--   public.save_quiz(uuid,jsonb,uuid) (new)                      146bd8f9022958d70d411bb1dfe1c408
 --   public.list_quiz_tries(uuid) (new)                           e929cbfe0aa1130741bd2b3af1615a2d
 --   fv_private.quiz_json(uuid) (new)                             c1d41659890c23cb02d0f517cd5c037d
 --   public._quiz_draft_guard() (new)                             9e6ed6b0336305322b22c309161472f9
@@ -78,7 +78,7 @@ begin
         ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f', null),
         ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626', null),
         ('public.list_quiz(uuid)', null, '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', null, '8e7130eb52a5db2c25d8180f50a24b4a'),
+        ('public.save_quiz(uuid,jsonb,uuid)', null, '146bd8f9022958d70d411bb1dfe1c408'),
         ('public.list_quiz_tries(uuid)', null, 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', null, 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', null, '9e6ed6b0336305322b22c309161472f9'),
@@ -381,9 +381,9 @@ begin
     if _a.score_mode = 'dibels' or _a.collab_mode <> 'none' then
         raise exception 'not_offered' using errcode = '22023', detail = 'A quiz is not offered on a DIBELS, pair or group piece.';
     end if;
-    if jsonb_typeof(p_quiz) <> 'object'
-       or (select array_agg(k order by k) from jsonb_object_keys(p_quiz) k) is distinct from
-          array['accept_until', 'add_total', 'after_due', 'counts', 'questions', 'shows', 'shuffle_choices', 'shuffle_questions', 'tries'] then
+    if (case when jsonb_typeof(p_quiz) <> 'object' then true
+             else (select array_agg(k order by k) from jsonb_object_keys(p_quiz) k) is distinct from
+                  array['accept_until', 'add_total', 'after_due', 'counts', 'questions', 'shows', 'shuffle_choices', 'shuffle_questions', 'tries'] end) then
         _bad := 'The quiz must have exactly its nine settings and questions.';
     elsif jsonb_typeof(p_quiz->'shuffle_questions') <> 'boolean' or jsonb_typeof(p_quiz->'shuffle_choices') <> 'boolean'
        or jsonb_typeof(p_quiz->'add_total') <> 'boolean' then
@@ -415,7 +415,8 @@ begin
     insert into quiz (assessment_id) values (p_assessment_id) on conflict (assessment_id) do nothing;
     perform 1 from quiz where assessment_id = p_assessment_id for update;
     perform 1 from assessment_tag where assessment_id = p_assessment_id for key share;
-    select coalesce(array_agg(tag_id), '{}') into _tags from assessment_tag where assessment_id = p_assessment_id for key share;
+    select coalesce(array_agg(tag_id), '{}') into _tags
+      from (select x.tag_id from assessment_tag x where x.assessment_id = p_assessment_id for key share) x;
     update quiz set shuffle_questions = (p_quiz->>'shuffle_questions')::boolean, shuffle_choices = (p_quiz->>'shuffle_choices')::boolean,
                     tries = (p_quiz->>'tries')::smallint, counts = p_quiz->>'counts', shows = p_quiz->>'shows',
                     add_total = (p_quiz->>'add_total')::boolean, after_due = p_quiz->>'after_due',
@@ -425,8 +426,9 @@ begin
     for _q, _n in select v, o from jsonb_array_elements(p_quiz->'questions') with ordinality x(v, o) loop
         _bad := null; _id := null; _answered := false; _choices := null; _tag := null; _ans := null; _tol := null; _why := null;
         _k := _q->'key';
-        if jsonb_typeof(_q) <> 'object' or _q - 'id' - 'kind' - 'prompt' - 'choices' - 'multiple' - 'points' - 'tag_id' - 'key' <> '{}'::jsonb
-           or not (_q ? 'kind' and _q ? 'prompt' and _q ? 'points' and _q ? 'tag_id' and _q ? 'key') then
+        if (case when jsonb_typeof(_q) <> 'object' then true
+                 else _q - 'id' - 'kind' - 'prompt' - 'choices' - 'multiple' - 'points' - 'tag_id' - 'key' <> '{}'::jsonb
+                      or not (_q ? 'kind' and _q ? 'prompt' and _q ? 'points' and _q ? 'tag_id' and _q ? 'key') end) then
             _bad := 'its fields';
         elsif jsonb_typeof(_q->'id') = 'string' and not pg_input_is_valid(_q->>'id', 'uuid') then
             _bad := 'its id';
@@ -475,7 +477,7 @@ begin
         end if;
         -- The key.
         if _bad is null then
-            if jsonb_typeof(_k) is distinct from 'object' or _k - 'answer' - 'tolerance' - 'why' <> '{}'::jsonb then
+            if (case when jsonb_typeof(_k) is distinct from 'object' then true else _k - 'answer' - 'tolerance' - 'why' <> '{}'::jsonb end) then
                 _bad := 'its answer key';
             elsif coalesce(jsonb_typeof(_k->'why'), 'null') not in ('string', 'null') or char_length(btrim(_k->>'why')) > 500 then
                 _bad := 'its why line (500 characters at most)';
@@ -598,7 +600,7 @@ declare
 begin
     for _f in select * from (values
         ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', '8e7130eb52a5db2c25d8180f50a24b4a'),
+        ('public.save_quiz(uuid,jsonb,uuid)', '146bd8f9022958d70d411bb1dfe1c408'),
         ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9'),

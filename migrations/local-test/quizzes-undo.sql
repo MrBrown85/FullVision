@@ -34,7 +34,7 @@
 --
 -- md5 of pg_get_functiondef (as the file leaves them):
 --   public.list_quiz(uuid)                 4b5a877bdade0126970b90acbfa613d7
---   public.save_quiz(uuid,jsonb,uuid)      8e7130eb52a5db2c25d8180f50a24b4a
+--   public.save_quiz(uuid,jsonb,uuid)      146bd8f9022958d70d411bb1dfe1c408
 --   public.list_quiz_tries(uuid)           e929cbfe0aa1130741bd2b3af1615a2d
 --   fv_private.quiz_json(uuid)             c1d41659890c23cb02d0f517cd5c037d
 --   public._quiz_draft_guard()             9e6ed6b0336305322b22c309161472f9
@@ -69,7 +69,7 @@ declare
 begin
     for _f in select * from (values
         ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', '8e7130eb52a5db2c25d8180f50a24b4a'),
+        ('public.save_quiz(uuid,jsonb,uuid)', '146bd8f9022958d70d411bb1dfe1c408'),
         ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9'),

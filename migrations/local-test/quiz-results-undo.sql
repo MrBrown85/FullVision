@@ -18,7 +18,7 @@
 -- md5 of pg_get_functiondef (as the file leaves them):
 --   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)   77bd2789ea9f46790f6eef639a605c24
 --   public.reopen_quiz(uuid,uuid,uuid)                     012bb9a8cb2a7034b90b14e2f5c20c87
---   public.confirm_quiz(uuid,jsonb,uuid)                   6f0684dffbf9ec9487feb212d81e7347
+--   public.confirm_quiz(uuid,jsonb,uuid)                   8380e8fa33795295b97e17623376414f
 
 -- PART 1 begins
 do $stop$
@@ -47,7 +47,7 @@ begin
     for _f in select * from (values
         ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),
         ('public.reopen_quiz(uuid,uuid,uuid)', '012bb9a8cb2a7034b90b14e2f5c20c87'),
-        ('public.confirm_quiz(uuid,jsonb,uuid)', '6f0684dffbf9ec9487feb212d81e7347')
+        ('public.confirm_quiz(uuid,jsonb,uuid)', '8380e8fa33795295b97e17623376414f')
     ) as v(fn, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
         if _md5 is not null and _md5 <> _f.now then

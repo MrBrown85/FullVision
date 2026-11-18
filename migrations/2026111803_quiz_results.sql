@@ -20,7 +20,7 @@
 -- leaves them):
 --   public.mark_quiz_answer(uuid,uuid,numeric,text,uuid) (new)   77bd2789ea9f46790f6eef639a605c24
 --   public.reopen_quiz(uuid,uuid,uuid) (new)                     012bb9a8cb2a7034b90b14e2f5c20c87
---   public.confirm_quiz(uuid,jsonb,uuid) (new)                   6f0684dffbf9ec9487feb212d81e7347
+--   public.confirm_quiz(uuid,jsonb,uuid) (new)                   8380e8fa33795295b97e17623376414f
 -- Relied on, unchanged (function, live, and 2026111802's):
 --   public.fv_owns_assessment(uuid)                              9f4c680c35f9f3ac32e8290824707673
 --   public.fv_idem_check(uuid,text)                              1c7b546434bee4b774557e0e6b16024f
@@ -55,7 +55,7 @@ begin
         ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f', null),
         ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', null, '77bd2789ea9f46790f6eef639a605c24'),
         ('public.reopen_quiz(uuid,uuid,uuid)', null, '012bb9a8cb2a7034b90b14e2f5c20c87'),
-        ('public.confirm_quiz(uuid,jsonb,uuid)', null, '6f0684dffbf9ec9487feb212d81e7347')
+        ('public.confirm_quiz(uuid,jsonb,uuid)', null, '8380e8fa33795295b97e17623376414f')
     ) as v(fn, was, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
         if _md5 is distinct from _f.was and (_f.now is null or _md5 is distinct from _f.now) then
@@ -207,12 +207,13 @@ begin
     else
         for _it in select v from jsonb_array_elements(p_marks) v loop
             _m := _it->'marked';
-            if jsonb_typeof(_it) <> 'object' or _it - 'attempt_id' - 'marked' <> '{}'::jsonb or not (_it ? 'attempt_id' and _it ? 'marked')
-               or jsonb_typeof(_it->'attempt_id') <> 'string' or not pg_input_is_valid(_it->>'attempt_id', 'uuid') then
+            if (case when jsonb_typeof(_it) <> 'object' then true
+                     else _it - 'attempt_id' - 'marked' <> '{}'::jsonb or not (_it ? 'attempt_id' and _it ? 'marked')
+                          or jsonb_typeof(_it->'attempt_id') <> 'string' or not pg_input_is_valid(_it->>'attempt_id', 'uuid') end) then
                 _bad := 'Each item is an attempt_id and marked.';
             elsif jsonb_typeof(_m) = 'null' then
                 null;
-            elsif jsonb_typeof(_m) <> 'object' or _m - 'earned' - 'possible' - 'questions' <> '{}'::jsonb
+            elsif (case when jsonb_typeof(_m) <> 'object' then true else _m - 'earned' - 'possible' - 'questions' <> '{}'::jsonb end)
                   or jsonb_typeof(_m->'earned') is distinct from 'number' or jsonb_typeof(_m->'possible') is distinct from 'number'
                   or jsonb_typeof(_m->'questions') is distinct from 'object' then
                 _bad := 'Marked is earned, possible and questions.';
@@ -279,7 +280,7 @@ begin
     for _f in select * from (values
         ('public.mark_quiz_answer(uuid,uuid,numeric,text,uuid)', '77bd2789ea9f46790f6eef639a605c24'),
         ('public.reopen_quiz(uuid,uuid,uuid)', '012bb9a8cb2a7034b90b14e2f5c20c87'),
-        ('public.confirm_quiz(uuid,jsonb,uuid)', '6f0684dffbf9ec9487feb212d81e7347')
+        ('public.confirm_quiz(uuid,jsonb,uuid)', '8380e8fa33795295b97e17623376414f')
     ) as v(fn, now) loop
         if md5(pg_get_functiondef(to_regprocedure(_f.fn))) is distinct from _f.now then
             raise exception '% did not come out as expected (md5 %). Nothing was changed.', _f.fn, md5(pg_get_functiondef(to_regprocedure(_f.fn)));
