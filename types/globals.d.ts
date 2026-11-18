@@ -348,3 +348,11 @@ declare var MSplitScanModel: any;
 declare var MComponents: any;
 declare var MGrade: any;
 declare var MGradePhotos: any;
+// Class Settings and the modules the Students list calls
+// (teacher/student-page-students.js), which are not typed.
+declare var DashClassManager: any;
+declare var StudentCards: any;
+declare var StudentView: any;
+declare var PreviewStudent: any;
+declare var Questionnaires: any;
+declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: () => void, durationMs?: number): void;

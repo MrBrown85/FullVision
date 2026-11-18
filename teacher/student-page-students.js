@@ -1,3 +1,4 @@
+// @ts-check
 /* Students in Class Settings › Student Page: per-student options and
    facts (docs/plans/per-student-options-plan.md, Layout A; Colin chose it
    on Nov 17 2026).
@@ -40,6 +41,7 @@ var StudentPageStudents = (function () {
   /* cid → { picked: { student id: true }, open: student id or null, fresh:
      true for the one draw that slides the panel in, looking, asked }. */
   var _state = {};
+  /** @type {((e: KeyboardEvent) => void) | null} */
   var _onKey = null;
 
   function _st(cid) {
@@ -68,7 +70,7 @@ var StudentPageStudents = (function () {
 
   function _fmtDay(iso) {
     var t = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso + 'T12:00:00' : iso);
-    return isNaN(t) ? '' : t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+    return isNaN(t.getTime()) ? '' : t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
   }
 
   function _time(iso) {
@@ -115,7 +117,7 @@ var StudentPageStudents = (function () {
     setTimeout(function () {
       st.looking = false;
       if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
-      var card = document.querySelector('.sc-card');
+      var card = /** @type {HTMLElement | null} */ (document.querySelector('.sc-card'));
       if (!card || !card.dataset || card.dataset.cid !== cid) return;
       st.asked = Date.now();
       var was = studentPageOptionsOffered(cid) + JSON.stringify(getStudentPageOptions(cid));
@@ -749,6 +751,7 @@ var StudentPageStudents = (function () {
   }
 
   function _openCid() {
+    /** @type {string | null} */
     var out = null;
     Object.keys(_state).forEach(function (cid) {
       if (_state[cid].open) out = cid;

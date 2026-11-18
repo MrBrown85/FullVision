@@ -272,6 +272,10 @@ async function signedIn(opts = {}) {
   seedClass(LIVE, { students: opts.students || LIVE_STUDENTS, courseConfigs: ON });
   serverSaysStudentPageOn(LIVE);
   const session = signIn();
+  // The Students list reads the class's per-student options too (tests/student-page-students.test.js):
+  // the calls these tests count are the cards'.
+  const allSent = session.sent;
+  session.sent = () => allSent().filter(c => c[0] !== 'list_student_page_options');
   const tokens = [TOKEN];
   session.fake.auth = {
     getSession: async () => ({ data: { session: { access_token: tokens[0] } }, error: null }),

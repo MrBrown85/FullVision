@@ -600,7 +600,7 @@ test('New Codes for This Class: a part-failed run names who still has their old 
   expect(cards.posts[1].body.items).toEqual([{ enrollment_id: ALICE, replaces: firstCards[0] }]);
   await expect(card.locator('.sc-note .sc-note-line')).toHaveText([
     '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-    '2 students still have their old card: Bob Baker, Charlie Chen. Use Print New Card on their rows to try again.',
+    '2 students still have their old card: Bob Baker, Charlie Chen. Choose each name, then Print New Card, to try again.',
   ]);
   expect(cards.fake.live(BOB).id).toBe(firstCards[1]);
   expect(cards.fake.live(CHARLIE).id).toBe(firstCards[2]);
@@ -610,6 +610,8 @@ test('New Codes for This Class: a part-failed run names who still has their old 
   }
 
   // Print New Card for Bob: asked first (his card was printed), then printed.
+  // Print New Card is in the panel the student's name opens.
+  await card.getByRole('button', { name: 'Bob Baker', exact: true }).click();
   await card.getByRole('button', { name: 'Print a New Card for Bob Baker' }).click();
   const one = page.getByRole('dialog', { name: 'Print a New Card for Bob?' });
   await expect(one.locator('.confirm-message')).toHaveText(
@@ -620,7 +622,7 @@ test('New Codes for This Class: a part-failed run names who still has their old 
   expect(cards.posts[cards.posts.length - 1].body.items).toEqual([{ enrollment_id: BOB, replaces: firstCards[1] }]);
   await expect(card.locator('.sc-note .sc-note-line')).toHaveText([
     '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-    '1 student still has their old card: Charlie Chen. Use Print New Card on their row to try again.',
+    '1 student still has their old card: Charlie Chen. Choose their name, then Print New Card, to try again.',
   ]);
 
   const all = await sheets(page);
@@ -667,6 +669,8 @@ test('Print New Card: an old card stopped and the new one not printed is said, a
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
   await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
   const bobs = cards.fake.live(BOB).id;
+  // Print New Card is in the panel the student's name opens.
+  await card.getByRole('button', { name: 'Bob Baker', exact: true }).click();
   await card.getByRole('button', { name: 'Print a New Card for Bob Baker' }).click();
   await page
     .getByRole('dialog', { name: 'Print a New Card for Bob?' })

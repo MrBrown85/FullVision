@@ -596,6 +596,7 @@ function saveDemoReflections(cid, list) {
 var _SPO_MAX_IDS = 500; // the most students set_student_page_options takes
 var _SPO_STALE_MS = 60000; // a signed-in class's list is read again after this long
 var _SPO_GRADE = { class: true, show: true, hide: true };
+var _SPO_QUIET = { suppressSessionExpiredModal: true }; // the read asks no one to sign in again
 /** @type {Record<string, Record<string, { show_overall_grade: string; paused_at: string | null }>>} */
 var _spoServer = {}; // cid → { enrollment id → options }, as the server last said
 /** @type {Record<string, { state: string; at: number; loading: Promise<unknown> | null }>} */
@@ -625,10 +626,17 @@ function _spoRow(grade, pausedAt) {
     paused_at: typeof pausedAt === 'string' && pausedAt ? pausedAt : null,
   };
 }
-// The server's row: show_overall_grade true, false or null.
+/* The server's row: show_overall_grade as a word ('class', 'show' or
+   'hide'). The enrollment column's own true, false or null (the class
+   bundle's) reads the same. */
 function _spoFromServer(r) {
-  var g = r.show_overall_grade === true ? 'show' : r.show_overall_grade === false ? 'hide' : 'class';
+  var v = r.show_overall_grade;
+  var g = v === true || v === 'show' ? 'show' : v === false || v === 'hide' ? 'hide' : 'class';
   return _spoRow(g, r.paused_at);
+}
+// A reply of either function: { ok: true, options: [...] }. A refusal is a raised error, never a reply.
+function _spoReply(data) {
+  return !!data && data.ok !== false && (data.ok === true || Array.isArray(data.options));
 }
 function _spoSet(row) {
   return row.show_overall_grade !== 'class' || !!row.paused_at;
@@ -722,11 +730,9 @@ function loadStudentPageOptions(cid, force) {
   if (read.state === 'missing') return Promise.resolve(false);
   if (read.loading) return read.loading;
   if (!force && read.state === 'ok' && Date.now() - read.at < _SPO_STALE_MS) return Promise.resolve(true);
-  read.loading = _callRpcWithAuthGuard(
-    'list_student_page_options',
-    { p_course_id: cid },
-    { suppressSessionExpiredModal: true },
-  ).then(function (res) {
+  // @ts-ignore: not in types/database.d.ts until it is refreshed after the migration (per-student-options plan)
+  var asked = _callRpcWithAuthGuard('list_student_page_options', { p_course_id: cid }, Object.assign({}, _SPO_QUIET));
+  read.loading = asked.then(function (res) {
     read.loading = null;
     read.at = Date.now();
     if (res && res.error) {
@@ -739,7 +745,7 @@ function loadStudentPageOptions(cid, force) {
       return false;
     }
     var data = _rpcObject(res && res.data);
-    if (!data || data.ok !== true) {
+    if (!_spoReply(data)) {
       if (read.state !== 'ok') read.state = 'failed';
       return false;
     }
@@ -828,7 +834,7 @@ function _setStudentPageOptionsLive(cid, ids, change, key, at) {
     if (at2 >= 0) here.splice(at2, 1);
     if (!here.length) delete _spoHere[cid];
     var data = res && !res.error ? _rpcObject(res.data) : null;
-    if (data && data.ok === true) {
+    if (_spoReply(data)) {
       var server = _spoServer[cid] || (_spoServer[cid] = {});
       _rpcRows(data.options).forEach(function (r) {
         if (!_plainObject(r) || typeof r.enrollment_id !== 'string') return;
@@ -838,6 +844,8 @@ function _setStudentPageOptionsLive(cid, ids, change, key, at) {
       });
       return { ok: true, options: getStudentPageOptions(cid) };
     }
+    // Refused (P0002, 22023, PT401 are raised errors): the outbox's dead letter and the sync dot say so,
+    // and what is shown goes back to the server's, as set_course_feedback_options' callers do.
     if (res && res.error && !res.error.handledSessionExpired && !res.error.refused) {
       console.warn('set_student_page_options failed:', res.error);
     }
