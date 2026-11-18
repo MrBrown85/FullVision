@@ -114,13 +114,7 @@ test('a title with an apostrophe: Return N Graded is not swapped out under the m
 
 /* Small text is readable in each new state, in light and dark mode
    (e2e/contrast.spec.js's rule and its exemptions). */
-const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
-  `--score-${n}`,
-  `--score-${n}-bg`,
-  `--score-${n}-text`,
-  `--score-${n}-dark`,
-]);
-const CONTRAST = { skip: ['.gb-grid'], textTokens: LEVEL_TOKENS, fillTokens: [...LEVEL_TOKENS, '--active'] };
+const CONTRAST = { skip: ['.gb-grid'] };
 
 for (const colorScheme of ['light', 'dark']) {
   test.describe(`text contrast, ${colorScheme} mode`, () => {
