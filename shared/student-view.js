@@ -668,6 +668,8 @@ window.StudentView = (function () {
               updatedAt (when updated), and on a row that moved, was,
               marks: null | { pages, notes } (the teacher's Mark Up given
               on returned work, from the `feedback` reply),
+              pages: how many handed-in pages See Your Work can show
+              (pagesBy; 0 for none),
               resources: [ { id, kind: 'handout' | 'link', title, pages,
               url, host } ] (Handouts and Links, resourcesOf),
               rubric: null | { id, name, style, rows: [ row + beyond,
@@ -738,6 +740,38 @@ window.StudentView = (function () {
     var pages = whole(m.pages);
     var notes = whole(m.notes);
     return pages >= 1 && notes >= 0 ? { pages: pages, notes: notes } : null;
+  }
+
+  /* How many handed-in pages the student can open on each piece (See Your
+     Work, from My Learning; DECISIONS, "See Your Work from My Learning
+     (2026-11-18)"): the newest work in, sent by the student or added by the
+     teacher, as the `work` reply counts it (sent.pages; none for work
+     handed in on paper), and the whole of the work the marks were given on
+     (the `feedback` reply's marks.work_pages, a group's pages included).
+     Read from `work` whether or not the class has Send Work on: the server
+     sends a student their own pages either way (student_submit.file_links).
+     Counts only; the pages themselves are fetched when they are opened. */
+  function pagesBy(work, feedback) {
+    var out = {};
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.min(Math.floor(v), 200) : 0;
+    };
+    var more = function (id, n) {
+      if (typeof id === 'string' && n > (out[id] || 0)) out[id] = n;
+    };
+    if (work && typeof work === 'object' && work.ok !== false) {
+      list(work.assessments).forEach(function (entry) {
+        var sent = entry && entry.sent && typeof entry.sent === 'object' ? entry.sent : null;
+        if (sent && sent.on_paper !== true) more(entry.id, whole(sent.pages));
+      });
+    }
+    if (feedback && typeof feedback === 'object' && feedback.ok === true) {
+      list(feedback.assessments).forEach(function (entry) {
+        var m = entry && entry.marks && typeof entry.marks === 'object' ? entry.marks : null;
+        if (m) more(entry.id, Math.max(whole(m.work_pages), whole(m.pages)));
+      });
+    }
+    return out;
   }
 
   // The `feedback` reply's pieces by id (Mark Up only, for now), or none for a reply that is not one.
@@ -957,6 +991,32 @@ window.StudentView = (function () {
     return { ok: true, v: 1, reflect_on_feedback: on, assessments: assessments };
   }
 
+  /* The part of the `work` reply that says what is in, for Preview as
+     Student: each piece the student (or the teacher, for them) has handed
+     work in for, with its page count, as the server counts it for the
+     student's own page (the newest work in; none on paper). Send Work is
+     given as off, so the preview's cards stay as they were: build() reads
+     only the page counts from it (pagesBy). The student's group's pages on
+     a One per Group piece come with the group's counts (getStudentGroupWork). */
+  function workReplyFromCache(cid, sid, page) {
+    var newest = typeof getStudentSubmission === 'function' ? getStudentSubmission : null;
+    var assessments = [];
+    list(page && page.assessments).forEach(function (row) {
+      var sub = newest && row && row.id ? newest(cid, sid, row.id) : null;
+      if (!sub || sub.state === 'sending') return;
+      assessments.push({
+        id: str(row.id),
+        students_send: 'nothing',
+        sent: {
+          sent_by: sub.sent_by === 'teacher' ? 'teacher' : 'student',
+          on_paper: sub.on_paper === true,
+          pages: list(sub.files).filter(Boolean).length,
+        },
+      });
+    });
+    return { ok: true, v: 1, send_work: false, assessments: assessments };
+  }
+
   /* The `group_work` reply (S12-F1; Batch C's contract), by piece: how
      many are in the student's group, whether the group's work is in, how
      many pages, whether the student sent any of them, and when it was
@@ -988,6 +1048,7 @@ window.StudentView = (function () {
     page = page || {};
     var grouped = groupsBy(groups);
     var marked = marksBy(feedback);
+    var paged = pagesBy(work, feedback);
     var reflections = reflectionsBy(feedback);
     var revisions = revisionsBy(feedback);
     var sending = {};
@@ -1029,6 +1090,8 @@ window.StudentView = (function () {
         created_at: str(row.created_at),
         // The teacher's Mark Up on the student's pages (S9-F3): only on work that came back with a grade.
         marks: null,
+        // How many handed-in pages See Your Work can show (pagesBy): the student's own, or their group's.
+        pages: 0,
         reflection: null,
         // Your Plan From Last Time, on the next piece to do (S10-F2): { text, fromTitle }.
         plan: null,
@@ -1044,6 +1107,7 @@ window.StudentView = (function () {
       // A group's work is in once any member has sent it: the piece is Sent for every member.
       piece.group = hidden ? null : grouped[piece.id] || null;
       if (piece.group && piece.group.sent && (piece.kind === 'due' || piece.kind === 'missing')) piece.kind = 'sent';
+      piece.pages = Math.max(paged[piece.id] || 0, piece.group && piece.group.sent ? piece.group.pages : 0);
       if (piece.send && piece.send.sent && (piece.kind === 'due' || piece.kind === 'missing')) {
         piece.kind = 'sent';
         piece.late = piece.late || piece.send.sent.late;
@@ -1544,6 +1608,7 @@ window.StudentView = (function () {
     var page = unopened(reply(cid, sid));
     if (!page) return { ready: false };
     var feedback = feedbackReply(cid, sid, page);
+    var work = workReplyFromCache(cid, sid, page);
     // As the student's page: work dated after the class's today is not counted (shared/data.js).
     var asStudent =
       typeof withStudentsToday === 'function'
@@ -1564,7 +1629,8 @@ window.StudentView = (function () {
             var a = pieceOf(cid, aid);
             return a ? assessmentCellValue(cid, sid, a) : null;
           },
-          null,
+          // What is in, for See Your Work's page counts only (workReplyFromCache).
+          work,
           feedback,
           // Group work from the cache (S12-T1's reader), counts only, as the student's page gets it.
           typeof getStudentGroupWork === 'function' ? getStudentGroupWork(cid, sid) : null,
@@ -1573,7 +1639,7 @@ window.StudentView = (function () {
         return v;
       });
     });
-    return { ready: true, reply: page, feedback: feedback, view: view };
+    return { ready: true, reply: page, feedback: feedback, work: work, view: view };
   }
 
   /* Before and After's first version on the student's own device (S11-F2):
