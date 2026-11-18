@@ -31,7 +31,7 @@
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
 --   public.list_quiz(uuid) (new)                                 4b5a877bdade0126970b90acbfa613d7
---   public.save_quiz(uuid,jsonb,uuid) (new)                      fa12ce3511c7edf8bedbd07477efd6f9
+--   public.save_quiz(uuid,jsonb,uuid) (new)                      8e7130eb52a5db2c25d8180f50a24b4a
 --   public.list_quiz_tries(uuid) (new)                           e929cbfe0aa1130741bd2b3af1615a2d
 --   fv_private.quiz_json(uuid) (new)                             c1d41659890c23cb02d0f517cd5c037d
 --   public._quiz_draft_guard() (new)                             9e6ed6b0336305322b22c309161472f9
@@ -78,7 +78,7 @@ begin
         ('public.fv_idem_check(uuid,text)', '1c7b546434bee4b774557e0e6b16024f', null),
         ('public.fv_idem_store(uuid,text,jsonb)', '6d0b48c458d273a332db39e1a4b68626', null),
         ('public.list_quiz(uuid)', null, '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', null, 'fa12ce3511c7edf8bedbd07477efd6f9'),
+        ('public.save_quiz(uuid,jsonb,uuid)', null, '8e7130eb52a5db2c25d8180f50a24b4a'),
         ('public.list_quiz_tries(uuid)', null, 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', null, 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', null, '9e6ed6b0336305322b22c309161472f9'),
@@ -364,6 +364,7 @@ begin
     end if;
     if not fv_owns_assessment(p_assessment_id) then raise exception 'not found' using errcode = 'P0002'; end if;
     select a.score_mode, a.collab_mode into _a from assessment a where a.id = p_assessment_id for key share;
+    if not found then raise exception 'not found' using errcode = 'P0002'; end if;
 
     -- Null: the quiz is removed, while no student has a try.
     if p_quiz is null or jsonb_typeof(p_quiz) = 'null' then
@@ -597,7 +598,7 @@ declare
 begin
     for _f in select * from (values
         ('public.list_quiz(uuid)', '4b5a877bdade0126970b90acbfa613d7'),
-        ('public.save_quiz(uuid,jsonb,uuid)', 'fa12ce3511c7edf8bedbd07477efd6f9'),
+        ('public.save_quiz(uuid,jsonb,uuid)', '8e7130eb52a5db2c25d8180f50a24b4a'),
         ('public.list_quiz_tries(uuid)', 'e929cbfe0aa1130741bd2b3af1615a2d'),
         ('fv_private.quiz_json(uuid)', 'c1d41659890c23cb02d0f517cd5c037d'),
         ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9'),
