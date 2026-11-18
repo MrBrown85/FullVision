@@ -120,13 +120,15 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* Every row is one height: the name is one line, cut with an ellipsis; the
-   number and its word never wrap. Rows share the height between 41 and 64
-   px; with more than fit, the list scrolls inside the page. */
+/* Every row is one height, the height a two-line name needs. A name wraps to
+   two lines and only a longer one is cut with an ellipsis (its full name is
+   in the row's accessible name); the number and its word sit beside it and
+   never wrap. Rows share the height between 45 and 64 px; with more than
+   fit, the list scrolls inside the page. */
 .dash-comp-ln {
   position: relative;
   box-sizing: border-box;
-  flex: 1 0 41px;
+  flex: 1 0 45px;
   max-height: 64px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -156,10 +158,13 @@
 }
 .dash-comp-ln-name {
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 16px;
+  overflow-wrap: anywhere;
+  line-height: 15px;
 }
 .dash-comp-ln.is-flag .dash-comp-ln-name {
   font-weight: 600;
@@ -168,9 +173,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  align-self: start;
   white-space: nowrap;
   font-weight: 600;
-  line-height: 16px;
+  line-height: 15px;
   font-variant-numeric: tabular-nums;
 }
 /* Lowest and Only are words; the tag has no meaning in its colour. */
@@ -207,32 +213,10 @@
 .dash-comp-ln-bar i.is-none {
   background: var(--divider-subtle);
 }
-/* Pointing at or focusing a row says its counts as text, where the name and
-   number were. Hidden at rest. */
+/* The row's counts as text show in the tip box on the window (the name stays
+   on screen). The copy inside the row is only what the box reads from. */
 .dash-comp-ln-tip {
   display: none;
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 0 4px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 16px;
-  text-align: center;
-  background: var(--surface);
-  border-radius: 4px;
-}
-.dash-comp-ln:hover .dash-comp-ln-tip,
-.dash-comp-ln:focus-visible .dash-comp-ln-tip {
-  display: block;
-}
-.dash-comp-ln:hover .dash-comp-ln-name,
-.dash-comp-ln:hover .dash-comp-ln-num,
-.dash-comp-ln:focus-visible .dash-comp-ln-name,
-.dash-comp-ln:focus-visible .dash-comp-ln-num {
-  visibility: hidden;
 }
 
 /* ── The row's list and the other views' tips: on the window, outside the
@@ -255,7 +239,7 @@
   width: 320px;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
-  overflow-y: auto;
+  overflow: hidden;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -266,10 +250,17 @@
 .dash-comp-tipbox[hidden] {
   display: none;
 }
+.dash-comp-pop .dash-mix-pop-head,
+.dash-comp-pop-sum,
+.dash-comp-pop-links {
+  flex: none;
+}
 .dash-comp-pop-sum {
   line-height: 1.4;
 }
 .dash-comp-pop-people {
+  flex: 1 1 auto;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;

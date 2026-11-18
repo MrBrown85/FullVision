@@ -181,28 +181,33 @@ test('To Grade in the top bar scrolls to the Inbox and rings it; the ring is gon
   expect(ring.off - ring.on).toBeLessThanOrEqual(400);
 });
 
-test('a counts line too long for its box loses its quiet words, never Late', async ({ page }) => {
+test('a counts line too long for its box loses its quiet words, never Late, in the page font or a wide one', async ({
+  page,
+}) => {
   await open(page);
-  const r = await page.evaluate(() => {
-    const host = document.createElement('div');
-    host.style.cssText = 'position:fixed;left:0;top:0;width:260px;z-index:9999;background:#fff';
-    host.innerHTML =
-      '<p class="dash-inbox-counts">' +
-      DashInbox.countsHtml({ in: 12, tograde: 4, notin: 20, toreturn: 2, late: 3, addedByTeacher: 9, onPaper: 4 }) +
-      '</p>';
-    document.body.appendChild(host);
-    const p = host.querySelector('.dash-inbox-counts').getBoundingClientRect();
-    const late = host.querySelector('.dash-inbox-late').getBoundingClientRect();
-    const out = {
-      pRight: p.right,
-      lateRight: late.right,
-      lateText: host.querySelector('.dash-inbox-late').textContent,
-    };
-    host.remove();
-    return out;
-  });
-  expect(r.lateText).toBe('· Late 3');
-  expect(r.lateRight).toBeLessThanOrEqual(r.pRight + 0.5);
+  for (const wide of [false, true]) {
+    const r = await page.evaluate(wide => {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:0;top:0;width:260px;z-index:9999;background:#fff';
+      if (wide) host.style.cssText += ';font-family:Verdana,"DejaVu Sans",sans-serif;letter-spacing:0.04em';
+      host.innerHTML =
+        '<p class="dash-inbox-counts">' +
+        DashInbox.countsHtml({ in: 12, tograde: 4, notin: 20, toreturn: 2, late: 3, addedByTeacher: 9, onPaper: 4 }) +
+        '</p>';
+      document.body.appendChild(host);
+      const p = host.querySelector('.dash-inbox-counts').getBoundingClientRect();
+      const late = host.querySelector('.dash-inbox-late').getBoundingClientRect();
+      const out = {
+        pRight: p.right,
+        lateRight: late.right,
+        lateText: host.querySelector('.dash-inbox-late').textContent,
+      };
+      host.remove();
+      return out;
+    }, wide);
+    expect(r.lateText).toBe('· Late 3');
+    expect(r.lateRight, wide ? 'wide font' : 'own font').toBeLessThanOrEqual(r.pRight + 0.5);
+  }
 });
 
 test('a paper hand-in with no scan is a sheet that holds its name and its words', async ({ page }) => {
@@ -235,26 +240,55 @@ test('a paper hand-in with no scan is a sheet that holds its name and its words'
   }, LIGHT);
   const sheet = page.locator('.dash-inbox-sheet').first();
   await expect(sheet).toBeVisible();
-  const m = await sheet.evaluate(el => {
-    const r = el.getBoundingClientRect();
-    const name = el.querySelector('.dash-inbox-sheet-name');
-    const note = el.querySelector('.dash-inbox-sheet-note');
-    const lines = n => Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).lineHeight));
-    return {
-      w: r.width,
-      h: r.height,
-      fits: el.scrollHeight <= el.clientHeight + 1,
-      nameLines: lines(name),
-      noteLines: lines(note),
-      label: el.getAttribute('aria-label'),
-    };
-  });
-  expect(m.w).toBeGreaterThanOrEqual(66);
-  expect(m.h).toBeGreaterThanOrEqual(80);
-  expect(m.fits).toBe(true);
-  expect(m.noteLines).toBeLessThanOrEqual(2);
-  expect(m.nameLines).toBeLessThanOrEqual(2);
-  expect(m.label).toMatch(/Featherstonehaugh-Smythe: Handed In on Paper$/);
+  // The sheet is measured twice: in the page's own font, and in a wider one
+  // (Verdana, with a little more space between letters), as a Windows laptop
+  // or a Chromebook may draw it. Both must hold.
+  const FONTS = {
+    own: '',
+    wide: 'body, .dash-inbox-sheet, .dash-inbox-sheet * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }',
+  };
+  for (const [fontName, css] of Object.entries(FONTS)) {
+    await page.evaluate(c => {
+      let t = document.getElementById('__font');
+      if (!t) {
+        t = document.createElement('style');
+        t.id = '__font';
+        document.head.appendChild(t);
+      }
+      t.textContent = c;
+    }, css);
+    const m = await sheet.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      const name = el.querySelector('.dash-inbox-sheet-name');
+      const note = el.querySelector('.dash-inbox-sheet-note');
+      const lines = n => Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).lineHeight));
+      // Each note line's words, measured as drawn: none runs out of the note's box.
+      const noteBox = note.getBoundingClientRect();
+      const words = [...note.children].map(c => {
+        const range = document.createRange();
+        range.selectNodeContents(c);
+        return range.getBoundingClientRect().right - noteBox.right;
+      });
+      return {
+        w: r.width,
+        h: r.height,
+        fits: el.scrollHeight <= el.clientHeight + 1,
+        nameLines: lines(name),
+        noteLines: lines(note),
+        over: Math.max(...words),
+        label: el.getAttribute('aria-label'),
+      };
+    });
+    const at = fontName + ' font';
+    expect(m.w, at).toBeGreaterThanOrEqual(66);
+    expect(m.h, at).toBeGreaterThanOrEqual(80);
+    expect(m.fits, at).toBe(true);
+    expect(m.noteLines, at).toBeLessThanOrEqual(2);
+    expect(m.nameLines, at).toBeLessThanOrEqual(2);
+    expect(m.over, at).toBeLessThanOrEqual(0.5);
+    expect(m.label, at).toMatch(/Featherstonehaugh-Smythe: Handed In on Paper$/);
+  }
+  await page.evaluate(() => document.getElementById('__font').remove());
   await shot(page, 'inbox-paper-sheet');
 });
 
@@ -295,7 +329,7 @@ test('the view menu is not visible at rest, opens on the pill and closes on Esca
   expect(await hidden()).toBe(true);
   await page.locator('#dash-view-btn-inbox').click();
   expect(await hidden()).toBe(false);
-  await expect(menu.locator('[role="menuitemradio"]')).toHaveCount(1);
+  await expect(menu.locator('[role="menuitemradio"]').first()).toContainText('By Assessment');
   await expect(menu).toContainText('One row per assessment, newest work first.');
   await page.keyboard.press('Escape');
   expect(await hidden()).toBe(true);
@@ -391,4 +425,17 @@ test('with Send Work off the slot keeps Recent Assessments', async ({ page }) =>
   await open(page, { sendWork: false });
   await expect(page.locator('#dash-inbox')).toHaveCount(0);
   await expect(page.locator('.dash-recent')).toBeVisible();
+});
+
+test('the view menu keeps one fixed order, whatever order the scripts load in', async ({ page }) => {
+  await open(page);
+  await page.locator('#dash-view-btn-inbox').click();
+  const keys = await page.locator('#dash-view-menu-inbox [data-view]').evaluateAll(els => els.map(e => e.dataset.view));
+  const want = ['assessment', 'side', 'flip', 'roll'];
+  expect(keys).toContain('roll');
+  expect(keys[0]).toBe('assessment');
+  // An ordered match: each shown view comes in the fixed order.
+  const ranks = keys.map(k => want.indexOf(k));
+  expect(ranks.every(r => r >= 0)).toBe(true);
+  expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
 });

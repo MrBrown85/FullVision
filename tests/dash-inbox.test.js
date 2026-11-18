@@ -78,8 +78,9 @@ describe('the tile', () => {
     const head = doc.querySelector('.dash-inbox-head');
     expect(head.querySelector('.dash-inbox-title').textContent).toBe('Inbox');
     expect(head.querySelector('.dash-view-btn').textContent.trim()).toBe('By Assessment');
-    // The pill's menu lists the one view registered in this slice.
-    expect(head.querySelectorAll('.dash-view-item')).toHaveLength(1);
+    // The pill's menu lists the views registered, By Assessment first (D6 adds Side by Side).
+    expect(head.querySelectorAll('.dash-view-item').length).toBeGreaterThanOrEqual(1);
+    expect(head.querySelector('.dash-view-item .dash-view-name').textContent).toBe('By Assessment');
     expect(head.querySelectorAll('a')).toHaveLength(1);
     expect(head.querySelector('a').textContent).toBe('Assignments →');
     expect(head.textContent).not.toMatch(/\d/);
@@ -215,7 +216,8 @@ describe('the tile', () => {
     GraderWork.workCounts(CID, LIGHT, ids()).ids.tograde.forEach(sid =>
       Grader.setOverallComment(CID, sid, LIGHT, 'Seen.'),
     );
-    expect(DashInbox.html(CID)).toContain('All Caught Up');
+    // D5 draws this space; with graded work not yet returned it does not say All Caught Up (the top bar's rule).
+    expect(DashInbox.html(CID)).toContain('id="dash-inbox-caught"');
     expect(DashInbox.html(CID)).not.toContain('Grade Submissions');
     const was = DashInbox.emptyHtml;
     DashInbox.emptyHtml = () => '<li id="d5-drop"></li>';
