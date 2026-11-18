@@ -6,6 +6,7 @@
  * copy of one piece and its own piece with another's title.
  */
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
 const SHOTS = process.env.FV_SHOTS || '';
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: SHOTS + '/' + name + '.png' }) : null);
@@ -73,10 +74,10 @@ async function twoClasses(page) {
 
 const open = async page => {
   await page.getByRole('button', { name: 'Add From Another Class' }).click();
-  await expect(page.locator('.afc-row').first()).toBeVisible();
+  await expect(page.locator('.afrom-row').first()).toBeVisible();
 };
-const row = (page, id) => page.locator('.afc-row[data-afc-row="' + id + '"]');
-const addBtn = page => page.locator('[data-afc-add]');
+const row = (page, id) => page.locator('.afrom-row[data-afrom-row="' + id + '"]');
+const addBtn = page => page.locator('[data-afrom-add]');
 
 test('pick from another class: columns, search, Select All, the count on Add, and what a copy holds', async ({
   page,
@@ -89,86 +90,96 @@ test('pick from another class: columns, search, Select All, the count on Add, an
 
   const dialog = page.getByRole('dialog', { name: 'Add From Another Class' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.afc-what')).toContainText('Student scores are never copied.');
+  await expect(dialog.locator('.afrom-what')).toContainText('Student scores are never copied.');
   // The other section of the course is first, and already chosen.
   const chips = dialog.getByRole('radio');
   await expect(chips).toHaveText(['Block A · Science 8', 'Science 7']);
   await expect(chips.first()).toHaveAttribute('aria-checked', 'true');
   await expect(chips.first()).toBeFocused();
-  await expect(page.locator('.afc-row')).toHaveCount(ids.total);
-  await expect(page.locator('#afc-status')).toHaveText(ids.total + ' assessments, 1 already here.');
+  await expect(page.locator('.afrom-row')).toHaveCount(ids.total);
+  await expect(page.locator('#afrom-status')).toHaveText(ids.total + ' assessments, 1 already here.');
   await expect(addBtn(page)).toBeDisabled();
   await expect(addBtn(page)).toHaveText('Add');
   await shot(page, 'after-1-open');
 
   // The list scrolls inside the dialog; the title and the buttons stay in view.
   const box = async sel => page.locator(sel).first().boundingBox();
-  const list = await box('#afc-list');
-  expect(await page.locator('#afc-list').evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
-  await page.locator('#afc-list').evaluate(el => (el.scrollTop = el.scrollHeight));
-  for (const sel of ['#afc-title', '.afc-classes', '#afc-search', '.afc-cols', '[data-afc-add]', '[data-afc-cancel]']) {
+  const list = await box('#afrom-list');
+  expect(await page.locator('#afrom-list').evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await page.locator('#afrom-list').evaluate(el => (el.scrollTop = el.scrollHeight));
+  for (const sel of [
+    '#afrom-title',
+    '.afrom-classes',
+    '#afrom-search',
+    '.afrom-cols',
+    '[data-afrom-add]',
+    '[data-afrom-cancel]',
+  ]) {
     const b = await box(sel);
     expect(b.y, sel).toBeGreaterThanOrEqual(0);
     expect(b.y + b.height, sel).toBeLessThanOrEqual(900);
     expect(b.y + b.height <= list.y + 1 || b.y >= list.y + list.height - 1, sel + ' is outside the list').toBe(true);
   }
-  await page.locator('#afc-list').evaluate(el => (el.scrollTop = 0));
+  await page.locator('#afrom-list').evaluate(el => (el.scrollTop = 0));
 
   // Columns line up, and a date reads "Nov 4", never 2026-11-04.
   const lefts = sel =>
-    page.locator('.afc-row ' + sel).evaluateAll(els => els.map(el => Math.round(el.getBoundingClientRect().left)));
-  for (const sel of ['.afc-cat', '.afc-scoring', '.afc-date']) expect(new Set(await lefts(sel)).size, sel).toBe(1);
-  const dates = await page.locator('.afc-row .afc-date').allTextContents();
+    page.locator('.afrom-row ' + sel).evaluateAll(els => els.map(el => Math.round(el.getBoundingClientRect().left)));
+  for (const sel of ['.afrom-cat', '.afrom-scoring', '.afrom-date'])
+    expect(new Set(await lefts(sel)).size, sel).toBe(1);
+  const dates = await page.locator('.afrom-row .afrom-date').allTextContents();
   expect(dates.every(d => /^[A-Z][a-z]{2}\.? \d{1,2}(, \d{4})?$/.test(d))).toBe(true);
 
   // A piece this class already has can't be ticked; a same-titled one is flagged; a Draft says so.
-  await expect(row(page, ids.linked).locator('.afc-chip')).toHaveText('Already Here');
-  await expect(row(page, ids.linked).locator('.afc-box')).toBeDisabled();
-  await expect(row(page, ids.twin).locator('.afc-chip')).toHaveText('Same Title Here');
+  await expect(row(page, ids.linked).locator('.afrom-chip')).toHaveText('Already Here');
+  await expect(row(page, ids.linked).locator('.afrom-box')).toBeDisabled();
+  await expect(row(page, ids.twin).locator('.afrom-chip')).toHaveText('Same Title Here');
   await expect(row(page, ids.draft).locator('.draft-badge')).toHaveText('Draft');
 
   // Select All ticks what can be added, and leaves the same-titled one to the teacher.
-  await page.locator('#afc-all').check();
+  await page.locator('#afrom-all').check();
   await expect(addBtn(page)).toHaveText('Add ' + (ids.total - 2));
-  await expect(page.locator('#afc-status')).toContainText('Select All left out 1 with a title this class already has.');
-  await expect(page.locator('#afc-status')).toContainText('A Draft stays a Draft until you assign it here.');
-  await expect(row(page, ids.twin).locator('.afc-box')).not.toBeChecked();
-  await page.locator('[data-afc-clear]').click();
+  await expect(page.locator('#afrom-status')).toContainText(
+    'Select All left out 1 with a title this class already has.',
+  );
+  await expect(page.locator('#afrom-status')).toContainText('A Draft stays a Draft until you assign it here.');
+  await expect(row(page, ids.twin).locator('.afrom-box')).not.toBeChecked();
+  await page.locator('[data-afrom-clear]').click();
   await expect(addBtn(page)).toHaveText('Add');
 
   // Search narrows the list; what is ticked stays ticked when the search is cleared.
-  await page.fill('#afc-search', 'zzzz');
-  await expect(page.locator('.afc-row')).toHaveCount(0);
-  await expect(page.locator('#afc-list')).toContainText('No assessments match.');
-  await page.locator('[data-afc-reset]').click();
-  await expect(page.locator('.afc-row')).toHaveCount(ids.total);
+  await page.fill('#afrom-search', 'zzzz');
+  await expect(page.locator('.afrom-row')).toHaveCount(0);
+  await expect(page.locator('#afrom-list')).toContainText('No assessments match.');
+  await page.locator('[data-afrom-reset]').click();
+  await expect(page.locator('.afrom-row')).toHaveCount(ids.total);
   const word = ids.firstTitle.split(/\s+/)[0];
-  await page.fill('#afc-search', word);
+  await page.fill('#afrom-search', word);
   await expect(row(page, ids.first)).toBeVisible();
-  expect(await page.locator('.afc-row').count()).toBeLessThan(ids.total);
+  expect(await page.locator('.afrom-row').count()).toBeLessThan(ids.total);
   // The whole row is the target: a click on the title ticks it.
-  await row(page, ids.first).locator('.afc-name').click();
-  await expect(row(page, ids.first).locator('.afc-box')).toBeChecked();
+  await row(page, ids.first).locator('.afrom-name').click();
+  await expect(row(page, ids.first).locator('.afrom-box')).toBeChecked();
   await expect(addBtn(page)).toHaveText('Add 1');
-  await page.fill('#afc-search', '');
-  await expect(row(page, ids.first).locator('.afc-box')).toBeChecked();
+  await page.fill('#afrom-search', '');
+  await expect(row(page, ids.first).locator('.afrom-box')).toBeChecked();
   await shot(page, 'after-2-one-ticked');
 
   // Category narrows it too.
-  const cat = page.locator('#afc-cat');
+  const cat = page.locator('#afrom-cat');
   await expect(cat).toBeVisible();
   const pick = await cat.locator('option').nth(1).getAttribute('value');
   await cat.selectOption(pick);
-  const n = await page.locator('.afc-row').count();
+  const n = await page.locator('.afrom-row').count();
   expect(n).toBeGreaterThan(0);
   expect(n).toBeLessThan(ids.total);
-  await expect(page.locator('#afc-status')).toContainText('1 selected');
+  await expect(page.locator('#afrom-status')).toContainText('1 selected');
   await cat.selectOption('');
 
   // The arrow keys walk the rows; Space ticks the Draft.
-  await row(page, ids.first).locator('.afc-box').focus();
+  await row(page, ids.first).locator('.afrom-box').focus();
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
-  await expect(row(page, ids.draft).locator('.afc-box')).toBeFocused();
+  await expect(row(page, ids.draft).locator('.afrom-box')).toBeFocused();
   await page.keyboard.press('Space');
   await expect(addBtn(page)).toHaveText('Add 2');
 
@@ -213,13 +224,13 @@ test('pick from another class: columns, search, Select All, the count on Add, an
 
   // Open again: both are now marked, and the class last copied from is chosen.
   await open(page);
-  await expect(row(page, ids.first).locator('.afc-chip')).toHaveText('Already Here');
-  await expect(row(page, ids.draft).locator('.afc-chip')).toHaveText('Already Here');
-  await expect(page.locator('#afc-status')).toHaveText(ids.total + ' assessments, 3 already here.');
+  await expect(row(page, ids.first).locator('.afrom-chip')).toHaveText('Already Here');
+  await expect(row(page, ids.draft).locator('.afrom-chip')).toHaveText('Already Here');
+  await expect(page.locator('#afrom-status')).toHaveText(ids.total + ' assessments, 3 already here.');
   // Another class: its own list, and nothing carried over.
   await dialog.getByRole('radio', { name: 'Science 7' }).click();
-  await expect(page.locator('#afc-list')).toHaveText('Science 7 has no assessments yet.');
-  await expect(page.locator('#afc-all')).toBeDisabled();
+  await expect(page.locator('#afrom-list')).toHaveText('Science 7 has no assessments yet.');
+  await expect(page.locator('#afrom-all')).toBeDisabled();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(dialog).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -236,16 +247,16 @@ test('on an iPad held upright the dialog fits: nothing off the side, the buttons
   const ids = await twoClasses(page);
   expect(await page.evaluate(() => document.documentElement.classList.contains('fv-tablet'))).toBe(true);
   await open(page);
-  await expect(page.locator('.afc-row')).toHaveCount(ids.total);
-  const card = await page.locator('.afc-card').boundingBox();
+  await expect(page.locator('.afrom-row')).toHaveCount(ids.total);
+  const card = await page.locator('.afrom-card').boundingBox();
   expect(card.x).toBeGreaterThanOrEqual(0);
   expect(card.x + card.width).toBeLessThanOrEqual(744);
   expect(card.y).toBeGreaterThanOrEqual(0);
   expect(card.y + card.height).toBeLessThanOrEqual(1133);
   // No row or control is wider than the dialog, and the list doesn't scroll sideways.
-  expect(await page.locator('#afc-list').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await page.locator('#afrom-list').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   const wide = await page
-    .locator('.afc-card *')
+    .locator('.afrom-card *')
     .evaluateAll(
       (els, right) => els.filter(el => el.getBoundingClientRect().right > right + 0.5).length,
       card.x + card.width,
@@ -253,12 +264,40 @@ test('on an iPad held upright the dialog fits: nothing off the side, the buttons
   expect(wide).toBe(0);
   // Rows a finger can hit.
   const h = await page
-    .locator('.afc-row')
+    .locator('.afrom-row')
     .first()
     .evaluate(el => el.getBoundingClientRect().height);
   expect(h).toBeGreaterThanOrEqual(44);
-  await page.locator('.afc-row').nth(0).tap();
-  await expect(page.locator('[data-afc-add]')).toHaveText('Add 1');
+  await page.locator('.afrom-row').nth(0).tap();
+  await expect(page.locator('[data-afrom-add]')).toHaveText('Add 1');
   await shot(page, 'after-3-ipad');
   await context.close();
+});
+
+// Nov 17: Wipr (EasyList) hid the old checkbox class `.afc-box`, so in Colin's
+// Safari each title fell into the checkbox's column, one letter to a line.
+// Here every EasyList name is hidden, as a blocker would, and the dialog
+// must still show its checkboxes and give the titles their wide column.
+test('with an ad blocker on, the checkboxes show and the titles keep their column', async ({ page }) => {
+  const names = readFileSync('tests/fixtures/adblock-hidden-names.txt', 'utf8')
+    .split('\n')
+    .filter(l => l && !l.startsWith('!'));
+  const css = names.join(',\n') + ' { display: none !important; }';
+  await page.addInitScript(rules => {
+    const add = () => {
+      const st = document.createElement('style');
+      st.textContent = rules;
+      document.documentElement.appendChild(st);
+    };
+    if (document.documentElement) add();
+    else document.addEventListener('DOMContentLoaded', add);
+  }, css);
+  await page.setViewportSize({ width: 1000, height: 850 });
+  await twoClasses(page);
+  await open(page);
+  const first = page.locator('.afrom-row').first();
+  await expect(first.locator('.afrom-box')).toBeVisible();
+  await expect(page.locator('#afrom-all')).toBeVisible();
+  const w = await first.locator('.afrom-title-cell').evaluate(el => el.getBoundingClientRect().width);
+  expect(w).toBeGreaterThan(200);
 });
