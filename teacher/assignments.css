@@ -5353,14 +5353,14 @@ body.af-comp-open #gb-tooltip {
    The top (title, class chips, search) and the buttons stay put; only the
    list scrolls. Rows are a grid, so titles, categories, scoring and dates
    line up however long a title is. */
-.afc-overlay {
+.afrom-overlay {
   padding: 24px 16px;
   box-sizing: border-box;
   /* Opens at once: the list is what the teacher came for. */
   animation: none;
 }
-.afc-card {
-  --afc-cols: 18px minmax(0, 1fr) 180px 132px 92px;
+.afrom-card {
+  --afrom-cols: 18px minmax(0, 1fr) 180px 132px 92px;
   display: flex;
   flex-direction: column;
   width: min(880px, 100%);
@@ -5372,45 +5372,45 @@ body.af-comp-open #gb-tooltip {
   color: var(--text);
   overflow: hidden;
 }
-.afc-head {
+.afrom-head {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 20px 24px 14px;
 }
-.afc-title {
+.afrom-title {
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 600;
 }
-.afc-what {
+.afrom-what {
   margin: -8px 0 0;
   font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--text-2);
 }
-.afc-what strong {
+.afrom-what strong {
   font-weight: 600;
   color: var(--text);
 }
-.afc-from {
+.afrom-from {
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
-.afc-label {
+.afrom-label {
   flex-shrink: 0;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-2);
 }
-.afc-classes {
+.afrom-classes {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
 }
-.afc-class {
+.afrom-class {
   max-width: 100%;
   height: var(--control-h);
   padding: 0 12px;
@@ -5426,28 +5426,28 @@ body.af-comp-open #gb-tooltip {
   color: var(--text-2);
   cursor: pointer;
 }
-.afc-class:hover {
+.afrom-class:hover {
   background: var(--overlay-pressed);
   color: var(--text);
 }
-.afc-class[aria-checked='true'] {
+.afrom-class[aria-checked='true'] {
   border-color: var(--active);
   background: var(--active);
   color: #fff;
 }
-.afc-class:focus-visible {
+.afrom-class:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-.afc-tools {
+.afrom-tools {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.afc-search {
+.afrom-search {
   flex: 1 1 220px;
 }
-.afc-select {
+.afrom-select {
   flex: 0 1 190px;
   min-width: 0;
   height: var(--control-h);
@@ -5459,15 +5459,15 @@ body.af-comp-open #gb-tooltip {
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
-.afc-cols,
-.afc-row {
+.afrom-cols,
+.afrom-row {
   display: grid;
-  grid-template-columns: var(--afc-cols);
+  grid-template-columns: var(--afrom-cols);
   column-gap: 14px;
   align-items: center;
   padding: 0 24px;
 }
-.afc-cols {
+.afrom-cols {
   padding-top: 8px;
   padding-bottom: 8px;
   border-top: 1px solid var(--divider-medium);
@@ -5477,26 +5477,26 @@ body.af-comp-open #gb-tooltip {
   font-weight: 600;
   color: var(--text-2);
 }
-.afc-col-all {
+.afrom-col-all {
   cursor: pointer;
 }
-.afc-box {
+.afrom-box {
   width: 16px;
   height: 16px;
   margin: 0;
   accent-color: var(--active);
   cursor: pointer;
 }
-.afc-box:disabled {
+.afrom-box:disabled {
   cursor: default;
 }
-.afc-list {
+.afrom-list {
   flex: 1 1 auto;
   min-height: 132px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.afc-list.afc-empty {
+.afrom-list.afrom-empty {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5506,7 +5506,7 @@ body.af-comp-open #gb-tooltip {
   color: var(--text-2);
   text-align: center;
 }
-.afc-row {
+.afrom-row {
   min-height: 38px;
   padding-top: 6px;
   padding-bottom: 6px;
@@ -5518,40 +5518,40 @@ body.af-comp-open #gb-tooltip {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.afc-row:last-child {
+.afrom-row:last-child {
   border-bottom: 0;
 }
-.afc-row:hover {
+.afrom-row:hover {
   background: var(--divider-subtle);
 }
-.afc-row.is-on,
-.afc-row.is-on:hover {
+.afrom-row.is-on,
+.afrom-row.is-on:hover {
   background: var(--active-light);
 }
-.afc-row:has(.afc-box:focus-visible) {
+.afrom-row:has(.afrom-box:focus-visible) {
   box-shadow: inset 0 0 0 2px var(--active);
 }
-.afc-row.is-off {
+.afrom-row.is-off {
   color: var(--text-3);
   cursor: default;
 }
-.afc-row.is-off:hover {
+.afrom-row.is-off:hover {
   background: none;
 }
-.afc-title-cell {
+.afrom-title-cell {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 8px;
   min-width: 0;
 }
-.afc-name {
+.afrom-name {
   min-width: 0;
   font-weight: 500;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
-.afc-cell {
+.afrom-cell {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5559,14 +5559,14 @@ body.af-comp-open #gb-tooltip {
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-.afc-row.is-off .afc-cell {
+.afrom-row.is-off .afrom-cell {
   color: var(--text-3);
 }
-.afc-date {
+.afrom-date {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.afc-chip {
+.afrom-chip {
   flex-shrink: 0;
   padding: 1px 8px;
   border-radius: var(--radius-xl);
@@ -5575,25 +5575,25 @@ body.af-comp-open #gb-tooltip {
   font-weight: 600;
   color: var(--text-2);
 }
-.afc-chip-warn {
+.afrom-chip-warn {
   background: var(--score-2-bg);
   color: var(--text);
 }
-.afc-foot {
+.afrom-foot {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
   border-top: 1px solid var(--divider-medium);
 }
-.afc-status {
+.afrom-status {
   flex: 1;
   min-width: 0;
   font-size: var(--text-sm);
   line-height: 1.4;
   color: var(--text-2);
 }
-.afc-link {
+.afrom-link {
   padding: 0;
   border: 0;
   background: none;
@@ -5602,31 +5602,31 @@ body.af-comp-open #gb-tooltip {
   color: var(--link);
   cursor: pointer;
 }
-.afc-link:hover {
+.afrom-link:hover {
   text-decoration: underline;
 }
-.afc-foot .confirm-ok {
+.afrom-foot .confirm-ok {
   min-width: 76px;
 }
-.afc-foot .confirm-ok:disabled {
+.afrom-foot .confirm-ok:disabled {
   opacity: 0.45;
   cursor: default;
 }
 /* A narrow window: Scoring gives its room to the titles. */
 @media (max-width: 700px) {
-  .afc-card {
-    --afc-cols: 18px minmax(0, 1fr) 120px 84px;
+  .afrom-card {
+    --afrom-cols: 18px minmax(0, 1fr) 120px 84px;
   }
-  .afc-scoring {
+  .afrom-scoring {
     display: none;
   }
-  .afc-head,
-  .afc-foot {
+  .afrom-head,
+  .afrom-foot {
     padding-left: 16px;
     padding-right: 16px;
   }
-  .afc-cols,
-  .afc-row {
+  .afrom-cols,
+  .afrom-row {
     padding-left: 16px;
     padding-right: 16px;
   }

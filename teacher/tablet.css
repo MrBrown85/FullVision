@@ -269,23 +269,23 @@
 
   /* Rows and controls a finger can hit, and Scoring gives its room to the
      titles (teacher/add-from-class.js). */
-  html.fv-tablet .afc-card {
-    --afc-cols: 20px minmax(0, 1fr) 150px 92px;
+  html.fv-tablet .afrom-card {
+    --afrom-cols: 20px minmax(0, 1fr) 150px 92px;
     max-height: 100%;
   }
-  html.fv-tablet .afc-scoring {
+  html.fv-tablet .afrom-scoring {
     display: none;
   }
-  html.fv-tablet .afc-row {
+  html.fv-tablet .afrom-row {
     min-height: 44px;
   }
-  html.fv-tablet .afc-box {
+  html.fv-tablet .afrom-box {
     width: 20px;
     height: 20px;
   }
-  html.fv-tablet .afc-class,
-  html.fv-tablet .afc-select,
-  html.fv-tablet .afc-search .assess-search-input {
+  html.fv-tablet .afrom-class,
+  html.fv-tablet .afrom-select,
+  html.fv-tablet .afrom-search .assess-search-input {
     height: 40px;
   }
 

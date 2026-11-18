@@ -186,7 +186,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     // The Closed Assignment board: a "Closed Nov 13" pill, then a locked row; no due pill.
     expect(words(quick.querySelector('.sp-flag-closed'))).toMatch(/^Closed \S+ \d+$/);
     expect(words(quick.querySelector('.sp-lock-row.sp-send-closed-line'))).toBe('Hand this one in on paper');
-    expect(quick.querySelector('.sp-flag-due, .sp-flag-overdue')).toBeNull();
+    expect(quick.querySelector('.sp-band-due, .sp-band-later, .sp-band-waiting')).toBeNull();
     await page.click('[data-segment="upcoming"]');
     const fair = card(page, 'Science Fair Proposal');
     expect(words(fair.querySelector('[data-act="send-open"]'))).toBe('Send My Work');
