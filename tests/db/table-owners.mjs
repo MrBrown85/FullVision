@@ -54,6 +54,12 @@ export const OWNERS = {
   'public.photo_check_log': 'rls_test.of_course(t.course_id)',
   'public.photo_keep_check': 'rls_test.of_course(t.course_id)',
   'public.question': 'rls_test.of_questionnaire(t.questionnaire_id)',
+  'public.quiz': 'rls_test.of_assessment(t.assessment_id)',
+  'public.quiz_answer': 'rls_test.of_assessment(t.assessment_id)',
+  'public.quiz_attempt': 'rls_test.of_enrollment(t.enrollment_id)',
+  'public.quiz_key':
+    '(select rls_test.of_assessment(q.assessment_id) from public.quiz_question q where q.id = t.question_id)',
+  'public.quiz_question': 'rls_test.of_assessment(t.assessment_id)',
   'public.questionnaire': 'rls_test.of_course(t.course_id)',
   'public.reflection': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.report_config': 'rls_test.of_course(t.course_id)',
@@ -113,4 +119,10 @@ export const NO_TEACHER = {
 /* Tables that a file in migrations/ adds and live does not have yet. Each is tested only when it is
    there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
    out once the file is applied and migrations/baseline/ is refreshed. */
-export const NOT_YET_APPLIED = {};
+export const NOT_YET_APPLIED = {
+  'public.quiz': '2026111802_quizzes.sql',
+  'public.quiz_answer': '2026111802_quizzes.sql',
+  'public.quiz_attempt': '2026111802_quizzes.sql',
+  'public.quiz_key': '2026111802_quizzes.sql',
+  'public.quiz_question': '2026111802_quizzes.sql',
+};

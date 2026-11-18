@@ -299,7 +299,17 @@ def scen_save():
     bad('choices on a true/false question', with_q(lambda q: q.update(choices=[{'id': u4(), 'text': 'a'}, {'id': u4(), 'text': 'b'}]), tf()))
     bad('Several Right on a true/false question', with_q(lambda q: q.update(multiple=True), tf()))
     bad('points below 0', with_q(lambda q: q.update(points=-1))); bad('points above 100', with_q(lambda q: q.update(points=101)))
-    bad('points as text', with_q(lambda q: q.update(points='1')))
+    bad('points as text', with_q(lambda q: q.update(points='1'))); bad('points as a word', with_q(lambda q: q.update(points='abc')))
+    bad('a tolerance as a word', with_q(lambda q: q['key'].update(tolerance='x'), num()))
+    bad('a number key as a word that is not a number', with_q(lambda q: q['key'].update(answer='abc'), num()))
+    bad('a competency id that is not a uuid', with_q(lambda q: q.update(tag_id='zzz')))
+    bad('a competency id that is a number', with_q(lambda q: q.update(tag_id=5)))
+    bad('a question that is a number', dict(base, questions=[5])); bad('a question that is a list', dict(base, questions=[[1]]))
+    bad('a key that is a number', with_q(lambda q: q.update(key=5))); bad('a choice that is a word', with_q(lambda q: q['choices'].append('x')))
+    bad('a choice key with a number in it', with_q(lambda q: q['key'].update(answer=[1])))
+    bad('a prompt that is a number', with_q(lambda q: q.update(prompt=5)))
+    bad('until with a word for a date', dict(base, after_due='until', accept_until='soon'))
+    bad('tries 1.5', dict(base, tries=1.5))
     bad("a competency not on the piece", with_q(lambda q: q.update(tag_id=w.t[2])))
     bad('a competency that does not exist', with_q(lambda q: q.update(tag_id=u4())))
     bad('a key with an extra field', with_q(lambda q: q['key'].update(right=1)))
@@ -343,6 +353,11 @@ def scen_list():
     l = listed(w, w.a)
     ok('list: the quiz, its questions and the key', l == r and all('key' in q for q in l['questions']) and l['questions'][0]['key']['answer'], l)
     ok('list: it writes nothing', catalog(d.c) == cat and sums(d) == s)
+    d.run('insert into quiz (assessment_id) values (:a)', a=w.a2)
+    z = d.one('select to_jsonb(z) from quiz z where assessment_id = :a', a=w.a2)
+    ok('list: the table defaults are the contract\'s', {k: z[k] for k in SETTINGS} == SETTINGS, z)
+    d.run("insert into quiz_question (assessment_id, position, kind, prompt) values (:a, 1, 'text', 'Q')", a=w.a2)
+    ok('list: a question defaults to 1 point, not Several Right', d.all('select points::text, multiple from quiz_question where assessment_id = :a', a=w.a2) == [['1', False]])
     ok('list: list_quiz and list_quiz_tries are marked stable', d.one("select string_agg(provolatile::text, '' order by proname) from pg_proc where proname in ('list_quiz', 'list_quiz_tries')") == 'ss')
     d.close()
 
@@ -500,7 +515,13 @@ def scen_confirm():
                               ('a result not known', one(dict(m1, questions={q[0]: {'earned': 1, 'result': 'maybe'}})), ('22023', 'bad_marks')),
                               ('a question earning 101', one(dict(m1, questions={q[0]: {'earned': 101, 'result': 'right'}})), ('22023', 'bad_marks')),
                               ('a question with a level', one(dict(m1, questions={q[0]: {'earned': 1, 'result': 'right', 'level': 3}})), ('22023', 'bad_marks')),
-                              ('one try twice', one() + one(), ('22023', 'bad_marks'))):
+                              ('one try twice', one() + one(), ('22023', 'bad_marks')),
+                              ('earned as a word', one(dict(m1, earned='x')), ('22023', 'bad_marks')),
+                              ('a question id that is not a uuid', one(dict(m1, questions={'zzz': {'earned': 1, 'result': 'right'}})), ('22023', 'bad_marks')),
+                              ('a question earning a word', one(dict(m1, questions={q[0]: {'earned': 'x', 'result': 'right'}})), ('22023', 'bad_marks')),
+                              ('an item that is a number', [5], ('22023', 'bad_marks')),
+                              ('marked that is a list', one([1]), ('22023', 'bad_marks')),
+                              ('questions that is a list', one(dict(m1, questions=[1])), ('22023', 'bad_marks'))):
         x = refusal(lambda: confirm(w, w.a, marks)); ok('confirm refused: %s %s' % (name, want), x == want, x)
     x = refusal(lambda: confirm(w, w.a2, one())); ok('confirm refused: a piece with no quiz is not found', x == ('P0002', 'not found'), x)
     ok('confirm: the refusals changed nothing', quiz_rows(d) == before)
