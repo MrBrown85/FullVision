@@ -15,7 +15,7 @@
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     function typing() {
       var a = document.activeElement;
-      return !!a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+      return a instanceof HTMLElement && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
     }
     function settle() {
       if ((window.scrollY || window.scrollX) && !typing()) window.scrollTo(0, 0);
