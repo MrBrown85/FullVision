@@ -397,7 +397,11 @@ SCREENS.push(
 async function quizDemo(p, c) {
   await p.goto('about:blank');
   await p.goto((c.base || '') + '/s/');
-  await p.evaluate(() => localStorage.setItem('fv-build-quizzes', '1'));
+  await p.evaluate(() => {
+    localStorage.setItem('fv-build-quizzes', '1');
+    // The sample's progress is kept on the device: each screen starts from a first try.
+    localStorage.removeItem('gb-student-quiz-demo');
+  });
   await openDemo(p, c, 'demo-card');
   await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
   await expect(p.locator('.sp-quiz-q').first()).toBeVisible();
