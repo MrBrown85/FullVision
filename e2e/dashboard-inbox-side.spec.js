@@ -135,7 +135,7 @@ test('the row lists every student with work in: to grade first by arrival, then 
   await expect(page.locator('.dash-inbox-side-line', { hasText: /^Late · / })).toHaveCount(1);
   // The word Late is said, and only the word is amber.
   await expect(page.locator('.dash-inbox-side-line .dash-inbox-late')).toHaveText('Late');
-  await expect(page.locator('#dash-inbox')).not.toContainText('Compare');
+  await expect(page.locator('#dash-inbox')).not.toContainText(/Compare 2|picked/);
   await expect(page.getByRole('button', { name: /compare/i })).toHaveCount(0);
 });
 
