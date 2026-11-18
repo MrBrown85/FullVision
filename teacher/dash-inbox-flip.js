@@ -55,8 +55,16 @@
   // The list the last html() drew, for the mount that follows it.
   /** @type {{ cid: string, aid: string, list: any[] } | null} */
   var _drawn = null;
-  // The class the last html() drew for; keys start with it, so no other class's can match.
-  var _cidOf = '';
+  // Where the centre stood when the grader opened, until the stage is drawn again after it closes.
+  /** @type {{ cid: string, aid: string, sid: string, idx: number } | null} */
+  var _afterGrade = null;
+
+  /** One picture's key: the class id first, so no other class's key can match. The
+   * thumbnail and the whole page of one file share it. */
+  /** @param {string} cid @param {string} aid @param {string} sid @param {string} fid */
+  function picKey(cid, aid, sid, fid) {
+    return cid + '|' + aid + '|' + sid + '|' + fid;
+  }
 
   /** @returns {any} */
   function _inbox() {
@@ -140,6 +148,20 @@
     return moveTo(st, list, centreOf(st, list) + delta);
   }
 
+  /** The grader has closed on the student who stood at place `was.idx`. They may
+   * have left the to-grade order; the stage stays at the same place, so the
+   * stop that took their place is the centre and the next student to grade is
+   * not skipped. Where the student is still at that place, nothing moves.
+   * @param {State} st @param {any[]} list @param {{ sid: string, idx: number }} was */
+  function settleAfterGrade(st, list, was) {
+    if (!list.length) return 0;
+    var now = list.findIndex(function (e) {
+      return e.sid === was.sid;
+    });
+    if (now === was.idx) return moveTo(st, list, now);
+    return moveTo(st, list, was.idx);
+  }
+
   /** Which of a student's pages shows, kept in range.
    * @param {State} st @param {any} entry */
   function pageShown(st, entry) {
@@ -168,38 +190,68 @@
       late: entry.late,
       added: entry.added,
       onPaper: entry.onPaper,
-      label: entry.waiting ? 'Grade Submissions' : 'Open',
+      label: 'Open in Grader',
     };
   }
 
   /* ── Drawing ───────────────────────────────────────────── */
-  /** The face of one page: its picture, or a lined sheet.
-   * @param {string} aid @param {any} e @param {boolean} centre @param {State} st
-   * @param {Record<string, any>} files filled with the file the img asks for
-   * @returns {string} */
-  function faceHtml(aid, e, centre, st, files) {
-    var f = e.files[pageShown(st, e)];
-    if (!f) {
-      return (
-        '<span class="dash-inbox-flip-sheet"><span class="dash-inbox-flip-sheet-name">' +
-        esc(e.name) +
-        '</span><span class="dash-inbox-flip-sheet-note">' +
-        (e.onPaper ? 'Handed In on Paper' : 'No Pages') +
-        '</span></span>'
-      );
-    }
-    var key = _cidOf + '|' + aid + '|' + e.sid + '|' + f.id;
-    files[key] = f;
-    var which = centre ? 'page' : 'thumb';
+  /** @param {string} key @param {string} which */
+  function imgHtml(key, which) {
     return (
       '<img class="dash-inbox-flip-img" data-work-pic data-flip-pic="' +
       esc(key) +
+      '" data-flip-part="' +
+      which +
       '" data-flip-want="' +
-      esc(key + '|' + which) +
+      esc(key) +
       '"' +
-      (centre ? ' data-work-which="page" data-work-first="thumb"' : '') +
+      (which === 'page' ? ' data-work-which="page"' : '') +
       ' alt="" decoding="async" draggable="false">'
     );
+  }
+
+  /** @param {any} e */
+  function sheetHtml(e) {
+    return (
+      '<span class="dash-inbox-flip-sheet" data-flip-part="sheet" data-flip-want="1"><span class="dash-inbox-flip-sheet-name">' +
+      esc(e.name) +
+      '</span><span class="dash-inbox-flip-sheet-note">' +
+      (e.onPaper ? 'Handed In on Paper' : 'No Pages') +
+      '</span></span>'
+    );
+  }
+
+  /** What a face holds, as { part: [want, html] }: a thumbnail for every page on
+   * the stage, the whole page over it for the centre and one stop each side
+   * (and, once a page is held, until it is two stops away), or a lined sheet.
+   * @param {string} cid @param {string} aid @param {any} e @param {number} dist
+   * @param {State} st @param {boolean} hadPage @param {Record<string, any>} files
+   * @returns {Record<string, [string, string]>} */
+  function faceParts(cid, aid, e, dist, st, hadPage, files) {
+    var f = e.files[pageShown(st, e)];
+    if (!f) return { sheet: ['1', sheetHtml(e)] };
+    var key = picKey(cid, aid, e.sid, f.id);
+    files[key] = f;
+    /** @type {Record<string, [string, string]>} */
+    var out = { thumb: [key, imgHtml(key, 'thumb')] };
+    if (dist <= 1 || (hadPage && dist <= 2)) out.page = [key, imgHtml(key, 'page')];
+    return out;
+  }
+
+  /** @param {Element} face @param {string} part @param {string} want @param {string} html */
+  function syncPart(face, part, want, html) {
+    var now = face.querySelector('[data-flip-part="' + part + '"]');
+    var cur = now ? now.getAttribute('data-flip-want') || '' : '';
+    if (cur === want) return;
+    if (now) now.remove();
+    if (!want) return;
+    var tmp = document.createElement('div');
+    // html-safe: imgHtml and sheetHtml escape every key and name with esc
+    tmp.innerHTML = html;
+    var el = tmp.firstChild;
+    if (!el) return;
+    if (part === 'page') face.appendChild(el);
+    else face.insertBefore(el, face.firstChild);
   }
 
   /** The side a page stands on (-1, 0, 1), the steps back from the centre,
@@ -239,13 +291,18 @@
       .map(function (e, i) {
         var p = _place(i, c);
         var cap = caption(cid, e, pageShown(st, e));
+        var parts = p.on ? faceParts(cid, aid, e, p.a, st, false, files) : {};
         return (
           '<button type="button" tabindex="-1" data-flip-i="' +
           i +
           '"' +
           _pgAttrs(p, e, p.centre ? e.fullName + ', ' + cap.label : e.fullName) +
           '><span class="dash-inbox-flip-face">' +
-          (p.on ? faceHtml(aid, e, p.centre, st, files) : '') +
+          Object.keys(parts)
+            .map(function (k) {
+              return parts[k][1];
+            })
+            .join('') +
           '</span></button>'
         );
       })
@@ -270,7 +327,44 @@
       esc('Student ' + (c + 1) + ' of ' + list.length) +
       '" aria-valuetext="' +
       esc(list[c].fullName) +
-      '" data-flip-focus="slider"></div>'
+      '" data-flip-focus="slider"></div>' +
+      workSentHtml(cid, list, c)
+    );
+  }
+
+  /** What each stop says, in words: the same for the hidden list and the pages.
+   * @param {string} cid @param {any} e */
+  function summaryText(cid, e) {
+    var when = _inbox() ? _inbox().whenText(cid, e.at) : '';
+    return (
+      e.fullName +
+      (when ? ', ' + when : '') +
+      (e.late ? ', late' : '') +
+      (e.pages ? ', ' + e.pages + (e.pages === 1 ? ' page' : ' pages') : e.onPaper ? ', on paper' : ', no pages') +
+      (e.added ? ', added by you' : '')
+    );
+  }
+
+  /** The list a screen reader reaches: every stop, whatever is on the stage. Out
+   * of sight, not out of the page; each item moves the stage to its stop.
+   * @param {string} cid @param {any[]} list @param {number} c */
+  function workSentHtml(cid, list, c) {
+    return (
+      '<ul class="dash-inbox-flip-vh" aria-label="Work sent">' +
+      list
+        .map(function (e, i) {
+          return (
+            '<li><button type="button" tabindex="-1" data-flip-goto="' +
+            i +
+            '"' +
+            (i === c ? ' aria-current="true"' : '') +
+            '>' +
+            esc(summaryText(cid, e)) +
+            '</button></li>'
+          );
+        })
+        .join('') +
+      '</ul>'
     );
   }
 
@@ -300,7 +394,7 @@
       esc(c.name) +
       '</strong><span class="dash-inbox-flip-meta">' +
       bits.join('') +
-      '</span><button type="button" class="dash-inbox-flip-open" data-flip-open data-flip-focus="open">' +
+      '</span><button type="button" class="btn btn-ghost dash-inbox-flip-open" data-flip-open data-flip-focus="open">' +
       esc(c.label) +
       '</button>'
     );
@@ -309,10 +403,15 @@
   /** @param {string} cid
    * @returns {string} */
   function html(cid) {
-    _cidOf = cid;
     var aid = chosen(cid);
     var st = stateOf(cid, aid);
     var list = entries(cid, aid);
+    // The grader has closed: the stage stays at the place the grader was opened from.
+    if (_afterGrade && !_graderOpen()) {
+      var was = _afterGrade;
+      _afterGrade = null;
+      if (was.cid === cid && was.aid === aid) settleAfterGrade(st, list, was);
+    }
     _drawn = { cid: cid, aid: aid, list: list };
     /** @type {Record<string, any>} */
     var files = {};
@@ -359,19 +458,17 @@
       b.setAttribute('aria-label', p.centre ? e.fullName + ', ' + cap.label : e.fullName);
       var face = b.querySelector('.dash-inbox-flip-face');
       if (!face) return;
-      if (!p.on) {
-        if (face.firstChild) face.textContent = '';
-        return;
-      }
-      var f = e.files[pageShown(st, e)];
-      var want = f ? 'flip|' + L.aid + '|' + e.sid + '|' + f.id + '|' + (p.centre ? 'page' : 'thumb') : '';
-      var img = face.querySelector('img');
-      if (!face.firstChild || (img ? img.getAttribute('data-flip-want') : '') !== want) {
-        var tmp = document.createElement('div');
-        tmp.innerHTML = faceHtml(L.aid, e, p.centre, st, files);
-        face.textContent = '';
-        while (tmp.firstChild) face.appendChild(tmp.firstChild);
-      }
+      var fc = face;
+      var parts = p.on
+        ? faceParts(L.cid, L.aid, e, p.a, st, !!face.querySelector('[data-flip-part="page"]'), files)
+        : {};
+      ['sheet', 'thumb', 'page'].forEach(function (k) {
+        syncPart(fc, k, parts[k] ? parts[k][0] : '', parts[k] ? parts[k][1] : '');
+      });
+    });
+    L.main.querySelectorAll('[data-flip-goto]').forEach(function (/** @type {Element} */ b, /** @type {number} */ i) {
+      if (i === c) b.setAttribute('aria-current', 'true');
+      else b.removeAttribute('aria-current');
     });
     var cp = L.main.querySelector('.dash-inbox-flip-cap');
     if (cp) {
@@ -450,6 +547,7 @@
     var e = L.list[centreOf(L.st, L.list)];
     if (!e || !window.PageAssignments || !PageAssignments.openGrader) return;
     _opener = how;
+    _afterGrade = { cid: L.cid, aid: L.aid, sid: e.sid, idx: centreOf(L.st, L.list) };
     PageAssignments.openGrader(L.cid, L.aid, e.sid, {
       studentIds: L.list.map(function (/** @type {any} */ x) {
         return x.sid;
@@ -464,10 +562,13 @@
     var root = /** @type {HTMLElement | null} */ (tile.querySelector('#dash-inbox-flip'));
     if (!root) return;
     var main = /** @type {HTMLElement} */ (root.querySelector('#dash-inbox-flip-main'));
-    var aid = chosen(cid);
-    var st = stateOf(cid, aid);
-    var drawn = _drawn && _drawn.cid === cid && _drawn.aid === aid ? _drawn.list : entries(cid, aid);
+    // What html() just drew: no count of the class is made again. Only when
+    // nothing was drawn is the piece asked for.
+    var d = _drawn && _drawn.cid === cid ? _drawn : null;
     _drawn = null;
+    var aid = d ? d.aid : chosen(cid);
+    var st = stateOf(cid, aid);
+    var drawn = d ? d.list : entries(cid, aid);
     /** @type {any} */
     var L = {
       root: root,
@@ -498,9 +599,10 @@
 
     root.addEventListener('click', (L.onClick = onClick.bind(null, L)));
     root.addEventListener('keydown', (L.onKey = onKey.bind(null, L)));
-    // On the stage only, and passive: it never stops a scroll, vertical or not.
+    // On the stage only. It stops the default of a mostly sideways wheel (the
+    // browser's Back swipe), never a vertical one.
     L.stage = root.querySelector('.dash-inbox-flip-stage');
-    if (L.stage) L.stage.addEventListener('wheel', (L.onWheel = onWheel.bind(null, L)), { passive: true });
+    if (L.stage) L.stage.addEventListener('wheel', (L.onWheel = onWheel.bind(null, L)), { passive: false });
     root.addEventListener('pointerdown', (L.onDown = onDown.bind(null, L)));
     root.addEventListener('pointermove', (L.onMove = onMove.bind(null, L)));
     root.addEventListener('input', (L.onInput = onInput.bind(null, L)));
@@ -519,7 +621,9 @@
     // Focus comes back to the control that had it, when a draw was not the teacher's doing.
     if (_refocus && _refocus.cid === cid && Date.now() - _refocus.at < 2000) {
       var stage = root.querySelector('.dash-inbox-flip-stage');
+      var pgNow = root.querySelector('.dash-inbox-flip-pg.is-centre');
       if (_refocus.token === 'stage' && stage) /** @type {HTMLElement} */ (stage).focus({ preventScroll: true });
+      else if (_refocus.token === 'page' && pgNow) /** @type {HTMLElement} */ (pgNow).focus({ preventScroll: true });
       else _focusToken(root, _refocus.token);
     }
     _refocus = null;
@@ -545,7 +649,13 @@
     _live = null;
     var a = document.activeElement;
     if (a && L.root.contains(a)) {
-      var token = a.getAttribute('data-flip-focus') || (a.classList.contains('dash-inbox-flip-stage') ? 'stage' : '');
+      var token =
+        a.getAttribute('data-flip-focus') ||
+        (a.classList.contains('dash-inbox-flip-stage')
+          ? 'stage'
+          : a.classList.contains('dash-inbox-flip-pg')
+            ? 'page'
+            : '');
       _refocus = token ? { cid: L.cid, token: token, at: Date.now() } : null;
     }
     L.root.removeEventListener('click', L.onClick);
@@ -570,6 +680,11 @@
       if (turnBtn.getAttribute('aria-disabled') !== 'true') flip(L, Number(turnBtn.getAttribute('data-flip-turn')));
       return;
     }
+    var goto = t.closest('[data-flip-goto]');
+    if (goto) {
+      go(L, Number(goto.getAttribute('data-flip-goto')));
+      return;
+    }
     if (t.closest('[data-flip-open]')) {
       openGrader(L, 'open');
       return;
@@ -584,7 +699,12 @@
   /** @param {any} L @param {KeyboardEvent} e */
   function onKey(L, e) {
     var stage = L.main.querySelector('.dash-inbox-flip-stage');
-    if (!stage || _graderOpen() || e.target !== stage || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (!stage || _graderOpen() || e.altKey || e.ctrlKey || e.metaKey) return;
+    // The stage, or a page on it (clicked, or the grader closed on it); the
+    // slider and the caption's controls have their own keys.
+    var t = /** @type {any} */ (e.target);
+    var onStage = t === stage || (t && t.closest && t.closest('.dash-inbox-flip-pg') && stage.contains(t));
+    if (!onStage) return;
     var c = centreOf(L.st, L.list);
     if (e.key === 'ArrowRight') {
       e.preventDefault();
@@ -605,7 +725,7 @@
         e.preventDefault();
         flip(L, e.key === 'ArrowDown' ? 1 : -1);
       }
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && t === stage) {
       e.preventDefault();
       openGrader(L, 'stage');
     }
@@ -613,13 +733,15 @@
 
   /* A sideways gesture moves one page, then waits until the wheel has been
      quiet, so a trackpad's long tail is not a flurry. A mostly vertical one
-     is the page's own and is never stopped. */
+     is the page's own: never stopped, and it moves no stop. */
   /** @param {any} L @param {WheelEvent} e */
   function onWheel(L, e) {
     var t = /** @type {any} */ (e.target);
     if (!t || !t.closest || _graderOpen() || !t.closest('.dash-inbox-flip-stage')) return;
     var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0;
     if (!dx) return;
+    // Sideways over the stage is the stage's: never the browser's Back or a sideways scroll.
+    if (e.cancelable) e.preventDefault();
     var now = Date.now();
     if (L.locked && now - L.lastWheel > GAP) {
       L.locked = false;
@@ -688,6 +810,8 @@
     pageShown: pageShown,
     turn: turn,
     caption: caption,
+    settleAfterGrade: settleAfterGrade,
+    picKey: picKey,
     html: html,
     mount: mount,
     unmount: unmount,
@@ -698,6 +822,7 @@
       _opener = null;
       _files = {};
       _drawn = null;
+      _afterGrade = null;
     },
   };
 })();

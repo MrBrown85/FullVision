@@ -17,6 +17,7 @@
   margin-bottom: 6px;
 }
 .dash-inbox-flip-main {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -89,6 +90,7 @@
   outline-offset: 2px;
 }
 .dash-inbox-flip-face {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -103,6 +105,8 @@
   box-shadow: var(--shadow-md, var(--shadow-sm));
 }
 .dash-inbox-flip-img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -212,20 +216,28 @@
 }
 .dash-inbox-flip-open {
   flex: 0 0 auto;
-  height: 28px;
+  min-height: 28px;
   padding: 0 12px;
-  font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  background: var(--active);
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
+  color: var(--link);
 }
-.dash-inbox-flip-open:hover {
-  filter: brightness(0.92);
+
+/* Every stop in words, for a screen reader: out of sight, not out of the page. */
+.dash-inbox-flip-vh {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+  list-style: none;
 }
 .dash-inbox-flip-open:focus-visible,
 .dash-inbox-flip-turn:focus-visible,
@@ -254,14 +266,14 @@
   opacity: 0.5;
 }
 .dash-inbox-flip-slider::-webkit-slider-runnable-track {
-  height: 8px;
+  height: 24px;
   background: var(--divider-strong);
-  border-radius: 4px;
+  border-radius: 12px;
 }
 .dash-inbox-flip-slider::-webkit-slider-thumb {
-  width: 20px;
-  height: 20px;
-  margin-top: -6px;
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
   background: var(--active);
   border: 3px solid var(--surface);
   border-radius: 50%;
@@ -270,13 +282,13 @@
   appearance: none;
 }
 .dash-inbox-flip-slider::-moz-range-track {
-  height: 8px;
+  height: 24px;
   background: var(--divider-strong);
-  border-radius: 4px;
+  border-radius: 12px;
 }
 .dash-inbox-flip-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   background: var(--active);
   border: 3px solid var(--surface);
   border-radius: 50%;

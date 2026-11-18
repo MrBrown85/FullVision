@@ -88,7 +88,7 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     expect(mateo.onPaper).toBe(false);
     expect(mateo.pagesText).toBe('1 page');
     expect(mateo.pager).toBeNull();
-    expect(mateo.label).toBe('Open');
+    expect(mateo.label).toBe('Open in Grader');
 
     const ethan = DashInboxFlip.caption(CID, find(list, 'Ethan Dubois'), 0);
     expect(ethan.onPaper).toBe(true);
@@ -101,9 +101,9 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     expect(fatima.pagesText).toBe('');
     expect(fatima.when).toBeTruthy();
 
-    // Work waiting says Grade Submissions.
+    // Work waiting and work assessed open the same way, as the board says.
     const waiting = DashInboxFlip.entries(CID, LIGHT).find(e => e.waiting);
-    expect(DashInboxFlip.caption(CID, waiting, 0).label).toBe('Grade Submissions');
+    expect(DashInboxFlip.caption(CID, waiting, 0).label).toBe('Open in Grader');
   });
 
   it("pages through one student's work in place, stopping at the first and the last", () => {
@@ -182,7 +182,7 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     const html = DashInboxFlip.html(CID);
     const list = DashInboxFlip.entries(CID, LAB);
     expect((html.match(/dash-inbox-flip-pg/g) || []).length).toBeGreaterThanOrEqual(list.length);
-    expect(html).toContain('aria-label="' + list[0].fullName + ', Open"');
+    expect(html).toContain('aria-label="' + list[0].fullName + ', Open in Grader"');
     expect(html).toContain('aria-label="Student 1 of ' + list.length + '"');
     expect(html).toContain('aria-roledescription="carousel"');
     // Pages off the stage carry no picture; pictures are keyed by class first.
@@ -214,6 +214,53 @@ describe('Flip Through, Science 8 with Send Work on', () => {
     saveDemoStudentWork(CID, work);
     const html = DashInboxFlip.html(CID);
     expect(html).toContain('No work in yet');
+  });
+
+  it('builds a picture key once, class id first, for the page and its thumbnail', () => {
+    expect(DashInboxFlip.picKey('c1', 'a1', 's1', 'f1')).toBe('c1|a1|s1|f1');
+    DashInboxPick.set(CID, LAB);
+    const html = DashInboxFlip.html(CID);
+    // The key an img carries is the key place() compares against: one function.
+    const keys = [...html.matchAll(/data-flip-pic="([^"]+)" data-flip-part="(thumb|page)" data-flip-want="([^"]+)"/g)];
+    expect(keys.length).toBeGreaterThan(0);
+    keys.forEach(k => {
+      expect(k[1]).toBe(k[3]);
+      expect(k[1].startsWith(CID + '|' + LAB + '|')).toBe(true);
+    });
+    // The centre and one stop each side hold the whole page; the rest a thumbnail only.
+    const pages = keys.filter(k => k[2] === 'page').length;
+    expect(pages).toBe(2);
+  });
+
+  it('lists every stop for a screen reader, one item each, whatever is on the stage', () => {
+    DashInboxPick.set(CID, LAB);
+    const list = DashInboxFlip.entries(CID, LAB);
+    const html = DashInboxFlip.html(CID);
+    expect(html).toContain('aria-label="Work sent"');
+    expect((html.match(/data-flip-goto="/g) || []).length).toBe(list.length);
+    expect(html).toContain('Fatima Hassan, ');
+    expect(html).toMatch(/Fatima Hassan, [^<]*, late, 2 pages/);
+    expect(html).toMatch(/Ethan Dubois, [^<]*on paper/);
+  });
+
+  it('stays at the same place in the order after grading, and glides nowhere past the end', () => {
+    const list = DashInboxFlip.entries(CID, LIGHT);
+    const st = DashInboxFlip.stateOf(CID, LIGHT);
+    DashInboxFlip.moveTo(st, list, 1);
+    const was = { sid: list[1].sid, idx: 1 };
+    // The graded student leaves the to-grade order: the one who was stop 3 takes the place.
+    const after = list.filter(e => e.sid !== was.sid).concat(list[1]);
+    expect(DashInboxFlip.settleAfterGrade(st, after, was)).toBe(1);
+    expect(st.sid).toBe(list[2].sid);
+    // Still in the same place: nothing moves.
+    const st2 = { aid: LIGHT, sid: list[1].sid, idx: 1, pages: {} };
+    expect(DashInboxFlip.settleAfterGrade(st2, list, was)).toBe(1);
+    expect(st2.sid).toBe(list[1].sid);
+    // The last stop graded away: the stage keeps to the end of the shorter list.
+    const last = { sid: list[list.length - 1].sid, idx: list.length - 1 };
+    const shorter = list.slice(0, -1);
+    const st3 = { aid: LIGHT, sid: last.sid, idx: last.idx, pages: {} };
+    expect(DashInboxFlip.settleAfterGrade(st3, shorter, last)).toBe(shorter.length - 1);
   });
 
   it('escapes a name with markup in it', () => {
