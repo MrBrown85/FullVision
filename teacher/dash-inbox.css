@@ -271,6 +271,148 @@
   white-space: nowrap;
 }
 
+/* All Caught Up and a drop on the tile (D5; boards E1 and E1b). The drop
+   area is Add Work for the Class's own (.awt-drop in add-work-class.css):
+   grey and dashed at rest, blue while files are held over the tile. */
+.dash-inbox-body {
+  position: relative;
+}
+.dash-inbox-drop-home {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 2px 0 0;
+}
+.dash-inbox-drop-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+.dash-inbox-drop-caught {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-inbox-drop-for {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-2);
+}
+.dash-inbox-drop-for-label {
+  white-space: nowrap;
+}
+.dash-inbox-drop-for-one {
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-inbox-drop-select {
+  min-width: 0;
+  max-width: 260px;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.dash-inbox-drop-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  cursor: pointer;
+}
+.dash-inbox-drop-pick:focus-visible,
+.dash-inbox-drop-select:focus-visible,
+.dash-inbox-drop-wall:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.dash-inbox-drop-line {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-inbox-drop-line b {
+  font-weight: 600;
+  color: var(--text);
+}
+/* After an action found the list of assessments changed: one plain sentence. */
+.dash-inbox-drop-notice {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-inbox-drop-line a,
+.dash-inbox-drop-wall {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--link);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+/* Beside Bulletins the Inbox is 299 px: the drop area loses its icon so all of it fits. */
+@media (min-width: 901px) {
+  .dash-row-left.has-bulletins .dash-inbox-drop-area svg {
+    display: none;
+  }
+  .dash-row-left.has-bulletins .dash-inbox-drop-area {
+    padding: 10px 12px;
+    gap: 4px;
+  }
+  .dash-row-left.has-bulletins .dash-inbox-drop-home {
+    gap: 6px;
+  }
+}
+/* Files held over the tile: one opaque cover over its body, in Add Work's
+   blue. Out of sight at rest: [hidden] wins over the display rule. */
+.dash-inbox-drop-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-radius: 12px;
+}
+.dash-inbox-drop-cover[hidden] {
+  display: none;
+}
+.dash-inbox-drop-cover-in {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 12px;
+  text-align: center;
+  color: var(--link);
+  background: var(--active-light);
+  border: 2px dashed var(--active);
+  border-radius: 12px;
+  pointer-events: none;
+}
+.dash-inbox-drop-cover.is-none .dash-inbox-drop-cover-in {
+  color: var(--text-2);
+  background: var(--bg);
+  border-color: var(--border-2);
+}
+
 /* Under 900 px the tiles stack; a row's button goes under its words. */
 @media (max-width: 600px) {
   .dash-inbox-row {

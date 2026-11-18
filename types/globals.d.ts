@@ -112,6 +112,7 @@ interface Window {
   DashRecent: unknown;
   DashInboxModel: unknown;
   DashInbox: unknown;
+  DashInboxDrop: unknown;
   DashInboxPick: unknown;
   DashInboxSide: unknown;
   PageDashboard: unknown;
@@ -364,6 +365,7 @@ declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
 declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
+declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
 declare var DashInbox: any; // teacher/dash-inbox.js
 declare var DashInboxPick: any; // teacher/dash-inbox-pick.js
 declare var DashInboxSide: any; // teacher/dash-inbox-side.js

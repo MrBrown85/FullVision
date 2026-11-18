@@ -213,7 +213,7 @@ window.DashInbox = (function () {
     return (
       '<span class="dash-inbox-pic" data-pic-key="' +
       esc(key) +
-      '"><img class="dash-inbox-img" data-work-pic data-dash-pic="' +
+      '"><img class="dash-inbox-img" draggable="false" data-work-pic data-dash-pic="' +
       esc(key) +
       '" alt="' +
       esc(pg.name + "'s first page") +
@@ -306,9 +306,11 @@ window.DashInbox = (function () {
     );
   }
 
-  /** What D5 replaces: the drop area for a class with nothing to grade.
+  /** A class with nothing to grade: DashInboxDrop's drop area (D5), else one line.
    * @param {string} cid @param {any} model */
   function emptyHtml(cid, model) {
+    var drop = /** @type {any} */ (window).DashInboxDrop;
+    if (drop) return drop.emptyHtml(cid, model);
     return '<li class="dash-inbox-caught" id="dash-inbox-caught">All Caught Up</li>';
   }
 
@@ -316,6 +318,9 @@ window.DashInbox = (function () {
   /** @param {string} cid @param {any} m */
   function byAssessmentHtml(cid, m) {
     var rows = '';
+    // All Caught Up with D5: the drop area is the list's whole space.
+    if (m.caughtUp && /** @type {any} */ (window).DashInboxDrop)
+      return '<ul class="dash-inbox-list" id="dash-inbox-list">' + api.emptyHtml(cid, m) + '</ul>';
     if (m.caughtUp) rows += api.emptyHtml(cid, m);
     m.rows.forEach(function (/** @type {any} */ p) {
       rows += rowHtml(cid, p);
@@ -414,6 +419,7 @@ window.DashInbox = (function () {
       }
     }
     _mounted = null;
+    if (window.DashInboxDrop) DashInboxDrop.unmount();
     var list = document.getElementById('dash-inbox-list');
     _scroll = list ? list.scrollTop : 0;
     _snap = _drawn && document.getElementById('dash-inbox') ? { cid: _drawn, at: _positions() } : null;
@@ -473,6 +479,8 @@ window.DashInbox = (function () {
     // The new page's pictures are in, the view's own included (it fills them
     // from mount, through pics()); let go of any the old page held alone.
     if (_pics) _pics.sweep();
+    // A drop of files anywhere on the tile, in every view (D5).
+    if (window.DashInboxDrop) DashInboxDrop.mount(tile, cid, _model);
     _fresh(cid);
   }
 
@@ -500,6 +508,7 @@ window.DashInbox = (function () {
       }
     }
     _mounted = null;
+    if (window.DashInboxDrop) DashInboxDrop.leave(cid);
     if (_pics) _pics.releaseAll();
     _snap = null;
     _scroll = 0;

@@ -329,6 +329,7 @@ load('teacher/dash-competencies.js');
 load('teacher/dash-recent.js');
 load('teacher/dash-inbox-model.js');
 load('teacher/dash-inbox.js');
+load('teacher/dash-inbox-drop.js');
 load('teacher/dash-inbox-pick.js');
 load('teacher/dash-inbox-side.js');
 load('teacher/dash-inbox-roll.js');

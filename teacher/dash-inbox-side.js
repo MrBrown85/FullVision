@@ -221,7 +221,9 @@ window.DashInboxSide = (function () {
       var key = cid + '|' + m.aid + '|' + it.sid + '|' + pg.id;
       _files[key] = pg;
       inner =
-        '<img class="dash-inbox-side-img" data-work-pic data-dash-side-pic="' + esc(key) + '" alt="" decoding="async">';
+        '<img class="dash-inbox-side-img" draggable="false" data-work-pic data-dash-side-pic="' +
+        esc(key) +
+        '" alt="" decoding="async">';
     }
     var badge = '';
     if (i === 0) {

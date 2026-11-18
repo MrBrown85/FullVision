@@ -1273,6 +1273,19 @@
     e.returnValue = '';
   }
 
+  /* Opens the page for one piece. → false when the piece is not offered
+     (nothing is taken then). opts:
+       onClose  called when the page closes
+       drop     a drop's own DataTransfer: once the page is drawn it goes to
+                the tray exactly as a drop off a student does
+                (tray.takeDrop), folders and all. A browser gives up a
+                dropped folder's contents only while the drop is handled, so
+                a caller passing this calls open synchronously inside its
+                drop handler, with no wait before it.
+       files    File objects (an array or FileList), used when drop is not
+                given: they go to the tray as files chosen there do
+                (tray.take), so a single PDF opens Split the Scan.
+     Nothing is saved until Add Work is pressed on the page. */
   function open(cid, aid, opts) {
     var a = _piece(cid, aid);
     if (!offered(cid, a)) return false;
@@ -1386,6 +1399,8 @@
     _draw();
     var back = /** @type {HTMLElement | null} */ (overlay.querySelector('.awc-back'));
     if (back) back.focus();
+    if (opts.drop) s.tray.takeDrop(opts.drop);
+    else if (opts.files) s.tray.take(opts.files);
     return true;
   }
 
