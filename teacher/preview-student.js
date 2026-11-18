@@ -616,11 +616,13 @@ window.PreviewStudent = (function () {
   }
 
   /* The pages of piece `aid` as the student sees them: the newest work
-     handed in, in page order, each with the marks the student was given
-     on it (getStudentMarkup: the given copy only, none while the piece
-     hides its Mark Up or Missing or Excused is on it). The pictures come
-     through openStudentWorkPage. The answer draws only while the preview
-     is still open on this student with See Your Work on this piece. */
+     handed in, sent by the student or added by the teacher, in page order
+     (on a One per Group piece each member's newest work in turn, as
+     group-links gives the student's page), each with the marks the student
+     was given on it (getStudentMarkup: the given copy only, none while the
+     piece hides its Mark Up or Missing or Excused is on it). The pictures
+     come through openStudentWorkPage. The answer draws only while the
+     preview is still open on this student with See Your Work on this piece. */
   function _loadWork(aid) {
     var mine = _open;
     if (!mine) return;
@@ -629,10 +631,21 @@ window.PreviewStudent = (function () {
     _letGo(mine);
     mine.ui = Object.assign({}, mine.ui, { workPages: { id: aid, state: 'loading', pages: [] } });
     _drawScreen('#sp-work-title');
-    var sub = typeof getStudentSubmission === 'function' ? getStudentSubmission(cid, sid, aid) : null;
-    var files = ((sub && sub.files) || []).filter(Boolean).slice();
-    files.sort(function (x, y) {
-      return (Number(x.page) || 0) - (Number(y.page) || 0);
+    var group = typeof getStudentWorkGroup === 'function' ? getStudentWorkGroup(cid, sid, aid) : null;
+    var subs =
+      group && typeof getGroupSubmissions === 'function'
+        ? getGroupSubmissions(cid, sid, aid)
+        : typeof getStudentSubmission === 'function'
+          ? [getStudentSubmission(cid, sid, aid)]
+          : [];
+    var files = [];
+    (subs || []).forEach(function (sub) {
+      if (!sub || sub.on_paper) return;
+      files = files.concat(
+        (sub.files || []).filter(Boolean).sort(function (x, y) {
+          return (Number(x.page) || 0) - (Number(y.page) || 0);
+        }),
+      );
     });
     var given = typeof getStudentMarkup === 'function' ? getStudentMarkup(cid, sid, aid) : null;
     var byFile = {};

@@ -143,13 +143,15 @@ function studentSide() {
   side = page;
   return side;
 }
-function phoneHtml(reply, feedback, ui) {
+function phoneHtml(reply, feedback, ui, work) {
   const page = studentSide();
   page.ctx.__reply = JSON.parse(JSON.stringify(reply));
   page.ctx.__feedback = JSON.parse(JSON.stringify(feedback));
+  // What is in (the `work` reply's page counts, for See Your Work), as Preview read it.
+  page.ctx.__work = JSON.parse(JSON.stringify(work || null));
   page.ctx.__ui = ui;
   return page.run(
-    'StudentData.use(StudentData.fromServer(__reply)); StudentPageView.html(StudentView.fromPage(__reply, StudentData.page(), null, __feedback), __ui)',
+    'StudentData.use(StudentData.fromServer(__reply)); StudentPageView.html(StudentView.fromPage(__reply, StudentData.page(), __work, __feedback), __ui)',
   );
 }
 const UIS = [
@@ -165,7 +167,9 @@ const UIS = [
 function sameOnBoth() {
   const built = preview();
   UIS.forEach(ui =>
-    expect(StudentPageView.html(built.view, ui), JSON.stringify(ui)).toBe(phoneHtml(built.reply, built.feedback, ui)),
+    expect(StudentPageView.html(built.view, ui), JSON.stringify(ui)).toBe(
+      phoneHtml(built.reply, built.feedback, ui, built.work),
+    ),
   );
   return built;
 }
