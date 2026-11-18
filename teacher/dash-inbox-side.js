@@ -39,6 +39,8 @@ window.DashInboxSide = (function () {
   /** @type {Record<string, any>} */
   var _files = {};
   var _h = 120;
+  // The last page opened in the grader was opened with the pointer.
+  var _byPointer = false;
   /** @type {(() => void) | null} */
   var _undo = null;
 
@@ -451,6 +453,8 @@ window.DashInboxSide = (function () {
       }
       if (!_model || !window.PageAssignments || !PageAssignments.openGrader) return;
       _st.refocus = sid + '|' + (btn.getAttribute('data-pg') || '0');
+      // A click (detail above 0) is the pointer's, whatever key closes the grader after.
+      _byPointer = /** @type {MouseEvent} */ (e).detail > 0;
       PageAssignments.openGrader(cid, _model.aid, sid, { studentIds: _model.order, onClose: redraw });
     }
     function scroll() {
@@ -549,7 +553,7 @@ window.DashInboxSide = (function () {
           var open = _st.open;
           if (!open || !rowRef.isConnected) return;
           var li = rowRef.querySelector('.dash-inbox-side-item[data-sid="' + open + '"]');
-          if (!li || li.matches(':hover') || li.querySelector(':focus-visible')) return;
+          if (!li || li.matches(':hover') || (!_byPointer && li.querySelector(':focus-visible'))) return;
           var top = /** @type {HTMLElement | null} */ (li.querySelector('.dash-inbox-side-page'));
           if (top && li.contains(document.activeElement) && document.activeElement !== top) {
             top.focus({ preventScroll: true });

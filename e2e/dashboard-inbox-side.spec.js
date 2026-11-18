@@ -246,7 +246,7 @@ test('a pile spreads on hover and pushes the others along, and gathers when left
   await page.mouse.move(5, 5);
   await expect(page.locator(PILE)).not.toHaveClass(/is-open/);
   await expect.poll(() => lowerHidden(page)).toBe(true);
-  // Back to a closed pile's width, within the 2 px the row's own sizing may move it.
+  // Back to a closed pile's width, within a few px the row's own sizing may move it (4 wide, 6 for the next page).
   await expect.poll(async () => Math.abs((await box(page, PILE)).width - w0)).toBeLessThanOrEqual(4);
   await expect.poll(async () => Math.abs((await nextLeft(page)) - next0)).toBeLessThanOrEqual(6);
 });

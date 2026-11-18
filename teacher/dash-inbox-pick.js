@@ -1,24 +1,34 @@
 // @ts-check
 /* dash-inbox-pick.js — the assessment switch the Inbox's views share (D6 of
    docs/plans/dashboard-inbox-plan.md; board C2's "Light Refraction Lab · 6 In"
-   row). Side by Side, Flip Through and the others all call:
+   row). Side by Side, Flip Through and Roll Call all use it.
 
-     pieces(cid)   [{ aid, title, inCount }] — the class's pieces whose work
-                   the teacher's screens show (GraderWork.workShown) and that
-                   have work in, the newest work first. inCount is
-                   GraderWork.workInIds(cid, aid, studentIds).length.
-     current(cid)  the aid kept for this class on this device; with none kept
-                   (or the kept one gone), the first piece with work to grade
-                   (GraderWork's count), newest work first, and only then the
-                   first piece with work in; null with nothing in.
-     set(cid, aid) keeps the choice.
-     html(cid)     the switch: one button a piece, the current one pressed.
-     mount(root, cid, onChange) / unmount(root)
-                   one delegated click and key listener; a pick calls set,
-                   then onChange(aid). The left and right arrows move
-                   between the buttons.
+   THE CONTRACT. The piece list is worked out once per draw and shared:
+   - draw(cid) → { pieces, current }. pieces: [{ aid, title, inCount,
+     toGrade }], the class's pieces whose work the teacher's screens show
+     (GraderWork.workShown) and that have work in, newest work first. current:
+     the chosen piece of that list, { aid, title, inCount, toGrade }, or null
+     with nothing in. A view takes both from here and counts nothing again.
+   - pieces(cid) → the same list; current(cid) → current's aid or null. The
+     chosen piece is the one kept for this class on this device; with none
+     kept (or the kept one gone), the first piece with work to grade, newest
+     first, and only then the first piece with work in.
+   - set(cid, aid) keeps the choice. html(cid) is the switch: one button a
+     piece, the current one pressed (aria-pressed), scrolling sideways inside
+     itself. mount(root, cid, onChange) / unmount(root): one delegated click
+     and key listener; a pick calls set, then onChange(aid); the left and
+     right arrows move between the buttons; after the redraw the pressed
+     button has the focus if the switch had it.
 
-   The count is GraderWork's; nothing here counts for itself. */
+   COUNTING. The class is counted once per draw, by DashOverview's shared
+   classWorkCounts (the same answer the top bar's To Grade and the Inbox
+   use): toGrade comes from its pieces[]. inCount is the students whose work
+   is in (sent work from enrolled students), read from the class's work in
+   one pass; only a piece worked as pairs or groups asks
+   GraderWork.workInIds, because a group-mate's work is theirs too. Nothing
+   here calls GraderWork.workCounts per piece. The list is kept only while
+   the draw's shared answer is the same object, so a new send or score shows
+   on the next draw; outside a draw every call counts afresh. */
 window.DashInboxPick = (function () {
   'use strict';
 
@@ -34,36 +44,76 @@ window.DashInboxPick = (function () {
     return Date.parse(String((s && (s.sent_at || s.created_at)) || '')) || 0;
   }
 
-  /** @param {string} cid
-   * @returns {{ aid: string, title: string, inCount: number }[]} */
-  function pieces(cid) {
+  /** @typedef {{ aid: string, title: string, inCount: number, toGrade: number }} Piece */
+  /** @type {{ cid: string, cc: any, list: Piece[] } | null} */
+  var _memo = null;
+
+  /** The class's pieces with work in, newest work first, counted once for
+   * the draw. @param {string} cid
+   * @returns {Piece[]} */
+  function _list(cid) {
     var GW = _gw();
     if (!cid || !GW || typeof getAssessments !== 'function') return [];
-    var ids = (getStudents(cid) || []).map(function (s) {
+    var students = getStudents(cid) || [];
+    var ids = students.map(function (s) {
       return s.id;
     });
-    // When the newest work on each piece came in.
+    var cc =
+      window.DashOverview && DashOverview.classWorkCounts
+        ? DashOverview.classWorkCounts(cid, ids)
+        : GW.classWorkCounts(cid, ids);
+    if (_memo && _memo.cid === cid && _memo.cc === cc) return _memo.list;
+    /** @type {Record<string, boolean>} */
+    var enrolled = {};
+    ids.forEach(function (/** @type {string} */ sid) {
+      enrolled[sid] = true;
+    });
+    // Who has work in on each piece, and when the newest came.
+    /** @type {Record<string, Record<string, boolean>>} */
+    var who = {};
     /** @type {Record<string, number>} */
     var newest = {};
-    var subs = getCourseSubmissions(cid).submissions || [];
-    subs.forEach(function (/** @type {any} */ s) {
-      if (!s || s.state !== 'sent' || !s.assessment_id) return;
+    (getCourseSubmissions(cid).submissions || []).forEach(function (/** @type {any} */ s) {
+      if (!s || s.state !== 'sent' || !s.assessment_id || !enrolled[s.enrollment_id]) return;
+      (who[s.assessment_id] = who[s.assessment_id] || {})[s.enrollment_id] = true;
       var t = _at(s);
       if (t > (newest[s.assessment_id] || 0)) newest[s.assessment_id] = t;
     });
-    /** @type {{ aid: string, title: string, inCount: number, at: number }[]} */
+    /** @type {Record<string, number>} */
+    var toGrade = {};
+    (cc.pieces || []).forEach(function (/** @type {any} */ c) {
+      toGrade[c.aid] = c.tograde || 0;
+    });
+    /** @type {(Piece & { at: number })[]} */
     var out = [];
     (getAssessments(cid) || []).forEach(function (/** @type {any} */ a) {
-      if (!a || !a.id || !GW.workShown(cid, a)) return;
-      var n = GW.workInIds(cid, a.id, ids).length;
-      if (n > 0) out.push({ aid: a.id, title: String(a.title || 'Untitled'), inCount: n, at: newest[a.id] || 0 });
+      if (!a || !a.id || !who[a.id] || !GW.workShown(cid, a)) return;
+      var n = Object.keys(who[a.id]).length;
+      // A pair's or group's work is each member's: GraderWork says who is in.
+      if (getAssessmentStudentWork(cid, a.id).group_work === 'group') n = GW.workInIds(cid, a.id, ids).length;
+      if (n > 0)
+        out.push({
+          aid: a.id,
+          title: String(a.title || 'Untitled'),
+          inCount: n,
+          toGrade: toGrade[a.id] || 0,
+          at: newest[a.id] || 0,
+        });
     });
     out.sort(function (x, y) {
       return y.at - x.at || (x.title < y.title ? -1 : x.title > y.title ? 1 : 0);
     });
-    return out.map(function (p) {
-      return { aid: p.aid, title: p.title, inCount: p.inCount };
+    var list = out.map(function (p) {
+      return { aid: p.aid, title: p.title, inCount: p.inCount, toGrade: p.toGrade };
     });
+    _memo = { cid: cid, cc: cc, list: list };
+    return list;
+  }
+
+  /** @param {string} cid
+   * @returns {Piece[]} */
+  function pieces(cid) {
+    return _list(cid);
   }
 
   /** @param {string} cid */
@@ -76,9 +126,9 @@ window.DashInboxPick = (function () {
   }
 
   /** @param {string} cid
-   * @returns {string | null} */
-  function current(cid) {
-    var list = pieces(cid);
+   * @returns {Piece | null} */
+  function _chosen(cid) {
+    var list = _list(cid);
     if (!list.length) return null;
     var kept = _kept(cid);
     var found = kept
@@ -86,15 +136,26 @@ window.DashInboxPick = (function () {
           return p.aid === kept;
         })[0]
       : null;
-    if (found) return found.aid;
-    var GW = _gw();
-    var ids = (getStudents(cid) || []).map(function (s) {
-      return s.id;
-    });
-    var waiting = list.filter(function (p) {
-      return GW.workCounts(cid, p.aid, ids).tograde > 0;
-    })[0];
-    return (waiting || list[0]).aid;
+    if (found) return found;
+    return (
+      list.filter(function (p) {
+        return p.toGrade > 0;
+      })[0] || list[0]
+    );
+  }
+
+  /** @param {string} cid
+   * @returns {string | null} */
+  function current(cid) {
+    var p = _chosen(cid);
+    return p ? p.aid : null;
+  }
+
+  /** The piece list and the chosen piece, for this draw.
+   * @param {string} cid
+   * @returns {{ pieces: Piece[], current: Piece | null }} */
+  function draw(cid) {
+    return { pieces: _list(cid), current: _chosen(cid) };
   }
 
   /** @param {string} cid @param {string} aid */
@@ -109,9 +170,10 @@ window.DashInboxPick = (function () {
   /** @param {string} cid
    * @returns {string} */
   function html(cid) {
-    var list = pieces(cid);
+    var d = draw(cid);
+    var list = d.pieces;
     if (!list.length) return '';
-    var now = current(cid);
+    var now = d.current ? d.current.aid : null;
     return (
       '<div class="dash-inbox-pick" role="group" aria-label="Assessment">' +
       list
@@ -202,5 +264,14 @@ window.DashInboxPick = (function () {
     _bound.delete(root);
   }
 
-  return { pieces: pieces, current: current, set: set, html: html, mount: mount, unmount: unmount, KEY: KEY };
+  return {
+    pieces: pieces,
+    current: current,
+    draw: draw,
+    set: set,
+    html: html,
+    mount: mount,
+    unmount: unmount,
+    KEY: KEY,
+  };
 })();
