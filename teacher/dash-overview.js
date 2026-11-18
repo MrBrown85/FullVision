@@ -221,7 +221,7 @@ window.DashOverview = (function () {
   // html-safe: numbers and fixed words; the link is our path and id
   function toGradeGlanceHtml(cid, studentIds) {
     if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return '';
-    var c = GraderWork.classWorkCounts(cid, studentIds);
+    var c = classWorkCounts(cid, studentIds);
     // A question waiting (S10-F4) rides in the same cell: "· 1 Question".
     var asked = questionsIn(cid).length;
     var parts = [];
@@ -1251,7 +1251,25 @@ window.DashOverview = (function () {
      Competencies side by side at one height (Colin, Nov 5: Needs Attention
      is gone). The students follow (page-dashboard.js), and Observations
      goes last (obsCardHtml) until Colin decides its place. */
+  /* One count of the class's work for one draw, shared by the top bar's To
+     Grade cell and the Inbox (D4 follow-up): classWorkCounts goes through
+     every piece, and a busy class has dozens. Outside a draw, a plain call. */
+  var _draw = null;
+  function classWorkCounts(cid, studentIds) {
+    if (!_draw || _draw.cid !== cid) return GraderWork.classWorkCounts(cid, studentIds);
+    return _draw.counts || (_draw.counts = GraderWork.classWorkCounts(cid, studentIds));
+  }
+
   function renderOverviewPanel(opts) {
+    _draw = { cid: opts.cid, counts: null };
+    try {
+      return _renderOverviewPanel(opts);
+    } finally {
+      _draw = null;
+    }
+  }
+
+  function _renderOverviewPanel(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;
     var missing = DashInsights.missingItems(cid, allStudents);
@@ -1306,7 +1324,7 @@ window.DashOverview = (function () {
     var cid = opts.cid;
     var inboxHome =
       window.DashInbox && window.GraderWork && GraderWork.workOnInClass && GraderWork.workOnInClass(cid)
-        ? DashInbox.html(cid)
+        ? DashInbox.html(cid, { classCounts: classWorkCounts })
         : DashRecent.html(cid, opts.allStudents || []);
     var bulletins =
       window.BuildFlags && BuildFlags.on('bulletins') && window.DashBulletins ? DashBulletins.html(cid) : '';
@@ -1406,6 +1424,7 @@ window.DashOverview = (function () {
     renderDashToolbar: renderDashToolbar,
     studentControlsHtml: studentControlsHtml,
     renderOverviewPanel: renderOverviewPanel,
+    classWorkCounts: classWorkCounts,
     rowHeight: rowHeight,
     sizeRow: sizeRow,
     obsCardHtml: obsCardHtml,
