@@ -41,6 +41,14 @@ export default defineConfig({
               hasTouch: true,
             },
           },
+          /* Teachers use Safari on a Mac: the Bulletins page and its Dashboard
+             tile in WebKit at a desktop size. Run: FV_WEBKIT=1 npx playwright
+             test --project=webkit-teacher */
+          {
+            name: 'webkit-teacher',
+            testMatch: /(bulletins-teacher|dashboard-bulletins-tile)\.spec\.js$/,
+            use: { browserName: 'webkit' },
+          },
         ]
       : []),
   ],
