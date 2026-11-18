@@ -56,13 +56,13 @@ describe('the sample class (Science 8) with Send Work on', () => {
     sendWorkOn();
     const m = DashInboxModel.build(CID, { seen: null });
     expect(m.on).toBe(true);
-    for (const aid of [LAB, LIGHT]) {
-      const c = GraderWork.workCounts(CID, aid, ids());
-      const p = piece(m, aid);
-      expect([p.tograde, p.toreturn, p.returned, p.notin]).toEqual([c.tograde, c.toreturn, c.returned, c.notin]);
-      expect(p.in).toBe(GraderWork.workInIds(CID, aid, ids()).length);
-    }
-    expect(piece(m, LIGHT).tograde).toBeGreaterThan(0);
+    // Cell Microscope Lab has nothing to grade: no piece, no row.
+    expect(piece(m, LAB)).toBeUndefined();
+    const c = GraderWork.workCounts(CID, LIGHT, ids());
+    const p = piece(m, LIGHT);
+    expect([p.tograde, p.toreturn, p.notin]).toEqual([c.tograde, c.toreturn, c.notin]);
+    expect(p.in).toBe(GraderWork.workInIds(CID, LIGHT, ids()).length);
+    expect(p.tograde).toBeGreaterThan(0);
   });
 
   it("the rows' to grade add up to the top bar's To Grade, folded pieces included", () => {
@@ -77,14 +77,20 @@ describe('the sample class (Science 8) with Send Work on', () => {
   it('gives to grade in the order the work came in, oldest first', () => {
     sendWorkOn();
     const m = DashInboxModel.build(CID, { seen: null });
-    const p = piece(m, LIGHT);
+    const order = DashInboxModel.gradeOrder(CID, LIGHT);
+    const p = { gradeOrder: order };
     const listed = GraderWork.workCounts(CID, LIGHT, ids()).ids.tograde;
     // A sort of GraderWork's own list: nothing added, nothing left out.
     expect([...p.gradeOrder].sort()).toEqual([...listed].sort());
+    // A pair-mate with no send of their own goes by their pair's send.
     const at = sid => {
-      const s = getStudentSubmission(CID, sid, LIGHT);
-      return s ? Date.parse(s.sent_at || s.created_at) : Infinity;
+      const own = getGroupSubmissions(CID, sid, LIGHT);
+      return Math.min(...own.map(s => Date.parse(s.sent_at || s.created_at)));
     };
+    // Olivia is in Aiden's pair and sent nothing herself: she follows Aiden, not last.
+    const at2 = name => p.gradeOrder.findIndex(sid => displayName(getStudents(CID).find(x => x.id === sid)) === name);
+    expect(Math.abs(at2('Olivia Tam') - at2('Aiden Singh'))).toBe(1);
+    expect(at2('Olivia Tam')).toBeLessThan(p.gradeOrder.length - 1);
     for (let i = 1; i < p.gradeOrder.length; i++)
       expect(at(p.gradeOrder[i])).toBeGreaterThanOrEqual(at(p.gradeOrder[i - 1]));
   });
@@ -95,10 +101,6 @@ describe('the sample class (Science 8) with Send Work on', () => {
     const light = piece(m, LIGHT);
     expect(light.newest[0]).toMatchObject({ name: 'Marcus Lee', late: true, pages: 1 });
     expect(light.late).toBe(1);
-    const lab = piece(m, LAB);
-    expect(lab.onPaper).toBe(1);
-    // Ethan's sheet has no scan: it is pictured as a lined sheet with his name.
-    expect(lab.pages.some(pg => pg.paper && pg.name === 'Ethan Dubois' && pg.file === null)).toBe(true);
     expect(light.pages.every(pg => !pg.paper && pg.file && pg.file.id)).toBe(true);
     expect(light.pages.length).toBeLessThanOrEqual(DashInboxModel.MAX_PICS);
   });
@@ -122,17 +124,6 @@ describe('the sample class (Science 8) with Send Work on', () => {
     expect(newCount(iso(newest + 86400000))).toBe(0);
     // Before the oldest: all of them.
     expect(newCount(iso(oldest - 1))).toBe(sends.length);
-  });
-
-  it('never counts work the teacher added as new: it is "You Added"', () => {
-    sendWorkOn();
-    const m = DashInboxModel.build(CID, { seen: null });
-    const lab = piece(m, LAB);
-    // Mateo's and Ethan's hand-ins were added by the teacher.
-    expect(lab.addedByTeacher).toBe(2);
-    expect(lab.fromStudents).toBe(8);
-    expect(lab.newCount).toBe(8);
-    expect(lab.newCount + lab.addedByTeacher).toBe(10);
   });
 
   it('is All Caught Up when nothing waits', () => {
@@ -269,9 +260,10 @@ describe('built classes', { timeout: 120000 }, () => {
     const p = m.pieces[0];
     expect(p.newCount).toBe(1);
     expect(p.addedByTeacher).toBe(1);
+    expect(p.newCount + p.addedByTeacher).toBeLessThan(p.in + 1);
     expect(DashInboxModel.build(CID, { seen: '2026-11-13T00:00:00Z' }).pieces[0].newCount).toBe(0);
-    // Never looked: every student's own send is new; the teacher's still is not.
-    expect(DashInboxModel.build(CID, { seen: null }).pieces[0].newCount).toBe(2);
+    // Never looked: nothing is new, so a first visit has no wall of "+N".
+    expect(DashInboxModel.build(CID, { seen: null }).pieces[0].newCount).toBe(0);
   });
 
   it('compares instants, whatever offset the kept time is written in', () => {
@@ -286,6 +278,44 @@ describe('built classes', { timeout: 120000 }, () => {
     expect(at('2026-11-12T10:00:00.001Z')).toBe(0);
   });
 
+  it('does not count a send already graded as new', () => {
+    const aid = AIDS[0];
+    seed(
+      [aid],
+      [
+        sub(1, aid, IDS[0], { sent_by: 'student', sent_at: '2026-11-12T10:00:00Z' }),
+        sub(2, aid, IDS[1], { sent_by: 'student', sent_at: '2026-11-12T11:00:00Z' }),
+      ],
+    );
+    const seen = '2026-11-11T00:00:00Z';
+    expect(DashInboxModel.build(CID, { seen }).pieces[0]).toMatchObject({ fromStudents: 2, newCount: 2, tograde: 2 });
+    Grader.setOverallComment(CID, IDS[0], aid, 'Seen.');
+    // One is graded: "+1" beside "1 to grade", never "+2".
+    expect(DashInboxModel.build(CID, { seen }).pieces[0]).toMatchObject({ fromStudents: 2, newCount: 1, tograde: 1 });
+  });
+
+  it('counts each folded piece once: named with a student send, or in You Added, never both', () => {
+    const subs = [];
+    let n = 0;
+    AIDS.forEach((aid, p) => {
+      IDS.slice(0, 5).forEach(sid =>
+        subs.push(sub(n++, aid, sid, { sent_at: '2026-11-0' + (1 + (p % 9)) + 'T19:00:00Z' })),
+      );
+    });
+    // Two folded pieces also hold a student's send (and keep their teacher-added work).
+    subs.push(sub(n++, AIDS[30], IDS[10], { sent_by: 'student', sent_at: '2026-11-01T08:00:00Z' }));
+    subs.push(sub(n++, AIDS[31], IDS[10], { sent_by: 'student', sent_at: '2026-11-01T08:00:00Z' }));
+    seed(AIDS, subs);
+    const m = DashInboxModel.build(CID, { seen: null });
+    const f = m.fold;
+    expect(f.pieces).toBe(34);
+    expect(f.withStudents.length + f.youAdded.pieces).toBe(f.pieces);
+    expect(f.withStudents.length).toBeGreaterThanOrEqual(2);
+    // What is said of the folded pieces never adds up to more than they hold.
+    expect(f.youAdded.work).toBeLessThanOrEqual(f.work);
+    expect(f.youAdded.pieces).toBeLessThanOrEqual(f.pieces - f.withStudents.length);
+  });
+
   it('orders what came in oldest first, whatever the class list says', () => {
     const aid = AIDS[0];
     seed(
@@ -297,7 +327,7 @@ describe('built classes', { timeout: 120000 }, () => {
       ],
     );
     const p = DashInboxModel.build(CID, { seen: null }).pieces[0];
-    expect(p.gradeOrder).toEqual([IDS[1], IDS[2], IDS[0]]);
+    expect(DashInboxModel.gradeOrder(CID, aid)).toEqual([IDS[1], IDS[2], IDS[0]]);
     expect(p.newest.map(x => x.sid)).toEqual([IDS[0], IDS[2], IDS[1]]);
   });
 

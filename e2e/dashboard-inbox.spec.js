@@ -127,7 +127,7 @@ test('Grade Submissions opens the grader on the first student in the order the w
   const first = await page.evaluate(aid => {
     const cid = getActiveCourse();
     const p = DashInboxModel.build(cid, { seen: null }).pieces.find(x => x.aid === aid);
-    const st = getStudents(cid).find(s => s.id === p.gradeOrder[0]);
+    const st = getStudents(cid).find(s => s.id === DashInboxModel.gradeOrder(cid, aid)[0]);
     return { name: displayName(st), n: p.tograde };
   }, LIGHT);
   await page.locator('.dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-grade').click();
@@ -156,6 +156,15 @@ test('To Grade in the top bar scrolls to the Inbox and rings it; the ring is gon
   });
   const before = await box(page, '#dash-inbox');
   expect(before.bottom <= 0 || before.top >= 800 || before.top < 0).toBe(true);
+  // The ring's own life: when the class goes on and when it comes off.
+  await page.evaluate(() => {
+    window.__ring = {};
+    new MutationObserver(() => {
+      const on = document.getElementById('dash-inbox').classList.contains('is-ring');
+      if (on && !window.__ring.on) window.__ring.on = performance.now();
+      if (!on && window.__ring.on && !window.__ring.off) window.__ring.off = performance.now();
+    }).observe(document.getElementById('dash-inbox'), { attributes: true, attributeFilter: ['class'] });
+  });
   // Enter on the focused cell, as a keyboard teacher would.
   await page.locator('.dash-glance-tograde').evaluate(el => el.focus({ preventScroll: true }));
   await page.keyboard.press('Enter');
@@ -165,7 +174,88 @@ test('To Grade in the top bar scrolls to the Inbox and rings it; the ring is gon
   expect(after.top).toBeLessThan(800);
   // Still on the Dashboard: the link was not followed.
   expect(new URL(page.url()).pathname).toBe('/dashboard');
-  await expect(tile).not.toHaveClass(/is-ring/, { timeout: 4000 });
+  await expect(tile).not.toHaveClass(/is-ring/, { timeout: 2000 });
+  // The ring lasts 200 to 250 ms (a 1,000 ms ring would fail this).
+  const ring = await page.evaluate(() => window.__ring);
+  expect(ring.off - ring.on).toBeGreaterThanOrEqual(180);
+  expect(ring.off - ring.on).toBeLessThanOrEqual(400);
+});
+
+test('a counts line too long for its box loses its quiet words, never Late', async ({ page }) => {
+  await open(page);
+  const r = await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:0;top:0;width:260px;z-index:9999;background:#fff';
+    host.innerHTML =
+      '<p class="dash-inbox-counts">' +
+      DashInbox.countsHtml({ in: 12, tograde: 4, notin: 20, toreturn: 2, late: 3, addedByTeacher: 9, onPaper: 4 }) +
+      '</p>';
+    document.body.appendChild(host);
+    const p = host.querySelector('.dash-inbox-counts').getBoundingClientRect();
+    const late = host.querySelector('.dash-inbox-late').getBoundingClientRect();
+    const out = {
+      pRight: p.right,
+      lateRight: late.right,
+      lateText: host.querySelector('.dash-inbox-late').textContent,
+    };
+    host.remove();
+    return out;
+  });
+  expect(r.lateText).toBe('· Late 3');
+  expect(r.lateRight).toBeLessThanOrEqual(r.pRight + 0.5);
+});
+
+test('a paper hand-in with no scan is a sheet that holds its name and its words', async ({ page }) => {
+  await open(page);
+  await page.evaluate(aid => {
+    const cid = getActiveCourse();
+    const work = getCourseSubmissions(cid);
+    const st = getStudents(cid).find(
+      s => !work.submissions.some(x => x.assessment_id === aid && x.enrollment_id === s.id),
+    );
+    // A long name, to see it wrap rather than run out of the sheet.
+    st.firstName = 'Maximilian-Alexander';
+    st.lastName = 'Featherstonehaugh-Smythe';
+    work.submissions.push({
+      id: 'paper-x',
+      assessment_id: aid,
+      enrollment_id: st.id,
+      version: 1,
+      state: 'sent',
+      sent_by: 'teacher',
+      on_paper: true,
+      is_late: false,
+      note: null,
+      sent_at: '2999-01-01T00:00:00Z',
+      created_at: '2999-01-01T00:00:00Z',
+      files: [],
+    });
+    saveDemoStudentWork(cid, work);
+    PageDashboard.render();
+  }, LIGHT);
+  const sheet = page.locator('.dash-inbox-sheet').first();
+  await expect(sheet).toBeVisible();
+  const m = await sheet.evaluate(el => {
+    const r = el.getBoundingClientRect();
+    const name = el.querySelector('.dash-inbox-sheet-name');
+    const note = el.querySelector('.dash-inbox-sheet-note');
+    const lines = n => Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).lineHeight));
+    return {
+      w: r.width,
+      h: r.height,
+      fits: el.scrollHeight <= el.clientHeight + 1,
+      nameLines: lines(name),
+      noteLines: lines(note),
+      label: el.getAttribute('aria-label'),
+    };
+  });
+  expect(m.w).toBeGreaterThanOrEqual(66);
+  expect(m.h).toBeGreaterThanOrEqual(80);
+  expect(m.fits).toBe(true);
+  expect(m.noteLines).toBeLessThanOrEqual(2);
+  expect(m.nameLines).toBeLessThanOrEqual(2);
+  expect(m.label).toMatch(/Featherstonehaugh-Smythe: Handed In on Paper$/);
+  await shot(page, 'inbox-paper-sheet');
 });
 
 test('a redraw keeps the tile and asks for no picture twice', async ({ page }) => {

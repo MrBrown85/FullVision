@@ -116,7 +116,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 6px 5px;
+  padding: 5px 3px;
   color: #3b3b3f;
   background-color: #fbfaf6;
   background-image: repeating-linear-gradient(to bottom, transparent 0 11px, rgba(60, 100, 170, 0.28) 11px 12px);
@@ -124,10 +124,13 @@
   line-height: 1.2;
 }
 .dash-inbox-sheet-name {
-  font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .dash-inbox-sheet-note {
   font-weight: 600;
@@ -184,6 +187,25 @@
   white-space: nowrap;
   font-size: var(--text-sm);
   color: var(--text-2);
+}
+/* The counts line wraps to a second line rather than cut anything: Late is
+   always readable. Only the quiet words (You Added, on paper) can be cut. */
+.dash-inbox-counts {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.3em;
+  white-space: normal;
+  overflow: visible;
+}
+.dash-inbox-late {
+  white-space: nowrap;
+}
+.dash-inbox-quiet {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dash-inbox-n {
   font-weight: 600;

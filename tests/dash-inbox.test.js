@@ -112,13 +112,62 @@ describe('the tile', () => {
     expect(DashInbox.countsText({ in: 6, tograde: 4, notin: 20, toreturn: 0 })).toBe('6 in · 4 to grade · 20 not in');
   });
 
-  it('says "You Added" and "on paper" quietly', () => {
-    const model = DashInboxModel.build(CID, { seen: null });
-    const html = DashInbox.html(CID);
-    const doc = parseHTML('<body>' + html + '</body>').document;
-    // Cell Microscope Lab has nothing to grade, so it has no row; its words are the model's.
-    expect(doc.querySelector('.dash-inbox-row[data-aid="sci8a1"]')).toBeNull();
-    expect(model.pieces.find(p => p.aid === 'sci8a1')).toMatchObject({ addedByTeacher: 2, onPaper: 1 });
+  it('puts Late straight after the counts, before the quiet words, so it is never cut', () => {
+    const html = DashInbox.countsHtml({
+      in: 9,
+      tograde: 4,
+      notin: 1,
+      toreturn: 2,
+      late: 3,
+      addedByTeacher: 1,
+      onPaper: 1,
+    });
+    expect(html.indexOf('dash-inbox-main')).toBeLessThan(html.indexOf('dash-inbox-late'));
+    expect(html.indexOf('dash-inbox-late')).toBeLessThan(html.indexOf('dash-inbox-quiet'));
+    expect(html).toContain('· Late 3');
+    expect(html).toContain('You Added 1 · 1 on paper');
+  });
+
+  it('reads the time as "Thu 1:05 pm", with no comma, and a date past a week', () => {
+    const day = DashInbox.whenText(CID, new Date(Date.now() - 86400000).toISOString());
+    expect(day).toMatch(/^[A-Z][a-z]{2} \d{1,2}:\d{2} [ap]m$/);
+    expect(DashInbox.whenText(CID, new Date(Date.now() - 20 * 86400000).toISOString())).toMatch(
+      /^[A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2} [ap]m$/,
+    );
+  });
+
+  it('starts the kept time at a first look, so nothing is new on it', () => {
+    const key = 'fv-dash-inbox-seen:' + CID;
+    localStorage.removeItem(key);
+    const doc = parseHTML('<body>' + DashInbox.html(CID) + '</body>').document;
+    expect(doc.querySelector('.dash-inbox-new')).toBeNull();
+    expect(Date.parse(localStorage.getItem(key))).toBeGreaterThan(0);
+  });
+
+  it('draws a paper hand-in as a sheet named for the student, with the full name for a screen reader', () => {
+    const work = getCourseSubmissions(CID);
+    work.submissions.push({
+      id: 'paper-1',
+      assessment_id: LIGHT,
+      enrollment_id: 'st1',
+      version: 1,
+      state: 'sent',
+      sent_by: 'teacher',
+      on_paper: true,
+      is_late: false,
+      note: null,
+      sent_at: '2999-01-01T00:00:00Z',
+      created_at: '2999-01-01T00:00:00Z',
+      files: [],
+    });
+    saveDemoStudentWork(CID, work);
+    const doc = parseHTML('<body>' + DashInbox.html(CID) + '</body>').document;
+    const sheet = doc.querySelector('.dash-inbox-sheet');
+    expect(sheet.textContent).toContain('Handed In on Paper');
+    expect(sheet.getAttribute('aria-label')).toMatch(/^.+: Handed In on Paper$/);
+    expect(sheet.querySelector('.dash-inbox-sheet-name').textContent).toBe(
+      sheet.getAttribute('aria-label').replace(': Handed In on Paper', ''),
+    );
   });
 
   it('Grade Submissions opens the grader on the first student in the order the work came in', () => {
@@ -135,7 +184,7 @@ describe('the tile', () => {
     } finally {
       window.PageAssignments = was;
     }
-    const order = DashInboxModel.build(CID, { seen: null }).pieces.find(p => p.aid === LIGHT).gradeOrder;
+    const order = DashInboxModel.gradeOrder(CID, LIGHT);
     expect(calls).toHaveLength(1);
     expect(calls[0][0]).toBe(CID);
     expect(calls[0][1]).toBe(LIGHT);
