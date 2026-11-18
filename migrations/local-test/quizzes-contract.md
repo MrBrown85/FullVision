@@ -417,55 +417,171 @@ Everything it needs comes from `list_quiz` (questions, keys, competencies, setti
 - Choice: compare `answer` and the key's `answer` as sets of ids. True or False: equal booleans. Number: `|answer − key| ≤ tolerance` (tolerance null is 0), compared as the plan says.
 - A try counts only if sent. Which try counts (Best, Latest) is the app's; `confirm_quiz` stores the one it chose.
 
-## MQ2, the student's side (slice Q3a): build exactly this
+## The student's side (MQ2)
 
-File `migrations/<date>_quizzes_student.sql`. Three functions in `student_submit`, `security definer`, `search_path` `public, student_submit, pg_temp`, executable by `service_role` only. Each begins with `_s := student_submit._session_class(p_session_token, p_enrollment_id)` and answers `{ "ok": false, "error": _s->>'error' }` when it has one (`signed_out`, `not_found`, `closed`, `card_stopped`, `card_expired`, …, as every route does). Then the piece: `assessment` with `id = p_assessment_id and course_id = _s->>'course_id'`, `student_submit._listed(a, today)` true, `score_mode <> 'dibels'`, and a `quiz` row; otherwise `{ ok: false, error: 'not_found' }`. **None of them reads `quiz_key`, and none sends `tag_id`, a key's answer, `why`, archived questions, another student's anything, or anything from which right could be told.**
+Slice Q3a: `migrations/2026111806_quizzes_student.sql` and the edge function's `supabase/functions/student-submit/quiz-routes.ts`. **This section is exact; the student's quiz screen (Q3b) builds to it.** It replaces the first sketch of MQ2 that stood here. Where it differs from that sketch:
 
-Refusal answers, exactly: `{ "ok": false, "error": "closed" }` (the quiz is closed and the student has no reopened try), `{ "ok": false, "error": "no_tries_left" }`, `{ "ok": false, "error": "not_found" }`, `{ "ok": false, "error": "sent" }` (the try was sent: no try is open), `{ "ok": false, "error": "bad_answer", "question_id": "uuid" }`, `{ "ok": false, "error": "too_many", "retry_after_s": 120 }`.
+1. **A closed quiz is refused `quiz_closed`, not `closed`.** `closed` already means "this class's page is off or paused for you" (from `_session_class`, on every route); the screen must tell the two apart, as Send Work's `work_closed` does.
+2. **`quiz` answers `can_answer`**, so the screen need not work out the tries rule itself.
+3. **A reopened try not yet opened** (Reopen after a sent try) is opened by the next `quiz` call, whatever `new_try` says; until then `quiz-save` and `quiz-send` answer `sent`.
+4. **A Choice answer is stored sorted** (byte order, collation `C`), as the key is. The order the student ticked is not kept.
+5. The write-limit check is widened in one statement, as Bulletins' M2 did (no `not valid` step).
 
-**Write limit.** `student_submit._write_limit(card_id, 'quiz', 600)` (600 an hour per card) before each `quiz_save`, each `quiz_send`, and each `quiz` call that starts a try. MQ2 widens `write_log_kind_check` to add `quiz`: `alter table student_submit.write_log drop constraint write_log_kind_check, add constraint write_log_kind_check check (kind in ('reflect', 'seen', 'finish', 'answer', 'quiz')) not valid;` then `validate constraint`. Bulletins' M2 widens the same check: **whichever is applied second names both kinds.**
+### What it adds, and what it changes
 
-### `student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean default false) → jsonb`
+Five functions in `student_submit`, each `security definer`, `search_path` `public, student_submit, pg_temp`:
 
-Locks: the assessment's row `for share`, then the quiz's row `for key share`, then the student's advisory lock. Then:
+| Function                                                                                                                                  | Who may run it      | What                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------- |
+| `_quiz_window(p_assessment_id uuid, p_course_id uuid) → jsonb`                                                                            | no role             | the piece as a quiz this class's students may open       |
+| `_quiz_new_order(p_assessment_id uuid) → jsonb`                                                                                           | no role             | a new `question_order` (shuffled as the quiz says)       |
+| `_quiz_questions(p_assessment_id uuid, p_order jsonb) → jsonb`                                                                            | no role             | the active questions in an order, numbered, without keys |
+| `quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean default false) → jsonb`         | `service_role` only | route `quiz`                                             |
+| `quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) → jsonb` | `service_role` only | route `quiz-save`                                        |
+| `quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) → jsonb`                                     | `service_role` only | route `quiz-send`                                        |
 
-1. The open try is the student's unsent attempt. If it has no `question_order` (a reopened try not yet opened), fill `question_order` and `started_at` now.
-2. If there is none, and either the student has no attempt at all or `p_new_try` is true, and they can start one (open, tries left): insert an ordinary try (`try` = highest + 1, `started_at` now, the order made as under `quiz_attempt`). If `p_new_try` is true and they cannot: `closed` or `no_tries_left`.
-3. Answer:
+(Six rows, five names: the three helpers and the three the edge function calls. "No role" means not `public`, `anon`, `authenticated` or `service_role`; the database's owner runs them through the three.)
+
+It changes one existing thing: `student_submit.write_log`'s `write_log_kind_check` gains `quiz`, so it reads `kind in ('reflect', 'seen', 'finish', 'answer', 'bulletin', 'quiz')` (Bulletins' M2 is applied, so this file names both). No row changes; no table, policy or other function changes. **None of the five reads `quiz_key`**, and none sends `tag_id`, `position`, a key's answer, a tolerance, a "why" line, an archived question, a `marked` value, `given_points`, a note, or anything of another student.
+
+### Who may answer: the rules every one of the three follows
+
+1. `_s := _session_class(p_session_token, p_enrollment_id)`; with `_s ? 'error'` the answer is `{ "ok": false, "error": _s->>'error' }`: `signed_out`, `not_found`, `card_stopped`, `card_expired`, `closed` (page off or paused). Withdrawn is `not_found`.
+2. **The piece**: `assessment.id = p_assessment_id`, in the session's class (`course_id = _s->>'course_id'`), `student_submit._listed(a, today)` true (not a Draft, assigned on or before today in the class's time zone), `score_mode <> 'dibels'`, and a `quiz` row. Otherwise `{ "ok": false, "error": "not_found" }`. A piece of another class, a Draft and a piece assigned next week answer the same.
+3. **Open or closed**, read as `student_submit._work_window` reads Student Work's, but from the quiz's own columns: `today = (now() at time zone public._fv_timezone(course.timezone))::date`; `after_due = 'keep'` open; `'stop'` open while `due_date is null or today <= due_date`; `'until'` open while `today <= accept_until`. `closes_on` is `accept_until` for `until`, `due_date` for `stop`, null for `keep`.
+4. **Tries** (the rule under "Tries" above): ordinary tries have `reopened_at` null. `tries_left` is null when `quiz.tries = 0` (unlimited), else `greatest(quiz.tries - ordinary tries, 0)`. The **open try** is the student's one unsent attempt. The student **can answer** it when it is reopened (`reopened_at` set), whether the quiz is open or not, or when it is ordinary and the quiz is open. The student **can start** a try when they have no open try, the quiz is open, and `tries_left` is null or above 0.
+5. **Locks**, in the contract's order: `quiz` takes the assessment's row `for share`; all three take the quiz's row `for key share`; then the student's advisory lock `pg_advisory_xact_lock(hashtext('fv.quiz'), hashtext(assessment_id::text || ':' || enrollment_id::text))`; then attempt rows, then answer rows. So two calls for one student (two phones, two taps) run one after the other, and a Reopen waits for them.
+6. **The write limit**: `student_submit._write_limit(card_id, 'quiz', 600)`, 600 an hour per card, shared by the three. It is spent only by a call that writes: each `quiz_save`, each `quiz_send`, and each `quiz` that starts or opens a try; and only after every other check has passed (a refused call spends nothing). The 601st is `{ "ok": false, "error": "too_many", "retry_after_s": 1 to 3600 }` and writes nothing.
+
+### `student_submit.quiz(...)`: open the quiz
+
+What it does, after the rules above:
+
+1. With an open try that has no `question_order` (a reopened try not yet opened): spend one write; set `question_order` (made now, see `quiz_attempt`) and `started_at = now()`.
+2. With no open try, when the student has no attempt at all or `p_new_try` is true: if they can start one, spend one write and insert an ordinary try (`try` = the student's highest + 1, `started_at = now()`, the order made now). If `p_new_try` is true and they cannot: `{ "ok": false, "error": "quiz_closed" }` when the quiz is closed, else `{ "ok": false, "error": "no_tries_left" }`. When they have no attempt, `p_new_try` is false and the quiz is closed, nothing is made and the answer below has `try: null`.
+3. `p_new_try` true with an open try already: the open try is answered; nothing is made.
+
+Answer (every key always present):
 
 ```json
 {
   "ok": true,
-  "quiz": { "tries": 1, "tries_left": 0, "closed": false, "closes_on": "2026-11-28 or null" },
-  "try": { "number": 1, "sent": false, "started_at": "timestamptz", "sent_at": null, "reopened": false },
+  "quiz": { "tries": 1, "tries_left": 0, "closed": false, "closes_on": "2026-11-28" },
+  "try": {
+    "number": 1,
+    "sent": false,
+    "started_at": "2026-11-18T17:04:11.482913+00:00",
+    "sent_at": null,
+    "reopened": false
+  },
   "sent_tries": 0,
+  "can_answer": true,
   "can_try_again": false,
   "questions": [
     {
       "id": "uuid",
       "number": 1,
       "kind": "choice",
-      "prompt": "…",
+      "prompt": "Which is a producer?",
       "points": 1,
       "multiple": false,
-      "choices": [{ "id": "uuid v4", "text": "…" }]
+      "choices": [
+        { "id": "uuid v4", "text": "Grass" },
+        { "id": "uuid v4", "text": "Hawk" }
+      ]
+    },
+    {
+      "id": "uuid",
+      "number": 2,
+      "kind": "number",
+      "prompt": "Half of 7?",
+      "points": 2,
+      "multiple": false,
+      "choices": null
     }
   ],
-  "answers": { "<question id>": ["uuid v4"] }
+  "answers": { "<question id>": ["uuid v4"], "<question id>": 3.5 }
 }
 ```
 
-`tries_left` is null when unlimited. `closes_on` is `accept_until` or the due date as `_work_window` gives it. `try` is the open try, or with none the latest sent try (`sent: true`), or null with no try. `questions` are in this student's order (reading the order, under `quiz_attempt`) for that try, choices in their order with `id` and `text` only, `choices` null for other kinds; `[]` when `try` is null. `answers` are that try's own answers by question id (`{}` with none). `can_try_again`: no open try, tries left and open.
+| Key               | Value                                                                                                                                                                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quiz.tries`      | 0 (unlimited), 1 or 2: the quiz's setting                                                                                                                                                                                         |
+| `quiz.tries_left` | null when unlimited, else ordinary tries left (a reopened try is not counted in either)                                                                                                                                           |
+| `quiz.closed`     | true when the quiz is closed today (rule 3)                                                                                                                                                                                       |
+| `quiz.closes_on`  | `YYYY-MM-DD` or null (rule 3)                                                                                                                                                                                                     |
+| `try`             | the open try; with none, the latest sent try (`sent: true`); with no attempt, null                                                                                                                                                |
+| `try.number`      | its `try` (1, 2, ...; a reopened try continues the count)                                                                                                                                                                         |
+| `try.reopened`    | true when the teacher's Reopen made or marked it                                                                                                                                                                                  |
+| `sent_tries`      | how many of this student's tries are sent                                                                                                                                                                                         |
+| `can_answer`      | true when `try` is the open try and the student can answer it (rule 4). False on a sent try, with no try, and on an ordinary open try once the quiz has closed                                                                    |
+| `can_try_again`   | true when there is no open try and the student can start one (rule 4): then `quiz` with `new_try: true` starts it                                                                                                                 |
+| `questions`       | `try`'s questions in this student's order (reading the order, under `quiz_attempt`): active questions only, numbered 1, 2, ...; `choices` in their order with `id` and `text` only, null for other kinds. `[]` when `try` is null |
+| `answers`         | `try`'s own saved answers to those questions, by question id, each the raw answer JSON (below). `{}` with none                                                                                                                    |
 
-### `student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) → jsonb`
+Refusals: the session's five; `not_found`; `quiz_closed`; `no_tries_left`; `too_many`.
 
-Locks: the quiz's row `for key share`, the student's advisory lock. The open try must exist and be started (`sent` if the latest try is sent, `not_found` if there is none); the student must be able to answer it (`closed`); the question must be an active question of the quiz (`not_found`). `p_answer` null deletes the answer. Otherwise it must be the raw answer's JSON for the question's kind (table above; choice ids among the question's own; text trimmed, 1 to 5000), else `bad_answer`. Insert or replace the row (`answer`, `saved_at = now()`, `given_points` and `note` null). A later save replaces an earlier. Answers `{ "ok": true, "question_id": "uuid", "saved_at": "timestamptz" }`.
+### `student_submit.quiz_save(...)`: save one answer
 
-### `student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) → jsonb`
+`p_answer` null (SQL or JSON null) clears the answer (deletes its row). Otherwise it must be, for the question's kind:
 
-Locks as `quiz_save`. Sets `sent_at = now()` on the open try (`sent` if none is open and the latest is sent, `not_found` if there is no try; `closed` if the student cannot answer it). A sent try is never changed by a student again. Answers `{ "ok": true, "try": 1, "sent_at": "timestamptz", "tries_left": 0, "can_try_again": false }`.
+| Kind         | `p_answer`                                                                                                           | Stored as                      |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `choice`     | an array of distinct strings, each one of the question's own choice ids; exactly one unless `multiple`, else 1 to 20 | the ids sorted (collation `C`) |
+| `true_false` | `true` or `false`                                                                                                    | as sent                        |
+| `number`     | a JSON number, -10^12 to 10^12                                                                                       | as sent                        |
+| `text`       | a string, 1 to 5000 characters after ASCII white space is trimmed at both ends                                       | trimmed                        |
 
-**The access rule for unfinished answers**: only the student's own session (a session holding that enrolment, through `_session_class`) reads or writes them. The teacher's functions never return them; another student's session is `not_found`.
+In order, after rules 1, 2 and 5:
+
+1. No open try, or an open try not yet opened: `{ "ok": false, "error": "sent" }` when the student has a sent try, else `not_found`.
+2. The student cannot answer the open try: `quiz_closed`.
+3. `p_question_id` is not an active question of this quiz (archived, another quiz's, made up): `not_found`.
+4. `p_answer` is not the shape above: `{ "ok": false, "error": "bad_answer", "question_id": "<p_question_id>" }`.
+5. Spend one write (`too_many`).
+6. Insert or replace the row `(attempt, question)`: `answer`, `saved_at = clock_timestamp()`, `given_points` and `note` null. The later of two saves replaces the earlier.
+
+Answer: `{ "ok": true, "question_id": "uuid", "saved_at": "timestamptz" }`. For a clear, `saved_at` is when it was cleared.
+
+### `student_submit.quiz_send(...)`: send the try
+
+In order, after rules 1, 2 and 5: no open try or one not yet opened: `sent` (with a sent try) or `not_found`; the student cannot answer it: `quiz_closed`; spend one write (`too_many`); set `sent_at = clock_timestamp()`. Nothing checks that every question is answered (the screen asks). A sent try is never changed by a student again: a second `quiz_send` is `sent`, a `quiz_save` after it is `sent`.
+
+Answer: `{ "ok": true, "try": 1, "sent_at": "timestamptz", "tries_left": 0, "can_try_again": false }` (`tries_left` and `can_try_again` as `quiz` would now answer them).
+
+### The access rule for unfinished answers
+
+Only the student's own session (a session holding that enrolment, through `_session_class`) reads or writes an unsent try. The teacher's `list_quiz_tries` answers only sent tries (two booleans of an unsent one); another student's session is `not_found` (their enrolment is not on it); a classmate's session naming this student's enrolment is `not_found`.
+
+### The routes (`quiz-routes.ts`)
+
+The phone posts JSON to the `student-submit` edge function, as every route does. A request of the wrong shape is HTTP 400 `{ "ok": false, "error": "bad_request" }` and the database is not asked. Every other answer is HTTP 200 with the reply below, rebuilt key by key from the lists in `SENT` (`tests/student-submit-allow-list.test.js` holds them to the SQL); a refusal is passed on by its code (any code the route does not name becomes `not_found`); a database error is HTTP 500 `{ "ok": false, "error": "server" }`.
+
+| Route       | Request                                                                                          | Calls                      |
+| ----------- | ------------------------------------------------------------------------------------------------ | -------------------------- |
+| `quiz`      | `{ "route": "quiz", "session", "enrollment_id", "assessment_id", "new_try"? }`                   | `student_submit.quiz`      |
+| `quiz-save` | `{ "route": "quiz-save", "session", "enrollment_id", "assessment_id", "question_id", "answer" }` | `student_submit.quiz_save` |
+| `quiz-send` | `{ "route": "quiz-send", "session", "enrollment_id", "assessment_id" }`                          | `student_submit.quiz_send` |
+
+Shapes: `session` a string of 1 to 128 characters; each id a UUID; `new_try` absent (false) or a boolean; `answer` required (the key present): null, a boolean, a finite number, a string of at most 5000 characters after trimming (and 20,000 before) with no NUL and no lone surrogate, or an array of 0 to 20 UUID strings. Anything else is `bad_request`. The database checks the rest (`bad_answer`).
+
+Replies: `quiz` as above, `quiz-save` and `quiz-send` as above, refusals `{ "ok": false, "error" }`, plus `question_id` on `bad_answer` and `retry_after_s` on `too_many`.
+
+| Route       | Refusals passed on                                                                                              |
+| ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `quiz`      | `signed_out`, `not_found`, `card_stopped`, `card_expired`, `closed`, `quiz_closed`, `no_tries_left`, `too_many` |
+| `quiz-save` | the session's five, `quiz_closed`, `sent`, `bad_answer`, `too_many`                                             |
+| `quiz-send` | the session's five, `quiz_closed`, `sent`, `too_many`                                                           |
+
+The edge function is the second look: a key the database might add later is dropped until it is named in `SENT`; a question carries only `id`, `number`, `kind`, `prompt`, `points`, `multiple`, `choices`; a choice only `id` and `text`; an answer only a raw answer's shape, under a question id that is in `questions`.
+
+### For the student's screen (Q3b)
+
+- Open the screen with `quiz` (`new_try` false). Show `questions` in the order given and number them by `number`. Show `answers`. When `can_answer` is false, show the answers read-only.
+- Save each answer as it changes with `quiz-save`; a cleared answer sends `answer: null` (a blank text box too: an empty string is `bad_answer`). Send with `quiz-send`. "Try Again" is `quiz` with `new_try: true`, offered only when `can_try_again`.
+- `sent` on a save means the try was sent elsewhere (another phone) or a Reopen is waiting: call `quiz` again and show what it answers. `quiz_closed` on a save: the quiz closed while it was open; call `quiz`.
+- Every open and save spends one of 600 writes an hour per card; never save on a timer, only when an answer changes.
+- Two phones on one card: the later save wins. A phone that was offline sends its saves when it returns and may then replace newer ones from the other phone.
 
 ## MQ3, the returned view (slice Q5a): build exactly this
 
