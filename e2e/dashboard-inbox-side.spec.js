@@ -28,10 +28,6 @@ async function open(page, { bulletins = false, dark = false, side = true } = {})
         if (side) localStorage.setItem('fv-dash-inbox-view:sci8', 'side');
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');
-          window.DashBulletins = {
-            html: () =>
-              '<section class="dash-bulletins-stub" style="flex:1;background:var(--surface);border-radius:12px"></section>',
-          };
         }
       } catch (e) {
         /* storage blocked */

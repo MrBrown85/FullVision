@@ -31,11 +31,6 @@ async function open(page, { flag = true, bulletins = false, sendWork = true, dar
         if (flag) localStorage.setItem('fv-build-dashRow', '1');
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');
-          // A stand-in for the Bulletins tile, which is built apart from the Inbox.
-          window.DashBulletins = {
-            html: () =>
-              '<section class="dash-bulletins-stub" style="flex:1;background:var(--surface);border-radius:12px"></section>',
-          };
         }
       } catch (e) {
         /* storage blocked */
@@ -381,7 +376,7 @@ test('beside a Bulletins tile the Inbox is 299 px: whole rows, pictures of 80 px
   expect(m.sideways).toEqual([0, 0, 0]);
   // The tile did not make the row taller: it is still 510 px beside Bulletins.
   expect(Math.round((await box(page, '.dash-row')).height)).toBe(510);
-  const bulletins = await box(page, '.dash-bulletins-stub');
+  const bulletins = await box(page, '.dash-row-bulletins');
   expect(bulletins.top).toBeGreaterThanOrEqual(tile.bottom + 11);
   await shot(page, 'inbox-299-light');
 });
