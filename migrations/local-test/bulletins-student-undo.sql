@@ -1,6 +1,6 @@
 -- Undo for migrations/2026111803_bulletins_student.sql (2026-11-17).
 --
--- ── PART 1, the fast stop that deletes nothing ──────────────────────────────
+-- == PART 1, the fast stop that deletes nothing ==
 -- Drops the four functions the student-submit edge function calls
 -- (bulletins, bulletin_seen, bulletin_react, bulletin_file_links). A revoke
 -- would stop nothing: the edge function signs in to the database as its
@@ -15,7 +15,7 @@
 -- "PART 1 begins" to "PART 1 ends"). It stops, dropping nothing, if one of
 -- the four is not this file's definition (a later change would be lost).
 --
--- ── PART 2, the full removal: the rest of this file ──────────────────────────
+-- == PART 2, the full removal: the rest of this file ==
 -- Drops the two private helpers too, and puts the check on
 -- student_submit.write_log.kind back exactly as it was before the file
 -- (validated). To do that it first takes write_log to itself, then deletes

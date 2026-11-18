@@ -9,7 +9,7 @@
 -- no table. student_submit.page, _session_class, _session_classes and
 -- _card_refusal are not changed.
 --
--- ── Why ────────────────────────────────────────────────────────────────────
+-- == Why ==
 -- Bulletins, slice B1b (docs/plans/bulletins-plan.md; the contract is
 -- migrations/local-test/bulletins-contract.md, "For B1b"). A class's one-way
 -- feed on the student's page: the teacher posts, the student reads, marks it
@@ -18,21 +18,21 @@
 -- file gives the edge function (service_role) the four it calls for a
 -- student.
 --
--- ── What it adds (all in student_submit, security definer, search_path
---    public, student_submit, pg_temp) ───────────────────────────────────────
--- _bulletin_visible(p_bulletin_id, p_enrollment_id) → boolean: the one rule
+-- == What it adds (all in student_submit, security definer, search_path
+--    public, student_submit, pg_temp) ==
+-- _bulletin_visible(p_bulletin_id, p_enrollment_id) -> boolean: the one rule
 --   for "may this student see this bulletin": it exists, it is posted
 --   (posted_at not null: every file finished), and it is in the student's
 --   class. Every function below asks it; none repeats its test. No role may
 --   call it.
--- _bulletin_session_enrollments(p_session_id) → uuid[]: the enrolments a
+-- _bulletin_session_enrollments(p_session_id) -> uuid[]: the enrolments a
 --   device's session holds whose class it may name, in the order they were
 --   added. It mirrors the tests of _session_classes exactly (card not
 --   stopped, student not withdrawn and not paused, class not in the trash
 --   and its Student Page on; an expired card's class is still named, as
 --   _session_classes names it), without its to-do counts and names, which
 --   the feed does not need. No role may call it.
--- bulletins(p_session_token, p_enrollment_id, p_ip_hash) → { ok, bulletins,
+-- bulletins(p_session_token, p_enrollment_id, p_ip_hash) -> { ok, bulletins,
 --   new }: the session's class's visible bulletins, oldest first (one shown
 --   again and not yet seen by this student sits at the new end), the newest
 --   100 of that order, each with its ready files and this student's own
@@ -41,14 +41,14 @@
 --   expired card's included), that student's count of visible bulletins not
 --   yet seen. Read-only.
 -- bulletin_seen(p_session_token, p_enrollment_id, p_bulletin_ids,
---   p_ip_hash) → { ok, seen }: up to 100 ids; each one the student may see
+--   p_ip_hash) -> { ok, seen }: up to 100 ids; each one the student may see
 --   is marked seen, the first time kept; any other id is skipped.
 -- bulletin_react(p_session_token, p_enrollment_id, p_bulletin_id, p_word,
---   p_ip_hash) → { ok, reaction }: got_it, done or question sets or
+--   p_ip_hash) -> { ok, reaction }: got_it, done or question sets or
 --   replaces the student's reaction; null takes it back. Refused where
 --   Reactions is off.
 -- bulletin_file_links(p_session_token, p_enrollment_id, p_bulletin_file_id,
---   p_ip_hash) → { ok, bucket, file_id, bulletin_id, kind, title,
+--   p_ip_hash) -> { ok, bucket, file_id, bulletin_id, kind, title,
 --   page_count, pages: [{ page, path }] }: a ready file of a bulletin the
 --   student may see; the edge function signs 60-second links. Read-only.
 -- Who runs the four: they are granted to service_role and to no other role;
@@ -93,7 +93,7 @@
 --   from  CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text])))
 --   to    CHECK ((kind = ANY (ARRAY['reflect'::text, 'seen'::text, 'finish'::text, 'answer'::text, 'bulletin'::text])))
 --
--- ── The checks it makes first ──────────────────────────────────────────────
+-- == The checks it makes first ==
 -- It stops with nothing changed unless: the nine functions it relies on are
 -- the definitions it was tested against; its own six are missing or this
 -- file's (a second run); no function of those names exists with other
@@ -106,18 +106,18 @@
 -- path (set below). Read-only from gradebook-prod: the query in
 -- migrations/local-test/bulletins-student-live-precheck.sql.
 --
--- ── Rows ───────────────────────────────────────────────────────────────────
+-- == Rows ==
 -- None changes and none is added. The constraint is checked again against
 -- write_log's rows as it is added (at most a day of rate-limit counters,
 -- each of a kind the new check allows).
 --
--- ── Locks ──────────────────────────────────────────────────────────────────
+-- == Locks ==
 -- Swapping the constraint takes student_submit.write_log to itself for a
 -- moment; students' writes that count against a limit wait behind it. If a
 -- long transaction holds the table, the file gives up after five seconds
 -- with nothing applied: run it again.
 --
--- ── Order ──────────────────────────────────────────────────────────────────
+-- == Order ==
 -- After 2026111801 (it reads M1's tables, fv_private.bulletin_file_path and
 -- fv_private.bulletin_pinned_now).
 -- Before the edge function with bulletin-routes.ts is deployed. The student
@@ -137,7 +137,7 @@ set local lock_timeout = '5s';
 -- is taken with public on it, whatever path the session sending this file has.
 set local search_path = public, pg_temp;
 
--- ── 1. The checks, before anything changes ─────────────────────────────────
+-- == 1. The checks, before anything changes ==
 do $guard$
 declare
     _f    record;
@@ -229,7 +229,7 @@ begin
 end
 $guard$;
 
--- ── 2. The write limit knows 'bulletin' ────────────────────────────────────
+-- == 2. The write limit knows 'bulletin' ==
 -- Dropped and added in one statement, inside this transaction: no moment
 -- without a check. Only when it is still today's (a second run skips it).
 do $kind$
@@ -244,7 +244,7 @@ begin
 end
 $kind$;
 
--- ── 3. The one rule: may this student see this bulletin ─────────────────────
+-- == 3. The one rule: may this student see this bulletin ==
 create or replace function student_submit._bulletin_visible(p_bulletin_id uuid, p_enrollment_id uuid)
  returns boolean
  language sql
@@ -284,7 +284,7 @@ $function$;
 
 revoke all on function student_submit._bulletin_session_enrollments(uuid) from public, anon, authenticated, service_role;
 
--- ── 4. The feed ────────────────────────────────────────────────────────────
+-- == 4. The feed ==
 create or replace function student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
  returns jsonb
  language plpgsql
@@ -353,7 +353,7 @@ begin
 end;
 $function$;
 
--- ── 5. Seen ────────────────────────────────────────────────────────────────
+-- == 5. Seen ==
 create or replace function student_submit.bulletin_seen(p_session_token text, p_enrollment_id uuid, p_bulletin_ids uuid[], p_ip_hash text)
  returns jsonb
  language plpgsql
@@ -387,7 +387,7 @@ begin
 end;
 $function$;
 
--- ── 6. A reaction ──────────────────────────────────────────────────────────
+-- == 6. A reaction ==
 create or replace function student_submit.bulletin_react(p_session_token text, p_enrollment_id uuid, p_bulletin_id uuid, p_word text, p_ip_hash text)
  returns jsonb
  language plpgsql
@@ -425,7 +425,7 @@ begin
 end;
 $function$;
 
--- ── 7. A file's pages, for the edge function to sign ────────────────────────
+-- == 7. A file's pages, for the edge function to sign ==
 create or replace function student_submit.bulletin_file_links(p_session_token text, p_enrollment_id uuid, p_bulletin_file_id uuid, p_ip_hash text)
  returns jsonb
  language plpgsql
@@ -462,7 +462,7 @@ grant execute on function student_submit.bulletin_react(text, uuid, uuid, text, 
 revoke all on function student_submit.bulletin_file_links(text, uuid, uuid, text) from public, anon, authenticated;
 grant execute on function student_submit.bulletin_file_links(text, uuid, uuid, text) to service_role;
 
--- ── 8. What this file leaves is what it was tested as ───────────────────────
+-- == 8. What this file leaves is what it was tested as ==
 do $after$
 declare
     _f record;

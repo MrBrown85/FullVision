@@ -59,6 +59,13 @@ checks(check_name, value) as (
         or (select proowner from pg_proc where oid = to_regprocedure('student_submit._session_class(text,uuid)')) is distinct from (select oid from pg_roles where rolname = current_user)
         or not has_schema_privilege('student_submit', 'create')
     union all
+    -- Guards the route the files are sent by: it must hand PostgreSQL the text as written. The tool that
+    -- sends a migration was measured turning a backslash, u and four hex digits into the character itself;
+    -- a backslash before x or before another backslash must arrive untouched (4 characters each, with
+    -- standard_conforming_strings on, as on live). A row here means the route changes text: do not apply.
+    select 'the route keeps backslashes as written', 'length of the two test strings: ' || length('\x41') || ', ' || length('a\\b')
+     where length('\x41') <> 4 or length('a\\b') <> 4
+    union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17)
 select * from checks order by check_name collate "C";
