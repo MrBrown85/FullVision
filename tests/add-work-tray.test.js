@@ -981,6 +981,12 @@ describe('one pile, two classes: turned on after the files', () => {
     await tick();
   }
 
+  it('a class whose assessment has another title is not offered', () => {
+    saveAssessments(CID2, [{ id: PIECE2, title: 'Something Else', tagIds: [], date: '2026-10-20' }]);
+    AddWorkClass.open(CID, PIECE);
+    expect($('[data-awc="two"]')).toBeNull();
+  });
+
   it('drop then switch gives what switch then drop gives', async () => {
     const before = await dropThenSwitch();
     // One class: Kaur.jpg was certain, Ximena's file had no student.

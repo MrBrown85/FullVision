@@ -200,13 +200,13 @@
       });
   }
 
-  function _files(n) {
+  function _twoFiles(n) {
     return n === 1 ? '1 file' : n + ' files';
   }
   // The line under the switch once it is on: what moved, or the usual line.
   function _againLine(n) {
     var parts = [];
-    if (n.back) parts.push(_files(n.back) + ' went back to Waiting for a Student');
+    if (n.back) parts.push(_twoFiles(n.back) + ' went back to Waiting for a Student');
     if (n.placed) parts.push(n.placed === 1 ? '1 waiting file was placed' : n.placed + ' waiting files were placed');
     if (!parts.length) return '';
     var said = parts.join(', and ');
@@ -258,15 +258,15 @@
     return out;
   }
 
-  function _find(cid, aid) {
+  function _twoAssessment(cid, aid) {
     return (
       (getAssessments(cid) || []).find(function (x) {
         return x && x.id === aid;
       }) || null
     );
   }
-  function _title(cid, aid) {
-    var a = _find(cid, aid);
+  function _twoTitle(cid, aid) {
+    var a = _twoAssessment(cid, aid);
     return (a && a.title) || 'that assessment';
   }
 
@@ -284,7 +284,7 @@
         given.sid,
         file +
           ' was for ' +
-          _title(given.forCid, given.forAid) +
+          _twoTitle(given.forCid, given.forAid) +
           ' in ' +
           _name(given.forCid) +
           '.' +
@@ -294,7 +294,7 @@
     }
     var res = s.stage.setFor(given.sid, placed.piece.id, given.forAid);
     if (res.ok) return { ok: true, piece: res.piece };
-    var a = _find(given.forCid, given.forAid);
+    var a = _twoAssessment(given.forCid, given.forAid);
     var st = s.byId[given.sid];
     var who = st && typeof displayNameWithLast === 'function' ? displayNameWithLast(st) : 'this student';
     var said =
