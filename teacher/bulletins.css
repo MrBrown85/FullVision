@@ -112,18 +112,24 @@
   display: grid;
   grid-template-rows: 1fr;
 }
-.bulletin-compose-inner {
+.bulletin-set {
   min-height: 0;
+  min-width: 0;
+  margin: 0;
+  border: 0;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+.bulletin-set:disabled {
+  opacity: 0.7;
+}
 /* The feed slides down under the box as it opens. */
 .bulletin-compose-opening {
   animation: bulletin-open 200ms var(--motion-ease, ease-out);
 }
-.bulletin-compose-opening .bulletin-compose-inner {
+.bulletin-compose-opening .bulletin-set {
   overflow: hidden;
 }
 @keyframes bulletin-open {
@@ -134,8 +140,21 @@
     grid-template-rows: 1fr;
   }
 }
+/* A new bulletin glides in from just above its place: it moves, it does not fade. */
+.bulletin-glide {
+  animation: bulletin-glide 200ms var(--motion-ease, ease-out);
+}
+@keyframes bulletin-glide {
+  from {
+    transform: translateY(-14px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .bulletin-compose-opening {
+  .bulletin-compose-opening,
+  .bulletin-glide {
     animation: none;
   }
 }
@@ -300,6 +319,26 @@ textarea.bulletin-field {
 .bulletin-page .btn[disabled] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* A bulletin that was not posted, offered back. */
+.bulletin-returned-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.bulletin-returned-line:empty,
+#bulletin-returned:empty {
+  display: none;
+}
+#bulletin-returned {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ── Feed ── */

@@ -138,7 +138,7 @@ describe('the pure helpers', () => {
         link_url: ' https://a.org ',
         link_title: ' Site ',
         pinned_until: '2026-11-20',
-        assessment_id: 'a1',
+        assessment_id: U(555),
         reactions_on: true,
       }),
     ).toEqual({
@@ -148,9 +148,45 @@ describe('the pure helpers', () => {
       link_title: 'Site',
       pinned: true,
       pinned_until: '2026-11-20',
-      assessment_id: 'a1',
+      assessment_id: U(555),
       reactions_on: true,
     });
+  });
+
+  it('an assessment id made on this device (not a server id) is never put in a bulletin', () => {
+    // Signed in: an assessment still waiting to be saved has a local id, and an id inside p_bulletin is never re-keyed.
+    expect(bulletinPayload({ kind: 'reminder', body: 'x', assessment_id: 'c1abc2' })).not.toHaveProperty(
+      'assessment_id',
+    );
+    expect(bulletinDraftProblem({ kind: 'reminder', body: 'x', assessment_id: 'c1abc2' })).toMatch(/still being saved/);
+    expect(bulletinDraftProblem({ kind: 'reminder', body: 'x', assessment_id: U(555) })).toBe('');
+    const wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true; // Demo Mode's own ids are all local, and nothing is sent
+    expect(bulletinPayload({ kind: 'reminder', body: 'x', assessment_id: 'sci8a1' }).assessment_id).toBe('sci8a1');
+    window.isDemoMode = wasDemo;
+  });
+
+  it('a link with a user name or password, or with hidden or direction-changing characters, is refused', () => {
+    expect(bulletinLinkProblem('https://example.com/a')).toBe('');
+    expect(bulletinLinkProblem('https://user:pass@example.com/')).toMatch(/user name or a password/);
+    expect(bulletinLinkProblem('https://example.com@evil.test/')).toMatch(/user name or a password/);
+    expect(bulletinLinkProblem('https://exa\u200bmple.com/')).toMatch(/hidden characters/);
+    expect(bulletinLinkProblem('https://example.com/\u202egpj.exe')).toMatch(/hidden characters/);
+    expect(bulletinLinkProblem('ftp://example.com')).toMatch(/http/);
+    expect(bulletinDraftProblem({ kind: 'announcement', body: '', link_url: 'https://u:p@x.org' })).toMatch(
+      /user name/,
+    );
+    expect(bulletinLinkOk('https://user:pass@example.com/')).toBe('');
+  });
+
+  it('the link card shows the host from a real parse, and drops credentials from what it links to', () => {
+    expect(bulletinLinkShown('https://user:pw@www.Example.com:8080/a?b=1#c')).toEqual({
+      href: 'https://www.example.com:8080/a?b=1#c',
+      host: 'example.com',
+    });
+    expect(bulletinLinkShown('https://example.com@evil.test/x').host).toBe('evil.test');
+    expect(bulletinLinkShown('javascript:alert(1)')).toBe(null);
+    expect(bulletinLinkShown('https://exa\u200bmple.com/')).toBe(null);
   });
 
   it('bulletins sort pinned first, then newest first', () => {
@@ -340,6 +376,7 @@ describe('signed in, against stand-in answers', () => {
     seedClass(REAL, { students: STUDENTS, courseConfigs: ON });
     for (const k of Object.keys(_bltMem)) delete _bltMem[k];
     localStorage.removeItem('gb-bulletins-pending-' + REAL);
+    localStorage.removeItem('gb-bulletins-returned-' + REAL);
     events = [];
     document.addEventListener('fv:bulletins-changed', on);
   });
@@ -351,6 +388,7 @@ describe('signed in, against stand-in answers', () => {
     session.signOut();
     clearClass(REAL);
     localStorage.removeItem('gb-bulletins-pending-' + REAL);
+    localStorage.removeItem('gb-bulletins-returned-' + REAL);
     vi.useRealTimers();
   });
 
@@ -481,10 +519,10 @@ describe('signed in, against stand-in answers', () => {
     await refreshBulletins(REAL);
     fake.on('post_bulletin', () => ({
       data: null,
-      error: { code: '22023', message: 'A link must start with http:// or https://.' },
+      error: { code: '22023', message: 'a bulletin needs words, a link or a file' },
     }));
     const out = await postBulletin(REAL, { kind: 'announcement', body: 'Hi' });
-    expect(out).toEqual({ ok: false, message: 'A link must start with http:// or https://.' });
+    expect(out).toEqual({ ok: false, message: 'Write something, add a link or add a file.' });
     expect(getBulletins(REAL)).toEqual([]);
     expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
     expect(sent('post_bulletin').length).toBe(1);
@@ -496,6 +534,175 @@ describe('signed in, against stand-in answers', () => {
     const out = await postBulletin(REAL, { kind: 'announcement', body: 'x'.repeat(2001) });
     expect(out.ok).toBe(false);
     expect(sent('post_bulletin')).toEqual([]);
+  });
+
+  it('a post or an edit naming an assessment with a local id is refused before anything is queued', async () => {
+    fake.on('list_bulletins', () => listAnswer([row(1)]));
+    await refreshBulletins(REAL);
+    const out = await postBulletin(REAL, { kind: 'reminder', body: 'Due', assessment_id: 'c1abc2' });
+    expect(out.ok).toBe(false);
+    expect(out.message).toMatch(/still being saved/);
+    const edit = await editBulletin(REAL, U(1001), { assessment_id: 'a1x2y3' });
+    expect(edit.ok).toBe(false);
+    expect(edit.message).toMatch(/still being saved/);
+    expect(sent('post_bulletin').concat(sent('edit_bulletin'))).toEqual([]);
+    expect(window.v2Queue.stats().queued).toBe(0);
+    expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
+    // A server id goes.
+    fake.on('post_bulletin', () => ({ data: { bulletin: row(2) }, error: null }));
+    const ok = await postBulletin(REAL, { kind: 'reminder', body: 'Due', assessment_id: U(777) });
+    expect(ok.ok).toBe(true);
+    expect(sent('post_bulletin')[0][1].p_bulletin.assessment_id).toBe(U(777));
+  });
+
+  it('a refusal is shown as a plain sentence, never the server’s own words', async () => {
+    fake.on('list_bulletins', () => listAnswer([]));
+    await refreshBulletins(REAL);
+    const say = async (code, message) => {
+      fake.on('post_bulletin', () => ({ data: null, error: { code, message } }));
+      return (await postBulletin(REAL, { kind: 'announcement', body: 'Hi' })).message;
+    };
+    expect(await say('22023', 'assessment_id must be a id')).toBe(
+      'The linked assessment could not be found. Choose another one, or None.',
+    );
+    expect(await say('22023', "a link's name needs a link")).toBe(
+      'A link name needs a link. Add the link, or clear the name.',
+    );
+    // A message nobody listed is the general sentence, never a rule's.
+    expect(await say('22023', 'something new the server says')).toBe(
+      'Bulletins could not be saved. Try again in a moment.',
+    );
+    expect(await say('P0002', 'class not found')).toBe('This class is no longer there.');
+    expect(await say('XX000', 'internal failure at line 4')).toBe(
+      'Bulletins could not be saved. Try again in a moment.',
+    );
+  });
+
+  describe('a post that was not posted gives its words back', () => {
+    const entry = (key, body, at = '2026-11-17T16:00:00.000Z') => ({
+      key,
+      at,
+      bulletin: { kind: 'announcement', body },
+      files: [],
+    });
+
+    it('refused now (no file): the words are kept for the page, nothing waits, the box is not touched', async () => {
+      fake.on('list_bulletins', () => listAnswer([]));
+      await refreshBulletins(REAL);
+      fake.on('post_bulletin', () => ({ data: null, error: { code: '22023', message: 'a bulletin is an object' } }));
+      const out = await postBulletin(REAL, {
+        kind: 'announcement',
+        body: 'My careful words',
+        link_url: 'https://a.org',
+      });
+      expect(out.ok).toBe(false);
+      const back = getReturnedBulletins(REAL);
+      expect(back.length).toBe(1);
+      expect(back[0].bulletin).toMatchObject({
+        kind: 'announcement',
+        body: 'My careful words',
+        link_url: 'https://a.org',
+      });
+      expect(back[0].message).toBe('This bulletin was not accepted. Check it and try again.');
+      expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
+      expect(events.length).toBeGreaterThan(0);
+      dropReturnedBulletin(REAL, back[0].key);
+      expect(getReturnedBulletins(REAL)).toEqual([]);
+      expect(localStorage.getItem('gb-bulletins-returned-' + REAL)).toBe(null);
+    });
+
+    it('refused after a reload (the outbox’s dead-letter event): the words come back, the dead letter is cleared', async () => {
+      fake.on('list_bulletins', () => listAnswer([]));
+      await refreshBulletins(REAL); // the page listens to the outbox
+      const key = crypto.randomUUID();
+      localStorage.setItem('gb-bulletins-pending-' + REAL, JSON.stringify([entry(key, 'Written before the reload')]));
+      fake.on('post_bulletin', () => ({
+        data: null,
+        error: { code: '22023', message: "a bulletin's words can be 2000 characters at most" },
+      }));
+      // As after a reload: the entry is only in the outbox, no promise of this page waits for it.
+      window.v2Queue.enqueue(
+        'post_bulletin',
+        {
+          p_course_id: REAL,
+          p_bulletin: { kind: 'announcement', body: 'Written before the reload' },
+          p_files: null,
+          p_idempotency_key: key,
+        },
+        { id: key },
+      );
+      await quiet();
+      const back = getReturnedBulletins(REAL);
+      expect(back.map(e => e.bulletin.body)).toEqual(['Written before the reload']);
+      expect(back[0].message).toBe('Words can be up to 2,000 characters.');
+      expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
+      expect(window.v2Queue.deadLetter().filter(e => e.endpoint === 'post_bulletin')).toEqual([]);
+    });
+
+    it('a dead letter kept from before the page opened is swept on the first read', async () => {
+      const key = crypto.randomUUID();
+      localStorage.setItem('gb-bulletins-pending-' + REAL, JSON.stringify([entry(key, 'Kept words')]));
+      const was = { dead: window.v2Queue.deadLetter, dismiss: window.v2Queue.dismissDeadLetter };
+      const dismissed = [];
+      window.v2Queue.deadLetter = () => [
+        {
+          id: key,
+          endpoint: 'post_bulletin',
+          payload: { p_course_id: REAL, p_bulletin: { kind: 'announcement', body: 'Kept words' } },
+          last_code: '22023',
+          last_error: "a link's name needs a link",
+        },
+        { id: 'other', endpoint: 'edit_bulletin', payload: { p_course_id: REAL } },
+      ];
+      window.v2Queue.dismissDeadLetter = id => dismissed.push(id);
+      try {
+        fake.on('list_bulletins', () => listAnswer([]));
+        await refreshBulletins(REAL, { force: true });
+      } finally {
+        window.v2Queue.deadLetter = was.dead;
+        window.v2Queue.dismissDeadLetter = was.dismiss;
+      }
+      expect(getReturnedBulletins(REAL).map(e => [e.bulletin.body, e.message])).toEqual([
+        ['Kept words', 'A link name needs a link. Add the link, or clear the name.'],
+      ]);
+      expect(dismissed).toEqual([key]);
+      expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
+    });
+
+    it('a waiting post the outbox no longer holds and the server does not list comes back instead of vanishing', async () => {
+      const key = crypto.randomUUID();
+      localStorage.setItem('gb-bulletins-pending-' + REAL, JSON.stringify([entry(key, 'Lost words')]));
+      fake.on('list_bulletins', () => listAnswer([]));
+      await refreshBulletins(REAL, { force: true });
+      expect(getReturnedBulletins(REAL).map(e => e.bulletin.body)).toEqual(['Lost words']);
+      expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
+      // The same words are not kept twice.
+      localStorage.setItem('gb-bulletins-pending-' + REAL, JSON.stringify([entry(key, 'Lost words')]));
+      await refreshBulletins(REAL, { force: true });
+      expect(getReturnedBulletins(REAL).length).toBe(1);
+    });
+  });
+
+  it('a bulletin whose files this device is not uploading says so; one it is uploading does not', async () => {
+    const key = crypto.randomUUID();
+    const half = row(3, { visible: false, posted_at: null, idempotency_key: key });
+    fake.on('list_bulletins', () => listAnswer([half]));
+    await refreshBulletins(REAL, { force: true });
+    expect(getBulletins(REAL)[0]).toMatchObject({ waiting: true, stalled: true, key: null });
+    _bltFlows[key] = true;
+    expect(getBulletins(REAL)[0]).toMatchObject({ waiting: true, stalled: false });
+    delete _bltFlows[key];
+  });
+
+  it('Show It Again on a bulletin deleted a moment before is gone: it leaves the list', async () => {
+    fake.on('list_bulletins', () => listAnswer([row(1), row(2)]));
+    await refreshBulletins(REAL, { force: true });
+    fake.on('show_bulletin_again', () => ({ data: null, error: { code: 'P0002', message: 'not found' } }));
+    fake.on('list_bulletins', () => listAnswer([row(1)]));
+    const out = await showBulletinAgain(REAL, U(1002));
+    expect(out).toEqual({ ok: false, gone: true, message: 'That bulletin is no longer there.' });
+    await settle();
+    expect(getBulletins(REAL).map(b => b.id)).toEqual([U(1001)]);
   });
 
   describe('a file', () => {
@@ -608,6 +815,39 @@ describe('signed in, against stand-in answers', () => {
       expect(localStorage.getItem('gb-bulletins-pending-' + REAL)).toBe(null);
     });
 
+    it('a refused post with a file keeps its draft in the box only: the sweep does not return the words a second time', async () => {
+      fake.on('post_bulletin', () => ({
+        data: null,
+        error: { code: '22023', message: 'a bulletin can have 20 pages at most' },
+      }));
+      const out = await postBulletin(REAL, { kind: 'announcement', body: 'With a file' }, [
+        { kind: 'photo', title: 'Board', pages: [page()] },
+      ]);
+      expect(out).toEqual({ ok: false, message: 'A bulletin can hold up to 20 pages in all.' });
+      const key = fake.calls.find(c => c.name === 'post_bulletin').params.p_idempotency_key;
+      // The outbox still lists the refusal as a dead letter; the box has the draft.
+      const was = { dead: window.v2Queue.deadLetter, dismiss: window.v2Queue.dismissDeadLetter };
+      const dismissed = [];
+      window.v2Queue.deadLetter = () => [
+        {
+          id: key,
+          endpoint: 'post_bulletin',
+          payload: { p_course_id: REAL, p_bulletin: { kind: 'announcement', body: 'With a file' } },
+          last_code: '22023',
+          last_error: 'a bulletin can have 20 pages at most',
+        },
+      ];
+      window.v2Queue.dismissDeadLetter = id => dismissed.push(id);
+      try {
+        await refreshBulletins(REAL, { force: true });
+      } finally {
+        window.v2Queue.deadLetter = was.dead;
+        window.v2Queue.dismissDeadLetter = was.dismiss;
+      }
+      expect(getReturnedBulletins(REAL)).toEqual([]);
+      expect(dismissed).toEqual([key]);
+    });
+
     it('with no connection a file is refused up front, nothing queued, the draft kept', async () => {
       setOnline(false);
       const out = await postBulletin(REAL, { kind: 'announcement', body: 'Look' }, [
@@ -659,9 +899,13 @@ describe('signed in, against stand-in answers', () => {
     });
 
     it('a refused edit puts back what was shown and says why', async () => {
-      fake.on('edit_bulletin', () => ({ data: null, error: { code: '22023', message: 'Words are too long.' } }));
+      fake.on('edit_bulletin', () => ({
+        data: null,
+        error: { code: '22023', message: "a bulletin's words can be 2000 characters at most" },
+      }));
       const out = await editBulletin(REAL, U(1001), { body: 'x' });
-      expect(out).toEqual({ ok: false, message: 'Words are too long.' });
+      // The server's own words are never shown: a sentence of this app's.
+      expect(out).toEqual({ ok: false, gone: false, message: 'Words can be up to 2,000 characters.' });
       expect(getBulletins(REAL).find(b => b.id === U(1001)).body).toBe('Words 1');
     });
 
@@ -713,5 +957,43 @@ describe('the Bulletins tab', () => {
     localStorage.setItem('fv-build-bulletins', '1');
     expect(tabs()).toEqual(['Dashboard', 'Assignments', 'Bulletins', 'Observations', 'Gradebook', 'Reporting']);
     expect(Router.isRoute('/bulletins')).toBe(true);
+  });
+});
+
+describe('the Stays Pinned Until date is the class’s, not the device’s', () => {
+  const CLASS = U(950);
+  let was;
+  beforeEach(() => {
+    was = process.env.TZ;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    clearClass(CLASS);
+    seedClass(CLASS, { students: STUDENTS, courseConfigs: ON });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (was === undefined) delete process.env.TZ;
+    else process.env.TZ = was;
+    clearClass(CLASS);
+  });
+  const reminder = until => ({ cid: CLASS, kind: 'reminder', body: 'x', pinned_until: until });
+
+  it('a device ahead of the class (Auckland) near midnight: the class’s today is accepted', () => {
+    process.env.TZ = 'Pacific/Auckland';
+    COURSES[CLASS].timezone = 'America/Vancouver';
+    vi.setSystemTime(new Date('2026-11-19T04:00:00Z')); // 8 pm on Nov 18 in Vancouver, 5 pm on Nov 19 in Auckland
+    expect(getTodayStr()).toBe('2026-11-19');
+    expect(courseToday(CLASS)).toBe('2026-11-18');
+    expect(bulletinDraftProblem(reminder('2026-11-18'))).toBe('');
+    expect(bulletinDraftProblem(reminder('2026-11-17'))).toMatch(/before today/);
+  });
+
+  it('a device behind the class (Vancouver) near midnight: the class’s today is the cut-off', () => {
+    process.env.TZ = 'America/Vancouver';
+    COURSES[CLASS].timezone = 'Pacific/Auckland';
+    vi.setSystemTime(new Date('2026-11-19T04:00:00Z'));
+    expect(getTodayStr()).toBe('2026-11-18');
+    expect(courseToday(CLASS)).toBe('2026-11-19');
+    expect(bulletinDraftProblem(reminder('2026-11-18'))).toMatch(/before today/);
+    expect(bulletinDraftProblem(reminder('2026-11-19'))).toBe('');
   });
 });
