@@ -718,6 +718,14 @@ function getBulletins(cid) {
   var list = mem.list.slice();
   if (_isDemoSession()) return bulletinsSorted(list);
   if (typeof _bltQueuedView === 'function') list = _bltQueuedView(cid, list);
+  // A bulletin whose delete waits in the outbox (offline included) is gone from the list at once.
+  var outbox = /** @type {any} */ (window.v2Queue);
+  var deleting = (outbox && outbox.queued ? outbox.queued('delete_bulletin') : []).map(function (/** @type {any} */ e) {
+    return e && e.payload && e.payload.p_bulletin_id;
+  });
+  list = list.filter(function (b) {
+    return deleting.indexOf(b.id) < 0;
+  });
   /** @type {Record<string, boolean>} */
   var onServer = {};
   list.forEach(function (b) {

@@ -343,7 +343,7 @@ window.MBulletins = (function () {
           esc(c.link.host) +
           '</span></div>'
         : '',
-      seen: seen,
+      seen: _notes[c.id] ? seen + '<p class="m-bulletin-note-line" role="status">' + esc(_notes[c.id]) + '</p>' : seen,
     };
   }
 
@@ -458,6 +458,11 @@ window.MBulletins = (function () {
       _drawnHead = headHtml;
     }
     var cards = _offered(_cid) ? feedModel(W.getBulletins(_cid)) : [];
+    _adoptDeleteRefusals(
+      cards.map(function (c) {
+        return c.id;
+      }),
+    );
     if (!cards.length) {
       var none = _offered(_cid) ? '<p class="m-bulletin-empty">Nothing Posted Yet</p>' : '';
       // html-safe: fixed markup.
@@ -1051,7 +1056,8 @@ window.MBulletins = (function () {
         return typeof W._bltAssessmentOk !== 'function' || W._bltAssessmentOk(a.id);
       },
     );
-    var today = typeof W.getTodayStr === 'function' ? W.getTodayStr() : '';
+    // The class's date (courseToday), not the phone's.
+    var today = typeof W._bltToday === 'function' ? W._bltToday(cid) : W.getTodayStr();
     var seg = function (/** @type {string} */ kind, /** @type {string} */ label) {
       var onNow = d.kind === kind;
       return (
@@ -1331,6 +1337,93 @@ window.MBulletins = (function () {
     cancel.focus({ preventScroll: true });
   }
 
+  /* ── Take It Back and Delete ────────────────────────────────── */
+
+  /** Where Take It Back stands now: 'waiting', 'sent' or 'none'. @param {string} cid @param {string} key */
+  function _takeBackState(cid, key) {
+    return typeof W.bulletinTakeBackState === 'function' ? W.bulletinTakeBackState(cid, key) : 'waiting';
+  }
+
+  /**
+   * Take It Back always ends with the bulletin gone or the teacher told. The
+   * words are true for where it stands when OK is tapped: if that changed
+   * since the question opened, the question is asked again with the new
+   * words before anything is done.
+   * @param {string} cid @param {string} key @param {{ x: number, y: number } | null} tap
+   */
+  function _askTakeBack(cid, key, tap) {
+    var state = _takeBackState(cid, key);
+    var sent = state === 'sent';
+    _confirm(
+      'Take It Back?',
+      sent
+        ? 'Students may already have seen it. It will be deleted.'
+        : 'It will not be posted, and students will never see it.',
+      sent ? 'Delete It' : 'Take It Back',
+      function () {
+        var now = _takeBackState(cid, key);
+        // Moved on while the question was open: ask again in words that are true now (after this sheet has gone).
+        if ((now === 'sent') !== sent && now !== 'none') return void setTimeout(_askTakeBack, 380, cid, key, null);
+        _takeBackNow(cid, key, true);
+      },
+      tap,
+    );
+  }
+
+  /** @param {string} cid @param {string} key @param {boolean} retry */
+  function _takeBackNow(cid, key, retry) {
+    if (W.takeBackBulletin(cid, key)) return _drawFeed();
+    if (!retry) {
+      MC.showToast('It could not be taken back. Open it and choose Delete This Bulletin.');
+      return _drawFeed();
+    }
+    // Not known here yet (its answer has not been read): read the class, then try once more.
+    Promise.resolve(W.refreshBulletins(cid, { force: true })).then(function () {
+      _takeBackNow(cid, key, false);
+    });
+  }
+
+  /** @type {Record<string, string>} */
+  var _notes = {}; // bulletin id → the plain sentence of a refused delete, shown on its card
+
+  /** Delete a sent bulletin: gone from the feed at once (and while it waits in the outbox); a refusal brings it back with its sentence. @param {string} cid @param {string} id */
+  function _deleteNow(cid, id) {
+    delete _notes[id];
+    Promise.resolve(W.deleteBulletin(cid, id)).then(function (/** @type {any} */ out) {
+      if (out && !out.ok && !out.gone) {
+        _notes[id] = out.message || 'It could not be deleted.';
+        _dismissDeleteRefusal(id);
+      }
+      if (cid === _cid) _drawFeed();
+    });
+    _drawFeed();
+  }
+
+  /** The outbox's failed delete of a bulletin, once its sentence is on the card. @param {string} id */
+  function _dismissDeleteRefusal(id) {
+    var q = W.v2Queue;
+    if (!q || typeof q.deadLetter !== 'function' || typeof q.dismissDeadLetter !== 'function') return;
+    (q.deadLetter() || []).forEach(function (/** @type {any} */ e) {
+      if (e && e.endpoint === 'delete_bulletin' && e.payload && e.payload.p_bulletin_id === id)
+        q.dismissDeadLetter(e.id);
+    });
+  }
+
+  /** A delete refused while the page was closed: its sentence goes on the card, and the outbox forgets it. @param {string[]} ids */
+  function _adoptDeleteRefusals(ids) {
+    var q = W.v2Queue;
+    if (!q || typeof q.deadLetter !== 'function') return;
+    (q.deadLetter() || []).forEach(function (/** @type {any} */ e) {
+      var id = e && e.endpoint === 'delete_bulletin' && e.payload ? String(e.payload.p_bulletin_id || '') : '';
+      if (!id || ids.indexOf(id) < 0 || _notes[id]) return;
+      _notes[id] =
+        typeof W._bltMessage === 'function'
+          ? W._bltMessage({ code: e.last_code, message: e.last_error }, 'delete_bulletin')
+          : 'It could not be deleted.';
+      _dismissDeleteRefusal(id);
+    });
+  }
+
   /* ── Events ─────────────────────────────────────────────────── */
 
   function _bind() {
@@ -1384,19 +1477,7 @@ window.MBulletins = (function () {
       W.dropReturnedBulletin(cid, el.getAttribute('data-key') || '');
       return _drawWrite();
     }
-    if (what === 'take-back') {
-      var key = el.getAttribute('data-key') || '';
-      return _confirm(
-        'Take It Back?',
-        'It is removed from this phone and never shown to students.',
-        'Take It Back',
-        function () {
-          W.takeBackBulletin(cid, key);
-          _drawFeed();
-        },
-        tap,
-      );
-    }
+    if (what === 'take-back') return _askTakeBack(cid, el.getAttribute('data-key') || '', tap);
     if (what === 'delete') {
       var id = el.getAttribute('data-id') || '';
       return _confirm(
@@ -1404,8 +1485,7 @@ window.MBulletins = (function () {
         'It is removed from every student’s phone, with who has seen it. This cannot be undone.',
         'Delete',
         function () {
-          W.deleteBulletin(cid, id);
-          _drawFeed();
+          _deleteNow(cid, id);
         },
         tap,
       );

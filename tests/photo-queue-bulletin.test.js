@@ -1076,6 +1076,26 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(getBulletins(CID)).toEqual([]);
   });
 
+  it('Delete This Bulletin: gone from the feed at once and while it waits offline; a refusal brings it back', async () => {
+    await postBulletin(CID, { kind: 'announcement', body: 'To delete' }, PHOTO(), { queue: true });
+    await quiet();
+    await refreshBulletins(CID, { force: true });
+    const [row] = getBulletins(CID);
+    expect(row.visible).toBe(true);
+    setOnline(false);
+    const deleting = deleteBulletin(CID, row.id);
+    expect(getBulletins(CID)).toEqual([]);
+    reload(); // still waiting in the outbox after a reload
+    await refreshBulletins(CID, { force: true }).then(null, () => {});
+    expect(getBulletins(CID).map(b => b.id)).not.toContain(row.id);
+    fake.on('delete_bulletin', () => ({ data: null, error: { code: '42501', message: 'permission denied' } }));
+    setOnline(true);
+    await quiet();
+    await deleting;
+    await refreshBulletins(CID, { force: true });
+    expect(getBulletins(CID).map(b => b.id)).toEqual([row.id]);
+  });
+
   it('taken back while its post is in flight: the card goes at once, nothing uploads, and the bulletin the server made is deleted', async () => {
     let answer;
     const slow = new Promise(r => (answer = r));
