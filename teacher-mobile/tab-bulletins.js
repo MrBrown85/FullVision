@@ -1026,7 +1026,7 @@ window.MBulletins = (function () {
           '" value="' +
           esc(d.until) +
           '"></label>' +
-          '<label class="m-bulletin-row" for="m-bulletin-linked"><span>Linked To</span>' +
+          '<label class="m-bulletin-row m-bulletin-row-pick" for="m-bulletin-linked"><span>Linked To</span>' +
           '<select id="m-bulletin-linked"><option value="">None</option>' +
           assessments
             .map(function (/** @type {any} */ a) {

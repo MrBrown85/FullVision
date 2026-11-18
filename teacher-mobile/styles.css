@@ -6620,10 +6620,30 @@ body.fv-switching-course::after {
   color: var(--text);
 }
 /* Safari draws a select at its own height unless it draws it plainly: the row's value
-   shows in link blue, as Settings rows do, and the whole 44 px is the target. */
+   shows in link blue, as Settings rows do, and the whole 44 px is the target. A chevron
+   drawn from two borders (not a font glyph) says it opens a list. */
 .m-bulletin-row select {
   -webkit-appearance: none;
   appearance: none;
+}
+.m-bulletin-row-pick {
+  position: relative;
+}
+.m-bulletin-row-pick select {
+  padding-right: 18px;
+}
+.m-bulletin-row-pick::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -6px;
+  border-right: 2px solid var(--link);
+  border-bottom: 2px solid var(--link);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 .m-bulletin-row input,
 .m-bulletin-row select {
