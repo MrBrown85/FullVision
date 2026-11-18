@@ -105,15 +105,23 @@ const date = (v: unknown): string | null => (typeof v === 'string' && DATE.test(
 const count = (v: unknown, hi: number): number | null => (whole(v, 0, hi) ? v : null);
 const finite = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+/* ASCII white space at either end, as the database trims it ([[:space:]] under collation C): space, tab, newline,
+   vertical tab, form feed, carriage return. A no-break space or any other character is kept, and counted. */
+const ASCII_SPACE = /^[ \t\n\v\f\r]+|[ \t\n\v\f\r]+$/g;
+
 /** A raw answer as the phone may send it: null, a boolean, a finite number, a string (at most MAX_TEXT_SENT
-    characters, no NUL, no lone surrogate), or an array of 0 to 20 ids (lower-cased). Undefined when it is none of
-    these. The database decides whether it fits its question (bad_answer). */
+    characters as sent, no NUL, no lone surrogate; trimmed of ASCII white space, then at most MAX_TEXT characters),
+    or an array of 0 to 20 ids (lower-cased). Undefined (bad_request) when it is none of these. The database decides
+    whether it fits its question (bad_answer). */
 export function rawAnswer(v: unknown): unknown {
   if (v === null || typeof v === 'boolean') return v;
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
   if (typeof v === 'string') {
     if (v.includes('\u0000') || LONE.test(v) || [...v].length > MAX_TEXT_SENT) return undefined;
-    return v;
+    // Trimmed as the database trims it, then at most 5000 characters as PostgreSQL counts them (code points), as the
+    // contract says; empty is sent on, for the database to answer bad_answer.
+    const trimmed = v.replace(ASCII_SPACE, '');
+    return [...trimmed].length > MAX_TEXT ? undefined : trimmed;
   }
   if (Array.isArray(v)) {
     if (v.length > MAX_CHOICES) return undefined;

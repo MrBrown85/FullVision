@@ -2,7 +2,7 @@
 -- SELECTs only, catalog facts only (no row of any table is read). Every row says ok. Run it with public
 -- on the search path (as Supabase's SQL editor does): an md5 of pg_get_functiondef depends on it.
 with want(sig, after_md5) as (values
-    ('student_submit._quiz_window(uuid,uuid)', 'a6aad8a24c4b47020eb23e51a9b564a6'),
+    ('student_submit._quiz_window(uuid,uuid)', '2eb5a1c0652415e1cd3923b79c22b101'),
     ('student_submit._quiz_new_order(uuid)', '60094583822902bdafa8b0623942e9ef'),
     ('student_submit._quiz_questions(uuid,jsonb)', '774274b707ad660b1d3f2d023edf13be'),
     ('student_submit.quiz(text,uuid,uuid,text,boolean)', '0746b4af4f1cadd75b86cc20f49931d3'),
@@ -52,6 +52,11 @@ union all select 'write_log_kind_check allows the five kinds it did and quiz, va
 union all select 'each of the six runs as its owner with the search path pinned',
        case when (select count(*) from acl a join pg_proc p on p.oid = to_regprocedure(a.sig)
                    where p.prosecdef and p.proconfig = array['search_path=public, student_submit, pg_temp']) = 6 then 'ok' else 'NOT AS EXPECTED' end
+union all select 'a pair or group piece is never served as a quiz: _quiz_window serves collab_mode none only, and collab_mode is none, pairs or groups',
+       case when pg_get_functiondef(to_regprocedure('student_submit._quiz_window(uuid,uuid)')) like '%and a.collab_mode = ''none'' and %'
+             and (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.assessment'::regclass and conname = 'assessment_collab_mode_check')
+                 = 'CHECK ((collab_mode = ANY (ARRAY[''none''::text, ''pairs''::text, ''groups''::text])))'
+            then 'ok' else 'NOT AS EXPECTED' end
 union all select 'no student_submit function names quiz_key',
        case when not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                               where n.nspname = 'student_submit'

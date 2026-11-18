@@ -41,7 +41,7 @@
 -- on the search path, as Supabase's SQL editor does (each part sets its own).
 --
 -- md5 of pg_get_functiondef (as the file leaves them):
---   student_submit._quiz_window(uuid,uuid)                        a6aad8a24c4b47020eb23e51a9b564a6
+--   student_submit._quiz_window(uuid,uuid)                        2eb5a1c0652415e1cd3923b79c22b101
 --   student_submit._quiz_new_order(uuid)                          60094583822902bdafa8b0623942e9ef
 --   student_submit._quiz_questions(uuid,jsonb)                    774274b707ad660b1d3f2d023edf13be
 --   student_submit.quiz(text,uuid,uuid,text,boolean)              0746b4af4f1cadd75b86cc20f49931d3
@@ -91,7 +91,7 @@ declare
     _def text;
 begin
     for _f in select * from (values
-        ('student_submit._quiz_window(uuid,uuid)', 'a6aad8a24c4b47020eb23e51a9b564a6'),
+        ('student_submit._quiz_window(uuid,uuid)', '2eb5a1c0652415e1cd3923b79c22b101'),
         ('student_submit._quiz_new_order(uuid)', '60094583822902bdafa8b0623942e9ef'),
         ('student_submit._quiz_questions(uuid,jsonb)', '774274b707ad660b1d3f2d023edf13be'),
         ('student_submit.quiz(text,uuid,uuid,text,boolean)', '0746b4af4f1cadd75b86cc20f49931d3'),

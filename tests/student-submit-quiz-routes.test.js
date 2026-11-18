@@ -299,7 +299,7 @@ describe('quiz-save', () => {
       [true, 'true'],
       [false, 'false'],
       [-1e12, '-1000000000000'],
-      ['  Plants need light.  ', JSON.stringify('  Plants need light.  ')],
+      ['  Plants need light.  ', JSON.stringify('Plants need light.')],
       [[C1.toUpperCase(), C2], JSON.stringify([C1, C2])],
       [[], '[]'],
       ['', '""'],
@@ -332,10 +332,42 @@ describe('quiz-save', () => {
     }
   });
 
-  it('a whole emoji and 20,000 characters are taken (the database trims and decides)', () => {
+  it('a whole emoji is taken; NaN is not an answer', () => {
     expect(rawAnswer('Light 🌱')).toBe('Light 🌱');
-    expect(rawAnswer('x'.repeat(20_000))).toBe('x'.repeat(20_000));
     expect(rawAnswer(Number.NaN)).toBe(undefined);
+  });
+
+  it('a text answer is trimmed of ASCII white space as the database trims it, then refused over 5,000 characters', async () => {
+    const pad = ' \t\n\v\f\r';
+    // 5,000 after trimming, with white space either side: taken, and sent trimmed.
+    expect(rawAnswer(pad + 'x'.repeat(5000) + pad)).toBe('x'.repeat(5000));
+    expect(rawAnswer('x'.repeat(5001))).toBe(undefined);
+    expect(rawAnswer(pad + 'x'.repeat(5001) + pad)).toBe(undefined);
+    // Counted as PostgreSQL counts characters: one emoji is one.
+    expect(rawAnswer('🌱'.repeat(5000))).toBe('🌱'.repeat(5000));
+    expect(rawAnswer('🌱'.repeat(5001))).toBe(undefined);
+    // A no-break space is not white space to the database: kept, and counted.
+    const nbsp = String.fromCharCode(160);
+    expect(rawAnswer(nbsp + 'x'.repeat(4999))).toBe(nbsp + 'x'.repeat(4999));
+    expect(rawAnswer(nbsp + 'x'.repeat(5000))).toBe(undefined);
+    // Blank after trimming goes on, for the database to answer bad_answer.
+    expect(rawAnswer('   ')).toBe('');
+    for (const [answer, status] of [
+      [' ' + 'x'.repeat(5000) + '\n', 200],
+      ['x'.repeat(5001), 400],
+      ['  ' + 'x'.repeat(5001) + '  ', 400],
+      ['🌱'.repeat(5001), 400],
+    ]) {
+      const t = setup(() => ({ ok: true, question_id: Q3, saved_at: AT }));
+      const r = await t.send({ ...SAVE, question_id: Q3, answer });
+      expect(r.status).toBe(status);
+      if (status === 400) {
+        expect(r.body).toEqual({ ok: false, error: 'bad_request' });
+        expect(t.calls).toEqual([]);
+      } else {
+        expect(t.calls[0][1][4]).toBe(JSON.stringify('x'.repeat(5000)));
+      }
+    }
   });
 
   it('bad_answer passes on with its question; the other refusals by their code', async () => {

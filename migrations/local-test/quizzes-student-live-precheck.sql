@@ -45,6 +45,11 @@ checks(check_name, value) as (
              where c.conrelid = to_regclass('public.quiz_answer') and c.contype = 'p') is distinct from array['attempt_id', 'question_id']
         or not exists (select 1 from pg_index i where i.indexrelid = to_regclass('public.quiz_attempt_one_open_idx') and i.indisunique)
     union all
+    select 'assessment.collab_mode is none, pairs or groups', coalesce((select pg_get_constraintdef(oid) from pg_constraint
+                                                                         where conrelid = 'public.assessment'::regclass and conname = 'assessment_collab_mode_check'), 'absent')
+     where (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.assessment'::regclass and conname = 'assessment_collab_mode_check')
+           is distinct from 'CHECK ((collab_mode = ANY (ARRAY[''none''::text, ''pairs''::text, ''groups''::text])))'
+    union all
     select 'the edge function''s role may use the schema student_submit', 'no'
      where not has_schema_privilege('service_role', 'student_submit', 'usage')
     union all

@@ -29,6 +29,8 @@ save_quiz; tries are made only through the three functions under test (and reope
   reopen    reopen_quiz after a sent try: the next open starts it in an order of its own and it is answerable after
             the quiz closes; a save before that open is sent; an in-progress try reopened while closed can be
             answered; reopen before any try: the first open is that try.
+  collab    A quiz whose piece the teacher switches to Pairs or to Groups after (save_collab lets it): every one of
+            the three is not_found and nothing is written; switched back, the student carries on in her own try.
   refused   On all three: a paused, withdrawn, page-off, trash, stopped-card, expired-card, unknown-session,
             expired-session, classmate's and made-up enrolment, each refused with its code and nothing written
             (not the write limit). A Draft, a piece assigned next week, a piece with no quiz, a DIBELS piece,
@@ -53,7 +55,7 @@ save_quiz; tries are made only through the three functions under test (and reope
             every function runs as its owner with the path pinned; no grant on any table changed.
   defaults  With wide default privileges in place the file still leaves the grants exact.
   apply     The guards stop with the catalog unchanged (each relied-on function changed, the check changed, a second
-            check, the check unvalidated or renamed, an MQ1 column missing, quiz_answer's key, a function of these
+            check, the check unvalidated or renamed, collab_mode allowing another word, an MQ1 column missing, quiz_answer's key, a function of these
             names elsewhere, the wrong role); the pre-check names each; a relied-on function missing; the lock
             timeout; only the header's changes; no row changed; the header's md5s; post-check; a second run; size;
             plain ASCII with no backslash.
@@ -586,6 +588,32 @@ def scen_refused():
     ok('refused: a locked card still works on an open session', Q(w, e=w.dev).get('ok') is True)
     d.close()
 
+def scen_collab():
+    """save_quiz refuses a pair or group piece, but the teacher may switch a quiz's piece to Pairs or Groups after
+    (save_collab): then students are served nothing of it."""
+    w = world('collab'); d = w.d
+    a = str(T(d, "create_assessment(:c, 'Pair Later', p_tag_ids => cast(:g as uuid[]))", c=w.c, g=w.t[:1]))
+    q = [x['id'] for x in tsave(w, a, payload([tf(), textq()]))['questions']]
+    Q(w, a=a); SV(w, q[0], True, a=a); Q(w, e=w.dev, a=a)
+    ok('(setup) Cece and Dev have started the quiz', d.one('select count(*) from quiz_attempt where assessment_id = :a', a=a) == 2)
+    for mode, config in (('pairs', None), ('groups', None)):
+        x = refusal(lambda: T(d, 'save_collab(:a, :m, cast(:c as jsonb))', a=a, m=mode, c=config))
+        ok("collab: the teacher's save_collab switches the quiz's piece to %s (it is let through)" % mode, x is None
+           and d.one('select collab_mode from assessment where id = :a', a=a) == mode, x)
+        s0 = sums(d); n0 = log_rows(d)
+        for name, call in (('quiz', lambda: Q(w, a=a)), ('quiz with new_try', lambda: Q(w, a=a, new_try=True)),
+                           ('quiz_save', lambda: SV(w, q[0], False, a=a)), ('quiz_send', lambda: SD(w, a=a)),
+                           ("quiz for a student who never opened it", lambda: Q(w, e=w.eli, a=a))):
+            r = call()
+            ok('collab: on a %s piece %s is not_found' % (mode, name), r == {'ok': False, 'error': 'not_found'}, r)
+        ok('collab: on a %s piece nothing is written, not even the write limit' % mode, sums(d) == s0 and log_rows(d) == n0)
+        ok('collab: on a %s piece the save_quiz refusal still holds' % mode,
+           refusal(lambda: tsave(w, a, payload([tf()]))) == ('22023', 'not_offered'))
+    T(d, "save_collab(:a, 'none', null)", a=a)
+    r = Q(w, a=a)
+    ok('collab: switched back to one student each, Cece carries on in her own try', r.get('ok') is True and r['try']['number'] == 1 and r['answers'] == {q[0]: True}, r)
+    d.close()
+
 def scen_access():
     w = world('access'); d = w.d
     r = Q(w); SV(w, w.q[1], True); SV(w, w.q[3], 'Cece unfinished words')
@@ -991,6 +1019,9 @@ def scen_apply():
           'alter table public.quiz_answer drop constraint quiz_answer_pkey, add constraint quiz_answer_pkey primary key (attempt_id, question_id)', 'lacks its key')
     guard('the one-open-try index missing', 'alter index public.quiz_attempt_one_open_idx rename to quiz_attempt_open_idx',
           'alter index public.quiz_attempt_open_idx rename to quiz_attempt_one_open_idx', 'one-open-try index')
+    guard("assessment.collab_mode allowing another word", "alter table public.assessment drop constraint assessment_collab_mode_check, add constraint assessment_collab_mode_check check (collab_mode = any (array['none'::text, 'pairs'::text, 'groups'::text, 'teams'::text]))",
+          "alter table public.assessment drop constraint assessment_collab_mode_check, add constraint assessment_collab_mode_check check (collab_mode = any (array['none'::text, 'pairs'::text, 'groups'::text]))",
+          'collab_mode is not none, pairs or groups')
     guard('a quiz function with other arguments', 'create function student_submit.quiz(text) returns int language sql as $$ select 1 $$',
           'drop function student_submit.quiz(text)', 'other arguments or in another schema')
     guard('a quiz_save in public', 'create function public.quiz_save(uuid) returns int language sql as $$ select 1 $$',
@@ -1031,7 +1062,7 @@ def scen_apply():
     ok('apply: no row changed', sums(d) == rows0)
     ok("apply: the new functions are the header's", all(md5(d, s) == new[s] for s in OURS), {s: md5(d, s) for s in OURS})
     r = d.file(POST)
-    ok('apply: the post-check says ok on every row', r == 'ok' and len(d.rows) == 27 and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or (r, len(d.rows)))
+    ok('apply: the post-check says ok on every row', r == 'ok' and len(d.rows) == 28 and all(x[1] == 'ok' for x in d.rows), [x for x in d.rows if x[1] != 'ok'] or (r, len(d.rows)))
     ok('apply: the pre-check now names the six as there, and the check as changed', d.statements(pre) == 'ok' and len(d.rows) == 7, d.rows)
     Q(w); SV(w, w.q[1], True); rows_now = sums(d)
     r = d.file(FILE); ok('apply: a second run is ok', r == 'ok', r)
@@ -1223,7 +1254,7 @@ def scen_collations():
     ok('collations: the stored answer is the same under both', seen['icu'][2] == seen['c'][2])
 
 SCENARIOS = {'open': scen_open, 'save': scen_save, 'send': scen_send, 'tries': scen_tries, 'closed': scen_closed, 'reopen': scen_reopen,
-             'refused': scen_refused, 'access': scen_access, 'leak': scen_leak, 'limit': scen_limit, 'race': scen_race,
+             'refused': scen_refused, 'collab': scen_collab, 'access': scen_access, 'leak': scen_leak, 'limit': scen_limit, 'race': scen_race,
              'released': scen_released, 'others': scen_others, 'defaults': scen_defaults, 'apply': scen_apply, 'lastcheck': scen_lastcheck,
              'undo': scen_undo, 'undolock': scen_undolock, 'collations': scen_collations}
 if __name__ == '__main__':

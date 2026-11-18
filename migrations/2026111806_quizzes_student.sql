@@ -17,7 +17,8 @@
 -- == What it adds (all in student_submit, security definer, search_path
 --    public, student_submit, pg_temp) ==
 -- _quiz_window(assessment, course) -> the piece as a quiz this class's
---   students may open (in the class, listed today, not DIBELS, a quiz row):
+--   students may open (in the class, listed today, not DIBELS, not a pair
+--   or group piece, a quiz row):
 --   { tries, open, closes_on }, open and closed read as _work_window reads
 --   Student Work's, from the quiz's own after_due and accept_until; else null.
 -- _quiz_new_order(assessment) -> a new question_order, shuffled as the quiz
@@ -49,7 +50,7 @@
 --
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new functions, as this file
 -- leaves them):
---   student_submit._quiz_window(uuid,uuid) (new)                          a6aad8a24c4b47020eb23e51a9b564a6
+--   student_submit._quiz_window(uuid,uuid) (new)                          2eb5a1c0652415e1cd3923b79c22b101
 --   student_submit._quiz_new_order(uuid) (new)                            60094583822902bdafa8b0623942e9ef
 --   student_submit._quiz_questions(uuid,jsonb) (new)                      774274b707ad660b1d3f2d023edf13be
 --   student_submit.quiz(text,uuid,uuid,text,boolean) (new)                0746b4af4f1cadd75b86cc20f49931d3
@@ -80,7 +81,8 @@
 -- own six are missing or this file's; no function of those names is
 -- elsewhere; write_log_kind_check is the 'from' above (or the 'to': a second
 -- run) and write_log's only check; the quiz tables have 2026111804's
--- columns, quiz_answer its key and quiz_attempt its one-open-try index.
+-- columns, quiz_answer its key and quiz_attempt its one-open-try index; and
+-- assessment.collab_mode is still none, pairs or groups.
 -- Nothing it compares depends on the database's collation (every text order
 -- it aggregates is collate "C"), its time zone or the session's search path
 -- (set below). Read-only pre-check: local-test/quizzes-student-live-precheck.sql.
@@ -147,7 +149,7 @@ begin
         ('public.reopen_quiz(uuid,uuid,uuid)', 'daabc9bbdd81761d4ddfd72b773eca78', null),
         ('public._quiz_draft_guard()', '9e6ed6b0336305322b22c309161472f9', null),
         ('public._quiz_attempt_same_class()', '5b0045acab2f7eb94cf3d8ff75210e1f', null),
-        ('student_submit._quiz_window(uuid,uuid)', null, 'a6aad8a24c4b47020eb23e51a9b564a6'),
+        ('student_submit._quiz_window(uuid,uuid)', null, '2eb5a1c0652415e1cd3923b79c22b101'),
         ('student_submit._quiz_new_order(uuid)', null, '60094583822902bdafa8b0623942e9ef'),
         ('student_submit._quiz_questions(uuid,jsonb)', null, '774274b707ad660b1d3f2d023edf13be'),
         ('student_submit.quiz(text,uuid,uuid,text,boolean)', null, '0746b4af4f1cadd75b86cc20f49931d3'),
@@ -199,6 +201,12 @@ begin
                         and i.indrelid = 'public.quiz_attempt'::regclass) then
         raise exception 'quiz_answer lacks its key (attempt_id, question_id) or quiz_attempt its one-open-try index. Nothing was changed.';
     end if;
+    -- A pair or group piece is never served as a quiz: _quiz_window serves collab_mode none only, so that word must
+    -- still mean a piece of one student's own.
+    if (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.assessment'::regclass and conname = 'assessment_collab_mode_check')
+       is distinct from 'CHECK ((collab_mode = ANY (ARRAY[''none''::text, ''pairs''::text, ''groups''::text])))' then
+        raise exception 'assessment.collab_mode is not none, pairs or groups as this file was written against. Nothing was changed.';
+    end if;
 end
 $guard$;
 
@@ -226,8 +234,9 @@ create or replace function student_submit._quiz_window(p_assessment_id uuid, p_c
  set search_path to 'public', 'student_submit', 'pg_temp'
 as $function$
     -- The piece as a quiz this class's students may open, or null: in this class, listed today in the
-    -- class's time zone (not a Draft, assigned), not DIBELS, with a quiz. Open and closed are read as
-    -- _work_window reads Student Work's, from the quiz's own after_due and accept_until.
+    -- class's time zone (not a Draft, assigned), not DIBELS, not a pair or group piece (save_quiz refuses
+    -- those, but the teacher may switch a quiz's piece to Pairs or Groups after), with a quiz. Open and
+    -- closed are read as _work_window reads Student Work's, from the quiz's own after_due and accept_until.
     select jsonb_build_object(
                'tries', z.tries,
                'open', case z.after_due when 'until' then d.today <= z.accept_until
@@ -239,7 +248,7 @@ as $function$
       join quiz z on z.assessment_id = a.id
      cross join lateral (select (now() at time zone public._fv_timezone(c.timezone))::date as today) d
      where a.id = p_assessment_id and a.course_id = p_course_id and a.score_mode <> 'dibels'
-       and student_submit._listed(a, d.today);
+       and a.collab_mode = 'none' and student_submit._listed(a, d.today);
 $function$;
 
 create or replace function student_submit._quiz_new_order(p_assessment_id uuid)
@@ -521,7 +530,7 @@ declare
     _got text;
 begin
     for _f in select * from (values
-        ('student_submit._quiz_window(uuid,uuid)', 'a6aad8a24c4b47020eb23e51a9b564a6', null),
+        ('student_submit._quiz_window(uuid,uuid)', '2eb5a1c0652415e1cd3923b79c22b101', null),
         ('student_submit._quiz_new_order(uuid)', '60094583822902bdafa8b0623942e9ef', null),
         ('student_submit._quiz_questions(uuid,jsonb)', '774274b707ad660b1d3f2d023edf13be', null),
         ('student_submit.quiz(text,uuid,uuid,text,boolean)', '0746b4af4f1cadd75b86cc20f49931d3', 'service_role'),
