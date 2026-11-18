@@ -49,13 +49,16 @@ const WIDE_AT = { 320: SIZES, 390: ['normal'] };
 /* The screens in groups, one test each, so no one test runs long enough to
    risk the timeout on a slow runner. Every screen is in exactly one group. */
 const FIRST_BULLETINS = SCREENS.findIndex(s => s.bulletins);
+const FIRST_QUIZ = SCREENS.findIndex(s => s.quizzes);
 const GROUPS = [
   ['assignments', 0, 7],
   ['my learning and feedback', 7, 16],
   ['send work and reflect', 16, 24],
   ['cards, report and settings', 24, FIRST_BULLETINS],
   // Bulletins (docs/plans/bulletins-plan.md B1d), behind its build switch: the last screens.
-  ['bulletins', FIRST_BULLETINS, SCREENS.length],
+  ['bulletins', FIRST_BULLETINS, FIRST_QUIZ],
+  // A quiz (docs/plans/quizzes-plan.md Q3b), behind the quizzes switch: the last screens.
+  ['quizzes', FIRST_QUIZ, SCREENS.length],
 ].map(([name, from, to]) => ({ name, screens: SCREENS.slice(from, to) }));
 
 async function useFont(page, font) {

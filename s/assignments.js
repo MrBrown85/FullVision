@@ -68,6 +68,8 @@
       // Bulletins (s/bulletins.js): only with the build switch on and the server's answer in; else no tab.
       var bulletins = typeof StudentPage.bulletinsOf === 'function' ? StudentPage.bulletinsOf(state) : null;
       if (bulletins) view.bulletins = bulletins;
+      // A quiz's button words, from what this tab has seen of it (s/quiz.js).
+      if (typeof StudentPage.quizMarks === 'function') StudentPage.quizMarks(view, state);
       return view;
     } catch (e) {
       return null;

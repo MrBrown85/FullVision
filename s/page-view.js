@@ -439,6 +439,19 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* A quiz the student answers on the page (docs/plans/quizzes-plan.md Q3b; s/quiz.js opens it). Drawn only for a piece
+     the page marked as one, which happens only with the quizzes switch on. */
+  function quizBlockHtml(p) {
+    if (!p.quiz) return '';
+    return (
+      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="quiz-open" data-piece="' +
+      esc(p.id) +
+      '">' +
+      esc(p.quizWord || 'Start the Quiz') +
+      '</button>'
+    );
+  }
+
   // A grey row with a lock: what the student can't change and why (the Closed and Being Graded boards).
   function lockRowHtml(text, cls) {
     return '<p class="sp-lock-row ' + cls + '">' + pillIcon('lock', 18) + '<span>' + esc(text) + '</span></p>';
@@ -928,7 +941,7 @@ window.StudentPageView = (function () {
       (todo || p.kind === 'revise' ? resourcesHtml(p, !!car) : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) : '') +
-      (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
+      (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) + quizBlockHtml(p) : '') +
       reviseBlockHtml(p, 'card') +
       (hasCompare(p)
         ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="compare" data-piece="' +

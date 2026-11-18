@@ -264,6 +264,29 @@ var StudentQuestionKinds = (function () {
     );
   }
 
+  /* One choice as a button (a radio when only one answer is wanted, else a
+     checkbox): the question's own presses are named by `act`, the value it
+     stands for by `value` (none for Other). */
+  function optionRow(q, single, act, value, label, on) {
+    return (
+      '<button type="button" class="sp-rq-opt" role="' +
+      (single ? 'radio' : 'checkbox') +
+      '" aria-checked="' +
+      on +
+      '" data-act="' +
+      act +
+      '" data-q="' +
+      esc(q.id) +
+      '"' +
+      (value == null ? '' : ' data-value="' + esc(value) + '"') +
+      '><span class="sp-rq-' +
+      (single ? 'dot' : 'box') +
+      '" aria-hidden="true"></span><span>' +
+      esc(label) +
+      '</span></button>'
+    );
+  }
+
   /* A choice: a list of buttons (board 5), one answer or many, with Other
      last; or, with dropdown on, a menu. */
   function choiceBody(q, v, prompt, otherOn) {
@@ -300,25 +323,8 @@ var StudentQuestionKinds = (function () {
       );
     }
     var single = o.multiple === false;
-    var role = single ? 'radio' : 'checkbox';
     var row = function (act, value, label, on) {
-      return (
-        '<button type="button" class="sp-rq-opt" role="' +
-        role +
-        '" aria-checked="' +
-        on +
-        '" data-act="' +
-        act +
-        '" data-q="' +
-        esc(q.id) +
-        '"' +
-        (value == null ? '' : ' data-value="' + esc(value) + '"') +
-        '><span class="sp-rq-' +
-        (single ? 'dot' : 'box') +
-        '" aria-hidden="true"></span><span>' +
-        esc(label) +
-        '</span></button>'
-      );
+      return optionRow(q, single, act, value, label, on);
     };
     return (
       head(q, prompt) +
@@ -495,6 +501,72 @@ var StudentQuestionKinds = (function () {
     );
   }
 
+  /* ── A quiz's questions (s/quiz-view.js) ────────────────────
+     A quiz question is the shape the `quiz` route sends: { id, kind
+     (choice, true_false, number, text), prompt, multiple, choices: [ { id,
+     text } ] or null }. Its answer is what `quiz-save` takes: a choice an
+     array of choice ids, true_false a boolean, number a finite number,
+     text a string. The choices are drawn in the order given (the server
+     keeps each student's own order), a press is `quiz-pick` with the
+     choice's id (true or false for true_false), and typing is read by
+     s/quiz.js from the box's data-q. A quiz shows no right answer. */
+  function numberBody(q, v) {
+    var id = base(q);
+    return (
+      head(q, q.prompt || '', id) +
+      '<input class="sp-input sp-quiz-number" id="' +
+      esc(id) +
+      '" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="24"' +
+      attrs(q, 'number') +
+      ' value="' +
+      esc(typeof v === 'number' && isFinite(v) ? String(v) : '') +
+      '">' +
+      '<p class="sp-quiz-hint" id="' +
+      esc(id) +
+      '-hint" role="status"></p>'
+    );
+  }
+
+  function trueFalseBody(q, v) {
+    return (
+      head(q, q.prompt || '') +
+      '<div class="sp-rq-list" role="radiogroup" aria-labelledby="' +
+      esc(base(q)) +
+      '-p">' +
+      optionRow(q, true, 'quiz-pick', 'true', 'True', v === true) +
+      optionRow(q, true, 'quiz-pick', 'false', 'False', v === false) +
+      '</div>'
+    );
+  }
+
+  function quizChoiceBody(q, v) {
+    var picked = Array.isArray(v) ? v : [];
+    var single = !q.multiple;
+    return (
+      head(q, q.prompt || '') +
+      '<div class="sp-rq-list" role="' +
+      (single ? 'radiogroup' : 'group') +
+      '" aria-labelledby="' +
+      esc(base(q)) +
+      '-p">' +
+      (Array.isArray(q.choices) ? q.choices : [])
+        .map(function (c) {
+          return optionRow(q, single, 'quiz-pick', c.id, c.text, picked.indexOf(c.id) >= 0);
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  // The prompt and the controls of one quiz question, with no card around them (the quiz draws its own).
+  function quizBody(q, v) {
+    if (q.kind === 'choice') return quizChoiceBody(q, v);
+    if (q.kind === 'true_false') return trueFalseBody(q, v);
+    if (q.kind === 'number') return numberBody(q, v);
+    if (q.kind === 'text') return textBody(q, v, q.prompt || '');
+    return '';
+  }
+
   /* One question's card. ctx: { prompt: the prompt as shown, other: a
      choice's Other is chosen }. */
   function card(q, v, ctx) {
@@ -549,6 +621,7 @@ var StudentQuestionKinds = (function () {
     isComplete: isComplete,
     value: value,
     card: card,
+    quizBody: quizBody,
     intro: intro,
   };
 })();
