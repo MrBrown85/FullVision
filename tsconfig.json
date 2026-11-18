@@ -35,6 +35,7 @@
     "shared/data-markup.js",
     "shared/data-reflect.js",
     "shared/data-bulletins.js",
+    "shared/data-bulletins-queue.js",
     "teacher/page-bulletins.js",
     "shared/data-revisions.js",
     "shared/data-roster.js",

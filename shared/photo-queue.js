@@ -75,18 +75,13 @@
  *   (meta.mime) and sent to the path the server named in the bucket
  *   handout-files (<course>/<resource>.<html|txt|epub>).
  *
- * Bulletins: the pages of a bulletin the teacher posted from the phone
- *   (docs/plans/bulletins-plan.md, B1f) wait here too, one record per page,
- *   kind 'bulletin', added by addBulletin(). Its ids are { course, key, file }
- *   where key is the bulletin's idempotency key made on the device: no local
- *   bulletin id is ever made. It has no thumbnail. It goes to the path
- *   post_bulletin named for it (<course>/<bulletin file>/<n>.jpg in the
- *   bucket bulletin-files), which placeBulletin() writes into the record:
- *   until then it is blocked. It is sent and committed only through its own
- *   two functions (configure: bulletinUpload, bulletinCommit), so a bulletin's
- *   page never reaches the upload or commit of a student's work or a
- *   handout. Its batch commits as { kind: 'bulletin', key, batch, ids,
- *   files }.
+ * Bulletins (B1f): a page of a bulletin posted from the phone, kind
+ *   'bulletin', added by addBulletin(), ids { course, key, file } (key: the
+ *   bulletin's device idempotency key; no local bulletin id), no thumbnail.
+ *   Blocked until placeBulletin() writes the path post_bulletin named
+ *   (<course>/<bulletin file>/<n>.jpg, bucket bulletin-files). Sent and
+ *   committed only by bulletinUpload and bulletinCommit, as { kind:
+ *   'bulletin', key, batch, ids, files }.
  *
  * Everything here is a window.PhotoQueue.* public surface; no other globals.
  */
@@ -146,8 +141,7 @@ window.PhotoQueue = (function () {
        isDemo() → true in Demo Mode (default: the page's isDemoMode())
        owner() → the signed-in user's id, or null
        store    where pages are kept (tests pass a fake; default IndexedDB)
-       bulletinUpload(path, blob, info), bulletinCommit(batch): a bulletin's
-         pages only (see Bulletins); until both are set they wait, blocked */
+       bulletinUpload, bulletinCommit: a bulletin's pages only (see Bulletins) */
   function configure(opts) {
     opts = opts || {};
     if ('upload' in opts) _upload = typeof opts.upload === 'function' ? opts.upload : null;
@@ -266,12 +260,6 @@ window.PhotoQueue = (function () {
   function bulletinPathOk(path, course) {
     var m = typeof path === 'string' ? BULLETIN_PATH.exec(path) : null;
     return !!m && isServerId(course) && m[1] === String(course).toLowerCase();
-  }
-
-  // The bulletin file a page's path names (its second part).
-  function _bulletinFileOf(path) {
-    var m = typeof path === 'string' ? BULLETIN_PATH.exec(path) : null;
-    return m ? m[2] : null;
   }
 
   /* ── The IndexedDB store ──────────────────────────────────────────────── */
@@ -1210,7 +1198,7 @@ window.PhotoQueue = (function () {
                   id: m.id,
                   order: m.order,
                   path: path,
-                  file: _bulletinFileOf(path),
+                  file: (BULLETIN_PATH.exec(path) || [])[2] || null, // the bulletin file its path names
                   fileIndex: m.file_index || 0,
                   page: m.page,
                   hash: m.hash,

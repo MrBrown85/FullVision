@@ -251,6 +251,7 @@ load('shared/data-feedback-live.js');
 load('shared/data-markup.js');
 load('shared/data-reflect.js');
 load('shared/data-bulletins.js');
+load('shared/data-bulletins-queue.js');
 load('shared/data-revisions.js');
 load('shared/data-roster.js');
 load('shared/data-withdrawn.js');

@@ -661,8 +661,8 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(store.count()).toBe(0);
     expect(pending()).toBe(null);
     expect(getBulletins(CID).filter(b => b.waiting)).toEqual([]);
-    expect(takeReturnedBulletin(CID).bulletin).toMatchObject({ kind: 'reminder', body: 'Lab form' });
-    expect(takeReturnedBulletin(CID)).toBe(null);
+    expect(bulletinGivenBack(CID).bulletin).toMatchObject({ kind: 'reminder', body: 'Lab form' });
+    expect(bulletinGivenBack(CID)).toBe(null);
   });
 
   it('gone with the pages no longer held: the bulletin leaves the waiting list', async () => {
@@ -683,7 +683,7 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(pending()).toBe(null);
     expect(getBulletins(CID).some(b => b.key === out.key)).toBe(false);
     expect(store.count()).toBe(0);
-    expect(takeReturnedBulletin(CID).bulletin).toMatchObject({ body: 'Old' });
+    expect(bulletinGivenBack(CID).bulletin).toMatchObject({ body: 'Old' });
     expect(calls('post_bulletin')).toEqual([]);
   });
 
@@ -698,11 +698,11 @@ describe('a photo posted from the phone, through shared/data-bulletins.js', () =
     expect(pending()).toBe(null);
     expect(store.count()).toBe(0);
     expect(getBulletins(CID)).toEqual([]);
-    expect(takeReturnedBulletin(CID)).toEqual({
+    expect(bulletinGivenBack(CID)).toEqual({
       bulletin: expect.objectContaining({ kind: 'announcement', body: 'Refused words' }),
       message: 'Stays Pinned Until cannot be before today.',
     });
-    expect(takeReturnedBulletin(CID)).toBe(null);
+    expect(bulletinGivenBack(CID)).toBe(null);
     expect(uploads).toEqual([]);
   });
 

@@ -819,7 +819,7 @@ window.MBulletins = (function () {
     if (!cid) return;
     var d = _draft(cid);
     // Words the server refused, or a post that could not go, come back here once.
-    var back = typeof W.takeReturnedBulletin === 'function' ? W.takeReturnedBulletin(cid) : null;
+    var back = typeof W.bulletinGivenBack === 'function' ? W.bulletinGivenBack(cid) : null;
     if (back && back.bulletin) {
       var b = back.bulletin;
       d.kind = b.kind === 'reminder' ? 'reminder' : 'announcement';
