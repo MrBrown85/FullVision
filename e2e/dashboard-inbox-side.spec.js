@@ -1,6 +1,6 @@
 /**
  * The Inbox's Side by Side view and the assessment switch (D6 of
- * docs/plans/dashboard-inbox-plan.md; board C2), behind the dashRow switch.
+ * docs/plans/dashboard-inbox-plan.md; board C2).
  * Demo Mode, Science 8, the student page and Send Work on: Light Refraction
  * Lab has work waiting (Sofia Petrov sent two pages), Cell Microscope Lab is
  * assessed. There is no Compare view, so no Compare control.
@@ -24,7 +24,6 @@ async function open(page, { bulletins = false, dark = false, side = true } = {})
   await page.addInitScript(
     ([bulletins, side]) => {
       try {
-        localStorage.setItem('fv-build-dashRow', '1');
         if (side) localStorage.setItem('fv-dash-inbox-view:sci8', 'side');
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');

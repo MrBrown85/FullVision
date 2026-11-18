@@ -310,6 +310,7 @@ declare function signOut(opts?: { force?: boolean; redirect?: string }): Promise
 // seed-data.js (loaded in Demo Mode only): the sample class and its seeder.
 declare var DEFAULT_COURSES: Record<string, unknown>;
 declare function seedIfNeeded(): void;
+declare function seedDemoDrafts(): boolean;
 interface Window {
   // Set by the Netlify edge function (inject-env.js).
   __ENV?: { SUPABASE_URL?: string; SUPABASE_KEY?: string };

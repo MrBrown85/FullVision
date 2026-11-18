@@ -10,7 +10,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function openDashboard(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-  await page.locator('.dash-comp-card .dash-comp-row').first().waitFor();
+  await page.locator('.dash-glance').waitFor();
 }
 
 // Draws the Dashboard with the change forced, and reports the cell's state.

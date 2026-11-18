@@ -1,22 +1,23 @@
 /**
- * The Dashboard's middle row behind the dashRow switch (D2 of
- * docs/plans/dashboard-inbox-plan.md): a left tile at two thirds and one
- * Competencies tile at one third, as tall as the window leaves, with the
- * Students heading below the first view. Demo Mode, Science 8.
+ * The Dashboard's middle row (D2 of docs/plans/dashboard-inbox-plan.md, on
+ * since D9): a left tile at two thirds and one Competencies tile at one
+ * third, as tall as the window leaves, with the Students heading below the
+ * first view. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
 
-async function openDashboard(page, { flag = true, bulletins = false } = {}) {
+async function openDashboard(page, { oldFlag = null, bulletins = false } = {}) {
   await page.addInitScript(
-    ([flag, bulletins]) => {
+    ([oldFlag, bulletins]) => {
       try {
-        if (flag) localStorage.setItem('fv-build-dashRow', '1');
+        // What a browser that saw the row before D9 may still have kept.
+        if (oldFlag != null) localStorage.setItem('fv-build-dashRow', oldFlag);
         if (bulletins) localStorage.setItem('fv-build-bulletins', '1');
       } catch (e) {
         /* storage blocked */
       }
     },
-    [flag, bulletins],
+    [oldFlag, bulletins],
   );
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -94,13 +95,15 @@ test('a photo-expiry line that arrives after the first draw: the row still ends 
   expect(Math.round(after.row.height)).toBeLessThan(610);
 });
 
-test('with the switch off the page has none of the new row', async ({ page }) => {
+test("the old two-card row is gone, whatever an old 'fv-build-dashRow' says", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await openDashboard(page, { flag: false });
-  await expect(page.locator('.dash-comp-card')).toBeVisible();
-  for (const sel of ['.dash-row', '.dash-comp-tile', '.dash-recent', '.dash-row-left']) {
-    await expect(page.locator(sel)).toHaveCount(0);
-  }
+  await openDashboard(page, { oldFlag: '0' });
+  for (const sel of ['.dash-row', '.dash-comp-tile', '.dash-recent', '.dash-row-left'])
+    await expect(page.locator(sel)).toHaveCount(1);
+  await expect(page.locator('.dash-overview-cards')).toHaveCount(0);
+  // Each card is a page of the one tile, never a box of its own in the row.
+  expect(await page.locator('.dash-comp-card').evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
+  expect(await page.locator('.dash-core-card').evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
 });
 
 test('at 800 wide the tiles stack and nothing scrolls sideways', async ({ page }) => {
@@ -123,7 +126,6 @@ test('at 800 wide the tiles stack and nothing scrolls sideways', async ({ page }
 
 test('at 335 wide the tile does not scroll the page sideways', async ({ page }) => {
   await page.setViewportSize({ width: 335, height: 800 });
-  await page.addInitScript(() => localStorage.setItem('fv-build-dashRow', '1'));
   // The phone app takes a phone-width window at sign-in; the desktop page is
   // opened by its address, as phone-width-desktop-pages.spec.js does.
   await page.goto('/login.html');

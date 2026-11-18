@@ -1,8 +1,8 @@
 /**
- * The Dashboard's middle row behind the dashRow switch (D2 of
- * docs/plans/dashboard-inbox-plan.md): the height rule, the left column's
- * two shapes, Recent Assessments' model, and the Competencies tile. With the
- * switch off, renderOverviewPanel draws what it always did.
+ * The Dashboard's middle row (D2 of docs/plans/dashboard-inbox-plan.md, on
+ * since D9): the height rule, the left column's two shapes, Recent
+ * Assessments' model, the Competencies tile, and the one count of the
+ * class's work a draw shares.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -40,7 +40,6 @@ function opts(extra) {
       compView: 'mix',
       obs: {},
       classChange: null,
-      mixPop: null,
       helpRule: null,
       naComp: null,
     },
@@ -82,12 +81,7 @@ describe('the row height rule', () => {
   });
 });
 
-// The flag-off row is guarded byte for byte against the pre-D2 output in
-// tests/dash-overview-flag-off.test.js.
-
-describe('with the dashRow switch on', () => {
-  beforeEach(() => setFlags({ dashRow: true }));
-
+describe('the row', () => {
   it('draws one row: the left column, then the one Competencies tile', () => {
     const html = DashOverview.renderOverviewPanel(opts());
     expect(html).toContain('<div class="dash-row"');
@@ -121,7 +115,7 @@ describe('with the dashRow switch on', () => {
     expect(html).not.toContain('has-bulletins');
     // Flag on, not built: the same.
     delete window.DashBulletins;
-    setFlags({ dashRow: true, bulletins: true });
+    setFlags({ bulletins: true });
     html = DashOverview.renderOverviewPanel(opts());
     expect(html).not.toContain('has-bulletins');
     // Both: the split.
@@ -135,6 +129,46 @@ describe('with the dashRow switch on', () => {
     expect(DashOverview.renderOverviewPanel(opts())).toContain('<section class="dash-comp-tile"');
     expect(DashOverview.renderOverviewPanel(opts())).toContain('data-page="curricular"');
     expect(DashOverview.renderOverviewPanel(opts({ compPage: 'core' }))).toContain('data-page="core"');
+  });
+});
+
+/* One count of the class's work per draw (DashOverview.classWorkCounts),
+   kept by the student list it was asked about (D9, 5a). */
+describe("a draw's one count of the class's work", () => {
+  it('gives each student list its own answer, and one list one count', () => {
+    const was = GraderWork.classWorkCounts;
+    const asked = [];
+    GraderWork.classWorkCounts = (cid, ids) => (asked.push(ids.join(',')), { tograde: ids.length, pieces: [] });
+    const inDraw = {};
+    window.DashInbox = {
+      html: (cid, ctx) => {
+        inDraw.all = ctx.classCounts(cid, ['s1', 's2', 's3']);
+        inDraw.again = ctx.classCounts(cid, ['s1', 's2', 's3']);
+        inDraw.two = ctx.classCounts(cid, ['s1', 's2']);
+        inDraw.sameAsTwo = ctx.classCounts(cid, ['s1', 's2']);
+        return '<section id="stub-inbox"></section>';
+      },
+    };
+    const wasOn = GraderWork.workOnInClass;
+    GraderWork.workOnInClass = () => true;
+    try {
+      DashOverview.renderOverviewPanel(opts());
+      expect(inDraw.all.tograde).toBe(3);
+      expect(inDraw.again).toBe(inDraw.all);
+      // Another list in the same draw is never given the first's answer.
+      expect(inDraw.two.tograde).toBe(2);
+      expect(inDraw.sameAsTwo).toBe(inDraw.two);
+      // The top bar and the Inbox asked about the whole class: counted once; the two-student list once.
+      expect(asked.filter(a => a === 's1,s2,s3')).toHaveLength(1);
+      expect(asked.filter(a => a === 's1,s2')).toHaveLength(1);
+      // Outside a draw, each call is a plain one.
+      DashOverview.classWorkCounts(CID, ['s1']);
+      DashOverview.classWorkCounts(CID, ['s1']);
+      expect(asked.filter(a => a === 's1')).toHaveLength(2);
+    } finally {
+      GraderWork.classWorkCounts = was;
+      GraderWork.workOnInClass = wasOn;
+    }
   });
 });
 

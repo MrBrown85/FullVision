@@ -44,10 +44,12 @@ const roster = () => sortStudents(getStudents(CID), 'lastName');
 const ids = () => roster().map(s => s.id);
 const chip = (m, sid) => m.students.find(c => c.sid === sid);
 
-// Chips as drawn: solid, dashed and quiet, counted from the model's own kinds.
+// Chips as drawn: solid, dashed and Excused, counted from the model's own
+// kinds. A chip with work in that says Excused is counted as Excused.
 const drawn = m => ({
-  solid: m.students.filter(c => c.kind === 'in').length,
+  solid: m.students.filter(c => c.kind === 'in' && c.status !== 'excused').length,
   dashed: m.students.filter(c => c.kind === 'out').length,
+  excused: m.students.filter(c => c.status === 'excused').length,
 });
 
 function sendNothing(aid) {
@@ -210,6 +212,11 @@ describe('the foot counts the chips as drawn', () => {
       setAssignmentStatus(CID, outs[0].sid, LIGHT, 'EXC');
       setAssignmentStatus(CID, outs[1].sid, LIGHT, 'NS');
     },
+    'an Excused student who sent work, and one who did not': () => {
+      const m = DashInboxRoll.model(CID, LIGHT);
+      setAssignmentStatus(CID, m.students.find(c => c.kind === 'in' && !c.mates.length).sid, LIGHT, 'EXC');
+      setAssignmentStatus(CID, m.students.find(c => c.kind === 'out').sid, LIGHT, 'EXC');
+    },
   };
   for (const [name, make] of Object.entries(states)) {
     it('agrees for every piece: ' + name, () => {
@@ -221,7 +228,11 @@ describe('the foot counts the chips as drawn', () => {
         const d = drawn(m);
         expect(m.counts.in).toBe(d.solid);
         expect(m.counts.notin).toBe(d.dashed);
+        expect(m.counts.excused).toBe(d.excused);
+        // Each student once: the numbers add up to the class.
+        expect(m.counts.in + m.counts.notin + m.counts.excused).toBe(m.students.length);
         expect(m.foot.startsWith(d.solid + ' in · ' + d.dashed + ' not in')).toBe(true);
+        if (d.excused) expect(m.foot).toContain(d.excused + ' Excused');
         const html = DashInboxRoll.html(CID);
         void html;
       });

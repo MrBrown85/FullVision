@@ -1,16 +1,19 @@
 /**
  * The Curricular Competencies card's views and the page's competency filter
- * (docs/plans/dashboard-cards-plan.md, part B). Demo Mode, Science 8 (a
- * Proficiency class, so it opens on Level Mix).
+ * (docs/plans/dashboard-cards-plan.md, part B), the Curricular page of the
+ * Competencies tile since D9. Demo Mode, Science 8 (a Proficiency class, so
+ * it opens on Level Mix). A Class Average row filters the page in one click;
+ * a Level Mix row opens its list first (e2e/dashboard-competencies.spec.js).
  */
 import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-async function openDashboard(page) {
+async function openDashboard(page, { view = null } = {}) {
+  if (view) await page.addInitScript(v => localStorage.setItem('fv-dash-comp-view:sci8', v), view);
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-  await page.locator('.dash-comp-card .dash-comp-row').first().waitFor();
+  await page.locator('.dash-comp-tile .dash-comp-card').waitFor();
 }
 
 // Each card's value on a column, in the order the cards are drawn (0 when
@@ -47,30 +50,31 @@ test('the view menu works from the keyboard and the pick is remembered', async (
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(pill).toHaveText('Level Mix');
-  await expect(page.locator('.dash-comp-card .dash-comp-cell').first()).toBeVisible();
+  await expect(page.locator('.dash-comp-card .dash-comp-ln').first()).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('fv-dash-comp-view:sci8'))).toBe('mix');
 });
 
-// Science 8 has six folders: every view draws six rows (Needs Support: the
-// students, which are more), so beside Core Competencies the card is the
-// same height in each.
-test('every view keeps the card one height', async ({ page }) => {
+// Science 8 has six folders: every view keeps the tile at the row's height,
+// and nothing on the page moves when the view changes.
+test('every view keeps the tile one height', async ({ page }) => {
   await openDashboard(page);
   const heights = [];
   for (const view of ['avg', 'mix', 'below', 'trend']) {
     await page.locator('#dash-view-btn-comp').click();
     await page.locator(`#dash-view-menu-comp [data-view="${view}"]`).click();
     await expect(page.locator('.dash-comp-card')).toHaveAttribute('data-view', view);
-    heights.push(Math.round((await page.locator('.dash-comp-card').boundingBox()).height));
+    heights.push(Math.round((await page.locator('.dash-comp-tile').boundingBox()).height));
+    heights.push(Math.round((await page.locator('.dash-students-head').boundingBox()).y));
   }
-  expect(new Set(heights).size).toBe(1);
+  expect(new Set(heights.filter((_, i) => i % 2 === 0)).size).toBe(1);
+  expect(new Set(heights.filter((_, i) => i % 2 === 1)).size).toBe(1);
 });
 
 test('a row filters the page: the chip, the weakest first, the focused chips; × clears it', async ({ page }) => {
-  await openDashboard(page);
-  const row = page.locator('.dash-comp-card .dash-comp-pick').nth(2);
+  await openDashboard(page, { view: 'avg' });
+  const row = page.locator('.dash-comp-card .dash-comp-row').nth(2);
   const key = await row.getAttribute('data-key');
-  const label = (await row.textContent()).trim();
+  const label = (await row.locator('.dash-comp-name').textContent()).trim();
   await row.click();
   await expect(row).toHaveAttribute('aria-pressed', 'true');
 
@@ -99,12 +103,12 @@ test('a row filters the page: the chip, the weakest first, the focused chips; ×
   await bar.locator('.dash-comp-chip').click();
   await expect(page.locator('.dash-comp-filter')).toHaveCount(0);
   await expect(page.locator('.dash-card-seg.is-focus')).toHaveCount(0);
-  await expect(page.locator('.dash-comp-card .dash-comp-pick').nth(2)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.dash-comp-card .dash-comp-row').nth(2)).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('Escape clears the filter', async ({ page }) => {
-  await openDashboard(page);
-  await page.locator('.dash-comp-card .dash-comp-pick').first().click();
+  await openDashboard(page, { view: 'avg' });
+  await page.locator('.dash-comp-card .dash-comp-row').first().click();
   await expect(page.locator('.dash-comp-filter')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.dash-comp-filter')).toHaveCount(0);
@@ -112,8 +116,8 @@ test('Escape clears the filter', async ({ page }) => {
 
 test('nothing slides when less motion is asked for', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openDashboard(page);
-  await page.locator('.dash-comp-card .dash-comp-pick').first().click();
+  await openDashboard(page, { view: 'avg' });
+  await page.locator('.dash-comp-card .dash-comp-row').first().click();
   await expect(page.locator('.dash-comp-filter')).toBeVisible();
   await expect(page.locator('.dash-card.is-sliding')).toHaveCount(0);
   const t = await page

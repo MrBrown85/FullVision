@@ -1,8 +1,7 @@
 /* The Competencies tile's two pages at one third of the row (D3 of
    docs/plans/dashboard-inbox-plan.md). Everything here sits inside
-   .dash-comp-tile, which D2 draws only behind the dashRow switch, so with the
-   switch off none of it applies. The tile's own box and sliding pages are in
-   dashboard.css (D2). */
+   .dash-comp-tile. The tile's own box and sliding pages are in dashboard.css
+   (D2). */
 
 /* ── Housing ────────────────────────────────────────────────── */
 /* The tile's side padding is shared with the cards' own, so the rows'

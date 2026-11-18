@@ -1,7 +1,7 @@
 /**
  * The Inbox's All Caught Up and a file drop on the tile (D5 of
- * docs/plans/dashboard-inbox-plan.md; boards E1 and E1b), behind the dashRow
- * switch. Demo Mode, Science 8, the student page and Send Work on.
+ * docs/plans/dashboard-inbox-plan.md; boards E1 and E1b). Demo Mode, Science
+ * 8, the student page and Send Work on.
  *
  * Drops are made in the page with a DataTransfer (a real drag from Finder
  * cannot be automated). A folder is a DataTransferItem whose
@@ -33,11 +33,10 @@ const shot = async (page, name) => {
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { flag = true, bulletins = false, caughtUp = false } = {}) {
+async function open(page, { sendWork = true, bulletins = false, caughtUp = false } = {}) {
   await page.addInitScript(
-    ([flag, bulletins]) => {
+    ([bulletins]) => {
       try {
-        if (flag) localStorage.setItem('fv-build-dashRow', '1');
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');
           window.DashBulletins = {
@@ -49,37 +48,41 @@ async function open(page, { flag = true, bulletins = false, caughtUp = false } =
         /* storage blocked */
       }
     },
-    [flag, bulletins],
+    [bulletins],
   );
   await page.addInitScript(EXPIRING);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
-  await page.evaluate(caughtUp => {
-    const cid = getActiveCourse();
-    setStudentPageSwitch(cid, true, 'on_return');
-    const work = getCourseSubmissions(cid);
-    work.course.send_work = true;
-    saveDemoStudentWork(cid, work);
-    if (caughtUp) {
-      // Every piece of work waiting is assessed: nothing is left to grade.
-      const ids = getStudents(cid).map(s => s.id);
-      getAssessments(cid).forEach(a =>
-        GraderWork.workCounts(cid, a.id, ids).ids.tograde.forEach(sid =>
-          Grader.setOverallComment(cid, sid, a.id, 'Seen.'),
-        ),
-      );
-      // ...and returned: nothing to return either.
-      if (caughtUp === 'returned')
-        getAssessments(cid).forEach(a => {
-          const back = GraderWork.workCounts(cid, a.id, ids).ids.toreturn;
-          if (back.length) Grader.returnGrades(cid, a.id, back);
-        });
-    }
-    PageDashboard.render();
-  }, caughtUp);
-  if (flag) await page.locator('#dash-inbox').waitFor();
+  await page.evaluate(
+    ([caughtUp, sendWork]) => {
+      if (!sendWork) return;
+      const cid = getActiveCourse();
+      setStudentPageSwitch(cid, true, 'on_return');
+      const work = getCourseSubmissions(cid);
+      work.course.send_work = true;
+      saveDemoStudentWork(cid, work);
+      if (caughtUp) {
+        // Every piece of work waiting is assessed: nothing is left to grade.
+        const ids = getStudents(cid).map(s => s.id);
+        getAssessments(cid).forEach(a =>
+          GraderWork.workCounts(cid, a.id, ids).ids.tograde.forEach(sid =>
+            Grader.setOverallComment(cid, sid, a.id, 'Seen.'),
+          ),
+        );
+        // ...and returned: nothing to return either.
+        if (caughtUp === 'returned')
+          getAssessments(cid).forEach(a => {
+            const back = GraderWork.workCounts(cid, a.id, ids).ids.toreturn;
+            if (back.length) Grader.returnGrades(cid, a.id, back);
+          });
+      }
+      PageDashboard.render();
+    },
+    [caughtUp, sendWork],
+  );
+  if (sendWork) await page.locator('#dash-inbox').waitFor();
 }
 
 // Two students with nothing in for the piece, and a photo named for each, kept on window.__files.
@@ -408,8 +411,8 @@ test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrollin
   await shot(page, 'inbox-caught-up-299');
 });
 
-test('with the switch off there is no Inbox, and a file dropped on the Dashboard is left alone', async ({ page }) => {
-  await open(page, { flag: false });
+test('with Send Work off there is no Inbox, and a file dropped on the Dashboard is left alone', async ({ page }) => {
+  await open(page, { sendWork: false });
   await expect(page.locator('#dash-inbox')).toHaveCount(0);
   await expect(page.locator('.dash-inbox-drop-cover')).toHaveCount(0);
   await namedFiles(page, LIGHT);
@@ -507,6 +510,13 @@ test('a file let go just outside the tile is refused, so the browser does not op
     expect(await drag(page, sel, 'dragover')).toBe(true);
     expect(await drag(page, sel, 'drop')).toBe(true);
   }
+  // The class list left of the tile, about 13 px from it (D9): a near miss lands there.
+  for (const sel of ['#sidebar-mount .student-row', '#sidebar-mount']) {
+    expect(await drag(page, sel, 'dragover'), sel).toBe(true);
+    expect(await drag(page, sel, 'drop'), sel).toBe(true);
+  }
+  // The dock across the top is left as it is.
+  expect(await drag(page, '#dock-mount', 'dragover')).toBe(false);
   await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
   // Leaving the Dashboard takes its page listeners with it.
   await page
@@ -582,6 +592,17 @@ test('a real drop on the top bar is refused: the page stays', async ({ page }) =
   await expect(page.locator('#dash-inbox')).toBeVisible();
 });
 
+test('a real drop on the class list beside the tile is refused: the page stays', async ({ page }) => {
+  await open(page);
+  const url = page.url();
+  const list = page.locator('#sidebar-mount');
+  await expect(list).toBeVisible();
+  await realDrop(page, list, SAMPLE_PHOTO);
+  await page.waitForTimeout(300);
+  expect(page.url()).toBe(url);
+  await expect(page.locator('#dash-inbox')).toBeVisible();
+});
+
 test('the grader opened over the Dashboard still takes a photo dropped on its Choose Files', async ({ page }) => {
   await open(page);
   const sid = await page.evaluate(() => {
@@ -626,16 +647,18 @@ const COUNT_LISTENERS = () => {
   };
 };
 
-async function classSettingsListeners(page, flag) {
+async function classSettingsListeners(page, sendWork) {
   await page.addInitScript(COUNT_LISTENERS);
-  await open(page, { flag });
+  await open(page, { sendWork });
   await page.getByRole('button', { name: 'Class Settings' }).first().click();
   await page.locator('[data-action="cmRestoreBackup"]').waitFor();
   await page.waitForTimeout(100);
   return page.evaluate(() => window.__dragListeners());
 }
 
-test('in Class Settings the drag and drop listeners are the same as with the switch off', async ({ browser }) => {
+test('in Class Settings the drag and drop listeners are the same as after a Dashboard with no Inbox', async ({
+  browser,
+}) => {
   const on = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const off = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const withTile = await classSettingsListeners(on, true);
@@ -645,7 +668,7 @@ test('in Class Settings the drag and drop listeners are the same as with the swi
   await off.close();
 });
 
-test("Restore from Backup's file box still takes a dropped file with the switch on", async ({ page }) => {
+test("Restore from Backup's file box still takes a dropped file after a Dashboard with the Inbox", async ({ page }) => {
   await open(page);
   await page.getByRole('button', { name: 'Class Settings' }).first().click();
   await page.locator('[data-action="cmRestoreBackup"]').click();

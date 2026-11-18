@@ -2,7 +2,7 @@
 /* dash-inbox.js — the Dashboard's Inbox tile (D4 of
    docs/plans/dashboard-inbox-plan.md; boards C0, C1 and E2). It fills the
    left slot of the middle row in a class whose student page and Send Work
-   are on, behind the dashRow build switch. DashOverview calls
+   are on. DashOverview calls
    DashInbox.html(cid); everything it shows is DashInboxModel's.
 
    Views: DashInbox.addView({ key, label, hint, html, mount, unmount }), so a
@@ -337,15 +337,10 @@ window.DashInbox = (function () {
   });
 
   /* ── The tile ──────────────────────────────────────────── */
-  /** Whether the tile takes the slot: the build switch, and the class's student page and Send Work.
+  /** Whether the tile takes the slot: the class's student page and Send Work.
    * @param {string} cid */
   function shows(cid) {
-    return !!(
-      window.BuildFlags &&
-      BuildFlags.on('dashRow') &&
-      /** @type {any} */ (window).GraderWork &&
-      /** @type {any} */ (window).GraderWork.workOnInClass(cid)
-    );
+    return !!(/** @type {any} */ (window.GraderWork && /** @type {any} */ (window).GraderWork.workOnInClass(cid)));
   }
 
   /** @param {string} cid */
@@ -409,8 +404,51 @@ window.DashInbox = (function () {
     return at;
   }
 
+  /* ── A row's words fit its height ──────────────────────────
+     A row is 109 px. Where its words column is narrow (the window's
+     narrowest desktop widths, the roster shown beside it) and the counts
+     line wraps to a third line (Late, You Added and on paper all at once),
+     the words ran 3 to 17 px past the row. Then the row leaves out its
+     "Newest:" line, the one line that says nothing the counts and the
+     pictures do not, and Late is never cut. Fitted after each draw and
+     whenever the tile changes width. */
+  /** @type {ResizeObserver | null} */
+  var _fitWatch = null;
+
+  /** @param {ParentNode} root */
+  function fitRows(root) {
+    root.querySelectorAll('.dash-inbox-row:not(.is-slim)').forEach(function (/** @type {any} */ row) {
+      row.classList.remove('is-tight');
+      var info = row.querySelector('.dash-inbox-info');
+      if (!info || typeof row.getBoundingClientRect !== 'function' || typeof getComputedStyle !== 'function') return;
+      var cs = getComputedStyle(row);
+      var room = row.getBoundingClientRect().bottom - (parseFloat(cs.paddingBottom) || 0);
+      var last = info.lastElementChild;
+      if (last && last.getBoundingClientRect().bottom > room + 0.5) row.classList.add('is-tight');
+    });
+  }
+
+  /** @param {HTMLElement} tile */
+  function _watchFit(tile) {
+    if (_fitWatch) _fitWatch.disconnect();
+    _fitWatch = null;
+    fitRows(tile);
+    // Only By Assessment has rows; another view needs no watch.
+    if (typeof ResizeObserver === 'undefined' || !tile.querySelector('.dash-inbox-row:not(.is-slim)')) return;
+    var width = tile.getBoundingClientRect().width;
+    _fitWatch = new ResizeObserver(function () {
+      var now = tile.getBoundingClientRect().width;
+      if (Math.abs(now - width) < 0.5) return;
+      width = now;
+      fitRows(tile);
+    });
+    _fitWatch.observe(tile);
+  }
+
   /* Called just before the page is set: what the draw would lose. */
   function beforeRender() {
+    if (_fitWatch) _fitWatch.disconnect();
+    _fitWatch = null;
     if (_mounted && _mounted.unmount) {
       try {
         _mounted.unmount();
@@ -472,6 +510,7 @@ window.DashInbox = (function () {
         return _files[img.getAttribute('data-dash-pic') || ''] || null;
       });
     }
+    _watchFit(tile);
     _glide(cid);
     var view = viewOf(cid);
     _mounted = view;
@@ -516,6 +555,8 @@ window.DashInbox = (function () {
     _files = {};
     _model = null;
     clearTimeout(_ringTimer);
+    if (_fitWatch) _fitWatch.disconnect();
+    _fitWatch = null;
   }
 
   /* ── Clicks ────────────────────────────────────────────── */
@@ -571,6 +612,7 @@ window.DashInbox = (function () {
   }
 
   var api = {
+    fitRows: fitRows,
     configure: configure,
     addView: addView,
     setView: setView,

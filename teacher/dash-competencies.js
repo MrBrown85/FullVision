@@ -434,13 +434,16 @@ window.DashCompetencies = (function () {
   }
 
   /* ── The row's list ─────────────────────────────────────────── */
-  /** The people chips DashInsights.popHtml draws for one band, as it draws
-   * them (each name and its level, the way the class shows grades).
+  /** The band's shared next step and its people chips, as DashInsights.popHtml
+   * draws them for today's Level Mix (each name and its level, the way the
+   * class shows grades). The next step is the line today's Level Mix list
+   * gives a band; it is kept here so turning the row on loses nothing.
    * @param {any} opts @param {string} key @param {number} level */
   function _bandPeople(opts, key, level) {
     var h = DashInsights.popHtml(opts.cid, opts.allStudents || [], { key: key, level: level });
+    var next = /<div class="dash-mix-pop-next">[\s\S]*?<\/div>/.exec(h);
     var m = /<div class="dash-ins-people">[\s\S]*?<\/div>/.exec(h);
-    return m ? m[0] : '';
+    return (next ? next[0] : '') + (m ? m[0] : '');
   }
 
   /** @param {string} title */

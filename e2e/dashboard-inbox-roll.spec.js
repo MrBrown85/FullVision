@@ -1,7 +1,6 @@
 /**
- * The Inbox's Roll Call view (D8 of docs/plans/dashboard-inbox-plan.md),
- * behind the dashRow switch. Demo Mode, Science 8, the student page and Send
- * Work on. Set FV_SHOTS to a folder to keep pictures.
+ * The Inbox's Roll Call view (D8 of docs/plans/dashboard-inbox-plan.md).
+ * Demo Mode, Science 8, the student page and Send Work on. Set FV_SHOTS to a folder to keep pictures.
  */
 import { test, expect } from '@playwright/test';
 
@@ -20,7 +19,6 @@ const shot = async (page, name) => {
 async function open(page, { bulletins = false, dark = false } = {}) {
   await page.addInitScript(bulletins => {
     try {
-      localStorage.setItem('fv-build-dashRow', '1');
       if (bulletins) {
         localStorage.setItem('fv-build-bulletins', '1');
         window.DashBulletins = {
@@ -452,7 +450,6 @@ for (const [w, h] of [
 ]) {
   test('at ' + w + 'x' + h + ' the first draw is one render, and a redraw keeps the scroll', async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
-    await page.addInitScript(() => localStorage.setItem('fv-build-dashRow', '1'));
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/\/dashboard/);
     await page.locator('.dash-glance').waitFor();

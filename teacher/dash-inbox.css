@@ -1,5 +1,5 @@
 /* The Dashboard's Inbox tile (D4 of docs/plans/dashboard-inbox-plan.md; boards
-   C1 and E2), in the middle row's left slot behind the dashRow switch. One
+   C1 and E2), in the middle row's left slot. One
    white box like the cards. It has no overflow of its own, so the view menu
    can drop over the list; the list scrolls inside it. A page picture is
    never under 80 px tall: the picture row is 88. */
@@ -203,6 +203,11 @@
   white-space: nowrap;
   font-size: var(--text-sm);
   color: var(--text-2);
+}
+/* A row whose counts wrap to a third line leaves out "Newest:" so its words
+   stay inside its 109 px (DashInbox.fitRows). */
+.dash-inbox-row.is-tight .dash-inbox-newest {
+  display: none;
 }
 /* The counts line wraps to a second line rather than cut anything: Late is
    always readable. Only the quiet words (You Added, on paper) can be cut. */

@@ -224,6 +224,71 @@ for (const [width, height, ipad] of [
   });
 }
 
+/* The Dashboard's middle row upright (DECISIONS, "The Dashboard's middle
+   row"; board F): stacked, the Inbox 450 px and Competencies 520 px under
+   it, nothing sideways, and every control in it a finger's size (44 px) in
+   each Inbox view and on both Competencies pages. */
+for (const [width, height, ipad] of [
+  [744, 1133, 'iPad mini'],
+  [820, 1180, 'iPad Air'],
+  [1024, 1366, 'iPad Pro 13-inch'],
+]) {
+  test(`${ipad} upright (${width} wide): the Dashboard's row stacks, and every control in it is 44 px`, async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const context = await asIpad(browser, width, height);
+    const page = await context.newPage();
+    await enterDemo(page);
+    await studentPageOn(page);
+    await page.goto('/dashboard');
+    await page.locator('#dash-inbox').waitFor();
+    const found = {};
+    for (const view of ['assessment', 'side', 'flip', 'roll']) {
+      for (const pg of ['curricular', 'core']) {
+        await page.evaluate(
+          ([view, pg]) => {
+            localStorage.setItem('fv-dash-inbox-view:sci8', view);
+            localStorage.setItem('fv-dash-comp-page:sci8', pg);
+            PageDashboard.render();
+          },
+          [view, pg],
+        );
+        await page.waitForTimeout(400);
+        const m = await page.evaluate(() => {
+          const box = s => document.querySelector(s).getBoundingClientRect();
+          const small = [
+            ...document.querySelectorAll(
+              '.dash-row button, .dash-row a, .dash-row [role=link], .dash-row [role=tab], .dash-row input, .dash-row select',
+            ),
+          ]
+            .filter(e => {
+              // The list a screen reader reads behind Flip Through's pages is out of sight.
+              if (e.closest('.dash-inbox-flip-vh')) return false;
+              const r = e.getBoundingClientRect();
+              const cs = getComputedStyle(e);
+              return r.width && r.height && cs.visibility !== 'hidden' && Math.min(r.width, r.height) < 44 - 0.5;
+            })
+            .map(e => (e.textContent || e.getAttribute('aria-label') || e.className).trim().slice(0, 30));
+          const inbox = box('.dash-row-inbox');
+          const comp = box('.dash-row-comp');
+          return {
+            inbox: Math.round(inbox.height),
+            comp: Math.round(comp.height),
+            stacked: comp.top >= inbox.bottom + 11,
+            sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            small: [...new Set(small)],
+          };
+        });
+        if (m.inbox !== 450 || m.comp !== 520 || !m.stacked || m.sideways > 0 || m.small.length)
+          found[view + '/' + pg] = m;
+      }
+    }
+    expect(found).toEqual({});
+    await context.close();
+  });
+}
+
 test('the grader on an iPad: full screen, the title clear of the tabs, the rubric in view', async ({ browser }) => {
   const context = await asIpad(browser, 820, 1180);
   const page = await context.newPage();

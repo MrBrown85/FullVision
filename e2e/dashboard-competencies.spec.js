@@ -2,21 +2,13 @@
  * The Competencies tile's two pages at one third of the row (D3 of
  * docs/plans/dashboard-inbox-plan.md): Level Mix and Self-Assessment as one
  * row per competency, the row's list, the other views fitting the tile, and
- * the view menus and hover tips showing whole. Demo Mode, Science 8, with the
- * dashRow switch on.
+ * the view menus and hover tips showing whole. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
 async function openDashboard(page, { w = 1280, h = 800 } = {}) {
   await page.setViewportSize({ width: Math.max(w, 1024), height: h });
-  await page.addInitScript(() => {
-    try {
-      localStorage.setItem('fv-build-dashRow', '1');
-    } catch (e) {
-      /* storage blocked */
-    }
-  });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-comp-tile').waitFor();

@@ -1,6 +1,6 @@
 /**
- * The Inbox's Flip Through view (D7 of docs/plans/dashboard-inbox-plan.md),
- * behind the dashRow switch. Demo Mode, Science 8, the student page and Send
+ * The Inbox's Flip Through view (D7 of docs/plans/dashboard-inbox-plan.md).
+ * Demo Mode, Science 8, the student page and Send
  * Work on. The first piece with work in is Cell Microscope Lab: ten students,
  * Noor Al-Rashid (third) and Fatima Hassan (ninth, late) with two pages,
  * Mateo Cruz added by the teacher, Ethan Dubois on paper.
@@ -18,7 +18,23 @@ const shot = async (page, name) => {
   await page.screenshot({ path: SHOTS + '/' + name + '.png' });
 };
 
-async function open(page, { bulletins = false, dark = false, piece = 'sci8a1', view = true } = {}) {
+async function open(page, { bulletins = false, dark = false, piece = 'sci8a1', view = true, touch = false } = {}) {
+  // A touch device answers (pointer: coarse); the desktop browser here does not.
+  if (touch)
+    await page.addInitScript(() => {
+      const real = window.matchMedia.bind(window);
+      window.matchMedia = q =>
+        /pointer:\s*coarse/.test(q)
+          ? {
+              matches: true,
+              media: q,
+              addEventListener() {},
+              removeEventListener() {},
+              addListener() {},
+              removeListener() {},
+            }
+          : real(q);
+    });
   await page.addInitScript(() => {
     // Every wheel listener added to an element, with whether it is passive.
     window.__wheelListeners = [];
@@ -34,7 +50,6 @@ async function open(page, { bulletins = false, dark = false, piece = 'sci8a1', v
   await page.addInitScript(
     ([bulletins, piece]) => {
       try {
-        localStorage.setItem('fv-build-dashRow', '1');
         if (bulletins) {
           localStorage.setItem('fv-build-bulletins', '1');
           // A stand-in for the Bulletins tile, which is built apart from the Inbox.
@@ -1084,10 +1099,52 @@ test('five round trips ask for nothing after the first; down, up, down in a 13-p
   expect(all.filter(a => a.startsWith('big-') && a.endsWith('|page')).length).toBe(13);
 });
 
-test('with the switch off there is no Flip Through', async ({ page }) => {
+/* A 13-page pile, the centre student's pages walked down to the last one and
+   back: how many whole pages the centre holds at once (D9). */
+async function walkBigPile(page) {
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const work = getCourseSubmissions(cid);
+    const noor = DashInboxFlip.entries(cid, 'sci8a1')[2];
+    const sub = work.submissions.find(x => x.assessment_id === 'sci8a1' && x.enrollment_id === noor.sid);
+    sub.files = Array.from({ length: 13 }, (_, i) => ({ ...sub.files[0], id: 'big-' + (i + 1), page: i + 1 }));
+    saveDemoStudentWork(cid, work);
+    PageDashboard.render();
+  });
+  await page.locator('.dash-inbox-flip-slider').fill('2');
+  await settle(page);
+  await expect(page.locator('.dash-inbox-flip-pagetext')).toHaveText('Page 1 of 13');
+  const held = () =>
+    page.evaluate(() => document.querySelectorAll('.dash-inbox-flip-pg.is-centre img[data-flip-part="page"]').length);
+  let most = 0;
+  await page.locator('.dash-inbox-flip-stage').focus();
+  for (const key of ['ArrowDown', 'ArrowUp']) {
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(40);
+      most = Math.max(most, await held());
+    }
+  }
+  await settle(page);
+  return Math.max(most, await held());
+}
+
+test('on a touch device the centre holds its page and the 6 nearest, not the whole 13-page pile', async ({ page }) => {
+  await open(page, { touch: true });
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+  expect(await walkBigPile(page)).toBeLessThanOrEqual(7);
+});
+
+test('on a computer the centre keeps every page of a 13-page pile it has fetched', async ({ page }) => {
+  await open(page);
+  expect(await walkBigPile(page)).toBe(13);
+});
+
+test('a class with Send Work off has no Flip Through', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/);
   await page.locator('.dash-glance').waitFor();
+  await expect(page.locator('.dash-row')).toHaveCount(1);
   await expect(page.locator('#dash-inbox')).toHaveCount(0);
   await expect(page.locator('.dash-inbox-flip')).toHaveCount(0);
 });

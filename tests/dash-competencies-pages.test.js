@@ -70,7 +70,6 @@ function opts(extra) {
       coreView: 'self',
       compView: 'mix',
       obs: {},
-      mixPop: null,
       helpRule: null,
       naComp: null,
     },
@@ -94,7 +93,6 @@ const THREE = { IN: [2, 3, 4, 4], EV: [1, 2, 2, 0], PL: [0, 0, 0, 0] };
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem('fv-build-dashRow', '1');
 });
 
 afterEach(() => {
@@ -415,14 +413,13 @@ describe("each Core view's link is the one today's card uses for that view", () 
   });
 });
 
-describe('with the dashRow switch off', () => {
-  it('draws no tile and no row of the new pages', () => {
+describe("an old 'fv-build-dashRow' on the device", () => {
+  it('changes nothing: the row and the tile draw with it set to 0 or not set at all (D9)', () => {
     setClass('proficiency', THREE);
-    localStorage.clear();
-    const html = DashOverview.renderOverviewPanel(opts());
-    expect(html).not.toContain('dash-comp-ln');
-    expect(html).not.toContain('dash-comp-tile');
-    // The bytes themselves are held by tests/dash-overview-flag-off.test.js
-    // against tests/fixtures/dash-overview-flag-off.json, recorded before D2.
+    const without = DashOverview.renderOverviewPanel(opts());
+    expect(without).toContain('dash-comp-tile');
+    expect(without).toContain('dash-comp-ln');
+    localStorage.setItem('fv-build-dashRow', '0');
+    expect(DashOverview.renderOverviewPanel(opts())).toBe(without);
   });
 });
