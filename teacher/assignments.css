@@ -500,7 +500,7 @@
 .af-mode-card[aria-checked='true'],
 .af-mode-card[aria-checked='true']:hover {
   font-weight: 600;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .af-mode-card:focus-visible {
@@ -594,14 +594,14 @@
   background: rgba(0, 122, 255, 0.04);
 }
 .collab-panel-btn.active {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
-  border-color: var(--active);
+  border-color: var(--active-fill);
 }
 .collab-panel-btn.primary {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
-  border-color: var(--active);
+  border-color: var(--active-fill);
 }
 .collab-panel-btn.primary:hover {
   background: var(--btn-hover-blue);
@@ -820,7 +820,7 @@
   width: 22px;
   height: 22px;
   border-radius: var(--radius-sm);
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: var(--text-2xs);
   font-weight: 700;
@@ -1599,7 +1599,7 @@ body.af-comp-open #gb-tooltip {
   background: var(--surface-2);
 }
 .af-code.on {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .af-code.on b {
@@ -1654,7 +1654,7 @@ body.af-comp-open #gb-tooltip {
   height: 30px;
   padding: 0 10px;
   border-radius: 6px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 700;
 }
@@ -1899,7 +1899,7 @@ body.af-comp-open #gb-tooltip {
   background: var(--surface);
 }
 .af-rubric-card-head .btn-primary {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .af-rubric-card .rb-grid {
@@ -2616,8 +2616,8 @@ body.af-comp-open #gb-tooltip {
 /* Chosen: solid blue, the dot white (redesign PR 14). */
 .af-cc-chip.active,
 .af-cc-chip.active:hover {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -2937,13 +2937,13 @@ body.af-comp-open #gb-tooltip {
   background: var(--overlay-hover);
 }
 .rb-btn-primary {
-  background: var(--active);
-  border-color: var(--active);
+  background: var(--active-fill);
+  border-color: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
 .rb-btn-primary:hover {
-  background: var(--active);
+  background: var(--active-fill);
   filter: brightness(0.92);
 }
 .rb-btn-new,
@@ -3536,7 +3536,7 @@ body.af-comp-open #gb-tooltip {
   font-size: var(--text-sm);
   font-weight: 700;
   color: #fff;
-  background: var(--active);
+  background: var(--active-fill);
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -4769,7 +4769,7 @@ body.af-comp-open #gb-tooltip {
   padding: 4px 12px;
   border-radius: var(--radius-xl);
   border: none;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-family: var(--font-base);
   font-size: var(--text-xs);
@@ -5161,8 +5161,8 @@ body.af-comp-open #gb-tooltip {
 .af-copy-chip.active,
 .af-copy-chip.af-copy-this,
 .af-copy-chip.active:hover:not(:disabled) {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .af-copy-chip.active .af-copy-chip-mark,
@@ -5431,8 +5431,8 @@ body.af-comp-open #gb-tooltip {
   color: var(--text);
 }
 .afrom-class[aria-checked='true'] {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .afrom-class:focus-visible {
@@ -5993,7 +5993,7 @@ body.af-comp-open #gb-tooltip {
   background: rgba(118, 118, 128, 0.2);
 }
 .rsg-checks-btn.is-open {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 700;
 }
@@ -6172,7 +6172,7 @@ body.af-comp-open #gb-tooltip {
   padding: 0 14px;
   border: none;
   border-radius: var(--radius-sm);
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: var(--text-sm);
@@ -6688,7 +6688,7 @@ button.grader-member-name {
   padding: 0 18px;
   border: none;
   border-radius: 17px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: var(--text-base);
@@ -6808,7 +6808,7 @@ button.grader-member-name {
   padding: 0 14px;
   border: none;
   border-radius: 15px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-family: var(--font-base);
   font-size: var(--text-sm);
@@ -8453,7 +8453,7 @@ button.grader-member-name {
 }
 .af-start-row.is-on,
 .af-start-row.is-on:hover {
-  background: var(--active);
+  background: var(--active-fill);
 }
 .af-start-row.is-on b,
 .af-start-row.is-on small,
@@ -9109,7 +9109,7 @@ button.grader-member-name {
   justify-content: center;
   height: 36px;
   border-radius: 10px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -9262,8 +9262,8 @@ button.grader-member-name {
   cursor: default;
 }
 .grader-work-focus[aria-pressed='true'] {
-  background: var(--active);
-  border-color: var(--active);
+  background: var(--active-fill);
+  border-color: var(--active-fill);
   color: #fff;
 }
 .grader-work-page {
@@ -9370,7 +9370,7 @@ button.grader-member-name {
   height: 36px;
   padding: 0 16px;
   border-radius: 10px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
   font-size: 14px;
@@ -9525,7 +9525,7 @@ button.grader-member-name {
 }
 .grader-return-next {
   border: none;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: var(--text-sm);
@@ -9890,7 +9890,7 @@ button.grader-member-name {
   height: 20px;
   padding: 0 8px;
   border-radius: 10px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: var(--text-xs);
   font-weight: 700;
@@ -9911,7 +9911,7 @@ button.grader-member-name {
   white-space: nowrap;
 }
 .assess-grade-work-btn {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 /* The work icon on a student's row (_workIconHtml): See the Work, the
@@ -10078,7 +10078,7 @@ button.grader-member-name {
 }
 /* Blue only while its menu is open, as on the board: one solid primary per screen. */
 .assess-more-btn[aria-expanded='true'] {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .assess-menu {
@@ -10203,7 +10203,7 @@ button.grader-member-name {
   height: 20px;
   padding: 0 7px;
   border-radius: 10px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 11px;
   font-weight: 700;

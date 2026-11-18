@@ -187,7 +187,7 @@ main.auth-card {
   font-weight: 600;
   border: none;
   border-radius: 10px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   cursor: pointer;
   transition: all 0.15s;

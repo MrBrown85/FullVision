@@ -144,7 +144,7 @@
   min-height: 50px;
   border: 0;
   border-radius: 12px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 17px;
@@ -533,8 +533,8 @@
   font-size: 15px;
 }
 .m-ss-choice.is-on {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .m-ss-row-note {

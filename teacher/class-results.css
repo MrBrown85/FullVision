@@ -115,7 +115,7 @@
   cursor: pointer;
 }
 .cr-btn-primary {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .cr-btn:hover {
@@ -657,7 +657,7 @@
 .cr-menu button:hover,
 .cr-menu button:focus {
   outline: none;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 

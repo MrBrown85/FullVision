@@ -122,7 +122,7 @@
 }
 .awc-primary {
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .awc-overlay button:disabled {
@@ -361,8 +361,8 @@ button.awt-pic {
   text-overflow: ellipsis;
 }
 .awt-act.is-main {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .awt-act.is-quiet {

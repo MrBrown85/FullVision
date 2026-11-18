@@ -568,7 +568,7 @@
   outline: none;
 }
 .gpd-menu-item[aria-checked='true'] {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .gpd-menu-help {

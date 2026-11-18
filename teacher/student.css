@@ -625,7 +625,7 @@
   border-radius: 8px;
   font-size: var(--text-base);
   font-weight: 600;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -766,7 +766,7 @@
   background: rgba(118, 118, 128, 0.14);
 }
 .es-toggle[aria-pressed='true'] {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -1574,7 +1574,7 @@ button.ced-obs-row {
 /* The chosen step is a solid block in its level's colour, readable on a
    dim screen. */
 .stu-core-step.on {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 700;
 }

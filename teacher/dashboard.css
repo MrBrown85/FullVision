@@ -2821,7 +2821,7 @@ a.dash-ins-name:hover {
   flex-shrink: 0;
 }
 .cm-class-avatar-new {
-  background: var(--active);
+  background: var(--active-fill);
   font-size: var(--text-base);
 }
 .cm-class-text {
@@ -3790,8 +3790,8 @@ a.dash-ins-name:hover {
   color: var(--text-3);
 }
 .cw-step.active .cw-step-num {
-  border-color: var(--active);
-  background: var(--active);
+  border-color: var(--active-fill);
+  background: var(--active-fill);
   color: #fff;
 }
 .cw-step.done .cw-step-num {
@@ -3830,9 +3830,9 @@ a.dash-ins-name:hover {
   color: var(--link);
 }
 .cw-grade-btn.active {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
-  border-color: var(--active);
+  border-color: var(--active-fill);
 }
 
 .cw-subject-row {
@@ -4122,7 +4122,7 @@ a.dash-ins-name:hover {
   bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: var(--text-sm);
   font-weight: 600;
@@ -4745,7 +4745,7 @@ a.dash-ins-name:hover {
     color 0.12s;
 }
 .cm-relink-btn:hover {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .cm-relink-actions {
@@ -8675,7 +8675,7 @@ button.rb-v-prompt {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 12px;
   font-weight: 700;

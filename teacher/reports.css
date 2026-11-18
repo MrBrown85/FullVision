@@ -3314,7 +3314,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-generate {
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   padding: 6px 13px;
   border-radius: var(--radius-sm);
@@ -3657,7 +3657,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-stale-use {
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -4715,7 +4715,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-line-save {
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -4919,7 +4919,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   height: 18px;
   border-radius: 9px;
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font: inherit;
   font-size: 14px;
@@ -5077,7 +5077,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-browse-done {
   height: 30px;
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   padding: 0 16px;
   border-radius: 15px;
@@ -5246,7 +5246,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 600;
   padding: 1px 7px;
   border-radius: 6px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .qn-browse-group-rows[hidden] {
@@ -5440,7 +5440,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
 }
 .qn-cal-day.on {
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-weight: 600;
 }
