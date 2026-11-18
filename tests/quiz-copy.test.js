@@ -168,6 +168,9 @@ async function copyToDst() {
 let wasDemo;
 let toasts;
 beforeEach(() => {
+  // A fixed Date, as the fixture was recorded with: nothing time-derived differs between runs or zones.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-18T18:00:00.000Z'));
   wasDemo = window.isDemoMode;
   localStorage.clear();
   _quizProbe = {};
@@ -176,6 +179,7 @@ beforeEach(() => {
   globalThis.showSyncToast = msg => toasts.push(msg);
 });
 afterEach(() => {
+  vi.useRealTimers();
   closePages();
   clearClass(SRC);
   clearClass(DST);
@@ -464,8 +468,10 @@ describe('with the quizzes switch off', () => {
         .filter(c => !/^(save_teacher_preferences|get_|list_)/.test(c.name))
         .map(c => [c.name, Object.keys(c.params || {}).sort()]),
       saved: copy,
+      // Only the keys this slice could add to: the pieces and the quizzes. Others (the sync queue,
+      // settings, the learning map) are written by background timers and say nothing about a copy.
       keys: Object.keys(localStorage._store)
-        .filter(k => !/^gb-(idmap|outbox|bundle)/.test(k))
+        .filter(k => /^gb-(assessments|quiz)/.test(k))
         .map(k => k.replace(/[cs](?=[a-z0-9]*\d)[a-z0-9]{8,}$/, '<id>'))
         .sort(),
       toasts: toasts,
