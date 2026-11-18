@@ -146,6 +146,8 @@ interface Window {
   v2Queue: {
     dropBlockedOn(localId: string, opts?: unknown): number;
     remove(id: string): boolean;
+    has(id: string): boolean;
+    subscribe(listener: (evt: { kind: string; meta: any }) => void): () => void;
     markReloaded(classId: string): number;
   };
   __fvPerf: unknown[];
@@ -199,6 +201,17 @@ interface Window {
 }
 // The sync toast (teacher/ui.js, not checked yet).
 declare function showSyncToast(message: string, type?: string): void;
+// The desktop sidebar and the confirm dialog (teacher/ui.js, not checked yet).
+declare function renderSidebar(activeCourse: string, selectedStudentId?: string, onStudentClick?: string): string;
+declare function initSidebarToggle(): void;
+declare function showConfirm(
+  title: string,
+  message: string,
+  okLabel?: string,
+  okStyle?: string,
+  onConfirm?: () => void,
+  cancelLabel?: string,
+): void;
 // What each window.v2.upsert* call reads from its params (shared/data-rpc-wrappers.js).
 type V2UpsertSubjectParams = {
   id: string | null;

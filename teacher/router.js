@@ -5,6 +5,7 @@ window.Router = (function () {
   var _routes = {
     '/dashboard': window.PageDashboard,
     '/assignments': window.PageAssignments,
+    '/bulletins': window.PageBulletins,
     '/student': window.PageStudent,
     '/gradebook': window.PageGradebook,
     '/observations': window.PageObservations,
@@ -15,6 +16,7 @@ window.Router = (function () {
   var _titles = {
     '/dashboard': 'Dashboard',
     '/assignments': 'Assignments',
+    '/bulletins': 'Bulletins',
     '/student': 'Student',
     '/gradebook': 'Gradebook',
     '/observations': 'Observations',
@@ -83,6 +85,9 @@ window.Router = (function () {
   var _booted = false;
 
   function _isRoute(path) {
+    // Bulletins has no address until its build switch is on: the address then
+    // opens the Dashboard like any other unknown one.
+    if (path === '/bulletins' && !(window.BuildFlags && window.BuildFlags.on('bulletins'))) return false;
     return Object.prototype.hasOwnProperty.call(_routes, path);
   }
 
@@ -332,6 +337,7 @@ window.Router = (function () {
     // Determine which dock tab is active
     var dockPage = 'dashboard';
     if (path === '/assignments') dockPage = 'assignments';
+    else if (path === '/bulletins') dockPage = 'bulletins';
     else if (path === '/student') dockPage = 'dashboard';
     else if (path === '/gradebook') dockPage = 'spreadsheet';
     else if (path === '/observations' || path === '/observations/starters') dockPage = 'observations';

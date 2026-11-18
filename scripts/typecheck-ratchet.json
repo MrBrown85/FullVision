@@ -77,7 +77,9 @@
     "shared/scan-label-read.js",
     "teacher/scan-labels.js",
     "teacher-mobile/split-scan-model.js",
-    "teacher-mobile/split-scan.js"
+    "teacher-mobile/split-scan.js",
+    "shared/data-bulletins.js",
+    "teacher/page-bulletins.js"
   ],
   "notYetChecked": [
     "s/app.js",

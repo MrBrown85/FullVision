@@ -178,6 +178,9 @@ function _clearCourseLocalState(id) {
     'withdrawn',
     'bundle-meta',
     'assessment-resources',
+    // Bulletins (shared/data-bulletins.js): Demo Mode's, and a post waiting to be sent.
+    'bulletins',
+    'bulletins-pending',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];
