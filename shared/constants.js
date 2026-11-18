@@ -996,6 +996,8 @@ const LINE_ICONS = {
 const TB_PAGES = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
   { id: 'assignments', label: 'Assignments', href: '/assignments' },
+  // Drawn only while the build switch is on (renderDock in teacher/ui.js).
+  { id: 'bulletins', label: 'Bulletins', href: '/bulletins', flag: 'bulletins' },
   { id: 'observations', label: 'Observations', href: '/observations' },
   { id: 'spreadsheet', label: 'Gradebook', href: '/gradebook' },
   { id: 'reports', label: 'Reporting', href: '/reports' },
