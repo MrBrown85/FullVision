@@ -494,6 +494,147 @@ describe('the tray', () => {
   });
 });
 
+/* Rule 9 (docs/plans/add-work-for-class-plan.md): Return never takes a name
+   two students share (one in each class, or two in one): the teacher picks. */
+describe('Someone Else: Return takes a student only when one fits', () => {
+  const CID2 = U(2);
+  const PIECE2 = U(32);
+  const B_AVERY = U(200); // the same name as Socials 10's Avery Chen
+  const XIMENA = U(201);
+  const TWIN = U(202); // a second student in Socials 10
+
+  afterEach(() => clearClass(CID2));
+
+  function seedSecond() {
+    seedClass(CID2, {
+      students: [
+        { id: B_AVERY, firstName: 'Avery', lastName: 'Chen' },
+        { id: XIMENA, firstName: 'Ximena', lastName: 'Quill' },
+      ],
+      learningMaps: { subjects: [], sections: [], _customized: true, _version: 1, _flatVersion: 2 },
+      assessments: [{ id: PIECE2, title: 'Conscription', tagIds: [], date: '2026-10-20' }],
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_save' },
+    });
+    COURSES[CID2].name = 'Block C';
+    saveDemoStudentWork(CID2, {
+      course: { send_work: true },
+      assessments: [{ id: PIECE2, students_send: 'photos' }],
+      submissions: [],
+    });
+  }
+  async function bothClasses() {
+    seedSecond();
+    AddWorkClass.open(CID, PIECE);
+    click($('[data-awc="two"]'));
+    await tick(8);
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('true');
+  }
+
+  // A waiting file with Choose a Student open; → its find box.
+  async function openFind() {
+    await AddWorkClass.takeFiles([file('SCAN0017.pdf')]);
+    await tick();
+    click(itemNamed('SCAN0017.pdf').querySelector('.awt-choose'));
+    return find();
+  }
+  const find = () => itemNamed('SCAN0017.pdf').querySelector('.awt-find');
+  function type(value) {
+    const el = find();
+    el.value = value;
+    el.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+  }
+  function key(el, k) {
+    Object.defineProperty(doc, 'activeElement', { configurable: true, get: () => el });
+    const e = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+    e.key = k;
+    doc.dispatchEvent(e);
+    delete doc.activeElement;
+    return e;
+  }
+  const say = () => {
+    const el = itemNamed('SCAN0017.pdf').querySelector('[data-awt-say]');
+    return el ? text(el) : null;
+  };
+  const options = () => [...itemNamed('SCAN0017.pdf').querySelectorAll('.awt-option')];
+
+  it('two classes, one name in each: Return places nothing and the choices stay, each with its class', async () => {
+    await bothClasses();
+    await openFind();
+    type('Avery Chen');
+    key(find(), 'Enter');
+    expect(chipsOf(AVERY)).toEqual([]);
+    expect(chipsOf(B_AVERY)).toEqual([]);
+    expect(options().map(text)).toEqual(['Avery Chen · Socials 10', 'Avery Chen · Block C']);
+    expect(say()).toBe('Two students are named Avery Chen. Choose one.');
+    // The teacher picks the second class's Avery.
+    click(options()[1]);
+    expect(chipsOf(B_AVERY)).toEqual(['SCAN0017.pdf']);
+    expect(chipsOf(AVERY)).toEqual([]);
+  });
+
+  it('two students of the same name in one class: Return places nothing', async () => {
+    getStudents(CID).push({ id: TWIN, firstName: 'Priya', lastName: 'Kaur' });
+    AddWorkClass.open(CID, PIECE);
+    await openFind();
+    type('priya kaur');
+    key(find(), 'Enter');
+    expect(chipsOf(PRIYA)).toEqual([]);
+    expect(chipsOf(TWIN)).toEqual([]);
+    expect(options().map(o => o.getAttribute('data-sid'))).toEqual([PRIYA, TWIN]);
+    expect(say()).toBe('Two students are named Priya Kaur. Choose one.');
+  });
+
+  it('a surname two students share: Return places nothing; typing on clears the sentence', async () => {
+    AddWorkClass.open(CID, PIECE);
+    await openFind();
+    type('Chen');
+    key(find(), 'Enter');
+    expect(chipsOf(AVERY)).toEqual([]);
+    expect(chipsOf(LIAM)).toEqual([]);
+    expect(options().map(text)).toEqual(['Avery Chen', 'Liam Chen']);
+    expect(say()).toBe('More than one student could fit. Choose one.');
+    type('Liam');
+    expect(say()).toBe('');
+    key(find(), 'Enter');
+    expect(chipsOf(LIAM)).toEqual(['SCAN0017.pdf']);
+  });
+
+  it('two classes: a name only one student has is still placed on Return', async () => {
+    await bothClasses();
+    await openFind();
+    type('Ximena');
+    key(find(), 'Enter');
+    expect(chipsOf(XIMENA)).toEqual(['SCAN0017.pdf']);
+  });
+
+  it('nothing typed places no one; Enter on a highlighted choice places that one', async () => {
+    await bothClasses();
+    await openFind();
+    key(find(), 'Enter');
+    expect($$('.awc-chip').length).toBe(0);
+    type('Avery');
+    // The arrows reach a choice; Return on it is the button's own click, not the tray's.
+    key(find(), 'ArrowDown');
+    const second = options()[1];
+    expect(key(second, 'Enter').defaultPrevented).toBe(false);
+    click(second);
+    expect(chipsOf(B_AVERY)).toEqual(['SCAN0017.pdf']);
+    expect(chipsOf(AVERY)).toEqual([]);
+  });
+
+  it('a name that is markup is shown as text', async () => {
+    getStudents(CID).push({ id: TWIN, firstName: '<img src=x onerror=alert(1)>', lastName: 'Kaur' });
+    AddWorkClass.open(CID, PIECE);
+    await openFind();
+    type('Kaur');
+    key(find(), 'Enter');
+    expect(chipsOf(PRIYA)).toEqual([]);
+    expect(itemNamed('SCAN0017.pdf').querySelector('img[onerror]')).toBeNull();
+    expect(options().map(text)).toContain('<img src=x onerror=alert(1)> Kaur');
+    expect(say()).toBe('More than one student could fit. Choose one.');
+  });
+});
+
 describe('folders', () => {
   const fileEntry = f => ({ isFile: true, isDirectory: false, name: f.name, file: ok => ok(f) });
   const dirEntry = (name, children) => {
