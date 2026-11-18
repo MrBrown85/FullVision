@@ -307,6 +307,7 @@ window.StudentView = (function () {
         score_mode: dibels ? 'dibels' : str(a.scoreMode || a.score_mode) || 'proficiency',
         max_points: num(a.maxPoints != null ? a.maxPoints : a.max_points),
         weight: num(a.weight),
+        students_see_factored: !!(a.studentsSeeFactored || a.students_see_factored),
         rubric_id: a.rubricId || a.rubric_id || null,
         tag_ids: tagIds.slice().sort(),
         description: textOrNull(a.description),
@@ -373,11 +374,13 @@ window.StudentView = (function () {
       out.level = num(cell.level) || 0;
     } else if (cell.kind === 'points') {
       var max = num(a.max_points) || 100;
+      var fp = (a.students_see_factored && factoredPoints(a, cell.value, max)) || { points: cell.value, outOf: max };
       out.kind = 'points';
-      out.text = formatPoints(cell.value) + ' / ' + formatPoints(max);
+      out.text = formatPoints(fp.points) + ' / ' + formatPoints(fp.outOf);
       out.level = num(cell.level) || 0;
-      out.points = formatPoints(cell.value);
-      out.outOf = formatPoints(max);
+      out.points = formatPoints(fp.points);
+      out.outOf = formatPoints(fp.outOf);
+      if (fp.factor) out.factor = fp.factor;
       out.percent = formatPointsPercent(cell.value, max);
       // A bar, not a grade: how much of it is filled, 0 to 100.
       out.bar = Math.max(0, Math.min(100, (Number(cell.value) / max) * 100));
@@ -518,7 +521,7 @@ window.StudentView = (function () {
     var then = '';
     if (res.kind === 'complete' && v != null) then = v > 0 ? 'Complete' : 'Incomplete';
     else if (res.kind === 'points' && v != null && typeof formatPoints === 'function') {
-      then = formatPoints(v) + ' / ' + res.outOf;
+      then = formatPoints(res.factor ? v * res.factor : v) + ' / ' + res.outOf;
     }
     if (then && res.text && then !== res.text) res.was = then;
   }

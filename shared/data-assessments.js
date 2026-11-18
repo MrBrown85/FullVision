@@ -288,6 +288,7 @@ function _assessmentChanged(a, b) {
     (a.moduleId || '') !== (b.moduleId || '') ||
     (a.copyGroup || '') !== (b.copyGroup || '') ||
     !!a.isDraft !== !!b.isDraft ||
+    !!a.studentsSeeFactored !== !!b.studentsSeeFactored ||
     _coreCompetencyIdsOf(a.coreCompetencyIds).join() !== _coreCompetencyIdsOf(b.coreCompetencyIds).join() ||
     Number(a.display_order || 0) !== Number(b.display_order || 0) ||
     JSON.stringify(a.tagIds || []) !== JSON.stringify(b.tagIds || [])
@@ -364,6 +365,8 @@ function _canonicalCreateAssessment(sb, cid, a) {
   if (coreIds.length) params.p_core_competency_ids = coreIds;
   // Likewise only for a Draft (migration 2026111701).
   if (a.isDraft) params.p_is_draft = true;
+  // Likewise only when switched on (migration 2026111808).
+  if (a.studentsSeeFactored) params.p_students_see_factored = true;
   var rec = _registerPendingCreate(cid, 'assessment', localId, 'create_assessment');
   var created = _writeRpc('create_assessment', params, { entryId: rec ? rec.entryId : undefined }).then(function (res) {
     if (res.error) {
@@ -453,6 +456,8 @@ function _assessmentFieldsPatchOf(a) {
     core_competency_ids: _coreCompetencyIdsOf(a.coreCompetencyIds),
     // Each class's own: linked copies never take it (the server keeps it per piece).
     is_draft: !!a.isDraft,
+    // Students see the score times the Factor (display only; migration 2026111808).
+    students_see_factored: !!a.studentsSeeFactored,
   };
 }
 

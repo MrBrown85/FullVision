@@ -139,7 +139,7 @@ public.clear_section_override(p_enrollment_id uuid, p_section_id uuid) 1c58e286a
 public.close_phone_report(p_id uuid, p_idempotency_key uuid) c48bba0c9b0518a6cd962482ea8dde47 1077
 public.confirm_quiz(p_assessment_id uuid, p_marks jsonb, p_idempotency_key uuid) ee23f2910b1484f18a41ea76b08f0846 6061
 public.course_draft_count(p_course_id uuid) 65c23f8cbce58587ebd640c7f40e1e89 489
-public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) 2852ea5862f02785711a2d8125b5fadf 2322
+public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean, p_students_see_factored boolean) c8389c88180a9e4d4f36200b5ff94270 2434
 public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) 4ff682abea55af06136dfdfca5dc9a59 1972
 public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) 2a6b7a84af01bede93f1c4459f8f3720 755
 public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) e5bdcd077bf2b437eb5e02ac7a8ab01c 2346
@@ -169,7 +169,7 @@ public.delete_subject(p_id uuid) 507635467c25f6756ddd01010fdcc5a8 319
 public.delete_submission(p_submission_id uuid, p_idempotency_key uuid) c1f98e77a7fb756e75af4334d520f5fc 1712
 public.delete_tag(p_id uuid) 47f70892bd70be92dafe0e8c7a6488de 311
 public.delete_withdrawn_student(p_enrollment_id uuid, p_idempotency_key uuid) ad4c98f316f4f41f7ac7eec80f1c0093 2120
-public.duplicate_assessment(p_src_id uuid, p_idempotency_key uuid) 91fb43611f5a93739c32e2ee8cbcc7d2 1882
+public.duplicate_assessment(p_src_id uuid, p_idempotency_key uuid) 3797369592647effba25aaedaa9f18d6 1928
 public.duplicate_course(p_src_id uuid, p_idempotency_key uuid) 9a3ed29e3a739e2f57704446cbdf1674 6719
 public.edit_bulletin(p_bulletin_id uuid, p_patch jsonb, p_idempotency_key uuid) 5583fb3f7d1191e57e439870646ba6e7 1919
 public.fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer, p_modifier smallint) 59c53fb566c6d47fbf0030586a18113c 837
@@ -197,9 +197,9 @@ public.fv_retention_cleanup() a8da46d6664ba5956f4215ba3b2ada39 2099
 public.fv_section_proficiency(p_enrollment_id uuid, p_section_id uuid) 7712c1ae1c2588c3453fee863dd7dba0 212
 public.fv_status_counts(p_enrollment_id uuid, p_course_id uuid) 099ffee42b63f7a6ff8f9aca37402e79 1279
 public.get_assessment_detail(p_assessment_id uuid) 55d1f49f14d78a713eebadfd20417afa 4731
-public.get_class_bundle(p_course_id uuid, p_if_version bigint) ed59fcd4ef9bc85c6e5bcc24c3fdd608 23204
+public.get_class_bundle(p_course_id uuid, p_if_version bigint) c3f21f882ec87368e9584976bc5ca122 23279
 public.get_class_dashboard(p_course_id uuid) 24c3e969c92abb6390a1f42289bdd51c 8296
-public.get_gradebook(p_course_id uuid) 08d83934dcacbf14ddfce6ec6cf9068b 6898
+public.get_gradebook(p_course_id uuid) 0ca28a1e62ef28fd30e9312e61346041 6963
 public.get_learning_map(p_course_id uuid) 151c16b70a6f7e70a87985463c62123d 4620
 public.get_observations(p_course_id uuid, p_filters jsonb, p_page integer, p_page_size integer) 184fc8e045969e593ea641901bf2f0c3 8073
 public.get_report(p_enrollment_id uuid, p_term integer) c2cc106a10d89c23d210c51864db20e2 8552
@@ -307,7 +307,7 @@ public.submit_support_report(p_page text, p_message text, p_browser text, p_app_
 public.toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean) 3bc4a853c8039ee2ccdad330ba528f18 747
 public.unlock_all_student_cards(p_course_id uuid, p_idempotency_key uuid) 59d2299ae9fe06b7e1015693ba0fa256 1080
 public.unlock_student_card(p_card_id uuid, p_idempotency_key uuid) dcd1eff29a4eff0597c788ae1e940551 901
-public.update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[]) c48044d5e0d902e3e5a6fef63cb74049 3471
+public.update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[]) a80a08dff47da5ab3db72a0bff254691 3948
 public.update_course(p_course_id uuid, p_patch jsonb) 3d391cf6046f55d0079dcf8b6bb590b1 4176
 public.update_enrollment(p_id uuid, p_patch jsonb) 3cfcb3dd88253a54a5fc5b65a749ac82 1249
 public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[]) 4c6a5e1a6a507e6f525d4faa2f9e1902 2361
@@ -385,7 +385,7 @@ student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p
 student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) fa4006097230b4d5102ea63e84296448 8623
 student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) 2296aefc4e38f67aad5722a2637c2fb4 2297
 student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) 1b0862066e6d8c546f3944f12248be26 11393
-student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 9e16e8aaa8f1379beca4f64d4111fa1d 14821
+student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 4a255085ecbe97a940225744f4153ce4 14898
 student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) 0746b4af4f1cadd75b86cc20f49931d3 4989
 student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 51453e03b4293ff17eb598ab653dc0f2 2203
 student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) 106de8942ce40ccc9d51c35d2e4e328a 4655

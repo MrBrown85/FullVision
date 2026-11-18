@@ -277,6 +277,7 @@ create table assessment (
   group_work     text        not null default 'each',               -- each | group. Stored only; one submission for a group is Batch C
   students_see_markup boolean not null default true,                -- Stored only; Mark Up is Batch C
   is_draft       boolean     not null default false,                -- a Draft: the teacher's alone, nothing of it on the student page until assigned; back to a Draft only with no student result or work (trigger assessment_draft_guard, refuses 'draft_has_work' P0001) (2026111701_assessment_drafts; not applied when this was written)
+  students_see_factored boolean not null default false,             -- points work: students see the score times the Factor (20 / 24 for 5 / 6 at 4x); display only (2026111808_factored_score, applied Nov 18)
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()

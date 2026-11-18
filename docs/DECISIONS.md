@@ -251,6 +251,15 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
 
+### The factored score (2026-11-18)
+
+Teachers asked to show students the score with its Factor: an assignment out of 6 at Factor 4× shown as 20 / 24. Colin chose the design on Nov 18.
+
+- **The score as entered stays the only score.** The teacher grades out of the Max Points (5 / 6); the factored score is worked out for display only (`factoredPoints` in `constants.js`, beside `formatPoints`) and nothing about the course % changes. The percent is the same either way.
+- **The grader shows it beside each score box**, read-only: "= 20 / 24", on points work whose Factor isn't 1×. The gradebook cell is unchanged.
+- **Students see it only when the teacher says so**: Show Students the Factored Score, a switch under the share bar on the assessment form, per assessment, off by default (`assessment.students_see_factored`). It is on the form only for points work at a Factor other than 1×. With it on, the student's result reads "20 / 24" with the same percent and bar; nothing else is added.
+- Linked copies take it like the Factor; Duplicate copies it. A restored backup or a Teams import starts with it off.
+
 ## Rubric criteria score on their own (2026-10-29)
 
 Colin: "when I click on Proficient for the first criterion, it automatically sets the next as the same thing." Rubric scores were kept on the client under each criterion's competencies, so two criteria on one competency (Reading Questions 1 and 2, both on CI) shared one slot: scoring one scored the other, and only the last one scored reached the server. Twelve of Colin's rubrics have criteria that share a competency.
