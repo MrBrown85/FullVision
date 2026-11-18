@@ -458,7 +458,7 @@ describe('bulletins: the routes copy exactly the keys the SQL builds', () => {
   });
 });
 
-/* Quizzes (migrations/2026111806_quizzes_student.sql, not applied yet; the
+/* Quizzes (migrations/2026111806_quizzes_student.sql, applied Nov 18; the
    routes are supabase/functions/student-submit/quiz-routes.ts). The same two
    checks: the lists the routes copy are the keys the SQL builds, level by
    level, and a reply holding every one of them and a made-up key beside each

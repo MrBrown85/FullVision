@@ -13027,6 +13027,74 @@ AS $function$
      where c.id = p_code_id
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit._quiz_new_order(p_assessment_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+    -- Every active question, shuffled when the quiz says so, else in position order; each choice question's
+    -- choices, shuffled when the quiz says so, else in the teacher's order. Made once, when a try starts.
+    select jsonb_build_object(
+        'questions', coalesce((select jsonb_agg(x.id order by case when z.shuffle_questions then random() end, x.position, x.id)
+                                 from quiz_question x where x.assessment_id = z.assessment_id and x.archived_at is null), '[]'::jsonb),
+        'choices', coalesce((select jsonb_object_agg(x.id::text,
+                                        (select jsonb_agg(e->'id' order by case when z.shuffle_choices then random() end, t)
+                                           from jsonb_array_elements(x.choices) with ordinality c(e, t)))
+                               from quiz_question x
+                              where x.assessment_id = z.assessment_id and x.archived_at is null and x.kind = 'choice'), '{}'::jsonb))
+      from quiz z where z.assessment_id = p_assessment_id;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit._quiz_questions(p_assessment_id uuid, p_order jsonb)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+    -- The active questions in this order: those it names, as it names them, then any added since, by position;
+    -- within a question the choices it names, then any added since, in the teacher's order. Numbered 1, 2, ...
+    -- Only what a student may see: no key, no competency, no position, nothing archived.
+    with q as (
+        select x.id, x.position, x.kind, x.prompt, x.points, x.multiple, x.choices,
+               (select min(o.n) from jsonb_array_elements_text(p_order->'questions') with ordinality o(id, n)
+                 where o.id = x.id::text collate "C") as n
+          from quiz_question x where x.assessment_id = p_assessment_id and x.archived_at is null),
+    k as (select q.*, row_number() over (order by q.n nulls last, q.position, q.id) as num from q)
+    select coalesce(jsonb_agg(jsonb_build_object(
+               'id', k.id, 'number', k.num, 'kind', k.kind, 'prompt', k.prompt, 'points', k.points, 'multiple', k.multiple,
+               'choices', (select jsonb_agg(jsonb_build_object('id', e->'id', 'text', e->'text')
+                                            order by (select min(o.n) from jsonb_array_elements_text(p_order->'choices'->(k.id::text))
+                                                                      with ordinality o(id, n) where o.id = (e->>'id') collate "C") nulls last, t)
+                             from jsonb_array_elements(k.choices) with ordinality c(e, t)))
+               order by k.num), '[]'::jsonb)
+      from k;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit._quiz_window(p_assessment_id uuid, p_course_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+    -- The piece as a quiz this class's students may open, or null: in this class, listed today in the
+    -- class's time zone (not a Draft, assigned), not DIBELS, not a pair or group piece (save_quiz refuses
+    -- those, but the teacher may switch a quiz's piece to Pairs or Groups after), with a quiz. Open and
+    -- closed are read as _work_window reads Student Work's, from the quiz's own after_due and accept_until.
+    select jsonb_build_object(
+               'tries', z.tries,
+               'open', case z.after_due when 'until' then d.today <= z.accept_until
+                                        when 'stop' then a.due_date is null or d.today <= a.due_date
+                                        else true end,
+               'closes_on', case z.after_due when 'until' then z.accept_until when 'stop' then a.due_date end)
+      from assessment a
+      join course c on c.id = a.course_id
+      join quiz z on z.assessment_id = a.id
+     cross join lateral (select (now() at time zone public._fv_timezone(c.timezone))::date as today) d
+     where a.id = p_assessment_id and a.course_id = p_course_id and a.score_mode <> 'dibels'
+       and a.collab_mode = 'none' and student_submit._listed(a, d.today);
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid)
  RETURNS jsonb
  LANGUAGE sql
@@ -14955,6 +15023,221 @@ begin
                                 order by subj.display_order, subj.name)
                          from subject subj where subj.course_id = _course.id), '[]'::jsonb)))
            else '{}'::jsonb end;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _s    jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _w    jsonb;
+    _t    quiz_attempt%rowtype;
+    _open boolean;
+    _ord  int;
+    _all  int;
+    _left int;
+    _no   jsonb;
+begin
+    if _s ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _s->>'error');
+    end if;
+    -- Locks, in the contract's order: the piece for share (an Unassign waits for a try made here, or this sees
+    -- the Draft), the quiz for key share, then the student's tries.
+    perform 1 from assessment a where a.id = p_assessment_id and a.course_id = (_s->>'course_id')::uuid for share;
+    perform 1 from quiz z where z.assessment_id = p_assessment_id
+       and exists (select 1 from assessment a where a.id = z.assessment_id and a.course_id = (_s->>'course_id')::uuid) for key share;
+    _w := student_submit._quiz_window(p_assessment_id, (_s->>'course_id')::uuid);
+    if _w is null then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    perform pg_advisory_xact_lock(hashtext('fv.quiz'), hashtext(p_assessment_id::text || ':' || p_enrollment_id::text));
+    _open := (_w->>'open')::boolean;
+    select count(*) filter (where t.reopened_at is null), count(*) into _ord, _all
+      from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id;
+    select * into _t from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id and t.sent_at is null;
+    if _t.id is not null and _t.question_order is null then
+        -- A try the teacher's Reopen made: it starts now, in an order of its own.
+        _no := student_submit._write_limit((_s->>'card_id')::uuid, 'quiz', 600);
+        if _no is not null then
+            return _no;
+        end if;
+        update quiz_attempt set question_order = student_submit._quiz_new_order(p_assessment_id), started_at = now()
+         where id = _t.id returning * into _t;
+    elsif _t.id is null and (_all = 0 or p_new_try) then
+        _left := case when (_w->>'tries')::int = 0 then null else greatest((_w->>'tries')::int - _ord, 0) end;
+        if _open and (_left is null or _left > 0) then
+            _no := student_submit._write_limit((_s->>'card_id')::uuid, 'quiz', 600);
+            if _no is not null then
+                return _no;
+            end if;
+            insert into quiz_attempt (assessment_id, enrollment_id, try, question_order, started_at)
+            values (p_assessment_id, p_enrollment_id,
+                    coalesce((select max(t.try) from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id), 0) + 1,
+                    student_submit._quiz_new_order(p_assessment_id), now())
+            returning * into _t;
+            _ord := _ord + 1;
+        elsif p_new_try then
+            return jsonb_build_object('ok', false, 'error', case when _open then 'no_tries_left' else 'quiz_closed' end);
+        end if;
+    end if;
+    -- With no open try, the latest sent one.
+    if _t.id is null then
+        select * into _t from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id
+           and t.sent_at is not null order by t.try desc limit 1;
+    end if;
+    _left := case when (_w->>'tries')::int = 0 then null else greatest((_w->>'tries')::int - _ord, 0) end;
+    return jsonb_build_object(
+        'ok', true,
+        'quiz', jsonb_build_object('tries', _w->'tries', 'tries_left', _left, 'closed', not _open, 'closes_on', _w->'closes_on'),
+        'try', case when _t.id is not null then jsonb_build_object(
+                   'number', _t.try, 'sent', _t.sent_at is not null, 'started_at', _t.started_at, 'sent_at', _t.sent_at,
+                   'reopened', _t.reopened_at is not null) end,
+        'sent_tries', (select count(*) from quiz_attempt t
+                        where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id and t.sent_at is not null),
+        'can_answer', _t.id is not null and _t.sent_at is null and (_t.reopened_at is not null or _open),
+        'can_try_again', (_t.id is null or _t.sent_at is not null) and _open and (_left is null or _left > 0),
+        'questions', case when _t.id is null then '[]'::jsonb else student_submit._quiz_questions(p_assessment_id, _t.question_order) end,
+        -- This try's own answers, to the questions it shows.
+        'answers', coalesce((select jsonb_object_agg(a.question_id::text, a.answer)
+                               from quiz_answer a join quiz_question x on x.id = a.question_id and x.archived_at is null
+                              where a.attempt_id = _t.id), '{}'::jsonb));
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _s  jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _w  jsonb;
+    _t  quiz_attempt%rowtype;
+    _q  quiz_question%rowtype;
+    _a  jsonb;
+    _at timestamptz;
+    _no jsonb;
+begin
+    if _s ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _s->>'error');
+    end if;
+    -- The quiz for key share before an answer is written: a question cannot be deleted under it.
+    perform 1 from quiz z where z.assessment_id = p_assessment_id
+       and exists (select 1 from assessment a where a.id = z.assessment_id and a.course_id = (_s->>'course_id')::uuid) for key share;
+    _w := student_submit._quiz_window(p_assessment_id, (_s->>'course_id')::uuid);
+    if _w is null then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    perform pg_advisory_xact_lock(hashtext('fv.quiz'), hashtext(p_assessment_id::text || ':' || p_enrollment_id::text));
+    select * into _t from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id and t.sent_at is null;
+    if _t.id is null or _t.started_at is null then
+        return jsonb_build_object('ok', false, 'error',
+            case when exists (select 1 from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id
+                                 and t.sent_at is not null) then 'sent' else 'not_found' end);
+    end if;
+    if _t.reopened_at is null and not (_w->>'open')::boolean then
+        return jsonb_build_object('ok', false, 'error', 'quiz_closed');
+    end if;
+    select * into _q from quiz_question x where x.id = p_question_id and x.assessment_id = p_assessment_id and x.archived_at is null;
+    if not found then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    -- The raw answer's shape for the question's kind; anything else is bad_answer. Null clears it.
+    if p_answer is not null and jsonb_typeof(p_answer) <> 'null' then
+        if _q.kind = 'choice' then
+            if jsonb_typeof(p_answer) = 'array' then
+                if jsonb_array_length(p_answer) between 1 and (case when _q.multiple then 20 else 1 end)
+                   and not exists (select 1 from jsonb_array_elements(p_answer) r
+                                    where not exists (select 1 from jsonb_array_elements(_q.choices) c where c->'id' = r))
+                   and (select count(distinct r) from jsonb_array_elements(p_answer) r) = jsonb_array_length(p_answer) then
+                    select jsonb_agg(r order by (r #>> '{}') collate "C") into _a from jsonb_array_elements(p_answer) r;
+                end if;
+            end if;
+        elsif _q.kind = 'true_false' then
+            if jsonb_typeof(p_answer) = 'boolean' then
+                _a := p_answer;
+            end if;
+        elsif _q.kind = 'number' then
+            if jsonb_typeof(p_answer) = 'number' then
+                if abs((p_answer #>> '{}')::numeric) <= 1e12 then
+                    _a := p_answer;
+                end if;
+            end if;
+        elsif jsonb_typeof(p_answer) = 'string' then
+            -- White space at either end trimmed (ASCII's, the same under every collation).
+            _a := to_jsonb(regexp_replace((p_answer #>> '{}') collate "C", '^[[:space:]]+|[[:space:]]+$', '', 'g'));
+            if char_length(_a #>> '{}') not between 1 and 5000 then
+                _a := null;
+            end if;
+        end if;
+        if _a is null then
+            return jsonb_build_object('ok', false, 'error', 'bad_answer', 'question_id', _q.id);
+        end if;
+    end if;
+    _no := student_submit._write_limit((_s->>'card_id')::uuid, 'quiz', 600);
+    if _no is not null then
+        return _no;
+    end if;
+    if _a is null then
+        delete from quiz_answer where attempt_id = _t.id and question_id = _q.id;
+        _at := clock_timestamp();
+    else
+        insert into quiz_answer (attempt_id, question_id, assessment_id, answer, saved_at)
+        values (_t.id, _q.id, p_assessment_id, _a, clock_timestamp())
+        on conflict (attempt_id, question_id) do update
+            set answer = excluded.answer, saved_at = excluded.saved_at, given_points = null, note = null
+        returning saved_at into _at;
+    end if;
+    return jsonb_build_object('ok', true, 'question_id', _q.id, 'saved_at', _at);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _s    jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _w    jsonb;
+    _t    quiz_attempt%rowtype;
+    _left int;
+    _no   jsonb;
+begin
+    if _s ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _s->>'error');
+    end if;
+    perform 1 from quiz z where z.assessment_id = p_assessment_id
+       and exists (select 1 from assessment a where a.id = z.assessment_id and a.course_id = (_s->>'course_id')::uuid) for key share;
+    _w := student_submit._quiz_window(p_assessment_id, (_s->>'course_id')::uuid);
+    if _w is null then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    perform pg_advisory_xact_lock(hashtext('fv.quiz'), hashtext(p_assessment_id::text || ':' || p_enrollment_id::text));
+    select * into _t from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id and t.sent_at is null;
+    if _t.id is null or _t.started_at is null then
+        return jsonb_build_object('ok', false, 'error',
+            case when exists (select 1 from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id
+                                 and t.sent_at is not null) then 'sent' else 'not_found' end);
+    end if;
+    if _t.reopened_at is null and not (_w->>'open')::boolean then
+        return jsonb_build_object('ok', false, 'error', 'quiz_closed');
+    end if;
+    _no := student_submit._write_limit((_s->>'card_id')::uuid, 'quiz', 600);
+    if _no is not null then
+        return _no;
+    end if;
+    update quiz_attempt set sent_at = clock_timestamp() where id = _t.id returning * into _t;
+    select case when (_w->>'tries')::int = 0 then null else greatest((_w->>'tries')::int - count(*), 0) end into _left
+      from quiz_attempt t where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id and t.reopened_at is null;
+    return jsonb_build_object('ok', true, 'try', _t.try, 'sent_at', _t.sent_at, 'tries_left', _left,
+                              'can_try_again', (_w->>'open')::boolean and (_left is null or _left > 0));
 end;
 $function$;
 

@@ -1,4 +1,4 @@
--- Quizzes, MQ2: the student's side (2026-11-18). NOT APPLIED.
+-- Quizzes, MQ2: the student's side (2026-11-18). APPLIED Nov 18 2026 (as quizzes_student).
 --
 -- THIS FILE CHANGES ONE EXISTING THING: the check constraint on
 -- student_submit.write_log.kind gains the word 'quiz' (dropped and added
