@@ -287,14 +287,16 @@ describe('in Demo Mode', () => {
     expect(toasts.filter(t => /quiz/i.test(t))).toEqual([]);
   });
 
-  it('a class whose Student Page is off is told the quiz did not come along', async () => {
+  it('a class that can’t take quizzes is told the quiz did not come along', async () => {
     giveQuiz();
     setStudentPageSwitch(DST, false);
     expect(getCourseConfig(DST).student_page_enabled).toBeFalsy();
     const copy = await copyToDst();
     expect(QuizData.get(DST, copy.id)).toBeNull();
     expect(localStorage.getItem('gb-quizzes-' + DST)).toBeNull();
-    expect(toasts.some(t => /did not come along because the Student Page is off in Science 8 B/.test(t))).toBe(true);
+    expect(toasts.some(t => /did not come along because Science 8 B can’t take quizzes right now\./.test(t))).toBe(
+      true,
+    );
   });
 
   it('no tries or answers are read or written: the other class holds only the quiz and its key', async () => {

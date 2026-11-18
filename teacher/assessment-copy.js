@@ -354,7 +354,7 @@ window.AssessmentCopy = (function () {
       results.forEach(function (r, i) {
         var name = runs[i].dstName;
         if (!r) return;
-        if (r.notOffered) said.push('The quiz did not come along because the Student Page is off in ' + name + '.');
+        if (r.notOffered) said.push('The quiz did not come along because ' + name + ' can’t take quizzes right now.');
         else if (r.unmatched === 1)
           said.push(
             '1 quiz question is set to Counts Toward No Competency in ' +
