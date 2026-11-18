@@ -97,7 +97,7 @@
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   border-radius: 8px;
   font-family: var(--font-mono);
@@ -1694,7 +1694,7 @@ th.gb-group-alt {
 .gb-ctx-item:hover,
 .gb-ctx-item:focus {
   outline: none;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .gb-ctx-item.is-disabled,
@@ -1834,7 +1834,7 @@ th.gb-group-alt {
   padding: 6px 14px;
   border: none;
   border-radius: var(--radius-xs);
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   cursor: pointer;
 }
@@ -2079,7 +2079,7 @@ th.gb-group-alt {
   padding: 3px 6px;
   border: none;
   border-radius: 11px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-family: var(--font-base);
   font-size: var(--text-xs);

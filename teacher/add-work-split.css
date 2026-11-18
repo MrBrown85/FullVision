@@ -100,7 +100,7 @@
 }
 .aws-primary {
   border: 0;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
 }
 .aws-overlay button:disabled,
@@ -743,7 +743,7 @@
   margin: 6px 8px 0;
   padding: 6px 10px;
   border-radius: 8px;
-  background: var(--active);
+  background: var(--active-fill);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
