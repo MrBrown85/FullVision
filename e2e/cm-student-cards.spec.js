@@ -105,7 +105,6 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
     'Student',
     'Card',
     'Status',
-    'Feedback Opened',
     'Work Sent',
     'Overall Grade',
     '',
@@ -456,7 +455,6 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   // The Students list's own filters come after All (e2e/student-page-options.spec.js has them).
   await expect(filters.getByRole('radio')).toHaveText([
     'All ' + at.count,
-    /^Feedback Not Opened \d+$/,
     'Exceptions 0',
     'Not Printed ' + at.count,
     'Locked 0',
@@ -480,7 +478,6 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await page.goto('/dashboard?manage=student-page');
   await expect(filters.getByRole('radio')).toHaveText([
     'All ' + at.count,
-    /^Feedback Not Opened \d+$/,
     'Exceptions 0',
     'Not Printed 0',
     'Locked 1',

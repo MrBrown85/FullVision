@@ -36,6 +36,8 @@ window.PreviewStudent = (function () {
   var _onLeave = null;
 
   var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
+  // What a student reads when their card does not open their page (s/student.js, card_closed).
+  var CLOSED_LINE = 'The student page is turned off for this class. Ask your teacher.';
 
   /* The view the device draws. Opened by See What They'd See (S13-F1),
      My Learning is worked out as if the class showed it, for this preview
@@ -184,10 +186,13 @@ window.PreviewStudent = (function () {
     var first = displayNameFirst(st) || 'The student';
     var full = displayNameWithLast(st) || first;
     var built = _fromCache(cid, sid);
-    var screen = built.ready
-      ? drawPage(built.view, _open.ui)
-      : // html-safe: fixed markup
-        '<div class="ps-waiting" role="status">Loading this class…</div>';
+    // A paused student's card opens nothing: the phone shows what the student reads (s/student.js, card_closed).
+    var screen = _pausedFor(cid, sid)
+      ? '<div class="ps-closed" role="status"><p class="ps-closed-line">' + esc(CLOSED_LINE) + '</p></div>'
+      : built.ready
+        ? drawPage(built.view, _open.ui)
+        : // html-safe: fixed markup
+          '<div class="ps-waiting" role="status">Loading this class…</div>';
     var device = _open.device;
     var seg = ['phone', 'chromebook']
       .map(function (d) {

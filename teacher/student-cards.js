@@ -726,7 +726,7 @@ var StudentCards = (function () {
   /* Print New Cards for the students ticked on the list (the Students
      list's bar): asks first, then one press for just those students, each
      card in place of the one the list shows for them. */
-  function printNewCards(cid, ids) {
+  function printNewCards(cid, ids, onYes) {
     var st = _st(cid);
     if (st.making || st.loading || st.cards === null) return;
     var byStudent = _byStudent(st.cards);
@@ -747,13 +747,18 @@ var StudentCards = (function () {
       return !!it.replaces;
     }).length;
     _ask(cid, newCardsQuestion(stop, asked.length - stop), function () {
+      if (onYes) onYes();
       _makeAndPrint(cid, asked, true);
     });
   }
 
-  // Show one filter (the line under Show Overall Grade shows Exceptions).
+  /* Show one filter (the line under Show Overall Grade shows Exceptions).
+     A different filter clears the Students list's ticks, so its bar acts only
+     on students the teacher can see. */
   function setFilter(cid, value) {
-    _st(cid).filter = value;
+    var st = _st(cid);
+    if (st.filter !== value && _sps()) _sps().clearPicked(cid);
+    st.filter = value;
   }
 
   // Print the held codes again. Returns how many were printed.
@@ -1298,7 +1303,7 @@ var StudentCards = (function () {
       '<div class="cm-hint">' +
       esc(
         sps
-          ? 'Each student’s card, what they’ve opened, and what their page shows. They scan their card, or type its code, to open their page.'
+          ? 'Each student’s card, the work they’ve sent, and what their page shows. They scan their card, or type its code, to open their page.'
           : 'One card for each student. They scan it, or type its code, to open their page.',
       ) +
       '</div></div>' +
@@ -1465,7 +1470,7 @@ var StudentCards = (function () {
     }
     if (action === 'spCardsFilter') {
       if (cid && data.value) {
-        _st(cid).filter = data.value;
+        setFilter(cid, data.value);
         _rerender();
         // The redraw makes the chosen filter a new button: the focus goes back to it.
         _focus('.sc-filters [data-value="' + data.value + '"]');

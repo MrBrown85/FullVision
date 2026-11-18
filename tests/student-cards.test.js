@@ -681,7 +681,6 @@ describe('the list in Class Settings › Student Page', () => {
       'Student',
       'Card',
       'Status',
-      'Feedback Opened',
       'Work Sent',
       'Overall Grade',
       '',
@@ -2819,10 +2818,9 @@ describe('the filters', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(box.querySelector('.sc-filters').getAttribute('role')).toBe('radiogroup');
       expect(box.querySelector('.sc-filters').getAttribute('aria-label')).toBe('Show');
-      // The Students list's Feedback Not Opened comes after All (tests/student-page-students.test.js has the rest).
+      // The Students list's own filters are tests/student-page-students.test.js'.
       expect(filtersOf(box)).toEqual([
         ['All 5', 'true'],
-        ['Feedback Not Opened 0', 'false'],
         ['Not Printed 2', 'false'],
         ['Locked 1', 'false'],
         ['Never Opened 2', 'false'],
@@ -2830,7 +2828,6 @@ describe('the filters', () => {
       // Chips coloured by meaning: Not Printed amber, Locked red; one with nobody in it is not coloured.
       expect(Array.from(box.querySelectorAll('.sc-chip')).map(b => b.className)).toEqual([
         'sc-chip active',
-        'sc-chip',
         'sc-chip sc-chip-warn',
         'sc-chip sc-chip-alert',
         'sc-chip',

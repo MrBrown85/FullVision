@@ -22,7 +22,7 @@ No reason is stored for either (privacy: a reason would hold sensitive notes).
 
 - `student_submit._card_refusal(card)`: a paused enrollment is refused as `'closed'`, the code a class with its page off already gets. Every card scan (`_card_lookup`) and every session route (`_session_class`, and `_send_session` through it) goes through this one function, so a pause takes effect on the next call, mid-session too. The student reads "The student page is turned off for this class. Ask your teacher." No edge function or student page change: `closed` is already in both whitelists.
 - `student_submit._session_classes(session)`: leaves out a paused enrollment, as it leaves out a class whose page is off.
-- `student_submit.page` and `student_submit.feedback`: everywhere they read `_course.show_my_learning`, they read the student's effective value instead, `coalesce(enrollment.show_overall_grade, course.show_my_learning)`. The key sent stays `show_my_learning`. Hidden means the grade's inputs never leave the database for that student; each piece's result and feedback still go, as with the class switch off.
+- `student_submit.page` and `student_submit.feedback`: everywhere they read `_course.show_my_learning`, they read the student's effective value instead, `coalesce(enrollment.show_overall_grade, course.show_my_learning)`. The key sent stays `show_my_learning`. Hide sends exactly what the class switch off sends: the overall grade is not sent (no My Learning block, no piece's `category_id`); each piece's result, `weight` and `category_percent` still go, as they do today with the class switch off.
 
 ### Teacher RPCs (new)
 
@@ -30,9 +30,10 @@ No reason is stored for either (privacy: a reason would hold sensitive notes).
 
 - `p_show_overall_grade`: `'class'` (null), `'show'` (true), `'hide'` (false), or null for no change.
 - `p_paused`: true pauses (sets `page_paused_at` to now() when not already set), false opens (clears it), null for no change.
-- Refuses with nothing changed: a class the caller does not own, an id not an active enrollment of that class, more than 500 ids, no ids, both changes null, an unknown `p_show_overall_grade`.
+- An id that is not an active enrollment of that class (withdrawn, gone, or another class's) is skipped: nothing changes for it, and it comes back in `skipped`, which says nothing more about it.
+- Refuses with nothing changed: a class the caller does not own, no ids, a null id, more than 500 ids, both changes null, an unknown `p_show_overall_grade`, or no id left once the skipped ones are taken out.
 - Idempotent through `fv_idem_check` (a repeat with the same key returns the first answer).
-- Returns `{ ok: true, options: [{ enrollment_id, show_overall_grade, paused_at }] }` for the ids given.
+- Returns `{ ok: true, options: [{ enrollment_id, show_overall_grade, paused_at }], skipped: [enrollment_id] }`: `options` for the active students given (in class-list order), `skipped` for the rest (in the order given). `show_overall_grade` is the word, `'class'`, `'show'` or `'hide'`; `paused_at` is the time or null.
 
 `list_student_page_options(p_course_id uuid) returns jsonb`
 

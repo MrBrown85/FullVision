@@ -12,8 +12,9 @@
  *   key, shown at once; a refusal (a raised error) puts it back.
  * - The effective Show Overall Grade: the student's own Show or Hide, else
  *   the class's switch; Preview's StudentView.learningOn(cid, sid) reads it.
- * - The list: Feedback Opened, Work Sent and Overall Grade; the filters
- *   Feedback Not Opened, Questions and Exceptions with their counts; the
+ * - The list: Work Sent and Overall Grade; the filters Questions and
+ *   Exceptions with their counts. Feedback Opened and Feedback Not Opened
+ *   are off until Colin rules (TEACHER_SEES_OPENED), their counting kept; the
  *   exceptions line; the bar; the side panel; a toast with Undo; every name
  *   through esc().
  */
@@ -153,6 +154,33 @@ describe('the options on this device (Demo Mode)', () => {
     expect(Object.keys(getStudentPageOptions(CID))).toEqual(['s2']);
   });
 
+  it('Reset Demo Data and deleting the class take the options with them', async () => {
+    await setStudentPageOptions(CID, ['s1'], { show_overall_grade: 'hide' }, KEY());
+    expect(localStorage.getItem('gb-student-page-options-' + CID)).not.toBe(null);
+    _clearCourseLocalState(CID);
+    expect(localStorage.getItem('gb-student-page-options-' + CID)).toBe(null);
+    expect(getStudentPageOptions(CID)).toEqual({});
+  });
+
+  it('Preview as a paused student shows what their card shows, not their page', async () => {
+    const stub = globalThis.document;
+    const doc = parseHTML('<!doctype html><html><body></body></html>').document;
+    globalThis.document = doc;
+    try {
+      await setStudentPageOptions(CID, ['s3'], { paused: true }, KEY());
+      expect(PreviewStudent.open(CID, 's3', null)).toBe(true);
+      const screen = doc.querySelector('#preview-student .ps-screen');
+      expect(text(screen)).toBe('The student page is turned off for this class. Ask your teacher.');
+      expect(screen.querySelector('.sp-tabs-bottom')).toBe(null);
+      PreviewStudent.close();
+      expect(PreviewStudent.open(CID, 's2', null)).toBe(true);
+      expect(text(doc.querySelector('#preview-student .ps-screen'))).not.toContain('turned off');
+      PreviewStudent.close();
+    } finally {
+      globalThis.document = stub;
+    }
+  });
+
   it('the effective Show Overall Grade: the student’s own, else the class’s, and Preview reads it', async () => {
     await setStudentPageOptions(CID, ['s1'], { show_overall_grade: 'show' }, KEY());
     await setStudentPageOptions(CID, ['s2'], { show_overall_grade: 'hide' }, KEY());
@@ -278,6 +306,40 @@ describe('signed in', () => {
     expect(getStudentPageOptions(REAL)[S[2]].paused_at).toBe('2026-11-17T21:00:00Z');
   });
 
+  it('a list read begun before a change is dropped: it cannot put the change back', async () => {
+    session.fake.on('list_student_page_options', () => ({ data: { ok: true, options: [] }, error: null }));
+    await loadStudentPageOptions(REAL);
+    let stale;
+    session.fake.on('list_student_page_options', () => new Promise(r => (stale = r)));
+    const reading = loadStudentPageOptions(REAL, true);
+    session.fake.on('set_student_page_options', () => ({
+      data: { ok: true, options: [{ enrollment_id: S[0], show_overall_grade: 'hide', paused_at: null }], skipped: [] },
+      error: null,
+    }));
+    await setStudentPageOptions(REAL, [S[0]], { show_overall_grade: 'hide' }, KEY());
+    await settle();
+    stale({ data: { ok: true, options: [] }, error: null });
+    await reading;
+    expect(getStudentPageOptions(REAL)).toEqual({ [S[0]]: { show_overall_grade: 'hide', paused_at: null } });
+  });
+
+  it('students the server skipped show what the server has, and the rest are changed', async () => {
+    session.fake.on('list_student_page_options', () => ({ data: { ok: true, options: [] }, error: null }));
+    await loadStudentPageOptions(REAL);
+    session.fake.on('set_student_page_options', () => ({
+      data: {
+        ok: true,
+        options: [{ enrollment_id: S[0], show_overall_grade: 'hide', paused_at: null }],
+        skipped: [S[1]],
+      },
+      error: null,
+    }));
+    const out = await setStudentPageOptions(REAL, [S[0], S[1]], { show_overall_grade: 'hide' }, KEY());
+    expect(out.ok).toBe(true);
+    expect(out.skipped).toEqual([S[1]]);
+    expect(getStudentPageOptions(REAL)).toEqual({ [S[0]]: { show_overall_grade: 'hide', paused_at: null } });
+  });
+
   it('refused (a raised error): what is shown goes back to the server’s', async () => {
     session.fake.on('list_student_page_options', () => ({
       data: { ok: true, options: [{ enrollment_id: S[0], show_overall_grade: 'show', paused_at: null }] },
@@ -295,27 +357,25 @@ describe('signed in', () => {
 });
 
 describe('the Students list', () => {
-  it('Feedback Opened, Work Sent and Overall Grade for each student', async () => {
+  it('Work Sent and Overall Grade for each student; nothing about what a student opened', async () => {
     const box = await list();
     expect([...box.querySelectorAll('.sc-table thead th')].map(text)).toEqual([
       '',
       'Student',
       'Card',
       'Status',
-      'Feedback Opened',
       'Work Sent',
       'Overall Grade',
       '',
     ]);
-    // Jordan opened one of two pieces back; Priya saw hers only before it came back; Liam has none.
-    expect(column(box, 4)).toEqual(['1 of 2', '0 of 1', 'None']);
-    expect(column(box, 5)).toEqual(['0', '0', '0']);
-    expect(column(box, 6)).toEqual(['Hidden · Class', 'Hidden · Class', 'Hidden · Class']);
+    expect(column(box, 4)).toEqual(['0', '0', '0']);
+    expect(column(box, 5)).toEqual(['Hidden · Class', 'Hidden · Class', 'Hidden · Class']);
+    expect(box.textContent).not.toMatch(/Feedback Opened|Feedback Not Opened|Not opened|what they’ve opened/);
     classShows(true);
     await setStudentPageOptions(CID, ['s1'], { show_overall_grade: 'hide' }, KEY());
     await setStudentPageOptions(CID, ['s3'], { paused: true }, KEY());
     const after = parse(StudentCards.render(CID));
-    expect(column(after, 6)).toEqual(['Hidden', 'Shown · Class', 'Page Paused']);
+    expect(column(after, 5)).toEqual(['Hidden', 'Shown · Class', 'Page Paused']);
     expect([...after.querySelectorAll('.sps-grade')].map(e => e.className)).toEqual([
       'sps-grade sps-grade-hidden',
       'sps-grade sps-grade-class',
@@ -323,22 +383,49 @@ describe('the Students list', () => {
     ]);
   });
 
-  it('the facts behind them: returned, opened, not opened newest first, work sent by piece with late', () => {
+  it('the facts behind them: returned, opened, not opened newest first, work sent by piece, late from the newest version', () => {
     const f = StudentPageStudents.factsOf(CID, 's1', [
-      { assessment_id: 'a1', version: 1, is_late: true },
-      { assessment_id: 'a1', version: 2, is_late: false },
-      { assessment_id: 'a2', version: 1, is_late: false },
+      { assessment_id: 'a1', version: 1, is_late: false },
+      { assessment_id: 'a1', version: 2, is_late: true },
+      { assessment_id: 'a2', version: 1, is_late: true },
+      { assessment_id: 'a2', version: 2, is_late: false },
     ]);
     expect([f.returned, f.opened, f.sent, f.late]).toEqual([2, 1, 2, 1]);
     expect(f.notOpened).toEqual([{ title: 'Quiz <b>1</b>', back: '2026-11-12T18:00:00.000Z' }]);
     expect(f.reflections).toBe(null);
   });
 
+  it('a Missing or Excused piece is never counted as returned or not opened', () => {
+    saveAssignmentStatuses(CID, { 's1:a2': 'EXC', 's2:a1': 'NS' });
+    expect(StudentPageStudents.factsOf(CID, 's1', []).returned).toBe(1);
+    expect(StudentPageStudents.factsOf(CID, 's1', []).notOpened).toEqual([]);
+    expect(StudentPageStudents.factsOf(CID, 's2', []).returned).toBe(0);
+  });
+
+  it('with TEACHER_SEES_OPENED on (for a later server change): Feedback Opened and Feedback Not Opened', async () => {
+    StudentPageStudents._setTeacherSeesOpened(true);
+    try {
+      let box = await list();
+      expect([...box.querySelectorAll('.sc-table thead th')].map(text)).toContain('Feedback Opened');
+      // Jordan opened one of two pieces back; Priya saw hers only before it came back; Liam has none.
+      expect(column(box, 4)).toEqual(['1 of 2', '0 of 1', 'None']);
+      expect(filtersOf(box)[1]).toEqual(['Feedback Not Opened 2', 'sc-chip sc-chip-info']);
+      StudentCards.setFilter(CID, 'not_opened');
+      box = parse(StudentCards.render(CID));
+      expect(column(box, 1)).toEqual(['Jordan Abel', 'Priya Byrne']);
+      const p = panel('s1');
+      expect(text(p.querySelector('.sps-facts'))).toContain('Feedback Opened1 of 2 returned pieces');
+      expect(text(p.querySelector('.sps-unopened'))).toBe('Not opened: Quiz <b>1</b>, back Nov 12');
+      expect(p.querySelector('.sps-unopened b')).toBe(null);
+    } finally {
+      StudentPageStudents._setTeacherSeesOpened(false);
+    }
+  });
+
   it('filters with counts, coloured only when they hold any; Exceptions narrows the list', async () => {
     let box = await list();
     expect(filtersOf(box)).toEqual([
       ['All 3', 'sc-chip active'],
-      ['Feedback Not Opened 2', 'sc-chip sc-chip-info'],
       ['Exceptions 0', 'sc-chip'],
       ['Not Printed 3', 'sc-chip sc-chip-warn'],
       ['Locked 0', 'sc-chip'],
@@ -348,10 +435,8 @@ describe('the Students list', () => {
     await setStudentPageOptions(CID, ['s3'], { paused: true }, KEY());
     StudentCards.setFilter(CID, 'exceptions');
     box = parse(StudentCards.render(CID));
-    expect(filtersOf(box)[2]).toEqual(['Exceptions 2', 'sc-chip sc-chip-warn active']);
+    expect(filtersOf(box)[1]).toEqual(['Exceptions 2', 'sc-chip sc-chip-warn active']);
     expect(column(box, 1)).toEqual(['Priya Byrne', 'Liam Chen']);
-    StudentCards.setFilter(CID, 'not_opened');
-    expect(column(parse(StudentCards.render(CID)), 1)).toEqual(['Jordan Abel', 'Priya Byrne']);
   });
 
   it('Questions shows with Reflect on Feedback on', async () => {
@@ -415,12 +500,27 @@ describe('the Students list', () => {
       expect(getStudentPageOptions(CID).s1.show_overall_grade).toBe('hide');
       expect(getStudentPageOptions(CID).s2.show_overall_grade).toBe('hide');
       expect(toasts.map(t => t.msg)).toEqual(['Overall grade hidden for 2 students.']);
+      // A second press changes nobody: no change, no toast, and the first Undo still works.
+      StudentPageStudents.handleAction('spStudentBulk', {
+        dataset: { value: 'hide' },
+        closest: () => ({ dataset: { cid: CID } }),
+      });
+      expect(toasts.length).toBe(1);
       toasts[0].undo();
       await settle();
       // Each back as it was: Jordan follows the class, Priya is shown.
       expect(getStudentPageOptions(CID)).toEqual({ s2: { show_overall_grade: 'show', paused_at: null } });
       StudentPageStudents.handleAction('spStudentClear', at(CID));
       expect(parse(StudentCards.render(CID)).querySelector('.sps-bar')).toBe(null);
+      // Another filter clears the ticks, so the bar acts only on students the teacher can see.
+      StudentPageStudents.handleChange({
+        dataset: { actionChange: 'spStudentPick', student: 's1' },
+        checked: true,
+        closest: () => ({ dataset: { cid: CID } }),
+      });
+      expect(StudentPageStudents.picked(CID)).toEqual(['s1']);
+      StudentCards.setFilter(CID, 'locked');
+      expect(StudentPageStudents.picked(CID)).toEqual([]);
     } finally {
       globalThis.showUndoToast = was;
     }
@@ -470,9 +570,9 @@ describe('the Students list', () => {
     expect(text(p.querySelector('#sps-grade-hint'))).toBe('Jordan sees their overall grade at the top of My Learning.');
     expect(text(p.querySelector('#sps-page-hint'))).toBe('Jordan’s card opens their page.');
     expect(text(p.querySelector('#sps-done-title'))).toBe('What Jordan Has Done');
-    expect(text(p.querySelector('.sps-facts'))).toContain('Feedback Opened1 of 2 returned pieces');
-    expect(text(p.querySelector('.sps-unopened'))).toBe('Not opened: Quiz <b>1</b>, back Nov 12');
-    expect(p.querySelector('.sps-unopened b')).toBe(null);
+    // Nothing about what Jordan opened (TEACHER_SEES_OPENED is off); Work Sent stays.
+    expect(text(p.querySelector('.sps-facts'))).toBe('Work SentNone');
+    expect(p.querySelector('.sps-unopened')).toBe(null);
     expect(text(p.querySelector('#sps-card-title'))).toBe('Card');
     expect(p.querySelector('.sps-card-btns')).toBe(null);
     await setStudentPageOptions(CID, ['s1'], { show_overall_grade: 'hide' }, KEY());

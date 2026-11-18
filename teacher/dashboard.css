@@ -7655,6 +7655,21 @@ label.cm-cr-row {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Preview as a student whose page is paused: what their card shows instead of the page. */
+.ps-closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+.ps-closed-line {
+  margin: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  color: var(--text);
+}
 
 /* ── Reflect tab (teacher/cm-questionnaires.js; reflect plan, board 1) ── */
 .sq-section {

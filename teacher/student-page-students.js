@@ -37,6 +37,13 @@ var StudentPageStudents = (function () {
 
   var STALE_MS = 60000; // a signed-in class's options are read again when drawn after this long
   var NOT_OPENED_SHOWN = 5; // the returned pieces not opened the panel names
+  /* Whether the teacher sees what a student has opened: the Feedback Opened
+     column, the Feedback Not Opened filter and the panel's not-opened list.
+     Off until Colin rules on it (DECISIONS, "Per-student options on the
+     Student Page" 3): the server sends a teacher no seen_at, and Demo Mode
+     matches the real app. factsOf still counts it, for when it comes back. */
+  var TEACHER_SEES_OPENED = false;
+  var MAX_IDS = 500; // the most students one change takes (set_student_page_options)
 
   /* cid → { picked: { student id: true }, open: student id or null, fresh:
      true for the one draw that slides the panel in, looking, asked }. */
@@ -58,6 +65,20 @@ var StudentPageStudents = (function () {
     if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
     var el = document.querySelector(selector);
     if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
+  }
+
+  // The element with the focus, or null when nothing on the page has it.
+  function _active() {
+    if (typeof document === 'undefined') return null;
+    var a = document.activeElement;
+    return !a || a === document.body ? null : a;
+  }
+
+  // True when this class's Students list is on the page.
+  function _onScreen(cid) {
+    if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return false;
+    var card = /** @type {HTMLElement | null} */ (document.querySelector('.sc-card'));
+    return !!card && !!card.dataset && card.dataset.cid === cid;
   }
 
   // A value for a [data-…="…"] selector.
@@ -274,6 +295,9 @@ var StudentPageStudents = (function () {
     _pieces(cid).forEach(function (a) {
       var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, a.id) : null;
       if (!_back(cid, sid, a.id, row)) return;
+      // Missing or Excused: the student is shown no grade or feedback on it, so there is nothing to open.
+      var status = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, sid, a.id) : null;
+      if (status === 'NS' || status === 'EXC') return;
       returned += 1;
       var seen = row ? _time(row.seen_at) : null;
       var back = row ? _time(row.returned_at) : null;
@@ -283,11 +307,11 @@ var StudentPageStudents = (function () {
     notOpened.sort(function (x, y) {
       return String(y.back || '') < String(x.back || '') ? -1 : String(y.back || '') > String(x.back || '') ? 1 : 0;
     });
-    // One piece, one count: a revision is the same piece. Late is how the first version came in.
+    // One piece, one count: a revision is the same piece. Late is the newest version's, as the grader reads it.
     var byPiece = {};
     (sent || []).forEach(function (s) {
       var was = byPiece[s.assessment_id];
-      if (!was || Number(s.version || 1) < Number(was.version || 1)) byPiece[s.assessment_id] = s;
+      if (!was || Number(s.version || 1) > Number(was.version || 1)) byPiece[s.assessment_id] = s;
     });
     var pieces = Object.keys(byPiece);
     var questions = typeof getQuestionsWaiting === 'function' ? getQuestionsWaiting(cid, sid) : [];
@@ -328,17 +352,17 @@ var StudentPageStudents = (function () {
      label, tone, empty, shows(card, student, facts) }. Exceptions only where
      the options are offered; Questions only with Reflect on Feedback on. */
   function filters(cid) {
-    var out = [
-      {
-        value: 'not_opened',
-        label: 'Feedback Not Opened',
-        tone: 'info',
-        empty: 'Every student has opened the feedback you returned.',
-        shows: function (card, s, f) {
-          return !!f && f.returned > f.opened;
-        },
+    var out = [];
+    var opened = {
+      value: 'not_opened',
+      label: 'Feedback Not Opened',
+      tone: 'info',
+      empty: 'Every student has opened the feedback you returned.',
+      shows: function (card, s, f) {
+        return !!f && f.returned > f.opened;
       },
-    ];
+    };
+    if (TEACHER_SEES_OPENED) out.push(opened);
     var reflect = typeof getReflectOnFeedback === 'function' && getReflectOnFeedback(cid);
     if (reflect) {
       out.push({
@@ -380,7 +404,8 @@ var StudentPageStudents = (function () {
         (all ? ' checked' : '') +
         '></label></th>',
       rest:
-        '<th scope="col" class="sps-num">Feedback Opened</th><th scope="col" class="sps-num">Work Sent</th>' +
+        (TEACHER_SEES_OPENED ? '<th scope="col" class="sps-num">Feedback Opened</th>' : '') +
+        '<th scope="col" class="sps-num">Work Sent</th>' +
         (offered(cid) ? '<th scope="col">Overall Grade</th>' : ''),
     };
   }
@@ -425,11 +450,10 @@ var StudentPageStudents = (function () {
   function cellsHtml(cid, s, f) {
     var g = gradeWord(cid, s.id);
     return (
+      (TEACHER_SEES_OPENED
+        ? '<td class="sps-num' + (f.returned ? '' : ' sps-muted') + '">' + esc(_feedbackText(f)) + '</td>'
+        : '') +
       '<td class="sps-num' +
-      (f.returned ? '' : ' sps-muted') +
-      '">' +
-      esc(_feedbackText(f)) +
-      '</td><td class="sps-num' +
       (f.sent ? '' : ' sps-muted') +
       '">' +
       esc(_sentText(f)) +
@@ -598,28 +622,30 @@ var StudentPageStudents = (function () {
         '</span></div></section>';
     }
     var done = [];
-    done.push(
-      _fact(
-        'Feedback Opened',
-        esc(f.returned ? f.opened + ' of ' + f.returned + ' returned pieces' : 'Nothing returned yet') +
-          (f.notOpened.length
-            ? '<span class="sps-unopened">' +
-              // The newest five, then how many more.
-              f.notOpened
-                .slice(0, NOT_OPENED_SHOWN)
-                .map(function (p) {
-                  return (
-                    '<span>' + esc('Not opened: ' + p.title + (p.back ? ', back ' + _fmtDay(p.back) : '')) + '</span>'
-                  );
-                })
-                .join('') +
-              (f.notOpened.length > NOT_OPENED_SHOWN
-                ? '<span>' + esc('And ' + (f.notOpened.length - NOT_OPENED_SHOWN) + ' more not opened.') + '</span>'
-                : '') +
-              '</span>'
-            : ''),
-      ),
-    );
+    if (TEACHER_SEES_OPENED) {
+      done.push(
+        _fact(
+          'Feedback Opened',
+          esc(f.returned ? f.opened + ' of ' + f.returned + ' returned pieces' : 'Nothing returned yet') +
+            (f.notOpened.length
+              ? '<span class="sps-unopened">' +
+                // The newest five, then how many more.
+                f.notOpened
+                  .slice(0, NOT_OPENED_SHOWN)
+                  .map(function (p) {
+                    return (
+                      '<span>' + esc('Not opened: ' + p.title + (p.back ? ', back ' + _fmtDay(p.back) : '')) + '</span>'
+                    );
+                  })
+                  .join('') +
+                (f.notOpened.length > NOT_OPENED_SHOWN
+                  ? '<span>' + esc('And ' + (f.notOpened.length - NOT_OPENED_SHOWN) + ' more not opened.') + '</span>'
+                  : '') +
+                '</span>'
+              : ''),
+        ),
+      );
+    }
     done.push(
       _fact(
         'Work Sent',
@@ -812,21 +838,29 @@ var StudentPageStudents = (function () {
      they were. `focus` is the control to give the focus back to. A Promise
      of setStudentPageOptions' answer. */
   function change(cid, ids, what, focus) {
-    if (!ids.length || typeof setStudentPageOptions !== 'function' || !offered(cid)) {
+    if (typeof setStudentPageOptions !== 'function' || !offered(cid)) {
       return Promise.resolve({ result: 'not_available' });
     }
+    // Only the students it changes: a second press changes nobody, and shows no toast whose Undo would undo nothing.
     var before = {};
-    ids.forEach(function (sid) {
-      before[sid] = optionsOf(cid, sid);
+    ids = ids.filter(function (sid) {
+      var o = optionsOf(cid, sid);
+      var same = 'paused' in what ? o.paused === what.paused : o.grade === what.show_overall_grade;
+      if (!same) before[sid] = o;
+      return !same;
     });
+    if (!ids.length || ids.length > MAX_IDS) return Promise.resolve({ result: 'nothing' });
     var sent = setStudentPageOptions(cid, ids, what, _key());
     _memo = {};
     // Shown at once (Demo Mode keeps it; signed in it is laid over the server's until answered).
     _rerender();
     if (focus) _focus(focus);
+    var pressed = _active();
     sent.then(function () {
+      // A late answer (offline, slow) draws again, and gives the focus back only if the teacher has not moved on.
+      var stay = _active() === pressed || _active() === null;
       _rerender();
-      if (focus) _focus(focus);
+      if (focus && stay && _onScreen(cid)) _focus(focus);
     });
     if (typeof showUndoToast === 'function') {
       showUndoToast(_toastText(cid, ids, what), function () {
@@ -911,7 +945,12 @@ var StudentPageStudents = (function () {
         var ids = picked(cid);
         if (!ids.length) return true;
         if (data.value === 'print') {
-          if (typeof StudentCards !== 'undefined' && StudentCards.printNewCards) StudentCards.printNewCards(cid, ids);
+          // Once the cards are asked for, the ticks go: a second press would print them again.
+          if (typeof StudentCards !== 'undefined' && StudentCards.printNewCards) {
+            StudentCards.printNewCards(cid, ids, function () {
+              clearPicked(cid);
+            });
+          }
           return true;
         }
         if (BULK[data.value]) change(cid, ids, BULK[data.value], '.sps-bar [data-value="' + data.value + '"]');
@@ -958,6 +997,12 @@ var StudentPageStudents = (function () {
     return true;
   }
 
+  /* The filter changed: the ticks go, so the bar acts only on students the
+     teacher can see. */
+  function clearPicked(cid) {
+    _st(cid).picked = {};
+  }
+
   // Another class is drawn: this one's ticks and panel go.
   function leave(cid) {
     Object.keys(_state).forEach(function (id) {
@@ -993,12 +1038,17 @@ var StudentPageStudents = (function () {
     change: change,
     close: close,
     leave: leave,
+    clearPicked: clearPicked,
     // The student whose panel is open in class `cid`, or null.
     openStudent: function (cid) {
       return _st(cid).open;
     },
     handleAction: handleAction,
     handleChange: handleChange,
+    // Tests: turn what the teacher sees of what a student opened on or off (off by default).
+    _setTeacherSeesOpened: function (on) {
+      TEACHER_SEES_OPENED = !!on;
+    },
     // Tests: open (or close, with null) a student's panel without drawing.
     _setOpen: function (cid, sid) {
       _st(cid).open = sid || null;

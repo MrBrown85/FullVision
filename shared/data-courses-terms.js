@@ -159,6 +159,8 @@ function _clearCourseLocalState(id) {
     'grade-returns',
     'category-draft',
     'student-cards',
+    // Per-student options on the Student Page (shared/data-reflect.js), kept on the device in Demo Mode.
+    'student-page-options',
     'student-work',
     'student-feedback',
     'statuses',

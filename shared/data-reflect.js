@@ -603,6 +603,14 @@ var _spoServer = {}; // cid → { enrollment id → options }, as the server las
 var _spoRead = {}; // cid → the read: state 'ok', 'missing' (no such function yet) or 'failed'
 /** @type {Record<string, { ids: string[]; change: Record<string, unknown>; at: string }[]>} */
 var _spoHere = {}; // cid → changes on their way from this page, oldest first
+/* cid → a number moved on whenever a change is sent or answered. A list read
+   begun before the number last moved is older than a change, and is dropped
+   (as StudentCards drops a card list read begun before a press). */
+/** @type {Record<string, number>} */
+var _spoWrites = {};
+function _spoWriteMoved(cid) {
+  _spoWrites[cid] = (_spoWrites[cid] || 0) + 1;
+}
 
 function _spoOnDevice(cid) {
   return !!cid && _gradesKept(cid) && !_writesEnabled();
@@ -730,6 +738,7 @@ function loadStudentPageOptions(cid, force) {
   if (read.state === 'missing') return Promise.resolve(false);
   if (read.loading) return read.loading;
   if (!force && read.state === 'ok' && Date.now() - read.at < _SPO_STALE_MS) return Promise.resolve(true);
+  var began = _spoWrites[cid] || 0;
   // @ts-ignore: not in types/database.d.ts until it is refreshed after the migration (per-student-options plan)
   var asked = _callRpcWithAuthGuard('list_student_page_options', { p_course_id: cid }, Object.assign({}, _SPO_QUIET));
   read.loading = asked.then(function (res) {
@@ -749,6 +758,8 @@ function loadStudentPageOptions(cid, force) {
       if (read.state !== 'ok') read.state = 'failed';
       return false;
     }
+    // A change was sent or answered after this read began: its answer is newer than this list.
+    if (read.state === 'ok' && (_spoWrites[cid] || 0) !== began) return true;
     /** @type {Record<string, { show_overall_grade: string; paused_at: string | null }>} */
     var rows = {};
     _rpcRows(data.options).forEach(function (r) {
@@ -766,7 +777,8 @@ function loadStudentPageOptions(cid, force) {
 /* Change the options of `studentIds` in class `cid`. `change` names
    show_overall_grade ('class', 'show' or 'hide') and/or paused (true or
    false). A Promise of { ok: true, options } (the class's options as now
-   shown), or { result: 'invalid' } (no students, more than 500, a student
+   shown, and signed in `skipped`: students the server left out because they
+   are no longer in the class), or { result: 'invalid' } (no students, more than 500, a student
    not in the class, a wrong change or key), { result: 'not_available' }
    (not offered for this class) or { result: 'failed' } (the server
    refused it; what is shown goes back to the server's). Signed in, it
@@ -821,6 +833,7 @@ function setStudentPageOptions(cid, studentIds, change, key) {
 function _setStudentPageOptionsLive(cid, ids, change, key, at) {
   var mine = { ids: ids.slice(), change: change, at: at };
   (_spoHere[cid] = _spoHere[cid] || []).push(mine);
+  _spoWriteMoved(cid);
   var sent = _writeRpc('set_student_page_options', {
     p_course_id: cid,
     p_enrollment_ids: ids.slice(),
@@ -833,6 +846,7 @@ function _setStudentPageOptionsLive(cid, ids, change, key, at) {
     var at2 = here.indexOf(mine);
     if (at2 >= 0) here.splice(at2, 1);
     if (!here.length) delete _spoHere[cid];
+    _spoWriteMoved(cid);
     var data = res && !res.error ? _rpcObject(res.data) : null;
     if (_spoReply(data)) {
       var server = _spoServer[cid] || (_spoServer[cid] = {});
@@ -842,7 +856,12 @@ function _setStudentPageOptionsLive(cid, ids, change, key, at) {
         if (_spoSet(row)) server[r.enrollment_id] = row;
         else delete server[r.enrollment_id];
       });
-      return { ok: true, options: getStudentPageOptions(cid) };
+      /* Students the server skipped (no longer active in the class): nothing changed for them, and with
+         this change answered they show what the server has. */
+      var skipped = _rpcRows(data.skipped).filter(function (id) {
+        return typeof id === 'string';
+      });
+      return { ok: true, options: getStudentPageOptions(cid), skipped: skipped };
     }
     // Refused (P0002, 22023, PT401 are raised errors): the outbox's dead letter and the sync dot say so,
     // and what is shown goes back to the server's, as set_course_feedback_options' callers do.
@@ -877,4 +896,5 @@ function _forgetStudentPageOptions() {
   _spoServer = {};
   _spoRead = {};
   _spoHere = {};
+  _spoWrites = {};
 }
