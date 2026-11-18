@@ -16,7 +16,8 @@
    are listed, each class under its name; names matched from files, the
    Waiting tray and Split the Scan search both lists and show the class, so
    a name in both classes is offered, never taken; Class List Order is not
-   offered. Turning it off puts every piece on the second class's students
+   offered. Turned on after files were placed, every file the app matched
+   by its name is matched again against both (_matchAgain). Turning it off puts every piece on the second class's students
    back in the Waiting tray.
 
    A late paper. Each piece has a For choice: the page's assessment to
@@ -165,6 +166,7 @@
         return { error: e };
       })
       .then(function (res) {
+        var ok = false;
         if (ctx.state() !== s) return false;
         st.reading = '';
         // Add Work pressed meanwhile, or the summary showing: dropped, unsaid.
@@ -187,11 +189,48 @@
             s.byId[x.id] = x;
           });
           s.subs = s.stage.subs();
-          st.line = '';
+          var back = _matchAgain(s, ctx);
+          st.line = back
+            ? 'Both classes are listed. ' +
+              (back === 1 ? '1 file' : back + ' files') +
+              ' went back to Waiting for a Student.'
+            : '';
+          ok = true;
         }
         ctx.draw({ focus: 'two' });
-        return !st.line;
+        return ok;
       });
+  }
+
+  /* With both classes listed, every file the app matched by its name is
+     matched again, as if it were dropped now: the result never depends on
+     whether the files or the switch came first. One still certain for the
+     same student stays; any other goes back to waiting, saying why, and is
+     never moved to another student. A file the teacher placed or moved, and
+     a piece from Split the Scan (named by the teacher or by its sticker),
+     is not matched by name and is left alone. → how many went back. */
+  function _matchAgain(s, ctx) {
+    if (!s.tray || typeof s.tray.again !== 'function' || !s.byName) return 0;
+    // Waiting files first, so a file sent back below is not placed again.
+    s.tray.again();
+    var back = 0;
+    Object.keys(s.byName).forEach(function (pid) {
+      var h = s.stage.holder(pid);
+      if (!h) {
+        delete s.byName[pid];
+        return;
+      }
+      var m = s.tray.match(h.piece.from);
+      if (m.kind === 'one' && m.sid === h.sid) return;
+      delete s.byName[pid];
+      var gone = s.stage.takeOff(h.sid, pid);
+      ctx.release(gone);
+      gone.forEach(function (p) {
+        s.tray.hold(p.from, p.pages, m);
+        back++;
+      });
+    });
+    return back;
   }
 
   /* The second class off: its students leave the page, and every piece that

@@ -19,6 +19,7 @@
  *   Scan Order button, for Block C.
  */
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
 import path from 'path';
 import { madeUpScan } from './made-up-scan.js';
 
@@ -241,5 +242,76 @@ test('one pile, two classes, and a late paper: every page in its own class and a
   expect(await page.evaluate(() => getActiveCourse())).toBe(set.cidB);
   await page.keyboard.press('Escape');
   await expect(grader).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+/* Files first, then the switch: a file certain in Science 8 alone is matched
+   again with both classes listed, and waits when Block C has the same name. */
+test('turned on after the files: a name now in both classes waits, never stays on its student', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => {
+    var cid = typeof getActiveCourse === 'function' && getActiveCourse();
+    return !!cid && getAssessments(cid).some(a => a.id === 'sci8a1') && !!window.AddWorkTwoClasses;
+  });
+  await page.goto('/assignments');
+  await page.waitForSelector('#dock-mount nav');
+  const set = await page.evaluate(LAB => {
+    const cidA = getActiveCourse();
+    const sendWork = cid => {
+      setStudentPageSwitch(cid, true, 'on_return');
+      const work = getCourseSubmissions(cid);
+      work.course.send_work = true;
+      work.assessments = work.assessments.map(x => Object.assign({}, x, { students_send: 'photos' }));
+      saveDemoStudentWork(cid, work);
+    };
+    sendWork(cidA);
+    const lab = getAssessments(cidA).find(x => x.id === LAB);
+    const roster = getStudents(cidA);
+    // A Science 8 student whose last name alone is certain in Science 8.
+    const st = AddWorkClass.students(cidA, lab).find(
+      x => !getStudentSubmission(cidA, x.id, LAB) && NameMatch.match(x.lastName, roster).kind === 'one',
+    );
+    const cidB = createCourse({ name: 'Block C', gradeLevel: '8' }).id;
+    saveStudents(cidB, [{ id: crypto.randomUUID(), firstName: 'Hana', lastName: st.lastName }]);
+    saveAssessments(cidB, [Object.assign({}, lab, { id: 'blab-' + Date.now().toString(36) })]);
+    sendWork(cidB);
+    PageAssignments.render();
+    return { sid: st.id, last: st.lastName };
+  }, LAB);
+
+  const card = page.locator('#ac-' + LAB);
+  if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
+  await card.locator('.assess-more-btn').click();
+  await card.locator('.assess-add-class-btn').click();
+  const awc = page.locator('#add-work-class-overlay');
+  const row = awc.locator('.awc-row[data-awc-target="' + set.sid + '"]');
+
+  // Dropped first, with Science 8 alone: certain, so it goes on the student.
+  await awc.locator('.awt-input[data-awt-input="files"]').setInputFiles({
+    name: set.last + '.jpg',
+    mimeType: 'image/jpeg',
+    buffer: fs.readFileSync(PHOTO),
+  });
+  await expect(row.locator('.awc-chip')).toHaveCount(1, { timeout: 15000 });
+
+  // Then the switch: the name is in both classes now, so the file waits.
+  const two = awc.getByRole('switch', { name: 'This Pile Has Two Classes' });
+  await two.click();
+  await expect(two).toHaveAttribute('aria-checked', 'true');
+  await expect(awc.locator('.awc-chip')).toHaveCount(0);
+  const item = awc.locator('.awt-item');
+  await expect(item).toHaveCount(1);
+  await expect(item.locator('.awt-why')).toHaveText('Two students are named ' + set.last + '.');
+  await expect(awc.locator('.awc-two-line')).toHaveText(
+    'Both classes are listed. 1 file went back to Waiting for a Student.',
+  );
+  // Each Hana-or-not choice says its class; Add Work has nothing to add.
+  await expect(item.locator('.awt-act').nth(0)).toContainText('· Science 8');
+  await expect(item.locator('.awt-act').nth(1)).toContainText('· Block C');
+  await expect(awc.locator('.awc-primary')).toHaveText('Add Work for 0 Students');
   expect(errors).toEqual([]);
 });

@@ -910,3 +910,129 @@ describe('one pile, two classes: while the other class is read', () => {
     }
   });
 });
+
+/* Turned on after the files: every file matched by its name is matched
+   again, as if it were dropped now (the drop-then-switch fault). */
+describe('one pile, two classes: turned on after the files', () => {
+  const CID2 = U(2);
+  const PIECE2 = U(32);
+  const XIMENA = U(201);
+  const HANA = U(202); // shares Priya Kaur's last name
+  beforeEach(() => {
+    seedClass(CID2, {
+      students: [
+        { id: XIMENA, firstName: 'Ximena', lastName: 'Quill' },
+        { id: HANA, firstName: 'Hana', lastName: 'Kaur' },
+      ],
+      learningMaps: { subjects: [], sections: [], _customized: true, _version: 1, _flatVersion: 2 },
+      assessments: [{ id: PIECE2, title: 'Conscription', tagIds: [], date: '2026-10-20' }],
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_save' },
+    });
+    COURSES[CID2].name = 'Block C';
+    saveDemoStudentWork(CID2, {
+      course: { send_work: true },
+      assessments: [{ id: PIECE2, students_send: 'photos' }],
+      submissions: [],
+    });
+  });
+  afterEach(() => clearClass(CID2));
+
+  const pile = () => [file('Kaur.jpg'), file('Priya Kaur.pdf'), file('Ximena Quill.pdf'), file('Chen.pdf')];
+  const flip = async () => {
+    click($('[data-awc="two"]'));
+    await tick(8);
+  };
+  // Who has which file, and what waits with its reason, in a fixed order.
+  const placed = () =>
+    $$('.awc-row')
+      .flatMap(r =>
+        [...r.querySelectorAll('.awc-file-name')].map(n => r.getAttribute('data-awc-target') + ' ' + text(n)),
+      )
+      .sort();
+  const waiting = () =>
+    items()
+      .map(el => text(el.querySelector('.awt-file-name')) + ': ' + text(el.querySelector('.awt-why')))
+      .sort();
+  const shot = () => ({ placed: placed(), waiting: waiting() });
+
+  async function dropThenSwitch() {
+    AddWorkClass.open(CID, PIECE);
+    await AddWorkClass.takeFiles(pile());
+    await tick();
+    const before = shot();
+    await flip();
+    expect($('[data-awc="two"]').getAttribute('aria-checked')).toBe('true');
+    return before;
+  }
+  async function switchThenDrop() {
+    AddWorkClass.open(CID, PIECE);
+    await flip();
+    await AddWorkClass.takeFiles(pile());
+    await tick();
+  }
+
+  it('drop then switch gives what switch then drop gives', async () => {
+    const before = await dropThenSwitch();
+    // One class: Kaur.jpg was certain, Ximena's file had no student.
+    expect(before.placed).toEqual([PRIYA + ' Kaur.jpg', PRIYA + ' Priya Kaur.pdf']);
+    expect(before.waiting).toEqual([
+      'Chen.pdf: Two students are named Chen.',
+      'Ximena Quill.pdf: No student here has that name.',
+    ]);
+    const after = shot();
+    expect(after.placed).toEqual([PRIYA + ' Priya Kaur.pdf', XIMENA + ' Ximena Quill.pdf'].sort());
+    expect(after.waiting).toEqual(['Chen.pdf: Two students are named Chen.', 'Kaur.jpg: Two students are named Kaur.']);
+    expect(text($('.awc-two-line'))).toBe('Both classes are listed. 1 file went back to Waiting for a Student.');
+    // Kaur.jpg offers both Kaurs, each with their class; it is never taken.
+    expect([...itemNamed('Kaur.jpg').querySelectorAll('.awt-act')].map(text).slice(0, 2)).toEqual([
+      'Priya Kaur · Socials 10',
+      'Hana Kaur · Block C',
+    ]);
+    AddWorkClass.close(true);
+    await switchThenDrop();
+    expect(shot()).toEqual(after);
+  });
+
+  it('turned off again, both orders end the same, as switch-first always did', async () => {
+    await dropThenSwitch();
+    await flip();
+    const a = shot();
+    expect(text($('.awc-two-line'))).toBe('1 file from Block C went back to Waiting for a Student.');
+    AddWorkClass.close(true);
+    await switchThenDrop();
+    await flip();
+    expect(shot()).toEqual(a);
+    expect(rowOf(XIMENA)).toBeNull();
+    expect(a.placed).toEqual([PRIYA + ' Priya Kaur.pdf']);
+  });
+
+  it('a file the teacher placed or moved is left where it is', async () => {
+    AddWorkClass.open(CID, PIECE);
+    // Dropped on Priya's row.
+    await AddWorkClass.addFiles(PRIYA, [file('Kaur.jpg')]);
+    // Placed from the tray with a click.
+    await AddWorkClass.takeFiles([file('Chen.pdf'), file('Mateo Cruz.pdf')]);
+    click(itemNamed('Chen.pdf').querySelector('[data-sid="' + AVERY + '"]'));
+    // Matched by name, then moved by the teacher.
+    expect(chipsOf(MATEO)).toEqual(['Mateo Cruz.pdf']);
+    click(rowOf(MATEO).querySelector('[data-awc="moveMenu"]'));
+    click($('.awc-move-item[data-to="' + SAM + '"]'));
+    expect(chipsOf(SAM)).toEqual(['Mateo Cruz.pdf']);
+    await flip();
+    expect(chipsOf(PRIYA)).toEqual(['Kaur.jpg']);
+    expect(chipsOf(AVERY)).toEqual(['Chen.pdf']);
+    expect(chipsOf(SAM)).toEqual(['Mateo Cruz.pdf']);
+    expect(items().length).toBe(0);
+    expect(text($('.awc-two-line'))).toBe('Both classes are listed. Each student’s pages go to their own class.');
+  });
+
+  it('a piece from Split the Scan (named or by its sticker) is not matched by name', async () => {
+    AddWorkClass.open(CID, PIECE);
+    // As Split the Scan hands its pieces back.
+    AddWorkClass.placePieces([{ sid: PRIYA, from: 'Scan, page 1', pages: pages(1), scan: true }]);
+    expect(chipsOf(PRIYA)).toEqual(['Scan, page 1']);
+    await flip();
+    expect(chipsOf(PRIYA)).toEqual(['Scan, page 1']);
+    expect(items().length).toBe(0);
+  });
+});

@@ -272,24 +272,26 @@
 
     function _one(file) {
       var name = _fileName(file);
-      var m = _match(name);
       return AddWorkFiles.prepare([file]).then(
         function (got) {
           if (!host.alive()) return;
           done++;
           if (got.said || !got.pages.length) return _refused(name, got.said);
+          // Matched once read, against the classes on the page now (a second may have come).
+          var m = _match(name);
+          // byName: placed or held by the app from its name, not by the teacher.
           if (m.kind === 'one') {
-            var res = host.place([{ sid: m.sid, from: name, pages: got.pages }])[0];
+            var res = host.place([{ sid: m.sid, from: name, pages: got.pages, byName: true }])[0];
             if (res && res.ok) return;
             hold(
               name,
               got.pages,
               m,
               res && res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '',
-            );
+            ).byName = true;
             return;
           }
-          hold(name, got.pages, m);
+          hold(name, got.pages, m).byName = true;
         },
         function () {
           if (!host.alive()) return;
@@ -445,6 +447,26 @@
       });
       host.draw();
       return out;
+    }
+
+    /* A second class came onto the page (B6): each file waiting by its name
+       is matched again against both, as if it were dropped now. A certain
+       one goes on its student; the rest wait, saying why. → how many went. */
+    function again() {
+      var went = 0;
+      items.slice().forEach(function (item) {
+        if (!item.byName || item.refused) return;
+        var m = _match(item.from);
+        item.match = m;
+        if (m.kind !== 'one') return;
+        var res =
+          host.place([{ sid: m.sid, from: item.from, pages: item.pages, url: item.url, byName: true }])[0] || {};
+        if (res.ok) {
+          _drop(item);
+          went++;
+        } else item.note = res.reason === 'too_many_pages' ? 'A piece of work can have 30 pages at most.' : '';
+      });
+      return went;
     }
 
     /* ── Placing from the tray ── */
@@ -893,6 +915,12 @@
       takeDrop: takeDrop,
       hasFolder: hasFolder,
       placeOrHold: placeOrHold,
+      // Two classes (B6): a name matched as a drop is; a placed file held again.
+      match: _match,
+      hold: function (from, pages, m) {
+        hold(from, pages, m);
+      },
+      again: again,
       placeItem: placeItem,
       remove: remove,
       release: release,
