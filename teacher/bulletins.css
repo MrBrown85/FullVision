@@ -374,31 +374,14 @@ textarea.bulletin-field {
   background: var(--divider-medium);
 }
 .bulletin-post {
-  --kind: var(--active);
-  --kind-tint: rgba(0, 122, 255, 0.1);
-  position: relative;
-  padding: 18px 20px 14px 24px;
+  padding: 16px 18px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-radius: 14px;
-  overflow: hidden;
   transition: box-shadow var(--duration-micro, 0.15s) ease;
 }
-.bulletin-post.is-reminder {
-  --kind: #b36b00;
-  --kind-tint: rgba(255, 159, 10, 0.14);
-}
-/* The kind's colour down the left edge. */
-.bulletin-post::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: var(--kind);
-}
 .bulletin-post:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-md, 0 2px 10px rgba(0, 0, 0, 0.08));
 }
 .bulletin-meta {
   display: flex;
@@ -408,23 +391,28 @@ textarea.bulletin-field {
   color: var(--text-2);
 }
 .bulletin-kind-label {
-  padding: 3px 10px;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: var(--kind-tint);
-  color: var(--kind);
+  background: var(--seg-track);
+  color: var(--text-2);
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
 }
+/* A reminder in the app's notice colours, as the Dashboard tile labels it. */
+.bulletin-post.is-reminder .bulletin-kind-label {
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
 .bulletin-time {
   margin-left: auto;
   white-space: nowrap;
 }
 .bulletin-body {
-  font-size: 17px;
-  font-weight: 500;
+  font-size: var(--text-md);
   line-height: 1.5;
   color: var(--text);
   white-space: pre-wrap;
@@ -615,10 +603,11 @@ textarea.bulletin-field {
 
 /* ── Who has seen it ── */
 .bulletin-seenlist {
-  margin: 6px -20px -14px -24px;
-  padding: 18px 20px 20px 24px;
+  margin: 6px -18px -14px;
+  padding: 16px 18px 18px;
+  border-radius: 0 0 var(--radius) var(--radius);
   border-top: 1px solid var(--divider-medium);
-  background: linear-gradient(var(--surface), var(--bg));
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -656,11 +645,11 @@ textarea.bulletin-field {
 }
 .bsl-bar {
   grid-column: 1 / -1;
-  height: 8px;
-  border-radius: 4px;
+  height: 6px;
+  border-radius: 3px;
   background:
-    linear-gradient(#34a853, #34a853) 0 0 / var(--seen, 0%) 100% no-repeat,
-    rgba(255, 159, 10, 0.28);
+    linear-gradient(var(--active), var(--active)) 0 0 / var(--seen, 0%) 100% no-repeat,
+    var(--seg-track);
 }
 .bsl-groups {
   display: grid;
@@ -668,33 +657,13 @@ textarea.bulletin-field {
   gap: 12px;
 }
 .bsl-group {
-  --tone: #8e8e93;
-  --tone-tint: rgba(142, 142, 147, 0.14);
   padding: 12px 14px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface);
-  border: 1px solid var(--divider-medium);
-  box-shadow: inset 0 3px 0 var(--tone);
+  border: 1px solid var(--divider-subtle);
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-.bsl-group.is-not {
-  --tone: #e08a00;
-  --tone-tint: rgba(255, 159, 10, 0.16);
-}
-.bsl-group.is-seen {
-  --tone: #34a853;
-  --tone-tint: rgba(52, 168, 83, 0.14);
-}
-.bsl-group.is-got,
-.bsl-group.is-done {
-  --tone: var(--active);
-  --tone-tint: rgba(0, 122, 255, 0.12);
-}
-.bsl-group.is-question {
-  --tone: #af52de;
-  --tone-tint: rgba(175, 82, 222, 0.14);
 }
 .bsl-head {
   margin: 0;
@@ -709,8 +678,8 @@ textarea.bulletin-field {
   min-width: 22px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--tone-tint);
-  color: var(--text);
+  background: var(--seg-track);
+  color: var(--text-2);
   font-size: var(--text-xs);
   text-align: center;
 }
@@ -734,7 +703,7 @@ textarea.bulletin-field {
   gap: 6px;
   padding: 3px 10px 3px 3px;
   border-radius: 999px;
-  background: var(--tone-tint);
+  background: var(--seg-track);
   font-size: var(--text-sm);
   color: var(--text);
   white-space: nowrap;
@@ -746,15 +715,16 @@ button.bsl-chip {
   cursor: pointer;
 }
 button.bsl-chip:hover {
-  border-color: var(--tone);
+  border-color: var(--divider-medium);
 }
+/* Picked to remind: the app's selection blue. */
 button.bsl-chip[aria-pressed='true'] {
-  background: var(--tone);
+  background: var(--active-fill);
   color: #fff;
 }
 button.bsl-chip[aria-pressed='true'] .bsl-av {
-  background: #fff;
-  color: var(--tone);
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
 }
 .bsl-av {
   width: 22px;
@@ -763,8 +733,8 @@ button.bsl-chip[aria-pressed='true'] .bsl-av {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--tone);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text-2);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -776,23 +746,7 @@ button.bsl-chip[aria-pressed='true'] .bsl-av {
   gap: 6px 10px;
 }
 .bsl-again {
-  height: 32px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--tone);
-  color: #fff;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-.bsl-again:hover {
-  filter: brightness(0.94);
-}
-.bsl-again:disabled {
-  opacity: 0.6;
-  cursor: default;
+  align-self: flex-start;
 }
 .bsl-notes {
   display: flex;
@@ -825,13 +779,4 @@ button.bsl-chip[aria-pressed='true'] .bsl-av {
 .bulletin-arrived {
   outline: 2px solid var(--active);
   outline-offset: 2px;
-}
-@media (prefers-color-scheme: dark) {
-  .bulletin-post.is-reminder {
-    --kind: #ffb340;
-    --kind-tint: rgba(255, 179, 64, 0.16);
-  }
-  .bulletin-post:hover {
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  }
 }

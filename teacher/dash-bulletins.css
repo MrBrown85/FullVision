@@ -427,75 +427,29 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
   }
 }
 
-/* The cards as posted notes (Colin, Nov 18: "look like actual bulletins that
-   are posted"): paper on the board with a pin at the top, a reminder on
-   yellow, each set a little askew. Dark text on light paper in both modes. */
+/* The cards as bulletins posted on the tile (Colin, Nov 18), in the app's
+   own look: a raised card on the tile's surface, a hairline and a soft
+   shadow, the reminder label in the notice colours. */
 @container dash-bulletins (min-width: 860px) and (min-height: 168px) {
   .dash-bulletins-tile .dash-bulletins-rows {
-    column-gap: 18px;
-    padding: 6px 8px 8px;
+    column-gap: 12px;
+    padding: 2px 2px 6px;
   }
   .dash-bulletins-tile .dash-bulletins-row {
-    position: relative;
-    padding: 18px 14px 10px !important;
-    border: 0 !important;
-    border-radius: 3px !important;
-    background: #fffdf7;
-    color: #1d1d1f;
-    box-shadow:
-      0 1px 1px rgba(0, 0, 0, 0.1),
-      0 8px 16px -6px rgba(0, 0, 0, 0.22);
-    transform: rotate(-1deg);
-    transition:
-      transform 0.15s ease,
-      box-shadow 0.15s ease;
-  }
-  .dash-bulletins-tile .dash-bulletins-row:nth-child(2) {
-    transform: rotate(0.8deg);
-  }
-  .dash-bulletins-tile .dash-bulletins-row:nth-child(3) {
-    transform: rotate(-0.4deg);
-  }
-  .dash-bulletins-tile .dash-bulletins-row:has(.dash-bulletins-rem) {
-    background: #fff3a8;
+    padding: 10px 12px 9px !important;
+    border: 1px solid var(--divider-subtle) !important;
+    border-radius: var(--radius) !important;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.15s ease;
   }
   .dash-bulletins-tile .dash-bulletins-row:hover {
-    transform: rotate(0deg) translateY(-2px);
-    box-shadow:
-      0 1px 1px rgba(0, 0, 0, 0.1),
-      0 12px 22px -8px rgba(0, 0, 0, 0.28);
-  }
-  /* The pin. */
-  .dash-bulletins-tile .dash-bulletins-row::before {
-    content: '';
-    position: absolute;
-    top: 5px;
-    left: 50%;
-    width: 10px;
-    height: 10px;
-    margin-left: -5px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #ff8a80, #d93025 60%, #a50e0e);
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-md, 0 2px 10px rgba(0, 0, 0, 0.08));
   }
   .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-words {
-    color: #1d1d1f;
-    font-size: 14px;
+    font-size: var(--text-base);
     line-height: 1.4;
-  }
-  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-time {
-    color: #6e6e73;
-  }
-  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-kind {
-    background: rgba(0, 0, 0, 0.06);
-    color: #3a3a3c;
-  }
-  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-rem {
-    background: rgba(160, 100, 0, 0.14);
-    color: #6b4200;
-  }
-  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-seen {
-    color: #0058d0;
+    color: var(--text);
   }
 }
 @media (prefers-reduced-motion: reduce) {
