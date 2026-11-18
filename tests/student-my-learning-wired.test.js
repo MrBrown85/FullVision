@@ -236,3 +236,48 @@ describe('My Learning on a real card', () => {
     expect(off.calls).toEqual([]);
   });
 });
+
+/* Per-student options in Demo Mode (docs/plans/per-student-options-plan.md):
+   the sample card is Cece's, st1 in the teacher's sample class sci8, and the
+   page honours the teacher's options kept on this device as the server does. */
+describe('Demo Mode honours the teacher’s per-student options', () => {
+  const KEY = 'gb-student-page-options-sci8';
+  const signIn = async (page, hash) => {
+    await page.start(hash);
+    await page.submit('form[data-form="card"]');
+  };
+
+  it('Hide: no overall grade on My Learning, and the work still listed', async () => {
+    const page = openStudentPage({
+      store: { [KEY]: JSON.stringify({ st1: { show_overall_grade: 'hide', paused_at: null } }) },
+    });
+    await signIn(page, '#demo-card');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    await page.click('.sp-tabs-bottom [data-tab="learning"]');
+    expect(page.T.state().reply.show_my_learning).toBe(false);
+    expect(page.root().querySelector('.sp-ml-overall')).toBeNull();
+    expect(page.root().querySelectorAll('.sp-ml-work .sp-row-title').length).toBeGreaterThan(0);
+    expect(page.calls).toEqual([]);
+  });
+
+  it('Show over #demo-card-no-learning: the grade shows', async () => {
+    const page = openStudentPage({
+      store: { [KEY]: JSON.stringify({ st1: { show_overall_grade: 'show', paused_at: null } }) },
+    });
+    await signIn(page, '#demo-card-no-learning');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    expect(page.T.state().reply.show_my_learning).toBe(true);
+  });
+
+  it('Paused: the card is refused with the closed message', async () => {
+    const page = openStudentPage({
+      store: { [KEY]: JSON.stringify({ st1: { show_overall_grade: 'class', paused_at: '2026-11-17T20:00:00Z' } }) },
+    });
+    await signIn(page, '#demo-card');
+    expect(page.root().textContent).toContain('The student page is turned off for this class. Ask your teacher.');
+    expect(page.root().querySelector('.sp-tabs-bottom')).toBeNull();
+    expect(page.calls).toEqual([]);
+  });
+});

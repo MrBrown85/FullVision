@@ -847,6 +847,29 @@
   }
 
   // The sample class an enrollment opens.
+  /* The teacher's per-student options for the sample card's student, kept
+     on this device by the teacher's Demo Mode (shared/data-reflect.js,
+     gb-student-page-options-<class>): the sample card is Cece's, st1 in the
+     teacher's sample class sci8 (shared/seed-data.js). The page honours them
+     as student_submit does: Hide, no overall grade; Paused, the card and the
+     page are refused as closed. { grade: 'class'|'show'|'hide', paused }. */
+  var DEMO_TEACHER_CLASS = 'sci8';
+  var DEMO_TEACHER_STUDENT = 'st1';
+  function demoOwnOptions() {
+    try {
+      var all = JSON.parse(localStorage.getItem('gb-student-page-options-' + DEMO_TEACHER_CLASS) || 'null');
+      var own = all && typeof all === 'object' ? all[DEMO_TEACHER_STUDENT] : null;
+      if (!own || typeof own !== 'object') return { grade: 'class', paused: false };
+      return {
+        grade:
+          own.show_overall_grade === 'show' || own.show_overall_grade === 'hide' ? own.show_overall_grade : 'class',
+        paused: !!own.paused_at,
+      };
+    } catch (e) {
+      return { grade: 'class', paused: false };
+    }
+  }
+
   function demoClassFor(enrollment) {
     return enrollment === DEMO_SECOND ? demoSecondClass() : demoClass();
   }
@@ -1041,7 +1064,9 @@
   function demoPage(system, enrollment) {
     var cls = demoClassFor(enrollment);
     var seen = (demo && demo.seen) || {};
-    var learning = !(demo && demo.noLearning);
+    // The class's Show Overall Grade (#demo-card-no-learning: off), or the teacher's Show or Hide for Cece.
+    var own = enrollment === DEMO_SECOND ? {} : demoOwnOptions();
+    var learning = own.grade === 'show' ? true : own.grade === 'hide' ? false : !(demo && demo.noLearning);
     return {
       ok: true,
       v: 1,
@@ -1108,6 +1133,8 @@
      class's card: any code opens it. */
   function demoCard() {
     if (demo.wrong >= DEMO.tries) return { ok: false, error: 'card_locked' };
+    // Paused by the teacher in Demo Mode: refused as the server refuses a paused card.
+    if (!adding && demoOwnOptions().paused) return { ok: false, error: 'closed' };
     var cls = adding ? demoSecondClass() : demoClass();
     return {
       ok: true,
@@ -1156,6 +1183,8 @@
     page: function (body) {
       // Only a class the sample session has opened, as the server answers.
       if (demo.classes.indexOf(body.enrollment_id) < 0) return { ok: false, error: 'not_found' };
+      // A page already open stops at once when the teacher pauses it, as the server's does.
+      if (body.enrollment_id !== DEMO_SECOND && demoOwnOptions().paused) return { ok: false, error: 'closed' };
       return demoPage(demo.system, body.enrollment_id);
     },
     seen: function (body) {

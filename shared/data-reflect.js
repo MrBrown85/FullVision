@@ -739,7 +739,6 @@ function loadStudentPageOptions(cid, force) {
   if (read.loading) return read.loading;
   if (!force && read.state === 'ok' && Date.now() - read.at < _SPO_STALE_MS) return Promise.resolve(true);
   var began = _spoWrites[cid] || 0;
-  // @ts-ignore: not in types/database.d.ts until it is refreshed after the migration (per-student-options plan)
   var asked = _callRpcWithAuthGuard('list_student_page_options', { p_course_id: cid }, Object.assign({}, _SPO_QUIET));
   read.loading = asked.then(function (res) {
     read.loading = null;

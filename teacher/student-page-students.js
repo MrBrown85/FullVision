@@ -129,6 +129,17 @@ var StudentPageStudents = (function () {
     return studentPageOptionsOffered(cid);
   }
 
+  /* True where Show and Hide are offered: the options are, and so is the
+     class's own Show Overall Grade row (CmStudentPage.learningSettings), so a
+     student's grade is never shown or hidden against a switch the teacher
+     can't see. */
+  function gradeOffered(cid) {
+    if (!offered(cid)) return false;
+    return typeof CmStudentPage === 'undefined' || !CmStudentPage.learningSettings
+      ? true
+      : CmStudentPage.learningSettings(cid).offered === true;
+  }
+
   function _readIfShown(cid) {
     if (typeof loadStudentPageOptions !== 'function') return;
     var st = _st(cid);
@@ -498,13 +509,10 @@ var StudentPageStudents = (function () {
       '<span class="sps-bar-count" role="status">' +
       ids.length +
       ' Selected</span>' +
-      (offered(cid)
-        ? btn('hide', 'Hide Overall Grade') +
-          btn('show', 'Show Overall Grade') +
-          btn('class', 'Same as Class') +
-          btn('pause', 'Pause Pages') +
-          btn('open', 'Open Pages')
+      (gradeOffered(cid)
+        ? btn('hide', 'Hide Overall Grade') + btn('show', 'Show Overall Grade') + btn('class', 'Same as Class')
         : '') +
+      (offered(cid) ? btn('pause', 'Pause Pages') + btn('open', 'Open Pages') : '') +
       btn('print', 'Print New Cards') +
       '<button type="button" class="cm-action-btn sps-bar-btn sps-bar-clear" data-action="spStudentClear">Clear</button>' +
       '</div>'
@@ -565,6 +573,30 @@ var StudentPageStudents = (function () {
       : first + '’s card opens their page.';
   }
 
+  // The panel's Overall Grade control: Same as Class, Show, Hide, and what it does for this student.
+  function _gradeCtl(cid, sid, first, o) {
+    return (
+      '<div class="sps-ctl"><span class="sp-row-title" id="sps-grade-label">Overall Grade</span>' +
+      _seg(
+        'Overall Grade',
+        'sps-grade',
+        [
+          {
+            value: 'class',
+            label: 'Same as Class (' + (_classShows(cid) ? 'Shown' : 'Hidden') + ')',
+            action: 'spStudentGrade',
+          },
+          { value: 'show', label: 'Show', action: 'spStudentGrade' },
+          { value: 'hide', label: 'Hide', action: 'spStudentGrade' },
+        ],
+        o.grade,
+      ) +
+      '<span class="cm-hint" id="sps-grade-hint">' +
+      esc(_gradeHint(cid, sid, first)) +
+      '</span></div>'
+    );
+  }
+
   /* The panel for the student open, or ''. `card` is what the Students
      list knows of their card: { card, cardText, status, until, off }. */
   // html-safe: every name, title, question and date goes through esc(); the rest is fixed markup
@@ -589,24 +621,7 @@ var StudentPageStudents = (function () {
         '<section class="sps-sec" aria-labelledby="sps-sees-title"><h3 class="sps-sec-title" id="sps-sees-title">' +
         esc('What ' + first + ' Sees') +
         '</h3>' +
-        '<div class="sps-ctl"><span class="sp-row-title" id="sps-grade-label">Overall Grade</span>' +
-        _seg(
-          'Overall Grade',
-          'sps-grade',
-          [
-            {
-              value: 'class',
-              label: 'Same as Class (' + (_classShows(cid) ? 'Shown' : 'Hidden') + ')',
-              action: 'spStudentGrade',
-            },
-            { value: 'show', label: 'Show', action: 'spStudentGrade' },
-            { value: 'hide', label: 'Hide', action: 'spStudentGrade' },
-          ],
-          o.grade,
-        ) +
-        '<span class="cm-hint" id="sps-grade-hint">' +
-        esc(_gradeHint(cid, s.id, first)) +
-        '</span></div>' +
+        (gradeOffered(cid) ? _gradeCtl(cid, s.id, first, o) : '') +
         '<div class="sps-ctl"><span class="sp-row-title" id="sps-page-label">Student Page</span>' +
         _seg(
           'Student Page',
@@ -928,7 +943,7 @@ var StudentPageStudents = (function () {
         }
         return true;
       case 'spStudentGrade':
-        if (st.open && BULK[data.value] && 'show_overall_grade' in BULK[data.value]) {
+        if (gradeOffered(cid) && st.open && BULK[data.value] && 'show_overall_grade' in BULK[data.value]) {
           if (optionsOf(cid, st.open).grade !== data.value) {
             change(cid, [st.open], { show_overall_grade: data.value }, '#sps-grade-' + data.value);
           }
@@ -953,7 +968,8 @@ var StudentPageStudents = (function () {
           }
           return true;
         }
-        if (BULK[data.value]) change(cid, ids, BULK[data.value], '.sps-bar [data-value="' + data.value + '"]');
+        if (BULK[data.value] && ('paused' in BULK[data.value] || gradeOffered(cid)))
+          change(cid, ids, BULK[data.value], '.sps-bar [data-value="' + data.value + '"]');
         return true;
       }
       case 'spStudentClear':
@@ -1003,6 +1019,15 @@ var StudentPageStudents = (function () {
     _st(cid).picked = {};
   }
 
+  // Class Settings closed: every panel closes and its Escape goes, with nothing drawn.
+  function closeAll() {
+    Object.keys(_state).forEach(function (id) {
+      _state[id].open = null;
+      _state[id].fresh = false;
+    });
+    _unlisten();
+  }
+
   // Another class is drawn: this one's ticks and panel go.
   function leave(cid) {
     Object.keys(_state).forEach(function (id) {
@@ -1020,6 +1045,7 @@ var StudentPageStudents = (function () {
 
   return {
     offered: offered,
+    gradeOffered: gradeOffered,
     optionsOf: optionsOf,
     isException: isException,
     gradeWord: gradeWord,
@@ -1039,6 +1065,7 @@ var StudentPageStudents = (function () {
     close: close,
     leave: leave,
     clearPicked: clearPicked,
+    closeAll: closeAll,
     // The student whose panel is open in class `cid`, or null.
     openStudent: function (cid) {
       return _st(cid).open;

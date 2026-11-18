@@ -357,6 +357,16 @@ describe('signed in', () => {
 });
 
 describe('the Students list', () => {
+  // Demo Mode, where the class's Show Overall Grade row is offered (CmStudentPage.learningSettings).
+  let wasDemo;
+  beforeEach(() => {
+    wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true;
+  });
+  afterEach(() => {
+    window.isDemoMode = wasDemo;
+  });
+
   it('Work Sent and Overall Grade for each student; nothing about what a student opened', async () => {
     const box = await list();
     expect([...box.querySelectorAll('.sc-table thead th')].map(text)).toEqual([
@@ -583,6 +593,46 @@ describe('the Students list', () => {
     expect(text(p.querySelector('#sps-grade-hint'))).toBe(
       'Jordan’s overall grade stays off their page. Each piece’s result and feedback still show.',
     );
+  });
+
+  it('the panel closes with Class Settings, and opens again only when a name is pressed', async () => {
+    await list();
+    StudentPageStudents._setOpen(CID, 's1');
+    expect(StudentPageStudents.openStudent(CID)).toBe('s1');
+    DashClassManager.closeClassManager();
+    expect(StudentPageStudents.openStudent(CID)).toBe(null);
+    expect(parse(StudentCards.render(CID)).querySelector('.sps-panel')).toBe(null);
+  });
+
+  it('Show and Hide only where the class’s Show Overall Grade row is offered; Pause stays', async () => {
+    await list();
+    const was = CmStudentPage.learningSettings;
+    CmStudentPage.learningSettings = () => ({ offered: false, on: false });
+    try {
+      expect(StudentPageStudents.gradeOffered(CID)).toBe(false);
+      const p = panel('s1');
+      expect(p.querySelector('[data-action="spStudentGrade"]')).toBe(null);
+      expect(p.querySelector('#sps-page-paused')).not.toBe(null);
+      StudentPageStudents.handleChange({
+        dataset: { actionChange: 'spStudentPick', student: 's1' },
+        checked: true,
+        closest: () => ({ dataset: { cid: CID } }),
+      });
+      const bar = parse(StudentCards.render(CID)).querySelector('.sps-bar');
+      expect([...bar.querySelectorAll('button')].map(text)).toEqual([
+        'Pause Pages',
+        'Open Pages',
+        'Print New Cards',
+        'Clear',
+      ]);
+      StudentPageStudents.handleAction('spStudentBulk', {
+        dataset: { value: 'hide' },
+        closest: () => ({ dataset: { cid: CID } }),
+      });
+      expect(getStudentPageOptions(CID)).toEqual({});
+    } finally {
+      CmStudentPage.learningSettings = was;
+    }
   });
 
   it('every name goes through esc()', async () => {
