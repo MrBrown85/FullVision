@@ -925,9 +925,9 @@ grant execute on routine public.upsert_questionnaire(p_course_id uuid, p_kind te
 revoke all on routine public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) from public;
 grant execute on routine public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) to authenticated;
 grant execute on routine public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) to service_role;
-revoke all on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) from public;
-grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) to authenticated;
-grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) to service_role;
+revoke all on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) from public;
+grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) to authenticated;
+grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) to service_role;
 revoke all on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) from public;
 grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) to authenticated;
 grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) to service_role;
