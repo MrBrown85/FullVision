@@ -1,7 +1,8 @@
 /* rubric-checks.js — the level rule for Advanced Rubrics.
  *
  * An Advanced Rubric's level cells hold checkboxes as well as a descriptor
- * (criterion.checks: [{ id, level 1..4, label, displayOrder }]). While
+ * (criterion.checks: [{ id, level 1..4, label, displayOrder }]; 1..6 on a
+ * Six-Point rubric, whose levels are its six scores). While
  * scoring, the teacher ticks what they saw and FullVision suggests the
  * level: the highest level whose boxes are all ticked. A level with no
  * boxes is never suggested.
@@ -19,7 +20,9 @@
 window.RubricChecks = (function () {
   'use strict';
 
-  var LEVELS = [4, 3, 2, 1];
+  // Six-Point rubrics (shared/rubric-scale.js) use levels 5 and 6 as well; a
+  // four-level rubric has no boxes there, so it never reaches them.
+  var LEVELS = [6, 5, 4, 3, 2, 1];
 
   function _ids(ticked) {
     if (!ticked) return new Set();

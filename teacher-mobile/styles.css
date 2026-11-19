@@ -6842,3 +6842,30 @@ body.fv-switching-course::after {
     transform: none !important;
   }
 }
+
+/* Six-Point rubrics (shared/six-point.js): six score buttons, each filled
+   in the colour of the level it counts as (data-tone), a little tighter so
+   six fit a 375 px phone. */
+.m-six-btns:has(.m-level-btn) {
+  gap: 4px;
+}
+.m-score-btn.m-six-btn[data-tone='1'].m-score-active {
+  background: var(--score-1);
+  border-color: var(--score-1);
+}
+.m-score-btn.m-six-btn[data-tone='2'].m-score-active {
+  background: var(--score-2);
+  border-color: var(--score-2);
+}
+.m-score-btn.m-six-btn[data-tone='3'].m-score-active {
+  background: var(--score-3);
+  border-color: var(--score-3);
+}
+.m-score-btn.m-six-btn[data-tone='4'].m-score-active {
+  background: var(--score-4);
+  border-color: var(--score-4);
+}
+.m-six-btn .m-level-word {
+  font-size: 9.5px;
+  letter-spacing: -0.02em;
+}

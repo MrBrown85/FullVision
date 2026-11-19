@@ -4377,7 +4377,7 @@ begin
 
     for _row in select * from rubric where course_id = p_src_id loop
         _new_id := gen_random_uuid();
-        insert into rubric (id, course_id, name, style) values (_new_id, _new_course, _row.name, _row.style);
+        insert into rubric (id, course_id, name, style, scale) values (_new_id, _new_course, _row.name, _row.style, _row.scale);
         _rubric_map := _rubric_map || jsonb_build_object(_row.id::text, _new_id::text);
     end loop;
 
@@ -4385,12 +4385,14 @@ begin
         _new_id := gen_random_uuid();
         insert into criterion (id, rubric_id, name,
             level_4_descriptor, level_3_descriptor, level_2_descriptor, level_1_descriptor,
-            level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order)
+            level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order,
+            level_5_descriptor, level_6_descriptor)
         values (_new_id, (_rubric_map ->> _row.rubric_id::text)::uuid, _row.name,
             _row.level_4_descriptor, _row.level_3_descriptor,
             _row.level_2_descriptor, _row.level_1_descriptor,
             _row.level_4_value, _row.level_3_value, _row.level_2_value, _row.level_1_value,
-            _row.weight, _row.display_order);
+            _row.weight, _row.display_order,
+            _row.level_5_descriptor, _row.level_6_descriptor);
         _crit_map := _crit_map || jsonb_build_object(_row.id::text, _new_id::text);
     end loop;
 
@@ -5428,7 +5430,7 @@ begin
     select jsonb_build_object(
         'rubrics', coalesce((
             select jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'created_at', r.created_at,
-                                                'copy_group', r.copy_group, 'style', r.style)
+                                                'copy_group', r.copy_group, 'style', r.style, 'scale', r.scale)
                              order by r.created_at, r.id)
               from public.rubric r where r.course_id = p_course_id), '[]'::jsonb),
         'criteria', coalesce((
@@ -5436,6 +5438,7 @@ begin
                        'id', c.id, 'rubric_id', c.rubric_id, 'name', c.name,
                        'level_4_descriptor', c.level_4_descriptor, 'level_3_descriptor', c.level_3_descriptor,
                        'level_2_descriptor', c.level_2_descriptor, 'level_1_descriptor', c.level_1_descriptor,
+                       'level_5_descriptor', c.level_5_descriptor, 'level_6_descriptor', c.level_6_descriptor,
                        'level_4_value', c.level_4_value, 'level_3_value', c.level_3_value,
                        'level_2_value', c.level_2_value, 'level_1_value', c.level_1_value,
                        'weight', c.weight, 'display_order', c.display_order
@@ -7121,10 +7124,11 @@ begin
 
     if p_payload ? 'rubrics' then
       for _row in select * from jsonb_array_elements(p_payload->'rubrics') loop
-        insert into rubric (id, course_id, name, style)
+        insert into rubric (id, course_id, name, style, scale)
         values ((_row->>'id')::uuid, (_row->>'course_id')::uuid, coalesce(_row->>'name',''),
-                coalesce(_row->>'style','standard'))
-        on conflict (id) do update set name=excluded.name, style=excluded.style, updated_at=now();
+                coalesce(_row->>'style','standard'),
+                case when jsonb_typeof(_row->'scale') = 'array' then _row->'scale' end)
+        on conflict (id) do update set name=excluded.name, style=excluded.style, scale=excluded.scale, updated_at=now();
         _n_rub := _n_rub + 1;
       end loop;
     end if;
@@ -7133,7 +7137,8 @@ begin
       for _row in select * from jsonb_array_elements(p_payload->'criteria') loop
         insert into criterion (id, rubric_id, name,
           level_4_descriptor, level_3_descriptor, level_2_descriptor, level_1_descriptor,
-          level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order)
+          level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order,
+          level_5_descriptor, level_6_descriptor)
         values ((_row->>'id')::uuid, (_row->>'rubric_id')::uuid,
                 coalesce(_row->>'name',''),
                 _row->>'level_4_descriptor', _row->>'level_3_descriptor',
@@ -7143,11 +7148,13 @@ begin
                 coalesce((_row->>'level_2_value')::numeric, 2),
                 coalesce((_row->>'level_1_value')::numeric, 1),
                 coalesce((_row->>'weight')::numeric, 1.0),
-                coalesce((_row->>'display_order')::int, 0))
+                coalesce((_row->>'display_order')::int, 0),
+                _row->>'level_5_descriptor', _row->>'level_6_descriptor')
         on conflict (id) do update set
           name=excluded.name,
           level_4_descriptor=excluded.level_4_descriptor, level_3_descriptor=excluded.level_3_descriptor,
           level_2_descriptor=excluded.level_2_descriptor, level_1_descriptor=excluded.level_1_descriptor,
+          level_5_descriptor=excluded.level_5_descriptor, level_6_descriptor=excluded.level_6_descriptor,
           level_4_value=excluded.level_4_value, level_3_value=excluded.level_3_value,
           level_2_value=excluded.level_2_value, level_1_value=excluded.level_1_value,
           weight=excluded.weight, display_order=excluded.display_order, updated_at=now();
@@ -12066,7 +12073,7 @@ begin
     return _id;
 end; $function$;
 
-CREATE OR REPLACE FUNCTION public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid DEFAULT NULL::uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_style text DEFAULT NULL::text, p_linked_tag_ids jsonb DEFAULT NULL::jsonb)
+CREATE OR REPLACE FUNCTION public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid DEFAULT NULL::uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_style text DEFAULT NULL::text, p_linked_tag_ids jsonb DEFAULT NULL::jsonb, p_scale jsonb DEFAULT NULL::jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -12096,6 +12103,11 @@ begin
         raise exception 'p_style must be standard, advanced or single_point' using errcode = '22023';
     end if;
 
+    if p_scale is not null and (jsonb_typeof(p_scale) <> 'array'
+                                 or jsonb_array_length(p_scale) not in (0, 2, 3, 4, 5, 6)) then
+        raise exception 'p_scale must be an array of 2 to 6 levels, or empty' using errcode = '22023';
+    end if;
+
     if p_linked_tag_ids is not null and jsonb_typeof(p_linked_tag_ids) <> 'array' then
         raise exception 'p_linked_tag_ids must be a jsonb array' using errcode = '22023';
     end if;
@@ -12107,14 +12119,19 @@ begin
         end if;
         _is_insert := true;
 
-        insert into rubric (course_id, name, copy_group, style)
-        values (p_course_id, p_name, p_copy_group, coalesce(p_style, 'standard'))
+        insert into rubric (course_id, name, copy_group, style, scale)
+        values (p_course_id, p_name, p_copy_group, coalesce(p_style, 'standard'),
+                case when jsonb_array_length(coalesce(p_scale, '[]'::jsonb)) = 0 then null else p_scale end)
         returning id into _rubric_id;
     else
         -- A copy group is only ever set, never cleared, by a save. A save
         -- that names no style keeps the rubric's.
         update rubric set name = p_name, copy_group = coalesce(p_copy_group, copy_group),
-                          style = coalesce(p_style, style), updated_at = now()
+                          style = coalesce(p_style, style),
+                          scale = case when p_scale is null then scale
+                                       when jsonb_array_length(p_scale) = 0 then null
+                                       else p_scale end,
+                          updated_at = now()
          where id = p_id
         returning id into _rubric_id;
 
@@ -12133,6 +12150,8 @@ begin
                 level_3_descriptor = _elem->>'level_3_descriptor',
                 level_2_descriptor = _elem->>'level_2_descriptor',
                 level_1_descriptor = _elem->>'level_1_descriptor',
+                level_5_descriptor = _elem->>'level_5_descriptor',
+                level_6_descriptor = _elem->>'level_6_descriptor',
                 level_4_value      = coalesce((_elem->>'level_4_value')::numeric, 4),
                 level_3_value      = coalesce((_elem->>'level_3_value')::numeric, 3),
                 level_2_value      = coalesce((_elem->>'level_2_value')::numeric, 2),
@@ -12152,7 +12171,7 @@ begin
                 level_4_descriptor, level_3_descriptor,
                 level_2_descriptor, level_1_descriptor,
                 level_4_value, level_3_value, level_2_value, level_1_value,
-                weight, display_order
+                weight, display_order, level_5_descriptor, level_6_descriptor
             ) values (
                 _rubric_id,
                 _elem->>'name',
@@ -12163,7 +12182,8 @@ begin
                 coalesce((_elem->>'level_2_value')::numeric, 2),
                 coalesce((_elem->>'level_1_value')::numeric, 1),
                 coalesce((_elem->>'weight')::numeric, 1.0),
-                coalesce((_elem->>'display_order')::int, 0)
+                coalesce((_elem->>'display_order')::int, 0),
+                _elem->>'level_5_descriptor', _elem->>'level_6_descriptor'
             ) returning id into _crit_id;
         end if;
 
@@ -12188,8 +12208,10 @@ begin
             _kept_checks := '{}';
             for _check in select * from jsonb_array_elements(_elem->'checks') loop
                 _level := (_check->>'level')::int;
-                if _level is null or _level < 1 or _level > 4 then
-                    raise exception 'check level must be 1..4' using errcode = '22023';
+                if _level is null or _level < 1
+                   or _level > (case when (select scale from rubric where id = _rubric_id) is not null
+                                     then 6 else 4 end) then
+                    raise exception 'check level must be 1..4, or 1..6 on a rubric with its own levels' using errcode = '22023';
                 end if;
                 _check_id := null;
                 if _check ? 'id' and nullif(_check->>'id','') is not null then
@@ -14902,7 +14924,7 @@ begin
              where s.course_id = _course.id and s.removed_at is null), '{}'::jsonb),
         'rubrics', coalesce((
             select jsonb_agg(jsonb_build_object(
-                       'id', r.id, 'name', r.name, 'style', r.style,
+                       'id', r.id, 'name', r.name, 'style', r.style, 'scale', r.scale,
                        'criteria', coalesce((
                            select jsonb_agg(jsonb_build_object(
                                       'id', cr.id, 'name', cr.name, 'weight', cr.weight,
@@ -14910,6 +14932,7 @@ begin
                                       'level_3_value', cr.level_3_value, 'level_4_value', cr.level_4_value,
                                       'level_1_descriptor', cr.level_1_descriptor, 'level_2_descriptor', cr.level_2_descriptor,
                                       'level_3_descriptor', cr.level_3_descriptor, 'level_4_descriptor', cr.level_4_descriptor,
+                                      'level_5_descriptor', cr.level_5_descriptor, 'level_6_descriptor', cr.level_6_descriptor,
                                       -- The competencies this row counts toward, only those still on the class.
                                       'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
                                                              from criterion_tag x

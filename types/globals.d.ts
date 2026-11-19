@@ -104,6 +104,8 @@ declare var CommentBank: {
 // Observations card, the student's Voice and the class's report parts
 // (teacher/report-qn-voice-observations.js).
 interface Window {
+  // A rubric's own level columns (shared/rubric-scale.js).
+  RubricScale: any;
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;

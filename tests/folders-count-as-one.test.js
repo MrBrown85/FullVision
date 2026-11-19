@@ -288,29 +288,39 @@ describe('in Class Settings', () => {
     window.scrollTo = originalScrollTo;
   });
 
-  it('the Grading tab switch asks before changing grades', () => {
-    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
-    expect(main.innerHTML).toContain('Folders Count as One');
-    expect(main.innerHTML).toMatch(/id="cm-folders-count"[^>]*checked/);
-    expect(main.innerHTML).toContain('Each folder is averaged first and counts as one competency in the overall.');
+  it('How Folders Count, beside the competencies, sets each folder and asks before grades move', () => {
+    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'competencies' } });
+    expect(main.innerHTML).toContain('How Folders Count');
+    expect(main.innerHTML.match(/data-action="cmFolderCountChoice"[^>]*data-value="one"/g) || []).toHaveLength(2);
+    DashClassManager.handleAction('cmFolderCountChoice', { dataset: { grpid: 'g2', value: 'each' } });
+    expect(confirms).toHaveLength(1);
+    expect(confirms[0].title).toBe('Count Each Competency in Writing?');
+    confirms[0].run();
+    expect(group('g2').countsAsOne).toBe(false);
+    expect(getFoldersCountAsOne(CID)).toBe(true);
+  });
+
+  it('the class switch still asks before changing grades', () => {
     DashClassManager.handleChange({ dataset: { actionChange: 'cmFoldersCountAsOne' }, checked: false });
     expect(confirms).toHaveLength(1);
     expect(confirms[0].title).toBe('Count Every Competency the Same?');
     expect(confirms[0].message).toContain('1 of your 1 students');
-    expect(confirms[0].message).toContain('approved comments keep what they say');
-    expect(getFoldersCountAsOne(CID)).toBe(true);
     confirms[0].run();
     expect(getFoldersCountAsOne(CID)).toBe(false);
-    expect(main.innerHTML).not.toMatch(/id="cm-folders-count"[^>]*checked/);
-    expect(main.innerHTML).toContain('Every competency counts the same in the overall. Folders only group them.');
+    // With it off, As One on a folder turns it back on for that folder only.
+    DashClassManager.handleAction('cmFolderCountChoice', { dataset: { grpid: 'g1', value: 'one' } });
+    if (confirms.length > 1) confirms[1].run();
+    expect(getFoldersCountAsOne(CID)).toBe(true);
+    expect(group('g1').countsAsOne).toBe(true);
+    expect(group('g2').countsAsOne).toBe(false);
   });
 
   it('says so when the class has no folders with competencies', () => {
     _cache.learningMaps[CID].sections.forEach(function (s) {
       delete s.groupId;
     });
-    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
-    expect(main.innerHTML).toContain('This class has no folders with competencies yet.');
+    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'competencies' } });
+    expect(main.innerHTML).not.toContain('How Folders Count');
     // Nothing moves, so it changes without asking.
     DashClassManager.handleChange({ dataset: { actionChange: 'cmFoldersCountAsOne' }, checked: false });
     expect(confirms).toHaveLength(0);
@@ -355,6 +365,6 @@ describe('in Class Settings', () => {
     _cache.courseConfigs[CID].foldersCountAsOne = false;
     DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'competencies' } });
     expect(main.innerHTML).not.toContain('cmFolderCountsAsOne');
-    expect(main.innerHTML).toContain('Folders Count as One is off in Grading');
+    expect(main.innerHTML).toContain('folders only group them');
   });
 });

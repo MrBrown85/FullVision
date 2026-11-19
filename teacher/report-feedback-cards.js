@@ -139,6 +139,7 @@
   function _levelTable(rubric) {
     var order = rubric.levelOrder && rubric.levelOrder.length ? rubric.levelOrder : LEVELS;
     var advanced = rubric.style === 'advanced';
+    var six = !!rubric.scale && !!window.RubricScale;
     var cols = order.length + 1;
     var head =
       '<thead><tr><th class="fb-c1">' +
@@ -146,7 +147,7 @@
       '</th>' +
       order
         .map(function (lv) {
-          return '<th>' + _e(_levelName(lv)) + '</th>';
+          return '<th>' + _e(six ? RubricScale.label(rubric, lv) : _levelName(lv)) + '</th>';
         })
         .join('') +
       '</tr></thead>';

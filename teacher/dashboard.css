@@ -8923,3 +8923,59 @@ button.rb-v-prompt {
     transition: none;
   }
 }
+
+/* How Folders Count, beside the competency list: each folder with its
+   own As One | Each. */
+.cm-fc-intro {
+  margin: 4px 0 8px;
+  line-height: 1.4;
+}
+.cm-fc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.cm-fc-name {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.cm-fc-title {
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cm-fc-segs {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+}
+.cm-fc-seg {
+  min-width: 58px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cm-fc-seg.is-on {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.cm-fc-example {
+  margin: 8px 2px 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}

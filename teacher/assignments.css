@@ -11533,3 +11533,306 @@ button.grader-member-name {
   padding: 4px 14px;
   font-size: 13px;
 }
+
+/* ── Six-Point rubrics (shared/six-point.js) ──────────────────────────
+   Six scores where a rubric has four levels: the editor's level cards, the
+   checklist columns and the score buttons, each score in the colour of the
+   level it counts as. */
+/* Two rows of three: six columns leave the checkbox labels unreadable. */
+.rubric-editor.six-point .rubric-levels {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rubric-editor.six-point .rubric-level-card {
+  border-bottom: 1px solid var(--border);
+}
+.rubric-editor.six-point .rubric-level-card:nth-child(3n) {
+  border-right: none;
+}
+.rubric-editor.six-point .rubric-level-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.rubric-level-counts {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rsg-criterion-row.is-six .rsg-checklist,
+.grdt-crit.is-six .rsg-checklist {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.sp6-levels {
+  display: flex;
+  gap: 0;
+}
+button.sp6-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.sp6-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1.1;
+  padding: 2px 2px;
+}
+.rsg-level.sp6-btn {
+  height: 40px;
+}
+.sp6-num {
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+.sp6-word {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sp6-btn.is-on .sp6-word,
+.sp6-btn.active .sp6-word {
+  font-weight: 600;
+}
+@container (max-width: 360px) {
+  .sp6-word {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .rubric-editor.six-point .rubric-levels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rubric-editor.six-point .rubric-level-card:nth-child(3n) {
+    border-right: 1px solid var(--border);
+  }
+  .rubric-editor.six-point .rubric-level-card:nth-child(2n) {
+    border-right: none;
+  }
+}
+@media (max-width: 560px) {
+  .rubric-editor.six-point .rubric-levels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── The rubric editor window (Nov 19) ────────────────────────────────
+   New and Edit from the Rubric Bank: the Blank Rubric card, large, over
+   the page. Its level headers are typed in place, each with a ▾ menu, and
+   a + adds a level (shared/rubric-scale.js). */
+.rb-ed-overlay {
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+.rb-ed-window {
+  display: flex;
+  flex-direction: column;
+  width: min(1480px, 100%);
+  max-height: calc(100vh - 48px);
+  border-radius: 16px;
+  background: var(--bg, var(--surface));
+  box-shadow:
+    0 0 0 1px var(--af-card-edge),
+    0 24px 64px rgba(0, 0, 0, 0.28);
+  overflow: auto;
+}
+.rb-ed-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px 10px;
+}
+.rb-ed-title {
+  margin: 0;
+  font-size: var(--text-xl, 1.35rem);
+  font-weight: 700;
+  color: var(--text);
+}
+.rb-ed-hint {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.rb-ed-window > .rubric-guard-note {
+  margin: 0 24px 8px;
+}
+.rb-ed-window > .af-ge-card {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0 24px 24px;
+}
+/* Room under the grid for a level's menu; the window scrolls, not the grid. */
+.rb-ed-window > .af-ge-card > .af-ge-body {
+  min-height: 300px;
+}
+.rb-ed-window .af-ge-name {
+  min-width: 320px;
+}
+.rb-ed-window .af-ge-text {
+  min-height: 120px;
+}
+
+/* Level headers: the name typed on the colour, its number, a ▾ menu. */
+.af-ge-level-head {
+  position: relative;
+  white-space: normal;
+}
+.af-ge-level-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.af-ge-colname {
+  flex: 1;
+  min-width: 0;
+  margin: -3px 0 -3px -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+}
+.af-ge-colname:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.af-ge-colname:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.af-rubric-card .af-ge-level-head .rb-level-value {
+  float: none;
+  flex: none;
+}
+.af-ge-colmore {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.af-ge-colmore:hover,
+.af-ge-colmore[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.22);
+  opacity: 1;
+}
+.af-ge-counts-line {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  opacity: 0.9;
+}
+.af-ge-colmenu {
+  position: absolute;
+  z-index: 7;
+  right: 0;
+  top: calc(100% + 6px);
+  display: grid;
+  gap: 2px;
+  width: 230px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--af-card-edge),
+    0 12px 28px rgba(0, 0, 0, 0.18);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text);
+  text-align: left;
+}
+.af-ge-counts {
+  display: grid;
+  gap: 4px;
+  padding: 4px 6px 8px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.af-card .af-ge-counts .af-input,
+.af-ge-counts .af-input {
+  width: 100%;
+  height: 32px;
+}
+.af-ge-colnote {
+  margin: 0;
+  padding: 4px 6px 8px;
+  color: var(--text-3);
+}
+.af-ge-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.af-ge-menu-item:hover:not(:disabled) {
+  background: var(--overlay-hover);
+}
+.af-ge-menu-item:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.af-ge-menu-item.is-danger {
+  color: var(--score-1);
+}
+.af-ge-menu-row {
+  display: flex;
+  gap: 2px;
+  margin: 0 -4px;
+}
+.af-ge-menu-row .af-ge-menu-item {
+  width: auto;
+  flex: 1;
+  text-align: center;
+}
+/* The + at the far end of the header row. */
+.af-ge-addcol-head,
+.af-ge-addcol-cell {
+  width: 40px;
+  padding: 0;
+}
+.af-ge-addcol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px dashed var(--af-card-edge, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
+}
+.af-ge-addcol:hover {
+  border-color: var(--active);
+  color: var(--active);
+}

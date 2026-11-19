@@ -695,48 +695,59 @@ window.PageAssignments = (function () {
   // html-safe: names, words, check labels and comments through esc; ids are ours; levels are numbers
   function _rubricTilesHtml(cid, a, rubric, st, advanced) {
     var order = levelOrderFor(cid);
+    // A Six-Point rubric's six scores take the four levels' place (no ± of their own).
+    var six = !!window.RubricScale && RubricScale.has(rubric) ? rubric : null;
     var ticked = advanced ? getRubricCheckIds(cid, st.id, a.id) : [];
     var html = '';
     (rubric.criteria || []).forEach(function (crit) {
       if (!crit) return;
       var state = _criterionState(cid, st.id, a.id, crit);
+      var cur = six && state.level ? RubricScale.fromStored(six, state.level, state.mod) : state.level;
       var hasChecks = advanced && RubricChecks.hasChecks(crit);
-      var advice = hasChecks ? _checklistAdvice(crit, ticked, state.level) : null;
+      var advice = hasChecks
+        ? six
+          ? _sixChecklistAdvice(six, crit, ticked, cur)
+          : _checklistAdvice(crit, ticked, state.level)
+        : null;
       var open = hasChecks && _isChecklistOpen(a.id, st.id, crit.id);
       var note = getRubricCriterionComment(cid, st.id, a.id, crit);
       var noteKey = _checklistKey(a.id, st.id, crit.id);
       var writing = _graderNotesOpen.has(noteKey);
       var name = esc(crit.name || 'Criterion');
-      var seg = order
-        .map(function (lv) {
-          var on = state.level === lv;
-          var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
-          var btn =
-            '<button type="button" class="grdl-level' +
-            (on ? ' is-on l' + lv + (state.mixed ? ' mixed' : '') : '') +
-            '" data-action="graderLevel" data-critid="' +
-            crit.id +
-            '" data-level="' +
-            lv +
-            '" aria-pressed="' +
-            on +
-            '"' +
-            (words ? ' title="' + esc(PROF_LABELS[lv] + ': ' + words) + '"' : '') +
-            '>' +
-            PROF_LABELS[lv] +
-            '</button>';
-          return on
-            ? _graderPickHtml(
-                btn,
-                lv,
-                state.mixed ? 0 : state.level,
-                state.mod,
-                'data-action="graderMod" data-critid="' + crit.id + '"',
-                state.mixed,
-              )
-            : btn;
-        })
-        .join('');
+      var seg = six
+        ? _sixButtonsHtml(cid, six, crit, cur, 'grdl-level', function () {
+            return 'data-action="graderSix" data-critid="' + crit.id + '"';
+          })
+        : order
+            .map(function (lv) {
+              var on = state.level === lv;
+              var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
+              var btn =
+                '<button type="button" class="grdl-level' +
+                (on ? ' is-on l' + lv + (state.mixed ? ' mixed' : '') : '') +
+                '" data-action="graderLevel" data-critid="' +
+                crit.id +
+                '" data-level="' +
+                lv +
+                '" aria-pressed="' +
+                on +
+                '"' +
+                (words ? ' title="' + esc(PROF_LABELS[lv] + ': ' + words) + '"' : '') +
+                '>' +
+                PROF_LABELS[lv] +
+                '</button>';
+              return on
+                ? _graderPickHtml(
+                    btn,
+                    lv,
+                    state.mixed ? 0 : state.level,
+                    state.mod,
+                    'data-action="graderMod" data-critid="' + crit.id + '"',
+                    state.mixed,
+                  )
+                : btn;
+            })
+            .join('');
       var count = hasChecks ? RubricChecks.tickedCount(crit, ticked) : null;
       var chips =
         (hasChecks
@@ -769,7 +780,12 @@ window.PageAssignments = (function () {
         _COMMENT_ICON +
         'Comment</button>';
       var checklist = '';
-      if (open) {
+      if (open && six) {
+        checklist =
+          '<div class="rsg-checklist grdr-checklist">' +
+          _sixChecklistColsHtml(cid, six, crit, ticked, cur, 'data-action="graderTick"') +
+          '</div>';
+      } else if (open) {
         checklist = '<div class="rsg-checklist grdr-checklist">';
         order.forEach(function (lv) {
           checklist +=
@@ -823,6 +839,7 @@ window.PageAssignments = (function () {
           : '';
       html +=
         '<section class="grdt-crit grdr-crit' +
+        (six ? ' is-six' : '') +
         (open ? ' is-open' : '') +
         '" tabindex="0" data-critid="' +
         crit.id +
@@ -836,7 +853,7 @@ window.PageAssignments = (function () {
         (advice && advice.suggested
           ? // A level picked by hand stays; the hover says so (nothing moves).
             '<span class="grdr-suggested l' +
-            advice.suggested +
+            (six ? advice.tone : advice.suggested) +
             '"' +
             (advice.hint ? ' title="' + esc(advice.hint) + '"' : '') +
             '>' +
@@ -844,7 +861,11 @@ window.PageAssignments = (function () {
             '</span>'
           : '') +
         '</div>' +
-        '<div class="grdl-controls grdr-levels"><div class="grdl-seg" role="group" aria-label="Level">' +
+        '<div class="grdl-controls grdr-levels"><div class="grdl-seg' +
+        (six ? ' sp6-levels' : '') +
+        '" role="group" aria-label="' +
+        (six ? 'Score' : 'Level') +
+        '">' +
         seg +
         '</div></div>' +
         checklist +
@@ -5186,16 +5207,19 @@ window.PageAssignments = (function () {
   /* The editor's Cancel: a draft with writing in it asks first. Editing a
      rubric made on the form leaves that rubric as it was. */
   function _cancelBlank() {
-    if (!_blankWritten()) return closeStart(true);
+    var inModal = _blank && _blank.host === 'modal';
+    var done = function () {
+      if (inModal) _closeRubricModal();
+      else closeStart(true);
+    };
+    if (!_blankWritten()) return done();
     var name = String((_blank && _blank.draft.name) || '').trim();
     _formDialog('Discard This Rubric?', (name || 'This rubric') + ' isn\u2019t saved. What you wrote in it is lost.', [
       { label: 'Keep Editing', style: 'cancel' },
       {
         label: 'Discard',
         style: 'danger',
-        run: function () {
-          closeStart(true);
-        },
+        run: done,
       },
     ]);
   }
@@ -5221,7 +5245,87 @@ window.PageAssignments = (function () {
     };
   }
   function _blankLevels(cid, draft) {
-    return rubricStyle(draft) === 'single_point' ? [3] : levelOrderFor(cid);
+    if (rubricStyle(draft) === 'single_point') return [3];
+    // Its own level columns (shared/rubric-scale.js), in the class's order.
+    if (window.RubricScale && RubricScale.has(draft)) return RubricScale.keys(draft, levelOrderFor(cid));
+    return levelOrderFor(cid);
+  }
+  /* One level's header: its name typed in place, its number, a ▾ menu
+     (Counts As, Insert Before, Insert After, Remove Level) and, on a rubric
+     with its own columns, what it counts as. As other gradebooks do. */
+  // html-safe: names through esc; numbers and ids are ours
+  function _blankLevelHeadHtml(d, lv) {
+    var own = window.RubricScale && RubricScale.has(d);
+    var name = own ? RubricScale.name(d, lv) : PROF_LABELS[lv];
+    var tone = own ? RubricScale.tone(d, lv) : lv;
+    var open = _blank.colMenu === lv;
+    var cols = own ? RubricScale.columns(d).length : 4;
+    var menu = '';
+    if (open) {
+      var steps = own ? RubricScale.stepsFor(d, lv) : [];
+      var now = own ? RubricScale.toStored(d, lv) : { level: lv, mod: 0 };
+      menu =
+        '<div class="af-ge-colmenu" role="group" aria-label="' +
+        esc(name + ' settings') +
+        '">' +
+        (own
+          ? '<label class="af-ge-counts">Counts As <select class="af-input" data-ge="colcounts" data-k="' +
+            lv +
+            '">' +
+            steps
+              .map(function (st) {
+                var on = st.level === now.level && st.mod === now.mod;
+                return (
+                  '<option value="' +
+                  st.level +
+                  ':' +
+                  st.mod +
+                  '"' +
+                  (on ? ' selected' : '') +
+                  '>' +
+                  esc(st.text) +
+                  '</option>'
+                );
+              })
+              .join('') +
+            '</select></label>'
+          : '<p class="af-ge-colnote">Counts as ' + esc(PROF_LABELS[lv]) + '. Add or rename a level to choose.</p>') +
+        (cols < RubricScale.MAX
+          ? '<button type="button" class="af-ge-menu-item" data-action="geColInsert" data-k="' +
+            lv +
+            '" data-side="before">Insert Level Before</button>' +
+            '<button type="button" class="af-ge-menu-item" data-action="geColInsert" data-k="' +
+            lv +
+            '" data-side="after">Insert Level After</button>'
+          : '') +
+        (cols > RubricScale.MIN
+          ? '<button type="button" class="af-ge-menu-item is-danger" data-action="geColRemove" data-k="' +
+            lv +
+            '">Remove Level</button>'
+          : '') +
+        '</div>';
+    }
+    return (
+      '<th scope="col" class="rb-level-head af-ge-level-head l' +
+      tone +
+      (open ? ' is-open' : '') +
+      '"><div class="af-ge-level-top"><input class="af-ge-colname" type="text" data-ge="colname" data-k="' +
+      lv +
+      '" value="' +
+      esc(name) +
+      '" aria-label="Level name" maxlength="40"><span class="rb-level-value">' +
+      lv +
+      '</span><button type="button" class="af-ge-colmore" data-action="geColMenu" data-k="' +
+      lv +
+      '" aria-expanded="' +
+      open +
+      '" aria-label="' +
+      esc(name + ' options') +
+      '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>' +
+      (own ? '<span class="af-ge-counts-line">Counts as ' + esc(RubricScale.countsAs(d, lv)) + '</span>' : '') +
+      menu +
+      '</th>'
+    );
   }
 
   function _blankCardHtml(cid, inPlace) {
@@ -5229,6 +5333,8 @@ window.PageAssignments = (function () {
     var d = _blank.draft;
     var style = rubricStyle(d);
     var levels = _blankLevels(cid, d);
+    var own = !!window.RubricScale && RubricScale.has(d);
+    var canAddCol = style !== 'single_point' && !!window.RubricScale && levels.length < RubricScale.MAX;
     var head =
       '<div class="af-rubric-card-head">' +
       '<input class="af-input af-ge-name" id="af-ge-name" type="text" autocomplete="off" placeholder="Name This Rubric" aria-label="Rubric name" value="' +
@@ -5261,31 +5367,32 @@ window.PageAssignments = (function () {
     var grid =
       '<table class="rb-grid af-ge-grid' +
       (style === 'single_point' ? ' is-single-point' : '') +
+      (canAddCol ? ' has-addcol' : '') +
+      ' cols-' +
+      levels.length +
       '"><thead><tr><th class="rb-crit-head" scope="col">Criterion</th>' +
       levels
         .map(function (lv) {
-          return (
-            '<th scope="col" class="rb-level-head l' +
-            lv +
-            '"><span>' +
-            (style === 'single_point' ? 'Proficient Standard' : PROF_LABELS[lv]) +
-            '</span>' +
-            (style === 'single_point' ? '' : '<span class="rb-level-value">' + lv + '</span>') +
-            '</th>'
-          );
+          if (style !== 'single_point') return _blankLevelHeadHtml(d, lv);
+          return '<th scope="col" class="rb-level-head l3"><span>Proficient Standard</span></th>';
         })
         .join('') +
+      (canAddCol
+        ? '<th scope="col" class="af-ge-addcol-head"><button type="button" class="af-ge-addcol" data-action="geColAdd" title="Add a level" aria-label="Add a level"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></th>'
+        : '') +
       '</tr></thead><tbody>' +
       d.criteria
         .map(function (c, i) {
-          return _blankRowHtml(cid, d, c, i, levels, style);
+          return _blankRowHtml(cid, d, c, i, levels, style) + '';
         })
         .join('') +
       '</tbody></table>';
     var foot =
       '<div class="af-tag-rubric-note af-ge-foot">' +
       '<button type="button" class="af-link-btn" data-action="geAddCrit">+ Add Criterion</button>' +
-      '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-1">+ From Competency</button>' +
+      (own
+        ? ''
+        : '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-1">+ From Competency</button>') +
       (_blank.picker && _blank.picker.i === -1 ? _blankPickerHtml(cid, -1) : '') +
       '</div>';
     return (
@@ -5336,7 +5443,7 @@ window.PageAssignments = (function () {
         '" value="' +
         esc(String(c.weight != null ? c.weight : 1)) +
         '"></label>' +
-        (style === 'single_point'
+        (style === 'single_point' || (window.RubricScale && RubricScale.has(d))
           ? ''
           : '<div class="af-ge-points"><span>Points</span>' +
             // In the grid's order (Emerging first unless the class says otherwise).
@@ -5357,6 +5464,20 @@ window.PageAssignments = (function () {
               })
               .join('') +
             '</div>') +
+        '<div class="af-ge-menu-row">' +
+        '<button type="button" class="af-ge-menu-item" data-action="geDupCrit" data-i="' +
+        i +
+        '">Duplicate</button>' +
+        '<button type="button" class="af-ge-menu-item" data-action="geMoveCrit" data-dir="-1" data-i="' +
+        i +
+        '"' +
+        (i > 0 ? '' : ' disabled') +
+        '>Move Up</button>' +
+        '<button type="button" class="af-ge-menu-item" data-action="geMoveCrit" data-dir="1" data-i="' +
+        i +
+        '"' +
+        (i < d.criteria.length - 1 ? '' : ' disabled') +
+        '>Move Down</button></div>' +
         '<button type="button" class="af-link-btn af-ge-remove" data-action="geRemoveCrit" data-i="' +
         i +
         '"' +
@@ -5365,6 +5486,7 @@ window.PageAssignments = (function () {
       : '';
     var cells = levels
       .map(function (lv) {
+        var lvName = window.RubricScale && RubricScale.has(d) ? RubricScale.name(d, lv) : PROF_LABELS[lv];
         var checks =
           style === 'advanced' && window.RubricChecks
             ? '<div class="af-ge-checks">' +
@@ -5395,9 +5517,9 @@ window.PageAssignments = (function () {
           '" data-level="' +
           lv +
           '" placeholder="' +
-          esc('What does ' + String(PROF_LABELS[lv]).toLowerCase() + ' look like?') +
+          esc('What does ' + String(lvName).toLowerCase() + ' look like?') +
           '" aria-label="' +
-          esc((c.name || 'Criterion') + ', ' + PROF_LABELS[lv]) +
+          esc((c.name || 'Criterion') + ', ' + lvName) +
           '">' +
           esc((c.levels && c.levels[lv]) || '') +
           '</textarea>' +
@@ -5425,6 +5547,10 @@ window.PageAssignments = (function () {
       (_blank.picker && _blank.picker.i === i ? _blankPickerHtml(cid, i) : '') +
       '</th>' +
       cells +
+      // The + column's empty cell, so the rows line up under it.
+      (style !== 'single_point' && window.RubricScale && levels.length < RubricScale.MAX
+        ? '<td class="af-ge-addcol-cell" aria-hidden="true"></td>'
+        : '') +
       '</tr>'
     );
   }
@@ -5556,20 +5682,27 @@ window.PageAssignments = (function () {
     var a = document.activeElement;
     var keep =
       focusSel ||
-      (a && a.dataset && a.dataset.ge
-        ? '[data-ge="' +
-          a.dataset.ge +
-          '"][data-i="' +
-          a.dataset.i +
-          '"]' +
-          (a.dataset.level ? '[data-level="' + a.dataset.level + '"]' : '') +
-          (a.dataset.k ? '[data-k="' + a.dataset.k + '"]' : '')
-        : a && a.id
-          ? '#' + a.id
-          : null);
-    _renderRubricView();
-    var back = keep ? document.querySelector('.af-ge-card ' + keep) : null;
+      (a && a.dataset && a.dataset.ge && a.dataset.k
+        ? '[data-ge="' + a.dataset.ge + '"][data-k="' + a.dataset.k + '"]'
+        : a && a.dataset && a.dataset.ge
+          ? '[data-ge="' +
+            a.dataset.ge +
+            '"][data-i="' +
+            a.dataset.i +
+            '"]' +
+            (a.dataset.level ? '[data-level="' + a.dataset.level + '"]' : '') +
+            (a.dataset.k ? '[data-k="' + a.dataset.k + '"]' : '')
+          : a && a.id
+            ? '#' + a.id
+            : null);
+    var inModal = _blank && _blank.host === 'modal';
+    if (inModal) _renderRubricModal();
+    else _renderRubricView();
+    var back = keep ? document.querySelector((inModal ? '#rubric-modal ' : '') + '.af-ge-card ' + keep) : null;
     if (back) back.focus({ preventScroll: true });
+    // A text box drawn again keeps its cursor at the end of what was typed.
+    if (back && back.type === 'text' && typeof back.setSelectionRange === 'function')
+      back.setSelectionRange(back.value.length, back.value.length);
     _blankSizeCells();
   }
   // Each row's level cells take the height of its longest one, so the
@@ -5624,6 +5757,23 @@ window.PageAssignments = (function () {
     }
     var kind = t.dataset && t.dataset.ge;
     if (!kind) return;
+    // A level's name, typed in its header; Counts As, picked in its menu.
+    if (kind === 'colname' || kind === 'colcounts') {
+      _blank.touched = true;
+      var k = Number(t.dataset.k);
+      if (kind === 'colname') {
+        var was = window.RubricScale && RubricScale.has(d);
+        RubricScale.renameLevel(d, k, t.value);
+        // The first rename gives the rubric its own columns: redraw so
+        // each header says what it counts as.
+        if (!was && RubricScale.has(d)) _blankRender();
+        return;
+      }
+      var parts = String(t.value).split(':');
+      RubricScale.setLevelCounts(d, k, Number(parts[0]), Number(parts[1]));
+      _blankRender('[data-ge="colcounts"][data-k="' + k + '"]');
+      return;
+    }
     var c = d.criteria[Number(t.dataset.i)];
     if (!c) return;
     _blank.touched = true;
@@ -5656,6 +5806,9 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     if (action === 'geStyle') {
       d.style = el.dataset.style;
+      // A Single-Point rubric states one standard: its own columns go.
+      if (d.style === 'single_point' && d.scale) d.scale = null;
+      _blank.colMenu = null;
       _blank.touched = true;
     } else if (action === 'geAddCrit') {
       d.criteria.push(_newBlankCriterion(d.criteria.length + 1));
@@ -5663,6 +5816,21 @@ window.PageAssignments = (function () {
       _blankRender('[data-ge="name"][data-i="' + (d.criteria.length - 1) + '"]');
       return;
     } else if (action === 'geRemoveCrit') {
+      var gone = d.criteria[i];
+      var scoredOn = gone && _blank.host === 'modal' ? _rubricScored[gone.id] || 0 : 0;
+      if (scoredOn && !el.dataset.confirmed) {
+        showConfirm(
+          'Remove a scored criterion?',
+          RubricGuard.removeMessage(gone, scoredOn),
+          'Remove and drop scores',
+          'danger',
+          function () {
+            el.dataset.confirmed = '1';
+            _blankAct('geRemoveCrit', el);
+          },
+        );
+        return;
+      }
       if (d.criteria.length > 1) d.criteria.splice(i, 1);
       _blank.menu = null;
       _blank.touched = true;
@@ -5741,8 +5909,74 @@ window.PageAssignments = (function () {
         _blankRender('[data-ge="check"][data-i="' + i + '"][data-level="' + lv + '"][data-k="' + k + '"]');
         return;
       }
+    } else if (action === 'geColMenu') {
+      var mk = Number(el.dataset.k);
+      _blank.colMenu = _blank.colMenu === mk ? null : mk;
+      _blank.menu = null;
+      _blank.picker = null;
+      _blankRender('[data-action="geColMenu"][data-k="' + mk + '"]');
+      return;
+    } else if (action === 'geColAdd' || action === 'geColInsert' || action === 'geColRemove') {
+      // Levels are kept low to high; the + adds one at the grid's far end.
+      var asc = Number(levelOrderFor(cid)[0]) === 1;
+      var cols = RubricScale.columns(d);
+      var pos = cols.findIndex(function (cc) {
+        return cc.k === Number(el.dataset.k);
+      });
+      var done;
+      if (action === 'geColRemove') done = RubricScale.removeLevel(d, Number(el.dataset.k));
+      else {
+        var at =
+          action === 'geColAdd'
+            ? asc
+              ? cols.length
+              : 0
+            : // Before and After are as the teacher sees the grid.
+              (el.dataset.side === 'after') === asc
+              ? pos + 1
+              : pos;
+        done = RubricScale.insertLevel(d, at, 'New Level');
+      }
+      if (!done) return;
+      _blank.colMenu = null;
+      _blank.touched = true;
+      if (action === 'geColRemove') return _blankRender();
+      var made = RubricScale.columns(d).filter(function (cc) {
+        return cc.name === 'New Level';
+      })[0];
+      _blankRender(made ? '[data-ge="colname"][data-k="' + made.k + '"]' : null);
+      var box = made && document.querySelector('.af-ge-card [data-ge="colname"][data-k="' + made.k + '"]');
+      if (box) box.select();
+      return;
     } else if (action === 'geSave') {
-      _blankSave(false);
+      if (_blank.host === 'modal') _saveModalRubric();
+      else _blankSave(false);
+      return;
+    } else if (action === 'geDupCrit' || action === 'geMoveCrit') {
+      // ··· Duplicate puts a copy (new ids, no scores) under the criterion;
+      // Move Up and Move Down swap it with its neighbour.
+      var src = d.criteria[i];
+      if (!src) return;
+      if (action === 'geDupCrit') {
+        var copy = structuredClone(src);
+        copy.id = uid();
+        copy.name = (src.name || 'Criterion') + ' (Copy)';
+        copy.checks = (copy.checks || []).map(function (k) {
+          return Object.assign({}, k, { id: uid() });
+        });
+        d.criteria.splice(i + 1, 0, copy);
+        _blank.menu = null;
+        _blank.touched = true;
+        _blankRender('[data-ge="name"][data-i="' + (i + 1) + '"]');
+        return;
+      }
+      var to = i + Number(el.dataset.dir);
+      if (to < 0 || to >= d.criteria.length) return;
+      d.criteria.splice(i, 1);
+      d.criteria.splice(to, 0, src);
+      _blank.menu = to;
+      _blank.touched = true;
+      _blankRender('[data-action="geMoveCrit"][data-i="' + to + '"][data-dir="' + el.dataset.dir + '"]');
       return;
     }
     _blankRender();
@@ -6022,16 +6256,10 @@ window.PageAssignments = (function () {
     _openFormRubricEditor(copy);
   }
 
+  // Edit a Copy: the copy opens in the editor window, held for the form on save.
   function _openFormRubricEditor(rubric) {
-    _closeRubricsPanel();
-    _whenWordingLoaded();
-    _rubricBefore = null;
-    _rubricScored = {};
-    _editingRubric = rubric;
-    _editingRubric._isNew = true;
-    _editingRubric._forForm = true;
-    _rubricDirty = false;
-    renderRubricEditor();
+    _openRubricModal(rubric, true, true);
+    _blank.forForm = true;
   }
 
   /* Use This Rubric (rubric starts PR 2, replacing Draft From
@@ -8328,6 +8556,206 @@ window.PageAssignments = (function () {
     });
   }
 
+  /* ── Six-Point rubrics (shared/rubric-scale.js) ──────────────
+     A Six-Point criterion is scored 6 to 1 and stored as the level and ±
+     the score counts as, so these read and write through the score's
+     stored pair. No ± of its own: the six scores are the grain. */
+  /* The assessment's rubric when it has level columns of its own
+     (shared/rubric-scale.js), else null. */
+  function _sixRubricOf(cid, aid) {
+    if (!window.RubricScale) return null;
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var rubric = assess && assess.rubricId ? getRubricById(cid, assess.rubricId) : null;
+    return RubricScale.has(rubric) ? rubric : null;
+  }
+  // The criterion's six-point score for one student, 0 for none.
+  function _sixScoreNow(cid, sid, aid, crit) {
+    var state = _criterionState(cid, sid, aid, crit);
+    var rubric = _sixRubricOf(cid, aid);
+    return state.level && rubric ? RubricScale.fromStored(rubric, state.level, state.mod) : 0;
+  }
+  // Writes a six-point score (0 clears) under every key the criterion uses.
+  function _writeSixScore(cid, sid, aid, crit, key) {
+    var stored = key ? RubricScale.toStored(_sixRubricOf(cid, aid), key) : null;
+    rubricCriterionScoreKeys(crit).forEach(function (tid) {
+      Grader.setLevel(cid, sid, aid, tid, stored ? stored.level : 0, stored ? stored.mod : 0);
+    });
+  }
+  /* What the ticks say on a Six-Point criterion, in its scores' words. */
+  function _sixChecklistAdvice(rubric, crit, ticked, current) {
+    var suggested = RubricChecks.suggestedLevel(crit, ticked);
+    return {
+      suggested: suggested,
+      tone: RubricScale.tone(rubric, suggested),
+      head: suggested ? 'Suggested: ' + RubricScale.label(rubric, suggested) : 'No Level Suggested Yet',
+      hint: !suggested
+        ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
+        : current && current !== suggested
+          ? 'You picked ' + RubricScale.label(rubric, current) + '. Ticks keep your choice until you clear the level.'
+          : '',
+    };
+  }
+  // html-safe: check labels through esc; ids are ours; scores are numbers
+  function _sixChecklistColsHtml(cid, rubric, crit, ticked, current, inputAttrs) {
+    return RubricScale.keys(rubric, levelOrderFor(cid))
+      .map(function (k) {
+        return (
+          '<div class="rsg-checklist-col l' +
+          RubricScale.tone(rubric, k) +
+          (current === k ? ' is-chosen' : '') +
+          '" data-level="' +
+          k +
+          '" data-level-name="' +
+          esc(RubricScale.label(rubric, k)) +
+          '">' +
+          RubricChecks.checksAt(crit, k)
+            .map(function (check) {
+              return (
+                '<label class="rsg-check grdt-check"><input type="checkbox" ' +
+                inputAttrs +
+                ' data-critid="' +
+                crit.id +
+                '" data-checkid="' +
+                check.id +
+                '"' +
+                (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
+                '><span>' +
+                esc(check.label) +
+                '</span></label>'
+              );
+            })
+            .join('') +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+  // The six score buttons. `attrs(k)` gives each its action.
+  // html-safe: score names are fixed words; attrs are ids and numbers
+  function _sixButtonsHtml(cid, rubric, crit, current, cls, attrs) {
+    return RubricScale.keys(rubric, levelOrderFor(cid))
+      .map(function (k) {
+        var on = current === k;
+        var stored = RubricScale.toStored(rubric, k);
+        var words = (crit.levels && (crit.levels[k] || crit.levels[String(k)])) || '';
+        return (
+          '<button type="button" class="' +
+          cls +
+          ' sp6-btn l' +
+          RubricScale.tone(rubric, k) +
+          (on ? ' is-on active' : '') +
+          '" data-six="' +
+          k +
+          '" ' +
+          attrs(k) +
+          ' aria-pressed="' +
+          on +
+          '" title="' +
+          esc(
+            RubricScale.label(rubric, k) +
+              ' (counts as ' +
+              scoreLevelText(stored.level, stored.mod) +
+              ')' +
+              (words ? ': ' + words : ''),
+          ) +
+          '"><span class="sp6-num">' +
+          k +
+          '</span><span class="sp6-word">' +
+          esc(RubricScale.name(rubric, k)) +
+          '</span></button>'
+        );
+      })
+      .join('');
+  }
+
+  /* One Six-Point criterion for one student in the whole-class grid. */
+  // html-safe: names, labels and comments through esc; ids are ours
+  function _sixCriterionRowHtml(cid, aid, sid, crit) {
+    var rubric = _sixRubricOf(cid, aid);
+    var current = _sixScoreNow(cid, sid, aid, crit);
+    var hasChecks = _isAdvancedRubric(rubric) && RubricChecks.hasChecks(crit);
+    var open = hasChecks && _isChecklistOpen(aid, sid, crit.id);
+    var ticked = hasChecks ? getRubricCheckIds(cid, sid, aid) : [];
+    var advice = open ? _sixChecklistAdvice(rubric, crit, ticked, current) : null;
+    var commentBtn = criterionCommentButtonHtml(aid, sid, crit);
+    var note = getRubricCriterionComment(cid, sid, aid, crit);
+    return (
+      '<div class="rsg-criterion-row is-six' +
+      (open ? ' has-checklist' : '') +
+      '" data-student="' +
+      sid +
+      '" data-assess="' +
+      aid +
+      '" data-criterion="' +
+      crit.id +
+      '">' +
+      '<div class="rsg-criterion-side">' +
+      '<div class="rsg-criterion-label" data-chip-tip-name="' +
+      esc(crit.name) +
+      '"><span class="rsg-criterion-name">' +
+      esc(crit.name) +
+      '</span></div>' +
+      '<div class="rsg-crit-tools">' +
+      (hasChecks ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>' : '') +
+      commentBtn +
+      '</div>' +
+      (advice
+        ? '<div class="rsg-checklist-advice' +
+          (advice.suggested ? ' l' + advice.tone : '') +
+          '"><span class="rsg-checklist-head">' +
+          esc(advice.head) +
+          '</span>' +
+          (advice.hint ? '<span class="rsg-checklist-hint">' + esc(advice.hint) + '</span>' : '') +
+          '</div>'
+        : '') +
+      '</div>' +
+      '<div class="rsg-criterion-main">' +
+      '<div class="rsg-levels sp6-levels" role="group" aria-label="Score">' +
+      _sixButtonsHtml(cid, rubric, crit, current, 'rsg-level', function (k) {
+        return (
+          'data-action="selectSixScore" data-aid="' + aid + '" data-sid="' + sid + '" data-critid="' + crit.id + '"'
+        );
+      }) +
+      '</div>' +
+      (note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '') +
+      (open
+        ? '<div class="rsg-checklist" data-aid="' +
+          aid +
+          '" data-sid="' +
+          sid +
+          '" data-critid="' +
+          crit.id +
+          '">' +
+          _sixChecklistColsHtml(
+            cid,
+            rubric,
+            crit,
+            ticked,
+            current,
+            'data-action="tickRubricCheck" data-aid="' + aid + '" data-sid="' + sid + '"',
+          ) +
+          '</div>'
+        : '') +
+      '</div></div>'
+    );
+  }
+  /* Picking a score sets it; picking the chosen one again clears it. */
+  function selectSixScore(aid, sid, critId, key) {
+    var cid = activeCourse;
+    var crit = getRubricCriterion(aid, critId);
+    if (!crit || !RubricScale.isKey(_sixRubricOf(cid, aid), key)) return;
+    var current = _sixScoreNow(cid, sid, aid, crit);
+    var next = current === key ? 0 : key;
+    if (next && isScoreLocked(cid, sid, aid)) return;
+    var before = next ? null : structuredClone(getScores(cid));
+    _writeSixScore(cid, sid, aid, crit, next);
+    refreshSidebarGrades(sid);
+    _refreshChecklistRow(aid, sid, critId, false);
+    if (before) _offerClearUndo(cid, before);
+  }
+
   /* ── Rubric Grading ─────────────────────────────────────── */
   function getRubricCriterion(aid, critId) {
     var assess = getAssessments(activeCourse).find(function (a) {
@@ -9150,6 +9578,20 @@ window.PageAssignments = (function () {
     }
     var before = getRubricCheckIds(cid, sid, aid);
     var after = Grader.setTick(cid, sid, aid, checkId, el.checked);
+    if (_sixRubricOf(cid, aid)) {
+      var nowSix = _sixScoreNow(cid, sid, aid, crit);
+      var nextSix = RubricChecks.levelAfterTick(crit, nowSix, before, after);
+      if (nextSix !== nowSix) {
+        _writeSixScore(cid, sid, aid, crit, nextSix);
+        refreshSidebarGrades(sid);
+      }
+      _refreshChecklistRow(aid, sid, critId, false);
+      var box = document.querySelector(
+        '.rsg-checklist input[data-sid="' + sid + '"][data-aid="' + aid + '"][data-checkid="' + checkId + '"]',
+      );
+      if (box) box.focus();
+      return;
+    }
     var current = _criterionLevelNow(cid, aid, sid, crit);
     var next = RubricChecks.levelAfterTick(crit, current, before, after);
     if (next !== current) {
@@ -9233,6 +9675,7 @@ window.PageAssignments = (function () {
      a column of boxes under each level button, inside the row. */
   // html-safe: criterion names, check labels and comments through esc; levels are numbers; ids are ours
   function _rubricCriterionRowHtml(cid, aid, sid, crit, studentScores, advanced, single) {
+    if (_sixRubricOf(cid, aid)) return _sixCriterionRowHtml(cid, aid, sid, crit);
     var tagMods = [];
     var tagScores = rubricCriterionScoreKeys(crit).map(function (tid) {
       var entry = studentScores.find(function (s) {
@@ -9417,32 +9860,137 @@ window.PageAssignments = (function () {
     if (window.RubricBank) RubricBank.close();
   }
   /* A new rubric in the style the Rubric Bank's "+ New Rubric" menu picks:
-     Standard, Advanced or Single-Point. */
-  function newRubricUI(style) {
+     Standard, Advanced, Single-Point or Six-Point. `template` is one of the
+     English 12 scoring guides (SixPoint.templates), a Six-Point rubric with
+     its wording and checkboxes filled in. */
+  function newRubricUI(style, template) {
     _closeRubricsPanel();
     _whenWordingLoaded();
     _rubricBefore = null;
-    _editingRubric = {
-      id: uid(),
-      name: 'New Rubric',
-      created: new Date().toISOString(),
-      style: rubricStyle({ style: style }),
-      criteria: [{ id: uid(), name: 'Criterion 1', tagIds: [], levels: { 4: '', 3: '', 2: '', 1: '' }, checks: [] }],
-      _isNew: true,
-    };
-    _rubricDirty = false;
-    renderRubricEditor();
+    var next = rubricStyle({ style: style });
+    var draft;
+    if (template && window.RubricScale) draft = RubricScale.fromTemplate(template, uid);
+    else {
+      draft = _newBlankDraft();
+      draft.style = next;
+      // "Six-Point Rubric": the six-point columns, no wording yet.
+      if (style === 'six_point') {
+        draft.style = 'advanced';
+        draft.scale = RubricScale.BC_SIX.map(function (c) {
+          return Object.assign({}, c);
+        });
+        draft.criteria[0].name = 'Overall';
+      }
+    }
+    draft.created = new Date().toISOString();
+    _openRubricModal(draft, true, !!template);
   }
   function editRubricUI(rubricId) {
     var rubric = getRubricById(activeCourse, rubricId);
     if (!rubric) return;
-    _closeRubricsPanel();
-    _whenWordingLoaded();
     _rubricBefore = structuredClone(rubric);
     _rubricScored = RubricGuard.scoredStudentsByCriterion(activeCourse, rubric);
-    _editingRubric = structuredClone(rubric);
+    _openRubricModal(structuredClone(rubric), false, false);
+  }
+
+  /* ── The rubric editor window (Nov 19) ─────────────────────
+     New and Edit from the Rubric Bank open the Blank Rubric card (the
+     assessment form's editor) in a large window, so a rubric is built the
+     same way wherever it is built. The card's state is `_blank`, with
+     host 'modal'; a Blank draft open on the form waits in _formBlank. */
+  var _formBlank = null;
+  function _openRubricModal(draft, isNew, touched) {
+    _closeRubricsPanel();
+    _whenWordingLoaded();
+    if (isNew) {
+      _rubricBefore = null;
+      _rubricScored = {};
+    }
+    if (_blank && _blank.host !== 'modal') _formBlank = _blank;
+    _blank = _blankState(draft, true);
+    _blank.host = 'modal';
+    _blank.isNew = isNew;
+    // A template is written in already: Cancel asks before dropping it.
+    if (touched) _blank.orig = '';
+    _renderRubricModal('#af-ge-name');
+    _blankSizeCells();
+  }
+  function _renderRubricModal(focusSel) {
+    if (!_blank || _blank.host !== 'modal') return;
+    var modal = document.getElementById('rubric-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.className = 'rubric-modal-overlay rb-ed-overlay';
+      modal.id = 'rubric-modal';
+      modal.setAttribute('data-action', 'rubricModalBackdrop');
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-label', _blank.isNew ? 'New Rubric' : 'Edit Rubric');
+      document.body.appendChild(modal);
+    }
+    var note = _rubricBefore
+      ? RubricGuard.topChangeNote(RubricGuard.reviewEdit(_rubricBefore, _blank.draft, _rubricScored))
+      : '';
+    // html-safe: _blankCardHtml escapes every name, label and descriptor; the note is set as text below
+    modal.innerHTML =
+      '<div class="rb-ed-window"><div class="rb-ed-head"><h2 class="rb-ed-title">' +
+      (_blank.isNew ? 'New Rubric' : 'Edit Rubric') +
+      '</h2><p class="rb-ed-hint" id="rb-ed-hint"></p>' +
+      '<button type="button" class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
+      '<p class="rubric-guard-note" id="re-guard-note" hidden></p>' +
+      _blankCardHtml(activeCourse, true) +
+      '</div>';
+    var hint = document.getElementById('rb-ed-hint');
+    if (hint) hint.textContent = _RUBRIC_STYLE_HINTS[rubricStyle(_blank.draft)] || '';
+    var guard = document.getElementById('re-guard-note');
+    if (guard) {
+      guard.textContent = note;
+      guard.hidden = !note;
+    }
+    if (focusSel) {
+      var to = modal.querySelector(focusSel);
+      if (to) to.focus({ preventScroll: true });
+    }
+  }
+  function _closeRubricModal() {
+    var modal = document.getElementById('rubric-modal');
+    if (modal) modal.remove();
+    _blank = _formBlank;
+    _formBlank = null;
+    _editingRubric = null;
+    _rubricBefore = null;
+    _rubricScored = {};
     _rubricDirty = false;
-    renderRubricEditor();
+  }
+  /* Save Rubric in the window: into the class's rubrics, as the editor
+     always saved (saveRubricEdit). */
+  function _saveModalRubric() {
+    var d = _blank.draft;
+    var name = String(d.name || '').trim();
+    var input = document.querySelector('#rubric-modal #af-ge-name');
+    if (!name) {
+      if (input) {
+        input.classList.add('is-invalid');
+        input.placeholder = 'Name this rubric to save it';
+        input.focus();
+      }
+      return;
+    }
+    var held = structuredClone(d);
+    held.name = name;
+    held.criteria = held.criteria.map(function (c, n) {
+      return Object.assign(c, { name: String(c.name || '').trim() || 'Criterion ' + (n + 1) });
+    });
+    if (_blank.isNew) held._isNew = true;
+    if (_blank.forForm) held._forForm = true;
+    _editingRubric = held;
+    var before = _rubricBefore;
+    var scored = _rubricScored;
+    _blank = _formBlank;
+    _formBlank = null;
+    _rubricBefore = before;
+    _rubricScored = scored;
+    saveRubricEdit(name);
   }
   function deleteRubricUI(rubricId) {
     var rubric = getRubricById(activeCourse, rubricId);
@@ -9492,17 +10040,19 @@ window.PageAssignments = (function () {
       // level cell as well (Rubric Bank plan \u00a75). Single-Point: the
       // Proficient standard only (grader plan PR 15).
       '<div class="seg seg-sm rubric-style-seg" role="radiogroup" aria-label="Rubric Style">' +
-      RUBRIC_STYLES.map(function (s) {
-        return (
-          '<button type="button" class="seg-btn" role="radio" aria-checked="' +
-          (style === s) +
-          '" data-action="setRubricStyle" data-style="' +
-          s +
-          '">' +
-          _RUBRIC_STYLE_NAMES[s] +
-          '</button>'
-        );
-      }).join('') +
+      _editorStyles(r)
+        .map(function (s) {
+          return (
+            '<button type="button" class="seg-btn" role="radio" aria-checked="' +
+            (style === s) +
+            '" data-action="setRubricStyle" data-style="' +
+            s +
+            '">' +
+            _RUBRIC_STYLE_NAMES[s] +
+            '</button>'
+          );
+        })
+        .join('') +
       '</div>' +
       '<button class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
       '<div class="rubric-editor-body"><p class="rubric-guard-note" id="re-guard-note" hidden></p>' +
@@ -9519,7 +10069,9 @@ window.PageAssignments = (function () {
     });
     html +=
       '</div></div><div class="rubric-editor-footer"><button class="rubric-add-criterion-btn" data-action="addCriterion">+ Add Criterion</button>' +
-      '<button class="rubric-add-criterion-btn" data-action="criterionFromCompetency" title="Add criteria for competencies, with their descriptors drafted">+ From Competency</button>' +
+      (style === 'six_point'
+        ? ''
+        : '<button class="rubric-add-criterion-btn" data-action="criterionFromCompetency" title="Add criteria for competencies, with their descriptors drafted">+ From Competency</button>') +
       '<button class="btn btn-ghost" data-action="cancelRubricEdit">Cancel</button><button class="btn btn-primary" data-action="saveRubricEdit">Save Rubric</button></div></div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
     setTimeout(function () {
@@ -9530,17 +10082,47 @@ window.PageAssignments = (function () {
   function _editorIsAdvanced() {
     return !!_editingRubric && rubricStyle(_editingRubric) === 'advanced';
   }
+  function _editorIsSixPoint() {
+    return false;
+  }
+  // Advanced and Six-Point rubrics hold checkboxes in each level.
+  function _editorHasChecks() {
+    return _editorIsAdvanced() || _editorIsSixPoint();
+  }
+  /* The styles the editor offers. Six-Point is offered in English and Social
+     Studies classes (SixPoint.courseOffers). Its six levels don't fit the
+     four-level styles, so only a rubric not yet saved switches in or out. */
+  function _editorStyles(r) {
+    var style = rubricStyle(r);
+    var offered = false;
+    return RUBRIC_STYLES.filter(function (s) {
+      if (r._isNew) return s !== 'six_point' || offered || style === 'six_point';
+      return style === 'six_point' ? s === 'six_point' : s !== 'six_point';
+    });
+  }
   function _editorIsSinglePoint() {
     return !!_editingRubric && rubricStyle(_editingRubric) === 'single_point';
   }
-  var _RUBRIC_STYLE_NAMES = { standard: 'Standard', advanced: 'Advanced', single_point: 'Single-Point' };
-  var _RUBRIC_STYLE_CLASS = { standard: '', advanced: ' advanced', single_point: ' single-point' };
+  var _RUBRIC_STYLE_NAMES = {
+    standard: 'Standard',
+    advanced: 'Advanced',
+    single_point: 'Single-Point',
+    six_point: 'Six-Point',
+  };
+  var _RUBRIC_STYLE_CLASS = {
+    standard: '',
+    advanced: ' advanced',
+    single_point: ' single-point',
+    six_point: ' advanced six-point',
+  };
   var _RUBRIC_STYLE_HINTS = {
     standard: '',
     advanced:
       'Each level has a descriptor and checkboxes. When scoring, ticking boxes suggests the level: the highest level whose boxes are all ticked. You can always pick a different level.',
     single_point:
       'Write only what meeting the standard looks like. When scoring, you pick a level and can note what to work on and where the student went beyond.',
+    six_point:
+      'The BC six-point scale, scored holistically: 6 Superior to 1 Unacceptable. Each score has a descriptor and checkboxes; ticking boxes suggests the highest score whose boxes are all ticked. Each score counts as the FullVision level shown under it. A blank paper (NR) is Missing.',
   };
   /* ── Advanced Rubrics: the checkboxes in each level cell ──────────── */
   /* One level cell's checkbox list: a row per checkbox (drag handle, box,
@@ -9665,7 +10247,7 @@ window.PageAssignments = (function () {
     if (!_editingRubric) return;
     var next = rubricStyle({ style: style });
     if (rubricStyle(_editingRubric) === next) return;
-    if (next !== 'advanced' && RubricChecks.countChecks(_editingRubric) > 0) {
+    if (next !== 'advanced' && next !== 'six_point' && RubricChecks.countChecks(_editingRubric) > 0) {
       showConfirm(
         'Switch to a ' + _RUBRIC_STYLE_NAMES[next] + ' Rubric?',
         'The checkboxes in every level will be removed. Students’ scores keep their levels.',
@@ -9681,11 +10263,29 @@ window.PageAssignments = (function () {
   }
   function _applyRubricStyle(next) {
     if (!_editingRubric) return;
+    var wasSix = rubricStyle(_editingRubric) === 'six_point';
     _editingRubric.style = next;
-    if (next !== 'advanced') {
+    if (next !== 'advanced' && next !== 'six_point') {
       _editingRubric.criteria.forEach(function (c) {
         if (c) c.checks = [];
       });
+    }
+    // Into or out of Six-Point (a new rubric only): levels 5 and 6 come or go.
+    if (wasSix !== (next === 'six_point')) {
+      _editingRubric.criteria.forEach(function (c) {
+        if (!c) return;
+        c.levels = Object.assign(_blankEditorLevels(next), c.levels || {});
+        if (next !== 'six_point') {
+          delete c.levels[5];
+          delete c.levels[6];
+          c.checks = (c.checks || []).filter(function (k) {
+            return k && Number(k.level) <= 4;
+          });
+        }
+      });
+      _rubricDirty = true;
+      renderRubricEditor();
+      return;
     }
     _rubricDirty = true;
     document.querySelectorAll('.rubric-style-seg .seg-btn').forEach(function (b) {
@@ -9693,8 +10293,9 @@ window.PageAssignments = (function () {
     });
     var editor = document.querySelector('#rubric-modal .rubric-editor');
     if (editor) {
-      editor.classList.toggle('advanced', next === 'advanced');
+      editor.classList.toggle('advanced', next === 'advanced' || next === 'six_point');
       editor.classList.toggle('single-point', next === 'single_point');
+      editor.classList.toggle('six-point', next === 'six_point');
     }
     var hint = document.getElementById('re-style-hint');
     if (hint) {
@@ -9707,7 +10308,7 @@ window.PageAssignments = (function () {
   function _dropBlankChecks(rubric) {
     (rubric.criteria || []).forEach(function (c) {
       if (!c || !c.checks) return;
-      [4, 3, 2, 1].forEach(function (level) {
+      [6, 5, 4, 3, 2, 1].forEach(function (level) {
         _setLevelChecks(
           c,
           level,
@@ -9718,10 +10319,22 @@ window.PageAssignments = (function () {
       });
     });
   }
-  /* The editor's level columns, in the class's Rubric Levels order. */
+  /* The editor's level columns, in the class's Rubric Levels order. A
+     Six-Point rubric's are its six scores, each in the colour of the level it
+     counts as. */
   function _rubricEditorLevels() {
+    if (_editorIsSixPoint())
+      return RubricScale.keys(_editingRubric, levelOrderFor(activeCourse)).map(function (n) {
+        var stored = RubricScale.toStored(_editingRubric, n);
+        return {
+          n: n,
+          name: RubricScale.label(_editingRubric, n),
+          tone: RubricScale.tone(_editingRubric, n),
+          countsAs: scoreLevelText(stored.level, stored.mod),
+        };
+      });
     return levelOrderFor(activeCourse).map(function (n) {
-      return { n: n, name: PROF_LABELS[n] };
+      return { n: n, name: PROF_LABELS[n], tone: n };
     });
   }
   // A tag's teacher-facing name. Never the id: real tag ids are UUIDs.
@@ -9861,7 +10474,7 @@ window.PageAssignments = (function () {
     var lv = crit.levelValues || {};
     // One competency: its I-can statements can draft the four descriptors.
     var draftBtn = '';
-    if (window.RubricDraft && (crit.tagIds || []).length === 1) {
+    if (window.RubricDraft && !_editorIsSixPoint() && (crit.tagIds || []).length === 1) {
       var draftTag = getTagById(activeCourse, crit.tagIds[0]);
       if (draftTag) {
         var generic = !RubricDraft.statementsOf(draftTag).length;
@@ -9888,24 +10501,32 @@ window.PageAssignments = (function () {
       '</div><div class="rubric-levels">';
     // A single-point rubric states only the Proficient standard; the other
     // levels' wording and point values are kept, just not shown.
-    (single ? [{ n: 3, name: PROF_LABELS[3] }] : _rubricEditorLevels()).forEach(function (L) {
+    (single ? [{ n: 3, name: PROF_LABELS[3], tone: 3 }] : _rubricEditorLevels()).forEach(function (L) {
       var pts = lv[L.n] != null ? lv[L.n] : L.n;
+      // A Six-Point score has no points of its own: it counts as its level.
+      var ptsHtml = L.countsAs
+        ? '<span class="rubric-level-counts" title="What this score counts as in grades">Counts as ' +
+          esc(L.countsAs) +
+          '</span>'
+        : '<label class="rubric-level-pts" title="Points for ' +
+          L.name +
+          '"><input class="rubric-level-value" type="number" step="0.5" min="0" value="' +
+          esc(pts) +
+          '" data-crit="' +
+          ci +
+          '" data-level="' +
+          L.n +
+          '" data-action-blur="critLevelValue" aria-label="' +
+          L.name +
+          ' points"> pts</label>';
       html +=
         '<div class="rubric-level-card" style="--lvl:var(--score-' +
-        L.n +
+        L.tone +
         ')"><div class="rubric-level-header"><span class="rubric-level-name">' +
-        (single ? 'Meeting the Standard' : L.name) +
-        '</span><label class="rubric-level-pts" title="Points for ' +
-        L.name +
-        '"><input class="rubric-level-value" type="number" step="0.5" min="0" value="' +
-        esc(pts) +
-        '" data-crit="' +
-        ci +
-        '" data-level="' +
-        L.n +
-        '" data-action-blur="critLevelValue" aria-label="' +
-        L.name +
-        ' points"> pts</label></div><textarea class="rubric-level-text" data-crit="' +
+        (single ? 'Meeting the Standard' : esc(L.name)) +
+        '</span>' +
+        ptsHtml +
+        '</div><textarea class="rubric-level-text" data-crit="' +
         ci +
         '" data-level="' +
         L.n +
@@ -9916,7 +10537,7 @@ window.PageAssignments = (function () {
         '">' +
         esc((crit.levels && crit.levels[L.n]) || '') +
         '</textarea>' +
-        (_editorIsAdvanced() ? _renderCheckList(ci, crit, L) : '') +
+        (_editorHasChecks() ? _renderCheckList(ci, crit, L) : '') +
         '</div>';
     });
     html += '</div></div></div></div>';
@@ -9990,6 +10611,15 @@ window.PageAssignments = (function () {
     });
     mount.innerHTML = h;
   }
+  // A criterion's empty descriptors: six on a Six-Point rubric, else four.
+  function _blankEditorLevels(style) {
+    var levels = { 4: '', 3: '', 2: '', 1: '' };
+    if (style === 'six_point') {
+      levels[6] = '';
+      levels[5] = '';
+    }
+    return levels;
+  }
   function addCriterion() {
     if (!_editingRubric) return;
     _rubricDirty = true;
@@ -10001,7 +10631,7 @@ window.PageAssignments = (function () {
       id: uid(),
       name: 'Criterion ' + num,
       tagIds: [],
-      levels: { 4: '', 3: '', 2: '', 1: '' },
+      levels: _blankEditorLevels(rubricStyle(_editingRubric)),
       weight: 1,
       levelValues: null,
       checks: [],
@@ -10231,6 +10861,7 @@ window.PageAssignments = (function () {
     note.hidden = !text;
   }
   function cancelRubricEdit() {
+    if (_blank && _blank.host === 'modal') return _cancelBlank();
     // P7.8: route through the in-app confirm dialog so it matches the rest of
     // the destructive-action UX (focus trap, Esc handling, restored focus).
     function _doCancel() {
@@ -10253,10 +10884,10 @@ window.PageAssignments = (function () {
       _doCancel,
     );
   }
-  function saveRubricEdit() {
+  function saveRubricEdit(givenName) {
     if (!_editingRubric) return;
     var nameInput = document.getElementById('re-name');
-    var rubricName = (nameInput ? nameInput.value : '').trim();
+    var rubricName = givenName || (nameInput ? nameInput.value : '').trim();
     if (!rubricName) {
       if (nameInput) {
         nameInput.style.border = '2px solid var(--score-1)';
@@ -11379,6 +12010,24 @@ window.PageAssignments = (function () {
       geSave: function () {
         _blankAct('geSave', el);
       },
+      geDupCrit: function () {
+        _blankAct('geDupCrit', el);
+      },
+      geColMenu: function () {
+        _blankAct('geColMenu', el);
+      },
+      geColAdd: function () {
+        _blankAct('geColAdd', el);
+      },
+      geColInsert: function () {
+        _blankAct('geColInsert', el);
+      },
+      geColRemove: function () {
+        _blankAct('geColRemove', el);
+      },
+      geMoveCrit: function () {
+        _blankAct('geMoveCrit', el);
+      },
       startFromPast: function () {
         startFromPast();
       },
@@ -11582,6 +12231,13 @@ window.PageAssignments = (function () {
       },
       setChecklistMode: function () {
         setChecklistMode(el.dataset.mode);
+      },
+      selectSixScore: function () {
+        selectSixScore(el.dataset.aid, el.dataset.sid, el.dataset.critid, parseInt(el.dataset.six, 10));
+      },
+      graderSix: function () {
+        if (e.target.closest('.grdt-check')) return;
+        _graderSetLevel(_graderAid(el), el.dataset.critid, parseInt(el.dataset.six, 10));
       },
       selectRubricScore: function () {
         selectRubricScore(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.critid);
@@ -12166,6 +12822,19 @@ window.PageAssignments = (function () {
     }
     if (!_kbFocusEl) return;
     var key = e.key;
+    // A Six-Point row takes 1 to 6, the scores themselves.
+    var sixRow = _kbFocusEl.classList.contains('is-six');
+    if (sixRow && ['1', '2', '3', '4', '5', '6'].includes(key)) {
+      e.preventDefault();
+      var six = _kbFocusEl.querySelector('.sp6-btn[data-six="' + key + '"]');
+      if (six) six.click();
+      navigateKb('down');
+      return;
+    }
+    if (sixRow && ['+', '=', '-', '_'].includes(key)) {
+      e.preventDefault();
+      return;
+    }
     if (['1', '2', '3', '4'].includes(key)) {
       e.preventDefault();
       var val = parseInt(key, 10);
@@ -12756,6 +13425,12 @@ window.PageAssignments = (function () {
     if (!(card || tagCard) || e.metaKey || e.ctrlKey || e.altKey) return false;
     var aid = _graderAid(t);
     var up = e.key === '+' || e.key === '=';
+    // A Six-Point criterion takes 1 to 6, the scores themselves.
+    if (card && card.classList.contains('is-six') && ['5', '6'].indexOf(e.key) >= 0) {
+      e.preventDefault();
+      _graderSetLevel(aid, card.dataset.critid, parseInt(e.key, 10));
+      return true;
+    }
     if (['1', '2', '3', '4'].indexOf(e.key) >= 0) {
       e.preventDefault();
       if (card) _graderSetLevel(aid, card.dataset.critid, parseInt(e.key, 10));
@@ -16541,6 +17216,20 @@ window.PageAssignments = (function () {
     if (!aid || !focusStudentId) return;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
+    // On a Six-Point rubric `level` is the score, 1 to 6.
+    if (_sixRubricOf(activeCourse, aid)) {
+      if (!RubricScale.isKey(_sixRubricOf(activeCourse, aid), level)) return;
+      var nowSix = _sixScoreNow(activeCourse, focusStudentId, aid, crit);
+      var nextSix = nowSix === level ? 0 : level;
+      if (nextSix && isScoreLocked(activeCourse, focusStudentId, aid)) return;
+      var beforeSix = nextSix ? null : structuredClone(getScores(activeCourse));
+      _writeSixScore(activeCourse, focusStudentId, aid, crit, nextSix);
+      refreshSidebarGrades(focusStudentId);
+      render();
+      _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
+      if (beforeSix) _offerClearUndo(activeCourse, beforeSix);
+      return;
+    }
     var state = _criterionState(activeCourse, focusStudentId, aid, crit);
     var next = state.level === level && !state.mixed ? 0 : level;
     var before = next ? null : structuredClone(getScores(activeCourse));
@@ -16554,6 +17243,7 @@ window.PageAssignments = (function () {
   }
   function _graderSetMod(aid, critId, mod) {
     if (!aid || !focusStudentId) return;
+    if (_sixRubricOf(activeCourse, aid)) return;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
     var state = _criterionState(activeCourse, focusStudentId, aid, crit);
@@ -16608,12 +17298,18 @@ window.PageAssignments = (function () {
     }
     var before = getRubricCheckIds(cid, focusStudentId, aid);
     var after = Grader.setTick(cid, focusStudentId, aid, checkId, on);
-    var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
-    var next = RubricChecks.levelAfterTick(crit, current, before, after);
-    if (next !== current)
-      rubricCriterionScoreKeys(crit).forEach(function (tid) {
-        Grader.setLevel(cid, focusStudentId, aid, tid, next);
-      });
+    if (_sixRubricOf(cid, aid)) {
+      var nowSix = _sixScoreNow(cid, focusStudentId, aid, crit);
+      var nextSix = RubricChecks.levelAfterTick(crit, nowSix, before, after);
+      if (nextSix !== nowSix) _writeSixScore(cid, focusStudentId, aid, crit, nextSix);
+    } else {
+      var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
+      var next = RubricChecks.levelAfterTick(crit, current, before, after);
+      if (next !== current)
+        rubricCriterionScoreKeys(crit).forEach(function (tid) {
+          Grader.setLevel(cid, focusStudentId, aid, tid, next);
+        });
+    }
     refreshSidebarGrades(focusStudentId);
     render();
     var root = _graderRoot(aid);

@@ -17,6 +17,10 @@ function _rubricName(rubric) {
   return (rubric && (rubric.name || rubric.title)) || '';
 }
 function _rubricCriteriaPayload(rubric) {
+  // A rubric with level columns of its own (shared/rubric-scale.js) may
+  // use slots 5 and 6 for descriptors and checkboxes.
+  var six = _rubricScale(rubric).length > 0;
+  var topLevel = six ? 6 : 4;
   return (rubric && rubric.criteria ? rubric.criteria : []).map(function (crit, idx) {
     var levels = crit && crit.levels ? crit.levels : {};
     var levelValues = crit && crit.levelValues ? crit.levelValues : {};
@@ -31,6 +35,10 @@ function _rubricCriteriaPayload(rubric) {
         crit && crit.displayOrder != null && !isNaN(Number(crit.displayOrder)) ? Number(crit.displayOrder) : idx,
       linkedTagIds: crit && crit.tagIds ? crit.tagIds : [],
     };
+    if (six) {
+      payload.level6Descriptor = levels[6] || levels['6'] || '';
+      payload.level5Descriptor = levels[5] || levels['5'] || '';
+    }
     if (levelValues[4] != null || levelValues['4'] != null)
       payload.level4Value = Number(levelValues[4] != null ? levelValues[4] : levelValues['4']);
     if (levelValues[3] != null || levelValues['3'] != null)
@@ -46,7 +54,7 @@ function _rubricCriteriaPayload(rubric) {
     var perLevel = {};
     payload.checks = (crit && crit.checks ? crit.checks : [])
       .filter(function (check) {
-        return check && Number(check.level) >= 1 && Number(check.level) <= 4;
+        return check && Number(check.level) >= 1 && Number(check.level) <= topLevel;
       })
       .map(function (check) {
         var level = Number(check.level);
@@ -62,6 +70,19 @@ function _rubricCriteriaPayload(rubric) {
 /* 'advanced' or 'single_point' when the rubric says so; anything else, a
    missing field included, is a Standard rubric. */
 var RUBRIC_STYLES = ['standard', 'advanced', 'single_point'];
+/* A rubric's own level columns as saved: [] for the four FullVision
+   levels (rubric.scale, migrations/2026111901_rubric_levels.sql). */
+function _rubricScale(rubric) {
+  var s = rubric && !rubric.kind && Array.isArray(rubric.scale) ? rubric.scale : [];
+  if (s.length < 2) return [];
+  return s
+    .map(function (c) {
+      return { k: Number(c.k), name: String(c.name || ''), level: Number(c.level), mod: Number(c.mod) || 0 };
+    })
+    .sort(function (a, b) {
+      return a.k - b.k;
+    });
+}
 function rubricStyle(rubric) {
   return rubric && RUBRIC_STYLES.indexOf(rubric.style) > 0 ? rubric.style : 'standard';
 }
@@ -70,7 +91,7 @@ async function _loadCanonicalRubrics(cid) {
   if (!sb || !_isUuid(cid) || typeof sb.from !== 'function') return [];
   if (_signInWait) await _signInWait; // not read before start-up's re-check has passed
 
-  var rubricsQuery = sb.from('rubric').select('id,name,created_at,copy_group,style');
+  var rubricsQuery = sb.from('rubric').select('id,name,created_at,copy_group,style,scale');
   if (typeof rubricsQuery.eq === 'function') rubricsQuery = rubricsQuery.eq('course_id', cid);
   var rubricsRes = await rubricsQuery;
   if (rubricsRes.error) throw rubricsRes.error;
@@ -88,7 +109,7 @@ async function _loadCanonicalRubrics(cid) {
   var criteriaQuery = sb
     .from('criterion')
     .select(
-      'id,rubric_id,name,level_4_descriptor,level_3_descriptor,level_2_descriptor,level_1_descriptor,' +
+      'id,rubric_id,name,level_6_descriptor,level_5_descriptor,level_4_descriptor,level_3_descriptor,level_2_descriptor,level_1_descriptor,' +
         'level_4_value,level_3_value,level_2_value,level_1_value,weight,display_order',
     );
   if (typeof criteriaQuery.in === 'function') criteriaQuery = criteriaQuery.in('rubric_id', rubricIds);
@@ -208,6 +229,8 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       label: row.name || '',
       tagIds: (tagsByCriterion[row.id] || []).slice(),
       levels: {
+        6: row.level_6_descriptor || '',
+        5: row.level_5_descriptor || '',
         4: row.level_4_descriptor || '',
         3: row.level_3_descriptor || '',
         2: row.level_2_descriptor || '',
@@ -230,6 +253,7 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       criteria: criteriaByRubric[row.id] || [],
     };
     if (row.copy_group) rubric.copyGroup = row.copy_group;
+    if (Array.isArray(row.scale) && row.scale.length >= 2) rubric.scale = row.scale;
     return rubric;
   });
 }
@@ -281,6 +305,7 @@ function _rubricSignature(rubric) {
     (rubric && rubric.copyGroup) || null,
     rubricStyle(rubric),
     _rubricWholeTagIds(rubric),
+    _rubricScale(rubric),
   ]);
 }
 /* The competencies a whole rubric scores, as saved: server ids only. */
@@ -367,6 +392,7 @@ function _persistRubricsToCanonical(cid, prev, arr) {
               courseId: cid,
               name: _rubricName(rubric),
               style: rubricStyle(rubric),
+              scale: _rubricScale(rubric),
               criteria: _rubricCriteriaPayload(rubric),
               copyGroup: rubric.copyGroup || null,
               // null when this copy never loaded them: the server keeps its own.

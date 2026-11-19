@@ -406,6 +406,9 @@
       return r.level > 0;
     });
     var overall = null;
+    // A one-criterion Six-Point rubric's Overall is its score: "5 Proficient".
+    var sixKey =
+      rows.length === 1 && _isSixPoint(rubric) ? RubricScale.fromStored(rubric, rows[0].level, rows[0].mod) : 0;
     if (scored && typeof getAssessmentOverallScore === 'function') {
       var value = getAssessmentOverallScore(cid, sid, aid);
       if (value > 0) {
@@ -427,6 +430,9 @@
                 text: cell ? cell.text : '',
                 word: typeof levelWord === 'function' ? levelWord(cid, value) : '',
               };
+        // Beside it, what it counts as, as the class shows marks.
+        if (sixKey && overall.text)
+          overall = { value: value, text: RubricScale.label(rubric, sixKey), word: overall.text };
       }
     }
     return {
@@ -793,11 +799,11 @@
 
   /* ── Rendering ──────────────────────────────────────────── */
 
-  function _markHtml(row) {
-    var mark = '✓';
-    if (row.mod > 0) mark += '+';
-    else if (row.mod < 0) mark += '−';
-    return '<span class="rubric-mark" aria-label="' + esc(LEVEL_NAMES[row.level] || '') + '">' + mark + '</span>';
+  // A Six-Point score (sixKey, shared/rubric-scale.js) has no ± mark.
+  function _markHtml(row, sixKey, rubric) {
+    var mark = '✓' + (sixKey ? '' : row.mod > 0 ? '+' : row.mod < 0 ? '−' : '');
+    var name = sixKey ? RubricScale.label(rubric, sixKey) : LEVEL_NAMES[row.level];
+    return '<span class="rubric-mark" aria-label="' + esc(name || '') + '">' + mark + '</span>';
   }
 
   /* An Advanced Rubric's checkboxes for one level: an empty square, or a
@@ -829,8 +835,14 @@
     );
   }
 
+  // A Six-Point rubric has the Advanced Rubric's checkboxes.
   function _isAdvancedRubric(rubric) {
-    return !!rubric && !rubric.kind && typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
+    var style = !!rubric && !rubric.kind && typeof rubricStyle === 'function' && rubricStyle(rubric);
+    return style === 'advanced';
+  }
+
+  function _isSixPoint(rubric) {
+    return !!window.RubricScale && RubricScale.has(rubric);
   }
 
   function _isSinglePoint(rubric) {
@@ -894,8 +906,10 @@
 
   function renderSheet(data, opts) {
     var include = opts.include || DEFAULT_OPTIONS.include;
-    // The level columns run in the class's Rubric Levels order.
-    var levels = levelOrderFor(data.cid);
+    // The level columns run in the class's Rubric Levels order; a Six-Point
+    // rubric's six scores take the four levels' place.
+    var six = _isSixPoint(data.rubric);
+    var levels = six ? RubricScale.keys(data.rubric, levelOrderFor(data.cid)) : levelOrderFor(data.cid);
     var html = '<div class="rubric-sheet"><div class="rubric-sheet-inner">';
     html += '<div class="rubric-head"><div class="rubric-head-main">';
     html += data.blank
@@ -924,11 +938,22 @@
       return html + _feedbackHtml(data, include) + _nextStepsHtml(include) + '</div></div>';
     }
     html +=
-      '<table class="rubric-table"><thead><tr><th class="rubric-crit-head">' +
+      '<table class="rubric-table' +
+      (six ? ' is-six' : '') +
+      '"><thead><tr><th class="rubric-crit-head">' +
       esc(data.rubric.name || 'Criteria') +
       '</th>';
     levels.forEach(function (lv) {
-      html += '<th class="rubric-level-head l' + lv + '">' + LEVEL_NAMES[lv] + '</th>';
+      html +=
+        '<th class="rubric-level-head l' +
+        (six
+          ? RubricScale.tone(data.rubric, lv) +
+            '"><span class="rubric-six-num">' +
+            lv +
+            '</span> ' +
+            esc(RubricScale.name(data.rubric, lv))
+          : lv + '">' + LEVEL_NAMES[lv]) +
+        '</th>';
     });
     html += '</tr></thead><tbody>';
     data.rows.forEach(function (row) {
@@ -940,13 +965,17 @@
       if (include.codes && row.codes.length)
         html += '<div class="rubric-crit-codes">' + esc(row.codes.join(' · ')) + '</div>';
       html += '</th>';
+      // A Six-Point score is read back from the stored level and ±.
+      var at = six && row.level ? RubricScale.fromStored(data.rubric, row.level, row.mod) : row.level;
       levels.forEach(function (lv) {
-        var scored = row.level === lv;
+        var scored = at === lv;
         html +=
           '<td class="rubric-cell' +
-          (scored ? ' is-scored l' + lv + (row.mixed ? ' is-mixed' : '') : '') +
+          (scored
+            ? ' is-scored l' + (six ? RubricScale.tone(data.rubric, lv) : lv) + (row.mixed ? ' is-mixed' : '')
+            : '') +
           '">' +
-          (scored ? _markHtml(row) : '') +
+          (scored ? _markHtml(row, six ? lv : 0, data.rubric) : '') +
           esc((c.levels && c.levels[lv]) || '') +
           (include.checks ? _checksHtml(c, lv, data.ticked) : '') +
           '</td>';
