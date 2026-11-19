@@ -33,7 +33,7 @@ export default defineConfig({
           {
             name: 'webkit-student',
             testMatch:
-              /(student-settings|student-card-[\w-]+|student-carousel|student-text-size-sweep|student-see-work|bulletins-student)\.spec\.js$/,
+              /(student-settings|student-home-screen|student-card-[\w-]+|student-carousel|student-text-size-sweep|student-see-work|bulletins-student)\.spec\.js$/,
             use: {
               browserName: 'webkit',
               viewport: { width: 390, height: 844 },
