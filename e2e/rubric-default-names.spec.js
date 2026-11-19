@@ -10,17 +10,17 @@ test.beforeEach(async ({ page }) => {
   await seedStudents(page);
 });
 
-test('typing replaces New Rubric and a clicked Criterion 1', async ({ page }) => {
+test('the Bank New Rubric opens with its name box ready, and a clicked Criterion 1 is replaced', async ({ page }) => {
   await gotoApp(page, '/assignments');
   await page.locator('[data-action="openRubricBank"]').click();
   await page.getByRole('dialog', { name: 'Rubric Bank' }).locator('[data-rb="new"]').first().click();
   const editor = page.locator('#rubric-modal');
-  const name = editor.locator('#re-name');
+  const name = editor.locator('#af-ge-name');
   await expect(name).toBeFocused();
   await page.keyboard.type('Lab Report Rubric');
   await expect(name).toHaveValue('Lab Report Rubric');
 
-  const crit = editor.locator('.rubric-criterion-name').first();
+  const crit = editor.locator('.af-ge-crit-name').first();
   await expect(crit).toHaveValue('Criterion 1');
   await crit.click();
   await page.keyboard.type('Hypothesis');

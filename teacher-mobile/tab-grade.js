@@ -2279,6 +2279,67 @@ window.MGrade = (function () {
       return !!rubric && typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
     }
 
+    /* A Six-Point rubric (shared/rubric-scale.js): six scores and no ±, each
+       stored as the level and ± it counts as, so these read and write the
+       stored pair. Its checklist works as an Advanced Rubric's. */
+    // The rubric when it has level columns of its own, else null.
+    function _isSix(rubric) {
+      return !!window.RubricScale && RubricScale.has(rubric) ? rubric : null;
+    }
+    function _sixOf(cid, aid) {
+      return _isSix(_ownRubric(cid, _assessmentById(cid, aid)));
+    }
+    // A criterion's six-point score from its _critState, 0 for none.
+    function _sixNow(rubric, state) {
+      return state.level ? RubricScale.fromStored(rubric, state.level, state.mod) : 0;
+    }
+    // Write a six-point score (0 clears) under every key of the criterion.
+    function _writeSix(cid, sid, found, key) {
+      var s = key ? RubricScale.toStored(found.rubric, key) : null;
+      _writeCriterion(cid, sid, found, s ? s.level : 0, s ? s.mod : 0);
+    }
+    // The six score buttons, number over word, in the class's order.
+    // html-safe: score names are fixed words; ids are ours; scores are numbers
+    function _sixBtnsHtml(cid, st, assessment, crit, current) {
+      var rubric = _ownRubric(cid, assessment);
+      return RubricScale.keys(rubric, levelOrderFor(cid))
+        .map(function (k) {
+          var on = current === k;
+          var s = RubricScale.toStored(rubric, k);
+          return (
+            '<button class="m-score-btn m-level-btn m-six-btn' +
+            (on ? ' m-score-active' : '') +
+            '" data-action="m-grade-crit" data-score="' +
+            k +
+            '" data-tone="' +
+            RubricScale.tone(rubric, k) +
+            '" data-sid="' +
+            st.id +
+            '" data-aid="' +
+            assessment.id +
+            '" data-critid="' +
+            crit.id +
+            '" aria-pressed="' +
+            on +
+            '" aria-label="' +
+            MC.esc(RubricScale.label(rubric, k) + ', counts as ' + scoreLevelText(s.level, s.mod)) +
+            '"><span class="m-level-fig">' +
+            k +
+            '</span><span class="m-level-word">' +
+            MC.esc(RubricScale.name(rubric, k)) +
+            '</span></button>'
+          );
+        })
+        .join('');
+    }
+    function _paintSix(group, current) {
+      group.querySelectorAll('.m-six-btn').forEach(function (btn) {
+        var on = Number(btn.getAttribute('data-score')) === current;
+        btn.classList.toggle('m-score-active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
     function _findCriterion(cid, aid, critId) {
       var a = _assessmentById(cid, aid);
       var rubric = _ownRubric(cid, a);
@@ -2332,11 +2393,18 @@ window.MGrade = (function () {
     function _checklistHtml(cid, sid, aid, crit, state) {
       var ticked = getRubricCheckIds(cid, sid, aid);
       var suggested = RubricChecks.suggestedLevel(crit, ticked);
-      var head = suggested ? 'Suggested: ' + PROF_LABELS[suggested] : 'No Level Suggested Yet';
+      // On a Six-Point rubric the levels are its six scores, in their words.
+      var six = _sixOf(cid, aid);
+      var cur = six ? _sixNow(six, state) : state.level;
+      var word = 'level';
+      var name = function (lv) {
+        return six ? RubricScale.label(six, lv) : PROF_LABELS[lv];
+      };
+      var head = suggested ? 'Suggested: ' + name(suggested) : 'No Level Suggested Yet';
       var hint = !suggested
-        ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
-        : state.level && state.level !== suggested
-          ? 'You picked ' + PROF_LABELS[state.level] + '. Ticks keep your choice until you clear the level.'
+        ? 'Tick what you saw. A ' + word + ' is suggested when all of its boxes are ticked.'
+        : cur && cur !== suggested
+          ? 'You picked ' + name(cur) + '. Ticks keep your choice until you clear the ' + word + '.'
           : // The level already matches the ticks: nothing to explain.
             '';
       var html =
@@ -2344,14 +2412,14 @@ window.MGrade = (function () {
         MC.esc(head) +
         '</div>' +
         (hint ? '<div class="m-checklist-hint">' + MC.esc(hint) + '</div>' : '');
-      levelOrderFor(cid).forEach(function (lv) {
+      (six ? RubricScale.keys(six, levelOrderFor(cid)) : levelOrderFor(cid)).forEach(function (lv) {
         var boxes = RubricChecks.checksAt(crit, lv);
         if (!boxes.length) return;
         html +=
           '<div class="m-checklist-level"><div class="m-checklist-level-name l' +
-          lv +
+          (six ? RubricScale.tone(six, lv) : lv) +
           '">' +
-          PROF_LABELS[lv] +
+          name(lv) +
           '</div>';
         boxes.forEach(function (check) {
           html +=
@@ -2384,7 +2452,11 @@ window.MGrade = (function () {
         (rubric.criteria || [])
           .map(function (crit, i) {
             var state = _critState(cid, st.id, assessment.id, crit);
-            var now = state.level ? scoreLevelText(state.level) : 'Not scored';
+            var now = !state.level
+              ? 'Not scored'
+              : _isSix(rubric)
+                ? RubricScale.label(rubric, _sixNow(rubric, state))
+                : scoreLevelText(state.level);
             return (
               '<button type="button" class="m-paper-crit" data-action="m-paper-crit" data-sid="' +
               st.id +
@@ -2444,7 +2516,11 @@ window.MGrade = (function () {
        Rubric, the Checks button and its open checklist. */
     function _criterionGroupHtml(cid, st, assessment, rubric, crit) {
       var state = _critState(cid, st.id, assessment.id, crit);
-      var btns = _critLevelBtnsHtml(cid, st, assessment, crit, state);
+      // A Six-Point criterion: six score buttons, no ±, an Advanced checklist.
+      var six = _isSix(rubric);
+      var btns = six
+        ? _sixBtnsHtml(cid, st, assessment, crit, _sixNow(six, state))
+        : _critLevelBtnsHtml(cid, st, assessment, crit, state);
       var advanced = _isAdvanced(rubric) && RubricChecks.hasChecks(crit);
       var open = advanced && !!_openChecks[st.id + ':' + assessment.id + ':' + crit.id];
       var checksBtn = '';
@@ -2474,9 +2550,9 @@ window.MGrade = (function () {
         advanced && !open ? RubricChecks.suggestedLevel(crit, getRubricCheckIds(cid, st.id, assessment.id)) : 0;
       var suggestedLine = suggested
         ? '<div class="m-crit-suggested l' +
-          suggested +
+          (six ? RubricScale.tone(six, suggested) : suggested) +
           '">' +
-          MC.esc('Suggested: ' + scoreLevelText(suggested)) +
+          MC.esc('Suggested: ' + (six ? RubricScale.label(six, suggested) : scoreLevelText(suggested))) +
           '</div>'
         : '';
       return (
@@ -2492,12 +2568,16 @@ window.MGrade = (function () {
         '</span>' +
         '</div>' +
         suggestedLine +
-        '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
+        '<div class="m-score-btns' +
+        (six ? ' m-six-btns' : '') +
+        '" role="radiogroup" aria-label="' +
+        (six ? 'Score' : 'Level') +
+        ' for ' +
         MC.esc(crit.name || 'Criterion') +
         '">' +
         btns +
         '</div>' +
-        _critFineTuneHtml(st, assessment, crit, state) +
+        (six ? '' : _critFineTuneHtml(st, assessment, crit, state)) +
         (open ? _checklistHtml(cid, st.id, assessment.id, crit, state) : '') +
         _critCommentHtml(cid, st.id, assessment.id, crit) +
         '</div>'
@@ -2636,7 +2716,9 @@ window.MGrade = (function () {
         var group = card.querySelector('.m-crit-group[data-critid="' + crit.id + '"]');
         if (!group) return;
         var state = _critState(cid, sid, a.id, crit);
-        _paintRow(group, state.level || 0, state);
+        var own = _isSix(_ownRubric(cid, a));
+        if (own) _paintSix(group, _sixNow(own, state));
+        else _paintRow(group, state.level || 0, state);
         var list = group.querySelector('.m-checklist');
         // html-safe: _checklistHtml escapes its labels; ids are ours
         if (list) list.outerHTML = _checklistHtml(cid, sid, a.id, crit, state);
@@ -2813,6 +2895,16 @@ window.MGrade = (function () {
       var found = _findCriterion(cid, aid, critId);
       if (!found) return;
       var state = _critState(cid, sid, aid, found.crit);
+      // On a Six-Point rubric `level` is the score, 1 to 6.
+      if (_isSix(found.rubric)) {
+        if (!RubricScale.isKey(found.rubric, level)) return;
+        _writeSix(cid, sid, found, _sixNow(found.rubric, state) === level ? 0 : level);
+        MC.haptic();
+        _paintCard(cid, sid, found.assessment);
+        _updateThumbGraded(cid, aid, sid);
+        _syncReturnBar();
+        return;
+      }
       var cleared = state.level === level && !state.mixed;
       _writeCriterion(cid, sid, found, cleared ? 0 : level, 0);
       MC.haptic();
@@ -2824,7 +2916,7 @@ window.MGrade = (function () {
     // Tapping the active + or − again clears it.
     function setCriterionMod(cid, sid, aid, critId, mod) {
       var found = _findCriterion(cid, aid, critId);
-      if (!found) return;
+      if (!found || _isSix(found.rubric)) return;
       var state = _critState(cid, sid, aid, found.crit);
       if (!(state.level > 0) || state.mixed) return;
       var next = state.mod === mod ? 0 : mod;
@@ -2879,8 +2971,14 @@ window.MGrade = (function () {
       var before = getRubricCheckIds(cid, sid, aid);
       var after = Grader.setTick(cid, sid, aid, checkId, on);
       var state = _critState(cid, sid, aid, found.crit);
-      var next = RubricChecks.levelAfterTick(found.crit, state.level, before, after);
-      if (next !== state.level) _writeCriterion(cid, sid, found, next, 0);
+      if (_isSix(found.rubric)) {
+        var nowSix = _sixNow(found.rubric, state);
+        var nextSix = RubricChecks.levelAfterTick(found.crit, nowSix, before, after);
+        if (nextSix !== nowSix) _writeSix(cid, sid, found, nextSix);
+      } else {
+        var next = RubricChecks.levelAfterTick(found.crit, state.level, before, after);
+        if (next !== state.level) _writeCriterion(cid, sid, found, next, 0);
+      }
       MC.haptic();
       _refreshCard(cid, sid, aid);
       _updateThumbGraded(cid, aid, sid);

@@ -5250,6 +5250,7 @@ export type Database = {
           p_id: string
           p_idempotency_key?: string
           p_linked_tag_ids?: Json
+          p_scale?: Json
           p_name: string
           p_style?: string
         }

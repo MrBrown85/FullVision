@@ -70,6 +70,7 @@ const FILES = [
   'shared/calc.js',
   'shared/rubric-draft.js',
   'shared/rubric-checks.js',
+  'shared/rubric-scale.js',
   'teacher/ui.js',
   'teacher/report-scores.js',
   'teacher/report-blocks.js',

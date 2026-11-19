@@ -55,6 +55,11 @@
     var n = Number(v);
     return n >= 1 && n <= 4 && Math.floor(n) === n ? n : null;
   }
+  // A Six-Point rubric's checkbox level.
+  function level16(v) {
+    var n = Number(v);
+    return n >= 1 && n <= 6 && Math.floor(n) === n ? n : null;
+  }
   function modifierFor(value, mod) {
     if (typeof normalizeScoreMod === 'function') return normalizeScoreMod(value, mod);
     var m = Number(mod) > 0 ? 1 : Number(mod) < 0 ? -1 : 0;
@@ -414,9 +419,12 @@
         name: str(r.name || r.title),
         style: ['advanced', 'single_point'].indexOf(r.style) >= 0 ? r.style : 'standard',
       });
+      // Its own level columns (2026111901_rubric_levels), only when it has them.
+      if (Array.isArray(r.scale) && r.scale.length >= 2) p.rubrics[p.rubrics.length - 1].scale = r.scale;
       arr(r.tagIds).forEach(function (tid) {
         if (tagIds[tid]) p.rubric_tags.push({ rubric_id: r.id, tag_id: tid });
       });
+      var six = Array.isArray(r.scale) && r.scale.length >= 2;
       arr(r.criteria).forEach(function (c, i) {
         if (!c || !c.id) return;
         criteria[c.id] = true;
@@ -430,6 +438,8 @@
           level_3_descriptor: orNull(levels[3]),
           level_2_descriptor: orNull(levels[2]),
           level_1_descriptor: orNull(levels[1]),
+          level_5_descriptor: six ? orNull(levels[5]) : null,
+          level_6_descriptor: six ? orNull(levels[6]) : null,
           level_4_value: num(values[4], 4),
           level_3_value: num(values[3], 3),
           level_2_value: num(values[2], 2),
@@ -441,12 +451,13 @@
           if (tagIds[tid]) p.criterion_tags.push({ criterion_id: c.id, tag_id: tid });
         });
         arr(c.checks).forEach(function (k, j) {
-          if (!k || !k.id || !level14(k.level)) return;
+          var checkLevel = k && (six ? level16(k.level) : level14(k.level));
+          if (!k || !k.id || !checkLevel) return;
           checkIds[k.id] = true;
           p.criterion_checks.push({
             id: k.id,
             criterion_id: c.id,
-            level: level14(k.level),
+            level: checkLevel,
             label: str(k.label),
             display_order: num(k.displayOrder, j),
           });

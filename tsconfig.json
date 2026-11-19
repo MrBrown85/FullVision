@@ -14,6 +14,7 @@
     "types/globals.d.ts",
     "shared/html.js",
     "shared/build-flags.js",
+    "shared/rubric-scale.js",
     "shared/constants.js",
     "shared/calc.js",
     "shared/data-utilities.js",

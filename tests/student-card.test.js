@@ -81,6 +81,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       'shared/phone-report-view.js',
       'shared/loading-screen.js',
       's/student-data.js',
+      // Six-Point rubrics' scores, for Your Result and Your Feedback (Nov 19).
+      'shared/rubric-scale.js',
       'shared/student-view.js',
       's/page-view.js',
       // A handout's pages on a card still to do, to swipe through (Nov 17).

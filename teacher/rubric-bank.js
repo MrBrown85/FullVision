@@ -6,7 +6,7 @@
    deleting and the new-assessment form; it passes them in as hooks so this
    file never reaches into the page's state.
 
-   Hooks: edit(rid), newRubric(style), remove(rid), print(rid, cid),
+   Hooks: edit(rid), newRubric(style, template), remove(rid), print(rid, cid),
    useInNew(rid), goToAssessment(aid), changed().
 
    Pick mode (hooks.pick = { title, tagIds, use(rid) }, redesign PR 7): the
@@ -204,11 +204,18 @@ window.RubricBank = (function () {
   function isSinglePoint(rubric) {
     return typeof rubricStyle === 'function' && rubricStyle(rubric) === 'single_point';
   }
+  // A rubric with level columns of its own (shared/rubric-scale.js).
+  function hasScale(rubric) {
+    return !!window.RubricScale && RubricScale.has(rubric);
+  }
+  function hasCheckboxes(rubric) {
+    return isAdvanced(rubric);
+  }
 
   /* "3 Criteria", plus "· 24 Checkboxes" on an Advanced Rubric. */
   function _sizeText(rubric) {
     var text = _plural((rubric.criteria || []).length, 'Criterion', 'Criteria');
-    if (isAdvanced(rubric) && window.RubricChecks)
+    if (hasCheckboxes(rubric) && window.RubricChecks)
       text += ' · ' + _plural(RubricChecks.countChecks(rubric), 'Checkbox', 'Checkboxes');
     return text;
   }
@@ -706,8 +713,10 @@ window.RubricBank = (function () {
     var srcCid = opts.srcCid || cid;
     // A single-point rubric shows its one column: the Proficient standard.
     var single = isSinglePoint(rubric);
-    var levels = single ? [3] : _levels(cid);
-    var plainValues = single || _defaultValues(rubric);
+    // A Six-Point rubric shows its six scores, each in its level's colour.
+    var six = hasScale(rubric) && !single ? rubric : null;
+    var levels = single ? [3] : six ? RubricScale.keys(six, _levels(cid)) : _levels(cid);
+    var plainValues = single || six || _defaultValues(rubric);
     var html =
       '<table class="rb-grid' +
       (single ? ' is-single-point' : '') +
@@ -715,9 +724,9 @@ window.RubricBank = (function () {
     levels.forEach(function (lv) {
       html +=
         '<th scope="col" class="rb-level-head l' +
-        lv +
+        (six ? RubricScale.tone(six, lv) : lv) +
         '"><span>' +
-        (single ? 'Proficient Standard' : PROF_LABELS[lv]) +
+        (single ? 'Proficient Standard' : six ? esc(RubricScale.name(six, lv)) : PROF_LABELS[lv]) +
         '</span>' +
         (plainValues && !single ? '<span class="rb-level-value">' + lv + '</span>' : '') +
         '</th>';
@@ -756,7 +765,7 @@ window.RubricBank = (function () {
         html +=
           '<td class="rb-cell">' +
           esc((c.levels && c.levels[lv]) || '') +
-          (isAdvanced(rubric) ? _cellChecksHtml(c, lv) : '') +
+          (hasCheckboxes(rubric) ? _cellChecksHtml(c, lv) : '') +
           (plainValues ? '' : '<span class="rb-cell-value">Value ' + esc(String(value)) + '</span>') +
           '</td>';
       });
@@ -874,14 +883,40 @@ window.RubricBank = (function () {
           '<button type="button" role="menuitem" data-rb="new" data-style="standard"><span class="rb-menu-title">Standard Rubric</span><span class="rb-menu-help">One descriptor per level. Pick a level to score.</span></button>' +
           '<button type="button" role="menuitem" data-rb="new" data-style="advanced"><span class="rb-menu-title">Advanced Rubric</span><span class="rb-menu-help">Checkboxes inside each level. Ticks suggest the level.</span></button>' +
           '<button type="button" role="menuitem" data-rb="new" data-style="single_point"><span class="rb-menu-title">Single-Point Rubric</span><span class="rb-menu-help">Only the Proficient standard. Note what to work on and where they went beyond.</span></button>' +
+          _sixPointMenuHtml() +
           '</div>'
         : '')
+    );
+  }
+
+  /* Six-Point rubrics, in English and Social Studies classes: a blank one
+     and the three English 12 scoring guides, ready to use. */
+  function _sixPointMenuHtml() {
+    if (!window.RubricScale || !RubricScale.courseOffersGuides(typeof COURSES !== 'undefined' ? COURSES[_s.cid] : null))
+      return '';
+    return (
+      '<div class="rb-menu-sep"></div>' +
+      '<button type="button" role="menuitem" data-rb="new" data-style="six_point"><span class="rb-menu-title">Six-Point Rubric</span><span class="rb-menu-help">The BC six-point scale, 6 Superior to 1 Unacceptable, with checkboxes in each score.</span></button>' +
+      RubricScale.templates()
+        .map(function (t) {
+          return (
+            '<button type="button" role="menuitem" data-rb="new" data-style="six_point" data-template="' +
+            esc(t.key) +
+            '"><span class="rb-menu-title">' +
+            esc(t.name) +
+            '</span><span class="rb-menu-help">' +
+            esc(t.help) +
+            '</span></button>'
+          );
+        })
+        .join('')
     );
   }
 
   function _renderNew(focusFirst) {
     var el = document.getElementById('rb-new');
     if (!el) return;
+    // html-safe: fixed markup; the scoring guides' names and help go through esc
     el.innerHTML = _newHtml();
     var target = focusFirst ? el.querySelector('.rb-new-menu button') : el.querySelector('[data-rb="new-menu"]');
     if (target && focusFirst) target.focus();
@@ -948,7 +983,7 @@ window.RubricBank = (function () {
         ) +
         '</span></div>';
     }
-    if (isAdvanced(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
+    if (hasCheckboxes(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
     html += '<div class="rb-grid-wrap">' + gridHtml(cid, r, { srcCid: src, match: match }) + '</div>';
     if (match.total > match.matched) {
       html +=
@@ -1012,7 +1047,7 @@ window.RubricBank = (function () {
       '"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>' +
       (_s.menuOpen ? _menuHtml() : '') +
       '</div></div></div>';
-    if (isAdvanced(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
+    if (hasCheckboxes(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
     if (stats) html += _statsLineHtml(cid, r, stats, uses);
     html += '<div class="rb-grid-wrap">' + gridHtml(cid, r, { stats: showStats ? stats : null }) + '</div>';
     if (showStats) html += _overallHtml(cid, stats);
@@ -1047,7 +1082,7 @@ window.RubricBank = (function () {
       '<div class="rb-actions">' +
       (_s.pick.current ? '<button type="button" class="rb-btn" data-rb="pick-none">Use No Rubric</button>' : '') +
       '<button type="button" class="rb-btn rb-btn-primary" data-rb="pick-use">Use This Rubric</button></div></div>';
-    if (isAdvanced(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
+    if (hasCheckboxes(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
     html += '<div class="rb-grid-wrap">' + gridHtml(cid, r) + '</div>';
     if (uses.length) {
       html +=
@@ -1268,8 +1303,9 @@ window.RubricBank = (function () {
         break;
       case 'new': {
         var style = rubricStyle({ style: el && el.dataset.style });
+        var template = (el && el.dataset.template) || '';
         close();
-        if (hooks.newRubric) hooks.newRubric(style);
+        if (hooks.newRubric) hooks.newRubric(style, template);
         break;
       }
       case 'copy-here':

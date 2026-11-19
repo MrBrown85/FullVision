@@ -184,7 +184,7 @@ function _saveCategoriesParams(courseId, rows) {
    + criterion_check replace, all in one transaction.  criteria payload:
      [{ id?: uuid, name, level_{1..4}_descriptor, level_{1..4}_value?,
         weight?, display_order?, linked_tag_ids?: uuid[],
-        checks?: [{ id?: uuid, level 1..4, label, display_order }] }, …]
+        checks?: [{ id?: uuid, level 1..4 (1..6 on a Six-Point rubric), label, display_order }] }, …]
    Criteria present in the array are upserted; criteria absent are deleted
    (cascades criterion_tag, criterion_check + rubric_score). A criterion's
    checks are replaced the same way (migrations/20261022_advanced_rubric_checks.sql). */
@@ -197,6 +197,9 @@ window.v2.upsertRubric = function (params, options) {
       level_3_descriptor: c.level3Descriptor || null,
       level_2_descriptor: c.level2Descriptor || null,
       level_1_descriptor: c.level1Descriptor || null,
+      // Slots 5 and 6, on a rubric with its own level columns (2026111901_rubric_levels).
+      level_5_descriptor: c.level5Descriptor || null,
+      level_6_descriptor: c.level6Descriptor || null,
       weight: c.weight != null ? Number(c.weight) : 1.0,
       display_order: c.displayOrder != null ? Number(c.displayOrder) : 0,
       linked_tag_ids: (c.linkedTagIds || []).filter(_isUuid),
@@ -228,6 +231,8 @@ window.v2.upsertRubric = function (params, options) {
       p_style: rubricStyle({ style: params.style }),
       // The competencies the whole rubric scores; [] clears them, null keeps them.
       p_linked_tag_ids: Array.isArray(params.linkedTagIds) ? params.linkedTagIds.filter(_isUuid) : null,
+      // Its own level columns; [] clears them (the four FullVision levels).
+      p_scale: Array.isArray(params.scale) ? params.scale : [],
     },
     options,
   );

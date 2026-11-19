@@ -109,6 +109,7 @@ const PRECACHE_URLS = [
   '/shared/grader.js',
   '/shared/rubric-draft.js',
   '/shared/rubric-checks.js',
+  '/shared/rubric-scale.js',
   '/shared/core-self.js',
   '/shared/student-view.js',
   '/s/page-view.js',

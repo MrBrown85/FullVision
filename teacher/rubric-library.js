@@ -231,7 +231,8 @@ window.RubricLibrary = (function () {
     var vals = (c && c.levelValues) || {};
     return {
       name: _norm(c && c.name),
-      levels: [4, 3, 2, 1].map(function (l) {
+      // Levels 6 and 5 are a Six-Point rubric's; elsewhere they are empty.
+      levels: [6, 5, 4, 3, 2, 1].map(function (l) {
         return String(lv[l] || '');
       }),
       values: [4, 3, 2, 1].map(function (l) {
@@ -239,7 +240,7 @@ window.RubricLibrary = (function () {
       }),
       weight: c && c.weight != null && c.weight !== '' ? Number(c.weight) : 1,
       // The checkbox labels of each level, in order.
-      checks: [4, 3, 2, 1].map(function (l) {
+      checks: [6, 5, 4, 3, 2, 1].map(function (l) {
         return ((c && c.checks) || [])
           .filter(function (check) {
             return check && Number(check.level) === l;
