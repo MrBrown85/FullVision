@@ -245,7 +245,7 @@ describe('in Class Settings', () => {
       s.subject = 'ela';
     });
     DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
-    expect(main.innerHTML).toContain('Folders Count as One');
+    expect(main.innerHTML).toContain('Points and Proficiency');
     expect(main.innerHTML).not.toContain('Each Course Counts Equally');
   });
 });

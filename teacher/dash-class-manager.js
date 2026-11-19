@@ -3981,7 +3981,7 @@ window.DashClassManager = (function () {
     var foldersCount = getFoldersCountAsOne(cid);
     if (!foldersCount && compGroups.length > 0) {
       html +=
-        '<div class="cm-hint cm-folder-count-off">Folders Count as One is off in Grading, so every competency counts the same in the overall.</div>';
+        '<div class="cm-hint cm-folder-count-off">Every competency counts the same in the overall, so folders only group them (How Folders Count, beside the list).</div>';
     }
 
     // Competencies outside folders sit where their order puts them among
@@ -4158,6 +4158,7 @@ window.DashClassManager = (function () {
           compHtml +
           '</div><div class="cm-comp-side">' +
           html +
+          _cmRenderFoldersCountAsOne(cid) +
           subjectsHtml +
           '</div></div>';
   }
@@ -4457,7 +4458,6 @@ window.DashClassManager = (function () {
       '<div class="cm-hint">Every method skips work that hasn’t been scored.</div>' +
       '</div>' +
       _cmRenderRecentLimit(method, lastN) +
-      _cmRenderFoldersCountAsOne(cid) +
       _cmRenderCoursesCountEqually(cid) +
       _cmRenderPointsScale(cid) +
       '</div>';
@@ -4552,30 +4552,100 @@ window.DashClassManager = (function () {
     );
   }
 
-  /* "Folders Count as One": on, each folder is averaged first and counts as
-     one competency in the overall; off, every competency counts the same.
-     Each folder's own Counts as One is on its header in Competencies. */
+  /* How Folders Count, in the Competencies tab beside the list it changes
+     (Colin, Nov 19: the Grading tab's switch was unclear, and he expected
+     Humanities 8's ELA folders to count as one while SS 8's competencies
+     count on their own). Every folder with competencies, each with its own
+     choice: Counts as One (competency_group.counts_as_one) or Each
+     Competency. The class switch (course.folders_count_as_one) is kept on
+     while any folder counts as one; with every folder on Each Competency
+     it is the class's switch off. Not shown until a folder holds
+     competencies. */
   function _cmRenderFoldersCountAsOne(cid) {
-    var on = getFoldersCountAsOne(cid);
-    var hasFolders = getGroupedSections(cid).groups.some(function (gi) {
+    var grouped = getGroupedSections(cid);
+    var folders = grouped.groups.filter(function (gi) {
       return gi.sections.length > 0;
     });
-    var hint = !hasFolders
-      ? 'This class has no folders with competencies yet.'
-      : on
-        ? 'Each folder is averaged first and counts as one competency in the overall.'
-        : 'Every competency counts the same in the overall. Folders only group them.';
+    if (!folders.length) return '';
+    var loose = (grouped.ungrouped || []).length;
+    var parts = loose;
+    var rows = folders
+      .map(function (gi) {
+        var g = gi.group || {};
+        var one = folderCountsAsOne(cid, g);
+        var n = gi.sections.length;
+        parts += one ? 1 : n;
+        function seg(value, label) {
+          var on = (value === 'one') === one;
+          return (
+            '<button type="button" class="cm-fc-seg' +
+            (on ? ' is-on' : '') +
+            '" role="radio" aria-checked="' +
+            on +
+            '" data-action="cmFolderCountChoice" data-grpid="' +
+            esc(g.id || '') +
+            '" data-value="' +
+            value +
+            '">' +
+            label +
+            '</button>'
+          );
+        }
+        return (
+          '<div class="cm-fc-row"><span class="cm-fc-name"><span class="cm-fc-title">' +
+          esc(g.name || 'Folder') +
+          '</span><span class="cm-hint">' +
+          n +
+          (n === 1 ? ' competency' : ' competencies') +
+          ' · ' +
+          (one ? '1 part' : n + (n === 1 ? ' part' : ' parts')) +
+          '</span></span><span class="cm-fc-segs" role="radiogroup" aria-label="' +
+          esc('How ' + (g.name || 'this folder') + ' counts') +
+          '">' +
+          seg('one', 'As One') +
+          seg('each', 'Each') +
+          '</span></div>'
+        );
+      })
+      .join('');
     return (
-      '<div class="cm-recent-limit cm-folder-count-row">' +
-      '<span class="cm-recent-text"><label class="cm-label" for="cm-folders-count">Folders Count as One</label>' +
-      '<span class="cm-hint">' +
-      hint +
-      '</span></span>' +
-      '<span class="gpd-switch"><input type="checkbox" role="switch" id="cm-folders-count" data-action-change="cmFoldersCountAsOne"' +
-      (on ? ' checked' : '') +
-      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
-      '</div>'
+      '<div class="cm-section cm-comp-side-card cm-folder-count-row">' +
+      '<h2 class="cm-grade-title">How Folders Count</h2>' +
+      '<p class="cm-hint cm-fc-intro">As One: the folder\u2019s competencies are averaged first, and the folder counts as one part of the overall. Each: every competency in it counts as its own part.</p>' +
+      rows +
+      '<p class="cm-fc-example">The overall has ' +
+      parts +
+      (parts === 1 ? ' part' : ' parts') +
+      (loose ? ', including ' + loose + (loose === 1 ? ' competency' : ' competencies') + ' in no folder' : '') +
+      '.</p></div>'
     );
+  }
+
+  /* A folder's As One | Each in How Folders Count. With the class switch
+     on, it is the folder's own Counts as One (asks first when grades move).
+     With it off every folder counts each competency, so As One turns the
+     switch on with only this folder as one: the others are set to Each
+     first, which moves nothing while the switch is off. */
+  function cmFolderCountChoice(grpId, value) {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var one = value === 'one';
+    if (getFoldersCountAsOne(cid)) {
+      var map = getLearningMap(cid);
+      var others = (map.competencyGroups || []).filter(function (g) {
+        return g.id !== grpId && g.countsAsOne !== false;
+      });
+      // The last folder going to Each is the class switch going off.
+      if (!one && !others.length) return cmSetFoldersCountAsOne(false);
+      return cmSetFolderCountsAsOne(grpId, one);
+    }
+    if (!one) return;
+    var lm = ensureCustomLearningMap(cid);
+    (lm.competencyGroups || []).forEach(function (g) {
+      g.countsAsOne = g.id === grpId;
+    });
+    saveLearningMap(cid, lm);
+    cmSetFoldersCountAsOne(true);
   }
 
   /* "Each Course Counts Equally": on, each course in a combined class is
@@ -10894,6 +10964,9 @@ window.DashClassManager = (function () {
       cmIcanDelete: function () {
         cmIcanDelete(el.dataset.secid, Number(el.dataset.idx));
       },
+      cmFolderCountChoice: function () {
+        cmFolderCountChoice(el.dataset.grpid, el.dataset.value);
+      },
       cmToggleStdFolder: function () {
         cmToggleStdFolder(el.dataset.uid);
       },
@@ -11127,7 +11200,8 @@ window.DashClassManager = (function () {
       return true;
     }
     if (el.dataset.actionChange === 'cmFoldersCountAsOne') {
-      cmSetFoldersCountAsOne(el.checked);
+      // How Folders Count's two choices.
+      cmSetFoldersCountAsOne(el.type === 'radio' ? el.value === 'folder' : el.checked);
       return true;
     }
     if (el.dataset.actionChange === 'cwCompToggle') {
