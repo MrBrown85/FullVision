@@ -398,6 +398,8 @@ table public.criterion (rls on)
   display_order integer not null default 0
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
+  level_5_descriptor text
+  level_6_descriptor text
   constraint criterion_pkey PRIMARY KEY (id)
   constraint criterion_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubric(id) ON DELETE CASCADE
   constraint criterion_weight_check CHECK ((weight >= (0)::numeric))
@@ -418,7 +420,7 @@ table public.criterion_check (rls on)
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
   constraint criterion_check_criterion_id_fkey FOREIGN KEY (criterion_id) REFERENCES public.criterion(id) ON DELETE CASCADE
-  constraint criterion_check_level_check CHECK (((level >= 1) AND (level <= 4)))
+  constraint criterion_check_level_check CHECK (((level >= 1) AND (level <= 6)))
   constraint criterion_check_pkey PRIMARY KEY (id)
   CREATE INDEX criterion_check_criterion_idx ON public.criterion_check USING btree (criterion_id)
   CREATE UNIQUE INDEX criterion_check_pkey ON public.criterion_check USING btree (id)
@@ -1202,8 +1204,10 @@ table public.rubric (rls on)
   updated_at timestamp with time zone not null default now()
   copy_group uuid
   style text not null default 'standard'::text
+  scale jsonb
   constraint rubric_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
   constraint rubric_pkey PRIMARY KEY (id)
+  constraint rubric_scale_check CHECK (((scale IS NULL) OR ((jsonb_typeof(scale) = 'array'::text) AND ((jsonb_array_length(scale) >= 2) AND (jsonb_array_length(scale) <= 6)))))
   constraint rubric_style_check CHECK ((style = ANY (ARRAY['standard'::text, 'advanced'::text, 'single_point'::text])))
   CREATE INDEX rubric_copy_group_idx ON public.rubric USING btree (copy_group) WHERE (copy_group IS NOT NULL)
   CREATE INDEX rubric_course_idx ON public.rubric USING btree (course_id)
@@ -2164,7 +2168,7 @@ function public.upsert_note(p_enrollment_id uuid, p_body text, p_idempotency_key
 function public.upsert_observation_template(p_id uuid, p_course_id uuid, p_body text, p_default_sentiment text, p_default_context_type text, p_display_order integer, p_idempotency_key uuid, p_default_dims text[]) returns uuid
 function public.upsert_questionnaire(p_course_id uuid, p_kind text, p_title text, p_template_id text, p_theme text, p_report_period integer, p_parent_id uuid, p_opens_on date, p_closes_on date, p_is_on boolean, p_myed_comment text, p_questions jsonb, p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) returns uuid
-function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) returns uuid
+function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) returns uuid
 function public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) returns uuid
 function public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) returns uuid
 function public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text, p_competency_group_id uuid, p_display_order integer, p_idempotency_key uuid) returns uuid
