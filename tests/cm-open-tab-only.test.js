@@ -10,7 +10,7 @@
  *   questionnaires CmQuestionnaires.render
  *   grading        calcMethodExample (one per method)
  *   terms          normalizeTermOrdinals (the term tiles)
- *   competencies   getFoldersCountAsOne (the Grading tab asks it too)
+ *   competencies   getFoldersCountAsOne
  *
  * What a closed tab did besides drawing still happens: the questionnaires
  * are asked for, for the tab's count.
@@ -114,7 +114,7 @@ describe('Class Settings builds the open tab only', () => {
       open(tab);
       expect(main.innerHTML).toContain('cm-tab-panel-' + tab);
       // The Grading tab asks whether folders count as one, as the competency list does.
-      expect(built()).toEqual(tab === 'grading' ? ['grading', 'competencies'] : [tab]);
+      expect(built()).toEqual([tab]);
     });
   });
 

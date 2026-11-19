@@ -272,6 +272,7 @@ load('shared/grade-state.js');
 load('shared/grader.js');
 load('shared/rubric-draft.js');
 load('shared/rubric-checks.js');
+load('shared/rubric-scale.js');
 load('shared/core-self.js');
 load('shared/student-view.js');
 // Photos: shrinking and the queue that keeps them (Add Work in the grader).

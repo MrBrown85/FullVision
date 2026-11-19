@@ -1287,7 +1287,7 @@ describe('pin-assignments-page-writes', () => {
           b.textContent.startsWith('Edit a Copy for'),
         );
         click(copy);
-        click(document.querySelector('[data-action="saveRubricEdit"]'));
+        click(document.querySelector('#rubric-modal [data-action="geSave"]'));
         expect(writers.calls()).toEqual([]);
         click(document.getElementById('new-assess-form').querySelector('[data-action="saveEditAssess"]'));
         await settle();

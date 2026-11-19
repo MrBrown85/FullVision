@@ -187,6 +187,11 @@ window.StudentView = (function () {
         [1, 2, 3, 4].forEach(function (l) {
           row['level_' + l + '_descriptor'] = str(levels[l]);
         });
+        // A Six-Point rubric's two more scores (shared/rubric-scale.js).
+        if (window.RubricScale && RubricScale.has(rubric)) {
+          row.level_5_descriptor = str(levels[5]);
+          row.level_6_descriptor = str(levels[6]);
+        }
         // The competencies this row counts toward, only those still on the class, by id.
         row.tag_ids = (Array.isArray(c.tagIds) ? c.tagIds : [])
           .map(str)
@@ -212,6 +217,8 @@ window.StudentView = (function () {
         return row;
       }),
     };
+    // Its own level columns (shared/rubric-scale.js), as the server sends them.
+    if (Array.isArray(rubric.scale) && rubric.scale.length) out.scale = rubric.scale;
     return out;
   }
 
@@ -430,8 +437,60 @@ window.StudentView = (function () {
      asks (its descriptor, and on an Advanced Rubric its boxes not ticked);
      the Proficient wording (a Single-Point Rubric's goal); and each of the
      four levels for The Whole Rubric, the one given marked. */
+  /* A Six-Point rubric's row (shared/rubric-scale.js): its levels are the six
+     scores, read back from the stored level and ±; the row's level stays the
+     stored one, for its colour. "4 Competent · Proficient": the score, then
+     what it counts as. The goal is the column that counts as Proficient. */
+  function sixRow(rubric, row, c, part) {
+    var given = row.level ? RubricScale.fromStored(rubric, row.level, part ? num(part.modifier) || 0 : 0) : 0;
+    var at = function (k) {
+      return row.checks.filter(function (x) {
+        return x.level === k;
+      });
+    };
+    var ks = RubricScale.columns(rubric).map(function (col) {
+      return col.k;
+    });
+    var top = ks[ks.length - 1];
+    row.descriptors = [1, 2, 3, 4, 5, 6].map(function (k) {
+      return str(c['level_' + k + '_descriptor']);
+    });
+    if (given) row.text = RubricScale.label(rubric, given) + (row.text ? ' · ' + row.text : '');
+    row.levelName = given ? RubricScale.label(rubric, given) : '';
+    row.descriptor = given ? row.descriptors[given - 1] : '';
+    row.shown = row.checks.filter(function (k) {
+      return k.ticked;
+    });
+    row.next =
+      given && given < top
+        ? {
+            level: RubricScale.tone(rubric, given + 1),
+            name: RubricScale.label(rubric, given + 1),
+            descriptor: row.descriptors[given],
+            checks: at(given + 1).filter(function (k) {
+              return !k.ticked;
+            }),
+          }
+        : null;
+    var goal = ks.filter(function (k) {
+      return RubricScale.toStored(rubric, k).level === 3;
+    })[0];
+    row.goal = goal ? row.descriptors[goal - 1] : '';
+    row.whole = ks.map(function (k) {
+      return {
+        level: RubricScale.tone(rubric, k),
+        name: RubricScale.label(rubric, k),
+        descriptor: row.descriptors[k - 1],
+        checks: at(k),
+        you: k === given,
+      };
+    });
+    return row;
+  }
+
   function rubricView(rubric, grade, tags) {
     tags = tags || {};
+    var six = !!window.RubricScale && RubricScale.has(rubric);
     var criteria = (grade && grade.criteria) || {};
     var ticked = {};
     ((grade && grade.checks) || []).forEach(function (id) {
@@ -460,6 +519,7 @@ window.StudentView = (function () {
         row.checks = (c.checks || []).map(function (k) {
           return { id: k.id, level: num(k.level), label: str(k.label), ticked: !!ticked[k.id] };
         });
+        if (six) return sixRow(rubric, row, c, part);
         var given = row.level >= 1 && row.level <= 4 ? row.level : 0;
         var at = function (l) {
           return row.checks.filter(function (k) {

@@ -103,11 +103,15 @@ window.StudentOverview = (function () {
     var rubric = !isPointsScored(a) && rid ? getRubricById(cid, rid) : null;
     if (rubric) {
       single = rubric.style === 'single_point';
+      // A Six-Point criterion reads as its score, then what it counts as.
+      var RS = window.RubricScale;
+      var six = !!RS && RS.has(rubric);
       (rubric.criteria || []).forEach(function (crit) {
         var v = rubricCriterionLevel(cid, studentId, a, crit);
         rows.push({
           name: crit.name || '',
-          text: v != null ? nearestScoreLevelName(v) : '',
+          text:
+            v != null ? (six ? RS.label(rubric, RS.fromValue(rubric, v)) + ' · ' : '') + nearestScoreLevelName(v) : '',
           lv: v != null ? nearestScoreLevel(v).level : 0,
           comment: getRubricCriterionComment(cid, studentId, a.id, crit),
           beyond: single ? getRubricCriterionBeyond(cid, studentId, a.id, crit) : '',

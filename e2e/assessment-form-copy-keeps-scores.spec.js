@@ -46,7 +46,7 @@ async function copyTakesScores(page, online) {
   const copyBtn = page.locator('.af-dialog-card button', { hasText: 'Edit a Copy for' });
   await expect(copyBtn).toBeEnabled();
   await copyBtn.click();
-  await page.locator('[data-action="saveRubricEdit"]').click();
+  await page.locator('#rubric-modal [data-action="geSave"]').click();
   await page.locator('[data-action="saveEditAssess"]').click();
 
   await expect
@@ -117,8 +117,9 @@ test('a criterion removed from the copy keeps its scores off the others', async 
   await page.evaluate(id => document.querySelector(`[data-action="editAssess"][data-aid="${id}"]`).click(), before.aid);
   await page.locator('[data-action="editRubricFromForm"]').click();
   await page.locator('.af-dialog-card button', { hasText: 'Edit a Copy for' }).click();
-  await page.locator('[data-action="removeCriterion"][data-index="0"]').click();
-  await page.locator('[data-action="saveRubricEdit"]').click();
+  await page.locator('#rubric-modal [data-action="geMenu"][data-i="0"]').click();
+  await page.locator('#rubric-modal [data-action="geRemoveCrit"][data-i="0"]').click();
+  await page.locator('#rubric-modal [data-action="geSave"]').click();
   await page.locator('[data-action="saveEditAssess"]').click();
   await expect
     .poll(() => page.evaluate(aid => getAssessments('sci8').find(a => a.id === aid).rubricId, before.aid))

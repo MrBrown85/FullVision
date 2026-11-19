@@ -1,5 +1,6 @@
 {
   "checked": [
+    "shared/rubric-scale.js",
     "teacher-mobile/tab-bar.js",
     "teacher-mobile/pin-page.js",
     "teacher-mobile/bulletins-model.js",

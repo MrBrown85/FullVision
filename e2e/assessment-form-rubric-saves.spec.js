@@ -69,8 +69,8 @@ test('Edit Rubric on a shared rubric asks; Edit a Copy is the default and leaves
   const copyBtn = page.locator('.af-dialog-card button', { hasText: 'Edit a Copy for Density Lab' });
   await expect(copyBtn).toBeFocused();
   await copyBtn.click();
-  await expect(page.locator('#re-name')).toHaveValue(lab.name + ' · Density Lab');
-  await page.locator('[data-action="saveRubricEdit"]').click();
+  await expect(page.locator('#rubric-modal #af-ge-name')).toHaveValue(lab.name + ' · Density Lab');
+  await page.locator('#rubric-modal [data-action="geSave"]').click();
   await page.locator('[data-action="saveNewAssess"]:not([data-draft])').click();
   await expect
     .poll(() =>
