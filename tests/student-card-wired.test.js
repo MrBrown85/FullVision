@@ -306,9 +306,10 @@ describe('a slip still opens: the card is asked first, then open', () => {
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="start"]');
     // The slip's code goes with its verify, so a password can be checked by its tag (plan S3-S1).
+    // The token is the one the function made for open (2026112403), not one the database chose.
     expect(page.calls[2].body).toEqual({
       route: 'verify',
-      token: 'a'.repeat(64),
+      token: expect.stringMatching(/^[0-9a-f]{64}$/),
       code: 'K7M4QX',
       birthday: null,
       student_number: '0123456',

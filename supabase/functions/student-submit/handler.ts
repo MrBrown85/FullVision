@@ -45,14 +45,10 @@ import { QUIZ_ROUTES, makeQuizRoutes } from './quiz-routes.ts';
 import { openSlip, verifySlip } from './slip-routes.ts';
 
 export type Db = {
-  /* A slip's open and verify as the database had them before 2026111160 (the plain code, the plain password).
-     slip-routes.ts sends them only while that migration is not applied; after it, open and verify go through
-     call, with tags. */
-  open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
-  verify: (token: string, who: Identity, ipHash: string) => Promise<Record<string, unknown>>;
+  // A phone report's birthday check and a questionnaire's answers, each with the slip token's hash.
   check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
   submit: (token: string, answers: unknown, ipHash: string) => Promise<Record<string, unknown>>;
-  // A card route's one statement (card-routes.ts), with its parameters. Gives back the function's reply.
+  // One statement (card-routes.ts, slip-routes.ts) with its parameters. Gives back the function's reply.
   call: (sql: string, params: Param[]) => Promise<unknown>;
 };
 
@@ -75,7 +71,8 @@ export type Options = {
   // Who a teacher's sign-in token belongs to (Supabase Auth), for sweep.
   whoIs?: ((token: string) => Promise<string | null>) | null;
   now?: () => number;
-  // Makes a new session's token for verify and add-card; the database is given only its hash. Tests fix it.
+  // Makes a new session's token for verify and add-card, and a slip's for open; the database is given only its
+  // hash. Tests fix it.
   sessionToken?: () => string;
   // Runs the removal worker after the answer (EdgeRuntime.waitUntil in index.ts); absent, before it.
   defer?: ((work: Promise<void>) => void) | null;
@@ -303,6 +300,10 @@ export function makeHandler(opts: Options) {
     if (typeof body.session === 'string' && body.session.length > 0 && body.session.length <= 128) {
       body.session = await sha256Hex(body.session);
     }
+    // A slip's token, the same way (2026112403): verify, check and submit send its SHA-256.
+    if (typeof body.token === 'string' && body.token.length > 0 && body.token.length <= 128) {
+      body.token = await sha256Hex(body.token);
+    }
 
     const route = body.route;
     // A verify with a token is a slip's, as it always was; with a code and no token, a card's.
@@ -371,7 +372,9 @@ export function makeHandler(opts: Options) {
           log({ route, outcome: 'no_card_key', ms: Date.now() - started });
           return reply(500, { ok: false, error: 'server' }, origin);
         }
-        result = await openSlip(opts.db, opts.cardKey, body.code, hash);
+        // A new slip token is made here; the database is given only its hash.
+        const token = (opts.sessionToken || randomSessionToken)();
+        result = await openSlip(opts.db, opts.cardKey, body.code, hash, token, await sha256Hex(token));
       } else if (route === 'verify') {
         const who = identity(body);
         if (typeof body.token !== 'string' || body.token.length > 128 || !who) {
