@@ -78,6 +78,19 @@ async function openInbox(page, { view = null, caughtUp = false } = {}) {
   await page.waitForTimeout(400);
 }
 
+/* The sample class with its Student Page and Send Work on, as openInbox
+   sets them, then the page drawn again. */
+async function sendWorkOn(page, hash) {
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    setStudentPageSwitch(cid, true, 'on_return');
+    const work = getCourseSubmissions(cid);
+    work.course.send_work = true;
+    saveDemoStudentWork(cid, work);
+  });
+  await page.goto(hash);
+}
+
 const DESKTOP = [
   { name: 'dashboard', hash: '/dashboard', ready: '.dash-card' },
   // The Inbox is behind a build switch. Its +N badge, Grade button, ticks and
@@ -114,6 +127,33 @@ const DESKTOP = [
       // A chosen + or − shows the pressed state.
       await row.locator('.rsg-mod:not(:disabled)').first().click();
       await expect(row.locator('.rsg-mod.active')).toHaveCount(1);
+    },
+  },
+  /* The tinted and outlined blue buttons that went out under 4.5:1 in
+     #1602: Answer in the Grader (Questions From Students), and on an open
+     card with work to grade, Grade Submissions and Return N Graded, then
+     the grader's Return All and Return for Revision. */
+  {
+    name: 'dashboard, Questions From Students',
+    hash: '/dashboard',
+    ready: '.dash-card',
+    open: async page => {
+      await sendWorkOn(page, '/dashboard');
+      await expect(page.locator('.dash-questions-answer').first()).toBeVisible();
+    },
+  },
+  {
+    name: 'assignments, the grader on work to grade',
+    hash: '/assignments',
+    ready: '#ac-sci8a1',
+    open: async page => {
+      await sendWorkOn(page, '/assignments');
+      // The piece with graded work not yet returned, so Return All shows.
+      // Its buttons show once the card is open.
+      const card = page.locator('[id^="ac-"]:has(.assess-return-btn)').first();
+      await card.locator('.assess-title').click();
+      await card.locator('.assess-grade-work-btn').click();
+      await expect(page.locator('.grader-return-all').first()).toBeVisible();
     },
   },
   { name: 'gradebook', hash: '/gradebook', ready: '.gb-grid' },

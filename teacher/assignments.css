@@ -6803,15 +6803,17 @@ button.grader-member-name {
 .grader-return-all:hover {
   background: rgba(0, 122, 255, 0.16);
 }
+/* Dark: the link blue on a lighter tint, 4.87:1 at rest and 4.63:1 on
+   hover over --surface (--active read 3.0:1). */
 @media (prefers-color-scheme: dark) {
   .assess-return-btn,
   .grader-return-all {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
   }
   .assess-return-btn:hover,
   .grader-return-all:hover {
-    background: rgba(10, 132, 255, 0.28);
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 /* A row's mark beside the student's name. */
@@ -9902,9 +9904,11 @@ button.grader-member-name {
   height: 28px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--active);
+  /* The link blue: 5.11:1 on --bg in light, 6.95:1 in dark (--active
+     read 3.7:1 in light). */
+  border: 1px solid var(--link);
   background: var(--bg);
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -10662,9 +10666,10 @@ button.grader-member-name {
   height: 30px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--active);
+  /* The link blue, as Grade Submissions: --active read 3.7:1 in light. */
+  border: 1px solid var(--link);
   background: var(--bg);
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -10780,7 +10785,8 @@ button.grader-member-name {
   border: 1px solid var(--divider-heavy);
   border-radius: 17px;
   background: var(--surface);
-  color: var(--active);
+  /* The link blue: --active read 4.02:1 on white. */
+  color: var(--link);
   font: inherit;
   font-size: var(--text-base);
   font-weight: 600;
