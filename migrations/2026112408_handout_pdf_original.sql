@@ -3,7 +3,7 @@
 -- compress that pdf into an image. it should keep it as a pdf so that students can download and print
 -- them. they should also be able to see the image they already can." Contract:
 -- migrations/local-test/handouts-links-contract.md, "A PDF's original". Apply after 2026111706
--- (live since Nov 17) and 2026112407; the first check stops it otherwise.
+-- (live since Nov 17); the first check stops it otherwise.
 --
 -- == What it adds ==
 -- A PDF handout keeps its pages exactly as now (JPEGs in student-photos, 2026111170). Its original is
@@ -35,6 +35,9 @@
 --   _handout_drop_expired        an original still 'uploading' after two hours becomes 'dropped' and its
 --                                name is queued for deletion; the PDF keeps working from its pages. It
 --                                never restarts. The number it answers is still the rows dropped.
+--                                "Two hours" means finished (finish_handout_original called) within two
+--                                hours of the start, not only stored: a file stored in time whose finish
+--                                comes later is dropped and deleted too, and the PDF keeps its pages.
 --   photo_lifecycle_nightly      also visits a class with an original still uploading
 --   fv_private.handout_file_upload_allowed and _read_allowed (what the storage policies ask): also allow the
 --                                one name of a PDF's original, for the owner, while it is 'uploading' and
@@ -59,7 +62,7 @@
 -- functions it changes; 2026111706 is applied; every function it relies on or replaces is the one it was
 -- tested against (md5 of pg_get_functiondef, public on the search path); none of its names is taken (or, on
 -- a second run, each is as it leaves it); assessment_resource, its constraints, the bucket and the ten
--- ten policies on storage.objects are there; the bucket holds
+-- policies on storage.objects are there; the bucket holds
 -- no .pdf before this file. Its last step checks everything came out as written.
 --
 -- == What it does not depend on ==
