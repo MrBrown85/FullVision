@@ -51,9 +51,12 @@ test('builds a reflection with every question type, saves it On and sees its car
   await on.getByRole('textbox', { name: 'Statement 1', exact: true }).fill('I asked questions');
   await add('Heading');
   await prompt.fill('Last Part');
-  // The heading glides up above the Likert.
-  await on.getByRole('button', { name: 'Move question up' }).click();
-  await expect(b.locator('.rb-q').nth(5)).toHaveClass(/rb-q-on/);
+  // The Likert goes under the heading: ⌥↓ while typing in it, as in One Report. It stays open.
+  await b.getByRole('button', { name: 'Edit question 6' }).click();
+  await prompt.press('Alt+ArrowDown');
+  await expect(b.locator('.rb-q').nth(6)).toHaveClass(/rb-q-on/);
+  await expect(prompt).toBeFocused();
+  await expect(b.locator('.rb-q').nth(5)).toContainText('Last Part');
 
   // The cards not being edited read as students see them.
   await expect(b.locator('.rb-q-view .rb-v-prompt').first()).toHaveText('1. Which helped you learn the most? *');
@@ -101,5 +104,51 @@ test('builds a reflection with every question type, saves it On and sees its car
   await expect(page.locator('.rb-build .cm-section-title')).toHaveText('Edit Reflection');
   await page.locator('.rb-build').getByRole('button', { name: 'Cancel' }).click();
   await expect(page.locator('.rb-build')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('moves a card from its ⋯ menu and by dragging its ⠿, a heading with its questions', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await expect(page.locator('#app-loading')).toHaveCount(0);
+  await page.goto('/dashboard?manage=questionnaires');
+  await page.getByRole('button', { name: 'New Reflection' }).click();
+  const b = page.locator('.rb-build');
+  await b.getByLabel('Title').fill('Moving');
+  const on = b.locator('.rb-q-on');
+  const prompt = on.locator('[data-rb-path="prompt"]');
+  const add = name => b.locator('.rb-add').getByRole('button', { name, exact: true }).click();
+  const order = () => page.evaluate(() => CmReflectBuilder._state().questions.map(d => d.prompt));
+  await on.locator('select.rb-kind').selectOption('text');
+  await prompt.fill('a');
+  await add('Heading');
+  await prompt.fill('H');
+  await add('Text');
+  await prompt.fill('b');
+  await add('Heading');
+  await prompt.fill('K');
+  await add('Text');
+  await prompt.fill('c');
+
+  // ⋯ Move To puts c at the foot of H; focus goes back to its ⋯.
+  await on.getByRole('button', { name: 'More options' }).click();
+  await expect(on.getByRole('menuitem', { name: 'Move Down' })).toBeDisabled();
+  await on.getByRole('menuitem', { name: 'H', exact: true }).click();
+  expect(await order()).toEqual(['a', 'H', 'b', 'c', 'K']);
+  await expect(on.getByRole('button', { name: 'More options' })).toBeFocused();
+
+  // Dragging H's ⠿ below K carries b and c with it.
+  const head = b.locator('.rb-q').nth(1);
+  await head.hover();
+  const g = await head.locator('.rb-q-grip').boundingBox();
+  const end = await b.locator('.rb-q').last().boundingBox();
+  await page.mouse.move(g.x + 12, g.y + 12);
+  await page.mouse.down();
+  for (let k = 1; k <= 10; k++) await page.mouse.move(g.x + 12, g.y + 12 + ((end.y + end.height - g.y) * k) / 10);
+  await page.mouse.up();
+  await expect.poll(order).toEqual(['a', 'K', 'H', 'b', 'c']);
+  await expect(page.locator('#rb-said')).toHaveText('Moved the heading H.');
   expect(errors).toEqual([]);
 });
