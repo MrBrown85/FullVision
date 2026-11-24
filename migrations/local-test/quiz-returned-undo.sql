@@ -22,7 +22,7 @@
 -- Supabase's SQL editor does (each part sets its own).
 --
 -- md5 of pg_get_functiondef (as the file leaves it):
---   student_submit.quiz_result(text,uuid,uuid,text)               8ad540cf01444c8126910300f95dc7d4
+--   student_submit.quiz_result(text,uuid,uuid,text)               30ae0744d9bc53043e6df40dbee5274c
 
 -- PART 1 begins
 begin;
@@ -34,7 +34,7 @@ do $stop$
 declare
     _md5 text := md5(pg_get_functiondef(to_regprocedure('student_submit.quiz_result(text,uuid,uuid,text)')));
 begin
-    if _md5 is not null and _md5 <> '8ad540cf01444c8126910300f95dc7d4' then
+    if _md5 is not null and _md5 <> '30ae0744d9bc53043e6df40dbee5274c' then
         raise exception 'student_submit.quiz_result(text,uuid,uuid,text) is not the definition 2026112407 left (md5 %). Nothing was dropped.', _md5;
     end if;
 end
@@ -54,7 +54,7 @@ do $guard$
 declare
     _md5 text := md5(pg_get_functiondef(to_regprocedure('student_submit.quiz_result(text,uuid,uuid,text)')));
 begin
-    if _md5 is not null and _md5 <> '8ad540cf01444c8126910300f95dc7d4' then
+    if _md5 is not null and _md5 <> '30ae0744d9bc53043e6df40dbee5274c' then
         raise exception 'student_submit.quiz_result(text,uuid,uuid,text) is not the definition 2026112407 left (md5 %). Everything is kept.', _md5;
     end if;
 end

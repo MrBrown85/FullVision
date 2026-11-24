@@ -2,7 +2,7 @@
 -- SELECTs only, catalog facts only (no row of any table is read). Every row says ok. Run it with public
 -- on the search path (as Supabase's SQL editor does): an md5 of pg_get_functiondef depends on it.
 with want(sig, after_md5) as (values
-    ('student_submit.quiz_result(text,uuid,uuid,text)', '8ad540cf01444c8126910300f95dc7d4'),
+    ('student_submit.quiz_result(text,uuid,uuid,text)', '30ae0744d9bc53043e6df40dbee5274c'),
     ('student_submit._session_class(text,uuid)', '1ae94981ff32f804d12079a24bd7b41a'),
     ('student_submit._card_refusal(uuid)', '4b982e451dbd5c9c68916c99d29d2d37'),
     ('student_submit._device_session(text)', '86d4747f0dd055fa4a61945046ca64d3'),

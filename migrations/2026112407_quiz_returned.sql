@@ -25,9 +25,11 @@
 --   1. Returned to this student: a grade_return row with returned_at, and
 --      _returned_grade has a grade (Missing, Excused, a Draft never returned
 --      and a cleared grade have none).
---   2. The student can no longer answer: no unsent try (a Reopen's try
---      counts, opened or not), and the quiz is closed or no tries are left
---      (tries counted as quiz counts them).
+--   2. The student can no longer answer, by MQ2's own rule: no unsent try
+--      she may still answer (a Reopen's try, opened or not, closed or not;
+--      an ordinary try while the quiz is open), and the quiz is closed or no
+--      tries are left (tries counted as quiz counts them). An ordinary try
+--      started and never sent before the quiz closed does not hold it back.
 --   3. A confirmed try (marked not null; there is at most one), returned
 --      after it was confirmed. In a class that keeps changes until Return
 --      (_grade_return_holds), its marked_at is not after returned_at: a
@@ -43,8 +45,11 @@
 --      changes and is Returned: they fail safe.
 --   4. The quiz's shows: grade sends no questions; right sends each question
 --      with result and the student's own answer; answers adds the key's
---      answer and why line. total (marked's earned and possible) only with
---      add_total.
+--      answer and why line, only for a question in the confirmed marking (a
+--      question added since was never marked or returned: its answer and why
+--      are null). total (marked's earned and possible) only with add_total.
+--      shows is read as it is now: a teacher who switches it to answers
+--      after a Return sends the key with no new Return.
 --   Questions are in this student's order, the confirmed try's
 --   question_order read by _quiz_questions; archived ones are left out.
 --   It writes nothing: no row, no lock, no write_log row (it is marked
@@ -56,7 +61,7 @@
 --
 -- md5 of pg_get_functiondef on PostgreSQL 17 (new function, as this file
 -- leaves it):
---   student_submit.quiz_result(text,uuid,uuid,text) (new)                 8ad540cf01444c8126910300f95dc7d4
+--   student_submit.quiz_result(text,uuid,uuid,text) (new)                 30ae0744d9bc53043e6df40dbee5274c
 -- Relied on, unchanged (function, live):
 --   student_submit._session_class(text,uuid)                              1ae94981ff32f804d12079a24bd7b41a
 --   student_submit._card_refusal(uuid)                                    4b982e451dbd5c9c68916c99d29d2d37
@@ -168,7 +173,7 @@ begin
         ('public._grade_return_one(uuid,uuid,timestamp with time zone)', '99e3165d005b5b2020ec40dcf307c689', null),
         ('public._grade_return_release()', '81222b025ca3625612b1bcd3ff9e2431', null),
         ('public.confirm_quiz(uuid,jsonb,uuid)', 'ee23f2910b1484f18a41ea76b08f0846', null),
-        ('student_submit.quiz_result(text,uuid,uuid,text)', null, '8ad540cf01444c8126910300f95dc7d4')
+        ('student_submit.quiz_result(text,uuid,uuid,text)', null, '30ae0744d9bc53043e6df40dbee5274c')
     ) as v(fn, was, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
         if _md5 is distinct from _f.was and (_f.now is null or _md5 is distinct from _f.now) then
@@ -240,9 +245,11 @@ begin
            -- 1. Returned to this student, with a grade the student page shows.
            _at is not null
            and (student_submit._returned_grade(p_enrollment_id, p_assessment_id)->>'grade') is not null
-           -- 2. The student can no longer answer.
+           -- 2. The student can no longer answer: MQ2's rule. No unsent try she may still answer (a reopened one,
+           --    closed or not, or an ordinary one while the quiz is open), and the quiz closed or no tries left.
            and not exists (select 1 from quiz_attempt t where t.assessment_id = p_assessment_id
-                             and t.enrollment_id = p_enrollment_id and t.sent_at is null)
+                             and t.enrollment_id = p_enrollment_id and t.sent_at is null
+                             and (t.reopened_at is not null or (_w->>'open')::boolean))
            and (not (_w->>'open')::boolean or _left = 0)
            -- 3. One try confirmed, and returned since: by the time where saves wait for Return, else no draft waiting.
            and _t.id is not null
@@ -260,14 +267,17 @@ begin
                           || jsonb_build_object(
                                  'your_answer', (select n.answer from quiz_answer n
                                                   where n.attempt_id = _t.id and n.question_id = (q.e->>'id')::uuid),
-                                 'result', (select m.v->'result' from jsonb_each(_t.marked->'questions') m(k, v)
-                                             where case when pg_input_is_valid(m.k, 'uuid') then m.k::uuid end = (q.e->>'id')::uuid
-                                             limit 1))
+                                 'result', m.result)
                           || case when _z.shows = 'answers' then jsonb_build_object('answer', k.answer, 'why', k.why)
                                   else '{}'::jsonb end
                           order by q.n)
                  from jsonb_array_elements(student_submit._quiz_questions(p_assessment_id, _t.question_order)) with ordinality q(e, n)
-                 left join quiz_key k on k.question_id = (q.e->>'id')::uuid), '[]'::jsonb))
+                 left join lateral (select x.v->'result' as result, true as marked
+                                      from jsonb_each(_t.marked->'questions') x(k, v)
+                                     where case when pg_input_is_valid(x.k, 'uuid') then x.k::uuid end = (q.e->>'id')::uuid
+                                     limit 1) m on true
+                 -- The key only for a question in the confirmed marking: one added since was never marked or returned.
+                 left join quiz_key k on m.marked and k.question_id = (q.e->>'id')::uuid), '[]'::jsonb))
                 else '{}'::jsonb end;
 end;
 $function$;
@@ -283,8 +293,8 @@ declare
     _got text;
 begin
     _got := md5(pg_get_functiondef(to_regprocedure('student_submit.quiz_result(text,uuid,uuid,text)')));
-    if _got is distinct from '8ad540cf01444c8126910300f95dc7d4' then
-        _bad := _bad || format('function student_submit.quiz_result(text,uuid,uuid,text) has md5 %s, not %s', coalesce(_got, 'none (missing)'), '8ad540cf01444c8126910300f95dc7d4');
+    if _got is distinct from '30ae0744d9bc53043e6df40dbee5274c' then
+        _bad := _bad || format('function student_submit.quiz_result(text,uuid,uuid,text) has md5 %s, not %s', coalesce(_got, 'none (missing)'), '30ae0744d9bc53043e6df40dbee5274c');
     end if;
     select string_agg(w, ', ' order by w collate "C") into _got
       from (select distinct case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end as w

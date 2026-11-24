@@ -3,9 +3,10 @@
 -- functions whose live definition differs from the one this file was built and tested against: no rows means
 -- every one matches, byte for byte. Run it with public on the search path (as Supabase's SQL editor does): an
 -- md5 of pg_get_functiondef depends on it. The expected values were read on a database rebuilt from the repo
--- with scripts/db-rebuild.mjs --check (which proves it equal to migrations/baseline/, live's catalog as of
--- 2026112404) and agree with migrations/baseline/function-md5.txt for each function (that file is printed
--- with pg_catalog alone on the path, so its line for _listed names public.assessment and differs there only).
+-- at main 157dbbc0 with scripts/db-rebuild.mjs --check, which proves it equal to migrations/baseline/ (last
+-- refreshed from live by PR 1675, after 2026112406 was applied), and agree with
+-- migrations/baseline/function-md5.txt for each function (that file is printed with pg_catalog alone on the
+-- path, so its line for _listed names public.assessment and differs there only).
 select v.sig, v.expected, coalesce(md5(pg_get_functiondef(to_regprocedure(v.sig))), 'absent') as live
   from (values
     ('student_submit._session_class(text,uuid)', '1ae94981ff32f804d12079a24bd7b41a'),

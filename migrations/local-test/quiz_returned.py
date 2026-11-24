@@ -21,11 +21,12 @@ stored with confirm_quiz, in each order the app's outbox can deliver them (it se
             only under a question's answer and why, and only with Grade, Which Were Right and the Answers. Another
             student's session naming her is not_found at every stage and his own result says returned false.
   shows     grade: no questions; right: each question with your_answer and result, no answer or why; answers: also
-            the key's answer and why; total only with Add a Total; the keys at every level exactly the contract's; the
+            the key's answer and why, only for a question in the marking (one added after Return: all four null, its
+            key in no reply under any shows); total only with Add a Total; the keys at every level exactly the contract's; the
             questions in her own order (shuffled), numbered 1, 2, ...; an archived question left out; a question with
             no answer and none marked is null in both.
   tries     two tries, one sent, confirmed and returned: false while a try is left and the quiz open; true once it
-            closes; unlimited: false while open, true closed; a Reopen after return: false (not opened, part way),
+            closes; try 2 started and never sent: false while open, true (try 1's) once closed, false again reopened; unlimited: false while open, true closed; a Reopen after return: false (not opened, part way),
             then the try sent: the earlier marking again, then the new one confirmed: false until Returned, then the
             new try's answers.
   order     In a class that keeps changes: a re-confirm whose marking lands before its scores is false in between;
@@ -239,8 +240,11 @@ def check_view(w, a, e, r, shows, marked, add_total):
        all(q['result'] == (marked['questions'].get(q['id']) or {}).get('result') for q in r['questions']))
     if shows == 'answers':
         key = key_of(w, a)
-        ok('view answers: answer and why are the key\'s', all(q['answer'] == key[q['id']]['answer'] and q['why'] == key[q['id']].get('why') for q in r['questions']),
-           [(q['answer'], key[q['id']]['answer']) for q in r['questions']])
+        # The key only for a question in the marking; one added since has answer and why null.
+        want = lambda q, f: key[q['id']].get(f) if q['id'] in marked['questions'] else None
+        ok('view answers: answer and why are the key\'s, for each question in the marking, null for any other',
+           all(q['answer'] == want(q, 'answer') and q['why'] == want(q, 'why') for q in r['questions']),
+           [(q['answer'], want(q, 'answer')) for q in r['questions']])
     ok('view %s: no tolerance, competency, position, points given or note' % shows, not re.search('tolerance|tag_id|position|given_points|"note"|marked', blob(r)))
 
 # == Scenarios ==
@@ -292,12 +296,22 @@ def scen_shows():
             r = sweep(w, a, 'shows %s, add_total %s' % (shows, total), shows)
             check_view(w, a, w.cece, r, shows, M1(qq), total)
             if shows == 'grade': ok('shows grade: no questions key', 'questions' not in r)
-    # A question added after Confirm: in her view at the end, with null answer and null result.
-    p = qs.as_sent(T(d, 'list_quiz(:a)', a=a)); p['questions'].append(tf('Added later.')); r2 = tsave(w, a, p)
-    added = [q['id'] for q in r2['questions'] if q['prompt'] == 'Added later.'][0]
-    v = R(w, a=a)
-    ok('shows: a question added later is last, your_answer and result null', v['questions'][-1]['id'] == added
-       and v['questions'][-1]['your_answer'] is None and v['questions'][-1]['result'] is None, v['questions'][-1])
+    # A question added after Return (never marked, never returned): in her view at the end, its answer, result,
+    # and the key's answer and why all null; its key is in no reply.
+    p = qs.as_sent(T(d, 'list_quiz(:a)', a=a)); p['questions'].append(choice('Added later.', why='ZQX-ADDED-MARKER'))
+    r2 = tsave(w, a, p)
+    added = [q for q in r2['questions'] if q['prompt'] == 'Added later.'][0]
+    v = sweep(w, a, 'a question added after Return', 'answers')
+    last = v['questions'][-1]
+    ok('shows: a question added after Return is last, your_answer, result, answer and why null', last['id'] == added['id']
+       and last['your_answer'] is None and last['result'] is None and last['answer'] is None and last['why'] is None, last)
+    ok("shows: the added question's key (its right choice, its why line) is in no reply",
+       'ZQX-ADDED' not in blob(v) and not any(q.get('answer') == added['key']['answer'] for q in v['questions']), last)
+    check_view(w, a, w.cece, v, 'answers', M1(qq), True)
+    for shows in ('right', 'grade'):
+        settings(w, a, shows=shows)
+        ok('shows %s: the added question\'s key is in no reply' % shows, 'ZQX-ADDED' not in blob(R(w, a=a)))
+    settings(w, a, shows='answers')
     # The text question taken out of the quiz (it has an answer, so it is archived): left out, renumbered.
     p = qs.as_sent(T(d, 'list_quiz(:a)', a=a)); p['questions'] = [q for q in p['questions'] if q['kind'] != 'text']; tsave(w, a, p)
     ok('(setup) the text question is archived, not deleted', d.one('select archived_at is not null from quiz_question where id = :q', q=qq[3]['id']) is True)
@@ -315,6 +329,23 @@ def scen_tries():
     sweep(w, a, 'two tries, one sent and returned, open: sent with tries left', None)
     settings(w, a, after_due='until', accept_until='2020-01-01')
     r = sweep(w, a, 'two tries, one sent, the quiz closed', 'answers'); check_view(w, a, w.cece, r, 'answers', M1(qq), False)
+    # Two tries: try 1 returned, try 2 started (Try Again) and never sent. Open: she may still answer it, so nothing.
+    # Then the quiz closes: MQ2 no longer lets her answer that try, so the returned view shows try 1.
+    b, qb = new_piece(w, 'Started Then Closed', tries=2)
+    answer_all(w, b, qb); tb = try_id(d, b, w.cece)
+    levels(w, b, w.cece, [3, 2, 4]); confirm(w, b, [(tb, M1(qb))]); give_back(w, b, w.cece)
+    x = Q(w, a=b, new_try=True); ok('(setup) Try Again starts try 2', x['try']['number'] == 2 and x['can_answer'] is True, x.get('try'))
+    SV(w, qb[1]['id'], True, a=b)
+    sweep(w, b, 'two tries, try 1 returned, try 2 started, open', None)
+    settings(w, b, after_due='until', accept_until='2020-01-01')
+    x = Q(w, a=b)
+    ok('(setup) closed: MQ2 refuses the unsent ordinary try', x['can_answer'] is False and x['try']['sent'] is False
+       and SV(w, qb[1]['id'], False, a=b) == {'ok': False, 'error': 'quiz_closed'}, x.get('can_answer'))
+    r = sweep(w, b, 'two tries, try 1 returned, try 2 never sent, the quiz closed', 'answers')
+    check_view(w, b, w.cece, r, 'answers', M1(qb), False)
+    ok("that view is try 1's: your_answer is try 1's, not the unsent try's", [q for q in r['questions'] if q['id'] == qb[1]['id']][0]['your_answer'] is None)
+    T(d, 'reopen_quiz(:a, :e, null)', a=b, e=w.cece)
+    sweep(w, b, 'that unsent try reopened while closed (she may answer it again)', None)
     # Unlimited: never out of tries, so only closed shows it.
     u, qu = new_piece(w, 'Unlimited', tries=0)
     answer_all(w, u, qu); tu = try_id(d, u, w.cece)
