@@ -111,6 +111,9 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       // "Open this website in a new tab?", asked by a handout's link and a bulletin's.
       'shared/website-ask.js',
       'shared/handout-viewer.js',
+      // A handout's Print and Save to Phone (a PDF written in the browser from the pages).
+      'shared/handout-pdf.js',
+      'shared/handout-out.js',
       // Handouts and Links: a handout's pages, opened in the page (2026111170).
       's/handouts.js',
       // Reflect on Feedback (S10-F1 and F2), Demo Mode only until Batch C.
