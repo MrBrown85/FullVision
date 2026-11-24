@@ -1851,7 +1851,6 @@ describe('data-idempotency-keys', () => {
         'duplicate_course',
         'import_json_restore',
         'import_roster_csv',
-        'import_teams_class',
         'move_rubric_scores',
         'note_course_opened',
         'patch_teacher_preferences',
