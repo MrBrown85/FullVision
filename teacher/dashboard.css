@@ -2463,7 +2463,9 @@ a.dash-ins-name:hover {
   text-overflow: ellipsis;
 }
 .dash-obs-when.is-overdue {
-  color: var(--score-2);
+  /* The darker Developing amber: --score-2 read 3.49:1 on white, this is
+     4.69:1 (dark mode is the same #ff9f0a, 6.78:1). */
+  color: var(--score-2-dark);
   font-weight: 600;
 }
 .dash-obs-count {

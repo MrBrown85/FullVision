@@ -84,6 +84,13 @@
   font-weight: 600;
   color: var(--score-1-dark);
 }
+/* Dark: --score-1-dark is #ff453a there, 4.09:1 on --surface; the Emerging
+   text red is 4.94:1. */
+@media (prefers-color-scheme: dark) {
+  .assess-missing {
+    color: var(--score-1-text);
+  }
+}
 /* Header actions: shown on the open card, on hover for a closed one. */
 .assess-header-actions {
   grid-area: actions;
@@ -6170,10 +6177,15 @@ body.af-comp-open #gb-tooltip {
 .grader-print:hover {
   background: rgba(0, 122, 255, 0.16);
 }
+/* Dark: the link blue on a lighter tint, as the grader's Return All
+   (--active read 3.0:1, --link on the old 0.2 tint 4.49:1). */
 @media (prefers-color-scheme: dark) {
   .grader-print {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
+  }
+  .grader-print:hover {
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 .grader-scroll {
