@@ -245,6 +245,7 @@ var CmReflectBuilder = (function () {
         : [],
       active: -1,
       menu: -1,
+      past: [], // the Undo list: { qs, active, label }, newest last
       showErrors: false,
       msg: '',
       saving: false,
@@ -403,11 +404,19 @@ var CmReflectBuilder = (function () {
         return x === qs[k];
       });
     };
-    if (d.kind === 'section')
+    if (d.kind === 'section') {
+      var b = _blockAt(qs, i);
       return [
         { label: 'Move Heading Up', action: 'sqBUp', off: same(moveBy(qs, i, -1)) },
         { label: 'Move Heading Down', action: 'sqBDown', off: same(moveBy(qs, i, 1)) },
+        null,
+        {
+          label: b && b.end - b.start > 1 ? 'Remove Heading, Keep Its Questions' : 'Remove Heading',
+          action: 'sqBDelete',
+          danger: true,
+        },
       ];
+    }
     /** @type {any[]} */
     var out = [null, { label: 'Add a Question Below', action: 'sqBAddAt', data: { at: i + 1 } }];
     if (canStartHeading(qs, i))
@@ -431,6 +440,7 @@ var CmReflectBuilder = (function () {
         });
       });
     }
+    out.push(null, { label: 'Remove Question', action: 'sqBDelete', danger: true });
     return out;
   }
 
@@ -578,6 +588,69 @@ var CmReflectBuilder = (function () {
     if (el && el.focus) el.focus();
   }
 
+  /* ── Undo (DECISIONS, "Reflect's builder works the way One Report's
+     editor does" 4) ─────────────────────────────────────────────
+     Every add, copy, move and remove goes on the draft's Undo list first;
+     ⌘Z outside a text box steps back through it, and a remove's toast has
+     Undo too. The list holds the cards themselves, so words typed since
+     stay. It goes with the draft (Save, Cancel). */
+
+  function _push(label) {
+    _b.past.push({ qs: _b.questions.slice(), active: _b.active, label: label });
+    if (_b.past.length > 50) _b.past.shift();
+    return _b.past[_b.past.length - 1];
+  }
+
+  /* Steps back to `step` (the newest on the list), or to the newest. */
+  function _undo(step) {
+    if (!_b || !_b.past.length) return false;
+    var top = _b.past[_b.past.length - 1];
+    if (step && step !== top) return false;
+    _settle();
+    _b.past.pop();
+    var before = _tops();
+    _b.questions = top.qs;
+    _b.active = top.active;
+    _b.menu = -1;
+    _hideIns();
+    _rerender();
+    _glide(before);
+    var g = _g();
+    if (!step && typeof g.dismissUndoToast === 'function') g.dismissUndoToast();
+    _say('Undid: ' + top.label + '.');
+    return true;
+  }
+
+  /* What a card is called in a toast or to a screen reader. */
+  function _cardName(qs, i) {
+    var d = qs[i];
+    var words = _clean(d && d.prompt);
+    if (d && d.kind === 'section') return words ? 'the heading “' + words + '”' : 'a heading';
+    var num = 0;
+    for (var k = 0; k <= i; k++) if (qs[k].kind !== 'section') num++;
+    return 'question ' + num + (words ? ', “' + words + '”' : '');
+  }
+
+  function _remove(i) {
+    var qs = _b.questions;
+    if (!qs[i]) return;
+    var label = 'Removed ' + _cardName(qs, i);
+    var step = _push(label);
+    _settle();
+    var before = _tops();
+    _b.questions = qs.slice(0, i).concat(qs.slice(i + 1));
+    _b.active = -1;
+    _b.menu = -1;
+    _rerender();
+    _glide(before);
+    var g = _g();
+    if (typeof g.showUndoToast === 'function')
+      g.showUndoToast(label, function () {
+        _undo(step);
+      });
+    else _say(label + '.');
+  }
+
   /* A card moved: the new list drawn, the cards gliding from where they
      were, the moved card still the one open (when it was), and the focus
      back where the teacher was: `back` is 'menu' (the card's ⋯), or the id
@@ -591,6 +664,7 @@ var CmReflectBuilder = (function () {
       })
     )
       return false;
+    _push('Moved ' + _cardName(qs, qs.indexOf(d)));
     _settle();
     var open = _b.active >= 0 ? qs[_b.active] : null;
     var before = _tops();
@@ -746,8 +820,21 @@ var CmReflectBuilder = (function () {
     });
   }
 
+  /* ⌘Z (Ctrl+Z) on the builder, outside a text box (where it undoes typing). */
+  function _isUndoKey(e) {
+    if (!_b || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'z') return false;
+    if (typeof document === 'undefined' || !document.querySelector('.rb-build[data-rb-open]')) return false;
+    var t = /** @type {any} */ (e.target);
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return false;
+    return !document.querySelector('.confirm-overlay, body.rb-dragging');
+  }
+
   /* ⌥↑ ⌥↓ in the card being edited move it, the caret staying put. */
   function _onKey(e) {
+    if (_isUndoKey(e)) {
+      if (_undo(null)) e.preventDefault();
+      return;
+    }
     if (!_b || !e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     var t = /** @type {any} */ (e.target);
@@ -896,6 +983,8 @@ var CmReflectBuilder = (function () {
   /* ── Actions ───────────────────────────────────────────────── */
 
   function _closeAndDraw() {
+    var g = _g();
+    if (typeof g.dismissUndoToast === 'function') g.dismissUndoToast();
     close();
     _rerender();
   }
@@ -1017,6 +1106,7 @@ var CmReflectBuilder = (function () {
         return true;
       case 'sqBAdd': {
         var n = _blank(el.dataset.kind || 'choice');
+        _push(n.kind === 'section' ? 'Added a heading' : 'Added a question');
         _b.questions.push(n);
         _b.active = _b.questions.length - 1;
         _rerender();
@@ -1027,6 +1117,7 @@ var CmReflectBuilder = (function () {
         var at = Math.max(0, Math.min(Number(el.dataset.at), _b.questions.length));
         var added = _blank(el.dataset.kind === 'section' ? 'section' : kindAbove(_b.questions, at));
         var tops = _tops();
+        _push(added.kind === 'section' ? 'Added a heading' : 'Added a question');
         _b.questions.splice(at, 0, added);
         _b.active = at;
         _hideIns();
@@ -1041,6 +1132,7 @@ var CmReflectBuilder = (function () {
         delete c.id;
         delete c.savedId;
         c.k = 'k' + ++_seq;
+        _push('Copied ' + _cardName(_b.questions, i));
         _b.questions.splice(i + 1, 0, c);
         _b.active = i + 1;
         _rerender();
@@ -1057,10 +1149,7 @@ var CmReflectBuilder = (function () {
         _moveCard(moveTo(_b.questions, i, Number(el.dataset.to)), d, 'menu');
         return true;
       case 'sqBDelete':
-        if (!d) return true;
-        _b.questions.splice(i, 1);
-        _b.active = -1;
-        _rerender();
+        if (d) _remove(i);
         return true;
       case 'sqBToggle': {
         if (!d) return true;
@@ -1175,6 +1264,9 @@ var CmReflectBuilder = (function () {
     toContract: toContract,
     validate: validate,
     blocksOf: blocksOf,
+    undo: function () {
+      return _undo(null);
+    },
     moveBy: moveBy,
     moveTo: moveTo,
     dropAt: dropAt,

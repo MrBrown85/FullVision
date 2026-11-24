@@ -13,7 +13,10 @@
  * grip, the ↑ ↓ buttons gone, or the ⋯ menu's moving items (and a ⋯ on a
  * heading's card). Rewritten again for adding (same entry, 3): the only
  * difference was the ⋯ menu's Add a Question Below and Start a New Heading
- * Here. It guards Reflect's output from here on.
+ * Here. And for removing (same entry, 4): ⋯'s Remove Question or Remove
+ * Heading (red), and the toolbar's names (Remove question; Copy heading and
+ * Remove heading on a heading's card). It guards Reflect's output from
+ * here on.
  */
 import './setup.js';
 import { describe, expect, it } from 'vitest';
