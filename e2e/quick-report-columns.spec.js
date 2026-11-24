@@ -47,7 +47,7 @@ async function openQuickReportFor(page, wide) {
     const rows = GradeReport.rows(cid, st, GradeReport.options({}));
     const level = rows.find(r => r.note === '' && r.score && !r.outOf && !/Complete/.test(r.score));
     // He has two pieces with no mark yet: one is excused, one stays blank.
-    const none = rows.filter(r => r.note === '' && !r.score);
+    const none = rows.filter(r => r.note === '' && !r.score && !/^sci8-quiz-/.test(r.id));
     Grader.setStatus(cid, st.id, level.id, 'LATE');
     Grader.setStatus(cid, st.id, none[0].id, 'EXC');
     return { mode: courseGradeMode(cid), late: level.title, excused: none[0].title, blank: none.length };

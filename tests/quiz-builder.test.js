@@ -2,31 +2,16 @@
  * The Quiz card on the assessment form (teacher/quiz-builder.js, slice Q2b
  * of docs/plans/quizzes-plan.md; board "Quizzes Artboard", Board 1).
  *
- * 1. With the quizzes switch off the form is byte for byte what it was:
- *    tests/fixtures/quiz-switch-off.json holds the form as origin/main drew
- *    it (before Q2b), in its states (new, with Send Work off and on, after
- *    Yes, Photos, an edit of Points work, the Student Page off; in Demo Mode
- *    and signed in), what an edit and a new assessment save, the
- *    localStorage keys each walk left, and every server call it made, by
- *    name and in order. It was written by this file's own
- *    walk on that commit, with only this file and its fixture added:
- *      UPDATE_QUIZ_SNAPSHOT=1 npx vitest run tests/quiz-builder.test.js
- *    Run that only on code from before a change the form is meant to keep
- *    out; never to make a failing comparison pass.
- * 2. With it on: They Answer a Quiz on the Student Work card, the card's
+ * With the switch on: They Answer a Quiz on the Student Work card, the card's
  *    model (each kind, the key, points, a competency, validation), the
  *    round trip through save and reopen, Points kept equal to the quiz's
  *    total, Students Send kept at Nothing, the scoring a new quiz starts on,
  *    and that Duplicate does not carry a quiz.
  */
 import './setup.js';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { runInThisContext } from 'node:vm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   U,
-  signIn,
   seedClass,
   clearClass,
   click,
@@ -35,11 +20,7 @@ import {
   tick,
   openAssignments,
   closePages,
-  serverSaysStudentPageOn,
 } from './helpers/pin-save-paths.js';
-
-const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'quiz-switch-off.json');
-const UPDATE = process.env.UPDATE_QUIZ_SNAPSHOT === '1';
 
 const CID = U(1);
 const AVA = U(11);
@@ -90,155 +71,6 @@ async function openNew(seed) {
   click(document.querySelector('[data-action="showNewForm"]'));
   await settled();
 }
-async function openEdit(seed, aid) {
-  openAssignments(seed, CID);
-  await settled();
-  click(document.querySelector('[data-action="editAssess"][data-aid="' + aid + '"]'));
-  await settled();
-}
-
-/* ── 1. The switch off ─────────────────────────────────────── */
-
-/* Every state of the form this walk draws, as HTML, with the keys and calls. */
-async function walk(demo, calls) {
-  const out = {};
-  const take = name => {
-    out[name] = form().innerHTML;
-  };
-  const page = { student_page_enabled: true, return_grades: 'on_return' };
-  const close = () => {
-    closePages();
-    clearClass(CID);
-  };
-  const sendWork = on => {
-    if (demo) setCourseSendWork(CID, { send_work: on });
-  };
-
-  await openNew(seedWith(page));
-  sendWork(false);
-  close();
-  await openNew(seedWith(page));
-  take('new, Student Page on');
-  close();
-  if (demo) {
-    await openNew(() => {
-      seedWith(page)();
-      sendWork(true);
-    });
-    take('new, Send Work on');
-    click(form().querySelector('[data-field="students_send"][data-value="photos"]'));
-    await settled();
-    take('new, Send Work on, Yes, Photos');
-    close();
-    await openEdit(() => {
-      seedWith(page)();
-      sendWork(true);
-    }, POINTS);
-    take('edit Points work, Send Work on');
-    close();
-  }
-  await openEdit(seedWith(page), ESSAY);
-  take('edit, Student Page on');
-  // Saved: what is stored, and (signed in) every call it makes.
-  const titleBox = form().querySelector('#af-title');
-  titleBox.value = 'Essay Two';
-  fire(titleBox, 'input');
-  click(form().querySelector('.af-actions .btn-primary'));
-  await settled();
-  out['saved edit'] = JSON.stringify(getAssessments(CID).find(a => a.id === ESSAY));
-  out['saved edit, Student Work'] = JSON.stringify(getAssessmentStudentWork(CID, ESSAY));
-  close();
-  await openNew(seedWith(page));
-  const newTitle = form().querySelector('#af-title');
-  newTitle.value = 'Lab Two';
-  fire(newTitle, 'input');
-  tick(form().querySelector('.af-tag-cb[value="' + T1 + '"]'), true);
-  click(form().querySelector('.af-actions .btn-primary'));
-  await settled();
-  const made = getAssessments(CID).find(a => a.title === 'Lab Two');
-  out['saved new'] = made ? JSON.stringify({ ...made, id: '<id>', created: '<created>' }) : 'not saved';
-  close();
-  await openNew(seedWith({}));
-  take('new, Student Page off');
-  close();
-  out.keys = Object.keys(localStorage._store).sort().join(' ');
-  if (calls) out.calls = calls().join(' ');
-  return out;
-}
-
-describe('with the quizzes switch off the form is what it was', () => {
-  let wasDemo;
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-11-18T18:00:00.000Z'));
-    wasDemo = window.isDemoMode;
-    localStorage.clear();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-    window.isDemoMode = wasDemo;
-    serverSaysStudentPageOn(CID, false);
-    localStorage.clear();
-  });
-
-  const demoWalk = () => {
-    window.isDemoMode = () => true;
-    return walk(true);
-  };
-  const signedInWalk = async () => {
-    window.isDemoMode = () => false;
-    const session = signIn();
-    try {
-      serverSaysStudentPageOn(CID, true);
-      return await walk(false, () => session.fake.calls.map(c => c.name));
-    } finally {
-      session.signOut();
-    }
-  };
-
-  if (UPDATE) {
-    it('writes the snapshot (run on the code from before the change)', async () => {
-      const demo = await demoWalk();
-      localStorage.clear();
-      const snap = { demo, signedIn: await signedInWalk() };
-      writeFileSync(SNAPSHOT, JSON.stringify(snap, null, 2) + '\n');
-    });
-    return;
-  }
-  const before = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) : {};
-
-  it('has the snapshot', () => {
-    expect(Object.keys(before.demo || {})).toHaveLength(10);
-    expect(Object.keys(before.signedIn || {})).toHaveLength(8);
-  });
-
-  it('in Demo Mode: every state, and the keys left', async () => {
-    const now = await demoWalk();
-    Object.keys(before.demo).forEach(name => expect(now[name], name).toBe(before.demo[name]));
-    expect(Object.keys(now)).toEqual(Object.keys(before.demo));
-  });
-
-  it('signed in with the server’s student page on: every state, the keys, and no quiz call', async () => {
-    const now = await signedInWalk();
-    // Every call by name, in order, saves included: the same as main's, and no quiz call.
-    Object.keys(before.signedIn).forEach(name => expect(now[name], name).toBe(before.signedIn[name]));
-    expect(now.calls).not.toMatch(/quiz/);
-  });
-
-  it('the seed adds nothing to Demo Mode with the switch off', () => {
-    window.isDemoMode = () => true;
-    const seedDemoQuiz = runInThisContext(
-      '(function () {\n' + readFileSync('shared/seed-data.js', 'utf-8') + '\nreturn seedDemoQuiz;\n})()',
-    );
-    COURSES.sci8 = { id: 'sci8', name: 'Science 8' };
-    expect(seedDemoQuiz()).toBe(false);
-    delete COURSES.sci8;
-    expect(Object.keys(localStorage._store).filter(k => /quiz/.test(k))).toEqual([]);
-  });
-});
-
-/* ── 2. The switch on ──────────────────────────────────────── */
-
 describe('with the quizzes switch on, in Demo Mode', () => {
   let wasDemo;
   beforeEach(() => {

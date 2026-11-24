@@ -121,9 +121,9 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     // The page opens on Assignments.
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     // `forms` is S4-F4's: the Reflections tab.
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'forms']);
     await scrollThroughAll(page);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'seen']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'forms', 'seen']);
     // The code goes again with what was typed. No token, and no session: this device had none.
     expect(page.calls[1].body).toEqual({
       route: 'verify',
@@ -136,13 +136,13 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(token).toMatch(/^[0-9a-f]{64}$/);
     expect(page.calls[2].body).toEqual({ route: 'page', session: token, enrollment_id: CECE });
     // Every request passed the handler's own checks.
-    expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
-    // `bulletins` is asked at once with `page` (B1d), and `work` with `forms`, so the server may finish either of each pair first.
+    expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    // `bulletins` and `quiz-list` are asked at once with `page` (B1d, Q6), and `work` with `forms`, so the server may finish any of each group first.
     const fns = dev.fn.sql.map(q => q.fn);
     expect(fns.slice(0, 2)).toEqual(['card', 'verify_card']);
-    expect(fns.slice(2, 4).sort()).toEqual(['bulletins', 'page']);
-    expect(fns.slice(4, 6).sort()).toEqual(['forms', 'work']);
-    expect(fns[6]).toBe('seen');
+    expect(fns.slice(2, 5).sort()).toEqual(['bulletins', 'page', 'quiz_list']);
+    expect(fns.slice(5, 7).sort()).toEqual(['forms', 'work']);
+    expect(fns[7]).toBe('seen');
     expect(dev.fn.sql[1].add).toBe(false);
 
     // Scrolling through My Learning's rows left the page there.
@@ -186,7 +186,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
     page.advance(500);
     await page.click('[data-act="card-done"]');
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'seen', 'done']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'forms', 'seen', 'done']);
     page.calls.forEach(c => {
       expect(c.url).toBe('https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1');
       expect(c.init.method).toBe('POST');
@@ -551,10 +551,10 @@ describe('the page won’t open: each refusal has its line', () => {
     const token = JSON.parse(dev.store[KEY]).t;
     Object.assign(dev.card, card);
     const page = await dev.open('');
-    // `bulletins` goes with `page` (B1d) and is refused the same way.
-    expect(dev.fn.logs.slice(-3).map(l => l.outcome)).toEqual([error, error, 'ok']);
-    expect(routes(page)).toEqual(['page', 'bulletins', 'done']);
-    expect(page.calls[2].body).toEqual({ route: 'done', session: token });
+    // `bulletins` goes with `page` (B1d), and `quiz-list` (Q6), and each is refused the same way.
+    expect(dev.fn.logs.slice(-4).map(l => l.outcome)).toEqual([error, error, error, 'ok']);
+    expect(routes(page)).toEqual(['page', 'bulletins', 'quiz-list', 'done']);
+    expect(page.calls[3].body).toEqual({ route: 'done', session: token });
     expect(alertText(page)).toBe(line);
     expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('[data-act="page-retry"]')).toBeNull();
@@ -570,7 +570,7 @@ describe('the page won’t open: each refusal has its line', () => {
     await signIn(dev);
     dev.fn.state.sessions = {};
     const page = await dev.open('');
-    expect(routes(page)).toEqual(['page', 'bulletins']);
+    expect(routes(page)).toEqual(['page', 'bulletins', 'quiz-list']);
     const note = page.root().querySelector('.sp-msg');
     expect(note.textContent).toBe(SIGNED_OUT);
     expect(note.getAttribute('role')).toBe('status');
@@ -616,7 +616,7 @@ describe('the page won’t open: each refusal has its line', () => {
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     await scrollThroughAll(page);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'seen']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'forms', 'seen']);
     expect(page.root().querySelector(LIST)).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(dev.store).toEqual({});
@@ -655,6 +655,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     expect(page.calls.map(c => c.body)).toEqual([
       { route: 'page', session: token, enrollment_id: CECE },
       { route: 'bulletins', session: token, enrollment_id: CECE },
+      { route: 'quiz-list', session: token, enrollment_id: CECE },
       { route: 'work', session: token, enrollment_id: CECE },
       { route: 'forms', session: token, enrollment_id: CECE },
     ]);
@@ -1332,8 +1333,8 @@ describe('Demo Mode and a real card cannot drift', () => {
     await demo.click('[data-act="card-yes"]');
     expect(demo.calls).toEqual([]);
     const demoRows = await rows(demo);
-    // Three on Assignments, seven on My Learning (the Missing one on both).
-    expect(demoRows).toHaveLength(10);
+    // Four on Assignments (the sample quiz is one), seven on My Learning (the Missing one on both).
+    expect(demoRows).toHaveLength(11);
 
     // The sample class's reply before anything was opened (the walk above has opened its own).
     const sent = realIds(openStudentPage().T.demoPage(system));
@@ -1357,10 +1358,10 @@ describe('Demo Mode and a real card cannot drift', () => {
     // The same marks, in the same places.
     expect((await rows(real)).filter(r => /^Updated /.test(r.sub)).map(r => r.title)).toEqual(['Lab Safety Contract']);
     // And each walked the same steps: card, verify, page, then seen for the rows that came on screen.
-    expect(routes(real)).toEqual(['card', 'verify', 'page', 'bulletins', 'work']);
+    expect(routes(real)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work']);
     await scrollThroughAll(demo);
     await scrollThroughAll(real);
-    expect(routes(real)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'seen']);
+    expect(routes(real)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'seen']);
     expect(demo.calls).toEqual([]);
   });
 

@@ -98,7 +98,7 @@ describe('Send Work off (every class, and #demo-card): nothing about sending sho
     const { page } = await demo('#demo-card');
     expect(page.T.workOf(page.T.state())).toBeNull();
     expect(page.root().innerHTML).not.toMatch(/sp-send|Send My Work|Hand this one in on paper/);
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
     expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 1');
     await page.click('[data-segment="upcoming"]');
     expect(page.root().innerHTML).not.toMatch(/sp-send|Send My Work|Hand this one in on paper/);
@@ -186,6 +186,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     expect(cards(page).map(c => words(c.querySelector('.sp-piece-title')))).toEqual([
       'Immune System Quick Check',
       'Disease Research Poster',
+      'Data Patterns Quick Check',
     ]);
     expect(words(card(page, 'Disease Research Poster').querySelector('[data-act="send-open"]'))).toBe('Send My Work');
     const quick = card(page, 'Immune System Quick Check');
@@ -242,7 +243,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     expect(page.T.state().screen).toBe('assignments');
     // Sent work leaves Assignments.
     expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 0');
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
     expect(has(page, '.sp-piece[data-piece="demo-fair"]')).toBe(false);
     expect(text(page, '.sp-page')).toMatch(/Nothing coming up yet\./);
     // It is at the top of My Learning's Your Work, waiting for feedback.
@@ -280,7 +281,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     await page.click('[data-act="send-go"]');
     await page.settle();
     await page.click('[data-act="send-done"]');
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 1');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
     await openSent(page, 'Disease Research Poster');
     const poster = card(page, 'Disease Research Poster');
     expect(words(poster.querySelector('.sp-send-line'))).toBe('Your teacher is grading this');
@@ -555,7 +556,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     // The page goes to its card on Assignments, in Upcoming (it is due in four days).
     expect(page.T.state()).toMatchObject({ tab: 'assignments', segment: 'upcoming', pick: 'demo-fair', card: '' });
     expect(text(page, '[data-segment="upcoming"]')).toBe('Upcoming 1');
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
     expect(words(card(page, 'Science Fair Proposal').querySelector('[data-act="send-open"]'))).toBe('Send My Work');
     // And it is off My Learning.
     await page.click('[data-tab="learning"]');

@@ -258,7 +258,8 @@ describe('with the student page and Send Work on', () => {
     picker();
     MGrade.filterAssessments(CID, 'all');
     MGrade.openFilterSheet(CID);
-    const total = getAssessments(CID).length;
+    // The phone lists assigned work only; the sample class also has a quiz not yet assigned.
+    const total = getAssignedAssessments(CID).length;
     const count = () => document.querySelector('#m-sheet-container .m-live-filter-count').textContent;
     expect(count()).toBe('Showing ' + total + ' of ' + total);
     MGrade.onFilterSegChange('gradedStatus', 'has-ungraded');

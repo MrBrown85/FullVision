@@ -32,7 +32,7 @@ test('Save as Draft keeps a new assessment out of the gradebook until Assign', a
   await form.locator('#af-category').selectOption({ index: 1 });
   await form.locator('[data-action="saveNewAssess"][data-draft="1"]').click();
 
-  const draft = page.locator('.assess-card.is-draft');
+  const draft = page.locator('.assess-card.is-draft', { hasText: 'Organ Systems Plan' });
   await expect(draft).toHaveCount(1);
   await expect(draft.locator('.assess-title')).toHaveText('Organ Systems Plan');
   await expect(draft.locator('.draft-badge')).toHaveText('Draft');
@@ -43,8 +43,8 @@ test('Save as Draft keeps a new assessment out of the gradebook until Assign', a
   await expect(page.locator('#main')).not.toContainText('Organ Systems Plan');
 
   await page.goto('/assignments');
-  await page.locator('.assess-card.is-draft .draft-assign-btn').click();
-  await expect(page.locator('.assess-card.is-draft')).toHaveCount(0);
+  await draft.locator('.draft-assign-btn').click();
+  await expect(draft).toHaveCount(0);
   const assigned = await page.evaluate(
     () => getAssessments(getActiveCourse()).find(a => a.title === 'Organ Systems Plan').isDraft,
   );

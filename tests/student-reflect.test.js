@@ -21,8 +21,11 @@ const q = (page, sel) => page.root().querySelector(sel);
 const qa = (page, sel) => [...page.root().querySelectorAll(sel)];
 const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
 
-async function demo(hash) {
+async function demo(hash, opts) {
   const page = openStudentPage();
+  // The sample quiz (Quizzes, on since Q6) is due today, so it is the next piece to do and takes the plan;
+  // the tests of a plan on a piece to send put it out of the way.
+  if (opts && opts.noQuiz) page.run('StudentPage.demoQuiz = function () { return []; }');
   await page.start(hash || '#demo-card-reflect');
   await page.submit('form[data-form="card"]');
   page.type('#sp-ident', page.T.DEMO.number);
@@ -319,8 +322,14 @@ describe('answers that arrive late, or wrong', () => {
 });
 
 describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
-  it('the plan from yesterday shows on the next piece to do, not the late one', async () => {
+  it('the sample quiz is due today, so it is the next piece to do and carries the plan', async () => {
     const page = await demo();
+    expect(piece(page, 'Data Patterns Quick Check').plan).toMatchObject({ fromTitle: 'KMT & States of Matter Lab' });
+    expect(piece(page, 'Science Fair Proposal').plan).toBeNull();
+  });
+
+  it('the plan from yesterday shows on the next piece to do, not the late one', async () => {
+    const page = await demo(undefined, { noQuiz: true });
     const fair = piece(page, 'Science Fair Proposal');
     expect(fair.plan).toEqual({
       text: 'Next time I’ll write down what I predict before I heat anything.',
@@ -426,7 +435,7 @@ describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
   });
 
   it('Check and Send asks Did You Do It? on the piece with the plan, and keeps the student’s word', async () => {
-    const page = await demo();
+    const page = await demo(undefined, { noQuiz: true });
     page.T.setPrepare(file =>
       Promise.resolve({ ok: true, kind: 'jpeg', pages: [{ blob: { size: 1 }, thumb: { size: 1 }, hash: 'h' }] }),
     );

@@ -684,6 +684,11 @@ export function fakeStudentSubmit(opts = {}) {
           const found = inSession(params[0], params[1]);
           return found.error ? no(found.error) : clone(state.bulletins || { ok: true, bulletins: [], new: [] });
         }
+        // Quizzes (Q3a, deployed, on since Q6): what state.quizList holds, else a class with no quiz marked.
+        if (fn === 'quiz_list') {
+          const found = inSession(params[0], params[1]);
+          return found.error ? no(found.error) : clone(state.quizList || { ok: true, quizzes: [] });
+        }
         // Batch C's `feedback`: what state.feedback holds, else a class with no marks and Reflect on Feedback off.
         if (fn === 'feedback') {
           return clone(

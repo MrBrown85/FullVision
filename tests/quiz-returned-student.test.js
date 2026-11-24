@@ -159,17 +159,6 @@ describe('asking quiz-result', () => {
     expect(w.db.asked).toEqual([]);
   });
 
-  it('is not asked, and nothing quiz is drawn, with the switch off', async () => {
-    const w = world();
-    const page = await signIn(w, {});
-    expect(w.db.asked).toEqual([]);
-    expect(w.db.listed).toBe(0);
-    await feedbackOf(page, AID);
-    expect(seeQuiz(page)).toBe(null);
-    expect(page.root().innerHTML).not.toMatch(/sp-quiz|quiz-open|See Your Quiz/);
-    expect(routes(page).filter(r => /^quiz/.test(r))).toEqual([]);
-  });
-
   it('is not asked when the server names no quiz (no quiz-list)', async () => {
     const w = world({ noList: true });
     await signIn(w);

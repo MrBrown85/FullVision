@@ -17,7 +17,7 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
   await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
-  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
   return posts;
 }
 
@@ -27,7 +27,11 @@ test.describe('on a phone', () => {
   test('Outstanding: the cards one under another, to scroll; Upcoming: what is due later', async ({ page }) => {
     const posts = await demo(page);
     const cards = page.locator('.sp-deck .sp-piece');
-    await expect(cards.locator('.sp-piece-title')).toHaveText(['Immune System Quick Check', 'Disease Research Poster']);
+    await expect(cards.locator('.sp-piece-title')).toHaveText([
+      'Immune System Quick Check',
+      'Disease Research Poster',
+      'Data Patterns Quick Check',
+    ]);
     await expect(page.locator('.sp-deck-count')).toHaveCount(0);
     // Stacked: the second card starts below the first, at the same left edge.
     const [a, b] = await cards.evaluateAll(els => els.map(e => e.getBoundingClientRect().toJSON()));
@@ -97,7 +101,7 @@ test.describe('on a phone', () => {
     await sheet.getByRole('button', { name: 'Cancel' }).click();
     await expect(sheet).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();
-    await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
     expect(posts).toEqual([]);
   });
 });

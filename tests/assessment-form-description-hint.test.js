@@ -144,8 +144,14 @@ describe('with the Student Page on the form says students see the Description', 
   // The form with the hint taken out is the form with the page off. Handouts and Links
   // (assessment-handouts.test.js) is the other field a class whose students read the page has.
   const RES_FIELD = /<div class="af-field af-res" id="af-res"[\s\S]*?<p class="af-res-msg"[^>]*>[^<]*<\/p><\/div>/;
+  // And the Quiz card's own Student Work card (Quizzes, on since Q6), which a class with its Student Page on draws.
+  const QUIZ_MOUNT = /<div id="quiz-mount" class="quiz-mount">[\s\S]*?<\/section><\/div>/;
   const withoutHint = html =>
-    html.replace(RES_FIELD, '').replace(HINT_HTML, '').replace(' aria-describedby="af-desc-hint"', '');
+    html
+      .replace(RES_FIELD, '')
+      .replace(QUIZ_MOUNT, '')
+      .replace(HINT_HTML, '')
+      .replace(' aria-describedby="af-desc-hint"', '');
 
   async function check(config) {
     const now = await walk(config);

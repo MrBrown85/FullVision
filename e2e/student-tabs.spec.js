@@ -88,7 +88,7 @@ test('a competency goal saves from the Learner Profile', async ({ page }) => {
 test('the student page has no term picker and counts the year so far', async ({ page }) => {
   await openCece(page);
   await expect(page.locator('select.term-select')).toHaveCount(0);
-  const n = await page.evaluate(() => getAssessments(getActiveCourse()).length);
+  const n = await page.evaluate(() => getAssessments(getActiveCourse()).filter(a => !a.isDraft).length);
   expect(n).toBeGreaterThan(1);
   await expect(page.locator('#stu-tab-grades .stu-tab-stat')).toHaveText(n + ' Pieces');
 });

@@ -5,8 +5,9 @@ order: 3
 summary: What's New lists changes to FullVision by release date, newest first.
 keywords:
   - Class Management
-checked: 2026-11-18
+checked: 2026-11-24
 labels:
+  - They Answer a Quiz
   - Bulletins
   - Let Students React
   - Inbox
@@ -57,6 +58,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 24, 2026: Quizzes
+
+A quiz is a new way for students to do an assessment. On the assessment form, **They Answer a Quiz** opens a Quiz card for writing the questions, the right answers and the competency each question counts toward. Students answer on their Student Page, on a phone or a Chromebook, and the teacher sees the answers by student, by question and by competency, with a suggested level for each competency. A suggested level counts nowhere until the teacher confirms it. Quizzes need the class's Student Page on. **Download All My Data** has two new sheets for quizzes; a class backup does not hold them. See [Make a Quiz](make-a-quiz).
 
 ## Nov 18, 2026: Bulletins
 

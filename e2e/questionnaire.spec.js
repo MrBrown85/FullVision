@@ -554,7 +554,7 @@ test.describe('checks and approval', () => {
     // One assignment labelled Missing for Cece.
     const title = await page.evaluate(() => {
       const dated = getAssessments('sci8')
-        .filter(x => x.date)
+        .filter(x => x.date && !/^sci8-quiz-/.test(x.id))
         .sort((x, y) => x.date.localeCompare(y.date));
       const a = dated[dated.length - 1];
       _cache.scores['sci8']['st1'] = (_cache.scores['sci8']['st1'] || []).filter(e => e.assessmentId !== a.id);

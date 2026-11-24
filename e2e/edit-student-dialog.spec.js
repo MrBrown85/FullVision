@@ -59,6 +59,8 @@ test('two columns with every roster field; 44 px controls; Save', async ({ page 
     el => [...el.querySelectorAll('.es-toggle span')].filter(s => s.scrollWidth > s.clientWidth + 1).length,
   );
   expect(cut).toBe(0);
+  // The dialog opens with a short scale animation: measure it once it has settled.
+  await dialog.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished)));
   const small = await dialog.evaluate(
     el =>
       [...el.querySelectorAll('button, input, select')]

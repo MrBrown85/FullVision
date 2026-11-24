@@ -95,7 +95,9 @@ for (const size of [
       await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 0', 'Upcoming 1']);
       await page.getByRole('button', { name: 'Upcoming 1' }).click();
       await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText(['Medieval Europe Map']);
-      await expect.poll(() => routes(posts)).toEqual(['card', 'add-card', 'page', 'bulletins', 'work', 'forms']);
+      await expect
+        .poll(() => routes(posts))
+        .toEqual(['card', 'add-card', 'page', 'bulletins', 'quiz-list', 'work', 'forms']);
       // One session: the token is the same; the class it opens is the new one.
       const kept = JSON.parse((await stored(page)).local[KEY]);
       expect(kept.t).toBe(token);

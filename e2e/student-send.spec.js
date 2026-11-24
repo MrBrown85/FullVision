@@ -29,7 +29,7 @@ async function demo(page) {
   // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
   await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
   // Disease Research Poster (past due) and Immune System Quick Check (missing); Science Fair Proposal is due later.
-  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upcoming 1' })).toBeVisible();
   return { posts, errors };
 }
@@ -86,7 +86,7 @@ for (const [where, device] of [
       await page.getByRole('alertdialog').getByRole('button', { name: 'Unsend' }).click();
       // Unsent: the page goes to its card on Assignments, in Upcoming by its due date, its title focused.
       await expect(page.getByRole('button', { name: 'Upcoming 1' })).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
       await expect(fair.locator('.sp-piece-title')).toBeFocused();
       await expect(fair.getByRole('button', { name: 'Send My Work' })).toBeVisible();
       // And it is off My Learning.
