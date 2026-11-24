@@ -121,6 +121,8 @@
     "teacher/add-work-tray.js",
     "shared/handout-files.js",
     "shared/handout-viewer.js",
+    "shared/handout-pdf.js",
+    "shared/handout-out.js",
     "shared/data-scan-labels.js",
     "shared/scan-label-read.js",
     "teacher/scan-labels.js",

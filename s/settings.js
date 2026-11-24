@@ -29,11 +29,15 @@ window.StudentSettings = (function () {
     window.addEventListener('keydown', function (e) {
       var S = state();
       if (!S || S.screen !== 'assignments' || typeof document === 'undefined') return;
-      var open = S.logout ? '.sp-logout' : S.settings ? '.sp-set' : '';
+      var open = S.logout ? '.sp-logout' : S.settings ? '.sp-set' : S.handoutMenu ? '.sp-handout-sheet' : '';
       if (!open) return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        press(S.logout ? 'logout-cancel' : 'settings-close');
+        // Save or Print over a handout closes as its Cancel does (s/handouts.js).
+        var cancel =
+          !S.logout && !S.settings && document.querySelector('.sp-handout-sheet [data-act="handout-out-close"]');
+        if (cancel) /** @type {HTMLElement} */ (cancel).click();
+        else press(S.logout ? 'logout-cancel' : 'settings-close');
         return;
       }
       if (e.key !== 'Tab') return;

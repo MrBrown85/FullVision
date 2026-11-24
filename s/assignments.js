@@ -100,6 +100,7 @@
       handoutPiece: state.handoutPiece,
       handoutPage: state.handoutPage,
       handoutPages: state.handoutPages,
+      handoutMenu: state.handoutMenu,
       // A bulletin's file open full size (s/bulletins-view.js), and "2 new" by class in Switch Class.
       bulletinFile: state.bulletinFile,
       bulletinPage: state.bulletinPage,

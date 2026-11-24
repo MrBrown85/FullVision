@@ -1794,6 +1794,8 @@
     'handoutPiece',
     'handoutPage',
     'handoutPages',
+    // Save or Print, the sheet over an open handout (s/handouts.js).
+    'handoutMenu',
     // Settings (the gear) open, and the Text Size chosen there.
     'settings',
     'textSize',

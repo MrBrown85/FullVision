@@ -136,6 +136,7 @@ var StudentPage = (function () {
       handout: '', // the Assignments tab: the handout open in the page (Handouts and Links)
       handoutPiece: '', // the piece that handout is on
       handoutPage: 0, // the handout: the page showing, from 0
+      handoutMenu: false, // the handout: Save or Print, the sheet, is open (s/handouts.js)
       handoutPages: null, // the handout: the pages fetched, { id, state, pages, asked } (s/handouts.js)
       form: '', // Reflections: the one picked on a Chromebook
       back: '', // a questionnaire or report opened from a card's page: the tab to go back to
