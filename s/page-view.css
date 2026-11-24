@@ -1732,6 +1732,44 @@ html.sp-size-larger .sp-view .sp-head-class {
 .sp-view .sp-work {
   max-width: 620px;
 }
+/* Save or Print on an open handout (s/page-view.js handoutOutButton): one
+   button at the right of the top bar, which never wraps. The title keeps
+   room for whole words (10em): where the button would squeeze it below that
+   (a narrow phone, large text), the button moves under the title instead.
+   Its sheet is the Your Classes sheet (.sp-set above), each row its icon and
+   its name. */
+.sp-view .sp-handout .sp-work-head {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.sp-view .sp-handout .sp-work-head .sp-work-words {
+  flex: 1 1 10em;
+}
+.sp-view .sp-handout-outbtn {
+  flex: none;
+  gap: 6px;
+  margin-left: auto;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.sp-view .sp-out-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+.sp-view .sp-handout-outbtn .sp-out-icon {
+  width: 18px;
+  height: 18px;
+}
+.sp-view .sp-out-list .sp-class {
+  gap: 14px;
+}
+.sp-view .sp-out-list .sp-out-icon {
+  color: #0066cc;
+}
+.sp-view .sp-out-list .sp-class[aria-disabled='true'] {
+  opacity: 0.6;
+}
 
 /* For This Assignment (Handouts and Links; the board "What the Student
    Sees (Phone)"): the teacher's handout and links under the Description,

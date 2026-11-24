@@ -331,6 +331,67 @@ describe('in Demo Mode', () => {
     expect(StudentPageView.press(ui, view, 'segment', tab).ui.handout).toBe('');
   });
 
+  it('an open handout has a Save or Print button in its top bar, and a sheet of two rows', async () => {
+    const h = await addAssessmentHandout(CID, AID, 'Density Lab Instructions', shrunk(2));
+    const view = StudentView.fromCache(CID, SID).view;
+    const base = { segment: 'upcoming', pick: AID, tab: 'assignments', handout: h.resource.id, handoutPiece: AID };
+    const show = (got, extra) => {
+      const ui = Object.assign({}, base, extra, {
+        handoutPages: Object.assign({ id: h.resource.id, state: 'ready' }, got),
+      });
+      const { document } = parseHTML('<main>' + StudentPageView.html(view, ui) + '</main>');
+      const btn = document.querySelector('.sp-work-head > .sp-handout-outbtn');
+      return {
+        button: btn ? [btn.textContent, btn.getAttribute('data-act'), btn.getAttribute('aria-expanded')] : null,
+        // The button is the last thing in the bar, after the title.
+        last: btn ? btn === document.querySelector('.sp-work-head').lastElementChild : false,
+        rows: [...document.querySelectorAll('.sp-handout-sheet .sp-out-row')].map(b => [
+          b.textContent,
+          b.getAttribute('data-act'),
+          b.getAttribute('aria-disabled'),
+          b.querySelectorAll('svg').length,
+        ]),
+        sheet: !!document.querySelector('.sp-handout-sheet'),
+        subs: document.querySelectorAll('.sp-handout-sheet .sp-class-sub').length,
+        cancel: [...document.querySelectorAll('.sp-handout-sheet .sp-btn-quiet')].map(b => b.textContent),
+        title: (document.querySelector('.sp-handout-sheet .sp-sheet-title') || {}).textContent,
+        bottomButtons: document.querySelectorAll('.sp-handout-out').length,
+      };
+    };
+    const here = [{ url: 'blob:one' }, { url: 'blob:two' }];
+    const gap = [{ url: 'blob:one' }, { url: '' }];
+    // No button until a page is here.
+    expect(show({ state: 'loading', pages: [] }).button).toBeNull();
+    // A page is here: the button, and no sheet yet and no row along the bottom.
+    const shut = show({ pages: gap });
+    expect(shut.button).toEqual(['Save or Print', 'handout-out-open', 'false']);
+    expect(shut.last).toBe(true);
+    expect([shut.sheet, shut.bottomButtons]).toEqual([false, 0]);
+    // Open: Save to Phone, Print, each an icon and a name only, and Cancel.
+    const open = show({ pages: here }, { handoutMenu: true });
+    expect(open.button[2]).toBe('true');
+    expect(open.title).toBe('Save or Print');
+    expect(open.rows).toEqual([
+      ['Save to Phone', 'handout-save', null, 1],
+      ['Print', 'handout-print', null, 1],
+    ]);
+    expect([open.subs, open.cancel]).toEqual([0, ['Cancel']]);
+    // The chosen row says Getting Pages… in the name's place, and the other stays.
+    expect(show({ pages: here, out: { state: 'working', how: 'print' } }, { handoutMenu: true }).rows).toEqual([
+      ['Save to Phone', 'handout-save', null, 1],
+      ['Getting Pages…', 'handout-print', 'true', 1],
+    ]);
+    // A page that did not come: the row says so in the name's place, nothing else changes.
+    const failed = show({ pages: gap, missed: 1, out: { state: 'failed', how: 'save' } }, { handoutMenu: true });
+    expect(failed.rows).toEqual([
+      ['The handout didn’t load. Check your internet and try again.', 'handout-save', null, 1],
+      ['Print', 'handout-print', null, 1],
+    ]);
+    // A press that leaves the handout closes the sheet.
+    const out = StudentPageView.press(Object.assign({}, base, { handoutMenu: true }), view, 'handout-close', null);
+    expect(out && out.ui.handoutMenu).toBe(false);
+  });
+
   it('the view leaves out a link that is not an http(s) address', () => {
     const view = StudentView.fromPage(
       {

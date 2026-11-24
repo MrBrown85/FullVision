@@ -326,7 +326,7 @@ describe('pin-assignments-page-writes', () => {
       session = signIn();
       writers = recordWriters(['refreshSidebarGrades'].concat(more || []));
       mark(aid);
-      // linkedom draws no layout. The criterion comment box asks which
+      // linkedom draws no layout. The criterion comment field asks which
       // comment buttons are on screen: here, all of them.
       const proto = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div')));
       if (!proto.getClientRects) proto.getClientRects = () => [{}];
@@ -531,67 +531,90 @@ describe('pin-assignments-page-writes', () => {
         expect(levels(CID, AVA)).toEqual({ [SAFETY]: 2 });
       });
 
-      describe('the criterion comment box', () => {
-        function openBox(sid, criterion) {
+      describe('the criterion comment field', () => {
+        function openField(sid, criterion) {
           click(critRow(LAB, sid, criterion).querySelector('[data-action="openCriterionComment"]'));
-          // The overlay cancels on a click on its backdrop (`e.target ===
-          // this`). linkedom calls an onclick with `this` as the click's
-          // target, so every click inside the box would cancel it first.
-          document.getElementById('crit-comment-overlay').onclick = null;
         }
         const field = () => document.getElementById('crit-comment-input');
-        const press = action => click(document.querySelector('#crit-comment-overlay [data-action="' + action + '"]'));
         function type(text) {
           field().value = text;
           fire(field(), 'input');
         }
 
-        it('Save is saveRubricCriterionComment with the trimmed text; on an unscored criterion a null level goes up', () => {
+        it('opens in its row; Escape writes saveRubricCriterionComment with the trimmed text, with no redraw', () => {
           open(LAB);
-          openBox(AVA, METHOD);
+          openField(AVA, METHOD);
+          expect(critRow(LAB, AVA, METHOD).contains(field())).toBe(true);
+          expect(document.activeElement).toBe(field());
+          expect(field().getAttribute('aria-label')).toBe('Comment on Method for Ava');
           type('  Label the axes ');
-          press('saveCriterionComment');
+          key(field(), 'Escape');
 
           expect(writers.calls()).toEqual([['saveRubricCriterionComment', CID, AVA, LAB, METHOD, 'Label the axes']]);
           expect(entries(CID, AVA)).toEqual([entry(AVA, LAB, METHOD, 0, { critNote: 'Label the axes' })]);
           expect(session.sent()).toEqual([rubricScore(AVA, LAB, METHOD, null, 0, 'Label the axes')]);
+          expect(field()).toBe(null);
           expect(critRow(LAB, AVA, METHOD).querySelector('.rsg-crit-note').textContent).toBe('Label the axes');
           expect(drew(LAB)).toBe(false);
         });
 
-        it('unchanged text saves nothing; Remove Comment saves ""', () => {
-          open(LAB, { scores: { [AVA]: [entry(AVA, LAB, METHOD, 3, { critNote: 'Label the axes' })] } });
-          openBox(AVA, METHOD);
-          field().focus();
-          key(field(), 'Enter');
+        it('typing saves after a pause, once', () => {
+          vi.useFakeTimers();
+          open(LAB);
+          openField(AVA, METHOD);
+          type('Two');
+          type('Two trials');
           expect(writers.calls()).toEqual([]);
-          expect(field()).toBe(null);
+          vi.advanceTimersByTime(800);
+          expect(writers.calls()).toEqual([['saveRubricCriterionComment', CID, AVA, LAB, METHOD, 'Two trials']]);
+          key(field(), 'Escape');
+          expect(writers.calls()).toHaveLength(1);
+        });
 
-          openBox(AVA, METHOD);
-          press('removeCriterionComment');
+        it('unchanged text saves nothing; emptying it saves ""', () => {
+          open(LAB, { scores: { [AVA]: [entry(AVA, LAB, METHOD, 3, { critNote: 'Label the axes' })] } });
+          openField(AVA, METHOD);
+          expect(field().value).toBe('Label the axes');
+          key(field(), 'Escape');
+          expect(writers.calls()).toEqual([]);
+
+          openField(AVA, METHOD);
+          type('');
+          key(field(), 'Escape');
           expect(writers.calls()).toEqual([['saveRubricCriterionComment', CID, AVA, LAB, METHOD, '']]);
           expect(session.sent()).toEqual([rubricScore(AVA, LAB, METHOD, 3, 0, '')]);
           expect(critRow(LAB, AVA, METHOD).querySelector('.rsg-crit-note')).toBe(null);
         });
 
-        it('Enter saves; Cmd+Enter saves and opens the next criterion’s box', () => {
+        it('Enter saves and opens the next criterion; Shift+Tab saves and goes back', () => {
           open(LAB);
-          openBox(AVA, SAFETY);
+          openField(AVA, SAFETY);
           type('Goggles');
-          field().focus();
-          key(field(), 'Enter', { metaKey: true });
-          expect(writers.since()).toEqual([['saveRubricCriterionComment', CID, AVA, LAB, SAFETY, 'Goggles']]);
-
-          // The box is now Method's.
-          expect(document.querySelector('#crit-comment-overlay .crit-comment-crit').textContent).toBe('Method');
-          type('Two trials');
-          field().focus();
           key(field(), 'Enter');
+          expect(writers.since()).toEqual([['saveRubricCriterionComment', CID, AVA, LAB, SAFETY, 'Goggles']]);
+          expect(critRow(LAB, AVA, METHOD).contains(field())).toBe(true);
+          expect(critRow(LAB, AVA, SAFETY).querySelector('.rsg-crit-note').textContent).toBe('Goggles');
+
+          type('Two trials');
+          key(field(), 'Tab', { shiftKey: true });
           expect(writers.since()).toEqual([['saveRubricCriterionComment', CID, AVA, LAB, METHOD, 'Two trials']]);
+          expect(critRow(LAB, AVA, SAFETY).contains(field())).toBe(true);
+          expect(field().value).toBe('Goggles');
           expect(session.sent()).toEqual([
             rubricScore(AVA, LAB, SAFETY, null, 0, 'Goggles'),
             rubricScore(AVA, LAB, METHOD, null, 0, 'Two trials'),
           ]);
+        });
+
+        it('Same As offers another student’s comment on the criterion; choosing it saves it', () => {
+          open(LAB, { scores: { [AVA]: [entry(AVA, LAB, METHOD, 3, { critNote: 'Label the axes' })] } });
+          openField(BEN, METHOD);
+          const chip = document.querySelector('.rsg-crit-reuse-chip');
+          expect(chip.textContent).toBe('Ava: Label the axes');
+          click(chip);
+          expect(writers.calls()).toEqual([['saveRubricCriterionComment', CID, BEN, LAB, METHOD, 'Label the axes']]);
+          expect(field().value).toBe('Label the axes');
+          expect(document.querySelector('.rsg-crit-reuse').hidden).toBe(true);
         });
       });
 

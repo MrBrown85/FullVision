@@ -111,10 +111,9 @@ test('a rubric level with +, a criterion comment and Missing on another student 
   // Cece: a comment on Analysis.
   const comment = criterion(card, CECE, ANALYSIS).locator('.rsg-crit-comment');
   await comment.click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel(/Comment for/).fill('Name the pattern in your data.');
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.locator('.crit-comment-popover')).toHaveCount(0);
+  await page.locator('#crit-comment-input').fill('Name the pattern in your data.');
+  await page.locator('#crit-comment-input').press('Escape');
+  await expect(page.locator('#crit-comment-input')).toHaveCount(0);
   await expect(comment).toHaveClass(/has-comment/);
 
   // Noor: Missing is off while she has levels; Clear from her row menu, then Missing.
@@ -136,9 +135,9 @@ test('a rubric level with +, a criterion comment and Missing on another student 
   const commentAfter = criterion(card, CECE, ANALYSIS).locator('.rsg-crit-comment');
   await expect(commentAfter).toHaveClass(/has-comment/);
   await commentAfter.click();
-  await expect(page.getByRole('dialog').getByLabel(/Comment for/)).toHaveValue('Name the pattern in your data.');
+  await expect(page.locator('#crit-comment-input')).toHaveValue('Name the pattern in your data.');
   await page.keyboard.press('Escape');
-  await expect(page.locator('.crit-comment-popover')).toHaveCount(0);
+  await expect(page.locator('#crit-comment-input')).toHaveCount(0);
   const noorAfter = student(card, NOOR);
   await expect(status(noorAfter, 'NS')).toHaveAttribute('aria-pressed', 'true');
   await expect(noorAfter.locator('.rsg-level.active')).toHaveCount(0);

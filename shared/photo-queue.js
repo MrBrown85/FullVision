@@ -74,6 +74,8 @@
  *   such record whose page is the file itself, kept with its own type
  *   (meta.mime) and sent to the path the server named in the bucket
  *   handout-files (<course>/<resource>.<html|txt|epub>).
+ *   A PDF handout's original (2026112408) is the same: one such record, type application/pdf, queued under the
+ *   same resource id as the pages and sent to <course>/<resource>.pdf once start_handout_original names it.
  *
  * Bulletins (B1f): a page of a bulletin posted from the phone, kind
  *   'bulletin', added by addBulletin(), ids { course, key, file } (key: the
@@ -101,15 +103,15 @@ window.PhotoQueue = (function () {
   // Where a handout's page goes: the class's handouts folder, the resource, the page's number.
   var HANDOUT_PATH =
     /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/handouts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([1-9]|1[0-9]|20)\.jpg$/;
-  // A handout file's name in the bucket handout-files: <course>/<resource>.<kind>.
+  // A handout file's name in the bucket handout-files: <course>/<resource>.<kind> (kind pdf: a PDF handout's original).
   var HANDOUT_FILE_PATH =
-    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(html|txt|epub)$/;
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(html|txt|epub|pdf)$/;
   var BULLETIN_KEYS = ['course']; // a page's key is the bulletin's own, already a uuid; its file id stays local
   // Where a bulletin's page goes in the bucket bulletin-files: <course>/<bulletin file>/<n>.jpg.
   var BULLETIN_PATH =
     /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([1-9]|1[0-9]|20)\.jpg$/;
-  // The types a handout file is kept and sent as, and nothing else.
-  var FILE_TYPES = { 'text/html': true, 'text/plain': true, 'application/epub+zip': true };
+  // The types a handout file (or a PDF's original) is kept and sent as, and nothing else.
+  var FILE_TYPES = { 'text/html': true, 'text/plain': true, 'application/epub+zip': true, 'application/pdf': true };
   // The same test shared/data.js uses (_isUuid) to tell a server id from a local one.
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var BUSY = {}; // another tab holds the lease

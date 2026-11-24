@@ -32,13 +32,13 @@ const ASSESSMENT = {
   created: new Date('2026-03-21').toISOString(),
 };
 
-async function openGrid(page) {
+async function openGrid(page, assessment) {
   await page.addInitScript(
     ({ rubric, assessment, cid }) => {
       localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric]));
       localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
     },
-    { rubric: RUBRIC, assessment: ASSESSMENT, cid: TEST_COURSE.id },
+    { rubric: RUBRIC, assessment: assessment || ASSESSMENT, cid: TEST_COURSE.id },
   );
   await gotoApp(page, '/assignments');
   await page.locator('text=Rubric Lab Report').first().click();
@@ -48,113 +48,123 @@ async function openGrid(page) {
 function commentButton(page, sid, critId) {
   return page.locator('.rsg-crit-comment[data-sid="' + sid + '"][data-critid="' + critId + '"]');
 }
+function row(page, sid, critId) {
+  return page.locator('.rsg-criterion-row[data-student="' + sid + '"][data-criterion="' + critId + '"]');
+}
+const field = page => page.locator('#crit-comment-input');
 
-test.describe('Criterion comment box', () => {
+/* The comment is typed in place under the criterion's levels (Nov 24 2026;
+   it was a box over the page). */
+test.describe('Criterion comment, typed in place', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuth(page);
     await seedCourse(page);
     await seedStudents(page);
   });
 
-  test('has a labelled text area, a count, and Save off until the text changes', async ({ page }) => {
+  test('opens in the row, named for the student, with a count; no dialog', async ({ page }) => {
     await openGrid(page);
     await commentButton(page, 'stu-001', 'crit-hyp').click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    const box = dialog.getByLabel(/Comment for/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const box = row(page, 'stu-001', 'crit-hyp').getByLabel('Comment on Hypothesis for Alice');
     await expect(box).toBeFocused();
     expect(await box.evaluate(el => el.tagName)).toBe('TEXTAREA');
-    await expect(dialog.locator('#crit-comment-count')).toHaveText('0 / 500');
-    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-
-    await box.fill('Clear question.');
-    await expect(dialog.locator('#crit-comment-count')).toHaveText('15 / 500');
-    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+    await expect(page.locator('#crit-comment-count')).toHaveText('0 / 500');
 
     await box.fill('x'.repeat(150));
-    await expect(dialog.locator('#crit-comment-count')).toHaveClass(/is-long/);
+    await expect(page.locator('#crit-comment-count')).toHaveClass(/is-long/);
   });
 
-  test('Shift+Enter adds a line and Enter saves', async ({ page }) => {
+  test('Shift+Enter adds a line; Enter saves and moves to the next criterion, then the overall comment', async ({
+    page,
+  }) => {
     await openGrid(page);
     await commentButton(page, 'stu-001', 'crit-hyp').click();
-    const box = page.getByRole('dialog').getByLabel(/Comment for/);
-    await box.type('First line');
-    await box.press('Shift+Enter');
-    await box.type('Second line');
-    await expect(box).toHaveValue('First line\nSecond line');
-    await box.press('Enter');
-    await expect(page.getByRole('dialog')).toBeHidden();
+    await field(page).pressSequentially('First line');
+    await field(page).press('Shift+Enter');
+    await field(page).pressSequentially('Second line');
+    await expect(field(page)).toHaveValue('First line\nSecond line');
+    await field(page).press('Enter');
     await expect(commentButton(page, 'stu-001', 'crit-hyp')).toHaveClass(/has-comment/);
-  });
+    await expect(row(page, 'stu-001', 'crit-hyp').locator('.rsg-crit-note')).toHaveText('First line\nSecond line');
+    await expect(row(page, 'stu-001', 'crit-data').locator('#crit-comment-input')).toBeFocused();
 
-  test('shows the chosen level beside the criterion', async ({ page }) => {
-    await openGrid(page);
-    await page
-      .locator('[data-action="selectRubricScore"][data-level="3"][data-sid="stu-001"][data-critid="crit-hyp"]')
-      .first()
-      .click();
-    await commentButton(page, 'stu-001', 'crit-hyp').click();
-    await expect(page.locator('.crit-comment-level')).toHaveText('Proficient');
-  });
-
-  test('Save and next moves to the next criterion, then the next student', async ({ page }) => {
-    await openGrid(page);
-    await commentButton(page, 'stu-001', 'crit-hyp').click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel(/Comment for/).fill('Good hypothesis.');
-    await dialog.getByRole('button', { name: 'Save and Next Criterion' }).click();
-    await expect(dialog.locator('.crit-comment-crit')).toHaveText('Data Collection');
-    await expect(commentButton(page, 'stu-001', 'crit-hyp')).toHaveClass(/has-comment/);
-
-    await dialog.getByLabel(/Comment for/).fill('Tidy table.');
-    await dialog.getByLabel(/Comment for/).press('Control+Enter');
-    await expect(dialog.locator('.crit-comment-crit')).toHaveText('Hypothesis');
-    await expect(dialog.getByLabel(/Comment for/)).toHaveValue('');
+    await field(page).fill('Tidy table.');
+    await field(page).press('Tab');
     await expect(commentButton(page, 'stu-001', 'crit-data')).toHaveClass(/has-comment/);
+    await expect(field(page)).toHaveCount(0);
+    const overall = page.locator('.rsg-overall-comment[data-sid="stu-001"]');
+    await expect(overall).toBeFocused();
+    // Tab from there goes on to the next student's first criterion.
+    await overall.press('Tab');
+    await expect(row(page, 'stu-002', 'crit-hyp').locator('#crit-comment-input')).toBeFocused();
+    await field(page).press('Shift+Tab');
+    await expect(overall).toBeFocused();
   });
 
-  test('Remove comment clears it; keys do not reach the grid while open', async ({ page }) => {
+  test('saves as you type; a click elsewhere puts it away, a click on the comment opens it again', async ({ page }) => {
     await openGrid(page);
     await commentButton(page, 'stu-001', 'crit-hyp').click();
-    await page
-      .getByRole('dialog')
-      .getByLabel(/Comment for/)
-      .fill('To remove.');
-    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+    await field(page).fill('Good hypothesis.');
+    await expect(commentButton(page, 'stu-001', 'crit-hyp')).toHaveClass(/has-comment/);
+    await page.locator('.rsg-overall-comment[data-sid="stu-002"]').click();
+    await expect(field(page)).toHaveCount(0);
+    const note = row(page, 'stu-001', 'crit-hyp').locator('.rsg-crit-note');
+    await expect(note).toHaveText('Good hypothesis.');
+    await note.click();
+    await expect(field(page)).toHaveValue('Good hypothesis.');
+    await expect(field(page)).toBeFocused();
+  });
 
+  test('keys do not reach the grid while typing; emptying it removes the comment; Escape puts it away', async ({
+    page,
+  }) => {
+    await openGrid(page);
     await commentButton(page, 'stu-001', 'crit-hyp').click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Cancel' }).focus();
-    await page.keyboard.press('3');
+    await field(page).press('3');
     await expect(page.locator('.rsg-level.active')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Remove Comment' }).click();
-    await expect(dialog).toBeHidden();
-    await expect(commentButton(page, 'stu-001', 'crit-hyp')).not.toHaveClass(/has-comment/);
+    await expect(field(page)).toHaveValue('3');
+    await field(page).press('Escape');
+    await expect(field(page)).toHaveCount(0);
+    await expect(commentButton(page, 'stu-001', 'crit-hyp')).toHaveClass(/has-comment/);
 
     await commentButton(page, 'stu-001', 'crit-hyp').click();
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).toBeHidden();
+    await field(page).fill('');
+    await field(page).press('Escape');
+    await expect(commentButton(page, 'stu-001', 'crit-hyp')).not.toHaveClass(/has-comment/);
+    await expect(row(page, 'stu-001', 'crit-hyp').locator('.rsg-crit-note')).toHaveCount(0);
   });
 
-  // Nov 3 sweep (step 4 group 2 #13): Escape threw away a typed comment.
-  test('Escape with a typed comment asks first; Keep Editing keeps it', async ({ page }) => {
+  test('Same As offers a comment already written on the criterion', async ({ page }) => {
     await openGrid(page);
     await commentButton(page, 'stu-001', 'crit-hyp').click();
-    const box = page.locator('#crit-comment-input');
-    await box.fill('Try writing two different predictions next time.');
-    await page.keyboard.press('Escape');
-    const ask = page.locator('.af-dialog-card');
-    await expect(ask.locator('.confirm-title')).toHaveText('Discard This Comment?');
-    await expect(ask.getByRole('button', { name: 'Keep Editing' })).toBeFocused();
-    await page.keyboard.press('Escape');
-    await expect(ask).toHaveCount(0);
-    await expect(box).toBeVisible();
-    await expect(box).toHaveValue('Try writing two different predictions next time.');
+    await field(page).fill('Clear question.');
+    await field(page).press('Escape');
+    await commentButton(page, 'stu-002', 'crit-hyp').click();
+    const chip = page.locator('.rsg-crit-reuse-chip');
+    await expect(chip).toHaveText('Alice: Clear question.');
+    await chip.click();
+    await expect(field(page)).toHaveValue('Clear question.');
+    await expect(page.locator('.rsg-crit-reuse')).toBeHidden();
+    await expect(commentButton(page, 'stu-002', 'crit-hyp')).toHaveClass(/has-comment/);
+  });
 
-    await page.locator('.crit-comment-popover').getByRole('button', { name: 'Cancel' }).click();
-    await ask.getByRole('button', { name: 'Discard' }).click();
-    await expect(page.locator('.crit-comment-popover')).toHaveCount(0);
-    await expect(commentButton(page, 'stu-001', 'crit-hyp')).not.toHaveClass(/has-comment/);
+  test('on group work the field is named for the group and the comment is every member’s', async ({ page }) => {
+    await openGrid(page, { ...ASSESSMENT, collaboration: 'group', groups: [['stu-001', 'stu-002']] });
+    await commentButton(page, 'stu-001', 'crit-hyp').click();
+    await expect(field(page)).toHaveAttribute('aria-label', 'Comment on Hypothesis for Group 1');
+    await field(page).fill('Strong question.');
+    await field(page).press('Escape');
+    const notes = await page.evaluate(
+      ({ cid }) =>
+        ['stu-001', 'stu-002'].map(sid =>
+          (getScores(cid)[sid] || [])
+            .filter(e => e.assessmentId === 'assess-cc' && e.critNote)
+            .map(e => e.critNote)
+            .join('|'),
+        ),
+      { cid: TEST_COURSE.id },
+    );
+    expect(notes).toEqual(['Strong question.', 'Strong question.']);
   });
 });

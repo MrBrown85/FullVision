@@ -148,3 +148,64 @@ Colin's call of Nov 17: "+ Add a PDF" becomes "+ Add a File". A PDF works as abo
 - A web page's own stylesheets and scripts that sit beside it on disk are not put inside it (pictures only).
 - The EPUB reader has no table of contents; links between chapters work.
 - `handout-files` has no nightly stray sweep (`_photo_strays` looks only in `student-photos`), and none is added: a stray there would be a file with no row, and none can arise from the app. A teacher can write a name only while its row is `uploading` (the policy is checked again when Storage records the file), removing the row queues the name, and the worker looks again after ten minutes (`link_dies_at`), so a file recorded in that moment is deleted too. An upload never finished is dropped by the nightly job and its name queued. Only a file put there by hand (the dashboard, the service key) would stay; catching that would need a SQL sweep like `_photo_strays` for this bucket.
+
+## A PDF's original (2026-11-24, `migrations/2026112408_handout_pdf_original.sql`)
+
+Colin's call of Nov 24: a PDF handout keeps its pages (students still see the pictures) and also the PDF itself, so students can save and print it.
+
+### The row
+
+A PDF row may also carry, once an original was started:
+
+```json
+{
+  "original": "uploading | ready | dropped",
+  "original_path": "<class>/<id>.pdf",
+  "original_bytes": 340000,
+  "original_finish_by": "timestamptz while uploading"
+}
+```
+
+A PDF with no original (every row made before this, and one never started) has none of the four keys and answers exactly as before. `original_bytes` is the size declared at the start, and the stored size once `ready`. `dropped` means it was not stored within two hours of its start: it is final (never restarted, its name is queued for deletion) and the handout works from its pages.
+
+### Teacher functions (each idempotent through `p_idempotency_key`)
+
+- `start_handout_original(p_resource_id, p_bytes, p_idempotency_key)`: the PDF's row with `original: 'uploading'`, plus `bucket`. Only after the pages are ready (`22023` before). `p_bytes` 1 to 20971520 (`22023`). Another teacher's, a link's or a missing handout: `P0002`. Started again it answers as it stands (`ready`, `dropped`) and changes nothing.
+- `finish_handout_original(p_resource_id, p_idempotency_key)`: the row with `original: 'ready'` once the file is stored typed `application/pdf` within 20 MB. Otherwise still `uploading` with `missing: true` (send it again) or `bad: true` (another type or size: it cannot be replaced, and is dropped after two hours). `{ id, status: 'gone' }` when the handout is not there.
+
+`remove_assessment_resource` and `list_course_resources` take originals as they take pages. Removing a handout, deleting its assessment, the 30-day purge of its class and an upload never finished all queue the original's name in `submission_file_removal` (bucket `handout-files`), as they queue the pages.
+
+### Uploading (the teacher's browser)
+
+Bucket `handout-files` (private, 20 MB) also takes `application/pdf`. Upload signed in, to exactly `original_path`, typed `application/pdf`, never `upsert`, within two hours of the start. Storage refuses any other name, a second upload to the same name, and any upload once it is `ready` or `dropped`. A teacher reads the original of a class they own.
+
+### The student page
+
+`student_submit.handout_original(p_session_token, p_enrollment_id, p_resource_id, p_ip_hash)` (service role only; `fv_student_submit` too, if it exists), under `handout_file`'s checks (the session's class, a ready PDF, listed for this student). A PDF with no ready original is not refused:
+
+```json
+{ "ok": true, "has_original": false, "resource_id": "uuid" }
+```
+
+and with one:
+
+```json
+{
+  "ok": true,
+  "has_original": true,
+  "bucket": "handout-files",
+  "resource_id": "uuid",
+  "assessment_id": "uuid",
+  "title": "Worksheet",
+  "bytes": 340000,
+  "path": "<class>/<id>.pdf"
+}
+```
+
+or `{ ok: false, error }` (`not_found` for a link, a file, another class, a Draft or a piece dated into the future).
+
+The edge function's route `handout-original` (`supabase/functions/student-submit/handout-routes.ts`) rebuilds the reply key by key: `{ ok: true, original: false }` when there is none (the page leaves Open as PDF out without asking again), else `{ ok: true, original: true, bytes, title, url }` with one link signed for 60 seconds in `handout-files`, after the bucket, that the name is this resource's `.pdf` and the size are checked. `student_submit.page` does not change.
+
+### What is not done
+
+Copies of an assessment do not carry originals. Handouts attached before this have none and are not backfilled. `handout-files` still has no nightly stray sweep.

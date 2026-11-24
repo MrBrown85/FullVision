@@ -648,6 +648,8 @@ window.PreviewStudent = (function () {
         // Escape over the student page's Settings or Log Out? closes that, as on the student's device.
         var ui = _open.ui || {};
         if (ui.logout || ui.settings) return _press(ui.logout ? 'logout-cancel' : 'settings-close', null);
+        // Escape over Save or Print closes the sheet, not the preview.
+        if (ui.handoutMenu) return _press('handout-out-close', null);
         close();
       } else if (e.key === 'Tab') {
         var box = _overlay();
@@ -775,6 +777,18 @@ window.PreviewStudent = (function () {
       return;
     }
     if (act === 'handout-file') return _openFile(el);
+    if (act === 'handout-out-open' || act === 'handout-out-close') {
+      var opening = act === 'handout-out-open';
+      var gotP = _open.ui.handoutPages;
+      if (opening && gotP && gotP.out && gotP.out.state === 'failed') {
+        _open.ui = Object.assign({}, _open.ui, { handoutPages: Object.assign({}, gotP, { out: null }) });
+      }
+      _open.ui = Object.assign({}, _open.ui, { handoutMenu: opening });
+      _drawScreen(opening ? '#sp-out-title' : '.sp-handout-outbtn');
+      if (opening && _overlay()) StudentPageView.slideIn(_overlay());
+      return;
+    }
+    if (act === 'handout-print' || act === 'handout-save') return _handoutOut(act === 'handout-print');
     if (act === 'quiz-open') return _openQuiz(el && el.getAttribute('data-piece'));
     if (_open.quiz && /^quiz-/.test(act)) return _pressQuiz(act, el, built);
     // A bulletin's link asks first, as on the student's phone (shared/website-ask.js); a reaction sends nothing here.
@@ -872,6 +886,36 @@ window.PreviewStudent = (function () {
      the class's store (openAssessmentHandoutPage: this device's photo
      queue in Demo Mode, a signed link otherwise). The answer draws only
      while the preview is still open on this student with the handout open. */
+  /* Print or Save to Phone on the open handout (shared/handout-out.js), as on
+     the student's phone. The preview holds every page when it shows any. */
+  function _handoutOut(print) {
+    var mine = _open;
+    var got = mine && mine.ui.handoutPages;
+    if (!got || got.state !== 'ready' || typeof HandoutOut === 'undefined') return;
+    var how = print ? 'print' : 'save';
+    var heading = document.getElementById('sp-handout-title');
+    var title = heading ? heading.textContent || '' : '';
+    var pages = (got.pages || []).filter(function (pg) {
+      return pg && pg.url;
+    });
+    // `menu`: whether the Save or Print sheet is open after this change; `focus`: where the keyboard goes.
+    function mark(out, menu, focus) {
+      if (_open !== mine || !mine.ui.handoutPages || mine.ui.handoutPages.id !== got.id) return;
+      mine.ui = Object.assign({}, mine.ui, {
+        handoutMenu: menu,
+        handoutPages: Object.assign({}, mine.ui.handoutPages, { out: out }),
+      });
+      _drawScreen(focus);
+    }
+    var row = '.sp-handout-sheet [data-act="handout-' + how + '"]';
+    if (!pages.length || pages.length < (got.pages || []).length) return mark({ state: 'failed', how: how }, true, row);
+    // Every page is here: the sheet closes and the print sheet or share sheet opens.
+    mark(null, false, '.sp-handout-outbtn');
+    Promise.resolve(print ? HandoutOut.print(pages) : HandoutOut.save(pages, title)).then(null, function () {
+      mark({ state: 'failed', how: how }, true, row);
+    });
+  }
+
   function _loadHandout(rid) {
     var mine = _open;
     if (!mine) return;

@@ -167,6 +167,37 @@ test('a teacher adds a handout and a link, and the student sees them on the card
   await pane.getByRole('button', { name: 'Next Page' }).click();
   await expect(pane.locator('.sp-fb-sub')).toHaveText('Page 2 of 2');
   if (SHOTS) await dialog.screenshot({ path: SHOTS + '/handouts-links-handout-chromebook.png' });
+  // Print and Save to Phone work in the preview too: every page, nothing sent.
+  await page.evaluate(() => {
+    window.print = () => {
+      window.__printed = document.querySelectorAll('body > .fv-print-sheet img.fv-print-page').length;
+      setTimeout(() => window.dispatchEvent(new Event('afterprint')), 0);
+    };
+    navigator.canShare = () => true;
+    navigator.share = async d => {
+      window.__shared = {
+        name: d.files[0].name,
+        bytes: Array.from(new Uint8Array(await d.files[0].arrayBuffer())),
+      };
+    };
+  });
+  await pane.getByRole('button', { name: 'Save or Print' }).click();
+  const sheet = dialog.getByRole('dialog', { name: 'Save or Print' });
+  await expect(sheet.getByRole('button')).toHaveText(['Save to Phone', 'Print', 'Cancel']);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await pane.getByRole('button', { name: 'Save or Print' }).click();
+  await sheet.getByRole('button', { name: 'Print' }).click();
+  await expect.poll(() => page.evaluate(() => window.__printed)).toBe(2);
+  await pane.getByRole('button', { name: 'Save or Print' }).click();
+  await sheet.getByRole('button', { name: 'Save to Phone' }).click();
+  await expect.poll(() => page.evaluate(() => !!window.__shared)).toBe(true);
+  const shared = await page.evaluate(() => window.__shared);
+  expect(shared.name).toBe('Density Lab Instructions.pdf');
+  const pdfText = Buffer.from(shared.bytes).toString('latin1');
+  expect(pdfText.slice(0, 8)).toBe('%PDF-1.4');
+  expect(pdfText).toContain('/Count 2');
   await pane.getByRole('button', { name: 'Back' }).click();
   await expect(dialog.locator('.sp-handout')).toHaveCount(0);
   await expect(dialog.locator('.sp-piece.sp-picked .sp-car')).toBeVisible();

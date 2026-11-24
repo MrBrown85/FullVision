@@ -41,6 +41,7 @@
 // (a web page, a text file or an EPUB; migrations/2026111706_handout_files.sql)
 // is in a second bucket, handout-files, as
 //   <course>/<resource>.<html|txt|epub>
+// and a PDF handout's original (migrations/2026112408_handout_pdf_original.sql) is <course>/<resource>.pdf there,
 // and is taken by signDownloads and remove only, each told that bucket
 // (FILE_BUCKET); in it no other shape is taken, and in student-photos no
 // handout file's. A page of a file on a teacher's bulletin (Bulletins,
@@ -64,7 +65,7 @@
 // No Deno imports: `fetcher` is fetch, so the tests can run it under Node.
 
 export const BUCKET = 'student-photos';
-/** The teachers' handout files (2026111706): private, 20 MB, text/html, text/plain, application/epub+zip. */
+/** The teachers' handout files (2026111706): private, 20 MB, text/html, text/plain, application/epub+zip (and, 2026112408, application/pdf). */
 export const FILE_BUCKET = 'handout-files';
 
 const ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -89,8 +90,8 @@ export function handoutPathParts(path: unknown): { course: string; resource: str
   return m ? { course: m[1], resource: m[2], page: Number(m[3]) } : null;
 }
 
-/** A teacher's handout file in FILE_BUCKET: <course>/<resource>.<html|txt|epub>. */
-export const HANDOUT_FILE_PATH = new RegExp(`^(${ID})/(${ID})\\.(html|txt|epub)$`);
+/** A teacher's handout file in FILE_BUCKET: <course>/<resource>.<html|txt|epub>, or a PDF handout's original, .pdf. */
+export const HANDOUT_FILE_PATH = new RegExp(`^(${ID})/(${ID})\\.(html|txt|epub|pdf)$`);
 
 /** A handout file's parts, or null when it is not one. */
 export function handoutFilePathParts(path: unknown): { course: string; resource: string; kind: string } | null {

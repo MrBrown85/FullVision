@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { useFont } from './wide-font.js';
 
 /* The Quiz card on the assessment form (docs/plans/quizzes-plan.md, slice
    Q2b; board "Quizzes Artboard", Board 1), in Demo Mode with the quizzes
@@ -504,4 +505,48 @@ test('Reset Demo Data brings the sample quiz back, after it was deleted', async 
   const back = await page.evaluate(aid => QuizData.get('sci8', aid), AID);
   expect(back.quiz).toMatchObject({ after_due: 'stop' });
   expect(back.questions).toHaveLength(10);
+});
+
+/* + New Quiz (Colin, Nov 24): a quiz is started by name, beside + New Assessment. */
+test.describe('+ New Quiz', () => {
+  // The stand-in font is a style the page's own CSP would refuse.
+  test.use({ bypassCSP: true });
+  for (const font of ['page', 'wide']) {
+    test('opens the form with the Quiz card open and the title Quiz (' + font + ' font)', async ({ page }) => {
+      await demo(page, true);
+      await useFont(page, font);
+      const btns = await page.locator('.assess-toolbar-actions .tb-action-btn').allTextContents();
+      expect(btns.slice(-2).map(t => t.trim())).toEqual(['+ New Quiz', '+ New Assessment']);
+      const toolbar = page.locator('.assess-toolbar-actions');
+      expect(await toolbar.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      if (SHOTS && font === 'page')
+        await page.screenshot({
+          path: SHOTS + '/new-quiz-toolbar.png',
+          clip: await toolbar.evaluate(el => {
+            const r = el.parentElement.getBoundingClientRect();
+            return { x: r.x, y: r.y, width: r.width, height: r.height };
+          }),
+        });
+      await page.locator('[data-action="newQuiz"]').click();
+      await expect(page.locator('#af-title')).toHaveValue('Quiz');
+      await expect(page.locator('#quiz-mount .quiz-edit')).toBeVisible();
+      await expect(page.locator('#quiz-mount .quiz-prompt')).toBeVisible();
+      // The Quiz card is brought into view.
+      await expect
+        .poll(() => page.locator('#quiz-mount').evaluate(el => el.getBoundingClientRect().top < window.innerHeight))
+        .toBe(true);
+      // The cursor is in the first question's text field, and the title is Quiz as it was set.
+      await expect(page.locator('#quiz-mount .quiz-edit .quiz-prompt')).toBeFocused();
+      await expect(page.locator('#af-title')).toHaveValue('Quiz');
+      await shot(page, 'new-quiz-form');
+    });
+  }
+
+  test('is not there with the Student Page off', async ({ page }) => {
+    await demo(page, true);
+    await page.evaluate(() => setStudentPageSwitch('sci8', false));
+    await page.goto('/assignments?course=sci8');
+    await page.waitForSelector('[data-action="showNewForm"]');
+    await expect(page.locator('[data-action="newQuiz"]')).toHaveCount(0);
+  });
 });

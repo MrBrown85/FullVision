@@ -1794,6 +1794,8 @@
     'handoutPiece',
     'handoutPage',
     'handoutPages',
+    // Save or Print, the sheet over an open handout (s/handouts.js).
+    'handoutMenu',
     // Settings (the gear) open, and the Text Size chosen there.
     'settings',
     'textSize',
@@ -2309,6 +2311,8 @@
     'handout-links': 1,
     // A handout file, a web page, a text file or an EPUB (2026111706; s/handouts.js).
     'handout-file': 1,
+    // A PDF handout's original file, for Open as PDF (2026112408; s/handouts.js).
+    'handout-original': 1,
     // Bulletins: the class's feed, Seen, a reaction, a file's pages (docs/plans/bulletins-plan.md B1d; s/bulletins.js).
     bulletins: 1,
     'bulletin-seen': 1,

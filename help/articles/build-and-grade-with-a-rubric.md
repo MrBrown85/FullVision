@@ -3,7 +3,7 @@ title: Build and Grade With a Rubric
 section: Assignments
 order: 2
 summary: A rubric describes each level of the work, one row per criterion. A criterion linked to a competency scores that competency.
-checked: 2026-11-05
+checked: 2026-11-24
 pages:
   - /assignments
 demo: /assignments
@@ -34,8 +34,7 @@ labels:
   - Choose a Rubric
   - Set Everyone To
   - Comment
-  - Save
-  - Save and Next Criterion
+  - Same As
   - Work On
   - Went Beyond
 next:
@@ -86,5 +85,5 @@ To use a saved rubric, select it in the Rubric Bank and choose **Use in New Asse
 
 1. Open the assessment on the Assignments page. Each student has a line for each criterion.
 2. Select a level on each line. On an Advanced rubric, tick the boxes the work shows; the highest level whose boxes are all ticked is suggested, and any level can be chosen instead. On a Single-Point rubric, type notes under **Work On** and **Went Beyond**.
-3. To add a note to one criterion, choose **Comment** at the end of its line, type the note, then choose **Save** or **Save and Next Criterion**. The note prints under that criterion on the rubric handout.
+3. To add a note to one criterion, choose **Comment** under its name and type the note in the box that opens under the levels. It saves as you type. Press Tab or Enter to go on to the next criterion, then to the overall comment; Shift+Enter starts a new line, and Escape closes the box. The note prints under that criterion on the rubric handout. On pair and group work the note is the group's. A note already written on that criterion for another student or group shows under **Same As**; choose it to use it again.
 4. To score the whole class, choose a level in the **Set Everyone To** row and confirm. Only criteria not yet scored are set.

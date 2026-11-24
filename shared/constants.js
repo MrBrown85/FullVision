@@ -1104,6 +1104,5 @@ const KEYBOARD_SHORTCUTS = [
   { context: 'Help', action: 'Close Help', keys: 'Escape' },
   { context: 'New Assessment', action: 'Create and Add Another', keys: 'Control+Shift+Enter Meta+Shift+Enter' },
   { context: 'Grading With a Rubric', action: 'Comment on the Selected Criterion', keys: 'C' },
-  { context: 'Comment on a Criterion', action: 'Save', keys: 'Enter' },
-  { context: 'Comment on a Criterion', action: 'Save and Next Criterion or Student', keys: 'Meta+Enter Control+Enter' },
+  { context: 'Comment on a Criterion', action: 'Next Criterion', keys: 'Enter' },
 ];

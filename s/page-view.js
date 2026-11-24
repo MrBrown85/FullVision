@@ -823,6 +823,118 @@ window.StudentPageView = (function () {
       });
   }
 
+  /* Save or Print (Colin, Nov 24 2026): a button in the open handout's top
+     bar opens a sheet of ways to keep the handout (the Your Classes sheet's
+     look, page-view.css .sp-set). s/handouts.js gets every page, then
+     shared/handout-out.js prints or makes the PDF. Each row is its icon and
+     its name only: while the chosen row gets the pages its name reads
+     "Getting Pages…", and when a page did not come it says so, in the
+     name's place. A row is one entry in OUT_ROWS: `when(got)` says whether
+     it shows. "Open as PDF" is to come as one more entry here. */
+  var OUT_ICON =
+    'width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"';
+  var SAVE_ICON =
+    '<svg class="sp-out-icon" ' +
+    OUT_ICON +
+    '><path d="M12 4v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></svg>';
+  var PRINT_ICON =
+    '<svg class="sp-out-icon" ' +
+    OUT_ICON +
+    '><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>';
+  var OPEN_ICON =
+    '<svg class="sp-out-icon" ' +
+    OUT_ICON +
+    '><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14h6M9 17h4"/></svg>';
+  var OUT_ROWS = [
+    {
+      how: 'open',
+      act: 'handout-open',
+      name: 'Open as PDF',
+      icon: OPEN_ICON,
+      // Only a handout that keeps the teacher's original file (the route says so when the sheet opens).
+      when: function (got) {
+        return got.original === true;
+      },
+    },
+    {
+      how: 'save',
+      act: 'handout-save',
+      name: 'Save to Phone',
+      icon: SAVE_ICON,
+      when: function () {
+        return true;
+      },
+    },
+    {
+      how: 'print',
+      act: 'handout-print',
+      name: 'Print',
+      icon: PRINT_ICON,
+      when: function () {
+        return true;
+      },
+    },
+  ];
+
+  // The button in the top bar: only once a page is here to print or keep.
+  function handoutOutButton(got, pages, menu) {
+    if (!got || got.state !== 'ready' || !pages.length) return '';
+    return (
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-small sp-handout-outbtn" data-act="handout-out-open" aria-haspopup="dialog" aria-expanded="' +
+      (menu ? 'true' : 'false') +
+      '">' +
+      SAVE_ICON +
+      'Save or Print</button>'
+    );
+  }
+
+  // The sheet, drawn over the page while ui.handoutMenu is on.
+  function handoutOutSheetHtml(ui, view) {
+    var open = ui.handoutMenu ? handoutOpen(view, ui) : null;
+    if (!open) return '';
+    var got = ui.handoutPages && ui.handoutPages.id === open.resource.id ? ui.handoutPages : null;
+    if (!got || got.state !== 'ready') return '';
+    var out = got.out || null;
+    return (
+      '<button type="button" class="sp-sheet-back sp-set-back" data-act="handout-out-close" aria-label="Cancel" tabindex="-1"></button>' +
+      '<div class="sp-sheet sp-set sp-handout-sheet" role="dialog" aria-modal="true" aria-labelledby="sp-out-title">' +
+      '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title sp-set-title" id="sp-out-title" tabindex="-1">Save or Print</h2>' +
+      '<ul class="sp-classes sp-out-list">' +
+      OUT_ROWS.filter(function (row) {
+        return row.when(got);
+      })
+        .map(function (row) {
+          var mine = out && out.how === row.how ? out.state : '';
+          var words =
+            mine === 'working'
+              ? mine && out.what === 'pdf'
+                ? 'Getting the PDF…'
+                : 'Getting Pages…'
+              : mine === 'failed'
+                ? 'The handout didn’t load. Check your internet and try again.'
+                : row.name;
+          return (
+            '<li><button type="button" class="sp-class sp-out-row" data-act="' +
+            row.act +
+            '"' +
+            (mine === 'working' ? ' aria-disabled="true"' : '') +
+            '>' +
+            row.icon +
+            '<span class="sp-class-words"><span class="sp-class-name"' +
+            (mine ? ' role="' + (mine === 'failed' ? 'alert' : 'status') + '"' : '') +
+            '>' +
+            esc(words) +
+            '</span></span></button></li>'
+          );
+        })
+        .join('') +
+      '</ul>' +
+      '<button type="button" class="sp-btn sp-btn-quiet" data-act="handout-out-close">Cancel</button>' +
+      '</div>'
+    );
+  }
+
   /* A handout open in the page: the way back to the card, its name, which
      page this is, the page, and a way between the pages, as See Your Work
      shows the student's own. */
@@ -882,7 +994,9 @@ window.StudentPageView = (function () {
       esc(r.title) +
       '</h1><p class="sp-fb-sub">' +
       esc(n ? 'Page ' + (i + 1) + ' of ' + n : 'Handout' + SEP + pagesWord(r.pages)) +
-      '</p></div></div>' +
+      '</p></div>' +
+      handoutOutButton(got, pages, !!ui.handoutMenu) +
+      '</div>' +
       body +
       '</section>'
     );
@@ -2556,6 +2670,7 @@ window.StudentPageView = (function () {
       (ui.settings && !ui.logout ? settingsSheetHtml(view, ui) : '') +
       (ui.logout ? logoutSheetHtml(ui) : '') +
       (ui.classHold && !ui.logout ? classHoldSheetHtml(ui) : '') +
+      (ui.handoutMenu && !ui.settings && !ui.logout ? handoutOutSheetHtml(ui, view) : '') +
       '</div>'
     );
   }
@@ -2654,6 +2769,7 @@ window.StudentPageView = (function () {
     }
     // A handout open in the page goes with any press but its own (Handouts and Links).
     if (!/^handout/.test(act)) {
+      next.handoutMenu = false;
       next.handout = '';
       next.handoutPiece = '';
       next.handoutPage = 0;
@@ -2697,6 +2813,7 @@ window.StudentPageView = (function () {
         typeof StudentPageCarousel !== 'undefined' &&
         StudentPageCarousel.shows(wasP);
       next.handout = '';
+      next.handoutMenu = false;
       next.handoutPiece = '';
       next.handoutPage = 0;
       return {

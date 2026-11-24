@@ -215,9 +215,23 @@
     if (!k || !showing(id, student)) return;
     var state = stateOf(k);
     var had = S.handoutPages;
-    S.handoutPages = { id: id, state: state, pages: k.pages.slice(), asked: asked };
+    S.handoutPages = {
+      id: id,
+      state: state,
+      pages: k.pages.slice(),
+      asked: asked,
+      missed: Object.keys(k.missed).length,
+      out: k.out,
+      // Open as PDF: true when the handout keeps its original, false when not, null until asked.
+      original: k.original && k.original.state !== 'asking' ? k.original.state === 'have' : null,
+    };
     // Drawn again only when what shows changes, so the keyboard stays where it is.
-    if (!had || had.id !== id || had.state !== state || state === 'ready') StudentPage.paint('#sp-handout-title');
+    if (!had || had.id !== id || had.state !== state || state === 'ready') {
+      // Over the Save or Print sheet the keyboard stays in it, on the row that was chosen.
+      var focus = '#sp-handout-title';
+      if (S.handoutMenu) focus = k.out ? '.sp-handout-sheet [data-act="handout-' + k.out.how + '"]' : '';
+      StudentPage.paint(focus);
+    }
   }
 
   // What is kept of handout `id` for this student, started if need be.
@@ -236,6 +250,8 @@
       count: 0,
       failed: false,
       failedAt: 0,
+      out: null, // Open as PDF, Print or Save to Phone: { state: 'working' | 'failed', how, what }
+      original: null, // the handout's original PDF, once asked (askOriginal)
     };
     if (S && S.demo) {
       var demoPages = DEMO_PAGES[id] || [];
@@ -293,7 +309,7 @@
     var u = blob ? objectUrl(new Blob([blob], { type: 'image/jpeg' })) : '';
     if (u) {
       for (var n = k.pages.length; n <= i; n++) k.pages.push({ url: '' });
-      k.pages[i] = { url: u };
+      k.pages[i] = { url: u, blob: blob };
       delete k.missed[i];
     } else {
       k.missed[i] = true;
@@ -364,12 +380,175 @@
     },
   };
 
+  /* ── A PDF's original (migration 2026112408; the route `handout-original`) ──
+     A handout made from a PDF may also keep the teacher's original file.
+     When the Save or Print sheet opens, the route is asked once per handout
+     for the session: { ok, original: false } (an older handout: the page
+     keeps building the PDF from the pages), or { ok, original: true, bytes,
+     title, url } with one link signed for 60 seconds. With one, the sheet
+     gets Open as PDF, and the file is fetched ahead (so a tap opens it in
+     the same press, which a phone's browser needs to open a tab), kept as a
+     blob for the session and let go with the pages. k.original: null (not
+     asked), or { state: 'asking' | 'none' | 'have', url, at, blob, getting }. */
+
+  // What a row uses: the original file when there is one, else the pages. Print opens the original
+  // in the phone's viewer, which has Print; Save to Phone shares or downloads it as it is.
+  function sourceOf(have, how) {
+    if (have && (how === 'open' || how === 'print')) return 'original-open';
+    if (have && how === 'save') return 'original-save';
+    return how === 'print' ? 'pages-print' : 'pages-save';
+  }
+
+  function isLink(res) {
+    return !!res && res.ok === true && res.original === true && /^https:\/\//.test(String(res.url || ''));
+  }
+
+  function askOriginal(k, id) {
+    if (k.original) return;
+    if (!S || S.demo) {
+      // Demo Mode's handouts are the site's own pictures: pages only.
+      k.original = { state: 'none' };
+      return;
+    }
+    var o = (k.original = { state: 'asking', url: '', at: 0, blob: null, getting: null });
+    var body = { enrollment_id: k.student, assessment_id: k.piece, resource_id: id };
+    StudentPage.whileCurrent(answerOf(body, 'handout-original')).then(function (res) {
+      if (kept[id] !== k || k.original !== o) return;
+      if (isLink(res)) {
+        o.state = 'have';
+        o.url = res.url;
+        o.at = Date.now();
+        originalBlob(k, id);
+      } else if (res && res.ok === true && res.original === false) {
+        o.state = 'none';
+      } else {
+        // The route did not answer: asked again the next time the sheet opens.
+        k.original = null;
+      }
+      if (showing(id, k.student)) show(id, k.student);
+    });
+  }
+
+  // The original's bytes as a PDF blob (ahead of a tap, and again on a tap), or null when they did not come.
+  function originalBlob(k, id) {
+    var o = k.original;
+    if (!o || o.state !== 'have') return Promise.resolve(null);
+    if (o.blob) return Promise.resolve(o.blob);
+    if (o.getting) return o.getting;
+    var link =
+      o.url && Date.now() - o.at < LINK_FRESH
+        ? Promise.resolve(o.url)
+        : StudentPage.whileCurrent(
+            answerOf({ enrollment_id: k.student, assessment_id: k.piece, resource_id: id }, 'handout-original'),
+          ).then(function (res) {
+            if (!isLink(res)) return '';
+            o.url = res.url;
+            o.at = Date.now();
+            return res.url;
+          });
+    var mine = link
+      .then(function (u) {
+        return u ? picture(u) : null;
+      })
+      .then(function (blob) {
+        if (o.getting === mine) o.getting = null;
+        if (blob && kept[id] === k && k.original === o) o.blob = new Blob([blob], { type: 'application/pdf' });
+        return o.blob || null;
+      });
+    o.getting = mine;
+    return mine;
+  }
+
+  /* Open as PDF, Print or Save to Phone (shared/handout-out.js). Each uses
+     the original when the handout has one (sourceOf), else every page,
+     asking again for any that did not come: nothing goes out if one is
+     missing, and the row says so. `how`: 'open', 'print' or 'save'. */
+  function output(how, id, piece) {
+    var student = S && S.page ? S.page.student.id : '';
+    var k = kept[id];
+    if (!k || k.student !== student || (k.out && k.out.state === 'working') || typeof HandoutOut === 'undefined')
+      return;
+    var heading = typeof document !== 'undefined' ? document.getElementById('sp-handout-title') : null;
+    var title = heading ? heading.textContent || '' : '';
+    var have = !!k.original && k.original.state === 'have';
+    var source = sourceOf(have, how);
+    // The sheet closes once the file is on its way, and the keyboard goes back to the button.
+    function done() {
+      k.out = null;
+      S.handoutMenu = false;
+      show(id, student);
+      StudentPage.paint('.sp-handout-outbtn');
+    }
+    function fail() {
+      if (kept[id] !== k) return;
+      k.out = {
+        state: 'failed',
+        how: how,
+        what: source === 'pages-print' || source === 'pages-save' ? 'pages' : 'pdf',
+      };
+      // The sheet is open again, to say so in the row.
+      S.handoutMenu = true;
+      show(id, student);
+    }
+    function fromPages() {
+      k.out = { state: 'working', how: how, what: 'pages' };
+      show(id, student);
+      var all = [];
+      for (var i = 0; i < k.count; i++) all.push(pageOf(k, id, i));
+      return Promise.all(all)
+        .then(function () {
+          if (kept[id] !== k) return null;
+          var pages = k.pages.slice(0, k.count);
+          if (
+            !pages.length ||
+            pages.length < k.count ||
+            !pages.every(function (pg) {
+              return pg && pg.url;
+            })
+          )
+            throw new Error('pages');
+          return pages;
+        })
+        .then(function (pages) {
+          if (!pages) return;
+          done();
+          return how === 'print' ? HandoutOut.print(pages) : HandoutOut.save(pages, title);
+        });
+    }
+    function useOriginal(blob) {
+      done();
+      return source === 'original-save' ? HandoutOut.saveBlob(blob, title) : HandoutOut.openPdf(blob, title);
+    }
+    if (source === 'pages-print' || source === 'pages-save') {
+      fromPages().then(null, fail);
+      return;
+    }
+    // Fetched ahead: opened in this very press, as a phone's browser lets a tab open.
+    if (have && k.original.blob) {
+      Promise.resolve(useOriginal(k.original.blob)).then(null, fail);
+      return;
+    }
+    k.out = { state: 'working', how: how, what: 'pdf' };
+    show(id, student);
+    originalBlob(k, id).then(function (blob) {
+      if (kept[id] !== k) return;
+      if (blob) {
+        // A tab may not open this long after the press: the sheet closes, and the row, shown again, opens it at once.
+        return Promise.resolve(useOriginal(blob)).then(null, fail);
+      }
+      // Print and Save still have the pages; Open as PDF has nothing else to open.
+      if (how === 'open') return fail();
+      return fromPages().then(null, fail);
+    });
+  }
+
   function load(id, piece) {
     if (!S || !S.page || !id) return;
     asked += 1;
     var student = S.page.student.id;
     // Try Again starts over.
     if (kept[id] && stateOf(kept[id]) === 'failed') delete kept[id];
+    S.handoutMenu = false;
     S.handoutPages = { id: id, state: 'loading', pages: [], asked: asked };
     fetchHandout(id, piece, student, true);
     if (S.handoutPages && S.handoutPages.state === 'loading') StudentPage.paint('#sp-handout-title');
@@ -406,6 +585,7 @@
   function onClick(act, el) {
     if (!S) return;
     if (act === 'card-done' || act === 'class-open' || act === 'card-add') {
+      S.handoutMenu = false;
       S.handout = '';
       S.handoutPiece = '';
       S.handoutPages = null;
@@ -413,6 +593,26 @@
       return;
     }
     if (act === 'handout-file') return openFile(el);
+    if (act === 'handout-out-open' && S.handout) {
+      var open = kept[S.handout];
+      if (open && open.out && open.out.state === 'failed') open.out = null;
+      if (open) askOriginal(open, S.handout);
+      S.handoutMenu = true;
+      show(S.handout, S.page.student.id);
+      // The sheet slides up on the drawing that opens it (page-view.js).
+      if (typeof StudentPageView !== 'undefined' && typeof document !== 'undefined') StudentPageView.slideIn(document);
+      var title = typeof document !== 'undefined' ? document.getElementById('sp-out-title') : null;
+      if (title && title.focus) title.focus();
+      return;
+    }
+    if (act === 'handout-out-close') {
+      S.handoutMenu = false;
+      StudentPage.paint('.sp-handout-outbtn');
+      return;
+    }
+    if ((act === 'handout-print' || act === 'handout-save' || act === 'handout-open') && S.handout) {
+      return output(act.slice(8), S.handout, S.handoutPiece);
+    }
     // app.js has opened the handout (StudentPageView.press); its pages come from what is kept, or are fetched.
     if (act === 'handout' && S.handout) return load(S.handout, S.handoutPiece);
     if (act === 'handout-retry' && S.handout && S.handout === ((el && el.getAttribute('data-resource')) || '')) {
@@ -437,6 +637,7 @@
     test: {
       // Tests answer `handout-links` themselves (to hold one, or fail it); null puts the real route back.
       handoutSource: source,
+      sourceOf: sourceOf,
       setHandoutAnswer: function (fn) {
         answerFn = fn;
       },

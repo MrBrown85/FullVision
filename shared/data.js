@@ -9044,6 +9044,7 @@ var _RES_ENDPOINTS = {
   add_assessment_link: true,
   start_handout_upload: true,
   start_handout_file: true,
+  start_handout_original: true,
   remove_assessment_resource: true,
 };
 
@@ -9178,6 +9179,7 @@ function _resRowOut(r) {
     host: kind === 'link' ? resourceHost(r.url) : '',
     pageCount: kind === 'pdf' ? Math.max(0, Number(r.page_count) || (pages ? pages.length : 0)) : 0,
     bytes: _resIsFileKind(kind) ? Math.max(0, Number(r.bytes) || 0) : 0,
+    hasOriginal: kind === 'pdf' && typeof r.original === 'string' && r.original !== '',
     status: r.status === 'uploading' ? 'uploading' : 'ready',
     position: Number(r.position) || 0,
   };
@@ -9248,6 +9250,7 @@ function _resFromServer(row) {
     created_at: row.created_at || null,
     pages: null,
     file: _resIsFileKind(kind) && typeof row.path === 'string' ? row.path : null,
+    original: _resOriginalOf(kind, row),
   };
   if (kind === 'pdf' && Array.isArray(row.paths)) {
     out.pages = row.paths.filter(function (p) {
@@ -9298,8 +9301,9 @@ function addAssessmentLink(cid, aid, address, title) {
    order, 1 to 20. `title` is the name students see (the file's name).
    → Promise of { ok: true, resource } or { ok: false, reason:
    'too_many_pages' | 'no_pages' | 'storage_full' | 'store_failed' |
-   'no_photo_store' | 'not_available' }. */
-function addAssessmentHandout(cid, aid, title, pages) {
+   'no_photo_store' | 'not_available' }. `original`: the PDF itself, kept
+   beside the pages when it can be (data-handout-files.js, "A PDF handout's original"). */
+function addAssessmentHandout(cid, aid, title, pages, original) {
   if (!Array.isArray(pages) || !pages.length) return Promise.resolve({ ok: false, reason: 'no_pages' });
   if (pages.length > RESOURCE_MAX_PAGES) return Promise.resolve({ ok: false, reason: 'too_many_pages' });
   if (!assessmentResourcesOffered(cid) || !aid) return Promise.resolve({ ok: false, reason: 'not_available' });
@@ -9312,26 +9316,29 @@ function addAssessmentHandout(cid, aid, title, pages) {
     .then(function (res) {
       if (!res || !res.ok)
         return { ok: false, reason: res && res.reason === 'storage_full' ? 'storage_full' : 'store_failed' };
-      var draft = _resDraft(cid);
-      var row = {
-        id: rid,
-        assessment_id: aid,
-        kind: 'pdf',
-        title: name,
-        url: null,
-        page_count: pages.length,
-        status: live ? 'uploading' : 'ready',
-        position: _resNextPosition(draft.rows, aid),
-        created_at: new Date().toISOString(),
-        pages: res.ids.map(function (id) {
-          return 'photo-queue:' + id;
-        }),
-      };
-      draft.rows.push(row);
-      _resWrite(cid, draft);
-      if (live) _handoutStart(cid, aid, rid, name, res);
-      _resChanged(cid);
-      return { ok: true, resource: _resRowOut(row) };
+      return _handoutOriginalQueue(q, cid, aid, rid, original).then(function (kept) {
+        var draft = _resDraft(cid);
+        var row = {
+          id: rid,
+          assessment_id: aid,
+          kind: 'pdf',
+          title: name,
+          url: null,
+          page_count: pages.length,
+          status: live ? 'uploading' : 'ready',
+          position: _resNextPosition(draft.rows, aid),
+          created_at: new Date().toISOString(),
+          pages: res.ids.map(function (id) {
+            return 'photo-queue:' + id;
+          }),
+          original: kept ? 'photo-queue:' + kept.ids[0] : null,
+        };
+        draft.rows.push(row);
+        _resWrite(cid, draft);
+        if (live) _handoutStart(cid, aid, rid, name, res, null, kept);
+        _resChanged(cid);
+        return { ok: true, resource: _resRowOut(row) };
+      });
     })
     .then(null, function () {
       return { ok: false, reason: 'store_failed' };
@@ -9341,6 +9348,7 @@ function addAssessmentHandout(cid, aid, title, pages) {
 function _resQueueIds(row) {
   return ((row && row.pages) || [])
     .concat(row && typeof row.file === 'string' ? [row.file] : [])
+    .concat(row && typeof row.original === 'string' ? [row.original] : [])
     .map(function (p) {
       var m = typeof p === 'string' ? _STUDENT_WORK_QUEUE_PATH.exec(p) : null;
       return m && !m[2] ? m[1] : null;
@@ -9438,7 +9446,7 @@ function _resTakeServer(cid, serverRows) {
     })
     .map(function (r) {
       var had = byId[r.id];
-      if (had && mine[r.id]) return Object.assign({}, r, { pages: had.pages, status: had.status });
+      if (had && mine[r.id]) return _resKeepOwn(r, had);
       if (had && !r.pages && had.pages && had.status === 'ready') return Object.assign({}, r, { pages: had.pages });
       return r;
     });
@@ -9485,7 +9493,7 @@ function _handoutUploadsSave(all) {
 /* start_handout_upload (a PDF's pages) or, for a handout file (`file`: {
    kind, bytes }), start_handout_file, through the outbox, keyed so a retry
    is the same start. */
-function _handoutStart(cid, aid, rid, title, queued, file) {
+function _handoutStart(cid, aid, rid, title, queued, file, original) {
   var key = _newEntryId();
   var all = _handoutUploads();
   all[key] = {
@@ -9499,6 +9507,7 @@ function _handoutStart(cid, aid, rid, title, queued, file) {
     ids: queued.ids,
     batch: queued.batch,
     kind: file ? file.kind : 'pdf',
+    original: original || null,
   };
   _handoutUploadsSave(all);
   var endpoint = file ? 'start_handout_file' : 'start_handout_upload';
@@ -9583,7 +9592,8 @@ function _handoutGiveUp(rec, refused) {
   _resWrite(rec.cid, draft);
   if (refused) _workNoteDropped();
   _resChanged(rec.cid);
-  return _teacherWorkForget(rec.ids || []).then(function () {
+  var queued = (rec.ids || []).concat((rec.original && rec.original.ids) || []);
+  return _teacherWorkForget(queued).then(function () {
     return null;
   });
 }
@@ -9603,8 +9613,10 @@ function _handoutUploadByBatch(batch) {
 async function _handoutCommit(batch) {
   var rid = batch && batch.ids && batch.ids.resource;
   if (!_isUuid(rid)) return { error: { message: 'no resource id', status: 422 } };
-  var rec = _handoutUploadByBatch(batch.key);
   var fileKind = _handoutFileKindOf(batch);
+  // A PDF handout's original is its own batch, handed in by its own call.
+  if (fileKind === 'pdf') return _handoutOriginalCommit(batch);
+  var rec = _handoutUploadByBatch(batch.key);
   var finish = { p_resource_id: rid, p_idempotency_key: batch.key };
   var quiet = { suppressSessionExpiredModal: true };
   var res = fileKind
@@ -9632,7 +9644,9 @@ async function _handoutCommit(batch) {
     if (rec) {
       var all = _handoutUploads();
       delete all[rec.key];
+      var next = fileKind ? null : _handoutOriginalNext(all, rec, cid, rid); // the original beside the pages starts now
       _handoutUploadsSave(all);
+      if (next) _handoutOriginalStart(next);
     }
     _resChanged(cid);
     _resReadAfterWrite({ p_course_id: cid });
@@ -9680,6 +9694,7 @@ function _onResourceWriteEvent(kind, endpoint, payload, data) {
   if (kind === 'flush:success') _resReadAfterWrite(payload);
   try {
     var key = payload && payload.p_idempotency_key;
+    if (endpoint === 'start_handout_original' && key) return _handoutOriginalEvent(kind, key, data);
     if ((endpoint === 'start_handout_upload' || endpoint === 'start_handout_file') && key) {
       if (kind === 'flush:success') _handoutStarted(key, data);
       else {
