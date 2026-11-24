@@ -245,3 +245,114 @@ test('removes a question from ⋯ with an Undo toast; ⌘Z outside a text box st
   await expect(page.locator('#rb-said')).toHaveText('Undid: Added a question.');
   expect(errors).toEqual([]);
 });
+
+test('Enter goes down the card, then makes the next one: a whole reflection typed without the mouse', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await expect(page.locator('#app-loading')).toHaveCount(0);
+  await page.goto('/dashboard?manage=questionnaires');
+  await page.getByRole('button', { name: 'New Reflection' }).click();
+  const b = page.locator('.rb-build');
+  const kb = page.keyboard;
+  const focused = () => page.evaluate(() => document.activeElement.getAttribute('aria-label'));
+  const state = () =>
+    page.evaluate(() =>
+      CmReflectBuilder._state().questions.map(d => [
+        d.kind,
+        d.prompt,
+        (d.kind === 'choice' ? d.choices : []).join('|'),
+      ]),
+    );
+
+  await b.getByLabel('Title').click();
+  await kb.type('Lab Week');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Description');
+  await kb.type('Five minutes');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Question');
+  await kb.type('Which helped most?');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Option 1');
+  await kb.type('Labs');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Option 2');
+  await kb.type('Notes');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Option 3');
+  // The last one, empty: it goes, and a Choice is added below, open.
+  await kb.press('Enter');
+  expect(await focused()).toBe('Question');
+  await expect(b.locator('.rb-q').nth(1)).toHaveClass(/rb-q-on/);
+  await expect(page.locator('#rb-said')).toHaveText('Added a question.');
+  await kb.type('Why?');
+  await b.locator('.rb-q-on select.rb-kind').selectOption('text');
+  await b.locator('.rb-q-on [data-rb-path="prompt"]').press('Enter');
+  // A Text question has nothing under its words: Enter adds another Text.
+  await expect(b.locator('.rb-q')).toHaveCount(3);
+  await kb.press('Escape');
+  await b.locator('.cm-section-title').click();
+  expect(await state()).toEqual([
+    ['choice', 'Which helped most?', 'Labs|Notes'],
+    ['text', 'Why?', ''],
+    ['text', '', ''],
+  ]);
+  // Each added card is on the Undo list.
+  await kb.press('ControlOrMeta+z');
+  await expect(b.locator('.rb-q')).toHaveCount(2);
+  expect(errors).toEqual([]);
+});
+
+test('Enter in a heading, a Likert and a Rating', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await expect(page.locator('#app-loading')).toHaveCount(0);
+  await page.goto('/dashboard?manage=questionnaires');
+  await page.getByRole('button', { name: 'New Reflection' }).click();
+  const b = page.locator('.rb-build');
+  const kb = page.keyboard;
+  const focused = () => page.evaluate(() => document.activeElement.getAttribute('aria-label'));
+  const kinds = () => page.evaluate(() => CmReflectBuilder._state().questions.map(d => d.kind));
+  const on = b.locator('.rb-q-on');
+
+  // A heading: its words, its subtitle, then a question under it (the type above it: none, so a Choice).
+  await on.locator('select.rb-kind').selectOption('section');
+  await on.locator('[data-rb-path="prompt"]').click();
+  await kb.type('Part One');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Subtitle');
+  await kb.press('Enter');
+  expect(await kinds()).toEqual(['section', 'choice']);
+  expect(await focused()).toBe('Question');
+
+  // A Likert: statements, then (an empty last one) on to the columns.
+  await on.locator('select.rb-kind').selectOption('likert');
+  await on.locator('[data-rb-path="prompt"]').click();
+  await kb.type('How often?');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Statement 1');
+  await kb.type('I asked');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Statement 2');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Column 1');
+  expect(await page.evaluate(() => CmReflectBuilder._state().questions[1].statements)).toEqual(['I asked']);
+
+  // A Rating: the two end words, then a Rating below.
+  await b.locator('.rb-add').getByRole('button', { name: 'Rating', exact: true }).click();
+  await kb.type('How sure?');
+  await kb.press('Enter');
+  expect(await focused()).toBe('Word for 1');
+  await kb.press('Enter');
+  expect(await focused()).toMatch(/^Word for \d+$/);
+  expect(await focused()).not.toBe('Word for 1');
+  await kb.press('Enter');
+  expect(await kinds()).toEqual(['section', 'likert', 'rating', 'rating']);
+  expect(errors).toEqual([]);
+});
