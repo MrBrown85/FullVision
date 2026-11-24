@@ -29,10 +29,14 @@ import vm from 'node:vm';
 import BANK_STEPS from '../supabase/functions/_shared/bank-steps.json' with { type: 'json' };
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { FAKE_KEY } from './helpers/card-key-fake.js';
 import { clearClass, seedClass } from './helpers/pin-save-paths.js';
 import { openStudentPage } from './helpers/student-page-context.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = file => readFileSync(resolve(ROOT, file), 'utf-8');

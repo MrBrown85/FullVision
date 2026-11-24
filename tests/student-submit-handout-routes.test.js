@@ -17,9 +17,13 @@
  *   a handout file has no address and no page count.
  */
 import { describe, expect, it } from 'vitest';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { SQL } from '../supabase/functions/student-submit/handout-routes.ts';
 import { CARD_ROUTES, cardReply } from '../supabase/functions/student-submit/card-routes.ts';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
 const PHONE = 's'.repeat(64);

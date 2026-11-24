@@ -7,9 +7,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 import { FAKE_KEY, keyId, slipCodeTag, slipPasswordTag } from './helpers/card-key-fake.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const KEY = await readCardKey(FAKE_KEY);
 const TOKEN = 'a'.repeat(64);

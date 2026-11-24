@@ -75,6 +75,8 @@ export type Options = {
   // Who a teacher's sign-in token belongs to (Supabase Auth), for sweep.
   whoIs?: ((token: string) => Promise<string | null>) | null;
   now?: () => number;
+  // Makes a new session's token for verify and add-card; the database is given only its hash. Tests fix it.
+  sessionToken?: () => string;
   // Runs the removal worker after the answer (EdgeRuntime.waitUntil in index.ts); absent, before it.
   defer?: ((work: Promise<void>) => void) | null;
   // PHOTO_SWEEP_SECRET, for scheduled-sweep (the database's timer). Null or absent: that route answers a server error.
@@ -211,6 +213,19 @@ export async function ipHash(req: Request, key: string): Promise<string> {
   return Array.from(sig, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/* SHA-256 of a text, as 64 lower-case hex characters. */
+export async function sha256Hex(text: string): Promise<string> {
+  const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return Array.from(sum, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* A new session's token, made here so the database never has it: 32 random
+   bytes as 64 hex characters. */
+export function randomSessionToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 /* The verify body's identity fields: each a short string or absent, and at
    least one given. Null when the shape is wrong. */
 export function identity(body: Record<string, unknown>): Identity | null {
@@ -282,6 +297,13 @@ export function makeHandler(opts: Options) {
       return reply(400, { ok: false, error: 'bad_request' }, origin);
     }
 
+    // The device's session token goes no further than here (2026112401): every route reads `session` as its
+    // SHA-256, which is what the database keeps, so a token is never in a statement. A value of the wrong
+    // shape is left for the route to refuse.
+    if (typeof body.session === 'string' && body.session.length > 0 && body.session.length <= 128) {
+      body.session = await sha256Hex(body.session);
+    }
+
     const route = body.route;
     // A verify with a token is a slip's, as it always was; with a code and no token, a card's.
     const card =
@@ -331,10 +353,15 @@ export function makeHandler(opts: Options) {
           return reply(500, { ok: false, error: 'server' }, origin);
         }
         // Not a card's code: answered here as an unknown card is, and the database is not asked.
-        result =
-          params === 'not_a_card'
-            ? { ok: false, error: 'not_found' }
-            : cardReply(card, await opts.db.call(card.sql, [...params, hash]));
+        if (params === 'not_a_card') {
+          result = { ok: false, error: 'not_found' };
+        } else if (card.newSession) {
+          // verify and add-card: the database is given the new session's hash, and the phone its token.
+          const token = (opts.sessionToken || randomSessionToken)();
+          result = cardReply(card, await opts.db.call(card.sql, [...params, hash, await sha256Hex(token)]), token);
+        } else {
+          result = cardReply(card, await opts.db.call(card.sql, [...params, hash]));
+        }
       } else if (route === 'open') {
         if (typeof body.code !== 'string' || body.code.length > 32) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);

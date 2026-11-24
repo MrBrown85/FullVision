@@ -10,9 +10,13 @@
  * tests/helpers/fake-send-world.js, as the other send routes are.
  */
 import { describe, expect, it } from 'vitest';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { sweepSecret } from '../supabase/functions/student-submit/send-routes.ts';
 import { C1, CECE, LAB, fakeWorld } from './helpers/fake-send-world.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
 const SECRET = '5e'.repeat(32); // a test value

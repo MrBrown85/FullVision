@@ -18,6 +18,7 @@
  * The page runs against the function's real handler with a stand-in
  * database, as in tests/student-card-wired.test.js.
  */
+import { sha256 } from './helpers/session-hash.js';
 import { describe, expect, it } from 'vitest';
 import { makeHandler as functionDeployedToday } from './fixtures/student-submit-handler-2026-11-03.ts';
 import { openStudentPage } from './helpers/student-page-context.js';
@@ -182,7 +183,7 @@ describe('any recognised card signs the last student out', () => {
     expect(text(other)).toContain(shows);
     expect(routes(other)).toEqual(['card', 'open']);
     expect(dev.store[KEY]).toBe(kept);
-    expect(Object.keys(dev.fn.state.sessions)).toEqual([JSON.parse(kept).t]);
+    expect(Object.keys(dev.fn.state.sessions)).toEqual([sha256(JSON.parse(kept).t)]);
   });
 
   it('too many wrong codes from this address is not a card either: nobody is signed out', async () => {

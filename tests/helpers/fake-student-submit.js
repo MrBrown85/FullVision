@@ -341,7 +341,9 @@ export function fakeStudentSubmit(opts = {}) {
         also_password: identity && !!k.password,
       };
     },
-    verify_card(tag, birthday, number, password, token, hash, add) {
+    // `token` is the device's token as the function hashed it, and `newHash` the hash of the one it made for a new
+    // session (2026112401): the stand-in, like the database, keeps sessions by hash and never sees a token.
+    verify_card(tag, birthday, number, password, token, hash, newHash, add) {
       const found = lookup(tag);
       if (found.error) return no(found.error);
       const k = found.card;
@@ -363,15 +365,16 @@ export function fakeStudentSubmit(opts = {}) {
       let s = live(token);
       let fresh = null;
       if (!s) {
+        if (!/^[0-9a-f]{64}$/.test(String(newHash))) throw new Error('the database was handed no session hash');
         made += 1;
-        fresh = (('0' + made).slice(-2) + 'ab'.repeat(31)).slice(0, 64);
+        fresh = newHash;
         s = state.sessions[fresh] = { expires: new Date(now() + (opts.lasts || 6 * 3600e3)).toISOString(), cards: {} };
       }
       s.cards[k.enrollment] = norm(k.code);
       k.wrong = 0;
       return {
         ok: true,
-        session_token: fresh,
+        new_session: !!fresh,
         expires_at: s.expires,
         enrollment_id: k.enrollment,
         classes: classes(s),
@@ -638,7 +641,7 @@ export function fakeStudentSubmit(opts = {}) {
         }
         if (text === SLIP_SQL.verify) return slip('verify')(params[0]);
         const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
-        const add = /, p_add => (true|false)\) as r$/.exec(text);
+        const add = /, p_add => (true|false)[,)]/.exec(text);
         if (world && WORKER_FNS.includes(fn)) return world.db.call(text, params);
         sql.push({ fn, params: params.slice(0, -1), add: add ? add[1] === 'true' : undefined });
         if (world && SEND_FNS.includes(fn)) return versions(fn, params, await world.db.call(text, params));

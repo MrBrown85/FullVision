@@ -161,8 +161,9 @@ export function fakeCardDatabase() {
       };
     },
     // student_submit.verify_card(p_code_hmac, p_key_id, p_birthday, p_student_number, p_password_hmac,
-    //                            p_session_token, p_ip_hash, p_add)
-    verify_card(tag, keyId, birthday, number, passwordTag) {
+    //                            p_session_token, p_ip_hash, p_add, p_new_session_hash)
+    // The new session is kept by the hash the function sent; the token itself the database never has (2026112401).
+    verify_card(tag, keyId, birthday, number, passwordTag, session, ipHash, newHash) {
       const found = find('verify_card', tag, keyId);
       if (found.error) return no(found.error);
       if (passwordTag != null && !HEX64.test(String(passwordTag))) throw raised('22023', 'password tag');
@@ -173,11 +174,11 @@ export function fakeCardDatabase() {
         (student.number && number === student.number) ||
         (k.pw_hmac && passwordTag === k.pw_hmac);
       if (!right) return { ok: false, error: 'wrong_identity', tries_left: 4 };
-      const token = ('5e' + String(Object.keys(state.sessions).length).padStart(2, '0')).repeat(16);
-      state.sessions[token] = k.enrollment_id;
+      if (!HEX64.test(String(newHash))) throw raised('22023', 'session hash');
+      state.sessions[newHash] = k.enrollment_id;
       return {
         ok: true,
-        session_token: token,
+        new_session: true,
         expires_at: '2026-11-11T08:00:00+00:00',
         enrollment_id: k.enrollment_id,
         classes: [

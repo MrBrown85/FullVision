@@ -10,6 +10,7 @@
  * through the handler's allow-list. Nothing is deployed and nothing real is
  * called.
  */
+import { sha256 } from './helpers/session-hash.js';
 import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import {
@@ -629,9 +630,9 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const kept = JSON.parse(dev.store[KEY]);
     expect(Object.keys(kept).sort()).toEqual(['a', 'e', 't', 'x']);
     expect(typeof kept.a).toBe('number');
-    expect(kept.t).toBe(Object.keys(dev.fn.state.sessions)[0]);
+    expect(sha256(kept.t)).toBe(Object.keys(dev.fn.state.sessions)[0]);
     expect(kept.e).toBe(CECE);
-    expect(kept.x).toBe(dev.fn.state.sessions[kept.t].expires);
+    expect(kept.x).toBe(dev.fn.state.sessions[sha256(kept.t)].expires);
     // No name, class, code, birthday, student number or grade, in either store.
     const stored = JSON.stringify(dev.store) + JSON.stringify(page.tab);
     for (const secret of ['Cece', 'Science', 'P3R', '0123456', '2012', 'Extending', 'Quiz', '8 / 10']) {
@@ -889,7 +890,7 @@ describe('a shared device: a card from the start screen starts fresh', () => {
         return dev.fn.handle(body);
       },
     });
-    expect(Object.keys(dev.fn.state.sessions)).toEqual([cece]);
+    expect(Object.keys(dev.fn.state.sessions)).toEqual([sha256(cece)]);
     page.type('#sp-ident', '7654321');
     await page.click('[data-act="card-yes"]');
     const verify = page.calls.find(c => c.body.route === 'verify').body;
@@ -898,7 +899,7 @@ describe('a shared device: a card from the start screen starts fresh', () => {
     expect(dev.fn.sql.find(q => q.fn === 'verify_card' && q.params[0] === codeTag('K7M4QX2P')).add).toBe(false);
     const omarToken = JSON.parse(dev.store[KEY]).t;
     expect(omarToken).not.toBe(cece);
-    expect(Object.keys(dev.fn.state.sessions)).toEqual([omarToken]);
+    expect(Object.keys(dev.fn.state.sessions)).toEqual([sha256(omarToken)]);
     expect(JSON.parse(dev.store[KEY]).e).toBe(OMAR);
     expect(page.root().querySelector('.sp-caught-up-words').textContent).toBe('All caught up');
     expect(text(page)).not.toContain('Cece');
