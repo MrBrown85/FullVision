@@ -270,7 +270,7 @@ Student number is the match key everywhere. Today's uniqueness is per teacher. W
 | `get_learning_update_export(p_course_id, p_term_ordinal)`                                                          | The export sheet, server-sorted.                                                                                                                                                                                       |
 | `attach_sis_identity(p_course_id, p_section jsonb)`                                                                | Extension or paste sets the section fields without a roster import.                                                                                                                                                    |
 
-`import_roster_csv` and `import_teams_class` stay for now and are removed once the new path has a term of use.
+`import_roster_csv` stays for now and is removed once the new path has a term of use. (`import_teams_class` was dropped on 2026-11-24.)
 
 ### 4.5 Where levels come from
 

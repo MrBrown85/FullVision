@@ -218,8 +218,6 @@ grant execute on routine fv_private.work_read_allowed(p_name text) to service_ro
 revoke all on routine fv_private.work_upload_allowed(p_name text) from public;
 grant execute on routine fv_private.work_upload_allowed(p_name text) to authenticated;
 grant execute on routine fv_private.work_upload_allowed(p_name text) to service_role;
-revoke all on routine public._access_code_hash(p_code text, p_salt text) from public;
-grant execute on routine public._access_code_hash(p_code text, p_salt text) to service_role;
 revoke all on routine public._assessment_draft_guard() from public;
 revoke all on routine public._assessment_resource_gone() from public;
 revoke all on routine public._assessment_resource_json(p_id uuid) from public;
@@ -314,8 +312,6 @@ revoke all on routine public._revision_state(p_request_id uuid) from public;
 revoke all on routine public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) from public;
 grant execute on routine public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) to authenticated;
 grant execute on routine public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) to service_role;
-revoke all on routine public._slip_password_on_change() from public;
-revoke all on routine public._slip_password_settle(p_student_id uuid) from public;
 revoke all on routine public._student_card_json(p_card_id uuid) from public;
 grant execute on routine public._student_card_json(p_card_id uuid) to service_role;
 revoke all on routine public._submission_file_removed() from public;
@@ -981,7 +977,6 @@ revoke all on routine student_submit._send_begin(p_intent text, p_session_token 
 revoke all on routine student_submit._send_session(p_session_token text, p_enrollment_id uuid) from public;
 revoke all on routine student_submit._session_class(p_session_token text, p_enrollment_id uuid) from public;
 revoke all on routine student_submit._session_classes(p_session_id uuid) from public;
-revoke all on routine student_submit._slip_old_until() from public;
 revoke all on routine student_submit._work_window(p_assessment_id uuid) from public;
 revoke all on routine student_submit._write_limit(p_card_id uuid, p_kind text, p_per_hour integer) from public;
 revoke all on routine student_submit.answer(p_session_token text, p_enrollment_id uuid, p_questionnaire_id uuid, p_answers jsonb, p_ip_hash text) from public;
@@ -1022,8 +1017,8 @@ revoke all on routine student_submit.issue_slips(p_teacher_id uuid, p_kind text,
 grant execute on routine student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) to service_role;
 revoke all on routine student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
-revoke all on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) from public;
-grant execute on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) to service_role;
+revoke all on routine student_submit.open(p_code_hmac text, p_key_id text, p_ip_hash text, p_new_token_hash text) from public;
+grant execute on routine student_submit.open(p_code_hmac text, p_key_id text, p_ip_hash text, p_new_token_hash text) to service_role;
 revoke all on routine student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) to service_role;
 revoke all on routine student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) from public;
@@ -1066,8 +1061,8 @@ revoke all on routine student_submit.submit(p_token text, p_answers jsonb, p_ip_
 grant execute on routine student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) to service_role;
 revoke all on routine student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
-revoke all on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) from public;
-grant execute on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) to service_role;
+revoke all on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_pw_hmac text, p_ip_hash text) from public;
+grant execute on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_pw_hmac text, p_ip_hash text) to service_role;
 revoke all on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) from public;
 grant execute on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) to service_role;
 revoke all on routine student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;

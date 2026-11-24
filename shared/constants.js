@@ -1060,7 +1060,6 @@ const FV_IDEMPOTENT_RPCS = {
   duplicate_course: true,
   import_json_restore: true,
   import_roster_csv: true,
-  import_teams_class: true,
   note_course_opened: true,
   patch_teacher_preferences: true,
   reenrol_student: true,

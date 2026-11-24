@@ -75,8 +75,6 @@ function setup(extra = {}) {
     ipKey: 'test-key',
     db: {
       // The slip routes are never asked by these routes.
-      open: async () => (asked.push('open'), { ok: false }),
-      verify: async () => (asked.push('verify'), { ok: false }),
       check: async () => (asked.push('check'), { ok: false }),
       submit: async () => (asked.push('submit'), { ok: false }),
       call: world.db.call,

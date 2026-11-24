@@ -3069,7 +3069,6 @@ export type Database = {
           last_name: string | null
           preferred_name: string | null
           pronouns: string | null
-          slip_password: string | null
           student_number: string | null
           teacher_id: string
           updated_at: string
@@ -3084,7 +3083,6 @@ export type Database = {
           last_name?: string | null
           preferred_name?: string | null
           pronouns?: string | null
-          slip_password?: string | null
           student_number?: string | null
           teacher_id: string
           updated_at?: string
@@ -3098,7 +3096,6 @@ export type Database = {
           last_name?: string | null
           preferred_name?: string | null
           pronouns?: string | null
-          slip_password?: string | null
           student_number?: string | null
           teacher_id?: string
           updated_at?: string
@@ -3114,9 +3111,7 @@ export type Database = {
       }
       student_access_code: {
         Row: {
-          code_hash: string | null
           code_hmac: string | null
-          converted_at: string | null
           created_at: string
           enrollment_id: string
           expires_at: string
@@ -3128,14 +3123,11 @@ export type Database = {
           questionnaire_id: string | null
           report_issue_id: string | null
           revoked_at: string | null
-          salt: string | null
           used_at: string | null
         }
         ComputedFields: never
         Insert: {
-          code_hash?: string | null
           code_hmac?: string | null
-          converted_at?: string | null
           created_at?: string
           enrollment_id: string
           expires_at: string
@@ -3147,13 +3139,10 @@ export type Database = {
           questionnaire_id?: string | null
           report_issue_id?: string | null
           revoked_at?: string | null
-          salt?: string | null
           used_at?: string | null
         }
         Update: {
-          code_hash?: string | null
           code_hmac?: string | null
-          converted_at?: string | null
           created_at?: string
           enrollment_id?: string
           expires_at?: string
@@ -3165,7 +3154,6 @@ export type Database = {
           questionnaire_id?: string | null
           report_issue_id?: string | null
           revoked_at?: string | null
-          salt?: string | null
           used_at?: string | null
         }
         Relationships: [
@@ -3933,10 +3921,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _access_code_hash: {
-        Args: { p_code: string; p_salt: string }
-        Returns: string
-      }
       _assessment_resource_json: { Args: { p_id: string }; Returns: Json }
       _assessment_work_json: {
         Args: { p_assessment_id: string }
@@ -4133,10 +4117,6 @@ export type Database = {
           p_old_value: number
           p_score_id: string
         }
-        Returns: undefined
-      }
-      _slip_password_settle: {
-        Args: { p_student_id: string }
         Returns: undefined
       }
       _student_card_json: { Args: { p_card_id: string }; Returns: Json }
@@ -4580,10 +4560,6 @@ export type Database = {
       }
       import_roster_csv: {
         Args: { p_course_id: string; p_idempotency_key?: string; p_rows: Json }
-        Returns: Json
-      }
-      import_teams_class: {
-        Args: { p_idempotency_key?: string; p_payload: Json }
         Returns: Json
       }
       issue_scan_labels: {
