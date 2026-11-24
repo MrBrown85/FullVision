@@ -91,6 +91,43 @@ const shown = page =>
       .filter(line => !/^Shared next step:/.test(line))
       .join('\n'),
   );
+/* What the page shows once it has stopped changing: two reads 250 ms apart
+   that agree. A fixed wait was not enough on a GitHub runner, where Progress
+   Reports was still drawing the class when it was read. */
+const steady = async page => {
+  let last = await shown(page);
+  for (let i = 0; i < 60; i++) {
+    await page.waitForTimeout(250);
+    const now = await shown(page);
+    if (now === last) return now;
+    last = now;
+  }
+  return last;
+};
+/* Whether the page comes to show want, within 15 seconds; if not, the first
+   line that differs, so a failure says what it saw. */
+const comesTo = async (page, want) => {
+  const until = Date.now() + 15000;
+  let now = await shown(page);
+  while (now !== want && Date.now() < until) {
+    await page.waitForTimeout(250);
+    now = await shown(page);
+  }
+  if (now === want) return '';
+  const a = want.split('\n');
+  const b = now.split('\n');
+  const i = a.findIndex((line, k) => line !== b[k]);
+  const at = i < 0 ? a.length : i;
+  return (
+    ' (line ' +
+    (at + 1) +
+    ': ' +
+    JSON.stringify((a[at] || '').slice(0, 80)) +
+    ' became ' +
+    JSON.stringify((b[at] || '').slice(0, 80)) +
+    ')'
+  );
+};
 // A button left busy: turned off while it says it is working ("Sending…", "Updating…").
 const busy = page =>
   page.evaluate(() =>
@@ -115,7 +152,7 @@ async function walk(page, list) {
   const expected = {};
   for (const address of list) {
     await go(page, address);
-    expected[address] = await shown(page);
+    expected[address] = await steady(page);
   }
   check('all', 'loaded from the start', 'page errors ' + JSON.stringify(errors), errors.length === 0);
   for (const address of list) {
@@ -135,13 +172,14 @@ async function walk(page, list) {
       check(address, 'not loaded', 'no loading line', waiting === 'Loading this class…');
     } else {
       // Every other page shows the teacher's own work: the same with the rows missing as with them loaded.
-      check(address, 'not loaded', 'not what it shows loaded', (await shown(page)) === expected[address]);
+      const differs = await comesTo(page, expected[address]);
+      check(address, 'not loaded', 'not what it shows loaded' + differs, differs === '');
     }
     await loaded(page);
-    await page.waitForTimeout(700);
+    const differs = await comesTo(page, expected[address]);
     check(address, 'once loaded', 'page errors ' + JSON.stringify(errors), errors.length === 0);
     check(address, 'once loaded', 'busy ' + JSON.stringify(await busy(page)), (await busy(page)).length === 0);
-    check(address, 'once loaded', 'not what it shows loaded', (await shown(page)) === expected[address]);
+    check(address, 'once loaded', 'not what it shows loaded' + differs, differs === '');
   }
   return found;
 }
