@@ -208,11 +208,17 @@ describe('an answer waiting is not lost silently', () => {
     const page = await waiting(w, { leave: false });
     const ask = () => page.T.quizAsksBeforeClosing();
     expect(ask()).toBe(true);
+    // The real beforeunload event: it asks (preventDefault) while the save waits.
+    let prevented = 0;
+    page.fire('beforeunload', { preventDefault: () => (prevented += 1) });
+    expect(prevented).toBe(1);
     w.db.saveFails = false;
     page.advance(60 * 1000);
     page.runTimers();
     await page.settle();
     expect(ask()).toBe(false);
+    page.fire('beforeunload', { preventDefault: () => (prevented += 1) });
+    expect(prevented).toBe(1);
   });
   it('the Log Out sheet is the plain one when nothing waits', async () => {
     const w = world();
