@@ -68,6 +68,8 @@
       // Bulletins (s/bulletins.js): only with the build switch on and the server's answer in; else no tab.
       var bulletins = typeof StudentPage.bulletinsOf === 'function' ? StudentPage.bulletinsOf(state) : null;
       if (bulletins) view.bulletins = bulletins;
+      // A quiz's button words, from what this tab has seen of it (s/quiz.js).
+      if (typeof StudentPage.quizMarks === 'function') StudentPage.quizMarks(view, state);
       return view;
     } catch (e) {
       return null;
@@ -82,6 +84,9 @@
       pick: state.pick,
       card: state.card,
       logout: state.logout,
+      // A quiz answer not yet saved: the Log Out sheet and the Switch Class question say so (s/quiz.js).
+      quizWaiting: typeof StudentPage.quizWaiting === 'function' ? StudentPage.quizWaiting() : 0,
+      classHold: state.classHold || '',
       feedback: state.feedback,
       whole: state.whole,
       compare: state.compare,
