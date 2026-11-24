@@ -1733,11 +1733,17 @@ html.sp-size-larger .sp-view .sp-head-class {
   max-width: 620px;
 }
 /* Save or Print on an open handout (s/page-view.js handoutOutButton): one
-   button at the right of the top bar, which never wraps; the title keeps
-   wrapping beside it. Its sheet is the Your Classes sheet (.sp-set above),
-   each row its icon and its name. */
+   button at the right of the top bar, which never wraps. The title keeps
+   room for whole words (10em): where the button would squeeze it below that
+   (a narrow phone, large text), the button moves under the title instead.
+   Its sheet is the Your Classes sheet (.sp-set above), each row its icon and
+   its name. */
+.sp-view .sp-handout .sp-work-head {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
 .sp-view .sp-handout .sp-work-head .sp-work-words {
-  flex: 1 1 0;
+  flex: 1 1 10em;
 }
 .sp-view .sp-handout-outbtn {
   flex: none;

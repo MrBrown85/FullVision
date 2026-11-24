@@ -234,3 +234,14 @@ test('shots: the open handout at 390 × 844, sheet closed and open, light and da
     await page.screenshot({ path: SHOTS + '/handout-390-sheet-' + scheme + '-' + browserName + '.png' });
   }
 });
+
+// On a 375 px phone (PHONE) in the page font the button sits beside the title. In a wider face, or at a
+// narrower width or larger text, it moves under the title rather than break the title's words
+// (student-text-size-sweep checks those).
+test('at 375 px the button sits beside the title', async ({ page }) => {
+  const pane = await openStudyGuide(page);
+  const title = await pane.getByRole('heading', { name: 'Study Guide' }).boundingBox();
+  const button = await pane.getByRole('button', { name: 'Save or Print' }).boundingBox();
+  expect(button.y).toBeLessThan(title.y + title.height);
+  expect(button.x).toBeGreaterThan(title.x + title.width);
+});
