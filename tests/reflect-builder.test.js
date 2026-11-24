@@ -232,7 +232,7 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
       'Date',
       'Ranking',
       'Likert',
-      'Section Heading',
+      'Heading',
     ]);
     type('#rb-name', 'Unit 2 Exit Reflection');
     type('#rb-desc', 'About 5 minutes.');

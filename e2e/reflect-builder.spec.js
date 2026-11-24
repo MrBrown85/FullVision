@@ -49,7 +49,7 @@ test('builds a reflection with every question type, saves it On and sees its car
   await add('Likert');
   await prompt.fill('How often did you do each?');
   await on.getByRole('textbox', { name: 'Statement 1', exact: true }).fill('I asked questions');
-  await add('Section Heading');
+  await add('Heading');
   await prompt.fill('Last Part');
   // The heading glides up above the Likert.
   await on.getByRole('button', { name: 'Move question up' }).click();
