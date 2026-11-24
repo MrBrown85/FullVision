@@ -439,6 +439,19 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* A quiz the student answers on the page (docs/plans/quizzes-plan.md Q3b; s/quiz.js opens it). Drawn only for a piece
+     the page marked as one, which happens only with the quizzes switch on. */
+  function quizBlockHtml(p) {
+    if (!p.quiz) return '';
+    return (
+      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="quiz-open" data-piece="' +
+      esc(p.id) +
+      '">' +
+      esc(p.quizWord || 'Start the Quiz') +
+      '</button>'
+    );
+  }
+
   // A grey row with a lock: what the student can't change and why (the Closed and Being Graded boards).
   function lockRowHtml(text, cls) {
     return '<p class="sp-lock-row ' + cls + '">' + pillIcon('lock', 18) + '<span>' + esc(text) + '</span></p>';
@@ -928,7 +941,7 @@ window.StudentPageView = (function () {
       (todo || p.kind === 'revise' ? resourcesHtml(p, !!car) : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) + seeWorkHtml(p) : '') +
-      (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
+      (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) + quizBlockHtml(p) : '') +
       reviseBlockHtml(p, 'card') +
       (hasCompare(p)
         ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="compare" data-piece="' +
@@ -2425,19 +2438,46 @@ window.StudentPageView = (function () {
   /* Log Out? (Colin, 2026-11-14: "Done should be Log Out and should also
      prompt a warning"): asked over the page before the session ends. Log
      Out ends it as Done did (card-done, s/app.js). */
-  function logoutSheetHtml() {
+  function logoutSheetHtml(ui) {
+    var left = !!ui && ui.quizWaiting > 0;
     return (
       '<button type="button" class="sp-sheet-back sp-set-back" data-act="logout-cancel" aria-label="Cancel" tabindex="-1"></button>' +
       '<div class="sp-sheet sp-logout" role="alertdialog" aria-modal="true" aria-labelledby="sp-logout-title" aria-describedby="sp-logout-line">' +
       '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
       '<h2 class="sp-sheet-title sp-set-title" id="sp-logout-title" tabindex="-1">Log Out?</h2>' +
-      '<p class="sp-lead" id="sp-logout-line">You’ll need your card to open your page again.</p>' +
+      '<p class="sp-lead" id="sp-logout-line">' +
+      (left
+        ? 'An answer on your quiz hasn’t reached your teacher yet. Wait a moment for it to send, or log out and lose it.'
+        : 'You’ll need your card to open your page again.') +
+      '</p>' +
       /* One under the other, Cancel last: at the foot of the sheet, where
          Settings' Log Out was under the finger, so a double tap cancels
          (s/app.js also ignores presses here for a moment after it opens). */
       '<div class="sp-logout-buttons">' +
-      '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">Log Out</button>' +
-      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
+      '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">' +
+      (left ? 'Log Out Anyway' : 'Log Out') +
+      '</button>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">' +
+      (left ? 'Wait' : 'Cancel') +
+      '</button>' +
+      '</div></div>'
+    );
+  }
+
+  /* Switch Class asking first, while a quiz answer waits to be saved (s/quiz.js): the same sheet, with its
+     own words. Wait is last, at the foot. */
+  function classHoldSheetHtml(ui) {
+    return (
+      '<button type="button" class="sp-sheet-back sp-set-back" data-act="class-hold-cancel" aria-label="Wait" tabindex="-1"></button>' +
+      '<div class="sp-sheet sp-logout" role="alertdialog" aria-modal="true" aria-labelledby="sp-logout-title" aria-describedby="sp-logout-line">' +
+      '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title sp-set-title" id="sp-logout-title" tabindex="-1">Switch Class?</h2>' +
+      '<p class="sp-lead" id="sp-logout-line">An answer on your quiz hasn’t reached your teacher yet. Wait a moment for it to send, or switch and lose it.</p>' +
+      '<div class="sp-logout-buttons">' +
+      '<button type="button" class="sp-btn sp-btn-danger" data-act="class-open" data-enrollment="' +
+      esc(ui.classHold) +
+      '">Switch Class Anyway</button>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="class-hold-cancel">Wait</button>' +
       '</div></div>'
     );
   }
@@ -2486,7 +2526,8 @@ window.StudentPageView = (function () {
       '</main>' +
       tabBarHtml(ui, 'bottom', view) +
       (ui.settings && !ui.logout ? settingsSheetHtml(view, ui) : '') +
-      (ui.logout ? logoutSheetHtml() : '') +
+      (ui.logout ? logoutSheetHtml(ui) : '') +
+      (ui.classHold && !ui.logout ? classHoldSheetHtml(ui) : '') +
       '</div>'
     );
   }

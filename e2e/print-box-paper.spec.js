@@ -23,8 +23,8 @@ async function openReports(page, paper) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
-  // The class's paper as this computer remembers it (page-reports.js _loadPaper).
-  if (paper) await page.evaluate(p => localStorage.setItem('gb-report-paper-sci8', p), paper);
+  // The class's paper as the teacher's preferences hold it (page-reports.js _loadPaper).
+  if (paper) await page.evaluate(p => saveViewPref('gb-report-paper-sci8', p), paper);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Print Reports' }).click();
   await expect(page.locator('#studio.studio-one')).toBeVisible();
@@ -114,7 +114,7 @@ test('switching to Letter in the box counts again, the toolbar follows, and it p
   await expect(box.locator('#issue-paper-say')).toHaveText(LETTER);
   await expect(boxPaper(box)).toHaveText('Letter');
   await expect(toolbarPaper(page)).toHaveText('Letter');
-  expect(await page.evaluate(() => localStorage.getItem('gb-report-paper-sci8'))).toBeNull();
+  expect(await page.evaluate(() => getViewPref('gb-report-paper-sci8'))).toBeNull();
   // Focus stays in the box, on the paper just chosen.
   expect(await box.evaluate(b => b.contains(document.activeElement) && document.activeElement.textContent)).toBe(
     'Letter',
@@ -148,7 +148,7 @@ test('the switch works from the keyboard, and Legal prints on Legal', async ({ p
   await expect(box.locator('#issue-sheets')).toHaveText(/^27 students · /, { timeout: 30_000 });
   await expect(box.locator('[data-issue="go"]')).toBeEnabled();
   await expect(toolbarPaper(page)).toHaveText('Legal');
-  expect(await page.evaluate(() => localStorage.getItem('gb-report-paper-sci8'))).toBe('legal');
+  expect(await page.evaluate(() => getViewPref('gb-report-paper-sci8'))).toBe('legal');
   for (let i = 0; i < 10; i++) {
     await page.keyboard.press('Tab');
     expect(await box.evaluate(b => b.contains(document.activeElement))).toBe(true);

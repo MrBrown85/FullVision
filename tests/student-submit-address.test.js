@@ -197,8 +197,8 @@ describe('student-submit: the hashed address', () => {
         check: record('check'),
         submit: record('submit'),
         async call(text, params) {
-          // A slip's open ends with the new token's hash (2026112403); the address comes before it.
-          calls.push({ route: 'card', hash: text === SLIP_SQL.open ? params[3] : params.at(-1), args: params });
+          // A slip's open ends with the new token's hash (2026112403); the address is third.
+          calls.push({ route: 'card', hash: text === SLIP_SQL.open ? params[2] : params.at(-1), args: params });
           return { ok: true };
         },
       },

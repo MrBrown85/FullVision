@@ -232,7 +232,7 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
       'Date',
       'Ranking',
       'Likert',
-      'Section Heading',
+      'Heading',
     ]);
     type('#rb-name', 'Unit 2 Exit Reflection');
     type('#rb-desc', 'About 5 minutes.');
@@ -247,7 +247,12 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
       'Add a Subtitle',
       'Shuffle Options',
       'Show as a Drop-Down',
+      'Add a Question Below',
+      'Move Up',
+      'Move Down',
     ]);
+    // The only card: it can move neither way.
+    expect([...root.querySelectorAll('.rb-qmenu-item[data-action^="sqB"]')].filter(b => b.disabled)).toHaveLength(2);
     click('.rb-qmenu-item[data-opt="shuffle"]');
     expect(root.querySelector('.rb-qmenu')).toBeNull();
 
@@ -276,9 +281,16 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
 
     click('[data-action="sqBAdd"][data-kind="section"]');
     type('.rb-q-on [data-rb-path="prompt"]', 'Last Part');
-    // The section moves up one, above the Likert.
-    click('.rb-q-on [data-action="sqBUp"]');
-    expect(CmReflectBuilder._state().active).toBe(5);
+    // The Likert moves down one, under the heading, from its ⋯ menu; it stays open.
+    click('[data-action="sqBEdit"][data-i="5"]');
+    click('.rb-q-on [data-action="sqBMenu"]');
+    click('.rb-qmenu-item[data-action="sqBDown"]');
+    expect(CmReflectBuilder._state().active).toBe(6);
+    expect(
+      CmReflectBuilder._state()
+        .questions.map(d => d.kind)
+        .slice(5),
+    ).toEqual(['section', 'likert']);
 
     // The cards not being edited show as students see them.
     var views = [...root.querySelectorAll('.rb-q-view .rb-v-prompt')].map(b => b.textContent);
@@ -416,7 +428,8 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
 
     click('[data-card="custom-' + q.id + '"] [data-action="sqEdit"]');
     click('[data-action="sqBEdit"][data-i="1"]');
-    click('.rb-q-on [data-action="sqBUp"]');
+    click('.rb-q-on [data-action="sqBMenu"]');
+    click('.rb-qmenu-item[data-action="sqBUp"]');
     type('#rb-name', 'Exit Ticket 2');
     click('[data-action="sqBCancel"]');
     expect(asked.map(a => a.title)).toEqual(['Discard Your Changes?']);

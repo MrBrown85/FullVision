@@ -449,6 +449,8 @@
        revision there too. */
     // #demo-card-feed: a long list still to do, the last with a handout (s/handouts.js demoFeed).
     if (demo && demo.feed && StudentPage.demoFeed) cls.work = cls.work.concat(StudentPage.demoFeed(isoDay));
+    // The sample quiz (s/quiz.js), only with the quizzes switch on.
+    if (StudentPage.demoQuiz) cls.work = cls.work.concat(StudentPage.demoQuiz(isoDay));
     if (demo && demo.revise) {
       cls.work.unshift({
         id: 'demo-vaccine',
@@ -1287,6 +1289,8 @@
   function forget(stored) {
     // A questionnaire's draft from a card's page goes too (student.js): it is this tab's student's.
     StudentPage.wipeCardDrafts();
+    // Quiz answers still waiting to be saved are this student's too, and their savers stop (s/quiz.js).
+    if (typeof StudentPage.quizLetGo === 'function') StudentPage.quizLetGo();
     session = null;
     adding = null;
     // The Text Size went with the session: the page is at Normal again, whatever is drawn next.
@@ -1396,6 +1400,8 @@
   function showing() {
     return (
       S.screen === 'assignments' ||
+      // The quiz screen is the signed-in student's page too: idle, midnight and Done elsewhere end it (s/quiz.js).
+      S.screen === 'quiz' ||
       (S.screen === 'cardmessage' && !!S.again) ||
       (S.screen === 'loading' && S.heading === TITLE) ||
       (!!adding && !!session && has(ADDING_SCREENS, S.screen))
@@ -1741,6 +1747,10 @@
       return c.enrollmentId === enrollment;
     });
     if (!session || !known) return Promise.resolve();
+    // An answer on a quiz still waiting to be saved: asked about first (s/quiz.js).
+    if (enrollment !== session.enrollment && StudentPage.quizHeld && StudentPage.quizHeld(enrollment)) {
+      return Promise.resolve();
+    }
     S.settings = false;
     if (enrollment === session.enrollment) {
       paint('.sp-gear');
@@ -2205,6 +2215,8 @@
     var asked = ask('page', { session: mine.token, enrollment_id: mine.enrollment });
     // With Bulletins on, `bulletins` is asked beside it and waited for a second at most (s/bulletins.js).
     if (StudentPage.bulletinsWith) asked = StudentPage.bulletinsWith(mine, asked);
+    // With Quizzes on, `quiz-list` is asked beside it, once (s/quiz.js).
+    if (StudentPage.quizzesWith) asked = StudentPage.quizzesWith(mine, asked);
     return asked.then(function (res) {
       S.sending = false;
       if (!(res && res.ok && typeof StudentData !== 'undefined')) {
@@ -2302,6 +2314,11 @@
     'bulletin-seen': 1,
     'bulletin-react': 1,
     'bulletin-files': 1,
+    // Quizzes: which pieces are quizzes, open, save an answer, send (docs/plans/quizzes-plan.md Q3b; s/quiz.js).
+    quiz: 1,
+    'quiz-save': 1,
+    'quiz-send': 1,
+    'quiz-list': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });

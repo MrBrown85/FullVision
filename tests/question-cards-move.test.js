@@ -5,6 +5,15 @@
  * previewHtml returned on the code before the move. Every string must match
  * exactly. Never regenerate the fixture after the move
  * (UPDATE_QUESTION_CARDS_FIXTURE=1 rewrites it; it was run once, before).
+ * One edit by hand since: "Section Heading" became "Heading" (DECISIONS,
+ * "Reflect's builder works the way One Report's editor does" 1), a find and
+ * replace of those words only.
+ * Rewritten once since, on purpose, when Reflect's cards began to move as
+ * One Report's do (same entry, 2): every difference was checked to be a ⠿
+ * grip, the ↑ ↓ buttons gone, or the ⋯ menu's moving items (and a ⋯ on a
+ * heading's card). Rewritten again for adding (same entry, 3): the only
+ * difference was the ⋯ menu's Add a Question Below and Start a New Heading
+ * Here. It guards Reflect's output from here on.
  */
 import './setup.js';
 import { describe, expect, it } from 'vitest';

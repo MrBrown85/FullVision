@@ -494,8 +494,6 @@ function setup(extra = {}) {
     region: 'ca-central-1',
     ipKey: 'test-key',
     db: {
-      open: async () => ({ ok: false }),
-      verify: async () => ({ ok: false }),
       check: async () => ({ ok: false }),
       submit: async () => ({ ok: false }),
       call: db.call,

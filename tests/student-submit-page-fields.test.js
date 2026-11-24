@@ -225,8 +225,6 @@ function setup(reply) {
     cardKey: KEY,
     log: entry => logs.push(entry),
     db: {
-      open: async () => ({ ok: true }),
-      verify: async () => ({ ok: true }),
       check: async () => ({ ok: true }),
       submit: async () => ({ ok: true }),
       async call(text) {
