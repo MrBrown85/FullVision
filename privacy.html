@@ -263,7 +263,9 @@
         <li>
           FullVision keeps the quiz's questions and the teacher's right answers, and for each student their answers to
           each question, each try, when they started and sent it, and what the teacher confirmed (which questions were
-          right, and the points). Answers save to the class as the student goes, so they are not lost if the phone is.
+          right, and the points). For a written answer, the teacher's points and note are kept too. Answers save to the
+          class as the student goes, so they are not lost if the phone is. When a phone has no connection, an answer
+          waits in that browser tab's storage until it saves, and is removed when it does or when the student logs out.
         </li>
         <li>
           The right answers stay in a part of the database that only the returned quiz can read. They never reach a
@@ -343,7 +345,8 @@
             <td>Quizzes</td>
             <td>
               A teacher's questions and right answers. For each student, their answers to each question, each try, when
-              they started and sent it, and what the teacher confirmed: which questions were right, and the points.
+              they started and sent it, and what the teacher confirmed: which questions were right, and the points. For
+              a written answer, the teacher's points and note.
             </td>
           </tr>
           <tr>

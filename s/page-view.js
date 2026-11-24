@@ -2873,6 +2873,10 @@ window.StudentPageView = (function () {
     canSeeWork: canSeeWork,
     planHtml: planHtml,
     quizTopHtml: quizTopHtml,
+    // "Returned Nov 24": the date as Your Feedback and the rows read it (a time is read in the student's own day).
+    returnedOn: function (p) {
+      return p && p.returnedAt ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '';
+    },
     // A reminder linked to a piece carries that card's band (s/bulletins-view.js).
     bandHtml: bandHtml,
   };

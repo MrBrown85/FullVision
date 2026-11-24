@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
-import { WORK, fakeStudentSubmit, sampleCard, samplePage } from './helpers/fake-student-submit.js';
+import { CECE, OMAR, WORK, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const ON = { 'fv-build-quizzes': '1' };
@@ -57,6 +57,8 @@ function world(opts = {}) {
   const fn = fakeStudentSubmit({
     cards: [sampleCard(TODAY, opts.system ? { page: samplePage(TODAY, opts.system) } : undefined)],
   });
+  const extra = [];
+  for (let i = 0; i < (opts.many || 0); i++) extra.push(id(200 + i));
   const db = {
     listed: 0,
     asked: [],
@@ -69,11 +71,11 @@ function world(opts = {}) {
       if (opts.noList) return { ok: false, error: 'bad_request' };
       return {
         ok: true,
-        quizzes: [AID, POINTS, WORK.fair].map(id => ({
-          assessment_id: id,
-          tries_left: db.answerable || id === WORK.fair ? 1 : 0,
-          can_answer: db.answerable || id === WORK.fair,
-          closed: !db.answerable && id !== WORK.fair,
+        quizzes: [AID, POINTS, WORK.fair, ...extra].map(qid => ({
+          assessment_id: qid,
+          tries_left: db.answerable || qid === WORK.fair ? 1 : 0,
+          can_answer: db.answerable || qid === WORK.fair,
+          closed: !db.answerable && qid !== WORK.fair,
           has_open_try: false,
         })),
       };
@@ -85,7 +87,29 @@ function world(opts = {}) {
       return db.reply;
     }
     if (/^quiz/.test(body.route)) return { ok: false, error: 'bad_request' };
-    return fn.handle(body);
+    // A second class on the card, whose page is the first's (as quiz-exits.test.js does).
+    const res = await fn.handle(
+      body.route === 'page' && body.enrollment_id === OMAR ? { ...body, enrollment_id: CECE } : body,
+    );
+    if (body.route === 'page' && res.ok) {
+      res.classes = [
+        { enrollment_id: CECE, course: { name: 'Science 8', block: 'B' } },
+        { enrollment_id: OMAR, course: { name: 'Math 8', block: 'A' } },
+      ];
+      if (body.enrollment_id === OMAR) res.student = { enrollment_id: OMAR, first_name: 'Omar' };
+      const energy = res.assessments.find(a => a.id === AID);
+      // More returned pieces, each a copy of the energy piece, a day apart (newest first on the page).
+      extra.forEach((eid, i) => {
+        res.assessments.push({
+          ...structuredClone(energy),
+          id: eid,
+          title: 'Extra Quiz ' + (i + 1),
+          date: energy.date,
+        });
+      });
+      if (opts.returnedAt) energy.returned_at = opts.returnedAt;
+    }
+    return res;
   };
   return { db, server, fn };
 }
@@ -335,5 +359,69 @@ describe('the source', () => {
   it('the returned view reads no localStorage or sessionStorage of its own', () => {
     const view = readFileSync('s/quiz-view.js', 'utf8');
     expect(view).not.toMatch(/localStorage|sessionStorage/);
+  });
+});
+
+describe('the cap on what is asked at class open', () => {
+  it('asks for 12 at class open, and for one past them when its Your Feedback opens, once', async () => {
+    const w = world({ many: 14 }); // 16 returned quiz pieces in all
+    const page = await signIn(w);
+    expect(w.db.asked).toHaveLength(12);
+    const left = [AID, POINTS, ...Array.from({ length: 14 }, (_, i) => id(200 + i))].filter(
+      x => !w.db.asked.includes(x),
+    );
+    expect(left).toHaveLength(4);
+    // Its card says nothing of a quiz yet.
+    await page.click('[data-tab="learning"]');
+    await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + left[0] + '"]');
+    await page.settle();
+    expect(w.db.asked).toHaveLength(13);
+    expect(w.db.asked).toContain(left[0]);
+    expect(words(seeQuiz(page))).toBe('See Your Quiz');
+    // Once per open: closing and opening it again asks nothing more.
+    await page.click('[data-act="feedback-close"]');
+    await page.click('.sp-ml-row[data-act="feedback"][data-piece="' + left[0] + '"]');
+    await page.settle();
+    expect(w.db.asked).toHaveLength(13);
+    // A piece that is not open on Your Feedback is still not asked for.
+    expect(w.db.asked).not.toContain(left[1]);
+  });
+});
+
+describe('Switch Class', () => {
+  it('lets go of the result, and of the screen that held it', async () => {
+    const page = await signIn(world());
+    await feedbackOf(page, AID);
+    await page.click('[data-act="quiz-open"]');
+    await page.click('[data-act="quiz-back"]');
+    const test = page.ctx.StudentPage._test;
+    expect(Object.keys(test.quizBack())).toHaveLength(2);
+    expect(test.quizOf().back).not.toBe(null);
+    const before = test.quizBack();
+    await page.click('[data-act="feedback-close"]');
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="class-open"][data-enrollment="' + OMAR + '"]');
+    await page.settle();
+    // The first class's results are not the new class's: what is held now was asked for again, by this class.
+    expect(test.quizBack()).not.toBe(before);
+    expect(test.quizOf().back).toBe(null);
+  });
+});
+
+describe('the Returned date is the student’s own day', () => {
+  it('an evening return in Vancouver is that evening’s date, not the next day’s UTC date', async () => {
+    const was = process.env.TZ;
+    process.env.TZ = 'America/Vancouver';
+    try {
+      // 2026-11-25T03:30Z is 7:30 pm on Nov 24 in Vancouver.
+      const page = await signIn(world({ returnedAt: '2026-11-25T03:30:00+00:00' }));
+      await feedbackOf(page, AID);
+      await page.click('[data-act="quiz-open"]');
+      expect(words(q(page, '.sp-quiz-class'))).toContain('Returned Nov 24');
+      expect(words(q(page, '.sp-quiz-class'))).not.toContain('Nov 25');
+    } finally {
+      if (was === undefined) delete process.env.TZ;
+      else process.env.TZ = was;
+    }
   });
 });

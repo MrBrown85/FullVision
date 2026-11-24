@@ -30,6 +30,16 @@ const ASSESSMENTS = [
     weight: 1,
     tagIds: ['t1'],
   },
+  // A returned piece that is not a quiz.
+  {
+    id: 'essay',
+    title: 'Returned Essay',
+    date: '2026-10-01',
+    dueDate: '2026-10-02',
+    type: 'summative',
+    weight: 1,
+    tagIds: ['t1'],
+  },
 ];
 const CH = [
   { id: 'a', text: 'Grass' },
@@ -66,12 +76,24 @@ const QUESTIONS = [
     choices: null,
     key: { answer: false, tolerance: null, why: 'Hawks eat other animals.' },
   },
+  {
+    id: 'q4',
+    position: 4,
+    kind: 'number',
+    prompt: 'Added later: 2 plus 2?',
+    points: 1,
+    multiple: false,
+    choices: null,
+    key: { answer: 4, tolerance: 0, why: 'LATER-WHY' },
+  },
 ];
-// Jordan's own order is q3, q1, q2.
+// Jordan's own order is q3, q1, q2 (q4 was added after: it comes last).
 const TRY = {
   attempt_id: 't1',
   try: 1,
   sent_at: '2026-10-11T18:00:00Z',
+  reopened_at: null,
+  marked_at: '2026-11-03T18:00:00Z',
   question_order: { questions: ['q3', 'q1', 'q2'], choices: { q1: ['b', 'a'] } },
   marked: {
     earned: 1,
@@ -92,7 +114,7 @@ let doc;
 let stub;
 let setup;
 
-function seed() {
+function seed(held = HELD, row = { is_draft: false, returned_at: '2026-11-04T18:00:00Z' }) {
   localStorage.clear();
   clearClass(CID);
   const cells = {
@@ -104,13 +126,14 @@ function seed() {
       },
     },
   };
+  cells[S1].essay = structuredClone(cells[S1][AID]);
   seedClass(CID, {
     students: [{ id: S1, firstName: 'Jordan', lastName: 'Reyes' }],
     assessments: structuredClone(ASSESSMENTS),
     scores: _gradebookCellsToScoreCache(CID, structuredClone(ASSESSMENTS), cells).scores,
     learningMaps: { sections: [{ id: 'sec1', name: 'Questioning', tags: [{ id: 't1', label: 'Questioning' }] }] },
-    courseConfigs: structuredClone(HELD),
-    gradeReturns: { [AID]: { [S1]: { is_draft: false, returned_at: '2026-11-04T18:00:00Z' } } },
+    courseConfigs: structuredClone(held),
+    gradeReturns: { [AID]: { [S1]: row }, essay: { [S1]: row } },
   });
   COURSES[CID] = { id: CID, name: 'Socials 10', block: 'C', gradingSystem: 'proficiency', gradeLevel: '10' };
   delete _returnedSets[CID];
@@ -132,7 +155,13 @@ function teacher(opts = {}) {
       ? {
           students: [
             Object.assign(
-              { enrollment_id: S1, sent: 1, in_progress: false, reopened: false, tries: [structuredClone(TRY)] },
+              {
+                enrollment_id: S1,
+                sent: 1,
+                in_progress: false,
+                reopened: false,
+                tries: opts.tries || [structuredClone(TRY)],
+              },
               opts.student,
             ),
           ],
@@ -152,6 +181,7 @@ beforeEach(() => {
     getQuizTries: globalThis.getQuizTries,
     loadQuiz: globalThis.loadQuiz,
     loadQuizTries: globalThis.loadQuizTries,
+    probeQuizzes: globalThis.probeQuizzes,
   };
   const dom = parseHTML(
     '<!DOCTYPE html><html><body><div id="page-toolbar-mount"></div><div id="page-layout"><div id="sidebar-mount"></div><div id="main"></div></div></body></html>',
@@ -194,7 +224,9 @@ function click(target) {
 function openFeedback() {
   PreviewStudent.open(CID, S1, null, null);
   click(screen().querySelector('.sp-tabs-bottom [data-tab="learning"]'));
-  click(screen().querySelector('.sp-ml-row[data-act="feedback"][data-piece="' + AID + '"]'));
+  const row = screen().querySelector('.sp-ml-row[data-act="feedback"][data-piece="' + AID + '"]');
+  // A piece not returned has no Your Feedback to open: nothing of a quiz either.
+  if (row) click(row);
 }
 const seeQuiz = () => screen().querySelector('[data-act="quiz-open"]');
 
@@ -289,5 +321,167 @@ describe('Preview as Student, a returned quiz', () => {
     click(screen().querySelector('[data-act="quiz-back"]'));
     expect(ask).not.toHaveBeenCalled();
     expect(JSON.stringify(Object.entries(localStorage))).toBe(before);
+  });
+});
+
+/* The server's rules, case by case (migrations/2026112407_quiz_returned.sql, quiz_result): the same cases the
+   harness (migrations/local-test/quiz_returned.py) runs, so the preview and the server agree. */
+const RETURNED = '2026-11-04T18:00:00Z';
+const BEFORE = '2026-11-03T18:00:00Z';
+const AFTER = '2026-11-05T18:00:00Z';
+const offered = () => {
+  openFeedback();
+  const on = !!seeQuiz();
+  PreviewStudent.close();
+  return on;
+};
+const try1 = more => ({ ...structuredClone(TRY), ...more });
+
+describe('rule 3: confirmed, and returned since', () => {
+  it('keeping changes until Return: the marking must not be after the return', () => {
+    teacher({ tries: [try1({ marked_at: BEFORE })] });
+    expect(offered()).toBe(true);
+    teacher({ tries: [try1({ marked_at: RETURNED })] });
+    expect(offered()).toBe(true); // equal is not after
+    teacher({ tries: [try1({ marked_at: AFTER })] });
+    expect(offered()).toBe(false); // confirmed since the last Return: waits for the next
+    teacher({ tries: [try1({ marked_at: null })] });
+    expect(offered()).toBe(false);
+  });
+
+  it('keeping changes until Return: a draft over a returned grade still shows the returned marking', () => {
+    seed(HELD, {
+      is_draft: true,
+      returned_at: RETURNED,
+      returned_copy: { v: 1, value: null, modifier: 0, comment: null, tags: { t1: lv(3) }, criteria: {}, checks: [] },
+    });
+    teacher({ tries: [try1({ marked_at: BEFORE })] });
+    expect(offered()).toBe(true);
+    teacher({ tries: [try1({ marked_at: AFTER })] });
+    expect(offered()).toBe(false);
+  });
+
+  it('a grade never returned, in either kind of class, is not returned', () => {
+    seed(HELD, { is_draft: true });
+    teacher();
+    expect(offered()).toBe(false);
+    seed({ student_page_enabled: true, return_grades: 'on_save' }, { is_draft: true });
+    teacher();
+    expect(offered()).toBe(false);
+  });
+
+  it('returning every save at once: the times are not compared, only that no draft waits', () => {
+    seed({ student_page_enabled: true, return_grades: 'on_save' });
+    teacher({ tries: [try1({ marked_at: AFTER })] });
+    expect(offered()).toBe(true); // the scores landed first, the marking after
+    seed({ student_page_enabled: true, return_grades: 'on_save' }, { is_draft: true, returned_at: RETURNED });
+    teacher({ tries: [try1({ marked_at: BEFORE })] });
+    expect(offered()).toBe(false); // a draft is waiting
+  });
+});
+
+describe('rule 2: the student can no longer answer', () => {
+  const sent = more => try1(more);
+  const reopenedSent = more =>
+    try1({ try: 2, attempt_id: 't2', reopened_at: '2026-10-20T18:00:00Z', marked: null, ...more });
+  it('counts only ordinary tries: a sent reopened try is not one of the allowed', () => {
+    // Two allowed; one ordinary and one made by Reopen, both sent: one ordinary try is left.
+    teacher({ quiz: { tries: 2 }, tries: [sent(), reopenedSent()] });
+    expect(offered()).toBe(false);
+    // One allowed; the ordinary try sent, then a Reopen try sent: none left.
+    teacher({ quiz: { tries: 1 }, tries: [sent(), reopenedSent()] });
+    expect(offered()).toBe(true);
+    // Two ordinary tries sent of two.
+    teacher({ quiz: { tries: 2 }, tries: [sent({ marked: null }), sent({ try: 2, attempt_id: 't2' })] });
+    expect(offered()).toBe(true);
+  });
+
+  it('an unsent ordinary try counts as a try used, and holds nothing back once the quiz has closed', () => {
+    // Open, one allowed, an ordinary try started and not sent: the student can still answer it.
+    teacher({ quiz: { tries: 1 }, student: { in_progress: true, sent: 0 }, tries: [sent()] });
+    expect(offered()).toBe(false);
+    // Closed (after the due date): the unsent try does not hold it back.
+    teacher({ quiz: { tries: 1, after_due: 'stop' }, student: { in_progress: true }, tries: [sent()] });
+    expect(offered()).toBe(true);
+    // Two allowed, one sent and one started, open: still answerable.
+    teacher({ quiz: { tries: 2 }, student: { in_progress: true }, tries: [sent()] });
+    expect(offered()).toBe(false);
+    // Two allowed, one sent and one started, closed: the started one is a try used, but closing is enough.
+    teacher({ quiz: { tries: 2, after_due: 'stop' }, student: { in_progress: true }, tries: [sent()] });
+    expect(offered()).toBe(true);
+  });
+
+  it('a reopened unsent try holds it back, closed or not', () => {
+    teacher({ quiz: { tries: 1 }, student: { reopened: true }, tries: [sent()] });
+    expect(offered()).toBe(false);
+    teacher({ quiz: { tries: 1, after_due: 'stop' }, student: { reopened: true }, tries: [sent()] });
+    expect(offered()).toBe(false);
+  });
+
+  it('unlimited tries are never out: only a closed quiz returns', () => {
+    teacher({ quiz: { tries: 0 }, tries: [sent()] });
+    expect(offered()).toBe(false);
+    teacher({ quiz: { tries: 0, after_due: 'stop' }, tries: [sent()] });
+    expect(offered()).toBe(true);
+    teacher({ quiz: { tries: 0, after_due: 'until', accept_until: '2026-11-09' }, tries: [sent()] });
+    expect(offered()).toBe(true);
+    teacher({ quiz: { tries: 0, after_due: 'until', accept_until: '2026-11-30' }, tries: [sent()] });
+    expect(offered()).toBe(false);
+  });
+});
+
+describe('rule 4: the key only for a question the marking saw', () => {
+  it('a question added since has no right answer and no why, with answers on', () => {
+    teacher({ quiz: { shows: 'answers' } });
+    openFeedback();
+    click(seeQuiz());
+    const text = words(screen().querySelector('.sp-quiz'));
+    expect(text).toContain('Question 4');
+    expect(text).toContain('Added later: 2 plus 2?');
+    expect(text).not.toContain('LATER-WHY');
+    expect(text).not.toContain('Right answer: 4');
+    // The questions it did see still carry theirs.
+    expect(text).toContain('Right answer: Grass');
+  });
+});
+
+describe('the Returned date is the student’s own day', () => {
+  it('an evening return in Vancouver reads as that evening, not the next day’s UTC date', () => {
+    const was = process.env.TZ;
+    process.env.TZ = 'America/Vancouver';
+    try {
+      // 2026-11-25T03:30Z is 7:30 pm on Nov 24 in Vancouver.
+      seed(HELD, { is_draft: false, returned_at: '2026-11-25T03:30:00Z' });
+      teacher({ tries: [try1({ marked_at: BEFORE })] });
+      openFeedback();
+      click(seeQuiz());
+      const line = words(screen().querySelector('.sp-quiz-class'));
+      expect(line).toContain('Returned Nov 24');
+      expect(line).not.toContain('Nov 25');
+    } finally {
+      if (was === undefined) delete process.env.TZ;
+      else process.env.TZ = was;
+    }
+  });
+});
+
+describe('what the preview reads from the teacher’s side', () => {
+  it('asks list_quiz_tries only for the pieces that are quizzes', async () => {
+    teacher();
+    globalThis.getQuizTries = () => null;
+    const asked = [];
+    globalThis.loadQuizTries = (cid, aid) => {
+      asked.push(aid);
+      return Promise.resolve(null);
+    };
+    globalThis.loadQuiz = () => Promise.resolve(null);
+    globalThis.probeQuizzes = () => Promise.resolve(true);
+    // getQuiz answers for the quiz piece only (teacher() above), and the essay is returned too.
+    PreviewStudent.open(CID, S1, null, null);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(asked).toEqual([AID]);
   });
 });

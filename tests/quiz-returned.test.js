@@ -115,7 +115,11 @@ describe('the model reads quiz-result', () => {
     expect(M.resultFrom(reply('right', { total: { earned: -1, possible: 10 } })).total).toBe(null);
     expect(M.figure(7)).toBe('7');
     expect(M.figure(6.5)).toBe('6.5');
-    expect(M.figure(0.1 + 0.2)).toBe('0.3');
+    // Written as constants.js's formatPoints writes a points figure.
+    const real = globalThis.formatPoints;
+    globalThis.formatPoints = n => 'pts:' + n;
+    expect(M.figure(6.5)).toBe('pts:6.5');
+    globalThis.formatPoints = real;
   });
 
   it('a result it does not know is none, not a guess', () => {

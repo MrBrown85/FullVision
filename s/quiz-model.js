@@ -517,9 +517,9 @@ var StudentQuizModel = (function () {
     return { shows: shows, total: total, questions: questions };
   }
 
-  /** A quiz total's number as words ("7", "7.5"): float noise removed, no trailing zero. @param {number} n */
+  /** A quiz total's number as words ("7", "7.5"): as constants.js's formatPoints writes it. @param {number} n */
   function figure(n) {
-    return String(Number(n.toPrecision(10)));
+    return typeof formatPoints === 'function' ? formatPoints(n) : String(n);
   }
 
   /* ── What is kept on this tab ────────────────────────────── */

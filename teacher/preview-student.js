@@ -223,12 +223,12 @@ window.PreviewStudent = (function () {
     var mine = (tries.students || []).filter(function (s) {
       return s.enrollment_id === sid;
     })[0];
-    if (!mine || mine.in_progress || mine.reopened) return null;
+    if (!mine) return null;
     var counted = (mine.tries || []).filter(function (t) {
       return t.marked;
     })[0];
     if (!counted) return null;
-    // The student can no longer answer: no ordinary tries left, or the quiz has closed.
+    /* The server's rules (migrations/2026112407_quiz_returned.sql, quiz_result), one for one. */
     var q = held.quiz;
     var piece = ((view && view.work) || []).filter(function (p) {
       return p.id === aid;
@@ -236,8 +236,32 @@ window.PreviewStudent = (function () {
     var today = (view && view.today) || '';
     var closes = q.after_due === 'until' ? q.accept_until : q.after_due === 'stop' && piece ? piece.dueDate : null;
     var closed = !!closes && !!today && String(closes) < today;
-    var allowed = q.tries === 0 ? 0 : q.tries === 2 ? 2 : 1;
-    if (!closed && (allowed === 0 || (mine.tries || []).length < allowed)) return null;
+    // Rule 2: no unsent try the student may still answer (a reopened one, or an ordinary one while the quiz is open),
+    // and the quiz closed or no ordinary tries left. Tries are counted as quiz counts them: reopened_at null only.
+    var unsentOpen = mine.reopened === true || (mine.in_progress === true && !closed);
+    if (unsentOpen) return null;
+    var ordinary = (mine.tries || []).filter(function (t) {
+      return !t.reopened_at;
+    }).length;
+    // An unsent ordinary try (started, not reopened) is a try used.
+    if (mine.in_progress === true && mine.reopened !== true) ordinary += 1;
+    var left = q.tries === 0 ? null : Math.max((q.tries === 2 ? 2 : 1) - ordinary, 0);
+    if (!(closed || left === 0)) return null;
+    // Rule 1 and 3: returned with a grade shown (the view's own 'back'), and the confirmed try returned since: where
+    // saves wait for Return, its marked_at is not after returned_at; else no draft is waiting.
+    var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+    if (!row || !row.returned_at) return null;
+    var holds =
+      typeof GradeState !== 'undefined' && typeof getReturnSettings === 'function'
+        ? GradeState.holds(getReturnSettings(cid))
+        : false;
+    if (holds) {
+      var markedAt = Date.parse(counted.marked_at || '');
+      var returnedAt = Date.parse(row.returned_at);
+      if (!isFinite(markedAt) || !isFinite(returnedAt) || markedAt > returnedAt) return null;
+    } else if (row.is_draft) {
+      return null;
+    }
     var order = counted.question_order || {};
     var all = (held.questions || []).slice();
     var rank = (order.questions || []).slice();
@@ -277,9 +301,10 @@ window.PreviewStudent = (function () {
           your_answer: by[qu.id] === undefined ? null : by[qu.id],
           result: m ? m.result : null,
         };
+        // A question the marking never saw (added since) was never returned: no answer, no why.
         if (shows === 'answers') {
-          item.answer = qu.key ? qu.key.answer : null;
-          item.why = qu.key ? qu.key.why : null;
+          item.answer = m && qu.key ? qu.key.answer : null;
+          item.why = m && qu.key ? qu.key.why : null;
         }
         return item;
       });
@@ -296,10 +321,7 @@ window.PreviewStudent = (function () {
       mode: quiz.mode,
       course: course.name || '',
       title: piece ? piece.title : '',
-      due:
-        quiz.back && piece && piece.returnedAt
-          ? 'Returned ' + StudentQuizView.dayOf(String(piece.returnedAt).slice(0, 10))
-          : '',
+      due: quiz.back && piece ? StudentPageView.returnedOn(piece) : '',
       back: quiz.back || null,
       top:
         quiz.back && piece && typeof StudentPageView.quizTopHtml === 'function'
@@ -679,23 +701,33 @@ window.PreviewStudent = (function () {
         var todo = (built.view.work || []).filter(function (p) {
           return (p.kind === 'due' || p.kind === 'missing' || p.kind === 'back') && !getQuiz(cid, p.id);
         });
-        // A returned piece's quiz also needs the tries the teacher confirmed (the teacher's own read).
-        var backs = (built.view.work || []).filter(function (p) {
-          return p.kind === 'back' && typeof loadQuizTries === 'function' && !getQuizTries(cid, p.id);
-        });
         return Promise.all(
-          todo
-            .map(function (p) {
-              return loadQuiz(cid, p.id);
-            })
-            .concat(
+          todo.map(function (p) {
+            return loadQuiz(cid, p.id);
+          }),
+        )
+          .then(function () {
+            // A returned piece that is a quiz also needs the tries the teacher confirmed (the
+            // teacher's own read): asked only for the quiz pieces.
+            var backs = (built.view.work || []).filter(function (p) {
+              var held = getQuiz(cid, p.id);
+              return (
+                p.kind === 'back' &&
+                typeof loadQuizTries === 'function' &&
+                !!held &&
+                !!held.quiz &&
+                !getQuizTries(cid, p.id)
+              );
+            });
+            return Promise.all(
               backs.map(function (p) {
                 return loadQuizTries(cid, p.id);
               }),
-            ),
-        ).then(function () {
-          if (_open === opened && !opened.quiz) _drawScreen();
-        });
+            );
+          })
+          .then(function () {
+            if (_open === opened && !opened.quiz) _drawScreen();
+          });
       })
       .then(null, function () {
         /* the pieces stay as they were */

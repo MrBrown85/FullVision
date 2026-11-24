@@ -561,7 +561,7 @@
       if (it && p.kind === 'back') {
         // A returned quiz: See Your Quiz, only once `quiz-result` has said it is back.
         if (back[p.id]) p.quizReturned = true;
-        else askBack(p, it, student);
+        else askBack(p, it, student, state);
         return;
       }
       if (!it || (p.kind !== 'due' && p.kind !== 'missing')) return;
@@ -583,12 +583,15 @@
     back = {};
     backAsked = {};
     backCount = 0;
+    // The screen open on a result goes with it (Switch Class, a sign-out).
+    if (Q) Q.back = null;
   }
 
-  /** `quiz-result` for one returned piece of this class, once. @param {any} p @param {any} it its quiz-list entry @param {string} student */
-  function askBack(p, it, student) {
+  /** `quiz-result` for one returned piece of this class, once. The first 12 are asked at class open; one past that is asked when its Your Feedback opens. @param {any} p @param {any} it its quiz-list entry @param {string} student @param {any} state */
+  function askBack(p, it, student, state) {
     // The page knows the grade is back; the list says nothing more can be answered. Anything else is not asked.
-    if (backAsked[p.id] || it.can_answer || it.has_open_try || backCount >= BACK_MAX) return;
+    if (backAsked[p.id] || it.can_answer || it.has_open_try) return;
+    if (backCount >= BACK_MAX && !(state && state.feedback === p.id)) return;
     backAsked[p.id] = true;
     backCount += 1;
     var mine = back;
@@ -650,6 +653,11 @@
       back: q.back || null,
       top: q.mode === 'returned' ? topOf(q.aid) : '',
     };
+  }
+  // "Returned Nov 24", read as Your Feedback reads it.
+  /** @param {any} p */
+  function returnedWords(p) {
+    return typeof w.StudentPageView === 'object' && w.StudentPageView.returnedOn ? w.StudentPageView.returnedOn(p) : '';
   }
   // The piece's Your Result and the teacher's comment, as the page's Your Feedback draws them (calc.js's words).
   /** @param {string} aid */
@@ -830,7 +838,7 @@
     var block = String(course.block || '').trim();
     var due = p.dueDate ? V.dayOf(p.dueDate) : '';
     var dueWords = due ? 'Due ' + due : '';
-    if (returned) dueWords = p.returnedAt ? 'Returned ' + V.dayOf(String(p.returnedAt).slice(0, 10)) : '';
+    if (returned) dueWords = returnedWords(p);
     var old = Q;
     var q = {
       aid: aid,
@@ -1051,7 +1059,6 @@
     M.wipeKept();
     // What came back is let go too, and the screen open on it.
     forgetBack();
-    if (Q) Q.back = null;
   }
 
   SP.quizLetGo = letGo;
