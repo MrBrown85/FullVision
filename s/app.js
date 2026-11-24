@@ -2319,6 +2319,8 @@
     'quiz-save': 1,
     'quiz-send': 1,
     'quiz-list': 1,
+    // What came back, once a quiz is returned (Q5b; the route is Q5a's, quiz-routes.ts).
+    'quiz-result': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });

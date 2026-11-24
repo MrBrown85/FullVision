@@ -48,7 +48,7 @@ window.PreviewStudent = (function () {
     var built = StudentView.fromCache(cid, sid, { learning: !!(_open && _open.learning) });
     var bulletins = built && built.ready && built.view ? _bulletinsOf(cid) : null;
     if (bulletins) built.view.bulletins = bulletins;
-    if (built && built.ready) _markQuizzes(cid, built.view);
+    if (built && built.ready) _markQuizzes(cid, built.view, sid);
     return built;
   }
 
@@ -166,9 +166,14 @@ window.PreviewStudent = (function () {
     );
   }
 
-  function _markQuizzes(cid, view) {
+  function _markQuizzes(cid, view, sid) {
     if (!view || !_quizzesOn(cid)) return;
     (view.work || []).forEach(function (p) {
+      // A returned quiz: See Your Quiz, as the student has it once `quiz-result` says it is back.
+      if (p.kind === 'back') {
+        if (_quizResult(cid, sid, p.id, view)) p.quizReturned = true;
+        return;
+      }
       if (p.kind !== 'due' && p.kind !== 'missing') return;
       var held = getQuiz(cid, p.id);
       if (held && held.quiz && (held.questions || []).length) p.quiz = true;
@@ -206,6 +211,107 @@ window.PreviewStudent = (function () {
     });
   }
 
+  /* What `quiz-result` would answer this student, worked out from the teacher's own quiz, tries and confirmed
+     marking (nothing is asked of a server), and read by the student page's own reader. Null while it would answer
+     `returned: false`: no confirmed try, a try or tries still open to the student, or the grade not back. The
+     piece being a returned grade is the view's own (`back`); the key's answers are read only as `shows` allows. */
+  function _quizResult(cid, sid, aid, view) {
+    if (typeof getQuiz !== 'function' || typeof getQuizTries !== 'function') return null;
+    var held = getQuiz(cid, aid);
+    var tries = getQuizTries(cid, aid);
+    if (!held || !held.quiz || !tries) return null;
+    var mine = (tries.students || []).filter(function (s) {
+      return s.enrollment_id === sid;
+    })[0];
+    if (!mine) return null;
+    var counted = (mine.tries || []).filter(function (t) {
+      return t.marked;
+    })[0];
+    if (!counted) return null;
+    /* The server's rules (migrations/2026112407_quiz_returned.sql, quiz_result), one for one. */
+    var q = held.quiz;
+    var piece = ((view && view.work) || []).filter(function (p) {
+      return p.id === aid;
+    })[0];
+    var today = (view && view.today) || '';
+    var closes = q.after_due === 'until' ? q.accept_until : q.after_due === 'stop' && piece ? piece.dueDate : null;
+    var closed = !!closes && !!today && String(closes) < today;
+    // Rule 2: no unsent try the student may still answer (a reopened one, or an ordinary one while the quiz is open),
+    // and the quiz closed or no ordinary tries left. Tries are counted as quiz counts them: reopened_at null only.
+    var unsentOpen = mine.reopened === true || (mine.in_progress === true && !closed);
+    if (unsentOpen) return null;
+    var ordinary = (mine.tries || []).filter(function (t) {
+      return !t.reopened_at;
+    }).length;
+    // An unsent ordinary try (started, not reopened) is a try used.
+    if (mine.in_progress === true && mine.reopened !== true) ordinary += 1;
+    var left = q.tries === 0 ? null : Math.max((q.tries === 2 ? 2 : 1) - ordinary, 0);
+    if (!(closed || left === 0)) return null;
+    // Rule 1 and 3: returned with a grade shown (the view's own 'back'), and the confirmed try returned since: where
+    // saves wait for Return, its marked_at is not after returned_at; else no draft is waiting.
+    var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+    if (!row || !row.returned_at) return null;
+    var holds =
+      typeof GradeState !== 'undefined' && typeof getReturnSettings === 'function'
+        ? GradeState.holds(getReturnSettings(cid))
+        : false;
+    if (holds) {
+      var markedAt = Date.parse(counted.marked_at || '');
+      var returnedAt = Date.parse(row.returned_at);
+      if (!isFinite(markedAt) || !isFinite(returnedAt) || markedAt > returnedAt) return null;
+    } else if (row.is_draft) {
+      return null;
+    }
+    var order = counted.question_order || {};
+    var all = (held.questions || []).slice();
+    var rank = (order.questions || []).slice();
+    all.sort(function (a, b) {
+      var i = rank.indexOf(a.id);
+      var j = rank.indexOf(b.id);
+      if (i < 0 && j < 0) return (a.position || 0) - (b.position || 0);
+      return i < 0 ? 1 : j < 0 ? -1 : i - j;
+    });
+    var by = {};
+    (counted.answers || []).forEach(function (a) {
+      by[a.question_id] = a.answer;
+    });
+    var marked = counted.marked;
+    var shows = q.shows;
+    var out = { ok: true, returned: true, shows: shows };
+    if (q.add_total && marked) out.total = { earned: marked.earned, possible: marked.possible };
+    if (shows !== 'grade') {
+      out.questions = all.map(function (qu, i) {
+        var kept = (order.choices && order.choices[qu.id]) || [];
+        var choices = Array.isArray(qu.choices)
+          ? qu.choices.slice().sort(function (a, b) {
+              var x = kept.indexOf(a.id);
+              var y = kept.indexOf(b.id);
+              return x < 0 && y < 0 ? 0 : x < 0 ? 1 : y < 0 ? -1 : x - y;
+            })
+          : null;
+        var m = marked && marked.questions ? marked.questions[qu.id] : null;
+        var item = {
+          id: qu.id,
+          number: i + 1,
+          kind: qu.kind,
+          prompt: qu.prompt,
+          points: qu.points,
+          multiple: !!qu.multiple,
+          choices: choices,
+          your_answer: by[qu.id] === undefined ? null : by[qu.id],
+          result: m ? m.result : null,
+        };
+        // A question the marking never saw (added since) was never returned: no answer, no why.
+        if (shows === 'answers') {
+          item.answer = m && qu.key ? qu.key.answer : null;
+          item.why = m && qu.key ? qu.key.why : null;
+        }
+        return item;
+      });
+    }
+    return StudentQuizModel.resultFrom(out);
+  }
+
   function _quizCtx(view, quiz) {
     var piece = (view.work || []).filter(function (p) {
       return p.id === quiz.aid;
@@ -215,6 +321,12 @@ window.PreviewStudent = (function () {
       mode: quiz.mode,
       course: course.name || '',
       title: piece ? piece.title : '',
+      due: quiz.back && piece ? StudentPageView.returnedOn(piece) : '',
+      back: quiz.back || null,
+      top:
+        quiz.back && piece && typeof StudentPageView.quizTopHtml === 'function'
+          ? StudentPageView.quizTopHtml(piece)
+          : '',
       m: quiz.m,
       answers: quiz.answers,
       message: quiz.message,
@@ -225,7 +337,7 @@ window.PreviewStudent = (function () {
 
   // The device's screen: the page, or the quiz open on it.
   function _screenHtml(built) {
-    return _open.quiz && _open.quiz.m
+    return _open.quiz && (_open.quiz.m || _open.quiz.back)
       ? StudentQuizView.html(_quizCtx(built.view, _open.quiz))
       : drawPage(built.view, _open.ui);
   }
@@ -238,6 +350,16 @@ window.PreviewStudent = (function () {
       var aid = quiz.aid;
       _open.quiz = null;
       return _drawScreen('[data-act="quiz-open"][data-piece="' + String(aid).replace(/["\\]/g, '') + '"]');
+    }
+    if (act === 'quiz-look' && screen) {
+      var row = screen.querySelector(
+        '.sp-quiz-ra[data-pos="' + (Number(el && el.getAttribute('data-pos')) || 1) + '"]',
+      );
+      if (row) {
+        if (row.scrollIntoView) row.scrollIntoView({ block: 'start' });
+        row.focus({ preventScroll: true });
+      }
+      return;
     }
     if (act === 'quiz-pick' && screen) {
       var hit = StudentQuizView.pressed(quiz.m, quiz.answers, el);
@@ -577,15 +699,35 @@ window.PreviewStudent = (function () {
         var built = ok && _open === opened ? _fromCache(cid, opened.sid) : null;
         if (!built || !built.ready) return null;
         var todo = (built.view.work || []).filter(function (p) {
-          return (p.kind === 'due' || p.kind === 'missing') && !getQuiz(cid, p.id);
+          return (p.kind === 'due' || p.kind === 'missing' || p.kind === 'back') && !getQuiz(cid, p.id);
         });
         return Promise.all(
           todo.map(function (p) {
             return loadQuiz(cid, p.id);
           }),
-        ).then(function () {
-          if (_open === opened && !opened.quiz) _drawScreen();
-        });
+        )
+          .then(function () {
+            // A returned piece that is a quiz also needs the tries the teacher confirmed (the
+            // teacher's own read): asked only for the quiz pieces.
+            var backs = (built.view.work || []).filter(function (p) {
+              var held = getQuiz(cid, p.id);
+              return (
+                p.kind === 'back' &&
+                typeof loadQuizTries === 'function' &&
+                !!held &&
+                !!held.quiz &&
+                !getQuizTries(cid, p.id)
+              );
+            });
+            return Promise.all(
+              backs.map(function (p) {
+                return loadQuizTries(cid, p.id);
+              }),
+            );
+          })
+          .then(function () {
+            if (_open === opened && !opened.quiz) _drawScreen();
+          });
       })
       .then(null, function () {
         /* the pieces stay as they were */
@@ -653,6 +795,19 @@ window.PreviewStudent = (function () {
 
   function _openQuiz(aid) {
     if (!aid || !_quizzesOn(_open.cid)) return;
+    var built = _fromCache(_open.cid, _open.sid);
+    var piece =
+      built && built.ready
+        ? (built.view.work || []).filter(function (p) {
+            return p.id === aid;
+          })[0]
+        : null;
+    if (piece && piece.kind === 'back') {
+      var result = _quizResult(_open.cid, _open.sid, aid, built.view);
+      if (!result) return;
+      _open.quiz = { aid: aid, m: null, back: result, answers: {}, mode: 'returned', message: '' };
+      return _drawScreen('#sp-quiz-title');
+    }
     var m = _quizModel(_open.cid, aid);
     if (!m || !m.questions.length) return;
     _open.quiz = { aid: aid, m: m, answers: {}, mode: 'take', message: '' };

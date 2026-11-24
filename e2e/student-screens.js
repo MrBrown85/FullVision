@@ -426,6 +426,24 @@ async function quizAnswer(q) {
 async function quizAnswerAll(p) {
   for (const q of await p.locator('.sp-quiz-q').all()) await quizAnswer(q);
 }
+/* A quiz that came back (Q5b): the sample taken and sent, then closed, confirmed and returned by the demo teacher
+   (StudentPage._test.quizDemoReturn), the page opened again, and the returned view opened from Your Feedback. */
+async function quizReturned(p, c, opts) {
+  await quizDemo(p, c);
+  await quizAnswerAll(p);
+  await p.locator('[data-act="quiz-send-ask"]').click();
+  await p.locator('[data-act="quiz-send"]').click();
+  await expect(p.locator('#sp-quiz-sent')).toBeVisible();
+  expect(await p.evaluate(o => StudentPage._test.quizDemoReturn(o), opts)).toBe(true);
+  await openDemo(p, c, 'demo-card');
+  await p.locator('.sp-tab[data-tab="learning"]').locator('visible=true').first().click();
+  await p
+    .locator('.sp-ml-row[data-act="feedback"][data-piece="demo-quiz-check"]')
+    .locator('visible=true')
+    .first()
+    .click();
+  await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
+}
 SCREENS.push(
   { name: 'quiz, taking it', quizzes: true, marker: '.sp-quiz-progress', go: quizDemo },
   {
@@ -484,6 +502,31 @@ SCREENS.push(
       await p.locator('[data-act="quiz-back"]').click();
       await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
     },
+  },
+);
+
+// When a quiz comes back (docs/plans/quizzes-plan.md Q5b), behind the same switch: the last screens.
+SCREENS.push(
+  {
+    name: 'quiz, returned with the answers and a total',
+    quizzes: true,
+    returned: true,
+    marker: '.sp-quiz-ras',
+    go: (p, c) => quizReturned(p, c, { shows: 'answers', addTotal: true }),
+  },
+  {
+    name: 'quiz, returned with which were right',
+    quizzes: true,
+    returned: true,
+    marker: '.sp-quiz-ras',
+    go: (p, c) => quizReturned(p, c, { shows: 'right' }),
+  },
+  {
+    name: 'quiz, returned, grade only',
+    quizzes: true,
+    returned: true,
+    marker: '.sp-quiz-gradeonly',
+    go: (p, c) => quizReturned(p, c, { shows: 'grade', addTotal: true }),
   },
 );
 
