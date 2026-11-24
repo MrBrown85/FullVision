@@ -6,6 +6,7 @@
  * adds: Canada only, request shape, CORS, a keyed IP hash, and logs with no
  * student data.
  */
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { makeHandler, ipHash, allowedOrigin } from '../supabase/functions/student-submit/handler.ts';
 import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
@@ -36,18 +37,6 @@ function setup(overrides) {
             }
             const who = { birthday: p[1], studentNumber: p[2], password: p[3] };
             calls.push({ route: 'verify', token: p[0], who, hash: p[6] });
-            return who.studentNumber === '0123456' || who.password === '4821'
-              ? { ok: true, parts: [] }
-              : { ok: false, error: 'wrong_identity', tries_left: 4 };
-          },
-          async open(code, hash) {
-            calls.push({ route: 'open', code, hash });
-            return code === 'K7M-4QX'
-              ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
-              : { ok: false, error: 'not_found' };
-          },
-          async verify(token, who, hash) {
-            calls.push({ route: 'verify', token, who, hash });
             return who.studentNumber === '0123456' || who.password === '4821'
               ? { ok: true, parts: [] }
               : { ok: false, error: 'wrong_identity', tries_left: 4 };
@@ -102,7 +91,12 @@ describe('student-submit handler', () => {
     const answers = { 'q-1': 'Being curious helps me in labs.' };
     const res = await handle(post({ route: 'submit', token: 'a'.repeat(64), answers }));
     expect(await res.json()).toEqual({ ok: true, submitted_at: '2026-11-04T10:00:00Z' });
-    expect(calls[0]).toMatchObject({ route: 'submit', token: 'a'.repeat(64), answers });
+    // The slip's token goes as its hash (2026112403).
+    expect(calls[0]).toMatchObject({
+      route: 'submit',
+      token: createHash('sha256').update('a'.repeat(64)).digest('hex'),
+      answers,
+    });
   });
 
   it('verifies a questionnaire slip by birthday, student number or password, and never logs them', async () => {
@@ -158,6 +152,48 @@ describe('student-submit handler', () => {
       expect(res.status).toBe(421);
       expect(await res.json()).toEqual({ ok: false, error: 'wrong_region' });
       expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('refuses every route without the address key, before touching the database', async () => {
+    for (const ipKey of [null, '']) {
+      const { handle, calls, logs } = setup({ ipKey });
+      for (const body of [
+        { route: 'open', code: 'K7M-4QX' },
+        { route: 'submit', token: 'a'.repeat(64), answers: { q: 'x' } },
+        { route: 'card', code: 'K7M4QX2P' },
+      ]) {
+        const res = await handle(post(body));
+        expect(res.status).toBe(500);
+        expect(await res.json()).toEqual({ ok: false, error: 'server' });
+      }
+      expect(calls).toEqual([]);
+      expect(logs.every(l => l.outcome === 'no_ip_key')).toBe(true);
+    }
+  });
+
+  it('hands the database a session token only as its SHA-256, on every route that takes one', async () => {
+    const token = '7'.repeat(64);
+    const seen = [];
+    const { handle } = setup({
+      db: {
+        async call(text, p) {
+          seen.push(p);
+          return { ok: true };
+        },
+      },
+    });
+    for (const body of [
+      { route: 'page', session: token, enrollment_id: '00000001-0000-4000-8000-000000000000' },
+      { route: 'done', session: token },
+      { route: 'work', session: token, enrollment_id: '00000001-0000-4000-8000-000000000000' },
+    ]) {
+      await handle(post(body));
+    }
+    expect(seen).toHaveLength(3);
+    for (const p of seen) {
+      expect(p[0]).toBe(createHash('sha256').update(token).digest('hex'));
+      expect(JSON.stringify(p)).not.toContain(token);
     }
   });
 

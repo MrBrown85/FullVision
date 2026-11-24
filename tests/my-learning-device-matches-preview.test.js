@@ -29,10 +29,14 @@ import vm from 'node:vm';
 import BANK_STEPS from '../supabase/functions/_shared/bank-steps.json' with { type: 'json' };
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { FAKE_KEY } from './helpers/card-key-fake.js';
 import { clearClass, seedClass } from './helpers/pin-save-paths.js';
 import { openStudentPage } from './helpers/student-page-context.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = file => readFileSync(resolve(ROOT, file), 'utf-8');
@@ -487,6 +491,20 @@ async function throughEdge(dbReply) {
    calc.js and student-view.js, as the page fetches them for My Learning. */
 function phone() {
   const page = openStudentPage();
+  // The phone runs in its own context with its own Date, which the fake
+  // timers above don't reach: pin it to NOW too, or the month trend reads
+  // the real date and drifts from Preview as the calendar moves on.
+  vm.runInContext(
+    `Date = (function (Real, fixed) {
+      function D(...a) { return new.target ? new Real(...(a.length ? a : [fixed])) : new Real(fixed).toString(); }
+      D.prototype = Real.prototype;
+      D.now = () => fixed;
+      D.parse = Real.parse;
+      D.UTC = Real.UTC;
+      return D;
+    })(Date, Date.parse(${JSON.stringify(NOW)}));`,
+    page.ctx,
+  );
   ['shared/constants.js', 'shared/calc.js', 'shared/student-view.js'].forEach(f =>
     vm.runInContext(read(f), page.ctx, { filename: f }),
   );

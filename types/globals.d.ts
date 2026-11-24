@@ -104,6 +104,8 @@ declare var CommentBank: {
 // Observations card, the student's Voice and the class's report parts
 // (teacher/report-qn-voice-observations.js).
 interface Window {
+  // A rubric's own level columns (shared/rubric-scale.js).
+  RubricScale: any;
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
@@ -127,7 +129,13 @@ interface Window {
   MTabBar: unknown;
   MBulletins: unknown;
   MBulletinsModel: unknown;
+  // Share on a reminder (teacher/bulletin-share.js) and a Standard rubric's Words (teacher/rubric-words.js).
+  BulletinShare: { itemHtml(b: unknown): string; text(b: unknown): string };
+  RubricWords: unknown;
+  BulletinSeen: { bodyHtml(b: unknown, st: unknown, nameOf: (id: string) => string, manageHref: string): string };
 }
+declare var BulletinSeen: Window['BulletinSeen'];
+declare var BulletinShare: Window['BulletinShare'];
 // One Report's model (teacher/report-one.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
 declare var ReportOne: {
@@ -138,6 +146,11 @@ declare var ReportOne: {
   order(model: unknown, sid?: string): string[];
   offParts(model: unknown, cid: string, sid?: string): string[];
   label(key: string, cid: string): string;
+  // The reflections' wording, edited on the page (report-one-words.js, report-one-copy.js).
+  wordingOf(model: unknown, key: string): any;
+  setWording(model: unknown, key: string, wording: unknown): any;
+  normalize(model: unknown): any;
+  forConfig(reportConfig: unknown): any;
 };
 // The observation card (shared/obs-card.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
@@ -160,6 +173,8 @@ interface Window {
     dismissDeadLetter(id: string): void;
     subscribe(listener: (evt: { kind: string; meta: any }) => void): () => void;
     markReloaded(classId: string): number;
+    // shared/data-categories.js reads why waiting writes have not gone (queued, signedOut, owner).
+    stats(): { queued: number; signedOut: boolean; owner: boolean; [k: string]: unknown };
   };
   __fvPerf: unknown[];
   // shared/overwrite-count.js: lets a test (standing for a reload) detach it.
@@ -406,3 +421,21 @@ declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: 
 interface Window {
   StudentSettings: unknown;
 }
+
+// One Report's page (report-one-words.js, report-one-copy.js, report-one-undo.js).
+interface Window {
+  ReportOneWords: any;
+  ReportOneCopy: {
+    classes(cid: string, key: string): { cid: string; name: string; own: boolean }[];
+    copy(key: string, wording: unknown, cids: string[]): void;
+    dialog(api: unknown, key: string): void;
+  };
+  ReportOneUndo: any;
+}
+declare var ReportOneCopy: Window['ReportOneCopy'];
+declare var ReportBlocks: { wordingOf(key: string): any };
+declare var COURSES: Record<string, any>;
+declare function getReportConfig(cid: string): any;
+declare function saveReportConfig(cid: string, config: unknown): void;
+declare function printClassName(course: unknown): string;
+declare function isCourseArchived(cid: string): boolean;

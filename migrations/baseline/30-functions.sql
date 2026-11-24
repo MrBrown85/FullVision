@@ -3423,7 +3423,7 @@ AS $function$
        and a.score_mode <> 'dibels';
 $function$;
 
-CREATE OR REPLACE FUNCTION public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid DEFAULT NULL::uuid, p_description text DEFAULT NULL::text, p_date_assigned date DEFAULT NULL::date, p_due_date date DEFAULT NULL::date, p_score_mode text DEFAULT 'proficiency'::text, p_max_points numeric DEFAULT NULL::numeric, p_weight numeric DEFAULT 1.0, p_evidence_type text DEFAULT NULL::text, p_rubric_id uuid DEFAULT NULL::uuid, p_module_id uuid DEFAULT NULL::uuid, p_tag_ids uuid[] DEFAULT '{}'::uuid[], p_copy_group uuid DEFAULT NULL::uuid, p_core_competency_ids text[] DEFAULT '{}'::text[], p_idempotency_key uuid DEFAULT NULL::uuid, p_is_draft boolean DEFAULT false)
+CREATE OR REPLACE FUNCTION public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid DEFAULT NULL::uuid, p_description text DEFAULT NULL::text, p_date_assigned date DEFAULT NULL::date, p_due_date date DEFAULT NULL::date, p_score_mode text DEFAULT 'proficiency'::text, p_max_points numeric DEFAULT NULL::numeric, p_weight numeric DEFAULT 1.0, p_evidence_type text DEFAULT NULL::text, p_rubric_id uuid DEFAULT NULL::uuid, p_module_id uuid DEFAULT NULL::uuid, p_tag_ids uuid[] DEFAULT '{}'::uuid[], p_copy_group uuid DEFAULT NULL::uuid, p_core_competency_ids text[] DEFAULT '{}'::text[], p_idempotency_key uuid DEFAULT NULL::uuid, p_is_draft boolean DEFAULT false, p_students_see_factored boolean DEFAULT false)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -3448,12 +3448,12 @@ begin
 
     insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
                             score_mode, max_points, weight, evidence_type,
-                            rubric_id, module_id, display_order, copy_group, core_competency_ids, is_draft)
+                            rubric_id, module_id, display_order, copy_group, core_competency_ids, is_draft, students_see_factored)
     values (p_course_id, p_category_id, p_title, p_description, p_date_assigned, p_due_date,
             p_score_mode, p_max_points, p_weight, p_evidence_type,
             p_rubric_id, p_module_id, _next_pos, p_copy_group,
             array(select distinct c from unnest(coalesce(p_core_competency_ids, '{}')) c order by c),
-            coalesce(p_is_draft, false))
+            coalesce(p_is_draft, false), coalesce(p_students_see_factored, false))
     returning id into _id;
 
     if p_tag_ids is not null then
@@ -4283,11 +4283,11 @@ begin
     insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
                             score_mode, max_points, weight, evidence_type,
                             rubric_id, module_id, collab_mode, collab_config, display_order,
-                            core_competency_ids, is_draft)
+                            core_competency_ids, is_draft, students_see_factored)
     select course_id, category_id, title || ' (copy)', description, date_assigned, due_date,
            score_mode, max_points, weight, evidence_type,
            rubric_id, module_id, collab_mode, collab_config, _next_pos,
-           core_competency_ids, is_draft
+           core_competency_ids, is_draft, students_see_factored
       from assessment
      where id = p_src_id
     returning id into _new_id;
@@ -4377,7 +4377,7 @@ begin
 
     for _row in select * from rubric where course_id = p_src_id loop
         _new_id := gen_random_uuid();
-        insert into rubric (id, course_id, name, style) values (_new_id, _new_course, _row.name, _row.style);
+        insert into rubric (id, course_id, name, style, scale) values (_new_id, _new_course, _row.name, _row.style, _row.scale);
         _rubric_map := _rubric_map || jsonb_build_object(_row.id::text, _new_id::text);
     end loop;
 
@@ -4385,12 +4385,14 @@ begin
         _new_id := gen_random_uuid();
         insert into criterion (id, rubric_id, name,
             level_4_descriptor, level_3_descriptor, level_2_descriptor, level_1_descriptor,
-            level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order)
+            level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order,
+            level_5_descriptor, level_6_descriptor)
         values (_new_id, (_rubric_map ->> _row.rubric_id::text)::uuid, _row.name,
             _row.level_4_descriptor, _row.level_3_descriptor,
             _row.level_2_descriptor, _row.level_1_descriptor,
             _row.level_4_value, _row.level_3_value, _row.level_2_value, _row.level_1_value,
-            _row.weight, _row.display_order);
+            _row.weight, _row.display_order,
+            _row.level_5_descriptor, _row.level_6_descriptor);
         _crit_map := _crit_map || jsonb_build_object(_row.id::text, _new_id::text);
     end loop;
 
@@ -5267,7 +5269,7 @@ begin
         return jsonb_build_object('not_modified', true, 'version', _version);
     end if;
 
-    -- ── Gradebook: get_gradebook's roster, assessments, categories and
+    -- -- Gradebook: get_gradebook's roster, assessments, categories and
     --    modules, with scores as compact rows instead of `cells`.
     with
     enr as (
@@ -5332,7 +5334,8 @@ begin
                        'copy_group', asm.copy_group,
                        'core_competency_ids', to_jsonb(asm.core_competency_ids),
                        'created_at', asm.created_at,
-                       'is_draft', asm.is_draft
+                       'is_draft', asm.is_draft,
+                       'students_see_factored', asm.students_see_factored
                    ) order by asm.ix)
               from asm left join asm_tags on asm_tags.assessment_id = asm.id), '[]'::jsonb),
         'categories', coalesce((
@@ -5384,7 +5387,7 @@ begin
               join asm on asm.id = p.assessment_id), '[]'::jsonb)
     ) into _gradebook;
 
-    -- ── Learning map: same shape as get_learning_map, without the per-tag
+    -- -- Learning map: same shape as get_learning_map, without the per-tag
     --    class_avg and coverage_count (the client computes its own).
     with
     sections_with_tags as (
@@ -5423,11 +5426,11 @@ begin
               from subjects_with_sections sws), '[]'::jsonb)
     ) into _learning_map;
 
-    -- ── Rubrics: the rows the client read from three tables.
+    -- -- Rubrics: the rows the client read from three tables.
     select jsonb_build_object(
         'rubrics', coalesce((
             select jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'created_at', r.created_at,
-                                                'copy_group', r.copy_group, 'style', r.style)
+                                                'copy_group', r.copy_group, 'style', r.style, 'scale', r.scale)
                              order by r.created_at, r.id)
               from public.rubric r where r.course_id = p_course_id), '[]'::jsonb),
         'criteria', coalesce((
@@ -5435,6 +5438,7 @@ begin
                        'id', c.id, 'rubric_id', c.rubric_id, 'name', c.name,
                        'level_4_descriptor', c.level_4_descriptor, 'level_3_descriptor', c.level_3_descriptor,
                        'level_2_descriptor', c.level_2_descriptor, 'level_1_descriptor', c.level_1_descriptor,
+                       'level_5_descriptor', c.level_5_descriptor, 'level_6_descriptor', c.level_6_descriptor,
                        'level_4_value', c.level_4_value, 'level_3_value', c.level_3_value,
                        'level_2_value', c.level_2_value, 'level_1_value', c.level_1_value,
                        'weight', c.weight, 'display_order', c.display_order
@@ -5463,7 +5467,7 @@ begin
              where r.course_id = p_course_id), '[]'::jsonb)
     ) into _rubrics;
 
-    -- ── Observations: the most recent 500, same row shape as
+    -- -- Observations: the most recent 500, same row shape as
     --    get_observations, plus the total so the client knows what's older.
     with
     obs as (
@@ -5507,7 +5511,7 @@ begin
               from public.observation f where f.follow_up_of in (select id from obs)), '[]'::jsonb)
     ) into _observations;
 
-    -- ── Profiles: same row shape as list_course_student_profiles, without the
+    -- -- Profiles: same row shape as list_course_student_profiles, without the
     --    computed overall_proficiency / letter / counts and override
     --    'calculated', plus the notes it never returned.
     with
@@ -5566,7 +5570,7 @@ begin
       left join nt on nt.enrollment_id = enr.id
       left join recent on recent.enrollment_id = enr.id;
 
-    -- ── Term ratings, which the client never read back before.
+    -- -- Term ratings, which the client never read back before.
     with
     tr as (
         select tr.* from public.term_rating tr
@@ -5922,6 +5926,7 @@ begin
                'core_competency_ids', to_jsonb(a.core_competency_ids),
                'created_at', a.created_at,
                'is_draft', a.is_draft,
+               'students_see_factored', a.students_see_factored,
                'tag_ids', coalesce((
                    select jsonb_agg(at.tag_id order by t.display_order, t.label)
                      from assessment_tag at
@@ -7119,10 +7124,11 @@ begin
 
     if p_payload ? 'rubrics' then
       for _row in select * from jsonb_array_elements(p_payload->'rubrics') loop
-        insert into rubric (id, course_id, name, style)
+        insert into rubric (id, course_id, name, style, scale)
         values ((_row->>'id')::uuid, (_row->>'course_id')::uuid, coalesce(_row->>'name',''),
-                coalesce(_row->>'style','standard'))
-        on conflict (id) do update set name=excluded.name, style=excluded.style, updated_at=now();
+                coalesce(_row->>'style','standard'),
+                case when jsonb_typeof(_row->'scale') = 'array' then _row->'scale' end)
+        on conflict (id) do update set name=excluded.name, style=excluded.style, scale=excluded.scale, updated_at=now();
         _n_rub := _n_rub + 1;
       end loop;
     end if;
@@ -7131,7 +7137,8 @@ begin
       for _row in select * from jsonb_array_elements(p_payload->'criteria') loop
         insert into criterion (id, rubric_id, name,
           level_4_descriptor, level_3_descriptor, level_2_descriptor, level_1_descriptor,
-          level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order)
+          level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order,
+          level_5_descriptor, level_6_descriptor)
         values ((_row->>'id')::uuid, (_row->>'rubric_id')::uuid,
                 coalesce(_row->>'name',''),
                 _row->>'level_4_descriptor', _row->>'level_3_descriptor',
@@ -7141,11 +7148,13 @@ begin
                 coalesce((_row->>'level_2_value')::numeric, 2),
                 coalesce((_row->>'level_1_value')::numeric, 1),
                 coalesce((_row->>'weight')::numeric, 1.0),
-                coalesce((_row->>'display_order')::int, 0))
+                coalesce((_row->>'display_order')::int, 0),
+                _row->>'level_5_descriptor', _row->>'level_6_descriptor')
         on conflict (id) do update set
           name=excluded.name,
           level_4_descriptor=excluded.level_4_descriptor, level_3_descriptor=excluded.level_3_descriptor,
           level_2_descriptor=excluded.level_2_descriptor, level_1_descriptor=excluded.level_1_descriptor,
+          level_5_descriptor=excluded.level_5_descriptor, level_6_descriptor=excluded.level_6_descriptor,
           level_4_value=excluded.level_4_value, level_3_value=excluded.level_3_value,
           level_2_value=excluded.level_2_value, level_1_value=excluded.level_1_value,
           weight=excluded.weight, display_order=excluded.display_order, updated_at=now();
@@ -7660,100 +7669,6 @@ begin
 
     _result := jsonb_build_object('created', _created, 'enrolled', _enrolled, 'reactivated', _reactivated);
     perform fv_idem_store(p_idempotency_key, 'import_roster_csv', _result);
-    return _result;
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.import_teams_class(p_payload jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-    _uid uuid := (select auth.uid());
-    _course_id uuid;
-    _stu_created int := 0; _enr_created int := 0; _asm_created int := 0; _next_pos int := 0;
-    _row jsonb; _sid uuid;
-    _sn text; _em text; _fn text; _ln text;
-    _cached jsonb; _result jsonb;
-begin
-    if _uid is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-    if p_payload is null or jsonb_typeof(p_payload) <> 'object' then
-        raise exception 'p_payload must be an object' using errcode = '22023';
-    end if;
-    _cached := fv_idem_check(p_idempotency_key, 'import_teams_class');
-    if _cached is not null then return _cached; end if;
-
-    insert into course (teacher_id, name, grade_level, timezone)
-    values (_uid,
-            coalesce(p_payload->>'class_name', 'Imported Class'),
-            p_payload->>'grade_level',
-            coalesce(p_payload->>'timezone', 'America/Vancouver'))
-    returning id into _course_id;
-    insert into report_config (course_id) values (_course_id);
-
-    if p_payload ? 'students' and jsonb_typeof(p_payload->'students') = 'array' then
-        for _row in select * from jsonb_array_elements(p_payload->'students') loop
-            _sid := null;
-            _sn := nullif(_row->>'student_number', '');
-            _em := nullif(_row->>'email', '');
-            _fn := nullif(_row->>'first_name', '');
-            _ln := nullif(_row->>'last_name', '');
-            if _sn is not null then
-                select id into _sid from student where teacher_id = _uid and student_number = _sn limit 1;
-            end if;
-            if _sid is null and _em is not null then
-                select id into _sid from student where teacher_id = _uid and email = _em limit 1;
-            end if;
-            if _sid is null and _fn is not null then
-                select id into _sid from student where teacher_id = _uid and first_name = _fn
-                   and coalesce(last_name, '') = coalesce(_ln, '') limit 1;
-            end if;
-            if _sid is null then
-                insert into student (teacher_id, first_name, last_name, preferred_name,
-                                     pronouns, student_number, email, date_of_birth)
-                values (_uid, _fn, _ln,
-                        nullif(_row->>'preferred_name',''),
-                        nullif(_row->>'pronouns',''),
-                        _sn, _em,
-                        nullif(_row->>'date_of_birth','')::date)
-                returning id into _sid;
-                _stu_created := _stu_created + 1;
-            end if;
-            insert into enrollment (student_id, course_id, roster_position)
-            values (_sid, _course_id, _next_pos)
-            on conflict (student_id, course_id) do update set withdrawn_at = null, updated_at = now();
-            _next_pos := _next_pos + 1;
-            _enr_created := _enr_created + 1;
-        end loop;
-    end if;
-
-    if p_payload ? 'assignments' and jsonb_typeof(p_payload->'assignments') = 'array' then
-        for _row in select * from jsonb_array_elements(p_payload->'assignments') loop
-            insert into assessment (course_id, title, description, date_assigned, due_date,
-                                    score_mode, max_points, weight, display_order, is_draft)
-            values (_course_id,
-                    coalesce(_row->>'title', 'Untitled'),
-                    _row->>'description',
-                    nullif(_row->>'date_assigned','')::date,
-                    nullif(_row->>'due_date','')::date,
-                    coalesce(_row->>'score_mode', 'proficiency'),
-                    nullif(_row->>'max_points','')::numeric,
-                    coalesce((_row->>'weight')::numeric, 1.0),
-                    _asm_created,
-                    -- 2026111701: a Draft only when the row says so
-                    coalesce(case when jsonb_typeof(_row->'is_draft') = 'boolean' then (_row->>'is_draft')::boolean end, false));
-            _asm_created := _asm_created + 1;
-        end loop;
-    end if;
-
-    update teacher_preference set active_course_id = _course_id where teacher_id = _uid;
-
-    _result := jsonb_build_object('course_id', _course_id,
-        'students_created', _stu_created,
-        'enrollments_created', _enr_created,
-        'assessments_created', _asm_created);
-    perform fv_idem_store(p_idempotency_key, 'import_teams_class', _result);
     return _result;
 end;
 $function$;
@@ -8761,6 +8676,73 @@ begin
     return true;
 end;
 $function$;
+
+CREATE OR REPLACE FUNCTION public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+    _uid    uuid := (select auth.uid());
+    _cached jsonb;
+    _old    jsonb;
+    _change jsonb;
+    _dash   jsonb;
+begin
+    if _uid is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_patch is null or jsonb_typeof(p_patch) <> 'object' then
+        raise exception 'p_patch must be an object' using errcode = '22023';
+    end if;
+    if p_patch ? 'dashboard_prefs' and jsonb_typeof(p_patch->'dashboard_prefs') not in ('object', 'null') then
+        raise exception 'dashboard_prefs must be an object or null' using errcode = '22023';
+    end if;
+
+    _cached := fv_idem_check(p_idempotency_key, 'patch_teacher_preferences');
+    if _cached is not null then return; end if;
+
+    insert into teacher_preference (teacher_id) values (_uid)
+    on conflict (teacher_id) do nothing;
+
+    select dashboard_prefs into _old from teacher_preference where teacher_id = _uid for update;
+
+    _dash := _old;
+    if p_patch ? 'dashboard_prefs' then
+        _change := p_patch->'dashboard_prefs';
+        if jsonb_typeof(_change) = 'null' then
+            _dash := null;
+        else
+            if _old is null or jsonb_typeof(_old) <> 'object' then _old := '{}'::jsonb; end if;
+            _dash := _old || coalesce((
+                select jsonb_object_agg(c.key,
+                    case when jsonb_typeof(c.value) = 'object' and jsonb_typeof(_old->c.key) = 'object'
+                         then (_old->c.key) || c.value
+                         else c.value end)
+                  from jsonb_each(_change) c
+            ), '{}'::jsonb);
+        end if;
+    end if;
+
+    update teacher_preference set
+        active_course_id   = case when p_patch ? 'active_course_id'
+                                  then nullif(p_patch->>'active_course_id','')::uuid
+                                  else active_course_id end,
+        view_mode          = case when p_patch ? 'view_mode'
+                                  then nullif(p_patch->>'view_mode','')
+                                  else view_mode end,
+        mobile_view_mode   = case when p_patch ? 'mobile_view_mode'
+                                  then nullif(p_patch->>'mobile_view_mode','')
+                                  else mobile_view_mode end,
+        mobile_sort_mode   = case when p_patch ? 'mobile_sort_mode'
+                                  then nullif(p_patch->>'mobile_sort_mode','')
+                                  else mobile_sort_mode end,
+        card_widget_config = case when p_patch ? 'card_widget_config'
+                                  then nullif(p_patch->'card_widget_config', 'null'::jsonb)
+                                  else card_widget_config end,
+        dashboard_prefs    = _dash
+     where teacher_id = _uid;
+
+    perform fv_idem_store(p_idempotency_key, 'patch_teacher_preferences', jsonb_build_object('saved', true));
+end; $function$;
 
 CREATE OR REPLACE PROCEDURE public.photo_lifecycle_nightly()
  LANGUAGE plpgsql
@@ -11021,7 +11003,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+CREATE OR REPLACE FUNCTION public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_enrollment_ids uuid[] DEFAULT NULL::uuid[])
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -11047,7 +11029,18 @@ begin
   elsif _b.posted_at is null then
     raise exception 'a bulletin students cannot see yet cannot be shown again' using errcode = '22023';
   end if;
-  update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id;
+  if p_enrollment_ids is null then
+    update bulletin set shown_again_at = now(), updated_at = now() where id = p_bulletin_id;
+  else
+    -- 2026111809: only the students named, and only those who can see it and have not seen it.
+    insert into bulletin_reminder (bulletin_id, enrollment_id, reminded_at)
+    select p_bulletin_id, x.enrollment_id, now()
+      from fv_private.bulletin_audience(_course) x
+     where x.enrollment_id = any (p_enrollment_ids) and x.state = 'can_see'
+       and not exists (select 1 from bulletin_seen s where s.bulletin_id = p_bulletin_id and s.enrollment_id = x.enrollment_id)
+    on conflict (bulletin_id, enrollment_id) do update set reminded_at = excluded.reminded_at;
+    update bulletin set updated_at = now() where id = p_bulletin_id;
+  end if;
   _out := jsonb_build_object('bulletin', fv_private.bulletin_json(p_bulletin_id));
   perform fv_idem_store(p_idempotency_key, 'show_bulletin_again', _out);
   return _out;
@@ -11376,6 +11369,10 @@ begin
     if p_patch ? 'is_draft' and jsonb_typeof(p_patch->'is_draft') is distinct from 'boolean' then
         raise exception 'is_draft must be true or false' using errcode = '22023';
     end if;
+    -- 2026111808: students_see_factored is true or false.
+    if p_patch ? 'students_see_factored' and jsonb_typeof(p_patch->'students_see_factored') is distinct from 'boolean' then
+        raise exception 'students_see_factored must be true or false' using errcode = '22023';
+    end if;
 
     update assessment set
         title         = coalesce(p_patch->>'title', title),
@@ -11408,6 +11405,8 @@ begin
                              else '{}' end,
         is_draft      = case when p_patch ? 'is_draft'
                              then (p_patch->>'is_draft')::boolean else is_draft end,
+        students_see_factored = case when p_patch ? 'students_see_factored'
+                             then (p_patch->>'students_see_factored')::boolean else students_see_factored end,
         updated_at    = now()
     where id = p_id;
 
@@ -12047,7 +12046,7 @@ begin
     return _id;
 end; $function$;
 
-CREATE OR REPLACE FUNCTION public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid DEFAULT NULL::uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_style text DEFAULT NULL::text, p_linked_tag_ids jsonb DEFAULT NULL::jsonb)
+CREATE OR REPLACE FUNCTION public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid DEFAULT NULL::uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_style text DEFAULT NULL::text, p_linked_tag_ids jsonb DEFAULT NULL::jsonb, p_scale jsonb DEFAULT NULL::jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -12077,6 +12076,11 @@ begin
         raise exception 'p_style must be standard, advanced or single_point' using errcode = '22023';
     end if;
 
+    if p_scale is not null and (jsonb_typeof(p_scale) <> 'array'
+                                 or jsonb_array_length(p_scale) not in (0, 2, 3, 4, 5, 6)) then
+        raise exception 'p_scale must be an array of 2 to 6 levels, or empty' using errcode = '22023';
+    end if;
+
     if p_linked_tag_ids is not null and jsonb_typeof(p_linked_tag_ids) <> 'array' then
         raise exception 'p_linked_tag_ids must be a jsonb array' using errcode = '22023';
     end if;
@@ -12088,14 +12092,19 @@ begin
         end if;
         _is_insert := true;
 
-        insert into rubric (course_id, name, copy_group, style)
-        values (p_course_id, p_name, p_copy_group, coalesce(p_style, 'standard'))
+        insert into rubric (course_id, name, copy_group, style, scale)
+        values (p_course_id, p_name, p_copy_group, coalesce(p_style, 'standard'),
+                case when jsonb_array_length(coalesce(p_scale, '[]'::jsonb)) = 0 then null else p_scale end)
         returning id into _rubric_id;
     else
         -- A copy group is only ever set, never cleared, by a save. A save
         -- that names no style keeps the rubric's.
         update rubric set name = p_name, copy_group = coalesce(p_copy_group, copy_group),
-                          style = coalesce(p_style, style), updated_at = now()
+                          style = coalesce(p_style, style),
+                          scale = case when p_scale is null then scale
+                                       when jsonb_array_length(p_scale) = 0 then null
+                                       else p_scale end,
+                          updated_at = now()
          where id = p_id
         returning id into _rubric_id;
 
@@ -12114,6 +12123,8 @@ begin
                 level_3_descriptor = _elem->>'level_3_descriptor',
                 level_2_descriptor = _elem->>'level_2_descriptor',
                 level_1_descriptor = _elem->>'level_1_descriptor',
+                level_5_descriptor = _elem->>'level_5_descriptor',
+                level_6_descriptor = _elem->>'level_6_descriptor',
                 level_4_value      = coalesce((_elem->>'level_4_value')::numeric, 4),
                 level_3_value      = coalesce((_elem->>'level_3_value')::numeric, 3),
                 level_2_value      = coalesce((_elem->>'level_2_value')::numeric, 2),
@@ -12133,7 +12144,7 @@ begin
                 level_4_descriptor, level_3_descriptor,
                 level_2_descriptor, level_1_descriptor,
                 level_4_value, level_3_value, level_2_value, level_1_value,
-                weight, display_order
+                weight, display_order, level_5_descriptor, level_6_descriptor
             ) values (
                 _rubric_id,
                 _elem->>'name',
@@ -12144,7 +12155,8 @@ begin
                 coalesce((_elem->>'level_2_value')::numeric, 2),
                 coalesce((_elem->>'level_1_value')::numeric, 1),
                 coalesce((_elem->>'weight')::numeric, 1.0),
-                coalesce((_elem->>'display_order')::int, 0)
+                coalesce((_elem->>'display_order')::int, 0),
+                _elem->>'level_5_descriptor', _elem->>'level_6_descriptor'
             ) returning id into _crit_id;
         end if;
 
@@ -12169,8 +12181,10 @@ begin
             _kept_checks := '{}';
             for _check in select * from jsonb_array_elements(_elem->'checks') loop
                 _level := (_check->>'level')::int;
-                if _level is null or _level < 1 or _level > 4 then
-                    raise exception 'check level must be 1..4' using errcode = '22023';
+                if _level is null or _level < 1
+                   or _level > (case when (select scale from rubric where id = _rubric_id) is not null
+                                     then 6 else 4 end) then
+                    raise exception 'check level must be 1..4, or 1..6 on a rubric with its own levels' using errcode = '22023';
                 end if;
                 _check_id := null;
                 if _check ? 'id' and nullif(_check->>'id','') is not null then
@@ -12855,7 +12869,7 @@ CREATE OR REPLACE FUNCTION student_submit._device_session(p_token text)
 AS $function$
     select d.* from device_session d
      where coalesce(p_token, '') ~ '^[0-9a-f]{64}$'
-       and d.token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+       and d.token_hash = p_token
        and d.expires_at > now();
 $function$;
 
@@ -13700,7 +13714,9 @@ begin
         'bulletins', coalesce((
             select jsonb_agg(x.item order by x.sort_at, x.id)
               from (select b.id,
-                           coalesce(case when b.shown_again_at is not null and s.seen_at is null then b.shown_again_at end,
+                           coalesce(case when s.seen_at is null then greatest(b.shown_again_at,
+                                        (select r.reminded_at from bulletin_reminder r
+                                          where r.bulletin_id = b.id and r.enrollment_id = p_enrollment_id)) end,
                                     b.posted_at) as sort_at,
                            jsonb_build_object(
                                'id', b.id, 'kind', b.kind, 'body', b.body,
@@ -13806,7 +13822,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     select * into _s from session
-     where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+     where token_hash = p_token
        for update;
     if not found or _s.expires_at < now() then
         perform _log('open', 'bad_token', p_ip_hash);
@@ -13865,8 +13881,7 @@ CREATE OR REPLACE FUNCTION student_submit.done(p_session_token text, p_ip_hash t
 AS $function$
 begin
     if coalesce(p_session_token, '') ~ '^[0-9a-f]{64}$' then
-        delete from device_session
-         where token_hash = encode(sha256(convert_to(p_session_token, 'UTF8')), 'hex');
+        delete from device_session where token_hash = p_session_token;
     end if;
     return jsonb_build_object('ok', true);
 end;
@@ -14618,7 +14633,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text)
+CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -14633,7 +14648,6 @@ declare
     _course course%rowtype;
     _name   text;
     _why    text;
-    _token  text;
     _exp    timestamptz := now() + interval '80 minutes';
     _r      phone_report%rowtype;
     _dob    date;
@@ -14647,6 +14661,10 @@ begin
     end if;
     if coalesce(p_key_id, '') !~ '^[0-9a-f]{8}$' then
         raise exception 'malformed key id' using errcode = '22023';
+    end if;
+    -- The hash of a token the function made: the database never sees the token.
+    if coalesce(p_new_token_hash, '') !~ '^[0-9a-f]{64}$' then
+        raise exception 'malformed token hash' using errcode = '22023';
     end if;
 
     if random() < 0.02 then
@@ -14761,15 +14779,15 @@ begin
             perform _log('open', 'too_many_opens', p_ip_hash, _c.id, _r.course_id);
             return jsonb_build_object('ok', false, 'error', 'locked');
         end if;
-        _token := encode(uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()), 'hex');
+        -- The token is the function's; the database keeps only its hash.
         insert into session (token_hash, code_id, expires_at)
-        values (encode(sha256(convert_to(_token, 'UTF8')), 'hex'), _c.id, _exp);
+        values (p_new_token_hash, _c.id, _exp);
         select coalesce(nullif(btrim(s.preferred_name), ''), s.first_name), s.date_of_birth into _name, _dob
           from enrollment e join student s on s.id = e.student_id
          where e.id = _c.enrollment_id;
         perform _log('open', 'ok', p_ip_hash, _c.id, _r.course_id);
         return jsonb_build_object(
-            'ok', true, 'kind', 'report', 'token', _token, 'expires_at', _exp,
+            'ok', true, 'kind', 'report', 'new_token', true, 'expires_at', _exp,
             'student', jsonb_build_object('first_name', _name),
             'course', jsonb_build_object('name', _course.name, 'block', _course.block),
             'report', jsonb_build_object('title', coalesce(_r.term_label, 'Report ' || _r.term), 'expires_on', _r.expires_on),
@@ -14818,15 +14836,15 @@ begin
         return jsonb_build_object('ok', false, 'error', 'reprint');
     end if;
 
-    _token := encode(uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()), 'hex');
+    -- The token is the function's; the database keeps only its hash.
     insert into session (token_hash, code_id, expires_at)
-    values (encode(sha256(convert_to(_token, 'UTF8')), 'hex'), _c.id, _exp);
+    values (p_new_token_hash, _c.id, _exp);
 
     -- The questions wait for verify(); the slip alone shows only the first
     -- name and what the questions are called.
     perform _log('open', 'ok', p_ip_hash, _c.id, _q.course_id);
     return jsonb_build_object(
-        'ok', true, 'kind', 'questionnaire', 'token', _token, 'expires_at', _exp,
+        'ok', true, 'kind', 'questionnaire', 'new_token', true, 'expires_at', _exp,
         'student', jsonb_build_object('first_name', _name),
         'course', jsonb_build_object('name', _course.name, 'block', _course.block),
         'check', _by,
@@ -14881,7 +14899,7 @@ begin
              where s.course_id = _course.id and s.removed_at is null), '{}'::jsonb),
         'rubrics', coalesce((
             select jsonb_agg(jsonb_build_object(
-                       'id', r.id, 'name', r.name, 'style', r.style,
+                       'id', r.id, 'name', r.name, 'style', r.style, 'scale', r.scale,
                        'criteria', coalesce((
                            select jsonb_agg(jsonb_build_object(
                                       'id', cr.id, 'name', cr.name, 'weight', cr.weight,
@@ -14889,6 +14907,7 @@ begin
                                       'level_3_value', cr.level_3_value, 'level_4_value', cr.level_4_value,
                                       'level_1_descriptor', cr.level_1_descriptor, 'level_2_descriptor', cr.level_2_descriptor,
                                       'level_3_descriptor', cr.level_3_descriptor, 'level_4_descriptor', cr.level_4_descriptor,
+                                      'level_5_descriptor', cr.level_5_descriptor, 'level_6_descriptor', cr.level_6_descriptor,
                                       -- The competencies this row counts toward, only those still on the class.
                                       'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
                                                              from criterion_tag x
@@ -14911,6 +14930,7 @@ begin
                        jsonb_build_object(
                            'id', a.id, 'title', a.title, 'date', a.date_assigned, 'due_date', a.due_date,
                            'score_mode', a.score_mode, 'max_points', a.max_points, 'weight', a.weight,
+                           'students_see_factored', a.students_see_factored,
                            'rubric_id', a.rubric_id, 'created_at', a.created_at,
                            'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
                                                   from assessment_tag x
@@ -16237,7 +16257,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     select * into _s from session
-     where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+     where token_hash = p_token
        for update;
     if not found then
         perform _log('submit', 'bad_token', p_ip_hash);
@@ -16495,7 +16515,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     select * into _s from session
-     where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+     where token_hash = p_token
        for update;
     if not found or _s.expires_at < now() then
         perform _log('open', 'bad_token', p_ip_hash);
@@ -16582,7 +16602,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean)
+CREATE OR REPLACE FUNCTION student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -16597,7 +16617,7 @@ declare
     _num     text;
     _given   date;
     _session device_session%rowtype;
-    _token   text;
+    _new     boolean := false;
     _ends    timestamptz;
     _row     int;
     _week    int;
@@ -16606,6 +16626,11 @@ begin
     -- four digits typed), or null when none was typed. Never the digits.
     if p_password_hmac is not null and p_password_hmac !~ '^[0-9a-f]{64}$' then
         raise exception 'malformed password tag' using errcode = '22023';
+    end if;
+    -- The hash of a token the function made, always sent: the database never
+    -- sees the token itself.
+    if coalesce(p_new_session_hash, '') !~ '^[0-9a-f]{64}$' then
+        raise exception 'malformed session hash' using errcode = '22023';
     end if;
     _found := _card_lookup(p_code_hmac, p_key_id, p_ip_hash);
     _card := (_found->>'card_id')::uuid;
@@ -16666,10 +16691,10 @@ begin
         _session := null;
     end if;
     if _session.id is null then
-        _token := encode(uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()), 'hex');
         insert into device_session (token_hash, expires_at)
-        values (encode(sha256(convert_to(_token, 'UTF8')), 'hex'), _ends)
+        values (p_new_session_hash, _ends)
         returning * into _session;
+        _new := true;
     elsif _ends < _session.expires_at then
         update device_session set expires_at = _ends where id = _session.id returning * into _session;
     end if;
@@ -16680,7 +16705,7 @@ begin
 
     perform _log('card', 'verified', p_ip_hash, _k.id, _course.id);
     return jsonb_build_object(
-        'ok', true, 'session_token', _token, 'expires_at', _session.expires_at,
+        'ok', true, 'new_session', _new, 'expires_at', _session.expires_at,
         'enrollment_id', _k.enrollment_id, 'classes', _session_classes(_session.id));
 end;
 $function$;

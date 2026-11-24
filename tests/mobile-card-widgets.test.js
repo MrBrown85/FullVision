@@ -114,8 +114,9 @@ describe('Card Widget Config', () => {
     }
 
     expect(calls[0]).toEqual({
-      name: 'save_teacher_preferences',
+      name: 'patch_teacher_preferences',
       payload: {
+        p_idempotency_key: expect.any(String),
         p_patch: {
           card_widget_config: expect.objectContaining({
             order: ['hero', 'actions'],

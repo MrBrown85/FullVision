@@ -50,8 +50,13 @@
      Cell Microscope Lab came back with Ms. Rivera's marks. Since then she
      added a note and erased the highlight: that waits on her working copy,
      and Cece still has what she was given. Energy Transfer Investigation
-     has marks too, on a piece set not to show them. The Disease Research
-     Poster is a draft never returned: its marks are the teacher's only. */
+     has marks too, on a piece set not to show them: Cece sees her page
+     with none. The Cell Structure Quiz was done on paper and scanned in by
+     Ms. Rivera (Add Work for the Class): two pages, no marks. The Disease
+     Research Poster is a draft never returned: its marks are the teacher's
+     only. `by` is who handed the pages in; `handedIn` puts a piece's pages
+     in the `work` reply (s/send.js), as the server counts a returned
+     piece's work (DECISIONS, "See Your Work from My Learning (2026-11-18)"). */
   var SAMPLE = '../assets/sample-work/';
   var LAB_GIVEN = {
     v: 1,
@@ -95,18 +100,28 @@
   var DEMO_MARKUP = {
     'demo-lab': {
       see: true,
+      handedIn: 'student',
       pages: [{ file_id: 'demo-file-lab-1', page: 1, image: 'cell-lab-cece-1.jpg', given: LAB_GIVEN, working: null }],
     },
     'demo-energy': {
       see: false, // Students See Your Mark Up is off on this piece
+      handedIn: 'student',
       pages: [
         {
           file_id: 'demo-file-energy-1',
           page: 1,
-          image: 'cell-lab-cece-1.jpg',
+          image: 'energy-lab-cece-1.jpg',
           given: { v: 1, marks: [{ id: 'm1', type: 'note', x: 0.5, y: 0.5, text: 'Show the arrows.' }] },
           working: null,
         },
+      ],
+    },
+    'demo-quiz': {
+      see: true,
+      handedIn: 'teacher', // scanned in by Ms. Rivera
+      pages: [
+        { file_id: 'demo-file-quiz-1', page: 1, image: 'cell-quiz-cece-1.jpg', given: null, working: null },
+        { file_id: 'demo-file-quiz-2', page: 2, image: 'cell-quiz-cece-2.jpg', given: null, working: null },
       ],
     },
     'demo-poster': {
@@ -143,6 +158,21 @@
     return sample.pages.filter(function (pg) {
       return pg.given && pg.given.marks && pg.given.marks.length;
     });
+  }
+
+  /* The sample's returned pieces with pages in, in the `work` reply's
+     `sent` shape (s/send.js puts them in the reply): { id: { sent_by,
+     pages, sent_at } }. Only a piece on the page that came back: the
+     Poster's sample page was never handed in. */
+  function demoHandedIn(state) {
+    var out = {};
+    Object.keys(DEMO_MARKUP).forEach(function (id) {
+      var sample = DEMO_MARKUP[id];
+      var row = rowOf(state, id);
+      if (!sample.handedIn || !row || !row.returned_at) return;
+      out[id] = { sent_by: sample.handedIn, pages: sample.pages.length, sent_at: row.date || null };
+    });
+    return out;
   }
 
   function demoOn(state) {
@@ -480,7 +510,7 @@
       return {
         ok: true,
         files: (sample ? sample.pages : []).map(function (pg) {
-          return { file_id: pg.file_id, page: pg.page, url: SAMPLE + pg.image };
+          return { file_id: pg.file_id, version: 1, page: pg.page, url: SAMPLE + pg.image };
         }),
       };
     }
@@ -909,23 +939,62 @@
 
   /* ── See Your Work: fetching a piece's pages ───────────────── */
 
-  // The pages to show, in order, each with the given marks on it (or none).
+  /* The pages to show, in order, each with the given marks on it (or none).
+     The student's own pages are the newest version handed in (a revision's,
+     once sent): `file-links` lists every version, as Before and After needs.
+     A group's pages (`group-links`) come in the order the server sends,
+     each member's work in turn, the student's own newest version only. */
   function pagesFrom(links, marks) {
     var byFile = {};
     ((marks && marks.files) || []).forEach(function (f) {
       if (f && typeof f.file_id === 'string') byFile[f.file_id] = f.marks || null;
     });
-    return ((links && links.files) || [])
+    var files = ((links && links.files) || []).filter(function (f) {
+      return f && typeof f.file_id === 'string' && typeof f.url === 'string';
+    });
+    var own = function (f) {
+      return f.mine !== false;
+    };
+    var newest = files.filter(own).reduce(function (n, f) {
+      return Math.max(n, Number(f.version) || 1);
+    }, 0);
+    return files
       .filter(function (f) {
-        return f && typeof f.file_id === 'string' && typeof f.url === 'string';
+        return !own(f) || (Number(f.version) || 1) === newest;
       })
-      .slice()
+      .map(function (f, i) {
+        return { f: f, i: i };
+      })
       .sort(function (x, y) {
-        return (Number(x.page) || 0) - (Number(y.page) || 0);
+        // The student's own pages by page number; a group-mate's stay where the server put them.
+        if (own(x.f) && own(y.f) && x.f.submission_id === y.f.submission_id) {
+          return (Number(x.f.page) || 0) - (Number(y.f.page) || 0) || x.i - y.i;
+        }
+        return x.i - y.i;
       })
-      .map(function (f) {
-        return { url: f.url, marks: byFile[f.file_id] || null };
+      .map(function (x) {
+        return { url: x.f.url, marks: byFile[x.f.file_id] || null };
       });
+  }
+
+  /* A real card's pages as pictures on this device: each link is fetched
+     once and shown from a blob: address, as a Sent card's and a revision's
+     pages are (the page shows no picture from anywhere else). A page that
+     does not come is left out. Demo Mode's are the shipped sample pages. */
+  function picturesOf(pages) {
+    if (S && S.demo) return Promise.resolve(pages);
+    return Promise.all(
+      pages.map(function (pg) {
+        return /^https:\/\//.test(pg.url) ? picture(pg.url) : Promise.resolve(null);
+      }),
+    ).then(function (blobs) {
+      var out = [];
+      blobs.forEach(function (b, i) {
+        var u = b ? objectUrl(b) : '';
+        if (u) out.push({ url: u, marks: pages[i].marks });
+      });
+      return out;
+    });
   }
 
   // Is See Your Work still open on piece `id`, for this student, from this ask?
@@ -963,10 +1032,20 @@
         marks &&
         marks.ok === true &&
         Array.isArray(marks.files);
-      S.workPages = ok
-        ? { id: id, state: 'ready', pages: pagesFrom(links, marks), asked: mine }
-        : { id: id, state: 'failed', pages: [], asked: mine };
-      StudentPage.paint('#sp-work-title');
+      if (!ok) {
+        S.workPages = { id: id, state: 'failed', pages: [], asked: mine };
+        return StudentPage.paint('#sp-work-title');
+      }
+      var want = pagesFrom(links, marks);
+      return StudentPage.whileCurrent(picturesOf(want)).then(function (pages) {
+        if (!current(id, student, mine)) return;
+        // Every page's picture failed to come: Try Again, never an empty screen.
+        S.workPages =
+          want.length && !pages.length
+            ? { id: id, state: 'failed', pages: [], asked: mine }
+            : { id: id, state: 'ready', pages: pages, asked: mine };
+        StudentPage.paint('#sp-work-title');
+      });
     });
   }
 
@@ -1021,6 +1100,8 @@
   }
 
   StudentPage.feedbackOf = feedbackOf;
+  // The sample's returned pieces with pages in, for Demo Mode's `work` reply (s/send.js).
+  StudentPage.demoHandedIn = demoHandedIn;
   StudentPage.feedbackSeen = feedbackSeen;
   StudentPage.groupOf = groupOf;
   // s/send.js, after a real revision or group send went in or came out (S11-W1, S12-W1).

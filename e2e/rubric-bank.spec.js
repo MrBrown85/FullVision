@@ -481,7 +481,7 @@ test.describe('Rubric Bank, Advanced Rubrics', () => {
     await expect(bank).toHaveCount(0);
     const editor = page.locator('#rubric-modal');
     await expect(editor).toBeVisible();
-    await expect(editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Advanced' })).toHaveAttribute(
+    await expect(editor.locator('.af-ge-style').getByRole('radio', { name: 'Advanced' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
@@ -492,19 +492,19 @@ test.describe('Rubric Bank, Advanced Rubrics', () => {
     await bank.getByRole('button', { name: /New Rubric/ }).click();
     await bank.getByRole('menuitem', { name: /Single-Point Rubric/ }).click();
     const editor = page.locator('#rubric-modal');
-    await expect(editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Single-Point' })).toHaveAttribute(
+    await expect(editor.locator('.af-ge-style').getByRole('radio', { name: 'Single-Point' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
-    await expect(editor.locator('.rubric-level-card')).toHaveCount(1);
-    await expect(editor.locator('.rubric-level-name')).toHaveText('Meeting the Standard');
-    await editor.locator('.rubric-level-text').fill('Explains the trend with evidence.');
-    await editor.locator('#re-name').fill('Single-Point Lab');
+    await expect(editor.locator('thead .rb-level-head')).toHaveCount(1);
+    await expect(editor.locator('thead .rb-level-head')).toHaveText('Proficient Standard');
+    await editor.locator('.af-ge-text').fill('Explains the trend with evidence.');
+    await editor.locator('#af-ge-name').fill('Single-Point Lab');
     // Standard shows all four levels and keeps the Proficient wording.
-    await editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Standard' }).click();
-    await expect(editor.locator('.rubric-level-card')).toHaveCount(4);
-    await expect(editor.locator('.rubric-level-text[data-level="3"]')).toHaveValue('Explains the trend with evidence.');
-    await editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Single-Point' }).click();
+    await editor.locator('.af-ge-style').getByRole('radio', { name: 'Standard' }).click();
+    await expect(editor.locator('thead .rb-level-head')).toHaveCount(4);
+    await expect(editor.locator('.af-ge-text[data-level="3"]')).toHaveValue('Explains the trend with evidence.');
+    await editor.locator('.af-ge-style').getByRole('radio', { name: 'Single-Point' }).click();
     await editor.getByRole('button', { name: 'Save Rubric' }).click();
     const saved = await page.evaluate(() =>
       getRubrics(getActiveCourse())

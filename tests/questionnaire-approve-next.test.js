@@ -166,6 +166,33 @@ describe('Approve and Next', () => {
     expect(current().id).toBe('stu-hopper');
   });
 
+  describe('with the sidebar sorted by First Name (live run: Approve and Next jumped around the list)', () => {
+    afterEach(() => saveViewPref('gb-roster-sort-' + CID, null));
+
+    it('goes down the list in the sidebar’s order', () => {
+      saveViewPref('gb-roster-sort-' + CID, 'firstName');
+      expect(RQ.getTqStudents().map(s => s.id)).toEqual(['stu-lovelace', 'stu-turing', 'stu-hopper']);
+      RQ.tqStudentIndex = indexOf('stu-lovelace');
+      RQ.tqApproveNext();
+      expect(current().id).toBe('stu-turing');
+      RQ.tqApproveNext();
+      expect(current().id).toBe('stu-hopper');
+      RQ.tqNextStudent();
+      expect(onLast).toBe(1);
+    });
+
+    it('keeps the student on screen when the Sort changes, so the next approval is theirs', () => {
+      RQ.tqStudentIndex = indexOf('stu-turing');
+      expect(current().id).toBe('stu-turing');
+      saveViewPref('gb-roster-sort-' + CID, 'firstName');
+      expect(current().id).toBe('stu-turing');
+      RQ.tqApproveNext();
+      expect(approved('stu-turing')).toBe(true);
+      expect(approved('stu-lovelace')).toBe(false);
+      expect(current().id).toBe('stu-hopper');
+    });
+  });
+
   it('the roster’s next (↓) still moves without approving and hands over after the last student', () => {
     RQ.tqStudentIndex = indexOf('stu-lovelace');
     RQ.tqNextStudent();

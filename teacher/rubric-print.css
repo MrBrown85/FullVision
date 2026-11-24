@@ -699,3 +699,19 @@
 .rp-mark[hidden] {
   display: none;
 }
+
+/* Six-Point rubrics: six score columns on the same page, so the criterion
+   column and the type give a little room. */
+.rubric-table.is-six .rubric-crit-head {
+  width: 16%;
+}
+.rubric-table.is-six .rubric-level-head {
+  font-size: 0.82em;
+}
+.rubric-table.is-six td.rubric-cell {
+  font-size: 0.72em;
+}
+.rubric-six-num {
+  display: block;
+  font-size: 1.25em;
+}

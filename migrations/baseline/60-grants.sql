@@ -22,6 +22,7 @@ grant delete, insert, select, update on table public.attendance to authenticated
 revoke all on table public.bulletin from public;
 revoke all on table public.bulletin_file from public;
 revoke all on table public.bulletin_reaction from public;
+revoke all on table public.bulletin_reminder from public;
 revoke all on table public.bulletin_seen from public;
 revoke all on table public.category from public;
 grant delete, insert, select, update on table public.category to authenticated;
@@ -394,9 +395,9 @@ grant execute on routine public.confirm_quiz(p_assessment_id uuid, p_marks jsonb
 revoke all on routine public.course_draft_count(p_course_id uuid) from public;
 grant execute on routine public.course_draft_count(p_course_id uuid) to authenticated;
 grant execute on routine public.course_draft_count(p_course_id uuid) to service_role;
-revoke all on routine public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) from public;
-grant execute on routine public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) to authenticated;
-grant execute on routine public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) to service_role;
+revoke all on routine public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean, p_students_see_factored boolean) from public;
+grant execute on routine public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean, p_students_see_factored boolean) to authenticated;
+grant execute on routine public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean, p_students_see_factored boolean) to service_role;
 revoke all on routine public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) from public;
 grant execute on routine public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) to authenticated;
 grant execute on routine public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) to service_role;
@@ -599,9 +600,6 @@ grant execute on routine public.import_json_restore(p_payload jsonb, p_idempoten
 revoke all on routine public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) from public;
 grant execute on routine public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) to service_role;
-revoke all on routine public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) from public;
-grant execute on routine public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) to authenticated;
-grant execute on routine public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) to service_role;
 revoke all on routine public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) from public;
 grant execute on routine public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) to service_role;
@@ -712,6 +710,9 @@ grant execute on routine public.move_rubric_scores(p_assessment_id uuid, p_rubri
 revoke all on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) from public;
 grant execute on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) to service_role;
+revoke all on routine public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) from public;
+grant execute on routine public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) to authenticated;
+grant execute on routine public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) to service_role;
 revoke all on routine public.photo_lifecycle_nightly() from public;
 revoke all on routine public.photo_removal_call() from public;
 revoke all on routine public.photo_removal_due() from public;
@@ -845,8 +846,9 @@ grant execute on routine public.set_score_status(p_enrollment_id uuid, p_assessm
 grant execute on routine public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) to service_role;
 revoke all on routine public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) from public;
 grant execute on routine public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) to authenticated;
-revoke all on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) from public;
-grant execute on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) to authenticated;
+revoke all on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) from public;
+grant execute on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) to authenticated;
+grant execute on routine public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) to service_role;
 revoke all on routine public.soft_delete_teacher() from public;
 grant execute on routine public.soft_delete_teacher() to authenticated;
 grant execute on routine public.soft_delete_teacher() to service_role;
@@ -923,9 +925,9 @@ grant execute on routine public.upsert_questionnaire(p_course_id uuid, p_kind te
 revoke all on routine public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) from public;
 grant execute on routine public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) to authenticated;
 grant execute on routine public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) to service_role;
-revoke all on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) from public;
-grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) to authenticated;
-grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) to service_role;
+revoke all on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) from public;
+grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) to authenticated;
+grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) to service_role;
 revoke all on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) from public;
 grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) to authenticated;
 grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) to service_role;
@@ -1020,8 +1022,8 @@ revoke all on routine student_submit.issue_slips(p_teacher_id uuid, p_kind text,
 grant execute on routine student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) to service_role;
 revoke all on routine student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
-revoke all on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) from public;
-grant execute on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) to service_role;
+revoke all on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) from public;
+grant execute on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) to service_role;
 revoke all on routine student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) to service_role;
 revoke all on routine student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) from public;
@@ -1066,7 +1068,7 @@ revoke all on routine student_submit.unsend(p_session_token text, p_enrollment_i
 grant execute on routine student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
 revoke all on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) from public;
 grant execute on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) to service_role;
-revoke all on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) from public;
-grant execute on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) to service_role;
+revoke all on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) from public;
+grant execute on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) to service_role;
 revoke all on routine student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) to service_role;

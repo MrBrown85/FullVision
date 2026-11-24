@@ -64,13 +64,16 @@ function _applyDemoStudentPageAndDrafts() {
   if (applyDemoStudentPage() && typeof seedDemoDrafts === 'function') seedDemoDrafts();
 }
 
-/* The front page's Try Demo Mode link starts Demo Mode with the student
-   features showing (login-auth.js sets DEMO_STUDENT_KEY to 'pending'). Once
-   the sample class is there, this turns on for it, through the same writers
-   Class Settings uses: the Student Page switch, Return Grades set to When I
-   Return Them, Send Work, Reflect on Feedback and Show My Learning. It does
-   this once; the key then reads 'on', so a visitor's own changes stick.
-   Any other way into Demo Mode never sets the key and nothing changes. */
+/* Demo Mode always starts with the student features showing, however it is
+   entered (Try Demo Mode, /login.html?demo=1, Open Demo Mode, Reset Demo
+   Data), so Bulletins, Send Work and the student card have something to
+   show. Once the sample class is there, this turns on for it, through the
+   same writers Class Settings uses: the Student Page switch, Return Grades
+   set to When I Return Them, Send Work, Reflect on Feedback and Show My
+   Learning. It does this once; the key then reads 'on', so a visitor's own
+   changes stick. Reset Demo Data clears the key, so the sample class gets
+   them again. No grade moves: Return Grades only decides when a grade is
+   shown to a student. */
 var DEMO_STUDENT_KEY = 'gb-demo-student-page';
 var DEMO_STUDENT_CLASS = 'sci8';
 function applyDemoStudentPage() {
@@ -82,7 +85,7 @@ function applyDemoStudentPage() {
   } catch (e) {
     return false;
   }
-  if (mark !== 'pending' || !COURSES[DEMO_STUDENT_CLASS]) return false;
+  if (mark === 'on' || !COURSES[DEMO_STUDENT_CLASS]) return false;
   var cid = DEMO_STUDENT_CLASS;
   saveReturnSettings(cid, { student_page_enabled: true });
   saveReturnSettings(cid, { return_grades: 'on_return' });
@@ -131,9 +134,9 @@ window.resetDemoData = async function () {
   } catch (e) {
     /* storage blocked */
   }
-  // A demo that began with the student features showing gets them back.
+  // The sample class gets the student features back.
   try {
-    if (localStorage.getItem(DEMO_STUDENT_KEY) === 'on') localStorage.setItem(DEMO_STUDENT_KEY, 'pending');
+    localStorage.removeItem(DEMO_STUDENT_KEY);
   } catch (e) {
     /* storage blocked */
   }

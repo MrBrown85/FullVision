@@ -8,7 +8,7 @@
       content="FullVision is a gradebook and report writer for BC teachers: assess on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
     />
     <title>FullVision — Gradebook and Report Cards for BC Teachers</title>
-    <meta name="theme-color" content="#0071e3" />
+    <meta name="theme-color" content="#070d1a" />
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
@@ -26,35 +26,110 @@
     <meta name="twitter:card" content="summary_large_image" />
     <script src="shared/sentry-init.js"></script>
     <style>
+      /* The front page, on the look of the FullVision deck: deep navy, slow
+         colour in the background, screenshots that glow and drift, and words
+         that arrive as they scroll in. Colours are the Proficiency Scale's. */
       :root {
-        --ink: #1d1d1f;
-        --ink-2: #48484d;
-        --ink-3: #6e6e73;
+        --bg: #070d1a;
+        --bg-2: #0b1426;
+        --ink: #f4f7fb;
+        --ink-2: #c3ccda;
+        --ink-3: #8c98ab;
         --blue: #0071e3;
-        --blue-ink: #0058b0;
-        --paper: #ffffff;
-        --mist: #f5f5f7;
-        --line: #e5e5ea;
-        --night: #0f1420;
+        --sky: #5aaeff;
+        --emg: #ff7b7b;
+        --dev: #f5b843;
+        --prf: #34c77b;
+        --ext: #6d9bff;
+        --gold: #d69a2d;
+        --card: rgba(255, 255, 255, 0.055);
+        --line: rgba(255, 255, 255, 0.12);
+        --glow:
+          0 40px 90px -24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.12),
+          0 0 90px -20px rgba(74, 163, 255, 0.4);
+      }
+      html {
+        background: var(--bg);
+        scroll-behavior: smooth;
       }
       body {
         margin: 0;
-        background: var(--mist);
-        color-scheme: light;
+        background: var(--bg);
+        color-scheme: dark;
+        overflow-x: hidden;
       }
       a {
-        color: var(--blue);
+        color: var(--sky);
       }
       a:hover {
-        color: var(--blue-ink);
+        color: #8cc7ff;
       }
       .fv {
-        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+        position: relative;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
         color: var(--ink);
         -webkit-font-smoothing: antialiased;
       }
+      /* The living background: four soft lights that drift, and a faint grid. */
+      .aurora {
+        position: fixed;
+        inset: -20%;
+        z-index: 0;
+        pointer-events: none;
+        filter: blur(100px) saturate(140%);
+        opacity: 0.5;
+      }
+      .aurora i {
+        position: absolute;
+        width: 44vw;
+        height: 44vw;
+        border-radius: 50%;
+        mix-blend-mode: screen;
+      }
+      .aurora i:nth-child(1) {
+        background: #0071e3;
+        left: 4%;
+        top: 6%;
+      }
+      .aurora i:nth-child(2) {
+        background: #1f9d63;
+        left: 56%;
+        top: 0;
+        opacity: 0.8;
+      }
+      .aurora i:nth-child(3) {
+        background: #6a3cff;
+        left: 28%;
+        top: 52%;
+        opacity: 0.6;
+      }
+      .aurora i:nth-child(4) {
+        background: #d69a2d;
+        left: 72%;
+        top: 62%;
+        opacity: 0.4;
+      }
+      .grid {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 64px 64px;
+        -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 25%, transparent 75%);
+        mask-image: radial-gradient(ellipse at 50% 30%, #000 25%, transparent 75%);
+      }
+      .fv > header,
+      .fv > main,
+      .fv > footer {
+        position: relative;
+        z-index: 1;
+      }
       .wrap {
-        max-width: 1200px;
+        max-width: 1220px;
         margin: 0 auto;
         padding: 0 32px;
       }
@@ -62,9 +137,9 @@
         position: sticky;
         top: 0;
         z-index: 5;
-        background: rgba(255, 255, 255, 0.86);
-        backdrop-filter: saturate(180%) blur(16px);
-        -webkit-backdrop-filter: saturate(180%) blur(16px);
+        background: rgba(7, 13, 26, 0.72);
+        backdrop-filter: saturate(180%) blur(18px);
+        -webkit-backdrop-filter: saturate(180%) blur(18px);
         border-bottom: 1px solid var(--line);
       }
       .bar {
@@ -81,9 +156,12 @@
         text-decoration: none;
         color: var(--ink);
       }
+      .brand:hover {
+        color: var(--ink);
+      }
       .brand span {
         font-size: 20px;
-        font-weight: 700;
+        font-weight: 800;
         letter-spacing: -0.02em;
       }
       .navlinks {
@@ -91,110 +169,140 @@
         gap: 22px;
       }
       .navlink {
-        color: var(--ink);
+        color: var(--ink-2);
         text-decoration: none;
         font-size: 15px;
         padding: 12px 2px;
       }
       .navlink:hover {
-        color: var(--blue);
+        color: #ffffff;
       }
       .btn {
+        position: relative;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 48px;
-        padding: 0 24px;
-        border-radius: 12px;
+        min-height: 50px;
+        padding: 0 26px;
+        border-radius: 14px;
         font-size: 16px;
-        font-weight: 600;
+        font-weight: 700;
         text-decoration: none;
         box-sizing: border-box;
+        overflow: hidden;
       }
       .btn-sm {
         min-height: 40px;
         padding: 0 16px;
         font-size: 15px;
-        border-radius: 10px;
+        border-radius: 11px;
       }
+      /* Buttons are flat: one colour, no sheen or glow. */
       .btn-solid {
-        background: var(--blue);
+        background: #0066cc;
         color: #ffffff;
       }
       .btn-solid:hover {
         color: #ffffff;
-        filter: brightness(0.92);
+        background: #0058b0;
       }
       .btn-plain {
-        background: #ffffff;
+        background: rgba(255, 255, 255, 0.08);
         color: var(--ink);
-        box-shadow: inset 0 0 0 1px #d1d1d6;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
       }
       .btn-plain:hover {
-        color: var(--ink);
-        background: #fafafa;
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.14);
       }
       .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
         margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--blue-ink);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--sky);
+      }
+      .eyebrow::before {
+        content: '';
+        width: 32px;
+        height: 3px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, var(--sky), transparent);
       }
       .h1 {
         margin: 0;
-        font-size: 60px;
-        line-height: 1.04;
-        letter-spacing: -0.04em;
-        font-weight: 700;
+        font-size: 72px;
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+        font-weight: 850;
       }
       .h2 {
         margin: 0;
-        font-size: 38px;
-        line-height: 1.1;
-        letter-spacing: -0.03em;
-        font-weight: 700;
+        font-size: 44px;
+        line-height: 1.06;
+        letter-spacing: -0.035em;
+        font-weight: 800;
+      }
+      /* A heading's key words in the scale's colours, the light moving through. */
+      .h1 em,
+      .h2 em {
+        font-style: normal;
+        background: linear-gradient(100deg, #7cc0ff, #34c77b 40%, #f5b843 70%, #ff8f6b, #7cc0ff);
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
       .lede {
         margin: 0;
         font-size: 19px;
-        line-height: 1.55;
+        line-height: 1.6;
         color: var(--ink-2);
+      }
+      .lede b {
+        color: #ffffff;
       }
       .stack {
         display: flex;
         flex-direction: column;
-        gap: 18px;
+        gap: 20px;
       }
       .band {
-        padding: 104px 0;
+        padding: 112px 0;
       }
+      /* Every other band sits on a slightly lighter, glassy sheet. */
       .band-white {
-        background: var(--paper);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       }
       .shot {
         display: block;
         width: 100%;
         height: auto;
-        border-radius: 14px;
+        border-radius: 16px;
         background: #ffffff;
-        box-shadow:
-          0 24px 60px rgba(29, 29, 31, 0.12),
-          0 0 0 1px rgba(29, 29, 31, 0.08);
+        box-shadow: var(--glow);
       }
       .phone {
         display: block;
         width: 100%;
         height: auto;
-        border-radius: 34px;
+        border-radius: 36px;
         background: #ffffff;
         box-shadow:
-          0 28px 64px rgba(29, 29, 31, 0.22),
-          0 0 0 8px #1d1d1f;
+          0 40px 80px -20px rgba(0, 0, 0, 0.8),
+          0 0 0 9px #1a2130,
+          0 0 0 10px rgba(255, 255, 255, 0.14),
+          0 0 80px -10px rgba(52, 199, 123, 0.35);
       }
       /* Hero */
       .hero {
-        background: var(--paper);
-        padding: 80px 0 96px;
+        padding: 88px 0 72px;
         overflow: hidden;
       }
       .hero-grid {
@@ -203,18 +311,105 @@
         gap: 56px;
         align-items: center;
       }
+      .mark {
+        display: flex;
+        align-items: flex-end;
+        gap: 5px;
+        width: 64px;
+        height: 64px;
+        box-sizing: border-box;
+        padding: 0 12px 14px;
+        border-radius: 17px;
+        background: var(--blue);
+        box-shadow: 0 16px 44px -8px rgba(0, 113, 227, 0.85);
+      }
+      .mark span {
+        flex: 1;
+        border-radius: 2px;
+        background: #ffffff;
+        transform-origin: bottom;
+      }
+      .mark span:nth-child(1) {
+        height: 11px;
+        opacity: 0.55;
+      }
+      .mark span:nth-child(2) {
+        height: 19px;
+        opacity: 0.7;
+      }
+      .mark span:nth-child(3) {
+        height: 27px;
+        opacity: 0.85;
+      }
+      .mark span:nth-child(4) {
+        height: 35px;
+      }
       .collage {
         position: relative;
-        padding: 0 0 56px;
+        padding: 0 0 64px;
+        perspective: 1800px;
       }
       .collage .shot {
-        width: 88%;
+        width: 90%;
       }
       .collage .phone-wrap {
         position: absolute;
         right: 0;
         bottom: 0;
         width: 27%;
+      }
+      .tag {
+        position: absolute;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 16px;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+        color: #ffffff;
+        background: rgba(10, 18, 34, 0.86);
+        border: 1px solid var(--line);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      }
+      .tag::before {
+        content: '';
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--c, var(--sky));
+        box-shadow: 0 0 0 0 var(--c, var(--sky));
+      }
+      .scale {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pill {
+        padding: 7px 14px;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .pill.e {
+        background: rgba(255, 107, 107, 0.15);
+        color: #ff9a9a;
+      }
+      .pill.d {
+        background: rgba(245, 184, 67, 0.15);
+        color: #ffcd6a;
+      }
+      .pill.p {
+        background: rgba(52, 199, 123, 0.17);
+        color: #6ae3a8;
+      }
+      .pill.x {
+        background: rgba(76, 141, 255, 0.18);
+        color: #9dbfff;
       }
       .minis {
         display: flex;
@@ -227,21 +422,21 @@
       .minis li,
       .ticks li {
         position: relative;
-        padding-left: 22px;
+        padding-left: 24px;
         font-size: 15px;
-        line-height: 1.45;
+        line-height: 1.5;
         color: var(--ink-2);
       }
       .minis li::before,
       .ticks li::before {
         content: '';
         position: absolute;
-        left: 1px;
-        top: 5px;
+        left: 2px;
+        top: 6px;
         width: 10px;
         height: 5px;
-        border-left: 2px solid var(--blue);
-        border-bottom: 2px solid var(--blue);
+        border-left: 2px solid var(--prf);
+        border-bottom: 2px solid var(--prf);
         transform: rotate(-45deg);
       }
       .ticks {
@@ -250,40 +445,34 @@
         padding: 4px 0 0;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
       }
       .ticks li {
         font-size: 16px;
-        padding-left: 26px;
+        padding-left: 38px;
       }
-      /* Facts */
-      .facts {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
+      .ticks li::before {
+        left: 0;
+        top: -1px;
+        width: 26px;
+        height: 26px;
+        box-sizing: border-box;
+        border: 0;
+        border-radius: 8px;
+        transform: none;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='%2334c77b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+            center / 16px no-repeat,
+          rgba(52, 199, 123, 0.15);
       }
-      .fact {
-        background: var(--paper);
-        border-radius: 16px;
-        padding: 22px 22px 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .fact b {
-        font-size: 28px;
-        letter-spacing: -0.02em;
-      }
-      .fact span {
-        font-size: 15px;
-        line-height: 1.45;
-        color: var(--ink-2);
+      .ticks b {
+        color: #ffffff;
       }
       /* Feature rows */
       .feat {
         display: grid;
         grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
-        gap: 64px;
+        gap: 72px;
         align-items: center;
       }
       .feat.flip {
@@ -310,6 +499,23 @@
         justify-self: center;
         width: 100%;
       }
+      .feat + .feat {
+        margin-top: 112px;
+      }
+      /* A screenshot with a phone in front of it. */
+      .pair {
+        position: relative;
+        padding: 0 0 48px;
+      }
+      .pair .shot {
+        width: 82%;
+      }
+      .pair .phone-wrap {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 30%;
+      }
       /* Student work */
       .work {
         display: grid;
@@ -318,6 +524,7 @@
         align-items: center;
       }
       .steps {
+        position: relative;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 32px;
@@ -332,31 +539,46 @@
         flex-direction: column;
         gap: 6px;
         font-size: 16px;
-        line-height: 1.5;
+        line-height: 1.55;
         color: var(--ink-2);
+        padding: 24px;
+        border-radius: 22px;
+        background: var(--card);
+        border: 1px solid var(--line);
       }
       .steps li::before {
         content: counter(step);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 30px;
-        height: 30px;
+        width: 44px;
+        height: 44px;
         border-radius: 50%;
         background: var(--blue);
+        box-shadow: 0 0 0 8px rgba(0, 113, 227, 0.18);
         color: #ffffff;
-        font-weight: 700;
-        font-size: 15px;
-        margin-bottom: 6px;
+        font-weight: 850;
+        font-size: 19px;
+        margin-bottom: 10px;
+      }
+      .steps li:nth-child(2)::before {
+        background: #1f9d63;
+        box-shadow: 0 0 0 8px rgba(52, 199, 123, 0.18);
+      }
+      .steps li:nth-child(3)::before {
+        background: var(--gold);
+        box-shadow: 0 0 0 8px rgba(245, 184, 67, 0.18);
       }
       .steps b {
-        color: var(--ink);
-        font-size: 17px;
+        color: #ffffff;
+        font-size: 19px;
+        letter-spacing: -0.01em;
       }
-      /* Report sheet */
+      /* Printed sheets, on a lit desk */
       .sheet-wrap {
-        background: linear-gradient(160deg, #e9edf5, #f6f7fa);
-        border-radius: 20px;
+        background: radial-gradient(ellipse at 50% 0%, rgba(90, 174, 255, 0.28), rgba(255, 255, 255, 0.04) 70%);
+        border: 1px solid var(--line);
+        border-radius: 24px;
         padding: 40px 48px 0;
         overflow: hidden;
         max-height: 520px;
@@ -365,7 +587,7 @@
         display: block;
         width: 100%;
         border-radius: 8px 8px 0 0;
-        box-shadow: 0 18px 50px rgba(29, 29, 31, 0.14);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
       }
       /* Two ways to do the same job, side by side in the text column */
       .choices {
@@ -375,17 +597,13 @@
         padding-top: 4px;
       }
       .choice {
-        background: var(--paper);
-        border-radius: 14px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
         padding: 16px 18px;
         display: flex;
         flex-direction: column;
         gap: 4px;
-        box-shadow: 0 0 0 1px rgba(29, 29, 31, 0.06);
-      }
-      .band-white .choice {
-        background: var(--mist);
-        box-shadow: none;
       }
       .choice b {
         font-size: 16px;
@@ -393,18 +611,38 @@
       }
       .choice span {
         font-size: 15px;
-        line-height: 1.45;
+        line-height: 1.5;
         color: var(--ink-2);
       }
-      .feat + .feat {
-        margin-top: 96px;
+      /* Two choices side by side across a full-width section */
+      .choices.two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      /* New: a small marker beside an eyebrow */
+      .new {
+        display: inline-block;
+        margin-left: 10px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        color: #0b1a2a;
+        background: linear-gradient(120deg, #f1b434, #d69a2d);
+      }
+      .choice .new {
+        font-size: 11px;
+        line-height: 1.4;
+        color: #0b1a2a;
+        text-transform: uppercase;
+        vertical-align: 2px;
       }
       /* Type: headings break into even lines, and no paragraph ends on one
          stranded word. A long lede stops at a readable measure. */
       .h1,
       .h2,
       .card h3,
-      .fact b,
       .choice b {
         text-wrap: balance;
       }
@@ -412,66 +650,20 @@
       .ticks li,
       .steps li,
       .card p,
-      .fact span,
       .choice span {
         text-wrap: pretty;
       }
       .lede {
         max-width: 34em;
       }
-      /* Motion: small and quiet, and none at all for a visitor who asks for
-         less. Buttons and links ease on hover; the hero settles in once; each
-         block rises a few pixels as it scrolls into view (only where the
-         browser can tie it to the scroll, so nothing is ever left hidden). */
-      .btn,
-      .navlink {
-        transition:
-          color 0.15s ease,
-          background-color 0.15s ease,
-          filter 0.15s ease;
-      }
-      @media (prefers-reduced-motion: no-preference) {
-        @keyframes fv-rise {
-          from {
-            opacity: 0;
-            transform: translateY(16px);
-          }
-          to {
-            opacity: 1;
-            transform: none;
-          }
-        }
-        .hero .hero-grid > * {
-          animation: fv-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-        }
-        .hero .hero-grid > :nth-child(2) {
-          animation-delay: 0.12s;
-        }
-        @supports (animation-timeline: view()) {
-          .band .feat-text,
-          .band .shot,
-          .band .phone-col,
-          .band .sheet-wrap,
-          .fact,
-          .card,
-          .steps li {
-            animation: fv-rise linear both;
-            animation-timeline: view();
-            animation-range: entry 5% entry 45%;
-          }
-        }
-      }
       /* For schools */
       .schools {
-        background: var(--night);
-        color: #ffffff;
-        padding: 104px 0;
-      }
-      .schools .eyebrow {
-        color: #7cb8ff;
-      }
-      .schools .lede {
-        color: #b8bfcc;
+        padding: 112px 0;
+        background:
+          radial-gradient(ellipse at 15% 0%, rgba(31, 157, 99, 0.22), transparent 55%),
+          radial-gradient(ellipse at 85% 100%, rgba(0, 113, 227, 0.25), transparent 55%), rgba(0, 0, 0, 0.25);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       }
       .cards {
         display: grid;
@@ -479,23 +671,41 @@
         gap: 14px;
       }
       .card {
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 24px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 26px;
         display: flex;
         flex-direction: column;
         gap: 8px;
+        transition:
+          transform 0.25s ease,
+          border-color 0.25s ease;
+      }
+      .card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(90, 174, 255, 0.45);
       }
       .card h3 {
         margin: 0;
         font-size: 18px;
       }
+      .card h3::before {
+        content: '';
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        margin-right: 10px;
+        border-radius: 50%;
+        background: var(--prf);
+        box-shadow: 0 0 12px var(--prf);
+        vertical-align: 2px;
+      }
       .card p {
         margin: 0;
         font-size: 15px;
-        line-height: 1.55;
-        color: #b8bfcc;
+        line-height: 1.6;
+        color: var(--ink-2);
       }
       /* Questions */
       .faq {
@@ -510,7 +720,7 @@
       .faq summary {
         cursor: pointer;
         font-size: 18px;
-        font-weight: 600;
+        font-weight: 650;
         list-style: none;
         display: flex;
         justify-content: space-between;
@@ -521,7 +731,7 @@
       }
       .faq summary::after {
         content: '+';
-        color: var(--ink-3);
+        color: var(--sky);
         font-weight: 400;
       }
       .faq details[open] summary::after {
@@ -530,8 +740,57 @@
       .faq p {
         margin: 12px 0 0;
         font-size: 16px;
-        line-height: 1.55;
+        line-height: 1.6;
         color: var(--ink-2);
+      }
+      /* The closing invitation */
+      .cta {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        padding: 72px 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        text-align: center;
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(124, 192, 255, 0.55), transparent 60%),
+          radial-gradient(ellipse at 90% 100%, rgba(245, 184, 67, 0.35), transparent 55%),
+          linear-gradient(135deg, #0a4fa8, #0071e3 60%, #1f9d63);
+        box-shadow: 0 40px 100px -30px rgba(0, 113, 227, 0.8);
+      }
+      .cta p {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.55;
+        color: #e3efff;
+        max-width: 560px;
+      }
+      .cta .btn-plain {
+        background: #ffffff;
+        color: #0b2a52;
+        box-shadow: none;
+      }
+      .cta .btn-ghost {
+        color: #ffffff;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+      }
+      .cta .btn-ghost:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+      footer.foot {
+        border-top: 1px solid var(--line);
+        background: rgba(0, 0, 0, 0.25);
+      }
+      footer.foot a {
+        font-size: 14px;
+        text-decoration: none;
+        color: var(--ink-2);
+      }
+      footer.foot a:hover {
+        color: #ffffff;
       }
       .skip {
         position: absolute;
@@ -539,13 +798,227 @@
         top: -48px;
         padding: 10px 14px;
         background: #ffffff;
-        color: var(--ink);
+        color: #1d1d1f;
         border-radius: 10px;
         box-shadow: 0 0 0 2px var(--blue);
         z-index: 10;
       }
       .skip:focus {
         top: 12px;
+      }
+      :focus-visible {
+        outline: 2px solid var(--sky);
+        outline-offset: 3px;
+      }
+      /* Motion: lively, and none at all for a visitor who asks for less.
+         The lights drift, the logo's bars grow, the hero's pictures swing in
+         and float, headings shimmer, and each block rises as it scrolls into
+         view. Blocks are hidden only once the page's script is running
+         (html.fv-js), so without it nothing is ever left hidden. */
+      .btn,
+      .navlink {
+        transition:
+          color 0.15s ease,
+          background-color 0.15s ease,
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+      .tilt {
+        transition: transform 0.3s ease-out;
+        transform-style: preserve-3d;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .btn:hover {
+          transform: translateY(-2px);
+        }
+        .aurora i {
+          animation: fv-drift 28s ease-in-out infinite alternate;
+        }
+        .aurora i:nth-child(2) {
+          animation-duration: 33s;
+          animation-delay: -8s;
+        }
+        .aurora i:nth-child(3) {
+          animation-duration: 39s;
+          animation-delay: -14s;
+        }
+        .aurora i:nth-child(4) {
+          animation-duration: 31s;
+          animation-delay: -4s;
+        }
+        @keyframes fv-drift {
+          0% {
+            transform: translate(0, 0) scale(1);
+          }
+          50% {
+            transform: translate(8vw, -6vh) scale(1.2);
+          }
+          100% {
+            transform: translate(-6vw, 8vh) scale(0.9);
+          }
+        }
+        .h1 em,
+        .h2 em {
+          animation: fv-shine 7s linear infinite;
+        }
+        @keyframes fv-shine {
+          to {
+            background-position: 200% 0;
+          }
+        }
+        .mark span {
+          animation: fv-grow 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+        }
+        .mark span:nth-child(1) {
+          animation-delay: 0.25s;
+        }
+        .mark span:nth-child(2) {
+          animation-delay: 0.38s;
+        }
+        .mark span:nth-child(3) {
+          animation-delay: 0.51s;
+        }
+        .mark span:nth-child(4) {
+          animation-delay: 0.64s;
+        }
+        @keyframes fv-grow {
+          from {
+            transform: scaleY(0);
+          }
+        }
+        .float {
+          animation: fv-bob 7s ease-in-out infinite;
+        }
+        .float.b {
+          animation-duration: 8.5s;
+          animation-delay: -3s;
+        }
+        @keyframes fv-bob {
+          0%,
+          100% {
+            translate: 0 0;
+          }
+          50% {
+            translate: 0 -14px;
+          }
+        }
+        .tag::before {
+          animation: fv-ping 1.8s infinite;
+        }
+        @keyframes fv-ping {
+          70% {
+            box-shadow: 0 0 0 10px transparent;
+          }
+          100% {
+            box-shadow: 0 0 0 0 transparent;
+          }
+        }
+        .hero-text > * {
+          animation: fv-rise 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+        }
+        .hero-text > :nth-child(2) {
+          animation-delay: 0.08s;
+        }
+        .hero-text > :nth-child(3) {
+          animation-delay: 0.16s;
+        }
+        .hero-text > :nth-child(4) {
+          animation-delay: 0.24s;
+        }
+        .hero-text > :nth-child(5) {
+          animation-delay: 0.32s;
+        }
+        .hero-text > :nth-child(6) {
+          animation-delay: 0.4s;
+        }
+        .collage .shot-in {
+          animation: fv-swing 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both;
+        }
+        .collage .phone-wrap {
+          animation: fv-drop 1s cubic-bezier(0.2, 1.3, 0.4, 1) 0.7s both;
+        }
+        .collage .tag {
+          animation: fv-pop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+        }
+        .collage .tag:nth-of-type(1) {
+          animation-delay: 1.2s;
+        }
+        .collage .tag:nth-of-type(2) {
+          animation-delay: 1.4s;
+        }
+        @keyframes fv-rise {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
+        @keyframes fv-swing {
+          from {
+            opacity: 0;
+            transform: translateX(120px) rotateY(-28deg);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
+        @keyframes fv-drop {
+          0% {
+            opacity: 0;
+            transform: translateY(-120px) rotate(-6deg);
+          }
+          60% {
+            opacity: 1;
+            transform: translateY(10px) rotate(2deg);
+          }
+          100% {
+            opacity: 1;
+            transform: none;
+          }
+        }
+        @keyframes fv-pop {
+          0% {
+            opacity: 0;
+            transform: scale(0.4);
+          }
+          70% {
+            opacity: 1;
+            transform: scale(1.08);
+          }
+          100% {
+            opacity: 1;
+            transform: none;
+          }
+        }
+        .fv-js .reveal {
+          opacity: 0;
+          transform: translateY(48px);
+          transition:
+            opacity 0.9s ease,
+            transform 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.05);
+          transition-delay: var(--d, 0s);
+        }
+        .fv-js .reveal.from-right {
+          transform: translateX(80px) rotate(1.5deg);
+        }
+        .fv-js .reveal.from-left {
+          transform: translateX(-80px) rotate(-1.5deg);
+        }
+        .fv-js .reveal.zoom {
+          transform: scale(0.9);
+        }
+        .fv-js .reveal.seen {
+          opacity: 1;
+          transform: none;
+        }
+        /* Once in place, a picture that leans toward the pointer does so quickly. */
+        .fv-js .reveal.seen.settled {
+          transition: transform 0.3s ease-out;
+        }
       }
       @media (max-width: 1020px) {
         .hero-grid,
@@ -555,7 +1028,7 @@
         .feat.phone-row,
         .work {
           grid-template-columns: minmax(0, 1fr);
-          gap: 40px;
+          gap: 44px;
         }
         .feat.flip .feat-text {
           order: 0;
@@ -563,7 +1036,6 @@
         .phone-row .feat-text {
           justify-self: start;
         }
-        .facts,
         .cards {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -573,6 +1045,9 @@
         .work .phone-col {
           max-width: 260px;
         }
+        .h1 {
+          font-size: 58px;
+        }
       }
       @media (max-width: 680px) {
         .wrap {
@@ -580,41 +1055,48 @@
         }
         .band,
         .schools {
-          padding: 72px 0;
+          padding: 76px 0;
         }
         .hero {
-          padding: 48px 0 64px;
+          padding: 48px 0 56px;
         }
         .h1 {
-          font-size: 40px;
+          font-size: 42px;
         }
         .h2 {
-          font-size: 30px;
+          font-size: 32px;
         }
         .lede {
           font-size: 17px;
         }
-        .facts,
         .cards,
         .steps,
+        .choices.two,
         .faq {
           grid-template-columns: minmax(0, 1fr);
         }
         .navcta-demo {
           display: none;
         }
-        .collage .phone-wrap {
+        .collage .phone-wrap,
+        .pair .phone-wrap {
           width: 34%;
+        }
+        .tag {
+          display: none;
         }
         .phone {
           border-radius: 26px;
           box-shadow:
-            0 16px 40px rgba(29, 29, 31, 0.2),
-            0 0 0 5px #1d1d1f;
+            0 16px 40px rgba(0, 0, 0, 0.6),
+            0 0 0 5px #1a2130;
         }
         .sheet-wrap {
           padding: 24px 20px 0;
           max-height: 360px;
+        }
+        .cta {
+          padding: 48px 22px;
         }
       }
     </style>
@@ -622,6 +1104,8 @@
   <body>
     <a class="skip" href="#top">Skip to Content</a>
     <div class="fv">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="grid" aria-hidden="true"></div>
       <header class="top">
         <div class="wrap bar">
           <a href="#top" class="brand">
@@ -649,16 +1133,16 @@
           </div>
         </div>
       </header>
-
       <main id="top">
         <section class="hero">
           <div class="wrap hero-grid">
-            <div class="stack" style="gap: 24px">
+            <div class="stack hero-text" style="gap: 26px">
+              <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
               <p class="eyebrow">The Gradebook for Communicating Student Learning in BC</p>
-              <h1 class="h1">Assess, Give Feedback, Write Reports</h1>
+              <h1 class="h1">Assess, Give Feedback, <em>Write Reports</em></h1>
               <p class="lede">
                 Assess on the Provincial Proficiency Scale, keep your classroom observations, and write report comments
-                from what you have recorded. Students see their feedback on their own page.
+                from what you have recorded. Students see their feedback, and your bulletins, on their own page.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
                 <a class="btn btn-solid" href="/login.html?demo=1&amp;student=1" data-link="demo">Try Demo Mode</a>
@@ -671,217 +1155,152 @@
               </ul>
             </div>
             <div class="collage">
-              <img
-                class="shot"
-                src="/assets/splash/grader.jpg"
-                alt="Assessing a student’s handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
-              />
-              <div class="phone-wrap">
+              <div class="shot-in">
                 <img
-                  class="phone"
-                  src="/assets/splash/student-learning.jpg"
-                  alt="A student’s My Learning page: Proficient, with a next step and her strongest skill."
+                  class="shot float tilt"
+                  src="/assets/splash/grader.jpg"
+                  alt="Assessing a student’s handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
                 />
               </div>
+              <div class="phone-wrap">
+                <img
+                  class="phone float b tilt"
+                  src="/assets/splash/student-learning.jpg"
+                  alt="A student’s My Learning page: Proficient for the year so far, and each piece of work with its result."
+                />
+              </div>
+              <span class="tag" style="left: 4%; top: -18px; --c: var(--prf)">Suggested: Proficient</span>
+              <span class="tag" style="right: 12%; bottom: 8px; --c: var(--sky)">The Student’s Own Page</span>
             </div>
           </div>
         </section>
-
-        <section aria-label="At a Glance" style="padding: 56px 0">
-          <div class="wrap facts">
-            <div class="fact">
-              <b>226</b>
-              <span>BC courses, grades 8 to 12, with every competency in the Ministry’s own words.</span>
-            </div>
-            <div class="fact">
-              <b>Canada</b>
-              <span>Where class lists, assessments and comments are stored.</span>
-            </div>
-            <div class="fact">
-              <b>Offline</b>
-              <span>Assess and observe on your phone without Wi-Fi. It sends when you reconnect.</span>
-            </div>
-            <div class="fact">
-              <b>No AI Writing</b>
-              <span>Every comment is built from sentences you wrote and can read.</span>
-            </div>
-          </div>
-        </section>
-
         <section id="grading" class="band band-white">
           <div class="wrap feat">
-            <div class="feat-text stack">
+            <div class="feat-text stack reveal">
               <p class="eyebrow">Assessment</p>
-              <h2 class="h2">Assess With a Rubric, One Criterion at a Time</h2>
+              <h2 class="h2">Assess With a Rubric, <em>One Criterion at a Time</em></h2>
               <p class="lede">
                 Tick the descriptors the student met and FullVision suggests a level for that criterion. You set the
                 final level.
               </p>
+              <div class="scale" aria-label="The Proficiency Scale">
+                <span class="pill e">Emerging</span><span class="pill d">Developing</span
+                ><span class="pill p">Proficient</span><span class="pill x">Extending</span>
+              </div>
               <ul class="ticks">
                 <li>The Proficiency Scale with + and −, points, or letter grades for 10 to 12</li>
                 <li>Pair and group work, assessed together or one by one</li>
                 <li>A comment on any criterion, and one for the whole piece</li>
+                <li>Print Rubrics hands back a completed sheet for every student, ready for the photocopier</li>
               </ul>
             </div>
             <img
-              class="shot"
+              class="shot reveal from-right tilt"
               loading="lazy"
               src="/assets/splash/rubric.jpg"
               alt="Rubric criteria with the boxes a teacher ticked and Suggested: Proficient beside each."
             />
           </div>
-          <div class="wrap feat flip">
-            <div class="feat-text stack">
-              <p class="eyebrow">Printing</p>
-              <h2 class="h2">Hand Back a Completed Rubric</h2>
-              <p class="lede">
-                Print Rubrics makes a sheet for every student: the level you chose on each criterion, their overall
-                level and room for your feedback.
-              </p>
-              <ul class="ticks">
-                <li>One, two or four to a page, with cut lines</li>
-                <li>Black and white, ready for the photocopier</li>
-                <li>Blank copies to hand out before the work begins</li>
-              </ul>
-            </div>
-            <div class="sheet-wrap">
-              <img
-                loading="lazy"
-                src="/assets/splash/rubric-print.jpg"
-                alt="One printed page of four completed rubrics, each with a student’s name, the level chosen on every criterion and their overall level."
-              />
-            </div>
-          </div>
         </section>
-
-        <section class="band">
-          <div class="wrap feat flip">
-            <div class="feat-text stack">
-              <p class="eyebrow">Gradebook</p>
-              <h2 class="h2">Every Assignment for the Year in One Table</h2>
-              <p class="lede">
-                Each student’s overall level sits beside their scores, newest first, so a Learning Update shows the year
-                to date. Missing work is recorded as Missing and is never averaged in as a zero.
-              </p>
-            </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/gradebook.jpg"
-              alt="The gradebook: each student’s overall level beside their scores, newest first."
-            />
-          </div>
-        </section>
-
-        <section id="student-work" class="band band-white">
+        <section id="student-work" class="band">
           <div class="wrap stack" style="gap: 48px">
-            <div class="stack" style="max-width: 760px">
-              <h2 class="h2">Students Hand In Work and Read Your Feedback, With No Accounts</h2>
+            <div class="stack reveal" style="max-width: 780px">
+              <p class="eyebrow">Student Work</p>
+              <h2 class="h2">Students Hand In Work and Read Your Feedback, <em>With No Accounts</em></h2>
               <p class="lede">
                 Each student gets a printed card with a code. It opens their own page in a browser: no email, no
                 password, nothing to install.
               </p>
             </div>
             <ol class="steps">
-              <li>
+              <li class="reveal">
                 <b>Students Send Their Work</b>Students photograph their page, or upload a PDF, from their own page.
               </li>
-              <li><b>You Assess It</b>Tick, circle and leave notes on the page, then score the rubric beside it.</li>
-              <li>
+              <li class="reveal" style="--d: 0.12s">
+                <b>You Assess It</b>Tick, circle and leave notes on the page, then score the rubric beside it.
+              </li>
+              <li class="reveal" style="--d: 0.24s">
                 <b>Students Read Your Feedback</b>Students read your notes, say whether the feedback made sense, and ask
                 you a question.
               </li>
             </ol>
             <div class="work">
               <img
-                class="shot"
+                class="shot reveal zoom tilt"
                 loading="lazy"
                 src="/assets/splash/markup.jpg"
                 alt="Assessing a student’s lab on the page: green ticks, a circled angle and a note asking why light bends."
               />
-              <div class="phone-col">
+              <div class="phone-col reveal from-right" style="--d: 0.15s">
                 <img
-                  class="phone"
+                  class="phone float"
                   loading="lazy"
                   src="/assets/splash/student-feedback.jpg"
-                  alt="A returned piece on a student’s phone: Proficient on each criterion, with what the levels mean."
+                  alt="A returned piece on a student’s phone: Proficient − overall and on each rubric row, with Reflect on Feedback."
                 />
+              </div>
+            </div>
+            <div class="choices two reveal">
+              <div class="choice">
+                <b>Bulletins<span class="new">New</span></b>
+                <span
+                  >Announcements and reminders are the first tab on each student’s page. Post from your laptop or your
+                  phone, and see who has seen each one.</span
+                >
+              </div>
+              <div class="choice">
+                <b>Reflect<span class="new">New</span></b>
+                <span
+                  >Self-assessments and goals appear in each student’s Reflect tab, with no slips to print. Their words
+                  are there when you write their report.</span
+                >
               </div>
             </div>
           </div>
         </section>
-
-        <section class="band">
-          <div class="wrap feat narrow">
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/dashboard.jpg"
-              alt="The dashboard: a student’s question, work to assess, missing work and the class’s competencies."
-            />
-            <div class="feat-text stack">
-              <p class="eyebrow">Dashboard</p>
-              <h2 class="h2">What Needs Your Attention, on One Screen</h2>
+        <section id="paper" class="band band-white">
+          <div class="wrap feat">
+            <div class="feat-text stack reveal">
+              <p class="eyebrow">Paper Work<span class="new">New</span></p>
+              <h2 class="h2">Scan the Class’s Pile. <em>Each Student Gets Their Own Pages.</em></h2>
               <p class="lede">
-                Questions from students, work waiting to be assessed, and missing work, across every class you teach.
+                Scan a stack of paper on the school photocopier and open the PDF in Add Work for the Class. FullVision
+                splits it into each student’s pages and files them under the assessment.
               </p>
+              <ul class="ticks">
+                <li>A pile in class-list order names itself; or type two letters of a name</li>
+                <li>Blank backs are left out, and a page fed in upside down turns with one click</li>
+                <li>
+                  <b>Nothing reads the handwriting.</b> The scan is split on your computer, and only each student’s
+                  pages upload.
+                </li>
+              </ul>
             </div>
+            <img
+              class="shot reveal from-right tilt"
+              loading="lazy"
+              src="/assets/splash/add-work.jpg"
+              alt="Split the Scan: a 27-page scan of a Chemical Reactions Lab, cut into one piece per student, each named in class-list order."
+            />
           </div>
         </section>
-
-        <section id="comments" class="band band-white">
+        <section id="reports" class="band">
           <div class="wrap feat flip">
-            <div class="feat-text stack">
-              <p class="eyebrow">Report Comments</p>
-              <h2 class="h2">Write Report Comments From Your Own Records</h2>
+            <div class="feat-text stack reveal">
+              <p class="eyebrow">Reports</p>
+              <h2 class="h2">Write Report Comments <em>From Your Own Records</em></h2>
               <p class="lede">
                 While you write a comment, the student’s grades, your observations and their self-assessment are on the
-                same screen.
+                same screen. Every report fills in from your gradebook, and you choose what prints.
               </p>
               <ul class="ticks">
                 <li>A Comment Bank of written sentences, filled in from each student’s grades and work habits</li>
                 <li>Generate drafts a comment, using a sentence only when the student’s record supports it</li>
-                <li>Approve and Next opens the next student</li>
-              </ul>
-            </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/questionnaire.jpg"
-              alt="The Term Questionnaire: work habits, the student’s year at a glance, and the teacher comment."
-            />
-          </div>
-        </section>
-
-        <section id="reports" class="band">
-          <div class="wrap feat">
-            <div class="feat-text stack">
-              <p class="eyebrow">Reports</p>
-              <h2 class="h2">One Report, Made From the Parts You Choose</h2>
-              <p class="lede">Every report fills in from your gradebook for the whole class. You choose what prints.</p>
-              <div class="choices">
-                <div class="choice">
-                  <b>Start From a Setup</b>
-                  <span
-                    >Grades, Report Card, Interim Update or Conference Pack. Each one switches on the parts that report
-                    needs.</span
-                  >
-                </div>
-                <div class="choice">
-                  <b>Then Make It Yours</b>
-                  <span
-                    >Switch parts on or off, drag them into order, leave an assessment off, reword a question, and edit
-                    the comment right on the page.</span
-                  >
-                </div>
-              </div>
-              <ul class="ticks">
-                <li>Each competency group, and its change since the last report</li>
+                <li>Start from Grades, Report Card, Interim Update or Conference Pack, then switch parts on or off</li>
                 <li>Black and white, on Letter or Legal</li>
-                <li>Long parts carry on to the next page</li>
               </ul>
             </div>
-            <div class="sheet-wrap">
+            <div class="sheet-wrap reveal from-left">
               <img
                 loading="lazy"
                 src="/assets/splash/progress-report.jpg"
@@ -890,59 +1309,37 @@
             </div>
           </div>
         </section>
-
         <section id="curriculum" class="band band-white">
-          <div class="wrap feat flip">
-            <div class="feat-text stack">
+          <div class="wrap feat">
+            <div class="feat-text stack reveal">
               <p class="eyebrow">BC Curriculum</p>
-              <h2 class="h2">The Curriculum in the Ministry’s Own Words</h2>
+              <h2 class="h2">The Curriculum in the <em>Ministry’s Own Words</em></h2>
               <p class="lede">
                 Pick a course when you make a class. Its competencies arrive word for word, with an I Can statement for
-                each one, 5,029 in all.
+                each one, <b><span data-count="5029">5,029</span> in all</b>.
               </p>
-              <p class="lede">
-                It suits a teacher new to proficiency-based assessment and one who has used it for years: assess in as
-                much detail as you want.
-              </p>
-              <div class="choices">
-                <div class="choice">
-                  <b>Line by Line</b>
-                  <span
-                    >Tie each line of a rubric to a competency and score them one at a time. Every line counts toward
-                    its own competency.</span
-                  >
-                </div>
-                <div class="choice">
-                  <b>One Level for the Piece</b>
-                  <span
-                    >Or give the whole piece a single level, points or a letter grade. It still counts toward the
-                    competencies you chose.</span
-                  >
-                </div>
-              </div>
             </div>
             <img
-              class="shot"
+              class="shot reveal from-right tilt"
               loading="lazy"
               src="/assets/splash/curriculum.jpg"
               alt="Choosing English Language Arts 8 competencies for a new class."
             />
           </div>
         </section>
-
         <section id="phone" class="band">
           <div class="wrap feat phone-row">
-            <div class="feat-text stack">
+            <div class="feat-text stack reveal">
               <p class="eyebrow">On Your Phone</p>
-              <h2 class="h2">Record Observations on Your Phone</h2>
+              <h2 class="h2">Record Observations <em>on Your Phone</em></h2>
               <p class="lede">
                 Record a Strength, Growth or Concern during class, in the lab or on a field trip. Each note is saved to
-                the student’s profile and is there when you write their report.
+                the student’s profile and is there when you write their report. Post a bulletin from the same app.
               </p>
             </div>
-            <div class="phone-col">
+            <div class="phone-col reveal from-right">
               <img
-                class="phone"
+                class="phone float"
                 loading="lazy"
                 src="/assets/splash/phone-app.jpg"
                 alt="Observations on a phone: notes tagged Strength, Growth and Note."
@@ -950,57 +1347,40 @@
             </div>
           </div>
         </section>
-
         <section id="schools" class="schools">
           <div class="wrap stack" style="gap: 48px">
-            <div class="stack" style="max-width: 720px">
+            <div class="stack reveal" style="max-width: 720px">
               <p class="eyebrow">Policy and Privacy</p>
-              <h2 class="h2">Built Around BC’s Reporting Policy</h2>
+              <h2 class="h2">Built Around <em>BC’s Reporting Policy</em></h2>
               <p class="lede">
                 How FullVision follows the provincial reporting policy and looks after student information.
               </p>
             </div>
             <div class="cards">
-              <div class="card">
+              <div class="card reveal">
                 <h3>The K–12 Reporting Policy</h3>
                 <p>
                   The Proficiency Scale, descriptive feedback, Core Competency self-assessment and goals, and Learning
                   Updates through the year.
                 </p>
               </div>
-              <div class="card">
+              <div class="card reveal" style="--d: 0.08s">
                 <h3>Student Records Stay in Canada</h3>
                 <p>Stored in Canada and seen only by the teacher who owns the class.</p>
               </div>
-              <div class="card">
-                <h3>No Student Accounts</h3>
-                <p>Students open their page with a printed card. No student email, password or sign-up.</p>
-              </div>
-              <div class="card">
+              <div class="card reveal" style="--d: 0.16s">
                 <h3>No AI Writing About Students</h3>
                 <p>Nothing is sent to an AI service. Every comment is the teacher’s own words.</p>
               </div>
-              <div class="card">
-                <h3>Photos Deleted on Schedule</h3>
-                <p>Photos of student work are deleted on a date the teacher sets, with a reminder a week before.</p>
-              </div>
-              <div class="card">
-                <h3>Designations and Missing Work</h3>
-                <p>
-                  A student’s designation shows on the class list. Missing work is never counted as a zero. Each student
-                  gets a next step.
-                </p>
-              </div>
             </div>
-            <a href="/privacy.html" style="color: #7cb8ff; font-size: 17px; font-weight: 600; text-decoration: none"
-              >Read the Privacy Policy</a
+            <a href="/privacy.html" style="font-size: 17px; font-weight: 700; text-decoration: none"
+              >Read the Privacy Policy →</a
             >
           </div>
         </section>
-
-        <section id="questions" class="band band-white">
+        <section id="questions" class="band">
           <div class="wrap stack" style="gap: 32px">
-            <h2 class="h2">Questions Teachers Ask</h2>
+            <h2 class="h2 reveal">Questions <em>Teachers Ask</em></h2>
             <div class="faq">
               <details>
                 <summary>Can I try it before I sign up?</summary>
@@ -1042,45 +1422,21 @@
           </div>
         </section>
 
-        <section id="demo" style="padding: 96px 0">
+        <section id="demo" style="padding: 24px 0 112px">
           <div class="wrap">
-            <div
-              style="
-                background: linear-gradient(135deg, #0a4fa8, #0071e3 60%, #3a8dff);
-                border-radius: 24px;
-                padding: 64px 48px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-                text-align: center;
-              "
-            >
+            <div class="cta reveal zoom">
               <h2 class="h2" style="color: #ffffff">Try It With a Sample Class</h2>
-              <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #dbe9ff; max-width: 560px">
-                Assess, write comments and print a report card in a few minutes. Nothing you change is saved.
-              </p>
+              <p>Assess, write comments and print a report card in a few minutes. Nothing you change is saved.</p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding-top: 8px">
-                <a
-                  class="btn btn-plain"
-                  href="/login.html?demo=1&amp;student=1"
-                  data-link="demo"
-                  style="box-shadow: none"
-                  >Try Demo Mode</a
-                >
-                <a
-                  class="btn"
-                  href="/login.html#signup"
-                  style="color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6)"
-                  >Create an Account</a
-                >
+                <a class="btn btn-plain" href="/login.html?demo=1&amp;student=1" data-link="demo">Try Demo Mode</a>
+                <a class="btn btn-ghost" href="/login.html#signup">Create an Account</a>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer style="border-top: 1px solid var(--line); background: var(--paper)">
+      <footer class="foot">
         <div
           class="wrap"
           style="
@@ -1093,22 +1449,79 @@
             padding-bottom: 28px;
           "
         >
-          <span style="font-size: 14px; color: #636366">© 2026 Colin Brown · Made in British Columbia</span>
+          <span style="font-size: 14px; color: var(--ink-3)">© 2026 Colin Brown · Made in British Columbia</span>
           <nav aria-label="Footer" style="display: flex; gap: 24px; flex-wrap: wrap">
-            <a href="/privacy.html" style="font-size: 14px; text-decoration: none; color: var(--ink-2)"
-              >Privacy Policy</a
-            >
-            <a href="/help/" style="font-size: 14px; text-decoration: none; color: var(--ink-2)">Help</a>
-            <a href="mailto:colin.brown04@gmail.com" style="font-size: 14px; text-decoration: none; color: var(--ink-2)"
-              >Contact</a
-            >
-            <a href="/login.html" data-link="signin" style="font-size: 14px; text-decoration: none; color: var(--ink-2)"
-              >Sign In</a
-            >
+            <a href="/privacy.html">Privacy Policy</a>
+            <a href="/help/">Help</a>
+            <a href="mailto:colin.brown04@gmail.com">Contact</a>
+            <a href="/login.html" data-link="signin">Sign In</a>
           </nav>
         </div>
       </footer>
     </div>
+    <script>
+      // Motion that needs a script, none of it for a visitor who asks for less:
+      // blocks rise in as they scroll into view, numbers count up, and the
+      // screenshots lean a little toward the pointer. Blocks are hidden only
+      // once this runs (html.fv-js), so a page without scripts shows everything.
+      (function () {
+        if (!window.matchMedia || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (!('IntersectionObserver' in window)) return;
+        document.documentElement.classList.add('fv-js');
+        function countUp(el) {
+          var to = +el.getAttribute('data-count');
+          var t0 = null;
+          function step(t) {
+            if (!t0) t0 = t;
+            var p = Math.min((t - t0) / 1400, 1);
+            var n = Math.round(to * (1 - Math.pow(1 - p, 4)));
+            el.textContent = n.toLocaleString('en-CA');
+            if (p < 1) requestAnimationFrame(step);
+          }
+          requestAnimationFrame(step);
+        }
+        var seen = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (e) {
+              if (!e.isIntersecting) return;
+              e.target.classList.add('seen');
+              setTimeout(function () {
+                e.target.classList.add('settled');
+              }, 1300);
+              e.target.querySelectorAll('[data-count]').forEach(countUp);
+              seen.unobserve(e.target);
+            });
+          },
+          { rootMargin: '0px 0px -8% 0px', threshold: 0.12 },
+        );
+        document.querySelectorAll('.reveal').forEach(function (el) {
+          seen.observe(el);
+        });
+        if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+        var tilts = document.querySelectorAll('.tilt');
+        var queued = false;
+        var x = 0;
+        var y = 0;
+        window.addEventListener(
+          'mousemove',
+          function (e) {
+            x = e.clientX / innerWidth - 0.5;
+            y = e.clientY / innerHeight - 0.5;
+            if (queued) return;
+            queued = true;
+            requestAnimationFrame(function () {
+              queued = false;
+              tilts.forEach(function (t) {
+                // A block still rising in keeps its own motion.
+                if (t.classList.contains('reveal') && !t.classList.contains('settled')) return;
+                t.style.transform = 'perspective(1600px) rotateY(' + x * 5 + 'deg) rotateX(' + -y * 5 + 'deg)';
+              });
+            });
+          },
+          { passive: true },
+        );
+      })();
+    </script>
     <script>
       // A sign-up confirmation link that lands here (the site's default
       // address) goes on to the sign-in page, which opens the gradebook.

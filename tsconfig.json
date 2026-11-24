@@ -11,9 +11,13 @@
     "types": []
   },
   "files": [
+    "teacher/report-one-words.js",
+    "teacher/report-one-copy.js",
+    "teacher/report-one-undo.js",
     "types/globals.d.ts",
     "shared/html.js",
     "shared/build-flags.js",
+    "shared/rubric-scale.js",
     "shared/constants.js",
     "shared/calc.js",
     "shared/data-utilities.js",
@@ -80,6 +84,7 @@
     "teacher/report-print-paper.js",
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
+    "teacher-mobile/pin-page.js",
     "teacher-mobile/bulletins-model.js",
     "teacher-mobile/tab-bulletins.js",
     "s/question-kinds.js",
@@ -120,6 +125,9 @@
     "shared/scan-label-read.js",
     "teacher/scan-labels.js",
     "teacher-mobile/split-scan-model.js",
-    "teacher-mobile/split-scan.js"
+    "teacher-mobile/split-scan.js",
+    "teacher/rubric-words.js",
+    "teacher/bulletin-share.js",
+    "teacher/bulletin-seen.js"
   ]
 }

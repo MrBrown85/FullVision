@@ -930,6 +930,10 @@ a.dash-glance-cell:hover {
   color: var(--link);
   cursor: pointer;
 }
+.dash-comp-row.is-extra,
+.dash-comp-more[hidden] {
+  display: none;
+}
 .dash-comp-more:hover {
   text-decoration: underline;
 }
@@ -2459,7 +2463,9 @@ a.dash-ins-name:hover {
   text-overflow: ellipsis;
 }
 .dash-obs-when.is-overdue {
-  color: var(--score-2);
+  /* The darker Developing amber: --score-2 read 3.49:1 on white, this is
+     4.69:1 (dark mode is the same #ff9f0a, 6.78:1). */
+  color: var(--score-2-dark);
   font-weight: 600;
 }
 .dash-obs-count {
@@ -8577,12 +8583,28 @@ button.rb-v-prompt {
 }
 .btn.dash-questions-answer {
   margin-top: 8px;
+  border: 0;
+  background: rgba(0, 122, 255, 0.1);
+  color: #0062cc;
   min-height: 28px;
   padding: 6px 12px;
   border-radius: 14px;
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
+}
+.btn.dash-questions-answer:hover {
+  background: rgba(0, 122, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  /* As the grader's Return All: 4.87:1 at rest, 4.63:1 on hover. */
+  .btn.dash-questions-answer {
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
+  }
+  .btn.dash-questions-answer:hover {
+    background: rgba(10, 132, 255, 0.18);
+  }
 }
 
 /* ── A warning before the year runs out (shared/photo-expiry.js) ── */
@@ -8886,9 +8908,77 @@ button.rb-v-prompt {
   border-radius: 0;
   box-shadow: none;
 }
+/* In the tile every view's rows share the page's height, as Level Mix's do
+   (board D), never more than 72 px apart (review of #1603: spreading the
+   rows is the empty space moved between them). Needs Support shows as many
+   students as fit instead (DashCompetencies.fit). */
+.dash-comp-tile .dash-comp-row,
+.dash-comp-tile .dash-comp-card.is-roomy .dash-comp-row,
+.dash-comp-tile .dash-core-row {
+  max-height: 72px;
+}
+.dash-comp-tile .dash-core-group {
+  max-height: calc(var(--core-rows, 1) * 72px);
+}
 @media (prefers-reduced-motion: reduce) {
   .dash-comp-track,
   .dash-comp-page {
     transition: none;
   }
+}
+
+/* How Folders Count, beside the competency list: each folder with its
+   own As One | Each. */
+.cm-fc-intro {
+  margin: 4px 0 8px;
+  line-height: 1.4;
+}
+.cm-fc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.cm-fc-name {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.cm-fc-title {
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cm-fc-segs {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+}
+.cm-fc-seg {
+  min-width: 58px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cm-fc-seg.is-on {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.cm-fc-example {
+  margin: 8px 2px 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
 }

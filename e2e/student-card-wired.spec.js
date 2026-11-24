@@ -476,7 +476,16 @@ test.describe('a real card: a class graded by letter, and by both', () => {
 });
 
 test.describe('a real card: a shared Chromebook', () => {
-  test.use(CHROMEBOOK);
+  /* No service worker. Several tests here leave the student page for
+     /login.html, which registers /sw.js for the whole site; a student page
+     opened after that is controlled by it, and in WebKit Playwright's routes
+     do not see a controlled page's requests. The student-submit calls then
+     went to the real (unreachable) host: the second tab of "a page left
+     open…" showed Couldn't Reach FullVision, and a check that the page asked
+     nothing could pass without seeing what it asked. The student page
+     registers no worker of its own, and the worker leaves supabase.co
+     requests to the browser, so nothing the student sees is lost. */
+  test.use({ ...CHROMEBOOK, serviceWorkers: 'block' });
 
   const omar = () =>
     sampleCard(TODAY, {
@@ -570,11 +579,7 @@ test.describe('a real card: a shared Chromebook', () => {
 
   test('a page left open is taken down when Log Out is pressed in another tab, and when Back returns to it', async ({
     page,
-    browserName,
   }) => {
-    // In WebKit it passes alone but, in the full run, the second tab often does not open the
-    // session in time; the cause is not found yet. A Chromebook is Chrome, where it passes.
-    test.fixme(browserName === 'webkit', 'flaky in the full WebKit run (open)');
     const fn = school();
     await serve(page, fn);
     await signIn(page);
@@ -665,9 +670,10 @@ test.describe('a slip is as it was', () => {
       { route: 'card', code: 'K7M4QX' },
       { route: 'open', code: 'K7M4QX' },
       // The slip's code goes with its verify, so the function checks it against the slip's keyed tag (S3-S1).
+      // The token is the one the function made for open (2026112403).
       {
         route: 'verify',
-        token: 'a'.repeat(64),
+        token: expect.stringMatching(/^[0-9a-f]{64}$/),
         code: 'K7M4QX',
         birthday: null,
         student_number: '0123456',

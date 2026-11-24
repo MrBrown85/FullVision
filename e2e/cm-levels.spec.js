@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Class Settings' competency card (Nov 2 mockup, batch 2): a read-only
    Levels section with each descriptor and next step, and Write Your Own,
    which saves the teacher's wording to the descriptor bank printed rubrics
    read. Demo Mode, Science 8, on Data Patterns (PA4) from the curriculum
    bank. */
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 test.use({ viewport: { width: 1440, height: 1000 } });
 
 async function open(page) {

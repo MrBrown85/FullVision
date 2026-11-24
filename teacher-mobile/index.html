@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="m-root">
   <head>
     <meta charset="UTF-8" />
     <!-- The release this page belongs to; scripts/build.sh fills it in (sw.js, RELEASE_TAG). -->
     <meta name="fv-release" content="fullvision-dev" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="description" content="TeacherDashboard Mobile — quick student lookup, observations, and grading" />
     <title>FullVision</title>
@@ -13,7 +14,9 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="FullVision" />
-    <meta name="theme-color" content="#F2F2F7" />
+    <!-- The bars' colour (--surface), so the status bar and the nav bar are one band. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2c2c2e" media="(prefers-color-scheme: dark)" />
     <link rel="stylesheet" href="../teacher/styles.css?v=3" />
     <link rel="stylesheet" href="../shared/loading-screen.css" />
     <link rel="stylesheet" href="../teacher/obs-capture.css" />
@@ -309,6 +312,7 @@
     <script src="../shared/grade-state.js"></script>
     <script src="../shared/grader.js"></script>
     <script src="../shared/rubric-checks.js"></script>
+    <script src="../shared/rubric-scale.js"></script>
     <script src="../shared/work-thumbs.js"></script>
     <!-- Mobile-specific modules -->
     <script src="../shared/obs-capture.js"></script>
@@ -345,6 +349,7 @@
     <script src="../teacher-mobile/bulletins-model.js"></script>
     <script src="../teacher-mobile/tab-bulletins.js"></script>
     <script src="../teacher-mobile/tab-bar.js"></script>
+    <script src="../teacher-mobile/pin-page.js"></script>
     <script src="../teacher-mobile/shell.js"></script>
     <script>
       if ('serviceWorker' in navigator) {

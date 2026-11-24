@@ -52,9 +52,9 @@ const FIRST_BULLETINS = SCREENS.findIndex(s => s.bulletins);
 const FIRST_QUIZ = SCREENS.findIndex(s => s.quizzes);
 const GROUPS = [
   ['assignments', 0, 7],
-  ['my learning and feedback', 7, 16],
-  ['send work and reflect', 16, 24],
-  ['cards, report and settings', 24, FIRST_BULLETINS],
+  ['my learning and feedback', 7, 17],
+  ['send work and reflect', 17, 25],
+  ['cards, report and settings', 25, FIRST_BULLETINS],
   // Bulletins (docs/plans/bulletins-plan.md B1d), behind its build switch: the last screens.
   ['bulletins', FIRST_BULLETINS, FIRST_QUIZ],
   // A quiz (docs/plans/quizzes-plan.md Q3b), behind the quizzes switch: the last screens.

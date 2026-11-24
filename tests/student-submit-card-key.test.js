@@ -23,10 +23,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { CARD_ROUTES } from '../supabase/functions/student-submit/card-routes.ts';
 import { FAKE_KEY, codeTag, keyId, passwordTag } from './helpers/card-key-fake.js';
 import { CECE, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const CODE = 'P3R8WD4K';
 const TAG = codeTag(CODE);
@@ -164,6 +168,7 @@ describe('student-submit: the database is handed a tag, never the code or the ty
           passwordTag(CODE, '4821'),
           route === 'add-card' ? SESSION : null,
           HASH,
+          expect.stringMatching(/^[0-9a-f]{64}$/),
         ]);
       }
     }
@@ -189,13 +194,16 @@ describe('student-submit: the database is handed a tag, never the code or the ty
       SESSION,
       null,
     ]);
+    // verify and add-card end with the new session's hash (2026112401), after the hashed address.
     for (const call of h.asked) {
-      const params = call.params.slice(0, -1);
+      const fresh = /p_new_session_hash/.test(call.sql);
+      const params = call.params.slice(0, fresh ? -2 : -1);
       for (const p of params) expect(known.has(p), String(p)).toBe(true);
       expect(call.params.at(-1)).toMatch(/^[0-9a-f]{64}$/);
+      if (fresh) expect(call.params.at(-2)).toMatch(/^[0-9a-f]{64}$/);
       // And none of it is in the statement.
       expect(call.sql).toMatch(
-        /^select student_submit\.(card|verify_card)\((\$\d::text(, )?)+(p_add => (true|false))?\) as r$/,
+        /^select student_submit\.(card|verify_card)\((\$\d::text(, )?)+(p_add => (true|false), p_new_session_hash => \$8::text)?\) as r$/,
       );
     }
   });
@@ -237,7 +245,16 @@ describe('student-submit: the database is handed a tag, never the code or the ty
   it('a student number and a birthday go to the database as typed: they are checked there, where they live', async () => {
     const h = setup(KEY);
     await send(h, { route: 'verify', code: CODE, birthday: '2012-05-15', student_number: '0123456' });
-    expect(h.asked[0].params).toEqual([TAG, KEY_ID, '2012-05-15', '0123456', null, null, HASH]);
+    expect(h.asked[0].params).toEqual([
+      TAG,
+      KEY_ID,
+      '2012-05-15',
+      '0123456',
+      null,
+      null,
+      HASH,
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+    ]);
   });
 
   it('another key makes another tag for the same card, and says which key it is', async () => {
@@ -251,12 +268,13 @@ describe('student-submit: the database is handed a tag, never the code or the ty
 
   it('the statements do not fit the database from before S3-M1, so old and new can never half-work together', () => {
     // Before S3-E1 card took two values (the code, the address) and verify_card six. Now they take three and
-    // seven. The function from before cannot call the database after S3-M1, nor this one the database before
-    // it: either way the call fails and nothing opens.
+    // eight (seven until 2026112401 added the new session's hash). The function from before cannot call the
+    // database after either migration, nor this one the database before it: either way the call fails and
+    // nothing opens.
     const values = sql => sql.match(/\$\d/g).length;
     expect(values(CARD_ROUTES.card.sql)).toBe(3);
-    expect(values(CARD_ROUTES.verify.sql)).toBe(7);
-    expect(values(CARD_ROUTES['add-card'].sql)).toBe(7);
+    expect(values(CARD_ROUTES.verify.sql)).toBe(8);
+    expect(values(CARD_ROUTES['add-card'].sql)).toBe(8);
     // page, seen and done are called as they were before S3-E1.
     expect(CARD_ROUTES.page.sql).toBe('select student_submit.page($1::text, $2::uuid, $3::text) as r');
     expect(CARD_ROUTES.seen.sql).toBe('select student_submit.seen($1::text, $2::uuid, $3::uuid[], $4::text) as r');
@@ -551,8 +569,11 @@ describe('student-submit: where the key comes from (index.ts)', () => {
     }
   });
 
-  it('still falls back to the database address for the address-hash key (to be removed in a later change)', () => {
-    expect(code).toContain("ipKey: Deno.env.get('STUDENT_SUBMIT_IP_KEY') || Deno.env.get('SUPABASE_DB_URL')!,");
+  it('reads the address-hash key from STUDENT_SUBMIT_IP_KEY alone, with no fallback', () => {
+    expect(code.match(/STUDENT_SUBMIT_IP_KEY/g)).toHaveLength(1);
+    expect(code).toContain("const ipKey = Deno.env.get('STUDENT_SUBMIT_IP_KEY') || null;");
+    // The database's owner login is not read at all (2026112402).
+    expect(code).not.toMatch(/SUPABASE_DB_URL/);
   });
 });
 

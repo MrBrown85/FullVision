@@ -25,12 +25,12 @@ function _teacherPrefsPatchFromConfig(obj) {
   var patch = {};
   if (!obj) return patch;
   if (Object.prototype.hasOwnProperty.call(obj, 'activeCourse')) {
-    // save_teacher_preferences casts this straight to uuid, so a placeholder
+    // patch_teacher_preferences casts this straight to uuid, so a placeholder
     // id fails the whole RPC with 22P02 and the teacher's preferences never
     // save. Resolve it, and when it can't be resolved omit the key entirely:
-    // the RPC's on-conflict branch leaves active_course_id untouched when the
-    // key is absent, and create_course has already pointed it at the new
-    // course server-side. An explicit empty value still clears the pointer.
+    // the RPC leaves active_course_id untouched when the key is absent, and
+    // create_course has already pointed it at the new course server-side.
+    // An explicit empty value still clears the pointer.
     if (!obj.activeCourse) {
       patch.active_course_id = null;
     } else {
@@ -55,19 +55,98 @@ function _teacherPrefsPatchFromConfig(obj) {
   }
   return patch;
 }
+/* The teacher's preferences in this device's copy (getConfig) that are saved
+   to the server. dashboardPrefs is merged there key by key; the others are
+   one value each. */
+var _TEACHER_PREF_FIELDS = ['activeCourse', 'viewMode', 'mobileViewMode', 'mobileSortMode', 'cardWidgetConfig'];
+/* dashboardPrefs keys that hold many separate choices (getViewPref's view,
+   the Assignments page's closedModules per class): a change to one entry
+   sends that entry alone. */
+var _DASHBOARD_PREF_MAPS = { view: true, closedModules: true };
+
+/* What changed in dashboardPrefs from `before` to `after`, as the server
+   merges it (patch_teacher_preferences): only the keys that differ, and
+   inside view and closedModules only the entries that differ. A key or
+   entry taken out is sent as null. {} when nothing changed.
+
+   `picked` names what the teacher chose with a click: { key: true } for a
+   key, { view: { entry: true } } for an entry of a map. It is sent even
+   when it equals this tab's copy: another computer may have changed it
+   since, and the teacher's choice is what this tab now shows. */
+function _dashboardPrefsChange(before, after, picked) {
+  var was = _plainObject(before) ? before : {};
+  var now = _plainObject(after) ? after : {};
+  var chose = _plainObject(picked) ? picked : {};
+  var change = {};
+  Object.keys(now).forEach(function (k) {
+    if (_DASHBOARD_PREF_MAPS[k] && _plainObject(now[k])) {
+      var old = _plainObject(was[k]) ? was[k] : {};
+      var choseHere = _plainObject(chose[k]) ? chose[k] : {};
+      var entries = {};
+      Object.keys(now[k]).forEach(function (e) {
+        if (choseHere[e] || !Object.prototype.hasOwnProperty.call(old, e) || !_sameSetting(now[k][e], old[e])) {
+          entries[e] = now[k][e] === undefined ? null : now[k][e];
+        }
+      });
+      Object.keys(old).forEach(function (e) {
+        if (!Object.prototype.hasOwnProperty.call(now[k], e)) entries[e] = null;
+      });
+      if (Object.keys(entries).length) change[k] = entries;
+    } else if (
+      chose[k] === true ||
+      !_sameSetting(now[k] === undefined ? null : now[k], was[k] === undefined ? null : was[k])
+    ) {
+      change[k] = now[k] === undefined ? null : now[k];
+    }
+  });
+  Object.keys(was).forEach(function (k) {
+    if (!Object.prototype.hasOwnProperty.call(now, k) && was[k] != null) change[k] = null;
+  });
+  return change;
+}
+
+/* The patch for patch_teacher_preferences that takes the server from this
+   tab's copy `before` to `after`: only the preferences that differ. A tab
+   open since before a change on another computer still holds the old value
+   of everything it has not changed itself, and none of that is sent. */
+function _teacherPrefsChange(before, after) {
+  var was = before || {};
+  var now = after || {};
+  var changed = {};
+  _TEACHER_PREF_FIELDS.forEach(function (f) {
+    if (!Object.prototype.hasOwnProperty.call(now, f)) return;
+    // The active class is compared as this device holds it, so a class's
+    // local id giving way to its server id still sends the server id.
+    if (!_sameSetting(now[f] || null, was[f] || null)) changed[f] = now[f];
+  });
+  var patch = _teacherPrefsPatchFromConfig(changed);
+  if (Object.prototype.hasOwnProperty.call(now, 'dashboardPrefs')) {
+    if (now.dashboardPrefs == null) {
+      if (was.dashboardPrefs != null) patch.dashboard_prefs = null;
+    } else {
+      var dash = _dashboardPrefsChange(was.dashboardPrefs, now.dashboardPrefs);
+      if (Object.keys(dash).length) patch.dashboard_prefs = dash;
+    }
+  }
+  return patch;
+}
+
+/* Save the teacher's preferences. Only what differs from this tab's copy is
+   sent (_teacherPrefsChange); a save that changes nothing sends nothing.
+   These are saves the app makes of a whole copy; a choice the teacher makes
+   with a click goes through saveDashboardPrefs or saveViewPref, which send
+   it even when it is unchanged.
+   Callers pass a new object ({ ...getConfig(), activeCourse }); one that
+   changed the cached copy in place is compared with this device's stored
+   copy instead, which is all that is left of the old values. */
 function saveConfig(obj) {
+  var before = getConfig();
+  if (before === obj) before = _safeParseLS('gb-config', {});
   _cache.config = obj;
   _safeLSSet('gb-config', JSON.stringify(obj));
-  if (_writesEnabled()) {
-    const sb = getSupabase();
-    if (sb) {
-      const patch = _teacherPrefsPatchFromConfig(obj);
-      _trackPendingSync(
-        _writeRpc('save_teacher_preferences', { p_patch: patch }).then(function (res) {
-          if (res.error) console.warn('save_teacher_preferences RPC failed:', res.error);
-        }),
-      );
-    }
+  if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
+    var patch = _teacherPrefsChange(before, obj);
+    if (Object.keys(patch).length) window.v2.saveTeacherPreferences(patch);
   }
 }
 function getCourseConfig(cid) {

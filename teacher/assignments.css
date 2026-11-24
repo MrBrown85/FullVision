@@ -84,6 +84,13 @@
   font-weight: 600;
   color: var(--score-1-dark);
 }
+/* Dark: --score-1-dark is #ff453a there, 4.09:1 on --surface; the Emerging
+   text red is 4.94:1. */
+@media (prefers-color-scheme: dark) {
+  .assess-missing {
+    color: var(--score-1-text);
+  }
+}
 /* Header actions: shown on the open card, on hover for a closed one. */
 .assess-header-actions {
   grid-area: actions;
@@ -2114,12 +2121,13 @@ body.af-comp-open #gb-tooltip {
 .assess-seg-control {
   margin-left: 4px;
 }
-/* Search — subtle pill, 220px, giving way first when the row is tight */
+/* Search — subtle pill, up to 220px, giving way first when the row is tight */
 .assess-search-wrap {
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 220px;
+  flex: 1 1 110px;
+  max-width: 220px;
   min-width: 110px;
 }
 .assess-search-icon {
@@ -4033,6 +4041,31 @@ body.af-comp-open #gb-tooltip {
 .af-counts-as:empty {
   display: none;
 }
+/* Show Students the Factored Score: a switch under the share bar, points
+   work at a Factor other than 1× (2026-11-18). */
+.af-factored {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+.af-factored[hidden] {
+  display: none;
+}
+.af-factored-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.af-factored .af-label {
+  margin: 0;
+}
+.af-factored-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
 /* The share bar: this assessment's part of its category, in blue, the
    others grey (2026-11-06). */
 .af-share {
@@ -4589,6 +4622,18 @@ body.af-comp-open #gb-tooltip {
   font-size: var(--text-base);
   color: var(--text);
 }
+/* The score times its Factor, beside the score box (2026-11-18): read-only. */
+.ldg-pts .gb-pts-max {
+  white-space: nowrap;
+}
+.ldg-pts .gb-pts-factored {
+  flex: 0 0 auto;
+  min-width: 64px;
+  margin-left: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  white-space: nowrap;
+}
 .ldg-pts .gb-pts-live-pct {
   min-width: 44px;
   margin-left: 14px;
@@ -4984,108 +5029,8 @@ body.af-comp-open #gb-tooltip {
   gap: 4px;
 }
 
-/* ── Descriptor bar — slim frosted glass toolbar ─────────── */
-.rsg-descriptor-bar {
-  position: fixed;
-  bottom: 8px;
-  /* Over the page beside the student list, never over the list. */
-  left: calc(var(--sidebar-w) + 16px);
-  right: 16px;
-  margin: 0 auto;
-  z-index: 10000;
-  max-width: 1400px;
-  background: var(--surface);
-  border: 1px solid var(--overlay-pressed);
-  border-radius: var(--radius);
-  padding: 6px 16px;
-  display: none;
-  align-items: center;
-  gap: 14px;
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.1),
-    0 1px 4px rgba(0, 0, 0, 0.05);
-  font-family: inherit;
-  color: var(--text);
-  animation: slide-up 0.15s var(--ease-spring);
-}
-.rsg-descriptor-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.rsg-descriptor-label {
-  font-family: inherit;
-  font-size: var(--text-base);
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--text);
-}
-.rsg-descriptor-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-}
-.rsg-descriptor-tag {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  padding: 1px 8px;
-  border-radius: var(--radius-xl);
-  border: 1px solid;
-  background: rgba(0, 0, 0, 0.03);
-  white-space: nowrap;
-}
-.rsg-descriptor-tag-overall {
-  border-color: var(--text-3);
-  color: var(--text-3);
-}
-.rsg-descriptor-text {
-  font-size: var(--text-base);
-  line-height: 1.35;
-  color: var(--text-2);
-  font-weight: 400;
-  border-left: 1.5px solid var(--border);
-  padding-left: 14px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* A competency level's three lines (CompetencyWording): the level and its
-   descriptor, what Proficient means, the next step. */
-.rsg-descriptor-bar.is-lines {
-  align-items: flex-start;
-  /* Shown on every hover: no slide, which would also replace the bar's
-     centring transform while it runs. */
-  animation: none;
-}
-.rsg-descriptor-text.is-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  white-space: normal;
-  overflow: visible;
-  color: var(--text);
-}
 .cw-line b {
   font-weight: 600;
-}
-.rsg-descriptor-bar.is-idle {
-  visibility: hidden;
-}
-.rsg-descriptor-bar.bar-wide {
-  left: 16px;
-}
-@media (max-width: 1024px) {
-  .rsg-descriptor-bar {
-    left: 16px;
-  }
-  /* The student list open over the page covers the bar's place. */
-  .rsg-descriptor-bar.bar-covered {
-    display: none !important;
-  }
 }
 
 /* ── Keyboard Navigation Focus ──────────────────────────── */
@@ -5670,13 +5615,42 @@ body.af-comp-open #gb-tooltip {
   align-items: center;
   gap: 4px;
 }
+/* A level's words, joined under the level bar in its grey: part of the
+   rubric, not feedback. The chosen level's cell is the one that reads dark. */
+.rsg-words {
+  display: flex;
+  margin-top: -3px;
+  padding: 6px 2px 7px;
+  border-radius: 0 0 9px 9px;
+  background: rgba(118, 118, 128, 0.07);
+}
+.rsg-words-col {
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--text-3, var(--text-2));
+  overflow-wrap: anywhere;
+}
+.rsg-words-col + .rsg-words-col {
+  border-left: 1px solid var(--divider-subtle, rgba(0, 0, 0, 0.06));
+}
+.rsg-words-col.is-chosen {
+  color: var(--text);
+  font-weight: 600;
+}
 .rsg-crit-comment svg {
   width: 13px;
   height: 13px;
 }
 /* The saved comment, read in place under the levels. */
+/* The teacher's comment to the student, marked as feedback: a blue rule and
+   its name, so it never reads as the rubric's own words. */
 .rsg-crit-note {
-  padding: 0 4px;
+  margin-top: 6px;
+  padding: 1px 4px 1px 10px;
+  border-left: 3px solid var(--link);
   font-size: var(--text-sm);
   line-height: 1.4;
   color: var(--text-2);
@@ -5686,6 +5660,11 @@ body.af-comp-open #gb-tooltip {
   line-clamp: 2;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+.rsg-crit-note::before {
+  content: 'Comment  ';
+  font-weight: 700;
+  color: var(--link);
 }
 .rsg-crit-comment:hover,
 .rsg-crit-comment:focus-visible {
@@ -6199,10 +6178,15 @@ body.af-comp-open #gb-tooltip {
 .grader-print:hover {
   background: rgba(0, 122, 255, 0.16);
 }
+/* Dark: the link blue on a lighter tint, as the grader's Return All
+   (--active read 3.0:1, --link on the old 0.2 tint 4.49:1). */
 @media (prefers-color-scheme: dark) {
   .grader-print {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
+  }
+  .grader-print:hover {
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 .grader-scroll {
@@ -6820,21 +6804,29 @@ button.grader-member-name {
   background: var(--btn-hover-blue);
 }
 /* In the dialog it is tinted, as the board draws it and as Print is: Done
-   and Return stay the dialog's solid blue buttons. */
+   and Return stay the dialog's solid blue buttons. The Assignments card's
+   Return N Graded is tinted too: + New Assessment is that screen's one
+   solid button (DECISIONS, "Buttons and breadcrumbs"). */
+.assess-return-btn,
 .grader-return-all {
   background: rgba(0, 122, 255, 0.1);
   color: #0062cc;
 }
+.assess-return-btn:hover,
 .grader-return-all:hover {
   background: rgba(0, 122, 255, 0.16);
 }
+/* Dark: the link blue on a lighter tint, 4.87:1 at rest and 4.63:1 on
+   hover over --surface (--active read 3.0:1). */
 @media (prefers-color-scheme: dark) {
+  .assess-return-btn,
   .grader-return-all {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
   }
+  .assess-return-btn:hover,
   .grader-return-all:hover {
-    background: rgba(10, 132, 255, 0.28);
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 /* A row's mark beside the student's name. */
@@ -7525,15 +7517,11 @@ button.grader-member-name {
 /* Toolbar (Option A): one white row like the Dashboard and Gradebook.
    Category filters and Ungraded Only live in the Filter menu. */
 .assess-toolbar {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
 }
-/* A narrow window wraps rather than push the buttons out of sight. */
-@media (max-width: 1099px) {
-  .assess-toolbar {
-    flex-wrap: wrap;
-  }
-}
+/* A row that doesn't fit (a narrow window, a wide font, every button on)
+   wraps rather than push the buttons out of sight or scroll sideways. */
 .assess-toolbar .seg,
 .assess-toolbar .tb-action-btn {
   flex-shrink: 0;
@@ -9591,6 +9579,30 @@ button.grader-member-name {
   .grader-toolbar .grader-draft-still {
     display: none;
   }
+  /* A narrow window: the iPad's two rows (tablet.css), so the title, Show
+     and Return N Graded never sit on top of each other (Nov 18). */
+  .grader-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title end'
+      'lead lead';
+    row-gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .grader-title-wrap {
+    grid-area: title;
+    min-width: 0;
+    text-align: left;
+  }
+  .grader-toolbar-end {
+    grid-area: end;
+  }
+  .grader-toolbar-lead {
+    grid-area: lead;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
 }
 
 /* The pages. Each page's number, Rotate and Mark Up sit on its top
@@ -9901,18 +9913,16 @@ button.grader-member-name {
   height: 28px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--active);
+  /* The link blue: 5.11:1 on --bg in light, 6.95:1 in dark (--active
+     read 3.7:1 in light). */
+  border: 1px solid var(--link);
   background: var(--bg);
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-}
-.assess-grade-work-btn {
-  background: var(--active-fill);
-  color: #fff;
 }
 /* The work icon on a student's row (_workIconHtml): See the Work, the
    blue page icon, where work is in; + (Attach Work) where nothing is, quiet
@@ -10665,9 +10675,10 @@ button.grader-member-name {
   height: 30px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--active);
+  /* The link blue, as Grade Submissions: --active read 3.7:1 in light. */
+  border: 1px solid var(--link);
   background: var(--bg);
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -10783,7 +10794,8 @@ button.grader-member-name {
   border: 1px solid var(--divider-heavy);
   border-radius: 17px;
   background: var(--surface);
-  color: var(--active);
+  /* The link blue: --active read 4.02:1 on white. */
+  color: var(--link);
   font: inherit;
   font-size: var(--text-base);
   font-weight: 600;
@@ -11535,4 +11547,307 @@ button.grader-member-name {
 .alv-assign {
   padding: 4px 14px;
   font-size: 13px;
+}
+
+/* ── Six-Point rubrics (shared/six-point.js) ──────────────────────────
+   Six scores where a rubric has four levels: the editor's level cards, the
+   checklist columns and the score buttons, each score in the colour of the
+   level it counts as. */
+/* Two rows of three: six columns leave the checkbox labels unreadable. */
+.rubric-editor.six-point .rubric-levels {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rubric-editor.six-point .rubric-level-card {
+  border-bottom: 1px solid var(--border);
+}
+.rubric-editor.six-point .rubric-level-card:nth-child(3n) {
+  border-right: none;
+}
+.rubric-editor.six-point .rubric-level-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.rubric-level-counts {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rsg-criterion-row.is-six .rsg-checklist,
+.grdt-crit.is-six .rsg-checklist {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.sp6-levels {
+  display: flex;
+  gap: 0;
+}
+button.sp6-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.sp6-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1.1;
+  padding: 2px 2px;
+}
+.rsg-level.sp6-btn {
+  height: 40px;
+}
+.sp6-num {
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+.sp6-word {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sp6-btn.is-on .sp6-word,
+.sp6-btn.active .sp6-word {
+  font-weight: 600;
+}
+@container (max-width: 360px) {
+  .sp6-word {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .rubric-editor.six-point .rubric-levels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rubric-editor.six-point .rubric-level-card:nth-child(3n) {
+    border-right: 1px solid var(--border);
+  }
+  .rubric-editor.six-point .rubric-level-card:nth-child(2n) {
+    border-right: none;
+  }
+}
+@media (max-width: 560px) {
+  .rubric-editor.six-point .rubric-levels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── The rubric editor window (Nov 19) ────────────────────────────────
+   New and Edit from the Rubric Bank: the Blank Rubric card, large, over
+   the page. Its level headers are typed in place, each with a ▾ menu, and
+   a + adds a level (shared/rubric-scale.js). */
+.rb-ed-overlay {
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+.rb-ed-window {
+  display: flex;
+  flex-direction: column;
+  width: min(1480px, 100%);
+  max-height: calc(100vh - 48px);
+  border-radius: 16px;
+  background: var(--bg, var(--surface));
+  box-shadow:
+    0 0 0 1px var(--af-card-edge),
+    0 24px 64px rgba(0, 0, 0, 0.28);
+  overflow: auto;
+}
+.rb-ed-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px 10px;
+}
+.rb-ed-title {
+  margin: 0;
+  font-size: var(--text-xl, 1.35rem);
+  font-weight: 700;
+  color: var(--text);
+}
+.rb-ed-hint {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.rb-ed-window > .rubric-guard-note {
+  margin: 0 24px 8px;
+}
+.rb-ed-window > .af-ge-card {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0 24px 24px;
+}
+/* Room under the grid for a level's menu; the window scrolls, not the grid. */
+.rb-ed-window > .af-ge-card > .af-ge-body {
+  min-height: 300px;
+}
+.rb-ed-window .af-ge-name {
+  min-width: 320px;
+}
+.rb-ed-window .af-ge-text {
+  min-height: 120px;
+}
+
+/* Level headers: the name typed on the colour, its number, a ▾ menu. */
+.af-ge-level-head {
+  position: relative;
+  white-space: normal;
+}
+.af-ge-level-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.af-ge-colname {
+  flex: 1;
+  min-width: 0;
+  margin: -3px 0 -3px -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+}
+.af-ge-colname:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.af-ge-colname:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.af-rubric-card .af-ge-level-head .rb-level-value {
+  float: none;
+  flex: none;
+}
+.af-ge-colmore {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.af-ge-colmore:hover,
+.af-ge-colmore[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.22);
+  opacity: 1;
+}
+.af-ge-counts-line {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  opacity: 0.9;
+}
+.af-ge-colmenu {
+  position: absolute;
+  z-index: 7;
+  right: 0;
+  top: calc(100% + 6px);
+  display: grid;
+  gap: 2px;
+  width: 230px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--af-card-edge),
+    0 12px 28px rgba(0, 0, 0, 0.18);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text);
+  text-align: left;
+}
+.af-ge-counts {
+  display: grid;
+  gap: 4px;
+  padding: 4px 6px 8px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.af-card .af-ge-counts .af-input,
+.af-ge-counts .af-input {
+  width: 100%;
+  height: 32px;
+}
+.af-ge-colnote {
+  margin: 0;
+  padding: 4px 6px 8px;
+  color: var(--text-3);
+}
+.af-ge-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.af-ge-menu-item:hover:not(:disabled) {
+  background: var(--overlay-hover);
+}
+.af-ge-menu-item:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.af-ge-menu-item.is-danger {
+  color: var(--score-1);
+}
+.af-ge-menu-row {
+  display: flex;
+  gap: 2px;
+  margin: 0 -4px;
+}
+.af-ge-menu-row .af-ge-menu-item {
+  width: auto;
+  flex: 1;
+  text-align: center;
+}
+/* The + at the far end of the header row. */
+.af-ge-addcol-head,
+.af-ge-addcol-cell {
+  width: 40px;
+  padding: 0;
+}
+.af-ge-addcol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px dashed var(--af-card-edge, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
+}
+.af-ge-addcol:hover {
+  border-color: var(--active);
+  color: var(--active);
 }

@@ -371,17 +371,18 @@
     return '<option value="' + G.esc(value) + '"' + (on ? ' selected' : '') + '>' + G.esc(label) + '</option>';
   }
 
-  // The Cards | List switch on the toolbar.
+  // The Grade | Bulk Edit switch on the toolbar (Colin, Nov 18: "List is confusing"): the cards are
+  // where work is graded, the list where settings are changed for many pieces at once.
   // html-safe: fixed words
   function switchHtml() {
     return (
       '<div class="seg assess-view-seg" role="group" aria-label="View">' +
       '<button type="button" class="seg-btn"' +
       G.segAttr(!_on) +
-      ' data-alv-view="cards">Cards</button>' +
+      ' data-alv-view="cards">Grade</button>' +
       '<button type="button" class="seg-btn"' +
       G.segAttr(_on) +
-      ' data-alv-view="list">List</button>' +
+      ' data-alv-view="list">Bulk Edit</button>' +
       '</div>'
     );
   }

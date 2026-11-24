@@ -940,7 +940,7 @@ window.StudentPageView = (function () {
         : '') +
       (todo || p.kind === 'revise' ? resourcesHtml(p, !!car) : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
-      (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) : '') +
+      (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) + seeWorkHtml(p) : '') +
       (todo ? rubricLinkHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) + quizBlockHtml(p) : '') +
       reviseBlockHtml(p, 'card') +
       (hasCompare(p)
@@ -985,10 +985,22 @@ window.StudentPageView = (function () {
     );
   }
 
-  // A side row's press: a card on Assignments; on My Learning, the feedback, or the card of work sent.
+  // A side row's press: a card on Assignments; on My Learning, the feedback, the pages, or the card of work sent.
   function sideAct(p, view) {
     if (segmentOf(p, view)) return 'pick';
-    return hasFeedback(p) && p.kind !== 'sent' ? 'feedback' : 'open-piece';
+    return learningAct(p) || 'open-piece';
+  }
+
+  /* What a piece's row on My Learning opens (DECISIONS, "See Your Work from
+     My Learning (2026-11-18)"): work sent and waiting, or Missing, its card;
+     a piece with feedback, Your Feedback (which offers See Your Work when
+     there are pages); a piece with pages and no feedback, See Your Work;
+     anything else, nothing. */
+  function learningAct(p) {
+    if (p.kind === 'sent' || p.kind === 'missing') return 'open-piece';
+    if (hasFeedback(p)) return 'feedback';
+    if (canSeeWork(p)) return 'work';
+    return '';
   }
 
   // The Chromebook's list on the left, the piece picked marked.
@@ -1399,9 +1411,13 @@ window.StudentPageView = (function () {
 
   /* ── See Your Work, with Show Marks (S9-F3) ────────────────────
      The artboard's "Student: Returned Photo With Marks" and the See Your
-     Work row on Your Feedback ("2 pages · 3 notes on your work"). Only a
-     returned piece whose `feedback` reply says the student was given marks
-     has it (the view's piece.marks). The pages themselves are fetched by
+     Work row on Your Feedback ("2 pages · 3 notes on your work"). Since
+     Nov 18 (DECISIONS, "See Your Work from My Learning (2026-11-18)") every
+     piece with pages handed in has it, sent by the student or added by the
+     teacher (the view's piece.pages), marks or not: Your Feedback offers
+     it, a row on My Learning with pages and no feedback opens it, and so
+     does the card of work sent. Marks are drawn only where the `feedback`
+     reply says the student was given some (piece.marks). The pages themselves are fetched by
      whoever draws the page (s/feedback.js on the student's device, the
      preview from the teacher's cache) and handed in as ui.workPages:
      { id, state: 'loading' | 'ready' | 'failed', pages: [ { url, marks } ] },
@@ -1417,13 +1433,23 @@ window.StudentPageView = (function () {
     return pages + SEP + (m.notes === 1 ? '1 note' : m.notes + ' notes') + ' on your work';
   }
 
+  // "1 page", "2 pages": what is there when no marks were given.
+  function pagesLine(n) {
+    return n === 1 ? '1 page' : n + ' pages';
+  }
+
+  // Can See Your Work open on piece `p`: pages handed in, or marks given on them.
+  function canSeeWork(p) {
+    return !!(p && (p.marks || p.pages > 0));
+  }
+
   function seeWorkHtml(p) {
-    if (!p.marks) return '';
+    if (!canSeeWork(p)) return '';
     return (
       '<button type="button" class="sp-fb-card sp-fb-work" data-act="work" data-piece="' +
       esc(p.id) +
       '"><span class="sp-fb-work-words"><span class="sp-fb-work-title">See Your Work</span><span class="sp-fb-work-line">' +
-      esc(marksLine(p.marks)) +
+      esc(p.marks ? marksLine(p.marks) : pagesLine(p.pages)) +
       '</span></span>' +
       NEXT_ARROW +
       '</button>'
@@ -1431,7 +1457,16 @@ window.StudentPageView = (function () {
   }
 
   function workOpen(ui, p) {
-    return !!(ui.work && p && ui.work === p.id && p.marks);
+    return !!(ui.work && p && ui.work === p.id && canSeeWork(p));
+  }
+
+  /* See Your Work open with nothing under it but the list: opened from a
+     row on My Learning (a piece with pages and no feedback) or from the
+     card of work sent. With Your Feedback under it, feedbackBody draws it. */
+  function workPiece(view, ui) {
+    if (!view || !ui.work || feedbackPiece(view, ui)) return null;
+    var p = pieceIn(view.work, ui.work);
+    return p && p.id === ui.work && canSeeWork(p) ? p : null;
   }
 
   // Only a picture this page made or ships: a blob: address, or a drawn sample page.
@@ -1521,11 +1556,13 @@ window.StudentPageView = (function () {
     };
   }
 
-  function workPageHtml(view, ui, pages) {
+  function workPageHtml(view, ui, pages, p) {
     var n = pages.length;
     var i = Math.max(0, Math.min(n - 1, Number(ui.workPage) || 0));
     var page = pages[i];
-    var showing = !ui.marksOff;
+    // Show Marks is there only on a piece the student was given marks on.
+    var marked = !!(p && p.marks);
+    var showing = marked && !ui.marksOff;
     var drawn = showing ? marksHtml(page.marks) : { over: '', notes: [] };
     var alt = 'Your page ' + (i + 1) + (showing && drawn.over ? ' with your teacher’s marks' : '');
     var dots = '';
@@ -1553,36 +1590,42 @@ window.StudentPageView = (function () {
             .join('') +
           '</ol>'
         : '') +
-      '<div class="sp-work-bar">' +
-      (n > 1
-        ? '<button type="button" class="sp-head-icon" data-act="work-page" data-page="' +
-          (i - 1) +
-          '" aria-label="Previous Page"' +
-          (i === 0 ? ' disabled' : '') +
-          '>' +
-          BACK_ARROW +
-          '</button><span class="sp-work-dots" role="img" aria-label="' +
-          esc('Page ' + (i + 1) + ' of ' + n) +
-          '">' +
-          dots +
-          '</span><button type="button" class="sp-head-icon sp-work-next" data-act="work-page" data-page="' +
-          (i + 1) +
-          '" aria-label="Next Page"' +
-          (i === n - 1 ? ' disabled' : '') +
-          '>' +
-          BACK_ARROW +
-          '</button>'
-        : '') +
-      '<button type="button" class="sp-work-switch" role="switch" data-act="work-marks" aria-checked="' +
-      (showing ? 'true' : 'false') +
-      '"><span class="sp-work-track" aria-hidden="true"><span class="sp-work-knob"></span></span><span>Show Marks</span></button>' +
-      '</div>'
+      // The way between the pages and Show Marks; one page with no marks needs neither.
+      (n > 1 || marked
+        ? '<div class="sp-work-bar">' +
+          (n > 1
+            ? '<button type="button" class="sp-head-icon" data-act="work-page" data-page="' +
+              (i - 1) +
+              '" aria-label="Previous Page"' +
+              (i === 0 ? ' disabled' : '') +
+              '>' +
+              BACK_ARROW +
+              '</button><span class="sp-work-dots" role="img" aria-label="' +
+              esc('Page ' + (i + 1) + ' of ' + n) +
+              '">' +
+              dots +
+              '</span><button type="button" class="sp-head-icon sp-work-next" data-act="work-page" data-page="' +
+              (i + 1) +
+              '" aria-label="Next Page"' +
+              (i === n - 1 ? ' disabled' : '') +
+              '>' +
+              BACK_ARROW +
+              '</button>'
+            : '') +
+          (marked
+            ? '<button type="button" class="sp-work-switch" role="switch" data-act="work-marks" aria-checked="' +
+              (showing ? 'true' : 'false') +
+              '"><span class="sp-work-track" aria-hidden="true"><span class="sp-work-knob"></span></span><span>Show Marks</span></button>'
+            : '') +
+          '</div>'
+        : '')
     );
   }
 
-  /* See Your Work: the way back to Your Feedback, the piece's title, which
+  /* See Your Work: the way back (to Your Feedback, the card of work sent,
+     or My Learning, whichever it was opened from), the piece's title, which
      page this is, the page with the marks the student was given over it,
-     Show Marks, and a way between the pages. */
+     Show Marks when there are marks, and a way between the pages. */
   function seeWorkPaneHtml(view, ui, p) {
     var got = ui.workPages && ui.workPages.id === p.id ? ui.workPages : null;
     var pages = readyPages(ui, p) || [];
@@ -1599,7 +1642,7 @@ window.StudentPageView = (function () {
     } else if (!pages.length) {
       body = '<p class="sp-lead sp-msg-calm">Your pages can’t be shown here.</p>';
     } else {
-      body = workPageHtml(view, ui, pages);
+      body = workPageHtml(view, ui, pages, p);
     }
     return (
       '<section class="sp-feedback sp-work" aria-labelledby="sp-work-title">' +
@@ -1633,6 +1676,18 @@ window.StudentPageView = (function () {
           : workOpen(ui, p)
             ? seeWorkPaneHtml(view, ui, p)
             : feedbackHtml(view, ui, p)) +
+      '</div>'
+    );
+  }
+
+  // See Your Work opened from My Learning, in place of the list; on a Chromebook the list stays on the left.
+  function workBody(ui, view, p) {
+    var home = homeOf(p, view);
+    return (
+      homeTop(ui, view, home) +
+      '<div class="sp-split sp-split-feedback">' +
+      sideHtml(homeList(view, home), p, view) +
+      seeWorkPaneHtml(view, ui, p) +
       '</div>'
     );
   }
@@ -2022,6 +2077,7 @@ window.StudentPageView = (function () {
       act = 'open-piece';
     } else if (p.kind === 'excused') {
       chip = '<span class="sp-level sp-lv-0">Excused</span>';
+      act = learningAct(p);
     } else {
       var r = p.result || {};
       var was = r.was ? 'was ' + r.was : '';
@@ -2034,7 +2090,7 @@ window.StudentPageView = (function () {
         .filter(Boolean)
         .join(SEP);
       chip = r.text ? chipHtml(r.text, r.level) : '';
-      act = hasFeedback(p) ? 'feedback' : '';
+      act = learningAct(p);
     }
     var fresh = p.kind === 'back' && p.unseen && p.result && p.result.text;
     var inner =
@@ -2160,6 +2216,8 @@ window.StudentPageView = (function () {
     if (ho) return handoutBody(ui, view, ho);
     var fb = feedbackPiece(view, ui);
     if (fb) return feedbackBody(ui, view, fb);
+    var wk = workPiece(view, ui);
+    if (wk) return workBody(ui, view, wk);
     if (tab === 'learning') {
       var c = cardOpen(view, ui);
       return c ? sentCardBody(ui, view, c) : learningBody(view, ui);
@@ -2436,7 +2494,10 @@ window.StudentPageView = (function () {
     var open =
       ready &&
       tab !== 'bulletins' &&
-      (handoutOpen(view, ui) || feedbackPiece(view, ui) || (tab === 'learning' && cardOpen(view, ui)));
+      (handoutOpen(view, ui) ||
+        feedbackPiece(view, ui) ||
+        workPiece(view, ui) ||
+        (tab === 'learning' && cardOpen(view, ui)));
     return (
       '<div class="sp-view' +
       (open ? ' sp-on-feedback' : '') +
@@ -2632,9 +2693,13 @@ window.StudentPageView = (function () {
     if (act === 'work') {
       var wid = attr('data-piece');
       var w = view && pieceIn(view.work, wid);
-      if (!w || w.id !== wid || !w.marks || !hasFeedback(w)) return null;
+      if (!w || w.id !== wid || !canSeeWork(w)) return null;
+      // Your Feedback stays under it when it was opened from there; from a row or a card, nothing is.
+      var fromFeedback = !!(ui && ui.feedback === w.id && hasFeedback(w));
       goHome(next, w, view);
-      next.feedback = w.id;
+      next.feedback = fromFeedback ? w.id : '';
+      // The card of work sent stays under its own pages only.
+      if (next.card && next.card !== w.id) next.card = '';
       next.whole = false;
       next.work = w.id;
       next.workPage = 0;
@@ -2644,14 +2709,21 @@ window.StudentPageView = (function () {
       return { ui: next, focus: '#sp-work-title', work: w.id };
     }
     if (act === 'work-close') {
+      var shut = view && next.work ? pieceIn(view.work, next.work) : null;
       next.work = '';
       next.workPage = 0;
       next.marksOff = false;
-      return { ui: next, focus: '[data-act="work"]' };
+      // Back to Your Feedback or the card of work sent, at See Your Work; else to the piece's row.
+      var under = next.feedback || next.card;
+      return {
+        ui: next,
+        focus: under || !shut ? '[data-act="work"]' : backFocus(shut, view),
+      };
     }
     if (act === 'work-page' || act === 'work-marks') {
       var on = view && next.work ? pieceIn(view.work, next.work) : null;
-      if (!on || on.id !== next.work || !on.marks) return null;
+      if (!on || on.id !== next.work || !canSeeWork(on)) return null;
+      if (act === 'work-marks' && !on.marks) return null;
       if (act === 'work-marks') {
         next.marksOff = !next.marksOff;
         return { ui: next, focus: '[data-act="work-marks"]' };
@@ -2769,6 +2841,8 @@ window.StudentPageView = (function () {
     photosWord: photosWord,
     thumbsHtml: thumbsHtml,
     marksLine: marksLine,
+    pagesLine: pagesLine,
+    canSeeWork: canSeeWork,
     planHtml: planHtml,
     // A reminder linked to a piece carries that card's band (s/bulletins-view.js).
     bandHtml: bandHtml,

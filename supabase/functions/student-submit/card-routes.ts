@@ -30,7 +30,10 @@
 // The session token travels as today's slip token does: in the JSON body,
 // sent back as `session`. Never a cookie (the function is on another site,
 // so the browser would drop it), never a header (nothing new for CORS to
-// allow) and never the address (which is kept in history and logs).
+// allow) and never the address (which is kept in history and logs). The
+// database never sees it (2026112401): handler.ts swaps `session` for its
+// SHA-256 before any route here reads it, and a new session's token is made
+// in handler.ts, which gives verify_card only its hash.
 //
 // Each route below is the one place that names its SQL call, the error
 // codes it passes on, and the fields of the reply the phone is given. A
@@ -64,8 +67,11 @@ export type CardRoute = {
   typed?: (body: Json, who: Identity | null) => Typed | null;
   // The error codes passed on as they are. Any other is answered as not_found.
   errors: string[];
-  // The fields of a good reply the phone is given.
-  reply: (r: Json) => Json;
+  // The fields of a good reply the phone is given. `token` is the new session's token handler.ts made, on a
+  // route with newSession; null on the others.
+  reply: (r: Json, token: string | null) => Json;
+  // verify and add-card: a new session's hash goes as the parameter after the hashed address.
+  newSession?: true;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -360,11 +366,13 @@ function page(r: Json): Json {
   };
 }
 
-// session_token is the new session's token, or null when add-card joined the session sent.
-function verified(r: Json): Json {
+// session_token is the new session's token, or null when add-card joined the session sent. The database says
+// which (new_session); the token itself it never had.
+function verified(r: Json, token: string | null): Json {
   return {
     ok: true,
-    ...pick(r, ['session_token', 'expires_at', 'enrollment_id']),
+    session_token: r.new_session === true ? token : null,
+    ...pick(r, ['expires_at', 'enrollment_id']),
     classes: classes(r.classes),
   };
 }
@@ -386,10 +394,11 @@ const SESSION_ERRORS = ['signed_out', 'not_found', 'card_stopped', 'card_expired
    statement, never taken from the request: sending a session token, or
    anything else, cannot turn a plain verify into an add. The parameters are
    the code's tag, the key id, the birthday, the student number, the typed
-   password's tag, the session token and the hashed address. */
+   password's tag, the session token's hash, the hashed address and the hash
+   of the token handler.ts made for a new session. */
 const verifyCard = (add: boolean) =>
   'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, ' +
-  `p_add => ${add ? 'true' : 'false'}) as r`;
+  `p_add => ${add ? 'true' : 'false'}, p_new_session_hash => $8::text) as r`;
 
 function verifyTyped(body: Json, who: Identity | null, needsSession: boolean): Typed | null {
   const c = code(body);
@@ -429,6 +438,7 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
     typed: (body, who) => verifyTyped(body, who, false),
     errors: [...CARD_ERRORS, 'wrong_identity'],
     reply: verified,
+    newSession: true,
   },
 
   /* Add Another Card: the same check, from a device that is signed in. The
@@ -439,6 +449,7 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
     typed: (body, who) => verifyTyped(body, who, true),
     errors: [...CARD_ERRORS, 'wrong_identity'],
     reply: verified,
+    newSession: true,
   },
 
   // The student's whole page for one class in the session. Returned grades only.
@@ -514,8 +525,8 @@ export async function cardParams(
    code the route does not list is answered as not_found, so nothing the
    database adds later tells a real card from a guess. A reply that is
    neither is thrown, and the handler answers with a plain server error. */
-export function cardReply(route: CardRoute, r: unknown): Json {
-  if (isObject(r) && r.ok === true) return route.reply(r);
+export function cardReply(route: CardRoute, r: unknown, token: string | null = null): Json {
+  if (isObject(r) && r.ok === true) return route.reply(r, token);
   const error = isObject(r) ? r.error : null;
   if (!isObject(r) || typeof error !== 'string') throw new TypeError('reply');
   if (!route.errors.includes(error)) return { ok: false, error: 'not_found' };

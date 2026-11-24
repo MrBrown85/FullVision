@@ -722,7 +722,7 @@ function _moveCourseDataLocalToCanonical(localId, canonicalId) {
   // 4. gb-config's active-course pointer is keyed by course id as well. If it
   //    still holds the placeholder, move it across — otherwise it survives the
   //    re-key permanently and every later saveConfig re-sends a non-uuid to
-  //    save_teacher_preferences. This save also lets the server-side pointer
+  //    patch_teacher_preferences. This save also lets the server-side pointer
   //    catch up now that a canonical id exists.
   try {
     var cfg = getConfig();
@@ -3442,6 +3442,7 @@ function _assessmentFromDetail(existing, detail) {
   if (a.module_id !== undefined) next.moduleId = a.module_id || '';
   if (a.copy_group !== undefined) next.copyGroup = a.copy_group || null;
   if (a.is_draft !== undefined) next.isDraft = !!a.is_draft;
+  if (a.students_see_factored !== undefined) next.studentsSeeFactored = !!a.students_see_factored;
   if (a.core_competency_ids !== undefined) next.coreCompetencyIds = _coreCompetencyIdsOf(a.core_competency_ids);
   if (a.evidence_type !== undefined) next.evidenceType = a.evidence_type || '';
   if (a.collab_mode !== undefined) next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
@@ -3870,6 +3871,7 @@ function _v2GradebookToCache(cid, payload) {
       copyGroup: a.copy_group || null,
       coreCompetencyIds: _coreCompetencyIdsOf(a.core_competency_ids),
       isDraft: !!a.is_draft,
+      studentsSeeFactored: !!a.students_see_factored,
       has_rubric: !!a.has_rubric,
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
@@ -4311,8 +4313,47 @@ function _classMeta(cid) {
   return _safeParseLS('gb-bundle-meta-' + cid, null);
 }
 
+/* A class's saved copy with a part this device could not save (the browser's
+   storage was full): cid → the keys that failed. Such a copy is never
+   opened from, because it reads as a class with nothing in that part: on
+   Nov 18 2026 a phone whose scores would not fit reopened History 12 after
+   Safari reloaded the page with every Missing mark and no scores, so every
+   student read IE 0%, and the server answered "not modified" to the copy's
+   version, so it stayed that way. Its record (gb-bundle-meta) is removed
+   instead, and the class is downloaded in full the next time it opens. */
+var _copyKeysUnsaved = {};
+function _classOfCopyKey(key) {
+  if (typeof key !== 'string' || key.indexOf('gb-') !== 0 || key.indexOf('gb-bundle-meta-') === 0) return null;
+  var m = key.match(/-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+  return m ? m[1] : null;
+}
+function _copyKeyUnsaved(key) {
+  var cid = _classOfCopyKey(key);
+  if (!cid) return;
+  (_copyKeysUnsaved[cid] || (_copyKeysUnsaved[cid] = new Set())).add(key);
+  _dropClassMeta(cid);
+}
+function _copyKeySaved(key) {
+  var cid = _classOfCopyKey(key);
+  if (!cid || !_copyKeysUnsaved[cid]) return;
+  _copyKeysUnsaved[cid].delete(key);
+  if (!_copyKeysUnsaved[cid].size) delete _copyKeysUnsaved[cid];
+}
+function _dropClassMeta(cid) {
+  try {
+    localStorage.removeItem('gb-bundle-meta-' + cid);
+  } catch (e) {
+    /* storage unreadable: there is no copy to open from either */
+  }
+}
+
 function _saveClassMeta(cid, patch) {
   var meta = Object.assign({}, _classMeta(cid) || {}, patch);
+  // An incomplete copy keeps no record, so it is never opened from.
+  if (_copyKeysUnsaved[cid]) {
+    _dropClassMeta(cid);
+    return meta;
+  }
   _safeLSSet('gb-bundle-meta-' + cid, JSON.stringify(meta));
   return meta;
 }
@@ -4444,7 +4485,8 @@ function _purgeStaleSavedCopies() {
 
 /* Browser storage is full: remove the saved copy opened longest ago, never
    the open class, and never while writes wait in the outbox (it shares the
-   same storage). Returns true when something was removed. */
+   same storage). Its unsaved category draft stays. Returns true when
+   something was removed. */
 function _evictOldestSavedCopy(keepCid) {
   if (_hasUnsentWrites()) return false;
   var oldest = null;
@@ -4466,7 +4508,7 @@ function _evictOldestSavedCopy(keepCid) {
   }
   if (!oldest) return false;
   _removeLocalKeys(function (key) {
-    return key.startsWith('gb-') && key.endsWith('-' + oldest);
+    return key.startsWith('gb-') && key.endsWith('-' + oldest) && key.indexOf('gb-category-draft-') !== 0;
   });
   delete _classVersion[oldest];
   return true;
@@ -4962,6 +5004,7 @@ function _safeLSSet(key, value) {
     }
     console.warn('localStorage write failed (' + key + '):', e);
     if (key.indexOf('gb-scores-') === 0) _scoresApart[key] = true;
+    _copyKeyUnsaved(key);
     // Every quota failure counts until that key saves again; the sync dot
     // says so (getSaveProblem).
     if (e.name === 'QuotaExceededError' && !_storageFullKeys.has(key)) {
@@ -4973,6 +5016,7 @@ function _safeLSSet(key, value) {
 }
 
 function _storageSaved(key) {
+  _copyKeySaved(key);
   if (_storageFullKeys.delete(key)) _saveProblemChanged();
 }
 

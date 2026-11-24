@@ -19,7 +19,8 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { SQL as FEEDBACK_SQL } from '../supabase/functions/student-submit/feedback-routes.ts';
 import { SQL as REVISION_SQL } from '../supabase/functions/student-submit/revision-routes.ts';
 import {
@@ -40,6 +41,9 @@ import {
   THUMB_JPEG,
   fakeWorld,
 } from './helpers/fake-send-world.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
 const REQ = '0f0f0f0f-0000-4000-8000-0000000000c1';

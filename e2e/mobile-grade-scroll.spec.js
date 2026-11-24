@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Phone grading keeps its place. A score, ± or clear tapped low on a long
    rubric (or on a competency in Competencies view) used to scroll the student's
@@ -6,6 +7,8 @@ import { test, expect } from '@playwright/test';
    Science 8: the Science Fair Proposal's rubric is padded to eight
    criteria so the card scrolls. Also: the card's foot clears the tab bar,
    and each criterion has a comment box. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function openLongRubric(page) {
   await page.setViewportSize({ width: 375, height: 812 });

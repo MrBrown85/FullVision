@@ -1,6 +1,11 @@
 {
   "checked": [
+    "teacher/report-one-words.js",
+    "teacher/report-one-copy.js",
+    "teacher/report-one-undo.js",
+    "shared/rubric-scale.js",
     "teacher-mobile/tab-bar.js",
+    "teacher-mobile/pin-page.js",
     "teacher-mobile/bulletins-model.js",
     "teacher-mobile/tab-bulletins.js",
     "shared/calc.js",
@@ -106,7 +111,10 @@
     "shared/bulletins-refusals.js",
     "shared/data-bulletins-demo.js",
     "shared/data-bulletins-queue.js",
-    "teacher/page-bulletins.js"
+    "teacher/page-bulletins.js",
+    "teacher/rubric-words.js",
+    "teacher/bulletin-share.js",
+    "teacher/bulletin-seen.js"
   ],
   "notYetChecked": [
     "s/app.js",
@@ -162,7 +170,6 @@
     "teacher/assessment-copy.js",
     "teacher/assign-collab.js",
     "teacher/assign-competency-picker.js",
-    "teacher/assign-descriptor-bar.js",
     "teacher/class-results.js",
     "teacher/cm-block-picker.js",
     "teacher/cm-questionnaires.js",

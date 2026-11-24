@@ -250,22 +250,27 @@ window.DashInboxDrop = (function () {
         '</span></span>'
       );
     }
+    // As board E1 draws it: one chip a piece, the chosen one blue.
     return (
-      '<label class="dash-inbox-drop-for"><span class="dash-inbox-drop-for-label">Add Work For</span> <select class="dash-inbox-drop-select" data-dash-inbox-for>' +
+      '<div class="dash-inbox-drop-for" role="radiogroup" aria-label="Add Work For" data-dash-inbox-for>' +
+      '<span class="dash-inbox-drop-for-label" aria-hidden="true">Add Work For</span>' +
       list
         .map(function (x) {
+          var on = !!c && x.aid === c.aid;
           return (
-            '<option value="' +
+            '<button type="button" role="radio" class="dash-inbox-drop-chip" data-dash-inbox-for-chip="' +
             esc(x.aid) +
-            '"' +
-            (c && x.aid === c.aid ? ' selected' : '') +
-            '>' +
+            '" aria-checked="' +
+            on +
+            '" tabindex="' +
+            (on ? '0' : '-1') +
+            '">' +
             esc(x.label) +
-            '</option>'
+            '</button>'
           );
         })
         .join('') +
-      '</select></label>'
+      '</div>'
     );
   }
 
@@ -332,10 +337,12 @@ window.DashInboxDrop = (function () {
   function shown() {
     var tile = _tile;
     if (tile) {
-      var sel = /** @type {HTMLSelectElement | null} */ (tile.querySelector('[data-dash-inbox-for]'));
-      if (sel) {
-        var opt = sel.querySelector('option[value="' + sel.value + '"]') || sel.querySelector('option[selected]');
-        return sel.value ? { aid: sel.value, label: opt ? String(opt.textContent || '') : '' } : null;
+      var group = tile.querySelector('[data-dash-inbox-for]');
+      if (group) {
+        var on = group.querySelector('[data-dash-inbox-for-chip][aria-checked="true"]');
+        return on
+          ? { aid: on.getAttribute('data-dash-inbox-for-chip') || '', label: String(on.textContent || '') }
+          : null;
       }
       var one = tile.querySelector('[data-dash-inbox-for-aid]');
       if (one) return { aid: one.getAttribute('data-dash-inbox-for-aid') || '', label: String(one.textContent || '') };
@@ -564,9 +571,46 @@ window.DashInboxDrop = (function () {
   }
 
   /** @param {MouseEvent} e */
+  /** Chooses a piece in "Add Work For" in place: no draw.
+   * @param {Element} chip @param {boolean} focus */
+  function _choose(chip, focus) {
+    var group = chip.closest('[data-dash-inbox-for]');
+    if (!group || !_cid) return;
+    group.querySelectorAll('[data-dash-inbox-for-chip]').forEach(function (b) {
+      var on = b === chip;
+      b.setAttribute('aria-checked', String(on));
+      b.setAttribute('tabindex', on ? '0' : '-1');
+    });
+    _chosen[_cid] = chip.getAttribute('data-dash-inbox-for-chip') || '';
+    if (focus) /** @type {HTMLElement} */ (chip).focus();
+  }
+
+  /** The arrow keys move the choice along the chips, as radio buttons do.
+   * @param {KeyboardEvent} e */
+  function _key(e) {
+    var t = /** @type {any} */ (e.target);
+    if (!t || !t.closest || !t.closest('[data-dash-inbox-for-chip]')) return;
+    var k = e.key;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].indexOf(k) < 0) return;
+    var all = Array.prototype.slice.call(
+      t.closest('[data-dash-inbox-for]').querySelectorAll('[data-dash-inbox-for-chip]'),
+    );
+    var at = all.indexOf(t);
+    var to = k === 'Home' ? 0 : k === 'End' ? all.length - 1 : at + (k === 'ArrowLeft' || k === 'ArrowUp' ? -1 : 1);
+    to = (to + all.length) % all.length;
+    e.preventDefault();
+    _choose(all[to], true);
+  }
+
   function _click(e) {
     var t = /** @type {any} */ (e.target);
     if (!t || !t.closest || !_cid) return;
+    var chip = t.closest('[data-dash-inbox-for-chip]');
+    if (chip) {
+      e.preventDefault();
+      _choose(chip, false);
+      return;
+    }
     var pick = t.closest('[data-dash-inbox-pick]');
     if (pick) {
       e.preventDefault();
@@ -582,13 +626,6 @@ window.DashInboxDrop = (function () {
     }
     // A click on the drop area itself, off its buttons: Choose Files….
     if (t.closest('[data-dash-inbox-area]') && !t.closest('button, select, a')) choose(_cid, 'files');
-  }
-
-  /** @param {Event} e */
-  function _change(e) {
-    var t = /** @type {any} */ (e.target);
-    if (!t || !t.hasAttribute || !t.hasAttribute('data-dash-inbox-for') || !_cid) return;
-    _chosen[_cid] = t.value;
   }
 
   // The listeners on the document and window while a tile is mounted: one set.
@@ -654,7 +691,7 @@ window.DashInboxDrop = (function () {
     tile.addEventListener('dragleave', _leave);
     tile.addEventListener('drop', _drop);
     tile.addEventListener('click', _click);
-    tile.addEventListener('change', _change);
+    tile.addEventListener('keydown', _key);
     _page(true);
     // A new draw: no page drag is going on.
     _inner = false;
@@ -676,7 +713,7 @@ window.DashInboxDrop = (function () {
       _tile.removeEventListener('dragleave', _leave);
       _tile.removeEventListener('drop', _drop);
       _tile.removeEventListener('click', _click);
-      _tile.removeEventListener('change', _change);
+      _tile.removeEventListener('keydown', _key);
     }
     _page(false);
     if (_watch) _watch.disconnect();

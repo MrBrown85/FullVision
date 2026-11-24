@@ -2911,3 +2911,19 @@ Result on 2026-11-18, PostgreSQL 17.11 (embedded-postgres), from empty databases
 | `quiz-results-undo.sql` PART 2                                                   | the four functions, no row                                                                                                   | always                                                                                 |
 
 Since the apply, `docs/schema.generated.sql`, `migrations/baseline/` (the Database baseline workflow's output) and `types/database.d.ts` have the two files, so a rebuilt database is the database after them: `quizzes.py` takes each scenario's copy back to before the files with the two full undos and goes on from there. Not verified here: the app that calls the functions (Q2b, Q4); MQ2 and MQ3, which build to the contract.
+
+## The factored score (2026111808, 2026-11-18)
+
+One file, `../2026111808_factored_score.sql`, **applied to gradebook-prod on Nov 18** (Colin's OK; live then read every "after" md5 in its header). It adds `assessment.students_see_factored` (false on every row), `p_students_see_factored` (last) on `create_assessment`, and replaces `update_assessment`, `get_class_bundle`, `get_gradebook`, `duplicate_assessment` and `student_submit.page`, each guarded by its md5 in `migrations/baseline/function-md5.txt` (Nov 18). `get_class_bundle`'s own comments lose their box-drawing characters (plain hyphens), so the file is plain ASCII; nothing else in it changes.
+
+Run on PostgreSQL 17.11 (embedded-postgres), rebuilt from the repo and proved equal to live (`scripts/db-rebuild.mjs --check`):
+
+- Apply, a second run (no change), undo (`factored-score-undo.sql`: all six fingerprints back to live's, the column gone), apply again: all clean.
+- `FV_DB_TEST_APPLY=migrations/2026111808_factored_score.sql npm run test:db`: every security rule test passed.
+- As a seeded teacher: create with it on (true) and without (false); update off, on, another key (kept), and a non-boolean (refused, 22023); `get_class_bundle`, `get_gradebook` and Duplicate carry it; `student_submit.page` through a device session as `service_role` sends it on all 12 pieces, true on the one switched on.
+
+Not verified here: PostgREST's schema cache, the edge functions, gradebook-prod itself.
+
+## Bulletin reminders (2026111809, 2026-11-18)
+
+Applied to gradebook-prod on Nov 18 with Colin's OK; live then read both "after" md5s. Tested on PostgreSQL 17.11 rebuilt from the repo: apply, a second run, undo (`bulletin-reminders-undo.sql`, both fingerprints back to live's, the table gone), apply again; `test:db` with it loaded, every security rule test passed (the seed gains a reminder row); as a seeded teacher, a reminder reaches a named student who can see it and has not seen it, a made-up id is ignored, and the call without names sets `shown_again_at` as before.

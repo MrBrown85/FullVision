@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* The fit line's count of every student's sheets (speed assessment R1).
    A tick used to lay the whole class out again in one task straight after
@@ -7,6 +8,8 @@ import { test, expect } from '@playwright/test';
    one student, lays out only what changed. Counted, not timed. */
 
 test.setTimeout(120_000);
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function open(page) {
   const errors = [];

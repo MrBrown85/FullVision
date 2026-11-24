@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* The Quiz card on the assessment form (docs/plans/quizzes-plan.md, slice
    Q2b; board "Quizzes Artboard", Board 1), in Demo Mode with the quizzes
    switch on: a teacher builds the board's quiz with the keyboard alone and
    it is kept, key and all, apart from anything students are sent. With the
    switch off the form is today's. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ serviceWorkers: 'block', colorScheme: process.env.QUIZ_SCHEME === 'dark' ? 'dark' : 'light' });
 

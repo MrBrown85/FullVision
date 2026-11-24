@@ -187,6 +187,11 @@ window.StudentView = (function () {
         [1, 2, 3, 4].forEach(function (l) {
           row['level_' + l + '_descriptor'] = str(levels[l]);
         });
+        // A Six-Point rubric's two more scores (shared/rubric-scale.js).
+        if (window.RubricScale && RubricScale.has(rubric)) {
+          row.level_5_descriptor = str(levels[5]);
+          row.level_6_descriptor = str(levels[6]);
+        }
         // The competencies this row counts toward, only those still on the class, by id.
         row.tag_ids = (Array.isArray(c.tagIds) ? c.tagIds : [])
           .map(str)
@@ -212,6 +217,8 @@ window.StudentView = (function () {
         return row;
       }),
     };
+    // Its own level columns (shared/rubric-scale.js), as the server sends them.
+    if (Array.isArray(rubric.scale) && rubric.scale.length) out.scale = rubric.scale;
     return out;
   }
 
@@ -307,6 +314,7 @@ window.StudentView = (function () {
         score_mode: dibels ? 'dibels' : str(a.scoreMode || a.score_mode) || 'proficiency',
         max_points: num(a.maxPoints != null ? a.maxPoints : a.max_points),
         weight: num(a.weight),
+        students_see_factored: !!(a.studentsSeeFactored || a.students_see_factored),
         rubric_id: a.rubricId || a.rubric_id || null,
         tag_ids: tagIds.slice().sort(),
         description: textOrNull(a.description),
@@ -373,11 +381,13 @@ window.StudentView = (function () {
       out.level = num(cell.level) || 0;
     } else if (cell.kind === 'points') {
       var max = num(a.max_points) || 100;
+      var fp = (a.students_see_factored && factoredPoints(a, cell.value, max)) || { points: cell.value, outOf: max };
       out.kind = 'points';
-      out.text = formatPoints(cell.value) + ' / ' + formatPoints(max);
+      out.text = formatPoints(fp.points) + ' / ' + formatPoints(fp.outOf);
       out.level = num(cell.level) || 0;
-      out.points = formatPoints(cell.value);
-      out.outOf = formatPoints(max);
+      out.points = formatPoints(fp.points);
+      out.outOf = formatPoints(fp.outOf);
+      if (fp.factor) out.factor = fp.factor;
       out.percent = formatPointsPercent(cell.value, max);
       // A bar, not a grade: how much of it is filled, 0 to 100.
       out.bar = Math.max(0, Math.min(100, (Number(cell.value) / max) * 100));
@@ -427,8 +437,60 @@ window.StudentView = (function () {
      asks (its descriptor, and on an Advanced Rubric its boxes not ticked);
      the Proficient wording (a Single-Point Rubric's goal); and each of the
      four levels for The Whole Rubric, the one given marked. */
+  /* A Six-Point rubric's row (shared/rubric-scale.js): its levels are the six
+     scores, read back from the stored level and ±; the row's level stays the
+     stored one, for its colour. "4 Competent · Proficient": the score, then
+     what it counts as. The goal is the column that counts as Proficient. */
+  function sixRow(rubric, row, c, part) {
+    var given = row.level ? RubricScale.fromStored(rubric, row.level, part ? num(part.modifier) || 0 : 0) : 0;
+    var at = function (k) {
+      return row.checks.filter(function (x) {
+        return x.level === k;
+      });
+    };
+    var ks = RubricScale.columns(rubric).map(function (col) {
+      return col.k;
+    });
+    var top = ks[ks.length - 1];
+    row.descriptors = [1, 2, 3, 4, 5, 6].map(function (k) {
+      return str(c['level_' + k + '_descriptor']);
+    });
+    if (given) row.text = RubricScale.label(rubric, given) + (row.text ? ' · ' + row.text : '');
+    row.levelName = given ? RubricScale.label(rubric, given) : '';
+    row.descriptor = given ? row.descriptors[given - 1] : '';
+    row.shown = row.checks.filter(function (k) {
+      return k.ticked;
+    });
+    row.next =
+      given && given < top
+        ? {
+            level: RubricScale.tone(rubric, given + 1),
+            name: RubricScale.label(rubric, given + 1),
+            descriptor: row.descriptors[given],
+            checks: at(given + 1).filter(function (k) {
+              return !k.ticked;
+            }),
+          }
+        : null;
+    var goal = ks.filter(function (k) {
+      return RubricScale.toStored(rubric, k).level === 3;
+    })[0];
+    row.goal = goal ? row.descriptors[goal - 1] : '';
+    row.whole = ks.map(function (k) {
+      return {
+        level: RubricScale.tone(rubric, k),
+        name: RubricScale.label(rubric, k),
+        descriptor: row.descriptors[k - 1],
+        checks: at(k),
+        you: k === given,
+      };
+    });
+    return row;
+  }
+
   function rubricView(rubric, grade, tags) {
     tags = tags || {};
+    var six = !!window.RubricScale && RubricScale.has(rubric);
     var criteria = (grade && grade.criteria) || {};
     var ticked = {};
     ((grade && grade.checks) || []).forEach(function (id) {
@@ -457,6 +519,7 @@ window.StudentView = (function () {
         row.checks = (c.checks || []).map(function (k) {
           return { id: k.id, level: num(k.level), label: str(k.label), ticked: !!ticked[k.id] };
         });
+        if (six) return sixRow(rubric, row, c, part);
         var given = row.level >= 1 && row.level <= 4 ? row.level : 0;
         var at = function (l) {
           return row.checks.filter(function (k) {
@@ -518,7 +581,7 @@ window.StudentView = (function () {
     var then = '';
     if (res.kind === 'complete' && v != null) then = v > 0 ? 'Complete' : 'Incomplete';
     else if (res.kind === 'points' && v != null && typeof formatPoints === 'function') {
-      then = formatPoints(v) + ' / ' + res.outOf;
+      then = formatPoints(res.factor ? v * res.factor : v) + ' / ' + res.outOf;
     }
     if (then && res.text && then !== res.text) res.was = then;
   }
@@ -668,6 +731,8 @@ window.StudentView = (function () {
               updatedAt (when updated), and on a row that moved, was,
               marks: null | { pages, notes } (the teacher's Mark Up given
               on returned work, from the `feedback` reply),
+              pages: how many handed-in pages See Your Work can show
+              (pagesBy; 0 for none),
               resources: [ { id, kind: 'handout' | 'link', title, pages,
               url, host } ] (Handouts and Links, resourcesOf),
               rubric: null | { id, name, style, rows: [ row + beyond,
@@ -738,6 +803,38 @@ window.StudentView = (function () {
     var pages = whole(m.pages);
     var notes = whole(m.notes);
     return pages >= 1 && notes >= 0 ? { pages: pages, notes: notes } : null;
+  }
+
+  /* How many handed-in pages the student can open on each piece (See Your
+     Work, from My Learning; DECISIONS, "See Your Work from My Learning
+     (2026-11-18)"): the newest work in, sent by the student or added by the
+     teacher, as the `work` reply counts it (sent.pages; none for work
+     handed in on paper), and the whole of the work the marks were given on
+     (the `feedback` reply's marks.work_pages, a group's pages included).
+     Read from `work` whether or not the class has Send Work on: the server
+     sends a student their own pages either way (student_submit.file_links).
+     Counts only; the pages themselves are fetched when they are opened. */
+  function pagesBy(work, feedback) {
+    var out = {};
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.min(Math.floor(v), 200) : 0;
+    };
+    var more = function (id, n) {
+      if (typeof id === 'string' && n > (out[id] || 0)) out[id] = n;
+    };
+    if (work && typeof work === 'object' && work.ok !== false) {
+      list(work.assessments).forEach(function (entry) {
+        var sent = entry && entry.sent && typeof entry.sent === 'object' ? entry.sent : null;
+        if (sent && sent.on_paper !== true) more(entry.id, whole(sent.pages));
+      });
+    }
+    if (feedback && typeof feedback === 'object' && feedback.ok === true) {
+      list(feedback.assessments).forEach(function (entry) {
+        var m = entry && entry.marks && typeof entry.marks === 'object' ? entry.marks : null;
+        if (m) more(entry.id, Math.max(whole(m.work_pages), whole(m.pages)));
+      });
+    }
+    return out;
   }
 
   // The `feedback` reply's pieces by id (Mark Up only, for now), or none for a reply that is not one.
@@ -957,6 +1054,32 @@ window.StudentView = (function () {
     return { ok: true, v: 1, reflect_on_feedback: on, assessments: assessments };
   }
 
+  /* The part of the `work` reply that says what is in, for Preview as
+     Student: each piece the student (or the teacher, for them) has handed
+     work in for, with its page count, as the server counts it for the
+     student's own page (the newest work in; none on paper). Send Work is
+     given as off, so the preview's cards stay as they were: build() reads
+     only the page counts from it (pagesBy). The student's group's pages on
+     a One per Group piece come with the group's counts (getStudentGroupWork). */
+  function workReplyFromCache(cid, sid, page) {
+    var newest = typeof getStudentSubmission === 'function' ? getStudentSubmission : null;
+    var assessments = [];
+    list(page && page.assessments).forEach(function (row) {
+      var sub = newest && row && row.id ? newest(cid, sid, row.id) : null;
+      if (!sub || sub.state === 'sending') return;
+      assessments.push({
+        id: str(row.id),
+        students_send: 'nothing',
+        sent: {
+          sent_by: sub.sent_by === 'teacher' ? 'teacher' : 'student',
+          on_paper: sub.on_paper === true,
+          pages: list(sub.files).filter(Boolean).length,
+        },
+      });
+    });
+    return { ok: true, v: 1, send_work: false, assessments: assessments };
+  }
+
   /* The `group_work` reply (S12-F1; Batch C's contract), by piece: how
      many are in the student's group, whether the group's work is in, how
      many pages, whether the student sent any of them, and when it was
@@ -988,6 +1111,7 @@ window.StudentView = (function () {
     page = page || {};
     var grouped = groupsBy(groups);
     var marked = marksBy(feedback);
+    var paged = pagesBy(work, feedback);
     var reflections = reflectionsBy(feedback);
     var revisions = revisionsBy(feedback);
     var sending = {};
@@ -1029,6 +1153,8 @@ window.StudentView = (function () {
         created_at: str(row.created_at),
         // The teacher's Mark Up on the student's pages (S9-F3): only on work that came back with a grade.
         marks: null,
+        // How many handed-in pages See Your Work can show (pagesBy): the student's own, or their group's.
+        pages: 0,
         reflection: null,
         // Your Plan From Last Time, on the next piece to do (S10-F2): { text, fromTitle }.
         plan: null,
@@ -1044,6 +1170,7 @@ window.StudentView = (function () {
       // A group's work is in once any member has sent it: the piece is Sent for every member.
       piece.group = hidden ? null : grouped[piece.id] || null;
       if (piece.group && piece.group.sent && (piece.kind === 'due' || piece.kind === 'missing')) piece.kind = 'sent';
+      piece.pages = Math.max(paged[piece.id] || 0, piece.group && piece.group.sent ? piece.group.pages : 0);
       if (piece.send && piece.send.sent && (piece.kind === 'due' || piece.kind === 'missing')) {
         piece.kind = 'sent';
         piece.late = piece.late || piece.send.sent.late;
@@ -1544,6 +1671,7 @@ window.StudentView = (function () {
     var page = unopened(reply(cid, sid));
     if (!page) return { ready: false };
     var feedback = feedbackReply(cid, sid, page);
+    var work = workReplyFromCache(cid, sid, page);
     // As the student's page: work dated after the class's today is not counted (shared/data.js).
     var asStudent =
       typeof withStudentsToday === 'function'
@@ -1564,7 +1692,8 @@ window.StudentView = (function () {
             var a = pieceOf(cid, aid);
             return a ? assessmentCellValue(cid, sid, a) : null;
           },
-          null,
+          // What is in, for See Your Work's page counts only (workReplyFromCache).
+          work,
           feedback,
           // Group work from the cache (S12-T1's reader), counts only, as the student's page gets it.
           typeof getStudentGroupWork === 'function' ? getStudentGroupWork(cid, sid) : null,
@@ -1573,7 +1702,7 @@ window.StudentView = (function () {
         return v;
       });
     });
-    return { ready: true, reply: page, feedback: feedback, view: view };
+    return { ready: true, reply: page, feedback: feedback, work: work, view: view };
   }
 
   /* Before and After's first version on the student's own device (S11-F2):

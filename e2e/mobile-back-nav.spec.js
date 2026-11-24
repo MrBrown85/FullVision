@@ -5,6 +5,9 @@
  * opened on a student page slides back to that page. Runs in Demo Mode.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ isMobile: true, hasTouch: true, viewport: { width: 390, height: 844 } });
 

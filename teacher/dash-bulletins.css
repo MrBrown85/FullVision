@@ -1,15 +1,18 @@
 /* dash-bulletins.css — the Bulletins tile on the Dashboard (teacher/dash-bulletins.js,
    slice B1e). It fills the slot the middle row gives it (40% of the left
-   column: 199 px at 1280 x 800, 300 px stacked on an iPad). The header and
-   three 38 px rows fit at 199 px; where the slot is shorter, whole rows are
-   dropped from the bottom, never cut: a container query on the tile's height.
+   column: 199 px at 1280 x 800, 300 px stacked on an iPad). The rows share the
+   height under the header (up to five, each at least 40 px); where the slot is
+   shorter, whole rows are dropped from the bottom, never cut. When the tile is
+   900 px wide or more (and tall enough for a card) the rows are three cards side
+   by side and the buttons sit in a foot under them, as on the artboard.
    Colours are the app's tokens, so dark mode follows. Every class starts
    with dash-bulletins- (tests/adblock-names.test.js). */
 .dash-bulletins-tile {
   container: dash-bulletins / size;
-  display: flex;
-  flex-direction: column;
-  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 16px 20px;
   background: var(--surface);
   border: 1px solid var(--divider-strong);
   border-radius: 12px;
@@ -19,19 +22,23 @@
   overflow: hidden;
 }
 .dash-bulletins-head {
-  flex: 0 0 auto;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  height: 28px;
-  margin-bottom: 2px;
+  height: 32px;
+  margin-bottom: 8px;
 }
 .dash-bulletins-title {
   margin: 0;
   font: inherit;
-  font-size: var(--text-md);
+  font-size: 16px;
+  line-height: 26px;
   font-weight: 600;
   color: var(--text);
+  white-space: nowrap;
 }
 .dash-bulletins-sub {
   min-width: 0;
@@ -42,13 +49,13 @@
   color: var(--text-2);
 }
 .dash-bulletins-actions {
-  margin-left: auto;
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
   white-space: nowrap;
 }
-.dash-bulletins-write,
 .dash-bulletins-open,
 .dash-bulletins-seen {
   background: none;
@@ -56,21 +63,35 @@
   padding: 0;
   font: inherit;
   font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--link);
   cursor: pointer;
   text-decoration: none;
 }
-.dash-bulletins-write {
-  font-weight: 600;
+/* Seen by is 16 px tall on the artboard; 4 px of padding above and below, taken back by the margin, answers a press too: the target is 24 px or more and nothing moves. */
+.dash-bulletins-seen:not(.dash-bulletins-pending) {
+  padding: 4px 0;
+  margin: -4px 0;
 }
-.dash-bulletins-write:hover,
+/* Write a Bulletin is the app's secondary button (btn btn-ghost), in the link colour as on the artboard. */
+.dash-bulletins-tile .dash-bulletins-write {
+  color: var(--link);
+  font-size: var(--text-base);
+  font-weight: 500;
+  min-height: 32px;
+  padding: 8px 16px;
+}
 .dash-bulletins-open:hover,
 .dash-bulletins-seen:hover,
 .dash-bulletins-words:hover {
   text-decoration: underline;
 }
+.dash-bulletins-cls {
+  display: none;
+}
 .dash-bulletins-rows {
-  flex: 1 1 auto;
+  grid-column: 1 / -1;
+  grid-row: 2;
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -78,8 +99,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
   column-gap: 12px;
-  grid-auto-rows: 38px;
-  align-content: start;
+  grid-auto-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 .dash-bulletins-row {
@@ -87,29 +107,49 @@
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
   align-items: center;
-  height: 38px;
   box-sizing: border-box;
+  min-height: 0;
   border-top: 1px solid var(--divider-subtle);
+  border-radius: 6px;
+}
+.dash-bulletins-row:first-child {
+  border-top-color: transparent;
 }
 .dash-bulletins-kind {
   justify-self: start;
-  padding: 1px 7px;
+  padding: 0 6px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: var(--divider-subtle);
+  line-height: 1.45;
   font-size: var(--text-xs, 12px);
   font-weight: 600;
   color: var(--text-2);
   white-space: nowrap;
+}
+.dash-bulletins-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* The Reminder label is amber with a pin: the app's notice colours, which hold 4.5 to 1 in both modes. */
+.dash-bulletins-rem {
+  background: var(--notice-bg);
+  color: var(--notice-text);
 }
 .dash-bulletins-fresh .dash-bulletins-kind {
   border-color: var(--link);
 }
 .dash-bulletins-words {
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  padding: 1px 0;
   font-size: var(--text-base);
   color: var(--text);
   text-decoration: none;
@@ -136,12 +176,9 @@
   color: var(--text-2);
   cursor: default;
 }
-.dash-bulletins-ns {
-  font-weight: 600;
-  color: var(--text);
-}
 .dash-bulletins-none {
-  flex: 1 1 auto;
+  grid-column: 1 / -1;
+  grid-row: 2;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -160,14 +197,82 @@
   color: var(--link);
   white-space: nowrap;
 }
-/* Fewer whole rows when the slot is short: the content box is the tile less its padding, border and header. */
-@container dash-bulletins (max-height: 143px) {
+/* Rows share the height under the header, each at least 40 px (48 on an iPad) so two lines of words fit; a row that would be thinner is not drawn, so none is ever cut and the spare is under one row's share. The container's height is the tile less its padding and border; the header is 32 px (44 on an iPad). */
+@container dash-bulletins (max-height: 239.99px) {
+  .dash-bulletins-row:nth-child(5) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 199.99px) {
+  .dash-bulletins-row:nth-child(4) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 159.99px) {
   .dash-bulletins-row:nth-child(3) {
     display: none;
   }
 }
-@container dash-bulletins (max-height: 105px) {
+@container dash-bulletins (max-height: 119.99px) {
   .dash-bulletins-row:nth-child(2) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 79.99px) {
+  .dash-bulletins-row:nth-child(1) {
+    display: none;
+  }
+}
+/* iPad: header 44 px, every control a finger's size (44 px), rows at least 48 px. teacher/tablet.css has older rules for this tile (one-line words at 44 px, rows fixed at 48 px); these are more specific and take their place, so the words keep two lines and the rows share the height. */
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-head {
+  height: 44px;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-write {
+  justify-content: center;
+  min-height: 44px;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-open,
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-seen {
+  min-height: 44px;
+  padding: 0;
+  margin: 0;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-words {
+  display: -webkit-box;
+  -webkit-box-pack: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 4px 0;
+  line-height: 1.3;
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-rows {
+  grid-auto-rows: minmax(0, 1fr);
+}
+html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
+  height: auto;
+}
+@container dash-bulletins (max-height: 291.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(5) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 243.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(4) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 195.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(3) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 147.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(2) {
+    display: none;
+  }
+}
+@container dash-bulletins (max-height: 99.99px) {
+  html.fv-tablet .dash-bulletins-row:nth-child(1) {
     display: none;
   }
 }
@@ -191,5 +296,215 @@
   }
   .dash-bulletins-time {
     display: none;
+  }
+}
+/* Wide: three cards side by side (label and time on top, two lines of words, Seen by), the buttons in a foot, the class's name in the subtitle. A card needs about 280 px across and 92 px down, so under 860 px, or under 168 px of height, the tile stays in rows. On an iPad every control is 44 px, so a card needs 250 px of height. */
+@container dash-bulletins (min-width: 860px) and (min-height: 168px) {
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-head {
+    grid-column: 1 / -1;
+    height: 26px;
+    margin-bottom: 8px;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-cls {
+    display: inline;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider-subtle);
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-rows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 12px;
+    grid-auto-rows: minmax(0, 1fr);
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-row {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    row-gap: 3px;
+    box-sizing: border-box;
+    padding: 6px 12px;
+    border: 1px solid var(--divider-subtle);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-row:nth-child(n + 4) {
+    display: none;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-kind {
+    grid-column: 1;
+    grid-row: 1;
+    display: inline-flex;
+    min-width: 0;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-kind[data-until]::after {
+    content: attr(data-until);
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-time {
+    grid-column: 2;
+    grid-row: 1;
+    display: block;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-words {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-self: start;
+  }
+  html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-seen {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+    text-align: left;
+    line-height: 16px;
+  }
+}
+@container dash-bulletins (min-width: 860px) and (min-height: 250px) {
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-head {
+    grid-column: 1 / -1;
+    height: 26px;
+    margin-bottom: 8px;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-cls {
+    display: inline;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider-subtle);
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-rows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 12px;
+    grid-auto-rows: minmax(0, 1fr);
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    row-gap: 3px;
+    box-sizing: border-box;
+    padding: 6px 12px;
+    border: 1px solid var(--divider-subtle);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row:nth-child(n + 4) {
+    display: none;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-kind {
+    grid-column: 1;
+    grid-row: 1;
+    display: inline-flex;
+    min-width: 0;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-kind[data-until]::after {
+    content: attr(data-until);
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-time {
+    grid-column: 2;
+    grid-row: 1;
+    display: block;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-words {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-self: start;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-seen {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+    text-align: left;
+    line-height: 16px;
+  }
+  html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-seen {
+    justify-content: flex-start;
+  }
+}
+
+/* The cards as posted notes (Colin, Nov 18: "look like actual bulletins that
+   are posted"): paper on the board with a pin at the top, a reminder on
+   yellow, each set a little askew. Dark text on light paper in both modes. */
+@container dash-bulletins (min-width: 860px) and (min-height: 168px) {
+  .dash-bulletins-tile .dash-bulletins-rows {
+    column-gap: 18px;
+    padding: 5px 8px 3px;
+  }
+  .dash-bulletins-tile .dash-bulletins-row {
+    position: relative;
+    /* The tile is only about 85 px per card on a 1680 x 1050 screen, so the pin sits on the top edge, not in the padding. */
+    padding: 6px 14px 5px !important;
+    row-gap: 2px !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 3px !important;
+    background: #fffdf7;
+    color: #1d1d1f;
+    box-shadow:
+      0 1px 1px rgba(0, 0, 0, 0.1),
+      0 8px 16px -6px rgba(0, 0, 0, 0.22);
+    transform: rotate(-1deg);
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .dash-bulletins-tile .dash-bulletins-row:nth-child(2) {
+    transform: rotate(0.8deg);
+  }
+  .dash-bulletins-tile .dash-bulletins-row:nth-child(3) {
+    transform: rotate(-0.4deg);
+  }
+  .dash-bulletins-tile .dash-bulletins-row:has(.dash-bulletins-rem) {
+    background: #fff3a8;
+  }
+  .dash-bulletins-tile .dash-bulletins-row:hover {
+    transform: rotate(0deg) translateY(-2px);
+    box-shadow:
+      0 1px 1px rgba(0, 0, 0, 0.1),
+      0 12px 22px -8px rgba(0, 0, 0, 0.28);
+  }
+  /* The pin. */
+  .dash-bulletins-tile .dash-bulletins-row::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ff8a80, #d93025 60%, #a50e0e);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.35);
+  }
+  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-words {
+    color: #1d1d1f;
+    font-size: 13px;
+    line-height: 1.3;
+    padding: 0;
+  }
+  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-time {
+    color: #6e6e73;
+  }
+  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-kind {
+    line-height: 1.25;
+    background: rgba(0, 0, 0, 0.06);
+    color: #3a3a3c;
+  }
+  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-rem {
+    background: rgba(160, 100, 0, 0.14);
+    color: #6b4200;
+  }
+  .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-seen {
+    color: #0058d0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-bulletins-tile .dash-bulletins-row {
+    transition: none;
   }
 }

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 // S1-F4: Class Settings › Student Page has Return Grades, behind the build
 // switch, in Demo Mode. The tab is there only for a class whose student page
@@ -7,6 +8,8 @@ import { test, expect } from '@playwright/test';
 // them and saves the choice, which a reload keeps.
 
 // The Demo class with a piece nobody is graded on yet.
+test.beforeEach(({ page }) => demoStudentPageOff(page));
+
 async function demoWithNewPiece(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });

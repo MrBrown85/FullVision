@@ -16,8 +16,26 @@ body.mobile-mode {
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
   overflow: hidden;
-  height: 100vh;
-  height: 100dvh;
+  /* The page is pinned to the screen and never scrolls; only each screen's
+     content scrolls. A height in vh measured the screen wrongly from the
+     home screen (iOS standalone) and teacher/styles.css gives every body a
+     min-height of 100vh, so the page came out taller than the screen: it
+     scrolled and bounced under the tab bar, and after a reload iOS put the
+     old scroll back and showed the page's grey under the tab bar. Pinned to
+     the four edges, it is always exactly the screen. */
+  position: fixed;
+  inset: 0;
+  height: auto;
+  min-height: 0;
+  /* Landscape: keep the content clear of the notch. */
+  padding: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+}
+/* index.html's <html>. The page's own bounce is off, and anything iOS shows
+   past the page's edge is the bars' colour, not the grey. */
+html.m-root {
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--surface);
 }
 
 body.mobile-mode *,
@@ -38,8 +56,7 @@ body.mobile-mode :focus:not(:focus-visible) {
 #m-app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   position: relative;
 }
 
@@ -400,17 +417,11 @@ body.fv-switching-course::after {
   font-weight: 700;
   letter-spacing: 0.37px;
   color: var(--text);
-  transition:
-    opacity 0.15s,
-    transform 0.15s;
 }
-.m-nav-bar-scrolled + .m-screen-content .m-title-large {
-  opacity: 0;
-  transform: translateY(-8px);
-  height: 0;
-  padding: 0 16px;
-  overflow: hidden;
-}
+/* The large title scrolls away with the content, as on iOS; the bar's small
+   title shows once it has gone. It used to collapse to no height past 10 px,
+   which jumped the content up by the title's height mid-scroll and, on a list
+   only a little taller than the screen, flickered open and shut. */
 
 /* ── Screen Content ────────────────────────────────────────── */
 .m-screen-content {
@@ -1528,6 +1539,7 @@ body.fv-switching-course::after {
   transform: translateY(100%);
   transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1537,6 +1549,7 @@ body.fv-switching-course::after {
 }
 .m-sheet.m-sheet-half {
   max-height: 50vh;
+  max-height: 50dvh;
 }
 
 .m-sheet-handle {
@@ -1957,6 +1970,12 @@ body.fv-switching-course::after {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.2;
+}
+.m-pts-factored {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
   line-height: 1.2;
 }
 .m-pts-pct .gb-pts-bonus {
@@ -2502,14 +2521,23 @@ body.fv-switching-course::after {
 /* ── Mobile Login Screen ───────────────────────────────────── */
 .m-auth {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: calc(env(safe-area-inset-top, 20px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  /* Over the app, not above it in the page: on sign-in it fades out with
+     the app already in place under it (the app used to wait below it, then
+     jump up). The page never scrolls, so the sign-in scrolls in itself (a
+     small phone with the keyboard up); the card's auto margins centre it
+     and give way when it is taller, so its top is never cut off. */
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(env(safe-area-inset-top, 20px) + 20px) max(20px, env(safe-area-inset-right, 0px))
+    calc(env(safe-area-inset-bottom, 0px) + 20px) max(20px, env(safe-area-inset-left, 0px));
   background: var(--bg);
 }
 .m-auth-card {
+  margin: auto;
   width: 100%;
   max-width: 380px;
   background: var(--surface);
@@ -2891,6 +2919,7 @@ body.fv-switching-course::after {
 .m-card-stack {
   position: relative;
   height: calc(100vh - 280px);
+  height: calc(100dvh - 280px);
   min-height: 320px;
   max-height: 640px;
   margin: 12px 0;
@@ -6479,7 +6508,7 @@ body.fv-switching-course::after {
   flex-direction: column;
   padding: 8px 10px;
   border-radius: 10px;
-  background: var(--overlay-pressed);
+  background: var(--overlay-hover);
 }
 .m-bulletin-link-title {
   color: var(--link);
@@ -6487,7 +6516,7 @@ body.fv-switching-course::after {
 }
 .m-bulletin-link-host {
   font-size: 12px;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 .m-bulletin-seen {
   align-self: flex-start;
@@ -6812,4 +6841,31 @@ body.fv-switching-course::after {
     transition: none !important;
     transform: none !important;
   }
+}
+
+/* Six-Point rubrics (shared/six-point.js): six score buttons, each filled
+   in the colour of the level it counts as (data-tone), a little tighter so
+   six fit a 375 px phone. */
+.m-six-btns:has(.m-level-btn) {
+  gap: 4px;
+}
+.m-score-btn.m-six-btn[data-tone='1'].m-score-active {
+  background: var(--score-1);
+  border-color: var(--score-1);
+}
+.m-score-btn.m-six-btn[data-tone='2'].m-score-active {
+  background: var(--score-2);
+  border-color: var(--score-2);
+}
+.m-score-btn.m-six-btn[data-tone='3'].m-score-active {
+  background: var(--score-3);
+  border-color: var(--score-3);
+}
+.m-score-btn.m-six-btn[data-tone='4'].m-score-active {
+  background: var(--score-4);
+  border-color: var(--score-4);
+}
+.m-six-btn .m-level-word {
+  font-size: 9.5px;
+  letter-spacing: -0.02em;
 }

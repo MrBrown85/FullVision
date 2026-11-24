@@ -75,6 +75,7 @@ export type Database = {
           module_id: string | null
           rubric_id: string | null
           score_mode: string
+          students_see_factored: boolean
           students_see_markup: boolean
           students_send: string
           title: string
@@ -104,6 +105,7 @@ export type Database = {
           module_id?: string | null
           rubric_id?: string | null
           score_mode?: string
+          students_see_factored?: boolean
           students_see_markup?: boolean
           students_send?: string
           title: string
@@ -132,6 +134,7 @@ export type Database = {
           module_id?: string | null
           rubric_id?: string | null
           score_mode?: string
+          students_see_factored?: boolean
           students_see_markup?: boolean
           students_send?: string
           title?: string
@@ -4285,6 +4288,7 @@ export type Database = {
           p_module_id?: string
           p_rubric_id?: string
           p_score_mode?: string
+          p_students_see_factored?: boolean
           p_tag_ids?: string[]
           p_title: string
           p_weight?: number
@@ -4761,6 +4765,10 @@ export type Database = {
       note_course_opened: {
         Args: { p_course_id: string; p_idempotency_key?: string }
         Returns: boolean
+      }
+      patch_teacher_preferences: {
+        Args: { p_idempotency_key?: string; p_patch: Json }
+        Returns: undefined
       }
       photo_removal_call: { Args: Record<PropertyKey, never>; Returns: number }
       photo_removal_due: { Args: Record<PropertyKey, never>; Returns: boolean }
@@ -5246,6 +5254,7 @@ export type Database = {
           p_id: string
           p_idempotency_key?: string
           p_linked_tag_ids?: Json
+          p_scale?: Json
           p_name: string
           p_style?: string
         }

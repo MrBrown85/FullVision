@@ -1,7 +1,6 @@
 /**
- * Try Demo Mode on the front page starts a sample class with the student
- * features on. Demo Mode entered any other way has the Student Page tab
- * too, with its switch off and nothing else on it.
+ * Demo Mode starts a sample class with the student features on, however it
+ * is entered: the front page's Try Demo Mode link or the sign-in address.
  */
 import { test, expect } from '@playwright/test';
 
@@ -21,12 +20,23 @@ test('Try Demo Mode on the front page shows the Student Page tab with Send Work 
   await expect(page.locator('#sp-send-switch')).toBeChecked({ timeout: 15000 });
 });
 
-test('Demo Mode from the sign-in address alone has the Student Page tab with the switch off', async ({ page }) => {
+test('Demo Mode from the sign-in address alone has the student features on too', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.goto('/dashboard?manage=student-page');
   await page.locator('.tb-demo-pill').waitFor();
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#sp-build-switch')).not.toBeChecked();
-  await expect(page.locator('#sp-send-switch')).toHaveCount(0);
+  await expect(page.locator('#sp-build-switch')).toBeChecked({ timeout: 15000 });
+  await expect(page.locator('#sp-send-switch')).toBeChecked();
+});
+
+test('Reset Demo Data gives the sample class its student features back', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.locator('.dash-glance').waitFor();
+  await page.evaluate(async () => {
+    setStudentPageSwitch(getActiveCourse(), false);
+    await window.resetDemoData();
+  });
+  await page.goto('/dashboard?manage=student-page');
+  await expect(page.locator('#sp-build-switch')).toBeChecked({ timeout: 15000 });
 });

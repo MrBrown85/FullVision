@@ -179,6 +179,8 @@ window.RubricDraft = (function () {
      things up so this stays pure. Returns [{ key, level, text }]. */
   function savedEntries(rubric, getTag, getSaved) {
     var out = [];
+    // A Six-Point rubric's levels are scores, not the four proficiency levels.
+    if (rubric && Array.isArray(rubric.scale) && rubric.scale.length) return out;
     ((rubric && rubric.criteria) || []).forEach(function (crit) {
       if (!crit || (crit.tagIds || []).length !== 1) return;
       var tag = getTag(crit.tagIds[0]);

@@ -119,6 +119,12 @@ async function expectOneRelease(page, name, keys) {
   if (keys) expect(sorted(Object.keys(now.stamps))).toEqual(sorted(keys));
 }
 
+/* How long an install may take. It downloads every file a release changed
+   and copies the rest, then the old saved copy is deleted: on a GitHub
+   runner that has taken longer than the 5 seconds a poll waits by default,
+   and the test saw both saved copies (fullvision-a beside fullvision-b). */
+const INSTALL = { timeout: 30000 };
+
 async function cacheNames(page) {
   return page.evaluate(() => caches.keys());
 }
@@ -151,7 +157,7 @@ async function firstVisit(page, name) {
       await new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
     }
   });
-  await expect.poll(() => cacheNames(page)).toEqual(['fullvision-' + name]);
+  await expect.poll(() => cacheNames(page), INSTALL).toEqual(['fullvision-' + name]);
 }
 
 /* Have the browser look for a new sw.js now, from a plain file so no app
@@ -193,9 +199,9 @@ async function update(page, release) {
 /* Look for the new release and wait until its worker is in charge. */
 async function installs(page, name) {
   await update(page);
-  await expect.poll(() => cacheNames(page)).toEqual(['fullvision-' + name]);
+  await expect.poll(() => cacheNames(page), INSTALL).toEqual(['fullvision-' + name]);
   await expect
-    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).active.state))
+    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).active.state), INSTALL)
     .toBe('activated');
 }
 
@@ -374,6 +380,42 @@ test('offline, every page opens from the saved copy as one release', async ({ pa
   expect(errors).toEqual([]);
 });
 
+test('offline, the Demo Inbox draws its thumbnails and Bulletins draws its photo, from the saved copy', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  const errors = watch(page);
+  server.release('a', filesOf('a'));
+  await firstVisit(page, 'a');
+  // The sample class's pictures are in the install's saved copy.
+  expect(await cachedText(page, '/assets/sample-bulletins/cell-board-1.svg')).toContain('<svg');
+  const saved = await page.evaluate(async () => {
+    const hit = await caches.match('/assets/sample-work/light-lab-marcus-1-thumb.jpg');
+    return !!hit;
+  });
+  expect(saved).toBe(true);
+
+  await context.setOffline(true);
+  server.takeLog();
+  await page.goto(server.origin + '/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await appDrawn(page);
+  const drawn = sel =>
+    page.evaluate(s => [...document.querySelectorAll(s)].map(i => i.complete && i.naturalWidth > 0), sel);
+  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).every(Boolean)).toBe(true);
+
+  await page.goto(server.origin + '/bulletins');
+  await appDrawn(page);
+  await expect(page.locator('.bulletin-post', { hasText: 'Photo of the Board' })).toBeVisible();
+  await expect.poll(async () => (await drawn('.bulletin-thumb')).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('.bulletin-thumb')).every(Boolean)).toBe(true);
+  expect(server.takeLog()).toEqual([]);
+  await context.setOffline(false);
+  expect(errors).toEqual([]);
+});
+
 test('a release while a tab is open: the tab stays on one release until the quiet reload brings the new one', async ({
   page,
 }) => {
@@ -403,7 +445,7 @@ test('a release while a tab is open: the tab stays on one release until the quie
   await setHidden(page, false);
   await reloaded;
   await expect(page.locator('#studio')).toBeVisible();
-  await expect.poll(() => cacheNames(page)).toEqual(['fullvision-b']);
+  await expect.poll(() => cacheNames(page), INSTALL).toEqual(['fullvision-b']);
   await expectOneRelease(page, 'b', ['constants', 'device', 'gradebook', 'reports']);
 
   // The network was asked for the new worker, and for the pages and the
@@ -438,9 +480,9 @@ test('a release before a fresh load: that load runs the new release from the net
   expect(log).toContain('/' + STAMPED.gradebook);
 
   // The new worker installed behind that load. The next load is a repeat visit.
-  await expect.poll(() => cacheNames(page)).toEqual(['fullvision-b']);
+  await expect.poll(() => cacheNames(page), INSTALL).toEqual(['fullvision-b']);
   await expect
-    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).active.state))
+    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).active.state), INSTALL)
     .toBe('activated');
   server.takeLog();
   await page.goto(server.origin + '/gradebook?course=sci8');

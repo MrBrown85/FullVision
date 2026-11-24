@@ -146,13 +146,27 @@ describe('S9-F3: the marks the student was given, on returned work only', () => 
     expect(q(page, '.sp-work')).toBeNull();
   });
 
-  it('a piece with no marks given cannot open See Your Work, even by a press made up by hand', async () => {
+  it('a piece with its page in and no marks given opens See Your Work with no marks and no Show Marks', async () => {
     const page = await demo();
     await openFeedback(page, 'Energy Transfer Investigation');
+    expect(words(q(page, '[data-act="work"] .sp-fb-work-line'))).toBe('1 page');
+    await page.click('[data-act="work"]');
+    expect(q(page, '.sp-work-img').getAttribute('src')).toBe('../assets/sample-work/energy-lab-cece-1.jpg');
+    expect(q(page, '.sp-work-img').getAttribute('alt')).toBe('Your page 1');
+    expect(q(page, '.sp-work-over').innerHTML).toBe('');
+    expect(q(page, '[data-act="work-marks"]')).toBeNull();
+    // Its marks are there but not given to show: nothing of them reaches the page.
+    expect(page.root().innerHTML).not.toMatch(/Show the arrows/);
+  });
+
+  it('a piece with no pages in and no marks cannot open See Your Work, even by a press made up by hand', async () => {
+    const page = await demo();
+    await openFeedback(page, 'KMT & States of Matter Lab');
     expect(q(page, '[data-act="work"]')).toBeNull();
     const view = viewOf(page);
-    const fake = { getAttribute: n => (n === 'data-piece' ? 'demo-energy' : '') };
+    const fake = { getAttribute: n => (n === 'data-piece' ? 'demo-kmt' : '') };
     expect(StudentPageView.press({}, view, 'work', fake)).toBeNull();
+    expect(StudentPageView.press({}, view, 'work-page', { getAttribute: () => '0' })).toBeNull();
   });
 
   it('the stand-in gives nothing under Missing or Excused, or on work not returned', async () => {

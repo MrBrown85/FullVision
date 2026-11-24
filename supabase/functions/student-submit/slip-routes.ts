@@ -21,12 +21,6 @@
 // no code with verify: it cannot be given tags, and its password goes as
 // it always did. No code, tag, password or token is ever logged.
 //
-// Until the migration is applied the database has only the old open and
-// verify. A statement here that meets a function that does not exist
-// (SQLSTATE 42883) is sent the old way instead, word for word as before
-// (Db.open and Db.verify), so deploying this function first changes
-// nothing for a slip. After the migration those two are never called.
-//
 // Kept free of Deno and database imports, as handler.ts is.
 import { type CardKey, isSlipCode, tidy } from '../_shared/card-key.ts';
 
@@ -35,21 +29,20 @@ type Json = Record<string, unknown>;
 type Param = string | null;
 type Identity = { birthday: string | null; studentNumber: string | null; password: string | null };
 
-/* The two statements. The caller's hashed address is the last parameter.
+/* The two statements. The caller's hashed address comes after the slip's values. A slip's token reaches the
+   database only as its SHA-256 (2026112403): handler.ts hashes the token a phone sends, and makes the token for
+   a new slip session itself, giving open its hash as p_new_token_hash.
    Read by migrations/local-test/slips_keyed.py, which runs them as written. */
 export const SLIP_SQL = {
-  // p_code_hmac, p_key_id, p_code (null but on the fallback), p_ip_hash
-  open: 'select student_submit.open($1, $2, $3, $4) as r',
-  // p_token, p_birthday, p_student_number, p_password (null but on the fallback or from an old page),
+  // p_code_hmac, p_key_id, p_code (null but on the fallback), p_ip_hash, p_new_token_hash
+  open: 'select student_submit.open($1, $2, $3, $4, $5) as r',
+  // p_token (its hash), p_birthday, p_student_number, p_password (null but on the fallback or from an old page),
   // p_code_hmac, p_pw_hmac, p_ip_hash
   verify: 'select student_submit.verify($1, $2, $3, $4, $5, $6, $7) as r',
 };
 
 export type SlipDb = {
   call: (sql: string, params: Param[]) => Promise<unknown>;
-  // The database before 2026111160: student_submit.open(code, ip) and verify(token, …, ip), as they always were.
-  open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
-  verify: (token: string, who: Identity, ipHash: string) => Promise<Record<string, unknown>>;
 };
 
 function isObject(v: unknown): v is Json {
@@ -57,36 +50,41 @@ function isObject(v: unknown): v is Json {
 }
 
 /* The database's answer for the phone: everything but `fallback`, which is
-   for this file only. */
-function forPhone(said: unknown): Json {
+   for this file only. open's new_token (true when it started a slip session)
+   becomes the token the function made, which the database never had; a
+   `token` from the database is never passed on. */
+function forPhone(said: unknown, token: string | null = null): Json {
   if (!isObject(said)) return { ok: false, error: 'not_found' };
   const out: Json = {};
-  for (const k of Object.keys(said)) if (k !== 'fallback') out[k] = said[k];
+  for (const k of Object.keys(said)) {
+    if (k === 'fallback' || k === 'token') continue;
+    if (k === 'new_token') {
+      if (said[k] === true && token) out.token = token;
+      continue;
+    }
+    out[k] = said[k];
+  }
   return out;
-}
-
-// The database before the migration: the new functions are not there yet.
-function notYet(e: unknown): boolean {
-  return isObject(e) && e.code === '42883';
 }
 
 /* open. `typed` is the code as the phone sent it (a string of at most 32
    characters, checked by the handler). */
-export async function openSlip(db: SlipDb, key: CardKey, typed: string, ipHash: string): Promise<Json> {
+export async function openSlip(
+  db: SlipDb,
+  key: CardKey,
+  typed: string,
+  ipHash: string,
+  token: string,
+  tokenHash: string,
+): Promise<Json> {
   const code = tidy(typed);
   // Not six characters of the slip alphabet: no tag, and the database logs a bad format, as it always did.
   const tag = isSlipCode(code) ? await key.slipCodeTag(code) : null;
-  let said: unknown;
-  try {
-    said = await db.call(SLIP_SQL.open, [tag, key.id, null, ipHash]);
-    if (tag && isObject(said) && said.fallback === true) {
-      said = await db.call(SLIP_SQL.open, [tag, key.id, code, ipHash]);
-    }
-  } catch (e) {
-    if (!notYet(e)) throw e;
-    return db.open(typed, ipHash);
+  let said = await db.call(SLIP_SQL.open, [tag, key.id, null, ipHash, tokenHash]);
+  if (tag && isObject(said) && said.fallback === true) {
+    said = await db.call(SLIP_SQL.open, [tag, key.id, code, ipHash, tokenHash]);
   }
-  return forPhone(said);
+  return forPhone(said, token);
 }
 
 /* verify for a slip (a token in the body). `who` is what the student typed,
@@ -110,17 +108,12 @@ export async function verifySlip(
   const ask = (password: string | null, pw: string | null) =>
     db.call(SLIP_SQL.verify, [token, who.birthday, who.studentNumber, password, codeTag, pw, ipHash]);
   let said: unknown;
-  try {
-    if (pwTag) {
-      // The tag first; the typed password only if the database asks for it.
-      said = await ask(null, pwTag);
-      if (isObject(said) && said.fallback === true) said = await ask(who.password, pwTag);
-    } else {
-      said = await ask(who.password, null);
-    }
-  } catch (e) {
-    if (!notYet(e)) throw e;
-    return db.verify(token, who, ipHash);
+  if (pwTag) {
+    // The tag first; the typed password only if the database asks for it.
+    said = await ask(null, pwTag);
+    if (isObject(said) && said.fallback === true) said = await ask(who.password, pwTag);
+  } else {
+    said = await ask(who.password, null);
   }
   return forPhone(said);
 }

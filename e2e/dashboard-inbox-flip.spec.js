@@ -6,6 +6,9 @@
  * Mateo Cruz added by the teacher, Ethan Dubois on paper.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const SHOTS = process.env.FV_SHOTS || '';
 const shot = async (page, name) => {
@@ -331,10 +334,18 @@ test('a sideways scroll moves one page a gesture; a vertical one scrolls the pag
   const stage = await box(page, '.dash-inbox-flip-stage');
   await page.mouse.move(stage.left + stage.width / 2, stage.top + stage.height / 2);
   // A flurry of sideways events, a trackpad's swipe and its tail, is one page.
-  for (let i = 0; i < 8; i++) {
-    await page.mouse.wheel(30, 0);
-    await page.waitForTimeout(15);
-  }
+  // Sent from inside the page, 15 ms apart: sent one by one from the test, a
+  // GitHub runner took longer than the gesture's 150 ms quiet between two of
+  // them, so the flurry read as four gestures and moved four pages.
+  await page.evaluate(async () => {
+    const stage = document.querySelector('.dash-inbox-flip-stage');
+    const r = stage.getBoundingClientRect();
+    const at = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    for (let i = 0; i < 8; i++) {
+      stage.dispatchEvent(new WheelEvent('wheel', { ...at, deltaX: 30, bubbles: true, cancelable: true }));
+      await new Promise(done => setTimeout(done, 15));
+    }
+  });
   await expect(page.locator('.dash-inbox-flip-slider')).toHaveValue('1');
   await page.waitForTimeout(300);
   await page.mouse.wheel(0, 0);
@@ -366,8 +377,15 @@ test('the only non-passive wheel listener is the stage, and a sideways wheel is 
 }) => {
   await open(page);
   const got = await page.evaluate(() => window.__wheelListeners.filter(l => !l.passive).map(l => String(l.el)));
-  // The tile and everything else of the Inbox add no listener that can hold a scroll; the stage's does.
-  expect(got.filter(el => el.includes('dash-inbox') && !el.includes('dash-inbox-flip-stage'))).toEqual([]);
+  // The tile and everything else of the Inbox add no listener that can hold a
+  // scroll; the stage's does, and so does the assessment switch's, which turns
+  // a vertical wheel into its own sideways scroll and lets the page have it at
+  // either end (review of #1603; e2e/dashboard-row-fit.spec.js).
+  expect(
+    got.filter(
+      el => el.includes('dash-inbox') && !el.includes('dash-inbox-flip-stage') && !el.includes('dash-inbox-pick'),
+    ),
+  ).toEqual([]);
   const prevented = await page.evaluate(() => {
     const stage = document.querySelector('.dash-inbox-flip-stage');
     const fire = (dx, dy) => {

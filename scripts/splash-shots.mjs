@@ -104,60 +104,93 @@ async function openPreview(page, base) {
   await pause(page, 1500);
 }
 
-// Print Rubrics set to four per page, and page 1 of what it will print, drawn
-// as a sheet of paper: the dialog's own preview page, at a readable size.
-async function printedRubrics(page, base) {
-  await page.goto(base + '/assignments');
-  await pause(page, 1500);
-  // The Science Fair Proposal: an Advanced Rubric scored for the whole class.
-  await page.evaluate(() => document.querySelector('[data-action=printRubrics][data-aid="sci8a20"]').click());
-  await page.waitForSelector('#rp-preview', { timeout: 10000 });
-  await pause(page, 800);
-  await page.locator('input[name="rp-layout"][value="quarter"]').evaluate(el => el.click());
-  await pause(page, 1500);
-  await page.evaluate(() => {
-    const src = document.querySelector('#rp-preview .rubric-page');
-    const w = parseFloat(src.style.width);
-    const h = parseFloat(src.style.height);
-    const scale = 1.18;
-    const m = 24 * scale; // the quarter-inch print margin
-    const paper = document.createElement('div');
-    paper.id = 'splash-paper';
-    paper.style.cssText =
-      'position:fixed;left:0;top:0;z-index:2147483647;background:#fff;overflow:hidden;width:' +
-      Math.round(w * scale + 2 * m) +
-      'px;height:' +
-      Math.round(h * scale + 2 * m) +
-      'px';
-    const clone = src.cloneNode(true);
-    clone.style.cssText +=
-      ';position:absolute;left:' +
-      m +
-      'px;top:' +
-      m +
-      'px;transform:scale(' +
-      scale +
-      ');transform-origin:0 0;width:' +
-      w +
-      'px;height:' +
-      h +
-      'px';
-    paper.appendChild(clone);
-    document.body.appendChild(paper);
-  });
-  await pause(page, 400);
+// A made-up class scan for Split the Scan: one Chemical Reactions Lab page
+// per student, in class-list order, each with the student's name written at
+// the top, printed to a PDF the way a photocopier sends one.
+const SCAN_NAMES = [
+  'Cece A.',
+  'Noor A.',
+  'Hannah B.',
+  'Sam B.',
+  'Liam C.',
+  'Mateo C.',
+  'Ethan D.',
+  'Caleb F.',
+  'Jas G.',
+  'Fatima H.',
+  'Tessa I.',
+  'Anisa J.',
+  'Priya K.',
+  'Jordan K.',
+  'Ines L.',
+  'Marcus L.',
+  'Leo M.',
+  'Amara O.',
+  'Sofia P.',
+  'Tyler R.',
+  'Aiden S.',
+  'Olivia T.',
+  'Darius T.',
+  'Raj V.',
+  'Maya W.',
+  'Mei W.',
+  'Liv Z.',
+];
+async function classScan(page) {
+  const rows = [
+    ['Baking soda + vinegar', 'fizzing, bubbles, cold'],
+    ['Steel wool + vinegar', 'turned brown after a day'],
+    ['Milk + lemon juice', 'lumps formed'],
+    ['Candle burning', 'wax melted, smoke'],
+  ];
+  const said = [
+    'New stuff forms, so it is chemical. Melting wax is physical.',
+    'Gas and a colour change mean a new substance.',
+    'The bubbles were a gas we did not start with.',
+    'Rust is a new substance. It can not go back.',
+  ];
+  const sheet = (name, i) =>
+    '<section style="page-break-after:always;width:8.5in;height:11in;box-sizing:border-box;padding:.7in .8in;' +
+    'background:#fdfcf7 repeating-linear-gradient(#fdfcf7 0 31px,#c9d6e8 31px 32px);font-family:Caveat,cursive;color:#1f3a7a;' +
+    'transform:rotate(' +
+    ((i % 3) - 1) * 0.4 +
+    'deg)">' +
+    '<div style="font-size:26px">Name: <b style="font-size:36px">' +
+    name +
+    '</b></div>' +
+    '<div style="font-size:38px"><b>Chemical Reactions Lab</b></div>' +
+    '<div style="font-size:26px;margin-top:6px">Purpose: tell a chemical change from a physical change.</div>' +
+    '<table style="font-size:25px;margin-top:26px;width:100%">' +
+    rows
+      .map(
+        (r, k) =>
+          '<tr><td style="padding:6px 0;width:50%">' +
+          r[0] +
+          '</td><td>' +
+          (k === (i + 1) % 4 ? r[1].split(',')[0] : r[1]) +
+          '</td></tr>',
+      )
+      .join('') +
+    '</table><div style="font-size:30px;margin-top:30px;text-decoration:underline">Chemical or physical?</div>' +
+    '<div style="font-size:25px;line-height:32px;margin-top:6px">' +
+    said[i % 4] +
+    '</div></section>';
+  const printer = await page.context().newPage();
+  await printer.setContent(
+    '<!doctype html><html><head><link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap" rel="stylesheet">' +
+      '<style>@page{size:8.5in 11in;margin:0}body{margin:0}</style></head><body>' +
+      SCAN_NAMES.map(sheet).join('') +
+      '</body></html>',
+    { waitUntil: 'networkidle' },
+  );
+  await printer.evaluate(() => document.fonts.ready);
+  const out = join(TMP, 'class-scan.pdf');
+  await printer.pdf({ path: out, width: '8.5in', height: '11in', printBackground: true });
+  await printer.close();
+  return out;
 }
 
 const SHOTS = [
-  {
-    file: 'rubric-print.jpg',
-    width: 1100,
-    height: 1340,
-    async run(page, base) {
-      await printedRubrics(page, base);
-      return page.locator('#splash-paper');
-    },
-  },
   {
     file: 'grader.jpg',
     async run(page, base) {
@@ -228,43 +261,29 @@ const SHOTS = [
     },
   },
   {
-    file: 'dashboard.jpg',
+    file: 'add-work.jpg',
     async run(page, base) {
       await studentPageOn(page, base);
-      await page.goto(base + '/dashboard');
-      await pause(page, 1800);
-      return { clip: [0, 0, W, H] };
-    },
-  },
-  {
-    file: 'gradebook.jpg',
-    async run(page, base) {
-      await page.goto(base + '/gradebook');
-      await pause(page, 1800);
-      // A corner of the grid: ten students and the newest pieces.
-      return { clip: [0, 100, 1104, 720] };
-    },
-  },
-
-  {
-    file: 'questionnaire.jpg',
-    async run(page, base) {
-      await page.goto(base + '/reports');
+      const scan = await classScan(page);
+      await page.goto(base + '/assignments');
       await pause(page, 1500);
-      for (const [h, v] of [
-        ['completes', 4],
-        ['ready', 3],
-        ['others', 4],
-      ]) {
-        await page
-          .locator(`.qn-hs-stop[data-habit="${h}"][data-value="${v}"]`)
-          .first()
-          .click()
-          .catch(() => {});
-        await pause(page, 300);
-      }
-      await page.getByText('Teacher Comment', { exact: true }).first().click();
-      await pause(page, 300);
+      await page.evaluate(() => {
+        const head = [...document.querySelectorAll('.assess-header[data-aid]')].find(e =>
+          /Chemical Reactions Lab/.test(e.textContent),
+        );
+        document.querySelector('[data-action=openAddWorkClass][data-aid="' + head.dataset.aid + '"]').click();
+      });
+      await pause(page, 1500);
+      const [chooser] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        page.getByRole('button', { name: /Split a Scan/ }).click(),
+      ]);
+      await chooser.setFiles(scan);
+      await page.getByRole('button', { name: 'Class List Order' }).waitFor({ timeout: 30000 });
+      await pause(page, 4000);
+      await page.getByRole('button', { name: 'Class List Order' }).click();
+      await page.mouse.move(0, 0);
+      await pause(page, 1500);
       return { clip: [0, 0, W, H] };
     },
   },
@@ -300,7 +319,6 @@ const SHOTS = [
       };
     },
   },
-
   {
     file: 'curriculum.jpg',
     async run(page, base) {
@@ -324,7 +342,6 @@ const SHOTS = [
       };
     },
   },
-
   {
     file: 'student-learning.jpg',
     async run(page, base) {
@@ -334,14 +351,14 @@ const SHOTS = [
       return page.locator('.ps-screen');
     },
   },
-
   {
     file: 'student-feedback.jpg',
     async run(page, base) {
       await openPreview(page, base);
-      await page.locator('.ps-screen').getByText(/^Back/).first().click();
-      await pause(page, 1000);
-      await page.locator('.ps-screen').getByText('See Your Feedback').first().click();
+      // The newest returned piece, opened from My Learning.
+      await page.locator('.ps-screen').getByText('My Learning', { exact: true }).last().click();
+      await pause(page, 1200);
+      await page.locator('.ps-screen').getByText('Science Fair Proposal').first().click();
       await pause(page, 1500);
       return page.locator('.ps-screen');
     },

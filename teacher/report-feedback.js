@@ -82,9 +82,9 @@ window.ReportFeedback = (function () {
   }
 
   /* An Advanced Rubric's checkboxes at every level, ticked or not. */
-  function _checks(criterion, ticked) {
+  function _checks(criterion, ticked, levels) {
     var out = {};
-    LEVELS.forEach(function (lv) {
+    (levels || LEVELS).forEach(function (lv) {
       out[lv] = RubricChecks.checksAt(criterion, lv).map(function (check) {
         return { id: check.id, label: check.label || '', ticked: ticked.indexOf(check.id) >= 0 };
       });
@@ -95,16 +95,33 @@ window.ReportFeedback = (function () {
   function _rubric(cid, sheet) {
     var r = sheet.rubric;
     var style = r.kind ? 'standard' : rubricStyle(r);
-    return {
+    // A Six-Point rubric's levels are its six scores, read back from the
+    // stored level and ± (shared/rubric-scale.js); they carry no ±.
+    var six = !!window.RubricScale && RubricScale.has(r);
+    var order = six ? RubricScale.keys(r, levelOrderFor(cid)) : levelOrderFor(cid);
+    var out = {
       name: r.name || '',
       style: style,
-      levelOrder: levelOrderFor(cid),
+      levelOrder: order,
       rows: sheet.rows.map(function (row) {
         var c = row.criterion;
         var levels = {};
-        LEVELS.forEach(function (lv) {
+        (six ? order : LEVELS).forEach(function (lv) {
           levels[lv] = (c.levels && (c.levels[lv] || c.levels[String(lv)])) || '';
         });
+        if (six)
+          return {
+            criterionId: c.id,
+            name: c.name || '',
+            codes: row.codes.slice(),
+            levels: levels,
+            level: row.level ? RubricScale.fromStored(r, row.level, row.mod) : 0,
+            mod: 0,
+            mixed: row.mixed,
+            comment: row.comment || '',
+            beyond: '',
+            checks: style === 'advanced' ? _checks(c, sheet.ticked || [], order) : null,
+          };
         return {
           criterionId: c.id,
           name: c.name || '',
@@ -119,6 +136,9 @@ window.ReportFeedback = (function () {
         };
       }),
     };
+    // Its own level columns; the cards name each by RubricScale.label.
+    if (six) out.scale = RubricScale.columns(r);
+    return out;
   }
 
   /* The item for one assessment, or null when it has nothing to show. */

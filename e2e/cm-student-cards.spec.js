@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { catchPrints, heldAnywhere, holds, sheets } from './student-card-fake.js';
 import { notAdded } from '../tests/helpers/kept-secret.js';
 
@@ -9,6 +10,8 @@ import { notAdded } from '../tests/helpers/kept-secret.js';
 // With the student page on, Student Cards lists each student's card
 // with no code, and Make and Print makes the cards and prints them eight to
 // a page on the sheet the questionnaire slips use.
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const CODE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{4}-[ABCDEFGHJKMNPQRTUVWXYZ2346789]{4}$/;
 

@@ -9,6 +9,12 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="FullVision" />
+    <!-- Added to the Home Screen it opens as an app, without Safari's bars
+         (s/manifest.json; student.css pins the bars there). -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Student Questions — FullVision</title>
     <link rel="stylesheet" href="../shared/phone-report.css" />
     <link rel="stylesheet" href="../shared/loading-screen.css" />
@@ -29,6 +35,7 @@
     <script src="../shared/phone-report-view.js"></script>
     <script src="../shared/loading-screen.js"></script>
     <script src="student-data.js"></script>
+    <script src="../shared/rubric-scale.js"></script>
     <script src="../shared/student-view.js"></script>
     <script src="page-view.js"></script>
     <script src="page-carousel.js"></script>

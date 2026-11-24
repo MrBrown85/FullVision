@@ -5,7 +5,13 @@
  * first view. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import { FONTS, useFont } from './wide-font.js';
+
+// The test with a question waiting wants the class as Demo Mode now starts it, with the Student Page on.
+test.beforeEach(async ({ page }, testInfo) => {
+  if (!testInfo.title.startsWith('with a question waiting')) await demoStudentPageOff(page);
+});
 
 async function openDashboard(page, { oldFlag = null, tile = true } = {}) {
   await page.addInitScript(

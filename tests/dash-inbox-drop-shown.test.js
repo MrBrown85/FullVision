@@ -89,12 +89,15 @@ describe('the piece shown is the piece used', () => {
     work.assessments.push({ id: CELL, students_send: 'photos', after_due: 'stop', accept_until: null });
     saveDemoStudentWork(CID, work);
   }
+  // "Add Work For" is a chip a piece (board E1): a click chooses one.
   function pickBy(doc, aid) {
-    const select = doc.querySelector('[data-dash-inbox-for]');
-    select.querySelectorAll('option').forEach(o => o.removeAttribute('selected'));
-    select.querySelector('option[value="' + aid + '"]').setAttribute('selected', '');
-    select.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    doc
+      .querySelector('[data-dash-inbox-for-chip="' + aid + '"]')
+      .dispatchEvent(new doc.defaultView.Event('click', { bubbles: true }));
   }
+  // The piece the chips show chosen.
+  const chosenIn = doc =>
+    doc.querySelector('[data-dash-inbox-for] [aria-checked="true"]').getAttribute('data-dash-inbox-for-chip');
   // A day on, with no draw.
   const tomorrow = () => vi.setSystemTime(new Date(Date.now() + DAY));
   beforeEach(() => {
@@ -109,16 +112,16 @@ describe('the piece shown is the piece used', () => {
       caughtUp();
       const doc = mountTile();
       if (how === 'by hand') {
-        expect(doc.querySelector('[data-dash-inbox-for]').value).toBe(LIGHT);
+        expect(chosenIn(doc)).toBe(LIGHT);
         pickBy(doc, CELL);
       }
-      expect(doc.querySelector('[data-dash-inbox-for]').value).toBe(CELL);
+      expect(chosenIn(doc)).toBe(CELL);
       const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
       clickOn(doc, doc.querySelector('[data-dash-inbox-pick="files"]'));
       expect(open.mock.calls.map(c => c[1])).toEqual([CELL]);
       tomorrow();
       // The box still reads Cell Microscope Lab, which takes no more work: nothing opens.
-      expect(doc.querySelector('[data-dash-inbox-for]').value).toBe(CELL);
+      expect(chosenIn(doc)).toBe(CELL);
       clickOn(doc, doc.querySelector('[data-dash-inbox-pick="files"]'));
       expect(open).toHaveBeenCalledTimes(1);
       expect(doc.querySelector('.dash-inbox-drop-notice').textContent).toBe(
@@ -153,8 +156,14 @@ describe('the piece shown is the piece used', () => {
 
   it('with rows showing, a drop goes to the piece the cover named, and to no other once it has gone', () => {
     closesToday(5);
-    // Cell Microscope Lab is the newest piece taking work.
+    // Cell Microscope Lab is the newest piece taking work. The demo dates
+    // Light Refraction Lab from the real clock (seeded before the fake one),
+    // so pin it a week back, or on some days it ties Cell and comes first.
     getAssessments(CID).find(a => a.id === CELL).date = '2026-11-18';
+    Object.assign(
+      getAssessments(CID).find(a => a.id === LIGHT),
+      { date: '2026-11-11', dateAssigned: '2026-11-11' },
+    );
     const doc = mountTile();
     expect(doc.querySelector('.dash-inbox-row')).not.toBeNull();
     const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
@@ -411,7 +420,7 @@ describe('drags around the tile', () => {
     a.title = 'Light Refraction Lab';
     caughtUp();
     const doc = mountTile();
-    const labels = [...doc.querySelectorAll('[data-dash-inbox-for] option')].map(o => o.textContent);
+    const labels = [...doc.querySelectorAll('[data-dash-inbox-for-chip]')].map(o => o.textContent);
     expect(labels.length).toBe(2);
     expect(new Set(labels).size).toBe(2);
     labels.forEach(l => expect(l).toMatch(/^Light Refraction Lab \(\w{3} \d{1,2}(, \d{4})?\)$/));

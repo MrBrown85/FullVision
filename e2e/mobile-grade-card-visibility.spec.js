@@ -8,6 +8,9 @@
  * move away and back, after a redraw and after a tab switch. Demo Mode, Science 8, Cell Microscope Lab, at 375 x 812.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 

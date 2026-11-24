@@ -10,7 +10,10 @@
  * leave work waiting. With Send Work off the dialog is as it was.
  */
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 import path from 'path';
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 test.use({ viewport: { width: 1366, height: 900 } });
 

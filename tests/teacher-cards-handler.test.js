@@ -1005,19 +1005,22 @@ describe('teacher-cards: where the key, Auth and the database come from (index.t
   });
 
   it('runs one statement for cards: issue_cards, and two for slips (plan S3-S1), with every value a parameter', () => {
-    const statements = code.match(/sql`[^`]*`/g);
+    const statements = code.match(/sql\(\)`[^`]*`/g);
     expect(statements).toHaveLength(3);
     expect(statements[1].replace(/\s+/g, ' ')).toBe(
-      'sql` select student_submit.slip_roster(${teacherId}::uuid, ${kind}::text, ${targetId}::uuid) as r`',
+      'sql()` select student_submit.slip_roster(${teacherId}::uuid, ${kind}::text, ${targetId}::uuid) as r`',
     );
     expect(statements[2].replace(/\s+/g, ' ')).toBe(
-      'sql` select student_submit.issue_slips( ${teacherId}::uuid, ${kind}::text, ${targetId}::uuid, ${sql.json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`',
+      'sql()` select student_submit.issue_slips( ${teacherId}::uuid, ${kind}::text, ${targetId}::uuid, ${sql().json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`',
     );
     const text = statements[0].replace(/\s+/g, ' ');
     expect(text).toBe(
-      'sql` select student_submit.issue_cards( ${teacherId}::uuid, ${courseId}::uuid, ${sql.json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`',
+      'sql()` select student_submit.issue_cards( ${teacherId}::uuid, ${courseId}::uuid, ${sql().json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`',
     );
-    expect(code).not.toMatch(/sql\.unsafe/);
+    expect(code).not.toMatch(/sql\(\)\.unsafe/);
+    // Its own login, which can run only these three; never the owner's (2026112402).
+    expect(code).toContain("const sql = dbLogin(Deno.env.get('TEACHER_CARDS_DB_URL'));");
+    expect(code).not.toMatch(/SUPABASE_DB_URL/);
     expect(code).not.toMatch(/cardKey[^,V\n]*\$\{|\$\{[^}]*cardKey/);
   });
 });

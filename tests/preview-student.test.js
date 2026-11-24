@@ -562,12 +562,26 @@ describe('S9-F3: See Your Work in the preview, from the marks the student was gi
     expect(text(screen().querySelector('.sp-work-notes li span:last-child'))).toBe('Name your source.');
   });
 
-  it('with no marks given (no reader yet, or none), nothing of Mark Up shows', () => {
+  it('with no marks given (no reader yet, or none), nothing of Mark Up shows; the page still opens', async () => {
     stubMarkup();
     globalThis.getStudentMarkCounts = () => null;
+    globalThis.getStudentMarkup = () => ({ ok: true, files: [] });
+    openEssayFeedback();
+    expect(overlay().textContent).not.toMatch(/Mark Up/);
+    // The essay's page is in: See Your Work says so, and opens it with no marks and no Show Marks.
+    expect(text(screen().querySelector('[data-act="work"] .sp-fb-work-line'))).toBe('1 page');
+    click(screen().querySelector('[data-act="work"]'));
+    await vi.waitFor(() => expect(screen().querySelector('.sp-work-img')).toBeTruthy());
+    expect(screen().querySelector('.sp-work-over').innerHTML).toBe('');
+    expect(screen().querySelector('[data-act="work-marks"]')).toBeNull();
+  });
+
+  it('with no page in and no marks, there is no See Your Work', () => {
+    stubMarkup();
+    globalThis.getStudentMarkCounts = () => null;
+    globalThis.getStudentSubmission = () => null;
     openEssayFeedback();
     expect(screen().querySelector('[data-act="work"]')).toBeNull();
-    expect(overlay().textContent).not.toMatch(/Mark Up/);
   });
 
   it('a page that arrives after See Your Work closed is let go and not drawn', async () => {

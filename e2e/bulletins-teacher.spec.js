@@ -15,10 +15,13 @@ async function open(page, { oldKey = null, studentPage = true } = {}) {
   await page.clock.install({ time: NOW });
   // What a browser that saw Bulletins before B1g may still have kept.
   if (oldKey != null) await page.addInitScript(v => localStorage.setItem('fv-build-bulletins', v), oldKey);
-  // The front page's Try Demo Mode link (student=1) starts the sample class with the Student Page on.
-  await page.goto(studentPage ? '/login.html?student=1' : '/login.html');
-  await page.locator('#demo-mode-btn').click();
+  // Demo Mode starts the sample class with the Student Page on, however it is entered.
+  await page.goto('/login.html?demo=1');
   await page.waitForURL(/dashboard/);
+  if (!studentPage) {
+    await page.locator('.dash-glance').waitFor();
+    await page.evaluate(() => setStudentPageSwitch(getActiveCourse(), false));
+  }
   await page.goto('/bulletins');
 }
 
@@ -197,28 +200,27 @@ test('pin, edit and delete from the menu; the confirm shows only for Delete', as
   await expect(feed(page)).not.toContainText('Read pages 1 and 2');
 });
 
-test('Seen by opens the list: not seen first, then Show It Again', async ({ page }) => {
+test('Seen by opens the list: not seen first, then Remind', async ({ page }) => {
   await open(page);
   const card = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
   const list = card.locator('.bulletin-seenlist');
   await expect(list).toBeHidden();
   await card.getByRole('button', { name: /Seen by 19 of 27/ }).click();
   await expect(list).toBeVisible();
-  await expect(list).toContainText('Not Seen Yet · 8');
-  await expect(list).toContainText('Sam Blackwood');
-  await expect(list).toContainText('Caleb Firth');
-  await expect(list).toContainText('Have a Question · 2');
-  await expect(list).toContainText('Noor Al-Rashid');
-  const heads = await list.locator('.bulletin-seen-head').allTextContents();
-  expect(heads[0]).toBe('Not Seen Yet · 8');
-  await expect(list.getByRole('button', { name: 'Show Who Has Seen It (19)' })).toBeVisible();
-  await expect(list).not.toContainText('Jordan Kim'); // seen, no reaction: folded away
-  await expect(list).not.toContainText('Got It'); // Got It and Done are counts on the facts line, not lists of names
-  await expect(list).not.toContainText('Cece Adeyemi');
-  await list.getByRole('button', { name: 'Show Who Has Seen It (19)' }).click();
-  await expect(list).toContainText('Jordan Kim');
-  await list.getByRole('button', { name: 'Show It Again on These 8 Phones' }).click();
-  await expect(list).toContainText('Shown again on 8 phones.');
+  // The redesigned panel (#1633): the count, then Not Seen Yet and Seen side by side as name chips.
+  await expect(list.locator('.bsl-big')).toContainText('19 of 27');
+  await expect(list.locator('.bsl-group.is-not .bsl-head')).toHaveText('Not Seen Yet8');
+  await expect(list.locator('.bsl-group.is-not')).toContainText('Sam Blackwood');
+  await expect(list.locator('.bsl-group.is-not')).toContainText('Caleb Firth');
+  const heads = await list.locator('.bsl-head').allTextContents();
+  expect(heads[0]).toBe('Not Seen Yet8');
+  expect(heads[1]).toBe('Seen19');
+  await expect(list.locator('.bsl-group.is-seen')).toContainText('Jordan Kim');
+  await expect(list.locator('.bsl-group.is-question .bsl-head')).toHaveText('Have a Question2');
+  await expect(list.locator('.bsl-group.is-question')).toContainText('Noor Al-Rashid');
+  await expect(list.locator('.bsl-group.is-not')).not.toContainText('Jordan Kim');
+  await list.getByRole('button', { name: 'Remind All 8' }).click();
+  await expect(list).toContainText('Back at the top of their student page.');
   // Closing it hides it again.
   await card.getByRole('button', { name: /Seen by 19 of 27/ }).click();
   await expect(list).toBeHidden();
@@ -239,6 +241,30 @@ test('nothing scrolls sideways at 1280 × 800, with the composer and a list open
     };
   });
   expect(sideways).toEqual({ doc: false, main: false, page: false });
+});
+
+test('the sample announcement has a link, and its card fits in the page font and in a wide one', async ({ page }) => {
+  await open(page);
+  const card = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
+  await expect(card).toContainText('Cell Theory Video');
+  await expect(card).toContainText('khanacademy.org');
+  const fits = () =>
+    card.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      const wide = [el, ...el.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth + 1);
+      const out = [...el.querySelectorAll('*')].filter(e => {
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && (r.right > box.right + 1 || r.left < box.left - 1);
+      });
+      return { clipped: wide.length, outside: out.length };
+    });
+  expect(await fits()).toEqual({ clipped: 0, outside: 0 });
+  // A wider face with a little letter-spacing, as a Linux runner or a Windows laptop draws it.
+  await page.addStyleTag({
+    content:
+      '.bulletin-page, .bulletin-page * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }',
+  });
+  expect(await fits()).toEqual({ clipped: 0, outside: 0 });
 });
 
 test('a class whose Student Page is off says students cannot see Bulletins, and posting still works', async ({

@@ -9,6 +9,7 @@
  * tests/student-card-wired.test.js does. No test waits on real time: the
  * page's clock is moved (advance) and its timers fired (runTimers).
  */
+import { sha256 } from './helpers/session-hash.js';
 import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
@@ -205,7 +206,7 @@ describe('Switching Classes: Settings', () => {
     expect(routes(page)).not.toContain('done');
     expect(dev.fn.sql.filter(q => q.fn === 'verify_card').map(q => q.add)).toEqual([false, true]);
     // The same session, now opening Humanities 8.
-    expect(Object.keys(dev.fn.state.sessions)).toEqual([token]);
+    expect(Object.keys(dev.fn.state.sessions)).toEqual([sha256(token)]);
     expect(JSON.parse(dev.store[KEY])).toMatchObject({ t: token, e: HUM });
     expect(page.calls.filter(c => c.body.route === 'page').pop().body).toEqual({
       route: 'page',
@@ -309,7 +310,7 @@ describe('Switching Classes: what stops Add Another Card', () => {
       expect(alertText(page), field).toBe(words);
       expect(routes(page), field).toEqual(['card']);
       expect(JSON.parse(dev.store[KEY]).t, field).toBe(token);
-      expect(Object.keys(dev.fn.state.sessions), field).toEqual([token]);
+      expect(Object.keys(dev.fn.state.sessions), field).toEqual([sha256(token)]);
       page.calls.length = 0;
       await page.click('[data-act="card-back"]');
       expect(page.calls, field).toEqual([]);
@@ -400,7 +401,7 @@ describe('Switching Classes: what stops Add Another Card', () => {
     const dev = school();
     const page = await signIn(dev);
     const old = JSON.parse(dev.store[KEY]).t;
-    delete dev.fn.state.sessions[old];
+    delete dev.fn.state.sessions[sha256(old)];
     await addCard(page, 'K7M4-QX2P');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');

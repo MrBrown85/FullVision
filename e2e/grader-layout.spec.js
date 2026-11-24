@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 /* Grading layout in Demo Mode's Science 8 (sci8a3 plain rubric, sci8a19
    Advanced rubric, sci8a18 single-point, sci8a2 competencies):
@@ -7,6 +8,8 @@ import { test, expect } from '@playwright/test';
    - single-point controls stay inside their column;
    - Missing | Excused | Late in one order everywhere;
    - one hover prompt, and the descriptor bar beside the student list. */
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function demo(page, route) {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -159,20 +162,6 @@ test('Missing | Excused | Late everywhere; the dialog prints Print Rubrics', asy
   await dialog.locator('.grader-done').click();
   const ptsDialog = await openDialog(page, 'sci8q1', 'st1');
   await expect(ptsDialog.locator('.grader-print')).toHaveText('Print Scores');
-});
-
-test('rubric class view: no hover prompt; the bar starts after the student list', async ({ page }) => {
-  await demo(page, '/assignments?course=sci8');
-  const card = await openCard(page, 'sci8a3');
-  await expect(card.locator('.rsg-header-hint')).toHaveCount(0);
-  const bar = page.locator('#rsg-descriptor-bar');
-  await expect(bar).toBeHidden();
-  await expect(page.getByText('Hover a rubric level to see its descriptor')).toHaveCount(0);
-  const level = card.locator('.rsg-criterion-row .rsg-level.l3').first();
-  await level.hover();
-  await expect(bar).toBeVisible();
-  const sidebar = await box(page.locator('#gb-sidebar'));
-  expect((await box(bar)).left).toBeGreaterThanOrEqual(sidebar.right);
 });
 
 // S0-F2 (Demo Mode only, switch on): the row is in the dialog's footer (Nov 13), outside the part that scrolls: on a

@@ -13,8 +13,12 @@
  * - A refusal is passed on by its code, bad_answer with its question.
  */
 import { describe, expect, it } from 'vitest';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { ERRORS, QUIZ_ROUTES, SENT, SQL, rawAnswer } from '../supabase/functions/student-submit/quiz-routes.ts';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
 const PHONE = 's'.repeat(64);

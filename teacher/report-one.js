@@ -443,6 +443,20 @@ window.ReportOne = (function () {
   /* The class's model: the one it saved, else what it has today read as
      one (a built form for a class on Build Your Own, else its Quick Report
      choices). */
+  /* What a class saved before One Report, read as the Progress Reports
+     screen read it: on the Quick Report unless it chose Build Your Own, or
+     built a form before there was a choice; its form, or the starting
+     one. modelFor reads this; nothing saves it. */
+  function readSaved(rc) {
+    var r = Object.assign({}, rc);
+    if (r.progressMode !== 'grade' && r.progressMode !== 'build') r.progressMode = r.form ? 'build' : 'grade';
+    r.form = S().formFor({ form: rc && rc.form });
+    return r;
+  }
+  /* A class's model from its saved report settings, as Print Reports reads it. */
+  function forConfig(rc) {
+    return modelFor(Object.assign(readSaved(rc), { one: rc && rc.one }));
+  }
   function modelFor(reportConfig) {
     var rc = reportConfig || {};
     if (rc.one && typeof rc.one === 'object') return normalize(rc.one);
@@ -972,6 +986,11 @@ window.ReportOne = (function () {
       c.rows = tops.map(function (t, j) {
         return (j + 1 < tops.length ? tops[j + 1] : bottom) - t;
       });
+      // A heading row in the table (a folder, a reflection's heading) stays
+      // with the row under it: a page never ends on one.
+      c.keep = Array.prototype.map.call(rows, function (r) {
+        return !!(r.classList && r.classList.contains('report-ct-group'));
+      });
       c.chrome = Math.max(0, c.px - (bottom - tops[0]));
     });
   }
@@ -1140,7 +1159,7 @@ window.ReportOne = (function () {
     var packRows = [
       rows.map(function (row) {
         return row.map(function (c) {
-          return { id: c.key, size: c.size, px: c.px, rows: c.rows, chrome: c.chrome };
+          return { id: c.key, size: c.size, px: c.px, rows: c.rows, chrome: c.chrome, keep: c.keep };
         });
       }),
     ];
@@ -1334,6 +1353,8 @@ window.ReportOne = (function () {
     fromGrade: fromGrade,
     fromForm: fromForm,
     modelFor: modelFor,
+    readSaved: readSaved,
+    forConfig: forConfig,
     available: available,
     isOn: isOn,
     order: order,

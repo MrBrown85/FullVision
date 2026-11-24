@@ -202,6 +202,17 @@ export const SCREENS = [
     },
   },
   {
+    // See Your Work from My Learning: the quiz the teacher scanned in, two pages, no marks.
+    name: 'see your work, no marks',
+    marker: '#sp-work-title',
+    go: async (p, c) => {
+      await openDemo(p, c, 'demo-card-send');
+      await tab(p, 'learning');
+      await visible(p, '.sp-ml-row[data-piece="demo-quiz"]').click();
+      await visible(p, '[data-act="work"]').click();
+    },
+  },
+  {
     name: 'before and after',
     marker: '.sp-ba-card',
     go: async (p, c) => {

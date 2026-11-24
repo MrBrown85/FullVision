@@ -7,8 +7,8 @@
  * background is below 4.5:1. The background is found by compositing the
  * element's ancestors' background colours down to the page. Skipped:
  * aria-hidden and disabled controls, screen-reader-only text, anything
- * inside `opts.skip` selectors, text drawn in a level colour (`opts.textTokens`,
- * the LEVEL_TOKENS by default), and light text on a level fill.
+ * inside `opts.skip` selectors, level-coloured text on the elements that draw
+ * a level (LEVEL_TEXT_SELECTORS), and light text on a level fill.
  *
  * Level fills are exempt, here and only here: the score colours (--score-*) are
  * kept as the gradebook has always drawn them (Colin, 2026-10-19). An element is
@@ -18,6 +18,14 @@
  * never exempt, however it is spelled: in dark mode --score-4 and --active are
  * the same value, so a colour match alone exempts nothing. A new level element
  * goes in LEVEL_FILL_SELECTORS; a blue button never does.
+ *
+ * Level-coloured text is exempt the same way: its colour is one of the
+ * LEVEL_TOKENS (`opts.textTokens` to change them) AND it is inside one of
+ * LEVEL_TEXT_SELECTORS. Until Nov 24, 2026 a colour match alone was enough,
+ * so in dark mode every word drawn in --active (#0a84ff, the same as
+ * --score-4) went unmeasured; that is how #1602's 3.0:1 dark buttons passed.
+ * Status words drawn in a level token ("1 missing", "Last observed 21 days
+ * ago") are not levels and are measured.
  */
 
 /** The level colours, as custom property names. */
@@ -55,9 +63,29 @@ export const LEVEL_FILL_SELECTORS = [
   '.bday-today',
 ];
 
+/** The elements that draw a level colour as text. */
+export const LEVEL_TEXT_SELECTORS = [
+  // A student's level code (EXT, PRF …) in the student rows, and the overall level word.
+  '.student-row-prof',
+  '.overall-word',
+  // Return Grades: the suggested level ("Suggested: Developing") and the
+  // chosen − / + in the level's colour on white.
+  '.rsg-checklist-head',
+  '.rsg-mod',
+  // The Dashboard card's trend arrow: a glyph (role="img") in the Proficient
+  // or Emerging colour.
+  '.dash-card-trend',
+  // The Competencies tile's "Lowest" tag, drawn in the Emerging badge's pair.
+  '.dash-comp-ln-tag',
+  // Observation types (strength, growth, concern), as in LEVEL_FILL_SELECTORS.
+  '.obs-type',
+  '.m-obs-type',
+  '.m-obs-type-pill',
+];
+
 export async function findLowContrastText(page, opts = {}) {
   return page.evaluate(
-    ({ skip, textTokens, fillTokens, fillSelectors, min, maxPx }) => {
+    ({ skip, textTokens, textSelectors, fillTokens, fillSelectors, min, maxPx }) => {
       // Computed colours come back as rgb()/rgba(), or as color(srgb …) with
       // 0–1 channels when color-mix() made them. Anything else throws, so a
       // new format fails the test instead of being skipped.
@@ -162,7 +190,8 @@ export async function findLowContrastText(page, opts = {}) {
         if (cs.clip !== 'auto' || cs.clipPath !== 'none') continue;
         const fg = parse(cs.color);
         if (!fg || fg.a === 0) continue;
-        if (textKeys.has(rgbKey(fg))) continue;
+        const levelText = textKeys.has(rgbKey(fg));
+        if (levelText && textSelectors.length && el.closest(textSelectors.join(','))) continue;
         const under = backgroundOf(el);
         // A level fill is exempt on the level elements that carry it, not by its colour:
         // in dark mode --score-4 and --active are the same value.
@@ -191,6 +220,7 @@ export async function findLowContrastText(page, opts = {}) {
             fg: hex(text),
             bg: hex(bg),
             px: parseFloat(cs.fontSize),
+            ...(levelText ? { levelText: true } : {}),
           });
         }
       }
@@ -199,6 +229,7 @@ export async function findLowContrastText(page, opts = {}) {
     {
       skip: opts.skip || [],
       textTokens: opts.textTokens || LEVEL_TOKENS,
+      textSelectors: LEVEL_TEXT_SELECTORS,
       fillTokens: LEVEL_TOKENS,
       fillSelectors: LEVEL_FILL_SELECTORS,
       min: opts.min || 4.5,

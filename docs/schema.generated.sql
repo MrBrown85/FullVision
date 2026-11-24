@@ -49,6 +49,7 @@ table public.assessment (rls on)
   group_work text not null default 'each'::text
   students_see_markup boolean not null default true
   is_draft boolean not null default false
+  students_see_factored boolean not null default false
   constraint assessment_accept_until_check CHECK (((after_due = 'until'::text) = (accept_until IS NOT NULL)))
   constraint assessment_after_due_check CHECK ((after_due = ANY (ARRAY['keep'::text, 'until'::text, 'stop'::text])))
   constraint assessment_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.category(id) ON DELETE SET NULL
@@ -203,6 +204,14 @@ table public.bulletin_reaction (rls on)
   CREATE INDEX bulletin_reaction_enrollment_idx ON public.bulletin_reaction USING btree (enrollment_id)
   CREATE UNIQUE INDEX bulletin_reaction_pkey ON public.bulletin_reaction USING btree (bulletin_id, enrollment_id)
   CREATE TRIGGER bulletin_reaction_same_class BEFORE INSERT OR UPDATE ON public.bulletin_reaction FOR EACH ROW EXECUTE FUNCTION fv_private.bulletin_student_same_class()
+table public.bulletin_reminder (rls on)
+  bulletin_id uuid not null
+  enrollment_id uuid not null
+  reminded_at timestamp with time zone not null default now()
+  constraint bulletin_reminder_bulletin_id_fkey FOREIGN KEY (bulletin_id) REFERENCES public.bulletin(id) ON DELETE CASCADE
+  constraint bulletin_reminder_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint bulletin_reminder_pkey PRIMARY KEY (bulletin_id, enrollment_id)
+  CREATE UNIQUE INDEX bulletin_reminder_pkey ON public.bulletin_reminder USING btree (bulletin_id, enrollment_id)
 table public.bulletin_seen (rls on)
   bulletin_id uuid not null
   enrollment_id uuid not null
@@ -389,6 +398,8 @@ table public.criterion (rls on)
   display_order integer not null default 0
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
+  level_5_descriptor text
+  level_6_descriptor text
   constraint criterion_pkey PRIMARY KEY (id)
   constraint criterion_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubric(id) ON DELETE CASCADE
   constraint criterion_weight_check CHECK ((weight >= (0)::numeric))
@@ -409,7 +420,7 @@ table public.criterion_check (rls on)
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
   constraint criterion_check_criterion_id_fkey FOREIGN KEY (criterion_id) REFERENCES public.criterion(id) ON DELETE CASCADE
-  constraint criterion_check_level_check CHECK (((level >= 1) AND (level <= 4)))
+  constraint criterion_check_level_check CHECK (((level >= 1) AND (level <= 6)))
   constraint criterion_check_pkey PRIMARY KEY (id)
   CREATE INDEX criterion_check_criterion_idx ON public.criterion_check USING btree (criterion_id)
   CREATE UNIQUE INDEX criterion_check_pkey ON public.criterion_check USING btree (id)
@@ -1193,8 +1204,10 @@ table public.rubric (rls on)
   updated_at timestamp with time zone not null default now()
   copy_group uuid
   style text not null default 'standard'::text
+  scale jsonb
   constraint rubric_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
   constraint rubric_pkey PRIMARY KEY (id)
+  constraint rubric_scale_check CHECK (((scale IS NULL) OR ((jsonb_typeof(scale) = 'array'::text) AND ((jsonb_array_length(scale) >= 2) AND (jsonb_array_length(scale) <= 6)))))
   constraint rubric_style_check CHECK ((style = ANY (ARRAY['standard'::text, 'advanced'::text, 'single_point'::text])))
   CREATE INDEX rubric_copy_group_idx ON public.rubric USING btree (copy_group) WHERE (copy_group IS NOT NULL)
   CREATE INDEX rubric_course_idx ON public.rubric USING btree (course_id)
@@ -1969,7 +1982,7 @@ function public.clear_section_override(p_enrollment_id uuid, p_section_id uuid) 
 function public.close_phone_report(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.confirm_quiz(p_assessment_id uuid, p_marks jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.course_draft_count(p_course_id uuid) returns integer
-function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean) returns uuid
+function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid, p_is_draft boolean, p_students_see_factored boolean) returns uuid
 function public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) returns uuid
 function public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) returns uuid
 function public.create_observation(p_course_id uuid, p_body text, p_sentiment text, p_context_type text, p_assessment_id uuid, p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[], p_idempotency_key uuid, p_dims text[], p_level smallint, p_template_id uuid) returns uuid
@@ -2040,7 +2053,6 @@ function public.get_withdrawn_student_records(p_enrollment_id uuid) returns json
 procedure public.grade_return_repair_nightly()
 function public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) returns jsonb
-function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.list_assessment_copies(p_copy_group uuid) returns TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
 function public.list_assessment_markup(p_assessment_id uuid) returns jsonb security definer
@@ -2080,6 +2092,7 @@ function public.mark_quiz_answer(p_attempt_id uuid, p_question_id uuid, p_points
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
 function public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) returns boolean security definer
+function public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) returns void
 procedure public.photo_lifecycle_nightly()
 function public.photo_removal_call() returns bigint
 function public.photo_removal_due() returns boolean security definer
@@ -2128,7 +2141,7 @@ function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_c
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
 function public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_show_overall_grade text, p_paused boolean, p_idempotency_key uuid) returns jsonb security definer
-function public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid) returns jsonb security definer
+function public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) returns jsonb security definer
 function public.soft_delete_teacher() returns void
 function public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid) returns jsonb security definer
 function public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) returns jsonb security definer
@@ -2155,7 +2168,7 @@ function public.upsert_note(p_enrollment_id uuid, p_body text, p_idempotency_key
 function public.upsert_observation_template(p_id uuid, p_course_id uuid, p_body text, p_default_sentiment text, p_default_context_type text, p_display_order integer, p_idempotency_key uuid, p_default_dims text[]) returns uuid
 function public.upsert_questionnaire(p_course_id uuid, p_kind text, p_title text, p_template_id text, p_theme text, p_report_period integer, p_parent_id uuid, p_opens_on date, p_closes_on date, p_is_on boolean, p_myed_comment text, p_questions jsonb, p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) returns uuid
-function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) returns uuid
+function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) returns uuid
 function public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) returns uuid
 function public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) returns uuid
 function public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text, p_competency_group_id uuid, p_display_order integer, p_idempotency_key uuid) returns uuid
@@ -2214,7 +2227,7 @@ function student_submit.handout_links(p_session_token text, p_enrollment_id uuid
 function student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
-function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) returns jsonb security definer
+function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) returns jsonb security definer
 function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) returns jsonb security definer
 function student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
@@ -2237,6 +2250,6 @@ function student_submit.slip_roster(p_teacher_id uuid, p_kind text, p_target_id 
 function student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) returns jsonb security definer
-function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) returns jsonb security definer
+function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) returns jsonb security definer
 function student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 event trigger ensure_rls on ddl_command_end when tag in (CREATE TABLE, CREATE TABLE AS, SELECT INTO) runs public.rls_auto_enable()

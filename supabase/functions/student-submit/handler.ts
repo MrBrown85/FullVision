@@ -45,14 +45,10 @@ import { QUIZ_ROUTES, makeQuizRoutes } from './quiz-routes.ts';
 import { openSlip, verifySlip } from './slip-routes.ts';
 
 export type Db = {
-  /* A slip's open and verify as the database had them before 2026111160 (the plain code, the plain password).
-     slip-routes.ts sends them only while that migration is not applied; after it, open and verify go through
-     call, with tags. */
-  open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
-  verify: (token: string, who: Identity, ipHash: string) => Promise<Record<string, unknown>>;
+  // A phone report's birthday check and a questionnaire's answers, each with the slip token's hash.
   check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
   submit: (token: string, answers: unknown, ipHash: string) => Promise<Record<string, unknown>>;
-  // A card route's one statement (card-routes.ts), with its parameters. Gives back the function's reply.
+  // One statement (card-routes.ts, slip-routes.ts) with its parameters. Gives back the function's reply.
   call: (sql: string, params: Param[]) => Promise<unknown>;
 };
 
@@ -62,7 +58,9 @@ export type Identity = { birthday: string | null; studentNumber: string | null; 
 export type Options = {
   db: Db;
   region: string | undefined; // SB_REGION
-  ipKey: string; // HMAC key for IP hashes
+  // STUDENT_SUBMIT_IP_KEY, the HMAC key for address hashes. Null or empty: every route answers a server
+  // error and asks the database nothing, since each one counts against a per-address limit.
+  ipKey: string | null;
   // STUDENT_CARD_KEY as readCardKey gives it: null or absent when it is missing or malformed. card, a card's
   // verify, add-card and a slip's open need it: without it they answer a server error. A slip's verify uses it
   // when it is there. Every other route carries on without it.
@@ -73,6 +71,9 @@ export type Options = {
   // Who a teacher's sign-in token belongs to (Supabase Auth), for sweep.
   whoIs?: ((token: string) => Promise<string | null>) | null;
   now?: () => number;
+  // Makes a new session's token for verify and add-card, and a slip's for open; the database is given only its
+  // hash. Tests fix it.
+  sessionToken?: () => string;
   // Runs the removal worker after the answer (EdgeRuntime.waitUntil in index.ts); absent, before it.
   defer?: ((work: Promise<void>) => void) | null;
   // PHOTO_SWEEP_SECRET, for scheduled-sweep (the database's timer). Null or absent: that route answers a server error.
@@ -209,6 +210,19 @@ export async function ipHash(req: Request, key: string): Promise<string> {
   return Array.from(sig, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/* SHA-256 of a text, as 64 lower-case hex characters. */
+export async function sha256Hex(text: string): Promise<string> {
+  const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return Array.from(sum, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* A new session's token, made here so the database never has it: 32 random
+   bytes as 64 hex characters. */
+export function randomSessionToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 /* The verify body's identity fields: each a short string or absent, and at
    least one given. Null when the shape is wrong. */
 export function identity(body: Record<string, unknown>): Identity | null {
@@ -280,6 +294,17 @@ export function makeHandler(opts: Options) {
       return reply(400, { ok: false, error: 'bad_request' }, origin);
     }
 
+    // The device's session token goes no further than here (2026112401): every route reads `session` as its
+    // SHA-256, which is what the database keeps, so a token is never in a statement. A value of the wrong
+    // shape is left for the route to refuse.
+    if (typeof body.session === 'string' && body.session.length > 0 && body.session.length <= 128) {
+      body.session = await sha256Hex(body.session);
+    }
+    // A slip's token, the same way (2026112403): verify, check and submit send its SHA-256.
+    if (typeof body.token === 'string' && body.token.length > 0 && body.token.length <= 128) {
+      body.token = await sha256Hex(body.token);
+    }
+
     const route = body.route;
     // A verify with a token is a slip's, as it always was; with a code and no token, a card's.
     const card =
@@ -306,9 +331,14 @@ export function makeHandler(opts: Options) {
                     : Object.hasOwn(QUIZ_ROUTES, route)
                       ? quizRoute
                       : null;
+    if (!opts.ipKey) {
+      log({ route, outcome: 'no_ip_key', ms: Date.now() - started });
+      return reply(500, { ok: false, error: 'server' }, origin);
+    }
+    const ipKey = opts.ipKey;
     let result: Record<string, unknown>;
     try {
-      const hash = await ipHash(req, opts.ipKey);
+      const hash = await ipHash(req, ipKey);
       if (send) {
         const out = await send(route as string, body, hash);
         if (out.status !== 200) {
@@ -324,10 +354,15 @@ export function makeHandler(opts: Options) {
           return reply(500, { ok: false, error: 'server' }, origin);
         }
         // Not a card's code: answered here as an unknown card is, and the database is not asked.
-        result =
-          params === 'not_a_card'
-            ? { ok: false, error: 'not_found' }
-            : cardReply(card, await opts.db.call(card.sql, [...params, hash]));
+        if (params === 'not_a_card') {
+          result = { ok: false, error: 'not_found' };
+        } else if (card.newSession) {
+          // verify and add-card: the database is given the new session's hash, and the phone its token.
+          const token = (opts.sessionToken || randomSessionToken)();
+          result = cardReply(card, await opts.db.call(card.sql, [...params, hash, await sha256Hex(token)]), token);
+        } else {
+          result = cardReply(card, await opts.db.call(card.sql, [...params, hash]));
+        }
       } else if (route === 'open') {
         if (typeof body.code !== 'string' || body.code.length > 32) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
@@ -337,7 +372,9 @@ export function makeHandler(opts: Options) {
           log({ route, outcome: 'no_card_key', ms: Date.now() - started });
           return reply(500, { ok: false, error: 'server' }, origin);
         }
-        result = await openSlip(opts.db, opts.cardKey, body.code, hash);
+        // A new slip token is made here; the database is given only its hash.
+        const token = (opts.sessionToken || randomSessionToken)();
+        result = await openSlip(opts.db, opts.cardKey, body.code, hash, token, await sha256Hex(token));
       } else if (route === 'verify') {
         const who = identity(body);
         if (typeof body.token !== 'string' || body.token.length > 128 || !who) {

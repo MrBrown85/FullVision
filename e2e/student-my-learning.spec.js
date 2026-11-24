@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { demoStudentPageOff } from './demo-student-page-off.js';
 
 // My Learning in Preview as Student, Demo Mode (S13-F2; redrawn by Colin's
 // ruling of 2026-11-14). The tab always lists Your Work; once the class's
 // Show My Learning is on (S13-F1 sets it), the grade sits above it in the
 // class's grading style, from returned grades only. SHOTS=dir saves a
 // picture of each.
+
+test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const SHOTS = process.env.SHOTS || '';
 
