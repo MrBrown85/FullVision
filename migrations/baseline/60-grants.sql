@@ -1025,6 +1025,8 @@ revoke all on routine student_submit.quiz(p_session_token text, p_enrollment_id 
 grant execute on routine student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) to service_role;
 revoke all on routine student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) to service_role;
+revoke all on routine student_submit.quiz_result(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) from public;
+grant execute on routine student_submit.quiz_result(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
 revoke all on routine student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) from public;
 grant execute on routine student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text) to service_role;
 revoke all on routine student_submit.quiz_send(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) from public;

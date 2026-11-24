@@ -1,4 +1,4 @@
--- Quizzes, MQ3: the returned view on the student's side (2026-11-24). NOT APPLIED.
+-- Quizzes, MQ3: the returned view on the student's side (2026-11-24). APPLIED Nov 24 2026.
 --
 -- THIS FILE CHANGES NO EXISTING ROW, TABLE, POLICY, CONSTRAINT OR FUNCTION.
 -- It adds one read-only function, student_submit.quiz_result, for the
