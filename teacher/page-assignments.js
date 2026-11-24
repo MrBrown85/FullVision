@@ -185,7 +185,9 @@ window.PageAssignments = (function () {
     });
     var byClass = Object.assign({}, getDashboardPrefs().closedModules || {});
     byClass[activeCourse] = ids;
-    saveDashboardPrefs({ closedModules: byClass });
+    var picked = {};
+    picked[activeCourse] = true;
+    saveDashboardPrefs({ closedModules: byClass }, { closedModules: picked });
   }
 
   /* ── switchCourse ───────────────────────────────────────── */

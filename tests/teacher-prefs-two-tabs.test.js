@@ -179,15 +179,35 @@ describe('teacher preferences on two computers', () => {
     expect(patches()).toEqual([{ dashboard_prefs: { closedModules: { [CLASS_B]: ['m7'] } } }]);
   });
 
-  it('a save that changes nothing sends nothing', async () => {
+  it('a save the app makes of a copy that changes nothing sends nothing', async () => {
     setActiveCourse(CLASS_A);
     saveConfig(Object.assign({}, getConfig()));
-    saveViewPref('gb_newestFirst', '1');
-    saveDashboardPrefs({ studentView: 'cards' });
     await window.v2Queue.flush();
     await settle();
 
     expect(fake.calls).toEqual([]);
+  });
+
+  it('an old tab that re-picks what it already shows sends it, so the server matches the screen', async () => {
+    changeOnAnotherComputer();
+
+    // The old tab shows Cards and lastName; the teacher picks them again.
+    saveDashboardPrefs({ studentView: 'cards' });
+    saveViewPref('gb-roster-sort-c1', 'lastName');
+    const byClass = Object.assign({}, getDashboardPrefs().closedModules);
+    saveDashboardPrefs({ closedModules: byClass }, { closedModules: { [CLASS_A]: true } });
+    await window.v2Queue.flush();
+    await settle();
+
+    expect(patches()).toEqual([
+      { dashboard_prefs: { studentView: 'cards' } },
+      { dashboard_prefs: { view: { 'gb-roster-sort-c1': 'lastName' } } },
+      { dashboard_prefs: { closedModules: { [CLASS_A]: ['m1'] } } },
+    ]);
+    expect(server.row.dashboard_prefs.studentView).toBe('cards');
+    expect(server.row.dashboard_prefs.view).toEqual({ gb_newestFirst: '1', 'gb-roster-sort-c1': 'lastName' });
+    // What the old tab did not pick stays as the other computer left it.
+    expect(server.row.view_mode).toBe('classic');
   });
 
   it('a change made offline waits in the outbox, in order, and lands once online', async () => {

@@ -67,17 +67,24 @@ var _DASHBOARD_PREF_MAPS = { view: true, closedModules: true };
 /* What changed in dashboardPrefs from `before` to `after`, as the server
    merges it (patch_teacher_preferences): only the keys that differ, and
    inside view and closedModules only the entries that differ. A key or
-   entry taken out is sent as null. {} when nothing changed. */
-function _dashboardPrefsChange(before, after) {
+   entry taken out is sent as null. {} when nothing changed.
+
+   `picked` names what the teacher chose with a click: { key: true } for a
+   key, { view: { entry: true } } for an entry of a map. It is sent even
+   when it equals this tab's copy: another computer may have changed it
+   since, and the teacher's choice is what this tab now shows. */
+function _dashboardPrefsChange(before, after, picked) {
   var was = _plainObject(before) ? before : {};
   var now = _plainObject(after) ? after : {};
+  var chose = _plainObject(picked) ? picked : {};
   var change = {};
   Object.keys(now).forEach(function (k) {
     if (_DASHBOARD_PREF_MAPS[k] && _plainObject(now[k])) {
       var old = _plainObject(was[k]) ? was[k] : {};
+      var choseHere = _plainObject(chose[k]) ? chose[k] : {};
       var entries = {};
       Object.keys(now[k]).forEach(function (e) {
-        if (!Object.prototype.hasOwnProperty.call(old, e) || !_sameSetting(now[k][e], old[e])) {
+        if (choseHere[e] || !Object.prototype.hasOwnProperty.call(old, e) || !_sameSetting(now[k][e], old[e])) {
           entries[e] = now[k][e] === undefined ? null : now[k][e];
         }
       });
@@ -85,7 +92,10 @@ function _dashboardPrefsChange(before, after) {
         if (!Object.prototype.hasOwnProperty.call(now[k], e)) entries[e] = null;
       });
       if (Object.keys(entries).length) change[k] = entries;
-    } else if (!_sameSetting(now[k] === undefined ? null : now[k], was[k] === undefined ? null : was[k])) {
+    } else if (
+      chose[k] === true ||
+      !_sameSetting(now[k] === undefined ? null : now[k], was[k] === undefined ? null : was[k])
+    ) {
       change[k] = now[k] === undefined ? null : now[k];
     }
   });
@@ -123,6 +133,9 @@ function _teacherPrefsChange(before, after) {
 
 /* Save the teacher's preferences. Only what differs from this tab's copy is
    sent (_teacherPrefsChange); a save that changes nothing sends nothing.
+   These are saves the app makes of a whole copy; a choice the teacher makes
+   with a click goes through saveDashboardPrefs or saveViewPref, which send
+   it even when it is unchanged.
    Callers pass a new object ({ ...getConfig(), activeCourse }); one that
    changed the cached copy in place is compared with this device's stored
    copy instead, which is all that is left of the old values. */
