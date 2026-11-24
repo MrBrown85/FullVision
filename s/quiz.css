@@ -370,6 +370,134 @@
   color: var(--sp-text-2, #636366);
 }
 
+/* When it comes back (slice Q5b): the page's own Your Result and comment, then each question, marked with a
+   word and a mark as well as a colour. Greens and reds are the page's (4.5:1 or better on white). */
+.sp-quiz-returned {
+  padding-bottom: 24px;
+}
+.sp-quiz-top {
+  display: grid;
+  min-width: 0;
+}
+/* The page's own Your Result drawn inside the quiz: it keeps the page's look, and takes only the height it needs. */
+.sp-quiz .sp-quiz-topview.sp-view {
+  min-height: 0;
+  background: transparent;
+}
+/* A competency's name and its level share a row on a phone; when the screen is narrow (320 px at Larger is 246 px) the
+   level drops under the name instead of breaking a word of it. */
+.sp-quiz .sp-quiz-topview .sp-fb-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding: 6px 0;
+}
+.sp-quiz .sp-quiz-topview .sp-fb-row-name {
+  flex: 1 1 9em;
+}
+.sp-quiz-total {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-gradeonly {
+  padding: 0 2px;
+}
+.sp-quiz-look {
+  justify-self: start;
+  min-height: 44px;
+}
+.sp-quiz-ras {
+  color: var(--sp-text, #1d1d1f);
+}
+.sp-quiz-ra {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 11px 0;
+  border-top: 1px solid #e5e5ea;
+  font-size: 14px;
+  scroll-margin-top: 12px;
+}
+.sp-quiz-ra:first-child {
+  border-top: 0;
+}
+.sp-quiz-ra:focus {
+  outline: none;
+}
+.sp-quiz-ra:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.45);
+  outline-offset: 2px;
+}
+.sp-quiz-mk {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sp-quiz-mk-y {
+  background: #2e7d32;
+}
+.sp-quiz-mk-n {
+  background: #c62828;
+}
+.sp-quiz-mk-p {
+  background: #92400e;
+}
+.sp-quiz-mk-t {
+  background: #636366;
+}
+.sp-quiz-mk-none {
+  background: transparent;
+}
+.sp-quiz-ra-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.sp-quiz-ra-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-ra-q {
+  font-weight: 600;
+}
+.sp-quiz-ra-n {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-ra-is-y .sp-quiz-ra-n {
+  color: #166534;
+}
+.sp-quiz-ra-is-n .sp-quiz-ra-n {
+  color: #c62828;
+}
+.sp-quiz-ra-is-p .sp-quiz-ra-n {
+  color: #92400e;
+}
+.sp-quiz-ra-yours {
+  font-size: 13px;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-ra-key {
+  font-size: 13px;
+  font-weight: 600;
+  color: #166534;
+}
+.sp-quiz-ra-why {
+  font-size: 13px;
+  color: var(--sp-text-2, #636366);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sp-quiz-bar i {
     transition: none;

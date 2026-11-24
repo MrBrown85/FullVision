@@ -13,6 +13,7 @@
                 order, their saved answers, the tries left
      quiz-save  { assessment_id, question_id, answer }   one answer; null clears
      quiz-send  { assessment_id }   closes the try
+     quiz-result  { assessment_id }   only for a piece the page knows is returned (below, "When it comes back")
    Only the keys the model names are read from an answer.
 
    Which pieces are quizzes: `quiz-list`, asked once beside `page` (below).
@@ -37,6 +38,22 @@
    so a reload keeps it; Log Out, Reset Demo Data and leaving Demo Mode clear
    it. The teacher's Demo Mode answer key is not read by anything on the
    student's page.
+
+   When it comes back (slice Q5b; the board's "When It Comes Back"): for a piece
+   whose grade is back (kind 'back') that `quiz-list` says can no longer be
+   answered, the page asks `quiz-result` once per class open (at most 12 pieces,
+   never on a timer, never with the switch off). Only `returned: true` with a
+   `shows` the page knows is kept (M.resultFrom), in memory: nothing from it goes
+   in localStorage or sessionStorage on a real sign-in, and it is let go with
+   the answers (letGo, which every sign-out and class switch calls) and with a
+   new page state. A missing route, a 404, a 500 or `returned: false` leaves the
+   page as it was, with nothing said. A piece with a result gets See Your Quiz on
+   its card and on Your Feedback, which opens the returned view: the page's own
+   Your Result and comment on top (s/page-view.js quizTopHtml, calc.js's words),
+   then each question in the student's own numbering as the quiz's `shows` allows.
+   In Demo Mode the sample comes back when the demo teacher closes, confirms and
+   returns it (demoReturn): the sample's own confirmed try, kept on the device with the rest
+   of the sample's progress, answered by demoResult under the same `shows`.
 
    An answer still waiting is never lost silently: the Log Out sheet says so
    and offers Wait (StudentPage.quizWaiting), and closing the tab asks first
@@ -67,6 +84,16 @@
   var savers = []; // every saver that may still hold an answer: a quiz left for Assignments keeps saving
   /** @type {Record<string, string>} */
   var known = {}; // aid -> 'part' or 'sent', as far as this tab has seen: the card's button words
+  /* What came back (slice Q5b): `quiz-result`'s answer for each returned quiz piece of the class on screen, read by
+     M.resultFrom, kept in memory only and let go at every way out (letGo, and a new page state). Asked once for a piece
+     per class open, only for a piece the page knows is returned (its grade is back) and the list says can no longer be
+     answered; a missing route, a 404, a 500 or `returned: false` leaves it out and nothing is said. */
+  /** @type {Record<string, any>} */
+  var back = {};
+  /** @type {Record<string, boolean>} */
+  var backAsked = {};
+  var backCount = 0;
+  var BACK_MAX = 12; // the newest returned quizzes of a class; a page never asks for more
   /** @type {any} */
   var demoStore = null; // Demo Mode's tries, kept on this device (DEMO_KEY) like the rest of Demo Mode
 
@@ -139,21 +166,47 @@
     },
   ];
 
+  /* The sample's right answers. They are read in one place only: the sample coming back (demoReturn, which marks the
+     try, and demoResult, which sends what the quiz's `shows` allows), as the real key is read only by `quiz-result`. */
+  var DEMO_ANSWERS = {
+    dq1: { answer: ['dq1-a'], tolerance: null, why: 'A line graph shows how something changes over time.' },
+    dq2: { answer: ['dq2-a', 'dq2-b', 'dq2-d'], tolerance: null, why: 'Plants need light, water and air to grow.' },
+    dq3: {
+      answer: false,
+      tolerance: null,
+      why: 'A pattern shows two things happen together. It does not prove one caused the other.',
+    },
+    dq4: { answer: 10, tolerance: 0, why: 'Add 2.5, 3.5 and 4.' },
+    dq5: { answer: null, tolerance: null, why: null },
+    dq6: { answer: ['dq6-a'], tolerance: null, why: null },
+  };
+  var DEMO_COMMENT =
+    'Your pattern is clear and you explained it well. Look again at the question about cause and effect.';
+
   /** The sample's piece in the sample class's work (s/app.js demoClass), with the switch on only. @param {(n: number) => string} isoDay */
   SP.demoQuiz = function (isoDay) {
     if (!on()) return [];
-    return [
-      {
-        id: DEMO_AID,
-        title: 'Data Patterns Quick Check',
-        date: isoDay(-1),
-        due_date: isoDay(0),
-        tag_ids: ['demo-pa'],
-        unit: 'Unit 1: Cells',
-        category: 'Quizzes',
-        about: 'Answer each question. Your answers save as you go, and you can send them when you are done.',
-      },
-    ];
+    /** @type {any} */
+    var piece = {
+      id: DEMO_AID,
+      title: 'Data Patterns Quick Check',
+      date: isoDay(-1),
+      due_date: isoDay(0),
+      tag_ids: ['demo-pa'],
+      unit: 'Unit 1: Cells',
+      category: 'Quizzes',
+      about: 'Answer each question. Your answers save as you go, and you can send them when you are done.',
+    };
+    // Once the demo teacher has confirmed and returned it (demoReturn): a returned grade, as the sample class's others are.
+    var st = demoLoad();
+    if (st.returned) {
+      piece.working = {
+        score: { value: null, comment: DEMO_COMMENT },
+        tag_scores: [{ tag_id: 'demo-pa', value: st.returned.level, modifier: 0, comment: null }],
+      };
+      piece.ret = { is_draft: false, returned_at: st.returned.at, returned_copy: null };
+    }
+    return [piece];
   };
 
   /** @param {any[]} list */
@@ -175,7 +228,7 @@
     var sent = !!last.sentAt;
     return {
       ok: true,
-      quiz: { tries: DEMO_TRIES, tries_left: left, closed: false, closes_on: null },
+      quiz: { tries: DEMO_TRIES, tries_left: left, closed: !!st.closed, closes_on: null },
       try: {
         number: last.number,
         sent: sent,
@@ -186,8 +239,8 @@
       sent_tries: st.attempts.filter(function (/** @type {any} */ a) {
         return !!a.sentAt;
       }).length,
-      can_answer: !sent,
-      can_try_again: sent && left > 0,
+      can_answer: !sent && !st.closed,
+      can_try_again: sent && left > 0 && !st.closed,
       questions: last.order.map(function (/** @type {string} */ id, /** @type {number} */ i) {
         var q = DEMO_QUESTIONS.filter(function (x) {
           return x.id === id;
@@ -256,10 +309,102 @@
     return {
       assessment_id: DEMO_AID,
       tries_left: DEMO_TRIES - st.attempts.length,
-      can_answer: true,
-      closed: false,
-      has_open_try: open,
+      can_answer: !st.closed,
+      closed: !!st.closed,
+      has_open_try: open && !st.closed,
     };
+  }
+
+  /* The demo teacher closes the sample, confirms a try and returns it (Demo Mode has no teacher on this page, so a test
+     or a tour calls this once a try is sent). What the teacher confirmed is the sample's own record, as the sample
+     class's other returned grades are: Cece's try with these answers, marked as below, 6 of 10, Developing. Nothing here
+     works out a grade (right and wrong are decided in calc.js, which the student page never names for a quiz). The try keeps
+     the order the student's own last sent try was shown in. Kept on the device with the rest of the sample's progress.
+     @param {{ shows?: string, addTotal?: boolean }} [opts] */
+  var DEMO_TRY = {
+    answers: {
+      dq1: ['dq1-a'],
+      dq2: ['dq2-a', 'dq2-b'],
+      dq3: true,
+      dq4: 10,
+      dq5: 'The plants with more light grew taller each week.',
+      dq6: ['dq6-a'],
+    },
+    earned: 6,
+    possible: 10,
+    level: 2,
+    questions: {
+      dq1: { earned: 1, result: 'right' },
+      dq2: { earned: 0, result: 'wrong' },
+      dq3: { earned: 0, result: 'wrong' },
+      dq4: { earned: 2, result: 'right' },
+      dq5: { earned: 2, result: 'partly' },
+      dq6: { earned: 1, result: 'right' },
+    },
+  };
+  function demoReturn(opts) {
+    var o = opts || {};
+    if (!on() || !(S && S.demo)) return false;
+    var st = demoLoad();
+    var sent = st.attempts.filter(function (/** @type {any} */ a) {
+      return !!a.sentAt;
+    });
+    if (!sent.length) return false;
+    var counted = sent[sent.length - 1];
+    counted.answers = JSON.parse(JSON.stringify(DEMO_TRY.answers));
+    st.closed = true;
+    st.returned = {
+      shows: o.shows === 'grade' || o.shows === 'right' ? o.shows : 'answers',
+      add_total: o.addTotal === true,
+      level: DEMO_TRY.level,
+      marked: { earned: DEMO_TRY.earned, possible: DEMO_TRY.possible, questions: DEMO_TRY.questions },
+      counted_try: counted.number,
+      at: new Date().toISOString(),
+    };
+    demoKeep();
+    return true;
+  }
+
+  /** What `quiz-result` would answer for the returned sample: only what its `shows` allows is read from the answers. @param {any} st */
+  function demoResult(st) {
+    var r = st.returned;
+    if (!r) return { ok: true, returned: false };
+    var tried =
+      st.attempts.filter(function (/** @type {any} */ a) {
+        return a.number === r.counted_try;
+      })[0] || st.attempts[st.attempts.length - 1];
+    /** @type {any} */
+    var out = { ok: true, returned: true, shows: r.shows };
+    if (r.add_total) out.total = { earned: r.marked.earned, possible: r.marked.possible };
+    if (r.shows === 'grade') return out;
+    out.questions = tried.order.map(function (/** @type {string} */ id, /** @type {number} */ i) {
+      var q = DEMO_QUESTIONS.filter(function (x) {
+        return x.id === id;
+      })[0];
+      var mark = r.marked.questions[id];
+      /** @type {any} */
+      var item = {
+        id: q.id,
+        number: i + 1,
+        kind: q.kind,
+        prompt: q.prompt,
+        points: q.points,
+        multiple: q.multiple,
+        choices: q.choices,
+        your_answer: has(tried.answers, id) ? tried.answers[id] : null,
+        result: mark ? mark.result : null,
+      };
+      if (r.shows === 'answers') {
+        item.answer = DEMO_ANSWERS[id].answer;
+        item.why = DEMO_ANSWERS[id].why;
+      }
+      return item;
+    });
+    return out;
+  }
+  /** @param {any} map @param {string} key */
+  function has(map, key) {
+    return !!map && Object.prototype.hasOwnProperty.call(map, key);
   }
 
   /** @param {any} st @param {string} route @param {any} body */
@@ -279,10 +424,12 @@
     }
     if (route === 'quiz') {
       if (!last) fresh();
+      else if (body.new_try === true && st.closed) return { ok: false, error: 'quiz_closed' };
       else if (body.new_try === true && last.sentAt && st.attempts.length < DEMO_TRIES) fresh();
       else if (body.new_try === true && last.sentAt) return { ok: false, error: 'no_tries_left' };
       return demoReply(st);
     }
+    if (route === 'quiz-result') return demoResult(st);
     if (!last) return { ok: false, error: 'not_found' };
     if (last.sentAt) return { ok: false, error: 'sent' };
     if (route === 'quiz-save') {
@@ -364,6 +511,7 @@
   SP.quizzesWith = function (mine, pageAsked) {
     if (!on() || !mine || !mine.enrollment) return pageAsked;
     var student = String(mine.enrollment);
+    forgetBack();
     if (S && S.demo) {
       list = { student: student, items: {} };
       list.items[DEMO_AID] = demoItem();
@@ -407,8 +555,15 @@
     if (!on() || !v || !Array.isArray(v.work) || !list || !list.items) return;
     if (!state || !state.page || !state.page.student || list.student !== state.page.student.id) return;
     var items = list.items;
+    var student = list.student;
     v.work.forEach(function (/** @type {any} */ p) {
       var it = items[p.id];
+      if (it && p.kind === 'back') {
+        // A returned quiz: See Your Quiz, only once `quiz-result` has said it is back.
+        if (back[p.id]) p.quizReturned = true;
+        else askBack(p, it, student);
+        return;
+      }
       if (!it || (p.kind !== 'due' && p.kind !== 'missing')) return;
       p.quiz = true;
       var more = it.tries_left == null || it.tries_left > 0;
@@ -422,6 +577,35 @@
       else if (known[p.id] === 'sent') p.quizWord = more ? 'Try Again' : 'See Your Quiz';
     });
   };
+
+  /** Every returned result let go. */
+  function forgetBack() {
+    back = {};
+    backAsked = {};
+    backCount = 0;
+  }
+
+  /** `quiz-result` for one returned piece of this class, once. @param {any} p @param {any} it its quiz-list entry @param {string} student */
+  function askBack(p, it, student) {
+    // The page knows the grade is back; the list says nothing more can be answered. Anything else is not asked.
+    if (backAsked[p.id] || it.can_answer || it.has_open_try || backCount >= BACK_MAX) return;
+    backAsked[p.id] = true;
+    backCount += 1;
+    var mine = back;
+    ask('quiz-result', { assessment_id: p.id }, student).then(function (/** @type {any} */ res) {
+      // Another class or sign-out since: nothing of this answer is kept.
+      if (mine !== back || !list || list.student !== student) return;
+      if (res && M.SESSION_OVER[String(res.error)]) {
+        if (typeof SP.sessionRefused === 'function') SP.sessionRefused({ ok: false, error: String(res.error) });
+        return;
+      }
+      var got = M.resultFrom(res);
+      if (!got) return;
+      back[p.id] = got;
+      // The cards are drawn again where the student is, now with See Your Quiz.
+      if (S && S.screen === 'assignments' && (S.demo || (S.page && S.page.student.id === student))) paint();
+    });
+  }
 
   /** What this tab has seen of a quiz, and its entry in the list brought up to date. @param {any} q */
   function remember(q) {
@@ -463,7 +647,17 @@
       busy: q.busy,
       noRetry: q.noRetry,
       demo: !!(S && S.demo),
+      back: q.back || null,
+      top: q.mode === 'returned' ? topOf(q.aid) : '',
     };
+  }
+  // The piece's Your Result and the teacher's comment, as the page's Your Feedback draws them (calc.js's words).
+  /** @param {string} aid */
+  function topOf(aid) {
+    var p = pieceOf(aid);
+    return p && typeof w.StudentPageView === 'object' && w.StudentPageView.quizTopHtml
+      ? w.StudentPageView.quizTopHtml(p)
+      : '';
   }
   /** @param {any} state */
   function renderQuiz(state) {
@@ -489,6 +683,15 @@
     /** @type {any} */
     var first = card.querySelector('input, textarea, [role="radio"][tabindex="0"], [role="checkbox"]');
     if (first && typeof first.focus === 'function') first.focus({ preventScroll: true });
+  }
+
+  /** Look Again: the question scrolled to and focused. @param {number} pos */
+  function lookAt(pos) {
+    var r = appRoot();
+    var row = r ? r.querySelector('.sp-quiz-ra[data-pos="' + pos + '"]') : null;
+    if (!row) return;
+    if (typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'start', behavior: 'auto' });
+    /** @type {any} */ (row).focus({ preventScroll: true });
   }
 
   /** @param {any} q @param {string} code */
@@ -620,11 +823,14 @@
   /** @param {string} aid */
   function open(aid) {
     var p = pieceOf(aid);
-    if (!on() || !p || p.quiz !== true || !S) return;
+    var returned = !!p && p.kind === 'back' && p.quizReturned === true && !!back[aid];
+    if (!on() || !p || (p.quiz !== true && !returned) || !S) return;
     var v = view();
     var course = (v && v.course) || {};
     var block = String(course.block || '').trim();
     var due = p.dueDate ? V.dayOf(p.dueDate) : '';
+    var dueWords = due ? 'Due ' + due : '';
+    if (returned) dueWords = p.returnedAt ? 'Returned ' + V.dayOf(String(p.returnedAt).slice(0, 10)) : '';
     var old = Q;
     var q = {
       aid: aid,
@@ -633,8 +839,8 @@
       course:
         String(course.name || '') +
         (block ? ' · ' + (/^[A-Za-z0-9]{1,2}$/.test(block) ? 'Block ' + block.toUpperCase() : block) : ''),
-      due: due ? 'Due ' + due : '',
-      mode: 'loading',
+      due: dueWords,
+      mode: returned ? 'returned' : 'loading',
       m: null,
       answers: {},
       status: { kind: 'idle', at: 0 },
@@ -644,11 +850,14 @@
       noRetry: false,
       saver: null,
       scroll: 0,
+      back: returned ? back[aid] : null,
     };
     Q = q;
     S.screen = 'quiz';
     paint('#sp-quiz-title');
     if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    // A returned quiz is shown from what `quiz-result` said: nothing more is asked.
+    if (returned) return;
     // What the last visit left waiting goes first, so this answer never comes back older than it was.
     var wait = old && old.aid === aid && old.saver ? old.saver.flush() : Promise.resolve(true);
     wait.then(function () {
@@ -738,6 +947,7 @@
     var q = Q;
     if (S.screen !== 'quiz' || !q) return;
     if (act === 'quiz-back') return leave();
+    if (act === 'quiz-look' && q.mode === 'returned') return lookAt(Number(attr('data-pos')) || 1);
     if (act === 'quiz-retry') return load(q, false, true);
     if (act === 'quiz-pick' && q.mode === 'take' && q.m) {
       var hit = V.pressed(q.m, q.answers, el);
@@ -839,6 +1049,9 @@
     });
     savers = [];
     M.wipeKept();
+    // What came back is let go too, and the screen open on it.
+    forgetBack();
+    if (Q) Q.back = null;
   }
 
   SP.quizLetGo = letGo;
@@ -885,6 +1098,7 @@
         known = {};
         savers = [];
         list = null;
+        forgetBack();
         demoWipe();
         M.wipeKept();
       }
@@ -899,6 +1113,10 @@
       quizOf: function () {
         return Q;
       },
+      quizBack: function () {
+        return back;
+      },
+      quizDemoReturn: demoReturn,
     },
   });
 })();

@@ -440,6 +440,88 @@ var StudentQuizModel = (function () {
     };
   }
 
+  /* ── What comes back (quiz-result, slice Q5b) ────────────────
+     The `quiz-result` route's answer read key by key
+     (migrations/local-test/quizzes-contract.md, "MQ3, the returned view"). Only
+     `returned: true` with a `shows` this page knows is a result; anything else
+     (a missing route, `returned: false`, a reply of another shape) is null and
+     the screen shows what it did before. With `grade` no question is read even
+     if one was sent; a question's right answer and "why" line are read only
+     with `answers`. Nothing here is kept: s/quiz.js holds a result in memory
+     and lets it go at every way out. */
+  var SHOWS = { grade: 1, right: 1, answers: 1 };
+  var RESULTS = { right: 1, partly: 1, wrong: 1, waiting: 1 };
+  var WHY_MAX = 500;
+
+  /** The key's answer for a question, or undefined. @param {any} q @param {unknown} v */
+  function keyKept(q, v) {
+    if (q.kind === 'choice') {
+      if (!Array.isArray(v)) return undefined;
+      var ids = (q.choices || []).map(function (/** @type {any} */ c) {
+        return c.id;
+      });
+      var keep = v.filter(function (x, i) {
+        return typeof x === 'string' && ids.indexOf(x) >= 0 && v.indexOf(x) === i;
+      });
+      return keep.length ? keep : undefined;
+    }
+    if (q.kind === 'true_false') return typeof v === 'boolean' ? v : undefined;
+    if (q.kind === 'number') return typeof v === 'number' && isFinite(v) ? v : undefined;
+    return undefined;
+  }
+
+  /** @param {unknown} n */
+  function points(n) {
+    return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 1e9 ? n : null;
+  }
+
+  /**
+   * @param {any} res
+   * @returns {{ shows: string, total: { earned: number, possible: number } | null, questions: any[] } | null}
+   */
+  function resultFrom(res) {
+    if (!res || typeof res !== 'object' || res.ok !== true || res.returned !== true) return null;
+    var shows = typeof res.shows === 'string' && has(SHOWS, res.shows) ? res.shows : '';
+    if (!shows) return null;
+    /** @type {{ earned: number, possible: number } | null} */
+    var total = null;
+    if (res.total && typeof res.total === 'object') {
+      var earned = points(res.total.earned);
+      var possible = points(res.total.possible);
+      if (earned !== null && possible !== null) total = { earned: earned, possible: possible };
+    }
+    /** @type {any[]} */
+    var questions = [];
+    if (shows !== 'grade') {
+      if (!Array.isArray(res.questions)) return null;
+      for (var i = 0; i < res.questions.length; i++) {
+        var raw = res.questions[i];
+        var q = questionFrom(raw);
+        if (!q) return null;
+        var key = shows === 'answers' ? keyKept(q, raw.answer) : undefined;
+        questions.push({
+          id: q.id,
+          number: i + 1,
+          kind: q.kind,
+          prompt: q.prompt,
+          points: q.points,
+          multiple: q.multiple,
+          choices: q.choices,
+          yours: answerKept(q, raw.your_answer),
+          result: typeof raw.result === 'string' && has(RESULTS, raw.result) ? raw.result : null,
+          answer: key,
+          why: shows === 'answers' && typeof raw.why === 'string' ? raw.why.trim().slice(0, WHY_MAX) : '',
+        });
+      }
+    }
+    return { shows: shows, total: total, questions: questions };
+  }
+
+  /** A quiz total's number as words ("7", "7.5"): float noise removed, no trailing zero. @param {number} n */
+  function figure(n) {
+    return String(Number(n.toPrecision(10)));
+  }
+
   /* ── What is kept on this tab ────────────────────────────── */
 
   /** @param {string} enrollment @param {string} aid */
@@ -495,6 +577,8 @@ var StudentQuizModel = (function () {
   return {
     SESSION_OVER: SESSION_OVER,
     fromReply: fromReply,
+    resultFrom: resultFrom,
+    figure: figure,
     answerKept: answerKept,
     isAnswered: isAnswered,
     counts: counts,

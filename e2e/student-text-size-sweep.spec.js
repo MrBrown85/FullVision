@@ -50,6 +50,7 @@ const WIDE_AT = { 320: SIZES, 390: ['normal'] };
    risk the timeout on a slow runner. Every screen is in exactly one group. */
 const FIRST_BULLETINS = SCREENS.findIndex(s => s.bulletins);
 const FIRST_QUIZ = SCREENS.findIndex(s => s.quizzes);
+const FIRST_RETURNED = SCREENS.findIndex(s => s.returned);
 const GROUPS = [
   ['assignments', 0, 7],
   ['my learning and feedback', 7, 17],
@@ -58,7 +59,9 @@ const GROUPS = [
   // Bulletins (docs/plans/bulletins-plan.md B1d), behind its build switch: the last screens.
   ['bulletins', FIRST_BULLETINS, FIRST_QUIZ],
   // A quiz (docs/plans/quizzes-plan.md Q3b), behind the quizzes switch: the last screens.
-  ['quizzes', FIRST_QUIZ, SCREENS.length],
+  ['quizzes', FIRST_QUIZ, FIRST_RETURNED],
+  // A quiz that came back (Q5b), behind the same switch: the last screens.
+  ['quiz when it comes back', FIRST_RETURNED, SCREENS.length],
 ].map(([name, from, to]) => ({ name, screens: SCREENS.slice(from, to) }));
 
 async function useFont(page, font) {

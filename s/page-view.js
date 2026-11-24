@@ -452,6 +452,17 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* A returned quiz (Q5b; s/quiz.js sets `quizReturned` only once `quiz-result` has said it is back). The card and
+     Your Feedback each offer the quiz's own returned view, the board's "When It Comes Back". */
+  function seeQuizHtml(p) {
+    if (!p || !p.quizReturned) return '';
+    return (
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="quiz-open" data-piece="' +
+      esc(p.id) +
+      '">See Your Quiz</button>'
+    );
+  }
+
   // A grey row with a lock: what the student can't change and why (the Closed and Being Graded boards).
   function lockRowHtml(text, cls) {
     return '<p class="sp-lock-row ' + cls + '">' + pillIcon('lock', 18) + '<span>' + esc(text) + '</span></p>';
@@ -948,6 +959,7 @@ window.StudentPageView = (function () {
           esc(p.id) +
           '">Before and After</button>'
         : '') +
+      seeQuizHtml(p) +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn ' +
           // One primary button on a card: on Needs Revision it is Send My Revision.
@@ -1259,6 +1271,21 @@ window.StudentPageView = (function () {
     return '<p class="sp-fb-comment">' + esc(p.comment) + '</p>';
   }
 
+  /* The top of a returned quiz (s/quiz.js, teacher/preview-student.js): Your Result and the teacher's comment, as
+     Your Feedback draws them, so the quiz's own view says the grade in the class's words and cannot differ from it. */
+  function quizTopHtml(p) {
+    if (!p || !p.result || p.result.kind === 'none') return '';
+    // Inside `sp-view` and `sp-feedback`, where the page's stylesheet draws a result (the quiz's screen is not under either).
+    return (
+      '<div class="sp-view sp-quiz-topview"><section class="sp-feedback"><div class="sp-fb-top' +
+      (p.comment ? ' sp-fb-top-two' : '') +
+      '">' +
+      yourResultHtml(p) +
+      fbCommentHtml(p) +
+      '</div></section></div>'
+    );
+  }
+
   function feedbackHtml(view, ui, p) {
     var rubric = p.rubric;
     var style = rubric ? rubric.style : '';
@@ -1285,6 +1312,7 @@ window.StudentPageView = (function () {
       ) +
       reviseBlockHtml(p, 'fb') +
       seeWorkHtml(p) +
+      seeQuizHtml(p) +
       '<div class="sp-fb-top' +
       (p.comment ? ' sp-fb-top-two' : '') +
       '">' +
@@ -2844,6 +2872,7 @@ window.StudentPageView = (function () {
     pagesLine: pagesLine,
     canSeeWork: canSeeWork,
     planHtml: planHtml,
+    quizTopHtml: quizTopHtml,
     // A reminder linked to a piece carries that card's band (s/bulletins-view.js).
     bandHtml: bandHtml,
   };

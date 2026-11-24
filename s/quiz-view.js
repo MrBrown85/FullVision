@@ -20,7 +20,7 @@ var StudentQuizView = (function () {
 
   /**
    * @typedef {{ kind: string, at: number }} Status
-   * @typedef {{ mode: string, course?: string, title: string, due?: string, m?: any, answers?: Record<string, any>, status?: Status, message?: string, busy?: boolean, noRetry?: boolean, preview?: boolean, demo?: boolean }} Ctx
+   * @typedef {{ mode: string, course?: string, title: string, due?: string, m?: any, answers?: Record<string, any>, status?: Status, message?: string, busy?: boolean, noRetry?: boolean, preview?: boolean, demo?: boolean, back?: any, top?: string }} Ctx
    */
 
   var M = StudentQuizModel;
@@ -67,7 +67,9 @@ var StudentQuizView = (function () {
       '<header class="sp-quiz-head">' +
       '<button type="button" class="sp-quiz-back" data-act="quiz-back">' +
       BACK +
-      '<span>Assignments</span></button>' +
+      '<span>' +
+      (c.mode === 'returned' ? 'Back' : 'Assignments') +
+      '</span></button>' +
       (c.course || c.due
         ? '<p class="sp-quiz-class">' + esc([c.course, c.due].filter(Boolean).join(' · ')) + '</p>'
         : '') +
@@ -335,6 +337,94 @@ var StudentQuizView = (function () {
     );
   }
 
+  /* ── When it comes back (quiz-result, slice Q5b; the board's "When It Comes Back") ──
+     The result and the teacher's comment are the page's own Your Result
+     (s/page-view.js, drawn from calc.js's words), handed in as `top`: nothing here
+     works out or formats a grade. Under it, with Look Again, the student's own
+     numbering, each question marked with a word and a mark (never colour alone),
+     the right answer and the "why" line only where the quiz shows them. "Grade
+     Only" stops after the comment. */
+  var MARKS = {
+    right: { word: 'Right', mark: '✓', cls: 'y' },
+    partly: { word: 'Partly Right', mark: '½', cls: 'p' },
+    wrong: { word: 'Not Right', mark: '✗', cls: 'n' },
+    waiting: { word: 'Not Assessed Yet', mark: '…', cls: 't' },
+  };
+
+  /** The first question that is not right, or 0. @param {any[]} questions */
+  function firstMissed(questions) {
+    for (var i = 0; i < questions.length; i++) {
+      var r = questions[i].result;
+      if (r === 'wrong' || r === 'partly') return questions[i].number;
+    }
+    return 0;
+  }
+
+  /** @param {any} q */
+  function returnedAnswerHtml(q) {
+    var k = q.result ? MARKS[q.result] : null;
+    var said = M.describe(q, q.yours);
+    var lines = '';
+    var mineWords = q.kind === 'choice' || q.kind === 'true_false' ? 'You chose: ' : 'Your answer: ';
+    lines += said
+      ? '<p class="sp-quiz-ra-yours">' + esc(mineWords + said) + '</p>'
+      : '<p class="sp-quiz-ra-yours">' + esc('You didn’t answer this question.') + '</p>';
+    if (q.result !== 'right') {
+      var right = q.answer === undefined ? '' : M.describe(q, q.answer);
+      if (right) lines += '<p class="sp-quiz-ra-key">' + esc('Right answer: ' + right) + '</p>';
+      if (q.why) lines += '<p class="sp-quiz-ra-why">' + esc(q.why) + '</p>';
+    }
+    return (
+      '<li class="sp-quiz-ra' +
+      (k ? ' sp-quiz-ra-is-' + k.cls : '') +
+      '" data-pos="' +
+      q.number +
+      '" tabindex="-1"><span class="sp-quiz-mk' +
+      (k ? ' sp-quiz-mk-' + k.cls : ' sp-quiz-mk-none') +
+      '" aria-hidden="true">' +
+      (k ? k.mark : '') +
+      '</span><div class="sp-quiz-ra-body"><p class="sp-quiz-ra-q"><span class="sp-quiz-ra-n">Question ' +
+      q.number +
+      (k ? ' · ' + esc(k.word) : '') +
+      '</span> ' +
+      esc(q.prompt) +
+      '</p>' +
+      lines +
+      '</div></li>'
+    );
+  }
+
+  /** @param {Ctx} c */
+  function returnedHtml(c) {
+    var b = c.back;
+    var missed = b.shows === 'grade' ? 0 : firstMissed(b.questions);
+    return (
+      headHtml(c) +
+      '<div class="sp-quiz-body sp-quiz-returned">' +
+      (c.top ? '<div class="sp-quiz-top">' + c.top + '</div>' : '') +
+      (b.total
+        ? '<section class="sp-quiz-card sp-quiz-totalcard"><h2 class="sp-quiz-h2" id="sp-quiz-total-h">Your Total</h2><p class="sp-quiz-total">' +
+          esc(M.figure(b.total.earned) + ' of ' + M.figure(b.total.possible)) +
+          '</p></section>'
+        : '') +
+      (b.shows === 'grade'
+        ? '<p class="sp-quiz-line sp-quiz-gradeonly">Your teacher shows your result and comment for this quiz.</p>'
+        : (missed
+            ? '<button type="button" class="sp-quiz-link sp-quiz-look" data-act="quiz-look" data-pos="' +
+              missed +
+              '">Look Again at Question ' +
+              missed +
+              '</button>'
+            : '') +
+          (b.questions.length
+            ? '<section class="sp-quiz-card sp-quiz-mine"><h2 class="sp-quiz-h2" id="sp-quiz-returned">Your Answers</h2><ol class="sp-quiz-answers sp-quiz-ras">' +
+              b.questions.map(returnedAnswerHtml).join('') +
+              '</ol></section>'
+            : '')) +
+      '</div>'
+    );
+  }
+
   /** @param {Ctx} c @param {string} title @param {string} line @param {boolean} again */
   function plainHtml(c, title, line, again) {
     return (
@@ -354,7 +444,8 @@ var StudentQuizView = (function () {
   /** The screen: the quiz's own root, everything inside it. @param {Ctx} c */
   function html(c) {
     var inner;
-    if (c.mode === 'loading') inner = plainHtml(c, c.title, 'Opening your quiz…', false);
+    if (c.mode === 'returned' && c.back) inner = returnedHtml(c);
+    else if (c.mode === 'loading') inner = plainHtml(c, c.title, 'Opening your quiz…', false);
     else if (c.mode === 'failed') {
       inner = plainHtml(
         c,
