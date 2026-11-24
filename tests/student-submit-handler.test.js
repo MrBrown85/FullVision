@@ -161,6 +161,23 @@ describe('student-submit handler', () => {
     }
   });
 
+  it('refuses every route without the address key, before touching the database', async () => {
+    for (const ipKey of [null, '']) {
+      const { handle, calls, logs } = setup({ ipKey });
+      for (const body of [
+        { route: 'open', code: 'K7M-4QX' },
+        { route: 'submit', token: 'a'.repeat(64), answers: { q: 'x' } },
+        { route: 'card', code: 'K7M4QX2P' },
+      ]) {
+        const res = await handle(post(body));
+        expect(res.status).toBe(500);
+        expect(await res.json()).toEqual({ ok: false, error: 'server' });
+      }
+      expect(calls).toEqual([]);
+      expect(logs.every(l => l.outcome === 'no_ip_key')).toBe(true);
+    }
+  });
+
   it('refuses bad requests without calling the database', async () => {
     const { handle, calls } = setup();
     const bad = [

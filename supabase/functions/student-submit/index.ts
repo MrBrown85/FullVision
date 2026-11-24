@@ -48,6 +48,14 @@ const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 // server error, and its log line says so). Never logged.
 const photoSweepSecret = sweepSecret(Deno.env.get('PHOTO_SWEEP_SECRET'));
 
+// The address key: a secret only this function holds, never the database's
+// address or anything else someone holding the database could know, so the
+// 30-day log's address hashes cannot be turned back into addresses. No
+// fallback: without it every route answers a server error. Rotating it just
+// resets the rate limit windows. A request that finds it missing logs
+// no_ip_key, never the key.
+const ipKey = Deno.env.get('STUDENT_SUBMIT_IP_KEY') || null;
+
 const edge = (globalThis as { EdgeRuntime?: { waitUntil?: (work: Promise<unknown>) => void } }).EdgeRuntime;
 const waitUntil = edge && typeof edge.waitUntil === 'function' ? edge.waitUntil.bind(edge) : null;
 
@@ -58,9 +66,7 @@ const handle = makeHandler({
   whoIs: supabaseUrl && anonKey ? authUser(fetch, supabaseUrl, anonKey) : null,
   defer: waitUntil ? (work: Promise<void>) => waitUntil(work) : null,
   sweepSecret: photoSweepSecret,
-  // A secret only this function holds; rotating it just resets the rate
-  // limit windows.
-  ipKey: Deno.env.get('STUDENT_SUBMIT_IP_KEY') || Deno.env.get('SUPABASE_DB_URL')!,
+  ipKey,
   db: {
     // A slip's open and verify as the database had them before 2026111160. slip-routes.ts sends them only
     // while that migration is not applied; after it, open and verify go through call.
