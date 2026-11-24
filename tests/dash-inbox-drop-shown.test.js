@@ -156,8 +156,14 @@ describe('the piece shown is the piece used', () => {
 
   it('with rows showing, a drop goes to the piece the cover named, and to no other once it has gone', () => {
     closesToday(5);
-    // Cell Microscope Lab is the newest piece taking work.
+    // Cell Microscope Lab is the newest piece taking work. The demo dates
+    // Light Refraction Lab from the real clock (seeded before the fake one),
+    // so pin it a week back, or on some days it ties Cell and comes first.
     getAssessments(CID).find(a => a.id === CELL).date = '2026-11-18';
+    Object.assign(
+      getAssessments(CID).find(a => a.id === LIGHT),
+      { date: '2026-11-11', dateAssigned: '2026-11-11' },
+    );
     const doc = mountTile();
     expect(doc.querySelector('.dash-inbox-row')).not.toBeNull();
     const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
