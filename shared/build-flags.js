@@ -9,10 +9,13 @@
    asks for any of them any more. The names stay so a browser that still has
    'fv-build-dashRow', 'fv-build-bulletins' or 'fv-build-quizzes' set, to '1'
    or '0', changes nothing: a default that is on wins over what the device
-   has. */
+   has.
+
+   inboxStacks (the Inbox redrawn, docs/plans/inbox-redesign-plan.md) is off
+   until its last slice. */
 (function () {
   /** @type {Record<string, boolean>} */
-  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true };
+  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: false };
 
   /** @param {string} name */
   function on(name) {
