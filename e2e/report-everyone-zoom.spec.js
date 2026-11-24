@@ -109,6 +109,12 @@ test('50% shows fewer students a row, whole blocks, a sheet’s sides side by si
   const order = (await blocks(page)).map(b => b.sid);
   const whole = perRow(await blocks(page));
   await pick(page, '50%');
+  // Once, on a GitHub runner, the sheets were read at the Fit Map's 13% with
+  // 50% chosen (not seen in 16 runs on a Mac under load). Wait for the scale
+  // the teacher ends up seeing; a zoom that stays at 13% still fails here.
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.querySelector('#rb-preview .report-sheet')).transform))
+    .toBe('matrix(0.5, 0, 0, 0.5, 0, 0)');
   const list = await blocks(page);
   expect(perRow(list)).toBeLessThan(whole);
   expect(list.map(b => b.sid)).toEqual(order);
