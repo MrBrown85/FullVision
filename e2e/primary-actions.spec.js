@@ -48,7 +48,8 @@ test.describe('One primary action per screen', () => {
       name: 'Assignments',
       route: '/assignments',
       ready: '[data-action="showNewForm"]',
-      primary: ['+ New Assessment'],
+      // The sample class's Draft quiz has its own Assign, the primary action of a Draft's card.
+      primary: ['+ New Assessment', 'Assign'],
     },
     { name: 'Observations', route: '/observations', ready: '.obsc-add', primary: ['Add'] },
     { name: 'Gradebook', route: '/gradebook', ready: '.tb-action-btn', primary: ['+ New Assessment'] },

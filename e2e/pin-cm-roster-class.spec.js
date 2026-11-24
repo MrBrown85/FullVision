@@ -294,6 +294,8 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
       'photos',
       // "Bulletins are not in this file." (B1g)
       'bulletins',
+      // "Quizzes are not in this file." (Q6)
+      'quizzes',
       'courseInfo',
       'students',
       'categories',

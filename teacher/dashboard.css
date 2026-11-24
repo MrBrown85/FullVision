@@ -8417,6 +8417,134 @@ button.rb-v-prompt {
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+/* The Reflect builder's cards, laid out as One Report's rows read
+   (Colin, Nov 24: "the question and option boxes are weirdly spaced …
+   the little draggable dots … are half on the white space"):
+   - a gutter inside the card's left edge holds its ⠿ and the + between
+     cards, so neither sits half off the card;
+   - the open card's words are lines, not boxes: the question, its
+     subtitle and each option underline, and an option's ✕ shows on the
+     row pointed at, so every line ends at the same right edge;
+   - the question's words and the options' marks share one left edge,
+     with even gaps between the parts.
+   Scoped to .rb-build: the Quizzes card draws from the same pieces and
+   keeps its own look. */
+.rb-build .rb-q {
+  padding: 14px 18px 14px 40px;
+}
+.rb-build .rb-q-grip {
+  left: 8px;
+  top: 12px;
+}
+.rb-build .rb-q-on > .rb-q-grip {
+  top: 19px;
+}
+.rb-build .rb-ins-plus {
+  left: 10px;
+}
+.rb-build .rb-ins-acts {
+  left: 38px;
+}
+.rb-build .rb-ins.open::before {
+  left: 0;
+}
+.rb-build .rb-q-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rb-build .rb-q-edit input.cm-input {
+  border: 0;
+  border-bottom: 1px solid var(--divider-medium);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 0;
+  box-shadow: none;
+}
+.rb-build .rb-q-edit input.cm-input:hover {
+  border-bottom-color: var(--border-2);
+}
+/* Focused, a line thickens and turns blue; the app's glow around inputs
+   (styles.css, input:focus) would draw a box round a line. */
+.rb-build .rb-q-edit input.cm-input:focus,
+.rb-build .rb-q-edit input.cm-input:focus-visible {
+  border-bottom: 2px solid var(--active);
+  padding-bottom: 5px;
+  outline: none;
+}
+.rb-build .rb-q-edit input.cm-input:focus,
+.rb-build .rb-name:focus,
+.rb-build .rb-desc:focus {
+  box-shadow: none !important;
+}
+.rb-build .rb-q-edit .rb-prompt {
+  font-size: var(--text-lg);
+}
+.rb-build .rb-q-edit .rb-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin-top: -6px;
+}
+.rb-build .rb-opts {
+  gap: 2px;
+}
+.rb-build .rb-opt {
+  position: relative;
+  gap: 10px;
+}
+.rb-build .rb-opt input.cm-input {
+  padding-right: 34px;
+  border-bottom-color: var(--divider-subtle);
+}
+.rb-build .rb-opt .rb-x {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.rb-build .rb-opt:hover .rb-x,
+.rb-build .rb-opt:focus-within .rb-x,
+.rb-build .rb-opt .rb-x:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .rb-build .rb-opt .rb-x {
+    opacity: 1;
+  }
+}
+.rb-build .rb-other {
+  border: 0;
+  border-bottom: 1px dashed var(--divider-medium);
+  border-radius: 0;
+  padding: 7px 0;
+}
+.rb-build .rb-adds {
+  margin-top: -4px;
+}
+/* A Ranking's items are numbered while they are edited: a ⠿ beside each
+   would read as a second handle on a card that has one. */
+.rb-build .rb-q-edit .rb-opts {
+  counter-reset: rb-item;
+}
+.rb-build .rb-q-edit .rb-opt .rb-grip {
+  display: none;
+}
+.rb-build .rb-q-edit .rb-opt:has(.rb-grip)::before {
+  counter-increment: rb-item;
+  content: counter(rb-item) '.';
+  width: 16px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: right;
+}
+/* An answer box drawn on the open card is what students will see, not a
+   box to type in: dashed. */
+.rb-build .rb-q-edit .rb-v-box {
+  border-style: dashed;
+}
 @media (max-width: 640px) {
   .rb-footer {
     flex-direction: column;

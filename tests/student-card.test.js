@@ -256,6 +256,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     expect(all.filter(r => r.where === 'assignments').map(r => r.title)).toEqual([
       'Immune System Quick Check',
       'Disease Research Poster',
+      'Data Patterns Quick Check',
       'Science Fair Proposal',
     ]);
     expect((await row(page, 'Energy Transfer Investigation')).sub).toMatch(/^Returned \S+ \d+$/);
@@ -358,6 +359,7 @@ describe('student card: the demo walk', () => {
     expect((await rows(page)).map(r => r.title)).toEqual([
       'Immune System Quick Check',
       'Disease Research Poster',
+      'Data Patterns Quick Check',
       'Science Fair Proposal',
       'Immune System Quick Check',
       'Energy Transfer Investigation',

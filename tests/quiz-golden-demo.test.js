@@ -22,7 +22,7 @@ describe('golden grades with the sample quizzes answered', () => {
     BuildFlags.on = name => name === 'quizzes' || realOn(name);
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(FROZEN_AT));
-    cid = loadDemoClass();
+    cid = loadDemoClass({ quizzes: true });
   });
   afterAll(() => {
     vi.useRealTimers();

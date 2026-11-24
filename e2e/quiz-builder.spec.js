@@ -4,8 +4,7 @@ import { demoStudentPageOff } from './demo-student-page-off.js';
 /* The Quiz card on the assessment form (docs/plans/quizzes-plan.md, slice
    Q2b; board "Quizzes Artboard", Board 1), in Demo Mode with the quizzes
    switch on: a teacher builds the board's quiz with the keyboard alone and
-   it is kept, key and all, apart from anything students are sent. With the
-   switch off the form is today's. */
+   it is kept, key and all, apart from anything students are sent. */
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -392,22 +391,6 @@ test('the sample quiz opens on its Draft piece, with the board’s ten questions
   expect(cx >= ok.x && cx <= ok.x + ok.width && cy >= ok.y && cy <= ok.y + ok.height).toBe(false);
   await page.locator('#confirm-cancel-btn').click();
   await expect(page.locator('.quiz-row')).toHaveCount(9);
-});
-
-test('with the quizzes switch off the form is today’s: no fourth answer, no Quiz card, no quiz key', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await demo(page, false);
-  await page.evaluate(() => setCourseSendWork('sci8', { send_work: true }));
-  await page.goto('/assignments?course=sci8');
-  await page.locator('[data-action="showNewForm"]').first().click();
-  await expect(page.locator('#af-title')).toBeVisible();
-  await expect(page.locator('[data-field="students_send"]')).toHaveText(['No', 'Yes, Photos', 'Yes, Photos or PDFs']);
-  await expect(page.locator('#quiz-mount')).toHaveCount(0);
-  await expect(page.locator('[data-aid="sci8-quiz-data-patterns"]')).toHaveCount(0);
-  const keys = await page.evaluate(() => Object.keys(localStorage).filter(k => /quiz/.test(k)));
-  expect(keys).toEqual([]);
 });
 
 /* Nothing in the card runs out of its box, in the page's font and in a wider

@@ -11543,6 +11543,8 @@ button.grader-member-name {
 }
 .alv-title-col .draft-badge + .alv-title {
   width: calc(100% - 60px);
+  /* The badge takes its own room beside the title, so the column need not be wider for it. */
+  min-width: 150px;
 }
 .alv-assign {
   padding: 4px 14px;

@@ -7,8 +7,7 @@ import { test, expect } from '@playwright/test';
    steps and is marked Changed; a short answer is assessed down one column;
    Best of 2 Tries shows which try counts and both; Confirm asks in the plan's
    words, writes the levels, and Undo puts back exactly what was there;
-   Reopen for One Student asks first. Hidden at rest means hidden. With the
-   switch off the card has no line. */
+   Reopen for One Student asks first. Hidden at rest means hidden. */
 
 test.use({ serviceWorkers: 'block', colorScheme: process.env.QUIZ_SCHEME === 'dark' ? 'dark' : 'light' });
 
@@ -230,15 +229,6 @@ test('Reopen for One Student asks first', async ({ page }) => {
   await page.locator('#confirm-ok-btn').click();
   await expect(tyler.locator('[data-quiz-act="reopen"]')).toHaveCount(0);
   await expect(tyler).toContainText('Reopened');
-});
-
-test('with the quizzes switch off the card has no line and nothing quiz is kept', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await demo(page, false);
-  await expect(page.locator('[data-action="openQuizResults"]')).toHaveCount(0);
-  await expect(page.locator('#ac-' + AID)).toHaveCount(0);
-  const keys = await page.evaluate(() => Object.keys(localStorage).filter(k => /quiz/.test(k)));
-  expect(keys).toEqual([]);
 });
 
 /* Nothing runs out of its box, in the page's font and a wider stand-in, at 1280 and 769. */

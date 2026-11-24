@@ -4921,7 +4921,8 @@ function seedDemoQuiz() {
       categoryId: 'sci8-cat-checks',
       category_id: 'sci8-cat-checks',
       isDraft: true,
-      created: new Date().toISOString(),
+      // Older than every other sample piece: a new assessment's form starts on the scoring of the class's newest one (_lastScoreMode).
+      created: new Date('2025-10-01').toISOString(),
     });
     saveAssessments('sci8', pieces);
   }
@@ -5025,7 +5026,7 @@ function seedDemoQuizResults() {
       categoryId: 'sci8-cat-checks',
       category_id: 'sci8-cat-checks',
       isDraft: false,
-      created: new Date().toISOString(),
+      created: new Date('2025-10-01').toISOString(),
     });
     saveAssessments('sci8', pieces);
   }

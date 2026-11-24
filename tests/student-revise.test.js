@@ -122,7 +122,7 @@ describe('Needs Revision (the board "Student: Needs Revision")', () => {
     const page = await demo();
     const by = revs(page)['demo-lab'].revise_by;
     // The lab, the Missing quick check and the poster past its due date.
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 4');
     expect(StudentPageView.segmentOf(piece(page, 'demo-lab'), viewOf(page))).toBe('outstanding');
     const card = cardOf(page, 'demo-lab');
     expect(card).not.toBeNull();
@@ -145,6 +145,7 @@ describe('Needs Revision (the board "Student: Needs Revision")', () => {
       'demo-lab',
       'demo-quick',
       'demo-poster',
+      'demo-quiz-check',
     ]);
     // Never the teacher's name.
     expect(page.root().innerHTML).not.toMatch(/Rivera/);
@@ -200,7 +201,7 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     // Nothing went into the ordinary sends.
     expect(page.T.state().demoSent).toEqual({});
     await page.click('[data-act="send-done"]');
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 2');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
     expect(cardOf(page, 'demo-lab')).toBeNull();
     await page.click('[data-tab="learning"]');
     const row = q(page, '.sp-ml-row[data-piece="demo-lab"]');
@@ -229,7 +230,7 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
     expect(piece(page, 'demo-lab').kind).toBe('revise');
     // Back to its card, first in Outstanding.
     expect(page.T.state()).toMatchObject({ tab: 'assignments', segment: 'outstanding', card: '' });
-    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 3');
+    expect(text(page, '[data-segment="outstanding"]')).toBe('Outstanding 4');
     expect(q(page, '.sp-deck .sp-piece').getAttribute('data-piece')).toBe('demo-lab');
     expect(cardOf(page, 'demo-lab').querySelector('[data-act="revise-open"]')).not.toBeNull();
     expect(page.calls).toEqual([]);

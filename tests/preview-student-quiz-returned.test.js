@@ -298,12 +298,8 @@ describe('Preview as Student, a returned quiz', () => {
     expect(words(seeQuiz())).toBe('See Your Quiz');
   });
 
-  it('is not there with the switch off, or for a class with no quiz', () => {
+  it('is not there for a class with no quiz', () => {
     teacher();
-    localStorage.removeItem('fv-build-quizzes');
-    openFeedback();
-    expect(seeQuiz()).toBeNull();
-    PreviewStudent.close();
     seed();
     globalThis.getQuiz = () => null;
     openFeedback();

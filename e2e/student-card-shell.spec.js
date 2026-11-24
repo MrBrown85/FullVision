@@ -18,7 +18,7 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
   await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
-  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
   return posts;
 }
 
@@ -42,12 +42,13 @@ for (const size of [
       if (size.tag === 'phone') expect(box.y + box.height).toBeGreaterThan(vh - 4);
       else expect(box.y).toBeLessThan(60);
 
-      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
-      await expect(page.getByRole('button', { name: 'Outstanding 2' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 3', 'Upcoming 1']);
+      await expect(page.getByRole('button', { name: 'Outstanding 3' })).toHaveAttribute('aria-pressed', 'true');
       // The oldest due date first; work past its day, not Missing, is Not Assessed Yet (Colin, 2026-11-17).
       await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText([
         'Immune System Quick Check',
         'Disease Research Poster',
+        'Data Patterns Quick Check',
       ]);
       await expect(
         page.locator('.sp-piece', { hasText: 'Disease Research Poster' }).locator('.sp-band .sp-flag-waiting'),
@@ -150,7 +151,7 @@ for (const size of [
       await fits(page);
       await named(page);
       await nav.getByRole('button', { name: 'Assignments' }).click();
-      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 2', 'Upcoming 1']);
+      await expect(page.locator('.sp-segment')).toHaveText(['Outstanding 3', 'Upcoming 1']);
       await fits(page);
       expect(posts).toEqual([]);
     });

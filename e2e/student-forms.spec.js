@@ -25,7 +25,7 @@ async function demo(page) {
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
   // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
   await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
-  await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
   return posts;
 }
 

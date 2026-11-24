@@ -272,11 +272,13 @@ test("one student's Export CSV row matches the Scores view", async ({ page }) =>
   // A Complete mark shows as ✓ and is spelled out in the file, as the
   // cell's label spells it.
   const columns = await page.evaluate(() =>
-    getAssessments('sci8').map(a => ({
-      aid: a.id,
-      head: a.title + ' (' + (a.date || '') + ')',
-      mark: isCompletionScored(a),
-    })),
+    getAssessments('sci8')
+      .filter(a => !a.isDraft)
+      .map(a => ({
+        aid: a.id,
+        head: a.title + ' (' + (a.date || '') + ')',
+        mark: isCompletionScored(a),
+      })),
   );
   let compared = 0;
   for (const { aid, head, mark } of columns) {

@@ -149,17 +149,6 @@ test('Grade Only shows no questions at all, and stops after the teacher’s comm
   expect(await page.locator('.sp-quiz').innerHTML()).not.toMatch(/sp-quiz-ra|Prompt|plants need/i);
 });
 
-test('with the switch off the page has no quiz and asks for none', async ({ page }) => {
-  const posts = [];
-  page.on('request', req => {
-    if (/functions\/v1\//.test(req.url())) posts.push(req.url());
-  });
-  await openDemo(page, {}, 'demo-card');
-  await expect(page.locator('[data-act="quiz-open"]')).toHaveCount(0);
-  expect(await page.evaluate(() => StudentPage._test.quizDemoReturn({}))).toBe(false);
-  expect(posts).toEqual([]);
-});
-
 test('nothing of the result stays on the device after Log Out', async ({ page }) => {
   await demo(page);
   await takenAndReturned(page, { shows: 'answers' });

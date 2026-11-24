@@ -82,6 +82,7 @@ test.describe('Gradebook column headers', () => {
       });
     const dates = await page.evaluate(() =>
       getAssessments('sci8')
+        .filter(a => !a.isDraft)
         .map(a => a.date || '')
         .sort(),
     );

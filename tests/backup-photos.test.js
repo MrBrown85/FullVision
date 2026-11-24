@@ -99,6 +99,27 @@ describe('Download Class Backup and photos of student work', () => {
     expect(backup.bulletins).toBe('Bulletins are not in this file.');
   });
 
+  it('says in every file that quizzes are not in it, and puts none of them in (Q6)', () => {
+    window.isDemoMode = () => true;
+    localStorage.setItem(
+      'gb-quizzes-' + CID,
+      JSON.stringify({ quizzes: { a1: { quiz: { tries: 1 }, questions: [{ id: 'q-zz1', prompt: 'ZZQUIZ words' }] } } }),
+    );
+    localStorage.setItem(
+      'gb-quiz-keys-' + CID,
+      JSON.stringify({ 'q-zz1': { answer: ['zz-key-answer'], why: 'ZZWHY' } }),
+    );
+    localStorage.setItem(
+      'gb-quiz-tries-' + CID,
+      JSON.stringify({ a1: { s1: { tries: [{ attempt_id: 'zz-try-1' }] } } }),
+    );
+    expect(FVBackupRestore.QUIZZES_NOTE).toBe('Quizzes are not in this file.');
+    expect(download().quizzes).toBe('Quizzes are not in this file.');
+    ['ZZQUIZ', 'q-zz1', 'zz-key-answer', 'ZZWHY', 'zz-try-1'].forEach(v => expect(written).not.toContain(v));
+    const backup = FVBackupRestore.parseBackup(JSON.stringify(Object.assign({ learningMap: {} }, download())));
+    expect(backup.quizzes).toBe('Quizzes are not in this file.');
+  });
+
   it('puts nothing of the work sent in the file', () => {
     window.isDemoMode = () => true;
     saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { student_page_enabled: true }));
@@ -155,17 +176,18 @@ describe('Restore Class from Backup and photos of student work', () => {
     const src = readFileSync('teacher/dash-class-manager.js', 'utf-8');
     const at = src.indexOf('scores and reports. ');
     expect(at).toBeGreaterThan(0);
-    expect(src.slice(at, at + 600)).toMatch(
+    expect(src.slice(at, at + 900)).toMatch(
       /FVBackupRestore\.anyClassTakesWork\(\)\s*\?\s*esc\(FVBackupRestore\.PHOTOS_NOT_IN_BACKUP\) \+ ' '\s*:\s*''\)\s*\+\s*'Your other classes are not changed\./,
     );
   });
 
-  it('says Bulletins are not in a backup, every time, before the photos line', () => {
+  it('says Bulletins and Quizzes are not in a backup, every time, before the photos line', () => {
     expect(FVBackupRestore.BULLETINS_NOT_IN_BACKUP).toBe('Bulletins are not in a backup.');
+    expect(FVBackupRestore.QUIZZES_NOT_IN_BACKUP).toBe('Quizzes are not in a backup.');
     const src = readFileSync('teacher/dash-class-manager.js', 'utf-8');
     const at = src.indexOf('scores and reports. ');
     expect(src.slice(at, at + 600)).toMatch(
-      /scores and reports\. ' \+\s*\/\/[^\n]*\n\s*\(typeof FVBackupRestore !== 'undefined' \? esc\(FVBackupRestore\.BULLETINS_NOT_IN_BACKUP\) \+ ' ' : ''\) \+\s*\/\/[^\n]*\n\s*\(typeof FVBackupRestore !== 'undefined' && FVBackupRestore\.anyClassTakesWork\(\)/,
+      /scores and reports\. ' \+\s*\(typeof FVBackupRestore !== 'undefined' \? esc\(FVBackupRestore\.BULLETINS_NOT_IN_BACKUP\) \+ ' ' : ''\) \+\s*\(typeof FVBackupRestore !== 'undefined' \? esc\(FVBackupRestore\.QUIZZES_NOT_IN_BACKUP\) \+ ' ' : ''\) \+\s*\/\/[^\n]*\n\s*\(typeof FVBackupRestore !== 'undefined' && FVBackupRestore\.anyClassTakesWork\(\)/,
     );
   });
 
