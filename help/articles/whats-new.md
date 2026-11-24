@@ -7,6 +7,8 @@ keywords:
   - Class Management
 checked: 2026-11-24
 labels:
+  - Print
+  - Save to Phone
   - They Answer a Quiz
   - Bulletins
   - Let Students React
@@ -58,6 +60,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 24, 2026: Print or Keep a Handout
+
+A student who opens a PDF handout on their page can now press **Print** to print every page, or **Save to Phone** to keep the whole handout as one PDF file. On an iPhone, Save to Phone opens the share sheet, which has Print, Save to Files and Google Drive. Both work in Preview as Student too. Nothing is sent anywhere.
 
 ## Nov 24, 2026: Quizzes
 

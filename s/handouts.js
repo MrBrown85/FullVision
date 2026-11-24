@@ -215,9 +215,21 @@
     if (!k || !showing(id, student)) return;
     var state = stateOf(k);
     var had = S.handoutPages;
-    S.handoutPages = { id: id, state: state, pages: k.pages.slice(), asked: asked };
+    S.handoutPages = {
+      id: id,
+      state: state,
+      pages: k.pages.slice(),
+      asked: asked,
+      missed: Object.keys(k.missed).length,
+      out: k.out,
+    };
     // Drawn again only when what shows changes, so the keyboard stays where it is.
-    if (!had || had.id !== id || had.state !== state || state === 'ready') StudentPage.paint('#sp-handout-title');
+    if (!had || had.id !== id || had.state !== state || state === 'ready') {
+      // Over the Save or Print sheet the keyboard stays in it, on the row that was chosen.
+      var focus = '#sp-handout-title';
+      if (S.handoutMenu) focus = k.out ? '.sp-handout-sheet [data-act="handout-' + k.out.how + '"]' : '';
+      StudentPage.paint(focus);
+    }
   }
 
   // What is kept of handout `id` for this student, started if need be.
@@ -236,6 +248,7 @@
       count: 0,
       failed: false,
       failedAt: 0,
+      out: null, // Print or Save to Phone: { state: 'working' | 'failed' }
     };
     if (S && S.demo) {
       var demoPages = DEMO_PAGES[id] || [];
@@ -293,7 +306,7 @@
     var u = blob ? objectUrl(new Blob([blob], { type: 'image/jpeg' })) : '';
     if (u) {
       for (var n = k.pages.length; n <= i; n++) k.pages.push({ url: '' });
-      k.pages[i] = { url: u };
+      k.pages[i] = { url: u, blob: blob };
       delete k.missed[i];
     } else {
       k.missed[i] = true;
@@ -364,12 +377,59 @@
     },
   };
 
+  /* Print or Save to Phone (shared/handout-out.js): every page first,
+     asking again for any that did not come. Nothing goes out if one is
+     missing; the pane says so. `how`: 'print' or 'save'. */
+  function output(how, id, piece) {
+    var student = S && S.page ? S.page.student.id : '';
+    var k = kept[id];
+    if (!k || k.student !== student || (k.out && k.out.state === 'working') || typeof HandoutOut === 'undefined')
+      return;
+    var heading = typeof document !== 'undefined' ? document.getElementById('sp-handout-title') : null;
+    var title = heading ? heading.textContent || '' : '';
+    k.out = { state: 'working', how: how === 'print' ? 'print' : 'save' };
+    show(id, student);
+    var all = [];
+    for (var i = 0; i < k.count; i++) all.push(pageOf(k, id, i));
+    Promise.all(all)
+      .then(function () {
+        if (kept[id] !== k) return null;
+        var pages = k.pages.slice(0, k.count);
+        if (
+          !pages.length ||
+          pages.length < k.count ||
+          !pages.every(function (pg) {
+            return pg && pg.url;
+          })
+        )
+          throw new Error('pages');
+        return pages;
+      })
+      .then(function (pages) {
+        if (!pages) return;
+        // Every page is here: the sheet closes and the print sheet or share sheet opens.
+        k.out = null;
+        S.handoutMenu = false;
+        show(id, student);
+        StudentPage.paint('.sp-handout-outbtn');
+        return how === 'print' ? HandoutOut.print(pages) : HandoutOut.save(pages, title);
+      })
+      .then(null, function () {
+        if (kept[id] !== k) return;
+        k.out = { state: 'failed', how: how === 'print' ? 'print' : 'save' };
+        // The sheet is open again, to say so in the row.
+        S.handoutMenu = true;
+        show(id, student);
+      });
+  }
+
   function load(id, piece) {
     if (!S || !S.page || !id) return;
     asked += 1;
     var student = S.page.student.id;
     // Try Again starts over.
     if (kept[id] && stateOf(kept[id]) === 'failed') delete kept[id];
+    S.handoutMenu = false;
     S.handoutPages = { id: id, state: 'loading', pages: [], asked: asked };
     fetchHandout(id, piece, student, true);
     if (S.handoutPages && S.handoutPages.state === 'loading') StudentPage.paint('#sp-handout-title');
@@ -406,6 +466,7 @@
   function onClick(act, el) {
     if (!S) return;
     if (act === 'card-done' || act === 'class-open' || act === 'card-add') {
+      S.handoutMenu = false;
       S.handout = '';
       S.handoutPiece = '';
       S.handoutPages = null;
@@ -413,6 +474,25 @@
       return;
     }
     if (act === 'handout-file') return openFile(el);
+    if (act === 'handout-out-open' && S.handout) {
+      var open = kept[S.handout];
+      if (open && open.out && open.out.state === 'failed') open.out = null;
+      S.handoutMenu = true;
+      show(S.handout, S.page.student.id);
+      // The sheet slides up on the drawing that opens it (page-view.js).
+      if (typeof StudentPageView !== 'undefined' && typeof document !== 'undefined') StudentPageView.slideIn(document);
+      var title = typeof document !== 'undefined' ? document.getElementById('sp-out-title') : null;
+      if (title && title.focus) title.focus();
+      return;
+    }
+    if (act === 'handout-out-close') {
+      S.handoutMenu = false;
+      StudentPage.paint('.sp-handout-outbtn');
+      return;
+    }
+    if ((act === 'handout-print' || act === 'handout-save') && S.handout) {
+      return output(act === 'handout-print' ? 'print' : 'save', S.handout, S.handoutPiece);
+    }
     // app.js has opened the handout (StudentPageView.press); its pages come from what is kept, or are fetched.
     if (act === 'handout' && S.handout) return load(S.handout, S.handoutPiece);
     if (act === 'handout-retry' && S.handout && S.handout === ((el && el.getAttribute('data-resource')) || '')) {

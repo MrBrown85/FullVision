@@ -14,6 +14,7 @@ keywords:
   - confirm
   - tries
 labels:
+  - + New Quiz
   - Student Work
   - They Answer a Quiz
   - Add Question
@@ -91,7 +92,7 @@ A quiz needs the class's Student Page to be on in Class Settings.
 
 ## Write the Questions
 
-1. On the assessment form, find the **Student Work** card and choose **They Answer a Quiz**. The Quiz card opens under it.
+1. On the Assignments page, choose **+ New Quiz**. The assessment form opens with the Quiz card open and the title set to Quiz. This is the same as choosing **They Answer a Quiz** on the **Student Work** card of any assessment. **+ New Quiz** shows once the class's Student Page is on.
 2. Choose **Add Question**. Choose the kind: **Choice**, **True or False**, **Number** or **Text**. Type the question.
 3. Set the **Right Answer**. For a choice question, press the button beside each right choice; turn on **Multiple Answers** when several are right, and a student then gets the points only by choosing every right answer and no other. For a number, **Within** is how far off an answer may be and still be right. A **Text** question has no right answer: the teacher assesses each one.
 4. Add a reason in **Why the Right Answer Is Right** if students are to read it once the quiz comes back.

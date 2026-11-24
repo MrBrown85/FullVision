@@ -594,6 +594,7 @@ window.PageAssignments = (function () {
       (AssessmentCopy.copyTargets(cid).sameCourse.length || AssessmentCopy.copyTargets(cid).other.length)
         ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add From Another Class</button>'
         : '') +
+      _newQuizBtn(cid) +
       '<button class="tb-action-btn" data-action="showNewForm">+ New Assessment</button>' +
       '</div>' +
       '</div>';
@@ -1897,7 +1898,10 @@ window.PageAssignments = (function () {
         '<div class="empty-state assess-list-empty">' +
         '<div class="empty-state-title">No assessments yet</div>' +
         '<div class="empty-state-text">Create your first assessment to start grading.</div>' +
-        '<button class="tb-action-btn" data-action="showNewForm" style="margin-top:16px">+ New Assessment</button>' +
+        '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px">' +
+        _newQuizBtn(cid) +
+        '<button class="tb-action-btn" data-action="showNewForm">+ New Assessment</button>' +
+        '</div>' +
         '</div>';
     }
 
@@ -6526,6 +6530,11 @@ window.PageAssignments = (function () {
       var title = document.getElementById('af-title');
       if (title) title.focus({ preventScroll: true });
     }
+  }
+  // + New Quiz (Colin, Nov 24): shown with quizzes on, the builder loaded and the Student Page on.
+  function _newQuizBtn(cid) {
+    var on = window.QuizBuilder && BuildFlags.on('quizzes') && _studentPageOn(cid);
+    return on ? '<button class="tb-action-btn" data-action="newQuiz">+ New Quiz</button>' : '';
   }
   function hideNewForm() {
     _hideAfTip();
@@ -11896,6 +11905,14 @@ window.PageAssignments = (function () {
     var handlers = {
       showNewForm: function () {
         showNewForm();
+      },
+      newQuiz: function () {
+        showNewForm();
+        QuizBuilder.startNew({
+          open: () => _showingNewForm && !_editingAssessId,
+          choose: () => _formWork && _setFormWork('students_send', 'quiz'),
+          done: _markFormStart,
+        });
       },
       addFromClass: function () {
         if (window.AddFromClass) AddFromClass.open(activeCourse, render);
