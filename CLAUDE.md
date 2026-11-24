@@ -58,14 +58,14 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 9. **Plain language in the UI:** Title Case for labels, headings, buttons and tabs; plain sentences for hints and messages. No jargon without a legend, no all-caps prompts.
 10. **Don't touch** `fullvision-user-inputs.xlsx`, `fullvision-documentation-inventory.xlsx`, or the gradebook site's CSS from classroom-content work.
 
-## Current state (2026-11-14)
+## Current state (2026-11-24)
 
 - Grading compliance with Schoology/Teams (`docs/grading-compliance-plan.md`): Phase 1 and Phase 2 are implemented and live.
 - Course soft-delete with 30-day purge is live. Removing a student withdraws them (`migrations/20261019_withdraw_students.sql`); permanent delete is a second step from the Withdrawn list in Class Settings.
 - Reports: the Term Questionnaire with its Comment Bank and Generate, and Progress Reports on One Report (one list of parts, for every teacher, since Nov 13). Students answer questionnaires on the student page's Reflections tab (`s/`); phone reports are no longer on it (Nov 14).
 - Grades display only through `calc.js` and its helpers in `constants.js` (`formatLevel`, `scoreLevelText`, `BC_LETTER_BANDS`, `PROF_LABELS`); the grade-format-guard in `tests/grade.test.js` enforces it. Text goes into HTML only through `esc` in `shared/html.js`; `npm run audit:html` fails on a new unproven innerHTML site.
 - The curriculum bank was rebuilt from the Ministry's files (Nov 2). New classes import from it through the New Class wizard; older classes change only when a teacher runs Re-link. Folders Count as One and Each Course Counts Equally are Grading tab switches.
-- The student page build (`docs/plans/student-page-build-plan.md`) is built on `main` behind a per-class build switch. Not built: S15 (waits for Colin), S16 (paused), S17 (not in this build) and S18-F2 (waits for Colin). The last release merged into `production` was PR #1627 ("Release: Nov 18, 2026, seventh (New front page, Bulletins polished, Words, Share)") at 21:40 UTC on 2026-11-18, carrying everything on `main` up to #1626. Anything merged to `main` after it is not released.
+- The student page build (`docs/plans/student-page-build-plan.md`) is built on `main` behind a per-class build switch. Not built: S15 (waits for Colin), S16 (paused), S17 (not in this build) and S18-F2 (waits for Colin). The last release merged into `production` was PR #1656 ("Release: Nov 24, 2026 (Shorter front page, contrast fixes, Term Questionnaire order, Bulletins tile overlap)") at 09:10 UTC on 2026-11-24, carrying everything on `main` up to #1659. Anything merged to `main` after it is not released.
 - Reflect (`docs/plans/reflect-plan.md`): students reach reflections (the questionnaires) from the Reflect tab after their card sign-in, with no slips; teachers turn each one on in Class Settings › Reflect, build their own there, and read See Answers. Built on `main`; its database change (`migrations/2026111620_reflect_from_the_card.sql`) was applied Nov 16.
 - The S19 cleanup follows `docs/plans/handoff-review-plan.md`. Its overnight run and the Nov 13 alignment work (`docs/plans/alignment-plan.md`) are merged and released.
 - The Dashboard's middle row (an Inbox and one Competencies tile, `docs/plans/dashboard-inbox-plan.md`) is on by default and released.
