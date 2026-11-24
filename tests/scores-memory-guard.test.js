@@ -139,7 +139,7 @@ function guard(files) {
       ['saveScores', '_saveCourseField'].includes(n.callee.type === 'Identifier' ? n.callee.name : null));
   // The functions that save the list, and those that call one (Grader.undoCell), to a fixed point.
   const saving = new Set();
-  for (let more = true; more; ) {
+  for (let more = true; more;) {
     more = false;
     fns.forEach(fn => {
       if (saving.has(fn)) return;

@@ -44,6 +44,7 @@ export default [
   {
     ignores: [
       'node_modules/**',
+      '.claude/**',
       'dist/**',
       'vendor/**',
       '**/*.min.js',
