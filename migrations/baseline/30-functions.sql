@@ -15058,6 +15058,80 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION student_submit.quiz_result(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _s     jsonb := student_submit._session_class(p_session_token, p_enrollment_id);
+    _w     jsonb;
+    _z     quiz%rowtype;
+    _t     quiz_attempt%rowtype;
+    _at    timestamptz;
+    _draft boolean;
+    _left  int;
+begin
+    if _s ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _s->>'error');
+    end if;
+    -- The piece as quiz opens it (_quiz_window): anything else is not_found, the same answer for each.
+    _w := student_submit._quiz_window(p_assessment_id, (_s->>'course_id')::uuid);
+    if _w is null then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    select * into _z from quiz z where z.assessment_id = p_assessment_id;
+    select g.returned_at, g.is_draft into _at, _draft
+      from grade_return g where g.enrollment_id = p_enrollment_id and g.assessment_id = p_assessment_id;
+    -- The one confirmed try (quiz_attempt_one_marked_idx).
+    select * into _t from quiz_attempt t
+     where t.assessment_id = p_assessment_id and t.enrollment_id = p_enrollment_id and t.marked is not null;
+    _left := case when _z.tries = 0 then null
+                  else greatest(_z.tries - (select count(*) from quiz_attempt t where t.assessment_id = p_assessment_id
+                                              and t.enrollment_id = p_enrollment_id and t.reopened_at is null), 0)::int end;
+    -- Nothing about right and wrong unless all of these hold (the header, and the contract's "MQ3").
+    if not coalesce(
+           -- 1. Returned to this student, with a grade the student page shows.
+           _at is not null
+           and (student_submit._returned_grade(p_enrollment_id, p_assessment_id)->>'grade') is not null
+           -- 2. The student can no longer answer: MQ2's rule. No unsent try she may still answer (a reopened one,
+           --    closed or not, or an ordinary one while the quiz is open), and the quiz closed or no tries left.
+           and not exists (select 1 from quiz_attempt t where t.assessment_id = p_assessment_id
+                             and t.enrollment_id = p_enrollment_id and t.sent_at is null
+                             and (t.reopened_at is not null or (_w->>'open')::boolean))
+           and (not (_w->>'open')::boolean or _left = 0)
+           -- 3. One try confirmed, and returned since: by the time where saves wait for Return, else no draft waiting.
+           and _t.id is not null
+           and case when public._grade_return_holds(p_enrollment_id) then _t.marked_at <= _at else not _draft end,
+           false) then
+        return jsonb_build_object('ok', true, 'returned', false);
+    end if;
+    -- 4. What the quiz shows.
+    return jsonb_build_object('ok', true, 'returned', true, 'shows', _z.shows)
+        || case when _z.add_total
+                then jsonb_build_object('total', jsonb_build_object('earned', _t.marked->'earned', 'possible', _t.marked->'possible'))
+                else '{}'::jsonb end
+        || case when _z.shows in ('right', 'answers') then jsonb_build_object('questions', coalesce((
+               select jsonb_agg(q.e
+                          || jsonb_build_object(
+                                 'your_answer', (select n.answer from quiz_answer n
+                                                  where n.attempt_id = _t.id and n.question_id = (q.e->>'id')::uuid),
+                                 'result', m.result)
+                          || case when _z.shows = 'answers' then jsonb_build_object('answer', k.answer, 'why', k.why)
+                                  else '{}'::jsonb end
+                          order by q.n)
+                 from jsonb_array_elements(student_submit._quiz_questions(p_assessment_id, _t.question_order)) with ordinality q(e, n)
+                 left join lateral (select x.v->'result' as result, true as marked
+                                      from jsonb_each(_t.marked->'questions') x(k, v)
+                                     where case when pg_input_is_valid(x.k, 'uuid') then x.k::uuid end = (q.e->>'id')::uuid
+                                     limit 1) m on true
+                 -- The key only for a question in the confirmed marking: one added since was never marked or returned.
+                 left join quiz_key k on m.marked and k.question_id = (q.e->>'id')::uuid), '[]'::jsonb))
+                else '{}'::jsonb end;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION student_submit.quiz_save(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_question_id uuid, p_answer jsonb, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
