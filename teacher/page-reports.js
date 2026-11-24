@@ -198,19 +198,17 @@ window.PageReports = (function () {
   var reportConfig = null;
 
   /* ── Paper ───────────────────────────────────────────────────────
-     Letter or Legal for the printed reports, remembered per class on this
-     device. The sheets set the page size themselves when they render
+     Letter or Legal for the printed reports, remembered per class with the
+     teacher's preferences (getViewPref), so it follows them to another
+     computer; one chosen on this computer before that is read until it is
+     next changed. The sheets set the page size themselves when they render
      (ReportSheets.setPageStyle). DECISIONS.md, "Report forms" 4. */
   var PAPERS = ['letter', 'legal'];
   var reportPaper = 'letter';
 
   function _loadPaper(cid) {
-    try {
-      var v = localStorage.getItem('gb-report-paper-' + cid);
-      return PAPERS.indexOf(v) >= 0 ? v : 'letter';
-    } catch (e) {
-      return 'letter';
-    }
+    var v = getViewPref('gb-report-paper-' + cid);
+    return PAPERS.indexOf(v) >= 0 ? v : 'letter';
   }
 
   function _applyPaper() {
@@ -224,12 +222,7 @@ window.PageReports = (function () {
   function setPaper(paper) {
     if (PAPERS.indexOf(paper) < 0) return;
     reportPaper = paper;
-    try {
-      if (paper === 'letter') localStorage.removeItem('gb-report-paper-' + activeCourse);
-      else localStorage.setItem('gb-report-paper-' + activeCourse, paper);
-    } catch (e) {
-      /* per-device preference only */
-    }
+    saveViewPref('gb-report-paper-' + activeCourse, paper === 'letter' ? null : paper);
     _applyPaper();
     if (activeTab === 'progress') renderReportPreview(true);
   }
