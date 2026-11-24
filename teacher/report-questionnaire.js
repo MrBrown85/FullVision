@@ -64,8 +64,14 @@ window.ReportQuestionnaire = (function () {
     return _factsCache.f;
   }
 
+  // The sidebar's order (its Sort, ui.js); the student on screen is kept by id when the Sort changes.
+  var _tqSid = null;
   function getTqStudents() {
-    return sortStudents(getStudents(_activeCourse), 'lastName');
+    var students = _sortedRoster(_activeCourse, _rosterSortMode(_activeCourse));
+    var at = students.findIndex(s => s.id === _tqSid);
+    if (at >= 0) tqStudentIndex = at;
+    else _tqSid = (students[tqStudentIndex] || {}).id;
+    return students;
   }
   function _current() {
     return getTqStudents()[tqStudentIndex] || null;
@@ -76,11 +82,13 @@ window.ReportQuestionnaire = (function () {
     tqSaveCurrentIfNeeded();
     var students = getTqStudents();
     tqStudentIndex = Math.max(0, Math.min(students.length - 1, idx));
+    _tqSid = (students[tqStudentIndex] || {}).id;
     _commentTab = 'this';
     _drawer = null;
     rerender();
   }
   function tqPrevStudent() {
+    getTqStudents();
     _goTo(tqStudentIndex - 1);
   }
   /* The roster and ↑ ↓ move without approving. */
@@ -8412,6 +8420,7 @@ window.ReportQuestionnaire = (function () {
     },
     set tqStudentIndex(v) {
       tqStudentIndex = v;
+      _tqSid = null;
     },
     get tqNarrativeDirty() {
       return tqNarrativeDirty;
