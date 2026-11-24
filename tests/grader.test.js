@@ -243,6 +243,13 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 's1', 'lab', 'comment'],
     ],
     [
+      'setCriterionOwn',
+      [CID, 's1', 'lab', 'crit1', 'Your table was the clearest'],
+      'saveRubricCriterionOwn',
+      [CID, 's1', 'lab', 'crit1', 'Your table was the clearest'],
+      [CID, 's1', 'lab', 'comment'],
+    ],
+    [
       'setWentBeyond',
       [CID, 's1', 'claim', 'crit1', 'Cited two sources'],
       'saveRubricCriterionBeyond',

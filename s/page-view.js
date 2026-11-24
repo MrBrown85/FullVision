@@ -1333,6 +1333,8 @@ window.StudentPageView = (function () {
     } else if (row.comment) {
       notes += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
     }
+    // On pair or group work, a line the teacher wrote for this student alone.
+    if (row.own) notes += '<p class="sp-fb-note sp-fb-own">' + esc(row.own) + '</p>';
     return (
       '<li class="sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
       esc(row.name) +
@@ -1407,7 +1409,7 @@ window.StudentPageView = (function () {
     var crits = rubric
       ? rubric.rows
           .filter(function (row) {
-            return row.text || row.comment || row.beyond;
+            return row.text || row.comment || row.beyond || row.own;
           })
           .map(function (row) {
             return criterionHtml(style, row);

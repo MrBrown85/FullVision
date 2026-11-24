@@ -78,6 +78,12 @@ window.Grader = (function () {
     return _saved(cid, sid, aid, 'comment', saveRubricCriterionComment(cid, sid, aid, criterionId, text));
   }
 
+  /* On pair or group work, the line under a criterion's group comment for
+     one student alone (it is not copied to the group). */
+  function setCriterionOwn(cid, sid, aid, criterionId, text) {
+    return _saved(cid, sid, aid, 'comment', saveRubricCriterionOwn(cid, sid, aid, criterionId, text));
+  }
+
   /* A single-point rubric's Went Beyond note for one criterion. */
   function setWentBeyond(cid, sid, aid, criterionId, text) {
     return _saved(cid, sid, aid, 'comment', saveRubricCriterionBeyond(cid, sid, aid, criterionId, text));
@@ -1131,6 +1137,7 @@ window.Grader = (function () {
     setStatus: setStatus,
     setTick: setTick,
     setCriterionComment: setCriterionComment,
+    setCriterionOwn: setCriterionOwn,
     setWentBeyond: setWentBeyond,
     setCompetencyComment: setCompetencyComment,
     setOverallComment: setOverallComment,

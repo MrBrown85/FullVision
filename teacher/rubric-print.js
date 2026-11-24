@@ -392,8 +392,15 @@
         mixed: lv.mixed,
         // Comments belong to a rubric of the teacher's own (on a criterion)
         // or a Tag Rubric (on a competency); a General Rubric has none.
+        // On pair or group work, the line for this student alone follows the
+        // group's comment: their sheet is theirs.
         comment: !rubric.kind
-          ? ReportScores.getRubricCriterionComment(cid, sid, aid, criterion)
+          ? [
+              ReportScores.getRubricCriterionComment(cid, sid, aid, criterion),
+              ReportScores.getRubricCriterionOwn(cid, sid, aid, criterion),
+            ]
+              .filter(Boolean)
+              .join(' ')
           : rubric.kind === 'tags'
             ? ReportScores.getTagComment(cid, sid, aid, criterion.id)
             : '',

@@ -46,6 +46,7 @@ describe('grader-arrows-step-students', () => {
   function openGrader() {
     mount(seed, { course: CID });
     realPage = window.PageAssignments;
+    runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
     runInThisContext(readFileSync('teacher/page-assignments.js', 'utf-8'), { filename: 'teacher/page-assignments.js' });
     const cell = document.querySelector('.gb-scores-cell[data-aid="q1"][data-sid="s1"]');
     cell.classList.add('gb-focus');
@@ -232,6 +233,7 @@ describe('grader-tab-after-points', () => {
   function openGrader() {
     mount(seed, { course: CID });
     realPage = window.PageAssignments;
+    runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
     runInThisContext(readFileSync('teacher/page-assignments.js', 'utf-8'), { filename: 'teacher/page-assignments.js' });
     const cell = document.querySelector('.gb-scores-cell[data-aid="q1"][data-sid="s1"]');
     cell.classList.add('gb-focus');
