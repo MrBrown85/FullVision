@@ -343,12 +343,16 @@ function getDashboardPrefs() {
 
 /* Change some of them; the rest stay. Saved with the teacher's preferences. */
 function saveDashboardPrefs(change) {
-  var prefs = Object.assign({}, getDashboardPrefs(), change || {});
+  var before = getDashboardPrefs();
+  var prefs = Object.assign({}, before, change || {});
   var cfg = Object.assign({}, getConfig() || {}, { dashboardPrefs: prefs });
   _cache.config = cfg;
   _safeLSSet('gb-config', JSON.stringify(cfg));
-  if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
-    window.v2.saveTeacherPreferences({ dashboard_prefs: prefs });
+  // Only what changed goes, and the server merges it into what it holds,
+  // so this tab's older copy of the other choices never reaches it.
+  var sent = _dashboardPrefsChange(before, prefs);
+  if (Object.keys(sent).length && _writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
+    window.v2.saveTeacherPreferences({ dashboard_prefs: sent });
   }
   return prefs;
 }

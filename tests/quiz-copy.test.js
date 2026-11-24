@@ -465,7 +465,7 @@ describe('with the quizzes switch off', () => {
       );
     return plain({
       calls: session.fake.calls
-        .filter(c => !/^(save_teacher_preferences|get_|list_)/.test(c.name))
+        .filter(c => !/^((save|patch)_teacher_preferences|get_|list_)/.test(c.name))
         .map(c => [c.name, Object.keys(c.params || {}).sort()]),
       saved: copy,
       // Only the keys this slice could add to: the pieces and the quizzes. Others (the sync queue,

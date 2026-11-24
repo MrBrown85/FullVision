@@ -22,6 +22,6 @@
     "signed in both › list, nothing open": "sha256:ba72c4b9eadeab149789fef17c96e25678169097fcc5a7842361c19b2462303d of 17397 characters",
     "signed in both › list, every card open": "sha256:d1c92f7a69c1e2745f7a60c60de5d6db3438320aaab7cfa7836258f9185005f3 of 48119 characters",
     "keys": "gb-assessments-00000000-0000-4000-8000-000000000001 gb-config gb-courseconfig-00000000-0000-4000-8000-000000000001 gb-learningmap-00000000-0000-4000-8000-000000000001 gb-rubric-checks-00000000-0000-4000-8000-000000000001 gb-rubrics-00000000-0000-4000-8000-000000000001 gb-scores-00000000-0000-4000-8000-000000000001 gb-statuses-00000000-0000-4000-8000-000000000001 gb-students-00000000-0000-4000-8000-000000000001",
-    "calls": "save_teacher_preferences save_teacher_preferences save_teacher_preferences save_teacher_preferences save_teacher_preferences save_teacher_preferences"
+    "calls": "patch_teacher_preferences"
   }
 }

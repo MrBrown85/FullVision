@@ -268,7 +268,7 @@ describe('class-insights', () => {
       expect(JSON.parse(localStorage.getItem('gb-config')).dashboardPrefs.studentView).toBe('grid');
     });
 
-    it('sends them to save_teacher_preferences as dashboard_prefs', () => {
+    it('sends them to patch_teacher_preferences as dashboard_prefs', () => {
       expect(_teacherPrefsPatchFromConfig({ dashboardPrefs: { studentView: 'grid' } })).toEqual({
         dashboard_prefs: { studentView: 'grid' },
       });
