@@ -127,7 +127,7 @@ test('Seen by opens that bulletin with its list open', async ({ page }) => {
   await expect(arrived).toHaveCount(1);
   await expect(arrived.locator('.bulletin-seenlist')).toBeVisible();
   await expect(arrived.locator('.bulletin-seen-btn')).toBeFocused();
-  await expect(arrived.locator('.bulletin-seen-head').first()).toContainText('Not Seen Yet');
+  await expect(arrived.locator('.bsl-head').first()).toContainText('Not Seen Yet');
 });
 
 test('Write a Bulletin opens the page with the box open; Open Bulletins opens the page', async ({ page }) => {
@@ -350,18 +350,19 @@ async function cards(page) {
     return {
       width: tile.width,
       count: shown.length,
-      tops: shown.map(r => Math.round(rect(r).top)),
+      // offsetTop: the notes are tilted a degree or so (posted notes, #1630), which moves their drawn tops a few pixels.
+      tops: shown.map(r => r.offsetTop),
       widths: shown.map(r => Math.round(rect(r).width)),
       inside: shown.every(r => rect(r).bottom <= tile.bottom && rect(r).right <= tile.right),
       uncut: shown.map(r => r.scrollHeight <= r.clientHeight + 1 && r.scrollWidth <= r.clientWidth + 1),
       timeRight: shown.map(
         r => rect(r.querySelector('.dash-bulletins-time')).left > rect(r.querySelector('.dash-bulletins-kind')).right,
       ),
-      wordsOver: shown.map(
-        r =>
-          rect(r.querySelector('.dash-bulletins-seen')).top >=
-          rect(r.querySelector('.dash-bulletins-words')).bottom - 1,
-      ),
+      // Layout offsets, not drawn rectangles: a tilted note's rectangles grow by a few pixels each way.
+      wordsOver: shown.map(r => {
+        const words = r.querySelector('.dash-bulletins-words');
+        return r.querySelector('.dash-bulletins-seen').offsetTop >= words.offsetTop + words.offsetHeight - 1;
+      }),
       seenLeft: shown.map(r => Math.abs(rect(r.querySelector('.dash-bulletins-seen')).left - rect(r).left) < 20),
       footBelow: rect(foot).top >= Math.max(...shown.map(r => rect(r).bottom)) - 1,
       writeLeft: rect(q('.dash-bulletins-write')).left < rect(q('.dash-bulletins-open')).left,

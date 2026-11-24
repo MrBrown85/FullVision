@@ -433,11 +433,14 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
 @container dash-bulletins (min-width: 860px) and (min-height: 168px) {
   .dash-bulletins-tile .dash-bulletins-rows {
     column-gap: 18px;
-    padding: 6px 8px 8px;
+    padding: 5px 8px 3px;
   }
   .dash-bulletins-tile .dash-bulletins-row {
     position: relative;
-    padding: 18px 14px 10px !important;
+    /* The tile is only about 85 px per card on a 1680 x 1050 screen, so the pin sits on the top edge, not in the padding. */
+    padding: 6px 14px 5px !important;
+    row-gap: 2px !important;
+    overflow: visible !important;
     border: 0 !important;
     border-radius: 3px !important;
     background: #fffdf7;
@@ -469,7 +472,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
   .dash-bulletins-tile .dash-bulletins-row::before {
     content: '';
     position: absolute;
-    top: 5px;
+    top: -4px;
     left: 50%;
     width: 10px;
     height: 10px;
@@ -480,13 +483,15 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
   }
   .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-words {
     color: #1d1d1f;
-    font-size: 14px;
-    line-height: 1.4;
+    font-size: 13px;
+    line-height: 1.3;
+    padding: 0;
   }
   .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-time {
     color: #6e6e73;
   }
   .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-kind {
+    line-height: 1.25;
     background: rgba(0, 0, 0, 0.06);
     color: #3a3a3c;
   }

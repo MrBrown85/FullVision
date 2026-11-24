@@ -200,28 +200,27 @@ test('pin, edit and delete from the menu; the confirm shows only for Delete', as
   await expect(feed(page)).not.toContainText('Read pages 1 and 2');
 });
 
-test('Seen by opens the list: not seen first, then Show It Again', async ({ page }) => {
+test('Seen by opens the list: not seen first, then Remind', async ({ page }) => {
   await open(page);
   const card = feed(page).locator('.bulletin-post', { hasText: 'Read the Cell Theory pages' });
   const list = card.locator('.bulletin-seenlist');
   await expect(list).toBeHidden();
   await card.getByRole('button', { name: /Seen by 19 of 27/ }).click();
   await expect(list).toBeVisible();
-  await expect(list).toContainText('Not Seen Yet · 8');
-  await expect(list).toContainText('Sam Blackwood');
-  await expect(list).toContainText('Caleb Firth');
-  await expect(list).toContainText('Have a Question · 2');
-  await expect(list).toContainText('Noor Al-Rashid');
-  const heads = await list.locator('.bulletin-seen-head').allTextContents();
-  expect(heads[0]).toBe('Not Seen Yet · 8');
-  await expect(list.getByRole('button', { name: 'Show Who Has Seen It (19)' })).toBeVisible();
-  await expect(list).not.toContainText('Jordan Kim'); // seen, no reaction: folded away
-  await expect(list).not.toContainText('Got It'); // Got It and Done are counts on the facts line, not lists of names
-  await expect(list).not.toContainText('Cece Adeyemi');
-  await list.getByRole('button', { name: 'Show Who Has Seen It (19)' }).click();
-  await expect(list).toContainText('Jordan Kim');
-  await list.getByRole('button', { name: 'Show It Again on These 8 Phones' }).click();
-  await expect(list).toContainText('Shown again on 8 phones.');
+  // The redesigned panel (#1633): the count, then Not Seen Yet and Seen side by side as name chips.
+  await expect(list.locator('.bsl-big')).toContainText('19 of 27');
+  await expect(list.locator('.bsl-group.is-not .bsl-head')).toHaveText('Not Seen Yet8');
+  await expect(list.locator('.bsl-group.is-not')).toContainText('Sam Blackwood');
+  await expect(list.locator('.bsl-group.is-not')).toContainText('Caleb Firth');
+  const heads = await list.locator('.bsl-head').allTextContents();
+  expect(heads[0]).toBe('Not Seen Yet8');
+  expect(heads[1]).toBe('Seen19');
+  await expect(list.locator('.bsl-group.is-seen')).toContainText('Jordan Kim');
+  await expect(list.locator('.bsl-group.is-question .bsl-head')).toHaveText('Have a Question2');
+  await expect(list.locator('.bsl-group.is-question')).toContainText('Noor Al-Rashid');
+  await expect(list.locator('.bsl-group.is-not')).not.toContainText('Jordan Kim');
+  await list.getByRole('button', { name: 'Remind All 8' }).click();
+  await expect(list).toContainText('Back at the top of their student page.');
   // Closing it hides it again.
   await card.getByRole('button', { name: /Seen by 19 of 27/ }).click();
   await expect(list).toBeHidden();
