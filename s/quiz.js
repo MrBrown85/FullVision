@@ -802,14 +802,15 @@
     }, 0);
   }
   // The Log Out sheet (s/assignments.js): how many answers have not reached the teacher yet.
+  // Demo Mode sends nothing to any teacher, so it never says an answer is on its way to one.
   SP.quizWaiting = function () {
-    return on() ? waiting() : 0;
+    return on() && !(S && S.demo) ? waiting() : 0;
   };
 
   /* Switch Class (s/app.js openClass): with an answer waiting the page asks first, in a sheet (Wait, or Switch
      Class Anyway); the answer is let go only when the student chooses to. True while the sheet asks. */
   SP.quizHeld = function (/** @type {string} */ enrollment) {
-    if (!on() || !S || !waiting()) return false;
+    if (!on() || !S || S.demo || !waiting()) return false;
     if (S.classHold === enrollment) {
       S.classHold = '';
       letGo();
@@ -829,7 +830,7 @@
   }
 
   function asksBeforeClosing() {
-    return on() && waiting() > 0;
+    return on() && !(S && S.demo) && waiting() > 0;
   }
 
   // Closing the tab asks first, only while a save is waiting.
