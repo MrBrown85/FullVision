@@ -168,6 +168,8 @@ interface Window {
     dismissDeadLetter(id: string): void;
     subscribe(listener: (evt: { kind: string; meta: any }) => void): () => void;
     markReloaded(classId: string): number;
+    // shared/data-categories.js reads why waiting writes have not gone (queued, signedOut, owner).
+    stats(): { queued: number; signedOut: boolean; owner: boolean; [k: string]: unknown };
   };
   __fvPerf: unknown[];
   // shared/overwrite-count.js: lets a test (standing for a reload) detach it.
