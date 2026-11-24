@@ -572,8 +572,8 @@ describe('student-submit: where the key comes from (index.ts)', () => {
   it('reads the address-hash key from STUDENT_SUBMIT_IP_KEY alone, with no fallback', () => {
     expect(code.match(/STUDENT_SUBMIT_IP_KEY/g)).toHaveLength(1);
     expect(code).toContain("const ipKey = Deno.env.get('STUDENT_SUBMIT_IP_KEY') || null;");
-    // The database address opens the connection and nothing else.
-    expect(code.match(/SUPABASE_DB_URL'\)/g)).toHaveLength(1);
+    // The database's owner login is not read at all (2026112402).
+    expect(code).not.toMatch(/SUPABASE_DB_URL/);
   });
 });
 
