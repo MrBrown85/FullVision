@@ -25,6 +25,8 @@ labels:
   - Students
   - Choose Students
   - Create Assessment
+  - Handouts and Links
+  - + Add a File
 next:
   - set-up-grading
 shots:
@@ -51,3 +53,5 @@ shots:
 
 5. Under **Students**, every student in the class is included. To include only some students, use **Choose Students**.
 6. Choose **Create Assessment**. The assessment opens, ready to score.
+
+To give students a handout, open **Handouts and Links** on the form and choose **+ Add a File**. A PDF you add is shown to students as pictures, and it is also kept as the PDF itself, so they can save it and print it.

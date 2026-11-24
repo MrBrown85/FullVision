@@ -305,16 +305,22 @@ describe('a teacher’s handout file', () => {
   const R = 'a2a2a2a2-0000-4000-8000-000000000002';
   const FILE = `${C}/${R}.html`;
 
-  it('is its own shape: html, txt or epub, lower-case ids, nothing else', () => {
+  it('is its own shape: html, txt, epub or a PDF original, lower-case ids, nothing else', () => {
     expect(FILE_BUCKET).toBe('handout-files');
     expect(handoutFilePathParts(FILE)).toEqual({ course: C, resource: R, kind: 'html' });
     expect(handoutFilePathParts(`${C}/${R}.epub`)).toMatchObject({ kind: 'epub' });
     expect(handoutFilePathParts(`${C}/${R}.txt`)).toMatchObject({ kind: 'txt' });
+    // A PDF handout's original (2026112408) is <course>/<resource>.pdf in the same bucket.
+    expect(handoutFilePathParts(`${C}/${R}.pdf`)).toEqual({ course: C, resource: R, kind: 'pdf' });
+    expect(pathParts(`${C}/${R}.pdf`)).toBe(null);
+    expect(handoutPathParts(`${C}/${R}.pdf`)).toBe(null);
     for (const bad of [
       `${C}/${R}.htm`,
       `${C}/${R}.HTML`,
       `${C}/${R}.html.js`,
-      `${C}/${R}.pdf`,
+      `${C}/${R}.PDF`,
+      `${C}/${R}.pdf.js`,
+      `${C}/handouts/${R}.pdf`,
       `${C}/handouts/${R}.html`,
       `${C}/../${R}.html`,
       FILE.toUpperCase(),
@@ -354,6 +360,13 @@ describe('a teacher’s handout file', () => {
       method: 'DELETE',
       body: JSON.stringify({ prefixes: [FILE] }),
     });
+    // A PDF handout's original (2026112408): signed, and removed by the worker, in the same bucket only.
+    const PDF = `${C}/${R}.pdf`;
+    await store.signDownloads([PDF], 60, FILE_BUCKET);
+    await store.remove([PDF], FILE_BUCKET);
+    expect(f.sent[3]).toMatchObject({ method: 'DELETE', body: JSON.stringify({ prefixes: [PDF] }) });
+    await expect(store.signDownloads([PDF], 60)).rejects.toThrow('storage path');
+    await expect(store.remove([PDF])).rejects.toThrow('storage path');
   });
 
   it('a file is never taken in student-photos, a photo never in handout-files, and no other bucket at all', async () => {

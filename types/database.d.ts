@@ -4492,6 +4492,10 @@ export type Database = {
         Args: { p_idempotency_key?: string; p_resource_id: string }
         Returns: Json
       }
+      finish_handout_original: {
+        Args: { p_idempotency_key?: string; p_resource_id: string }
+        Returns: Json
+      }
       finish_handout_upload: {
         Args: { p_idempotency_key?: string; p_resource_id: string }
         Returns: Json
@@ -5054,6 +5058,14 @@ export type Database = {
           p_idempotency_key?: string
           p_kind: string
           p_title: string
+        }
+        Returns: Json
+      }
+      start_handout_original: {
+        Args: {
+          p_bytes: number
+          p_idempotency_key?: string
+          p_resource_id: string
         }
         Returns: Json
       }

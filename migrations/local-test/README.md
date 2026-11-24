@@ -2948,3 +2948,20 @@ Not verified here: PostgREST's schema cache, the edge functions, gradebook-prod 
 ## Bulletin reminders (2026111809, 2026-11-18)
 
 Applied to gradebook-prod on Nov 18 with Colin's OK; live then read both "after" md5s. Tested on PostgreSQL 17.11 rebuilt from the repo: apply, a second run, undo (`bulletin-reminders-undo.sql`, both fingerprints back to live's, the table gone), apply again; `test:db` with it loaded, every security rule test passed (the seed gains a reminder row); as a seeded teacher, a reminder reaches a named student who can see it and has not seen it, a made-up id is ignored, and the call without names sets `shown_again_at` as before.
+
+## A PDF handout's original (2026112408, 2026-11-24)
+
+One file, `../2026112408_handout_pdf_original.sql`, **not applied** (needs Colin's OK), about 47 KB. Colin's call on Nov 24: a PDF handout keeps its pages and also the PDF itself, so students can save and print it. It adds two columns to `assessment_resource` (`original_status`: null, uploading, ready or dropped; `original_started_at`; the existing `bytes` holds the original's size) and makes the shape check again so that only a PDF row has them; lets the bucket `handout-files` take `application/pdf`; adds `start_handout_original` and `finish_handout_original` for a signed-in teacher (idempotent through `fv_idem_check`), `student_submit.handout_original` for the edge function (service role, and `fv_student_submit` if it exists) and two helpers nobody is granted; and replaces six functions, each guarded by its live md5: `_assessment_resource_json`, `_assessment_resource_removed` (an original is queued for deletion by every path that deletes its handout), `_handout_drop_expired` (an original unfinished after two hours becomes `dropped`, final, its name queued), `photo_lifecycle_nightly` (also visits a class with an original still uploading) and the two storage policy helpers `handout_file_upload_allowed` and `_read_allowed` (the one name of an original). The four policies are not touched. It changes no row and no file. Contract: `handouts-links-contract.md`, "A PDF's original". Pre-check `handout-pdf-original-live-precheck.sql`, live fingerprints `handout-pdf-original-live-fingerprints.sql` (one read-only select; no rows means every function matches), post-check `handout-pdf-original-live-postcheck.sql`, undo `handout-pdf-original-undo.sql` (PART 0 stops new originals).
+
+```bash
+$PSQL postgresql://postgres@127.0.0.1:54901/postgres -c "create database fp_icu template template0 locale_provider icu icu_locale 'en-US' lc_collate 'en_US.UTF-8' lc_ctype 'en_US.UTF-8'"
+$PSQL postgresql://postgres@127.0.0.1:54901/postgres -c "create database fp_c template template0 locale_provider libc lc_collate 'C' lc_ctype 'C'"
+DATABASE_URL=postgresql://postgres@127.0.0.1:54901/fp_icu node scripts/db-rebuild.mjs --check     # and the same for fp_c
+export PGPORT=54901 FV_ICU_DB=fp_icu FV_C_DB=fp_c PYTHONDONTWRITEBYTECODE=1
+PGDATABASE=fp_icu python3 handout_pdf_original.py
+PGDATABASE=fp_c python3 handout_pdf_original.py
+FV_NONSUPER=hp_postgres PGDATABASE=fp_icu python3 handout_pdf_original.py      # and fp_c
+FV_EDGE_ROLE=no python3 handout_pdf_original.py                                # a cluster without fv_student_submit
+```
+
+Scenarios: `teacher`, `storage`, `student`, `lifecycle`, `apply`, `undo`, `collations` (docstring of the script). Result on 2026-11-24, PostgreSQL 17.11 (embedded-postgres), on databases rebuilt with `--check` from `main` at `f3873254`: under ICU en-US **137 of 137**; under C **137 of 137**; as a role that is not a superuser **144 of 144** on each; on a cluster without the role `fv_student_submit` **136 of 136** (no collations scenario). Not verified here: gradebook-prod, PostgREST's schema cache, the Storage API (the policies are tested through rows in `storage.objects`), the edge function deployed.
