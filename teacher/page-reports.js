@@ -521,6 +521,28 @@ window.PageReports = (function () {
     output.innerHTML = renderTermQuestionnaire(cid);
     _syncLongFormAuthContext();
     RQ.afterRender();
+    var st = RQ.getTqStudents()[RQ.tqStudentIndex];
+    if (st) _tqRemember(cid, st.id);
+  }
+
+  /* The questionnaire's student, remembered per class on this computer, so
+     leaving Reports and coming back opens them again. gb- keys go when the
+     teacher signs out (supabase.js, _clearDeviceData). */
+  function _tqRemember(cid, sid) {
+    try {
+      if (sid) localStorage.setItem('gb-tq-student-' + cid, sid);
+      else return localStorage.getItem('gb-tq-student-' + cid);
+    } catch (e) {
+      /* storage off: start at the top */
+    }
+  }
+  // The student in the address, else the one remembered, else the first.
+  function _tqOpen(cid, sid) {
+    var want = sid || _tqRemember(cid);
+    var idx = getTqStudents().findIndex(function (s) {
+      return s.id === want;
+    });
+    RQ.tqStudentIndex = Math.max(0, idx);
   }
 
   /* Feedback Pages print Tag Rubrics in the curriculum bank's wording (858 KB),
@@ -1631,6 +1653,7 @@ window.PageReports = (function () {
     previewSid = null;
     previewAuto = true;
     _configureQuestionnaire();
+    _tqOpen(cid);
     populateStudentSelect();
     populateReportPeriods(false);
     renderReports();
@@ -2062,14 +2085,7 @@ window.PageReports = (function () {
 
     populateStudentSelect();
 
-    // Handle params
-    if (params.student) {
-      var students = getTqStudents();
-      var idx = students.findIndex(function (s) {
-        return s.id === params.student;
-      });
-      if (idx >= 0) RQ.tqStudentIndex = idx;
-    }
+    _tqOpen(activeCourse, params.student);
 
     switchTab(activeTab);
 
@@ -2171,6 +2187,8 @@ window.PageReports = (function () {
       readSaved: _readSaved,
       orderBySheets: _orderBySheets,
       longestStudent: _longestStudent,
+      tqOpen: _tqOpen,
+      tqRemember: _tqRemember,
     },
   };
 })();

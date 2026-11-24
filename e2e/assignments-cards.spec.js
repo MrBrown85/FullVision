@@ -58,6 +58,8 @@ test('a card opens to a ⋯ menu that holds its actions, Set Everyone To in a su
     // In every class, student page or not (plan decision 2, Nov 17 2026).
     'Add Work for the Class',
     'Grade by Competencies',
+    // A Standard rubric's words, beside where an Advanced one keeps its checklists (#1638).
+    'Show Level Words',
     'Set Everyone To',
     'Edit Assessment',
     'Duplicate',

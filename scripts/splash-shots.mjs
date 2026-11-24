@@ -104,50 +104,6 @@ async function openPreview(page, base) {
   await pause(page, 1500);
 }
 
-// Print Rubrics set to four per page, and page 1 of what it will print, drawn
-// as a sheet of paper: the dialog's own preview page, at a readable size.
-async function printedRubrics(page, base) {
-  await page.goto(base + '/assignments');
-  await pause(page, 1500);
-  // The Science Fair Proposal: an Advanced Rubric scored for the whole class.
-  await page.evaluate(() => document.querySelector('[data-action=printRubrics][data-aid="sci8a20"]').click());
-  await page.waitForSelector('#rp-preview', { timeout: 10000 });
-  await pause(page, 800);
-  await page.locator('input[name="rp-layout"][value="quarter"]').evaluate(el => el.click());
-  await pause(page, 1500);
-  await page.evaluate(() => {
-    const src = document.querySelector('#rp-preview .rubric-page');
-    const w = parseFloat(src.style.width);
-    const h = parseFloat(src.style.height);
-    const scale = 1.18;
-    const m = 24 * scale; // the quarter-inch print margin
-    const paper = document.createElement('div');
-    paper.id = 'splash-paper';
-    paper.style.cssText =
-      'position:fixed;left:0;top:0;z-index:2147483647;background:#fff;overflow:hidden;width:' +
-      Math.round(w * scale + 2 * m) +
-      'px;height:' +
-      Math.round(h * scale + 2 * m) +
-      'px';
-    const clone = src.cloneNode(true);
-    clone.style.cssText +=
-      ';position:absolute;left:' +
-      m +
-      'px;top:' +
-      m +
-      'px;transform:scale(' +
-      scale +
-      ');transform-origin:0 0;width:' +
-      w +
-      'px;height:' +
-      h +
-      'px';
-    paper.appendChild(clone);
-    document.body.appendChild(paper);
-  });
-  await pause(page, 400);
-}
-
 // A made-up class scan for Split the Scan: one Chemical Reactions Lab page
 // per student, in class-list order, each with the student's name written at
 // the top, printed to a PDF the way a photocopier sends one.
@@ -236,15 +192,6 @@ async function classScan(page) {
 
 const SHOTS = [
   {
-    file: 'rubric-print.jpg',
-    width: 1100,
-    height: 1340,
-    async run(page, base) {
-      await printedRubrics(page, base);
-      return page.locator('#splash-paper');
-    },
-  },
-  {
     file: 'grader.jpg',
     async run(page, base) {
       await openGrader(page, base);
@@ -314,23 +261,6 @@ const SHOTS = [
     },
   },
   {
-    file: 'dashboard.jpg',
-    async run(page, base) {
-      await studentPageOn(page, base);
-      await page.goto(base + '/dashboard');
-      await pause(page, 1800);
-      // The Inbox as Side by Side: each student's pages in a row.
-      await page
-        .getByRole('button', { name: /By Assessment/ })
-        .first()
-        .click();
-      await pause(page, 400);
-      await page.getByText('Side by Side', { exact: true }).first().click();
-      await pause(page, 1500);
-      return { clip: [0, 0, W, H] };
-    },
-  },
-  {
     file: 'add-work.jpg',
     async run(page, base) {
       await studentPageOn(page, base);
@@ -354,80 +284,6 @@ const SHOTS = [
       await page.getByRole('button', { name: 'Class List Order' }).click();
       await page.mouse.move(0, 0);
       await pause(page, 1500);
-      return { clip: [0, 0, W, H] };
-    },
-  },
-  {
-    file: 'bulletins.jpg',
-    async run(page, base) {
-      await studentPageOn(page, base);
-      await page.goto(base + '/bulletins');
-      await page.locator('.bulletin-card').first().waitFor({ timeout: 10000 });
-      await pause(page, 1500);
-      // The feed's column: the box to write in, down to the last bulletin.
-      return {
-        clip: await page.evaluate(h => {
-          const els = [...document.querySelectorAll('#main h1, #main h2, .bulletin-card')];
-          const rs = els.map(e => e.getBoundingClientRect()).filter(r => r.width);
-          const pad = 28;
-          const left = Math.min(...rs.map(r => r.left)) - pad;
-          const top = Math.min(...rs.map(r => r.top)) - pad;
-          const right = Math.max(...rs.map(r => r.right)) + pad;
-          const bottom = Math.min(Math.max(...rs.map(r => r.bottom)) + pad, h);
-          return [left, top, right - left, bottom - top];
-        }, H),
-      };
-    },
-  },
-  {
-    file: 'reflect.jpg',
-    async run(page, base) {
-      await page.goto(base + '/dashboard?manage=questionnaires');
-      await page.locator('[data-action=sqSeeAnswers]').first().waitFor({ timeout: 10000 });
-      await page.mouse.move(0, 0);
-      await pause(page, 1200);
-      // The Reflections panel: each reflection, its switch, and who has answered.
-      return {
-        clip: await page.evaluate(() => {
-          let el = document.querySelector('[data-action=sqSeeAnswers]');
-          while (el.parentElement && !/New Reflection/.test(el.textContent)) el = el.parentElement;
-          const r = el.getBoundingClientRect();
-          const pad = 20;
-          // Less above, so the Class Settings tabs' line stays out.
-          return [r.left - pad, r.top - 12, r.width + 2 * pad, r.height + 12 + pad];
-        }),
-      };
-    },
-  },
-  {
-    file: 'gradebook.jpg',
-    async run(page, base) {
-      await page.goto(base + '/gradebook');
-      await pause(page, 1800);
-      // A corner of the grid: ten students and the newest pieces.
-      return { clip: [0, 100, 1104, 720] };
-    },
-  },
-
-  {
-    file: 'questionnaire.jpg',
-    async run(page, base) {
-      await page.goto(base + '/reports');
-      await pause(page, 1500);
-      for (const [h, v] of [
-        ['completes', 4],
-        ['ready', 3],
-        ['others', 4],
-      ]) {
-        await page
-          .locator(`.qn-hs-stop[data-habit="${h}"][data-value="${v}"]`)
-          .first()
-          .click()
-          .catch(() => {});
-        await pause(page, 300);
-      }
-      await page.getByText('Teacher Comment', { exact: true }).first().click();
-      await pause(page, 300);
       return { clip: [0, 0, W, H] };
     },
   },
@@ -463,7 +319,6 @@ const SHOTS = [
       };
     },
   },
-
   {
     file: 'curriculum.jpg',
     async run(page, base) {
@@ -487,7 +342,6 @@ const SHOTS = [
       };
     },
   },
-
   {
     file: 'student-learning.jpg',
     async run(page, base) {
@@ -497,7 +351,6 @@ const SHOTS = [
       return page.locator('.ps-screen');
     },
   },
-
   {
     file: 'student-feedback.jpg',
     async run(page, base) {
@@ -506,15 +359,6 @@ const SHOTS = [
       await page.locator('.ps-screen').getByText('My Learning', { exact: true }).last().click();
       await pause(page, 1200);
       await page.locator('.ps-screen').getByText('Science Fair Proposal').first().click();
-      await pause(page, 1500);
-      return page.locator('.ps-screen');
-    },
-  },
-  {
-    file: 'student-bulletins.jpg',
-    async run(page, base) {
-      await openPreview(page, base);
-      await page.locator('.ps-screen').getByText('Bulletins', { exact: true }).last().click();
       await pause(page, 1500);
       return page.locator('.ps-screen');
     },

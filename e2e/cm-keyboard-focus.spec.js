@@ -89,26 +89,26 @@ test('Escape closes the account menu and puts the focus on its button', async ({
   await expect(btn).toBeFocused();
 });
 
-test('Grading tab: a switch keeps the focus after Space, through its question, and a menu keeps it after a change', async ({
+test('How Folders Count keeps the focus after Space, through its question, and a Grading menu keeps it after a change', async ({
   page,
 }) => {
   await enterDemo(page);
-  await page.locator('[data-action="openClassManager"]').first().click();
-  await page.getByRole('tab', { name: /^Grading/ }).click();
-  const sw = () => page.locator('#cm-folders-count');
-  const before = await sw().isChecked();
-  await sw().focus();
+  await openCompetencies(page);
+  // A folder's Each choice moves grades, so it asks first.
+  const each = () => page.locator('.cm-fc-seg[data-value="each"]').first();
+  await expect(each()).toHaveAttribute('aria-checked', 'false');
+  await each().focus();
   await page.keyboard.press('Space');
-  // Folders Count as One moves grades, so it asks first.
   await expect(page.locator('#confirm-cancel-btn')).toBeFocused();
   await page.keyboard.press('Enter'); // Cancel
-  await expect(sw()).toBeFocused();
-  await expect(sw()).toBeChecked({ checked: before });
+  await expect(each()).toBeFocused();
+  await expect(each()).toHaveAttribute('aria-checked', 'false');
   await page.keyboard.press('Space');
   await page.locator('#confirm-ok-btn').click();
-  await expect(sw()).toBeChecked({ checked: !before });
-  await expect(sw()).toBeFocused();
+  await expect(each()).toHaveAttribute('aria-checked', 'true');
+  await expect(each()).toBeFocused();
 
+  await page.getByRole('tab', { name: /^Grading/ }).click();
   // A menu with no question keeps the focus after a change.
   const sel = page.locator('#cm-recent-limit');
   await sel.focus();

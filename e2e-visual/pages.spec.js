@@ -118,7 +118,7 @@ async function manageTab(page, tab, name) {
   await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
 }
 
-// The grader dialog grows in; wait for it to finish (e2e/grader-level-bar.spec.js).
+// The grader dialog grows in; wait for it to finish.
 async function settled(locator) {
   await locator.evaluate(el =>
     Promise.all(

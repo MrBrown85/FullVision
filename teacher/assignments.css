@@ -84,6 +84,13 @@
   font-weight: 600;
   color: var(--score-1-dark);
 }
+/* Dark: --score-1-dark is #ff453a there, 4.09:1 on --surface; the Emerging
+   text red is 4.94:1. */
+@media (prefers-color-scheme: dark) {
+  .assess-missing {
+    color: var(--score-1-text);
+  }
+}
 /* Header actions: shown on the open card, on hover for a closed one. */
 .assess-header-actions {
   grid-area: actions;
@@ -2114,12 +2121,13 @@ body.af-comp-open #gb-tooltip {
 .assess-seg-control {
   margin-left: 4px;
 }
-/* Search — subtle pill, 220px, giving way first when the row is tight */
+/* Search — subtle pill, up to 220px, giving way first when the row is tight */
 .assess-search-wrap {
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 220px;
+  flex: 1 1 110px;
+  max-width: 220px;
   min-width: 110px;
 }
 .assess-search-icon {
@@ -6170,10 +6178,15 @@ body.af-comp-open #gb-tooltip {
 .grader-print:hover {
   background: rgba(0, 122, 255, 0.16);
 }
+/* Dark: the link blue on a lighter tint, as the grader's Return All
+   (--active read 3.0:1, --link on the old 0.2 tint 4.49:1). */
 @media (prefers-color-scheme: dark) {
   .grader-print {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
+  }
+  .grader-print:hover {
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 .grader-scroll {
@@ -6803,15 +6816,17 @@ button.grader-member-name {
 .grader-return-all:hover {
   background: rgba(0, 122, 255, 0.16);
 }
+/* Dark: the link blue on a lighter tint, 4.87:1 at rest and 4.63:1 on
+   hover over --surface (--active read 3.0:1). */
 @media (prefers-color-scheme: dark) {
   .assess-return-btn,
   .grader-return-all {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
   }
   .assess-return-btn:hover,
   .grader-return-all:hover {
-    background: rgba(10, 132, 255, 0.28);
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 /* A row's mark beside the student's name. */
@@ -7502,15 +7517,11 @@ button.grader-member-name {
 /* Toolbar (Option A): one white row like the Dashboard and Gradebook.
    Category filters and Ungraded Only live in the Filter menu. */
 .assess-toolbar {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
 }
-/* A narrow window wraps rather than push the buttons out of sight. */
-@media (max-width: 1099px) {
-  .assess-toolbar {
-    flex-wrap: wrap;
-  }
-}
+/* A row that doesn't fit (a narrow window, a wide font, every button on)
+   wraps rather than push the buttons out of sight or scroll sideways. */
 .assess-toolbar .seg,
 .assess-toolbar .tb-action-btn {
   flex-shrink: 0;
@@ -9902,9 +9913,11 @@ button.grader-member-name {
   height: 28px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--active);
+  /* The link blue: 5.11:1 on --bg in light, 6.95:1 in dark (--active
+     read 3.7:1 in light). */
+  border: 1px solid var(--link);
   background: var(--bg);
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -10662,9 +10675,10 @@ button.grader-member-name {
   height: 30px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--active);
+  /* The link blue, as Grade Submissions: --active read 3.7:1 in light. */
+  border: 1px solid var(--link);
   background: var(--bg);
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -10780,7 +10794,8 @@ button.grader-member-name {
   border: 1px solid var(--divider-heavy);
   border-radius: 17px;
   background: var(--surface);
-  color: var(--active);
+  /* The link blue: --active read 4.02:1 on white. */
+  color: var(--link);
   font: inherit;
   font-size: var(--text-base);
   font-weight: 600;
