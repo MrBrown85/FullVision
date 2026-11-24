@@ -18,13 +18,15 @@
 //
 // The browser calls it with ?forceFunctionRegion=ca-central-1 so it runs
 // beside gradebook-prod; handler.ts refuses anywhere else. It reaches the
-// database over SUPABASE_DB_URL, as student-submit does, so the
-// student_submit schema never has to be exposed through the API.
-import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js';
+// database over its own login, fv_teacher_cards (TEACHER_CARDS_DB_URL,
+// ../_shared/db-login.ts), which can run only issue_cards, slip_roster and
+// issue_slips, so the student_submit schema never has to be exposed through
+// the API.
 import { loadCardKey } from '../_shared/card-key.ts';
+import { dbLogin } from '../_shared/db-login.ts';
 import { authUser, makeHandler } from './handler.ts';
 
-const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 2, idle_timeout: 20 });
+const sql = dbLogin(Deno.env.get('TEACHER_CARDS_DB_URL'));
 
 // The card key: exactly 64 hex characters, or no key. No fallback, and
 // nothing derived from another secret. Each time the function starts, one
@@ -39,21 +41,21 @@ const handle = makeHandler({
   db: {
     // One statement. The items are tags and ids; no code is among them.
     async issue(teacherId, courseId, items, keyId, requestId) {
-      const [row] = await sql`
+      const [row] = await sql()`
         select student_submit.issue_cards(
-          ${teacherId}::uuid, ${courseId}::uuid, ${sql.json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`;
+          ${teacherId}::uuid, ${courseId}::uuid, ${sql().json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`;
       return row.r;
     },
     // A slip request's two statements: the students, when the teacher names none; then the slips. Tags and ids only.
     async roster(teacherId, kind, targetId) {
-      const [row] = await sql`
+      const [row] = await sql()`
         select student_submit.slip_roster(${teacherId}::uuid, ${kind}::text, ${targetId}::uuid) as r`;
       return row.r;
     },
     async slips(teacherId, kind, targetId, items, keyId, requestId) {
-      const [row] = await sql`
+      const [row] = await sql()`
         select student_submit.issue_slips(
-          ${teacherId}::uuid, ${kind}::text, ${targetId}::uuid, ${sql.json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`;
+          ${teacherId}::uuid, ${kind}::text, ${targetId}::uuid, ${sql().json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`;
       return row.r;
     },
   },
