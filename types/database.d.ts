@@ -434,6 +434,38 @@ export type Database = {
           },
         ]
       }
+      bulletin_reminder: {
+        Row: {
+          bulletin_id: string
+          enrollment_id: string
+          reminded_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          bulletin_id: string
+          enrollment_id: string
+          reminded_at?: string
+        }
+        Update: {
+          bulletin_id?: string
+          enrollment_id?: string
+          reminded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_reminder_bulletin_id_fkey"
+            columns: ["bulletin_id"]
+            referencedRelation: "bulletin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_reminder_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            referencedRelation: "enrollment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulletin_seen: {
         Row: {
           bulletin_id: string
@@ -849,6 +881,8 @@ export type Database = {
           level_3_value: number
           level_4_descriptor: string | null
           level_4_value: number
+          level_5_descriptor: string | null
+          level_6_descriptor: string | null
           name: string
           rubric_id: string
           updated_at: string
@@ -867,6 +901,8 @@ export type Database = {
           level_3_value?: number
           level_4_descriptor?: string | null
           level_4_value?: number
+          level_5_descriptor?: string | null
+          level_6_descriptor?: string | null
           name: string
           rubric_id: string
           updated_at?: string
@@ -884,6 +920,8 @@ export type Database = {
           level_3_value?: number
           level_4_descriptor?: string | null
           level_4_value?: number
+          level_5_descriptor?: string | null
+          level_6_descriptor?: string | null
           name?: string
           rubric_id?: string
           updated_at?: string
@@ -2638,6 +2676,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          scale: Json | null
           style: string
           updated_at: string
         }
@@ -2648,6 +2687,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          scale?: Json | null
           style?: string
           updated_at?: string
         }
@@ -2657,6 +2697,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          scale?: Json | null
           style?: string
           updated_at?: string
         }
@@ -4995,7 +5036,11 @@ export type Database = {
         Returns: Json
       }
       show_bulletin_again: {
-        Args: { p_bulletin_id: string; p_idempotency_key?: string }
+        Args: {
+          p_bulletin_id: string
+          p_enrollment_ids?: string[]
+          p_idempotency_key?: string
+        }
         Returns: Json
       }
       soft_delete_teacher: {
@@ -5230,8 +5275,8 @@ export type Database = {
           p_id: string
           p_idempotency_key?: string
           p_linked_tag_ids?: Json
-          p_scale?: Json
           p_name: string
+          p_scale?: Json
           p_style?: string
         }
         Returns: string

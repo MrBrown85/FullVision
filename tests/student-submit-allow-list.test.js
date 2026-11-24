@@ -575,3 +575,77 @@ describe('quizzes: the routes copy exactly the keys the SQL builds', () => {
     }
   });
 });
+
+/* The returned view (migrations/2026112407_quiz_returned.sql, MQ3): the same two checks for quiz-result. */
+describe('quiz-result: the route copies exactly the keys the SQL builds', () => {
+  const file = read('migrations/2026112407_quiz_returned.sql');
+  const at = file.lastIndexOf('create or replace function student_submit.quiz_result(');
+  const open = file.indexOf('$function$', at);
+  const text = file.slice(open, file.indexOf('$function$;', open)).replace(/--.*$/gm, '');
+  const found = [];
+  let i = -1;
+  while ((i = text.indexOf('jsonb_build_object(', i + 1)) >= 0) {
+    found.push(
+      args(text, i + 'jsonb_build_object('.length)
+        .filter((_, n) => n % 2 === 0)
+        .map(k => /^'([a-z0-9_]+)'$/.exec(k)[1]),
+    );
+  }
+  const REFUSAL = ['ok', 'error'];
+
+  it('builds two refusals, returned false, the view, its total, its questions, and each question’s extras, and no others', () => {
+    expect(found).toEqual([
+      REFUSAL,
+      REFUSAL,
+      ['ok', 'returned'],
+      ['ok', 'returned', 'shows'],
+      ['total'],
+      Q.total,
+      ['questions'],
+      Q.right,
+      Q.answers,
+    ]);
+    // The top level the route passes on is exactly what the SQL can build there.
+    expect(Q.result).toEqual(['ok', 'returned', 'shows', 'total', 'questions']);
+    // A question is _quiz_questions' (checked above against Q.question) with those added.
+    expect(text).toContain('student_submit._quiz_questions(p_assessment_id, _t.question_order)');
+  });
+
+  it('a reply with a made-up key at every level comes out with exactly the SQL’s keys', async () => {
+    const extra = v => {
+      if (Array.isArray(v)) return v.map(extra);
+      if (!v || typeof v !== 'object') return v;
+      const out = { made_up: 'LEAK', key: 'LEAK', tag_id: U(9), tolerance: 0.5 };
+      for (const [k, inner] of Object.entries(v)) out[k] = extra(inner);
+      return out;
+    };
+    const VIEW = {
+      ok: true,
+      returned: true,
+      shows: 'answers',
+      total: { earned: 1, possible: 2 },
+      questions: [
+        {
+          id: U(1),
+          number: 1,
+          kind: 'choice',
+          prompt: 'Which is a producer?',
+          points: 1,
+          multiple: false,
+          choices: [{ id: U(2), text: 'Grass' }],
+          your_answer: [U(2)],
+          result: 'right',
+          answer: [U(2)],
+          why: 'It makes its own food.',
+        },
+      ],
+    };
+    const route = makeQuizRoutes({ db: { call: async () => extra(VIEW) } });
+    const body = { session: 'a'.repeat(64), enrollment_id: U(4), assessment_id: U(5) };
+    const r = await route('quiz-result', body, 'h');
+    expect(r.body).toEqual(VIEW);
+    expect(JSON.stringify(r.body)).not.toMatch(/LEAK|made_up|tag_id|tolerance|00000009/);
+    const none = makeQuizRoutes({ db: { call: async () => extra({ ok: true, returned: false }) } });
+    expect((await none('quiz-result', body, 'h')).body).toEqual({ ok: true, returned: false });
+  });
+});
