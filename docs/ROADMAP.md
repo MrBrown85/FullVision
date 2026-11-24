@@ -51,7 +51,7 @@ Without these, no feature set will be worth paying for.
 
 ## 3. Bring teachers over from the district tools
 
-1. **Import scores from Teams, Google Classroom and Schoology.** There's already an unused `import_teams_class` RPC. Teachers who still assign there can bring their scores in on day one and move their assignments over when they're ready. That turns your strongest competitor into a source of data instead of a reason to stay.
+1. **Import scores from Teams, Google Classroom and Schoology.** The old, unused `import_teams_class` RPC was dropped on 2026-11-24 (`migrations/2026112405_drop_import_teams_class.sql`); this import starts from a fresh design. Teachers who still assign there can bring their scores in on day one and move their assignments over when they're ready. That turns your strongest competitor into a source of data instead of a reason to stay.
 
 ## 4. What the school tier needs
 
