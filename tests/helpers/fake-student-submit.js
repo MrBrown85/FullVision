@@ -630,9 +630,23 @@ export function fakeStudentSubmit(opts = {}) {
     }
     return said;
   };
+  /* The tokens the function makes for a new card session or slip: 64 hex characters, all of them a to f, one
+     after another. A random one could hold a test's birthday or student number by chance (2012, 0123456), and
+     the tests look for those in what the page keeps. */
+  let tokens = 0;
+  const letterToken = () => {
+    let n = ++tokens;
+    let out = '';
+    while (n > 0) {
+      out = 'abcdef'[n % 6] + out;
+      n = Math.floor(n / 6);
+    }
+    return out.padStart(64, 'f');
+  };
   const options = {
     region: 'ca-central-1',
     ipKey: 'test-key',
+    sessionToken: letterToken,
     log: entry => logs.push(entry),
     db: {
       check: slip('check'),
