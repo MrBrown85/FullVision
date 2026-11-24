@@ -3889,8 +3889,7 @@ window.PageAssignments = (function () {
           title: _formResPdfTitle(file.name),
           pageCount: out.pages.length,
           pages: out.pages,
-          // The PDF itself, kept beside its pages so students can save and print it (data-handout-files.js).
-          original: file,
+          original: file, // the PDF itself, kept beside its pages for students to save and print
         });
         res.fresh = 'n' + res.next;
         return '';
