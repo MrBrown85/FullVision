@@ -4621,15 +4621,15 @@ window.DashClassManager = (function () {
     );
   }
 
-  /* A folder's As One | Each in How Folders Count. With the class switch
-     on, it is the folder's own Counts as One (asks first when grades move).
-     With it off every folder counts each competency, so As One turns the
-     switch on with only this folder as one: the others are set to Each
-     first, which moves nothing while the switch is off. */
+  /* A folder's As One | Each in How Folders Count; the pressed choice keeps the focus. With
+     the class switch on, it is the folder's own Counts as One (asks first when grades move).
+     With it off every folder counts each competency, so As One turns the switch on with only
+     this folder as one: the others go to Each first, which moves nothing while it is off. */
   function cmFolderCountChoice(grpId, value) {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var one = value === 'one';
+    _cmKeepFocusSel = window.CSS && '.cm-fc-seg[data-grpid="' + CSS.escape(grpId) + '"][data-value="' + value + '"]';
     if (getFoldersCountAsOne(cid)) {
       var map = getLearningMap(cid);
       var others = (map.competencyGroups || []).filter(function (g) {

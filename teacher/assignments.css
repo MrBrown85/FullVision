@@ -2114,12 +2114,13 @@ body.af-comp-open #gb-tooltip {
 .assess-seg-control {
   margin-left: 4px;
 }
-/* Search — subtle pill, 220px, giving way first when the row is tight */
+/* Search — subtle pill, up to 220px, giving way first when the row is tight */
 .assess-search-wrap {
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 220px;
+  flex: 1 1 110px;
+  max-width: 220px;
   min-width: 110px;
 }
 .assess-search-icon {
@@ -7504,15 +7505,11 @@ button.grader-member-name {
 /* Toolbar (Option A): one white row like the Dashboard and Gradebook.
    Category filters and Ungraded Only live in the Filter menu. */
 .assess-toolbar {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
 }
-/* A narrow window wraps rather than push the buttons out of sight. */
-@media (max-width: 1099px) {
-  .assess-toolbar {
-    flex-wrap: wrap;
-  }
-}
+/* A row that doesn't fit (a narrow window, a wide font, every button on)
+   wraps rather than push the buttons out of sight or scroll sideways. */
 .assess-toolbar .seg,
 .assess-toolbar .tb-action-btn {
   flex-shrink: 0;
