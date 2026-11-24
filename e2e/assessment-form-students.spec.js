@@ -70,10 +70,15 @@ test('groups are made only from the students chosen, and a drag says where they 
   await page.locator('.af-collab-btn[data-collab="group"]').click();
   await page.locator('[data-action="collabRandomGroups"]').click();
   await expect(page.locator('.collab-group-member')).toHaveCount(n - 1);
-  // Drag the first student of Group 1 into Group 2.
+  // Drag the first student of Group 1 into Group 2. The drag events go
+  // straight to the elements, as in assign-collab-panel.spec.js: the form is
+  // still scrolling into view, so a mouse drag can miss on a slow machine.
   const member = page.locator('[data-collab-drop="0"] .collab-group-member').first();
   const name = (await member.textContent()).trim();
-  await member.dragTo(page.locator('[data-collab-drop="1"]'));
+  const dt = await page.evaluateHandle(() => new DataTransfer());
+  await member.dispatchEvent('dragstart', { dataTransfer: dt });
+  await page.locator('[data-collab-drop="1"]').dispatchEvent('dragover', { dataTransfer: dt });
+  await page.locator('[data-collab-drop="1"]').dispatchEvent('drop', { dataTransfer: dt });
   await expect(page.locator('.collab-moved')).toContainText('moved to Group 2.');
   await expect(page.locator('[data-collab-drop="1"]')).toContainText(name.slice(2));
   await page.locator('[data-action="collabUndoMove"]').click();
