@@ -600,9 +600,6 @@ grant execute on routine public.import_json_restore(p_payload jsonb, p_idempoten
 revoke all on routine public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) from public;
 grant execute on routine public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) to service_role;
-revoke all on routine public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) from public;
-grant execute on routine public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) to authenticated;
-grant execute on routine public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) to service_role;
 revoke all on routine public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) from public;
 grant execute on routine public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) to service_role;
@@ -713,6 +710,9 @@ grant execute on routine public.move_rubric_scores(p_assessment_id uuid, p_rubri
 revoke all on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) from public;
 grant execute on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) to authenticated;
 grant execute on routine public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) to service_role;
+revoke all on routine public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) from public;
+grant execute on routine public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) to authenticated;
+grant execute on routine public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) to service_role;
 revoke all on routine public.photo_lifecycle_nightly() from public;
 revoke all on routine public.photo_removal_call() from public;
 revoke all on routine public.photo_removal_due() from public;
