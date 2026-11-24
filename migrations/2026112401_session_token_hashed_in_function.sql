@@ -177,5 +177,13 @@ revoke all on function student_submit.verify_card(text, text, text, text, text, 
     from public, anon, authenticated;
 grant execute on function student_submit.verify_card(text, text, text, text, text, text, text, boolean, text)
     to service_role;
+-- And to student-submit's own login, when 2026112402 has made it: DROP took its grant with it.
+do $$
+begin
+    if exists (select 1 from pg_roles where rolname = 'fv_student_submit') then
+        grant execute on function student_submit.verify_card(text, text, text, text, text, text, text, boolean, text)
+            to fv_student_submit;
+    end if;
+end $$;
 
 commit;
