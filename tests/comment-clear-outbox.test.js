@@ -100,6 +100,19 @@ describe('a comment deleted offline, then a level change', () => {
     expect(calls[0]).toMatchObject({ p_criterion_id: CRIT, p_value: 4, p_comment: '', p_beyond: '' });
   });
 
+  it('sends a cleared line for one student as cleared with the new level, though the level leaves it out', async () => {
+    saveRubricCriterionOwn(CID, ENR, AID_R, CRIT, 'Your table was the clearest.');
+    await sendAll();
+    setOnline(false);
+    saveRubricCriterionOwn(CID, ENR, AID_R, CRIT, '');
+    upsertScore(CID, ENR, AID_R, CRIT, 4, '2026-10-03', 'summative', '');
+    await sendAll();
+
+    const calls = sent('upsert_rubric_score');
+    const last = calls[calls.length - 1];
+    expect(last).toMatchObject({ p_criterion_id: CRIT, p_value: 4, p_own_comment: '' });
+  });
+
   it('still lets a newer comment replace a queued one', async () => {
     saveTagComment(CID, ENR, AID, TAG, '');
     saveTagComment(CID, ENR, AID, TAG, 'Right note.');

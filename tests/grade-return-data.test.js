@@ -180,6 +180,13 @@ const WRITER_SCENARIOS = {
     saveRubricCriterionBeyond(CID, 's1', 'lab', 'c2', '');
     if (on) expect(row('s1', 'lab').returned_copy.criteria.c2.beyond).toBe('Drew the set-up');
   },
+  saveRubricCriterionOwn(on) {
+    saveRubricCriterionOwn(CID, 's1', 'lab', 'c1', 'Your steps were the clearest');
+    if (on) expect(state('s1', 'lab')).toBe('draft');
+    give('lab', 's1');
+    saveRubricCriterionOwn(CID, 's1', 'lab', 'c1', '');
+    if (on) expect(row('s1', 'lab').returned_copy.criteria.c1.own).toBe('Your steps were the clearest');
+  },
   saveTagComment(on) {
     saveTagComment(CID, 's1', 'essay', 't2', 'Use a second source');
     if (on) expect(state('s1', 'essay')).toBe('draft');
@@ -1759,6 +1766,7 @@ describe('the grader’s gradebook, phone and Assignments page actions follow th
       'setStatus',
       'setTick',
       'setCriterionComment',
+      'setCriterionOwn',
       'setWentBeyond',
       'setCompetencyComment',
       'setOverallComment',

@@ -832,6 +832,8 @@
     function level(r, criterion) {
       var out = { value: r.value, modifier: r.modifier || 0, comment: r.comment || null };
       if (criterion) out.beyond = r.beyond || null;
+      // The line for this student alone on group work, only when there is one.
+      if (criterion && r.own) out.own = r.own;
       return out;
     }
     var copy = {

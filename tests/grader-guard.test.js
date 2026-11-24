@@ -32,6 +32,7 @@ const WRITERS = [
   'setRubricCheck', // a checklist tick
   'saveRubricCriterionComment', // a criterion's comment
   'saveRubricCriterionBeyond', // a single-point rubric's Went Beyond
+  'saveRubricCriterionOwn', // on group work, a line for one student under a criterion
   'saveTagComment', // a competency's comment
   'saveScoreComment', // the Overall Comment
   'saveScoreReportNote', // the Note for the Report

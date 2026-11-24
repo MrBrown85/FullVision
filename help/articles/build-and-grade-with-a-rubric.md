@@ -35,6 +35,7 @@ labels:
   - Set Everyone To
   - Comment
   - Same As
+  - Line for One Student
   - Work On
   - Went Beyond
 next:
@@ -85,5 +86,5 @@ To use a saved rubric, select it in the Rubric Bank and choose **Use in New Asse
 
 1. Open the assessment on the Assignments page. Each student has a line for each criterion.
 2. Select a level on each line. On an Advanced rubric, tick the boxes the work shows; the highest level whose boxes are all ticked is suggested, and any level can be chosen instead. On a Single-Point rubric, type notes under **Work On** and **Went Beyond**.
-3. To add a note to one criterion, choose **Comment** under its name and type the note in the box that opens under the levels. It saves as you type. Press Tab or Enter to go on to the next criterion, then to the overall comment; Shift+Enter starts a new line, and Escape closes the box. The note prints under that criterion on the rubric handout. On pair and group work the note is the group's. A note already written on that criterion for another student or group shows under **Same As**; choose it to use it again.
+3. To add a note to one criterion, choose **Comment** under its name and type the note in the box that opens under the levels. It saves as you type. Press Tab or Enter to go on to the next criterion, then to the overall comment; Shift+Enter starts a new line, and Escape closes the box. The note prints under that criterion on the rubric handout. On pair and group work the note is the group's; under **Line for One Student**, choose a member's name to add a line for them alone, which prints only on their sheet and shows only on their page. A note already written on that criterion for another student or group shows under **Same As**; choose it to use it again.
 4. To score the whole class, choose a level in the **Set Everyone To** row and confirm. Only criteria not yet scored are set.

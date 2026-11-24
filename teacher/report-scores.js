@@ -221,6 +221,12 @@ window.ReportScores = (function () {
     return _criterionNote(cid, sid, aid, criterion, 'critBeyond');
   }
 
+  // On pair or group work, the line for this student alone under a criterion, or ''.
+  function criterionOwn(cid, sid, aid, criterion) {
+    if (setInUse() === 'all') return getRubricCriterionOwn(cid, sid, aid, criterion);
+    return _criterionNote(cid, sid, aid, criterion, 'critOwn');
+  }
+
   // The comment on one competency of work scored by competency levels, or ''.
   function tagComment(cid, sid, aid, tagId) {
     if (setInUse() === 'all') return getTagComment(cid, sid, aid, tagId);
@@ -324,6 +330,7 @@ window.ReportScores = (function () {
     getScoreComment: comment,
     getRubricCriterionComment: criterionComment,
     getRubricCriterionBeyond: criterionBeyond,
+    getRubricCriterionOwn: criterionOwn,
     getTagComment: tagComment,
     getScoreReportNote: reportNote,
     getRubricCheckIds: checkIds,

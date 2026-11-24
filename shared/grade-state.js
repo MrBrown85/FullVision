@@ -93,7 +93,11 @@ window.GradeState = (function () {
       comment: _text(row.comment),
     };
     if (criterion) out.beyond = _text(row.beyond);
-    return out.value == null && !out.comment && !out.beyond ? null : out;
+    // The line for one student on group work: in a copy only when there is
+    // one, as the server writes it (_grade_copy_entry).
+    var own = criterion ? _text(row.own) : null;
+    if (own) out.own = own;
+    return out.value == null && !out.comment && !out.beyond && !own ? null : out;
   }
   function _parts(rows, criterion) {
     var out = {};

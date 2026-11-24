@@ -824,7 +824,7 @@ begin
                   and (x.value is not null or nullif(btrim(x.status), '') is not null
                        or nullif(btrim(x.comment), '') is not null or nullif(btrim(x.report_note), '') is not null))
        or exists (select 1 from rubric_score x where x.assessment_id = new.id
-                     and (x.value is not null or nullif(btrim(x.comment), '') is not null or nullif(btrim(x.beyond), '') is not null))
+                     and (x.value is not null or nullif(btrim(x.comment), '') is not null or nullif(btrim(x.beyond), '') is not null or nullif(btrim(x.own_comment), '') is not null))
        or exists (select 1 from tag_score x where x.assessment_id = new.id
                      and (x.value is not null or nullif(btrim(x.comment), '') is not null))
        or exists (select 1 from rubric_check_score x where x.assessment_id = new.id)
@@ -1078,29 +1078,33 @@ AS $function$
            from tag_score t
           where t.enrollment_id = p_enrollment_id and t.assessment_id = p_assessment_id
             and _grade_copy_entry(t.value, t.modifier, t.comment, null, false) is not null),
-        (select jsonb_object_agg(r.criterion_id::text, _grade_copy_entry(r.value, r.modifier, r.comment, r.beyond, true))
+        (select jsonb_object_agg(r.criterion_id::text, _grade_copy_entry(r.value, r.modifier, r.comment, r.beyond, true, r.own_comment))
            from rubric_score r
           where r.enrollment_id = p_enrollment_id and r.assessment_id = p_assessment_id
-            and _grade_copy_entry(r.value, r.modifier, r.comment, r.beyond, true) is not null),
+            and _grade_copy_entry(r.value, r.modifier, r.comment, r.beyond, true, r.own_comment) is not null),
         (select jsonb_agg(k.check_id::text)
            from rubric_check_score k
           where k.enrollment_id = p_enrollment_id and k.assessment_id = p_assessment_id));
 $function$;
 
-CREATE OR REPLACE FUNCTION public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean)
+CREATE OR REPLACE FUNCTION public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean, p_own text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE sql
  IMMUTABLE
  SET search_path TO 'public', 'pg_temp'
 AS $function$
     select case
-        when p_value is null and nullif(btrim(p_comment), '') is null and nullif(btrim(p_beyond), '') is null then null
+        when p_value is null and nullif(btrim(p_comment), '') is null and nullif(btrim(p_beyond), '') is null
+             and not (coalesce(p_criterion, false) and nullif(btrim(p_own), '') is not null) then null
         else jsonb_build_object(
                  'value', p_value,
                  'modifier', case when p_value is null then 0 else coalesce(p_modifier, 0) end,
                  'comment', case when nullif(btrim(p_comment), '') is null then null else p_comment end)
              || case when p_criterion
                      then jsonb_build_object('beyond', case when nullif(btrim(p_beyond), '') is null then null else p_beyond end)
+                     else '{}'::jsonb end
+             || case when coalesce(p_criterion, false) and nullif(btrim(p_own), '') is not null
+                     then jsonb_build_object('own', p_own)
                      else '{}'::jsonb end
     end;
 $function$;
@@ -5431,9 +5435,9 @@ begin
               join enr on enr.id = t.enrollment_id
               join asm on asm.id = t.assessment_id
               join tg on tg.id = t.tag_id), '[]'::jsonb),
-        -- [student, assessment, criterion, value, modifier, comment, beyond]
+        -- [student, assessment, criterion, value, modifier, comment, beyond, own]
         'criterion_rows', coalesce((
-            select jsonb_agg(jsonb_build_array(enr.ix, asm.ix, cr.ix, r.value, r.modifier, r.comment, r.beyond))
+            select jsonb_agg(jsonb_build_array(enr.ix, asm.ix, cr.ix, r.value, r.modifier, r.comment, r.beyond, r.own_comment))
               from public.rubric_score r
               join enr on enr.id = r.enrollment_id
               join asm on asm.id = r.assessment_id
@@ -6953,7 +6957,7 @@ begin
     'rubric_scores', coalesce((
       select jsonb_agg(jsonb_build_object(
                'assessment', a.title, 'date', coalesce(a.due_date, a.date_assigned),
-               'criterion', c.name, 'value', rs.value, 'modifier', rs.modifier, 'comment', rs.comment, 'beyond', rs.beyond)
+               'criterion', c.name, 'value', rs.value, 'modifier', rs.modifier, 'comment', rs.comment, 'beyond', rs.beyond, 'own', rs.own_comment)
              order by coalesce(a.due_date, a.date_assigned), a.title, c.display_order)
         from public.rubric_score rs
         join public.assessment a on a.id = rs.assessment_id
@@ -7385,17 +7389,17 @@ begin
 
     if p_payload ? 'rubric_scores' then
       insert into rubric_score (id, enrollment_id, assessment_id, criterion_id, value,
-                                modifier, comment, beyond)
+                                modifier, comment, beyond, own_comment)
       select distinct on ((r->>'enrollment_id')::uuid, (r->>'assessment_id')::uuid, (r->>'criterion_id')::uuid)
              coalesce(nullif(r->>'id','')::uuid, gen_random_uuid()),
              (r->>'enrollment_id')::uuid, (r->>'assessment_id')::uuid, (r->>'criterion_id')::uuid,
              (r->>'value')::int,
              coalesce((r->>'modifier')::smallint, 0),
-             nullif(r->>'comment',''), nullif(r->>'beyond','')
+             nullif(r->>'comment',''), nullif(r->>'beyond',''), nullif(r->>'own_comment','')
         from jsonb_array_elements(case when jsonb_typeof(p_payload->'rubric_scores') = 'array' then p_payload->'rubric_scores' else '[]'::jsonb end) r
       on conflict (enrollment_id, assessment_id, criterion_id) do update set
         value=excluded.value, modifier=excluded.modifier, comment=excluded.comment,
-        beyond=excluded.beyond, updated_at=now();
+        beyond=excluded.beyond, own_comment=excluded.own_comment, updated_at=now();
       get diagnostics _n_rs = row_count;
     end if;
 
@@ -12340,42 +12344,44 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint DEFAULT 0, p_comment text DEFAULT NULL::text, p_beyond text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint DEFAULT 0, p_comment text DEFAULT NULL::text, p_beyond text DEFAULT NULL::text, p_own_comment text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
 AS $function$
-declare _id uuid; _note text; _beyond text;
+declare _id uuid; _note text; _beyond text; _own text;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
 
     if p_value is null or p_value = 0 then
         -- No level: keep the row only for its notes.
-        select comment, beyond into _note, _beyond from rubric_score
+        select comment, beyond, own_comment into _note, _beyond, _own from rubric_score
          where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id and criterion_id = p_criterion_id;
         if p_comment is not null then _note := nullif(p_comment, ''); end if;
         if p_beyond is not null then _beyond := nullif(p_beyond, ''); end if;
-        if _note is null and _beyond is null then
+        if p_own_comment is not null then _own := nullif(p_own_comment, ''); end if;
+        if _note is null and _beyond is null and _own is null then
             delete from rubric_score
              where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id and criterion_id = p_criterion_id;
             return null;
         end if;
-        insert into rubric_score (enrollment_id, assessment_id, criterion_id, value, modifier, comment, beyond)
-        values (p_enrollment_id, p_assessment_id, p_criterion_id, null, 0, _note, _beyond)
+        insert into rubric_score (enrollment_id, assessment_id, criterion_id, value, modifier, comment, beyond, own_comment)
+        values (p_enrollment_id, p_assessment_id, p_criterion_id, null, 0, _note, _beyond, _own)
         on conflict (enrollment_id, assessment_id, criterion_id) do update
-           set value = null, modifier = 0, comment = _note, beyond = _beyond, updated_at = now()
+           set value = null, modifier = 0, comment = _note, beyond = _beyond, own_comment = _own, updated_at = now()
         returning id into _id;
         return _id;
     end if;
 
-    insert into rubric_score (enrollment_id, assessment_id, criterion_id, value, modifier, comment, beyond)
+    insert into rubric_score (enrollment_id, assessment_id, criterion_id, value, modifier, comment, beyond, own_comment)
     values (p_enrollment_id, p_assessment_id, p_criterion_id, p_value, coalesce(p_modifier, 0),
-            nullif(p_comment, ''), nullif(p_beyond, ''))
+            nullif(p_comment, ''), nullif(p_beyond, ''), nullif(p_own_comment, ''))
     on conflict (enrollment_id, assessment_id, criterion_id) do update
        set value = excluded.value,
            modifier = excluded.modifier,
            comment = case when p_comment is null then rubric_score.comment else nullif(p_comment, '') end,
            beyond = case when p_beyond is null then rubric_score.beyond else nullif(p_beyond, '') end,
+           own_comment = case when p_own_comment is null then rubric_score.own_comment else nullif(p_own_comment, '') end,
            updated_at = now()
     returning id into _id;
     return _id;

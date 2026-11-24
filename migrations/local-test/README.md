@@ -2965,3 +2965,19 @@ FV_EDGE_ROLE=no python3 handout_pdf_original.py                                #
 ```
 
 Scenarios: `teacher`, `storage`, `student`, `lifecycle`, `apply`, `undo`, `collations` (docstring of the script). Result on 2026-11-24, PostgreSQL 17.11 (embedded-postgres), on databases rebuilt with `--check` from `main` at `f3873254`: under ICU en-US **137 of 137**; under C **137 of 137**; as a role that is not a superuser **144 of 144** on each; on a cluster without the role `fv_student_submit` **136 of 136** (no collations scenario). Not verified here: gradebook-prod, PostgREST's schema cache, the Storage API (the policies are tested through rows in `storage.objects`), the edge function deployed.
+
+## A line for one student under a criterion (2026112410, 2026-11-24)
+
+One file, `../2026112410_criterion_own_line.sql`, **applied Nov 24 2026** on Colin's OK (pre-check no rows; post-check all 21 ok), about 24 KB. On pair and group work the app copies each criterion's level, comment and Went Beyond to every member; this adds a note per criterion that belongs to one student and is never copied ("Hannah only: ..."). It adds `rubric_score.own_comment` (null on every row); replaces `upsert_rubric_score` (the seven-argument version is dropped, the eight-argument one adds `p_own_comment` last, with the rule of `p_comment` and `p_beyond`: null keeps, `''` clears, a row with no level stays while a comment, a Went Beyond or a line remains) and `_grade_copy_entry` (the five-argument version is dropped; a sixth `p_own` adds the key `own` to a criterion entry only when it is not blank, and answers exactly as before otherwise); and patches five functions in place, each behind its live md5: `_grade_copy`, `get_class_bundle` (an eighth tuple element), `get_withdrawn_student_records`, `import_json_restore` and `_assessment_draft_guard`. It changes no row and no stored grade copy. The edge function `student-submit` (`gradeCopy` in `card-routes.ts`) keeps only the keys it names for a criterion and must also name `own` before a student can see the line. Pre-check `criterion-own-line-live-precheck.sql`, live fingerprints `criterion-own-line-live-fingerprints.sql` (no rows means all 16 match; read from gradebook-prod, read-only, on 2026-11-24: no rows), post-check `criterion-own-line-live-postcheck.sql`, undo `criterion-own-line-undo.sql` (no PART 0: the one function is both the write and the stop; it refuses while any line is held, because dropping the column would delete it).
+
+```bash
+$PSQL postgresql://postgres@127.0.0.1:54931/postgres -c "create database ol_icu template template0 locale_provider icu icu_locale 'en-US' lc_collate 'en_US.UTF-8' lc_ctype 'en_US.UTF-8'"
+$PSQL postgresql://postgres@127.0.0.1:54931/postgres -c "create database ol_c template template0 locale_provider libc lc_collate 'C' lc_ctype 'C'"
+DATABASE_URL=postgresql://postgres@127.0.0.1:54931/ol_icu node scripts/db-rebuild.mjs --check     # and the same for ol_c
+export PGPORT=54931 PYTHONDONTWRITEBYTECODE=1
+PGDATABASE=ol_icu python3 criterion_own_line.py fingerprints   # once, on a template that does not have the file
+PGDATABASE=ol_icu python3 criterion_own_line.py
+PGDATABASE=ol_c python3 criterion_own_line.py
+```
+
+Scenarios: `upsert`, `copy`, `readers`, `apply`, `undo` (docstring of the script). `copy` compares the old and new `_grade_copy_entry` on 1,440 argument sets with the line absent, null and blank, and `_grade_copy` on every (student, piece) pair of 400 random rows, as text; `readers` reads a student's page for a group of three and checks that no student's page holds a group mate's line. Result on 2026-11-24, PostgreSQL 17.11 (embedded-postgres), on databases rebuilt with `--check` from `main` at `4a77e60c`: under ICU en-US **108 of 108**; under C **108 of 108**. Not verified here: gradebook-prod, PostgREST's schema cache, a non-superuser applying role, the edge function.

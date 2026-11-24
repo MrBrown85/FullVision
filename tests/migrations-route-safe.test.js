@@ -49,6 +49,10 @@ export const LISTED = [
   'migrations/local-test/quiz-returned-live-postcheck.sql',
   'migrations/local-test/quiz-returned-undo.sql',
   'migrations/local-test/quiz-returned-live-fingerprints.sql',
+  'migrations/local-test/criterion-own-line-live-fingerprints.sql',
+  'migrations/local-test/criterion-own-line-live-precheck.sql',
+  'migrations/local-test/criterion-own-line-live-postcheck.sql',
+  'migrations/local-test/criterion-own-line-undo.sql',
 ];
 
 const BS = String.fromCharCode(92);
