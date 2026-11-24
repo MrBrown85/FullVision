@@ -24,12 +24,20 @@ const METHODS = ['average', 'mostRecent', 'highest', 'median', 'mode', 'decaying
 
 /* ── Loading the two classes ─────────────────────────────────── */
 
-export function loadDemoClass() {
+export function loadDemoClass(opts) {
   window.isDemoMode = () => true;
   localStorage.clear();
   CURRICULUM_INDEX = newBankIndex(['SCI8']);
   runInThisContext(readFileSync(resolve(ROOT, 'shared/seed-data.js'), 'utf-8'), { filename: 'shared/seed-data.js' });
   seedIfNeeded();
+  // The two sample quiz pieces (Quizzes, on since Q6) are not part of the class these grades pin: they hold
+  // no score, so no grade of any other piece moves, and the pinned files stay as they were.
+  // tests/quiz-golden-demo.test.js asks for them ({ quizzes: true }) and checks that.
+  if (!(opts && opts.quizzes))
+    saveAssessments(
+      'sci8',
+      getAssessments('sci8').filter(a => !/^sci8-quiz-/.test(a.id)),
+    );
   return 'sci8';
 }
 

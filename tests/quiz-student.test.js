@@ -136,14 +136,6 @@ describe('Start the Quiz', () => {
     await page.click('[data-act="quiz-back"]');
     expect(start(page).textContent).toBe('Carry On with the Quiz');
   });
-  it('is nowhere with the switch off, and nothing is asked', async () => {
-    const page = await signIn(world(), {});
-    expect(start(page)).toBe(null);
-    expect(page.root().innerHTML).not.toMatch(/quiz/i);
-    await page.settle();
-    expect(routes(page).filter(r => /^quiz/.test(r))).toEqual([]); // no request of ours: the page's own are main's
-    expect(Object.keys(page.store)).toEqual(['fv-s-session']);
-  });
   it('is nowhere when the server marks no piece (until the server has it, the page offers nothing)', async () => {
     const page = await signIn(world({ unmarked: true }));
     expect(start(page)).toBe(null);

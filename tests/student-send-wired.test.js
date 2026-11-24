@@ -148,7 +148,7 @@ describe('a class with Send Work off: nothing about sending, and the page as it 
     page.tap('[data-act="card-yes"]');
     for (let i = 0; i < 50 && !routes(page).includes('work'); i++) await page.tick();
     for (let i = 0; i < 5; i++) await page.tick();
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'forms']);
     const drawn = page.root().innerHTML;
     expect(drawn).toContain('sp-page-title');
     open();
@@ -156,7 +156,7 @@ describe('a class with Send Work off: nothing about sending, and the page as it 
     // Byte for byte what was drawn before `work` answered.
     expect(page.root().innerHTML).toBe(drawn);
     expect(drawn).not.toMatch(/sp-send|Send My Work|Hand this one in on paper/);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'quiz-list', 'work', 'forms']);
     expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
     expect(page.storageCalls).toEqual([]);
   });
@@ -167,7 +167,17 @@ describe('a real send: start, each file to its link, finish', () => {
     const dev = school();
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'bulletins', 'work', 'forms', 'feedback', 'group-work']);
+    expect(routes(page)).toEqual([
+      'card',
+      'verify',
+      'page',
+      'bulletins',
+      'quiz-list',
+      'work',
+      'forms',
+      'feedback',
+      'group-work',
+    ]);
     // Outstanding: the poster, past its due date, takes work; the quick check takes none and says nothing of sending.
     expect(page.root().querySelector(piece(WORK.poster) + ' [data-act="send-open"]')).toBeTruthy();
     expect(page.root().querySelector(piece(WORK.quick))).toBeTruthy();
@@ -220,6 +230,7 @@ describe('a real send: start, each file to its link, finish', () => {
       'verify',
       'page',
       'bulletins',
+      'quiz-list',
       'work',
       'forms',
       'feedback',
@@ -445,6 +456,7 @@ describe('a send survives a reload, within its two hours', () => {
     expect(routes(again)).toEqual([
       'page',
       'bulletins',
+      'quiz-list',
       'work',
       'forms',
       'feedback',
@@ -476,7 +488,7 @@ describe('a send survives a reload, within its two hours', () => {
     dev.clock = () => finishBy + 60 * 1000;
     const again = await dev.open('');
     expect(text(again, '#sp-send-title')).toBe('Not sent');
-    expect(routes(again)).toEqual(['page', 'bulletins', 'work', 'forms', 'feedback', 'group-work']);
+    expect(routes(again)).toEqual(['page', 'bulletins', 'quiz-list', 'work', 'forms', 'feedback', 'group-work']);
     await again.click('[data-act="send-restart"]');
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0].request_id).not.toBe(request);

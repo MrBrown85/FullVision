@@ -468,7 +468,7 @@ table.quiz-rt tr.is-selected > * {
   padding: 2px 8px;
   min-height: 24px;
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   cursor: pointer;
   white-space: nowrap;
 }

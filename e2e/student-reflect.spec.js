@@ -18,6 +18,8 @@ async function demo(page) {
     if (m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/s/#demo-card-reflect');
+  // The sample quiz is due today, so it would be the next piece and take the plan (Q6).
+  await page.evaluate(() => (StudentPage.demoQuiz = () => []));
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Student Number').fill('1234567');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();

@@ -905,6 +905,14 @@
   var BULLETINS_NOTE = 'Bulletins are not in this file.';
   var BULLETINS_NOT_IN_BACKUP = 'Bulletins are not in a backup.';
 
+  /* Quizzes are never in a class backup either (docs/plans/quizzes-plan.md,
+     Q6): the questions, the answer key, every student's tries and what the
+     teacher confirmed live on the server with the class. Every file says so
+     in its `quizzes` field, and Restore Class from Backup says it too. A
+     restore reads nothing from the field. */
+  var QUIZZES_NOTE = 'Quizzes are not in this file.';
+  var QUIZZES_NOT_IN_BACKUP = 'Quizzes are not in a backup.';
+
   function anyClassTakesWork() {
     return Object.keys(typeof COURSES !== 'undefined' && COURSES ? COURSES : {}).some(function (cid) {
       return !!photosNote(cid);
@@ -916,6 +924,8 @@
     PHOTOS_NOT_IN_BACKUP: PHOTOS_NOT_IN_BACKUP,
     BULLETINS_NOTE: BULLETINS_NOTE,
     BULLETINS_NOT_IN_BACKUP: BULLETINS_NOT_IN_BACKUP,
+    QUIZZES_NOTE: QUIZZES_NOTE,
+    QUIZZES_NOT_IN_BACKUP: QUIZZES_NOT_IN_BACKUP,
     anyClassTakesWork: anyClassTakesWork,
     photosNote: photosNote,
     parseBackup: parseBackup,

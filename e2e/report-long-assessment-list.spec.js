@@ -53,7 +53,8 @@ async function openWith(page, total, setup = 'conference-pack') {
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const n = await page.evaluate(total => {
     const cid = 'sci8';
-    const list = getAssessments(cid);
+    // The sample quizzes (Quizzes, on since Q6) are not part of this count.
+    const list = getAssessments(cid).filter(a => !/^sci8-quiz-/.test(a.id));
     const extra = [];
     for (let i = list.length; i < total; i++) {
       const from = list[i % list.length];

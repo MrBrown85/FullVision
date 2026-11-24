@@ -132,13 +132,13 @@ describe('the four tabs', () => {
 describe('Outstanding and Upcoming', () => {
   it('Outstanding is what is due by today and what is Missing; Upcoming what is due after today', async () => {
     const page = await demo();
-    expect(segments(page)).toEqual(['Outstanding 2', 'Upcoming 1']);
+    expect(segments(page)).toEqual(['Outstanding 3', 'Upcoming 1']);
     const view = page.T.viewOf(page.T.state());
-    expect(view.counts).toEqual({ toDo: 2, sent: 0, back: 6, missing: 1 });
-    expect(page.T.counts(view)).toEqual({ outstanding: 2, upcoming: 1 });
+    expect(view.counts).toEqual({ toDo: 3, sent: 0, back: 6, missing: 1 });
+    expect(page.T.counts(view)).toEqual({ outstanding: 3, upcoming: 1 });
     // The tab opens on Outstanding, the oldest due date first.
-    expect(pressed(page)).toBe('Outstanding 2');
-    expect(titles(page)).toEqual(['Immune System Quick Check', 'Disease Research Poster']);
+    expect(pressed(page)).toBe('Outstanding 3');
+    expect(titles(page)).toEqual(['Immune System Quick Check', 'Disease Research Poster', 'Data Patterns Quick Check']);
     await page.click('[data-segment="upcoming"]');
     expect(pressed(page)).toBe('Upcoming 1');
     expect(titles(page)).toEqual(['Science Fair Proposal']);
@@ -212,7 +212,7 @@ describe('Outstanding and Upcoming', () => {
     const page = await demo();
     page.root().querySelector('[data-segment="upcoming"]').setAttribute('data-segment', 'back');
     await page.click('[data-segment="back"]');
-    expect(pressed(page)).toBe('Outstanding 2');
+    expect(pressed(page)).toBe('Outstanding 3');
   });
 
   it('a row on My Learning is watched for "opened" once My Learning is showing, and told to the server once', async () => {

@@ -28,7 +28,7 @@ async function demo(page) {
   // The sample class has bulletins, so the page opens on them (B1g); Assignments is the next tab.
   await page.locator('.sp-tab[data-tab="assignments"]').locator('visible=true').first().click();
   // Outstanding: Cell Microscope Lab (Needs Revision), Immune System Quick Check (missing), Disease Research Poster (past due).
-  await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outstanding 4' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upcoming 1' })).toBeVisible();
   return { posts, errors };
 }
@@ -68,7 +68,7 @@ for (const [where, device] of [
       await expect(page.getByRole('heading', { name: 'Sent to Your Teacher' })).toBeVisible();
       await page.getByRole('button', { name: 'Back to My Work' }).click();
       // The revision sent leaves Outstanding and is the first row of My Learning's Your Work.
-      await expect(page.getByRole('button', { name: 'Outstanding 2' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Outstanding 3' })).toBeVisible();
       await page.getByRole('button', { name: /^My Learning/ }).click();
       const row = page.locator('.sp-ml-work .sp-ml-row').first();
       await expect(row).toContainText('Cell Microscope Lab');
@@ -83,7 +83,7 @@ for (const [where, device] of [
       await sent.getByRole('button', { name: 'Unsend' }).click();
       await page.getByRole('alertdialog').getByRole('button', { name: 'Unsend' }).click();
       // Unsent: the page goes to its card, Needs Revision again, first in Outstanding, its title focused.
-      await expect(page.getByRole('button', { name: 'Outstanding 3' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('button', { name: 'Outstanding 4' })).toHaveAttribute('aria-pressed', 'true');
       await expect(page.locator('.sp-deck .sp-piece').first().locator('.sp-flag-revise')).toHaveText(/^Revise by /);
       await expect(lab.locator('.sp-piece-title')).toBeFocused();
       await expect(lab.getByRole('button', { name: 'Send My Revision' })).toBeVisible();

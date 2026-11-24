@@ -81,6 +81,7 @@ describe('the count on My Learning', () => {
       'verify',
       'page',
       'bulletins',
+      'quiz-list',
       'work',
       'forms',
     ]);

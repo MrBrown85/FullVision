@@ -154,7 +154,8 @@ test.describe('Gradebook sorting and filters (pinned)', () => {
     // What each chip should leave, read from the store.
     const want = await page.evaluate(
       ([cat, mod, sec]) => {
-        const all = getAssessments('sci8');
+        // A Draft is not a column of the gradebook.
+        const all = getAssessments('sci8').filter(a => !a.isDraft);
         const inCat = all.filter(a => (a.categoryId || a.category_id) === cat);
         const inMod = inCat.filter(a => a.moduleId === mod);
         const inSec = inMod.filter(a =>

@@ -90,7 +90,9 @@ test.describe('Assignments list actions in Demo Mode', () => {
       'sci8q1',
     ]);
     expect(folders.find(f => f[0] === UNGROUPED)[1]).toEqual([
+      'sci8-quiz-data-patterns',
       'sci8a20',
+      'sci8-quiz-plant-growth',
       'sci8a10',
       'sci8q12',
       'sci8t5',
@@ -108,6 +110,8 @@ test.describe('Assignments list actions in Demo Mode', () => {
     });
     await reloadList(page);
     expect(await cardIds(folder(page, UNGROUPED))).toEqual([
+      'sci8-quiz-data-patterns',
+      'sci8-quiz-plant-growth',
       'sci8a10',
       'sci8q12',
       'sci8t5',

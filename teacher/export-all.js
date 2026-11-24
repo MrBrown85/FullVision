@@ -40,6 +40,11 @@
   var BULLETIN_KIND_WORDS = { announcement: 'Announcement', reminder: 'Reminder' };
   /** @type {Record<string, string>} */
   var BULLETIN_REACTION_NAMES = { got_it: 'Got It', done: 'Done', question: 'I Have a Question' };
+  // Quizzes (Q6): a marked question's result as the returned view words it (docs/DECISIONS.md, "Quizzes" 21).
+  /** @type {Record<string, string>} */
+  var QUIZ_RESULT_WORDS = { right: 'Right', partly: 'Partly Right', wrong: 'Not Right', waiting: 'Not Assessed Yet' };
+  /** @type {Record<string, string>} */
+  var QUIZ_KIND_WORDS = { choice: 'Choice', true_false: 'True or False', number: 'Number', text: 'Text' };
   /** @param {unknown} bytes */
   function sizeWords(bytes) {
     var n = Number(bytes) || 0;
@@ -103,6 +108,26 @@
   function className(cid) {
     var c = COURSES[cid] || {};
     return coursePickerName(c) || c.name || 'Class';
+  }
+
+  /* A quiz answer in words: a choice by its text, True or False, a number, or
+     the written answer. */
+  function quizAnswerWords(q, answer) {
+    if (answer == null) return '';
+    if (q.kind === 'choice') {
+      var ids = Array.isArray(answer) ? answer : [answer];
+      return ids
+        .map(function (id) {
+          var hit = (q.choices || []).filter(function (c) {
+            return c.id === id;
+          })[0];
+          return hit ? text(hit.text) : '';
+        })
+        .filter(Boolean)
+        .join('; ');
+    }
+    if (q.kind === 'true_false') return answer === true ? 'True' : answer === false ? 'False' : '';
+    return text(answer);
   }
 
   function studentName(st) {
@@ -254,7 +279,9 @@
      opts.teacher: the teacher's name; opts.date: 'YYYY-MM-DD';
      opts.entries(cid, sid): a student's questionnaire answers
      (StudentVoice.entries), or left out; opts.bulletinSeen(cid, id): who has
-     seen a bulletin and reacted (getBulletinSeen's answer), or left out. */
+     seen a bulletin and reacted (getBulletinSeen's answer), or left out;
+     opts.quizzes(cid, aid): { quiz: list_quiz's answer, tries: list_quiz_tries'
+     answer } for a piece, or left out. */
   /* Photos of student work never go in this file, and nor do the records of
      what was sent (Colin, Q22; S8-F2). Where a class could hold any, the
      Contents sheet says so: a class whose student page is on (the build
@@ -275,6 +302,7 @@
     var cids = opts.cids || classIds();
     var entries = typeof opts.entries === 'function' ? opts.entries : null;
     var bulletinSeen = typeof opts.bulletinSeen === 'function' ? opts.bulletinSeen : null;
+    var quizzesOf = typeof opts.quizzes === 'function' ? opts.quizzes : null;
 
     var summary = [];
     var grids = [];
@@ -288,6 +316,8 @@
     var resources = [];
     var bulletins = [];
     var bulletinMarks = [];
+    var quizRows = [];
+    var quizAnswerRows = [];
     var taken = { contents: true, summary: true };
 
     cids.forEach(function (cid) {
@@ -377,6 +407,77 @@
               ]);
             });
           });
+      }
+
+      // Quizzes (Q6): one row per question of each quiz, and one per answer a
+      // student sent. This is the teacher's own download, so a question's right
+      // answer and its reason are here, as they are on the teacher's own screen;
+      // they are never in anything a student's device receives.
+      if (quizzesOf && typeof quizzesOffered === 'function' && quizzesOffered(cid)) {
+        assessments.forEach(function (a) {
+          var got = quizzesOf(cid, a.id);
+          var reply = got && got.quiz;
+          if (!reply || !reply.quiz) return;
+          var all = (reply.questions || []).concat(reply.archived || []);
+          var names = {};
+          var numbers = {};
+          all.forEach(function (q) {
+            names[q.id] = q;
+            numbers[q.id] = q.archived_at || q.position == null ? 'Removed' : q.position;
+          });
+          all.forEach(function (q) {
+            var key = q.key || {};
+            quizRows.push([
+              cname,
+              text(a.title),
+              numbers[q.id],
+              QUIZ_KIND_WORDS[q.kind] || text(q.kind),
+              text(q.prompt),
+              (q.choices || [])
+                .map(function (c) {
+                  return text(c.text);
+                })
+                .join('; '),
+              Number(q.points) || 0,
+              q.tag_id ? tagLabel(cid, q.tag_id) : 'Counts Toward No Competency',
+              quizAnswerWords(q, key.answer),
+              key.tolerance == null ? '' : Number(key.tolerance),
+              text(key.why),
+            ]);
+          });
+          var byEnrol = {};
+          ((got.tries && got.tries.students) || []).forEach(function (t) {
+            byEnrol[t.enrollment_id] = t;
+          });
+          students.forEach(function (st) {
+            var mine = byEnrol[st.id];
+            if (!mine) return;
+            (mine.tries || []).forEach(function (t) {
+              var marked = t.marked || null;
+              (t.answers || []).forEach(function (r) {
+                var q = names[r.question_id];
+                if (!q) return;
+                var m = marked && marked.questions ? marked.questions[r.question_id] : null;
+                var points = m ? Number(m.earned) : r.given_points == null ? '' : Number(r.given_points);
+                quizAnswerRows.push([
+                  cname,
+                  text(a.title),
+                  studentName(st),
+                  Number(t.try) || 1,
+                  day(t.started_at),
+                  day(t.sent_at),
+                  numbers[q.id],
+                  text(q.prompt),
+                  quizAnswerWords(q, r.answer),
+                  points,
+                  m ? QUIZ_RESULT_WORDS[m.result] || '' : '',
+                  text(r.note),
+                  marked ? text(marked.earned) + ' of ' + text(marked.possible) : '',
+                ]);
+              });
+            });
+          });
+        });
       }
 
       // Summary
@@ -781,6 +882,46 @@
         ],
         rows: bulletinMarks,
       },
+      {
+        name: 'Quizzes',
+        about:
+          'Each question of each quiz, with its competency, its right answer and the reason given for it. This file is yours alone: the right answers never reach a student before their quiz is returned.',
+        columns: [
+          COL.classCol,
+          COL.assessment,
+          COL.short('Question', 10),
+          COL.short('Kind', 14),
+          COL.long('Question Words'),
+          COL.long('Choices'),
+          COL.short('Points', 8),
+          COL.short('Competency', 30),
+          COL.long('Right Answer'),
+          COL.short('Tolerance', 10),
+          COL.long('Why'),
+        ],
+        rows: quizRows,
+      },
+      {
+        name: 'Quiz Answers',
+        about:
+          'Each answer a student sent, by try, with the points and result you confirmed and the note on a written answer. A try you have not confirmed has no result.',
+        columns: [
+          COL.classCol,
+          COL.assessment,
+          COL.student,
+          COL.short('Try', 6),
+          { header: 'Started', width: 12, date: true },
+          { header: 'Sent', width: 12, date: true },
+          COL.short('Question', 10),
+          COL.long('Question Words'),
+          COL.long('Answer'),
+          COL.short('Points', 8),
+          COL.short('Result', 16),
+          COL.long('Note'),
+          COL.short('Confirmed Total', 16),
+        ],
+        rows: quizAnswerRows,
+      },
     ];
     list.forEach(function (s) {
       if (s.rows.length) sheets.push(s);
@@ -1020,6 +1161,37 @@
       .catch(function () {});
   }
 
+  /* Each class's quizzes and their sent tries, read once for the file
+     (loadQuiz, loadQuizTries), four at a time. A class that offers no quizzes,
+     or a read that fails, leaves its sheets out. */
+  var _quizRead = {};
+  function readQuizzes(cid) {
+    _quizRead[cid] = {};
+    if (typeof quizzesOffered !== 'function' || typeof loadQuiz !== 'function') return Promise.resolve();
+    return Promise.resolve(typeof probeQuizzes === 'function' ? probeQuizzes(cid) : null)
+      .then(function () {
+        if (!quizzesOffered(cid)) return null;
+        var queue = getAssessments(cid).slice();
+        function worker() {
+          var a = queue.shift();
+          if (!a) return null;
+          return loadQuiz(cid, a.id)
+            .then(function (quiz) {
+              if (!quiz || !quiz.quiz) return null;
+              return (typeof loadQuizTries === 'function' ? loadQuizTries(cid, a.id) : Promise.resolve(null)).then(
+                function (tries) {
+                  _quizRead[cid][a.id] = { quiz: quiz, tries: tries };
+                },
+              );
+            })
+            .catch(function () {})
+            .then(worker);
+        }
+        return Promise.all([worker(), worker(), worker(), worker()]);
+      })
+      .catch(function () {});
+  }
+
   var _running = false;
   function run() {
     if (_running) return Promise.resolve();
@@ -1038,6 +1210,9 @@
             })
             .then(function () {
               return readBulletinSeen(cid);
+            })
+            .then(function () {
+              return readQuizzes(cid);
             })
             .then(function () {
               return lib;
@@ -1065,6 +1240,9 @@
           entries: voice && voice.entries ? voice.entries : null,
           bulletinSeen: function (cid, id) {
             return (_seen[cid] || {})[id] || null;
+          },
+          quizzes: function (cid, aid) {
+            return (_quizRead[cid] || {})[aid] || null;
           },
         });
         return workbook(sheets, lib)

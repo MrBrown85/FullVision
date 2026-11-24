@@ -684,3 +684,115 @@ describe('Bulletins (B1g)', () => {
     expect(asked).toBe(0);
   });
 });
+
+describe('Quizzes (Q6)', () => {
+  const reply = {
+    quiz: { assessment_id: 'Lab', tries: 1 },
+    questions: [
+      {
+        id: 'q1',
+        position: 1,
+        kind: 'choice',
+        prompt: 'Which is a producer?',
+        choices: [
+          { id: 'c1', text: 'Grass' },
+          { id: 'c2', text: 'Hawk' },
+        ],
+        multiple: false,
+        points: 1,
+        tag_id: TAG,
+        key: { answer: ['c1'], tolerance: null, why: 'Grass makes its own food.' },
+      },
+      {
+        id: 'q2',
+        position: 2,
+        kind: 'text',
+        prompt: 'Explain why.',
+        choices: null,
+        multiple: false,
+        points: 2,
+        tag_id: null,
+        key: { answer: null, tolerance: null, why: null },
+      },
+    ],
+    archived: [],
+  };
+  const tries = {
+    students: [
+      {
+        enrollment_id: 's1',
+        sent: 1,
+        tries: [
+          {
+            attempt_id: 'a1',
+            try: 1,
+            started_at: '2026-11-10T16:00:00Z',
+            sent_at: '2026-11-10T16:20:00Z',
+            marked: {
+              earned: 2,
+              possible: 3,
+              questions: { q1: { earned: 1, result: 'right' }, q2: { earned: 1, result: 'partly' } },
+            },
+            answers: [
+              { question_id: 'q1', answer: ['c1'], given_points: null, note: null },
+              { question_id: 'q2', answer: 'Plants need light', given_points: 1, note: 'Good start' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const real = globalThis.quizzesOffered;
+  afterEach(() => {
+    globalThis.quizzesOffered = real;
+  });
+
+  it('lists each question with its right answer, and each answer sent with what was confirmed', () => {
+    seed({ assessments: [level('Lab')] });
+    globalThis.quizzesOffered = () => true;
+    const out = rows({ quizzes: (cid, aid) => (aid === 'Lab' ? { quiz: reply, tries } : null) });
+    const q = sheet(out, 'Quizzes');
+    expect(q.rows[0].slice(0, 9)).toEqual([
+      'Science 9',
+      'Lab',
+      1,
+      'Choice',
+      'Which is a producer?',
+      'Grass; Hawk',
+      1,
+      'T1 Questioning',
+      'Grass',
+    ]);
+    expect(q.rows[0][10]).toBe('Grass makes its own food.');
+    expect(q.rows[1][7]).toBe('Counts Toward No Competency');
+    const a = sheet(out, 'Quiz Answers');
+    expect(a.rows.map(r => r.slice(2))).toEqual([
+      ['Teddy Okafor', 1, '2026-11-10', '2026-11-10', 1, 'Which is a producer?', 'Grass', 1, 'Right', '', '2 of 3'],
+      [
+        'Teddy Okafor',
+        1,
+        '2026-11-10',
+        '2026-11-10',
+        2,
+        'Explain why.',
+        'Plants need light',
+        1,
+        'Partly Right',
+        'Good start',
+        '2 of 3',
+      ],
+    ]);
+  });
+
+  it('has no sheet where the class offers no quizzes or the piece has none', () => {
+    seed({ assessments: [level('Lab')] });
+    let asked = 0;
+    globalThis.quizzesOffered = () => false;
+    const off = rows({ quizzes: () => (asked++, { quiz: reply, tries }) });
+    expect(sheet(off, 'Quizzes')).toBeUndefined();
+    expect(asked).toBe(0);
+    globalThis.quizzesOffered = () => true;
+    expect(sheet(rows({ quizzes: () => null }), 'Quizzes')).toBeUndefined();
+    expect(sheet(rows(), 'Quiz Answers')).toBeUndefined();
+  });
+});

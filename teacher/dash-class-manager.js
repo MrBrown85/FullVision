@@ -8169,8 +8169,8 @@ window.DashClassManager = (function () {
       savedAt: new Date().toISOString(),
       // "Photos of student work are not in this file." once the class's student page is on (S8-F2).
       photos: typeof FVBackupRestore !== 'undefined' ? FVBackupRestore.photosNote(cid) : undefined,
-      // "Bulletins are not in this file.": they stay on the server with the class (B1g).
       bulletins: typeof FVBackupRestore !== 'undefined' ? FVBackupRestore.BULLETINS_NOTE : undefined,
+      quizzes: typeof FVBackupRestore !== 'undefined' ? FVBackupRestore.QUIZZES_NOTE : undefined,
       courseInfo: structuredClone(COURSES[cid]),
       students: getStudents(cid),
       categories: getCategories(cid),
@@ -8214,8 +8214,8 @@ window.DashClassManager = (function () {
       '<div class="confirm-card cm-restore-card">' +
       '<div class="confirm-title" id="cm-restore-title">Restore Class from Backup</div>' +
       '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. ' +
-      // Bulletins are never in a backup (B1g).
       (typeof FVBackupRestore !== 'undefined' ? esc(FVBackupRestore.BULLETINS_NOT_IN_BACKUP) + ' ' : '') +
+      (typeof FVBackupRestore !== 'undefined' ? esc(FVBackupRestore.QUIZZES_NOT_IN_BACKUP) + ' ' : '') +
       // Fixed text, said once any class takes work (S8-F2; wording approved, ruling 102).
       (typeof FVBackupRestore !== 'undefined' && FVBackupRestore.anyClassTakesWork()
         ? esc(FVBackupRestore.PHOTOS_NOT_IN_BACKUP) + ' '

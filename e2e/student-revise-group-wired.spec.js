@@ -167,11 +167,12 @@ test('a real card sends a revision through the revise routes and sees its group 
   await fits(page);
 
   const sent = posts.map(p => p.body.route).filter(r => r !== 'seen');
-  expect(sent.slice(0, 9)).toEqual([
+  expect(sent.slice(0, 10)).toEqual([
     'card',
     'verify',
     'page',
     'bulletins',
+    'quiz-list',
     'work',
     'forms',
     'feedback',

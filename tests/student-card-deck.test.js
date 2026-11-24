@@ -76,10 +76,10 @@ const button = attrs => ({ getAttribute: name => (attrs && attrs[name]) || null,
 describe('Outstanding: work due by today, Missing, and revisions', () => {
   it('the two segments with their counts; Outstanding first, the oldest due first; Missing says so', async () => {
     const page = await demo();
-    expect(segments(page)).toEqual(['Outstanding 2', 'Upcoming 1']);
+    expect(segments(page)).toEqual(['Outstanding 3', 'Upcoming 1']);
     expect(page.root().querySelector('.sp-segment-on').getAttribute('data-segment')).toBe('outstanding');
-    // The Quick Check was due five days ago and is Missing; the Poster was due two days ago.
-    expect(titles(page)).toEqual(['Immune System Quick Check', 'Disease Research Poster']);
+    // The Quick Check was due five days ago and is Missing; the Poster was due two days ago; the sample quiz is due today (Q6).
+    expect(titles(page)).toEqual(['Immune System Quick Check', 'Disease Research Poster', 'Data Patterns Quick Check']);
     expect(tags(card(page, 'Immune System Quick Check'))).toContain('Missing');
     // Work still to do shows no result and no comment.
     cards(page).forEach(c => {
@@ -133,7 +133,7 @@ describe('Outstanding: work due by today, Missing, and revisions', () => {
   it('the cards sit one under another, with no count of them; the first is the one picked', async () => {
     const page = await demo();
     expect(page.root().querySelector('.sp-deck-count')).toBeNull();
-    expect(page.root().querySelectorAll('.sp-deck > .sp-piece')).toHaveLength(2);
+    expect(page.root().querySelectorAll('.sp-deck > .sp-piece')).toHaveLength(3);
     expect(page.root().querySelector('.sp-piece.sp-picked .sp-piece-title').textContent).toBe(
       'Immune System Quick Check',
     );
@@ -147,7 +147,7 @@ describe('Outstanding: work due by today, Missing, and revisions', () => {
     await page.click('[data-segment="upcoming"]');
     shown.push(...cards(page));
     const kinds = shown.map(c => view.work.find(p => p.id === c.getAttribute('data-piece')).kind);
-    expect(kinds.sort()).toEqual(['due', 'due', 'missing']);
+    expect(kinds.sort()).toEqual(['due', 'due', 'due', 'missing']);
   });
 });
 
@@ -313,6 +313,7 @@ describe('on a Chromebook: the list on the left, the card picked on the right', 
     expect(side().map(b => [b.querySelector('.sp-side-title').textContent, b.getAttribute('aria-pressed')])).toEqual([
       ['Immune System Quick Check', 'true'],
       ['Disease Research Poster', 'false'],
+      ['Data Patterns Quick Check', 'false'],
     ]);
     const poster = piece(page, 'Disease Research Poster');
     expect(side()[1].getAttribute('data-act')).toBe('pick');
@@ -452,7 +453,7 @@ describe('what the server also tells, in Demo Mode (S4-W1)', () => {
     await page.click('[data-act="card-yes"]');
     await page.click('[data-act="settings-open"]');
     expect([...page.root().querySelectorAll('.sp-class-todo')].map(el => el.textContent)).toEqual([
-      '3 to do',
+      '4 to do',
       '2 to do',
     ]);
     const html = page.run('StudentPageView.html')(viewOf(page), {

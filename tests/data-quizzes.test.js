@@ -348,16 +348,6 @@ describe('signed in', () => {
     _teacherId = teacher;
   });
 
-  it('with the switch off nothing is asked or sent, and no key is written', async () => {
-    localStorage.removeItem('fv-build-quizzes');
-    const keys = Object.keys(localStorage._store).sort();
-    expect(await probeQuizzes(CID)).toBe(false);
-    expect(QuizData.save(CID, AID, payload(), [T1, T2])).toEqual({ ok: false });
-    await settle();
-    expect(session.fake.calls.map(c => c.name)).toEqual([]);
-    expect(Object.keys(localStorage._store).sort()).toEqual(keys);
-  });
-
   it('a server without list_quiz is offered nothing and sent nothing, and asked once', async () => {
     session.fake.on('list_quiz', () => ({
       data: null,

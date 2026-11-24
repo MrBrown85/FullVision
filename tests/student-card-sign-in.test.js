@@ -235,6 +235,7 @@ describe('Switching Classes: Settings', () => {
       { route: 'page', session: token, enrollment_id: CECE },
       // Its bulletins, asked with its page (B1d).
       { route: 'bulletins', session: token, enrollment_id: CECE },
+      { route: 'quiz-list', session: token, enrollment_id: CECE },
       // What the class takes (s/send.js), once its page is in.
       { route: 'work', session: token, enrollment_id: CECE },
       // Its questionnaires, for Reflections (S4-F4).

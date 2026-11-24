@@ -32,6 +32,11 @@ async function twoClasses(page) {
     saveRubrics('sci8b', reId(getRubrics('sci8'), 'b-'));
     saveModules('sci8b', reId(getModules('sci8'), 'b-'));
 
+    // This test is about plain pieces: the sample quizzes (Quizzes, on since Q6) are set aside.
+    saveAssessments(
+      'sci8',
+      getAssessments('sci8').filter(a => !/^sci8-quiz-/.test(a.id)),
+    );
     // Newest first, as the dialog lists them.
     const src = getAssessments('sci8')
       .slice()

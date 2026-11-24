@@ -784,7 +784,7 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
     // Only the page's reads (its questionnaires come in `forms`); no "opened" mark yet.
-    expect(routes(posts)).toEqual(['page', 'bulletins', 'work', 'forms']);
+    expect(routes(posts)).toEqual(['page', 'bulletins', 'quiz-list', 'work', 'forms']);
     // It is switched to.
     await page.evaluate(() => {
       window.__hidden = false;

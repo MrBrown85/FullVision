@@ -35,14 +35,6 @@ async function answer(page, q) {
   else await q.locator('[data-act="quiz-pick"]').first().click();
 }
 
-test('with the switch off there is no Start button', async ({ page }) => {
-  const { posts } = await demo(page, false);
-  await expect(page.locator('.sp-deck').first()).toBeVisible();
-  await expect(page.locator('[data-act="quiz-open"]')).toHaveCount(0);
-  await expect(page.getByText('Start the Quiz')).toHaveCount(0);
-  expect(posts).toEqual([]);
-});
-
 test('take the quiz, leave part way, come back to the same order and answers, send', async ({ page }) => {
   const { posts, errors } = await demo(page);
   await start(page).click();

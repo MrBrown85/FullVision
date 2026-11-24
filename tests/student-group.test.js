@@ -52,7 +52,7 @@ describe('S12-F1: the group card', () => {
     const page = await demo();
     // Not on Assignments: it is in, so it waits on My Learning.
     expect(card(page)).toBeNull();
-    expect(words(q(page, '[data-segment="outstanding"]'))).toBe('Outstanding 2');
+    expect(words(q(page, '[data-segment="outstanding"]'))).toBe('Outstanding 3');
     expect(words(q(page, '[data-segment="upcoming"]'))).toBe('Upcoming 1');
     await page.click('[data-tab="learning"]');
     expect(row(page).getAttribute('data-act')).toBe('open-piece');
