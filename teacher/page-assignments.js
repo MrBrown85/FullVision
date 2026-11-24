@@ -6534,7 +6534,7 @@ window.PageAssignments = (function () {
   // + New Quiz (Colin, Nov 24): shown with quizzes on, the builder loaded and the Student Page on.
   function _newQuizBtn(cid) {
     var on = window.QuizBuilder && BuildFlags.on('quizzes') && _studentPageOn(cid);
-    return on ? '<button class="tb-action-btn" data-action="newQuiz">+ New Quiz</button>' : '';
+    return on ? '<button class="tb-action-btn tb-action-secondary" data-action="newQuiz">+ New Quiz</button>' : '';
   }
   function hideNewForm() {
     _hideAfTip();

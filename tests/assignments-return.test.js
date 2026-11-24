@@ -375,7 +375,7 @@ describe('with the build switch off the Assignments page is what it was', () => 
     /<button type="button" role="menuitem" class="assess-menu-item assess-add-class-btn" data-action="openAddWorkClass" [^>]*>[\s\S]*?<\/button>/g;
   // Pin moved on purpose (Colin, Nov 24): + New Quiz sits beside + New Assessment where the
   // class's Student Page is on. It alone is taken out before comparing.
-  const NEW_QUIZ = /<button class="tb-action-btn" data-action="newQuiz">\+ New Quiz<\/button>/g;
+  const NEW_QUIZ = /<button class="tb-action-btn tb-action-secondary" data-action="newQuiz">\+ New Quiz<\/button>/g;
   const same = now => {
     const stripped = {};
     Object.keys(now).forEach(name => (stripped[name] = String(now[name]).replace(ADD_WORK, '').replace(NEW_QUIZ, '')));

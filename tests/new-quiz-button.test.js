@@ -57,7 +57,8 @@ describe('the + New Quiz button', () => {
       b.textContent.trim(),
     );
     expect(btns.slice(-2)).toEqual(['+ New Quiz', '+ New Assessment']);
-    expect(quizBtn().className).toBe('tb-action-btn');
+    // Secondary, like Rubrics: the page keeps one solid primary, + New Assessment (e2e/primary-actions.spec.js).
+    expect(quizBtn().className).toBe('tb-action-btn tb-action-secondary');
   });
 
   it('is not there with the Student Page off, in the toolbar or the empty class', async () => {
