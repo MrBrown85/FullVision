@@ -210,7 +210,6 @@ public.get_withdrawn_student_records(p_enrollment_id uuid) 218afcff7d47714d89ee4
 public.grade_return_repair_nightly() 42936da9b8bbf1d25eca30d1267cd099 1452
 public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) ddc59b55cdc6185e871b9812335853d8 37924
 public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) 58e0720ca12c8f09bbec775496cf67b1 3749
-public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) f15548a3b9fb9c6b46680fdff5d0a3cd 4592
 public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) d2d083b6c33a2cf8991ca65234606169 1788
 public.list_assessment_copies(p_copy_group uuid) 6fdf67f7a6fdfe01e42591ec71094ff1 566
 public.list_assessment_markup(p_assessment_id uuid) 5e64579a923a0f0c02791b6428e54d98 1181
@@ -250,6 +249,7 @@ public.mark_quiz_answer(p_attempt_id uuid, p_question_id uuid, p_points numeric,
 public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) 2ee4ab4fe90971e69d1ee8083c3a9aa3 895
 public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) eb9e161daa032f3b272435ec52a0bc7a 4442
 public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) 0c9431bb6ff130f8de2715f8315838f1 1125
+public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) 54963eeb8f241b3c902137f8fe02ac51 3067
 public.photo_lifecycle_nightly() 511904d486e08f495f2823aefd80b7e9 2818
 public.photo_removal_call() 08b22d449cc3312b31b975ee057fbc08 2010
 public.photo_removal_due() 3faf3499da0753407687386407c8b01f 481

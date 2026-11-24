@@ -7673,100 +7673,6 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.import_teams_class(p_payload jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-    _uid uuid := (select auth.uid());
-    _course_id uuid;
-    _stu_created int := 0; _enr_created int := 0; _asm_created int := 0; _next_pos int := 0;
-    _row jsonb; _sid uuid;
-    _sn text; _em text; _fn text; _ln text;
-    _cached jsonb; _result jsonb;
-begin
-    if _uid is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-    if p_payload is null or jsonb_typeof(p_payload) <> 'object' then
-        raise exception 'p_payload must be an object' using errcode = '22023';
-    end if;
-    _cached := fv_idem_check(p_idempotency_key, 'import_teams_class');
-    if _cached is not null then return _cached; end if;
-
-    insert into course (teacher_id, name, grade_level, timezone)
-    values (_uid,
-            coalesce(p_payload->>'class_name', 'Imported Class'),
-            p_payload->>'grade_level',
-            coalesce(p_payload->>'timezone', 'America/Vancouver'))
-    returning id into _course_id;
-    insert into report_config (course_id) values (_course_id);
-
-    if p_payload ? 'students' and jsonb_typeof(p_payload->'students') = 'array' then
-        for _row in select * from jsonb_array_elements(p_payload->'students') loop
-            _sid := null;
-            _sn := nullif(_row->>'student_number', '');
-            _em := nullif(_row->>'email', '');
-            _fn := nullif(_row->>'first_name', '');
-            _ln := nullif(_row->>'last_name', '');
-            if _sn is not null then
-                select id into _sid from student where teacher_id = _uid and student_number = _sn limit 1;
-            end if;
-            if _sid is null and _em is not null then
-                select id into _sid from student where teacher_id = _uid and email = _em limit 1;
-            end if;
-            if _sid is null and _fn is not null then
-                select id into _sid from student where teacher_id = _uid and first_name = _fn
-                   and coalesce(last_name, '') = coalesce(_ln, '') limit 1;
-            end if;
-            if _sid is null then
-                insert into student (teacher_id, first_name, last_name, preferred_name,
-                                     pronouns, student_number, email, date_of_birth)
-                values (_uid, _fn, _ln,
-                        nullif(_row->>'preferred_name',''),
-                        nullif(_row->>'pronouns',''),
-                        _sn, _em,
-                        nullif(_row->>'date_of_birth','')::date)
-                returning id into _sid;
-                _stu_created := _stu_created + 1;
-            end if;
-            insert into enrollment (student_id, course_id, roster_position)
-            values (_sid, _course_id, _next_pos)
-            on conflict (student_id, course_id) do update set withdrawn_at = null, updated_at = now();
-            _next_pos := _next_pos + 1;
-            _enr_created := _enr_created + 1;
-        end loop;
-    end if;
-
-    if p_payload ? 'assignments' and jsonb_typeof(p_payload->'assignments') = 'array' then
-        for _row in select * from jsonb_array_elements(p_payload->'assignments') loop
-            insert into assessment (course_id, title, description, date_assigned, due_date,
-                                    score_mode, max_points, weight, display_order, is_draft)
-            values (_course_id,
-                    coalesce(_row->>'title', 'Untitled'),
-                    _row->>'description',
-                    nullif(_row->>'date_assigned','')::date,
-                    nullif(_row->>'due_date','')::date,
-                    coalesce(_row->>'score_mode', 'proficiency'),
-                    nullif(_row->>'max_points','')::numeric,
-                    coalesce((_row->>'weight')::numeric, 1.0),
-                    _asm_created,
-                    -- 2026111701: a Draft only when the row says so
-                    coalesce(case when jsonb_typeof(_row->'is_draft') = 'boolean' then (_row->>'is_draft')::boolean end, false));
-            _asm_created := _asm_created + 1;
-        end loop;
-    end if;
-
-    update teacher_preference set active_course_id = _course_id where teacher_id = _uid;
-
-    _result := jsonb_build_object('course_id', _course_id,
-        'students_created', _stu_created,
-        'enrollments_created', _enr_created,
-        'assessments_created', _asm_created);
-    perform fv_idem_store(p_idempotency_key, 'import_teams_class', _result);
-    return _result;
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -8770,6 +8676,73 @@ begin
     return true;
 end;
 $function$;
+
+CREATE OR REPLACE FUNCTION public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+    _uid    uuid := (select auth.uid());
+    _cached jsonb;
+    _old    jsonb;
+    _change jsonb;
+    _dash   jsonb;
+begin
+    if _uid is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_patch is null or jsonb_typeof(p_patch) <> 'object' then
+        raise exception 'p_patch must be an object' using errcode = '22023';
+    end if;
+    if p_patch ? 'dashboard_prefs' and jsonb_typeof(p_patch->'dashboard_prefs') not in ('object', 'null') then
+        raise exception 'dashboard_prefs must be an object or null' using errcode = '22023';
+    end if;
+
+    _cached := fv_idem_check(p_idempotency_key, 'patch_teacher_preferences');
+    if _cached is not null then return; end if;
+
+    insert into teacher_preference (teacher_id) values (_uid)
+    on conflict (teacher_id) do nothing;
+
+    select dashboard_prefs into _old from teacher_preference where teacher_id = _uid for update;
+
+    _dash := _old;
+    if p_patch ? 'dashboard_prefs' then
+        _change := p_patch->'dashboard_prefs';
+        if jsonb_typeof(_change) = 'null' then
+            _dash := null;
+        else
+            if _old is null or jsonb_typeof(_old) <> 'object' then _old := '{}'::jsonb; end if;
+            _dash := _old || coalesce((
+                select jsonb_object_agg(c.key,
+                    case when jsonb_typeof(c.value) = 'object' and jsonb_typeof(_old->c.key) = 'object'
+                         then (_old->c.key) || c.value
+                         else c.value end)
+                  from jsonb_each(_change) c
+            ), '{}'::jsonb);
+        end if;
+    end if;
+
+    update teacher_preference set
+        active_course_id   = case when p_patch ? 'active_course_id'
+                                  then nullif(p_patch->>'active_course_id','')::uuid
+                                  else active_course_id end,
+        view_mode          = case when p_patch ? 'view_mode'
+                                  then nullif(p_patch->>'view_mode','')
+                                  else view_mode end,
+        mobile_view_mode   = case when p_patch ? 'mobile_view_mode'
+                                  then nullif(p_patch->>'mobile_view_mode','')
+                                  else mobile_view_mode end,
+        mobile_sort_mode   = case when p_patch ? 'mobile_sort_mode'
+                                  then nullif(p_patch->>'mobile_sort_mode','')
+                                  else mobile_sort_mode end,
+        card_widget_config = case when p_patch ? 'card_widget_config'
+                                  then nullif(p_patch->'card_widget_config', 'null'::jsonb)
+                                  else card_widget_config end,
+        dashboard_prefs    = _dash
+     where teacher_id = _uid;
+
+    perform fv_idem_store(p_idempotency_key, 'patch_teacher_preferences', jsonb_build_object('saved', true));
+end; $function$;
 
 CREATE OR REPLACE PROCEDURE public.photo_lifecycle_nightly()
  LANGUAGE plpgsql

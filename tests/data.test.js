@@ -15,7 +15,7 @@ describe('data-active-course-placeholder', () => {
    * createCourse() returns synchronously with a local id ("c{ts}{rand}") and
    * re-keys COURSES to the server's uuid once create_course resolves. Anything
    * that persists the active-course pointer in that window used to send the
-   * placeholder to save_teacher_preferences, which casts it straight to uuid and
+   * placeholder to the preferences RPC, which casts it straight to uuid and
    * fails the whole RPC with 22P02 — so the teacher's preferences never saved and
    * the UI never switched to the class they had just created.
    */
@@ -38,7 +38,7 @@ describe('data-active-course-placeholder', () => {
   function prefPatches(client) {
     return client.calls
       .filter(function (c) {
-        return c.name === 'save_teacher_preferences';
+        return c.name === 'patch_teacher_preferences';
       })
       .map(function (c) {
         return c.payload.p_patch || {};
@@ -72,14 +72,21 @@ describe('data-active-course-placeholder', () => {
       it('omits active_course_id while the placeholder is still unresolved', () => {
         COURSES['clocal1'] = { id: 'clocal1', name: 'New Class', __pendingLocalId: 'clocal1' };
 
+        saveConfig({ activeCourse: null, viewMode: 'dashboard' });
+        client.calls.length = 0;
+
         setActiveCourse('clocal1');
 
+        // Omitted, not null: the RPC leaves the column alone when the key is
+        // absent, and create_course has already pointed it at the new course
+        // server-side. Nothing else changed, so nothing is sent at all.
         var patches = prefPatches(client);
-        expect(patches).toHaveLength(1);
-        // Omitted, not null: the RPC's on-conflict branch leaves the column
-        // alone when the key is absent, and create_course has already pointed
-        // it at the new course server-side.
-        expect(Object.prototype.hasOwnProperty.call(patches[0], 'active_course_id')).toBe(false);
+        expect(
+          patches.some(function (p) {
+            return Object.prototype.hasOwnProperty.call(p, 'active_course_id');
+          }),
+        ).toBe(false);
+        expect(patches).toHaveLength(0);
       });
 
       it('keeps the placeholder locally so the UI can still resolve the course', () => {
@@ -109,6 +116,10 @@ describe('data-active-course-placeholder', () => {
       });
 
       it('still clears the pointer when passed an empty value', () => {
+        COURSES[CANONICAL] = { id: CANONICAL, name: 'Humanities 8' };
+        saveConfig({ activeCourse: CANONICAL });
+        client.calls.length = 0;
+
         setActiveCourse(null);
 
         expect(prefPatches(client)[0].active_course_id).toBeNull();
@@ -1239,7 +1250,7 @@ describe('data-course-soft-delete', () => {
         client.calls.map(function (c) {
           return c.name;
         }),
-      ).toEqual(['delete_course', 'save_teacher_preferences']);
+      ).toEqual(['delete_course', 'patch_teacher_preferences']);
       expect(client.calls[0]).toEqual({
         name: 'delete_course',
         payload: { p_course_id: CID_A },
@@ -1843,6 +1854,7 @@ describe('data-idempotency-keys', () => {
         'import_teams_class',
         'move_rubric_scores',
         'note_course_opened',
+        'patch_teacher_preferences',
         'reenrol_student',
         'remove_section',
         'restore_section',
@@ -4488,8 +4500,8 @@ describe('data-reportconfig-prefs-teacher-v2-dispatch', () => {
    *   applyReportPreset       → apply_report_preset
    *   saveReportConfig        → save_report_config (nulls preset when omitted)
    *   toggleReportBlock       → toggle_report_block (boolean coerce)
-   *   saveConfig              → save_teacher_preferences (local keys mapped to v2 patch)
-   *   saveTeacherPreferences  → save_teacher_preferences (jsonb patch)
+   *   saveConfig              → patch_teacher_preferences (only the local keys that changed)
+   *   saveTeacherPreferences  → patch_teacher_preferences (jsonb patch)
    *   softDeleteTeacher       → soft_delete_teacher
    *   restoreTeacher          → restore_teacher
    *   importRosterCsv         → import_roster_csv (v2-namespace alias)
@@ -4570,8 +4582,9 @@ describe('data-reportconfig-prefs-teacher-v2-dispatch', () => {
         });
 
         expect(client.calls[0]).toEqual({
-          name: 'save_teacher_preferences',
+          name: 'patch_teacher_preferences',
           payload: {
+            p_idempotency_key: expect.any(String),
             p_patch: {
               active_course_id: CID,
               view_mode: 'dashboard',
@@ -4583,17 +4596,18 @@ describe('data-reportconfig-prefs-teacher-v2-dispatch', () => {
         });
       });
 
-      it('passes jsonb patch to save_teacher_preferences', async () => {
+      it('passes jsonb patch to patch_teacher_preferences', async () => {
         await window.v2.saveTeacherPreferences({ view_mode: 'classic', active_course_id: CID });
         expect(client.calls[0]).toEqual({
-          name: 'save_teacher_preferences',
-          payload: { p_patch: { view_mode: 'classic', active_course_id: CID } },
+          name: 'patch_teacher_preferences',
+          payload: { p_idempotency_key: expect.any(String), p_patch: { view_mode: 'classic', active_course_id: CID } },
         });
       });
 
-      it('coerces null/undefined patch to empty object', async () => {
+      it('sends nothing for a patch that changes nothing', async () => {
         await window.v2.saveTeacherPreferences();
-        expect(client.calls[0].payload.p_patch).toEqual({});
+        await window.v2.saveTeacherPreferences({});
+        expect(client.calls).toHaveLength(0);
       });
     });
 

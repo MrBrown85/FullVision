@@ -722,7 +722,7 @@ function _moveCourseDataLocalToCanonical(localId, canonicalId) {
   // 4. gb-config's active-course pointer is keyed by course id as well. If it
   //    still holds the placeholder, move it across — otherwise it survives the
   //    re-key permanently and every later saveConfig re-sends a non-uuid to
-  //    save_teacher_preferences. This save also lets the server-side pointer
+  //    patch_teacher_preferences. This save also lets the server-side pointer
   //    catch up now that a canonical id exists.
   try {
     var cfg = getConfig();

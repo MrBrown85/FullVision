@@ -2053,7 +2053,6 @@ function public.get_withdrawn_student_records(p_enrollment_id uuid) returns json
 procedure public.grade_return_repair_nightly()
 function public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) returns jsonb
-function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.list_assessment_copies(p_copy_group uuid) returns TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
 function public.list_assessment_markup(p_assessment_id uuid) returns jsonb security definer
@@ -2093,6 +2092,7 @@ function public.mark_quiz_answer(p_attempt_id uuid, p_question_id uuid, p_points
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
 function public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) returns boolean security definer
+function public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) returns void
 procedure public.photo_lifecycle_nightly()
 function public.photo_removal_call() returns bigint
 function public.photo_removal_due() returns boolean security definer

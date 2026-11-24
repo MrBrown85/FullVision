@@ -660,9 +660,16 @@ window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
   return _issueSlips('questionnaire', questionnaireId, enrollmentIds);
 };
 
-/* Teacher preferences — jsonb patch; omitted keys unchanged. */
+/* Teacher preferences: a patch of only the keys that changed; the server
+   leaves every other key as it holds it, and merges dashboard_prefs key by
+   key (migration 2026112404). A patch that changes nothing sends nothing.
+   Every save waits behind the one before it, so two saves of one key land
+   in the order they were made. */
 window.v2.saveTeacherPreferences = function (patch) {
-  return _rpcOrNoop('save_teacher_preferences', { p_patch: patch || {} });
+  if (!patch || typeof patch !== 'object' || Object.keys(patch).length === 0) {
+    return Promise.resolve({ data: null, error: null });
+  }
+  return _rpcOrNoop('patch_teacher_preferences', { p_patch: patch }, { key: 'teacher-preferences' });
 };
 
 /* Soft-delete / restore for account-level lifecycle (Pass C §5). */

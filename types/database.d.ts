@@ -4766,6 +4766,10 @@ export type Database = {
         Args: { p_course_id: string; p_idempotency_key?: string }
         Returns: boolean
       }
+      patch_teacher_preferences: {
+        Args: { p_idempotency_key?: string; p_patch: Json }
+        Returns: undefined
+      }
       photo_removal_call: { Args: Record<PropertyKey, never>; Returns: number }
       photo_removal_due: { Args: Record<PropertyKey, never>; Returns: boolean }
       post_bulletin: {

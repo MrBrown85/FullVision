@@ -114,7 +114,7 @@ test('a repeat visit draws the saved class before the sign-in re-check answers, 
   await expect.poll(() => page.evaluate(() => !!document.getElementById('main').inert)).toBe(false);
   await expect
     .poll(() => page.evaluate(() => window.__e2eRpcLog.map(c => c.name)))
-    .toContain('save_teacher_preferences');
+    .toContain('patch_teacher_preferences');
   expect(new URL(page.url()).pathname).toBe('/dashboard');
 });
 

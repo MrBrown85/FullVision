@@ -173,7 +173,7 @@ async function leaveAWriteWaiting() {
   server.reachable = false;
   saveConfig(Object.assign({}, getConfig(), { viewMode: 'compact' }));
   await settle();
-  expect(window.v2Queue.queued('save_teacher_preferences')).toHaveLength(1);
+  expect(window.v2Queue.queued('patch_teacher_preferences')).toHaveLength(1);
   server.reachable = true;
   setOnline(true);
 }
@@ -428,7 +428,7 @@ describe('a repeat visit, with this teacher’s class list saved on the device',
 
     gates.getUser.open();
     await quiet();
-    expect(writesAsked()).toContain('save_teacher_preferences');
+    expect(writesAsked()).toContain('patch_teacher_preferences');
     expect(writesAsked()).toContain('create_report_issue');
     expect(window.v2Queue.stats().queued).toBe(0);
   });
@@ -730,7 +730,7 @@ describe('offline, start-up is as it was', () => {
     // A change made offline waits in the outbox, as before.
     saveConfig(Object.assign({}, getConfig(), { viewMode: 'compact' }));
     await settle();
-    expect(window.v2Queue.queued('save_teacher_preferences')).toHaveLength(1);
+    expect(window.v2Queue.queued('patch_teacher_preferences')).toHaveLength(1);
     expect(writesAsked()).toEqual([]);
   });
 });
@@ -842,19 +842,19 @@ describe('a write queued while the re-check has not passed', () => {
   it('is removed, never sent, when the re-check fails; one from an earlier visit stays', async () => {
     await firstVisit();
     await leaveAWriteWaiting();
-    const earlier = window.v2Queue.queued('save_teacher_preferences');
+    const earlier = window.v2Queue.queued('patch_teacher_preferences');
     loadPage();
     const page = boot();
     await page.done;
     saveConfig(Object.assign({}, getConfig(), { viewMode: 'wide' }));
     await settle();
-    expect(window.v2Queue.queued('save_teacher_preferences')).toHaveLength(2);
+    expect(window.v2Queue.queued('patch_teacher_preferences')).toHaveLength(2);
 
     auth.getUser = () => signedOut;
     GATED.forEach(name => gates[name].open());
     await settle();
     expect(location.href).toBe('/login.html');
-    const left = window.v2Queue.queued('save_teacher_preferences');
+    const left = window.v2Queue.queued('patch_teacher_preferences');
     expect(left).toHaveLength(1);
     expect(left[0].id).toBe(earlier[0].id);
     expect(writesAsked()).toEqual([]);
@@ -871,7 +871,7 @@ describe('a write queued while the re-check has not passed', () => {
     auth.getUser = () => ({ data: { user: { id: SOMEONE_ELSE } }, error: null });
     GATED.forEach(name => gates[name].open());
     await settle();
-    expect(window.v2Queue.queued('save_teacher_preferences')).toHaveLength(1);
+    expect(window.v2Queue.queued('patch_teacher_preferences')).toHaveLength(1);
     expect(writesAsked()).toEqual([]);
   });
 
@@ -885,7 +885,7 @@ describe('a write queued while the re-check has not passed', () => {
     await settle();
     GATED.forEach(name => gates[name].open());
     await quiet();
-    expect(writesAsked().filter(n => n === 'save_teacher_preferences')).toHaveLength(2);
+    expect(writesAsked().filter(n => n === 'patch_teacher_preferences')).toHaveLength(2);
     expect(window.v2Queue.stats().queued).toBe(0);
   });
 });
