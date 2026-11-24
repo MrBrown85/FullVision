@@ -94,10 +94,11 @@ function setup(cardKey, answers) {
     region: 'ca-central-1',
     ipKey: 'test-key',
     cardKey,
+    // A fixed new-session token: a random one's hash could hold a typed password's digits by chance, and the
+    // checks below look for those digits in everything handed to the database.
+    sessionToken: () => 'f'.repeat(64),
     log: entry => logs.push(entry),
     db: {
-      open: slip('open'),
-      verify: slip('verify'),
       check: slip('check'),
       submit: slip('submit'),
       async call(text, params) {

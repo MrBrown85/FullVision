@@ -56,8 +56,6 @@ function setup(answer, extra = {}) {
     region: 'ca-central-1',
     ipKey: 'k',
     db: {
-      open: async () => ({}),
-      verify: async () => ({}),
       check: async () => ({}),
       submit: async () => ({}),
       call: async (sql, params) => {
@@ -628,8 +626,6 @@ describe('the removal worker and bulletin-files', () => {
       region: 'ca-central-1',
       ipKey: 'test-key',
       db: {
-        open: async () => ({}),
-        verify: async () => ({}),
         check: async () => ({}),
         submit: async () => ({}),
         call: world.db.call,
@@ -707,8 +703,6 @@ describe('the removal worker and bulletin-files', () => {
       region: 'ca-central-1',
       ipKey: 'test-key',
       db: {
-        open: async () => ({}),
-        verify: async () => ({}),
         check: async () => ({}),
         submit: async () => ({}),
         call: world.db.call,

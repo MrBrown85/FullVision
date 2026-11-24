@@ -777,15 +777,6 @@ AS $function$
                       and fv_owns_course(s.course_id));
 $function$;
 
-CREATE OR REPLACE FUNCTION public._access_code_hash(p_code text, p_salt text)
- RETURNS text
- LANGUAGE sql
- IMMUTABLE
- SET search_path TO 'public'
-AS $function$
-  select encode(sha256(convert_to(p_salt || ':' || upper(replace(btrim(p_code), '-', '')), 'UTF8')), 'hex');
-$function$;
-
 CREATE OR REPLACE FUNCTION public._assessment_draft_guard()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2322,38 +2313,6 @@ begin
                 p_old_value, p_new_value, p_old_status, p_new_status);
     end if;
 end; $function$;
-
-CREATE OR REPLACE FUNCTION public._slip_password_on_change()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-begin
-    perform _slip_password_settle(e.student_id) from enrollment e where e.id = new.enrollment_id;
-    return null;
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION public._slip_password_settle(p_student_id uuid)
- RETURNS void
- LANGUAGE sql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-    update student s set slip_password = null
-     where s.id = p_student_id
-       and s.slip_password is not null
-       and not exists (
-           select 1 from student_access_code c join enrollment e on e.id = c.enrollment_id
-            where e.student_id = s.id and e.withdrawn_at is null
-              and c.questionnaire_id is not null
-              and c.pw_hmac is null
-              and (c.code_hash is not null or c.converted_at is not null)
-              and c.used_at is null and c.revoked_at is null
-              and c.expires_at > now()
-              and now() < student_submit._slip_old_until());
-$function$;
 
 CREATE OR REPLACE FUNCTION public._student_card_json(p_card_id uuid)
  RETURNS jsonb
@@ -13384,13 +13343,6 @@ AS $function$
        and e.page_paused_at is null;  -- 2026111720: a class whose page the teacher paused for this student is left out
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit._slip_old_until()
- RETURNS timestamp with time zone
- LANGUAGE sql
- IMMUTABLE
- SET search_path TO ''
-AS $function$ select timestamptz '2027-07-01 07:00:00+00' $function$;
-
 CREATE OR REPLACE FUNCTION student_submit._work_window(p_assessment_id uuid)
  RETURNS jsonb
  LANGUAGE sql
@@ -14633,16 +14585,13 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text)
+CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_ip_hash text, p_new_token_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'student_submit', 'pg_temp'
 AS $function$
 declare
-    _until  constant timestamptz := _slip_old_until();
-    _code   text;
-    _ids    uuid[];
     _c      student_access_code%rowtype;
     _q      questionnaire%rowtype;
     _course course%rowtype;
@@ -14694,69 +14643,14 @@ begin
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
 
-    -- 1. By its tag: a slip made since this file, or one already converted.
-    --    Live (or used) slips only, through the unique index on tags.
+    -- By its tag: live (or used) slips only, through the unique index on tags.
     select * into _c from student_access_code
      where code_hmac = p_code_hmac and revoked_at is null and expires_at > now()
        for update;
-
-    -- 2. A slip printed before this file and not yet converted. THE PLAIN
-    --    CODE IS USED HERE AND NOWHERE ELSE, and only against rows that still
-    --    have a salted hash (code_hash is not null): it is never compared
-    --    with a converted or a new slip, never stored and never logged.
     if _c.id is null then
-        if now() >= _until
-           or not exists (select 1 from student_access_code
-                           where code_hash is not null and revoked_at is null and expires_at > now()) then
-            -- No unconverted slip can be live: a miss is a miss.
-            perform _log('open', 'not_found', p_ip_hash);
-            return jsonb_build_object('ok', false, 'error', 'not_found');
-        end if;
-        if p_code is null then
-            -- Ask the edge for the plain code. Nothing is counted or logged:
-            -- the second call counts this code, once.
-            return jsonb_build_object('ok', false, 'error', 'not_found', 'fallback', true);
-        end if;
-        _code := _norm(p_code);
-        if _code !~ '^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$' then
-            perform _log('open', 'bad_format', p_ip_hash);
-            return jsonb_build_object('ok', false, 'error', 'not_found');
-        end if;
-        -- Each old slip has its own salt, so each is hashed with the code.
-        select array_agg(m.id) into _ids from (
-            select x.id from student_access_code x
-             where x.code_hash is not null and x.revoked_at is null and x.expires_at > now()
-               and x.code_hash = _access_code_hash(_code, x.salt)
-               for update) m;
-        if coalesce(cardinality(_ids), 0) = 0 then
-            -- Another scan of the same slip may have converted it just now
-            -- (the row it locked no longer has a hash): by its tag, again.
-            select * into _c from student_access_code
-             where code_hmac = p_code_hmac and revoked_at is null and expires_at > now()
-               for update;
-            if _c.id is null then
-                perform _log('open', 'not_found', p_ip_hash);
-                return jsonb_build_object('ok', false, 'error', 'not_found');
-            end if;
-        elsif cardinality(_ids) > 1 then
-            perform _log('open', 'ambiguous', p_ip_hash);
-            return jsonb_build_object('ok', false, 'error', 'not_found');
-        else
-            -- Converted on the spot: the tag in place of the hash and salt.
-            begin
-                update student_access_code
-                   set code_hmac = p_code_hmac, key_id = p_key_id, converted_at = now(), code_hash = null, salt = null
-                 where id = _ids[1];
-            exception when unique_violation then
-                -- That tag is already a slip's (taken back, or past its
-                -- date): this one keeps its hash and opens as before.
-                null;
-            end;
-            select * into _c from student_access_code where id = _ids[1];
-        end if;
+        perform _log('open', 'not_found', p_ip_hash);
+        return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
-
-    -- From here, as the slip's open always was, but for which password counts.
 
     -- A phone report's code opens to the birthday check, not the report:
     -- check() hands the report over once the birthday matches. It works
@@ -14819,15 +14713,13 @@ begin
     end if;
 
     -- Who the student must prove they are: their birthday or student number
-    -- when the teacher entered one, else the password printed on the slip:
-    -- the slip's own (its tag), or, for a slip printed before this file and
-    -- until the end of the old slips, the one stored with the student. A
-    -- slip with neither has nothing to check against: they need a new slip.
+    -- when the teacher entered one, else the password printed on the slip
+    -- (its tag). A slip with neither has nothing to check against: they need
+    -- a new slip.
     select coalesce(nullif(btrim(s.preferred_name), ''), s.first_name),
            case when s.date_of_birth is not null or nullif(btrim(s.student_number), '') is not null then 'identity'
-                when _c.pw_hmac is not null
-                     or (now() < _until and nullif(btrim(s.slip_password), '') is not null) then 'password' end,
-           _c.pw_hmac is not null or (now() < _until and nullif(btrim(s.slip_password), '') is not null)
+                when _c.pw_hmac is not null then 'password' end,
+           _c.pw_hmac is not null
       into _name, _by, _pw
       from enrollment e join student s on s.id = e.student_id
      where e.id = _c.enrollment_id;
@@ -16485,7 +16377,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text)
+CREATE OR REPLACE FUNCTION student_submit.verify(p_token text, p_birthday text, p_student_number text, p_pw_hmac text, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -16499,15 +16391,11 @@ declare
     _why    text;
     _dob    date;
     _num    text;
-    _pw     text;
-    _plain  boolean;
     _given  date;
     _match  boolean := false;
-    _by_pw  boolean := false;
     _misses int;
 begin
-    if (p_code_hmac is not null and p_code_hmac !~ '^[0-9a-f]{64}$')
-       or (p_pw_hmac is not null and p_pw_hmac !~ '^[0-9a-f]{64}$') then
+    if p_pw_hmac is not null and p_pw_hmac !~ '^[0-9a-f]{64}$' then
         raise exception 'malformed tag' using errcode = '22023';
     end if;
     if coalesce(p_token, '') !~ '^[0-9a-f]{64}$' then
@@ -16552,30 +16440,19 @@ begin
         return jsonb_build_object('ok', false, 'error', 'slip_locked');
     end if;
 
-    select s.date_of_birth, nullif(_norm(s.student_number), ''), nullif(_norm(s.slip_password), '')
-      into _dob, _num, _pw
+    select s.date_of_birth, nullif(_norm(s.student_number), '')
+      into _dob, _num
       from enrollment e join student s on s.id = e.student_id
      where e.id = _c.enrollment_id;
-    -- The stored password counts only until the end of the old slips.
-    _plain := _pw is not null and now() < _slip_old_until();
 
     begin
         _given := nullif(btrim(coalesce(p_birthday, '')), '')::date;
     exception when others then
         _given := null;
     end;
-    _by_pw := _plain and p_password is not null and _norm(p_password) = _pw;
     _match := (_dob is not null and _given is not null and _given = _dob)
            or (_num is not null and _norm(p_student_number) = _num)
-           or (_c.pw_hmac is not null and p_pw_hmac is not null and p_pw_hmac = _c.pw_hmac)
-           or _by_pw;
-
-    if not _match and p_password is null and p_pw_hmac is not null and _c.pw_hmac is null and _plain then
-        -- This slip's password has no tag yet and the stored one is on file:
-        -- ask the edge for the typed password. Nothing is counted or logged:
-        -- the second call counts this try, once.
-        return jsonb_build_object('ok', false, 'error', 'wrong_identity', 'fallback', true);
-    end if;
+           or (_c.pw_hmac is not null and p_pw_hmac is not null and p_pw_hmac = _c.pw_hmac);
 
     if not _match then
         update session set check_fails = check_fails + 1 where id = _s.id;
@@ -16584,15 +16461,6 @@ begin
             return jsonb_build_object('ok', false, 'error', 'slip_locked');
         end if;
         return jsonb_build_object('ok', false, 'error', 'wrong_identity', 'tries_left', 4 - _misses);
-    end if;
-
-    -- The printed password matched the stored one: keep its tag on this
-    -- slip, bound to this slip's own code (the phone opened it with that
-    -- code), so the next check compares tags. Once no live slip needs the
-    -- stored password, the trigger clears it.
-    if _by_pw and _c.pw_hmac is null and p_pw_hmac is not null
-       and _c.code_hmac is not null and p_code_hmac = _c.code_hmac then
-        update student_access_code set pw_hmac = p_pw_hmac where id = _c.id;
     end if;
 
     update session set checked_at = now() where id = _s.id;
