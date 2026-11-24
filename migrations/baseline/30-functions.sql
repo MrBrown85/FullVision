@@ -257,11 +257,17 @@ CREATE OR REPLACE FUNCTION fv_private.handout_file_read_allowed(p_name text)
  SET search_path TO 'public', 'pg_temp'
 AS $function$
     select (select auth.uid()) is not null
-       and exists (select 1
-                     from fv_private.handout_file_path_parts(p_name) h
-                     join assessment_resource r on r.id = h.resource_id
-                    where r.course_id = h.course_id and r.kind = h.kind
-                      and fv_owns_assessment(r.assessment_id));
+       and (exists (select 1
+                      from fv_private.handout_file_path_parts(p_name) h
+                      join assessment_resource r on r.id = h.resource_id
+                     where r.course_id = h.course_id and r.kind = h.kind
+                       and fv_owns_assessment(r.assessment_id))
+         or exists (select 1
+                      from fv_private.handout_original_parts(p_name) h
+                      join assessment_resource r on r.id = h.resource_id
+                     where r.course_id = h.course_id and r.kind = 'pdf'
+                       and r.original_status is not null
+                       and fv_owns_assessment(r.assessment_id)));
 $function$;
 
 CREATE OR REPLACE FUNCTION fv_private.handout_file_upload_allowed(p_name text)
@@ -271,13 +277,31 @@ CREATE OR REPLACE FUNCTION fv_private.handout_file_upload_allowed(p_name text)
  SET search_path TO 'public', 'pg_temp'
 AS $function$
     select (select auth.uid()) is not null
-       and exists (select 1
-                     from fv_private.handout_file_path_parts(p_name) h
-                     join assessment_resource r on r.id = h.resource_id
-                    where r.course_id = h.course_id and r.kind = h.kind
-                      and r.status = 'uploading'
-                      and r.created_at >= now() - _work_hold()
-                      and fv_owns_assessment(r.assessment_id));
+       and (exists (select 1
+                      from fv_private.handout_file_path_parts(p_name) h
+                      join assessment_resource r on r.id = h.resource_id
+                     where r.course_id = h.course_id and r.kind = h.kind
+                       and r.status = 'uploading'
+                       and r.created_at >= now() - _work_hold()
+                       and fv_owns_assessment(r.assessment_id))
+         or exists (select 1
+                      from fv_private.handout_original_parts(p_name) h
+                      join assessment_resource r on r.id = h.resource_id
+                     where r.course_id = h.course_id and r.kind = 'pdf'
+                       and r.original_status = 'uploading'
+                       and r.original_started_at >= now() - _work_hold()
+                       and fv_owns_assessment(r.assessment_id)));
+$function$;
+
+CREATE OR REPLACE FUNCTION fv_private.handout_original_parts(p_name text)
+ RETURNS TABLE(course_id uuid, resource_id uuid)
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select m[1]::uuid, m[2]::uuid
+      from regexp_match(p_name, '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})[.]pdf$') m
+     where m is not null;
 $function$;
 
 CREATE OR REPLACE FUNCTION fv_private.handout_path_parts(p_name text)
@@ -855,6 +879,14 @@ AS $function$
            || case when r.kind <> 'link' and r.status = 'uploading'
                    then jsonb_build_object('finish_by', r.created_at + _work_hold())
                    else '{}'::jsonb end
+           || case when r.kind = 'pdf' and r.original_status is not null
+                   then jsonb_build_object('original', r.original_status,
+                                           'original_path', _handout_original_path(r.course_id, r.id))
+                        || case when r.bytes is not null then jsonb_build_object('original_bytes', r.bytes) else '{}'::jsonb end
+                        || case when r.original_status = 'uploading'
+                                then jsonb_build_object('original_finish_by', r.original_started_at + _work_hold())
+                                else '{}'::jsonb end
+                   else '{}'::jsonb end
       from assessment_resource r
      where r.id = p_id;
 $function$;
@@ -873,6 +905,12 @@ begin
         select _work_bucket(), _handout_path(old.course_id, old.id, n), old.course_id, _why, now() + interval '10 minutes'
           from generate_series(1, old.page_count) n
         on conflict (bucket, path) do nothing;
+        if old.original_status is not null then
+            insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
+            values (_handout_file_bucket(), _handout_original_path(old.course_id, old.id), old.course_id, _why,
+                    now() + interval '10 minutes')
+            on conflict (bucket, path) do nothing;
+        end if;
     elsif old.kind in ('html', 'txt', 'epub') then
         insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
         values (_handout_file_bucket(), _handout_file_path(old.course_id, old.id, old.kind), old.course_id, _why,
@@ -1610,6 +1648,19 @@ begin
      where course_id = p_course_id and kind <> 'link' and status = 'uploading' and created_at < now() - _work_hold();
     get diagnostics _n = row_count;
     perform set_config('fv.handout_removal_reason', '', true);
+    -- A PDF whose original was not stored in time keeps working from its pages; the original is given up
+    -- for good (it never restarts, so a name queued here cannot be written again) and its name is queued.
+    with d as (
+        update assessment_resource
+           set original_status = 'dropped', bytes = null, updated_at = now()
+         where course_id = p_course_id and kind = 'pdf' and original_status = 'uploading'
+           and original_started_at < now() - _work_hold()
+        returning id, course_id)
+    insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
+    select _handout_file_bucket(), _handout_original_path(d.course_id, d.id), d.course_id, 'handout_expired',
+           now() + interval '10 minutes'
+      from d
+    on conflict (bucket, path) do nothing;
     return _n;
 end;
 $function$;
@@ -1664,6 +1715,15 @@ CREATE OR REPLACE FUNCTION public._handout_file_path(p_course_id uuid, p_resourc
 AS $function$
     select p_course_id::text || '/' || p_resource_id::text || '.' || p_kind
      where p_kind in ('html', 'txt', 'epub');
+$function$;
+
+CREATE OR REPLACE FUNCTION public._handout_original_path(p_course_id uuid, p_resource_id uuid)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+    select p_course_id::text || '/' || p_resource_id::text || '.pdf';
 $function$;
 
 CREATE OR REPLACE FUNCTION public._handout_path(p_course_id uuid, p_resource_id uuid, p_page integer)
@@ -4545,6 +4605,53 @@ begin
     end if;
     _cached := _assessment_resource_json(_r.id);
     perform fv_idem_store(p_idempotency_key, 'finish_handout_file', _cached);
+    return _cached;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.finish_handout_original(p_resource_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _course uuid;
+    _r      assessment_resource%rowtype;
+    _o      record;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select r.course_id into _course from assessment_resource r
+     where r.id = p_resource_id and r.kind = 'pdf' and fv_owns_assessment(r.assessment_id);
+    if _course is not null then
+        perform _grade_return_lock_first(_course);
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'finish_handout_original');
+    if _cached is not null then return _cached; end if;
+    if _course is null then
+        return jsonb_build_object('id', p_resource_id, 'status', 'gone');
+    end if;
+    perform _handout_drop_expired(_course);
+    select * into _r from assessment_resource where id = p_resource_id for update;
+    if not found then
+        return jsonb_build_object('id', p_resource_id, 'status', 'gone');
+    end if;
+    if _r.original_status is null then
+        return _assessment_resource_json(_r.id);
+    end if;
+    if _r.original_status = 'uploading' then
+        select o.bytes, o.mimetype into _o from _handout_file_object(_handout_original_path(_r.course_id, _r.id)) o;
+        if not found then
+            return _assessment_resource_json(_r.id) || jsonb_build_object('missing', true);
+        end if;
+        if _o.mimetype is distinct from 'application/pdf' or coalesce(_o.bytes, 0) not between 1 and _handout_file_max_bytes() then
+            return _assessment_resource_json(_r.id) || jsonb_build_object('bad', true);
+        end if;
+        update assessment_resource set original_status = 'ready', bytes = _o.bytes, updated_at = now() where id = _r.id;
+    end if;
+    _cached := _assessment_resource_json(_r.id);
+    perform fv_idem_store(p_idempotency_key, 'finish_handout_original', _cached);
     return _cached;
 end;
 $function$;
@@ -8725,8 +8832,9 @@ begin
          where c.id in (select distinct fv_private.work_path_course(o.name) from storage.objects o
                          where o.bucket_id = public._work_bucket() and o.archived_at is null and not o.is_delete_marker)
         union
-        -- and every class with a handout still uploading (2026111706), so one never finished is dropped
-        select r.course_id from public.assessment_resource r where r.status = 'uploading'
+        -- and every class with a handout still uploading, or a PDF's original still uploading (2026112408),
+        -- so one never finished is dropped
+        select r.course_id from public.assessment_resource r where r.status = 'uploading' or r.original_status = 'uploading'
         order by 1
     loop
         begin
@@ -11074,6 +11182,48 @@ begin
     returning id into _id;
     _cached := _assessment_resource_json(_id) || jsonb_build_object('bucket', _handout_file_bucket());
     perform fv_idem_store(p_idempotency_key, 'start_handout_file', _cached);
+    return _cached;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.start_handout_original(p_resource_id uuid, p_bytes bigint, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _cached jsonb;
+    _course uuid;
+    _r      assessment_resource%rowtype;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select r.course_id into _course from assessment_resource r
+     where r.id = p_resource_id and r.kind = 'pdf' and fv_owns_assessment(r.assessment_id);
+    if _course is null then
+        raise exception 'handout not found' using errcode = 'P0002';
+    end if;
+    if p_bytes is null or p_bytes < 1 or p_bytes > _handout_file_max_bytes() then
+        raise exception 'a PDF can be 20 MB at most' using errcode = '22023';
+    end if;
+    perform _grade_return_lock_first(_course);
+    _cached := fv_idem_check(p_idempotency_key, 'start_handout_original');
+    if _cached is not null then return _cached; end if;
+    perform _handout_drop_expired(_course);
+    select * into _r from assessment_resource where id = p_resource_id for update;
+    if not found then
+        raise exception 'handout not found' using errcode = 'P0002';
+    end if;
+    if _r.status <> 'ready' then
+        raise exception 'the pages are not finished' using errcode = '22023';
+    end if;
+    if _r.original_status is null then
+        update assessment_resource
+           set original_status = 'uploading', original_started_at = now(), bytes = p_bytes, updated_at = now()
+         where id = _r.id;
+    end if;
+    _cached := _assessment_resource_json(_r.id) || jsonb_build_object('bucket', _handout_file_bucket());
+    perform fv_idem_store(p_idempotency_key, 'start_handout_original', _cached);
     return _cached;
 end;
 $function$;
@@ -14211,6 +14361,39 @@ begin
         'resource_id', _r.id, 'assessment_id', _r.assessment_id, 'title', _r.title, 'page_count', _r.page_count,
         'pages', (select jsonb_agg(jsonb_build_object('page', n, 'path', public._handout_path(_r.course_id, _r.id, n)) order by n)
                     from generate_series(1, _r.page_count) n));
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.handout_original(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in jsonb := _session_class(p_session_token, p_enrollment_id);
+    _r  assessment_resource%rowtype;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    select r.* into _r
+      from assessment_resource r
+      join assessment a on a.id = r.assessment_id
+      join course c on c.id = a.course_id
+     where r.id = p_resource_id and r.kind = 'pdf' and r.status = 'ready'
+       and r.course_id = (_in->>'course_id')::uuid and a.course_id = r.course_id
+       and student_submit._listed(a, (now() at time zone public._fv_timezone(c.timezone))::date);
+    if not found then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    if _r.original_status is distinct from 'ready' then
+        return jsonb_build_object('ok', true, 'has_original', false, 'resource_id', _r.id);
+    end if;
+    return jsonb_build_object(
+        'ok', true, 'has_original', true, 'bucket', public._handout_file_bucket(),
+        'resource_id', _r.id, 'assessment_id', _r.assessment_id, 'title', _r.title,
+        'bytes', _r.bytes, 'path', public._handout_original_path(_r.course_id, _r.id));
 end;
 $function$;
 

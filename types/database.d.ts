@@ -176,6 +176,8 @@ export type Database = {
           created_at: string
           id: string
           kind: string
+          original_started_at: string | null
+          original_status: string | null
           page_count: number | null
           position: number
           status: string
@@ -191,6 +193,8 @@ export type Database = {
           created_at?: string
           id?: string
           kind: string
+          original_started_at?: string | null
+          original_status?: string | null
           page_count?: number | null
           position: number
           status: string
@@ -205,6 +209,8 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          original_started_at?: string | null
+          original_status?: string | null
           page_count?: number | null
           position?: number
           status?: string
@@ -4065,6 +4071,10 @@ export type Database = {
       }
       _handout_file_path: {
         Args: { p_course_id: string; p_kind: string; p_resource_id: string }
+        Returns: string
+      }
+      _handout_original_path: {
+        Args: { p_course_id: string; p_resource_id: string }
         Returns: string
       }
       _handout_path: {
