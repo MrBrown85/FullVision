@@ -271,3 +271,44 @@ test('a level and Late set on the phone show in the desktop gradebook', async ({
   await expect(cell.locator('.gb-late')).toHaveText('L');
   await expect(cell).toHaveAttribute('aria-label', /: 1\.0, Emerging, Late$/);
 });
+
+test('on a group’s card, Line for One Student saves a line for one member alone', async ({ page }) => {
+  await enterDemo(page);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  const [first, second] = await page.evaluate(aid => {
+    const list = getAssessments('sci8');
+    const a = list.find(x => x.id === aid);
+    const ids = sortStudents(getStudents('sci8'), 'lastName').map(s => s.id);
+    a.collaboration = 'group';
+    a.groups = [ids.slice(0, 2)];
+    saveAssessments('sci8', list);
+    return ids.slice(0, 2);
+  }, PROPOSAL);
+  const card = await openWork(page, PROPOSAL);
+  await expect(card).toHaveAttribute('data-sid', first);
+  const crit = card.locator('.m-crit-group').first();
+  await crit.locator('[data-action="m-grade-crit-comment"]').click();
+  const each = crit.locator('.m-crit-each');
+  await expect(each).toBeVisible();
+  await each.locator('[data-own="' + second + '"]').click();
+  const box = crit.locator('.m-crit-own-input[data-sid="' + second + '"]');
+  await expect(box).toBeFocused();
+  await box.fill('Your sketch made the plan clear.');
+  await crit.locator('.m-crit-name').click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ({ sids, aid }) =>
+          sids.map(sid =>
+            (getScores('sci8')[sid] || [])
+              .filter(e => e.assessmentId === aid && e.critOwn)
+              .map(e => e.critOwn)
+              .join(','),
+          ),
+        { sids: [first, second], aid: PROPOSAL },
+      ),
+    )
+    .toEqual(['', 'Your sketch made the plan clear.']);
+  await expect(crit.locator('[data-action="m-grade-crit-comment"]')).toHaveClass(/is-on/);
+  await crit.screenshot({ path: 'test-results/phone-line-for-one-student.png' });
+});

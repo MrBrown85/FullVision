@@ -2259,6 +2259,69 @@ body.fv-switching-course::after {
   box-shadow: 0 0 0 2px var(--active);
 }
 
+/* Pair and group work: a line under the criterion's comment for one member
+   alone, and the names that open one. */
+.m-crit-own-wrap[hidden],
+.m-crit-own[hidden],
+.m-crit-own-btn[hidden] {
+  display: none;
+}
+.m-crit-own {
+  display: block;
+  margin: 10px 0 0 16px;
+}
+.m-crit-own-label {
+  display: block;
+  margin: 0 0 4px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.m-crit-own-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}
+.m-crit-own-input:focus {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.m-crit-own-input:not(:focus):not(:placeholder-shown) {
+  background: var(--active-light);
+  font-size: 15px;
+}
+.m-crit-each {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-crit-own-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--active-light);
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Status toggles */
 /* The Overall Comment under the score and status. */
 .m-overall {

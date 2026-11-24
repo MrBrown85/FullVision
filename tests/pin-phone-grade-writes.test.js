@@ -197,6 +197,7 @@ const WRITERS = [
   'setRubricCheck',
   'saveRubricCriterionComment',
   'saveRubricCriterionBeyond',
+  'saveRubricCriterionOwn',
   'saveTagComment',
   'saveScoreComment',
   'saveScoreReportNote',
@@ -293,6 +294,7 @@ describe('pin: the phone Grade tab’s writes', () => {
     if (action === 'm-grade-view') return MGrade.setGradeView(CID, a('aid'), a('view'));
     if (action === 'm-grade-checks') return MGrade.toggleChecklist(CID, a('sid'), a('aid'), a('critid'));
     if (action === 'm-grade-crit-comment') return MGrade.openCritComment(el);
+    if (action === 'm-grade-crit-own') return MGrade.openCritOwn(el);
     if (action === 'm-grade-tick') return MGrade.tickCheck(CID, a('sid'), a('aid'), a('critid'), a('checkid'), on);
     if (action === 'm-grade-mod') {
       const box = el.closest('.m-score-mods');
@@ -866,6 +868,72 @@ describe('pin: the phone Grade tab’s writes', () => {
       typeAndLeave(overall(AVA, ESSAY), 'Clear thesis.');
       expect(writers.since()).toEqual([['saveScoreComment', CID, AVA, ESSAY, 'Clear thesis.']]);
       expect(session.sent()).toEqual([comment(AVA, ESSAY, 'Clear thesis.')]);
+    });
+  });
+
+  describe('a line for one student (pair work on a rubric)', () => {
+    const pairLab = {
+      assessments: [
+        {
+          id: LAB,
+          title: 'Lab',
+          rubricId: LAB_RUBRIC,
+          tagIds: [QUESTION],
+          date: '2026-10-12',
+          type: 'summative',
+          collaboration: 'pair',
+          pairs: [[AVA, BEN]],
+        },
+      ],
+    };
+    const ownBtn = (crit, member) =>
+      on(AVA, '.m-crit-group[data-critid="' + crit + '"] [data-action="m-grade-crit-own"][data-own="' + member + '"]');
+    const ownBox = (crit, member) =>
+      on(AVA, '.m-crit-own-input[data-critid="' + crit + '"][data-sid="' + member + '"]');
+
+    it('on the pair’s card, a member’s name opens their own line, saved for them alone', () => {
+      open(LAB, pairLab);
+      tap(on(AVA, '[data-action="m-grade-crit-comment"][data-critid="' + METHOD + '"]'));
+      expect(ownBtn(METHOD, AVA)).toBeTruthy();
+      tap(ownBtn(METHOD, BEN));
+      expect(ownBox(METHOD, BEN).closest('.m-crit-own').hidden).toBe(false);
+      expect(ownBtn(METHOD, BEN).hidden).toBe(true);
+      typeAndLeave(ownBox(METHOD, BEN), '  Your table was the clearest.  ');
+
+      expect(writers.since()).toEqual([
+        ['saveRubricCriterionOwn', CID, BEN, LAB, METHOD, 'Your table was the clearest.'],
+      ]);
+      expect(entries(CID, BEN).map(e => [e.tagId, e.critOwn])).toEqual([[METHOD, 'Your table was the clearest.']]);
+      expect(entries(CID, AVA)).toEqual([]);
+      const sent = session.since();
+      expect(sent).toHaveLength(1);
+      expect(sent[0][1]).toMatchObject({
+        p_enrollment_id: BEN,
+        p_criterion_id: METHOD,
+        p_own_comment: 'Your table was the clearest.',
+      });
+
+      // The pair's comment then fills both, and Ben keeps his line.
+      typeAndLeave(critComment(AVA, METHOD), 'Clear method.');
+      expect(getRubricCriterionOwn(CID, BEN, LAB, { id: METHOD, tagIds: [QUESTION] })).toBe(
+        'Your table was the clearest.',
+      );
+      expect(entries(CID, AVA).map(e => [e.critNote, e.critOwn || ''])).toEqual([['Clear method.', '']]);
+      expect(entries(CID, BEN).map(e => [e.critNote, e.critOwn])).toEqual([
+        ['Clear method.', 'Your table was the clearest.'],
+      ]);
+    });
+
+    it('a line left empty goes back behind the member’s name, and its save clears it', () => {
+      open(LAB, pairLab);
+      tap(on(AVA, '[data-action="m-grade-crit-comment"][data-critid="' + METHOD + '"]'));
+      tap(ownBtn(METHOD, BEN));
+      typeAndLeave(ownBox(METHOD, BEN), 'Soon gone');
+      writers.since();
+      typeAndLeave(ownBox(METHOD, BEN), '');
+      expect(writers.since()).toEqual([['saveRubricCriterionOwn', CID, BEN, LAB, METHOD, '']]);
+      expect(ownBox(METHOD, BEN).closest('.m-crit-own').hidden).toBe(true);
+      expect(ownBtn(METHOD, BEN).hidden).toBe(false);
     });
   });
 

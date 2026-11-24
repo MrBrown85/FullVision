@@ -1695,6 +1695,11 @@
         return;
       }
 
+      if (action === 'm-grade-crit-own') {
+        MGrade.openCritOwn(target);
+        return;
+      }
+
       if (action === 'm-grade-tick') {
         MGrade.tickCheck(
           _cid,
