@@ -273,7 +273,7 @@ window.ReportOnePanel = (function () {
         '<button type="button" class="one-o-action" data-action="oneWording" data-part="' +
         esc(key) +
         '">' +
-        (key === 'parent-response' ? 'Edit Wording…' : 'Edit Questions…') +
+        (key === 'parent-response' ? 'Edit Wording' : 'Edit Questions') +
         '</button>';
     return h + '</div></div>';
   }

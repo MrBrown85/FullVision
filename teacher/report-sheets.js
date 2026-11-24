@@ -778,6 +778,16 @@ window.ReportSheets = (function () {
             used += c.rows[start + take];
             take++;
           }
+          // A page never ends on a row kept with the one under it (a heading).
+          while (take > 1 && start + take < c.rows.length && c.keep && c.keep[start + take - 1]) {
+            take--;
+            used -= c.rows[start + take];
+          }
+          // Only a heading fits here: it goes on with its rows.
+          if (take === 1 && start + 1 < c.rows.length && c.keep && c.keep[start] && (y > y0 || lim < H)) {
+            take = 0;
+            used = 0;
+          }
           if (!take) {
             if (y > y0 || lim < H) {
               // No room for a row here: the next side.

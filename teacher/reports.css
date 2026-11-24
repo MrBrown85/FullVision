@@ -5946,6 +5946,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   vertical-align: middle;
   white-space: nowrap;
 }
+/* A teacher's own scale words ("Almost Always, Without Reminders") wrap
+   in their column instead of widening it and squeezing the statements. */
+.report-sheet .report-reflect-tbl th.report-habit-o {
+  white-space: normal;
+  vertical-align: bottom;
+}
 .report-habit-over th {
   border-bottom: 0 !important;
   padding-bottom: 0 !important;

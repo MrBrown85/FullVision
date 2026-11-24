@@ -27,11 +27,17 @@ window.ReportOnePage = (function () {
       preview.addEventListener('pointerdown', _onPointerDown);
     }
     if (_comment()) _comment().mount(preview, apiFn);
+    if (_words()) _words().mount(preview, apiFn);
   }
 
   /* The Teacher Comment's editor is its own file (report-one-comment.js). */
   function _comment() {
     return typeof ReportOneComment !== 'undefined' ? ReportOneComment : null;
+  }
+  /* So is the reflections' and the response's wording, edited where it
+     prints (report-one-words.js). */
+  function _words() {
+    return typeof ReportOneWords !== 'undefined' ? ReportOneWords : null;
   }
 
   /* ── Small helpers ─────────────────────────────────────────── */
@@ -104,6 +110,7 @@ window.ReportOnePage = (function () {
       _parts(preview, api, m, student);
       _addStrip(preview, api, m);
     }
+    if (_words()) _words().decorate(preview, api);
     if (_then) {
       var fn = _then;
       _then = null;
@@ -309,7 +316,11 @@ window.ReportOnePage = (function () {
   // A drag that starts on a control or a heading being renamed is not a
   // drag of the part.
   function _onPointerDown(e) {
-    if (e.target.closest && e.target.closest('.' + MINE + ', [data-one-title][contenteditable]')) e.stopPropagation();
+    if (
+      e.target.closest &&
+      e.target.closest('.' + MINE + ', [data-one-title][contenteditable], [data-wt][contenteditable]')
+    )
+      e.stopPropagation();
   }
   function _onDbl(e) {
     var h = e.target.closest ? e.target.closest('[data-one-title]') : null;
@@ -541,7 +552,9 @@ window.ReportOnePage = (function () {
         return true;
       case 'oneWording':
         if (WORDED.indexOf(el.getAttribute('data-part')) < 0) return false;
-        _openDialog(api, 'wording', el.getAttribute('data-part'), el);
+        // On the page; the dialog only when there is no student to show it for.
+        if (!(_words() && _words().open(api, el.getAttribute('data-part'))))
+          _openDialog(api, 'wording', el.getAttribute('data-part'), el);
         return true;
     }
     return !!(_comment() && _comment().handle(action, el, api, e));
@@ -1089,6 +1102,7 @@ window.ReportOnePage = (function () {
      unsaved changes is saved or discarded first). */
   function beforePrint(api) {
     _flushWording();
+    if (_words()) _words().beforePrint();
     if (_renaming) _endRename(true);
     return _comment() ? _comment().beforePrint(api) : true;
   }
