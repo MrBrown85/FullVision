@@ -2380,19 +2380,46 @@ window.StudentPageView = (function () {
   /* Log Out? (Colin, 2026-11-14: "Done should be Log Out and should also
      prompt a warning"): asked over the page before the session ends. Log
      Out ends it as Done did (card-done, s/app.js). */
-  function logoutSheetHtml() {
+  function logoutSheetHtml(ui) {
+    var left = !!ui && ui.quizWaiting > 0;
     return (
       '<button type="button" class="sp-sheet-back sp-set-back" data-act="logout-cancel" aria-label="Cancel" tabindex="-1"></button>' +
       '<div class="sp-sheet sp-logout" role="alertdialog" aria-modal="true" aria-labelledby="sp-logout-title" aria-describedby="sp-logout-line">' +
       '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
       '<h2 class="sp-sheet-title sp-set-title" id="sp-logout-title" tabindex="-1">Log Out?</h2>' +
-      '<p class="sp-lead" id="sp-logout-line">You’ll need your card to open your page again.</p>' +
+      '<p class="sp-lead" id="sp-logout-line">' +
+      (left
+        ? 'An answer on your quiz hasn’t reached your teacher yet. Wait a moment for it to send, or log out and lose it.'
+        : 'You’ll need your card to open your page again.') +
+      '</p>' +
       /* One under the other, Cancel last: at the foot of the sheet, where
          Settings' Log Out was under the finger, so a double tap cancels
          (s/app.js also ignores presses here for a moment after it opens). */
       '<div class="sp-logout-buttons">' +
-      '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">Log Out</button>' +
-      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">Cancel</button>' +
+      '<button type="button" class="sp-btn sp-btn-danger" data-act="card-done">' +
+      (left ? 'Log Out Anyway' : 'Log Out') +
+      '</button>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="logout-cancel">' +
+      (left ? 'Wait' : 'Cancel') +
+      '</button>' +
+      '</div></div>'
+    );
+  }
+
+  /* Switch Class asking first, while a quiz answer waits to be saved (s/quiz.js): the same sheet, with its
+     own words. Wait is last, at the foot. */
+  function classHoldSheetHtml(ui) {
+    return (
+      '<button type="button" class="sp-sheet-back sp-set-back" data-act="class-hold-cancel" aria-label="Wait" tabindex="-1"></button>' +
+      '<div class="sp-sheet sp-logout" role="alertdialog" aria-modal="true" aria-labelledby="sp-logout-title" aria-describedby="sp-logout-line">' +
+      '<span class="sp-sheet-grip sp-set-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title sp-set-title" id="sp-logout-title" tabindex="-1">Switch Class?</h2>' +
+      '<p class="sp-lead" id="sp-logout-line">An answer on your quiz hasn’t reached your teacher yet. Wait a moment for it to send, or switch and lose it.</p>' +
+      '<div class="sp-logout-buttons">' +
+      '<button type="button" class="sp-btn sp-btn-danger" data-act="class-open" data-enrollment="' +
+      esc(ui.classHold) +
+      '">Switch Class Anyway</button>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="class-hold-cancel">Wait</button>' +
       '</div></div>'
     );
   }
@@ -2438,7 +2465,8 @@ window.StudentPageView = (function () {
       '</main>' +
       tabBarHtml(ui, 'bottom', view) +
       (ui.settings && !ui.logout ? settingsSheetHtml(view, ui) : '') +
-      (ui.logout ? logoutSheetHtml() : '') +
+      (ui.logout ? logoutSheetHtml(ui) : '') +
+      (ui.classHold && !ui.logout ? classHoldSheetHtml(ui) : '') +
       '</div>'
     );
   }

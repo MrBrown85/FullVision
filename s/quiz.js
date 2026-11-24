@@ -25,12 +25,22 @@
    online." says so; Send is refused while any save is waiting, and says why.
    Nothing about a save is ever a banner or a failed-item list.
 
-   The key is not on the device and nothing here knows a right answer. A quiz
-   answered in Demo Mode is the sample's, kept in this tab's memory only and
-   never sent anywhere; the teacher's Demo Mode answer key
-   is not read by anything on the student's page.
-   Whatever a real student's answers left on this tab is wiped at every
-   sign-out (StudentQuizModel.wipeKept). */
+   The key is not on the device and nothing here knows a right answer.
+
+   What is kept on the device, and the one exception to "nothing of a
+   student's answers stays": a real student's answers still waiting to be
+   saved are in this tab's sessionStorage (`fv-s-quiz-<enrolment>-<piece>`), as
+   the questionnaire drafts are (s/student.js, CARD_DRAFTS): they last only for
+   the tab, go when the save lands, and go at every sign-out
+   (StudentQuizModel.wipeKept). A quiz answered in Demo Mode is the sample's,
+   never sent anywhere, and kept in localStorage under `gb-student-quiz-demo`,
+   so a reload keeps it; Log Out, Reset Demo Data and leaving Demo Mode clear
+   it. The teacher's Demo Mode answer key is not read by anything on the
+   student's page.
+
+   An answer still waiting is never lost silently: the Log Out sheet says so
+   and offers Wait (StudentPage.quizWaiting), and closing the tab asks first
+   (beforeunload), only while a save is waiting. */
 (function () {
   'use strict';
 
@@ -53,6 +63,8 @@
   var S = null; // the page's state (student.js)
   /** @type {any} */
   var Q = null; // the quiz open (or last open); see open()
+  /** @type {any[]} */
+  var savers = []; // every saver that may still hold an answer: a quiz left for Assignments keeps saving
   /** @type {Record<string, string>} */
   var known = {}; // aid -> 'part' or 'sent', as far as this tab has seen: the card's button words
   /** @type {any} */
@@ -286,12 +298,18 @@
     return { ok: false, error: 'not_found' };
   }
 
-  /** @param {string} route @param {any} body */
-  function ask(route, body) {
+  /** @param {string} route @param {any} body @param {string} [student] */
+  function ask(route, body, student) {
     if (S && S.demo) return SP.whileCurrent(Promise.resolve(demoAsk(route, body)));
-    return Promise.resolve(SP.askClass(route, body)).then(null, function () {
-      return { ok: false, error: 'network' };
-    });
+    // Named for its student: a save never reaches another class if the page has moved to one.
+    return Promise.resolve(SP.askClass(route, body, student)).then(
+      function (/** @type {any} */ res) {
+        return res && res.error === 'other_student' ? { ok: false, error: 'not_found' } : res;
+      },
+      function () {
+        return { ok: false, error: 'network' };
+      },
+    );
   }
 
   /* ── The piece, and what the card says ─────────────────── */
@@ -395,7 +413,10 @@
       p.quiz = true;
       var more = it.tries_left == null || it.tries_left > 0;
       // Closed before it was sent (a try is open and cannot be answered), or closed with none started.
-      if (!it.can_answer && (it.closed || it.has_open_try)) p.quizWord = 'Closed';
+      /* Closed with something of the student's to see (a try sent or left open) reads See Your Quiz, its closed date
+         inside; "Closed" alone is for a quiz this tab has opened and found nothing of theirs in. */
+      if (!it.can_answer && (it.closed || it.has_open_try))
+        p.quizWord = known[p.id] === 'none' ? 'Closed' : 'See Your Quiz';
       else if (it.has_open_try) p.quizWord = 'Carry On with the Quiz';
       else if (!it.can_answer) p.quizWord = 'See Your Quiz';
       else if (known[p.id] === 'sent') p.quizWord = more ? 'Try Again' : 'See Your Quiz';
@@ -406,7 +427,7 @@
   function remember(q) {
     if (!q.m) return;
     var n = M.counts(q.m, q.answers);
-    known[q.aid] = q.m.sent ? 'sent' : n.done ? 'part' : '';
+    known[q.aid] = q.m.sent ? 'sent' : n.done ? 'part' : q.m.tryNumber === 0 && q.m.closed ? 'none' : '';
     var it = list && list.items ? list.items[q.aid] : null;
     if (!it) return;
     it.has_open_try = !q.m.sent && q.m.tryNumber > 0;
@@ -487,7 +508,7 @@
   function startSaver(q) {
     q.saver = M.createSaver({
       send: function (/** @type {string} */ qid, /** @type {any} */ answer) {
-        return ask('quiz-save', { assessment_id: q.aid, question_id: qid, answer: answer });
+        return ask('quiz-save', { assessment_id: q.aid, question_id: qid, answer: answer }, q.student);
       },
       persist: function (/** @type {Record<string, any>} */ pending) {
         if (S && S.demo) demoTake(pending);
@@ -504,6 +525,7 @@
         if (typeof SP.sessionRefused === 'function') SP.sessionRefused(res);
       },
     });
+    savers.push(q.saver);
     // What an earlier page of this tab left waiting (no connection, a closed tab): sent again now.
     if (S && S.demo) return;
     var kept = M.keptPending(q.student, q.aid);
@@ -559,7 +581,7 @@
     }
     var words =
       e === 'quiz_closed'
-        ? 'This quiz is closed.'
+        ? 'This quiz closed, so you can’t start another try.'
         : e === 'no_tries_left'
           ? 'You have no tries left on this quiz.'
           : e === 'too_many'
@@ -568,9 +590,13 @@
               ? 'This quiz can’t open right now. Ask your teacher.'
               : NETWORK;
     q.message = words;
+    // Try Again is not offered again after a refusal that will not change: it would only be refused again.
+    var final = e === 'not_found' || e === 'bad_request' || e === 'quiz_closed' || e === 'no_tries_left';
     if (!q.m) {
       q.mode = 'failed';
-      q.noRetry = e === 'not_found' || e === 'bad_request';
+      q.noRetry = final;
+    } else if (final) {
+      q.m.canTryAgain = false;
     }
     paint('#sp-quiz-msg');
   }
@@ -582,7 +608,7 @@
     /** @type {any} */
     var body = { assessment_id: q.aid };
     if (again) body.new_try = true;
-    return ask('quiz', body).then(function (/** @type {any} */ res) {
+    return ask('quiz', body, q.student).then(function (/** @type {any} */ res) {
       if (!live(q)) return;
       q.busy = false;
       if (res && res.ok === true) return adopt(q, res, first);
@@ -652,7 +678,7 @@
         paint('#sp-quiz-msg');
         return;
       }
-      return ask('quiz-send', { assessment_id: q.aid }).then(function (/** @type {any} */ res) {
+      return ask('quiz-send', { assessment_id: q.aid }, q.student).then(function (/** @type {any} */ res) {
         if (!live(q)) {
           if (res && res.ok === true) known[q.aid] = 'sent';
           return;
@@ -704,6 +730,10 @@
       return (el && el.getAttribute && el.getAttribute(n)) || '';
     };
     if (act === 'quiz-open') return open(attr('data-piece'));
+    if (act === 'class-hold-cancel') {
+      S.classHold = '';
+      return paint('.sp-gear');
+    }
     var q = Q;
     if (S.screen !== 'quiz' || !q) return;
     if (act === 'quiz-back') return leave();
@@ -760,6 +790,57 @@
     changed(q, hit.q, hit.value, false);
   }
 
+  /* ── An answer still waiting is never lost silently ─────── */
+
+  /** How many answers are waiting to be saved, on every quiz this tab has open. */
+  function waiting() {
+    savers = savers.filter(function (s) {
+      return s.waiting() > 0 || s === (Q && Q.saver);
+    });
+    return savers.reduce(function (n, s) {
+      return n + s.waiting();
+    }, 0);
+  }
+  // The Log Out sheet (s/assignments.js): how many answers have not reached the teacher yet.
+  SP.quizWaiting = function () {
+    return on() ? waiting() : 0;
+  };
+
+  /* Switch Class (s/app.js openClass): with an answer waiting the page asks first, in a sheet (Wait, or Switch
+     Class Anyway); the answer is let go only when the student chooses to. True while the sheet asks. */
+  SP.quizHeld = function (/** @type {string} */ enrollment) {
+    if (!on() || !S || !waiting()) return false;
+    if (S.classHold === enrollment) {
+      S.classHold = '';
+      letGo();
+      return false;
+    }
+    S.classHold = enrollment;
+    paint('.sp-logout .sp-btn-tint');
+    return true;
+  };
+  // Every answer waiting on this tab is let go, and what the tab kept of it.
+  function letGo() {
+    savers.forEach(function (s) {
+      s.stop();
+    });
+    savers = [];
+    M.wipeKept();
+  }
+
+  function asksBeforeClosing() {
+    return on() && waiting() > 0;
+  }
+
+  // Closing the tab asks first, only while a save is waiting.
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('beforeunload', function (/** @type {any} */ e) {
+      if (!asksBeforeClosing()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+  }
+
   // The browser is back online: what is waiting goes now.
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('online', function () {
@@ -781,9 +862,13 @@
     share: function (/** @type {any} */ state) {
       // A new state is a sign-out (StudentPage.reset): the last student's answers go with it.
       if (S && state !== S) {
+        savers.forEach(function (s) {
+          s.stop();
+        });
         if (Q && Q.saver) Q.saver.stop();
         Q = null;
         known = {};
+        savers = [];
         list = null;
         demoWipe();
         M.wipeKept();
@@ -792,6 +877,7 @@
     },
     test: {
       quizOpen: open,
+      quizAsksBeforeClosing: asksBeforeClosing,
       quizSendNow: function () {
         if (Q) sendNow(Q);
       },

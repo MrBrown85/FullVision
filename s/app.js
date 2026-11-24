@@ -1743,6 +1743,10 @@
       return c.enrollmentId === enrollment;
     });
     if (!session || !known) return Promise.resolve();
+    // An answer on a quiz still waiting to be saved: asked about first (s/quiz.js).
+    if (enrollment !== session.enrollment && StudentPage.quizHeld && StudentPage.quizHeld(enrollment)) {
+      return Promise.resolve();
+    }
     S.settings = false;
     if (enrollment === session.enrollment) {
       paint('.sp-gear');

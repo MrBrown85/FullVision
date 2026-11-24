@@ -259,6 +259,11 @@ var StudentQuizView = (function () {
           ' Your teacher returns it with your result.',
       ) +
       '</p>' +
+      (m.closed
+        ? '<p class="sp-quiz-line">' +
+          esc(dayOf(m.closesOn) ? 'This quiz closed on ' + dayOf(m.closesOn) + '.' : 'This quiz is closed.') +
+          '</p>'
+        : '') +
       (m.canTryAgain
         ? '<p class="sp-quiz-line">' +
           esc(

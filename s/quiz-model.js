@@ -434,7 +434,7 @@ var StudentQuizModel = (function () {
       },
       status: status,
       waiting: function () {
-        return Object.keys(pending).length;
+        return stopped ? 0 : Object.keys(pending).length;
       },
       stop: stop,
     };

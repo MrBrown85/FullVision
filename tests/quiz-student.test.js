@@ -164,11 +164,11 @@ describe('Start the Quiz', () => {
 });
 
 describe('a quiz that closed before it was sent', () => {
-  it('says Closed on the card, and opens to the student’s own answers, read only, never blank', async () => {
+  it('says See Your Quiz on the card (something of theirs to see), and opens to the student’s own answers, read only, never blank', async () => {
     const w = world({ closed: true });
     w.db.answers = { q9: ['a'], q2: 3.5 };
     const page = await signIn(w);
-    expect(start(page).textContent).toBe('Closed');
+    expect(start(page).textContent).toBe('See Your Quiz');
     await page.click('[data-act="quiz-open"]');
     await page.settle();
     const text = page.root().textContent;

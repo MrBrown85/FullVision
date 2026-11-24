@@ -84,6 +84,9 @@
       pick: state.pick,
       card: state.card,
       logout: state.logout,
+      // A quiz answer not yet saved: the Log Out sheet and the Switch Class question say so (s/quiz.js).
+      quizWaiting: typeof StudentPage.quizWaiting === 'function' ? StudentPage.quizWaiting() : 0,
+      classHold: state.classHold || '',
       feedback: state.feedback,
       whole: state.whole,
       compare: state.compare,

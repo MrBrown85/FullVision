@@ -448,6 +448,22 @@ SCREENS.push(
     },
   },
   {
+    name: 'quiz, log out with an answer waiting',
+    quizzes: true,
+    marker: '.sp-logout',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswer(p.locator('.sp-quiz-q').first());
+      await p.locator('[data-act="quiz-back"]').click();
+      // Demo Mode's saves always land: one is made to wait, as it would offline.
+      await p.evaluate(() => {
+        StudentPage.quizWaiting = () => 1;
+      });
+      await p.locator('.sp-gear').click();
+      await p.locator('.sp-set-out').click();
+    },
+  },
+  {
     name: 'quiz, pick up where you left off',
     quizzes: true,
     marker: '#sp-quiz-resume',
