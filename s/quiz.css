@@ -1,0 +1,505 @@
+/* A quiz on the student's page and in Preview as Student's device
+   (docs/plans/quizzes-plan.md, slice Q3b; the board's "Taking It on a
+   Phone"). s/quiz-view.js draws it; every name starts sp-quiz-. The page
+   keeps its own colours as variables with these fallbacks, so the same sheet
+   reads the same in the teacher's preview, where s/student.css is not loaded.
+
+   Phone first: 16px boxes (iOS does not zoom them), every button at least 44px
+   tall. Nothing here is sized to the screen: the page grows with its
+   questions, and the Text Size's zoom (s/student.css) reflows it, so a 320px
+   phone at Larger lays out at 246px and still holds. Out of sight at rest
+   means hidden, and the rule below makes that win over any display. */
+
+.sp-quiz {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--sp-bg, #f5f5f7);
+  color: var(--sp-text, #1d1d1f);
+  font-family: inherit;
+  line-height: 1.35;
+}
+.sp-quiz *,
+.sp-quiz *::before,
+.sp-quiz *::after {
+  box-sizing: border-box;
+}
+.sp-quiz [hidden] {
+  display: none !important;
+}
+.sp-quiz :focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.45);
+  outline-offset: 2px;
+}
+
+/* Header: back, the class and the due day, the title */
+.sp-quiz-head {
+  background: var(--sp-card, #fff);
+  border-bottom: 1px solid var(--sp-line, #d1d1d6);
+  padding: 4px 16px 10px;
+}
+.sp-quiz-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  min-width: 44px;
+  margin: 0 0 0 -6px;
+  padding: 0 8px 0 0;
+  border: 0;
+  background: none;
+  color: var(--sp-blue-text, #0066cc);
+  font-size: 15px;
+  text-align: left;
+}
+.sp-quiz-class {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sp-text-2, #636366);
+  overflow-wrap: anywhere;
+}
+.sp-quiz-title {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-title:focus {
+  outline: none;
+}
+
+/* What is left */
+.sp-quiz-progress {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
+  background: rgba(245, 245, 247, 0.97);
+  border-bottom: 1px solid #e5e5ea;
+  font-size: 13px;
+}
+.sp-quiz-progress-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.sp-quiz-bar {
+  height: 4px;
+  width: min(150px, 100%);
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--sp-line, #d1d1d6);
+}
+.sp-quiz-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--sp-blue, #007aff);
+  transition: width 200ms ease;
+}
+.sp-quiz-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--sp-blue-text, #0066cc);
+  font-size: 15px;
+  text-align: left;
+}
+.sp-quiz-progress .sp-quiz-link {
+  flex: 0 0 auto;
+  max-width: 50%;
+  text-align: right;
+}
+
+/* The questions */
+.sp-quiz-list {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 12px 14px 16px;
+}
+.sp-quiz-q {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  /* Under the sticky count when a question is scrolled to. */
+  scroll-margin-top: 64px;
+  border-radius: 14px;
+  background: var(--sp-card, #fff);
+  box-shadow: var(--sp-shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+.sp-quiz-qn {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-todo .sp-quiz-st {
+  color: var(--sp-amber-text, #8a4b00);
+}
+.sp-quiz .sp-q {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.sp-quiz .sp-rq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-quiz .sp-rq-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid var(--sp-field, #c7c7cc);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--sp-text, #1d1d1f);
+  font-size: 15px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.sp-quiz .sp-rq-opt[aria-checked='true'] {
+  border: 1.5px solid #0a6ad6;
+  background: #eaf3ff;
+  color: #0a4f9e;
+  font-weight: 600;
+}
+.sp-quiz .sp-rq-dot,
+.sp-quiz .sp-rq-box {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #8e8e93;
+  background: #fff;
+}
+.sp-quiz .sp-rq-dot {
+  border-radius: 9px;
+}
+.sp-quiz .sp-rq-box {
+  border-radius: 4px;
+}
+.sp-quiz .sp-rq-opt[aria-checked='true'] .sp-rq-dot {
+  border: 5px solid #0a6ad6;
+}
+.sp-quiz .sp-rq-opt[aria-checked='true'] .sp-rq-box {
+  border-color: #0a6ad6;
+  background: #0a6ad6;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+.sp-quiz .sp-input,
+.sp-quiz .sp-text {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #8e8e93;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--sp-text, #1d1d1f);
+  font: inherit;
+  font-size: 16px;
+}
+.sp-quiz .sp-text {
+  min-height: 88px;
+  resize: none;
+}
+.sp-quiz .sp-quiz-number {
+  max-width: 11em;
+}
+.sp-quiz-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sp-red, #b91c1c);
+}
+.sp-quiz-hint:empty {
+  display: none;
+}
+
+/* The foot: the quiet line, a message when there is one, and the button */
+.sp-quiz-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  gap: 6px;
+  padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--sp-line, #d1d1d6);
+  background: var(--sp-card, #fff);
+}
+.sp-quiz-saved {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-msg {
+  margin: 0;
+  font-size: 14px;
+  color: var(--sp-red, #b91c1c);
+}
+.sp-quiz-msg:focus {
+  outline: none;
+}
+.sp-quiz-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1.5px solid var(--sp-blue-fill, #0066cc);
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+.sp-quiz-primary {
+  background: var(--sp-blue-fill, #0066cc);
+  color: #fff;
+}
+.sp-quiz-quiet {
+  background: #fff;
+  color: var(--sp-blue-text, #0066cc);
+}
+.sp-quiz-btn[disabled] {
+  opacity: 0.6;
+}
+
+/* Send Your Answers?, Sent, Closed, Pick Up Where You Left Off */
+.sp-quiz-body {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 16px 14px;
+}
+.sp-quiz-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--sp-card, #fff);
+  box-shadow: var(--sp-shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+.sp-quiz-h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-h2:focus {
+  outline: none;
+}
+.sp-quiz-lead {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-line,
+.sp-quiz-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--sp-text-2, #636366);
+  overflow-wrap: anywhere;
+}
+.sp-quiz-actions {
+  display: grid;
+  gap: 8px;
+}
+.sp-quiz-todo-list {
+  display: grid;
+}
+.sp-quiz-answers {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-quiz-answers li {
+  display: grid;
+  gap: 2px;
+  padding: 9px 0;
+  border-top: 1px solid #e5e5ea;
+  font-size: 14px;
+}
+.sp-quiz-answers li:first-child {
+  border-top: 0;
+}
+.sp-quiz-ans-q {
+  color: var(--sp-text-2, #636366);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-ans-a {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-none {
+  font-weight: 400;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-fine {
+  margin: 0;
+  padding: 8px 16px 16px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--sp-text-2, #636366);
+}
+
+/* When it comes back (slice Q5b): the page's own Your Result and comment, then each question, marked with a
+   word and a mark as well as a colour. Greens and reds are the page's (4.5:1 or better on white). */
+.sp-quiz-returned {
+  padding-bottom: 24px;
+}
+.sp-quiz-top {
+  display: grid;
+  min-width: 0;
+}
+/* The page's own Your Result drawn inside the quiz: it keeps the page's look, and takes only the height it needs. */
+.sp-quiz .sp-quiz-topview.sp-view {
+  min-height: 0;
+  background: transparent;
+}
+/* A competency's name and its level share a row on a phone; when the screen is narrow (320 px at Larger is 246 px) the
+   level drops under the name instead of breaking a word of it. */
+.sp-quiz .sp-quiz-topview .sp-fb-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding: 6px 0;
+}
+.sp-quiz .sp-quiz-topview .sp-fb-row-name {
+  flex: 1 1 9em;
+}
+.sp-quiz-total {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-gradeonly {
+  padding: 0 2px;
+}
+.sp-quiz-look {
+  justify-self: start;
+  min-height: 44px;
+}
+.sp-quiz-ras {
+  color: var(--sp-text, #1d1d1f);
+}
+.sp-quiz-ra {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 11px 0;
+  border-top: 1px solid #e5e5ea;
+  font-size: 14px;
+  scroll-margin-top: 12px;
+}
+.sp-quiz-ra:first-child {
+  border-top: 0;
+}
+.sp-quiz-ra:focus {
+  outline: none;
+}
+.sp-quiz-ra:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.45);
+  outline-offset: 2px;
+}
+.sp-quiz-mk {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sp-quiz-mk-y {
+  background: #2e7d32;
+}
+.sp-quiz-mk-n {
+  background: #c62828;
+}
+.sp-quiz-mk-p {
+  background: #92400e;
+}
+.sp-quiz-mk-t {
+  background: #636366;
+}
+.sp-quiz-mk-none {
+  background: transparent;
+}
+.sp-quiz-ra-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.sp-quiz-ra-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp-quiz-ra-q {
+  font-weight: 600;
+}
+.sp-quiz-ra-n {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-ra-is-y .sp-quiz-ra-n {
+  color: #166534;
+}
+.sp-quiz-ra-is-n .sp-quiz-ra-n {
+  color: #c62828;
+}
+.sp-quiz-ra-is-p .sp-quiz-ra-n {
+  color: #92400e;
+}
+.sp-quiz-ra-yours {
+  font-size: 13px;
+  color: var(--sp-text-2, #636366);
+}
+.sp-quiz-ra-key {
+  font-size: 13px;
+  font-weight: 600;
+  color: #166534;
+}
+.sp-quiz-ra-why {
+  font-size: 13px;
+  color: var(--sp-text-2, #636366);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-quiz-bar i {
+    transition: none;
+  }
+}

@@ -33,7 +33,7 @@ export default defineConfig({
           {
             name: 'webkit-student',
             testMatch:
-              /(student-settings|student-home-screen|student-card-[\w-]+|student-carousel|student-text-size-sweep|student-see-work|bulletins-student)\.spec\.js$/,
+              /(student-settings|student-home-screen|student-card-[\w-]+|student-carousel|student-text-size-sweep|student-see-work|bulletins-student|quiz-student|quiz-returned|student-reflect)\.spec\.js$/,
             use: {
               browserName: 'webkit',
               viewport: { width: 390, height: 844 },
@@ -42,12 +42,12 @@ export default defineConfig({
               hasTouch: true,
             },
           },
-          /* Teachers use Safari on a Mac: the Bulletins page and its Dashboard
-             tile in WebKit at a desktop size. Run: FV_WEBKIT=1 npx playwright
+          /* Teachers use Safari on a Mac: the Bulletins page, its Dashboard
+             tile and the Reflect builder in WebKit at a desktop size. Run: FV_WEBKIT=1 npx playwright
              test --project=webkit-teacher */
           {
             name: 'webkit-teacher',
-            testMatch: /(bulletins-teacher|dashboard-bulletins-tile)\.spec\.js$/,
+            testMatch: /(bulletins-teacher|dashboard-bulletins-tile|reflect-builder)\.spec\.js$/,
             use: { browserName: 'webkit' },
           },
           /* Teachers' phones are mostly iPhones: the phone app's Bulletins tab

@@ -22,7 +22,7 @@ function body(file, name) {
   const text = read(file);
   const re = new RegExp('create or replace function ' + name.replace('.', '\\.') + '\\(', 'gi');
   let at = -1;
-  for (let m; (m = re.exec(text)); ) at = m.index;
+  for (let m; (m = re.exec(text));) at = m.index;
   expect(at, name + ' in ' + file).toBeGreaterThan(-1);
   const open = text.indexOf('$function$', at);
   return text.slice(open + '$function$'.length, text.indexOf('$function$', open + 1));

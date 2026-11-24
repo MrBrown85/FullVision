@@ -232,7 +232,7 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
       'Date',
       'Ranking',
       'Likert',
-      'Section Heading',
+      'Heading',
     ]);
     type('#rb-name', 'Unit 2 Exit Reflection');
     type('#rb-desc', 'About 5 minutes.');
@@ -247,7 +247,13 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
       'Add a Subtitle',
       'Shuffle Options',
       'Show as a Drop-Down',
+      'Add a Question Below',
+      'Move Up',
+      'Move Down',
+      'Remove Question',
     ]);
+    // The only card: it can move neither way.
+    expect([...root.querySelectorAll('.rb-qmenu-item[data-action^="sqB"]')].filter(b => b.disabled)).toHaveLength(2);
     click('.rb-qmenu-item[data-opt="shuffle"]');
     expect(root.querySelector('.rb-qmenu')).toBeNull();
 
@@ -276,9 +282,16 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
 
     click('[data-action="sqBAdd"][data-kind="section"]');
     type('.rb-q-on [data-rb-path="prompt"]', 'Last Part');
-    // The section moves up one, above the Likert.
-    click('.rb-q-on [data-action="sqBUp"]');
-    expect(CmReflectBuilder._state().active).toBe(5);
+    // The Likert moves down one, under the heading, from its ⋯ menu; it stays open.
+    click('[data-action="sqBEdit"][data-i="5"]');
+    click('.rb-q-on [data-action="sqBMenu"]');
+    click('.rb-qmenu-item[data-action="sqBDown"]');
+    expect(CmReflectBuilder._state().active).toBe(6);
+    expect(
+      CmReflectBuilder._state()
+        .questions.map(d => d.kind)
+        .slice(5),
+    ).toEqual(['section', 'likert']);
 
     // The cards not being edited show as students see them.
     var views = [...root.querySelectorAll('.rb-q-view .rb-v-prompt')].map(b => b.textContent);
@@ -365,6 +378,71 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
     );
   });
 
+  it('Remove from ⋯ names what went on an Undo toast; Undo and ⌘Z step back through the changes', () => {
+    var toasts = [];
+    var was = { show: globalThis.showUndoToast, dismiss: globalThis.dismissUndoToast };
+    globalThis.showUndoToast = (msg, fn) => toasts.push({ msg, fn });
+    globalThis.dismissUndoToast = () => {};
+    try {
+      mount();
+      click('[data-action="sqNew"]');
+      type('#rb-name', 'Undo Check');
+      type('.rb-q-on [data-rb-path="prompt"]', 'First');
+      click('[data-action="sqBAdd"][data-kind="section"]');
+      type('.rb-q-on [data-rb-path="prompt"]', 'Part Two');
+      click('[data-action="sqBAdd"][data-kind="text"]');
+      type('.rb-q-on [data-rb-path="prompt"]', 'Second');
+      const names = () =>
+        B()
+          ._state()
+          .questions.map(d => d.prompt);
+      expect(names()).toEqual(['First', 'Part Two', 'Second']);
+
+      // The heading's ⋯ keeps its question.
+      click('[data-action="sqBEdit"][data-i="1"]');
+      click('.rb-q-on [data-action="sqBMenu"]');
+      var heading = root.querySelector('.rb-qmenu-danger');
+      expect(heading.textContent).toBe('Remove Heading, Keep Its Questions');
+      expect(root.querySelector('.rb-q-on [data-action="sqBDelete"].rb-tool').getAttribute('aria-label')).toBe(
+        'Remove heading',
+      );
+      click('.rb-qmenu-danger');
+      expect(names()).toEqual(['First', 'Second']);
+      expect(toasts.pop().msg).toBe('Removed the heading “Part Two”');
+
+      // A question removed from its ⋯, then put back by the toast's Undo, open as it was.
+      click('[data-action="sqBEdit"][data-i="1"]');
+      click('.rb-q-on [data-action="sqBMenu"]');
+      expect(root.querySelector('.rb-qmenu-danger').textContent).toBe('Remove Question');
+      click('.rb-qmenu-danger');
+      expect(names()).toEqual(['First']);
+      var t = toasts.pop();
+      expect(t.msg).toBe('Removed question 2, “Second”');
+      t.fn();
+      expect(names()).toEqual(['First', 'Second']);
+      expect(B()._state().active).toBe(1);
+
+      // ⌘Z steps back through the rest: the heading comes back, then each add goes.
+      expect(B().undo()).toBe(true);
+      expect(names()).toEqual(['First', 'Part Two', 'Second']);
+      expect(B().undo()).toBe(true);
+      expect(names()).toEqual(['First', 'Part Two']);
+      expect(B().undo()).toBe(true);
+      expect(names()).toEqual(['First']);
+      expect(B().undo()).toBe(false);
+      // A toast's Undo after another change does nothing.
+      click('[data-action="sqBAdd"][data-kind="text"]');
+      click('.rb-q-on [data-action="sqBDelete"]');
+      var late = toasts.pop();
+      click('[data-action="sqBAdd"][data-kind="text"]');
+      late.fn();
+      expect(B()._state().questions).toHaveLength(2);
+    } finally {
+      globalThis.showUndoToast = was.show;
+      globalThis.dismissUndoToast = was.dismiss;
+    }
+  });
+
   it('marks what stops a save beside the problem, and saves once it is fixed', async () => {
     mount();
     click('[data-action="sqNew"]');
@@ -416,7 +494,8 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
 
     click('[data-card="custom-' + q.id + '"] [data-action="sqEdit"]');
     click('[data-action="sqBEdit"][data-i="1"]');
-    click('.rb-q-on [data-action="sqBUp"]');
+    click('.rb-q-on [data-action="sqBMenu"]');
+    click('.rb-qmenu-item[data-action="sqBUp"]');
     type('#rb-name', 'Exit Ticket 2');
     click('[data-action="sqBCancel"]');
     expect(asked.map(a => a.title)).toEqual(['Discard Your Changes?']);

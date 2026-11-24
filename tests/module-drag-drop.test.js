@@ -39,7 +39,7 @@ describe('closed module folders', () => {
 
   // Browser storage is wiped at sign-out, so closed folders opened again.
   it("save with the teacher's preferences, not browser storage", () => {
-    expect(save).toContain('saveDashboardPrefs({ closedModules: byClass })');
+    expect(save).toContain('saveDashboardPrefs({ closedModules: byClass }, { closedModules: picked })');
     expect(save).not.toContain('localStorage');
   });
 

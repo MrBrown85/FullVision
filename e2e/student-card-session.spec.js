@@ -92,7 +92,10 @@ const WATCH_FRAMES = () => {
 const drewTheList = page => page.evaluate(() => (window.__drew || []).some(Boolean));
 
 test.describe('a shared Chromebook: who a scanned card signs out', () => {
-  test.use(CHROMEBOOK);
+  /* No service worker: a tab here visits /login.html, which registers /sw.js, and in WebKit
+     Playwright's routes do not see the requests of a page that worker controls (as in
+     student-card-wired.spec.js, a shared Chromebook). */
+  test.use({ ...CHROMEBOOK, serviceWorkers: 'block' });
 
   for (const [name, more, line] of [
     ['locked', { locked: true }, 'This card is locked after too many wrong tries. Ask your teacher to unlock it.'],
@@ -189,7 +192,10 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
 });
 
 test.describe('before the page knows whether a code is a card or a slip', () => {
-  test.use(PHONE);
+  /* No service worker: a tab here visits /login.html, which registers /sw.js, and in WebKit
+     Playwright's routes do not see the requests of a page that worker controls (as in
+     student-card-wired.spec.js, a shared Chromebook). */
+  test.use({ ...PHONE, serviceWorkers: 'block' });
 
   test('a scanned code with no internet: one line that fits both, and Try Again', async ({ page }) => {
     const fn = school();

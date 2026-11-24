@@ -722,7 +722,7 @@ function _moveCourseDataLocalToCanonical(localId, canonicalId) {
   // 4. gb-config's active-course pointer is keyed by course id as well. If it
   //    still holds the placeholder, move it across — otherwise it survives the
   //    re-key permanently and every later saveConfig re-sends a non-uuid to
-  //    save_teacher_preferences. This save also lets the server-side pointer
+  //    patch_teacher_preferences. This save also lets the server-side pointer
   //    catch up now that a canonical id exists.
   try {
     var cfg = getConfig();
@@ -4485,7 +4485,8 @@ function _purgeStaleSavedCopies() {
 
 /* Browser storage is full: remove the saved copy opened longest ago, never
    the open class, and never while writes wait in the outbox (it shares the
-   same storage). Returns true when something was removed. */
+   same storage). Its unsaved category draft stays. Returns true when
+   something was removed. */
 function _evictOldestSavedCopy(keepCid) {
   if (_hasUnsentWrites()) return false;
   var oldest = null;
@@ -4507,7 +4508,7 @@ function _evictOldestSavedCopy(keepCid) {
   }
   if (!oldest) return false;
   _removeLocalKeys(function (key) {
-    return key.startsWith('gb-') && key.endsWith('-' + oldest);
+    return key.startsWith('gb-') && key.endsWith('-' + oldest) && key.indexOf('gb-category-draft-') !== 0;
   });
   delete _classVersion[oldest];
   return true;

@@ -306,7 +306,7 @@ export function findScoreMutations(root, files) {
   };
 
   function pass(followParams) {
-    for (let changed = true; changed; ) {
+    for (let changed = true; changed;) {
       changed = false;
       const bind = (scope, name, value) => {
         changed = markLevel(scope, name, level(value)) || changed;

@@ -693,10 +693,26 @@ export async function mockAuth(page) {
       window.__e2eRpcLog.push({ name, params: params || null, at: Date.now() });
       let res;
       // The server keeps dashboard_prefs across reloads, even though the seed
-      // scripts rewrite gb-config on every page load.
-      if (name === 'save_teacher_preferences' && params && params.p_patch && 'dashboard_prefs' in params.p_patch) {
+      // scripts rewrite gb-config on every page load. It merges a patch into
+      // what it holds, two levels deep, as patch_teacher_preferences does
+      // (migrations/2026112404_teacher_preferences_patch.sql).
+      if (name === 'patch_teacher_preferences' && params && params.p_patch && 'dashboard_prefs' in params.p_patch) {
         try {
-          sessionStorage.setItem('e2e-server-dashboard-prefs', JSON.stringify(params.p_patch.dashboard_prefs));
+          const change = params.p_patch.dashboard_prefs;
+          let held = null;
+          try {
+            held = JSON.parse(sessionStorage.getItem('e2e-server-dashboard-prefs'));
+          } catch (e) {}
+          if (!held) held = Object.assign({}, serverDb().config.dashboardPrefs || {});
+          const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+          let next = null;
+          if (change) {
+            next = Object.assign({}, held);
+            Object.keys(change).forEach(k => {
+              next[k] = isObj(change[k]) && isObj(held[k]) ? Object.assign({}, held[k], change[k]) : change[k];
+            });
+          }
+          sessionStorage.setItem('e2e-server-dashboard-prefs', JSON.stringify(next));
         } catch (e) {}
       }
       if (name === 'bootstrap_teacher') {

@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { addressKey, ipHash, makeHandler } from '../supabase/functions/student-submit/handler.ts';
 import { FAKE_KEY } from './helpers/card-key-fake.js';
+import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 
 const from = headers => new Request('https://x.supabase.co/functions/v1/student-submit', { method: 'POST', headers });
 const hashOf = address => ipHash(from({ 'cf-connecting-ip': address }), 'k1');
@@ -193,12 +194,11 @@ describe('student-submit: the hashed address', () => {
       cardKey: await readCardKey(FAKE_KEY),
       log: () => {},
       db: {
-        open: record('open'),
-        verify: record('verify'),
         check: record('check'),
         submit: record('submit'),
         async call(text, params) {
-          calls.push({ route: 'card', hash: params.at(-1), args: params });
+          // A slip's open ends with the new token's hash (2026112403); the address is third.
+          calls.push({ route: 'card', hash: text === SLIP_SQL.open ? params[2] : params.at(-1), args: params });
           return { ok: true };
         },
       },

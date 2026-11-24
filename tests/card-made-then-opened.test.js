@@ -14,6 +14,7 @@
  * that has no key, makes no tag and stores exactly what it is given
  * (tests/helpers/fake-card-database.js).
  */
+import { sha256 } from './helpers/session-hash.js';
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler as studentSubmit } from '../supabase/functions/student-submit/handler.ts';
@@ -107,7 +108,9 @@ describe('a card teacher-cards just made opens through student-submit', () => {
     const verified = await s.phone({ route: 'verify', code: cece.code, birthday: '2012-05-15' });
     expect(verified).toMatchObject({ status: 200, ok: true, enrollment_id: CECE });
     expect(verified.session_token).toMatch(/^[0-9a-f]{64}$/);
-    expect(s.db.state.sessions[verified.session_token]).toBe(CECE);
+    // The database keeps the token's hash, never the token (2026112401).
+    expect(s.db.state.sessions[verified.session_token]).toBeUndefined();
+    expect(s.db.state.sessions[sha256(verified.session_token)]).toBe(CECE);
   });
 
   it('the password printed on a card opens it, and only that card', async () => {

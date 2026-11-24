@@ -106,6 +106,7 @@ window.PageReports = (function () {
       },
       key: function (e) {
         if (e.key === 'Escape' && _closeRailOnEscape(e)) e.preventDefault();
+        else if (typeof ReportOneUndo !== 'undefined' && ReportOneUndo.isKey(e) && _undoOne()) e.preventDefault();
       },
       resize: function () {
         clearTimeout(_resizeTimer);
@@ -197,19 +198,17 @@ window.PageReports = (function () {
   var reportConfig = null;
 
   /* ── Paper ───────────────────────────────────────────────────────
-     Letter or Legal for the printed reports, remembered per class on this
-     device. The sheets set the page size themselves when they render
+     Letter or Legal for the printed reports, remembered per class with the
+     teacher's preferences (getViewPref), so it follows them to another
+     computer; one chosen on this computer before that is read until it is
+     next changed. The sheets set the page size themselves when they render
      (ReportSheets.setPageStyle). DECISIONS.md, "Report forms" 4. */
   var PAPERS = ['letter', 'legal'];
   var reportPaper = 'letter';
 
   function _loadPaper(cid) {
-    try {
-      var v = localStorage.getItem('gb-report-paper-' + cid);
-      return PAPERS.indexOf(v) >= 0 ? v : 'letter';
-    } catch (e) {
-      return 'letter';
-    }
+    var v = getViewPref('gb-report-paper-' + cid);
+    return PAPERS.indexOf(v) >= 0 ? v : 'letter';
   }
 
   function _applyPaper() {
@@ -223,12 +222,7 @@ window.PageReports = (function () {
   function setPaper(paper) {
     if (PAPERS.indexOf(paper) < 0) return;
     reportPaper = paper;
-    try {
-      if (paper === 'letter') localStorage.removeItem('gb-report-paper-' + activeCourse);
-      else localStorage.setItem('gb-report-paper-' + activeCourse, paper);
-    } catch (e) {
-      /* per-device preference only */
-    }
+    saveViewPref('gb-report-paper-' + activeCourse, paper === 'letter' ? null : paper);
     _applyPaper();
     if (activeTab === 'progress') renderReportPreview(true);
   }
@@ -1376,19 +1370,9 @@ window.PageReports = (function () {
      time; those are read, never rewritten. */
   var _oneForStudent = false; // Changes Apply To: the student on the canvas, not the class
 
-  /* What a class saved before One Report, read as the Progress Reports
-     screen read it: on the Quick Report unless it chose Build Your Own, or
-     built a form before there was a choice; its form, or the starting
-     one. ReportOne.modelFor reads this; nothing saves it. */
-  function _readSaved(rc) {
-    var r = Object.assign({}, rc);
-    if (r.progressMode !== 'grade' && r.progressMode !== 'build') r.progressMode = r.form ? 'build' : 'grade';
-    r.form = ReportSheets.formFor({ form: rc && rc.form });
-    return r;
-  }
   var _savedCache = { rc: null, read: null };
   function _saved() {
-    if (_savedCache.rc !== reportConfig) _savedCache = { rc: reportConfig, read: _readSaved(reportConfig) };
+    if (_savedCache.rc !== reportConfig) _savedCache = { rc: reportConfig, read: ReportOne.readSaved(reportConfig) };
     return _savedCache.read;
   }
   var _oneCache = { rc: null, one: null, model: null };
@@ -1410,24 +1394,38 @@ window.PageReports = (function () {
     return s ? s.name : 'Your Setup';
   }
   /* Every change saves the model. `label` names the change on the Undo
-     toast; without one there is no toast. */
+     toast; without one there is no toast. A named change also goes on the
+     Undo list ⌘Z steps back through (report-one-undo.js). */
   function _setOne(model, label) {
     var before = reportConfig.one ? JSON.parse(JSON.stringify(reportConfig.one)) : null;
     reportConfig.one = ReportOne.normalize(model);
     _saveReportConfig();
     _classFitKey = '';
     _redrawStudio();
-    if (label && typeof showUndoToast === 'function') {
-      var cid = activeCourse;
+    if (!label) return;
+    var cid = activeCourse;
+    var step = ReportOneUndo.push(cid, before, reportConfig.one, label);
+    if (typeof showUndoToast === 'function')
       showUndoToast(label, function () {
         if (activeCourse !== cid) return;
-        if (before) reportConfig.one = before;
-        else delete reportConfig.one;
-        _saveReportConfig();
-        _classFitKey = '';
-        _redrawStudio();
+        ReportOneUndo.drop(step);
+        _putBackOne(before);
       });
-    }
+  }
+  function _putBackOne(before) {
+    if (before) reportConfig.one = before;
+    else delete reportConfig.one;
+    _saveReportConfig();
+    _classFitKey = '';
+    _redrawStudio();
+  }
+  function _undoOne() {
+    var step = ReportOneUndo.take(activeCourse, reportConfig.one);
+    if (!step) return false;
+    dismissUndoToast();
+    _putBackOne(step.before);
+    _announce('Undid: ' + step.label);
+    return true;
   }
   /* What the panel (report-one-panel.js) and the page (report-one-page.js)
      are given to read and change the report with. */
@@ -2184,7 +2182,9 @@ window.PageReports = (function () {
       tabFor: _tabFor,
       tabIdFor: _tabIdFor,
       tabBarHtml: _tabBarHtml,
-      readSaved: _readSaved,
+      readSaved: function (rc) {
+        return ReportOne.readSaved(rc);
+      },
       orderBySheets: _orderBySheets,
       longestStudent: _longestStudent,
       tqOpen: _tqOpen,

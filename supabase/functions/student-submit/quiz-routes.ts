@@ -1,7 +1,8 @@
-// Quizzes on the student's page: open, save each answer, send (docs/plans/
-// quizzes-plan.md, slice Q3a; the contract is migrations/local-test/
-// quizzes-contract.md, "The student's side (MQ2)"; the functions are
-// migrations/2026111806_quizzes_student.sql).
+// Quizzes on the student's page: open, save each answer, send, and the
+// returned view (docs/plans/quizzes-plan.md, slices Q3a and Q5a; the contract
+// is migrations/local-test/quizzes-contract.md, "The student's side (MQ2)"
+// and "MQ3, the returned view"; the functions are
+// migrations/2026111806_quizzes_student.sql, 2026111807 and 2026112407).
 //
 //   {route: 'quiz', session, enrollment_id, assessment_id, new_try?}
 //        -> student_submit.quiz: the student's try (the first open starts
@@ -20,6 +21,12 @@
 //           without starting or writing anything.
 //           { ok, quizzes: [{ assessment_id, tries_left, can_answer, closed,
 //           has_open_try }] }.
+//   {route: 'quiz-result', session, enrollment_id, assessment_id}
+//        -> student_submit.quiz_result (2026112407): the returned view. Only
+//           once the piece is returned to this student, they can no longer
+//           answer, a try is confirmed and returned since, it says anything
+//           about right and wrong: { ok, returned: true, shows, total?,
+//           questions? }; otherwise exactly { ok: true, returned: false }.
 //
 // The rules are bulletin-routes.ts's: the session checked by the database
 // first, and who the student is taken only from that; the statement named
@@ -30,10 +37,14 @@
 // refusal passed on by its code, any other answered not_found; a log line
 // with nothing about the student (handler.ts).
 //
-// THE ANSWER KEY never comes this way. The database's three functions never
-// read it; these lists are the second look: a question carries only its id,
-// number, kind, prompt, points, multiple and choices, a choice only its id
-// and text, an answer only a raw answer's shape under a question shown.
+// THE ANSWER KEY never comes this way to a student who is answering. Of the
+// database's functions only quiz_result reads it, and only for a quiz
+// returned and closed to that student; these lists are the second look: a
+// question carries only its id, number, kind, prompt, points, multiple and
+// choices, a choice only its id and text, an answer only a raw answer's
+// shape under a question shown. quiz-result adds your_answer and result
+// only when the quiz shows which were right, and answer and why only when
+// it shows the answers too; with shows grade it passes on no question.
 //
 // Kept free of Deno and database imports, as handler.ts is.
 import {
@@ -60,6 +71,7 @@ export const QUIZ_ROUTES: Record<string, true> = {
   'quiz-save': true,
   'quiz-send': true,
   'quiz-list': true,
+  'quiz-result': true,
 };
 
 /** The most quizzes one quiz-list answer holds: more is a server error (a class has far fewer pieces). */
@@ -85,6 +97,7 @@ export const SQL = {
   quizSave: 'select student_submit.quiz_save($1::text, $2::uuid, $3::uuid, $4::uuid, $5::text::jsonb, $6::text) as r',
   quizSend: 'select student_submit.quiz_send($1::text, $2::uuid, $3::uuid, $4::text) as r',
   quizList: 'select student_submit.quiz_list($1::text, $2::uuid, $3::text) as r',
+  quizResult: 'select student_submit.quiz_result($1::text, $2::uuid, $3::uuid, $4::text) as r',
 };
 
 /* The keys passed on, level by level: exactly the contract's
@@ -99,7 +112,18 @@ export const SENT = {
   send: ['ok', 'try', 'sent_at', 'tries_left', 'can_try_again'],
   list: ['ok', 'quizzes'],
   listed: ['assessment_id', 'tries_left', 'can_answer', 'closed', 'has_open_try'],
+  // quiz-result: returned false is exactly ok and returned; a returned view adds shows, total (with Add a Total)
+  // and questions (unless shows is grade). Each question is a quiz question with your_answer and result (shows
+  // right), and answer and why (shows answers).
+  result: ['ok', 'returned', 'shows', 'total', 'questions'],
+  total: ['earned', 'possible'],
+  right: ['your_answer', 'result'],
+  answers: ['answer', 'why'],
 };
+
+/** What When Returned Students See may be, and what a question's result may be (confirm_quiz's four). */
+export const SHOWS = ['grade', 'right', 'answers'];
+export const RESULTS = ['right', 'partly', 'wrong', 'waiting'];
 
 // Refusals each route passes on by name; any other is not_found. bad_answer carries its question_id.
 export const ERRORS = {
@@ -107,6 +131,7 @@ export const ERRORS = {
   'quiz-save': [...SESSION_ERRORS, 'quiz_closed', 'sent', 'bad_answer', 'too_many'],
   'quiz-send': [...SESSION_ERRORS, 'quiz_closed', 'sent', 'too_many'],
   'quiz-list': SESSION_ERRORS,
+  'quiz-result': SESSION_ERRORS,
 } as const;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -181,6 +206,41 @@ function question(q: unknown): Json {
     multiple: bool(x.multiple),
     choices,
   };
+}
+
+/* The key's answer as save_quiz keeps it: ids for a choice question, a boolean, a number, or null (a text
+   question). Anything else is left out as null. */
+function keyAnswer(v: unknown): unknown {
+  if (v === null || typeof v === 'string') return null;
+  const a = sentAnswer(v);
+  return a === undefined ? null : a;
+}
+
+/* The answer to quiz-result, rebuilt: returned false is exactly that; a returned view only as its shows allows. */
+export function resultReply(r: Json): Json {
+  if (r.returned !== true) return { ok: true, returned: false };
+  const shows = typeof r.shows === 'string' && SHOWS.includes(r.shows) ? r.shows : null;
+  if (!shows) throw new TypeError('shows');
+  const out: Json = { ok: true, returned: true, shows };
+  if (isObject(r.total)) out.total = { earned: finite(r.total.earned), possible: finite(r.total.possible) };
+  if (shows === 'grade') return out;
+  const all = list(r.questions);
+  if (all.length > MAX_QUESTIONS) throw new TypeError('questions');
+  out.questions = all.map(q => {
+    const x = isObject(q) ? q : {};
+    const mine = x.your_answer === null ? null : sentAnswer(x.your_answer);
+    const one: Json = {
+      ...question(q),
+      your_answer: mine === undefined ? null : mine,
+      result: typeof x.result === 'string' && RESULTS.includes(x.result) ? x.result : null,
+    };
+    if (shows === 'answers') {
+      one.answer = keyAnswer(x.answer);
+      one.why = text(x.why);
+    }
+    return one;
+  });
+  return out;
 }
 
 /* The answer to quiz, rebuilt. The keys in the order the contract writes them. */
@@ -296,8 +356,16 @@ export function makeQuizRoutes(opts: { db: { call: (sql: string, params: Param[]
     });
   }
 
+  async function result(body: Json, hash: string): Promise<SendAnswer> {
+    const p = ids(body);
+    if (!p) return bad();
+    const r = await opts.db.call(SQL.quizResult, [...p, hash]);
+    return ok(good(r) ? resultReply(r) : refusal(r, ERRORS['quiz-result']));
+  }
+
   return async function run(route: string, body: Json, hash: string): Promise<SendAnswer> {
     if (route === 'quiz') return open(body, hash);
+    if (route === 'quiz-result') return result(body, hash);
     if (route === 'quiz-list') return listed(body, hash);
     if (route === 'quiz-save') return save(body, hash);
     if (route === 'quiz-send') return send(body, hash);

@@ -341,14 +341,27 @@ function getDashboardPrefs() {
   return (cfg && cfg.dashboardPrefs) || {};
 }
 
-/* Change some of them; the rest stay. Saved with the teacher's preferences. */
-function saveDashboardPrefs(change) {
-  var prefs = Object.assign({}, getDashboardPrefs(), change || {});
+/* Change some of them; the rest stay. Saved with the teacher's preferences.
+   Every call is the teacher's own choice, so each key in `change` is sent
+   even when this tab already held that value (another computer may have
+   changed it since). For view and closedModules, which hold many choices,
+   only the entries that differ go, and those `picked` names
+   ({ view: { entry: true } }) go whatever they were. The server merges what
+   is sent into what it holds, so this tab's older copy of the other choices
+   never reaches it. */
+function saveDashboardPrefs(change, picked) {
+  var before = getDashboardPrefs();
+  var prefs = Object.assign({}, before, change || {});
   var cfg = Object.assign({}, getConfig() || {}, { dashboardPrefs: prefs });
   _cache.config = cfg;
   _safeLSSet('gb-config', JSON.stringify(cfg));
-  if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
-    window.v2.saveTeacherPreferences({ dashboard_prefs: prefs });
+  var chose = Object.assign({}, picked || {});
+  Object.keys(change || {}).forEach(function (k) {
+    if (!_DASHBOARD_PREF_MAPS[k] && chose[k] === undefined) chose[k] = true;
+  });
+  var sent = _dashboardPrefsChange(before, prefs, chose);
+  if (Object.keys(sent).length && _writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
+    window.v2.saveTeacherPreferences({ dashboard_prefs: sent });
   }
   return prefs;
 }
@@ -371,7 +384,9 @@ function getViewPref(key) {
 function saveViewPref(key, value) {
   var view = Object.assign({}, getDashboardPrefs().view || {});
   view[key] = value == null ? null : String(value);
-  saveDashboardPrefs({ view: view });
+  var picked = {};
+  picked[key] = true;
+  saveDashboardPrefs({ view: view }, { view: picked });
 }
 
 function clearCardWidgetConfig() {

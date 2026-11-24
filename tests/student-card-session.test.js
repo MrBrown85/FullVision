@@ -18,8 +18,8 @@
  * The page runs against the function's real handler with a stand-in
  * database, as in tests/student-card-wired.test.js.
  */
+import { sha256 } from './helpers/session-hash.js';
 import { describe, expect, it } from 'vitest';
-import { makeHandler as functionDeployedToday } from './fixtures/student-submit-handler-2026-11-03.ts';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, WORK, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
@@ -182,7 +182,7 @@ describe('any recognised card signs the last student out', () => {
     expect(text(other)).toContain(shows);
     expect(routes(other)).toEqual(['card', 'open']);
     expect(dev.store[KEY]).toBe(kept);
-    expect(Object.keys(dev.fn.state.sessions)).toEqual([JSON.parse(kept).t]);
+    expect(Object.keys(dev.fn.state.sessions)).toEqual([sha256(JSON.parse(kept).t)]);
   });
 
   it('too many wrong codes from this address is not a card either: nobody is signed out', async () => {
@@ -409,64 +409,6 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     first.type('#sp-code', 'K7M-4QX');
     await first.submit('form[data-form="card"]');
     expect(text(first)).toContain('Hi Cece!');
-  });
-
-  /* The page released before the function is deployed. This is the
-     function's handler as it stood on Nov 3, itself, with a stand-in
-     database: it knows no card route. */
-  it('against the function as deployed today, a slip opens and is answered, and nothing is counted for the card question', async () => {
-    const asked = [];
-    const old = functionDeployedToday({
-      region: 'ca-central-1',
-      ipKey: 'k',
-      log: () => {},
-      db: {
-        open: async code => (asked.push(['open', code]), SLIP),
-        verify: async token => (
-          asked.push(['verify', token]),
-          {
-            ok: true,
-            parts: [
-              {
-                id: 'p1',
-                kind: 'core_reflection',
-                title: 'November Reflection',
-                questions: [{ id: 'q1', kind: 'text', prompt: 'How did it go?', options: {}, core_ids: [] }],
-              },
-            ],
-            context: {},
-          }
-        ),
-      },
-    });
-    const statuses = [];
-    const server = async body => {
-      const res = await old(
-        new Request('https://x.supabase.co/functions/v1/student-submit', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            origin: 'https://fullvision.ca',
-            'cf-connecting-ip': '203.0.113.7',
-          },
-          body: JSON.stringify(body),
-        }),
-      );
-      statuses.push(body.route + ' ' + res.status);
-      return res.json();
-    };
-    const dev = school();
-    const page = await dev.open('#K7M-4QX', server);
-    expect(text(page)).toContain('Hi Cece!');
-    page.type('#sp-ident', '0123456');
-    await page.click('[data-act="start"]');
-    expect(text(page)).toContain('How did it go?');
-    expect(statuses).toEqual(['card 400', 'open 200', 'verify 200']);
-    // The card question never reached the database: nothing to count.
-    expect(asked).toEqual([
-      ['open', 'K7M4QX'],
-      ['verify', 'a'.repeat(64)],
-    ]);
   });
 
   it.each([

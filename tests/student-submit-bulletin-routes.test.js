@@ -16,7 +16,8 @@
  *   every bucket it knew before is handled as before.
  */
 import { describe, expect, it } from 'vitest';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { BULLETIN_ROUTES, SENT, SQL } from '../supabase/functions/student-submit/bulletin-routes.ts';
 import {
   BULLETIN_BUCKET,
@@ -28,6 +29,9 @@ import {
   storageRest,
 } from '../supabase/functions/_shared/storage-rest.ts';
 import { C1, CECE, LAB, fakeWorld } from './helpers/fake-send-world.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
 const PHONE = 's'.repeat(64);
@@ -52,8 +56,6 @@ function setup(answer, extra = {}) {
     region: 'ca-central-1',
     ipKey: 'k',
     db: {
-      open: async () => ({}),
-      verify: async () => ({}),
       check: async () => ({}),
       submit: async () => ({}),
       call: async (sql, params) => {
@@ -624,8 +626,6 @@ describe('the removal worker and bulletin-files', () => {
       region: 'ca-central-1',
       ipKey: 'test-key',
       db: {
-        open: async () => ({}),
-        verify: async () => ({}),
         check: async () => ({}),
         submit: async () => ({}),
         call: world.db.call,
@@ -703,8 +703,6 @@ describe('the removal worker and bulletin-files', () => {
       region: 'ca-central-1',
       ipKey: 'test-key',
       db: {
-        open: async () => ({}),
-        verify: async () => ({}),
         check: async () => ({}),
         submit: async () => ({}),
         call: world.db.call,

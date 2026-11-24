@@ -6,11 +6,12 @@
  * adds: Canada only, request shape, CORS, a keyed IP hash, and logs with no
  * student data.
  */
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { makeHandler, ipHash, allowedOrigin } from '../supabase/functions/student-submit/handler.ts';
 import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { FAKE_KEY, slipCodeTag } from './helpers/card-key-fake.js';
+import { FAKE_KEY, slipCodeTag, slipPasswordTag } from './helpers/card-key-fake.js';
 
 // Since plan S3-S1 a slip's open and verify go to the database as tagged statements (slip-routes.ts).
 const KEY = await readCardKey(FAKE_KEY);
@@ -29,26 +30,15 @@ function setup(overrides) {
         db: {
           async call(text, p) {
             if (text === SLIP_SQL.open) {
-              calls.push({ route: 'open', tag: p[0], code: p[2], hash: p[3] });
+              calls.push({ route: 'open', tag: p[0], hash: p[2] });
               return p[0] === K7M
                 ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
                 : { ok: false, error: 'not_found' };
             }
-            const who = { birthday: p[1], studentNumber: p[2], password: p[3] };
-            calls.push({ route: 'verify', token: p[0], who, hash: p[6] });
-            return who.studentNumber === '0123456' || who.password === '4821'
-              ? { ok: true, parts: [] }
-              : { ok: false, error: 'wrong_identity', tries_left: 4 };
-          },
-          async open(code, hash) {
-            calls.push({ route: 'open', code, hash });
-            return code === 'K7M-4QX'
-              ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
-              : { ok: false, error: 'not_found' };
-          },
-          async verify(token, who, hash) {
-            calls.push({ route: 'verify', token, who, hash });
-            return who.studentNumber === '0123456' || who.password === '4821'
+            // A password reaches the database only as its tag, bound to the slip's code (2026112406).
+            const who = { birthday: p[1], studentNumber: p[2], pwTag: p[3] };
+            calls.push({ route: 'verify', token: p[0], who, hash: p[4] });
+            return who.studentNumber === '0123456' || who.pwTag === slipPasswordTag('K7M4QX', '4821')
               ? { ok: true, parts: [] }
               : { ok: false, error: 'wrong_identity', tries_left: 4 };
           },
@@ -91,8 +81,8 @@ describe('student-submit handler', () => {
     const res = await handle(post({ route: 'open', code: 'K7M-4QX' }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, student: { first_name: 'Cece' } });
-    // The code goes as its tag, and the plain code is not sent (no fallback was asked for).
-    expect(calls[0]).toMatchObject({ route: 'open', tag: K7M, code: null });
+    // The code goes as its tag; the plain code is never sent.
+    expect(calls[0]).toMatchObject({ route: 'open', tag: K7M });
     expect(res.headers.get('access-control-allow-origin')).toBe('https://fullvision.ca');
     expect(res.headers.get('cache-control')).toBe('no-store');
   });
@@ -102,7 +92,12 @@ describe('student-submit handler', () => {
     const answers = { 'q-1': 'Being curious helps me in labs.' };
     const res = await handle(post({ route: 'submit', token: 'a'.repeat(64), answers }));
     expect(await res.json()).toEqual({ ok: true, submitted_at: '2026-11-04T10:00:00Z' });
-    expect(calls[0]).toMatchObject({ route: 'submit', token: 'a'.repeat(64), answers });
+    // The slip's token goes as its hash (2026112403).
+    expect(calls[0]).toMatchObject({
+      route: 'submit',
+      token: createHash('sha256').update('a'.repeat(64)).digest('hex'),
+      answers,
+    });
   });
 
   it('verifies a questionnaire slip by birthday, student number or password, and never logs them', async () => {
@@ -110,12 +105,12 @@ describe('student-submit handler', () => {
     const token = 'b'.repeat(64);
     let res = await handle(post({ route: 'verify', token, student_number: '0123456' }));
     expect(await res.json()).toEqual({ ok: true, parts: [] });
-    expect(calls[0].who).toEqual({ birthday: null, studentNumber: '0123456', password: null });
-    res = await handle(post({ route: 'verify', token, password: '4821' }));
+    expect(calls[0].who).toEqual({ birthday: null, studentNumber: '0123456', pwTag: null });
+    res = await handle(post({ route: 'verify', token, code: 'K7M4QX', password: '4821' }));
     expect((await res.json()).ok).toBe(true);
     res = await handle(post({ route: 'verify', token, birthday: '2012-05-16' }));
     expect(await res.json()).toEqual({ ok: false, error: 'wrong_identity', tries_left: 4 });
-    expect(calls[2].who).toEqual({ birthday: '2012-05-16', studentNumber: null, password: null });
+    expect(calls[2].who).toEqual({ birthday: '2012-05-16', studentNumber: null, pwTag: null });
     const logged = JSON.stringify(logs);
     for (const secret of ['0123456', '4821', '2012-05-16', token]) expect(logged).not.toContain(secret);
     expect(logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'wrong_identity']);
@@ -158,6 +153,48 @@ describe('student-submit handler', () => {
       expect(res.status).toBe(421);
       expect(await res.json()).toEqual({ ok: false, error: 'wrong_region' });
       expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('refuses every route without the address key, before touching the database', async () => {
+    for (const ipKey of [null, '']) {
+      const { handle, calls, logs } = setup({ ipKey });
+      for (const body of [
+        { route: 'open', code: 'K7M-4QX' },
+        { route: 'submit', token: 'a'.repeat(64), answers: { q: 'x' } },
+        { route: 'card', code: 'K7M4QX2P' },
+      ]) {
+        const res = await handle(post(body));
+        expect(res.status).toBe(500);
+        expect(await res.json()).toEqual({ ok: false, error: 'server' });
+      }
+      expect(calls).toEqual([]);
+      expect(logs.every(l => l.outcome === 'no_ip_key')).toBe(true);
+    }
+  });
+
+  it('hands the database a session token only as its SHA-256, on every route that takes one', async () => {
+    const token = '7'.repeat(64);
+    const seen = [];
+    const { handle } = setup({
+      db: {
+        async call(text, p) {
+          seen.push(p);
+          return { ok: true };
+        },
+      },
+    });
+    for (const body of [
+      { route: 'page', session: token, enrollment_id: '00000001-0000-4000-8000-000000000000' },
+      { route: 'done', session: token },
+      { route: 'work', session: token, enrollment_id: '00000001-0000-4000-8000-000000000000' },
+    ]) {
+      await handle(post(body));
+    }
+    expect(seen).toHaveLength(3);
+    for (const p of seen) {
+      expect(p[0]).toBe(createHash('sha256').update(token).digest('hex'));
+      expect(JSON.stringify(p)).not.toContain(token);
     }
   });
 

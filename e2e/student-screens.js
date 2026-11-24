@@ -403,6 +403,133 @@ SCREENS.push(
   },
 );
 
+/* A quiz (docs/plans/quizzes-plan.md Q3b), behind the `quizzes` build switch: the sample
+   quiz in Demo Mode, in every state a student sees it. A copy of `main` has none (`quizzes`). */
+async function quizDemo(p, c) {
+  await p.goto('about:blank');
+  await p.goto((c.base || '') + '/s/');
+  await p.evaluate(() => {
+    localStorage.setItem('fv-build-quizzes', '1');
+    // The sample's progress is kept on the device: each screen starts from a first try.
+    localStorage.removeItem('gb-student-quiz-demo');
+  });
+  await openDemo(p, c, 'demo-card');
+  await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
+  await expect(p.locator('.sp-quiz-q').first()).toBeVisible();
+}
+// One question answered, whatever its kind (the order is each try's own shuffle).
+async function quizAnswer(q) {
+  if (await q.locator('input[data-kind="number"]').count()) await q.locator('input').fill('10');
+  else if (await q.locator('textarea').count()) await q.locator('textarea').fill('The line goes up each week.');
+  else await q.locator('[data-act="quiz-pick"]').first().click();
+}
+async function quizAnswerAll(p) {
+  for (const q of await p.locator('.sp-quiz-q').all()) await quizAnswer(q);
+}
+/* A quiz that came back (Q5b): the sample taken and sent, then closed, confirmed and returned by the demo teacher
+   (StudentPage._test.quizDemoReturn), the page opened again, and the returned view opened from Your Feedback. */
+async function quizReturned(p, c, opts) {
+  await quizDemo(p, c);
+  await quizAnswerAll(p);
+  await p.locator('[data-act="quiz-send-ask"]').click();
+  await p.locator('[data-act="quiz-send"]').click();
+  await expect(p.locator('#sp-quiz-sent')).toBeVisible();
+  expect(await p.evaluate(o => StudentPage._test.quizDemoReturn(o), opts)).toBe(true);
+  await openDemo(p, c, 'demo-card');
+  await p.locator('.sp-tab[data-tab="learning"]').locator('visible=true').first().click();
+  await p
+    .locator('.sp-ml-row[data-act="feedback"][data-piece="demo-quiz-check"]')
+    .locator('visible=true')
+    .first()
+    .click();
+  await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
+}
+SCREENS.push(
+  { name: 'quiz, taking it', quizzes: true, marker: '.sp-quiz-progress', go: quizDemo },
+  {
+    name: 'quiz, send check with questions left',
+    quizzes: true,
+    marker: '.sp-quiz-todo-list',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await p.locator('[data-act="quiz-send-ask"]').click();
+    },
+  },
+  {
+    name: 'quiz, ready to send',
+    quizzes: true,
+    marker: '.sp-quiz-check .sp-quiz-actions',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswerAll(p);
+      await p.locator('[data-act="quiz-send-ask"]').click();
+    },
+  },
+  {
+    name: 'quiz, sent',
+    quizzes: true,
+    marker: '#sp-quiz-sent',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswerAll(p);
+      await p.locator('[data-act="quiz-send-ask"]').click();
+      await p.locator('[data-act="quiz-send"]').click();
+    },
+  },
+  {
+    name: 'quiz, log out with an answer waiting',
+    quizzes: true,
+    marker: '.sp-logout',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswer(p.locator('.sp-quiz-q').first());
+      await p.locator('[data-act="quiz-back"]').click();
+      // Demo Mode's saves always land: one is made to wait, as it would offline.
+      await p.evaluate(() => {
+        StudentPage.quizWaiting = () => 1;
+      });
+      await p.locator('.sp-gear').click();
+      await p.locator('.sp-set-out').click();
+    },
+  },
+  {
+    name: 'quiz, pick up where you left off',
+    quizzes: true,
+    marker: '#sp-quiz-resume',
+    go: async (p, c) => {
+      await quizDemo(p, c);
+      await quizAnswer(p.locator('.sp-quiz-q').first());
+      await p.locator('[data-act="quiz-back"]').click();
+      await p.locator('[data-act="quiz-open"]').locator('visible=true').first().click();
+    },
+  },
+);
+
+// When a quiz comes back (docs/plans/quizzes-plan.md Q5b), behind the same switch: the last screens.
+SCREENS.push(
+  {
+    name: 'quiz, returned with the answers and a total',
+    quizzes: true,
+    returned: true,
+    marker: '.sp-quiz-ras',
+    go: (p, c) => quizReturned(p, c, { shows: 'answers', addTotal: true }),
+  },
+  {
+    name: 'quiz, returned with which were right',
+    quizzes: true,
+    returned: true,
+    marker: '.sp-quiz-ras',
+    go: (p, c) => quizReturned(p, c, { shows: 'right' }),
+  },
+  {
+    name: 'quiz, returned, grade only',
+    quizzes: true,
+    returned: true,
+    marker: '.sp-quiz-gradeonly',
+    go: (p, c) => quizReturned(p, c, { shows: 'grade', addTotal: true }),
+  },
+);
+
 // Go to `screen` and wait for its mark, and for motion (sheets slide in for about 220 ms).
 export async function reach(page, screen, ctx) {
   await screen.go(page, ctx);

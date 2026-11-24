@@ -717,3 +717,349 @@
     display: none !important;
   }
 }
+
+/* ── Wording edited on the page (report-one-words.js) ──
+   The words are typed in where they print; the controls sit in the
+   sheet's margins (one-wl, like one-rows) at screen size. */
+.studio-one .one-wt {
+  border-radius: calc(3px / var(--sheet-zoom, 1));
+  cursor: text;
+  outline: none;
+}
+.studio-one .one-wt:hover {
+  background: rgba(0, 122, 255, 0.06);
+}
+.studio-one .one-wt:focus {
+  background: #fff;
+  box-shadow:
+    0 0 0 calc(1.5px / var(--sheet-zoom, 1)) var(--active),
+    0 0 0 calc(4px / var(--sheet-zoom, 1)) rgba(0, 122, 255, 0.15);
+}
+.studio-one .one-wt:empty::before {
+  content: attr(data-ph);
+  color: #8e8e93;
+  font-style: normal;
+}
+.studio-one span.one-wt:empty {
+  display: inline-block;
+  min-width: calc(40px / var(--sheet-zoom, 1));
+  min-height: 1em;
+}
+/* The line under a statement that has none shows only on its row. */
+.studio-one .one-w-ph {
+  display: none;
+}
+.studio-one tr:hover .one-w-ph,
+.studio-one .one-w-ph:focus {
+  display: block;
+}
+.studio-one .one-w-empty td,
+.studio-one .one-w-newrow td {
+  color: #6e6e73;
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  border: calc(1.5px / var(--sheet-zoom, 1)) dashed #c7c7cc;
+  padding: 10px;
+  cursor: pointer;
+}
+.studio-one .one-w-empty:hover td {
+  color: var(--link);
+  border-color: #9cc3ec;
+  background: #f7fbff;
+}
+.studio-one .one-w-newrow td {
+  text-align: left;
+  font-style: normal;
+  cursor: text;
+  border-style: solid;
+  border-color: rgba(0, 122, 255, 0.35);
+}
+.studio-one div.one-w-newrow {
+  margin-top: 8px;
+}
+.studio-one .one-w-newlines {
+  height: 52px;
+}
+.studio-one .one-wl {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.studio-one .one-w-more,
+.studio-one .one-w-grip {
+  position: absolute;
+  width: calc(24px / var(--sheet-zoom, 1));
+  height: calc(24px / var(--sheet-zoom, 1));
+  padding: 0;
+  border: 0;
+  border-radius: calc(6px / var(--sheet-zoom, 1));
+  background: none;
+  color: var(--text-2);
+  font: calc(15px / var(--sheet-zoom, 1)) / calc(24px / var(--sheet-zoom, 1)) var(--font-base);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.studio-one .one-w-more {
+  transform: translate(calc(6px / var(--sheet-zoom, 1)), -50%);
+  cursor: pointer;
+}
+.studio-one .one-w-more.one-w-before {
+  transform: translate(calc(-100% - 2px / var(--sheet-zoom, 1)), -50%);
+}
+.studio-one .one-w-grip {
+  transform: translate(calc(-100% - 6px / var(--sheet-zoom, 1)), -50%);
+  cursor: grab;
+}
+.studio-one .one-w-at-foot {
+  margin-top: calc(-12px / var(--sheet-zoom, 1));
+}
+.studio-one .one-w-on,
+.studio-one .one-w-more:focus-visible,
+.studio-one .one-w-more[aria-expanded='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.studio-one .one-w-more:hover,
+.studio-one .one-w-grip:hover,
+.studio-one .one-w-more[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.studio-one .one-w-more:focus-visible {
+  outline: calc(2px / var(--sheet-zoom, 1)) solid var(--active);
+}
+/* Adding: the + on the line between two rows; its choices in the gap the
+   rows part to make. */
+.studio-one .one-w-ins {
+  position: absolute;
+  height: 0;
+  z-index: 5;
+}
+.studio-one .one-w-ins-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1px / var(--sheet-zoom, 1));
+  height: calc(2px / var(--sheet-zoom, 1));
+  background: var(--active);
+  border-radius: 1px;
+}
+.studio-one .one-w-ins-plus {
+  position: absolute;
+  left: calc(-44px / var(--sheet-zoom, 1));
+  top: calc(-10px / var(--sheet-zoom, 1));
+  width: calc(20px / var(--sheet-zoom, 1));
+  height: calc(20px / var(--sheet-zoom, 1));
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--active);
+  color: #fff;
+  font: 600 calc(15px / var(--sheet-zoom, 1)) / calc(20px / var(--sheet-zoom, 1)) var(--font-base);
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: var(--shadow-sm);
+}
+.studio-one .one-w-ins-acts {
+  position: absolute;
+  left: calc(8px / var(--sheet-zoom, 1));
+  top: calc(-14px / var(--sheet-zoom, 1));
+  display: none;
+  gap: calc(2px / var(--sheet-zoom, 1));
+  padding: calc(2px / var(--sheet-zoom, 1));
+  background: #fff;
+  border: calc(1px / var(--sheet-zoom, 1)) solid #c9dcf2;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+/* Open, the + stays under the pointer; the line and the choices sit in
+   the middle of the 32px gap. */
+.studio-one .one-w-ins.open .one-w-ins-acts {
+  display: flex;
+  top: calc(2px / var(--sheet-zoom, 1));
+}
+/* A bridge from the + to its choices, so the pointer can cross the gap. */
+.studio-one .one-w-ins.open::before {
+  content: '';
+  position: absolute;
+  left: calc(-48px / var(--sheet-zoom, 1));
+  right: 0;
+  top: calc(-12px / var(--sheet-zoom, 1));
+  height: calc(44px / var(--sheet-zoom, 1));
+  pointer-events: auto;
+}
+.studio-one .one-w-ins.open .one-w-ins-line {
+  top: calc(15px / var(--sheet-zoom, 1));
+}
+.studio-one .one-w-ins-acts button {
+  font: 600 calc(11.5px / var(--sheet-zoom, 1)) / 1 var(--font-base);
+  color: var(--link);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  padding: calc(6px / var(--sheet-zoom, 1)) calc(10px / var(--sheet-zoom, 1));
+  cursor: pointer;
+}
+.studio-one .one-w-ins-acts button:hover {
+  background: rgba(0, 122, 255, 0.1);
+}
+.studio-one .one-w-parting,
+.studio-one .one-w-shift {
+  transition: transform 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.studio-one tr.one-w-lift {
+  position: relative;
+  z-index: 6;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.studio-one tr.one-w-lift > td {
+  background: #fff;
+}
+body.one-w-dragging,
+body.one-w-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.studio-one tr.one-w-flash > td {
+  animation: one-w-flash 700ms ease-out;
+}
+@keyframes one-w-flash {
+  from {
+    background: #fff3b0;
+  }
+  to {
+    background: transparent;
+  }
+}
+.studio-one .one-w-tip {
+  position: absolute;
+  z-index: 7;
+  margin-top: calc(10px / var(--sheet-zoom, 1));
+  pointer-events: auto;
+  width: calc(300px / var(--sheet-zoom, 1));
+  background: #1d1d1f;
+  color: #fff;
+  font: calc(13px / var(--sheet-zoom, 1)) / 1.4 var(--font-base);
+  border-radius: calc(10px / var(--sheet-zoom, 1));
+  padding: calc(10px / var(--sheet-zoom, 1)) calc(12px / var(--sheet-zoom, 1));
+  box-shadow: var(--shadow-lg);
+}
+.studio-one .one-w-tip button {
+  display: block;
+  margin: calc(8px / var(--sheet-zoom, 1)) 0 0 auto;
+  font: 600 calc(12.5px / var(--sheet-zoom, 1)) var(--font-base);
+  color: #5ca9ff;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+/* The ⋯ menu and the copy dialog sit over the page, at screen size. */
+.one-w-menu {
+  position: fixed;
+  z-index: 10002;
+  min-width: 230px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  font: 13px var(--font-base);
+}
+.one-w-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.one-w-menu button:hover,
+.one-w-menu button:focus {
+  background: rgba(0, 122, 255, 0.1);
+  outline: none;
+}
+.one-w-menu button.danger {
+  color: var(--danger);
+}
+.one-w-menu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+.one-w-menu-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 4px 10px 2px;
+}
+.one-w-copy .one-dlg {
+  width: 380px;
+}
+.one-w-copy-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.one-w-copy-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+.one-w-copy-row small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.one-w-copy-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.one-w-copy-cancel {
+  font: 600 13px var(--font-base);
+  color: var(--text);
+  background: var(--surface-2);
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.one-w-copy .one-dlg-done:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-one .one-w-parting,
+  .studio-one .one-w-shift {
+    transition: none;
+  }
+  .studio-one tr.one-w-flash > td {
+    animation: none;
+  }
+}
+@media print {
+  .one-wl,
+  .one-w-menu,
+  .one-w-ph,
+  .one-w-empty,
+  .one-w-newrow,
+  .one-w-tip {
+    display: none !important;
+  }
+}

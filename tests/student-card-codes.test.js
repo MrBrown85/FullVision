@@ -8,6 +8,7 @@
  * characters, the database is handed its tag, and a replaced card answers
  * card_stopped.
  */
+import { sha256 } from './helpers/session-hash.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -159,7 +160,7 @@ describe('a replaced card says so', () => {
     const dev = school();
     await signIn(dev);
     const last = JSON.parse(dev.store[KEY]).t;
-    expect(dev.fn.state.sessions[last]).toBeTruthy();
+    expect(dev.fn.state.sessions[sha256(last)]).toBeTruthy();
 
     dev.card.stopped = true;
     const page = await dev.open('#K7M4-QX2P');

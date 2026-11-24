@@ -137,8 +137,9 @@ begin
     insert into public.student_card (enrollment_id, code_hmac, pw_hmac, key_id, seq, works_until)
     values (e1, hex64, encode(sha256(convert_to(p_mark || 'pw', 'utf8')), 'hex'), '0000000a', 1, current_date + 30)
     returning id into card;
-    insert into public.student_access_code (enrollment_id, questionnaire_id, code_hash, salt, expires_at)
-    values (e1, q, md5(p_mark || 'code'), 'salt', now() + interval '30 days')
+    -- A keyed slip, as every slip is since 2026112406.
+    insert into public.student_access_code (enrollment_id, questionnaire_id, code_hmac, key_id, expires_at)
+    values (e1, q, encode(sha256(convert_to(p_mark || 'code', 'utf8')), 'hex'), '0000000a', now() + interval '30 days')
     returning id into code;
     insert into public.response (questionnaire_id, enrollment_id, via) values (q, e1, 'link') returning id into resp;
     insert into public.answer (response_id, question_id, value_text) values (resp, qq, p_mark || ' Answer');

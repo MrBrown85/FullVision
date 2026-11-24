@@ -9,8 +9,12 @@
  * the field the SQL gives them, and logs with nothing about the student.
  */
 import { describe, expect, it } from 'vitest';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { SQL } from '../supabase/functions/student-submit/forms-routes.ts';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
 const PHONE = 's'.repeat(64);
@@ -86,8 +90,6 @@ function setup(answers = {}) {
     region: 'ca-central-1',
     ipKey: 'k',
     db: {
-      open: async () => ({}),
-      verify: async () => ({}),
       check: async () => ({}),
       submit: async () => ({}),
       call: async (sql, params) => {

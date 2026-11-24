@@ -98,7 +98,7 @@ Constraints and indexes: `quiz_question_pkey (id)`; `quiz_question_id_assessment
 | `number`     | a JSON number, −10¹² to 10¹²: `3.5`                                                                                                    | null or 0 to 10¹² |
 | `text`       | null (assessed by hand)                                                                                                                | null              |
 
-**No function of the student page reads this table except MQ3's `student_submit.quiz_result`.** MQ1 has none; `quizzes.py` checks that no `student_submit` function names it. No copy of it is kept anywhere else: `save_quiz`'s idempotency record holds only `{"saved": true}`.
+**No function of the student page reads this table except MQ3's `student_submit.quiz_result`** (`migrations/2026112407_quiz_returned.sql`). MQ1 has none; `quizzes.py` checks that no `student_submit` function names it, and `quiz_returned.py` that none but `quiz_result` does. No copy of it is kept anywhere else: `save_quiz`'s idempotency record holds only `{"saved": true}`.
 
 ### `quiz_attempt`: one student's try
 
@@ -610,18 +610,81 @@ The edge function is the second look: a key the database might add later is drop
 - Every open and save spends one of 600 writes an hour per card; never save on a timer, only when an answer changes.
 - Two phones on one card: the later save wins. A phone that was offline sends its saves when it returns and may then replace newer ones from the other phone.
 
-## MQ3, the returned view (slice Q5a): build exactly this
+## MQ3, the returned view (slice Q5a): as built
 
-File `migrations/<date>_quiz_returned.sql`. One function, `student_submit.quiz_result(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) → jsonb`, as MQ2's are (service_role only, `_session_class` first, the same `not_found`). **It is the only function in `student_submit` that may name `quiz_key`.**
+File `migrations/2026112407_quiz_returned.sql` (after 2026111807), with the route `quiz-result` in `supabase/functions/student-submit/quiz-routes.ts`. One function, `student_submit.quiz_result(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) → jsonb`: `security definer`, `stable`, `search_path` `public, student_submit, pg_temp`, `service_role` only. **It is the only function in `student_submit` that names `quiz_key`**; the file's last check and its post-check both look.
 
-It sends anything about right and wrong **only when all hold**:
+It begins with `_session_class` (the session's five refusals, `{ "ok": false, "error" }`). The piece is taken exactly as `quiz` takes it, through `_quiz_window`: a Draft, a piece not yet assigned, a pair or group piece, a DIBELS piece, a piece with no quiz and another class's piece all answer the same `{ "ok": false, "error": "not_found" }`.
 
-1. **Returned to this student**: `student_submit._returned_grade(p_enrollment_id, p_assessment_id)` has `returned_at` not null and `grade` not null (a Draft grade is never sent; Missing or Excused sends nothing).
-2. **The student can no longer answer**: no unsent try, and the quiz is closed or no tries are left.
-3. **One try is confirmed**: the attempt with `marked` not null, and its `marked_at <= returned_at` (a marking confirmed after the last return is a draft until returned again). Q5a checks how `returned_at` moves under As Soon As I Save before relying on this. **And it must not rely on `marked_at` alone** (Q4's note): Undo of a Confirm sends the earlier marking back through `confirm_quiz`, which sets `marked_at` to the time of the Undo, not the time that marking was first confirmed. So after an Undo a marking can carry a `marked_at` later than a return that already showed it, or a return can follow an Undo that put back an older marking. Q5a checks the grade's own state too (the piece returned and not a draft for that student), not the time alone.
-4. **`shows`** allows it.
+It sends anything about right and wrong **only when all of these hold**; otherwise it answers exactly `{ "ok": true, "returned": false }`.
 
-Otherwise: `{ "ok": true, "returned": false }` and nothing else. When all hold:
+1. **Returned to this student**: the student's `grade_return` row has `returned_at`, and `student_submit._returned_grade(p_enrollment_id, p_assessment_id)` has a `grade`. So Missing or Excused on the piece (whatever was returned before), a grade never returned (a Draft waiting under When I Return Them) and a grade the teacher cleared send nothing. `returned_at` is read from the row, not from `_returned_grade`'s JSON, so no time is ever parsed from text.
+2. **The student can no longer answer**, by MQ2's own rule ("Who may answer", 4): no unsent try she may still answer (a reopened one, opened or not, whether the quiz is open or not; an ordinary one while the quiz is open), and the quiz is closed today (`_quiz_window`, in the class's time zone) or no ordinary tries are left (counted as under "Tries"; unlimited is never out, so only closed counts there). An ordinary try started (Try Again) and never sent before the quiz closed does not hold the view back: MQ2 refuses it then (`quiz_closed`).
+3. **One try confirmed, and returned since** (the release rule, below).
+4. **`shows`**: decides what is sent, as under "The reply".
+
+It writes nothing: no row, no lock, no `write_log` row. It is `stable` (PostgreSQL holds a stable function to that), as `quiz_list` is, so reading it spends none of the 600 quiz writes an hour and is never `too_many`. MQ2's rule spends a write only on a call that writes (`quiz_save`, `quiz_send`, and a `quiz` that starts or opens a try), and this one writes nothing.
+
+### The release rule (3), and why
+
+**The rule.** The confirmed try is the one with `marked` not null (there is at most one, `quiz_attempt_one_marked_idx`). Then:
+
+- **In a class that keeps changes until Return** (`public._grade_return_holds(enrolment)`: the Student Page on and Return Grades "When I Return Them"): its `marked_at` is not after the row's `returned_at`. A marking confirmed since the last Return waits for the next one.
+- **In a class that returns every save at once** ("As Soon As I Save"): the times are not compared; only that no draft is waiting (`is_draft` false).
+
+**How `returned_at` moves** (read in `migrations/baseline/30-functions.sql`, the live definitions):
+
+| What happens                                            | Keeping changes until Return                                                                                                                                                                       | Returning at once                                           |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| A save that changes the grade (`_grade_return_apply`)   | never returned: a draft row (`is_draft`, `returned_at` null); returned before: `is_draft` true, `returned_copy` = what was returned, `returned_at` kept (the student still sees the returned copy) | `returned_at` = now (`clock_timestamp()`), `is_draft` false |
+| A save that changes nothing                             | nothing moves                                                                                                                                                                                      | nothing moves                                               |
+| The grade cleared                                       | `is_draft` true over a returned grade; never returned: no draft                                                                                                                                    | `returned_at` null                                          |
+| Return (`return_grades`, `_grade_return_one`)           | only rows that are drafts: `returned_at` = the Return's time, `is_draft` false                                                                                                                     | (no drafts)                                                 |
+| A draft put back to what was returned (Undo)            | `is_draft` false, `returned_at` kept                                                                                                                                                               | (no drafts)                                                 |
+| The class switched to At Once (`_grade_return_release`) | every draft returned at that moment                                                                                                                                                                |                                                             |
+
+`confirm_quiz` sets `marked_at = now()` on every marking it stores, an Undo's included (an Undo stores the earlier marking again, with the time of the Undo). The app's Confirm (`Grader.confirmQuiz`) writes the scores and the marking as separate requests, and the outbox sends requests for different records side by side (`shared/offline-queue.js`, "Key"), so either may reach the database first.
+
+**Why the rule differs by class.** Keeping changes, the time is what tells a returned marking from one confirmed since: a re-confirm whose marking lands before its scores, while the earlier grade is still the returned one (not a draft), would otherwise show the new right and wrong beside the old grade; the time keeps it back, then the scores make the grade a draft, and the next Return releases both. Returning at once, there is no draft to wait for and the teacher's Confirm says "Students see them at once": the scores usually land first, so their `returned_at` is earlier than `marked_at`, and comparing the two would hide every such quiz until the grade next changed. Neither branch relies on `marked_at` alone: both read the grade's own state (returned, a grade shown, and, at once, no draft).
+
+**Every path, as tested** (`migrations/local-test/quiz_returned.py`):
+
+| Path                                                                   | Keeping changes                                                                                                   | At once                                                                                 |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Confirmed, not returned                                                | false (a draft)                                                                                                   | (returned at once)                                                                      |
+| Confirmed, then Returned                                               | true                                                                                                              | true, scores or marking first; false only between the two while the marking lands first |
+| Missing or Excused after return                                        | false; true again when taken off                                                                                  | the same                                                                                |
+| The grade changed after return                                         | true (a draft over the returned grade: she still sees the grade the marking was returned with); true after Return | true                                                                                    |
+| Reopened after return                                                  | false while the try is unsent (not opened, part way); once sent, the earlier marking again                        | the same                                                                                |
+| The reopened try confirmed                                             | false until Returned (a draft; and false in between when its marking lands before its scores); then the new try's | true                                                                                    |
+| Undo before Return                                                     | false; Return then finds nothing                                                                                  | (returned at once)                                                                      |
+| Undo of a first Confirm after Return                                   | false (no marking left)                                                                                           | false                                                                                   |
+| Undo of a later Confirm after Return                                   | **false** (known limit 2)                                                                                         | true, the earlier marking                                                               |
+| Return before the marking reached the server                           | **false** (known limit 3)                                                                                         | (no Return: true once both land)                                                        |
+| A re-confirm that changes no score                                     | **false** (known limit 1)                                                                                         | true                                                                                    |
+| Switched from At Once to keeping changes                               | **false** for a marking later than its last return (known limit 4); true otherwise                                |                                                                                         |
+| Switched from keeping changes to At Once with a draft waiting          |                                                                                                                   | true (the switch returns the draft)                                                     |
+| Two tries, one sent and returned, open                                 | false (a try left)                                                                                                | false                                                                                   |
+| The same, closed                                                       | true                                                                                                              | true                                                                                    |
+| Two tries, try 1 returned, try 2 started and never sent: open / closed | false / true (try 1's)                                                                                            | false / true (try 1's)                                                                  |
+| Unlimited, open / closed                                               | false / true                                                                                                      | false / true                                                                            |
+| A question added after Return                                          | listed last; `your_answer`, `result`, `answer` and `why` null                                                     | the same                                                                                |
+
+**Known limits, each failing safe (nothing is shown that should not be).** In a class that keeps changes, four paths leave a marking later than the last Return with no draft left for Return to release, so the student sees `returned: false` until the grade next changes and is Returned:
+
+1. A re-confirm that changes no score (a Text answer assessed later, the levels the same).
+2. Undo of a later Confirm after Return: the earlier marking comes back with a new `marked_at`.
+3. Return clicked before the marking reached the server (an offline device; otherwise a few milliseconds).
+4. The class switched from At Once to When I Return Them while a marking was later than its scores' return.
+
+Two more things a reader of the rule should know, neither closed by this file:
+
+- **`shows` is read as it is now.** A teacher who switches When Returned Students See to Grade, Which Were Right and the Answers after a Return sends the key's answers to every returned student at once, with no new Return. The Quiz card's setting is what decides; the app may want to say so beside it.
+- **Confirm and Return on two devices within milliseconds.** `confirm_quiz` stamps `marked_at` with `now()`, its transaction's start; `return_grades` stamps `returned_at` with `clock_timestamp()`, the moment it runs. A Confirm whose transaction began just before a Return on another device, and committed just after it, carries a `marked_at` earlier than that `returned_at` and counts as returned by it, in a class that keeps changes. The window is the length of one `confirm_quiz` call.
+
+Fixing the four limits needs a change outside this file (for example, Return also releasing a marking newer than the last return, or `confirm_quiz` keeping the earlier `marked_at` on an Undo). That is for Colin to decide; MQ3 changes nothing that exists.
+
+### The reply
 
 ```json
 {
@@ -634,20 +697,44 @@ Otherwise: `{ "ok": true, "returned": false }` and nothing else. When all hold:
       "id": "uuid",
       "number": 1,
       "kind": "choice",
-      "prompt": "…",
+      "prompt": "...",
       "points": 1,
       "multiple": false,
-      "choices": [{ "id": "uuid v4", "text": "…" }],
+      "choices": [{ "id": "uuid v4", "text": "..." }],
       "your_answer": ["uuid v4"],
       "result": "right",
       "answer": ["uuid v4"],
-      "why": "…"
+      "why": "..."
     }
   ]
 }
 ```
 
-`total` only when `add_total` (from `marked.earned`, `marked.possible`). `shows: "grade"`: no `questions` key. `right`: each question in this student's order with `result` from `marked.questions` (null when absent), `your_answer` the try's own answer (null when none). `answers`: also `answer` (the key's) and `why`. Archived questions are left out.
+| Key           | Value                                                                                                                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shows`       | the quiz's setting: `grade`, `right` or `answers`                                                                                                                                                                                                                                                                                     |
+| `total`       | only with Add a Total: `marked.earned` and `marked.possible` of the confirmed try                                                                                                                                                                                                                                                     |
+| `questions`   | not with `grade`. The confirmed try's questions in this student's order (its `question_order`, read by `_quiz_questions` as under "Reading an order"): active only, archived left out, one added since at the end; numbered 1, 2, ...; each with MQ2's seven keys (`id`, `number`, `kind`, `prompt`, `points`, `multiple`, `choices`) |
+| `your_answer` | that try's own saved answer (a raw answer's JSON), null with none                                                                                                                                                                                                                                                                     |
+| `result`      | `marked.questions[id].result` (`right`, `partly`, `wrong`, `waiting`), null where the marking has none (a question added since)                                                                                                                                                                                                       |
+| `answer`      | only with `answers`: the key's answer (choice ids, a boolean, a number; null for a Text question), and only for a question in the confirmed marking (`marked.questions`); null for one added since, which was never marked or returned                                                                                                |
+| `why`         | only with `answers`: the key's why line, or null; null for a question not in the marking, as `answer`                                                                                                                                                                                                                                 |
+
+Never sent: a tolerance, a competency, a position, a teacher's note or given points, `marked` itself, an attempt id, anything of another student.
+
+The route (`quiz-result`): request `{ "route": "quiz-result", "session", "enrollment_id", "assessment_id" }` (the session 1 to 128 characters, each id a UUID; anything else is HTTP 400 `bad_request` and the database is not asked); statement `select student_submit.quiz_result($1::text, $2::uuid, $3::uuid, $4::text) as r`; refusals passed on: the session's five (any other code is `not_found`). The reply is rebuilt key by key from `SENT.result`, `SENT.total`, `SENT.question`, `SENT.choice`, `SENT.right` and `SENT.answers`: anything but `returned: true` is exactly `{ "ok": true, "returned": false }`; with `grade` no question is passed on even if the database sent one; `answer` and `why` only with `answers`; an unknown `shows` or a malformed question is HTTP 500 `server`.
+
+### Where this differs from the section first written here, and why
+
+1. **Rule 3 is two rules, by the class's Return setting**, not `marked_at <= returned_at` everywhere: in a class that returns at once the app's scores usually reach the database before the marking, so the time comparison would hide the quiz there until the grade next changed (above).
+2. **`returned_at` is read from `grade_return`** rather than from `_returned_grade`'s JSON, so no time is parsed from text (that would depend on the server's date settings); `_returned_grade` still decides whether there is a grade to show.
+3. **Four known limits** in a class that keeps changes, listed above; the section first written did not name them.
+4. **A question's `result` is found by its id as a uuid**, not as text, so a marking stored with an id in capitals still matches.
+5. **Read-only, `stable`, no `write_log` row**: the first section did not say.
+6. **Rule 2 is MQ2's own "can answer"** (after review): an unsent ordinary try once the quiz has closed no longer holds the view back, as the first sketch's "no unsent try" would have for good.
+7. **The key only for a marked question** (after review): a question added after the Confirm is listed, but its `answer` and `why` are null.
+
+For the student's screen (Q5b): ask `quiz-result` for a quiz `quiz-list` shows as not answerable; on `returned: false` show the sent view as now. It spends no write, so it may be asked each time the screen opens.
 
 ## Limits (the author's, easy to change, listed for Colin)
 

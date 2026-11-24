@@ -10,8 +10,12 @@
 import BANK_STEPS from '../supabase/functions/_shared/bank-steps.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { FAKE_KEY } from './helpers/card-key-fake.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const KEY = await readCardKey(FAKE_KEY);
 const SESSION = 'a'.repeat(64);
@@ -209,8 +213,6 @@ function setup(reply) {
     cardKey: KEY,
     log: () => {},
     db: {
-      open: async () => ({ ok: true }),
-      verify: async () => ({ ok: true }),
       check: async () => ({ ok: true }),
       submit: async () => ({ ok: true }),
       async call(text) {

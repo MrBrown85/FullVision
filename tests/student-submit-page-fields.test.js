@@ -23,13 +23,17 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { tokensAtTheDatabase } from './helpers/session-hash.js';
 import { CARD_ROUTES, cardReply } from '../supabase/functions/student-submit/card-routes.ts';
 import {
   CARD_ROUTES as OLD_ROUTES,
   cardReply as oldCardReply,
 } from './fixtures/student-submit-card-routes-2026-11-11.ts';
 import { FAKE_KEY } from './helpers/card-key-fake.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const KEY = await readCardKey(FAKE_KEY);
 const SESSION = 'a'.repeat(64);
@@ -204,6 +208,12 @@ const OLD_VERIFIED = {
   classes: clone(OLD_PAGE.classes),
 };
 const NEW_VERIFIED = { ...clone(OLD_VERIFIED), classes: clone(NEW_PAGE.classes) };
+/* A verify reply as the database sends it since 2026112401: new_session in place of the token, which the
+   function made and passes to cardReply itself. */
+const fromDatabase = v => {
+  const { session_token, ...rest } = clone(v);
+  return { ...rest, new_session: session_token != null };
+};
 
 /* The handler with a stand-in database that answers student_submit.page
    with `reply`. */
@@ -215,8 +225,6 @@ function setup(reply) {
     cardKey: KEY,
     log: entry => logs.push(entry),
     db: {
-      open: async () => ({ ok: true }),
-      verify: async () => ({ ok: true }),
       check: async () => ({ ok: true }),
       submit: async () => ({ ok: true }),
       async call(text) {
@@ -265,7 +273,7 @@ describe('student-submit: the S4-M1 keys reach the phone', () => {
 
   it('hands on to_do with the classes of verify and add-card', () => {
     for (const route of ['verify', 'add-card']) {
-      expect(cardReply(CARD_ROUTES[route], clone(NEW_VERIFIED)), route).toEqual(NEW_VERIFIED);
+      expect(cardReply(CARD_ROUTES[route], fromDatabase(NEW_VERIFIED), SESSION), route).toEqual(NEW_VERIFIED);
     }
   });
 
@@ -343,9 +351,9 @@ describe('student-submit: a wrong type from the database is never passed on', ()
       const sent = clone(NEW_PAGE);
       sent.classes[0].to_do = value;
       expect(cardReply(CARD_ROUTES.page, sent).classes[0].to_do, String(value)).toBe(0);
-      const verified = clone(NEW_VERIFIED);
+      const verified = fromDatabase(NEW_VERIFIED);
       verified.classes[0].to_do = value;
-      expect(cardReply(CARD_ROUTES.verify, verified).classes[0].to_do, String(value)).toBe(0);
+      expect(cardReply(CARD_ROUTES.verify, verified, SESSION).classes[0].to_do, String(value)).toBe(0);
     }
     await check((p, v) => (p.classes[0].to_do = v), 0, ['2', -1, 2.5, true, null, { n: 2 }]);
   });
@@ -442,7 +450,7 @@ describe('student-submit: a reply from before S4-M1 reads as it did', () => {
   it('verify and add-card: the same bytes as before', () => {
     for (const route of ['verify', 'add-card']) {
       const before = JSON.stringify(oldCardReply(OLD_ROUTES[route], clone(OLD_VERIFIED)));
-      expect(JSON.stringify(cardReply(CARD_ROUTES[route], clone(OLD_VERIFIED))), route).toBe(before);
+      expect(JSON.stringify(cardReply(CARD_ROUTES[route], fromDatabase(OLD_VERIFIED), SESSION)), route).toBe(before);
     }
   });
 

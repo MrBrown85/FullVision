@@ -11,6 +11,9 @@
     "types": []
   },
   "files": [
+    "teacher/report-one-words.js",
+    "teacher/report-one-copy.js",
+    "teacher/report-one-undo.js",
     "types/globals.d.ts",
     "shared/html.js",
     "shared/build-flags.js",
@@ -88,6 +91,9 @@
     "s/page-carousel.js",
     "s/bulletins-view.js",
     "s/bulletins.js",
+    "s/quiz-model.js",
+    "s/quiz-view.js",
+    "s/quiz.js",
     "s/seen-watch.js",
     "shared/website-ask.js",
     "s/settings.js",
