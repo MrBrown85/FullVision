@@ -12,6 +12,9 @@
  *   in the bucket handout-files; it is signed for 60 seconds in that
  *   bucket only after its name is checked to be this handout's, of the
  *   kind the database named; anything else is a server error.
+ * - handout-original (2026112408): student_submit.handout_original says plainly when a PDF handout has no
+ *   original ({ ok, original: false }); with one, its name is checked to be this handout's .pdf and one 60-second
+ *   link is signed in handout-files.
  * - page: assessments[].resources is copied only where the database sent
  *   it, and only as the contract types it: a link is an http(s) address;
  *   a handout file has no address and no page count.
@@ -47,7 +50,8 @@ function setup(answer) {
       submit: async () => ({}),
       call: async (sql, params) => {
         calls.push([sql, params]);
-        if (sql !== SQL.handoutLinks && sql !== SQL.handoutFile) throw new Error('unknown statement');
+        if (sql !== SQL.handoutLinks && sql !== SQL.handoutFile && sql !== SQL.handoutOriginal)
+          throw new Error('unknown statement');
         return answer(params, sql);
       },
     },
@@ -285,6 +289,142 @@ describe('handout-file', () => {
   ])('%s is a server error, and nothing is signed', async (_name, over) => {
     const t = setup(() => one(over));
     expect(await t.send(ASK_FILE)).toEqual({ status: 500, body: { ok: false, error: 'server' } });
+    expect(t.storeCalls).toEqual([]);
+  });
+});
+
+describe('handout-original', () => {
+  const ORIG = `${COURSE}/${RES}.pdf`;
+  const ASK_ORIG = { route: 'handout-original', session: PHONE, enrollment_id: CECE, resource_id: RES };
+  const one = (over = {}) => ({
+    ok: true,
+    has_original: true,
+    bucket: 'handout-files',
+    resource_id: RES,
+    assessment_id: LAB,
+    title: 'Worksheet',
+    bytes: 340000,
+    path: ORIG,
+    ...over,
+  });
+
+  it('asks handout_original, then signs the one PDF for 60 seconds in handout-files', async () => {
+    const t = setup((params, sql) => (sql === SQL.handoutOriginal ? one() : { ok: false, error: 'not_found' }));
+    const r = await t.send(ASK_ORIG);
+    expect(r).toEqual({
+      status: 200,
+      body: {
+        ok: true,
+        original: true,
+        bytes: 340000,
+        title: 'Worksheet',
+        url: 'https://x.supabase.co/sign/' + ORIG + '?token=t',
+      },
+    });
+    expect(t.calls).toHaveLength(1);
+    expect(t.calls[0][0]).toBe(SQL.handoutOriginal);
+    expect(t.calls[0][1].slice(0, 3)).toEqual([PHONE, CECE, RES]);
+    expect(t.calls[0][1][3]).toMatch(/^[0-9a-f]{64}$/);
+    expect(t.storeCalls).toEqual([['signDownloads', [ORIG], 60, 'handout-files']]);
+    expect(JSON.stringify(t.logs)).not.toMatch(/\.pdf|[0-9a-f]{8}-0000/);
+  });
+
+  it('a handout with no original says so plainly, signs nothing and passes on nothing else', async () => {
+    const t = setup(() => ({
+      ok: true,
+      has_original: false,
+      resource_id: RES,
+      path: ORIG,
+      bucket: 'handout-files',
+      extra: 1,
+    }));
+    expect(await t.send(ASK_ORIG)).toEqual({ status: 200, body: { ok: true, original: false } });
+    expect(t.storeCalls).toEqual([]);
+  });
+
+  it('the SQL types each parameter as text, uuid, uuid, text', () => {
+    expect(SQL.handoutOriginal).toBe(
+      'select student_submit.handout_original($1::text, $2::uuid, $3::uuid, $4::text) as r',
+    );
+  });
+
+  it('rebuilds the reply key by key: nothing else the database sent is passed on', async () => {
+    const t = setup(() => one({ secret: 'x', session: 'y' }));
+    expect(Object.keys((await t.send(ASK_ORIG)).body).sort()).toEqual(['bytes', 'ok', 'original', 'title', 'url']);
+  });
+
+  it.each([
+    ['no session', { session: undefined }],
+    ['no resource id', { resource_id: undefined }],
+    ['a resource id that is not one', { resource_id: '../x.pdf' }],
+  ])('%s asks nothing', async (_name, over) => {
+    const t = setup(() => one());
+    expect(await t.send({ ...ASK_ORIG, ...over })).toEqual({ status: 400, body: { ok: false, error: 'bad_request' } });
+    expect(t.calls).toEqual([]);
+  });
+
+  it('a refusal passes on by its code; nothing is signed', async () => {
+    for (const [error, said] of [
+      ['signed_out', 'signed_out'],
+      ['not_found', 'not_found'],
+      ['not_yours', 'not_found'],
+    ]) {
+      const t = setup(() => ({ ok: false, error }));
+      expect((await t.send(ASK_ORIG)).body).toEqual({ ok: false, error: said });
+      expect(t.storeCalls).toEqual([]);
+    }
+  });
+
+  it.each([
+    ['the photos bucket', { bucket: 'student-photos' }],
+    ['no bucket', { bucket: undefined }],
+    ['an answer that says neither', { has_original: undefined }],
+    ['another handout', { path: `${COURSE}/${RES2}.pdf` }],
+    ['a web page’s name', { path: `${COURSE}/${RES}.html` }],
+    ['a handout page', { path: path(1) }],
+    ['a path out of the folder', { path: '../' + ORIG }],
+    ['no size', { bytes: undefined }],
+    ['over 20 MB', { bytes: 20971521 }],
+  ])('%s is a server error, and nothing is signed', async (_name, over) => {
+    const t = setup(() => one(over));
+    expect(await t.send(ASK_ORIG)).toEqual({ status: 500, body: { ok: false, error: 'server' } });
+    expect(t.storeCalls).toEqual([]);
+  });
+
+  it('with no Storage set up it answers a server error and asks the database nothing', async () => {
+    const calls = [];
+    const handle = makeHandler({
+      region: 'ca-central-1',
+      ipKey: 'k',
+      db: { check: async () => ({}), submit: async () => ({}), call: async (...a) => calls.push(a) },
+      log: () => {},
+    });
+    const res = await handle(
+      new Request(URL_, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(ASK_ORIG),
+      }),
+    );
+    expect(res.status).toBe(500);
+    expect(calls).toEqual([]);
+  });
+
+  it('handout-file never signs an original: a .pdf kind there is a server error', async () => {
+    const t = setup(() => ({
+      ok: true,
+      bucket: 'handout-files',
+      resource_id: RES,
+      assessment_id: LAB,
+      title: 't',
+      kind: 'pdf',
+      bytes: 5,
+      path: ORIG,
+    }));
+    expect(await t.send({ route: 'handout-file', session: PHONE, enrollment_id: CECE, resource_id: RES })).toEqual({
+      status: 500,
+      body: { ok: false, error: 'server' },
+    });
     expect(t.storeCalls).toEqual([]);
   });
 });

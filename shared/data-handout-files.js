@@ -28,7 +28,7 @@ function _resIsFileKind(kind) {
 
 // A handout file's name in handout-files: <class>/<resource>.<kind>.
 var _HANDOUT_FILE_STORAGE_PATH =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(html|txt|epub)$/;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(html|txt|epub|pdf)$/;
 
 /* Add a handout file to assessment `aid`: a web page, a text file or an
    EPUB (`kind` 'html' | 'txt' | 'epub'), `blob` its bytes as they are to be
@@ -95,10 +95,10 @@ function _handoutFilePaths(rec, res, id) {
   return id && res && res.path === expected ? [expected] : [];
 }
 
-// The photo queue's batch is a handout file's: its kind, or '' (a PDF's pages are .jpg).
+// The photo queue's batch is a handout file's: its kind ('pdf' is a PDF handout's original), or '' (a PDF's pages are .jpg).
 function _handoutFileKindOf(batch) {
   var path = String((((batch && batch.files) || [])[0] || {}).path || '');
-  return (/\.(html|txt|epub)$/.exec(path) || [])[1] || '';
+  return (/\.(html|txt|epub|pdf)$/.exec(path) || [])[1] || '';
 }
 
 function _handoutFileFinishCall(finish, quiet) {
@@ -114,7 +114,12 @@ function _handoutFileReady(r, batch, row) {
 /* The photo queue's upload for a handout file (data-student-work.js
    _workUploadFile): to the bucket handout-files with its kind's type,
    never upsert. null for any other path (a JPEG page in student-photos). */
-var _HANDOUT_FILE_UPLOAD_TYPES = { html: 'text/html', txt: 'text/plain', epub: 'application/epub+zip' };
+var _HANDOUT_FILE_UPLOAD_TYPES = {
+  html: 'text/html',
+  txt: 'text/plain',
+  epub: 'application/epub+zip',
+  pdf: 'application/pdf',
+};
 function _handoutFileUpload(sb, path, blob) {
   var m = _HANDOUT_FILE_STORAGE_PATH.exec(String(path || ''));
   if (!m) return null;
@@ -167,6 +172,296 @@ function openAssessmentHandoutFile(cid, rid) {
   }
   var own = String(cid).toLowerCase() + '/' + String(rid).toLowerCase() + '.' + row.kind;
   if (_isDemoSession() || name !== own || !_HANDOUT_FILE_STORAGE_PATH.test(name)) return Promise.resolve(null);
+  var sb = /** @type {any} */ (getSupabase());
+  if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
+  return Promise.resolve(_signInWait)
+    .then(function () {
+      return sb.storage.from('handout-files').createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
+    })
+    .then(function (res) {
+      var link = res && !res.error && res.data && res.data.signedUrl;
+      if (!link) return null;
+      return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
+        return r && r.ok ? r.blob() : null;
+      });
+    })
+    .then(done)
+    .then(null, function () {
+      return null;
+    });
+}
+
+/* ── A PDF handout's original (2026112408) ──
+
+   A PDF handout keeps its pages (the pictures) and also the PDF itself, whole, in
+   handout-files at <class>/<resource>.pdf, so students can save and print it.
+   The pages go first, as they always did. The original waits in the photo queue
+   under the same resource id, as a second batch of one file typed application/pdf;
+   once finish_handout_upload says the pages are ready, start_handout_original goes
+   through the outbox (keyed, so a retry is the same start), the file uploads to the
+   one name it answers, and finish_handout_original hands it in under the batch's
+   key. Offline, each step waits. The original is only ever extra: any step that
+   fails or is refused gives it up quietly (no banner, no sync-dot count) and the
+   handout works from its pages, as every handout made before this does. */
+
+/* Queue `original` (the PDF as the teacher picked it) beside a handout's pages.
+   → Promise of { ids, batch, bytes }, or null when it is not kept (none, empty,
+   over 20 MB, no room on this device). Never rejects. */
+function _handoutOriginalQueue(q, cid, aid, rid, original) {
+  if (!original || !(original.size > 0) || original.size > RESOURCE_FILE_MAX_BYTES) return Promise.resolve(null);
+  var typed = original.type === 'application/pdf' ? original : new Blob([original], { type: 'application/pdf' });
+  return Promise.resolve()
+    .then(function () {
+      return q.addHandout({ course: cid, assessment: aid, resource: rid }, [{ blob: typed, mime: 'application/pdf' }]);
+    })
+    .then(
+      function (res) {
+        return res && res.ok ? { ids: res.ids, batch: res.batch, bytes: typed.size } : null;
+      },
+      function () {
+        return null;
+      },
+    );
+}
+
+// The original's name in handout-files: <class>/<resource>.pdf.
+function _handoutOriginalPath(cid, rid) {
+  return String(cid).toLowerCase() + '/' + String(rid).toLowerCase() + '.pdf';
+}
+
+// Change what the row keeps of its original: a path, 'photo-queue:<id>', or null.
+function _handoutOriginalMark(cid, rid, value) {
+  var draft = _resDraft(cid);
+  var changed = false;
+  draft.rows.forEach(function (r) {
+    if (r.id === rid && (r.original || null) !== value) {
+      r.original = value;
+      changed = true;
+    }
+  });
+  if (!changed) return;
+  _resWrite(cid, draft);
+  _resChanged(cid);
+}
+
+/* The original is given up: it leaves this device and the record goes. The
+   handout stays, and keeps working from its pages. `path`: the original is
+   on the server after all (a start answered ready). Never noted on the sync
+   dot: nothing the teacher added is lost. */
+function _handoutOriginalGiveUp(rec, path) {
+  var all = _handoutUploads();
+  delete all[rec.key];
+  _handoutUploadsSave(all);
+  _handoutOriginalMark(rec.cid, rec.rid, path || null);
+  return _teacherWorkForget(rec.ids || []).then(function () {
+    return null;
+  });
+}
+
+// The pages are ready: the original's start goes through the outbox, keyed so a retry is the same start.
+function _handoutOriginalStart(rec) {
+  _rpcOrNoop(
+    'start_handout_original',
+    { p_resource_id: rec.rid, p_bytes: rec.bytes, p_idempotency_key: rec.key },
+    { entryId: rec.key },
+  ).then(function (res) {
+    if (res && !res.error && res.data != null) _handoutOriginalStarted(rec.key, res.data);
+  });
+}
+
+/* start_handout_original answered (from the call, or from the outbox's own
+   event after a reload): the row with `original` and `original_path`. Only
+   'uploading' at this class's and this handout's own name goes on: the
+   waiting file takes the path and goes up. Anything else gives it up. Runs
+   once per start. */
+function _handoutOriginalStarted(key, data) {
+  var rec = _handoutUploads()[key];
+  if (!rec || rec.placed || rec.kind !== 'pdf-original') return Promise.resolve(null);
+  var res = _rpcObject(data) || {};
+  var want = _handoutOriginalPath(rec.cid, rec.rid);
+  if (res.original === 'ready' && res.original_path === want) return _handoutOriginalGiveUp(rec, want);
+  var q = /** @type {any} */ (_wireWorkQueue());
+  if (
+    res.original !== 'uploading' ||
+    res.original_path !== want ||
+    String(res.id || '').toLowerCase() !== String(rec.rid).toLowerCase() ||
+    !q ||
+    typeof q.placeHandout !== 'function' ||
+    (rec.ids || []).length !== 1
+  ) {
+    return _handoutOriginalGiveUp(rec, null);
+  }
+  var map = {};
+  map[rec.ids[0]] = want;
+  return Promise.resolve(q.ready && q.ready())
+    .then(function () {
+      return q.placeHandout(map);
+    })
+    .then(function (placed) {
+      if (!placed || !placed.ok) return _handoutOriginalGiveUp(rec, null);
+      var now = _handoutUploads();
+      if (now[key]) {
+        now[key].placed = true;
+        _handoutUploadsSave(now);
+      }
+      q.send();
+      return null;
+    })
+    .then(null, function (e) {
+      console.warn('A handout original could not start:', e);
+      return null;
+    });
+}
+
+// A PDF's original, once the server says it is ready: its name in handout-files, else null.
+function _resOriginalOf(kind, row) {
+  return kind === 'pdf' && row.original === 'ready' && typeof row.original_path === 'string' ? row.original_path : null;
+}
+
+// A row with an upload on this device, as the server lists it: its pages, status and original stay as they are here.
+function _resKeepOwn(row, had) {
+  return Object.assign({}, row, {
+    pages: had.pages,
+    status: had.status,
+    original: row.original || had.original || null,
+  });
+}
+
+/* The pages are ready (data.js _handoutCommit): the record of the original waiting beside them, put
+   in `all` for its start, or null when there is none. */
+function _handoutOriginalNext(all, rec, cid, rid) {
+  if (!rec.original) return null;
+  var key = _newEntryId();
+  all[key] = {
+    key: key,
+    cid: cid,
+    rid: rid,
+    local: rid,
+    title: rec.title,
+    kind: 'pdf-original',
+    ids: rec.original.ids,
+    batch: rec.original.batch,
+    bytes: rec.original.bytes,
+  };
+  return all[key];
+}
+
+/* The photo queue's word (a subscriber, wired in _wireWorkQueue): an original the storage refused (the two hours
+   ran out, a wrong type) is marked failed and would stay, on the sync dot and on this device. It is optional, so
+   its record and its bytes go quietly and the handout works from its pages. */
+function _handoutOriginalWatch(evt) {
+  var ids = evt && evt.kind === 'failed' && evt.meta && Array.isArray(evt.meta.ids) ? evt.meta.ids : [];
+  if (!ids.length) return;
+  var all = _handoutUploads();
+  Object.keys(all).forEach(function (k) {
+    var rec = all[k];
+    if (
+      rec &&
+      rec.kind === 'pdf-original' &&
+      (rec.ids || []).some(function (id) {
+        return ids.indexOf(id) >= 0;
+      })
+    ) {
+      _handoutOriginalGiveUp(rec, null);
+    }
+  });
+}
+
+/* The outbox's word on start_handout_original: refused or lost, the original is given up
+   quietly (refused for a removed handout, an over-size file, anything): no dead letter stays; the handout works
+   from its pages. */
+function _handoutOriginalEvent(kind, key, data) {
+  if (kind === 'flush:success') return _handoutOriginalStarted(key, data);
+  var rec = _handoutUploads()[key];
+  if (!rec || rec.kind !== 'pdf-original') return;
+  _handoutOriginalGiveUp(rec, null);
+  // A dead letter would show on the sync dot; the original is optional (the handout works from its pages), so it goes.
+  var out = window.v2Queue;
+  if (out && typeof out.dismissDeadLetter === 'function') out.dismissDeadLetter(key);
+}
+
+/* The photo queue's commit for the original: it is in storage; finish_handout_original
+   marks it ready under the batch's key. Answers { error } as the queue reads it: none once
+   it is ready or given up, a passing one while the server says it is missing (sent again). */
+async function _handoutOriginalCommit(batch) {
+  var rid = batch && batch.ids && batch.ids.resource;
+  if (!_isUuid(rid)) return { error: { message: 'no resource id', status: 422 } };
+  var rec = _handoutUploadByBatch(batch.key);
+  var finish = { p_resource_id: rid, p_idempotency_key: batch.key };
+  var res = await _callRpcWithAuthGuard('finish_handout_original', finish, { suppressSessionExpiredModal: true });
+  if (!res || res.error) return { error: (res && res.error) || { message: 'no answer', status: 503 } };
+  var row = _rpcObject(res.data) || {};
+  var cid = (rec && rec.cid) || batch.ids.course;
+  var path = String((((batch && batch.files) || [])[0] || {}).path || '');
+  if (row.original === 'ready') {
+    if (rec) {
+      var all = _handoutUploads();
+      delete all[rec.key];
+      _handoutUploadsSave(all);
+    }
+    _handoutOriginalMark(cid, rid, path);
+    _resReadAfterWrite({ p_course_id: cid });
+    return { error: null };
+  }
+  if (row.missing === true) {
+    // Not in storage yet: the one file goes again.
+    var q = /** @type {any} */ (window.PhotoQueue);
+    var pages = q && typeof q.pages === 'function' ? q.pages() : [];
+    await Promise.all(
+      pages
+        .filter(function (p) {
+          return p.batch === batch.key;
+        })
+        .map(function (p) {
+          return Promise.resolve(q.retry(p.id, { again: true })).then(null, function () {});
+        }),
+    );
+    return { error: { message: 'missing_pages', status: 503 } };
+  }
+  // Another type or size (bad), given up by the server (dropped), or the handout is gone: nothing to hand in.
+  if (rec) await _handoutOriginalGiveUp(rec, null);
+  else _handoutOriginalMark(cid, rid, null);
+  return { error: null };
+}
+
+/* A PDF handout's original `rid` of class `cid`, as a student's Save or Print would
+   hand it over: Promise of { title, blob } (type application/pdf) or null when there
+   is none. One still on this device comes from the photo queue; one on the server
+   through a link signed for 300 seconds in handout-files, only at this class's and
+   this handout's own name. */
+function openAssessmentHandoutOriginal(cid, rid) {
+  var row = _resFind(cid, rid);
+  if (!row || row.kind !== 'pdf' || typeof row.original !== 'string' || !row.original) return Promise.resolve(null);
+  var done = function (blob) {
+    return blob ? { title: String(row.title || ''), blob: new Blob([blob], { type: 'application/pdf' }) } : null;
+  };
+  var name = row.original;
+  var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
+  if (m) {
+    var qid = m[1];
+    var q = /** @type {any} */ (window.PhotoQueue);
+    if (m[2] || !q || typeof q.blobs !== 'function') return Promise.resolve(null);
+    return Promise.resolve()
+      .then(function () {
+        return q.blobs(qid);
+      })
+      .then(
+        function (found) {
+          return done(found && found.photo);
+        },
+        function () {
+          return null;
+        },
+      );
+  }
+  if (
+    _isDemoSession() ||
+    !_isUuid(rid) ||
+    name !== _handoutOriginalPath(cid, rid) ||
+    !_HANDOUT_FILE_STORAGE_PATH.test(name)
+  ) {
+    return Promise.resolve(null);
+  }
   var sb = /** @type {any} */ (getSupabase());
   if (!sb || !sb.storage || typeof fetch !== 'function') return Promise.resolve(null);
   return Promise.resolve(_signInWait)

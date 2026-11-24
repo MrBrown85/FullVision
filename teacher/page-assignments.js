@@ -3893,6 +3893,7 @@ window.PageAssignments = (function () {
           title: _formResPdfTitle(file.name),
           pageCount: out.pages.length,
           pages: out.pages,
+          original: file, // the PDF itself, kept beside its pages for students to save and print
         });
         res.fresh = 'n' + res.next;
         return '';
@@ -3971,7 +3972,7 @@ window.PageAssignments = (function () {
         });
       } else if (!it.saved && it.kind === 'pdf') {
         steps.push(function () {
-          return addAssessmentHandout(cid, aid, it.title, it.pages);
+          return addAssessmentHandout(cid, aid, it.title, it.pages, it.original);
         });
       } else if (!it.saved && RES_FILE_WORDS[it.kind] && typeof addAssessmentHandoutFile === 'function') {
         steps.push(function () {

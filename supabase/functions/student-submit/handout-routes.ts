@@ -14,6 +14,13 @@
 //           The page fetches the file and shows it; a web page or a book
 //           only in the sealed frame (shared/handout-frame.html).
 //
+//   {route: 'handout-original', session, enrollment_id, resource_id}
+//        -> student_submit.handout_original (2026112408): the original PDF a teacher attached beside a PDF
+//           handout's pages. { ok: true, original: false } when the handout has none (older handouts, or one
+//           not finished): the page leaves "Open as PDF" out without asking again. With one, { ok: true,
+//           original: true, bytes, title, url }: one 60-second link in handout-files, only after its name is
+//           checked to be this handout's (<course>/<resource>.pdf).
+//
 // A link the student opens (a web address the teacher added) needs nothing
 // here: it comes with the page, assessments[].resources (card-routes.ts).
 //
@@ -51,6 +58,7 @@ type Param = string | null;
 export const HANDOUT_ROUTES: Record<string, true> = {
   'handout-links': true,
   'handout-file': true,
+  'handout-original': true,
 };
 
 /** A handout file is 20 MB at most (2026111706, the bucket's limit). */
@@ -64,6 +72,7 @@ export const MAX_HANDOUT_PAGES = 20;
 export const SQL = {
   handoutLinks: 'select student_submit.handout_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
   handoutFile: 'select student_submit.handout_file($1::text, $2::uuid, $3::uuid, $4::text) as r',
+  handoutOriginal: 'select student_submit.handout_original($1::text, $2::uuid, $3::uuid, $4::text) as r',
 };
 
 export function makeHandoutRoutes(opts: {
@@ -130,9 +139,37 @@ export function makeHandoutRoutes(opts: {
     });
   }
 
+  async function handoutOriginal(body: Json, hash: string): Promise<SendAnswer> {
+    const s = session(body);
+    const e = uuid(body.enrollment_id);
+    const id = uuid(body.resource_id);
+    if (!s || !e || !id) return bad();
+    if (!opts.store) return server();
+    const r = await opts.db.call(SQL.handoutOriginal, [s, e, id, hash]);
+    if (!good(r)) return ok(refusal(r, SESSION_ERRORS));
+    // A handout with no original says so plainly; nothing else of it is passed on.
+    if (r.has_original === false) return ok({ ok: true, original: false });
+    if (r.has_original !== true || r.bucket !== FILE_BUCKET) throw new TypeError('bucket');
+    // One file, this handout's, a PDF.
+    const parts = handoutFilePathParts(r.path);
+    if (!parts || parts.resource !== id || parts.kind !== 'pdf') throw new TypeError('path');
+    const bytes = typeof r.bytes === 'number' && Number.isSafeInteger(r.bytes) ? r.bytes : 0;
+    if (bytes < 1 || bytes > MAX_HANDOUT_FILE_BYTES) throw new TypeError('bytes');
+    const path = r.path as string;
+    const links = await opts.store.signDownloads([path], LINK_SECONDS, FILE_BUCKET);
+    return ok({
+      ok: true,
+      original: true,
+      bytes,
+      title: typeof r.title === 'string' ? r.title : '',
+      url: links[path],
+    });
+  }
+
   return async function run(route: string, body: Json, hash: string): Promise<SendAnswer> {
     if (route === 'handout-links') return handoutLinks(body, hash);
     if (route === 'handout-file') return handoutFile(body, hash);
+    if (route === 'handout-original') return handoutOriginal(body, hash);
     return bad();
   };
 }

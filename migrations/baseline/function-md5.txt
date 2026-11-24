@@ -13,8 +13,9 @@ fv_private.bulletin_pinned_now(p_pinned boolean, p_until date, p_timezone text) 
 fv_private.bulletin_student_same_class() e141cc62d498e426078f6f1da638416d 483
 fv_private.grade_return_remap(p_assessment_id uuid, p_criterion_map jsonb, p_check_map jsonb) 4cfec7b1e1ce680104cd25b8835a8ae0 999
 fv_private.handout_file_path_parts(p_name text) 185ad3fd3fc9ae84d6ae747f54a3423f 473
-fv_private.handout_file_read_allowed(p_name text) 01f9d53fbc7b87536957dca9984103be 548
-fv_private.handout_file_upload_allowed(p_name text) fd3ee2b395e774629f6e8d2c53a36e59 662
+fv_private.handout_file_read_allowed(p_name text) 157cbc9d9aef4f0a10ae4d36f061fc65 920
+fv_private.handout_file_upload_allowed(p_name text) d979e73142f88695a49059c207720b8d 1111
+fv_private.handout_original_parts(p_name text) b8f2d9237ed76faf5db4463818088f6e 444
 fv_private.handout_path_parts(p_name text) 9dd1528f2d0d1f49014b4b425b60492b 491
 fv_private.handout_read_allowed(p_name text) c49416c21dea4d9ebdae95e1ca881b8c 564
 fv_private.handout_upload_allowed(p_name text) b7a01941ecc710558b161f247c6cb413 678
@@ -31,8 +32,8 @@ fv_private.work_read_allowed(p_name text) 3ea2b37a835c7a86a881ed743b95d1c9 565
 fv_private.work_upload_allowed(p_name text) b53e85108b1e870a16e717055c63f2dc 632
 public._assessment_draft_guard() c18fcd8b805c83a2b75e8ca051792658 3092
 public._assessment_resource_gone() e7b0e2e222ddd148422248e7e96ce425 321
-public._assessment_resource_json(p_id uuid) ba262085f68a12f1320aa12cebf2f4af 1260
-public._assessment_resource_removed() becec68516a8cd68cccc383cf71325f7 1035
+public._assessment_resource_json(p_id uuid) 0aac1b8e58091a149e90422df56cddff 1917
+public._assessment_resource_removed() 208a21d723c24b89398d29e1733eff65 1409
 public._assessment_resource_same_class() 1d661e6e1a34b6c2a82735f439fdc064 448
 public._assessment_resource_truncated() 5d4a8ca2dd10909f2d669927b2a5bba6 332
 public._assessment_work_json(p_assessment_id uuid) e281660216f4186fe3f374eeacaf2fe6 524
@@ -61,12 +62,13 @@ public._grade_return_repair_lost() c75b7104f21d8c212e4c2325bea88b07 458
 public._grade_return_repoint() b16aee7bd8c6a29f0900eba03fe36528 1791
 public._grade_return_settle(p_enrollment_id uuid, p_assessment_id uuid) 8dc3dd05b65d552076d2707bfd062b2d 881
 public._grade_return_truncated() ba003fabdd309a99db522b5534435469 398
-public._handout_drop_expired(p_course_id uuid) 2a89c8ea4984d1832f3dd4370756f253 569
+public._handout_drop_expired(p_course_id uuid) 8bbc7a7dc0f46717b9d1c59016dc9e8e 1386
 public._handout_file_bucket() f7ed7b1fe72127f538fcc133ebf7e423 195
 public._handout_file_max_bytes() 587c06ecb2e6fa6980dfc027eae9ea00 195
 public._handout_file_mime(p_kind text) 234e3efb8c0358be67c1705dea81fac1 296
 public._handout_file_object(p_path text) 797abf1f084660a2cf8254d712f7e040 496
 public._handout_file_path(p_course_id uuid, p_resource_id uuid, p_kind text) 72ad6e9a0c48f4243ba66a03a42427b0 330
+public._handout_original_path(p_course_id uuid, p_resource_id uuid) 8bca6f364391cd12d96027b0a4c02ffb 269
 public._handout_path(p_course_id uuid, p_resource_id uuid, p_page integer) 90e3c0e7b44ef1cc8fb3ad1b8b0bc222 308
 public._keep_photos_day(p_choice text, p_terms jsonb, p_on date) ad345bdd6eadab44296ed32ef7870be6 816
 public._markup_check(p_marks jsonb) d5fac66f176bf8f23391a7c6c19b053a 3950
@@ -172,6 +174,7 @@ public.edit_bulletin(p_bulletin_id uuid, p_patch jsonb, p_idempotency_key uuid) 
 public.fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer, p_modifier smallint) 59c53fb566c6d47fbf0030586a18113c 837
 public.finish_bulletin_file(p_bulletin_file_id uuid, p_idempotency_key uuid) 5ff81d27ecf035324eaf5782a899d8f9 2600
 public.finish_handout_file(p_resource_id uuid, p_idempotency_key uuid) 88338da511bac8aa1d931244aa1ee559 2025
+public.finish_handout_original(p_resource_id uuid, p_idempotency_key uuid) a7a502a24cdec27cfbdfab95b5cfd723 2110
 public.finish_handout_upload(p_resource_id uuid, p_idempotency_key uuid) 03444c3bd55e4826285eeac20bdcfc40 2634
 public.finish_work_upload(p_submission_id uuid, p_files jsonb, p_idempotency_key uuid) c8c5c26be1758ec2e07fe73a68731159 5720
 public.fv_assessment_overall(p_enrollment_id uuid, p_assessment_id uuid) 533e4340d2899d159ad2051e8ede6b47 231
@@ -247,7 +250,7 @@ public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) 2ee
 public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) eb9e161daa032f3b272435ec52a0bc7a 4442
 public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) 0c9431bb6ff130f8de2715f8315838f1 1125
 public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) 54963eeb8f241b3c902137f8fe02ac51 3067
-public.photo_lifecycle_nightly() 511904d486e08f495f2823aefd80b7e9 2818
+public.photo_lifecycle_nightly() 590634077c8115f35e972f1d211e04fc 2901
 public.photo_removal_call() 08b22d449cc3312b31b975ee057fbc08 2010
 public.photo_removal_due() 3faf3499da0753407687386407c8b01f 481
 public.post_bulletin(p_course_id uuid, p_bulletin jsonb, p_files jsonb, p_idempotency_key uuid) b383dee60c48bea8edf769bdfd2a4a41 3800
@@ -298,6 +301,7 @@ public.set_student_page_options(p_course_id uuid, p_enrollment_ids uuid[], p_sho
 public.show_bulletin_again(p_bulletin_id uuid, p_idempotency_key uuid, p_enrollment_ids uuid[]) 137d3c394aa7b9885d50b0b052616fcc 2131
 public.soft_delete_teacher() 3ce9c3af43008efdd003f65c8b5bd8c5 481
 public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_bytes bigint, p_idempotency_key uuid) cfe44806c71f0927070a4299bef64dd6 2447
+public.start_handout_original(p_resource_id uuid, p_bytes bigint, p_idempotency_key uuid) 72fe4a680ef117111f471d6553ae89ad 1855
 public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) ac3c7d7c3a3f8d30eec287fed2c510ec 2228
 public.start_work_upload(p_assessment_id uuid, p_enrollment_id uuid, p_pages jsonb, p_mode text, p_idempotency_key uuid) 538ffab506d6c20344c07662837fe714 4421
 public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) d417bb92da948ecbb0001c33cc18620a 1219
@@ -377,6 +381,7 @@ student_submit.group_file_links(p_session_token text, p_enrollment_id uuid, p_as
 student_submit.group_work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) fd39a0807e49ab3e6f68860d0e78ee2f 1785
 student_submit.handout_file(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text) 09910f172f6403ac3a15bea4e1b49511 1319
 student_submit.handout_links(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text) 410877d7e4d5b860b8dadb4c1b185f3c 1407
+student_submit.handout_original(p_session_token text, p_enrollment_id uuid, p_resource_id uuid, p_ip_hash text) 65e00c70081b1234c60679087c117fbe 1464
 student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) 3662c2827078922670b5347ca37c685e 9633
 student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) fa4006097230b4d5102ea63e84296448 8623
 student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) 2296aefc4e38f67aad5722a2637c2fb4 2297

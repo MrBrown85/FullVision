@@ -176,6 +176,8 @@ export type Database = {
           created_at: string
           id: string
           kind: string
+          original_started_at: string | null
+          original_status: string | null
           page_count: number | null
           position: number
           status: string
@@ -191,6 +193,8 @@ export type Database = {
           created_at?: string
           id?: string
           kind: string
+          original_started_at?: string | null
+          original_status?: string | null
           page_count?: number | null
           position: number
           status: string
@@ -205,6 +209,8 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          original_started_at?: string | null
+          original_status?: string | null
           page_count?: number | null
           position?: number
           status?: string
@@ -4067,6 +4073,10 @@ export type Database = {
         Args: { p_course_id: string; p_kind: string; p_resource_id: string }
         Returns: string
       }
+      _handout_original_path: {
+        Args: { p_course_id: string; p_resource_id: string }
+        Returns: string
+      }
       _handout_path: {
         Args: { p_course_id: string; p_page: number; p_resource_id: string }
         Returns: string
@@ -4489,6 +4499,10 @@ export type Database = {
         Returns: Json
       }
       finish_handout_file: {
+        Args: { p_idempotency_key?: string; p_resource_id: string }
+        Returns: Json
+      }
+      finish_handout_original: {
         Args: { p_idempotency_key?: string; p_resource_id: string }
         Returns: Json
       }
@@ -5054,6 +5068,14 @@ export type Database = {
           p_idempotency_key?: string
           p_kind: string
           p_title: string
+        }
+        Returns: Json
+      }
+      start_handout_original: {
+        Args: {
+          p_bytes: number
+          p_idempotency_key?: string
+          p_resource_id: string
         }
         Returns: Json
       }
