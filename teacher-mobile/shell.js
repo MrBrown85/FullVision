@@ -885,13 +885,11 @@
     var stack = document.getElementById('m-nav-stack');
     // The tab switch usually puts the student's page back itself.
     var screen = stack.querySelector('.m-screen:last-child');
-    if (
-      !(
-        screen &&
-        screen.id === 'm-screen-student-detail' &&
-        screen.getAttribute('data-restore') === JSON.stringify({ kind: 'detail', sid: sid })
-      )
-    ) {
+    if (!(
+      screen &&
+      screen.id === 'm-screen-student-detail' &&
+      screen.getAttribute('data-restore') === JSON.stringify({ kind: 'detail', sid: sid })
+    )) {
       var list = screen;
       var tmp = document.createElement('div');
       tmp.innerHTML = MStudents.renderDetail(_cid, sid);
