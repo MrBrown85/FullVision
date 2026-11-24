@@ -1068,7 +1068,7 @@ revoke all on routine student_submit.unsend(p_session_token text, p_enrollment_i
 grant execute on routine student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
 revoke all on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) from public;
 grant execute on routine student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) to service_role;
-revoke all on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) from public;
-grant execute on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) to service_role;
+revoke all on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) from public;
+grant execute on routine student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) to service_role;
 revoke all on routine student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) to service_role;

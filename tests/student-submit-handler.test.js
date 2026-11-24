@@ -6,6 +6,7 @@
  * adds: Canada only, request shape, CORS, a keyed IP hash, and logs with no
  * student data.
  */
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { makeHandler, ipHash, allowedOrigin } from '../supabase/functions/student-submit/handler.ts';
 import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
@@ -175,6 +176,31 @@ describe('student-submit handler', () => {
       }
       expect(calls).toEqual([]);
       expect(logs.every(l => l.outcome === 'no_ip_key')).toBe(true);
+    }
+  });
+
+  it('hands the database a session token only as its SHA-256, on every route that takes one', async () => {
+    const token = '7'.repeat(64);
+    const seen = [];
+    const { handle } = setup({
+      db: {
+        async call(text, p) {
+          seen.push(p);
+          return { ok: true };
+        },
+      },
+    });
+    for (const body of [
+      { route: 'page', session: token, enrollment_id: '00000001-0000-4000-8000-000000000000' },
+      { route: 'done', session: token },
+      { route: 'work', session: token, enrollment_id: '00000001-0000-4000-8000-000000000000' },
+    ]) {
+      await handle(post(body));
+    }
+    expect(seen).toHaveLength(3);
+    for (const p of seen) {
+      expect(p[0]).toBe(createHash('sha256').update(token).digest('hex'));
+      expect(JSON.stringify(p)).not.toContain(token);
     }
   });
 

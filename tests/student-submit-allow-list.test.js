@@ -23,7 +23,12 @@ import { SENT as B, makeBulletinRoutes } from '../supabase/functions/student-sub
 import { SENT as Q, makeQuizRoutes } from '../supabase/functions/student-submit/quiz-routes.ts';
 
 const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-const SQL = ['migrations/2026110902_grade_return.sql', 'migrations/2026110904_student_sessions_page.sql']
+const SQL = [
+  'migrations/2026110902_grade_return.sql',
+  'migrations/2026110904_student_sessions_page.sql',
+  // verify_card answers new_session in place of the token (2026112401).
+  'migrations/2026112401_session_token_hashed_in_function.sql',
+]
   .map(read)
   .join('\n');
 
@@ -104,6 +109,7 @@ const has = (name, keys) =>
 
 const U = n => ('0000000' + n).slice(-8) + '-0000-4000-8000-000000000000';
 const AT = '2026-11-10T16:04:11.482913+00:00';
+const TOKEN = 'a'.repeat(64);
 
 /* What the SQL sends, level by level. Each list is checked against the SQL
    in the first test, then used to build a full reply for the second. */
@@ -111,7 +117,7 @@ const SENT = {
   card: ['ok', 'kind', 'student', 'course', 'check', 'also_password'],
   person: ['first_name'],
   klass: ['name', 'block'],
-  verified: ['ok', 'session_token', 'expires_at', 'enrollment_id', 'classes'],
+  verified: ['ok', 'new_session', 'expires_at', 'enrollment_id', 'classes'],
   sessionClass: ['enrollment_id', 'student', 'course'],
   page: ['ok', 'v', 'expires_at', 'student', 'course', 'classes', 'tags', 'rubrics', 'assessments'],
   pageStudent: ['enrollment_id', 'first_name'],
@@ -250,7 +256,7 @@ const FULL = {
   }),
   verified: fill(SENT.verified, {
     ok: true,
-    session_token: 'a'.repeat(64),
+    new_session: true,
     expires_at: AT,
     enrollment_id: U(1),
     classes: CLASSES,
@@ -323,11 +329,15 @@ describe('the phone is given exactly what the SQL sends', () => {
   });
 
   it('verify and add-card: every key, nothing else', () => {
-    expect(cardReply(CARD_ROUTES.verify, FULL.verified)).toEqual(FULL.verified);
-    expect(cardReply(CARD_ROUTES['add-card'], FULL.verified)).toEqual(FULL.verified);
+    // The phone gets the token the function made in place of new_session: the database never has it.
+    const { new_session, ...rest } = FULL.verified;
+    expect(new_session).toBe(true);
+    const phone = { ...rest, session_token: TOKEN };
+    expect(cardReply(CARD_ROUTES.verify, FULL.verified, TOKEN)).toEqual(phone);
+    expect(cardReply(CARD_ROUTES['add-card'], FULL.verified, TOKEN)).toEqual(phone);
     // A session joined by Add Another Card sends no new token.
-    const joined = { ...FULL.verified, session_token: null };
-    expect(cardReply(CARD_ROUTES['add-card'], joined)).toEqual(joined);
+    const joined = { ...FULL.verified, new_session: false };
+    expect(cardReply(CARD_ROUTES['add-card'], joined, TOKEN)).toEqual({ ...phone, session_token: null });
   });
 
   it('page: every key at every level, nothing else', () => {
@@ -357,10 +367,12 @@ describe('the phone is given exactly what the SQL sends', () => {
     expect(passed).toEqual(want);
     expect(text.split('"created_at"').length - 1).toBe(1);
 
-    for (const route of ['card', 'verify']) {
-      const full = route === 'card' ? FULL.card : FULL.verified;
-      expect(cardReply(CARD_ROUTES[route], { ...extra(full), ok: true })).toEqual(full);
-    }
+    expect(cardReply(CARD_ROUTES.card, { ...extra(FULL.card), ok: true })).toEqual(FULL.card);
+    const { new_session, ...verified } = FULL.verified;
+    expect(cardReply(CARD_ROUTES.verify, { ...extra(FULL.verified), ok: true, new_session }, TOKEN)).toEqual({
+      ...verified,
+      session_token: TOKEN,
+    });
   });
 
   it('seen and done say only what the SQL says', () => {

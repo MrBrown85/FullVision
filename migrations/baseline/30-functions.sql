@@ -12896,7 +12896,7 @@ CREATE OR REPLACE FUNCTION student_submit._device_session(p_token text)
 AS $function$
     select d.* from device_session d
      where coalesce(p_token, '') ~ '^[0-9a-f]{64}$'
-       and d.token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+       and d.token_hash = p_token
        and d.expires_at > now();
 $function$;
 
@@ -13908,8 +13908,7 @@ CREATE OR REPLACE FUNCTION student_submit.done(p_session_token text, p_ip_hash t
 AS $function$
 begin
     if coalesce(p_session_token, '') ~ '^[0-9a-f]{64}$' then
-        delete from device_session
-         where token_hash = encode(sha256(convert_to(p_session_token, 'UTF8')), 'hex');
+        delete from device_session where token_hash = p_session_token;
     end if;
     return jsonb_build_object('ok', true);
 end;
@@ -16627,7 +16626,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean)
+CREATE OR REPLACE FUNCTION student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -16642,7 +16641,7 @@ declare
     _num     text;
     _given   date;
     _session device_session%rowtype;
-    _token   text;
+    _new     boolean := false;
     _ends    timestamptz;
     _row     int;
     _week    int;
@@ -16651,6 +16650,11 @@ begin
     -- four digits typed), or null when none was typed. Never the digits.
     if p_password_hmac is not null and p_password_hmac !~ '^[0-9a-f]{64}$' then
         raise exception 'malformed password tag' using errcode = '22023';
+    end if;
+    -- The hash of a token the function made, always sent: the database never
+    -- sees the token itself.
+    if coalesce(p_new_session_hash, '') !~ '^[0-9a-f]{64}$' then
+        raise exception 'malformed session hash' using errcode = '22023';
     end if;
     _found := _card_lookup(p_code_hmac, p_key_id, p_ip_hash);
     _card := (_found->>'card_id')::uuid;
@@ -16711,10 +16715,10 @@ begin
         _session := null;
     end if;
     if _session.id is null then
-        _token := encode(uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()), 'hex');
         insert into device_session (token_hash, expires_at)
-        values (encode(sha256(convert_to(_token, 'UTF8')), 'hex'), _ends)
+        values (p_new_session_hash, _ends)
         returning * into _session;
+        _new := true;
     elsif _ends < _session.expires_at then
         update device_session set expires_at = _ends where id = _session.id returning * into _session;
     end if;
@@ -16725,7 +16729,7 @@ begin
 
     perform _log('card', 'verified', p_ip_hash, _k.id, _course.id);
     return jsonb_build_object(
-        'ok', true, 'session_token', _token, 'expires_at', _session.expires_at,
+        'ok', true, 'new_session', _new, 'expires_at', _session.expires_at,
         'enrollment_id', _k.enrollment_id, 'classes', _session_classes(_session.id));
 end;
 $function$;

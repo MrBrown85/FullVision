@@ -21,9 +21,13 @@
 import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
-import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
+import { sha256, tokensAtTheDatabase } from './helpers/session-hash.js';
 import { CARD_ROUTES } from '../supabase/functions/student-submit/card-routes.ts';
 import { FAKE_KEY, codeTag, keyId, passwordTag } from './helpers/card-key-fake.js';
+
+// The stand-in database is handed the tokens the test sent; one sent as itself fails (2026112401).
+const makeHandler = tokensAtTheDatabase(makeRealHandler);
 
 const CODE = 'P3R8-WD4K'; // a card's code: eight characters
 const CODE_TAG = codeTag(CODE); // what the database is handed in its place
@@ -190,8 +194,10 @@ function setup(answers, overrides) {
     {
       // The database knows a card by the tag of its code, and its password by a tag. It is handed neither as typed.
       card: tag => (tag === CODE_TAG ? clone(CARD_OK) : { ok: false, error: 'not_found' }),
-      // `add` is p_add, read from the statement: it is not a parameter.
-      verify_card(tag, key, birthday, number, password, session, hash, add) {
+      // `add` is p_add, read from the statement: it is not a parameter. `fresh` is the hash of the token the
+      // function made for a new session (2026112401); the database keeps that hash and is never given the token.
+      verify_card(tag, key, birthday, number, password, session, hash, fresh, add) {
+        if (fresh !== sha256(NEW_SESSION)) throw new Error('no new session hash');
         if (tag !== CODE_TAG) return { ok: false, error: 'not_found' };
         if (birthday !== '2012-05-15' && number !== '0123456' && password !== pwTag('4821')) {
           return { ok: false, error: 'wrong_identity', tries_left: 4 };
@@ -203,7 +209,7 @@ function setup(answers, overrides) {
         sessions[token] = [...new Set([...(sessions[token] || []), CECE])];
         return {
           ok: true,
-          session_token: joined ? null : NEW_SESSION,
+          new_session: !joined,
           expires_at: EXPIRES,
           enrollment_id: CECE,
           classes: clone(CLASSES),
@@ -231,6 +237,7 @@ function setup(answers, overrides) {
         region: 'ca-central-1',
         ipKey: 'test-key',
         cardKey: KEY,
+        sessionToken: () => NEW_SESSION,
         log: entry => logs.push(entry),
         db: {
           open: untouched('open'),
@@ -243,7 +250,7 @@ function setup(answers, overrides) {
             if (text === SLIP_SQL.verify) return untouched('verify')();
             calls.push({ sql: text, params });
             const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
-            const add = /, p_add => (true|false)\) as r$/.exec(text);
+            const add = /, p_add => (true|false)[,)]/.exec(text);
             return sql[fn](...params, add ? add[1] === 'true' : undefined);
           },
         },
@@ -410,12 +417,15 @@ describe('student-submit: verify for a card', () => {
     expect(await res.json()).toEqual(ok);
 
     for (const c of calls) expect(c.sql).toBe(VERIFY);
-    // The code's tag, the key id, the birthday, the number, the typed password's tag, the session, the address.
+    // The code's tag, the key id, the birthday, the number, the typed password's tag, the session, the address,
+    // and the hash of the new session's token: the token itself the database is never given.
+    const fresh = sha256(NEW_SESSION);
     expect(calls.map(c => c.params)).toEqual([
-      [CODE_TAG, KEY_ID, '2012-05-15', null, null, null, hash],
-      [CODE_TAG, KEY_ID, null, '0123456', null, null, hash],
-      [CODE_TAG, KEY_ID, null, null, pwTag('4821'), null, hash],
+      [CODE_TAG, KEY_ID, '2012-05-15', null, null, null, hash, fresh],
+      [CODE_TAG, KEY_ID, null, '0123456', null, null, hash, fresh],
+      [CODE_TAG, KEY_ID, null, null, pwTag('4821'), null, hash, fresh],
     ]);
+    for (const c of calls) expect(c.params).not.toContain(NEW_SESSION);
     // The slip's verify is a different function and is not called.
     expect(slip).toEqual([]);
   });
@@ -459,19 +469,21 @@ describe('student-submit: verify for a card', () => {
       expect((await res.json()).session_token, JSON.stringify(extra)).toBe(NEW_SESSION);
       expect(calls).toHaveLength(1);
       expect(calls[0].sql).toBe(VERIFY);
-      expect(calls[0].sql).toMatch(/, p_add => false\) as r$/);
+      expect(calls[0].sql).toMatch(/, p_add => false, p_new_session_hash => \$8::text\) as r$/);
       // Seven parameters: the code's tag, the key id, what was typed, the token and the hashed address.
       // p_add is not one.
-      expect(calls[0].params).toHaveLength(7);
+      expect(calls[0].params).toHaveLength(8);
       expect(calls[0].params).not.toContain(true);
     }
   });
 
   it('gives the phone the named fields only', async () => {
     const { handle } = setup({
+      // A token the database names is not passed on: the phone gets the one the function made.
       verify_card: () => ({
         ok: true,
-        session_token: NEW_SESSION,
+        new_session: true,
+        session_token: 'e'.repeat(64),
         token_hash: 'f'.repeat(64),
         session_id: RUBRIC,
         card_id: CHECK,
@@ -618,7 +630,7 @@ describe('student-submit: add-card', () => {
       classes: CLASSES,
     });
     expect(calls[0].sql).toBe(ADD_CARD);
-    expect(calls[0].sql).toMatch(/, p_add => true\) as r$/);
+    expect(calls[0].sql).toMatch(/, p_add => true, p_new_session_hash => \$8::text\) as r$/);
     expect(calls[0].params).toEqual([
       CODE_TAG,
       KEY_ID,
@@ -627,6 +639,7 @@ describe('student-submit: add-card', () => {
       null,
       OTHER_DEVICE,
       expect.stringMatching(/^[0-9a-f]{64}$/),
+      sha256(NEW_SESSION),
     ]);
     for (const enrollment_id of [OMAR, CECE]) {
       const page = await handle(post({ route: 'page', session: OTHER_DEVICE, enrollment_id }));
@@ -636,7 +649,7 @@ describe('student-submit: add-card', () => {
 
   it('differs from verify only in p_add, which neither takes from the request', () => {
     expect(VERIFY).toBe(
-      'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, p_add => false) as r',
+      'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, p_add => false, p_new_session_hash => $8::text) as r',
     );
     expect(ADD_CARD).toBe(VERIFY.replace('p_add => false', 'p_add => true'));
     expect(CARD_ROUTES.verify.sql).toBe(VERIFY);
@@ -957,7 +970,7 @@ describe('student-submit: every card route', () => {
     // One statement, one function, and only placeholders inside it.
     expect(text).toMatch(
       new RegExp(
-        `^select student_submit\\.${FUNCTION[route]}\\((\\$\\d::(text|uuid|uuid\\[\\])(, )?)+(p_add => (true|false))?\\) as r$`,
+        `^select student_submit\\.${FUNCTION[route]}\\((\\$\\d::(text|uuid|uuid\\[\\])(, )?)+(p_add => (true|false), p_new_session_hash => \\$8::text)?\\) as r$`,
       ),
     );
     expect(text.match(/student_submit\./g)).toHaveLength(1);

@@ -2250,6 +2250,6 @@ function student_submit.slip_roster(p_teacher_id uuid, p_kind text, p_target_id 
 function student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) returns jsonb security definer
-function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) returns jsonb security definer
+function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) returns jsonb security definer
 function student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 event trigger ensure_rls on ddl_command_end when tag in (CREATE TABLE, CREATE TABLE AS, SELECT INTO) runs public.rls_auto_enable()
