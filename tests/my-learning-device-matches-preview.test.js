@@ -487,6 +487,20 @@ async function throughEdge(dbReply) {
    calc.js and student-view.js, as the page fetches them for My Learning. */
 function phone() {
   const page = openStudentPage();
+  // The phone runs in its own context with its own Date, which the fake
+  // timers above don't reach: pin it to NOW too, or the month trend reads
+  // the real date and drifts from Preview as the calendar moves on.
+  vm.runInContext(
+    `Date = (function (Real, fixed) {
+      function D(...a) { return new.target ? new Real(...(a.length ? a : [fixed])) : new Real(fixed).toString(); }
+      D.prototype = Real.prototype;
+      D.now = () => fixed;
+      D.parse = Real.parse;
+      D.UTC = Real.UTC;
+      return D;
+    })(Date, Date.parse(${JSON.stringify(NOW)}));`,
+    page.ctx,
+  );
   ['shared/constants.js', 'shared/calc.js', 'shared/student-view.js'].forEach(f =>
     vm.runInContext(read(f), page.ctx, { filename: f }),
   );
