@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edit the reflection on the page (mockup)</title>
+<style>
+  :root {
+    --font-base: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+    --surface: #fff; --surface-2: #e5e5ea; --border: #d1d1d6; --text: #1d1d1f; --text-2: #636366; --text-3: #58585d;
+    --active: #007aff; --link: #0066cc; --danger: #c62828;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.12); --shadow-lg: 0 8px 32px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.04);
+  }
+  body { margin: 0; background: #e3e3e8; font: 13px var(--font-base); color: var(--text); }
+  body.wide .page { font-family: Verdana, Geneva, sans-serif; }
+  .stage { display: flex; gap: 28px; align-items: flex-start; padding: 28px 24px 80px; }
+  #main { display: flex; flex-direction: column; gap: 18px; }
+
+  /* The printed page: letter size, at print size. */
+  .page { position: relative; box-sizing: border-box; width: 816px; height: 1056px; overflow: hidden; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.18); padding: 20px 56px 48px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+  #main .page { overflow: visible; }
+  .who { font-size: 13px; margin-bottom: 18px; }
+  .part { position: relative; }
+  .ptitle { font-size: 11.5px; font-weight: 700; margin-bottom: 6px; }
+  .intro { font-size: 12.5px; color: #333; margin-bottom: 10px; }
+  table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  .tbl thead th { font-size: 11px; font-weight: 700; padding: 0 3px 6px; border-bottom: 1.5px solid #000; text-align: center; vertical-align: bottom; width: 74px; line-height: 1.2; }
+  .tbl thead th:first-child { width: auto; }
+  .tbl td { border-bottom: 1px solid #ddd; padding: 6px 4px; vertical-align: middle; background: #fff; }
+  .tbl td.k { position: relative; }
+  .tbl td.o { text-align: center; position: relative; }
+  .tbl tr.gh td { font-size: 11px; font-weight: 700; border-bottom: 1.5px solid #000; padding: 10px 4px 4px; }
+  .n { display: block; font-weight: 600; font-size: 13px; }
+  .d { display: block; font-size: 11px; font-style: italic; color: #444; line-height: 1.3; }
+  /* Long words and links wrap instead of running into the circles. */
+  .n, .d, .tbl th, .tbl tr.gh span, .qlabel, .ptitle, .intro { overflow-wrap: anywhere; hyphens: auto; }
+  .bub { display: inline-block; width: 15px; height: 15px; border: 1.5px solid #000; border-radius: 50%; }
+  .write { margin-top: 14px; }
+  .q { position: relative; margin-top: 12px; }
+  .qlabel { font-size: 12.5px; font-weight: 700; }
+  .lines { height: 78px; background: repeating-linear-gradient(#fff 0 25px, #555 25px 26px); }
+
+  /* Screen only: what editing adds. None of it prints. */
+  [contenteditable] { outline: none; border-radius: 3px; cursor: text; }
+  .part:hover [contenteditable]:hover { background: rgba(0,122,255,.06); }
+  [contenteditable]:focus { background: #fff; box-shadow: 0 0 0 1.5px var(--active), 0 0 0 4px rgba(0,122,255,.15); }
+  .d:empty::before { content: attr(data-ph); color: #a0a0a6; font-style: normal; display: none; }
+  tr:hover .d:empty::before, .d:empty:focus::before { display: inline; }
+  .hidepill { position: absolute; top: -6px; right: -6px; z-index: 4; font: 600 11px/1.3 var(--font-base); color: var(--text-2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; box-shadow: var(--shadow-sm); opacity: 0; transition: opacity 120ms; }
+  .part:hover .hidepill { opacity: 1; }
+  .grip, .more { position: absolute; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--text-2); font: 15px/24px var(--font-base); text-align: center; opacity: 0; transition: opacity 120ms; }
+  .grip { left: -30px; cursor: grab; }
+  .more { right: -36px; cursor: pointer; }
+  /* Only the row under the pointer shows its handles. */
+  tr:hover > td > .grip, tr:hover > td > .more, .grip:focus-visible, .more:focus-visible, .more[aria-expanded="true"] { opacity: 1; }
+  .grip:hover, .more:hover, .more[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
+  .grip:focus-visible, .more:focus-visible, .ins button:focus-visible { outline: 2px solid var(--active); outline-offset: 1px; }
+  tr.gh .grip, tr.gh .more { top: auto; bottom: -2px; transform: none; }
+  tr.empty td { color: #8e8e93; font-size: 12px; font-style: italic; text-align: center; border: 1.5px dashed #c7c7cc; padding: 10px; cursor: pointer; }
+  tr.empty:hover td { color: var(--link); border-color: #9cc3ec; background: #f7fbff; }
+  .qmore { top: 10px; }
+  .q:hover > .more, .q > .more:focus-visible { opacity: 1; }
+  .namechip { position: absolute; z-index: 5; font: 12px var(--font-base); color: var(--text-2); background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; box-shadow: var(--shadow-sm); white-space: nowrap; }
+
+  /* Adding: point at the line between two rows. A + shows in the margin
+     and the line turns blue; the + opens the choices for that spot. */
+  .ins { position: absolute; z-index: 8; height: 0; pointer-events: none; }
+  .ins[hidden] { display: none; }
+  .ins-line { position: absolute; left: 22px; right: 0; top: -1px; height: 2px; background: var(--active); border-radius: 1px; }
+  .ins-plus { position: absolute; left: 0; top: -10px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--active); color: #fff; font: 600 15px/20px var(--font-base); text-align: center; cursor: pointer; pointer-events: auto; box-shadow: var(--shadow-sm); }
+  .ins-acts { position: absolute; left: 28px; top: -14px; display: none; gap: 2px; padding: 2px; background: #fff; border: 1px solid #c9dcf2; border-radius: 999px; box-shadow: var(--shadow-sm); pointer-events: auto; white-space: nowrap; }
+  .ins.open .ins-acts { display: flex; }
+  .ins-acts button { font: 600 11.5px/1 var(--font-base); color: var(--link); background: none; border: 0; border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+  .ins-acts button:hover, .ins-acts button:focus { background: rgba(0,122,255,.1); outline: none; }
+
+  tr.lift td { background: #fff; }
+  tr.lift { box-shadow: 0 8px 24px rgba(0,0,0,.18); position: relative; z-index: 6; }
+  tr.glift { position: relative; z-index: 6; }
+  tr.glift td { background: #f7fbff; }
+  body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }
+
+  .menu { position: absolute; z-index: 30; min-width: 230px; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow-lg); border: 1px solid #e5e5ea; padding: 4px; font: 13px var(--font-base); }
+  .menu button { display: block; width: 100%; text-align: left; font: inherit; border: 0; background: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: var(--text); }
+  .menu button:hover, .menu button:focus { background: rgba(0,122,255,.1); outline: none; }
+  .menu button.danger { color: var(--danger); }
+  .menu hr { border: 0; border-top: 1px solid #e5e5ea; margin: 4px 0; }
+  .menu .sub { font-size: 11.5px; color: var(--text-3); padding: 4px 10px 2px; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1d1d1f; color: #fff; font: 13px var(--font-base); border-radius: 10px; padding: 9px 14px; display: flex; gap: 14px; align-items: center; box-shadow: var(--shadow-lg); z-index: 40; }
+  .toast button { font: 600 13px var(--font-base); color: #5ca9ff; background: none; border: 0; cursor: pointer; padding: 0; }
+
+  /* The next student's pages, drawn small, changing as you type. */
+  .side { position: sticky; top: 28px; flex: 0 0 auto; }
+  .side .cap { font: 12px var(--font-base); color: var(--text-2); margin: 0 0 6px; }
+  .side label { display: block; font: 12px var(--font-base); color: var(--text-2); margin-top: 10px; }
+  .thumbwrap { width: 261px; overflow: hidden; }
+  .thumb { transform: scale(.32); transform-origin: 0 0; pointer-events: none; display: flex; flex-direction: column; gap: 40px; }
+  .flash td, .flash { animation: flash 600ms ease-out; }
+  @keyframes flash { from { background: #fff3b0; } to { background: #fff; } }
+  .panelrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 261px; box-sizing: border-box; background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 14px; font: 13px var(--font-base); box-shadow: var(--shadow-sm); }
+  .panelrow button { font: 600 12.5px var(--font-base); color: var(--link); background: none; border: 0; cursor: pointer; padding: 2px 0; }
+  .tip { position: absolute; z-index: 9; width: 300px; background: #1d1d1f; color: #fff; font: 13px/1.4 var(--font-base); border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow-lg); }
+  .tip::after { content: ''; position: absolute; left: 24px; bottom: -6px; width: 12px; height: 12px; background: #1d1d1f; transform: rotate(45deg); }
+  .tip button { display: block; margin: 8px 0 0 auto; font: 600 12.5px var(--font-base); color: #5ca9ff; background: none; border: 0; cursor: pointer; padding: 0; }
+  .scrim { position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.18); display: flex; align-items: flex-start; justify-content: center; padding-top: 120px; }
+  .cdlg { width: 380px; background: #fff; border-radius: 16px; box-shadow: var(--shadow-lg); padding: 16px 18px 14px; font: 13px var(--font-base); }
+  .cdlg h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .cdlg p { margin: 0 0 10px; color: var(--text-3); font-size: 12.5px; }
+  .cdlg label { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid #eee; }
+  .cdlg label small { display: block; color: var(--text-3); font-size: 12px; }
+  .cdlg .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .cdlg .row button { font: 600 13px var(--font-base); border-radius: 8px; padding: 6px 14px; border: 0; cursor: pointer; }
+  .cdlg .go { background: #0066cc; color: #fff; } .cdlg .go:disabled { opacity: .4; cursor: default; }
+  .cdlg .cancel { background: var(--surface-2); color: var(--text); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div id="main"></div>
+  <div class="side">
+    <div class="panelrow"><span>Reflection: My Learning</span><button type="button" id="editQ">Edit Questions</button></div>
+    <p class="cap">Aarav Singh’s pages, changing as you type</p>
+    <div class="thumbwrap"><div class="thumb" id="thumb"></div></div>
+    <label><input type="checkbox" id="wide"> Wide font (as CI’s Linux prints)</label>
+  </div>
+</div>
+<div class="ins" id="ins" hidden>
+  <div class="ins-line"></div>
+  <button class="ins-plus" type="button" aria-label="Add here">+</button>
+  <div class="ins-acts" role="menu"></div>
+</div>
+<script>
+'use strict';
+var PAGE_H = 1056, PAD_BOTTOM = 48, LIMIT = PAGE_H - PAD_BOTTOM, THUMB = 0.32;
+var S = {
+  title: 'How I See Myself as a Learner',
+  intro: '{name}, rate yourself honestly on each learning disposition. Fill in one circle per row.',
+  scale: ['Rarely', 'Sometimes', 'Usually', 'Consistently'],
+  groups: [
+    { id: 'g1', name: 'Learning Dispositions', items: [
+      ['Engagement', 'I participate actively and stay focused on my learning'],
+      ['Curiosity & Exploration', 'I explore new ideas, take risks in my thinking, and connect learning to the world around me'],
+      ['Self-Regulation & Reflection', 'I manage my time, reflect on my learning, and understand my own growth'],
+      ['Resilience', 'I keep trying when things are difficult and learn from setbacks'] ] },
+    { id: 'g2', name: 'Relational & Identity', items: [
+      ['Belonging & Connection', 'I feel part of our learning community and connected to the people and places around me'],
+      ['Identity & Self-Knowledge', 'I know my strengths, explore who I am, and bring my whole self to learning'],
+      ['Collaboration', 'I work well with others and support my group'],
+      ['Respect', 'I show care for my classmates and our community'],
+      ['Responsibility & Reciprocity', 'I think about how my actions affect others and give back to my community'] ] },
+  ],
+  open: ['My biggest strength as a learner:', 'One thing I want to work on:', 'What helps me learn best:'],
+};
+var seq = 0;
+function nid(p) { return p + ++seq; }
+S.groups.forEach(function (g) { g.items = g.items.map(function (a) { return { id: nid('s'), label: a[0], prompt: a[1] }; }); });
+S.open = S.open.map(function (t) { return { id: nid('q'), text: t }; });
+var original = JSON.stringify(S);
+
+var main = document.getElementById('main');
+var thumb = document.getElementById('thumb');
+var ins = document.getElementById('ins');
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+/* ── Drawing ──────────────────────────────────────────────────
+   The table's rows in order; a page holds a run of them. */
+var editingIntro = false;
+function rowsOf(edit) {
+  var out = [], ce = edit ? ' contenteditable="plaintext-only"' : '';
+  S.groups.forEach(function (g) {
+    if (g.name || edit)
+      out.push({ type: 'gh', g: g.id, html: '<tr class="gh" data-k="' + g.id + '"><td colspan="5" class="k">' +
+        (edit ? '<button class="grip" data-drag="g" data-g="' + g.id + '" aria-label="Move the heading ' + esc(g.name) + ' and its statements. Arrow keys move it.">⠿</button>' : '') +
+        '<span data-e="gname" data-g="' + g.id + '"' + ce + ' aria-label="Heading in the table">' + esc(g.name) + '</span>' +
+        (edit ? '<button class="more" data-more="g" data-g="' + g.id + '" aria-haspopup="menu" aria-label="More for the heading ' + esc(g.name) + '">⋯</button>' : '') + '</td></tr>' });
+    g.items.forEach(function (it) {
+      if (!edit && !it.label.trim()) return;
+      out.push({ type: 'it', g: g.id, html: '<tr class="it" data-k="' + it.id + '"><td class="k">' +
+        (edit ? '<button class="grip" data-drag="s" data-id="' + it.id + '" aria-label="Move ' + esc(it.label) + '. Arrow keys move it.">⠿</button>' : '') +
+        '<span class="n" data-e="label" data-id="' + it.id + '"' + ce + ' aria-label="Statement">' + esc(it.label) + '</span>' +
+        (it.prompt || edit ? '<span class="d" data-e="prompt" data-id="' + it.id + '" data-ph="Add the line under it"' + ce + ' aria-label="The line under it">' + esc(it.prompt) + '</span>' : '') +
+        '</td>' + S.scale.map(function (w, i) {
+          return '<td class="o"><span class="bub"></span>' + (edit && i === S.scale.length - 1 ? '<button class="more" data-more="s" data-id="' + it.id + '" aria-haspopup="menu" aria-label="More for ' + esc(it.label) + '">⋯</button>' : '') + '</td>';
+        }).join('') + '</tr>' });
+    });
+    if (edit && !g.items.length)
+      out.push({ type: 'empty', g: g.id, html: '<tr class="empty" data-k="e' + g.id + '" data-addto="' + g.id + '"><td colspan="5" class="k">Drag a statement here, or click to add one.</td></tr>' });
+  });
+  return out;
+}
+/* One page of the part: rows [start, end). The first page has the
+   instructions; the last has the questions; a later page's heading says
+   "(continued)", as One Report prints it. */
+function pageHtml(student, edit, rows, start, end, total) {
+  var ce = edit ? ' contenteditable="plaintext-only"' : '';
+  var first = start === 0, last = end >= total;
+  var intro = edit && editingIntro ? S.intro : S.intro.split('{name}').join(student.split(' ')[0]).split('{teacher}').join('Mr. Brown');
+  var h = '<div class="page"><div class="who">' + esc(student) + ' · Philosophy 12 · Block D (continued)</div><div class="part">';
+  if (edit && first) h += '<span class="hidepill">Hide</span>';
+  h += first ? '<div class="ptitle" data-e="title"' + ce + ' aria-label="Part heading">' + esc(S.title) + '</div>' : '<div class="ptitle">' + esc(S.title) + ' (continued)</div>';
+  if (first) h += '<div class="intro" data-e="intro"' + ce + ' aria-label="Instructions">' + esc(intro) + '</div>';
+  h += '<table class="tbl"><thead><tr><th></th>' + S.scale.map(function (w, i) {
+    return '<th' + (first ? ' data-e="scale" data-i="' + i + '"' + ce + ' aria-label="Scale word ' + (i + 1) + '"' : '') + '>' + esc(w) + '</th>';
+  }).join('') + '</tr></thead>';
+  var g = null;
+  rows.slice(start, end).forEach(function (r) {
+    if (r.g !== g) { if (g) h += '</tbody>'; h += '<tbody data-g="' + r.g + '">'; g = r.g; }
+    h += r.html;
+  });
+  if (g) h += '</tbody>';
+  h += '</table>';
+  if (last) h += '<div class="write">' + S.open.map(function (q) {
+    return '<div class="q" data-k="' + q.id + '"><div class="qlabel" data-e="q" data-id="' + q.id + '"' + ce + ' aria-label="Question">' + esc(q.text) + '</div>' +
+      (edit ? '<button class="more qmore" data-more="q" data-id="' + q.id + '" aria-haspopup="menu" aria-label="More for this question">⋯</button>' : '') + '<div class="lines"></div></div>';
+  }).join('') + '</div>';
+  return h + '</div></div>';
+}
+/* Heights, read from whatever is drawn now, at print size. */
+function measure(root, scale) {
+  var pages = root.querySelectorAll('.page'), trs = root.querySelectorAll('tbody tr');
+  var top = function (el) { return el.getBoundingClientRect().top / scale; };
+  var hgt = function (el) { return el.getBoundingClientRect().height / scale; };
+  var p0 = pages[0], intro = p0.querySelector('.intro');
+  var headFirst = top(trs[0] || p0.querySelector('thead')) - top(p0) + (trs[0] ? 0 : 30);
+  var p1tr = pages[1] && pages[1].querySelector('tbody tr');
+  var headCont = p1tr ? top(p1tr) - top(pages[1]) : headFirst - (intro ? hgt(intro) + 10 : 0);
+  var w = root.querySelector('.write');
+  return {
+    h: Array.prototype.map.call(trs, hgt),
+    type: Array.prototype.map.call(trs, function (t) { return t.classList.contains('gh') ? 'gh' : 'row'; }),
+    headFirst: headFirst, headCont: headCont,
+    writesH: w ? hgt(w) + 14 : 0,
+  };
+}
+/* Where the pages break: fill each page; the questions go with the last
+   rows; a heading never sits alone at the bottom of a page. */
+function split(m) {
+  var n = m.h.length, out = [], i = 0, head = m.headFirst;
+  if (!n) return [[0, 0]];
+  while (i < n) {
+    var s = i, y = head;
+    while (i < n && y + m.h[i] <= LIMIT) { y += m.h[i]; i++; }
+    if (i === s) { y += m.h[i]; i++; }
+    // The questions don't fit under the last row: that row goes over with them.
+    if (i === n && i - s > 1 && y + m.writesH > LIMIT) i--;
+    while (i < n && i - s > 1 && m.type[i - 1] === 'gh') i--;
+    out.push([s, i]);
+    head = m.headCont;
+  }
+  return out;
+}
+function layout(root, student, edit, scale) {
+  var rows = rowsOf(edit), pieces = [[0, rows.length]];
+  for (var t = 0; t < 4; t++) {
+    root.innerHTML = pieces.map(function (p) { return pageHtml(student, edit, rows, p[0], p[1], rows.length); }).join('');
+    var next = split(measure(root, scale));
+    if (JSON.stringify(next) === JSON.stringify(pieces)) break;
+    pieces = next;
+  }
+  return pieces;
+}
+var shown = null;
+function drawThumb(flashKey) {
+  var n = layout(thumb, 'Aarav Singh', false, THUMB).length;
+  thumb.parentNode.style.height = Math.ceil((n * PAGE_H + (n - 1) * 40) * THUMB) + 'px';
+  if (flashKey) { var el = thumb.querySelector('[data-k="' + flashKey + '"]'); if (el) el.classList.add('flash'); }
+}
+function keys() {
+  var m = {};
+  main.querySelectorAll('[data-k]').forEach(function (el) { if (!/lift/.test(el.className)) m[el.dataset.k] = el.getBoundingClientRect().top; });
+  return m;
+}
+/* FLIP: everything that moved glides from where it was, about 200 ms. */
+function glide(before) {
+  main.querySelectorAll('[data-k]').forEach(function (el) {
+    if (/lift/.test(el.className)) return;
+    var b = before[el.dataset.k];
+    if (b == null) return;
+    var dy = b - el.getBoundingClientRect().top;
+    if (!dy) return;
+    el.style.transition = 'none'; el.style.transform = 'translateY(' + dy + 'px)';
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      el.style.transition = 'transform 200ms cubic-bezier(.2,.7,.3,1)'; el.style.transform = '';
+    }); });
+  });
+}
+function draw(opts) {
+  opts = opts || {};
+  var before = keys(), caret = saveCaret();
+  hideIns();
+  shown = layout(main, 'Saaleha Ali', true, 1);
+  if (drag) lift();
+  glide(before);
+  if (opts.caret !== false) restoreCaret(caret);
+  drawThumb(opts.flash);
+}
+/* While typing, the pages are drawn again only when a break moves. */
+function reflow(flashKey) {
+  var next = split(measure(main, 1));
+  if (JSON.stringify(next) !== JSON.stringify(shown)) draw({ flash: flashKey });
+  else drawThumb(flashKey);
+}
+
+/* ── The caret survives a redraw ─────────────────────────────── */
+function selOf(a) {
+  var d = a.dataset;
+  return '[data-e="' + d.e + '"]' + (d.id ? '[data-id="' + d.id + '"]' : '') + (d.e === 'gname' ? '[data-g="' + d.g + '"]' : '') + (d.i != null ? '[data-i="' + d.i + '"]' : '');
+}
+function saveCaret() {
+  var a = document.activeElement;
+  if (!a || !a.dataset || !a.dataset.e || !main.contains(a)) return null;
+  var s = getSelection();
+  return { sel: selOf(a), off: s.rangeCount ? s.getRangeAt(0).startOffset : 0 };
+}
+function restoreCaret(c) {
+  if (!c) return;
+  var el = main.querySelector(c.sel); if (!el) return;
+  el.focus();
+  var tn = el.firstChild, r = document.createRange();
+  if (tn && tn.nodeType === 3) r.setStart(tn, Math.min(c.off, tn.length)); else r.selectNodeContents(el);
+  r.collapse(true);
+  var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function focusEl(sel, selectAll) {
+  var el = main.querySelector(sel); if (!el) return;
+  el.focus();
+  var r = document.createRange(); r.selectNodeContents(el); if (!selectAll) r.collapse(false);
+  var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+
+/* ── The model ───────────────────────────────────────────────── */
+function findItem(id) {
+  for (var gi = 0; gi < S.groups.length; gi++) {
+    var ii = S.groups[gi].items.findIndex(function (x) { return x.id === id; });
+    if (ii >= 0) return { g: S.groups[gi], gi: gi, ii: ii, it: S.groups[gi].items[ii] };
+  }
+}
+/* One Undo for everything: Cmd+Z and the toast's Undo step back through
+   moves, adds, removals and typing (one step a box). */
+var undoStack = [], typingKey = null, noted = false;
+function checkpoint() {
+  undoStack.push(JSON.stringify(S));
+  if (undoStack.length > 100) undoStack.shift();
+  typingKey = null;
+  if (!noted) {
+    noted = true;
+    var NOTE = 'This changes the form for all 28 students in Block D.';
+    setTimeout(function () { if (toastEl) toastEl.querySelector('span').textContent += ' ' + NOTE; else toast(NOTE); }, 0);
+  }
+}
+function undo() {
+  var snap = undoStack.pop(); if (!snap) return;
+  S = JSON.parse(snap); typingKey = null; draw({ caret: false });
+  toast('Undone.');
+}
+document.addEventListener('keydown', function (e) {
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+});
+function findGroup(id) { var gi = S.groups.findIndex(function (g) { return g.id === id; }); return { g: S.groups[gi], gi: gi }; }
+function addItem(gid, at) {
+  checkpoint();
+  var g = findGroup(gid).g, it = { id: nid('s'), label: '', prompt: '' };
+  g.items.splice(at == null ? g.items.length : at, 0, it);
+  draw({ caret: false }); focusEl('[data-e="label"][data-id="' + it.id + '"]');
+}
+/* A new heading after a statement takes the statements below it. */
+function addGroupAfter(gid, at) {
+  checkpoint();
+  var f = findGroup(gid), g = { id: nid('g'), name: 'New Heading', items: f.g.items.splice(at) };
+  S.groups.splice(f.gi + 1, 0, g);
+  draw({ caret: false }); focusEl('[data-e="gname"][data-g="' + g.id + '"]', true);
+}
+function addQuestion(at) {
+  checkpoint();
+  var q = { id: nid('q'), text: '' };
+  S.open.splice(at == null ? S.open.length : at, 0, q);
+  draw({ caret: false }); focusEl('[data-e="q"][data-id="' + q.id + '"]');
+}
+function moveItem(id, dir) {
+  checkpoint();
+  var f = findItem(id), j = f.ii + dir;
+  if (j >= 0 && j < f.g.items.length) { f.g.items.splice(f.ii, 1); f.g.items.splice(j, 0, f.it); }
+  else {
+    // Past the top or bottom of its heading, it joins the heading next to it.
+    var ng = S.groups[f.gi + dir]; if (!ng) return;
+    f.g.items.splice(f.ii, 1);
+    if (dir < 0) ng.items.push(f.it); else ng.items.unshift(f.it);
+  }
+  draw({ flash: id });
+}
+function moveGroup(id, dir) {
+  checkpoint();
+  var f = findGroup(id), j = f.gi + dir;
+  if (j < 0 || j >= S.groups.length) return;
+  S.groups.splice(f.gi, 1); S.groups.splice(j, 0, f.g); draw();
+}
+
+/* ── Typing ──────────────────────────────────────────────────── */
+main.addEventListener('beforeinput', function (e) {
+  var t = e.target; if (!t.dataset || !t.dataset.e) return;
+  var key = selOf(t);
+  if (typingKey !== key) { checkpoint(); typingKey = key; }
+});
+main.addEventListener('input', function (e) {
+  var t = e.target, v = t.textContent, k = t.dataset.e, key;
+  if (k === 'title') S.title = v;
+  else if (k === 'intro') S.intro = v;
+  else if (k === 'scale') S.scale[+t.dataset.i] = v;
+  else if (k === 'gname') { findGroup(t.dataset.g).g.name = v; key = t.dataset.g; }
+  else if (k === 'label' || k === 'prompt') { var f = findItem(t.dataset.id); f.it[k] = v; key = f.it.id; }
+  else if (k === 'q') { S.open.find(function (q) { return q.id === t.dataset.id; }).text = v; key = t.dataset.id; }
+  reflow(key);
+});
+var chip = null;
+main.addEventListener('focusin', function (e) {
+  if (e.target.dataset && e.target.dataset.e === 'intro' && !editingIntro) {
+    editingIntro = true; e.target.textContent = S.intro; focusEl('[data-e="intro"]');
+    chip = document.createElement('div'); chip.className = 'namechip';
+    chip.textContent = '{name} prints each student’s first name, {teacher} your name.';
+    var r = e.target.getBoundingClientRect(); chip.style.left = r.left + scrollX + 'px'; chip.style.top = r.top + scrollY - 30 + 'px';
+    document.body.appendChild(chip);
+  }
+});
+main.addEventListener('focusout', function (e) {
+  if (e.target.dataset && e.target.dataset.e === 'intro' && e.target.isConnected) {
+    editingIntro = false; e.target.textContent = S.intro.split('{name}').join('Saaleha');
+    if (chip) { chip.remove(); chip = null; }
+  }
+});
+main.addEventListener('keydown', function (e) {
+  var t = e.target, k = t.dataset && t.dataset.e;
+  if (e.key === 'Escape' && k) { t.blur(); return; }
+  var arrow = e.key === 'ArrowUp' || e.key === 'ArrowDown', dir = e.key === 'ArrowUp' ? -1 : 1;
+  if (arrow && e.altKey && (k === 'label' || k === 'prompt')) { e.preventDefault(); moveItem(t.dataset.id, dir); return; }
+  if (arrow && e.altKey && k === 'gname') { e.preventDefault(); moveGroup(t.dataset.g, dir); return; }
+  if (arrow && t.dataset && t.dataset.drag) {
+    e.preventDefault();
+    if (t.dataset.drag === 'g') { moveGroup(t.dataset.g, dir); main.querySelector('[data-drag="g"][data-g="' + t.dataset.g + '"]').focus(); }
+    else { moveItem(t.dataset.id, dir); main.querySelector('[data-drag="s"][data-id="' + t.dataset.id + '"]').focus(); }
+    return;
+  }
+  if (e.key !== 'Enter' || e.shiftKey || !k) return;
+  e.preventDefault();
+  // Enter: from a statement to the line under it, then to a new statement.
+  if (k === 'label') focusEl('[data-e="prompt"][data-id="' + t.dataset.id + '"]');
+  else if (k === 'prompt') { var f = findItem(t.dataset.id); addItem(f.g.id, f.ii + 1); }
+  else if (k === 'gname') { var g = findGroup(t.dataset.g).g; if (g.items[0]) focusEl('[data-e="label"][data-id="' + g.items[0].id + '"]'); else addItem(g.id); }
+  else if (k === 'q') { addQuestion(S.open.findIndex(function (q) { return q.id === t.dataset.id; }) + 1); }
+  else t.blur();
+});
+/* Pasting several lines makes one statement a line. "Name – line under it"
+   or a tab splits a line into the two. */
+main.addEventListener('paste', function (e) {
+  var t = e.target; if (!t.dataset || t.dataset.e !== 'label') return;
+  var lines = (e.clipboardData.getData('text') || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+  if (lines.length < 2) return;
+  e.preventDefault();
+  var f = findItem(t.dataset.id);
+  checkpoint();
+  var fresh = lines.map(function (l) { var p = l.split(/\t|\s+[–—-]\s+/); return { id: nid('s'), label: p[0], prompt: (p[1] || '').trim() }; });
+  f.g.items.splice.apply(f.g.items, [f.it.label.trim() ? f.ii + 1 : f.ii, f.it.label.trim() ? 0 : 1].concat(fresh));
+  draw({ caret: false }); toast('Added ' + fresh.length + ' statements.');
+});
+
+/* ── Adding between rows ─────────────────────────────────────── */
+var insAt = null;
+function hideIns() { if (insAt) part(false); ins.hidden = true; insAt = null; }
+function spots() {
+  var out = [], trs = main.querySelectorAll('tbody tr'), lastTr = trs[trs.length - 1];
+  trs.forEach(function (tr) {
+    var b = tr.getBoundingClientRect().bottom, tbl = tr.closest('table').getBoundingClientRect();
+    var page = tr.closest('.page');
+    if (tr.classList.contains('gh')) out.push({ page: page, y: b, tbl: tbl, acts: [['s', 'Add a Statement']], g: tr.closest('tbody').dataset.g, at: 0 });
+    else if (tr.classList.contains('it')) {
+      var f = findItem(tr.dataset.k), acts = [['s', 'Add a Statement'], ['h', 'Add a Heading']];
+      if (tr === lastTr && !S.open.length) acts.push(['q', 'Add a Question']);
+      out.push({ page: page, y: b, tbl: tbl, acts: acts, g: f.g.id, at: f.ii + 1 });
+    }
+  });
+  main.querySelectorAll('.q').forEach(function (q, i) {
+    out.push({ page: q.closest('.page'), y: q.getBoundingClientRect().bottom, tbl: q.closest('.part').getBoundingClientRect(), acts: [['q', 'Add a Question']], at: i + 1 });
+  });
+  return out;
+}
+document.addEventListener('mousemove', function (e) {
+  if (drag || menu) return;
+  if (e.target.closest && e.target.closest('#ins')) return;
+  var best = null;
+  spots().forEach(function (s) {
+    var d = Math.abs(e.clientY - s.y);
+    if (d <= 8 && e.clientX >= s.tbl.left - 56 && e.clientX <= s.tbl.right && (!best || d < best.d)) { best = s; best.d = d; }
+  });
+  if (!best) { if (insAt && !ins.classList.contains('open')) hideIns(); return; }
+  if (insAt && insAt.y === best.y) return;
+  if (insAt) part(false);
+  insAt = best;
+  ins.style.left = best.tbl.left - 52 + scrollX + 'px';
+  ins.style.top = best.y + scrollY + 'px';
+  ins.style.width = best.tbl.width + 52 + 'px';
+  ins.querySelector('.ins-acts').innerHTML = best.acts.map(function (a) { return '<button type="button" role="menuitem" data-ins="' + a[0] + '">' + a[1] + '</button>'; }).join('');
+  ins.hidden = false;
+});
+/* Pointing at the + parts the rows below it, so the choices sit in the gap
+   and cover nothing. */
+var GAP = 32;
+function part(open) {
+  if (!insAt) return;
+  var page = insAt.page;
+  page.querySelectorAll('tbody tr, .q').forEach(function (el) {
+    if (!open) { if (el.dataset.parted) { el.style.transform = ''; delete el.dataset.parted; } return; }
+    if (el.getBoundingClientRect().top >= insAt.y - 1) {
+      el.style.transition = 'transform 160ms cubic-bezier(.2,.7,.3,1)';
+      el.style.transform = 'translateY(' + GAP + 'px)';
+      el.dataset.parted = '1';
+    }
+  });
+  ins.style.top = insAt.y + (open ? GAP / 2 : 0) + scrollY + 'px';
+  ins.classList.toggle('open', open);
+}
+ins.addEventListener('mouseleave', function () { part(false); });
+ins.querySelector('.ins-plus').addEventListener('mouseenter', function () { part(true); });
+ins.addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b || !insAt) return;
+  var a = b.dataset.ins || insAt.acts[0][0], at = insAt;
+  hideIns();
+  if (a === 's') addItem(at.g, at.at);
+  else if (a === 'h') addGroupAfter(at.g, at.at);
+  else addQuestion(at.g ? S.open.length : at.at);
+});
+
+/* ── Menus ───────────────────────────────────────────────────── */
+var menu = null;
+function closeMenu() { if (menu) { menu.btn.setAttribute('aria-expanded', 'false'); menu.el.remove(); menu = null; } }
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b || !b.closest('.menu')) { var same = b && b.dataset.more && menu && menu.btn === b; closeMenu(); if (same) return; }
+  var empty = e.target.closest('tr.empty');
+  if (empty) { addItem(empty.dataset.addto); return; }
+  if (!b) return;
+  if (b.dataset.more) showMenu(b);
+  else if (b.dataset.act) { var a = b.dataset.act, arg = b.dataset.arg; closeMenu(); act(a, arg); }
+});
+function showMenu(b) {
+  var h = '';
+  if (b.dataset.more === 's') {
+    var f = findItem(b.dataset.id);
+    h += '<button data-act="addbelow" data-arg="' + f.it.id + '">Add a Statement Below</button>' +
+      (f.ii > 0 ? '<button data-act="split" data-arg="' + f.it.id + '">Start a New Heading Here</button>' : '') +
+      '<hr><button data-act="up" data-arg="' + f.it.id + '">Move Up</button><button data-act="down" data-arg="' + f.it.id + '">Move Down</button>';
+    var others = S.groups.filter(function (g) { return g !== f.g; });
+    if (others.length) h += '<div class="sub">Move To</div>' + others.map(function (g) { return '<button data-act="to" data-arg="' + f.it.id + '|' + g.id + '">' + esc(g.name || 'No Heading') + '</button>'; }).join('');
+    h += '<hr><button class="danger" data-act="del" data-arg="' + f.it.id + '">Remove Statement</button>';
+  } else if (b.dataset.more === 'g') {
+    var gf = findGroup(b.dataset.g);
+    h += '<button data-act="gup" data-arg="' + gf.g.id + '">Move Heading Up</button><button data-act="gdown" data-arg="' + gf.g.id + '">Move Heading Down</button><hr>' +
+      '<button class="danger" data-act="gdel" data-arg="' + gf.g.id + '">' + (gf.g.items.length && S.groups.length > 1 ? 'Remove Heading, Keep Its Statements' : 'Remove Heading') + '</button>';
+  } else {
+    h += '<button data-act="qbelow" data-arg="' + b.dataset.id + '">Add a Question Below</button><hr><button class="danger" data-act="qdel" data-arg="' + b.dataset.id + '">Remove Question</button>';
+  }
+  h += '<hr><button data-act="copy">Use This Wording in My Other Classes…</button><button data-act="reset">Reset to Original Wording</button>';
+  var m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu'); m.innerHTML = h;
+  document.body.appendChild(m);
+  var r = b.getBoundingClientRect();
+  m.style.left = r.right + scrollX - 230 + 'px'; m.style.top = r.bottom + scrollY + 4 + 'px';
+  b.setAttribute('aria-expanded', 'true'); menu = { el: m, btn: b };
+  hideIns();
+  m.querySelector('button').focus();
+}
+function act(a, arg) {
+  if (/^(to|del|gdel|qdel|reset)$/.test(a)) checkpoint();
+  var snap = true;
+  if (a === 'up' || a === 'down') moveItem(arg, a === 'up' ? -1 : 1);
+  else if (a === 'gup' || a === 'gdown') moveGroup(arg, a === 'gup' ? -1 : 1);
+  else if (a === 'addbelow') { var fa = findItem(arg); addItem(fa.g.id, fa.ii + 1); }
+  else if (a === 'split') { var fs = findItem(arg); addGroupAfter(fs.g.id, fs.ii); }
+  else if (a === 'copy') copyDialog();
+  else if (a === 'qbelow') addQuestion(S.open.findIndex(function (q) { return q.id === arg; }) + 1);
+  else if (a === 'to') {
+    var p = arg.split('|'), f = findItem(p[0]), g = findGroup(p[1]).g;
+    f.g.items.splice(f.ii, 1); g.items.push(f.it); draw({ flash: f.it.id });
+  } else if (a === 'del') {
+    var d = findItem(arg); d.g.items.splice(d.ii, 1); draw();
+    toast('Removed ' + (d.it.label || 'a statement') + '.', snap);
+  } else if (a === 'gdel') {
+    var gf = findGroup(arg), prev = S.groups[gf.gi - 1], next = S.groups[gf.gi + 1];
+    if (prev) prev.items = prev.items.concat(gf.g.items); else if (next) next.items = gf.g.items.concat(next.items);
+    S.groups.splice(gf.gi, 1);
+    if (!S.groups.length) S.groups.push({ id: nid('g'), name: '', items: gf.g.items });
+    draw(); toast('Removed the heading ' + (gf.g.name || '') + '.', snap);
+  } else if (a === 'qdel') {
+    S.open = S.open.filter(function (q) { return q.id !== arg; }); draw(); toast('Removed a question.', snap);
+  } else if (a === 'reset') {
+    S = JSON.parse(original); draw(); toast('Put back the original wording.', snap);
+  }
+}
+/* Copy this part's wording to other classes. A class that has its own
+   wording says so before it is replaced. */
+var CLASSES = [
+  { name: 'Philosophy 12 · Block A', own: false },
+  { name: 'Philosophy 12 · Block C', own: true },
+  { name: 'Socials 10 · Block B', own: false },
+];
+function copyDialog() {
+  var sc = document.createElement('div'); sc.className = 'scrim';
+  sc.innerHTML = '<div class="cdlg" role="dialog" aria-labelledby="cdt"><h2 id="cdt">Use This Wording in My Other Classes</h2>' +
+    '<p>Reflection: My Learning, as it is in Block D now: headings, statements, scale and questions.</p>' +
+    CLASSES.map(function (c, i) { return '<label><input type="checkbox" data-c="' + i + '"><span>' + esc(c.name) + (c.own ? '<small>Has its own wording. This replaces it.</small>' : '') + '</span></label>'; }).join('') +
+    '<div class="row"><button type="button" class="cancel">Cancel</button><button type="button" class="go" disabled>Use in 0 Classes</button></div></div>';
+  document.body.appendChild(sc);
+  var go = sc.querySelector('.go');
+  sc.addEventListener('change', function () {
+    var n = sc.querySelectorAll('input:checked').length;
+    go.disabled = !n; go.textContent = 'Use in ' + n + (n === 1 ? ' Class' : ' Classes');
+  });
+  sc.querySelector('.cancel').onclick = function () { sc.remove(); };
+  go.onclick = function () { var n = sc.querySelectorAll('input:checked').length; sc.remove(); toast('Used this wording in ' + n + (n === 1 ? ' class.' : ' classes.'), true); };
+  sc.querySelector('input').focus();
+}
+
+/* The way in for a first-timer: Edit Questions scrolls to the part, puts
+   the cursor in the first statement and says how it works, once. */
+var tipShown = false;
+function showTip() {
+  if (tipShown) return; tipShown = true;
+  var part = main.querySelector('.tbl').getBoundingClientRect();
+  var t = document.createElement('div'); t.className = 'tip'; t.setAttribute('role', 'status');
+  t.innerHTML = 'Click any words to change them. Drag ⠿ to move a row. Point between two rows to add one.<button type="button">Got It</button>';
+  document.body.appendChild(t);
+  t.style.left = part.left + scrollX + 'px'; t.style.top = part.top + scrollY - t.offsetHeight - 10 + 'px';
+  t.querySelector('button').onclick = function () { t.remove(); };
+}
+document.getElementById('editQ').addEventListener('click', function () {
+  main.querySelector('.part').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  var first = S.groups[0] && S.groups[0].items[0];
+  if (first) focusEl('[data-e="label"][data-id="' + first.id + '"]');
+  showTip();
+});
+main.addEventListener('focusin', function (e) { if (e.target.closest('.tbl')) showTip(); });
+
+var toastEl = null;
+function toast(msg, snap) {
+  if (toastEl) toastEl.remove();
+  toastEl = document.createElement('div'); toastEl.className = 'toast'; toastEl.setAttribute('role', 'status');
+  toastEl.innerHTML = '<span>' + esc(msg) + '</span>' + (snap ? '<button type="button">Undo</button>' : '');
+  if (snap) toastEl.querySelector('button').onclick = function () { toastEl.remove(); toastEl = null; undo(); };
+  document.body.appendChild(toastEl);
+  var mine = toastEl; setTimeout(function () { if (toastEl === mine) { mine.remove(); toastEl = null; } }, 6000);
+}
+
+/* ── Dragging ────────────────────────────────────────────────────
+   The row lifts and follows the pointer; the rows it passes glide out of
+   its way, across headings and across a page break. */
+var drag = null;
+main.addEventListener('pointerdown', function (e) {
+  var g = e.target.closest('[data-drag]'); if (!g || e.button !== 0) return;
+  e.preventDefault(); closeMenu(); hideIns();
+  var isG = g.dataset.drag === 'g';
+  var els = isG ? Array.from(main.querySelectorAll('tbody[data-g="' + g.dataset.g + '"] tr')) : [g.closest('tr')];
+  var r0 = els[0].getBoundingClientRect(), r1 = els[els.length - 1].getBoundingClientRect();
+  drag = { isG: isG, id: isG ? g.dataset.g : g.dataset.id, grab: e.clientY - r0.top, h: r1.bottom - r0.top, y: e.clientY };
+  drag.before = JSON.stringify(S);
+  lift();
+  document.body.classList.add('dragging');
+});
+function dragEls() { return drag.isG ? Array.from(main.querySelectorAll('tbody[data-g="' + drag.id + '"] tr')) : [main.querySelector('tr[data-k="' + drag.id + '"]')]; }
+function lift() {
+  var els = dragEls();
+  els.forEach(function (r) { r.classList.add(drag.isG ? 'glift' : 'lift'); r.style.transition = 'none'; r.style.transform = ''; });
+  drag.top = els[0].getBoundingClientRect().top;
+  follow();
+}
+function follow() {
+  var dy = drag.y - drag.grab - drag.top;
+  dragEls().forEach(function (r) { r.style.transform = 'translateY(' + dy + 'px)'; });
+}
+window.addEventListener('pointermove', function (e) {
+  if (!drag) return;
+  drag.y = e.clientY; follow();
+  var center = e.clientY - drag.grab + Math.min(drag.h, 60) / 2;
+  if (drag.isG) {
+    var f = findGroup(drag.id), to = 0;
+    S.groups.forEach(function (g) {
+      if (g === f.g) return;
+      var trs = main.querySelectorAll('tbody[data-g="' + g.id + '"] tr');
+      var mid = (trs[0].getBoundingClientRect().top + trs[trs.length - 1].getBoundingClientRect().bottom) / 2;
+      if (mid < center) to++;
+    });
+    if (to !== f.gi) { S.groups.splice(f.gi, 1); S.groups.splice(to, 0, f.g); draw(); }
+    return;
+  }
+  var fi = findItem(drag.id), last = null;
+  main.querySelectorAll('tbody tr').forEach(function (tr) {
+    if (tr.dataset.k === drag.id) return;
+    var r = tr.getBoundingClientRect(); if (r.top + r.height / 2 < center) last = tr;
+  });
+  var tg, ti;
+  if (!last) { tg = S.groups[0]; ti = 0; }
+  else if (!last.classList.contains('it')) { tg = findGroup(last.closest('tbody').dataset.g).g; ti = 0; }
+  else { var lf = findItem(last.dataset.k); tg = lf.g; ti = lf.ii + 1; if (lf.g === fi.g && lf.ii > fi.ii) ti -= 1; }
+  if (tg === fi.g && ti === fi.ii) return;
+  fi.g.items.splice(fi.ii, 1); tg.items.splice(ti, 0, fi.it); draw();
+});
+window.addEventListener('pointerup', function () {
+  if (!drag) return;
+  var els = dragEls(), d = drag; drag = null;
+  if (JSON.stringify(S) !== d.before) { undoStack.push(d.before); typingKey = null; }
+  document.body.classList.remove('dragging');
+  els.forEach(function (r) { r.style.transition = 'transform 200ms cubic-bezier(.2,.7,.3,1)'; r.style.transform = ''; });
+  setTimeout(function () { els.forEach(function (r) { r.classList.remove('lift', 'glift'); }); drawThumb(d.isG ? null : d.id); }, 200);
+});
+
+document.getElementById('wide').addEventListener('change', function (e) { document.body.classList.toggle('wide', e.target.checked); draw(); });
+draw();
+</script>
+</body>
+</html>

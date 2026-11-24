@@ -146,6 +146,11 @@ declare var ReportOne: {
   order(model: unknown, sid?: string): string[];
   offParts(model: unknown, cid: string, sid?: string): string[];
   label(key: string, cid: string): string;
+  // The reflections' wording, edited on the page (report-one-words.js, report-one-copy.js).
+  wordingOf(model: unknown, key: string): any;
+  setWording(model: unknown, key: string, wording: unknown): any;
+  normalize(model: unknown): any;
+  forConfig(reportConfig: unknown): any;
 };
 // The observation card (shared/obs-card.js, not checked yet). Only the
 // members the Voice and Observations piece uses are typed.
@@ -414,3 +419,21 @@ declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: 
 interface Window {
   StudentSettings: unknown;
 }
+
+// One Report's page (report-one-words.js, report-one-copy.js, report-one-undo.js).
+interface Window {
+  ReportOneWords: any;
+  ReportOneCopy: {
+    classes(cid: string, key: string): { cid: string; name: string; own: boolean }[];
+    copy(key: string, wording: unknown, cids: string[]): void;
+    dialog(api: unknown, key: string): void;
+  };
+  ReportOneUndo: any;
+}
+declare var ReportOneCopy: Window['ReportOneCopy'];
+declare var ReportBlocks: { wordingOf(key: string): any };
+declare var COURSES: Record<string, any>;
+declare function getReportConfig(cid: string): any;
+declare function saveReportConfig(cid: string, config: unknown): void;
+declare function printClassName(course: unknown): string;
+declare function isCourseArchived(cid: string): boolean;

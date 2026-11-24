@@ -312,4 +312,24 @@ describe('ReportSheets.pack for One Report', () => {
     expect(filled.sides[1].rows[0].cells[0].part.end).toBe(30);
     filled.sides.forEach(sd => sd.rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H)));
   });
+
+  it('a page never ends on a heading row: it goes on with the rows under it', () => {
+    // Room on the first side for the chrome and 3 rows; row 2 is a heading.
+    const keep = [false, false, true, false, false, false];
+    const t = c('reflect', 40 + 6 * 100, { rows: Array(6).fill(100), chrome: 40, keep });
+    const filled = P([[c('header', 600)], [t]]);
+    const first = filled.sides[0].rows[1].cells[0].part;
+    expect(first.end).toBe(2);
+    expect(keep[first.end - 1]).toBe(false);
+  });
+
+  it('a heading that is the only row with room left goes on to the next side', () => {
+    const keep = [true, false, false];
+    const t = c('reflect', 40 + 3 * 200, { rows: [100, 200, 200], chrome: 40 });
+    const filled = P([[c('header', 840)], [{ ...t, keep }]]);
+    const parts = [];
+    filled.sides.forEach(sd => sd.rows.forEach(r => r.cells.forEach(x => x.part && parts.push(x.part))));
+    expect(parts[0].start).toBe(0);
+    expect(parts[0].end).toBeGreaterThan(1);
+  });
 });

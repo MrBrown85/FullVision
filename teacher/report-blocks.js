@@ -1542,28 +1542,28 @@ window.ReportBlocks = (function () {
     const w = _wording('parent-response', options);
     let html = `<div class="report-block-box report-parent-response">`;
     html += `<div class="report-block-title">${_say(w.title)}</div>`;
-    html += `<div class="report-parent-intro" style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">${_intro(w.intro, student)}</div>`;
+    html += `<div class="report-parent-intro" data-wt="intro" data-wraw="${esc(w.intro == null ? '' : String(w.intro))}" style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">${_intro(w.intro, student)}</div>`;
     // The labelled lines, two to a row: Signature + Date, Phone + Email
-    const field = f =>
-      `<div class="report-parent-line"${f === 'Date' ? ' style="max-width:180px"' : ''}><span class="report-parent-label">${_say(f)}</span><span class="report-parent-field"></span></div>`;
+    const field = (f, i) =>
+      `<div class="report-parent-line" data-wrow="fields.${i}"${f === 'Date' ? ' style="max-width:180px"' : ''}><span class="report-parent-label" data-wt="fields.${i}">${_say(f)}</span><span class="report-parent-field"></span></div>`;
     for (let i = 0; i < w.fields.length; i += 2) {
       html += `<div class="report-parent-lines">
     ${w.fields
       .slice(i, i + 2)
-      .map(field)
+      .map((f, j) => field(f, i + j))
       .join('\n    ')}
   </div>`;
     }
     // Checkboxes
     if (w.checks.length) {
       html += `<div class="report-parent-checks">
-    ${w.checks.map(c => `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${_say(c)}</div>`).join('\n    ')}
+    ${w.checks.map((c, i) => `<div class="report-parent-check" data-wrow="checks.${i}"><span class="report-parent-checkbox"></span> <span data-wt="checks.${i}">${_say(c)}</span></div>`).join('\n    ')}
   </div>`;
     }
     // Comments
-    w.open.forEach(label => {
-      html += `<div class="report-parent-comments" style="margin-top:14px">
-    <div class="report-parent-label" style="margin-bottom:6px">${_say(label)}</div>
+    w.open.forEach((label, i) => {
+      html += `<div class="report-parent-comments" data-wrow="open.${i}" style="margin-top:14px">
+    <div class="report-parent-label" data-wt="open.${i}" style="margin-bottom:6px">${_say(label)}</div>
     <div class="report-parent-comments-box" style="border:1.5px solid var(--border);border-radius:8px;min-height:${lines * 22 + 16}px;padding:8px"></div>
   </div>`;
     });
@@ -1587,36 +1587,52 @@ window.ReportBlocks = (function () {
     const lines = _writeLines(options);
     return `<div class="report-reflect-write">${list
       .map(
-        o =>
-          `<div class="report-reflect-q"><div class="report-reflect-q-label">${_say(o)}</div><div class="report-write-lines" style="height:${lines * 26}px"></div></div>`,
+        (o, i) =>
+          `<div class="report-reflect-q" data-wrow="open.${i}"><div class="report-reflect-q-label" data-wt="open.${i}">${_say(o)}</div><div class="report-write-lines" style="height:${lines * 26}px"></div></div>`,
       )
       .join('')}</div>`;
   }
   function _scaleHead(scale, first) {
-    return `<thead><tr><th>${first}</th>${scale.map(s => `<th class="report-habit-o">${_say(s)}</th>`).join('')}</tr></thead>`;
+    return `<thead><tr><th>${first}</th>${scale.map((s, i) => `<th class="report-habit-o" data-wt="scale.${i}">${_say(s)}</th>`).join('')}</tr></thead>`;
   }
   function _bubbleCells(scale) {
     return scale.map(() => '<td class="report-habit-o"><span class="report-bubble"></span></td>').join('');
+  }
+
+  /* The instructions, with the words as typed kept beside them (data-wraw)
+     so One Report's page can edit {name} rather than the name. */
+  function _introHtml(text, student) {
+    return `<div class="report-habit-intro" data-wt="intro" data-wraw="${esc(text == null ? '' : String(text))}">${_intro(text, student)}</div>`;
+  }
+  /* The rated rows, a heading row where the heading changes. Each row says
+     which wording it prints (data-wrow, data-wt, data-whead) for One
+     Report's page to edit; the attributes print as nothing. A heading kept
+     with no statement under it yet (a blank statement) prints alone. */
+  function _ratedRows(items, scale) {
+    let rows = '';
+    let group = null;
+    items.forEach((it, i) => {
+      const item = typeof it === 'string' ? { label: it } : it || {};
+      const g = item.group == null ? '' : String(item.group);
+      if (g !== group && g)
+        rows += `<tr class="report-ct-group" data-whead="${i}"><td colspan="${scale.length + 1}" data-wt="head.${i}">${_say(g)}</td></tr>`;
+      group = g;
+      const label = item.label == null ? '' : String(item.label);
+      if (!label.trim()) return;
+      const prompt = item.prompt == null ? '' : String(item.prompt);
+      rows += `<tr data-wrow="items.${i}"><td class="report-habit-k"><span class="report-habit-name" data-wt="items.${i}.label">${_say(label)}</span>${prompt ? `<span class="report-habit-desc" data-wt="items.${i}.prompt">${_say(prompt)}</span>` : ''}</td>${_bubbleCells(scale)}</tr>`;
+    });
+    return rows;
   }
 
   /* ── Student Self-Reflection: My Learning ── */
   function renderBlockStudentReflectionLearning(cid, student, options) {
     const w = _wording('student-reflection-learning', options);
     const scale = w.scale;
-    let rows = '';
-    let group = null;
-    w.items.forEach(it => {
-      const item = typeof it === 'string' ? { label: it } : it || {};
-      const g = item.group == null ? '' : String(item.group);
-      if (g !== group && g)
-        rows += `<tr class="report-ct-group"><td colspan="${scale.length + 1}">${_say(g)}</td></tr>`;
-      group = g;
-      const prompt = item.prompt == null ? '' : String(item.prompt);
-      rows += `<tr><td class="report-habit-k"><span class="report-habit-name">${_say(item.label)}</span>${prompt ? `<span class="report-habit-desc">${_say(prompt)}</span>` : ''}</td>${_bubbleCells(scale)}</tr>`;
-    });
+    const rows = _ratedRows(w.items, scale);
     return `<div class="report-block-box report-reflect">
     <div class="report-block-title">${_say(w.title)}</div>
-    <div class="report-habit-intro">${_intro(w.intro, student)}</div>
+    ${_introHtml(w.intro, student)}
     <table class="report-ct report-reflect-tbl">${_scaleHead(scale, '')}<tbody>${rows}</tbody></table>
     ${_openHtml(w.open, options)}
   </div>`;
@@ -1626,20 +1642,18 @@ window.ReportBlocks = (function () {
   function renderBlockStudentReflectionHabits(cid, student, options) {
     const w = _wording('student-reflection-habits', options);
     const scale = w.scale;
-    const rows = w.items
-      .map(
-        h =>
-          `<tr><td class="report-habit-k"><span class="report-habit-name">${_say(typeof h === 'string' ? h : h && h.label)}</span></td>${_bubbleCells(scale)}</tr>`,
-      )
-      .join('');
+    const rows = _ratedRows(w.items, scale);
     const checks = w.checks.length
-      ? `<div class="report-reflect-checks"><div class="report-reflect-q-label">${_say(w.checkHead)}</div><div class="report-habits-checks">${w.checks
-          .map(c => `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${_say(c)}</div>`)
+      ? `<div class="report-reflect-checks"><div class="report-reflect-q-label" data-wt="checkHead">${_say(w.checkHead)}</div><div class="report-habits-checks">${w.checks
+          .map(
+            (c, i) =>
+              `<div class="report-parent-check" data-wrow="checks.${i}"><span class="report-parent-checkbox"></span> <span data-wt="checks.${i}">${_say(c)}</span></div>`,
+          )
           .join('')}</div></div>`
       : '';
     return `<div class="report-block-box report-reflect">
     <div class="report-block-title">${_say(w.title)}</div>
-    <div class="report-habit-intro">${_intro(w.intro, student)}</div>
+    ${_introHtml(w.intro, student)}
     <table class="report-ct report-reflect-tbl">${_scaleHead(scale, '')}<tbody>${rows}</tbody></table>
     ${checks}${_openHtml(w.open, options)}
   </div>`;
