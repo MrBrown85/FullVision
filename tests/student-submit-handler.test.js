@@ -41,18 +41,6 @@ function setup(overrides) {
               ? { ok: true, parts: [] }
               : { ok: false, error: 'wrong_identity', tries_left: 4 };
           },
-          async open(code, hash) {
-            calls.push({ route: 'open', code, hash });
-            return code === 'K7M-4QX'
-              ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
-              : { ok: false, error: 'not_found' };
-          },
-          async verify(token, who, hash) {
-            calls.push({ route: 'verify', token, who, hash });
-            return who.studentNumber === '0123456' || who.password === '4821'
-              ? { ok: true, parts: [] }
-              : { ok: false, error: 'wrong_identity', tries_left: 4 };
-          },
           async check(token, birthday, hash) {
             calls.push({ route: 'check', token, birthday, hash });
             return birthday === '2012-05-15'
@@ -103,7 +91,12 @@ describe('student-submit handler', () => {
     const answers = { 'q-1': 'Being curious helps me in labs.' };
     const res = await handle(post({ route: 'submit', token: 'a'.repeat(64), answers }));
     expect(await res.json()).toEqual({ ok: true, submitted_at: '2026-11-04T10:00:00Z' });
-    expect(calls[0]).toMatchObject({ route: 'submit', token: 'a'.repeat(64), answers });
+    // The slip's token goes as its hash (2026112403).
+    expect(calls[0]).toMatchObject({
+      route: 'submit',
+      token: createHash('sha256').update('a'.repeat(64)).digest('hex'),
+      answers,
+    });
   });
 
   it('verifies a questionnaire slip by birthday, student number or password, and never logs them', async () => {

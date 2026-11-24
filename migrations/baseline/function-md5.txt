@@ -371,7 +371,7 @@ student_submit.bulletin_react(p_session_token text, p_enrollment_id uuid, p_bull
 student_submit.bulletin_seen(p_session_token text, p_enrollment_id uuid, p_bulletin_ids uuid[], p_ip_hash text) 96185b2e8173c90ccd40f2a054ad5cc7 1374
 student_submit.bulletins(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 4753e0fa8727403e1311be6c224fd025 4619
 student_submit.card(p_code_hmac text, p_key_id text, p_ip_hash text) 253b34cd5da404aca98806f6d334f277 1763
-student_submit.check(p_token text, p_birthday text, p_ip_hash text) cc54e80ca585024c65926cb5e73f3f43 3192
+student_submit.check(p_token text, p_birthday text, p_ip_hash text) 99f1c611b868805f292dfadb6786ce08 3149
 student_submit.done(p_session_token text, p_ip_hash text) a2687fa923a64b763dbbb1c5b3f1387c 417
 student_submit.feedback(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 73b78adc4b6661bc99ca0eaebf2e81bb 7708
 student_submit.file_links(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) cb91bac98d5d9b4fb27ba72769b1f211 1598
@@ -384,7 +384,7 @@ student_submit.handout_links(p_session_token text, p_enrollment_id uuid, p_resou
 student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) 3662c2827078922670b5347ca37c685e 9633
 student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) fa4006097230b4d5102ea63e84296448 8623
 student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) 2296aefc4e38f67aad5722a2637c2fb4 2297
-student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) 1b0862066e6d8c546f3944f12248be26 11393
+student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) 795532a2a3aa53b6525fd272fe21bac2 11522
 student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 0caa34be2c4c9f26f36a6776664d1bfa 15044
 student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) 0746b4af4f1cadd75b86cc20f49931d3 4989
 student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 51453e03b4293ff17eb598ab653dc0f2 2203
@@ -404,8 +404,8 @@ student_submit.send_finish(p_session_token text, p_enrollment_id uuid, p_submiss
 student_submit.send_paths(p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_ip_hash text) 25ced0f7757967dc79ab1a9ce465009d 1865
 student_submit.send_start(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid, p_ip_hash text) e1ccea79acc7dedcbbe10da2a4548643 517
 student_submit.slip_roster(p_teacher_id uuid, p_kind text, p_target_id uuid) 33954320e0812e4c22e5936bb2ee76a9 1751
-student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) 90ace3c164dab19f6a77ba7dfb19e40e 7616
+student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) 0ffa8fff7d8fc10daea29a4a7f90357d 7573
 student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) 68665f35e1678f1bba64d30c082409d8 4663
-student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) b6b51a888f68aa5b54ffdf866756ee47 5475
+student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) fd8ed6ede15c8e52da80d079dd3e64d8 5432
 student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean, p_new_session_hash text) b08667fa6b3986c883e8250aa6289da2 5350
 student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) 9e237f6e19649807b64aa6dc870de3f3 4409

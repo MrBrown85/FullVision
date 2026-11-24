@@ -2227,7 +2227,7 @@ function student_submit.handout_links(p_session_token text, p_enrollment_id uuid
 function student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
-function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) returns jsonb security definer
+function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) returns jsonb security definer
 function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) returns jsonb security definer
 function student_submit.quiz_list(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer

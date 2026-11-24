@@ -1,7 +1,7 @@
 /**
- * The student-submit function hashes a device's session token before any
- * statement (migrations/2026112401_session_token_hashed_in_function.sql):
- * the database is given SHA-256 of the token, never the token.
+ * The student-submit function hashes a device's session token and a slip's
+ * token before any statement (migrations 2026112401 and 2026112403): the
+ * database is given SHA-256 of the token, never the token.
  *
  * The route tests were written with tokens in their stand-in databases.
  * `tokensAtTheDatabase(makeHandler)` makes handlers whose stand-in database
@@ -35,8 +35,10 @@ export function tokensAtTheDatabase(makeHandler) {
     return async req => {
       try {
         const body = JSON.parse(await req.clone().text());
-        const s = body && body.session;
-        if (typeof s === 'string' && s.length > 0 && s.length <= 128) sent.set(sha256(s), s);
+        // A card's session token and a slip's token (2026112403) alike.
+        for (const s of [body && body.session, body && body.token]) {
+          if (typeof s === 'string' && s.length > 0 && s.length <= 128) sent.set(sha256(s), s);
+        }
       } catch {
         // Not JSON: the handler refuses it.
       }

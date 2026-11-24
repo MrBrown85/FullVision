@@ -3,12 +3,13 @@
  * plan S3-S1). The database is handed tags; the plain code goes only on open's second call, when the
  * database asks for it (a slip printed before 2026111160, not yet converted), and the typed password
  * only on verify's second call, or from a page that sends no code. `fallback` never reaches the phone.
- * Before the migration (SQLSTATE 42883) both go the old way.
+ * A slip's token reaches the database only as its hash (2026112403): open is given the hash of a token the
+ * function made, and the phone that token.
  */
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
-import { tokensAtTheDatabase } from './helpers/session-hash.js';
+import { sha256, tokensAtTheDatabase } from './helpers/session-hash.js';
 import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 import { FAKE_KEY, keyId, slipCodeTag, slipPasswordTag } from './helpers/card-key-fake.js';
 
@@ -25,10 +26,9 @@ function setup(answer, extra = {}) {
     region: 'ca-central-1',
     ipKey: 'k',
     cardKey: 'cardKey' in extra ? extra.cardKey : KEY,
+    sessionToken: () => TOKEN,
     log: e => logs.push(e),
     db: {
-      open: async (code, hash) => (calls.push(['old open', code]), { ok: true, token: TOKEN }),
-      verify: async (token, who) => (calls.push(['old verify', who]), { ok: true, parts: [] }),
       async call(sql, params) {
         calls.push([sql === SLIP_SQL.open ? 'open' : 'verify', params]);
         return answer(sql, params, calls.length);
@@ -50,15 +50,23 @@ function setup(answer, extra = {}) {
 
 describe('a slip’s open', () => {
   it('a slip found by its tag: one call, the plain code never sent', async () => {
-    const h = setup(() => ({ ok: true, token: TOKEN }));
+    const h = setup(() => ({ ok: true, new_token: true }));
     expect((await h.send({ route: 'open', code: 'k7m-4qx' })).body).toEqual({ ok: true, token: TOKEN });
     expect(h.calls).toHaveLength(1);
     expect(h.calls[0][1].slice(0, 3)).toEqual([slipCodeTag('K7M4QX'), keyId(), null]);
+    // The new token's hash, last; the token itself never.
+    expect(h.calls[0][1][4]).toBe(sha256(TOKEN));
+    expect(JSON.stringify(h.calls)).not.toContain(TOKEN);
+  });
+
+  it('a token the database names is never passed on; no new_token, no token', async () => {
+    const h = setup(() => ({ ok: true, token: 'e'.repeat(64) }));
+    expect((await h.send({ route: 'open', code: 'K7M4QX' })).body).toEqual({ ok: true });
   });
 
   it('the database asks for the plain code: a second call with it, and fallback is not passed on', async () => {
     const h = setup((sql, p, n) =>
-      n === 1 ? { ok: false, error: 'not_found', fallback: true } : { ok: true, token: TOKEN },
+      n === 1 ? { ok: false, error: 'not_found', fallback: true } : { ok: true, new_token: true },
     );
     expect((await h.send({ route: 'open', code: 'K7M-4QX' })).body).toEqual({ ok: true, token: TOKEN });
     expect(h.calls.map(c => c[1][2])).toEqual([null, 'K7M4QX']);
@@ -71,14 +79,7 @@ describe('a slip’s open', () => {
   it('not a slip’s code: no tag, one call, so the database counts a bad format as before', async () => {
     const h = setup(() => ({ ok: false, error: 'not_found', fallback: true }));
     await h.send({ route: 'open', code: 'K7M4Q1' });
-    expect(h.calls).toEqual([['open', [null, keyId(), null, expect.any(String)]]]);
-  });
-
-  it('before the migration: the old open, with the code as typed', async () => {
-    const h = setup(() => Promise.reject(Object.assign(new Error('no function'), { code: '42883' })));
-    expect((await h.send({ route: 'open', code: 'k7m-4qx' })).body).toEqual({ ok: true, token: TOKEN });
-    expect(h.calls.map(c => c[0])).toEqual(['open', 'old open']);
-    expect(h.calls[1][1]).toBe('k7m-4qx');
+    expect(h.calls).toEqual([['open', [null, keyId(), null, expect.any(String), sha256(TOKEN)]]]);
   });
 
   it('no key: a server error, and nothing is asked', async () => {
@@ -122,14 +123,5 @@ describe('a slip’s verify', () => {
     const h = setup(() => ({ ok: true, parts: [] }));
     await h.send({ route: 'verify', token: TOKEN, password: '4821' });
     expect(h.calls[0][1]).toEqual([TOKEN, null, null, '4821', null, null, expect.any(String)]);
-  });
-
-  it('before the migration: the old verify', async () => {
-    const h = setup(() => Promise.reject(Object.assign(new Error('x'), { code: '42883' })));
-    expect((await h.send({ route: 'verify', token: TOKEN, code: 'K7M4QX', birthday: '2012-05-15' })).body).toEqual({
-      ok: true,
-      parts: [],
-    });
-    expect(h.calls.map(c => c[0])).toEqual(['verify', 'old verify']);
   });
 });

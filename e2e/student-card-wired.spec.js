@@ -665,9 +665,10 @@ test.describe('a slip is as it was', () => {
       { route: 'card', code: 'K7M4QX' },
       { route: 'open', code: 'K7M4QX' },
       // The slip's code goes with its verify, so the function checks it against the slip's keyed tag (S3-S1).
+      // The token is the one the function made for open (2026112403).
       {
         route: 'verify',
-        token: 'a'.repeat(64),
+        token: expect.stringMatching(/^[0-9a-f]{64}$/),
         code: 'K7M4QX',
         birthday: null,
         student_number: '0123456',

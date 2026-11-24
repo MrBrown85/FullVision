@@ -617,19 +617,24 @@ export function fakeStudentSubmit(opts = {}) {
     },
   };
 
+  /* A slip's four functions. open answers as state.slips says, but as the database does since 2026112403: it
+     names no token, only new_token, and the function hands the phone a token it made itself. */
   const slip = name => async code => {
     if (state.down) throw new Error('down');
     sql.push({ fn: name, params: [code] });
     if (name !== 'open') return clone(state.slipAnswers[name]);
-    return state.slips[norm(code)] ? clone(state.slips[norm(code)]) : no('not_found');
+    const said = state.slips[norm(code)] ? clone(state.slips[norm(code)]) : no('not_found');
+    if (typeof said.token === 'string') {
+      delete said.token;
+      said.new_token = true;
+    }
+    return said;
   };
   const options = {
     region: 'ca-central-1',
     ipKey: 'test-key',
     log: entry => logs.push(entry),
     db: {
-      open: slip('open'),
-      verify: slip('verify'),
       check: slip('check'),
       submit: slip('submit'),
       async call(text, params) {
