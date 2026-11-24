@@ -128,6 +128,12 @@ window.resetDemoData = async function () {
       console.warn('Could not clear waiting photos:', e);
     }
   }
+  // The sample quiz's answers on the student page (s/quiz.js) go with the rest.
+  try {
+    localStorage.removeItem('gb-student-quiz-demo');
+  } catch (e) {
+    /* storage blocked */
+  }
   // The sample class gets the student features back.
   try {
     localStorage.removeItem(DEMO_STUDENT_KEY);

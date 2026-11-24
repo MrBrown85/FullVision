@@ -1125,22 +1125,15 @@
 
   /* ── Remembered choices ────────────────────────────────── */
 
+  // The class's paper is kept with the teacher's preferences (getViewPref), so it follows them to another
+  // computer; one chosen before that is read from this computer until it is next changed.
   function _loadPaper(cid) {
-    try {
-      var v = localStorage.getItem(PAPER_KEY + cid);
-      return PAPER[v] ? v : 'letter';
-    } catch (e) {
-      return 'letter';
-    }
+    var v = getViewPref(PAPER_KEY + cid);
+    return PAPER[v] ? v : 'letter';
   }
 
   function _savePaper(cid, paper) {
-    try {
-      if (paper === 'letter') localStorage.removeItem(PAPER_KEY + cid);
-      else localStorage.setItem(PAPER_KEY + cid, paper);
-    } catch (e) {
-      /* a per-device preference only */
-    }
+    saveViewPref(PAPER_KEY + cid, paper === 'letter' ? null : paper);
   }
 
   function _loadOptions(cid, given) {
