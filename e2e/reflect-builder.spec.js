@@ -206,3 +206,42 @@ test('adds a card between two others: the + on the line between them, and ⋯', 
   expect(await state()).toEqual(['rating:a', 'rating:new', 'text:b', 'section:Last Part', 'text:c', 'text:d']);
   expect(errors).toEqual([]);
 });
+
+test('removes a question from ⋯ with an Undo toast; ⌘Z outside a text box steps back', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await expect(page.locator('#app-loading')).toHaveCount(0);
+  await page.goto('/dashboard?manage=questionnaires');
+  await page.getByRole('button', { name: 'New Reflection' }).click();
+  const b = page.locator('.rb-build');
+  await b.getByLabel('Title').fill('Removing');
+  const on = b.locator('.rb-q-on');
+  const prompt = on.locator('[data-rb-path="prompt"]');
+  const add = name => b.locator('.rb-add').getByRole('button', { name, exact: true }).click();
+  const order = () => page.evaluate(() => CmReflectBuilder._state().questions.map(d => d.prompt));
+  await prompt.fill('a');
+  await add('Text');
+  await prompt.fill('b');
+  await add('Text');
+  await prompt.fill('c');
+
+  await on.getByRole('button', { name: 'More options' }).click();
+  await on.getByRole('menuitem', { name: 'Remove Question' }).click();
+  await expect(page.locator('#undo-toast')).toContainText('Removed question 3, “c”');
+  expect(await order()).toEqual(['a', 'b']);
+  await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
+  expect(await order()).toEqual(['a', 'b', 'c']);
+  await expect(b.locator('.rb-q').nth(2)).toHaveClass(/rb-q-on/);
+
+  // In a text box ⌘Z is the box's own; outside one it undoes the last add.
+  await prompt.click();
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await order()).toEqual(['a', 'b', 'c']);
+  await b.locator('.cm-section-title').click();
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await order()).toEqual(['a', 'b']);
+  await expect(page.locator('#rb-said')).toHaveText('Undid: Added a question.');
+  expect(errors).toEqual([]);
+});

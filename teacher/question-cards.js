@@ -59,8 +59,8 @@ var QuestionCards = (function () {
      over the defaults. arrows: false leaves Move Up and Move Down out of the
      toolbar. more(d, i): the builder's own items for the ⋯ menu, after its
      first ones: null for a line, { sub } for a small label over the items
-     under it, or { label, action, data, off } for an item (data: the
-     item's data-* attributes; off: drawn but not usable). With more, a
+     under it, or { label, action, data, off, danger } for an item (data:
+     the item's data-* attributes; off: drawn but not usable; danger: red). With more, a
      heading's card has a ⋯ too. */
   function _o(opts) {
     var o = opts || {};
@@ -406,7 +406,9 @@ var QuestionCards = (function () {
           })
           .join('');
         return (
-          '<button type="button" class="rb-qmenu-item" role="menuitem" data-action="' +
+          '<button type="button" class="rb-qmenu-item' +
+          (x.danger ? ' rb-qmenu-danger' : '') +
+          '" role="menuitem" data-action="' +
           x.action +
           '" data-i="' +
           i +
@@ -433,9 +435,11 @@ var QuestionCards = (function () {
     );
   }
 
-  /* Copy, Move Up, Move Down and Delete (Move Up and Move Down only while
-     opts.arrows is not false). last: this is the last card. */
-  function toolbar(i, last, opts) {
+  /* Copy, Move Up, Move Down and Remove (Move Up and Move Down only while
+     opts.arrows is not false). last: this is the last card. noun: what the
+     card is, for the buttons' names ('question' unless said). */
+  function toolbar(i, last, opts, noun) {
+    var what = noun || 'question';
     var o = _o(opts);
     var a = o.actions;
     var tool = function (action, name, label, off) {
@@ -455,11 +459,11 @@ var QuestionCards = (function () {
     };
     return (
       '<span class="rb-tools">' +
-      tool(a.copy, 'copy', 'Copy question') +
+      tool(a.copy, 'copy', 'Copy ' + what) +
       (o.arrows
         ? tool(a.up, 'up', 'Move question up', i === 0) + tool(a.down, 'down', 'Move question down', last)
         : '') +
-      tool(a.del, 'trash', 'Delete question') +
+      tool(a.del, 'trash', 'Remove ' + what) +
       '</span>'
     );
   }
@@ -512,7 +516,7 @@ var QuestionCards = (function () {
       (section ? 'Heading' : 'Question ' + num) +
       '</span>' +
       kindPicker(d, i, opts) +
-      toolbar(i, last, opts) +
+      toolbar(i, last, opts, section ? 'heading' : 'question') +
       '</div>' +
       input(d, i, 'prompt', d.prompt, section ? 'Heading' : 'Question', o.max.prompt, ' rb-prompt', opts) +
       (d.subtitle !== null
