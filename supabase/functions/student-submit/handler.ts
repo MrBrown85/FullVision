@@ -62,7 +62,9 @@ export type Identity = { birthday: string | null; studentNumber: string | null; 
 export type Options = {
   db: Db;
   region: string | undefined; // SB_REGION
-  ipKey: string; // HMAC key for IP hashes
+  // STUDENT_SUBMIT_IP_KEY, the HMAC key for address hashes. Null or empty: every route answers a server
+  // error and asks the database nothing, since each one counts against a per-address limit.
+  ipKey: string | null;
   // STUDENT_CARD_KEY as readCardKey gives it: null or absent when it is missing or malformed. card, a card's
   // verify, add-card and a slip's open need it: without it they answer a server error. A slip's verify uses it
   // when it is there. Every other route carries on without it.
@@ -306,9 +308,14 @@ export function makeHandler(opts: Options) {
                     : Object.hasOwn(QUIZ_ROUTES, route)
                       ? quizRoute
                       : null;
+    if (!opts.ipKey) {
+      log({ route, outcome: 'no_ip_key', ms: Date.now() - started });
+      return reply(500, { ok: false, error: 'server' }, origin);
+    }
+    const ipKey = opts.ipKey;
     let result: Record<string, unknown>;
     try {
-      const hash = await ipHash(req, opts.ipKey);
+      const hash = await ipHash(req, ipKey);
       if (send) {
         const out = await send(route as string, body, hash);
         if (out.status !== 200) {

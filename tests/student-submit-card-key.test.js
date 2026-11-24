@@ -551,8 +551,11 @@ describe('student-submit: where the key comes from (index.ts)', () => {
     }
   });
 
-  it('still falls back to the database address for the address-hash key (to be removed in a later change)', () => {
-    expect(code).toContain("ipKey: Deno.env.get('STUDENT_SUBMIT_IP_KEY') || Deno.env.get('SUPABASE_DB_URL')!,");
+  it('reads the address-hash key from STUDENT_SUBMIT_IP_KEY alone, with no fallback', () => {
+    expect(code.match(/STUDENT_SUBMIT_IP_KEY/g)).toHaveLength(1);
+    expect(code).toContain("const ipKey = Deno.env.get('STUDENT_SUBMIT_IP_KEY') || null;");
+    // The database address opens the connection and nothing else.
+    expect(code.match(/SUPABASE_DB_URL'\)/g)).toHaveLength(1);
   });
 });
 
