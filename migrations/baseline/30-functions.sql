@@ -13849,7 +13849,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     select * into _s from session
-     where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+     where token_hash = p_token
        for update;
     if not found or _s.expires_at < now() then
         perform _log('open', 'bad_token', p_ip_hash);
@@ -14660,7 +14660,7 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text)
+CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -14675,7 +14675,6 @@ declare
     _course course%rowtype;
     _name   text;
     _why    text;
-    _token  text;
     _exp    timestamptz := now() + interval '80 minutes';
     _r      phone_report%rowtype;
     _dob    date;
@@ -14689,6 +14688,10 @@ begin
     end if;
     if coalesce(p_key_id, '') !~ '^[0-9a-f]{8}$' then
         raise exception 'malformed key id' using errcode = '22023';
+    end if;
+    -- The hash of a token the function made: the database never sees the token.
+    if coalesce(p_new_token_hash, '') !~ '^[0-9a-f]{64}$' then
+        raise exception 'malformed token hash' using errcode = '22023';
     end if;
 
     if random() < 0.02 then
@@ -14803,15 +14806,15 @@ begin
             perform _log('open', 'too_many_opens', p_ip_hash, _c.id, _r.course_id);
             return jsonb_build_object('ok', false, 'error', 'locked');
         end if;
-        _token := encode(uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()), 'hex');
+        -- The token is the function's; the database keeps only its hash.
         insert into session (token_hash, code_id, expires_at)
-        values (encode(sha256(convert_to(_token, 'UTF8')), 'hex'), _c.id, _exp);
+        values (p_new_token_hash, _c.id, _exp);
         select coalesce(nullif(btrim(s.preferred_name), ''), s.first_name), s.date_of_birth into _name, _dob
           from enrollment e join student s on s.id = e.student_id
          where e.id = _c.enrollment_id;
         perform _log('open', 'ok', p_ip_hash, _c.id, _r.course_id);
         return jsonb_build_object(
-            'ok', true, 'kind', 'report', 'token', _token, 'expires_at', _exp,
+            'ok', true, 'kind', 'report', 'new_token', true, 'expires_at', _exp,
             'student', jsonb_build_object('first_name', _name),
             'course', jsonb_build_object('name', _course.name, 'block', _course.block),
             'report', jsonb_build_object('title', coalesce(_r.term_label, 'Report ' || _r.term), 'expires_on', _r.expires_on),
@@ -14860,15 +14863,15 @@ begin
         return jsonb_build_object('ok', false, 'error', 'reprint');
     end if;
 
-    _token := encode(uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()), 'hex');
+    -- The token is the function's; the database keeps only its hash.
     insert into session (token_hash, code_id, expires_at)
-    values (encode(sha256(convert_to(_token, 'UTF8')), 'hex'), _c.id, _exp);
+    values (p_new_token_hash, _c.id, _exp);
 
     -- The questions wait for verify(); the slip alone shows only the first
     -- name and what the questions are called.
     perform _log('open', 'ok', p_ip_hash, _c.id, _q.course_id);
     return jsonb_build_object(
-        'ok', true, 'kind', 'questionnaire', 'token', _token, 'expires_at', _exp,
+        'ok', true, 'kind', 'questionnaire', 'new_token', true, 'expires_at', _exp,
         'student', jsonb_build_object('first_name', _name),
         'course', jsonb_build_object('name', _course.name, 'block', _course.block),
         'check', _by,
@@ -16281,7 +16284,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     select * into _s from session
-     where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+     where token_hash = p_token
        for update;
     if not found then
         perform _log('submit', 'bad_token', p_ip_hash);
@@ -16539,7 +16542,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     select * into _s from session
-     where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex')
+     where token_hash = p_token
        for update;
     if not found or _s.expires_at < now() then
         perform _log('open', 'bad_token', p_ip_hash);

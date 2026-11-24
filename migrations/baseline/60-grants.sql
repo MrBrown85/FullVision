@@ -1022,8 +1022,8 @@ revoke all on routine student_submit.issue_slips(p_teacher_id uuid, p_kind text,
 grant execute on routine student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) to service_role;
 revoke all on routine student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) to service_role;
-revoke all on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) from public;
-grant execute on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) to service_role;
+revoke all on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) from public;
+grant execute on routine student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text, p_new_token_hash text) to service_role;
 revoke all on routine student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) from public;
 grant execute on routine student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) to service_role;
 revoke all on routine student_submit.quiz(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text, p_new_try boolean) from public;
