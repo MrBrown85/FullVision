@@ -228,6 +228,7 @@ var CmReflectBuilder = (function () {
 
   /* Opens the builder for a new reflection (q null) or a teacher-built one. */
   function open(cid, q) {
+    _listen();
     _b = {
       cid: cid,
       qid: q ? q.id : null,
@@ -244,6 +245,7 @@ var CmReflectBuilder = (function () {
         : [],
       active: -1,
       menu: -1,
+      past: [], // the Undo list: { qs, active, label }, newest last
       showErrors: false,
       msg: '',
       saving: false,
@@ -285,6 +287,94 @@ var CmReflectBuilder = (function () {
     });
   }
 
+  /* ── Moving (pure: the tests call these) ─────────────────────
+     As One Report moves a reflection's statements (DECISIONS, "Reflect's
+     builder works the way One Report's editor does" 2). A heading carries
+     the questions under it, up to the next heading: its block (questions
+     before the first heading are a block with no heading). A heading moves
+     past the whole block next to it; a question moves one card at a time,
+     past a heading into the block next to it. */
+
+  /* The blocks of a list of cards: [{ start, end, head }], end exclusive. */
+  function blocksOf(qs) {
+    var out = [];
+    (qs || []).forEach(function (d, i) {
+      if (d.kind === 'section' || !out.length) out.push({ start: i, end: i + 1, head: d.kind === 'section' });
+      else out[out.length - 1].end = i + 1;
+    });
+    return out;
+  }
+
+  function _blockAt(qs, i) {
+    return blocksOf(qs).filter(function (b) {
+      return i >= b.start && i < b.end;
+    })[0];
+  }
+
+  /* The cards from..to (exclusive) moved to sit before card `before`. */
+  function _shift(qs, from, to, before) {
+    if (before >= from && before <= to) return qs.slice();
+    var out = qs.slice();
+    var run = out.splice(from, to - from);
+    var at = before > from ? before - run.length : before;
+    Array.prototype.splice.apply(out, [at, 0].concat(run));
+    return out;
+  }
+
+  /* Card i one step up (dir -1) or down (1): a question one card, a heading
+     with its block past the block next to it. The same list when it cannot. */
+  function moveBy(qs, i, dir) {
+    var d = qs[i];
+    if (!d) return qs.slice();
+    if (d.kind !== 'section') {
+      var j = i + dir;
+      if (j < 0 || j >= qs.length) return qs.slice();
+      return _shift(qs, i, i + 1, dir < 0 ? j : j + 1);
+    }
+    var all = blocksOf(qs);
+    var at = all.findIndex(function (b) {
+      return b.start === i;
+    });
+    var other = all[at + dir];
+    if (!other) return qs.slice();
+    return dir < 0 ? _shift(qs, i, all[at].end, other.start) : _shift(qs, i, all[at].end, other.end);
+  }
+
+  /* Question i to the foot of the block that starts at card `start`. */
+  function moveTo(qs, i, start) {
+    var b = _blockAt(qs, start);
+    if (!qs[i] || qs[i].kind === 'section' || !b || (i >= b.start && i < b.end)) return qs.slice();
+    return _shift(qs, i, i + 1, b.end);
+  }
+
+  /* Card i (a heading with its block) dragged to sit before card `before`
+     (qs.length: the end). A heading lands only at the top, before another
+     heading or at the end. */
+  function dropAt(qs, i, before) {
+    var d = qs[i];
+    if (!d) return qs.slice();
+    if (d.kind !== 'section') return _shift(qs, i, i + 1, before);
+    var b = _blockAt(qs, i);
+    if (before > 0 && before < qs.length && (!qs[before] || qs[before].kind !== 'section')) return qs.slice();
+    return _shift(qs, b.start, b.end, before);
+  }
+
+  /* What a question added before card `at` is: the type of the nearest
+     question above it, a Choice when there is none
+     (DECISIONS, "Reflect's builder works the way One Report's editor does" 3). */
+  function kindAbove(qs, at) {
+    for (var k = Math.min(at, (qs || []).length) - 1; k >= 0; k--) if (qs[k].kind !== 'section') return qs[k].kind;
+    return 'choice';
+  }
+
+  /* Whether "Start a New Heading Here" fits question i: not when it is
+     already the first question under its heading (or the very first). */
+  function canStartHeading(qs, i) {
+    var b = _blockAt(qs, i);
+    if (!b || !qs[i] || qs[i].kind === 'section') return false;
+    return i > (b.head ? b.start + 1 : b.start);
+  }
+
   /* ── Drawing ───────────────────────────────────────────────── */
 
   /* A saved reflection's questions as students see them (the card's Show Questions). */
@@ -306,6 +396,56 @@ var CmReflectBuilder = (function () {
     );
   }
 
+  /* The ⋯ menu's moving items for card i (QuestionCards opts.more). */
+  function _moreItems(d, i) {
+    var qs = _b.questions;
+    var same = function (next) {
+      return next.every(function (x, k) {
+        return x === qs[k];
+      });
+    };
+    if (d.kind === 'section') {
+      var b = _blockAt(qs, i);
+      return [
+        { label: 'Move Heading Up', action: 'sqBUp', off: same(moveBy(qs, i, -1)) },
+        { label: 'Move Heading Down', action: 'sqBDown', off: same(moveBy(qs, i, 1)) },
+        null,
+        {
+          label: b && b.end - b.start > 1 ? 'Remove Heading, Keep Its Questions' : 'Remove Heading',
+          action: 'sqBDelete',
+          danger: true,
+        },
+      ];
+    }
+    /** @type {any[]} */
+    var out = [null, { label: 'Add a Question Below', action: 'sqBAddAt', data: { at: i + 1 } }];
+    if (canStartHeading(qs, i))
+      out.push({ label: 'Start a New Heading Here', action: 'sqBAddAt', data: { at: i, kind: 'section' } });
+    out.push(
+      null,
+      { label: 'Move Up', action: 'sqBUp', off: i === 0 },
+      { label: 'Move Down', action: 'sqBDown', off: i === qs.length - 1 },
+    );
+    var mine = _blockAt(qs, i);
+    var others = blocksOf(qs).filter(function (b) {
+      return !mine || b.start !== mine.start;
+    });
+    if (others.length) {
+      out.push({ sub: 'Move To' });
+      others.forEach(function (b) {
+        out.push({
+          label: b.head ? _clean(qs[b.start].prompt) || 'Untitled Heading' : 'No Heading',
+          action: 'sqBMoveTo',
+          data: { to: b.start },
+        });
+      });
+    }
+    out.push(null, { label: 'Remove Question', action: 'sqBDelete', danger: true });
+    return out;
+  }
+
+  var CARD_OPTS = { arrows: false, more: _moreItems };
+
   function render(cid) {
     if (!isOpen(cid)) return '';
     var errs = _b.showErrors ? validate(_b) : null;
@@ -322,10 +462,15 @@ var CmReflectBuilder = (function () {
           (err ? ' rb-q-bad' : '') +
           '" data-k="' +
           d.k +
+          '" data-i="' +
+          i +
           '">' +
+          '<button type="button" class="rb-q-grip" tabindex="-1" aria-hidden="true" data-rb-grip="' +
+          i +
+          '">⠿</button>' +
           (on
-            ? QuestionCards.editHtml(d, i, num, i === last, _b.menu === i)
-            : QuestionCards.viewHtml(d, i, num, true)) +
+            ? QuestionCards.editHtml(d, i, num, i === last, _b.menu === i, CARD_OPTS)
+            : QuestionCards.viewHtml(d, i, num, true, CARD_OPTS)) +
           (err ? '<div class="rb-err" role="alert">' + esc(err) + '</div>' : '') +
           '</li>'
         );
@@ -443,9 +588,403 @@ var CmReflectBuilder = (function () {
     if (el && el.focus) el.focus();
   }
 
+  /* ── Undo (DECISIONS, "Reflect's builder works the way One Report's
+     editor does" 4) ─────────────────────────────────────────────
+     Every add, copy, move and remove goes on the draft's Undo list first;
+     ⌘Z outside a text box steps back through it, and a remove's toast has
+     Undo too. The list holds the cards themselves, so words typed since
+     stay. It goes with the draft (Save, Cancel). */
+
+  function _push(label) {
+    _b.past.push({ qs: _b.questions.slice(), active: _b.active, label: label });
+    if (_b.past.length > 50) _b.past.shift();
+    return _b.past[_b.past.length - 1];
+  }
+
+  /* Steps back to `step` (the newest on the list), or to the newest. */
+  function _undo(step) {
+    if (!_b || !_b.past.length) return false;
+    var top = _b.past[_b.past.length - 1];
+    if (step && step !== top) return false;
+    _settle();
+    _b.past.pop();
+    var before = _tops();
+    _b.questions = top.qs;
+    _b.active = top.active;
+    _b.menu = -1;
+    _hideIns();
+    _rerender();
+    _glide(before);
+    var g = _g();
+    if (!step && typeof g.dismissUndoToast === 'function') g.dismissUndoToast();
+    _say('Undid: ' + top.label + '.');
+    return true;
+  }
+
+  /* What a card is called in a toast or to a screen reader. */
+  function _cardName(qs, i) {
+    var d = qs[i];
+    var words = _clean(d && d.prompt);
+    if (d && d.kind === 'section') return words ? 'the heading “' + words + '”' : 'a heading';
+    var num = 0;
+    for (var k = 0; k <= i; k++) if (qs[k].kind !== 'section') num++;
+    return 'question ' + num + (words ? ', “' + words + '”' : '');
+  }
+
+  function _remove(i) {
+    var qs = _b.questions;
+    if (!qs[i]) return;
+    var label = 'Removed ' + _cardName(qs, i);
+    var step = _push(label);
+    _settle();
+    var before = _tops();
+    _b.questions = qs.slice(0, i).concat(qs.slice(i + 1));
+    _b.active = -1;
+    _b.menu = -1;
+    _rerender();
+    _glide(before);
+    var g = _g();
+    if (typeof g.showUndoToast === 'function')
+      g.showUndoToast(label, function () {
+        _undo(step);
+      });
+    else _say(label + '.');
+  }
+
+  /* A card moved: the new list drawn, the cards gliding from where they
+     were, the moved card still the one open (when it was), and the focus
+     back where the teacher was: `back` is 'menu' (the card's ⋯), or the id
+     of the box being typed in with its caret. A screen reader hears where
+     it went. */
+  function _moveCard(next, d, back, caret) {
+    var qs = _b.questions;
+    if (
+      next.every(function (x, k) {
+        return x === qs[k];
+      })
+    )
+      return false;
+    _push('Moved ' + _cardName(qs, qs.indexOf(d)));
+    _settle();
+    var open = _b.active >= 0 ? qs[_b.active] : null;
+    var before = _tops();
+    _b.questions = next;
+    _b.active = open ? next.indexOf(open) : -1;
+    _b.menu = -1;
+    _rerender();
+    _glide(before);
+    if (back === 'menu') _focus('.rb-q[data-k="' + d.k + '"] .rb-qmore-btn');
+    else if (back) {
+      var el = /** @type {any} */ (typeof document !== 'undefined' ? document.getElementById(back) : null);
+      if (el && el.focus) {
+        el.focus();
+        if (caret && el.setSelectionRange) {
+          try {
+            el.setSelectionRange(caret[0], caret[1]);
+          } catch (e) {
+            /* a box with no caret (a date, a list) */
+          }
+        }
+      }
+    }
+    _say(_movedText(d));
+    return true;
+  }
+
+  function _movedText(d) {
+    var qs = _b.questions;
+    var at = qs.indexOf(d);
+    var num = 0;
+    for (var k = 0; k <= at; k++) if (qs[k].kind !== 'section') num++;
+    if (d.kind === 'section') return 'Moved the heading ' + (_clean(d.prompt) || 'Untitled Heading') + '.';
+    var b = _blockAt(qs, at);
+    var head = b && b.head ? _clean(qs[b.start].prompt) : '';
+    return 'Moved to question ' + num + (head ? ', under ' + head : '') + '.';
+  }
+
+  /* Said to a screen reader, from a box outside the redraw. */
+  function _say(text) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var box = document.getElementById('rb-said');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'rb-said';
+      box.className = 'rb-said';
+      box.setAttribute('role', 'status');
+      document.body.appendChild(box);
+    }
+    box.textContent = '';
+    var b = box;
+    setTimeout(function () {
+      b.textContent = text;
+    }, 30);
+  }
+
+  /* The box being typed in saves now, by the place it was drawn at. A
+     redraw takes it away, and a blur after a card was added, removed or
+     moved would save its words into whichever card has that place by then
+     (Safari keeps the focus in the box when a button is clicked). */
+  function _settle() {
+    var typing = /** @type {any} */ (typeof document !== 'undefined' ? document.activeElement : null);
+    if (typing && typing.blur && typing.closest && typing.closest('.rb-build') && typing.dataset.rbPath != null)
+      typing.blur();
+  }
+
+  /* ── The + between two cards ───────────────────────────────
+     Pointing at the line between two cards (or above the first) shows a +
+     in the left margin; pointing at the + parts the cards and offers Add a
+     Question and Add a Heading, as One Report's + does. It is for the
+     pointer: the keyboard adds from ⋯. */
+
+  var PART = 20; // px the cards part by, on top of .rb-qs's 12px gap
+  /** @type {any} */
+  var _ins = null; // { el, at, y, open, next }
+
+  /* The places between cards: { at, y } in page coordinates, y the middle of the gap. */
+  function _gaps() {
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.rb-build[data-rb-open] .rb-qs > .rb-q'));
+    var out = [];
+    cards.forEach(function (/** @type {any} */ el, k) {
+      var r = el.getBoundingClientRect();
+      if (k === 0) out.push({ at: 0, y: r.top - GAP / 2, el: el });
+      else out.push({ at: k, y: (cards[k - 1].getBoundingClientRect().bottom + r.top) / 2, el: el });
+    });
+    return out;
+  }
+
+  function _hideIns() {
+    var ins = _ins;
+    _ins = null;
+    if (!ins) return;
+    if (ins.el.parentNode) ins.el.parentNode.removeChild(ins.el);
+    if (ins.next) ins.next.classList.remove('rb-q-parted');
+  }
+
+  function _part(open) {
+    if (!_ins || _ins.open === open) return;
+    _ins.open = open;
+    _ins.el.classList.toggle('open', open);
+    if (_ins.next) _ins.next.classList.toggle('rb-q-parted', open);
+  }
+
+  function _onPointerMove(e) {
+    if (!_b || _drag || e.pointerType === 'touch') return;
+    var t = /** @type {any} */ (e.target);
+    var build = t && t.closest ? t.closest('.rb-build[data-rb-open]') : null;
+    if (_ins && _ins.el.contains(t)) return;
+    if (!build || (t.closest && t.closest('.rb-qmenu'))) return _hideIns();
+    var list = build.querySelector('.rb-qs');
+    var lr = list.getBoundingClientRect();
+    if (e.clientX < lr.left - 44 || e.clientX > lr.right) return _hideIns();
+    /** @type {any} */
+    var best = null;
+    _gaps().forEach(function (g) {
+      var dd = Math.abs(e.clientY - g.y);
+      if (dd <= 8 && (!best || dd < best.d)) best = { at: g.at, y: g.y, d: dd, el: g.el };
+    });
+    if (!best) {
+      if (_ins && !_ins.open) _hideIns();
+      return;
+    }
+    if (_ins && _ins.at === best.at) return;
+    _hideIns();
+    var br = build.getBoundingClientRect();
+    var box = document.createElement('div');
+    box.className = 'rb-ins';
+    box.style.top = best.y - br.top + 'px';
+    box.style.left = lr.left - br.left + 'px';
+    box.style.width = lr.width + 'px';
+    var kind = esc(kindAbove(_b.questions, best.at));
+    var at = Number(best.at);
+    // html-safe: fixed markup; at is a number and kind passes through esc
+    box.innerHTML =
+      '<div class="rb-ins-line"></div><button type="button" class="rb-ins-plus" tabindex="-1" aria-hidden="true">+</button>' +
+      '<div class="rb-ins-acts">' +
+      '<button type="button" tabindex="-1" data-action="sqBAddAt" data-at="' +
+      at +
+      '" data-kind="' +
+      kind +
+      '">Add a Question</button>' +
+      '<button type="button" tabindex="-1" data-action="sqBAddAt" data-at="' +
+      at +
+      '" data-kind="section">Add a Heading</button></div>';
+    build.appendChild(box);
+    _ins = { el: box, at: best.at, open: false, next: best.el };
+    var plus = box.querySelector('.rb-ins-plus');
+    if (plus)
+      plus.addEventListener('mouseenter', function () {
+        _part(true);
+      });
+    box.addEventListener('mouseleave', function () {
+      _hideIns();
+    });
+  }
+
+  /* ⌘Z (Ctrl+Z) on the builder, outside a text box (where it undoes typing). */
+  function _isUndoKey(e) {
+    if (!_b || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'z') return false;
+    if (typeof document === 'undefined' || !document.querySelector('.rb-build[data-rb-open]')) return false;
+    var t = /** @type {any} */ (e.target);
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return false;
+    return !document.querySelector('.confirm-overlay, body.rb-dragging');
+  }
+
+  /* ⌥↑ ⌥↓ in the card being edited move it, the caret staying put. */
+  function _onKey(e) {
+    if (_isUndoKey(e)) {
+      if (_undo(null)) e.preventDefault();
+      return;
+    }
+    if (!_b || !e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    var t = /** @type {any} */ (e.target);
+    if (!t || !t.closest || !t.closest('.rb-build[data-rb-open] .rb-q-on')) return;
+    e.preventDefault();
+    _sync();
+    var i = _b.active;
+    var d = _b.questions[i];
+    if (!d) return;
+    var caret = typeof t.selectionStart === 'number' ? [t.selectionStart, t.selectionEnd] : null;
+    _moveCard(moveBy(_b.questions, i, e.key === 'ArrowUp' ? -1 : 1), d, t.id || 'menu', caret);
+  }
+
+  /* ── Dragging a card by its ⠿ ──────────────────────────────── */
+
+  var GAP = 12; // .rb-qs's gap
+  /** @type {any} */
+  var _drag = null;
+
+  function _onPointerDown(e) {
+    if (!_b || e.button !== 0) return;
+    var g = e.target && e.target.closest ? e.target.closest('.rb-build[data-rb-open] [data-rb-grip]') : null;
+    if (!g) return;
+    e.preventDefault();
+    _sync();
+    var i = Number(g.dataset.rbGrip);
+    var d = _b.questions[i];
+    if (!d) return;
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.rb-build[data-rb-open] .rb-q[data-k]'));
+    var b = d.kind === 'section' ? _blockAt(_b.questions, i) : { start: i, end: i + 1 };
+    var rows = cards.map(function (el, k) {
+      return { el: el, i: k, rect: el.getBoundingClientRect(), moving: k >= b.start && k < b.end };
+    });
+    var moving = rows.filter(function (r) {
+      return r.moving;
+    });
+    if (!moving.length) return;
+    var top = moving[0].rect.top;
+    var bottom = moving[moving.length - 1].rect.bottom;
+    _drag = {
+      i: i,
+      d: d,
+      rows: rows,
+      moving: moving,
+      cands: rows.filter(function (r) {
+        return !r.moving;
+      }),
+      y0: e.clientY,
+      grab: e.clientY - top,
+      h: bottom - top + GAP,
+      span: Math.min(bottom - top, 80),
+      at: -1,
+    };
+    _b.menu = -1;
+    _hideIns();
+    moving.forEach(function (r) {
+      r.el.classList.add('rb-q-lift');
+    });
+    rows.forEach(function (r) {
+      if (!r.moving) r.el.classList.add('rb-q-shift');
+    });
+    document.body.classList.add('rb-dragging');
+    window.addEventListener('pointermove', _onDragMove);
+    window.addEventListener('pointerup', _onDragEnd);
+    window.addEventListener('pointercancel', _onDragEnd);
+  }
+
+  /* Where the dragged cards would land: they go before cands[at]
+     (cands.length: the end). A heading lands only at the top, before
+     another heading or at the end. */
+  function _landing(y) {
+    var dr = _drag;
+    var c = dr.cands;
+    var mid = y - dr.grab + dr.span / 2;
+    var at = 0;
+    c.forEach(function (r, k) {
+      if (r.rect.top + r.rect.height / 2 < mid) at = k + 1;
+    });
+    if (dr.d.kind !== 'section') return at;
+    var best = c.length;
+    var gap = Infinity;
+    for (var k = 0; k <= c.length; k++) {
+      if (k > 0 && k < c.length && _b.questions[c[k].i].kind !== 'section') continue;
+      if (Math.abs(k - at) < gap) {
+        gap = Math.abs(k - at);
+        best = k;
+      }
+    }
+    return best;
+  }
+
+  function _onDragMove(e) {
+    var dr = _drag;
+    if (!dr) return;
+    var dy = e.clientY - dr.y0;
+    dr.moving.forEach(function (r) {
+      r.el.style.transform = 'translateY(' + dy + 'px)';
+    });
+    var at = _landing(e.clientY);
+    if (at === dr.at) return;
+    dr.at = at;
+    // The cards between the old place and the new one make room.
+    var first = dr.moving[0].i;
+    dr.cands.forEach(function (r, k) {
+      var shift = 0;
+      if (r.i < first && k >= at) shift = dr.h;
+      if (r.i > first && k < at) shift = -dr.h;
+      r.el.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+    });
+  }
+
+  function _onDragEnd() {
+    var dr = _drag;
+    _drag = null;
+    window.removeEventListener('pointermove', _onDragMove);
+    window.removeEventListener('pointerup', _onDragEnd);
+    window.removeEventListener('pointercancel', _onDragEnd);
+    if (typeof document !== 'undefined') document.body.classList.remove('rb-dragging');
+    if (!dr || !_b) return;
+    var c = dr.cands;
+    var before = dr.at < 0 ? -1 : dr.at < c.length ? c[dr.at].i : _b.questions.length;
+    var moved = before >= 0 && _moveCard(dropAt(_b.questions, dr.i, before), dr.d, null);
+    if (moved) return;
+    // Back where it was.
+    dr.rows.forEach(function (r) {
+      r.el.style.transform = '';
+      r.el.classList.remove('rb-q-lift');
+      r.el.classList.add('rb-q-shift');
+    });
+    setTimeout(function () {
+      dr.rows.forEach(function (r) {
+        r.el.classList.remove('rb-q-shift');
+      });
+    }, 220);
+  }
+
+  var _listening = false;
+  function _listen() {
+    if (_listening || typeof document === 'undefined') return;
+    _listening = true;
+    document.addEventListener('pointerdown', _onPointerDown);
+    document.addEventListener('pointermove', _onPointerMove);
+    document.addEventListener('keydown', _onKey);
+  }
+
   /* ── Actions ───────────────────────────────────────────────── */
 
   function _closeAndDraw() {
+    var g = _g();
+    if (typeof g.dismissUndoToast === 'function') g.dismissUndoToast();
     close();
     _rerender();
   }
@@ -554,6 +1093,7 @@ var CmReflectBuilder = (function () {
   function handleAction(action, el) {
     if (!_b || !/^sqB/.test(action)) return false;
     _sync();
+    _settle();
     var i = el.dataset.i != null && el.dataset.i !== '' ? Number(el.dataset.i) : -1;
     var d = i >= 0 ? _b.questions[i] : null;
     if (action !== 'sqBMenu') _b.menu = -1;
@@ -566,10 +1106,24 @@ var CmReflectBuilder = (function () {
         return true;
       case 'sqBAdd': {
         var n = _blank(el.dataset.kind || 'choice');
+        _push(n.kind === 'section' ? 'Added a heading' : 'Added a question');
         _b.questions.push(n);
         _b.active = _b.questions.length - 1;
         _rerender();
         _focus('#rb-' + n.k + '-prompt');
+        return true;
+      }
+      case 'sqBAddAt': {
+        var at = Math.max(0, Math.min(Number(el.dataset.at), _b.questions.length));
+        var added = _blank(el.dataset.kind === 'section' ? 'section' : kindAbove(_b.questions, at));
+        var tops = _tops();
+        _push(added.kind === 'section' ? 'Added a heading' : 'Added a question');
+        _b.questions.splice(at, 0, added);
+        _b.active = at;
+        _hideIns();
+        _rerender();
+        _glide(tops);
+        _focus('#rb-' + added.k + '-prompt');
         return true;
       }
       case 'sqBCopy': {
@@ -578,6 +1132,7 @@ var CmReflectBuilder = (function () {
         delete c.id;
         delete c.savedId;
         c.k = 'k' + ++_seq;
+        _push('Copied ' + _cardName(_b.questions, i));
         _b.questions.splice(i + 1, 0, c);
         _b.active = i + 1;
         _rerender();
@@ -585,32 +1140,16 @@ var CmReflectBuilder = (function () {
         return true;
       }
       case 'sqBUp':
-      case 'sqBDown': {
-        var to = action === 'sqBUp' ? i - 1 : i + 1;
-        if (!d || to < 0 || to >= _b.questions.length) return true;
-        var before = _tops();
-        _b.questions.splice(i, 1);
-        _b.questions.splice(to, 0, d);
-        _b.active = to;
-        _rerender();
-        _glide(before);
-        var again = /** @type {HTMLButtonElement|null} */ (
-          document.querySelector('.rb-q[data-k="' + d.k + '"] [data-action="' + action + '"]')
-        );
-        _focus(
-          '.rb-q[data-k="' +
-            d.k +
-            '"] [data-action="' +
-            (again && !again.disabled ? action : action === 'sqBUp' ? 'sqBDown' : 'sqBUp') +
-            '"]',
-        );
-        return true;
-      }
-      case 'sqBDelete':
+      case 'sqBDown':
         if (!d) return true;
-        _b.questions.splice(i, 1);
-        _b.active = -1;
-        _rerender();
+        _moveCard(moveBy(_b.questions, i, action === 'sqBUp' ? -1 : 1), d, 'menu');
+        return true;
+      case 'sqBMoveTo':
+        if (!d) return true;
+        _moveCard(moveTo(_b.questions, i, Number(el.dataset.to)), d, 'menu');
+        return true;
+      case 'sqBDelete':
+        if (d) _remove(i);
         return true;
       case 'sqBToggle': {
         if (!d) return true;
@@ -724,6 +1263,15 @@ var CmReflectBuilder = (function () {
     fromSaved: fromSaved,
     toContract: toContract,
     validate: validate,
+    blocksOf: blocksOf,
+    undo: function () {
+      return _undo(null);
+    },
+    moveBy: moveBy,
+    moveTo: moveTo,
+    dropAt: dropAt,
+    kindAbove: kindAbove,
+    canStartHeading: canStartHeading,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,

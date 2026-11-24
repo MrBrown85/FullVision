@@ -55,13 +55,21 @@ var QuestionCards = (function () {
     subtitle: 'sqBSubtitle',
   };
 
-  /* opts: { actions, kinds, max }, each optional and merged over the defaults. */
+  /* opts: { actions, kinds, max, arrows, more }, each optional and merged
+     over the defaults. arrows: false leaves Move Up and Move Down out of the
+     toolbar. more(d, i): the builder's own items for the ⋯ menu, after its
+     first ones: null for a line, { sub } for a small label over the items
+     under it, or { label, action, data, off, danger } for an item (data:
+     the item's data-* attributes; off: drawn but not usable; danger: red). With more, a
+     heading's card has a ⋯ too. */
   function _o(opts) {
     var o = opts || {};
     return {
       actions: Object.assign({}, ACTIONS, o.actions),
       kinds: o.kinds || KINDS,
       max: Object.assign({}, MAX, o.max),
+      arrows: o.arrows !== false,
+      more: typeof o.more === 'function' ? o.more : null,
     };
   }
 
@@ -368,9 +376,11 @@ var QuestionCards = (function () {
     return viewBody(d);
   }
 
-  /* The "more options" menu: the subtitle, and a Choice's two extra switches. */
+  /* The "more options" menu: the subtitle, a Choice's two extra switches,
+     then the builder's own items (opts.more). */
   function menuHtml(d, i, opts) {
-    var a = _o(opts).actions;
+    var o = _o(opts);
+    var a = o.actions;
     var item = function (label, action, opt, on) {
       return (
         '<button type="button" class="rb-qmenu-item" role="' +
@@ -386,20 +396,52 @@ var QuestionCards = (function () {
         '</button>'
       );
     };
+    var more = (o.more ? o.more(d, i) : [])
+      .map(function (/** @type {any} */ x) {
+        if (!x) return '<hr class="rb-qmenu-line">';
+        if (x.sub) return '<div class="rb-qmenu-sub">' + esc(x.sub) + '</div>';
+        var data = Object.keys(x.data || {})
+          .map(function (k) {
+            return ' data-' + k + '="' + esc(String(x.data[k])) + '"';
+          })
+          .join('');
+        return (
+          '<button type="button" class="rb-qmenu-item' +
+          (x.danger ? ' rb-qmenu-danger' : '') +
+          '" role="menuitem" data-action="' +
+          x.action +
+          '" data-i="' +
+          i +
+          '"' +
+          data +
+          (x.off ? ' disabled' : '') +
+          '>' +
+          esc(x.label) +
+          '</button>'
+        );
+      })
+      .join('');
     return (
       '<div class="rb-qmenu" role="menu" aria-label="More options">' +
-      item(d.subtitle === null ? 'Add a Subtitle' : 'Remove the Subtitle', a.subtitle) +
-      (d.kind === 'choice'
-        ? item('Shuffle Options', a.toggle, 'shuffle', d.shuffle) +
-          item('Show as a Drop-Down', a.toggle, 'dropdown', d.dropdown && !d.multiple)
-        : '') +
+      (d.kind === 'section'
+        ? ''
+        : item(d.subtitle === null ? 'Add a Subtitle' : 'Remove the Subtitle', a.subtitle) +
+          (d.kind === 'choice'
+            ? item('Shuffle Options', a.toggle, 'shuffle', d.shuffle) +
+              item('Show as a Drop-Down', a.toggle, 'dropdown', d.dropdown && !d.multiple)
+            : '')) +
+      more +
       '</div>'
     );
   }
 
-  /* Copy, Move Up, Move Down and Delete. last: this is the last card. */
-  function toolbar(i, last, opts) {
-    var a = _o(opts).actions;
+  /* Copy, Move Up, Move Down and Remove (Move Up and Move Down only while
+     opts.arrows is not false). last: this is the last card. noun: what the
+     card is, for the buttons' names ('question' unless said). */
+  function toolbar(i, last, opts, noun) {
+    var what = noun || 'question';
+    var o = _o(opts);
+    var a = o.actions;
     var tool = function (action, name, label, off) {
       return (
         '<button type="button" class="rb-tool" data-action="' +
@@ -417,10 +459,11 @@ var QuestionCards = (function () {
     };
     return (
       '<span class="rb-tools">' +
-      tool(a.copy, 'copy', 'Copy question') +
-      tool(a.up, 'up', 'Move question up', i === 0) +
-      tool(a.down, 'down', 'Move question down', last) +
-      tool(a.del, 'trash', 'Delete question') +
+      tool(a.copy, 'copy', 'Copy ' + what) +
+      (o.arrows
+        ? tool(a.up, 'up', 'Move question up', i === 0) + tool(a.down, 'down', 'Move question down', last)
+        : '') +
+      tool(a.del, 'trash', 'Remove ' + what) +
       '</span>'
     );
   }
@@ -454,9 +497,9 @@ var QuestionCards = (function () {
     var foot = '';
     if (d.kind === 'choice') foot += _switch(d, i, 'multiple', 'Multiple Answers', d.multiple, a);
     if (d.kind === 'text') foot += _switch(d, i, 'long', 'Long Answer', d.long, a);
-    if (!section) {
+    if (!section) foot += _switch(d, i, 'required', 'Required', d.required, a);
+    if (!section || o.more) {
       foot +=
-        _switch(d, i, 'required', 'Required', d.required, a) +
         '<span class="rb-qmore"><button type="button" class="rb-qmore-btn" aria-label="More options" aria-haspopup="menu" aria-expanded="' +
         !!menuOpen +
         '" data-action="' +
@@ -473,7 +516,7 @@ var QuestionCards = (function () {
       (section ? 'Heading' : 'Question ' + num) +
       '</span>' +
       kindPicker(d, i, opts) +
-      toolbar(i, last, opts) +
+      toolbar(i, last, opts, section ? 'heading' : 'question') +
       '</div>' +
       input(d, i, 'prompt', d.prompt, section ? 'Heading' : 'Question', o.max.prompt, ' rb-prompt', opts) +
       (d.subtitle !== null
