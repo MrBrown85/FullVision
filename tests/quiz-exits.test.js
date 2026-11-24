@@ -25,7 +25,14 @@ const Q = [
 
 function world(opts = {}) {
   const fn = fakeStudentSubmit({ cards: [sampleCard(TODAY)], lasts: opts.lasts });
-  const db = { saveFails: true, saves: 0, sent: !!opts.sent, closed: !!opts.closed, newTry: opts.newTry || null };
+  const db = {
+    saveError: 'network',
+    saveFails: true,
+    saves: 0,
+    sent: !!opts.sent,
+    closed: !!opts.closed,
+    newTry: opts.newTry || null,
+  };
   const reply = () => ({
     ok: true,
     quiz: { tries: 2, tries_left: db.sent ? 1 : 1, closed: db.closed, closes_on: db.closed ? '2026-11-21' : null },
@@ -73,7 +80,7 @@ function world(opts = {}) {
     if (body.route === 'quiz-save') {
       db.saves += 1;
       return db.saveFails
-        ? { ok: false, error: 'network' }
+        ? { ok: false, error: db.saveError }
         : { ok: true, question_id: body.question_id, saved_at: new Date().toISOString() };
     }
     if (body.route === 'quiz-send')
@@ -261,5 +268,98 @@ describe('Try Again and a closed quiz', () => {
     await page.click('[data-act="quiz-open"]');
     await page.settle();
     expect(page.root().textContent).toContain('This quiz closed on Nov 21');
+  });
+});
+
+describe('leaving while still on the quiz screen (nothing tapped back first)', () => {
+  const stillOnQuiz = page => expect(page.root().querySelector('.sp-quiz')).not.toBe(null);
+  const gone = page => {
+    expect(page.root().querySelector('.sp-quiz')).toBe(null);
+    expect(page.root().querySelector('.sp-deck')).toBe(null);
+    expectNothingLeft(page);
+  };
+
+  it('is set up: the answer waits, the quiz is on screen', async () => {
+    const page = await waiting(world(), { leave: false });
+    stillOnQuiz(page);
+    expectKept(page);
+  });
+
+  it('the fifteen idle minutes end the session on the quiz', async () => {
+    const page = await waiting(world(), { leave: false });
+    page.advance(16 * MIN);
+    page.fire('pageshow');
+    page.hide();
+    page.show();
+    await page.settle();
+    gone(page);
+  });
+
+  it('the midnight end', async () => {
+    const page = await waiting(world({ lasts: 10 * MIN }), { leave: false });
+    page.advance(10 * MIN + 1000);
+    page.runTimers();
+    await page.settle();
+    gone(page);
+  });
+
+  it('Done in another tab', async () => {
+    const page = await waiting(world(), { leave: false });
+    delete page.store[KEY];
+    page.fire('storage');
+    await page.settle();
+    gone(page);
+  });
+
+  it('twenty minutes of typing count as activity: the next tap does not sign them out', async () => {
+    const page = await waiting(world(), { leave: false });
+    for (let i = 0; i < 20; i += 1) {
+      page.advance(MIN);
+      page.fire('keydown');
+    }
+    await page.click('[data-act="quiz-back"]');
+    page.advance(2000);
+    page.fire('pointerdown');
+    await page.settle();
+    expect(page.root().querySelector('.sp-deck')).not.toBe(null);
+    expectKept(page);
+  });
+
+  it('the tab hidden covers the quiz as it covers the list', async () => {
+    const page = await waiting(world(), { leave: false });
+    page.hide();
+    expect(page.ctx.document.documentElement.classList.contains('sp-away')).toBe(true);
+  });
+
+  for (const error of ['card_stopped', 'card_expired', 'closed']) {
+    it('a save refused with ' + error + ' leaves no answer on the device', async () => {
+      const w = world();
+      w.db.saveError = error;
+      const page = await waiting(w, { leave: false });
+      page.advance(60 * 1000);
+      page.runTimers();
+      await page.settle();
+      expect(page.root().querySelector('.sp-quiz')).toBe(null);
+      expectNothingLeft(page);
+    });
+  }
+});
+
+describe('the Log Out sheet follows the waiting count', () => {
+  it('stops warning once the waiting save lands, and Switch Class closes', async () => {
+    const w = world();
+    const page = await waiting(w);
+    await page.click('[data-act="settings-open"]');
+    await page.click('.sp-set [data-act="logout-ask"]');
+    page.advance(500);
+    expect(page.root().querySelector('.sp-logout').textContent).toContain('hasn’t reached your teacher yet');
+    w.db.saveFails = false;
+    page.advance(60 * 1000);
+    page.runTimers();
+    await page.settle();
+    const sheet = page.root().querySelector('.sp-logout');
+    expect(sheet.textContent).toContain('You’ll need your card');
+    expect(sheet.textContent).not.toContain('lose it');
+    expect(sheet.textContent).not.toContain('Log Out Anyway');
   });
 });

@@ -517,6 +517,7 @@
       onStatus: function (/** @type {any} */ s) {
         q.status = s;
         if (q.mode === 'take') refreshNow(q);
+        sheetWords();
       },
       onStop: function (/** @type {string} */ code) {
         if (live(q)) stopped(q, code);
@@ -802,6 +803,17 @@
     }, 0);
   }
   // The Log Out sheet (s/assignments.js): how many answers have not reached the teacher yet.
+  /* The Log Out and Switch Class sheets say an answer is still waiting, and their words are drawn when they open:
+     drawn again whenever the number waiting changes, so they never go on warning after the save has landed. */
+  var shown = 0;
+  function sheetWords() {
+    var n = SP.quizWaiting();
+    if (n === shown) return;
+    shown = n;
+    if (!S || !(S.logout || S.classHold)) return;
+    if (!n) S.classHold = '';
+    paint(S.classHold || S.logout ? '.sp-logout .sp-btn-tint' : '.sp-gear');
+  }
   // Demo Mode sends nothing to any teacher, so it never says an answer is on its way to one.
   SP.quizWaiting = function () {
     return on() && !(S && S.demo) ? waiting() : 0;
@@ -828,6 +840,8 @@
     savers = [];
     M.wipeKept();
   }
+
+  SP.quizLetGo = letGo;
 
   function asksBeforeClosing() {
     return on() && !(S && S.demo) && waiting() > 0;

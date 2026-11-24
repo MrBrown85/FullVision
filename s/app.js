@@ -1289,6 +1289,8 @@
   function forget(stored) {
     // A questionnaire's draft from a card's page goes too (student.js): it is this tab's student's.
     StudentPage.wipeCardDrafts();
+    // Quiz answers still waiting to be saved are this student's too, and their savers stop (s/quiz.js).
+    if (typeof StudentPage.quizLetGo === 'function') StudentPage.quizLetGo();
     session = null;
     adding = null;
     // The Text Size went with the session: the page is at Normal again, whatever is drawn next.
@@ -1398,6 +1400,8 @@
   function showing() {
     return (
       S.screen === 'assignments' ||
+      // The quiz screen is the signed-in student's page too: idle, midnight and Done elsewhere end it (s/quiz.js).
+      S.screen === 'quiz' ||
       (S.screen === 'cardmessage' && !!S.again) ||
       (S.screen === 'loading' && S.heading === TITLE) ||
       (!!adding && !!session && has(ADDING_SCREENS, S.screen))

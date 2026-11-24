@@ -99,7 +99,7 @@ var StudentQuizView = (function () {
       total +
       esc(sub) +
       '</span><span class="sp-quiz-st" aria-live="off">' +
-      (done ? 'Answered' : 'Not answered') +
+      (done ? 'Answered' : 'Not Answered') +
       '</span></div>' +
       StudentQuestionKinds.quizBody(q, answers[q.id]) +
       '</section>'
@@ -231,7 +231,7 @@ var StudentQuizView = (function () {
             '</span><span class="sp-quiz-ans-a' +
             (said ? '' : ' sp-quiz-none') +
             '">' +
-            esc(said || 'Not answered') +
+            esc(said || 'Not Answered') +
             '</span></li>'
           );
         })
@@ -399,7 +399,7 @@ var StudentQuizView = (function () {
       var done = stateOf(q, answers);
       card.classList.toggle('sp-quiz-todo', !done);
       var st = card.querySelector('.sp-quiz-st');
-      if (st) st.textContent = done ? 'Answered' : 'Not answered';
+      if (st) st.textContent = done ? 'Answered' : 'Not Answered';
     });
     var saved = root.querySelector('#sp-quiz-saved');
     if (saved) saved.textContent = savedLine(c.status, c);
