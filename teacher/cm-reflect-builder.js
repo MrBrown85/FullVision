@@ -820,6 +820,115 @@ var CmReflectBuilder = (function () {
     });
   }
 
+  /* A new card of `kind` before card `at`, open with the cursor in it. */
+  function _addAt(at, kind) {
+    at = Math.max(0, Math.min(at, _b.questions.length));
+    var added = _blank(kind);
+    _settle();
+    var tops = _tops();
+    _push(kind === 'section' ? 'Added a heading' : 'Added a question');
+    _b.questions.splice(at, 0, added);
+    _b.active = at;
+    _b.menu = -1;
+    _hideIns();
+    _rerender();
+    _glide(tops);
+    _focus('#rb-' + added.k + '-prompt');
+    _say(kind === 'section' ? 'Added a heading.' : 'Added a question.');
+  }
+
+  /* ── Enter (DECISIONS, "Reflect's builder works the way One Report's
+     editor does" 5) ─────────────────────────────────────────────
+     Enter goes to where the next words go, down the card, then makes the
+     next one, as One Report's Enter does: the title to the description to
+     the open card; a question to the first box under it; an option (item,
+     statement, column) with words to the empty one under it or a new one;
+     the last one,
+     empty, goes and a question is added below; a card with nothing more
+     to fill adds a question below. Only an Enter does any of it. */
+
+  var LISTS = {
+    choice: [{ list: 'choices', min: 2, max: 'choices' }],
+    ranking: [{ list: 'choices', min: 2, max: 'items' }],
+    likert: [
+      { list: 'statements', min: 1, max: 'statements' },
+      { list: 'columns', min: 2, max: 'columns' },
+    ],
+  };
+
+  function _box(d, path) {
+    return '#rb-' + d.k + '-' + String(path).replace('.', '-');
+  }
+
+  /* The first box under the question's own words (and its subtitle). */
+  function _firstBelow(d, fromSubtitle) {
+    if (!fromSubtitle && d.subtitle !== null) return _box(d, 'subtitle');
+    if (LISTS[d.kind]) return _box(d, LISTS[d.kind][0].list + '.0');
+    if (d.kind === 'rating') return _box(d, 'low');
+    return null;
+  }
+
+  /* After card i: the next question under a heading, or a new question. */
+  function _onward(i) {
+    var d = _b.questions[i];
+    var next = _b.questions[i + 1];
+    if (d.kind === 'section' && next && next.kind !== 'section') {
+      _b.active = i + 1;
+      _rerender();
+      _focus(_box(next, 'prompt'));
+      return;
+    }
+    _addAt(i + 1, d.kind === 'section' ? kindAbove(_b.questions, i + 1) : d.kind);
+  }
+
+  function _onEnter(t) {
+    var path = t.dataset.rbPath;
+    _sync();
+    _settle();
+    if (path === 'title') return _focus('#rb-desc');
+    if (path === 'description') {
+      if (!_b.questions.length) return;
+      if (_b.active < 0) {
+        _b.active = 0;
+        _rerender();
+      }
+      return _focus(_box(_b.questions[_b.active], 'prompt'));
+    }
+    var i = Number(t.dataset.i);
+    var d = _b.questions[i];
+    if (!d) return;
+    if (path === 'prompt' || path === 'subtitle') {
+      var below = _firstBelow(d, path === 'subtitle');
+      return below ? _focus(below) : _onward(i);
+    }
+    if (path === 'low') return _focus(_box(d, 'high'));
+    if (path === 'high') return _onward(i);
+    var parts = String(path).split('.');
+    var spec = (LISTS[d.kind] || []).filter(function (x) {
+      return x.list === parts[0];
+    })[0];
+    if (!spec || !Array.isArray(d[spec.list])) return;
+    var list = d[spec.list];
+    var j = Number(parts[1]);
+    var last = j === list.length - 1;
+    if (_clean(list[j])) {
+      if (!last && !_clean(list[j + 1])) return _focus(_box(d, spec.list + '.' + (j + 1)));
+      if (list.length >= MAX[spec.max]) return last ? undefined : _focus(_box(d, spec.list + '.' + (j + 1)));
+      list.splice(j + 1, 0, '');
+      _rerender();
+      return _focus(_box(d, spec.list + '.' + (j + 1)));
+    }
+    if (!last) return _focus(_box(d, spec.list + '.' + (j + 1)));
+    // The last one, empty: it goes (while the list keeps its least), then onward.
+    if (list.length > spec.min) list.splice(j, 1);
+    // A Likert's statements lead on to its columns.
+    if (spec.list === 'statements') {
+      _rerender();
+      return _focus(_box(d, 'columns.0'));
+    }
+    _onward(i);
+  }
+
   /* ⌘Z (Ctrl+Z) on the builder, outside a text box (where it undoes typing). */
   function _isUndoKey(e) {
     if (!_b || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'z') return false;
@@ -833,6 +942,25 @@ var CmReflectBuilder = (function () {
   function _onKey(e) {
     if (_isUndoKey(e)) {
       if (_undo(null)) e.preventDefault();
+      return;
+    }
+    if (
+      _b &&
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.isComposing &&
+      e.target &&
+      e.target.tagName === 'INPUT' &&
+      e.target.type === 'text' &&
+      e.target.closest &&
+      e.target.closest('.rb-build[data-rb-open]') &&
+      e.target.dataset.rbPath != null
+    ) {
+      e.preventDefault();
+      _onEnter(e.target);
       return;
     }
     if (!_b || !e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
@@ -1114,16 +1242,8 @@ var CmReflectBuilder = (function () {
         return true;
       }
       case 'sqBAddAt': {
-        var at = Math.max(0, Math.min(Number(el.dataset.at), _b.questions.length));
-        var added = _blank(el.dataset.kind === 'section' ? 'section' : kindAbove(_b.questions, at));
-        var tops = _tops();
-        _push(added.kind === 'section' ? 'Added a heading' : 'Added a question');
-        _b.questions.splice(at, 0, added);
-        _b.active = at;
-        _hideIns();
-        _rerender();
-        _glide(tops);
-        _focus('#rb-' + added.k + '-prompt');
+        var at = Number(el.dataset.at);
+        _addAt(at, el.dataset.kind === 'section' ? 'section' : kindAbove(_b.questions, at));
         return true;
       }
       case 'sqBCopy': {
