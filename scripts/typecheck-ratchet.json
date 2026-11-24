@@ -4,6 +4,7 @@
     "teacher/report-one-copy.js",
     "teacher/report-one-undo.js",
     "shared/rubric-scale.js",
+    "teacher-mobile/crit-own.js",
     "teacher-mobile/tab-bar.js",
     "teacher-mobile/pin-page.js",
     "teacher-mobile/bulletins-model.js",

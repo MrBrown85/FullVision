@@ -334,6 +334,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/split-scan-model.js',
   '/teacher-mobile/split-scan.js',
   '/teacher-mobile/markup.js',
+  '/teacher-mobile/crit-own.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/bulletins-model.js',
   '/teacher-mobile/tab-bulletins.js',

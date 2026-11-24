@@ -1882,6 +1882,9 @@ window.MGrade = (function () {
       card.querySelectorAll('.m-crit-comment').forEach(function (el) {
         _saveCritComment(cid, el);
       });
+      card.querySelectorAll('.m-crit-own-input').forEach(function (el) {
+        MCritOwn.save(cid, el);
+      });
       card.querySelectorAll('.m-overall-comment').forEach(function (el) {
         _saveOverallComment(cid, el);
       });
@@ -2580,6 +2583,7 @@ window.MGrade = (function () {
         (six ? '' : _critFineTuneHtml(st, assessment, crit, state)) +
         (open ? _checklistHtml(cid, st.id, assessment.id, crit, state) : '') +
         _critCommentHtml(cid, st.id, assessment.id, crit) +
+        MCritOwn.html(cid, st.id, assessment, crit) +
         '</div>'
       );
     }
@@ -2613,7 +2617,7 @@ window.MGrade = (function () {
        comment, which then reads as a note under the levels. */
     // html-safe: the name goes through MC.esc; sid, aid and critId are ids; the rest is fixed markup.
     function _critCommentBtnHtml(cid, sid, aid, crit, labelled) {
-      var has = !!getRubricCriterionComment(cid, sid, aid, crit);
+      var has = !!getRubricCriterionComment(cid, sid, aid, crit) || MCritOwn.lines(cid, sid, aid, crit).length > 0;
       var name = crit.name || 'criterion';
       return (
         '<button type="button" class="m-crit-comment-btn' +
@@ -2639,12 +2643,19 @@ window.MGrade = (function () {
       var box = group && group.querySelector('.m-crit-comment');
       if (!box) return;
       box.hidden = false;
+      var own = group.querySelector('.m-crit-own-wrap');
+      if (own) own.hidden = false;
       box.focus();
     }
 
-    // Left empty: back behind its button.
+    // Left empty: back behind its button. On a group's card it stays while
+    // the names under it show: hiding it would move them as one is tapped,
+    // and the tap would land on what moved into its place.
     function _closeEmptyCritComment(el) {
       if (el.value.trim()) return;
+      var group = el.closest && el.closest('.m-crit-group');
+      var own = group && group.querySelector('.m-crit-own-wrap');
+      if (own && !own.hidden) return;
       el.hidden = true;
     }
 
@@ -2655,7 +2666,7 @@ window.MGrade = (function () {
 
     function _fitCritComments(root) {
       if (!root || !root.querySelectorAll) return;
-      root.querySelectorAll('.m-crit-comment').forEach(function (el) {
+      root.querySelectorAll('.m-crit-comment, .m-crit-own-input').forEach(function (el) {
         if (el.value) _fitCritComment(el);
       });
     }
@@ -3274,12 +3285,17 @@ window.MGrade = (function () {
           _saveCritComment(cid, e.target);
           return _closeEmptyCritComment(e.target);
         }
+        if (e.target.classList.contains('m-crit-own-input')) {
+          MCritOwn.save(cid, e.target);
+          return MCritOwn.closeEmpty(e.target);
+        }
         if (!e.target.classList.contains('m-pts-input')) return;
         selectOnUp = null;
         commitPointsInput(cid, e.target);
       });
       // The Overall Comment saves as the teacher types and when they leave it.
       swiper.addEventListener('input', function (e) {
+        if (e.target.classList.contains('m-crit-own-input')) return MCritOwn.input(cid, e.target);
         if (e.target.classList.contains('m-crit-comment')) {
           var box = e.target;
           _fitCritComment(box);
@@ -3351,6 +3367,14 @@ window.MGrade = (function () {
     }
 
     var _commentTimers = {};
+    // The Line for One Student (teacher-mobile/crit-own.js) borrows these.
+    MCritOwn.configure({
+      findCriterion: _findCriterion,
+      assessmentById: _assessmentById,
+      syncReturnBar: _syncReturnBar,
+      fit: _fitCritComment,
+      timers: _commentTimers,
+    });
     function _saveOverallComment(cid, el) {
       var key = el.dataset.sid + ':' + el.dataset.aid;
       clearTimeout(_commentTimers[key]);
@@ -3618,6 +3642,7 @@ window.MGrade = (function () {
       setGradeView: setGradeView,
       toggleChecklist: toggleChecklist,
       openCritComment: openCritComment,
+      openCritOwn: MCritOwn.open,
       tickCheck: tickCheck,
       setStatus: setStatus,
       adjustPointsScore: adjustPointsScore,
@@ -3687,6 +3712,7 @@ window.MGrade = (function () {
     setGradeView: Speed.setGradeView,
     toggleChecklist: Speed.toggleChecklist,
     openCritComment: Speed.openCritComment,
+    openCritOwn: Speed.openCritOwn,
     tickCheck: Speed.tickCheck,
     setStatus: Speed.setStatus,
     adjustPointsScore: Speed.adjustPointsScore,
